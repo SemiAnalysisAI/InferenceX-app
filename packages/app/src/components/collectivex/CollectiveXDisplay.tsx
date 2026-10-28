@@ -27,7 +27,6 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import { CollectiveXChart } from './CollectiveXChart';
 import { CollectiveXSwapSection } from './CollectiveXSwapSection';
 import { CollectiveXKvSection } from './CollectiveXKvSection';
-import { CollectiveXRunsTable } from './CollectiveXRunsTable';
 import { CollectiveXSupportMatrices } from './CollectiveXSupportMatrices';
 import {
   collectiveXColorKey,
@@ -58,7 +57,7 @@ interface SelectOption<T extends string | number> {
   label: string;
 }
 
-type CollectiveXSuiteFilter = 'all' | 'ep' | 'kv' | 'swap';
+type CollectiveXSuite = 'ep' | 'kv' | 'swap';
 
 const PERCENTILE_OPTIONS: SegmentedToggleOption<CollectiveXPercentile>[] = [
   { value: 'p50', label: 'p50' },
@@ -105,15 +104,9 @@ const STRINGS = {
     terminalCases: 'Terminal cases',
     publishedUtc: 'Published (UTC)',
     version: 'Benchmark version',
-    runsHeading: 'Runs',
-    runsDescription:
-      'Every stored run for the selected benchmark version. Check one or more runs to compare them in the explorer.',
-    runsShown: 'Runs shown',
     suiteControl: 'Suites',
-    suiteAria: 'Filter CollectiveX runs by suite',
-    allSuites: 'All',
-    noSuiteRuns: 'No runs contain the selected suite.',
-    selectRuns: 'Select one or more runs from the table to show their data.',
+    suiteAria: 'Choose which CollectiveX suite to show',
+    selectRuns: 'No CollectiveX results are stored yet.',
     selectedRunsFailed: 'One or more selected runs failed to load.',
     runControl: 'Run',
     loadRuns: 'Load runs',
@@ -182,14 +175,9 @@ const STRINGS = {
     terminalCases: '终态用例',
     publishedUtc: '发布时间（UTC）',
     version: '基准版本',
-    runsHeading: '运行记录',
-    runsDescription: '该基准测试版本下保存的全部运行记录。勾选一条或多条记录，即可在图表中对比。',
-    runsShown: '已显示运行',
     suiteControl: '测试套件',
-    suiteAria: '按测试套件筛选 CollectiveX 运行',
-    allSuites: '全部',
-    noSuiteRuns: '没有包含所选测试套件的运行。',
-    selectRuns: '请从表格中选择至少一个运行以显示数据。',
+    suiteAria: '选择要显示的 CollectiveX 测试套件',
+    selectRuns: '尚未保存任何 CollectiveX 结果。',
     selectedRunsFailed: '至少一个所选运行加载失败。',
     runControl: '运行',
     loadRuns: '加载运行',
@@ -253,24 +241,11 @@ export default function CollectiveXDisplay() {
   const locale = useLocale();
   const t = STRINGS[locale];
   const [version, setVersion] = useState<CollectiveXVersion>(COLLECTIVEX_DEFAULT_VERSION);
-  const [suiteFilter, setSuiteFilter] = useState<CollectiveXSuiteFilter>('all');
+  const [suite, setSuite] = useState<CollectiveXSuite>('ep');
   const [visibleRunIds, setVisibleRunIds] = useState<Set<string>>(new Set());
   const initializedVersionRef = useRef<CollectiveXVersion | null>(null);
   const runsQuery = useCollectiveXRuns(version);
   const runList = runsQuery.data?.runs ?? [];
-  const filteredRunList = useMemo(
-    () =>
-      runList.filter((run) => {
-        if (suiteFilter === 'all') return true;
-        const kvRequested = run.kv_cases?.requested ?? 0;
-        const swapRequested = run.swap_cases?.requested ?? 0;
-        if (suiteFilter === 'swap') return swapRequested > 0;
-        return suiteFilter === 'kv'
-          ? kvRequested > 0
-          : run.requested_cases - kvRequested - swapRequested > 0;
-      }),
-    [runList, suiteFilter],
-  );
   const orderedVisibleRunIds = useMemo(() => {
     const liveRunIds = new Set(runList.map((run) => run.run_id));
     return [...visibleRunIds].filter((runId) => liveRunIds.has(runId));
@@ -515,16 +490,6 @@ export default function CollectiveXDisplay() {
     void runsQuery.refetch();
     for (const query of runQueries) void query.refetch();
   }, [runQueries, runsQuery]);
-  const handleVisibleRunChange = useCallback((runIds: string[], visible: boolean) => {
-    setVisibleRunIds((previous) => {
-      const next = new Set(previous);
-      for (const runId of runIds) {
-        if (visible) next.add(runId);
-        else next.delete(runId);
-      }
-      return next;
-    });
-  }, []);
 
   if (runsQuery.isLoading) {
     return (
@@ -580,9 +545,17 @@ export default function CollectiveXDisplay() {
       ),
     0,
   );
-  const sourceShaByRunId = new Map(
-    datasets.map((dataset) => [dataset.run.run_id, dataset.run.source_sha]),
-  );
+  // EP is always offered; KV and swap_blocks only when the shown run carries them.
+  const suiteOptions: SegmentedToggleOption<CollectiveXSuite>[] = [
+    { value: 'ep', label: 'EP' },
+    ...(datasets.some((dataset) => dataset.kv?.length)
+      ? [{ value: 'kv' as const, label: 'KV' }]
+      : []),
+    ...(datasets.some((dataset) => dataset.swap_blocks?.length)
+      ? [{ value: 'swap' as const, label: 'swap_blocks' }]
+      : []),
+  ];
+  const shownSuite = suiteOptions.some((option) => option.value === suite) ? suite : 'ep';
 
   return (
     <section data-testid="collectivex-display" className="flex flex-col gap-4">
@@ -594,7 +567,21 @@ export default function CollectiveXDisplay() {
             </Heading>
             <p className="mt-1 text-sm text-muted-foreground">{t.description}</p>
           </div>
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <div className="flex shrink-0 flex-wrap items-end gap-2">
+            {datasets.length > 0 && (
+              <ControlGroup label={t.suiteControl}>
+                <SegmentedToggle
+                  value={shownSuite}
+                  options={suiteOptions}
+                  onValueChange={(next) => {
+                    setSuite(next);
+                    track('collectivex_suite_changed', { suite: next });
+                  }}
+                  ariaLabel={t.suiteAria}
+                  testId="collectivex-suite-filter"
+                />
+              </ControlGroup>
+            )}
             {singleDataset && (
               <>
                 <a
@@ -613,7 +600,7 @@ export default function CollectiveXDisplay() {
                 </a>
                 <a
                   data-testid="collectivex-methodology-link"
-                  href={`https://github.com/${sourceRepository}/blob/${singleDataset.run.source_sha}/collectivex/docs/${singleDataset.swap_blocks?.length ? 'swap-blocks' : 'methodology'}.md`}
+                  href={`https://github.com/${sourceRepository}/blob/${singleDataset.run.source_sha}/collectivex/docs/${shownSuite === 'swap' ? 'swap-blocks' : 'methodology'}.md`}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() =>
@@ -638,62 +625,12 @@ export default function CollectiveXDisplay() {
           </div>
         </div>
         {datasets.length > 0 && (
-          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
             <Stat value={seriesCount} label={t.seriesCount} />
             <Stat value={`${measuredCases}/${requestedCases}`} label={t.measuredCases} />
             <Stat value={`${terminalCases}/${requestedCases}`} label={t.terminalCases} />
-            <Stat value={datasets.length} label={t.runsShown} />
           </div>
         )}
-      </Card>
-
-      <Card data-testid="collectivex-runs">
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
-            <Heading level="card">{t.runsHeading}</Heading>
-            <p className="mt-1 text-sm text-muted-foreground">{t.runsDescription}</p>
-          </div>
-          <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-end md:w-auto">
-            <ControlGroup label={t.suiteControl}>
-              <SegmentedToggle
-                value={suiteFilter}
-                options={[
-                  { value: 'all', label: t.allSuites },
-                  { value: 'ep', label: 'EP' },
-                  { value: 'kv', label: 'KV' },
-                  { value: 'swap', label: 'swap_blocks' },
-                ]}
-                onValueChange={(suite) => {
-                  setSuiteFilter(suite);
-                  track('collectivex_suite_filter_changed', { suite });
-                }}
-                ariaLabel={t.suiteAria}
-                testId="collectivex-suite-filter"
-              />
-            </ControlGroup>
-            <div className="w-full sm:w-44">
-              <SelectControl
-                label={t.version}
-                testId="collectivex-version-select"
-                value={version}
-                options={versionOptions}
-                onChange={(value) => {
-                  setVersion(value);
-                  track('collectivex_version_changed', { version: value });
-                }}
-              />
-            </div>
-          </div>
-        </div>
-        <CollectiveXRunsTable
-          runs={filteredRunList}
-          selectedRunIndexById={selectedRunIndexById}
-          visibleRunIds={visibleRunIds}
-          loadingRunIds={loadingRunIds}
-          sourceShaByRunId={sourceShaByRunId}
-          onVisibleChange={handleVisibleRunChange}
-          emptyMessage={suiteFilter === 'all' ? undefined : t.noSuiteRuns}
-        />
       </Card>
 
       {visibleRunIds.size === 0 && (
@@ -718,9 +655,13 @@ export default function CollectiveXDisplay() {
 
       {datasets.length > 0 && (
         <>
-          <CollectiveXSwapSection datasets={datasets} runIndexById={selectedRunIndexById} />
-          <CollectiveXKvSection datasets={datasets} runIndexById={selectedRunIndexById} />
-          {(combinedSeries.length > 0 || !datasets.some((d) => d.swap_blocks?.length)) && (
+          {shownSuite === 'swap' && (
+            <CollectiveXSwapSection datasets={datasets} runIndexById={selectedRunIndexById} />
+          )}
+          {shownSuite === 'kv' && (
+            <CollectiveXKvSection datasets={datasets} runIndexById={selectedRunIndexById} />
+          )}
+          {shownSuite === 'ep' && (
             <>
               {phaseSeries.length === 0 && (
                 <Card data-testid="collectivex-empty-state" className="py-4">
