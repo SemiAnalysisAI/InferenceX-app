@@ -163,8 +163,8 @@ describe('First-load navigation', () => {
 
   it('leads the landing page with the AgentX hero and its two CTAs', () => {
     cy.get('[data-testid="compare-agentx-primary"]').within(() => {
-      cy.get('h2').should('have.text', 'Compare Realistic Agentic Inference Perf');
-      cy.get('h1').should('not.exist');
+      cy.get('h1').should('have.text', 'Compare Realistic Agentic Inference Perf');
+      cy.get('h2').should('not.exist');
       cy.get('[data-testid="compare-agentx-revenue-calculator-link"]')
         .should('contain.text', 'Token Revenue Calculator')
         .and('have.attr', 'href', '/profit-estimator-per-gigawatt');

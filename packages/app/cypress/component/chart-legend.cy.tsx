@@ -101,15 +101,19 @@ describe('ChartLegend blocked items', () => {
         onExpandedChange={() => {}}
       />,
     );
+    cy.get('#checkbox-h200-sxm')
+      .should('have.attr', 'aria-disabled', 'true')
+      .invoke('attr', 'aria-describedby')
+      .then((descriptionId) => {
+        cy.get(`#${descriptionId}`).should('have.text', reason);
+      });
     cy.contains('label', 'NVIDIA H200 SXM')
       .should('have.attr', 'title', reason)
-      .and('have.attr', 'aria-disabled', 'true')
       .and('have.class', 'cursor-not-allowed')
       .click();
     cy.get('@hardwareChange').should('have.been.calledWith', 'h200-sxm');
-    cy.contains('label', 'NVIDIA H100 SXM')
-      .should('not.have.attr', 'aria-disabled')
-      .and('have.class', 'cursor-pointer');
+    cy.get('#checkbox-h100-sxm').should('not.have.attr', 'aria-disabled');
+    cy.contains('label', 'NVIDIA H100 SXM').should('have.class', 'cursor-pointer');
   });
 
   it('ignores the blocked reason once the item is active', () => {
@@ -121,9 +125,9 @@ describe('ChartLegend blocked items', () => {
         onExpandedChange={() => {}}
       />,
     );
-    cy.contains('label', 'NVIDIA H200 SXM')
-      .should('not.have.attr', 'aria-disabled')
-      .and('not.have.attr', 'title', reason);
+    cy.get('#checkbox-h200-sxm').should('not.have.attr', 'aria-disabled');
+    cy.get('#checkbox-h200-sxm').should('not.have.attr', 'aria-describedby');
+    cy.contains('label', 'NVIDIA H200 SXM').should('not.have.attr', 'title', reason);
   });
 });
 

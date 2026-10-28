@@ -1550,11 +1550,21 @@ export function InferenceProvider({
     autoSelectAllGpus,
   ]);
 
-  const serializedLabelState = serializeLabelState(labelScenarioKind, {
-    showPointLabels,
-    useAdvancedLabels,
-    showLineLabels,
-  });
+  // Label defaults depend on the scenario kind, so until the sequence resolves the URL's label
+  // overrides pass through unchanged. Serializing against the provisional kind would drop an
+  // override that matches its defaults (e.g. `i_label=0` while the kind still reads fixed-seq)
+  // before the effect above applies it to the resolved agentic scenario.
+  const serializedLabelState = sequenceResolved
+    ? serializeLabelState(labelScenarioKind, {
+        showPointLabels,
+        useAdvancedLabels,
+        showLineLabels,
+      })
+    : {
+        i_label: getUrlParam('i_label') ?? '',
+        i_advlabel: getUrlParam('i_advlabel') ?? '',
+        i_linelabel: getUrlParam('i_linelabel') ?? '',
+      };
 
   useUrlStateSync(
     {

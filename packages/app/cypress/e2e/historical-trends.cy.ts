@@ -378,6 +378,9 @@ describe('Historical Trends — Chinese route', () => {
   });
 
   it('shows a distinct secondary-history error and recovers through the tracked retry', () => {
+    // The display is visible before its history request starts, so let the beforeEach page
+    // finish that request; otherwise it consumes the first failure the stub below counts.
+    cy.get('[data-testid="trend-chart-svg"] .dot-group').should('exist');
     cy.fixture('api/benchmarks-history.json').then((historyRows) => {
       let attempts = 0;
       cy.intercept('GET', '**/api/v1/benchmarks/history?*', (request) => {

@@ -13,8 +13,11 @@ vi.mock('next/dist/server/app-render/work-async-storage.external', () => ({
   workAsyncStorage: { getStore: () => workStore.current },
 }));
 
+const fixtures = vi.hoisted(() => ({ mode: false }));
 vi.mock('@semianalysisai/inferencex-db/connection', () => ({
-  FIXTURES_MODE: false,
+  get FIXTURES_MODE() {
+    return fixtures.mode;
+  },
 }));
 
 vi.mock('./blob-cache', () => ({
@@ -400,6 +403,16 @@ describe('cachedJson', () => {
       { tag: 'collectivex', cacheControl: 'public, max-age=0, s-maxage=60' },
     );
     expect(res.headers.get('Cache-Control')).toBe('public, max-age=0, s-maxage=60');
+  });
+
+  it('keeps fixture responses out of the browser cache so E2E intercepts see every request', () => {
+    fixtures.mode = true;
+    try {
+      const res = cachedJson(apiRequest(), { ok: true }, { cacheControl: 'public, max-age=5' });
+      expect(res.headers.get('Cache-Control')).toBe('no-store');
+    } finally {
+      fixtures.mode = false;
+    }
   });
 
   it('sets an environment-scoped Vercel-Cache-Tag', () => {

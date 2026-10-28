@@ -3,6 +3,7 @@ import { constants as zlibConstants, createBrotliCompress, createGzip } from 'no
 
 import { revalidateTag, unstable_cache } from 'next/cache';
 import { workAsyncStorage } from 'next/dist/server/app-render/work-async-storage.external';
+import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
 import { blobGet, blobPurge, blobSet } from './blob-cache';
 
 /**
@@ -273,6 +274,13 @@ export function purgeCollectiveX({ immediate = false }: { immediate?: boolean } 
 const DEFAULT_CACHE_CONTROL = 'public, max-age=60, s-maxage=86400, stale-while-revalidate=86400';
 
 /**
+ * Fixture builds back the E2E suite, which stubs API responses per test with
+ * `cy.intercept`. An intercept never sees a response the browser serves from
+ * its HTTP cache (or revalidates to a 304), so fixture responses are not stored.
+ */
+const FIXTURES_CACHE_CONTROL = 'no-store';
+
+/**
  * Response cache headers. `tag` defaults to the environment-scoped dashboard
  * CDN tag; CollectiveX and OperatorX routes pass their own scope (CollectiveX
  * also passes a shorter cacheControl).
@@ -282,7 +290,9 @@ export function cdnHeaders(
   cacheControl?: string,
 ): Record<string, string> {
   return {
-    'Cache-Control': cacheControl ?? DEFAULT_CACHE_CONTROL,
+    'Cache-Control': FIXTURES_MODE
+      ? FIXTURES_CACHE_CONTROL
+      : (cacheControl ?? DEFAULT_CACHE_CONTROL),
     'Vercel-Cache-Tag': tag,
     'X-Content-Type-Options': 'nosniff',
   };

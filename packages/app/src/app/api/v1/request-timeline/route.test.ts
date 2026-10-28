@@ -7,7 +7,10 @@ vi.mock('@/lib/cache/blob-cache', () => ({
   blobGet: vi.fn(() => Promise.resolve(null)),
   blobSet: vi.fn(),
 }));
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({ getDb: () => ({}) }));
+vi.mock('@semianalysisai/inferencex-db/connection', () => ({
+  getDb: () => ({}),
+  FIXTURES_MODE: false,
+}));
 vi.mock('@semianalysisai/inferencex-db/queries/request-timeline', () => ({
   getStoredRequestTimelineGz: vi.fn(),
   getRequestTimeline: vi.fn(),
