@@ -7,6 +7,7 @@ import { type Ladder, type StaggerLabel, staggerLabels } from '@/lib/powerx/ladd
 import { cn } from '@/lib/shared/utils';
 import { SYSTEM_POWER_CATEGORY_LABELS } from '@/lib/power/system-power-model';
 
+import { stepProgress, useBuildClock, useEasedValues } from './motion';
 import { CATEGORY_TITLES } from './strings';
 import { formatWatts, GrammarSwatch } from './widget-chrome';
 
@@ -47,20 +48,100 @@ const ROW = 15;
 const CHAR = 6.6;
 const RATED = 'var(--muted-foreground)';
 
+interface LadderNumbers {
+  gpu: number;
+  it: number;
+  facility: number;
+  tdp: number;
+  allIn: number;
+  scaleMax: number;
+}
+
+type LadderLabel = StaggerLabel & { text: string; title: string };
+
+function ladderLabels(
+  t: (typeof STRINGS)[Locale],
+  gpuTitle: string,
+  width: number,
+  numbers: LadderNumbers,
+  pue: number,
+  gpuInline: boolean,
+) {
+  const px = (width - 2 * PAD) / numbers.scaleMax;
+  const xOf = (watts: number) => PAD + watts * px;
+  const gpuText = t.gpu(formatWatts(numbers.gpu));
+  const top: LadderLabel[] = [
+    {
+      key: 'it',
+      x: xOf(numbers.it) - 3,
+      anchor: 'end',
+      text: t.it(formatWatts(numbers.it)),
+      title: t.itTitle,
+      width: 0,
+    },
+  ];
+  if (!gpuInline) {
+    top.push({ key: 'gpu', x: PAD, anchor: 'start', text: gpuText, title: gpuTitle, width: 0 });
+  }
+  const bottom: LadderLabel[] = [
+    {
+      key: 'tdp',
+      x: xOf(numbers.tdp),
+      anchor: 'middle',
+      text: t.tdp(formatWatts(numbers.tdp)),
+      title: t.tdpTitle,
+      width: 0,
+    },
+    {
+      key: 'allIn',
+      x: xOf(numbers.allIn),
+      anchor: 'middle',
+      text: t.allIn(formatWatts(numbers.allIn)),
+      title: t.allInTitle,
+      width: 0,
+    },
+    {
+      key: 'facility',
+      x: xOf(numbers.facility),
+      anchor: 'end',
+      text: t.facility(pue, formatWatts(numbers.facility)),
+      title: t.facilityTitle,
+      width: 0,
+    },
+  ];
+  for (const label of [...top, ...bottom]) {
+    label.width = label.text.length * CHAR;
+    // Keep middle-anchored labels inside the frame.
+    if (label.anchor === 'middle') {
+      label.x = Math.min(Math.max(label.x, label.width / 2 + PAD), width - label.width / 2 - PAD);
+    }
+  }
+  return { top, bottom, gpuText, px, xOf };
+}
+
 export interface PowerLadderProps {
   ladder: Ladder;
   color: string;
   locale: Locale;
   /** Without the parts list and with a shorter bar, for the worked example. */
   compact?: boolean;
+  /** Build the ladder up in reading order the first time it scrolls into view. */
+  build?: boolean;
   className?: string;
 }
+
+/**
+ * The build reads the ladder in order: the measured GPU bar grows, the modeled parts fill in left
+ * to right, then the PUE extension draws and the rated ticks fade in.
+ */
+const BUILD = { gpuMs: 700, stepMs: 60, partMs: 320, extensionMs: 400, ticksMs: 300 } as const;
 
 export function PowerLadder({
   ladder,
   color,
   locale,
   compact = false,
+  build = false,
   className,
 }: PowerLadderProps) {
   const t = STRINGS[locale];
@@ -68,89 +149,98 @@ export function PowerLadder({
   const titles = CATEGORY_TITLES[locale];
   const { setContainerRef, dimensions } = useResponsiveChartDimensions({ height: 1 });
   const width = Math.max(dimensions.width, 240);
-  const maxWatts = Math.max(ladder.facilityWatts, ladder.allInWatts) * 1.03;
-  const px = (width - 2 * PAD) / maxWatts;
-  const xOf = (watts: number) => PAD + watts * px;
+  const targets: Record<string, number> = {
+    scaleMax: Math.max(ladder.facilityWatts, ladder.allInWatts) * 1.03,
+    facility: ladder.facilityWatts,
+    tdp: ladder.tdpWatts,
+    allIn: ladder.allInWatts,
+  };
+  for (const segment of ladder.segments) targets[`seg:${segment.category}`] = segment.watts;
+  const shown = useEasedValues(targets);
+  const extensionStart =
+    BUILD.gpuMs + Math.max(0, ladder.segments.length - 2) * BUILD.stepMs + BUILD.partMs;
+  const ticksStart = extensionStart + BUILD.extensionMs - 100;
+  const [buildRef, elapsed] = useBuildClock<SVGSVGElement>(build, ticksStart + BUILD.ticksMs);
+  const grown = ladder.segments.map(
+    (segment, index) =>
+      (shown[`seg:${segment.category}`] ?? 0) *
+      (index === 0
+        ? stepProgress(elapsed, 0, BUILD.gpuMs)
+        : stepProgress(elapsed, BUILD.gpuMs + (index - 1) * BUILD.stepMs, BUILD.partMs)),
+  );
+  const itShown = grown.reduce((sum, watts) => sum + watts, 0);
+  const extension = stepProgress(elapsed, extensionStart, BUILD.extensionMs);
+  const ticks = stepProgress(elapsed, ticksStart, BUILD.ticksMs);
+  const gpuLabel = stepProgress(elapsed, BUILD.gpuMs * 0.45, 300);
+  const facilityShown = itShown + extension * (shown.facility - itShown);
+  const labelOpacity: Record<string, number> = {
+    it: 1,
+    gpu: gpuLabel,
+    tdp: ticks,
+    allIn: ticks,
+    facility: extension,
+  };
 
   const barH = compact ? 26 : 34;
-  const itX = xOf(ladder.itWatts);
-  const facilityX = xOf(ladder.facilityWatts);
-  const gpuWidth = ladder.gpuWatts * px;
-  const gpuText = t.gpu(formatWatts(ladder.gpuWatts));
-  const gpuInline = gpuWidth >= gpuText.length * CHAR + 24;
-
-  const topLabels: (StaggerLabel & { text: string; title: string })[] = [
+  // Rows and the GPU label's placement come from the final numbers so labels never hop mid-ease.
+  const finalPx = (width - 2 * PAD) / targets.scaleMax;
+  const gpuInline =
+    ladder.gpuWatts * finalPx >= t.gpu(formatWatts(ladder.gpuWatts)).length * CHAR + 24;
+  const final = ladderLabels(
+    t,
+    titles.gpu,
+    width,
     {
-      key: 'it',
-      x: itX - 3,
-      anchor: 'end',
-      text: t.it(formatWatts(ladder.itWatts)),
-      title: t.itTitle,
-      width: 0,
+      gpu: ladder.gpuWatts,
+      it: ladder.itWatts,
+      facility: ladder.facilityWatts,
+      tdp: ladder.tdpWatts,
+      allIn: ladder.allInWatts,
+      scaleMax: targets.scaleMax,
     },
-  ];
-  if (!gpuInline) {
-    topLabels.push({
-      key: 'gpu',
-      x: PAD,
-      anchor: 'start',
-      text: gpuText,
-      title: titles.gpu,
-      width: 0,
-    });
-  }
-  const bottomLabels: (StaggerLabel & { text: string; title: string })[] = [
-    {
-      key: 'tdp',
-      x: xOf(ladder.tdpWatts),
-      anchor: 'middle',
-      text: t.tdp(formatWatts(ladder.tdpWatts)),
-      title: t.tdpTitle,
-      width: 0,
-    },
-    {
-      key: 'allIn',
-      x: xOf(ladder.allInWatts),
-      anchor: 'middle',
-      text: t.allIn(formatWatts(ladder.allInWatts)),
-      title: t.allInTitle,
-      width: 0,
-    },
-    {
-      key: 'facility',
-      x: facilityX,
-      anchor: 'end',
-      text: t.facility(ladder.pue, formatWatts(ladder.facilityWatts)),
-      title: t.facilityTitle,
-      width: 0,
-    },
-  ];
-  for (const label of [...topLabels, ...bottomLabels]) {
-    label.width = label.text.length * CHAR;
-    // Keep middle-anchored labels inside the frame.
-    if (label.anchor === 'middle') {
-      label.x = Math.min(Math.max(label.x, label.width / 2 + PAD), width - label.width / 2 - PAD);
-    }
-  }
-  const topRows = staggerLabels(topLabels);
-  const bottomRows = staggerLabels(bottomLabels);
+    ladder.pue,
+    gpuInline,
+  );
+  const topRows = staggerLabels(final.top);
+  const bottomRows = staggerLabels(final.bottom);
   const topRowCount = Math.max(0, ...topRows.values()) + 1;
   const bottomRowCount = Math.max(0, ...bottomRows.values()) + 1;
   const barY = topRowCount * ROW + 4;
   const tickY = barY + barH;
   const height = tickY + 10 + bottomRowCount * ROW + 2;
 
+  const live = ladderLabels(
+    t,
+    titles.gpu,
+    width,
+    {
+      gpu: grown[0] ?? 0,
+      it: itShown,
+      facility: facilityShown,
+      tdp: shown.tdp,
+      allIn: shown.allIn,
+      scaleMax: shown.scaleMax,
+    },
+    ladder.pue,
+    gpuInline,
+  );
+  const { px, xOf } = live;
+  const itX = xOf(itShown);
+  const facilityX = xOf(facilityShown);
+
   let cursor = 0;
-  const segments = ladder.segments.map((segment) => {
+  const segments = ladder.segments.map((segment, index) => {
+    const watts = grown[index];
     const x0 = xOf(cursor);
-    cursor += segment.watts;
-    const w = Math.max(0, segment.watts * px - GAP);
-    return { ...segment, x0, w, share: (segment.watts / ladder.itWatts) * 100 };
+    cursor += watts;
+    const w = Math.max(0, watts * px - GAP);
+    return { ...segment, watts, x0, w, share: (segment.watts / ladder.itWatts) * 100 };
   });
 
   return (
     <div ref={setContainerRef} className={cn('min-w-0', className)}>
       <svg
+        ref={buildRef}
         width={width}
         height={height}
         viewBox={`0 0 ${width} ${height}`}
@@ -164,7 +254,7 @@ export function PowerLadder({
         fontSize={CHART_TYPE.axisLabel}
         fill="var(--muted-foreground)"
       >
-        {topLabels.map((label) => (
+        {live.top.map((label) => (
           <text
             key={label.key}
             x={label.x}
@@ -172,6 +262,8 @@ export function PowerLadder({
             textAnchor={label.anchor}
             fill="var(--foreground)"
             fontWeight={label.key === 'it' ? 600 : 500}
+            opacity={labelOpacity[label.key]}
+            className="tabular-nums"
           >
             <title>{label.title}</title>
             {label.text}
@@ -218,8 +310,10 @@ export function PowerLadder({
             fill="var(--primary-foreground)"
             fontWeight={600}
             pointerEvents="none"
+            opacity={gpuLabel}
+            className="tabular-nums"
           >
-            {gpuText}
+            {live.gpuText}
           </text>
         )}
 
@@ -233,7 +327,7 @@ export function PowerLadder({
           strokeWidth={1.5}
         />
         {(['tdp', 'allIn'] as const).map((key) => {
-          const x = xOf(key === 'tdp' ? ladder.tdpWatts : ladder.allInWatts);
+          const x = xOf(key === 'tdp' ? shown.tdp : shown.allIn);
           return (
             <line
               key={key}
@@ -244,6 +338,7 @@ export function PowerLadder({
               stroke={RATED}
               strokeWidth={1.25}
               strokeDasharray="3 2"
+              opacity={ticks}
             />
           );
         })}
@@ -254,14 +349,17 @@ export function PowerLadder({
           y2={tickY + 8}
           stroke={RATED}
           strokeWidth={1}
+          opacity={extension}
         />
 
-        {bottomLabels.map((label) => (
+        {live.bottom.map((label) => (
           <text
             key={label.key}
             x={label.x}
             y={tickY + 10 + (bottomRows.get(label.key) ?? 0) * ROW + 9}
             textAnchor={label.anchor}
+            opacity={labelOpacity[label.key]}
+            className="tabular-nums"
           >
             <title>{label.title}</title>
             {label.text}

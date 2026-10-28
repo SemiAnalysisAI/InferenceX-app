@@ -15,6 +15,7 @@ import {
 import { cn } from '@/lib/shared/utils';
 import { SYSTEM_POWER_CATEGORY_LABELS } from '@/lib/power/system-power-model';
 
+import { useEasedValues } from './motion';
 import { hardwareStore } from './hardware-store';
 import { CATEGORY_TITLES } from './strings';
 import {
@@ -54,6 +55,8 @@ const STRINGS = {
 const HASH_KEY = 'ld';
 const SPARK_W = 136;
 const SPARK_H = 40;
+/** Slider drags ease faster than chip switches so the readouts keep up with the thumb. */
+const SLIDE_MS = 200;
 
 export function LoadWidget({ locale, alt }: WidgetProps) {
   const t = STRINGS[locale];
@@ -75,6 +78,10 @@ export function LoadWidget({ locale, alt }: WidgetProps) {
   const names = SYSTEM_POWER_CATEGORY_LABELS[locale];
   const titles = CATEGORY_TITLES[locale];
   const fraction = gpuWatts / sweep.tdpWatts;
+  const targets: Record<string, number> = { gpu: gpuWatts, it: ladder?.itWatts ?? 0 };
+  for (const segment of ladder?.segments ?? []) targets[`seg:${segment.category}`] = segment.watts;
+  const shown = useEasedValues(targets, SLIDE_MS);
+  const shownFraction = shown.gpu / sweep.tdpWatts;
 
   return (
     <WidgetFrame name="load" alt={alt}>
@@ -96,7 +103,7 @@ export function LoadWidget({ locale, alt }: WidgetProps) {
           />
         </label>
         <span className="font-mono text-sm tabular-nums text-foreground">
-          {t.readout(formatWatts(gpuWatts), fraction * 100)}
+          {t.readout(formatWatts(shown.gpu), shownFraction * 100)}
         </span>
       </div>
       <p
@@ -104,13 +111,12 @@ export function LoadWidget({ locale, alt }: WidgetProps) {
         title={t.chip(ladderLabel(hardware))}
         data-testid="powerx-load-context"
       >
-        {ladderLabel(hardware)} · {ladder ? t.it(formatWatts(ladder.itWatts)) : ''}
+        {ladderLabel(hardware)} · {ladder ? t.it(formatWatts(shown.it)) : ''}
       </p>
 
       <ul className="mt-5 flex flex-wrap gap-x-7 gap-y-5">
         {sweep.tracks.map((trackRow) => {
-          const current =
-            ladder?.segments.find((segment) => segment.category === trackRow.category)?.watts ?? 0;
+          const current = shown[`seg:${trackRow.category}`] ?? 0;
           const max = Math.max(...trackRow.values, 1);
           const moves = trackMoves(trackRow.values);
           const path = trackRow.values
@@ -120,7 +126,7 @@ export function LoadWidget({ locale, alt }: WidgetProps) {
               return `${index === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
             })
             .join(' ');
-          const cx = fraction * SPARK_W;
+          const cx = shownFraction * SPARK_W;
           const cy = SPARK_H - (current / max) * (SPARK_H - 4) - 2;
           const measured = trackRow.kind === 'measured';
           return (
@@ -146,13 +152,7 @@ export function LoadWidget({ locale, alt }: WidgetProps) {
                   fill={color}
                   fillOpacity={measured ? 0.22 : 0.1}
                 />
-                <path
-                  d={path}
-                  fill="none"
-                  stroke={color}
-                  strokeWidth={measured ? 2 : 1.5}
-                  strokeDasharray={undefined}
-                />
+                <path d={path} fill="none" stroke={color} strokeWidth={measured ? 2 : 1.5} />
                 <line
                   x1={cx}
                   x2={cx}
