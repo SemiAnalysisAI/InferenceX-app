@@ -118,7 +118,12 @@ Locally, the same steps are `bun run admin:db:migrate:collectivex` and
   result file stays in `coverage` with outcome `pending` (requested, not run), counts toward
   `requested_cases` but not `measured_cases`, and adds no series, so the SKU controls list
   only measured pools. A later commit that adds pools is a new run with a later `run_id`,
-  so it becomes the latest run while the earlier one stays listed.
+  so it becomes the latest run while the earlier one stays listed in the API.
+- **One run on the page**: `/collectivex` shows only the newest stored run with at least one
+  measured case; there is no run table or multi-run overlay. The header's Suites control picks
+  the one section shown: `EP` (the default) shows the EP chart controls and chart, `KV` the
+  kv-transfer section, and `swap_blocks` the swap_blocks section. KV and swap_blocks are offered
+  only when the shown run carries them.
 - **Run list**: `/api/v1/collectivex/runs` always reports `discovery_complete: true`; the
   field stays for existing clients.
 - **No deletion or ingest in the app**: the app exposes no CollectiveX mutation. Runs are
@@ -143,8 +148,8 @@ Locally, the same steps are `bun run admin:db:migrate:collectivex` and
 ## Known-support matrix
 
 The bottom of the page carries the curated known-support matrix: every SKU × library pairing for
-throughput (`normal`) and `low-latency` kernels at EP8 and EP16, independent of which runs are
-checked. Green degrees are known to work on the fleet; red degrees are known NOT to work, each
+throughput (`normal`) and `low-latency` kernels at EP8 and EP16, independent of the shown run
+and suite. Green degrees are known to work on the fleet; red degrees are known NOT to work, each
 carrying a numbered note with the investigated reason (upstream issue references included, e.g.
 ROCm/mori#610); gray degrees do not exist for that pairing (vendor-mismatched library, a kernel
 with no such mode, or a pool the library was never brought up on). The table is maintained by hand
@@ -174,15 +179,14 @@ The additive `swap_blocks` dataset field holds runtime provenance and measured p
 `swap_cases` labels their run summaries separately from EP/KV. One verified artifact counts
 as one case; each measured (direction, layout, block bytes, block count, seed) is one point.
 Budget-excluded combinations are reported separately and are never plotted as measurements.
-The run-table suite filter includes swap_blocks; checked runs share the normal comparison
-selection and run dash styles. The chart selects direction, layout and latency percentile,
+The swap_blocks section appears when that suite is chosen in the Suites control, and the
+methodology link then points at `swap-blocks.md`. The chart selects direction, layout and latency percentile,
 plots block bytes in B/KiB/MiB/GiB, and keeps bandwidth linear with a zero baseline.
 Latency is logarithmic. Bandwidth is copied payload divided by host-observed latency,
 including submission and CUDA synchronization, counting payload once even for d2d.
 Both `/collectivex` and `/zh/collectivex` expose the controls and tooltips.
 
-Bandwidth charts draw dashed nominal hardware rooflines for visible GPUs, including across
-checked comparison runs. Host transfers use **64 GB/s one-way PCIe 5.0 x16** on the
+Bandwidth charts draw dashed nominal hardware rooflines for visible GPUs. Host transfers use **64 GB/s one-way PCIe 5.0 x16** on the
 registered x86 pools (including HGX B300's CPU uplink). GB200/GB300 use **225 GB/s per GPU
 per direction**: the 900 GB/s bidirectional Grace C2C link is split across two GPUs.
 Same-GPU copies use half the GPU Specs HBM bandwidth because each payload byte is read
