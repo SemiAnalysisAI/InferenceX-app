@@ -84,9 +84,12 @@ changes: PowerX writes the same `i_metric` and `i_pcompare` state, so share link
 
 PowerX sits behind the ↑↑↓↓ feature gate: `/powerx` is a `feature-gated` route, so it is
 listed under **Hidden** only once the gate is unlocked, and the AgentX point detail offers its
-PowerX view on the same condition. Direct and shared links (`/powerx`, `/zh/powerx`,
-`?view=power`) still open for locked visitors, and the read-only API is unchanged; the gate
-controls discovery, not data access.
+PowerX view on the same condition. It is a soft flag: `PowerXFeatureGate` wraps `/powerx`,
+`/zh/powerx` and both tutorial pages, renders nothing until it reads the gate on the client,
+and replaces a locked visitor onto the landing page (`/` or `/zh`), including after a relock.
+The gate lives in localStorage, so the server still sends the page and the read-only API is
+unchanged; the flag hides PowerX, it does not secure its data. An AgentX `?view=power` share
+link still opens that view for locked visitors.
 
 - Header card (`DashboardSectionHeader` + `ChartControls`, as on `/inference`): title and
   description, then the four views as a tab strip (`PowerXViewTabs`: Energy per token, Power
