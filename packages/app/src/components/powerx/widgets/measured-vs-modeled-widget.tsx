@@ -34,18 +34,18 @@ import {
 
 const STRINGS = {
   en: {
-    view: 'Energy per output token',
+    view: 'Energy per token',
     views: {
       measured: 'Measured GPU',
       modeled: 'Modeled facility',
     },
     viewTitles: {
-      measured: 'Joules per output token from GPU telemetry alone',
+      measured: 'Joules per token (input + output) from GPU telemetry alone',
       modeled:
         'The same points scaled by the power model: facility watts per GPU over measured watts',
     },
     x: 'Interactivity (tok/s/user)',
-    y: 'J per output token, log',
+    y: 'J per token, log',
     preset: 'DeepSeek-V4-Pro · AgentX traces · FP4',
     open: 'Open in PowerX',
     copy: 'Copy API URL',
@@ -63,17 +63,17 @@ const STRINGS = {
       `${count} validated points; the modeled facility curve sits above the measured GPU curve with the same shape`,
   },
   zh: {
-    view: '每输出 token 能量',
+    view: '每 token 能耗',
     views: {
       measured: '实测 GPU',
       modeled: '建模数据中心',
     },
     viewTitles: {
-      measured: '仅由 GPU 遥测得到的每输出 token 焦耳数',
+      measured: '仅由 GPU 遥测得到的每 token（输入 + 输出）焦耳数',
       modeled: '同一批数据点按功耗模型换算：乘以每 GPU 数据中心瓦特数 ÷ 实测瓦特数',
     },
     x: '交互性（tok/s/user）',
-    y: '每输出 token 焦耳数，对数坐标',
+    y: '每 token 焦耳数，对数坐标',
     preset: 'DeepSeek-V4-Pro · AgentX traces · FP4',
     open: '在 PowerX 中打开',
     copy: '复制 API URL',

@@ -219,11 +219,15 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   powerVariant?: PowerVariant;
 
   gpuProvisionedJPerOutputToken?: { y: number; roof: boolean };
+  gpuProvisionedJPerTotalToken?: { y: number; roof: boolean };
   utilityProvisionedJPerOutputToken?: { y: number; roof: boolean };
+  utilityProvisionedJPerTotalToken?: { y: number; roof: boolean };
   itModeledWatts?: { y: number; roof: boolean };
   itModeledJPerOutputToken?: { y: number; roof: boolean };
+  itModeledJPerTotalToken?: { y: number; roof: boolean };
   utilityModeledWatts?: { y: number; roof: boolean };
   utilityModeledJPerOutputToken?: { y: number; roof: boolean };
+  utilityModeledJPerTotalToken?: { y: number; roof: boolean };
 }
 
 /**
@@ -237,11 +241,15 @@ export type PowerVariant = { kind: 'basis'; id: PowerBasis } | { kind: 'role'; i
 
 export type PowerBasisFieldKey =
   | 'gpuProvisionedJPerOutputToken'
+  | 'gpuProvisionedJPerTotalToken'
   | 'utilityProvisionedJPerOutputToken'
+  | 'utilityProvisionedJPerTotalToken'
   | 'itModeledWatts'
   | 'itModeledJPerOutputToken'
+  | 'itModeledJPerTotalToken'
   | 'utilityModeledWatts'
-  | 'utilityModeledJPerOutputToken';
+  | 'utilityModeledJPerOutputToken'
+  | 'utilityModeledJPerTotalToken';
 
 export type { PowerBasis } from '@/lib/power/power-basis';
 

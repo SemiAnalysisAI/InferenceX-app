@@ -18,26 +18,58 @@ export type PowerXCount = PowerXBoundary | 'both';
 /** What one unit of energy is charged to on the Energy view. */
 export type EnergyPer = 'output' | 'input' | 'total' | 'query';
 
-export const POWERX_DEFAULT_METRIC = 'y_measuredJPerOutputToken';
+type BoundaryMetrics = Record<PowerXBoundary, string>;
 
-/** GPU-measured metric behind each Energy unit. Only output tokens have an IT or facility basis. */
-const ENERGY_PER_METRIC: Record<EnergyPer, string> = {
-  output: 'y_measuredJPerOutputToken',
-  input: 'y_measuredJPerInputToken',
-  total: 'y_measuredJPerTotalToken',
-  query: 'y_measuredWhPerSuccessfulQuery',
-};
-
-/** Metric keys behind each view/boundary pair. */
-export const VIEW_METRICS: Record<Exclude<PowerXView, 'time'>, Record<PowerXBoundary, string>> = {
-  draw: { gpu: 'y_measuredAvgPower', it: 'y_itModeledWatts', system: 'y_utilityModeledWatts' },
-  energy: {
+/**
+ * The Energy view's metric for each Per unit and boundary. Total and output tokens have
+ * IT and facility boundaries; input tokens and queries are GPU-only readings.
+ */
+const ENERGY_METRICS = {
+  total: {
+    gpu: 'y_measuredJPerTotalToken',
+    it: 'y_itModeledJPerTotalToken',
+    system: 'y_utilityModeledJPerTotalToken',
+  },
+  output: {
     gpu: 'y_measuredJPerOutputToken',
     it: 'y_itModeledJPerOutputToken',
     system: 'y_utilityModeledJPerOutputToken',
   },
+  input: { gpu: 'y_measuredJPerInputToken' },
+  query: { gpu: 'y_measuredWhPerSuccessfulQuery' },
+} as const satisfies Record<EnergyPer, Partial<BoundaryMetrics> & Pick<BoundaryMetrics, 'gpu'>>;
+
+/**
+ * Energy is charged to every token by default. Aggregated serving runs prefill and decode
+ * on the same GPUs, so their joules cannot be split by phase and J per output token would
+ * bill the prompt to the output.
+ */
+const DEFAULT_ENERGY_PER = 'total' satisfies EnergyPer;
+
+export const POWERX_DEFAULT_METRIC = ENERGY_METRICS[DEFAULT_ENERGY_PER].gpu;
+
+/** Metric keys behind each view/boundary pair; the Energy view opens on the default unit. */
+export const VIEW_METRICS: Record<Exclude<PowerXView, 'time'>, BoundaryMetrics> = {
+  draw: { gpu: 'y_measuredAvgPower', it: 'y_itModeledWatts', system: 'y_utilityModeledWatts' },
+  energy: ENERGY_METRICS[DEFAULT_ENERGY_PER],
   where: { gpu: 'y_measuredAvgPower', it: 'y_measuredAvgPower', system: 'y_measuredAvgPower' },
 };
+
+/** True when the unit has IT and facility boundaries (and the all-in provisioned bound). */
+export function energyPerHasBoundaries(per: EnergyPer): boolean {
+  return 'it' in ENERGY_METRICS[per];
+}
+
+function energyMetric(per: EnergyPer, boundary: PowerXBoundary): string {
+  const metrics: Partial<BoundaryMetrics> = ENERGY_METRICS[per];
+  return metrics[boundary] ?? ENERGY_METRICS[per].gpu;
+}
+
+/** The unit an overlay of boundaries draws on: the current one, or the default when it has none. */
+function boundaryEnergyPer(metric: string): EnergyPer {
+  const per = energyPerFor(metric);
+  return energyPerHasBoundaries(per) ? per : DEFAULT_ENERGY_PER;
+}
 
 /** The compare mode behind the Where the power goes view (`i_pcompare=breakdown`). */
 export const WHERE_COMPARE = 'breakdown' satisfies PowerCompare;
@@ -97,21 +129,21 @@ export function selectPowerXCount(next: PowerXCount, current: PowerXSelection): 
   const view = powerXViewFor(current.metric, current.compare);
   if (next === 'both') {
     return {
-      metric: view === 'draw' ? VIEW_METRICS.draw.gpu : ENERGY_PER_METRIC.output,
+      metric:
+        view === 'draw'
+          ? VIEW_METRICS.draw.gpu
+          : ENERGY_METRICS[boundaryEnergyPer(current.metric)].gpu,
       compare: 'boundaries',
     };
   }
   if (view === 'draw') return { metric: VIEW_METRICS.draw[next], compare: 'none' };
-  const per = energyPerFor(current.metric);
-  return {
-    metric: next === 'gpu' ? ENERGY_PER_METRIC[per] : VIEW_METRICS.energy[next],
-    compare: 'none',
-  };
+  const per = next === 'gpu' ? energyPerFor(current.metric) : boundaryEnergyPer(current.metric);
+  return { metric: energyMetric(per, next), compare: 'none' };
 }
 
 /**
- * True when the all-in provisioned line exists for the metric: it is a J per output
- * token series, so W per chip has no rated pair to draw.
+ * True when the all-in provisioned line exists for the metric: it is a J per output or
+ * total token series, so W per chip has no rated pair to draw.
  */
 export function powerXRatedAvailable(metric: string): boolean {
   return powerCompareVariants(metric, 'provisioned').some(
@@ -135,7 +167,10 @@ export function selectPowerXRated(on: boolean, current: PowerXSelection): PowerX
   if (on) {
     const view = powerXViewFor(current.metric, current.compare);
     return {
-      metric: view === 'draw' ? VIEW_METRICS.draw.gpu : ENERGY_PER_METRIC.output,
+      metric:
+        view === 'draw'
+          ? VIEW_METRICS.draw.gpu
+          : ENERGY_METRICS[boundaryEnergyPer(current.metric)].gpu,
       compare: 'provisioned',
     };
   }
@@ -146,17 +181,13 @@ export function selectPowerXRated(on: boolean, current: PowerXSelection): PowerX
   };
 }
 
-/** The Per toggle on the Energy view; only output tokens keep an IT or facility basis. */
+/** The Per toggle on the Energy view; only output and total tokens keep an IT or facility basis. */
 export function selectPowerXPer(next: EnergyPer, current: PowerXSelection): PowerXSelection {
   if (next === energyPerFor(current.metric)) return current;
-  const boundary = powerXBoundaryFor(current.metric);
-  const compare = next !== 'output' && current.compare !== 'none' ? 'none' : current.compare;
+  const keepsBoundaries = energyPerHasBoundaries(next);
   return {
-    metric:
-      next === 'output' && boundary !== 'gpu'
-        ? VIEW_METRICS.energy[boundary]
-        : ENERGY_PER_METRIC[next],
-    compare,
+    metric: energyMetric(next, keepsBoundaries ? powerXBoundaryFor(current.metric) : 'gpu'),
+    compare: keepsBoundaries ? current.compare : 'none',
   };
 }
 
@@ -179,7 +210,7 @@ export function powerXShowsHeadroom(metric: string, compare: PowerCompare): bool
 
 /**
  * How many PowerX Chart Config controls are off their default, for the mobile
- * "More chart controls (N changed)" fold: Count (GPU only), Per (output token),
+ * "More chart controls (N changed)" fold: Count (GPU only), Per (all tokens),
  * Show as (W per chip), Scope (all GPUs), Power statistic (average) and Rated
  * boundaries (off). The Where and Over time views keep their controls in the card.
  */
@@ -190,7 +221,7 @@ export function powerXChangedCount(selection: PowerXSelection): number {
   let changed = powerXCountFor(selection.metric, selection.compare) === 'gpu' ? 0 : 1;
   if (config?.scope !== undefined && config.scope !== 'all') changed += 1;
   if (view === 'energy') {
-    if (energyPerFor(selection.metric) !== 'output') changed += 1;
+    if (energyPerFor(selection.metric) !== DEFAULT_ENERGY_PER) changed += 1;
     if (powerXRatedOn(selection.compare)) changed += 1;
   } else {
     if (powerXShowAsFor(selection.metric) === 'tdp') changed += 1;
