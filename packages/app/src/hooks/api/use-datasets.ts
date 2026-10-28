@@ -1,5 +1,7 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 
+import { ApiRequestError } from '@/lib/api/api-request-error';
+
 import type {
   ConversationDetail,
   ConversationList,
@@ -73,7 +75,7 @@ async function fetchJsonOr404<T>(
 ): Promise<T | null> {
   const res = await fetch(url, { signal });
   if (res.status === 404) return null;
-  if (!res.ok) throw new Error(`${label} ${res.status}`);
+  if (!res.ok) throw new ApiRequestError(`${label} ${res.status}`, res.status, url);
   return (await res.json()) as T;
 }
 
@@ -81,8 +83,9 @@ export function useDatasets() {
   return useQuery({
     queryKey: ['datasets'] as const,
     queryFn: async ({ signal }) => {
-      const res = await fetch('/api/v1/datasets', { signal });
-      if (!res.ok) throw new Error(`datasets ${res.status}`);
+      const url = '/api/v1/datasets';
+      const res = await fetch(url, { signal });
+      if (!res.ok) throw new ApiRequestError(`datasets ${res.status}`, res.status, url);
       return (await res.json()) as DatasetRecord[];
     },
     staleTime: DAY,

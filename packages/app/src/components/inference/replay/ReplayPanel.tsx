@@ -28,7 +28,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useBenchmarkHistory } from '@/hooks/api/use-benchmark-history';
-import { track } from '@/lib/analytics/analytics';
+import { track, trackOncePerSession } from '@/lib/analytics/analytics';
 import { Sequence } from '@/lib/catalog/data-mappings';
 import { cn } from '@/lib/shared/utils';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -326,12 +326,11 @@ function ReplayPanelContent({
   const prefersReducedMotion = useReducedMotion();
 
   const hasWebCodecs = useMemo(() => typeof VideoEncoder !== 'undefined', []);
-  const unavailableReportedRef = useRef(false);
   useEffect(() => {
-    if (!hasWebCodecs && !unavailableReportedRef.current) {
-      unavailableReportedRef.current = true;
-      track('inference_replay_export_unavailable', {
-        userAgent: typeof navigator === 'undefined' ? 'unknown' : navigator.userAgent.slice(0, 200),
+    if (!hasWebCodecs) {
+      trackOncePerSession('inference_replay_export_unavailable', {
+        user_agent:
+          typeof navigator === 'undefined' ? 'unknown' : navigator.userAgent.slice(0, 200),
       });
     }
   }, [hasWebCodecs]);

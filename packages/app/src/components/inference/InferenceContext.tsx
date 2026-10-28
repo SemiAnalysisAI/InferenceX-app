@@ -14,7 +14,7 @@ import {
 
 import { DISPLAY_MODEL_TO_DB, rowToSequence } from '@semianalysisai/inferencex-constants';
 import type { BenchmarkRow } from '@/lib/api/api';
-import { track } from '@/lib/analytics/analytics';
+import { track, trackOncePerPageview } from '@/lib/analytics/analytics';
 import { EngineComparisonConfirmation } from '@/components/inference/ui/engine-comparison-confirmation';
 import {
   needsEngineComparisonConsent,
@@ -1528,7 +1528,7 @@ export function InferenceProvider({
   }, [activeDates]);
 
   useEffect(() => {
-    track('inference_chart_view', {
+    trackOncePerPageview('inference_chart_view', {
       yAxisMetric: selectedYAxisMetric,
       source: getUrlParam('i_metric') ? 'url' : 'default',
     });

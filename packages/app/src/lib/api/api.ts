@@ -14,6 +14,8 @@ import type { EvalRow } from '@semianalysisai/inferencex-db/queries/evaluations'
 
 import type { SubmissionsResponse } from '../submissions/submissions-types';
 
+import { ApiRequestError } from './api-request-error';
+
 export type { BenchmarkRow, EvalRow };
 
 export interface WorkflowRunRow {
@@ -82,7 +84,8 @@ export interface ReliabilityRow {
 
 async function fetchJson<T>(url: string, signal?: AbortSignal): Promise<T> {
   const res = await fetch(url, { signal });
-  if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`);
+  if (!res.ok)
+    throw new ApiRequestError(`API error: ${res.status} ${res.statusText}`, res.status, url);
   return res.json();
 }
 

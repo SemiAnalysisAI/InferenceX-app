@@ -11,10 +11,18 @@ import {
   TIMELINE_VERSION,
 } from '@semianalysisai/inferencex-db/operatorx/timeline';
 
+import { ApiRequestError } from '@/lib/api/api-request-error';
+
 async function get<T>(url: string, signal: AbortSignal): Promise<T> {
   const response = await fetch(url, { signal });
   const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(body?.error ?? `OperatorX request failed (${response.status})`);
+  if (!response.ok) {
+    throw new ApiRequestError(
+      body?.error ?? `OperatorX request failed (${response.status})`,
+      response.status,
+      url,
+    );
+  }
   return body as T;
 }
 

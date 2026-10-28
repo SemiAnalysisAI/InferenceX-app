@@ -17,7 +17,7 @@ import {
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { Card } from '@/components/ui/card';
-import { track } from '@/lib/analytics/analytics';
+import { track, trackOncePerPageview } from '@/lib/analytics/analytics';
 import type { BenchmarkRow } from '@/lib/api/api';
 import { toCalculatorBenchmarkRows } from '@/lib/benchmarks/benchmark-api-view';
 import { toModel, toPrecisions, toSequence } from '@/lib/compare/compare-enum-coerce';
@@ -114,8 +114,12 @@ export default function ComparePerDollarPageClient({
   locale = 'en',
 }: ComparePerDollarPageClientProps) {
   useEffect(() => {
-    track('compare_per_dollar_page_view', { gpu_a: a, gpu_b: b, default_model: defaultModel });
-  }, [a, b, defaultModel]);
+    trackOncePerPageview(
+      'compare_per_dollar_page_view',
+      { slug, gpus: [a, b], model: defaultModel },
+      slug,
+    );
+  }, [slug, a, b, defaultModel]);
 
   const compareGpuPair = useMemo(() => [a, b] as const, [a, b]);
   const initialModel = toModel(defaultModel);

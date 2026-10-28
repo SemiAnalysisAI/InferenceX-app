@@ -4,12 +4,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
-import { track } from '@/lib/analytics/analytics';
+import { track, trackOncePerPageview } from '@/lib/analytics/analytics';
 import { navigateInApp } from '@/lib/routing/client-navigation';
 
 export function LandingPageAnalytics() {
   useEffect(() => {
-    track('landing_page_viewed');
+    trackOncePerPageview('landing_page_viewed');
   }, []);
 
   return null;

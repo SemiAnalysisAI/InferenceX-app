@@ -1,6 +1,8 @@
 import { useCallback } from 'react';
 import { type QueryClient, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { ApiRequestError } from '@/lib/api/api-request-error';
+
 const STALE_TIME_MS = 5 * 60 * 1000;
 
 /**
@@ -18,8 +20,9 @@ export function bulkIdsFetcher<T>(
     }
     const maps = await Promise.all(
       chunks.map(async (chunk) => {
-        const res = await fetch(`/api/v1/${endpoint}?ids=${chunk.join(',')}`, { signal });
-        if (!res.ok) throw new Error(`${endpoint} ${res.status}`);
+        const url = `/api/v1/${endpoint}?ids=${chunk.join(',')}`;
+        const res = await fetch(url, { signal });
+        if (!res.ok) throw new ApiRequestError(`${endpoint} ${res.status}`, res.status, url);
         return (await res.json()) as Record<number, T>;
       }),
     );
@@ -128,9 +131,10 @@ export function useByIdQuery<T, TSelected = T>(
     queryKey: [endpoint, id] as const,
     queryFn: async ({ signal }): Promise<T | null> => {
       if (!id) return null;
-      const res = await fetch(`/api/v1/${endpoint}?id=${id}`, { signal });
+      const url = `/api/v1/${endpoint}?id=${id}`;
+      const res = await fetch(url, { signal });
       if (res.status === 404) return null;
-      if (!res.ok) throw new Error(`${endpoint} ${res.status}`);
+      if (!res.ok) throw new ApiRequestError(`${endpoint} ${res.status}`, res.status, url);
       return (await res.json()) as T;
     },
     enabled,

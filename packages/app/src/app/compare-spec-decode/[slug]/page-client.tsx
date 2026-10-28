@@ -15,7 +15,7 @@ import {
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { Card } from '@/components/ui/card';
-import { track } from '@/lib/analytics/analytics';
+import { track, trackOncePerPageview } from '@/lib/analytics/analytics';
 import { toModel, toPrecisions, toSequence } from '@/lib/compare/compare-enum-coerce';
 import { SPEC_METHODS_ACTIVE } from '@/lib/compare/compare-variant-slug';
 import type { AgenticScenarioIntro } from '@/lib/compare/compare-ssr';
@@ -103,7 +103,7 @@ export default function CompareSpecDecodePageClient({
   const t = STRINGS[locale];
 
   useEffect(() => {
-    track('compare_spec_decode_page_view', { slug, gpu, method });
+    trackOncePerPageview('compare_spec_decode_page_view', { slug, gpu, method }, slug);
   }, [slug, gpu, method]);
 
   const initialModel = toModel(modelDisplayName);
