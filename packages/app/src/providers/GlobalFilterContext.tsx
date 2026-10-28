@@ -69,9 +69,17 @@ export interface GlobalFilterSelectionContextType {
   effectivePrecisions: string[];
 }
 
+export interface ModelSelectionOptions {
+  /**
+   * Defaults to true. Pass false for programmatic corrections so the path sync they cause is not
+   * recorded as a virtual pageview.
+   */
+  userSelection?: boolean;
+}
+
 export interface GlobalFilterActionsContextType {
   setTcoBasis: (basis: TcoBasis) => void;
-  setSelectedModel: (model: Model) => void;
+  setSelectedModel: (model: Model, options?: ModelSelectionOptions) => void;
   setSelectedSequence: (sequence: Sequence) => void;
   setSelectedPrecisions: (precisions: string[]) => void;
   setSelectedRunDate: (date: string) => void;
@@ -218,6 +226,15 @@ export function GlobalFilterProvider({
 
   const [selectedModel, setSelectedModel] = useState<Model>(
     () => initialModel ?? routeModelForPathname(pathname) ?? Model.DeepSeek_V4_Pro,
+  );
+  // The model the user last picked. A path sync counts as a pageview only when it applies that pick.
+  const userSelectedModelRef = useRef<Model | null>(null);
+  const selectModel = useCallback(
+    (model: Model, { userSelection = true }: ModelSelectionOptions = {}) => {
+      if (userSelection) userSelectedModelRef.current = model;
+      setSelectedModel(model);
+    },
+    [],
   );
 
   const [selectedSequence, setSelectedSequenceRaw] = useState<Sequence>(() => {
@@ -488,7 +505,12 @@ export function GlobalFilterProvider({
   }, []);
 
   const isMountedRef = useRef(false);
+  const syncedModelRef = useRef(selectedModel);
   useEffect(() => {
+    const modelChanged = syncedModelRef.current !== selectedModel;
+    syncedModelRef.current = selectedModel;
+    const userSwitchedModel = modelChanged && userSelectedModelRef.current === selectedModel;
+    if (modelChanged) userSelectedModelRef.current = null;
     if (!isMountedRef.current) {
       isMountedRef.current = true;
       return;
@@ -500,8 +522,12 @@ export function GlobalFilterProvider({
       i_seq: sequenceResolved ? effectiveSequence : undefined,
       i_prec: precisionExplicit ? effectivePrecisions.join(',') : undefined,
     });
+    // Canonicalizing a bare route and settling non-model filters also rewrite the path, but only a
+    // user's model switch is a new page.
     const pathnameRewrite = modelRoutePathnameRewrite(window.location.pathname, selectedModel);
-    if (pathnameRewrite) replaceClientPathname(pathnameRewrite, [], { pageview: true });
+    if (pathnameRewrite) {
+      replaceClientPathname(pathnameRewrite, [], { pageview: userSwitchedModel });
+    }
   }, [
     selectedModel,
     requestedRunDate,
@@ -538,14 +564,14 @@ export function GlobalFilterProvider({
   const actionsValue = useMemo<GlobalFilterActionsContextType>(
     () => ({
       setTcoBasis,
-      setSelectedModel,
+      setSelectedModel: selectModel,
       setSelectedSequence,
       setSelectedPrecisions,
       setSelectedRunDate: setSelectedRunDateManual,
       setSelectedRunId,
     }),
     [
-      setSelectedModel,
+      selectModel,
       setSelectedSequence,
       setSelectedPrecisions,
       setSelectedRunDateManual,
