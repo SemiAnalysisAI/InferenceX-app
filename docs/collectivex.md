@@ -73,13 +73,14 @@ case-insensitive). Each document is then assembled alone, so every failure names
   one stored run and its documents. After a write, when `APP_URL` and
   `VERCEL_INVALIDATE_SECRET` are set, it purges the cache with
   `POST ${APP_URL}/api/v1/invalidate?scope=collectivex` (Bearer auth, plus
-  `x-vercel-protection-bypass` when `VERCEL_PROTECTION_BYPASS_SECRET` is set); otherwise it
-  says the dashboard updates when its cache expires or after the workflow below runs.
+  `x-vercel-protection-bypass` when `VERCEL_PROTECTION_BYPASS_SECRET` is set). A deletion adds
+  `immediate=true`. Otherwise it says the dashboard updates when its cache expires or after
+  the workflow below runs.
 - **Workflow**: `.github/workflows/ingest-collectivex.yml` (`Ingest CollectiveX Results`) runs
   only on `workflow_dispatch`. With no input it applies pending migrations
   (`migrate-collectivex.ts --yes`) and purges the CollectiveX cache, for example after an
   upload made without the purge variables. With `delete_run` it also deletes that run before
-  purging. Every run shares one concurrency group that queues rather than cancels, and it
+  purging, and that purge is `immediate`. Every run shares one concurrency group that queues rather than cancels, and it
   alerts Slack on failure, like `ingest-operatorx`. It reads no GitHub repository.
 
 There is no backfill and no prune: the results exist only in the database, so nothing can
@@ -108,9 +109,13 @@ case instead, upload its corrected result: the new run replaces that case and ke
 - **Reads use the primary**: every route reads through `DATABASE_COLLECTIVEX_WRITE_URL`, so a
   response cached right after an upload's purge never comes from a lagging replica.
   `DATABASE_COLLECTIVEX_READONLY_URL` is not read by the app routes.
-- **Caching**: responses carry the `collectivex` CDN tag with the default one-day `s-maxage`.
-  The ingest CLI and workflow purge only that tag through `POST /api/v1/invalidate?scope=collectivex`; the
-  main dashboard's blob cache is untouched by CollectiveX operations.
+- **Caching**: responses use the default API cache headers (`max-age=60`, a one-day
+  `s-maxage` and `stale-while-revalidate`, plus an ETag) under the `collectivex` CDN tag.
+  The ingest CLI and workflow purge only that tag through
+  `POST /api/v1/invalidate?scope=collectivex`. An upload marks it stale, so the CDN serves
+  the previous response once while it refreshes. A deletion passes `immediate=true` so the
+  retracted run is never served again. The main dashboard's blob cache is untouched by
+  CollectiveX operations.
 - **Partial results**: a run may hold results for only some pools (for example a first
   upload covering only `mi300x` and `mi325x`). Every runnable case in `cases.json` without a
   result stays in `coverage` with outcome `pending` (requested, not run), counts toward

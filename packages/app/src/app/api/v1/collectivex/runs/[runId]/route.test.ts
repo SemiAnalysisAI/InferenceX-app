@@ -6,7 +6,7 @@ const { mockGetRun, mockFromRow, mockGetWriteDb, mockCachedJson } = vi.hoisted((
   mockGetRun: vi.fn(),
   mockFromRow: vi.fn(),
   mockGetWriteDb: vi.fn(() => 'mock-write-sql'),
-  mockCachedJson: vi.fn((data: unknown) => Response.json(data)),
+  mockCachedJson: vi.fn((_request: Request, data: unknown) => Response.json(data)),
 }));
 
 vi.mock('@semianalysisai/inferencex-db/connection', () => ({
@@ -63,7 +63,7 @@ describe('GET /api/v1/collectivex/runs/[runId]', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual(dataset);
     expect(mockGetRun).toHaveBeenCalledWith('mock-write-sql', 1, runId);
-    expect(mockCachedJson).toHaveBeenCalledWith(dataset, { tag: 'collectivex' });
+    expect(mockCachedJson).toHaveBeenCalledWith(expect.anything(), dataset, { tag: 'collectivex' });
   });
 
   it('returns 404 for a run that is not stored', async () => {

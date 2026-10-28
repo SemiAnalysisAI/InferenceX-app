@@ -40,11 +40,11 @@ export async function GET(request: NextRequest) {
   if (!/^\d{4}-\d{2}-\d{2}$/u.test(date)) {
     return publicApiError(PUBLIC_API_ERRORS.invalidDate, 400);
   }
-  if (FIXTURES_MODE) return cachedJson(loadFixture('workflow-info'));
+  if (FIXTURES_MODE) return cachedJson(request, loadFixture('workflow-info'));
 
   try {
     const data = await getCachedWorkflowInfo(date, benchmarkType);
-    return cachedJson(data);
+    return cachedJson(request, data);
   } catch (error) {
     console.error('Error fetching workflow info:', error);
     return publicApiError(PUBLIC_API_ERRORS.internal, 500);

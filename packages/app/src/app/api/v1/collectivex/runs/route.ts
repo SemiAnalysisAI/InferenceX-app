@@ -15,12 +15,16 @@ export async function GET(request: NextRequest) {
   if (!version) {
     return NextResponse.json({ error: 'Unknown version' }, { status: 400 });
   }
-  if (FIXTURES_MODE) return cachedJson(loadFixture('collectivex-runs'));
+  if (FIXTURES_MODE) return cachedJson(request, loadFixture('collectivex-runs'));
 
   try {
     const runs = await listCollectiveXRuns(getCollectiveXWriteDb(), version);
     // Every run is ingested ahead of time, so the stored list is always complete.
-    return cachedJson({ version, runs, discovery_complete: true }, { tag: collectiveXCacheTag() });
+    return cachedJson(
+      request,
+      { version, runs, discovery_complete: true },
+      { tag: collectiveXCacheTag() },
+    );
   } catch (error) {
     console.error('Error listing CollectiveX runs:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

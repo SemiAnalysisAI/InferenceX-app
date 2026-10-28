@@ -15,11 +15,11 @@ const getCachedSummary = cachedQuery(() => getSubmissionSummary(getDb()), 'submi
 
 const getCachedVolume = cachedQuery(() => getSubmissionVolume(getDb()), 'submissions-volume');
 
-export async function GET() {
-  if (FIXTURES_MODE) return cachedJson(loadFixture('submissions'));
+export async function GET(request: Request) {
+  if (FIXTURES_MODE) return cachedJson(request, loadFixture('submissions'));
   try {
     const [summary, volume] = await Promise.all([getCachedSummary(), getCachedVolume()]);
-    return cachedJson({ summary, volume });
+    return cachedJson(request, { summary, volume });
   } catch (error) {
     console.error('Error fetching submissions:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

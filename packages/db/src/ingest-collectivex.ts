@@ -82,11 +82,20 @@ export function describeUpload({ run, docs, plan }: UploadedRun): string {
   return `${lines.join('\n')}\n`;
 }
 
-/** Purge the dashboard's CollectiveX CDN tag, as the ingest-collectivex workflow does. */
-export async function invalidateCollectiveXCache(
-  env: Record<string, string | undefined> = process.env,
-  fetchImpl: typeof globalThis.fetch = fetch,
-): Promise<boolean> {
+/**
+ * Purge the dashboard's CollectiveX CDN tag, as the ingest-collectivex workflow does. By
+ * default the CDN serves the previous response once while it refreshes. `immediate` drops it
+ * outright, so a deleted run is never served again.
+ */
+export async function invalidateCollectiveXCache({
+  immediate = false,
+  env = process.env,
+  fetchImpl = fetch,
+}: {
+  immediate?: boolean;
+  env?: Record<string, string | undefined>;
+  fetchImpl?: typeof globalThis.fetch;
+} = {}): Promise<boolean> {
   const appUrl = env.APP_URL;
   const secret = env.VERCEL_INVALIDATE_SECRET;
   if (!appUrl || !secret) {
@@ -100,7 +109,7 @@ export async function invalidateCollectiveXCache(
   if (env.VERCEL_PROTECTION_BYPASS_SECRET) {
     headers['x-vercel-protection-bypass'] = env.VERCEL_PROTECTION_BYPASS_SECRET;
   }
-  const url = `${appUrl.replace(/\/+$/u, '')}/api/v1/invalidate?scope=collectivex`;
+  const url = `${appUrl.replace(/\/+$/u, '')}/api/v1/invalidate?scope=collectivex${immediate ? '&immediate=true' : ''}`;
   const response = await fetchImpl(url, {
     method: 'POST',
     headers,
@@ -124,6 +133,7 @@ async function main(): Promise<void> {
     onnotice: () => {},
   });
   let wrote = false;
+  let deleted = false;
   try {
     if (args.mode === 'delete') {
       console.log(`This will delete stored run ${args.runId} and its documents.\n`);
@@ -138,6 +148,7 @@ async function main(): Promise<void> {
           : `  no stored run ${args.runId}`,
       );
       wrote = removed !== null;
+      deleted = wrote;
     } else {
       const planned = await planUpload(sql as unknown as DbClient, args.dir);
       console.log(describeUpload(planned));
@@ -166,7 +177,7 @@ async function main(): Promise<void> {
   } finally {
     await sql.end();
   }
-  if (wrote) await invalidateCollectiveXCache();
+  if (wrote) await invalidateCollectiveXCache({ immediate: deleted });
   console.log('=== db:ingest:collectivex complete ===');
 }
 

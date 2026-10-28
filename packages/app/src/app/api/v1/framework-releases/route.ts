@@ -13,8 +13,8 @@ import type {
   FrameworkReleases,
   LatestImageRow,
 } from '@/lib/api/api';
-import { readResponse } from '@/lib/views-api/source';
-import { NextResponse } from 'next/server';
+import { readResponse, sourceRequest } from '@/lib/views-api/source';
+import { type NextRequest, NextResponse } from 'next/server';
 
 interface GitHubRelease {
   tag_name: string;
@@ -80,9 +80,11 @@ async function fetchCommitStatuses(
   return Object.fromEntries(entries.filter((entry) => entry !== null));
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const rows = await readResponse<LatestImageRow[]>(await latestImages());
+    const rows = await readResponse<LatestImageRow[]>(
+      await latestImages(sourceRequest(request, '/api/v1/latest-images')),
+    );
     const images = rows.filter(isActiveImageRow);
     const entries = await Promise.all(
       Object.entries(FRAMEWORK_REPOS).map(async ([framework, { owner, repo }]) => {

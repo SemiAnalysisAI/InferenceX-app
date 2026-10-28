@@ -33,14 +33,14 @@ export async function GET(request: NextRequest, context: { params: Promise<{ run
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
     const latest = loadFixture<CollectiveXDataset>('collectivex-latest');
-    if (latest.run.run_id === runId) return cachedJson(latest);
-    return cachedJson(loadFixture<CollectiveXDataset>(`collectivex-run-${runId}`));
+    if (latest.run.run_id === runId) return cachedJson(request, latest);
+    return cachedJson(request, loadFixture<CollectiveXDataset>(`collectivex-run-${runId}`));
   }
 
   try {
     const row = await getCollectiveXRun(getCollectiveXWriteDb(), version, runId);
     if (row === null) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    return cachedJson(collectiveXDatasetFromRow(row), { tag: collectiveXCacheTag() });
+    return cachedJson(request, collectiveXDatasetFromRow(row), { tag: collectiveXCacheTag() });
   } catch (error) {
     console.error('Error fetching CollectiveX run:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

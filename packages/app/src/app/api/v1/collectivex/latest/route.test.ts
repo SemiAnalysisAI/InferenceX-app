@@ -6,7 +6,7 @@ const { mockGetLatest, mockFromRow, mockGetWriteDb, mockCachedJson } = vi.hoiste
   mockGetLatest: vi.fn(),
   mockFromRow: vi.fn(),
   mockGetWriteDb: vi.fn(() => 'mock-write-sql'),
-  mockCachedJson: vi.fn((data: unknown) => Response.json(data)),
+  mockCachedJson: vi.fn((_request: Request, data: unknown) => Response.json(data)),
 }));
 
 vi.mock('@semianalysisai/inferencex-db/connection', () => ({
@@ -55,7 +55,7 @@ describe('GET /api/v1/collectivex/latest', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual(dataset);
     expect(mockGetLatest).toHaveBeenCalledWith('mock-write-sql', 1);
-    expect(mockCachedJson).toHaveBeenCalledWith(dataset, { tag: 'collectivex' });
+    expect(mockCachedJson).toHaveBeenCalledWith(expect.anything(), dataset, { tag: 'collectivex' });
   });
 
   it('returns 404 when nothing is stored for the version', async () => {

@@ -46,7 +46,7 @@ export function GET(request: NextRequest) {
     if (test === 'core-memory-profiles') {
       const gpu = parseEnumParam(rawGpu, 'gpu', ['all', ...CORE_PROFILE_GPU_KEYS], 'all');
       return Promise.resolve(
-        cachedJson({
+        cachedJson(request, {
           apiVersion: 'v1',
           view: 'ubenchx',
           test,
@@ -60,7 +60,7 @@ export function GET(request: NextRequest) {
       const gpuKeys = [...Object.keys(TPC_SKYLINE_RUNS), 'Huawei 950PR', ...HUAWEI_SKU_GPU_KEYS];
       const gpu = parseEnumParam(s.get('gpu'), 'gpu', ['all', ...gpuKeys], 'all');
       return Promise.resolve(
-        cachedJson({
+        cachedJson(request, {
           apiVersion: 'v1',
           view: 'ubenchx',
           test: 'tpc-skyline',
@@ -87,7 +87,7 @@ export function GET(request: NextRequest) {
 
       if (test === 'mem-bw') {
         return Promise.resolve(
-          cachedJson({
+          cachedJson(request, {
             apiVersion: 'v1',
             view: 'ubenchx',
             test: 'mem-bw',
@@ -106,7 +106,7 @@ export function GET(request: NextRequest) {
             : [];
 
       return Promise.resolve(
-        cachedJson({
+        cachedJson(request, {
           apiVersion: 'v1',
           view: 'ubenchx',
           test: 'all',
@@ -141,7 +141,7 @@ export function GET(request: NextRequest) {
         : [transformSmL2Run(gpu, SM_L2_RUNS[gpu])];
 
     return Promise.resolve(
-      cachedJson({
+      cachedJson(request, {
         apiVersion: 'v1',
         view: 'ubenchx',
         test: 'sm-l2-distance',

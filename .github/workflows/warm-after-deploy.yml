@@ -1,12 +1,13 @@
 name: Warm After Deploy
 
 # Vercel's CDN cache key includes the deployment, so every production promotion
-# starts with an empty cache. OperatorX's first uncached responses take seconds
-# (cold function, database connection, merged comparison), so request them once
-# here instead of on a visitor's load. `vercel.deployment.promoted` fires once
-# the production domain serves the new deployment, for automatic deploys,
-# manual promotions, and rollbacks. The cache is also per region: this fills the
-# region nearest the runner and leaves a warm function for the others.
+# starts with an empty cache. First uncached responses take seconds (cold
+# function, database connection, large JSON, OperatorX merged comparison), so
+# request the dashboard APIs, OperatorX, and the top pages once here instead of
+# on a visitor's load. `vercel.deployment.promoted` fires once the production
+# domain serves the new deployment, for automatic deploys, manual promotions,
+# and rollbacks. The cache is also per region: this fills the region nearest the
+# runner and leaves warm functions and server caches for the others.
 on:
   repository_dispatch:
     types: [vercel.deployment.promoted]
@@ -20,23 +21,56 @@ concurrency:
 
 jobs:
   warm:
-    name: Warm OperatorX
+    name: Warm dashboards, OperatorX and top pages
     if: github.event_name == 'workflow_dispatch' || github.event.client_payload.environment == 'production'
-    timeout-minutes: 10
+    timeout-minutes: 15
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - name: Warm OperatorX pages and API
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Bun
+        id: setup-bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - name: Cache Bun packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ runner.arch }}-${{
+            steps.setup-bun.outputs.bun-version }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-${{ runner.arch }}-${{ steps.setup-bun.outputs.bun-version }}-
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+        env:
+          CYPRESS_INSTALL_BINARY: '0'
+
+      - name: Warm dashboard APIs
         env:
           APP_URL: ${{ vars.APP_URL }}
           VERCEL_PROTECTION_BYPASS_SECRET: ${{ secrets.VERCEL_PROTECTION_BYPASS_SECRET }}
         run: |
           : "${APP_URL:?APP_URL repository variable is not set}"
-          headers=()
+          bun run admin:cache:warmup "$APP_URL" --dashboard
+
+      - name: Warm OperatorX and top pages
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          VERCEL_PROTECTION_BYPASS_SECRET: ${{ secrets.VERCEL_PROTECTION_BYPASS_SECRET }}
+        run: |
+          : "${APP_URL:?APP_URL repository variable is not set}"
+          # API responses are cached per Accept-Encoding: request the browser's variant.
+          headers=(-H "Accept-Encoding: gzip, deflate, br, zstd")
           if [ -n "$VERCEL_PROTECTION_BYPASS_SECRET" ]; then
             headers+=(-H "x-vercel-protection-bypass: $VERCEL_PROTECTION_BYPASS_SECRET")
           fi
           # Consume each full response: a streamed body that is cut off is not cached.
-          for path in /operatorx /zh/operatorx /api/v1/operatorx/runs \
+          for path in / /zh /inference /zh/inference /historical /evaluation \
+            /operatorx /zh/operatorx /api/v1/operatorx/runs \
             '/api/v1/operatorx/compare?op=gemm' '/api/v1/operatorx/compare?op=moe'; do
             curl -sSf --retry 2 --retry-delay 2 --max-time 300 --compressed \
               -o /dev/null -w "%{http_code} %{time_total}s $path\n" \

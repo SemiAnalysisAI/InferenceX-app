@@ -79,18 +79,21 @@ jobs:
         # APP_URL is not passed here, so the CLI leaves the purge to the next step.
         run: bun run --cwd packages/db src/ingest-collectivex.ts --delete-run "$DELETE_RUN" --yes
 
+      # A deleted run must never be served again, so deletion drops the cached responses
+      # outright instead of serving them once more while the CDN refreshes.
       - name: Invalidate CollectiveX cache
         env:
           APP_URL: ${{ vars.APP_URL }}
           VERCEL_INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
           VERCEL_PROTECTION_BYPASS_SECRET: ${{ secrets.VERCEL_PROTECTION_BYPASS_SECRET }}
+          IMMEDIATE: ${{ inputs.delete_run != '' }}
         run: |
           : "${APP_URL:?APP_URL repository variable is not set}"
           headers=(-H "Authorization: Bearer $VERCEL_INVALIDATE_SECRET")
           if [ -n "$VERCEL_PROTECTION_BYPASS_SECRET" ]; then
             headers+=(-H "x-vercel-protection-bypass: $VERCEL_PROTECTION_BYPASS_SECRET")
           fi
-          curl -sSf -X POST "${APP_URL%/}/api/v1/invalidate?scope=collectivex" "${headers[@]}"
+          curl -sSf -X POST "${APP_URL%/}/api/v1/invalidate?scope=collectivex&immediate=${IMMEDIATE}" "${headers[@]}"
 
       - name: Notify Slack on failure
         if: failure()

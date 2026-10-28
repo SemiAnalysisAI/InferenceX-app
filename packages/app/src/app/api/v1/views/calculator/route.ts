@@ -405,7 +405,7 @@ export function GET(request: NextRequest): Promise<Response> {
       );
     }
 
-    return cachedJson({
+    return cachedJson(request, {
       view: 'calculator',
       apiVersion: 'v1',
       generatedAt,

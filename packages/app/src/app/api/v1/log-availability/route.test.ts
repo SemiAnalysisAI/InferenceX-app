@@ -11,7 +11,7 @@ vi.mock('@semianalysisai/inferencex-db/queries/server-logs', () => ({
 }));
 vi.mock('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: any[]) => any) => fn,
-  cachedJson: (data: unknown) => Response.json(data),
+  cachedJson: (_request: Request, data: unknown) => Response.json(data),
 }));
 
 import { NextRequest } from 'next/server';

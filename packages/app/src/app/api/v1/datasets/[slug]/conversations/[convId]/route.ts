@@ -19,7 +19,7 @@ const getCachedConversation = cachedQuery(
 
 /** GET /api/v1/datasets/[slug]/conversations/[convId] — flamegraph structure. */
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ slug: string; convId: string }> },
 ) {
   const { slug, convId } = await params;
@@ -30,7 +30,7 @@ export async function GET(
     // over-decode and mis-key ids containing '%' / '/'. Decode exactly once.
     const data = await getCachedConversation(slug, convId);
     if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    return cachedJson(data);
+    return cachedJson(request, data);
   } catch (error) {
     console.error('Error fetching dataset conversation:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

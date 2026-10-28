@@ -21,7 +21,7 @@ vi.mock('@semianalysisai/inferencex-db/queries/collectivex', () => ({
 }));
 
 vi.mock('@/lib/cache/api-cache', () => ({
-  cachedJson: (data: unknown) => Response.json(data),
+  cachedJson: (_request: Request, data: unknown) => Response.json(data),
   collectiveXCacheTag: () => 'collectivex',
 }));
 

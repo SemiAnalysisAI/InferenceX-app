@@ -68,7 +68,7 @@ measurement. Spec durations are Cypress's reported execution durations, not
 whole-job wall time; checkout, dependency installation, and application build
 time are not included.
 
-`E2E_FIXTURES=1` serves the committed API snapshots under `packages/app/cypress/fixtures/api/`. Refresh them with `bun run --cwd packages/app capture:fixtures`. The capture script updates `_manifest.json`, which records the fixture shape, byte length, checksum, source, and capture timestamp. The manifest guard rejects partial or hand-edited snapshots; benchmark history must also contain at least two dates so replay tests cannot silently skip their substantive path.
+`E2E_FIXTURES=1` serves the committed API snapshots under `packages/app/cypress/fixtures/api/`. Refresh them with `bun run --cwd packages/app capture:fixtures`. The capture script updates `_manifest.json`, which records the fixture shape, byte length, checksum, source, and capture timestamp. The manifest guard rejects partial or hand-edited snapshots; benchmark history must also contain at least two dates so replay tests cannot silently skip their substantive path. Fixture API responses are sent with `Cache-Control: no-store`. `cy.intercept` never sees a response the browser serves from its HTTP cache, so the production 60 s browser reuse would let an earlier test's response shadow a later test's stub.
 
 Server-cache performance regressions must assert source-reader call counts for repeated identical inputs. Do not use elapsed-time thresholds: CI scheduling and cold-start variance make wall-clock assertions nondeterministic.
 

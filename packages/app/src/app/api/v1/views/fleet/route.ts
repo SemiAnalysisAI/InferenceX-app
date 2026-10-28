@@ -355,7 +355,7 @@ export function GET(request: NextRequest): Promise<Response> {
       );
     }
 
-    return cachedJson({
+    return cachedJson(request, {
       view: 'fleet',
       apiVersion: 'v1',
       generatedAt,

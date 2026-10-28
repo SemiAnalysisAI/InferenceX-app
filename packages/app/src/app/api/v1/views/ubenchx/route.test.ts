@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { GET } from './route';
 
 vi.mock('@/lib/cache/api-cache', () => ({
-  cachedJson: (data: unknown) => Response.json(data),
+  cachedJson: (_request: Request, data: unknown) => Response.json(data),
   cachedQuery: (fn: unknown) => fn,
 }));
 

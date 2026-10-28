@@ -15,7 +15,7 @@ vi.mock('@semianalysisai/inferencex-db/queries/gpu-metrics', () => ({
 }));
 vi.mock('@/lib/cache/api-cache', () => ({
   cachedQuery: () => readCached,
-  cachedJson: (data: unknown) =>
+  cachedJson: (_request: Request, data: unknown) =>
     Response.json(data, { headers: { 'Cache-Control': 'public, max-age=3600' } }),
 }));
 

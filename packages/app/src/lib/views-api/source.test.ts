@@ -1,6 +1,7 @@
 import { cachedJson } from '@/lib/cache/api-cache';
+import { NextRequest } from 'next/server';
 import { describe, expect, it } from 'vitest';
-import { readResponse, selection } from './source';
+import { readResponse, selection, sourceRequest } from './source';
 import { Model, Sequence } from '@/lib/catalog/data-mappings';
 import { ViewsUpstreamError } from './upstream-error';
 
@@ -21,10 +22,13 @@ describe('Kimi K3 TCO selection', () => {
 });
 
 describe('internal published GET response decoding', () => {
-  it('decodes the actual compressed cachedJson response, not a JSON mock', async () => {
+  it('reads real cachedJson output for a source request from a br caller', async () => {
     const evidence = { benchmarks: [{ id: 123, value: null }], label: '基准测试' };
-    const response = cachedJson(evidence);
-    expect(response.headers.get('Content-Encoding')).toBe('gzip');
+    const caller = new NextRequest('https://example.test/api/v1/views/inference', {
+      headers: { 'Accept-Encoding': 'br, gzip' },
+    });
+    const response = cachedJson(sourceRequest(caller, '/api/v1/benchmarks'), evidence);
+    expect(response.headers.get('Content-Encoding')).toBeNull();
     expect(await readResponse(response)).toEqual(evidence);
   });
 

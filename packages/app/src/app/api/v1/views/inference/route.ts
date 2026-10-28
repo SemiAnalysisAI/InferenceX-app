@@ -630,7 +630,7 @@ export function GET(request: NextRequest) {
       ]);
     }
 
-    return cachedJson({
+    return cachedJson(request, {
       view: 'inference',
       apiVersion: 'v1',
       params: resolvedParams,

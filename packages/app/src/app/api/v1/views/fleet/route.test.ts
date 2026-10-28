@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockGetAllBenchmarksForHistory, mockCachedJson, mockCachedText } = vi.hoisted(() => ({
   mockGetAllBenchmarksForHistory: vi.fn(),
-  mockCachedJson: vi.fn((data: unknown) => Response.json(data)),
+  mockCachedJson: vi.fn((_request: Request, data: unknown) => Response.json(data)),
   mockCachedText: vi.fn(
     (data: string, contentType: string) =>
       new Response(data, { headers: { 'Content-Type': contentType } }),

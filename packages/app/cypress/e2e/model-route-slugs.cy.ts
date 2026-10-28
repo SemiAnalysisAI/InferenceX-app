@@ -96,6 +96,9 @@ function selectModel(label: string) {
 }
 
 function expectBestPerSku(enabled: boolean) {
+  // Opening the dialog while a select popover or the previous dialog is still exiting can leave
+  // it under Radix's pointer-events lock; a person cannot click that fast, so let them unmount.
+  cy.get('[data-radix-popper-content-wrapper], [role="dialog"]').should('not.exist');
   cy.get('[data-testid="scatter-quick-filters"]').click();
   cy.get('[data-testid="quick-filter-best-per-sku"]').should(
     'have.attr',

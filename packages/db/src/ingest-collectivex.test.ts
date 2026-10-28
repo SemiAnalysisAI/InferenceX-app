@@ -115,14 +115,14 @@ describe('invalidateCollectiveXCache', () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const fetch = vi.fn(() => Promise.resolve(new Response('{}')));
     await expect(
-      invalidateCollectiveXCache(
-        {
+      invalidateCollectiveXCache({
+        env: {
           APP_URL: 'https://app.example/',
           VERCEL_INVALIDATE_SECRET: 'secret',
           VERCEL_PROTECTION_BYPASS_SECRET: 'bypass',
         },
-        fetch as unknown as typeof globalThis.fetch,
-      ),
+        fetchImpl: fetch as unknown as typeof globalThis.fetch,
+      }),
     ).resolves.toBe(true);
     expect(fetch).toHaveBeenCalledWith(
       'https://app.example/api/v1/invalidate?scope=collectivex',
@@ -133,19 +133,38 @@ describe('invalidateCollectiveXCache', () => {
     );
   });
 
+  it('drops the cached responses outright when asked, as a deletion does', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const fetch = vi.fn(() => Promise.resolve(new Response('{}')));
+    await expect(
+      invalidateCollectiveXCache({
+        immediate: true,
+        env: { APP_URL: 'https://app.example', VERCEL_INVALIDATE_SECRET: 'secret' },
+        fetchImpl: fetch as unknown as typeof globalThis.fetch,
+      }),
+    ).resolves.toBe(true);
+    expect(fetch).toHaveBeenCalledWith(
+      'https://app.example/api/v1/invalidate?scope=collectivex&immediate=true',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
   it('skips without APP_URL or the secret, and fails on an HTTP error', async () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => {});
     const fetch = vi.fn(() => Promise.resolve(new Response('', { status: 401 })));
     await expect(
-      invalidateCollectiveXCache({ APP_URL: 'https://app.example' }, fetch as never),
+      invalidateCollectiveXCache({
+        env: { APP_URL: 'https://app.example' },
+        fetchImpl: fetch as never,
+      }),
     ).resolves.toBe(false);
     expect(fetch).not.toHaveBeenCalled();
     expect(log.mock.calls.flat().join('\n')).toMatch(/cache expires/u);
     await expect(
-      invalidateCollectiveXCache(
-        { APP_URL: 'https://app.example', VERCEL_INVALIDATE_SECRET: 'secret' },
-        fetch as never,
-      ),
+      invalidateCollectiveXCache({
+        env: { APP_URL: 'https://app.example', VERCEL_INVALIDATE_SECRET: 'secret' },
+        fetchImpl: fetch as never,
+      }),
     ).rejects.toThrow(/HTTP 401/u);
   });
 });
