@@ -462,10 +462,12 @@ export function operatorXBlobPrefix(): string {
 }
 
 /** Purge OperatorX's CDN tag and shared merged-comparison blobs. */
-export async function purgeOperatorX(): Promise<void> {
+export async function purgeOperatorX({
+  immediate = false,
+}: { immediate?: boolean } = {}): Promise<void> {
   // OperatorX has no unstable_cache layer: once its blobs are gone, the CDN's
   // background refresh reads fresh data, so the stale response is served once.
-  revalidateTag(operatorXCacheTag(), 'max');
+  revalidateTag(operatorXCacheTag(), immediate ? { expire: 0 } : 'max');
   await blobPurge(operatorXBlobPrefix());
 }
 

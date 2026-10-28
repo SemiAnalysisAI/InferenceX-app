@@ -51,8 +51,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ invalidated: true, scope, immediate });
   }
   if (scope === OPERATORX_CACHE_SCOPE) {
-    await purgeOperatorX();
-    return NextResponse.json({ invalidated: true, scope });
+    await purgeOperatorX({ immediate });
+    return NextResponse.json({ invalidated: true, scope, immediate });
   }
 
   const blobsDeleted = await purgeAll({ immediate });

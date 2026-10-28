@@ -823,7 +823,7 @@ export const apiRouteCatalog = [
       en: 'Secret-protected cache invalidation mutation for operators; it is not a public application contract.',
       zh: '供运维人员使用的密钥保护缓存失效写操作；它不是公开应用契约。',
     },
-    sourceSha256: 'f7760df7139d09ec5d65215aa2482fb7deef3121eb3b5c8e7569f2c77c0cac7e',
+    sourceSha256: 'fcc7185f1c837a2d204e0d0114ba12da8baa40aed3e478b7f8aaf6d0409081aa',
   },
   {
     source: 'src/app/api/v1/latest-images/route.ts',
@@ -1580,7 +1580,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/cache/api-cache.ts',
-    sourceSha256: 'd9f130b4adddf5d9b024a638d72998f8e81d08c15ebe506a073570927165fd76',
+    sourceSha256: '70c14129e91c161c9f35217bed114a41ceb224f4433b40b9144edfa3d5341bcc',
     reviewArea: {
       en: 'Public CDN tags, cache lifetimes, Blob key dimensions, and purge behavior.',
       zh: '公开 CDN 标签、缓存时长、Blob 键维度和清除行为。',

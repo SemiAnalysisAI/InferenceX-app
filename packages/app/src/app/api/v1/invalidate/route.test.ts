@@ -181,11 +181,24 @@ describe('POST /api/v1/invalidate', () => {
       return response;
     });
     await Promise.resolve();
-    expect(mockPurgeOperatorX).toHaveBeenCalledOnce();
+    expect(mockPurgeOperatorX).toHaveBeenCalledExactlyOnceWith({ immediate: false });
     expect(completed).toBe(false);
     purge.resolve();
     const response = await pending;
-    expect(await response.json()).toEqual({ invalidated: true, scope: 'operatorx' });
+    expect(await response.json()).toEqual({
+      invalidated: true,
+      scope: 'operatorx',
+      immediate: false,
+    });
+    expect(mockPurgeAll).not.toHaveBeenCalled();
+  });
+
+  it('hard-purges only the OperatorX scope when immediate=true', async () => {
+    const res = await POST(
+      postReq({ Authorization: 'Bearer test-secret-123' }, '?scope=operatorx&immediate=true'),
+    );
+    expect(await res.json()).toEqual({ invalidated: true, scope: 'operatorx', immediate: true });
+    expect(mockPurgeOperatorX).toHaveBeenCalledExactlyOnceWith({ immediate: true });
     expect(mockPurgeAll).not.toHaveBeenCalled();
   });
 
