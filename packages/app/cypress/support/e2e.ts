@@ -47,7 +47,7 @@ Cypress.on('window:before:load', (win) => {
 
 export function unlockAgenticGate(win: Window): void {
   try {
-    win.localStorage.setItem('inferencex-feature-gate', '1');
+    win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
   } catch {}
 }
 

@@ -404,7 +404,7 @@ describe('Chinese (/zh) pages', () => {
       cy.intercept('GET', '**/api/v1/feedback/list', { body: { rows: [] } }).as('feedbackList');
       cy.visit('/zh/feedback', {
         onBeforeLoad(win) {
-          win.localStorage.setItem('inferencex-feature-gate', '1');
+          win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
         },
       });
       cy.wait('@feedbackList');

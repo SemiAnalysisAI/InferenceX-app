@@ -87,7 +87,7 @@ function visitCertifiedPowerChart(
   cy.visit(`${page}?g_model=DeepSeek-V4-Pro&i_seq=8k/1k&i_prec=fp4${extraParams}`, {
     onBeforeLoad(win) {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      win.localStorage.setItem('inferencex-feature-gate', '1');
+      win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
     },
   });
   cy.wait(['@availability', '@benchmarks']);
