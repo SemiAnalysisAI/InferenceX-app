@@ -76,10 +76,18 @@ and the repository root `.vercelignore` assumes that layout. It defines no cron 
 `/logos`, `/decorative`, `/whitepaper`, favicons and `og-image.png`):
 `public, max-age=86400, stale-while-revalidate=604800`. File names there are reused across
 deploys, so they are not marked immutable. Optimized images (`/_next/image`) are served as
-WebP with a one-day `minimumCacheTTL`. AVIF is off because its encoder can stall a shared
-optimization request. `src/proxy.ts` runs only for API routes,
+WebP with a one-day `minimumCacheTTL`. `src/proxy.ts` runs only for API routes,
 embed pages, legacy Inference power links, and compare share links with query state; its
 `config.matcher` must stay a static literal.
+
+`patches/next@16.3.3.patch` (root `patchedDependencies`) fixes the self-hosted image optimizer
+used by `next start`, including CI. Unpatched, Next reads a local source image through a mocked
+request that reuses the browser's socket. When the browser cancels that image (a navigation, or a
+new `srcset` pick after a resize), the source read is dropped and the optimization never
+finishes. Next shares one optimization per image URL, width and format, so every later request
+for that variant hangs until the server restarts, and pages using it never fire `load`.
+`src/lib/runtime/next-image-optimizer-patch.test.ts` fails if a Next upgrade drops the patch;
+re-create it with `bun patch next` unless the new release fixes `fetchInternalImage`.
 
 `NEXT_PUBLIC_*` values, such as `NEXT_PUBLIC_POSTHOG_KEY` and `NEXT_PUBLIC_POSTHOG_HOST`,
 are inlined into the client bundle at build time. After changing one in the Vercel
