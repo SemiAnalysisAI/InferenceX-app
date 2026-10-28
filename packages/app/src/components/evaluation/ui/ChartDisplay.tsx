@@ -231,7 +231,7 @@ export default function EvaluationChartDisplay() {
                 >
                   <p className="text-sm text-muted-foreground">{t.tableLoading}</p>
                   <Skeleton className="h-8 w-1/3" />
-                  <Skeleton className="h-64 w-full" />
+                  <Skeleton className="h-154 w-full" />
                 </div>
               ) : (
                 <>

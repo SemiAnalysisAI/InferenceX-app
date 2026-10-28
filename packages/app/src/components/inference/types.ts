@@ -7,6 +7,7 @@ import type { PowerTier } from '@/lib/power/power-tier';
 import type { SystemPowerEstimate } from '@/lib/power/modeled-system-power';
 import type { MetricKey } from './metric-registry';
 import type { FixedSequenceStatistic } from './utils/resolveXAxisField';
+import type { BlockedComparisonToggle } from './utils/comparison-exclusion';
 import type { XAxisMode } from './hooks/chart-data-core';
 import type { PowerBasis } from '@/lib/power/power-basis';
 import type { TokenBasis } from '@/lib/benchmarks/benchmark-transform';
@@ -385,6 +386,8 @@ export interface InferenceDataContextType {
 export interface InferenceFiltersContextType {
   activeHwTypes: Set<string>;
   bestPerSku: boolean;
+  /** Inactive hardware keys whose legend toggle the engine exclusion blocks. */
+  blockedHwToggles: ReadonlyMap<string, BlockedComparisonToggle>;
   selectedModel: Model;
   selectedSequence: Sequence;
   selectedPrecisions: string[];

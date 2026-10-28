@@ -4,7 +4,13 @@ import { buildComparison, comparisonView } from '@semianalysisai/inferencex-db/o
 import { normalizeBundle } from '@semianalysisai/inferencex-db/operatorx/normalize';
 import { generateVendorColors } from '@/lib/charts/dynamic-colors';
 
-import { hardwareLabel, operatorXColors, peakBandwidthTBs, peakTflops } from './hardware';
+import {
+  hardwareLabel,
+  operatorXColors,
+  peakBandwidthTBs,
+  peakTflops,
+  toggleHardwareSelection,
+} from './hardware';
 import { metricById } from './metrics';
 
 function comparison() {
@@ -121,4 +127,16 @@ describe('Ascend OperatorX reference', () => {
       expect(operatorXColors([], theme)).toEqual({});
     },
   );
+});
+
+describe('toggleHardwareSelection', () => {
+  it('removes a selected GPU and appends an unselected one', () => {
+    expect(toggleHardwareSelection(['b200', 'h200', 'mi355x'], 'h200')).toEqual(['b200', 'mi355x']);
+    expect(toggleHardwareSelection(['b200'], 'h200')).toEqual(['b200', 'h200']);
+  });
+
+  it('keeps the last selected GPU and returns the same array so callers can skip the update', () => {
+    const only = ['b200'];
+    expect(toggleHardwareSelection(only, 'b200')).toBe(only);
+  });
 });

@@ -118,6 +118,7 @@ import {
 } from './hooks/useChartData';
 import { buildActiveComparisonIds, resolveComparisonEntries } from './utils/comparisonEntry';
 import {
+  blockedComparisonToggles,
   comparisonDefaultGroup,
   comparisonExclusionPolicy,
   comparisonExclusion as resolveComparisonExclusion,
@@ -1153,6 +1154,16 @@ export function InferenceProvider({
     () => new Set(hwFilteredPoints.map(extractHwKey)),
     [hwFilteredPoints, extractHwKey],
   );
+  const blockedHwToggles = useMemo(
+    () =>
+      blockedComparisonToggles(
+        activeHwTypes,
+        selectableHwTypes,
+        comparisonExclusion,
+        consentSupported,
+      ),
+    [activeHwTypes, selectableHwTypes, comparisonExclusion, consentSupported],
+  );
 
   const bestHwTypes = useMemo(() => {
     const wantedType = selectedXAxisMode === 'interactivity' ? 'interactivity' : 'e2e';
@@ -1803,6 +1814,7 @@ export function InferenceProvider({
     () => ({
       activeHwTypes,
       bestPerSku,
+      blockedHwToggles,
       selectedModel,
       selectedSequence: effectiveSequence,
       selectedPrecisions: effectivePrecisions,
@@ -1824,6 +1836,7 @@ export function InferenceProvider({
     [
       activeHwTypes,
       bestPerSku,
+      blockedHwToggles,
       selectedModel,
       effectiveSequence,
       effectivePrecisions,

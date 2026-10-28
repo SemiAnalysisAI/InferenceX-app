@@ -288,6 +288,7 @@ export function createMockInferenceContextValues(
     compareGpuPair: null,
     lockedFrameworks: null,
     minimalChrome: false,
+    blockedHwToggles: new Map(),
     ...overrides,
   };
 }
