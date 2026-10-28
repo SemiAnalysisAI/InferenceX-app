@@ -1736,7 +1736,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/collectivex.ts',
-    sourceSha256: '73ff29402f25c514bc5e2578703aacd4d6c81b7eb045266188d50b55391ed40c',
+    sourceSha256: 'd330c47acd94331d815515287990a5e25ab76a0f0d49c57d47dea0852604c3cd',
     reviewArea: {
       en: 'CollectiveX dataset projection, run summaries, coverage, series, and latest-run ordering.',
       zh: 'CollectiveX 数据集投影、运行汇总、覆盖范围、序列和最新运行排序。',

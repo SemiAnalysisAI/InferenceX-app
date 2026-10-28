@@ -4,6 +4,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  assignRunIds,
   committedRun,
   validateCommittedResults,
   type ResultsSource,
@@ -12,9 +13,11 @@ import { makeRawMatrix, makeRawShard } from '../collectivex/test-fixture';
 import { pgliteSql, type PgliteSql } from '../lib/test-pglite';
 import {
   collectiveXDatasetFromRow,
+  deleteCollectiveXRun,
   getCollectiveXRun,
   getLatestCollectiveXRun,
   listCollectiveXRuns,
+  pruneCollectiveXRuns,
   upsertCollectiveXRun,
 } from './collectivex';
 
@@ -25,12 +28,19 @@ const SECOND_SHA = 'b'.repeat(40);
 const FIRST_AT = '2026-10-28T00:00:00Z';
 const SECOND_AT = '2026-10-29T00:00:00Z';
 
+const MIGRATIONS = new URL('../../migrations-collectivex/', import.meta.url);
+
+async function applyMigrations(db: PGlite, filter: (name: string) => boolean): Promise<void> {
+  for (const name of fs.readdirSync(MIGRATIONS).toSorted()) {
+    if (name.endsWith('.sql') && filter(name)) {
+      await db.exec(fs.readFileSync(new URL(name, MIGRATIONS), 'utf8'));
+    }
+  }
+}
+
 async function collectiveXDb(): Promise<PgliteSql> {
   const db = await PGlite.create();
-  const dir = new URL('../../migrations-collectivex/', import.meta.url);
-  for (const name of fs.readdirSync(dir).toSorted()) {
-    if (name.endsWith('.sql')) await db.exec(fs.readFileSync(new URL(name, dir), 'utf8'));
-  }
+  await applyMigrations(db, () => true);
   return pgliteSql(db);
 }
 
@@ -59,9 +69,11 @@ function encode(value: unknown): Uint8Array {
 }
 
 function source(sha: string, committedAt: string, docs: Json[]): ResultsSource {
+  const [{ runId }] = assignRunIds([{ sha, committedAt }]);
   return {
     sha,
     committedAt,
+    runId,
     files: new Map([
       ['cases.json', encode(cases)],
       ...docs.map((doc): [string, Uint8Array] => [
@@ -145,5 +157,80 @@ describe('CollectiveX runs from committed results in PostgreSQL', () => {
     const kept = await getCollectiveXRun(sql, 1, first.run.run_id);
     expect(kept?.source_sha).toBe(FIRST_SHA);
     expect(await listCollectiveXRuns(sql, 1)).toHaveLength(1);
+  });
+
+  it('never serves a run with nothing measured', async () => {
+    const empty = committedRun(validateCommittedResults(source(FIRST_SHA, FIRST_AT, [])));
+    expect(empty.run.summary.measured_cases).toBe(0);
+    await upsertCollectiveXRun(sql, empty.run, empty.docs);
+    expect(await getLatestCollectiveXRun(sql, 1)).toBeNull();
+    expect(await getCollectiveXRun(sql, 1, empty.run.run_id)).toBeNull();
+    expect(await listCollectiveXRuns(sql, 1)).toEqual([]);
+  });
+
+  it('stores each document once when two ingests of one commit overlap', async () => {
+    const first = committedRun(
+      validateCommittedResults(source(FIRST_SHA, FIRST_AT, [mi300x, mi325x])),
+    );
+    const results = await Promise.all([
+      upsertCollectiveXRun(sql, first.run, first.docs),
+      upsertCollectiveXRun(sql, first.run, first.docs),
+      upsertCollectiveXRun(sql, first.run, first.docs),
+    ]);
+    expect(results.toSorted()).toEqual(['inserted', 'replaced', 'replaced']);
+    const [{ count }] = await sql`SELECT count(*)::int AS count FROM cx_run_docs`;
+    expect(count).toBe(2);
+  });
+
+  it('prunes runs outside the kept commits and deletes one named run', async () => {
+    const first = committedRun(validateCommittedResults(source(FIRST_SHA, FIRST_AT, [mi300x])));
+    const second = committedRun(validateCommittedResults(source(SECOND_SHA, SECOND_AT, [h200])));
+    await upsertCollectiveXRun(sql, first.run, first.docs);
+    await upsertCollectiveXRun(sql, second.run, second.docs);
+
+    await expect(pruneCollectiveXRuns(sql, [SECOND_SHA])).resolves.toEqual([
+      { run_id: first.run.run_id, source_sha: FIRST_SHA },
+    ]);
+    const kept = await listCollectiveXRuns(sql, 1);
+    expect(kept.map((run) => run.run_id)).toEqual([second.run.run_id]);
+    const [{ count }] = await sql`SELECT count(*)::int AS count FROM cx_run_docs`;
+    expect(count).toBe(1);
+
+    await expect(deleteCollectiveXRun(sql, second.run.run_id)).resolves.toEqual({
+      run_id: second.run.run_id,
+      source_sha: SECOND_SHA,
+    });
+    await expect(deleteCollectiveXRun(sql, second.run.run_id)).resolves.toBeNull();
+    expect(await getLatestCollectiveXRun(sql, 1)).toBeNull();
+  });
+});
+
+describe('migration 005', () => {
+  it('drops lazy-ingest runs that would outrank committed runs, and forbids new ones', async () => {
+    const db = await PGlite.create();
+    await applyMigrations(db, (name) => name < '005');
+    const legacy = pgliteSql(db);
+    const first = committedRun(validateCommittedResults(source(FIRST_SHA, FIRST_AT, [mi300x])));
+    await upsertCollectiveXRun(legacy, first.run, first.docs);
+    await upsertCollectiveXRun(
+      legacy,
+      { ...first.run, run_id: '37459990486', source_sha: SECOND_SHA },
+      first.docs,
+    );
+    const before = await getLatestCollectiveXRun(legacy, 1);
+    expect(before?.run_id).toBe('37459990486');
+
+    await applyMigrations(db, (name) => name >= '005');
+    const after = await getLatestCollectiveXRun(legacy, 1);
+    expect(after?.run_id).toBe(first.run.run_id);
+    const [{ count }] = await legacy`SELECT count(*)::int AS count FROM cx_run_docs`;
+    expect(count).toBe(1);
+    await expect(
+      upsertCollectiveXRun(
+        legacy,
+        { ...first.run, run_id: '37459990487', source_sha: SECOND_SHA },
+        first.docs,
+      ),
+    ).rejects.toThrow(/cx_runs_committed_run_id/u);
   });
 });

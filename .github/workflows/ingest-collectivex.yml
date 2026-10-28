@@ -15,11 +15,22 @@ on:
         description: Ingest every collectivex/results/ commit on main instead
         type: boolean
         default: false
+      prune:
+        description: With backfill, then delete every stored run the backfill did not store
+        type: boolean
+        default: false
+      delete_run:
+        description: Delete this one stored run_id instead (no other target)
+        required: false
 
 permissions: {}
 
+# One group for every ingest, prune and delete: runs queue behind each other instead of
+# writing at once (the database also serializes writers with an advisory lock). GitHub
+# keeps a single pending run per group, so a burst of dispatches can supersede a pending
+# one; a backfill then stores anything it skipped.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.client_payload.sha || inputs.sha || inputs.ref || 'backfill' }}
+  group: ${{ github.workflow }}
   cancel-in-progress: false
 
 jobs:
@@ -40,6 +51,8 @@ jobs:
           SHA: ${{ github.event.client_payload.sha || inputs.sha }}
           REF: ${{ inputs.ref }}
           BACKFILL: ${{ inputs.backfill }}
+          PRUNE: ${{ inputs.prune }}
+          DELETE_RUN: ${{ inputs.delete_run }}
         run: |
           : "${SLACK_WEBHOOK_URL:?SLACK_WEBHOOK_URL secret is not set}"
           : "${APP_URL:?APP_URL repository variable is not set}"
@@ -50,15 +63,24 @@ jobs:
           [ -n "$SHA" ] && selected=$((selected + 1))
           [ -n "$REF" ] && selected=$((selected + 1))
           [ "$BACKFILL" = true ] && selected=$((selected + 1))
+          [ -n "$DELETE_RUN" ] && selected=$((selected + 1))
           if [ "$selected" -ne 1 ]; then
-            echo "give exactly one of sha, ref, or backfill" >&2
+            echo "give exactly one of sha, ref, backfill, or delete_run" >&2
+            exit 1
+          fi
+          if [ "$PRUNE" = true ] && [ "$BACKFILL" != true ]; then
+            echo "prune needs backfill" >&2
+            exit 1
+          fi
+          if [ -n "$DELETE_RUN" ] && ! [[ "$DELETE_RUN" =~ ^[1-9][0-9]{0,9}$ ]]; then
+            echo "delete_run must be a stored run_id" >&2
             exit 1
           fi
           if [ -n "$SHA" ] && ! [[ "$SHA" =~ ^[0-9a-f]{40}$ ]]; then
             echo "sha must be 40 lowercase hex characters" >&2
             exit 1
           fi
-          if [ -n "$REF" ] && { ! [[ "$REF" =~ ^[A-Za-z0-9_./-]{1,255}$ ]] || [[ "$REF" == *..* ]]; }; then
+          if [ -n "$REF" ] && { ! [[ "$REF" =~ ^[A-Za-z0-9_][A-Za-z0-9_./-]{0,254}$ ]] || [[ "$REF" == *..* ]]; }; then
             echo "ref is not a valid branch or tag name" >&2
             exit 1
           fi
@@ -96,8 +118,14 @@ jobs:
           SHA: ${{ github.event.client_payload.sha || inputs.sha }}
           REF: ${{ inputs.ref }}
           BACKFILL: ${{ inputs.backfill }}
+          PRUNE: ${{ inputs.prune }}
+          DELETE_RUN: ${{ inputs.delete_run }}
         run: |
-          if [ "$BACKFILL" = true ]; then
+          if [ -n "$DELETE_RUN" ]; then
+            target=(--delete-run "$DELETE_RUN")
+          elif [ "$BACKFILL" = true ] && [ "$PRUNE" = true ]; then
+            target=(--backfill --prune)
+          elif [ "$BACKFILL" = true ]; then
             target=(--backfill)
           elif [ -n "$SHA" ]; then
             target=(--sha "$SHA")

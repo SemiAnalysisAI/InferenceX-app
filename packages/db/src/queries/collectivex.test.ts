@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { makeRawMatrix, makeRawShard, makeRunMeta } from '../collectivex/test-fixture';
 import type { DbClient } from '../connection.js';
+import type { Sql } from '../etl/db-utils';
 import {
   collectiveXDatasetFromRow,
   getCollectiveXRun,
@@ -19,10 +20,13 @@ interface Captured {
 
 function fakeSql(rowsQueue: Record<string, unknown>[][]) {
   const calls: Captured[] = [];
-  const sql = ((strings: TemplateStringsArray, ...values: unknown[]) => {
+  const tag = ((strings: TemplateStringsArray, ...values: unknown[]) => {
     calls.push({ text: strings.join('?'), values });
     return Promise.resolve(rowsQueue.shift() ?? []);
   }) as DbClient;
+  const sql = Object.assign(tag, {
+    begin: (fn: (tx: DbClient) => Promise<unknown>) => fn(tag),
+  }) as unknown as Sql & DbClient;
   return { sql, calls };
 }
 
@@ -58,6 +62,7 @@ describe('read queries', () => {
     for (const call of calls) {
       expect(call.text).not.toContain('deleted_at');
       expect(call.text).toContain("summary->>'requested_cases'");
+      expect(call.text).toContain("summary->>'measured_cases')::int, 0) > 0");
     }
     expect(calls[0].text).toContain('ORDER BY r.run_id DESC');
     expect(calls[2].text).toContain('ORDER BY run_id DESC');
@@ -76,24 +81,30 @@ describe('read queries', () => {
 
 describe('upsertCollectiveXRun', () => {
   it('binds raw objects (never pre-stringified JSON) and reports a first insert', async () => {
-    const { sql, calls } = fakeSql([[{ inserted: true }]]);
+    const { sql, calls } = fakeSql([[], [{ inserted: true }]]);
     const docs = [{ record_type: 'case-attempt' }];
 
     await expect(upsertCollectiveXRun(sql, runInsert, docs)).resolves.toBe('inserted');
 
-    expect(calls).toHaveLength(1);
-    expect(calls[0].values).toContainEqual(runInsert.matrix);
-    expect(calls[0].values).toContainEqual(runInsert.summary);
-    expect(calls[0].values).toContainEqual({ docs });
+    expect(calls).toHaveLength(2);
+    expect(calls[1].values).toContainEqual(runInsert.matrix);
+    expect(calls[1].values).toContainEqual(runInsert.summary);
+    expect(calls[1].values).toContainEqual({ docs });
     expect(
-      calls[0].values.every((value) => typeof value !== 'string' || !value.startsWith('{')),
+      calls[1].values.every((value) => typeof value !== 'string' || !value.startsWith('{')),
     ).toBe(true);
   });
 
+  it('takes the CollectiveX write lock in the transaction before writing', async () => {
+    const { sql, calls } = fakeSql([[], [{ inserted: true }]]);
+    await upsertCollectiveXRun(sql, runInsert, []);
+    expect(calls[0].text).toBe('SELECT pg_advisory_xact_lock(7384110219)');
+  });
+
   it('replaces the row and its documents when the same commit is ingested again', async () => {
-    const { sql, calls } = fakeSql([[{ inserted: false }]]);
+    const { sql, calls } = fakeSql([[], [{ inserted: false }]]);
     await expect(upsertCollectiveXRun(sql, runInsert, [])).resolves.toBe('replaced');
-    const { text } = calls[0];
+    const { text } = calls[1];
     expect(text).toContain('ON CONFLICT (run_id) DO UPDATE');
     expect(text).toContain('WHERE cx_runs.source_sha = EXCLUDED.source_sha');
     expect(text).toContain('DELETE FROM cx_run_docs WHERE run_id IN (SELECT run_id FROM upserted)');
@@ -101,17 +112,17 @@ describe('upsertCollectiveXRun', () => {
   });
 
   it('writes nothing when the run id already belongs to another commit', async () => {
-    const { sql } = fakeSql([[]]);
+    const { sql } = fakeSql([[], []]);
     await expect(upsertCollectiveXRun(sql, runInsert, [{}])).resolves.toBe('conflict');
   });
 
   it('touches only the CollectiveX tables and never drops data wholesale', async () => {
-    const { sql, calls } = fakeSql([[{ inserted: true }]]);
+    const { sql, calls } = fakeSql([[], [{ inserted: true }]]);
     await upsertCollectiveXRun(sql, runInsert, []);
-    expect(new Set([...calls[0].text.matchAll(/\bcx_[a-z_]+/gu)].map((match) => match[0]))).toEqual(
+    expect(new Set([...calls[1].text.matchAll(/\bcx_[a-z_]+/gu)].map((match) => match[0]))).toEqual(
       new Set(['cx_runs', 'cx_run_docs']),
     );
-    expect(calls[0].text).not.toMatch(/\b(?:DROP|TRUNCATE|ALTER)\b/iu);
+    expect(calls[1].text).not.toMatch(/\b(?:DROP|TRUNCATE|ALTER)\b/iu);
   });
 });
 

@@ -45,8 +45,11 @@ Requires Node 24 or 26. The command checks the current OpenAPI operations, reads
 list **once**, and selects its two newest runs with `measured_cases > 0`, ordered
 by numeric run ID. The older selection is `left`; the newer is `right`. This is a
 bounded example selection, not a representative sample. The run ID is the results
-commit time in epoch seconds and the dataset's `run.source_sha` is that commit; the
-conclusion remains in the export.
+commit time in epoch seconds (raised past the previous results commit on a same-second
+tie) and the dataset's `run.source_sha` is that commit; the conclusion remains in the
+export. EP tail percentiles (`p90`, `p95`, `p99`) of latencies and derived rates can be
+`null` where the harness withheld them; `p50` is always a number. Report a `null` tail as
+unavailable, never as zero.
 
 Run-list counts identify candidate pairs; exact EP and KV identities in the returned
 details establish whether they have matched groups. For a requested pair, supply
@@ -68,7 +71,7 @@ The public operations require `version=1`:
 
 | Operation                                                                                        | Meaning                                                                          |
 | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
-| [`/collectivex/latest`](https://inferencex.semianalysis.com/api/v1/collectivex/latest?version=1) | Newest stored run by run ID; it need not contain measurements.                   |
+| [`/collectivex/latest`](https://inferencex.semianalysis.com/api/v1/collectivex/latest?version=1) | Newest stored run by run ID; only runs with a measured result are stored.        |
 | [`/collectivex/runs`](https://inferencex.semianalysis.com/api/v1/collectivex/runs?version=1)     | Retained summaries and `discovery_complete`; the helper uses this for selection. |
 | `/collectivex/runs/{runId}`                                                                      | One run dataset; a re-ingest of the same commit can replace its contents.        |
 

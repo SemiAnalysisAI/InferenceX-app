@@ -103,7 +103,8 @@ describe('swap_blocks cases in a unified cases.json', () => {
       terminal_cases: 2,
       swap_requested_cases: 3,
       swap_measured_cases: 1,
-      covered_skus: ['h200-dgxc', 'mi300x'],
+      // mi300x is requested but has no result, so it is not a covered pool.
+      covered_skus: ['h200-dgxc'],
     });
   });
 

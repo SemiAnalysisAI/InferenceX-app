@@ -1,9 +1,10 @@
 /**
  * CollectiveX results committed to the benchmark repo: `collectivex/results/cases.json`
  * (the requested cases) plus one `collectivex/results/<sku>/<case_id>.json` per measured
- * case. Each InferenceX commit that carries results becomes one stored run, so this
- * module pins a ref to a commit, reads exactly those files at it, validates them, and
- * turns them into a cx_runs row. Shared by the ingest CLI and the app's ingest route.
+ * case. Each InferenceX commit on main that carries measured results becomes one stored
+ * run, so this module pins a ref to a commit, reads exactly those files at it, validates
+ * them, and turns them into a cx_runs row. Used by the ingest CLI (ingest-collectivex.ts),
+ * which the ingest-collectivex workflow runs; the app itself never ingests.
  */
 
 import {
@@ -30,6 +31,23 @@ const FETCH_CONCURRENCY = 8;
 const COMMITS_PER_PAGE = 100;
 const SHA = /^[0-9a-f]{40}$/u;
 const RESULT_PATH = /^(?<sku>[^/]+)\/(?<caseId>[^/]+)\.json$/u;
+// Mirrors collectivex/tests/test_results.py in the benchmark repo: results must not name
+// machines, by IPv4 address in any string or by a host-identifying key anywhere.
+const IPV4 = /(?<![\d.])(?:\d{1,3}\.){3}\d{1,3}(?![\d.])/u;
+const HOST_KEYS = new Set([
+  'host',
+  'hosts',
+  'hostname',
+  'nodelist',
+  'slurm_nodelist',
+  'master_addr',
+]);
+/**
+ * Exclusive upper bound of a committed-results run_id. Ids are epoch seconds (below this
+ * until the year 2286); the retired lazy ingest keyed runs by GitHub Actions run id, which
+ * is at or above it, and migration 005 removes those rows and forbids new ones.
+ */
+export const MAX_COMMITTED_RUN_ID = 10_000_000_000;
 
 export interface GithubReadOptions {
   /** Authenticates API and raw reads; without it GitHub's unauthenticated rate limit applies. */
@@ -37,10 +55,22 @@ export interface GithubReadOptions {
   fetch?: typeof globalThis.fetch;
 }
 
-export interface ResultsCommit {
+/** A commit as GitHub lists it. */
+export interface GithubCommit {
   sha: string;
   /** Committer time (ISO 8601): when the commit landed on its branch. */
   committedAt: string;
+}
+
+/** A results commit in main's history, with the run_id it is stored under. */
+export interface ResultsCommit extends GithubCommit {
+  /**
+   * Committer time in epoch seconds, raised to one past the previous results commit's
+   * id when it would not exceed it (two commits in the same second, or a committer
+   * clock behind its parent). Derived from main's history alone, so every ingest of a
+   * commit assigns it the same id, ids are unique, and they grow with history.
+   */
+  runId: string;
 }
 
 /** One commit's files under RESULTS_DIR, keyed by path relative to it. */
@@ -115,7 +145,7 @@ async function getJson(url: string, options: GithubReadOptions): Promise<unknown
   return response.json();
 }
 
-function toResultsCommit(body: unknown): ResultsCommit {
+function toGithubCommit(body: unknown): GithubCommit {
   const commit = body as { sha?: unknown; commit?: { committer?: { date?: unknown } } } | null;
   const date = commit?.commit?.committer?.date;
   if (
@@ -134,7 +164,7 @@ async function resultsCommitsPage(
   page: number,
   perPage: number,
   options: GithubReadOptions,
-): Promise<ResultsCommit[]> {
+): Promise<GithubCommit[]> {
   const query = new URLSearchParams({
     sha: ref,
     path: RESULTS_DIR,
@@ -148,21 +178,37 @@ async function resultsCommitsPage(
   if (!Array.isArray(body)) {
     throw new CommittedResultsError('unavailable', 'GitHub commit list is not an array');
   }
-  return body.map(toResultsCommit);
+  return body.map(toGithubCommit);
 }
 
-/** Every commit on `branch` that touched RESULTS_DIR, oldest first. */
+/**
+ * Give each results commit of a history (oldest first) its run_id: its committer
+ * second, or one more than the previous id when that is not larger.
+ */
+export function assignRunIds(history: readonly GithubCommit[]): ResultsCommit[] {
+  let previous = 0;
+  return history.map((commit) => {
+    const id = Math.max(Math.floor(Date.parse(commit.committedAt) / 1000), previous + 1);
+    if (id >= MAX_COMMITTED_RUN_ID) {
+      throw new CommittedResultsError('unavailable', `${commit.sha} has an out-of-range time`);
+    }
+    previous = id;
+    return { ...commit, runId: String(id) };
+  });
+}
+
+/** Every commit on `branch` that touched RESULTS_DIR, oldest first, with its run_id. */
 export async function listResultsCommits(
   branch: string = RESULTS_BRANCH,
   options: GithubReadOptions = {},
 ): Promise<ResultsCommit[]> {
-  const commits: ResultsCommit[] = [];
+  const commits: GithubCommit[] = [];
   for (let page = 1; ; page++) {
     const batch = await resultsCommitsPage(branch, page, COMMITS_PER_PAGE, options);
     commits.push(...batch);
     if (batch.length < COMMITS_PER_PAGE) break;
   }
-  return commits.toReversed();
+  return assignRunIds(commits.toReversed());
 }
 
 /**
@@ -184,13 +230,14 @@ export async function resolveResultsCommit(
     );
   }
   const history = await listResultsCommits(RESULTS_BRANCH, options);
-  if (!history.some((entry) => entry.sha === commit.sha)) {
+  const entry = history.find((candidate) => candidate.sha === commit.sha);
+  if (!entry) {
     throw new CommittedResultsError(
       'not-found',
       `${commit.sha} (from ${ref}) is not a ${RESULTS_DIR} commit on ${RESULTS_BRANCH}`,
     );
   }
-  return commit;
+  return entry;
 }
 
 interface TreeEntry {
@@ -285,8 +332,8 @@ interface ResultDoc {
   case_id?: unknown;
   version?: unknown;
   identity?: { case_id?: unknown; case_factors?: { sku?: unknown } };
-  provenance?: { source_dirty?: unknown };
-  runtime?: { sku?: unknown; source_dirty?: unknown };
+  provenance?: { source_sha?: unknown; source_dirty?: unknown };
+  runtime?: { sku?: unknown; source_sha?: unknown; source_dirty?: unknown };
 }
 
 /** Identity fields of an EP case attempt or a swap_blocks result; null for anything else. */
@@ -295,11 +342,37 @@ function resultIdentity(doc: ResultDoc | null) {
     return {
       caseId: doc.identity?.case_id,
       sku: doc.identity?.case_factors?.sku,
+      sourceSha: doc.provenance?.source_sha,
       sourceDirty: doc.provenance?.source_dirty,
     };
   }
   if (doc?.schema === SWAP_SCHEMA) {
-    return { caseId: doc.case_id, sku: doc.runtime?.sku, sourceDirty: doc.runtime?.source_dirty };
+    return {
+      caseId: doc.case_id,
+      sku: doc.runtime?.sku,
+      sourceSha: doc.runtime?.source_sha,
+      sourceDirty: doc.runtime?.source_dirty,
+    };
+  }
+  return null;
+}
+
+/** The first machine identifier in a document: an IPv4 address or a host-naming key. */
+function machineIdentifier(value: unknown): string | null {
+  if (typeof value === 'string') return IPV4.test(value) ? 'an IP address' : null;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = machineIdentifier(item);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (value && typeof value === 'object') {
+    for (const [key, item] of Object.entries(value)) {
+      if (HOST_KEYS.has(key.toLowerCase())) return `the host-identifying field "${key}"`;
+      const found = machineIdentifier(item);
+      if (found) return found;
+    }
   }
   return null;
 }
@@ -315,7 +388,7 @@ function parseJson(path: string, data: Uint8Array): unknown {
 function runMeta(source: ResultsCommit): CollectiveXNeutralRunMeta {
   const seconds = Math.floor(Date.parse(source.committedAt) / 1000);
   return {
-    run_id: String(seconds),
+    run_id: source.runId,
     run_attempt: 1,
     generated_at: new Date(seconds * 1000).toISOString().replace(/\.\d{3}Z$/u, 'Z'),
     conclusion: 'success',
@@ -373,18 +446,23 @@ export function validateCommittedResults(source: ResultsSource): CommittedResult
     if (!runnable.has(JSON.stringify([location.sku, location.caseId]))) {
       throw new CommittedResultsError('invalid', `${path} is not a runnable case in ${CASES_FILE}`);
     }
+    if (typeof identity.sourceSha !== 'string' || !SHA.test(identity.sourceSha)) {
+      throw new CommittedResultsError('invalid', `${path} has no 40-hex source_sha`);
+    }
     if (identity.sourceDirty !== false) {
       throw new CommittedResultsError(
         'invalid',
         `${path} was not measured from committed collectivex/ code`,
       );
     }
-    if (doc?.record_type === 'case-attempt' && Number(doc.version) !== version) {
+    if (doc?.record_type === 'case-attempt' && doc.version !== version) {
       throw new CommittedResultsError(
         'invalid',
         `${path} has version ${String(doc.version)}, ${CASES_FILE} has ${version}`,
       );
     }
+    const leaked = machineIdentifier(doc);
+    if (leaked) throw new CommittedResultsError('invalid', `${path} contains ${leaked}`);
     results.push({ path, doc });
   }
 
@@ -404,6 +482,7 @@ export function validateCommittedResults(source: ResultsSource): CommittedResult
   return {
     sha: source.sha,
     committedAt: source.committedAt,
+    runId: source.runId,
     version,
     matrix,
     docs: results.map(({ doc }) => doc),
@@ -411,10 +490,9 @@ export function validateCommittedResults(source: ResultsSource): CommittedResult
 }
 
 /**
- * The cx_runs row for one results commit. run_id is the commit time in epoch
- * seconds, so it grows with main's history and `ORDER BY run_id DESC` still means
- * "latest"; each commit is one attempt whose documents are replaced wholesale when
- * it is ingested again.
+ * The cx_runs row for one results commit. run_id comes from assignRunIds, so it grows
+ * with main's history and `ORDER BY run_id DESC` still means "latest"; each commit is
+ * one attempt whose documents are replaced wholesale when it is ingested again.
  */
 export function committedRun(results: CommittedResults): {
   run: CollectiveXRunInsert;

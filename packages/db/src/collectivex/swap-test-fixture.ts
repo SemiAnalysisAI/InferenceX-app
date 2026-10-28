@@ -56,7 +56,7 @@ export function makeSwapDoc(sku = 'h200-dgxc') {
       cuda: '13.0',
       hip: null,
       image: 'vllm/vllm-openai:v0.25.1',
-      source_sha: 'abc123',
+      source_sha: 'f'.repeat(40),
       source_dirty: false,
     },
     selection: {

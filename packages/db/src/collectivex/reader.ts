@@ -478,11 +478,12 @@ export function buildDatasetFromNeutral(
         points.filter((point) => point.terminal_status !== 'pending').length + swapPoints,
       measured_points:
         points.filter((point) => point.terminal_status === 'measured').length + swapPoints,
+      // Pools with at least one measured result; requested-only pools are not covered.
       covered_skus: [
         ...new Set([
-          ...coverage.map((item) => item.sku),
-          ...kv.map((item) => item.sku),
-          ...swapRequested.map((item) => item.sku),
+          ...coverage.filter((item) => item.outcome === 'success').map((item) => item.sku),
+          ...kv.filter((item) => item.outcome === 'success').map((item) => item.sku),
+          ...swap.map((item) => item.sku),
         ]),
       ].toSorted(),
       swap_requested_cases: swapRequested.length,

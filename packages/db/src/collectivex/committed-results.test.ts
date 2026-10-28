@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  assignRunIds,
   committedRun,
   CommittedResultsError,
   fetchResultsSource,
@@ -52,6 +53,7 @@ function sourceOf(cases: unknown, files: Record<string, unknown>): ResultsSource
   return {
     sha: SHA,
     committedAt: COMMITTED_AT,
+    runId: COMMITTED_SECONDS,
     files: new Map([
       ['cases.json', encode(cases)],
       ...Object.entries(files).map(([path, doc]): [string, Uint8Array] => [path, encode(doc)]),
@@ -141,15 +143,65 @@ describe('validateCommittedResults', () => {
   });
 
   it('rejects results measured from uncommitted code', () => {
-    const ep = { ...epResult(), provenance: { source_dirty: true } };
+    const ep = { ...epResult(), provenance: { source_sha: 'e'.repeat(40), source_dirty: true } };
     expect(() => validateCommittedResults(sourceOf(casesFor([ep]), { [pathOf(ep)]: ep }))).toThrow(
       /was not measured from committed collectivex\/ code/u,
     );
+    const unknown = { ...epResult(), provenance: { source_sha: 'e'.repeat(40) } };
+    expect(() =>
+      validateCommittedResults(sourceOf(casesFor([unknown]), { [pathOf(unknown)]: unknown })),
+    ).toThrow(/was not measured from committed collectivex\/ code/u);
+  });
+
+  it('requires a full 40-hex source_sha on EP and swap_blocks results', () => {
+    for (const sourceSha of [undefined, 'abc123', 'E'.repeat(40), 'e'.repeat(41)]) {
+      const ep = { ...epResult(), provenance: { source_sha: sourceSha, source_dirty: false } };
+      expect(() =>
+        validateCommittedResults(sourceOf(casesFor([ep]), { [pathOf(ep)]: ep })),
+      ).toThrow(`${RESULTS_DIR}/${pathOf(ep)} has no 40-hex source_sha`);
+    }
+    const swap = makeSwapDoc('h200-dgxc');
+    swap.runtime.source_sha = 'abc123';
+    expect(() =>
+      validateCommittedResults(
+        sourceOf(casesFor([], ['h200-dgxc']), {
+          [`h200-dgxc/${swapCaseId('h200-dgxc')}.json`]: swap,
+        }),
+      ),
+    ).toThrow(/has no 40-hex source_sha/u);
+  });
+
+  it('requires the exact cases.json version, not a coercible one', () => {
+    const ep = { ...epResult(), version: '1' };
+    expect(() => validateCommittedResults(sourceOf(casesFor([ep]), { [pathOf(ep)]: ep }))).toThrow(
+      /has version 1, cases\.json has 1/u,
+    );
+  });
+
+  it('rejects results that name machines by IPv4 address or host field', () => {
+    const withIp = { ...epResult(), notes: ['rendezvous at 10.0.12.7:29500'] };
+    expect(() =>
+      validateCommittedResults(sourceOf(casesFor([withIp]), { [pathOf(withIp)]: withIp })),
+    ).toThrow(`${RESULTS_DIR}/${pathOf(withIp)} contains an IP address`);
+    const withHost = { ...epResult(), launch: { SLURM_NODELIST: 'node[1-2]' } };
+    expect(() =>
+      validateCommittedResults(sourceOf(casesFor([withHost]), { [pathOf(withHost)]: withHost })),
+    ).toThrow(/contains the host-identifying field "SLURM_NODELIST"/u);
+    // Dotted versions that are not four octets, and host_* keys, are fine.
+    const fine = { ...epResult(), notes: ['vllm 0.25.1', 'v1.2.3.4.5'], host_memory: 'pinned' };
+    expect(
+      validateCommittedResults(sourceOf(casesFor([fine]), { [pathOf(fine)]: fine })).docs,
+    ).toHaveLength(1);
   });
 
   it('requires cases.json with a version and requested cases', () => {
     expect(() =>
-      validateCommittedResults({ sha: SHA, committedAt: COMMITTED_AT, files: new Map() }),
+      validateCommittedResults({
+        sha: SHA,
+        committedAt: COMMITTED_AT,
+        runId: COMMITTED_SECONDS,
+        files: new Map(),
+      }),
     ).toThrow(`${RESULTS_DIR}/cases.json is missing at ${SHA}`);
     expect(() => validateCommittedResults(sourceOf({ requested_cases: [] }, {}))).toThrow(
       /has no version and requested_cases/u,
@@ -196,12 +248,36 @@ describe('committedRun', () => {
     expect(docs).toEqual([ep]);
   });
 
-  it('orders later commits after earlier ones', () => {
+  it('stores the run under the commit run id and keeps generated_at at the commit time', () => {
     const ep = epResult();
-    const later = { ...sourceOf(casesFor([ep]), {}), committedAt: '2026-10-16T00:00:00Z' };
-    expect(Number(committedRun(validateCommittedResults(later)).run.run_id)).toBeGreaterThan(
-      Number(COMMITTED_SECONDS),
-    );
+    const bumped = {
+      ...sourceOf(casesFor([ep]), {}),
+      runId: String(Number(COMMITTED_SECONDS) + 1),
+    };
+    const { run } = committedRun(validateCommittedResults(bumped));
+    expect(run.run_id).toBe(bumped.runId);
+    expect(run.generated_at).toBe(COMMITTED_AT);
+  });
+});
+
+describe('assignRunIds', () => {
+  it('is the committer second, bumped past ties and clocks behind history', () => {
+    const ids = assignRunIds([
+      { sha: 'a'.repeat(40), committedAt: '2026-10-15T00:00:00Z' },
+      { sha: 'b'.repeat(40), committedAt: '2026-10-15T00:00:00.900Z' },
+      { sha: 'c'.repeat(40), committedAt: '2026-10-14T00:00:00Z' },
+      { sha: 'd'.repeat(40), committedAt: '2026-10-16T00:00:00Z' },
+    ]).map((commit) => Number(commit.runId));
+    const base = Date.parse('2026-10-15T00:00:00Z') / 1000;
+    expect(ids).toEqual([base, base + 1, base + 2, Date.parse('2026-10-16T00:00:00Z') / 1000]);
+  });
+
+  it('gives a commit the same id whatever ingest computes it', () => {
+    const history = [
+      { sha: 'a'.repeat(40), committedAt: COMMITTED_AT },
+      { sha: 'b'.repeat(40), committedAt: COMMITTED_AT },
+    ];
+    expect(assignRunIds(history)).toEqual(assignRunIds(history));
   });
 });
 
@@ -227,7 +303,7 @@ describe('GitHub reads', () => {
     });
     await expect(
       resolveResultsCommit('feature', { fetch: fetch as unknown as typeof globalThis.fetch }),
-    ).resolves.toEqual({ sha: SHA, committedAt: COMMITTED_AT });
+    ).resolves.toEqual({ sha: SHA, committedAt: COMMITTED_AT, runId: COMMITTED_SECONDS });
   });
 
   it('refuses a results commit that never landed on main', async () => {
@@ -255,6 +331,10 @@ describe('GitHub reads', () => {
     });
     expect(commits).toHaveLength(101);
     expect(commits[0].sha).toBe(SHA);
+    // The 100 same-second commits after SHA get distinct, increasing ids.
+    const ids = commits.map((commit) => Number(commit.runId));
+    expect(new Set(ids).size).toBe(101);
+    expect(ids).toEqual(ids.toSorted((a, b) => a - b));
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
@@ -277,7 +357,7 @@ describe('GitHub reads', () => {
     });
     const blobCache = new Map([['b2', new TextEncoder().encode('cached')]]);
     const source = await fetchResultsSource(
-      { sha: SHA, committedAt: COMMITTED_AT },
+      { sha: SHA, committedAt: COMMITTED_AT, runId: COMMITTED_SECONDS },
       { fetch: fetch as unknown as typeof globalThis.fetch, token: 'token', blobCache },
     );
     expect(urls[0]).toContain(`/git/trees/${SHA}:${RESULTS_DIR}?recursive=1`);
@@ -293,7 +373,7 @@ describe('GitHub reads', () => {
     const missing = vi.fn(() => new Response('', { status: 404 }));
     await expect(
       fetchResultsSource(
-        { sha: SHA, committedAt: COMMITTED_AT },
+        { sha: SHA, committedAt: COMMITTED_AT, runId: COMMITTED_SECONDS },
         { fetch: missing as unknown as typeof globalThis.fetch },
       ),
     ).rejects.toThrow(`${RESULTS_DIR} does not exist at ${SHA}`);
@@ -305,7 +385,7 @@ describe('GitHub reads', () => {
     );
     await expect(
       fetchResultsSource(
-        { sha: SHA, committedAt: COMMITTED_AT },
+        { sha: SHA, committedAt: COMMITTED_AT, runId: COMMITTED_SECONDS },
         { fetch: oversize as unknown as typeof globalThis.fetch },
       ),
     ).rejects.toMatchObject({ kind: 'invalid' });
