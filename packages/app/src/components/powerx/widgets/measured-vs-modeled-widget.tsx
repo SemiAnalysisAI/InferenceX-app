@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { type CSSProperties, useMemo, useRef, useState } from 'react';
 
 import { useResponsiveChartDimensions } from '@/hooks/useResponsiveChartDimensions';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -93,6 +93,13 @@ const STRINGS = {
 
 const HASH_KEY = 'mm';
 const MARGIN = { top: 16, right: 20, bottom: 42, left: 50 };
+const WIDE_FROM_PX = 560;
+/** The chart's two heights; the loading box reserves the same one through a container query. */
+const CHART_HEIGHT = { narrow: 300, wide: 380 } as const;
+const RESERVE = {
+  '--chart-narrow': `${CHART_HEIGHT.narrow}px`,
+  '--chart-wide': `${CHART_HEIGHT.wide}px`,
+} as CSSProperties;
 
 function logTicks(min: number, max: number): number[] {
   const ticks: number[] = [];
@@ -133,7 +140,7 @@ export function MeasuredVsModeledWidget({ locale, alt }: WidgetProps) {
   const { resolveColor } = useThemeColors({ highContrast: false, activeKeys: [...MM_GPUS] });
   const { setContainerRef, dimensions } = useResponsiveChartDimensions({ height: 1 });
   const width = Math.max(dimensions.width, 280);
-  const height = width < 560 ? 300 : 380;
+  const height = width < WIDE_FROM_PX ? CHART_HEIGHT.narrow : CHART_HEIGHT.wide;
   const [hover, setHover] = useState<Hover | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -219,20 +226,22 @@ export function MeasuredVsModeledWidget({ locale, alt }: WidgetProps) {
             title: t.viewTitles[key],
           }))}
         />
-        <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 pr-1 text-xs text-muted-foreground">
-          {paired?.map((series) => (
-            <span key={series.hwKey} className="flex items-center gap-1.5">
-              <GrammarSwatch kind="measured" color={resolveColor(series.gpu)} />
-              {series.label}
-            </span>
-          ))}
-          <GrammarLegend locale={locale} kinds={['measured', 'modeled']} />
-        </div>
+        <GrammarLegend locale={locale} kinds={['measured', 'modeled']} className="pr-1" />
       </div>
+      {/* One fixed line, so the series names arriving with the data never move the chart. */}
+      <p className="mt-3 flex h-4 min-w-0 items-center gap-x-4 overflow-hidden text-xs whitespace-nowrap text-muted-foreground">
+        {paired?.map((series) => (
+          <span key={series.hwKey} className="flex items-center gap-1.5">
+            <GrammarSwatch kind="measured" color={resolveColor(series.gpu)} />
+            {series.label}
+          </span>
+        ))}
+      </p>
 
       <div
         ref={setContainerRef}
-        className="relative mt-4 min-w-0"
+        style={RESERVE}
+        className="@container relative mt-3 min-w-0"
         onMouseLeave={() => setHover(null)}
       >
         {status === 'ok' && plot && paired ? (
@@ -411,7 +420,10 @@ export function MeasuredVsModeledWidget({ locale, alt }: WidgetProps) {
             )}
           </>
         ) : (
-          <p role="status" className="flex min-h-40 items-center text-sm text-muted-foreground">
+          <p
+            role="status"
+            className="flex h-(--chart-narrow) items-center text-sm text-muted-foreground @min-[560px]:h-(--chart-wide)"
+          >
             {status === 'loading' ? t.loading : status === 'failed' ? t.failed : t.empty}
           </p>
         )}

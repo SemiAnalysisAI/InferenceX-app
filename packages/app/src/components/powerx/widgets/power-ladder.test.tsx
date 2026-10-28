@@ -20,10 +20,15 @@ let host: HTMLDivElement | null = null;
 
 beforeEach(() => {
   vi.stubGlobal('ResizeObserver', ResizeObserverStub);
+  // The SVG draws once its container has a measured width.
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(0, 0, 720, 0),
+  );
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
   act(() => root?.unmount());
   host?.remove();
   root = null;
