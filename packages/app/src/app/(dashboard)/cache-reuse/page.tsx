@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import CacheReuseDisplay from '@/components/calculator/CacheReuseDisplay';
 import { resolveCalculatorUrlSeed } from '@/components/calculator/url-seed';
 import { tabMetadata } from '@/lib/routing/tab-meta';
+import { TabIntro } from '@/components/dashboard/tab-intro';
 
 export const metadata: Metadata = tabMetadata('cache-reuse');
 
@@ -13,5 +14,10 @@ interface Props {
 export default async function CacheReusePage({ searchParams }: Props) {
   const sp = await searchParams;
   const seed = resolveCalculatorUrlSeed(sp);
-  return <CacheReuseDisplay urlSeed={seed} />;
+  return (
+    <>
+      <TabIntro tab="cache-reuse" />
+      <CacheReuseDisplay urlSeed={seed} />
+    </>
+  );
 }

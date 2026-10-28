@@ -12,13 +12,10 @@ import {
   getRelatedZhGlossaryEntries,
   getZhGlossaryEntry,
 } from '@/lib/content/glossary-zh';
-import { ZH_LANG_TAG, ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
-import {
-  AUTHOR_HANDLE,
-  AUTHOR_NAME,
-  SITE_NAME,
-  SITE_URL,
-} from '@semianalysisai/inferencex-constants';
+import { ZH_LANG_TAG, zhAlternates } from '@/lib/i18n/i18n';
+import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
+import { clampMetaDescription } from '@/lib/seo/meta-text';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -35,7 +32,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const entry = getZhGlossaryEntry(slug);
   if (!entry) return {};
 
-  const title = `${entry.term}：AI 推理定义`;
+  const title = `什么是 ${entry.term}？`;
+  const description = clampMetaDescription(entry.definition, 'zh');
   const url = `${SITE_URL}/zh/glossary/${entry.slug}`;
   const keywords = [
     entry.term,
@@ -47,24 +45,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   return {
     title,
-    description: entry.definition,
+    description,
     keywords,
     authors: [{ name: AUTHOR_NAME }],
     alternates: zhAlternates(`/glossary/${entry.slug}`),
-    openGraph: {
+    ...socialMetadata({
       title: `${title} | ${SITE_NAME}`,
-      description: entry.definition,
+      description,
       url,
-      locale: ZH_OG_LOCALE,
+      locale: 'zh',
       type: 'article',
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title,
-      description: entry.definition,
-      site: AUTHOR_HANDLE,
-      creator: AUTHOR_HANDLE,
-    },
+    }),
   };
 }
 

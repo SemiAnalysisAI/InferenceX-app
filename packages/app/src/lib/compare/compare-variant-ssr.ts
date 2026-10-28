@@ -21,6 +21,7 @@ import {
   pickRotated,
   type SsrInterpolatedRow,
 } from '@/lib/compare/compare-ssr';
+import { datasetJsonLd } from '@/lib/seo/dataset-jsonld';
 
 export type VariantCompareKind = 'precision' | 'spec-decode';
 
@@ -538,15 +539,15 @@ export function buildVariantJsonLd(
           { name: `${bLabel} Concurrency`, value: String(Math.round(row.b.concurrency)) },
         );
       }
-      return {
-        '@type': 'Dataset',
+      return datasetJsonLd({
         name: `${model.label} ${kind === 'precision' ? 'precision' : 'spec-decode'} comparison at ${row.target} tok/s/user interactivity`,
+        description: `${aLabel} vs ${bLabel} on ${gpuDisplayLabel}: throughput, cost per million tokens, tok/s/MW and concurrency for ${model.label} at ${row.target} tok/s/user interactivity, measured by InferenceX CI.`,
         variableMeasured: metrics.map((m) => ({
           '@type': 'PropertyValue',
           name: m.name,
           value: m.value,
         })),
-      };
+      });
     });
 
   const keywords = [

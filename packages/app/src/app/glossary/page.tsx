@@ -8,10 +8,11 @@ import { getAllPosts } from '@/lib/blog/blog';
 import { GLOSSARY_CATEGORIES, getAllGlossaryEntries } from '@/lib/content/glossary';
 import { enAlternates } from '@/lib/i18n/i18n';
 import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 const title = 'AI Inference Glossary';
 const description =
-  'Clear, technically grounded definitions for agentic inference, LLM benchmarks, serving metrics, distributed parallelism, numerical precision, chip hardware, and inference software.';
+  'Clear definitions of agentic inference, LLM benchmark, serving metric, parallelism, precision, chip hardware and inference software terms.';
 
 export const metadata: Metadata = {
   title,
@@ -27,17 +28,12 @@ export const metadata: Metadata = {
     'distributed inference',
   ],
   alternates: enAlternates('/glossary'),
-  openGraph: {
+  ...socialMetadata({
     title: `${title} | ${SITE_NAME}`,
     description,
     url: `${SITE_URL}/glossary`,
-    type: 'website',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title,
-    description,
-  },
+    locale: 'en',
+  }),
 };
 
 export default function GlossaryPage() {

@@ -212,8 +212,8 @@ Load `.claude/skills/write-inferencex-whitepaper/` first. It holds the numbers w
 ### Adding a new tab
 
 1. Add the canonical route entry to `packages/app/src/lib/routing/dashboard-routes.ts`, including navigation group, indexability, provider capabilities, locale mirroring, and share scopes.
-2. Add explicit English metadata in `src/lib/routing/tab-meta.ts` and Chinese metadata, intro, and label entries in `src/lib/routing/tab-meta-zh.ts`.
-3. Create the English and Chinese App Router pages. `dashboard-routes.test.ts` enforces structural parity.
+2. Add explicit English metadata and intro entries (`TAB_META`, `TAB_INTRO`) in `src/lib/routing/tab-meta.ts` and Chinese metadata, intro, and label entries in `src/lib/routing/tab-meta-zh.ts`. Keep descriptions within 155 characters.
+3. Create the English and Chinese App Router pages, rendering `<TabIntro tab="<tab>" />` (EN) and `<ZhTabIntro tab="<tab>" />` (zh) above the content unless the content already renders an h1. `dashboard-routes.test.ts` enforces structural parity.
 4. Add the tab content and any section-specific provider only when the route actually needs one; declare dashboard-wide provider needs in the registry.
 5. Use `ChartLegend` with `variant="sidebar"`, sorted by `HW_REGISTRY` sort order, default expanded.
 6. Track interactive actions with the `{tabname}_` analytics prefix.

@@ -63,7 +63,7 @@ export function LandingPage({ locale = 'en' }: { locale?: Locale } = {}) {
       <NudgeEngine scope="landing" />
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-6 lg:gap-4">
         <Reveal>
-          <AgentXCompareHero locale={locale} headingLevel="h2" surface="landing" />
+          <AgentXCompareHero locale={locale} headingLevel="h1" surface="landing" />
         </Reveal>
 
         <Reveal delayMs={90}>

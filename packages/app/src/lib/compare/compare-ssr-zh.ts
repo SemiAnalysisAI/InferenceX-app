@@ -21,6 +21,7 @@ import {
   pickRotated,
   type SsrInterpolatedRow,
 } from '@/lib/compare/compare-ssr';
+import { datasetJsonLd } from '@/lib/seo/dataset-jsonld';
 
 export function formatModelListZh(models: CompareModelSlug[]): string {
   const labels = models.map((model) => model.label);
@@ -437,15 +438,16 @@ export function buildJsonLdZh(
           { name: `${bLabel} 并发数`, value: String(Math.round(row.b.concurrency)) },
         );
       }
-      return {
-        '@type': 'Dataset',
+      return datasetJsonLd({
         name: `${model.label}：目标交互性 ${row.target} tok/s/user 下的对比`,
+        description: `${model.label} 在 ${row.target} tok/s/user 交互性下 ${aLabel} 与 ${bLabel} 的吞吐量、每百万 token 成本、tok/s/MW 与并发数，由 InferenceX CI 实测。`,
+        inLanguage: 'zh-CN',
         variableMeasured: metrics.map((m) => ({
           '@type': 'PropertyValue',
           name: m.name,
           value: m.value,
         })),
-      };
+      });
     });
 
   return {

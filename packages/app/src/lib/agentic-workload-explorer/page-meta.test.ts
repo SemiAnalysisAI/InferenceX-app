@@ -60,6 +60,10 @@ describe('explorerSectionMetadata', () => {
     expect(zh.alternates?.languages).toEqual(en.alternates?.languages);
     expect(zh.openGraph).toMatchObject({ locale: 'zh_CN' });
     expect(en.robots).toBeUndefined();
+    for (const meta of [en, zh]) {
+      expect(meta.openGraph?.images).toBeDefined();
+      expect(meta.twitter).toMatchObject({ card: 'summary_large_image' });
+    }
   });
 });
 

@@ -88,7 +88,7 @@ export const DASHBOARD_ROUTES = [
   {
     key: 'inference',
     path: '/inference',
-    canonicalPath: '/',
+    canonicalPath: '/inference',
     navGroup: 'primary',
     indexable: true,
     localeMirrored: true,

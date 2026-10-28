@@ -150,7 +150,8 @@ describe('dashboard route registry', () => {
   it('resolves English, Chinese, canonical, and dashboard child paths', () => {
     expect(dashboardRouteForPathname('/evaluation')?.key).toBe('evaluation');
     expect(dashboardRouteForPathname('/zh/evaluation')?.key).toBe('evaluation');
-    expect(dashboardRouteForPathname('/')?.key).toBe('inference');
+    expect(dashboardRouteForPathname('/inference')?.key).toBe('inference');
+    expect(dashboardRouteForPathname('/')).toBeUndefined();
     expect(dashboardRouteForPathname('/zh/inference/agentic/42')?.key).toBe('inference');
     expect(dashboardRouteForPathname('/compare/foo-vs-bar')).toBeUndefined();
     expect(isDashboardRouteKey('not-a-tab')).toBe(false);

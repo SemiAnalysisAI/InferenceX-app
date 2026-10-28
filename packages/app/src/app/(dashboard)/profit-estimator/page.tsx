@@ -4,6 +4,7 @@ import ProfitEstimatorDisplay from '@/components/calculator/ProfitEstimatorDispl
 import { resolveCalculatorUrlSeed } from '@/components/calculator/url-seed';
 import { defaultRouteModel } from '@/lib/routing/model-routes';
 import { tabMetadata } from '@/lib/routing/tab-meta';
+import { TabIntro } from '@/components/dashboard/tab-intro';
 
 export const metadata: Metadata = tabMetadata('profit-estimator');
 
@@ -15,9 +16,12 @@ export default async function ProfitEstimatorPage({ searchParams }: Props) {
   const sp = await searchParams;
   const seed = resolveCalculatorUrlSeed(sp);
   return (
-    <ProfitEstimatorDisplay
-      basis="chip-hour"
-      urlSeed={{ ...seed, model: seed.model ?? defaultRouteModel('profit-estimator') }}
-    />
+    <>
+      <TabIntro tab="profit-estimator" />
+      <ProfitEstimatorDisplay
+        basis="chip-hour"
+        urlSeed={{ ...seed, model: seed.model ?? defaultRouteModel('profit-estimator') }}
+      />
+    </>
   );
 }

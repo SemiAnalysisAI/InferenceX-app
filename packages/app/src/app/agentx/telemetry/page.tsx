@@ -5,6 +5,7 @@ import { JsonLd } from '@/components/seo/json-ld';
 import { AGENTX_TELEMETRY_GUIDE } from '@/lib/agentx/agentx-telemetry';
 import { enAlternates } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 const TITLE = 'Exploring Agentic Workloads: Detailed Telemetry';
 const DESCRIPTION =
@@ -14,12 +15,12 @@ export const metadata: Metadata = {
   title: 'AgentX Telemetry Tutorial',
   description: DESCRIPTION,
   alternates: enAlternates('/agentx/telemetry'),
-  openGraph: {
+  ...socialMetadata({
     title: `${TITLE} | InferenceX`,
     description: DESCRIPTION,
     url: `${SITE_URL}/agentx/telemetry`,
-  },
-  twitter: { title: `${TITLE} | InferenceX`, description: DESCRIPTION },
+    locale: 'en',
+  }),
 };
 
 const jsonLd = {

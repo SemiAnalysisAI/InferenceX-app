@@ -15,7 +15,7 @@ describe('Chinese (/zh) pages', () => {
 
     it('renders the AgentX hero on the Chinese landing page', () => {
       cy.get('[data-testid="compare-agentx-primary"]').within(() => {
-        cy.get('h2').should('have.text', '真实智能体工作负载下的推理性能对比');
+        cy.get('h1').should('have.text', '真实智能体工作负载下的推理性能对比');
         cy.get('[data-testid="compare-agentx-revenue-calculator-link"]')
           .should('contain.text', 'Token 收入计算器')
           .and('have.attr', 'href', '/zh/profit-estimator-per-gigawatt');

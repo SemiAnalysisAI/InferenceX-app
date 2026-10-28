@@ -44,7 +44,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
     default: SITE_TITLE,
-    template: `%s | ${SITE_NAME} by ${AUTHOR_NAME}`,
+    template: `%s | ${SITE_NAME}`,
   },
   description: DESCRIPTION,
   keywords: [
@@ -93,7 +93,6 @@ export const metadata: Metadata = {
     },
   },
   alternates: {
-    canonical: SITE_URL,
     types: {
       'application/rss+xml': `${SITE_URL}/feed.xml`,
     },

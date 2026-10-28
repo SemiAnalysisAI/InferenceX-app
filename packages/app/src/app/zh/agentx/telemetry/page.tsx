@@ -3,8 +3,9 @@ import type { Metadata } from 'next';
 import { AgentXTelemetryArticle } from '@/components/datasets/agentx-telemetry-article';
 import { JsonLd } from '@/components/seo/json-ld';
 import { getTelemetryGuide } from '@/lib/agentx/agentx-telemetry-zh';
-import { zhAlternates, ZH_LANG_TAG, ZH_OG_LOCALE } from '@/lib/i18n/i18n';
+import { zhAlternates, ZH_LANG_TAG } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 const TITLE = '通过详细遥测数据解析智能体负载';
 const DESCRIPTION =
@@ -14,13 +15,12 @@ export const metadata: Metadata = {
   title: 'AgentX 遥测数据教程',
   description: DESCRIPTION,
   alternates: zhAlternates('/agentx/telemetry'),
-  openGraph: {
+  ...socialMetadata({
     title: `${TITLE} | InferenceX`,
     description: DESCRIPTION,
     url: `${SITE_URL}/zh/agentx/telemetry`,
-    locale: ZH_OG_LOCALE,
-  },
-  twitter: { title: `${TITLE} | InferenceX`, description: DESCRIPTION },
+    locale: 'zh',
+  }),
 };
 
 const jsonLd = {

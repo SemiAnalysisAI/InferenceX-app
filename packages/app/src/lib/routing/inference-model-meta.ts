@@ -5,17 +5,21 @@ export interface InferenceModelMeta {
   description: string;
 }
 
+const MAX_DESCRIPTION_LENGTH = 155;
+
 function nameWithDetail(entry: InferenceModelSlug): string {
   return entry.label === entry.seoName ? entry.seoName : `${entry.seoName} (${entry.label})`;
 }
 
+const describe = (name: string) =>
+  `Compare ${name} latency, throughput, cost and TTFT across chips and serving frameworks, ` +
+  'from public, reproducible GitHub Actions runs.';
+
 export function inferenceModelMeta(entry: InferenceModelSlug): InferenceModelMeta {
+  const detailed = describe(nameWithDetail(entry));
   return {
     title: `${entry.seoName} Inference Benchmarks`,
-    description:
-      `Compare ${nameWithDetail(entry)} latency, throughput, cost, and ` +
-      'time-to-first-token across chips and serving frameworks. Every datapoint is ' +
-      'produced by a public, reproducible GitHub Actions run.',
+    description: detailed.length <= MAX_DESCRIPTION_LENGTH ? detailed : describe(entry.seoName),
   };
 }
 
