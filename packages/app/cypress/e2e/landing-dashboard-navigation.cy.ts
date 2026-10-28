@@ -140,7 +140,9 @@ describe('landing model curation', () => {
           .should('contain.text', 'MiniMax M3.1 Flash')
           .and('contain.text', 'AgentX')
           .and('have.attr', 'href', `${prefix}/inference/minimax-m31-flash`);
-        cy.get('[data-new-badge="landing-minimax-m31-flash"]')
+        cy.get('[data-new-badge="landing-minimax-m31-flash"]').should('not.exist');
+        cy.get('[data-testid="landing-huawei-results-link"]')
+          .find('[data-new-badge="landing-huawei"]')
           .should('contain.text', prefix ? '新' : 'NEW')
           .and('have.class', 'new-badge-flash');
         cy.get('[data-testid="landing-minimax-m31-flash-minimax-logo"]').should(
