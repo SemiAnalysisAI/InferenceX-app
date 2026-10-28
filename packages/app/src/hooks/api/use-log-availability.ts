@@ -2,7 +2,7 @@ import { bulkIdsFetcher, useBulkIdsQuery } from './benchmark-id-query';
 
 export type LogAvailabilityMap = Record<number, true>;
 
-const fetchLogAvailability = bulkIdsFetcher<true>('log-availability');
+const fetchLogAvailability = bulkIdsFetcher<true>('log-availability', 500);
 
 export function useLogAvailability(ids: number[], enabled = true) {
   return useBulkIdsQuery('log-availability', ids, enabled, fetchLogAvailability);

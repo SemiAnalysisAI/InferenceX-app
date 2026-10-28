@@ -677,6 +677,7 @@ export function InferenceProvider({
     effectiveSelectedRunId && contestedRunIds.has(String(effectiveSelectedRunId))
       ? String(effectiveSelectedRunId)
       : undefined;
+  const seedRows = selectedModel === initialBenchmarkModel ? initialBenchmarkRows : undefined;
 
   const {
     graphs,
@@ -711,7 +712,7 @@ export function InferenceProvider({
     dataQuickFilters,
     overviewHistoryPair,
     benchmarkQueryScope,
-    selectedModel === initialBenchmarkModel ? initialBenchmarkRows : undefined,
+    seedRows,
     tcoBasis,
     activeTab === 'inference' &&
       !autoSelectAllGpus &&
@@ -721,6 +722,7 @@ export function InferenceProvider({
     powerCompare,
     fixedSequenceStatistic,
     tokenBasisForMetric(selectedYAxisMetric, tokenBasis),
+    isActive && !sequenceResolved && !effectiveRunDate && !seedRows,
   );
 
   const dbModelKeys = useMemo<string[]>(
@@ -1550,11 +1552,21 @@ export function InferenceProvider({
     autoSelectAllGpus,
   ]);
 
-  const serializedLabelState = serializeLabelState(labelScenarioKind, {
-    showPointLabels,
-    useAdvancedLabels,
-    showLineLabels,
-  });
+  // Label defaults depend on the scenario kind, so until the sequence resolves the URL's label
+  // overrides pass through unchanged. Serializing against the provisional kind would drop an
+  // override that matches its defaults (e.g. `i_label=0` while the kind still reads fixed-seq)
+  // before the effect above applies it to the resolved agentic scenario.
+  const serializedLabelState = sequenceResolved
+    ? serializeLabelState(labelScenarioKind, {
+        showPointLabels,
+        useAdvancedLabels,
+        showLineLabels,
+      })
+    : {
+        i_label: getUrlParam('i_label') ?? '',
+        i_advlabel: getUrlParam('i_advlabel') ?? '',
+        i_linelabel: getUrlParam('i_linelabel') ?? '',
+      };
 
   useUrlStateSync(
     {

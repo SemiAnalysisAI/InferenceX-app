@@ -135,6 +135,7 @@ export function useChartData(
   powerCompare: PowerCompare = 'none',
   fixedSequenceStatistic: FixedSequenceStatistic = 'median',
   tokenBasis: TokenBasis = 'total',
+  prefetchLatestRows = false,
 ) {
   const queryDate = asOfRunId
     ? (selectedRunDate ?? '')
@@ -158,6 +159,20 @@ export function useChartData(
     !asOfRunId && queryDate === '' ? initialBenchmarkRows : undefined,
     benchmarkQueryScope,
     true,
+  );
+  // Latest rows depend only on the model, so start them while availability resolves the sequence.
+  useQuery(
+    benchmarkQueryOptions(
+      selectedModel,
+      '',
+      prefetchLatestRows,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      benchmarkQueryScope,
+    ),
   );
   const {
     data: runRows,
