@@ -80,6 +80,16 @@ describe('Chinese (/zh) pages', () => {
     });
   });
 
+  describe('zh per-model inference page', () => {
+    it('renders a model-specific Chinese h1 and intro', () => {
+      cy.visit('/zh/inference/kimi-k3');
+      cy.get('[data-testid="zh-tab-intro"]').within(() => {
+        cy.get('h1').should('contain.text', 'Kimi').and('contain.text', '推理基准测试');
+        cy.get('p').first().should('contain.text', 'Kimi').and('contain.text', '本页面展示');
+      });
+    });
+  });
+
   describe('zh FAQ', () => {
     it('uses the same direct-link anchor as the English FAQ', () => {
       cy.visit('/zh/about#faq-normalized-interactivity');

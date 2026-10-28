@@ -42,9 +42,10 @@ export default async function ZhInferenceModelPage({ params }: Props) {
   const { model } = await params;
   const entry = getInferenceModelBySlug(model);
   if (!entry) notFound();
+  const meta = inferenceModelMetaZh(entry);
   return (
     <>
-      <ZhTabIntro tab="inference" />
+      <ZhTabIntro tab="inference" title={meta.title} intro={meta.intro} />
       <InferenceProvider activeTab="inference">
         <InferenceChartDisplay />
       </InferenceProvider>

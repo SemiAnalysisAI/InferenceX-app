@@ -42,9 +42,10 @@ export default async function InferenceModelPage({ params }: Props) {
   const { model } = await params;
   const entry = getInferenceModelBySlug(model);
   if (!entry) notFound();
+  const meta = inferenceModelMeta(entry);
   return (
     <>
-      <TabIntro tab="inference" title={inferenceModelMeta(entry).title} />
+      <TabIntro tab="inference" title={meta.title} intro={meta.intro} />
       <InferenceProvider activeTab="inference">
         <InferenceChartDisplay />
       </InferenceProvider>
