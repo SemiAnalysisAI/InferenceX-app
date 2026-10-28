@@ -1322,7 +1322,7 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
       `${Model.DeepSeek_V4_Pro}/agentx`,
       `${Model.DeepSeek_V4_1_Flash}/agentx`,
       `${Model.Kimi_K3}/agentx`,
-      `${Model.MiniMax_M3}/agentx`,
+      `${Model.MiniMax_M3_1_Flash}/agentx`,
       `${Model.GLM_5_2}/agentx`,
       `${Model.Qwen3_5}/agentx`,
       `${Model.Qwen3_8_Flash_Next}/agentx`,
@@ -1365,7 +1365,14 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
       ),
     ).toBe(false);
 
-    const minimax = page.models.find(
+    const allModelsPage = assembleOverviewPageData(
+      overviewRowsFixture as unknown as Record<string, BenchmarkRow[]>,
+      50,
+      'community',
+      'b200',
+      'all',
+    );
+    const minimax = allModelsPage.models.find(
       (m) => m.model === Model.MiniMax_M3 && m.scenario === 'agentx',
     )!;
     const mmGb300 = headlinePairOf(minimax, 'gb300-vs-b200')!;
@@ -1441,6 +1448,8 @@ describe('overview model scope', () => {
     const page = assembleOverviewPageData({});
     expect(new Set(page.models.map((m) => m.model))).toEqual(new Set(DEFAULT_MODELS));
     expect(page.modelScope).toBe('default');
+    expect(page.models.some((m) => m.model === Model.MiniMax_M3)).toBe(false);
+    expect(page.models.some((m) => m.model === Model.MiniMax_M3_1_Flash)).toBe(true);
   });
 
   it("appends maintenance then deprecated rows after defaults under scope 'all'", () => {
@@ -1449,7 +1458,8 @@ describe('overview model scope', () => {
     expect(orderedUniqueModels).toEqual([
       ...DEFAULT_MODELS,
       ...MAINTENANCE_MODELS,
-      ...DEPRECATED_MODELS,
+      Model.MiniMax_M3,
+      ...[...DEPRECATED_MODELS].filter((model) => model !== Model.MiniMax_M3),
     ]);
     expect(page.modelScope).toBe('all');
   });
@@ -1461,6 +1471,7 @@ describe('overview model scope', () => {
     expect(categoryOf(Model.DeepSeek_R1)).toBe('maintenance');
     expect(categoryOf(Model.GLM_5)).toBe('deprecated');
     expect(categoryOf(Model.GptOss)).toBe('deprecated');
+    expect(categoryOf(Model.MiniMax_M3)).toBe('deprecated');
   });
 
   it('forwards the model scope through the historical assembler', () => {
@@ -1470,7 +1481,8 @@ describe('overview model scope', () => {
     expect(orderedUniqueModels).toEqual([
       ...DEFAULT_MODELS,
       ...MAINTENANCE_MODELS,
-      ...DEPRECATED_MODELS,
+      Model.MiniMax_M3,
+      ...[...DEPRECATED_MODELS].filter((model) => model !== Model.MiniMax_M3),
     ]);
     expect(page.modelScope).toBe('all');
   });

@@ -33,9 +33,6 @@ on:
       DATABASE_WRITE_URL:
         description: Production database write connection for direct ingests
         required: false
-      DATABASE_DEV_WRITE_URL:
-        description: Development database write connection for direct ingests
-        required: false
       DATABASE_STAGING_WRITE_URL:
         description: Neon staging branch write connection
         required: true
@@ -45,6 +42,9 @@ on:
       VERCEL_STAGING_BYPASS_SECRET:
         description: Vercel protection automation bypass token
         required: true
+      VERCEL_PROTECTION_BYPASS_SECRET:
+        description: Optional Vercel protection bypass token for production site requests
+        required: false
       INFX_MAIN_PAT:
         description: Token used to download InferenceX artifacts
         required: true
@@ -55,8 +55,8 @@ on:
         description: Neon project containing named child branches
         required: false
       SLACK_WEBHOOK_URL:
-        description: Optional failure and unmapped-entity notifications
-        required: false
+        description: Failure and unmapped-entity notifications
+        required: true
   workflow_dispatch:
     inputs:
       run-id:
@@ -84,7 +84,6 @@ on:
         type: choice
         options:
           - production
-          - dev
           - staging
           - neon-branch
       neon-branch:
@@ -117,6 +116,12 @@ jobs:
       REQUESTED_DATABASE_TARGET: ${{ github.event.client_payload.database-target ||
         inputs.database-target || 'production' }}
     steps:
+      - name: Check required secrets
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          : "${SLACK_WEBHOOK_URL:?SLACK_WEBHOOK_URL secret is not set}"
+
       - name: Wait for source run to finish
         if: >-
           github.event_name == 'repository_dispatch' && (
@@ -155,12 +160,12 @@ jobs:
       - name: Select ingest target
         env:
           DATABASE_WRITE_URL_PRODUCTION: ${{ secrets.DATABASE_WRITE_URL }}
-          DATABASE_WRITE_URL_DEV: ${{ secrets.DATABASE_DEV_WRITE_URL }}
           DATABASE_WRITE_URL_STAGING: ${{ secrets.DATABASE_STAGING_WRITE_URL }}
           INVALIDATE_SECRET_DEFAULT: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
+          PROTECTION_BYPASS_SECRET_DEFAULT: ${{ secrets.VERCEL_PROTECTION_BYPASS_SECRET }}
           PROTECTION_BYPASS_SECRET_STAGING: ${{ secrets.VERCEL_STAGING_BYPASS_SECRET }}
-          STAGING_SITE_URL: ${{ vars.STAGING_SITE_URL ||
-            'https://inferencemax-app-git-staging-semianalysisai.vercel.app' }}
+          APP_URL: ${{ vars.APP_URL }}
+          STAGING_APP_URL: ${{ vars.STAGING_APP_URL }}
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
           NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
           NEON_BRANCH_NAME: ${{ inputs.neon-branch }}
@@ -168,18 +173,16 @@ jobs:
         run: |
           case "$REQUESTED_DATABASE_TARGET" in
             production)
+              : "${APP_URL:?APP_URL repository variable is not set}"
               database_write_url="$DATABASE_WRITE_URL_PRODUCTION"
-              cache_invalidate_url="https://inferencex.semianalysis.com/api/v1/invalidate"
+              cache_invalidate_url="${APP_URL%/}/api/v1/invalidate"
               cache_invalidate_secret="$INVALIDATE_SECRET_DEFAULT"
-              ;;
-            dev)
-              database_write_url="$DATABASE_WRITE_URL_DEV"
-              cache_invalidate_url="https://inferencemax-app-git-feat-agentx-semianalysisai.vercel.app/api/v1/invalidate"
-              cache_invalidate_secret="$INVALIDATE_SECRET_DEFAULT"
+              protection_bypass_secret="$PROTECTION_BYPASS_SECRET_DEFAULT"
               ;;
             staging)
+              : "${STAGING_APP_URL:?STAGING_APP_URL repository variable is not set}"
               database_write_url="$DATABASE_WRITE_URL_STAGING"
-              cache_invalidate_url="${STAGING_SITE_URL%/}/api/v1/invalidate"
+              cache_invalidate_url="${STAGING_APP_URL%/}/api/v1/invalidate"
               protection_bypass_secret="$PROTECTION_BYPASS_SECRET_STAGING"
               ;;
             neon-branch)
@@ -226,8 +229,8 @@ jobs:
             echo "::error::Database secret is empty for target: $REQUESTED_DATABASE_TARGET"
             exit 1
           fi
-          if [ "$REQUESTED_DATABASE_TARGET" != "staging" ] && [ "$REQUESTED_DATABASE_TARGET" != "neon-branch" ] && [ -z "$cache_invalidate_secret" ]; then
-            echo "::error::Cache invalidation secret is empty for target: $REQUESTED_DATABASE_TARGET"
+          if [ "$REQUESTED_DATABASE_TARGET" != "staging" ] && [ -z "$cache_invalidate_secret" ]; then
+            echo "::error::VERCEL_INVALIDATE_SECRET secret is not set for target: $REQUESTED_DATABASE_TARGET"
             exit 1
           fi
           if { [ "$REQUESTED_DATABASE_TARGET" = "staging" ] || [ "$REQUESTED_DATABASE_TARGET" = "neon-branch" ]; } && [ -z "$protection_bypass_secret" ]; then
@@ -247,7 +250,7 @@ jobs:
             echo "CACHE_INVALIDATE_SECRET=$cache_invalidate_secret"
             echo "INGEST_DATABASE_TARGET=$REQUESTED_DATABASE_TARGET"
             echo "CACHE_INVALIDATE_URL=$cache_invalidate_url"
-            echo "CACHE_PROTECTION_BYPASS_SECRET=$protection_bypass_secret"
+            echo "VERCEL_PROTECTION_BYPASS_SECRET=$protection_bypass_secret"
           } >> "$GITHUB_ENV"
           echo "Selected ingest target: $REQUESTED_DATABASE_TARGET"
           echo "Cache invalidate URL: $cache_invalidate_url"
@@ -261,9 +264,11 @@ jobs:
           MERGE_RUN_ID: ${{ github.event.client_payload.merge-run-id ||
             github.event.client_payload.run-id || inputs.run-id }}
           ARTIFACTS_PATH: ${{ github.workspace }}/artifacts
-          INGEST_REPO: SemiAnalysisAI/InferenceX
+          INGEST_REPO: ${{ vars.BENCHMARK_REPO }}
           INGEST_REQUIRE_POWER: ${{ github.event.client_payload.require-power == true || inputs.require-power == true }}
-        run: bun run admin:db:prepare:ci
+        run: |
+          : "${INGEST_REPO:?BENCHMARK_REPO repository variable is not set}"
+          bun run admin:db:prepare:ci
 
       - name: Run migrations
         run: bun run admin:db:migrate --yes
@@ -274,12 +279,15 @@ jobs:
           INGEST_RUN_ID: ${{ steps.artifacts.outputs.merge-run-id }}
           INGEST_RUN_ATTEMPT: ${{ steps.artifacts.outputs.merge-run-attempt }}
           INGEST_ARTIFACTS_PATH: ${{ github.workspace }}/artifacts
-          INGEST_REPO: SemiAnalysisAI/InferenceX
+          INGEST_REPO: ${{ vars.BENCHMARK_REPO }}
           INGEST_REQUIRE_POWER: ${{ github.event.client_payload.require-power == true || inputs.require-power == true }}
           UNMAPPED_ENTITIES_OUTPUT: ${{ github.workspace }}/unmapped-entities.json
           POWER_PUBLICATION_MANIFEST: ${{ github.workspace }}/power-publication.json
           DATABASE_WRITE_RECEIPT: ${{ github.workspace }}/database-writes.json
-        run: bun run admin:db:ingest:ci
+          INGEST_REPORT_OUTPUT: ${{ github.workspace }}/ingest-report.json
+        run: |
+          : "${INGEST_REPO:?BENCHMARK_REPO repository variable is not set}"
+          bun run admin:db:ingest:ci
 
       - name: Apply run overrides
         env:
@@ -291,17 +299,14 @@ jobs:
 
       - name: Invalidate Vercel cache
         run: |
-          if [ "$INGEST_DATABASE_TARGET" = "staging" ]; then
-            curl --retry 3 --retry-delay 2 --retry-connrefused -sSf -X POST "$CACHE_INVALIDATE_URL" \
-              -H "x-vercel-protection-bypass: $CACHE_PROTECTION_BYPASS_SECRET"
-          elif [ "$INGEST_DATABASE_TARGET" = "neon-branch" ]; then
-            curl --retry 3 --retry-delay 2 --retry-connrefused -sSf -X POST "$CACHE_INVALIDATE_URL" \
-              -H "x-vercel-protection-bypass: $CACHE_PROTECTION_BYPASS_SECRET" \
-              -H "Authorization: Bearer $CACHE_INVALIDATE_SECRET"
-          else
-            curl --retry 3 --retry-delay 2 --retry-connrefused -sSf -X POST "$CACHE_INVALIDATE_URL" \
-              -H "Authorization: Bearer $CACHE_INVALIDATE_SECRET"
+          headers=()
+          if [ -n "$VERCEL_PROTECTION_BYPASS_SECRET" ]; then
+            headers+=(-H "x-vercel-protection-bypass: $VERCEL_PROTECTION_BYPASS_SECRET")
           fi
+          if [ "$INGEST_DATABASE_TARGET" != "staging" ]; then
+            headers+=(-H "Authorization: Bearer $CACHE_INVALIDATE_SECRET")
+          fi
+          curl --retry 3 --retry-delay 2 --retry-connrefused -sSf -X POST "$CACHE_INVALIDATE_URL" "${headers[@]}"
 
       - name: Verify PowerX source, database and public API
         id: powerx
@@ -372,3 +377,47 @@ jobs:
             {
               "text": ":rotating_light: *Ingest results workflow failed*\nRun ID: ${{ steps.artifacts.outputs.source-run-id || github.event.client_payload.source-run-id || github.event.client_payload.run-id || inputs.run-id }}\n${{ steps.powerx.outcome == 'failure' && 'PowerX publication check failed\n' || '' }}${{ steps.database_writes.outputs.summary_json && format('```{0}```\n', steps.database_writes.outputs.summary_json) || '' }}<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
             }
+
+      # Report the outcome to InferenceX, whose callback comments on the PR that
+      # published the changelog entry. Only merge ingests arrive by dispatch;
+      # staging and manual runs have no merged PR to report to.
+      - name: Report ingest to InferenceX
+        if: always() && github.event_name == 'repository_dispatch' && (github.event.action == 'ingest-results' || github.event.action == 'ingest-agentic-results')
+        continue-on-error: true
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          MERGE_RUN_ID: ${{ github.event.client_payload.merge-run-id || github.event.client_payload.run-id }}
+          SOURCE_RUN_ID: ${{ steps.artifacts.outputs.source-run-id ||
+            github.event.client_payload.source-run-id || github.event.client_payload.run-id }}
+          INGEST_SUCCEEDED: ${{ job.status == 'success' }}
+          INGEST_REPORT: ${{ github.workspace }}/ingest-report.json
+          BENCHMARK_REPO: ${{ vars.BENCHMARK_REPO }}
+        with:
+          github-token: ${{ secrets.PAT }}
+          script: |
+            const fs = require('fs');
+            if (!process.env.BENCHMARK_REPO) {
+              throw new Error('BENCHMARK_REPO repository variable is not set');
+            }
+            let report = null;
+            try {
+              report = JSON.parse(fs.readFileSync(process.env.INGEST_REPORT, 'utf8'));
+            } catch {
+              core.warning('Ingest report not found; reporting status only');
+            }
+            const [owner, repo] = process.env.BENCHMARK_REPO.split('/');
+            await github.rest.repos.createDispatchEvent({
+              owner,
+              repo,
+              event_type: 'ingest-results-completed',
+              client_payload: {
+                'source-repository': `${context.repo.owner}/${context.repo.repo}`,
+                'merge-run-id': process.env.MERGE_RUN_ID,
+                'source-run-id': process.env.SOURCE_RUN_ID,
+                'app-run-id': String(context.runId),
+                'app-run-attempt': String(context.runAttempt),
+                'database-target': process.env.REQUESTED_DATABASE_TARGET,
+                'ingest-succeeded': process.env.INGEST_SUCCEEDED,
+                report: report && { counts: report.counts, detail: report.detail, unmapped: report.unmapped },
+              },
+            });

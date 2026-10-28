@@ -15,6 +15,7 @@ export enum Model {
   Kimi_K3 = 'Kimi-K3',
   MiniMax_M2_5 = 'MiniMax-M2.5',
   MiniMax_M3 = 'MiniMax-M3',
+  MiniMax_M3_1_Flash = 'MiniMax-M3.1-Flash',
   GLM_5 = 'GLM-5',
   GLM_5_2 = 'GLM-5.2',
   DeepSeek_V4_Pro = 'DeepSeek-V4-Pro',
@@ -107,8 +108,15 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
   [Model.MiniMax_M3]: {
     label: 'MiniMax M3 428B',
     prefix: 'minimaxm3',
-    category: 'default',
+    category: 'deprecated',
     openRouterModelId: 'minimax/minimax-m3',
+    logo: 'minimax-color.svg',
+  },
+  [Model.MiniMax_M3_1_Flash]: {
+    label: 'MiniMax M3.1 Flash 428B',
+    prefix: 'minimaxm31flash',
+    category: 'default',
+    openRouterModelId: 'minimax/minimax-m3.1-flash',
     logo: 'minimax-color.svg',
   },
   [Model.DeepSeek_R1]: {
@@ -198,9 +206,27 @@ function modelsByCategory(cat: CategoryTag): ReadonlySet<Model> {
   );
 }
 
-export const MODEL_OPTIONS = (Object.keys(MODEL_CONFIG) as Model[]).filter(
-  (m) => MODEL_CONFIG[m].category !== 'hidden',
-);
+// Selector order is independent of the overview registry order and selected defaults.
+const MODEL_SELECTOR_ORDER: readonly Model[] = [
+  Model.Kimi_K3,
+  Model.DeepSeek_V4_1_Flash,
+  Model.GLM_5_2,
+  Model.MiniMax_M3_1_Flash,
+  Model.Muse_Spark_Open,
+  Model.DeepSeek_V4_Pro,
+  Model.Qwen3_5,
+  Model.Qwen3_8_Flash_Next,
+];
+
+export const MODEL_OPTIONS = (Object.keys(MODEL_CONFIG) as Model[])
+  .filter((m) => MODEL_CONFIG[m].category !== 'hidden')
+  .sort((a, b) => {
+    const rank = (model: Model) => {
+      const index = MODEL_SELECTOR_ORDER.indexOf(model);
+      return index === -1 ? MODEL_SELECTOR_ORDER.length : index;
+    };
+    return rank(a) - rank(b);
+  });
 
 export const DEFAULT_MODELS: ReadonlySet<Model> = modelsByCategory('default');
 export const MAINTENANCE_MODELS: ReadonlySet<Model> = modelsByCategory('maintenance');

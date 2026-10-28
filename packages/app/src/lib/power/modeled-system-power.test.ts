@@ -11,6 +11,7 @@ import {
 import {
   estimateChassisPower,
   estimateRackPower,
+  SYSTEM_POWER_CATEGORIES,
   type SystemPowerHardware,
 } from '@/lib/power/system-power-model';
 
@@ -576,6 +577,56 @@ describe('modeled system power admission and accounting', () => {
       expect(points[0].utilityModeledWatts).toBeUndefined();
       expect(points[0].measuredAvgPower?.y).toBe(source.metrics.avg_power_w);
     }
+  });
+});
+
+const supported = (source: BenchmarkRow) => {
+  const result = modelSystemPower(source);
+  if (result.status !== 'supported') throw new Error(result.reason);
+  return result;
+};
+const total = (b: Record<string, number>) =>
+  SYSTEM_POWER_CATEGORIES.reduce((sum, key) => sum + b[key], 0);
+
+describe('deployment power breakdown', () => {
+  it('splits the full deployment watts so the parts sum to All in Measured', () => {
+    const full = row();
+    full.metrics.avg_total_gpu_power_w = 349.859 * 8;
+    const result = supported(full);
+    const b = result.deploymentBreakdownWatts;
+    expect(total(b)).toBeCloseTo(result.deploymentFacilityWatts, 6);
+    expect(b.gpu).toBeCloseTo(349.859 * 8, 6);
+    expect(b.facility).toBeCloseTo(result.deploymentFacilityWatts - result.deploymentItWatts, 6);
+  });
+
+  it('attributes only the measured share of an extrapolated chassis, part by part', () => {
+    const partial = row({ prefill_tp: 4, decode_tp: 4, num_prefill_gpu: 4, num_decode_gpu: 4 });
+    partial.metrics.avg_total_gpu_power_w = 1399.436;
+    const result = supported(partial);
+    const reference = chassis('b200', 349.859 * 8).breakdown;
+    for (const key of SYSTEM_POWER_CATEGORIES) {
+      expect(result.deploymentBreakdownWatts[key]).toBeCloseTo(reference[key] / 2, 6);
+    }
+    expect(result.deploymentBreakdownWatts.gpu / result.gpuCount).toBeCloseTo(349.859, 6);
+  });
+
+  it('carries measured Grace sockets as their own part of an NVL72 tray', () => {
+    const measured = supported(nvl72Row());
+    expect(measured.deploymentBreakdownWatts.measuredCpu).toBeCloseTo(501, 6);
+    expect(total(measured.deploymentBreakdownWatts)).toBeCloseTo(
+      measured.deploymentFacilityWatts,
+      6,
+    );
+    const modeled = supported(nvl72Row({ cpu_power_valid: 0 }));
+    expect(modeled.deploymentBreakdownWatts.measuredCpu).toBe(0);
+    // Distinct prefill and decode trays sum into one deployment breakdown.
+    const source = gb300DisaggRow();
+    const disagg = supported(source);
+    expect(total(disagg.deploymentBreakdownWatts)).toBeCloseTo(disagg.deploymentFacilityWatts, 6);
+    expect(disagg.deploymentBreakdownWatts.gpu).toBeCloseTo(
+      source.metrics.avg_total_gpu_power_w!,
+      2,
+    );
   });
 });
 

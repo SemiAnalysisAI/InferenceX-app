@@ -22,6 +22,11 @@ export const LANDING_META = {
 };
 
 export const TAB_META: Record<DashboardRouteKey, { title: string; description: string }> = {
+  powerx: {
+    title: 'PowerX: Measured GPU Power and Energy per Token',
+    description:
+      'Measured GPU power, energy per output token and power timelines for every InferenceX benchmark point, with modeled server and facility overhead.',
+  },
   inference: {
     title: 'Agentic Inference Benchmarks',
     description:

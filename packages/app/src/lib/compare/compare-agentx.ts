@@ -15,7 +15,7 @@ const FEATURED_AGENTX_MODEL_SLUGS = [
 
 const AGENTX_NEW_MODEL_SLUGS: readonly (typeof FEATURED_AGENTX_MODEL_SLUGS)[number][] = [];
 
-const AGENTX_ONLY_MODEL_SLUGS: readonly string[] = [];
+const AGENTX_ONLY_MODEL_SLUGS: readonly string[] = ['minimax-m31-flash'];
 
 const AGENTX_SCENARIO_MODEL_SET = new Set<string>([
   ...FEATURED_AGENTX_MODEL_SLUGS,

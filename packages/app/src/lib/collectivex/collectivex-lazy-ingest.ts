@@ -1,6 +1,10 @@
 import AdmZip from 'adm-zip';
 
-import { GITHUB_API_BASE, GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
+import {
+  benchmarkSourceRepos,
+  GITHUB_API_BASE,
+  GITHUB_REPO_FULL,
+} from '@semianalysisai/inferencex-constants';
 
 import {
   buildDatasetFromNeutral,
@@ -38,7 +42,7 @@ const MAX_CHANGED_RUNS_PER_PASS = 8;
 
 type SweepErrorCode = 'invalid' | 'not-found' | 'unavailable';
 
-interface WorkflowRun {
+interface GithubWorkflowRun {
   id: number;
   name: string;
   path: string;
@@ -50,6 +54,11 @@ interface WorkflowRun {
   run_started_at?: string | null;
   updated_at?: string | null;
   created_at?: string | null;
+}
+
+interface WorkflowRun extends GithubWorkflowRun {
+  /** `owner/repo` the run was read from. */
+  source_repository: string;
 }
 
 interface GithubArtifact {
@@ -170,7 +179,7 @@ function requireToken(): string {
   return token;
 }
 
-function isSweepRun(run: WorkflowRun): boolean {
+function isSweepRun(run: GithubWorkflowRun): boolean {
   return (
     run.name === WORKFLOW_NAME &&
     run.path === WORKFLOW_PATH &&
@@ -190,7 +199,10 @@ function artifactsMayBeAvailable(run: WorkflowRun): boolean {
   return !Number.isFinite(timestamp) || Date.now() - timestamp <= ARTIFACT_RETENTION_MS;
 }
 
-async function* sweepRuns(token: string): AsyncGenerator<WorkflowRun> {
+async function* repositorySweepRuns(
+  token: string,
+  repository: string,
+): AsyncGenerator<WorkflowRun> {
   let page = 1;
   let visited = 0;
   let total: number | null = null;
@@ -203,9 +215,13 @@ async function* sweepRuns(token: string): AsyncGenerator<WorkflowRun> {
       page: String(page),
     });
     const response = await githubFetch(
-      `${GITHUB_API_BASE}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/workflows/${WORKFLOW_FILE}/runs?${parameters}`,
+      `${GITHUB_API_BASE}/repos/${repository}/actions/workflows/${WORKFLOW_FILE}/runs?${parameters}`,
       token,
     );
+    // An extra source repository without the sweep workflow has no sweeps to list.
+    if (response.status === 404 && page === 1 && repository !== GITHUB_REPO_FULL) {
+      throw new CollectiveXSweepError('not-found', 'no sweep workflow');
+    }
     if (!response.ok) {
       throw new CollectiveXSweepError(
         'unavailable',
@@ -214,7 +230,7 @@ async function* sweepRuns(token: string): AsyncGenerator<WorkflowRun> {
     }
     const payload = (await response.json()) as {
       total_count?: number;
-      workflow_runs?: WorkflowRun[];
+      workflow_runs?: GithubWorkflowRun[];
     };
     const runs = payload.workflow_runs ?? [];
     if (
@@ -226,19 +242,98 @@ async function* sweepRuns(token: string): AsyncGenerator<WorkflowRun> {
     }
     if (runs.length === 0) break;
     visited += runs.length;
-    for (const run of runs) if (isSweepRun(run)) yield run;
+    for (const run of runs) {
+      if (isSweepRun(run)) yield { ...run, source_repository: repository };
+    }
     if (runs.length < RUNS_PER_PAGE || (total !== null && visited >= total)) break;
     page += 1;
   }
 }
 
-async function listArtifacts(runId: number, token: string): Promise<GithubArtifact[]> {
+interface SweepListing {
+  /** First error from a repository that has the sweep workflow but could not be fully listed. */
+  failure: unknown;
+}
+
+// Merges each source repository's newest-first runs by global run id, which is
+// also how getLatestCollectiveXRun orders stored rows. An extra repository without
+// the sweep workflow is skipped; one that fails is skipped and logged, and its error
+// is recorded on the listing. Discovery throws when every repository is skipped or fails.
+async function* sweepRuns(token: string, listing: SweepListing): AsyncGenerator<WorkflowRun> {
+  const repositories = benchmarkSourceRepos();
+  const sources = repositories.map((repository) => repositorySweepRuns(token, repository));
+  const heads: (WorkflowRun | null)[] = sources.map(() => null);
+  const failures = new Map<number, unknown>();
+  let skipped = 0;
+  const advance = async (index: number): Promise<void> => {
+    try {
+      const next = await sources[index].next();
+      heads[index] = next.done ? null : next.value;
+    } catch (error) {
+      heads[index] = null;
+      if (
+        repositories[index] !== GITHUB_REPO_FULL &&
+        collectiveXSweepErrorCode(error) === 'not-found'
+      ) {
+        skipped += 1;
+        return;
+      }
+      failures.set(index, error);
+      listing.failure ??= error;
+      if (sources.length > 1) {
+        console.warn(`[collectivex] skipping ${repositories[index]} during discovery:`, error);
+      }
+    }
+  };
+  await Promise.all(sources.map((_source, index) => advance(index)));
+  for (;;) {
+    let newest = -1;
+    for (const [index, run] of heads.entries()) {
+      if (run && (newest < 0 || run.id > heads[newest]!.id)) newest = index;
+    }
+    if (newest < 0) break;
+    yield heads[newest]!;
+    await advance(newest);
+  }
+  if (failures.size > 0 && failures.size + skipped === sources.length) throw failures.get(0);
+}
+
+// Run ids are global, so at most one source repository holds a run. A failed
+// lookup in any repository keeps a miss from reading as not found.
+async function fetchRun(runId: number, token: string): Promise<WorkflowRun> {
+  let failure: unknown = null;
+  for (const repository of benchmarkSourceRepos()) {
+    let response: Response;
+    try {
+      response = await githubFetch(
+        `${GITHUB_API_BASE}/repos/${repository}/actions/runs/${runId}`,
+        token,
+      );
+    } catch (error) {
+      failure ??= error;
+      continue;
+    }
+    if (response.ok) {
+      const run = (await response.json()) as GithubWorkflowRun;
+      return { ...run, source_repository: repository };
+    }
+    if (response.status !== 404) {
+      failure ??= new CollectiveXSweepError(
+        'unavailable',
+        `GitHub run lookup failed (${response.status})`,
+      );
+    }
+  }
+  throw failure ?? new CollectiveXSweepError('not-found', 'sweep run not found');
+}
+
+async function listArtifacts(run: WorkflowRun, token: string): Promise<GithubArtifact[]> {
   const artifacts: GithubArtifact[] = [];
   let page = 1;
   let total: number | null = null;
   while (total === null || artifacts.length < total) {
     const response = await githubFetch(
-      `${GITHUB_API_BASE}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runs/${runId}/artifacts?per_page=${ARTIFACTS_PER_PAGE}&page=${page}`,
+      `${GITHUB_API_BASE}/repos/${run.source_repository}/actions/runs/${run.id}/artifacts?per_page=${ARTIFACTS_PER_PAGE}&page=${page}`,
       token,
     );
     if (!response.ok) {
@@ -385,6 +480,9 @@ async function persistRun(
     generated_at: generatedAt,
     conclusion: run.conclusion,
     source_sha: run.head_sha,
+    ...(run.source_repository === GITHUB_REPO_FULL
+      ? {}
+      : { source_repository: run.source_repository }),
   };
 
   let summary;
@@ -413,7 +511,7 @@ async function matrixCandidateFor(
   version: CollectiveXVersion,
   token: string,
 ): Promise<MatrixCandidate | null> {
-  const artifacts = await listArtifacts(run.id, token);
+  const artifacts = await listArtifacts(run, token);
   if (!hasMatrixArtifact(artifacts, run)) return null;
   const candidate = await loadMatrixCandidate(artifacts, token, run);
   return candidate.version === version ? candidate : null;
@@ -439,7 +537,7 @@ async function considerCandidate(
     }
     return 'match';
   }
-  const artifacts = await listArtifacts(run.id, token);
+  const artifacts = await listArtifacts(run, token);
   if (!hasMatrixArtifact(artifacts, run)) return 'skip';
   const candidate = await loadMatrixCandidate(artifacts, token, run);
   const changed = await persistRun(run, candidate, token);
@@ -453,10 +551,13 @@ export function ensureLatestCollectiveXRun(version: CollectiveXVersion): Promise
     key,
     throttled(key, async () => {
       const token = requireToken();
-      for await (const run of sweepRuns(token)) {
+      const listing: SweepListing = { failure: undefined };
+      for await (const run of sweepRuns(token, listing)) {
         const result = await considerCandidate(run, version, token);
-        if (result === 'match' || result === 'changed-match') return;
+        if (result === 'match' || result === 'changed-match') break;
       }
+      // A repository that could not be listed may hold a newer sweep.
+      if (listing.failure !== undefined) throw listing.failure;
     }),
   );
 }
@@ -464,9 +565,14 @@ export function ensureLatestCollectiveXRun(version: CollectiveXVersion): Promise
 export function ensureCollectiveXRunsList(version: CollectiveXVersion): Promise<boolean> {
   const key = `list:${version}`;
   return dedupe(key, async () => {
+    // A source repository that recently failed to list keeps the pass incomplete
+    // without walking every repository again on each poll.
+    const settled = discoveryCooldown.get(key);
+    if (settled && Date.now() < settled.until) return false;
     const token = requireToken();
     let changed = 0;
-    for await (const run of sweepRuns(token)) {
+    const listing: SweepListing = { failure: undefined };
+    for await (const run of sweepRuns(token, listing)) {
       if (!artifactsMayBeAvailable(run)) continue;
       let result: CandidateResult;
       try {
@@ -479,7 +585,12 @@ export function ensureCollectiveXRunsList(version: CollectiveXVersion): Promise<
       if (result === 'changed-match' || result === 'changed-other') changed += 1;
       if (changed >= MAX_CHANGED_RUNS_PER_PASS) return false;
     }
-    return true;
+    if (listing.failure === undefined) return true;
+    discoveryCooldown.set(key, {
+      until: Date.now() + DISCOVERY_FAILURE_COOLDOWN_MS,
+      error: listing.failure,
+    });
+    return false;
   });
 }
 
@@ -495,20 +606,7 @@ export function ensureCollectiveXRun(version: CollectiveXVersion, runId: string)
       throw new CollectiveXSweepError('not-found', 'run is not available');
     }
     const token = requireToken();
-    const response = await githubFetch(
-      `${GITHUB_API_BASE}/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/runs/${numericId}`,
-      token,
-    );
-    if (response.status === 404) {
-      throw new CollectiveXSweepError('not-found', 'sweep run not found');
-    }
-    if (!response.ok) {
-      throw new CollectiveXSweepError(
-        'unavailable',
-        `GitHub run lookup failed (${response.status})`,
-      );
-    }
-    const run = (await response.json()) as WorkflowRun;
+    const run = await fetchRun(numericId, token);
     if (!isSweepRun(run)) {
       throw new CollectiveXSweepError('not-found', 'run is not a CollectiveX sweep');
     }
@@ -516,7 +614,7 @@ export function ensureCollectiveXRun(version: CollectiveXVersion, runId: string)
       throw new CollectiveXSweepError('not-found', 'sweep run has not completed');
     }
     if (known && run.run_attempt <= known.run_attempt) return;
-    const artifacts = await listArtifacts(run.id, token);
+    const artifacts = await listArtifacts(run, token);
     const candidate = await loadMatrixCandidate(artifacts, token, run);
     if (candidate.version !== version) {
       throw new CollectiveXSweepError('not-found', 'run does not match the requested version');

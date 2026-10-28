@@ -1,10 +1,17 @@
-import { GOOGLE_BLUE, GPU_VENDORS, VENDOR_OKLCH_ZONES } from '@semianalysisai/inferencex-constants';
+import {
+  GOOGLE_BLUE,
+  HUAWEI_CHART_COLORS,
+  GPU_VENDORS,
+  VENDOR_OKLCH_ZONES,
+} from '@semianalysisai/inferencex-constants';
 import { getModelSortIndex } from '@/lib/catalog/constants';
 
-export type Vendor = 'nvidia' | 'amd' | 'openai' | 'google' | 'unknown';
+export type Vendor = 'nvidia' | 'amd' | 'openai' | 'google' | 'huawei' | 'unknown';
 
 export function getVendor(hwKey: string): Vendor {
-  const base = hwKey.split('_')[0];
+  const normalized = hwKey.trim().toLowerCase();
+  if (/^(?:huawei|ascend)(?=\d|[\s_-]|$)/u.test(normalized)) return 'huawei';
+  const base = normalized.split('_')[0];
   if (base === 'nvidia' || base === 'amd' || base === 'openai' || base === 'google') return base;
   const vendor = GPU_VENDORS[base];
   if (vendor === 'NVIDIA') return 'nvidia';
@@ -48,6 +55,10 @@ export function generateVendorColors(
     const zone = VENDOR_OKLCH_ZONES[vendor];
     const chroma = zone.chroma[theme];
     const count = keys.length;
+    if (vendor === 'huawei' && count === 1) {
+      result[keys[0]] = HUAWEI_CHART_COLORS[theme];
+      continue;
+    }
     if (vendor === 'google' && count === 1) {
       result[keys[0]] = GOOGLE_BLUE;
       continue;
@@ -93,11 +104,19 @@ export function generateGpuDateColors(
     const zone = VENDOR_OKLCH_ZONES[vendor];
     const chroma = zone.chroma[theme];
     const gpuCount = keys.length;
-    const googleBase = vendor === 'google' && gpuCount === 1 ? hexToOklch(GOOGLE_BLUE) : null;
+    const fixedColor =
+      gpuCount === 1
+        ? vendor === 'google'
+          ? GOOGLE_BLUE
+          : vendor === 'huawei'
+            ? HUAWEI_CHART_COLORS[theme]
+            : null
+        : null;
+    const fixedBase = fixedColor ? hexToOklch(fixedColor) : null;
 
     for (let gi = 0; gi < gpuCount; gi++) {
       const hue =
-        googleBase?.[2] ??
+        fixedBase?.[2] ??
         (gpuCount <= 1
           ? (zone.start + zone.end) / 2
           : zone.start + ((gi + 0.5) / gpuCount) * (zone.end - zone.start));
@@ -107,9 +126,9 @@ export function generateGpuDateColors(
           dateCount <= 1 ? (lMin + lMax) / 2 : lMax - (di / (dateCount - 1)) * (lMax - lMin);
         const compositeKey = `${di}_${keys[gi]}`;
         result[compositeKey] =
-          googleBase && dateCount === 1
-            ? GOOGLE_BLUE
-            : `oklch(${lightness.toFixed(3)} ${googleBase?.[1] ?? chroma} ${hue.toFixed(1)})`;
+          fixedBase && dateCount === 1
+            ? fixedColor!
+            : `oklch(${lightness.toFixed(3)} ${fixedBase?.[1] ?? chroma} ${hue.toFixed(1)})`;
       }
     }
   }
@@ -184,4 +203,18 @@ export function generateHighContrastGpuDateColors(
   }
 
   return result;
+}
+
+/**
+ * Lighter/darker variant of an `oklch(L C H)` color for the nth series that shares one
+ * hardware color: 0 keeps the base, then alternates darker/lighter in widening steps.
+ * Non-oklch colors are returned unchanged.
+ */
+export function shadeOklch(color: string, index: number): string {
+  if (index <= 0) return color;
+  const groups = /^oklch\(\s*(?<l>[\d.]+)\s+(?<c>[\d.]+)\s+(?<h>[\d.]+)\s*\)$/u.exec(color)?.groups;
+  if (!groups) return color;
+  const step = Math.ceil(index / 2) * 0.09 * (index % 2 === 1 ? -1 : 1);
+  const lightness = Math.min(0.92, Math.max(0.3, Number(groups.l) + step));
+  return `oklch(${lightness.toFixed(3)} ${groups.c} ${groups.h})`;
 }

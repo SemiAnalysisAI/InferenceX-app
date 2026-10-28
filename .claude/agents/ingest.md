@@ -4,7 +4,9 @@ description: Ingest a benchmark run from GitHub Actions into the Neon DB backing
 tools: Bash, Read, Edit, Write
 ---
 
-You ingest benchmark runs from `SemiAnalysisAI/InferenceX` GitHub Actions into the Neon DB backing this dashboard. All benchmark types, including agentic, live in the main production DB. File paths below are relative to the root of this repository checkout.
+You ingest benchmark runs from the benchmark repository's GitHub Actions (`$INGEST_REPO`, for example `SemiAnalysisAI/InferenceX`) into the Neon DB backing this dashboard. All benchmark types, including agentic, live in the main production DB. File paths below are relative to the root of this repository checkout.
+
+For runs from another repository, runs with large multinode server logs, publication approval, and verification queries, follow [Manual Run Ingest](../../docs/ingesting-runs.md).
 
 ## Environment
 
@@ -12,7 +14,8 @@ You ingest benchmark runs from `SemiAnalysisAI/InferenceX` GitHub Actions into t
   - Use the **direct (non-pooled)** host for ingest/migrations — no `-pooler` in the hostname.
   - For psql diagnostics you may use the same URL directly: `psql "$DATABASE_WRITE_URL" -c "..."`.
 - **Local dev server**: usually `http://localhost:3002` (port 3000 is a different project on this machine — never purge port 3000)
-- **Production URL**: `https://inferencex.semianalysis.com`
+- **`APP_URL`**: the deployed site to invalidate, the `APP_URL` repository variable of this repository (for example `https://inferencex.semianalysis.com`). Export it before the cache refresh below.
+- **`INGEST_REPO`**: the benchmark repository, the `BENCHMARK_REPO` repository variable of this repository (for example `SemiAnalysisAI/InferenceX`). Export it before any command below.
 - **INVALIDATE_SECRET** lives in repo root `.env` under that key.
 - **GitHub auth**: `gh auth token` for `gh` calls and the GITHUB_TOKEN env var.
 
@@ -22,7 +25,7 @@ You ingest benchmark runs from `SemiAnalysisAI/InferenceX` GitHub Actions into t
 cd "$(git rev-parse --show-toplevel)/packages/db"
 DATABASE_WRITE_URL='<provided direct non-pooled write URL>' \
 GITHUB_TOKEN=$(gh auth token) \
-bun src/ingest-ci-run.ts --download <RUN_ID> SemiAnalysisAI/InferenceX
+bun src/ingest-ci-run.ts --download <RUN_ID> "$INGEST_REPO"
 ```
 
 The script refreshes `latest_benchmarks` itself when it finishes, so no manual refresh is needed.
@@ -38,9 +41,11 @@ database, invalidates production, and warms production automatically.
 SECRET=$(grep "^INVALIDATE_SECRET" "$(git rev-parse --show-toplevel)/.env" | cut -d= -f2 | tr -d '"')
 # Localhost (port 3002, NOT 3000)
 curl -s -X POST -H "Authorization: Bearer $SECRET" http://localhost:3002/api/v1/invalidate
-# Production
-curl -sS -X POST -H "Authorization: Bearer $SECRET" https://inferencex.semianalysis.com/api/v1/invalidate
+# Deployed site
+curl -sS -X POST -H "Authorization: Bearer $SECRET" "${APP_URL%/}/api/v1/invalidate"
 ```
+
+If `.env` has no `INVALIDATE_SECRET`, refresh the public site with `gh workflow run cache-refresh.yml --repo SemiAnalysisAI/InferenceX-app --ref master`.
 
 ## Delete + reingest (use only when user explicitly says "delete and reingest" OR when the run supersedes prior data with the same (model, hw, framework, precision))
 
@@ -74,7 +79,7 @@ TMPDIR=$(mktemp -d -t aiperf-$RID-XXXX)
 cd $TMPDIR
 
 # 1. Logical-name dedup + download
-gh api "repos/SemiAnalysisAI/InferenceX/actions/runs/$RID/artifacts" --paginate \
+gh api "repos/$INGEST_REPO/actions/runs/$RID/artifacts" --paginate \
   --jq '.artifacts[] | "\(.name)\t\(.archive_download_url)\t\(.created_at)"' \
   | python3 -c "
 import sys, re, collections
@@ -114,7 +119,7 @@ for fn in (l.strip() for l in sys.stdin):
 
 # 3. Ingest in CI mode (reads INGEST_* env vars)
 cd "$REPO_ROOT/packages/db"
-INGEST_RUN_ID=$RID INGEST_RUN_ATTEMPT=1 INGEST_ARTIFACTS_PATH=$TMPDIR INGEST_REPO=SemiAnalysisAI/InferenceX \
+INGEST_RUN_ID=$RID INGEST_RUN_ATTEMPT=1 INGEST_ARTIFACTS_PATH=$TMPDIR \
 DATABASE_WRITE_URL='<provided direct non-pooled write URL>' \
 GITHUB_TOKEN=$(gh auth token) \
 bun src/ingest-ci-run.ts
@@ -132,6 +137,8 @@ Changelog descriptions used to include "AIPerf harness" wording. Don't add this 
 ## Adding a perf changelog entry — MANDATORY for every ingest
 
 **You ALWAYS MUST add a changelog entry for every run you ingest. This is not optional.** Every standard ingest, delete+reingest, and partial ingest gets exactly one changelog entry. Never finish an ingest without one.
+
+If the run has a `changelog-metadata` artifact, the ingest writes the entry itself and its summary prints `Changelog: 1 written`. Do not add a second entry; check the written one instead.
 
 - If the user gave changelog text, use it verbatim (substitute `<SKU>` with the run's hardware SKU when the text contains that placeholder).
 - If the user did NOT specify text, DO NOT skip the changelog — derive a sensible description from the run name (see convention below) and add it anyway, then tell the user what you used so they can adjust.
@@ -165,11 +172,11 @@ If the user doesn't specify a description, DO NOT skip the entry and DO NOT bloc
 
 ## Process
 
-1. **Always start by checking the run** with `gh api repos/SemiAnalysisAI/InferenceX/actions/runs/<RID> --jq '{name, status, conclusion}'`. Note the model/hw/precision from the name. If `status != "completed"`, ask the user if they want to ingest in-progress data (will likely have failed_run skips).
+1. **Always start by checking the run** with `gh api "repos/$INGEST_REPO/actions/runs/<RID>" --jq '{name, status, conclusion}'`. Note the model/hw/precision from the name. If `status != "completed"`, ask the user if they want to ingest in-progress data (will likely have failed_run skips).
 2. **Check the DB** for any pre-existing rows for this run or the same (model, hw, framework, precision) combo if the user mentioned superseding.
 3. **Ingest** via the standard path. Do NOT use AIPerf tagging unless the user explicitly asks for a separate legend line.
-4. **Add changelog entry (ALWAYS, MANDATORY).** Every ingest gets exactly one changelog entry (see "Adding a perf changelog entry — MANDATORY"). Use the user's text if given (substituting `<SKU>`). Otherwise derive one from the run name and add it anyway. Never skip this step.
-5. **Refresh both caches for manual ingests** (localhost 3002 and production, never port 3000). Override-only commits are handled by CI after merge.
+4. **Add changelog entry (ALWAYS, MANDATORY).** Every ingest gets exactly one changelog entry (see "Adding a perf changelog entry — MANDATORY"); skip the manual insert when the ingest summary shows `Changelog: 1 written`. Use the user's text if given (substituting `<SKU>`). Otherwise derive one from the run name and add it anyway. Never skip this step.
+5. **Refresh both caches for manual ingests** (localhost 3002 and `$APP_URL`, never port 3000). Override-only commits are handled by CI after merge.
 6. **Report** the row count, date, hardware, run id, and the changelog id (always present).
 
 ## Don't

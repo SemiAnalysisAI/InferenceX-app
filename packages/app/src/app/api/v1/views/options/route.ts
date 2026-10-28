@@ -195,6 +195,7 @@ function buildOptionsPayload() {
       serviceCompare: false,
       roleShare: false,
       powerFit: false,
+      powerBreakdown: false,
       xmetric: 'p90_ttft',
       scale: 'auto',
       precisions: 'auto',

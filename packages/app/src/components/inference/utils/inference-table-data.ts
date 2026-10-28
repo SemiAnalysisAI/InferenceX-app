@@ -32,6 +32,8 @@ export function inferenceTableYValue(point: InferenceData, yPath?: string): numb
 type UnavailableReason = SystemPowerUnsupportedReason | 'energy' | 'model-unavailable';
 
 const ALL_IN_MEASURED_ENERGY_FIELDS: ReadonlySet<string> = new Set<PowerBasisFieldKey>([
+  'itModeledJPerOutputToken',
+  'itModeledJPerTotalToken',
   'utilityModeledJPerOutputToken',
   'utilityModeledJPerTotalToken',
 ]);

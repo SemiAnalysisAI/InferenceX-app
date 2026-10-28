@@ -17,6 +17,7 @@ import {
   getEvalBenchmarkLabel,
   isModelDeprecated,
   isModelMaintenance,
+  isModelDefault,
   isSequenceDeprecated,
   isSequenceDeprecatedForModel,
   isSequenceHiddenForModel,
@@ -28,6 +29,24 @@ import {
   Precision,
   EvalBenchmark,
 } from '@/lib/catalog/data-mappings';
+
+describe('model selector ordering', () => {
+  it('keeps non-default models in their existing order and excludes hidden models', () => {
+    expect(MODEL_OPTIONS.filter((model) => !isModelDefault(model))).toEqual([
+      Model.Kimi_K2_5,
+      Model.MiniMax_M3,
+      Model.DeepSeek_R1,
+      Model.GLM_5,
+      Model.Qwen3_8_27B,
+      Model.Qwen3_8_27B_Eager,
+      Model.GptOss,
+      Model.MiniMax_M2_5,
+      Model.Llama3_3_70B,
+    ]);
+    expect(new Set(MODEL_OPTIONS).size).toBe(MODEL_OPTIONS.length);
+    expect(MODEL_OPTIONS).not.toContain(Model.Llama3_1_70B);
+  });
+});
 
 describe('getModelAndSequence', () => {
   it('parses artifact name with 70b model and 1k1k sequence', () => {
@@ -173,6 +192,11 @@ describe('isModelDeprecated', () => {
 
   it('returns true for deprecated model MiniMax_M2_5 (superseded by M3)', () => {
     expect(isModelDeprecated(Model.MiniMax_M2_5)).toBe(true);
+  });
+
+  it('moves MiniMax M3 to deprecated while keeping M3.1 Flash active', () => {
+    expect(isModelDeprecated(Model.MiniMax_M3)).toBe(true);
+    expect(isModelDeprecated(Model.MiniMax_M3_1_Flash)).toBe(false);
   });
 
   it('returns true for deprecated model GptOss', () => {

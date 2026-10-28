@@ -170,6 +170,15 @@ describe('blobSet', () => {
 });
 
 describe('blobPurge', () => {
+  it('restricts scoped purges to their exact key subtree', async () => {
+    mockList.mockResolvedValue({ blobs: [], hasMore: false, cursor: '' } as any);
+    expect(await blobPurge('operatorx/deployment/')).toBe(0);
+    expect(mockList).toHaveBeenCalledWith({
+      prefix: 'test-cache/operatorx/deployment/',
+      cursor: undefined,
+    });
+  });
+
   it('deletes all blobs in a single page and returns count', async () => {
     mockList.mockResolvedValue({
       blobs: [
@@ -223,6 +232,27 @@ describe('blobPurge', () => {
     expect(mockList).toHaveBeenNthCalledWith(2, { prefix: 'test-cache/', cursor: 'cursor-abc' });
     expect(mockList).toHaveBeenNthCalledWith(3, { prefix: 'test-cache/', cursor: 'cursor-def' });
     expect(mockDel).toHaveBeenCalledTimes(3);
+  });
+
+  it('keeps blobs under the excluded key subtrees', async () => {
+    mockList.mockResolvedValue({
+      blobs: [
+        { url: 'https://blob.example.com/a.json', pathname: 'test-cache/db:v2:a.json' },
+        { url: 'https://blob.example.com/o.json', pathname: 'test-cache/operatorx/ns/cmp.json' },
+        { url: 'https://blob.example.com/b.json', pathname: 'test-cache/operatorxish.json' },
+      ],
+      hasMore: false,
+      cursor: '',
+    } as any);
+    mockDel.mockResolvedValue(undefined as any);
+
+    const deleted = await blobPurge('', ['operatorx/']);
+
+    expect(deleted).toBe(2);
+    expect(mockDel).toHaveBeenCalledWith([
+      'https://blob.example.com/a.json',
+      'https://blob.example.com/b.json',
+    ]);
   });
 
   it('returns 0 when no blobs exist', async () => {

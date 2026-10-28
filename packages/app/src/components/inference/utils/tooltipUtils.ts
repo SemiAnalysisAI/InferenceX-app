@@ -5,6 +5,7 @@ import { agenticDetailHref } from '@/lib/agentx/agentic-detail-link';
 import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
 import { frameworkFamily } from '@/lib/catalog/framework-family';
 import type { Locale } from '@/lib/i18n/i18n';
+import type { PowerBasisLabelStyle } from '@/lib/power/power-basis';
 import { isKvOffloadEnabled } from '@/lib/benchmarks/kv-offload';
 import { chartStateHref } from '@/lib/routing/url-state';
 import type {
@@ -17,6 +18,7 @@ import {
 } from '@/lib/power/system-power-model';
 
 import type { HardwareConfig, InferenceData, OverlayData } from '@/components/inference/types';
+import { powerBasisPillHtml } from '@/components/inference/powerx/PowerBasisPill';
 import {
   isAllInMeasuredConfigKey,
   isMeasuredEnergyConfigKey,
@@ -50,6 +52,10 @@ export interface TooltipConfig {
   hasLog?: boolean;
   showPowerTelemetry?: boolean;
   locale?: Locale;
+  /** PowerX names boundaries the way its Count control does (GPU only, Whole system). */
+  powerLabelStyle?: PowerBasisLabelStyle;
+  /** The viewer is on a touch-primary device: the pinned hint says Tap, not Click. */
+  touch?: boolean;
 }
 
 export interface OverlayTooltipConfig extends TooltipConfig {
@@ -123,6 +129,7 @@ export const fmt = (v: number): string => {
 const TOOLTIP_STRINGS = {
   en: {
     dismiss: 'Click elsewhere to dismiss',
+    dismissTouch: 'Tap elsewhere to dismiss',
     unofficialRun: '✕ UNOFFICIAL RUN',
     date: 'Date',
     dataFrom: (d: string) => `(data from ${d})`,
@@ -143,6 +150,7 @@ const TOOLTIP_STRINGS = {
   },
   zh: {
     dismiss: '点击其他区域关闭',
+    dismissTouch: '点按其他区域关闭',
     unofficialRun: '✕ 非官方运行',
     date: '日期',
     dataFrom: (d: string) => `（数据来自 ${d}）`,
@@ -167,11 +175,12 @@ const powerVariantHTML = (
   d: InferenceData,
   selectedYAxisMetric: string,
   locale: Locale,
+  labelStyle?: PowerBasisLabelStyle,
 ): string => {
   const variant = d.powerVariant;
   if (!variant) return '';
   const t = TOOLTIP_STRINGS[locale];
-  let html = tooltipLine(t.series, powerVariantLabel(variant, locale));
+  let html = tooltipLine(t.series, powerVariantLabel(variant, locale, labelStyle));
   if (
     variant.kind === 'role' &&
     variant.id !== 'all' &&
@@ -203,8 +212,10 @@ const escapeHtml = (s: string): string =>
 const SYSTEM_POWER_STRINGS = {
   en: {
     heading: 'InferenceX Power Model (beta)',
+    details: 'Deployment & model details',
     measuredGpu: 'Measured GPU power',
-    itPerGpu: 'Modeled IT power per GPU',
+    itPerGpu: 'Modeled IT power per GPU (no PUE)',
+    facilityPerGpu: 'Modeled facility power per GPU',
     deploymentIt: 'Modeled deployment IT power',
     facility: 'Modeled facility power',
     state: 'Operating state',
@@ -270,8 +281,10 @@ const SYSTEM_POWER_STRINGS = {
   },
   zh: {
     heading: 'InferenceX 功耗模型（Beta）',
+    details: '部署与模型详情',
     measuredGpu: 'GPU 实测功耗',
-    itPerGpu: '每 GPU 分摊的 IT 功耗估算',
+    itPerGpu: '每 GPU 分摊的 IT 功耗估算（不含 PUE）',
+    facilityPerGpu: '每 GPU 分摊的数据中心功耗估算',
     deploymentIt: '整个部署的 IT 功耗估算',
     facility: '数据中心功耗估算',
     state: '运行状态',
@@ -329,6 +342,24 @@ const SYSTEM_POWER_STRINGS = {
   },
 } as const;
 
+/** Power readings: whole watts with grouping — sub-watt digits are model noise. */
+const fmtWatts = (value: number): string => Math.round(value).toLocaleString('en-US');
+
+/** Y-axis metrics whose values are watts, shown rounded to whole watts. */
+const WATT_METRICS = new Set([
+  'y_measuredAvgPower',
+  'y_measuredPrefillAvgPower',
+  'y_measuredDecodeAvgPower',
+  'y_itModeledWatts',
+  'y_utilityModeledWatts',
+]);
+
+const fmtY = (value: number, metric: string): string =>
+  WATT_METRICS.has(metric) && Number.isFinite(value) ? fmtWatts(value) : fmt(value);
+
+/** A point's y value as the tooltip prints it for the metric (watts get their own format). */
+export const formatMetricValue = fmtY;
+
 const modeledSystemPowerHTML = (
   d: InferenceData,
   selectedYAxisMetric: string,
@@ -351,16 +382,20 @@ const modeledSystemPowerHTML = (
   const u = t.units[estimate.unit];
   return `<div data-testid="tooltip-modeled-system-power" style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px; font-size: 11px;">
     <strong>${t.heading}</strong>
-    ${tooltipLine(t.measuredGpu, `${fmt(estimate.measuredGpuWattsPerGpu)} W/GPU`)}
-    ${estimate.unit === 'nvl72-tray' && estimate.measuredGraceSocketWatts !== null ? tooltipLine(t.graceSocket, `${fmt(estimate.measuredGraceSocketWatts)} W/socket`) : ''}
-    ${tooltipLine(t.itPerGpu, `${fmt(estimate.itWattsPerGpu)} W/GPU`)}
+    ${tooltipLine(t.measuredGpu, `${fmtWatts(estimate.measuredGpuWattsPerGpu)} W/GPU${powerBasisPillHtml('gpu', locale)}`)}
+    ${estimate.unit === 'nvl72-tray' && estimate.measuredGraceSocketWatts !== null ? tooltipLine(t.graceSocket, `${fmtWatts(estimate.measuredGraceSocketWatts)} W/socket`) : ''}
+    ${tooltipLine(t.itPerGpu, `${fmtWatts(estimate.itWattsPerGpu)} W/GPU${powerBasisPillHtml('it', locale)}`)}
+    ${tooltipLine(t.facilityPerGpu, `${fmtWatts(estimate.deploymentFacilityWatts / estimate.gpuCount)} W/GPU${powerBasisPillHtml('facility', locale)}`)}
     ${
       isPinned
         ? `
+      <details data-testid="tooltip-power-model-details" style="margin-top: 2px;">
+      <summary style="cursor: pointer; color: var(--muted-foreground);">${t.details}</summary>
       ${tooltipLine(t.state, `${t.workloads[estimate.operatingState.workload]} · ${t.scaleOut(estimate.operatingState.scaleOut)}`)}
-      ${tooltipLine(t.deploymentIt, `${fmt(estimate.deploymentItWatts)} W`)}
-      ${tooltipLine(`${t.facility} (PUE ${fmt(estimate.pue)})`, `${fmt(estimate.deploymentFacilityWatts)} W`)}
+      ${tooltipLine(t.deploymentIt, `${fmtWatts(estimate.deploymentItWatts)} W`)}
+      ${tooltipLine(`${t.facility} (PUE ${fmt(estimate.pue)})`, `${fmtWatts(estimate.deploymentFacilityWatts)} W`)}
       <div style="color: var(--muted-foreground); margin-bottom: 4px;">${u.topology(estimate.chassisCount, estimate.gpuCount, estimate.modeledGpuCount)}${estimate.chassisBasis === 'extrapolated' ? `<br/>${u.extrapolation}` : ''}${estimate.topologyBasis === 'uniform-hosts' ? `<br/>${u.uniformHosts}` : ''}<br/>${estimate.unit === 'nvl72-tray' && estimate.cpuBasis === 'modeled' ? t.units['nvl72-tray'].modeledCpuAssumptions : u.assumptions}<br/>${u.network}<br/>${u.normalization}<br/>${u.boundary}</div>
+      </details>
       ${tooltipLine(t.model, `<a href="${escapeHtml(SYSTEM_POWER_MODEL_SOURCE_URL)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${escapeHtml(estimate.hardware)} · ${escapeHtml(estimate.modelRevision.slice(0, 12))}</a>`)}
     `
         : ''
@@ -780,7 +815,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
 
   return `
     <div style="${tooltipShellStyle({ isPinned })}">
-      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
+      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${config.touch ? t.dismissTouch : t.dismiss}</div>` : ''}
       <div style="color: var(--foreground); font-size: 12px; font-weight: 600; margin-bottom: 8px;">
         ${hardwareConfig[d.hwKey] ? getDisplayLabel(getPointHardwareConfig(d, hardwareConfig[d.hwKey])) : d.hwKey}
       </div>
@@ -792,7 +827,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
           : ''
       }
       ${tooltipLine(xLabel, fmt(d.x))}
-      ${tooltipLine(yLabel, fmt(d.y))}
+      ${tooltipLine(yLabel, fmtY(d.y, selectedYAxisMetric))}
       ${
         selectedYAxisMetric === 'y_tpPerGpu' && d['inputTputPerGpu']
           ? `
@@ -806,7 +841,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
           : ''
       }
       ${powerTierHTML(d, selectedYAxisMetric, locale)}
-      ${powerVariantHTML(d, selectedYAxisMetric, locale)}
+      ${powerVariantHTML(d, selectedYAxisMetric, locale, config.powerLabelStyle)}
       ${modeledSystemPowerHTML(d, selectedYAxisMetric, isPinned, locale)}
       ${tooltipLine(t.totalChips, d.physicalChips ?? d.tp)}
       ${generateParallelismHTML(d, locale)}
@@ -840,7 +875,7 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
 
   return `
     <div style="${tooltipShellStyle({ isPinned, border: '2px solid #dc2626' })}">
-      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
+      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${config.touch ? t.dismissTouch : t.dismiss}</div>` : ''}
       <div style="color: #dc2626; font-size: 10px; font-weight: 700; margin-bottom: 4px; text-transform: uppercase;">
         ${t.unofficialRun}
       </div>
@@ -850,9 +885,9 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
       ${tooltipLine(t.branch, `${branch}`)}
       ${tooltipLine(t.date, formatTooltipDate(d.actualDate ?? d.date, locale))}
       ${tooltipLine(xLabel, fmt(d.x))}
-      ${tooltipLine(yLabel, fmt(d.y))}
+      ${tooltipLine(yLabel, fmtY(d.y, selectedYAxisMetric))}
       ${powerTierHTML(d, selectedYAxisMetric, locale)}
-      ${powerVariantHTML(d, selectedYAxisMetric, locale)}
+      ${powerVariantHTML(d, selectedYAxisMetric, locale, config.powerLabelStyle)}
       ${modeledSystemPowerHTML(d, selectedYAxisMetric, isPinned, locale)}
       ${tooltipLine(t.totalChips, d.physicalChips ?? d.tp)}
       ${generateParallelismHTML(d, locale)}
@@ -891,7 +926,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
 
   return `
     <div style="${tooltipShellStyle({ isPinned })}">
-      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
+      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${config.touch ? t.dismissTouch : t.dismiss}</div>` : ''}
       ${tooltipLine(t.date, `${formatTooltipDate(d.date, locale)}${d.actualDate && d.actualDate !== d.date ? ` <span style="opacity: 0.7">${t.dataFrom(formatTooltipDate(d.actualDate, locale))}</span>` : ''}`)}
       ${tooltipLine(t.chipConfig, `${hardwareConfig[d.hwKey] ? getDisplayLabel(getPointHardwareConfig(d, hardwareConfig[d.hwKey])) : d.hwKey}`)}
       ${
@@ -901,7 +936,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
           : ''
       }
       ${tooltipLine(xLabel, fmt(d.x))}
-      ${tooltipLine(yLabel, fmt(d.y))}
+      ${tooltipLine(yLabel, fmtY(d.y, selectedYAxisMetric))}
       ${
         selectedYAxisMetric === 'y_tpPerGpu' && d['inputTputPerGpu']
           ? `
@@ -915,7 +950,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
           : ''
       }
       ${powerTierHTML(d, selectedYAxisMetric, locale)}
-      ${powerVariantHTML(d, selectedYAxisMetric, locale)}
+      ${powerVariantHTML(d, selectedYAxisMetric, locale, config.powerLabelStyle)}
       ${modeledSystemPowerHTML(d, selectedYAxisMetric, isPinned, locale)}
       ${tooltipLine(t.totalChips, d.physicalChips ?? d.tp)}
       ${generateParallelismHTML(d, locale)}

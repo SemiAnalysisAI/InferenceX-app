@@ -28,7 +28,7 @@ describe('measured metric configuration', () => {
 
   it('does not group unrelated metrics or unknown persisted values', () => {
     const grouped = METRIC_CONFIG_KEYS.filter((key) => getMeasuredMetricConfig(key));
-    expect(grouped).toHaveLength(21);
+    expect(grouped).toHaveLength(24);
     expect(new Set(grouped)).toEqual(
       new Set([...MEASURED_ENERGY_METRIC_CONFIG_KEYS, ...POWER_BASIS_METRIC_CONFIG_KEYS]),
     );
@@ -40,13 +40,24 @@ describe('measured metric configuration', () => {
   });
 
   it('offers provisioned boundaries for energy only and lands old provisioned-watt links on measured power', () => {
-    expect(measuredMetricBases('power')).toEqual(['gpu-measured', 'utility-modeled']);
+    expect(measuredMetricBases('power')).toEqual(['gpu-measured', 'it-modeled', 'utility-modeled']);
     expect(measuredMetricBases('energy')).toEqual([
       'gpu-measured',
       'gpu-provisioned',
       'utility-provisioned',
+      'it-modeled',
       'utility-modeled',
     ]);
+    expect(getMeasuredMetricConfig('y_itModeledWatts')).toMatchObject({
+      family: 'power',
+      basis: 'it-modeled',
+      display: 'watts',
+    });
+    expect(getMeasuredMetricConfig('y_itModeledJPerOutputToken')).toMatchObject({
+      family: 'energy',
+      basis: 'it-modeled',
+      denominator: 'output',
+    });
     expect(changeMeasuredMetricConfig('y_gpuProvisionedJPerOutputToken', { family: 'power' })).toBe(
       'y_measuredAvgPower',
     );

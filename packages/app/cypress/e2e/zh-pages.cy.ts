@@ -23,8 +23,10 @@ describe('Chinese (/zh) pages', () => {
           .should('have.text', '仪表板')
           .and('have.attr', 'href', '/zh/inference/kimi-k3');
         cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
-        cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 4);
-        cy.get('[data-testid="compare-agentx-model-minimax-m3"]').should('not.exist');
+        cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 2);
+        for (const hidden of ['minimax-m3', 'kimi-k3', 'glm-5-3']) {
+          cy.get(`[data-testid="compare-agentx-model-${hidden}"]`).should('not.exist');
+        }
         cy.get('[data-testid^="compare-agentx-model-"] [data-new-badge="agentx-ledger"]').should(
           'not.exist',
         );

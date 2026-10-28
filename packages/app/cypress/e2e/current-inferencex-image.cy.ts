@@ -148,6 +148,10 @@ describe('Current InferenceX Image localized routes', () => {
       date: '2026-08-01',
     },
   ];
+  const releases = {
+    sglang: { tag: 'v0.5.2', publishedAt: '2026-08-01T00:00:00Z', commits: {} },
+    vllm: { tag: 'v0.10.1', publishedAt: '2026-08-01T00:00:00Z', commits: {} },
+  };
 
   beforeEach(() => {
     cy.clock(fixedNow, ['Date']);
@@ -160,10 +164,7 @@ describe('Current InferenceX Image localized routes', () => {
       delay: 250,
       body: imageRows,
     }).as('latestImages');
-    cy.intercept('GET', '**/api/v1/framework-releases', {
-      sglang: 'v0.5.2',
-      vllm: 'v0.10.1',
-    });
+    cy.intercept('GET', '**/api/v1/framework-releases', releases);
     visitCurrentImage();
     cy.contains('加载中……').should('be.visible');
     cy.wait('@latestImages');
@@ -193,10 +194,7 @@ describe('Current InferenceX Image localized routes', () => {
 
     cy.viewport(1440, 900);
     cy.intercept('GET', '**/api/v1/latest-images', imageRows);
-    cy.intercept('GET', '**/api/v1/framework-releases', {
-      sglang: 'v0.5.2',
-      vllm: 'v0.10.1',
-    });
+    cy.intercept('GET', '**/api/v1/framework-releases', releases);
     visitCurrentImage();
     cy.get('#image-model-select').click();
     cy.get('[data-slot="select-item"]').contains('DeepSeek-R1').click();
@@ -208,10 +206,7 @@ describe('Current InferenceX Image localized routes', () => {
 
   it('preserves the English status, age, and technical tooltip copy', () => {
     cy.intercept('GET', '**/api/v1/latest-images', imageRows);
-    cy.intercept('GET', '**/api/v1/framework-releases', {
-      sglang: 'v0.5.2',
-      vllm: 'v0.10.1',
-    });
+    cy.intercept('GET', '**/api/v1/framework-releases', releases);
     cy.visit('/current-inferencex-image');
     selectFixedSequence();
     cy.get('table')
@@ -235,7 +230,7 @@ describe('Current InferenceX Image localized routes', () => {
     cy.intercept('GET', '**/api/v1/framework-releases', (req) => {
       req.reply(
         releasesSucceed
-          ? { statusCode: 200, body: { sglang: 'v0.5.2', vllm: 'v0.10.1' } }
+          ? { statusCode: 200, body: releases }
           : { statusCode: 500, body: { error: 'release failure' } },
       );
     }).as('frameworkReleases');
@@ -307,10 +302,7 @@ describe('Current InferenceX Image localized routes', () => {
 
   it('labels agentic rows as Agentic (never null/null) and flags stale AgentX submissions', () => {
     cy.intercept('GET', '**/api/v1/latest-images', imageRows);
-    cy.intercept('GET', '**/api/v1/framework-releases', {
-      sglang: 'v0.5.2',
-      vllm: 'v0.10.1',
-    });
+    cy.intercept('GET', '**/api/v1/framework-releases', releases);
     cy.visit('/current-inferencex-image');
     cy.get('#image-sequence-select').click();
     cy.get('[data-slot="select-item"]').should('not.contain.text', 'null/null');
@@ -326,7 +318,7 @@ describe('Current InferenceX Image localized routes', () => {
     cy.viewport(1440, 900);
     const retiredImage = 'lmsysorg/sglang:v0.4.9-minimax-8k1k-retired';
     const retiredDeepSeekImage = 'vllm/vllm-openai:v0.10.0-dsv4-8k1k-retired';
-    const activeMiniMaxImage = 'lmsysorg/sglang:v0.5.2-minimax-agentic';
+    const activeFlashImage = 'lmsysorg/sglang:v0.5.2-minimax-m31flash-agentic';
     const deprecatedModelImage = 'vllm/vllm-openai:v0.9.0-kimi-k2.5';
     cy.intercept('GET', '**/api/v1/latest-images', [
       ...imageRows,
@@ -340,21 +332,18 @@ describe('Current InferenceX Image localized routes', () => {
       },
       {
         ...imageRows[0],
-        model: 'minimaxm3',
+        model: 'minimaxm31flash',
         framework: 'sglang',
         isl: null,
         osl: null,
         benchmark_type: 'agentic_traces',
-        image: activeMiniMaxImage,
+        image: activeFlashImage,
         date: today,
       },
       { ...imageRows[1], model: 'kimik2.5', image: deprecatedModelImage },
       { ...imageRows[1], isl: 1024, osl: 1024, image: 'vllm/vllm-openai:v0.8.0-1k1k' },
     ]);
-    cy.intercept('GET', '**/api/v1/framework-releases', {
-      sglang: 'v0.5.2',
-      vllm: 'v0.10.1',
-    });
+    cy.intercept('GET', '**/api/v1/framework-releases', releases);
     cy.visit('/current-inferencex-image');
 
     cy.get('#image-sequence-select').should('contain.text', 'Agentic');
@@ -374,26 +363,27 @@ describe('Current InferenceX Image localized routes', () => {
 
     cy.get('#image-model-select').click();
     cy.get('[data-slot="select-item"]').should('not.contain.text', 'Kimi-K2.5');
-    cy.get('[data-slot="select-item"]').contains('MiniMax-M3').click();
+    cy.get('[data-slot="select-item"]').should(($items) => {
+      expect([...$items].map((item) => item.textContent?.trim())).not.to.include('MiniMax-M3');
+    });
+    cy.get('[data-slot="select-item"]').contains('MiniMax-M3.1-Flash').click();
 
     cy.get('#image-sequence-select').should('contain.text', 'Agentic');
     cy.get('#image-sequence-select').click();
     cy.get('[data-slot="select-item"]').should('have.length', 1).and('contain.text', 'Agentic');
     cy.get('[data-slot="select-item"]').contains('Agentic').click();
     cy.get('[data-testid="current-image-result-count"]').should('contain.text', '1 configuration');
-    cy.get('table')
-      .should('contain.text', activeMiniMaxImage)
-      .and('not.contain.text', retiredImage);
+    cy.get('table').should('contain.text', activeFlashImage).and('not.contain.text', retiredImage);
   });
   it('keeps full configuration and long image tags readable while filtering the catalog', () => {
     cy.viewport(1440, 900);
     const longImage =
-      'registry.example.com/inferencex/sglang:rocm7.1.1-ubuntu24.04-pytorch2.9-deepseek-r1-fp8-h200-single-node-release-candidate';
+      'registry.example.com/inferencex/sglang:v0.5.1-rocm7.1.1-ubuntu24.04-pytorch2.9-deepseek-r1-fp8-h200-single-node-release-candidate';
     cy.intercept('GET', '**/api/v1/latest-images', [
       { ...imageRows[0], image: longImage, date: '2026-08-20' },
       imageRows[1],
     ]);
-    cy.intercept('GET', '**/api/v1/framework-releases', { sglang: 'v0.5.2', vllm: 'v0.10.1' });
+    cy.intercept('GET', '**/api/v1/framework-releases', releases);
     cy.visit('/current-inferencex-image');
     cy.get('[data-testid="current-image-result-count"]').should('contain.text', '2 configurations');
     cy.get('tbody tr')
@@ -413,7 +403,7 @@ describe('Current InferenceX Image localized routes', () => {
             expect(el.scrollWidth).to.be.at.most(el.clientWidth);
             expect(el.clientHeight).to.be.greaterThan(40);
           });
-        cy.contains('Review image').should('have.attr', 'title').and('include', 'unstable tag');
+        cy.contains('Review image').should('have.attr', 'title').and('include', 'predates');
         cy.get('time').should('have.attr', 'datetime', '2026-08-20').and('have.text', '2026-08-20');
         cy.get('td[title^="Last submission:"]').should('contain.text', '3d');
       });

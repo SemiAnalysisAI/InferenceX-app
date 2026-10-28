@@ -284,7 +284,8 @@ describe('new dashboard projections', () => {
   ] as const)(
     '%s shares the DeepSeek V4 Pro default and preserves explicit targets',
     async (view, handler) => {
-      const row = agenticRow();
+      const baseRow = agenticRow();
+      const row = agenticRow({ metrics: { ...baseRow.metrics, p90_itl: 1 / 190 } });
       mocks.benchmarks.mockImplementation(() =>
         Response.json([
           row,
@@ -304,11 +305,11 @@ describe('new dashboard projections', () => {
       const response = await handler(req(view, 'model=DeepSeek-V4-Pro'));
       expect(response.status).toBe(200);
       const body = await response.json();
-      expect(body.params).toMatchObject({ target: 35, priceSource: 'list', labCut: 0 });
+      expect(body.params).toMatchObject({ target: 170, priceSource: 'list', labCut: 0 });
       expect(body.params.target).toBe(profitModelDefaults(Model.DeepSeek_V4_Pro).interactivity);
       expect(hardwareKeys(body.data)).toEqual(['b200_sglang']);
 
-      const explicit = await handler(req(view, 'model=DeepSeek-V4-Pro&target=35'));
+      const explicit = await handler(req(view, 'model=DeepSeek-V4-Pro&target=170'));
       expect(explicit.status).toBe(200);
       const explicitBody = await explicit.json();
       expect(explicitBody.data).toEqual(body.data);
@@ -318,6 +319,104 @@ describe('new dashboard projections', () => {
       const customBody = await custom.json();
       expect(customBody.params.target).toBe(24);
       expect(customBody.data).not.toEqual(body.data);
+    },
+  );
+  it.each([
+    [Model.Kimi_K3, 'kimik3', 60],
+    [Model.GLM_5_2, 'glm5.2', 135],
+    [Model.MiniMax_M3, 'minimaxm3', 115],
+    [Model.DeepSeek_V4_Pro, 'dsv4', 170],
+    [Model.DeepSeek_V4_1_Flash, 'dsv41flash', 150],
+  ] as const)(
+    'prices supported agentic model %s at its default through both public profit views',
+    async (model, dbKey, target) => {
+      const baseRow = agenticRow({ model: dbKey });
+      const firstRow = agenticRow({
+        model: dbKey,
+        metrics: { ...baseRow.metrics, p90_itl: 1 / 250 },
+      });
+      mocks.benchmarks.mockImplementation(() =>
+        Response.json([
+          firstRow,
+          agenticRow({
+            id: 2,
+            model: dbKey,
+            conc: 32,
+            metrics: {
+              ...firstRow.metrics,
+              p90_itl: 1 / 20,
+              tput_per_gpu: 9000,
+              input_tput_per_gpu: 8100,
+              output_tput_per_gpu: 900,
+            },
+          }),
+        ]),
+      );
+      for (const [view, handler] of [
+        ['profit-estimator', profit],
+        ['profit-estimator-per-gigawatt', gw],
+      ] as const) {
+        const query = `model=${encodeURIComponent(model)}&priceSource=custom`;
+        const response = await handler(req(view, query));
+        expect(response.status).toBe(200);
+        const body = await response.json();
+        expect(body.params).toMatchObject({ model, sequence: 'agentic-traces', target });
+        expect(hardwareKeys(body.data)).toEqual(['b200_sglang']);
+        expect(body.data.rows[0].profit).toBeTypeOf('number');
+
+        const overridden = await handler(req(view, `${query}&target=35`));
+        expect(overridden.status).toBe(200);
+        const overriddenBody = await overridden.json();
+        expect(overriddenBody.params.target).toBe(35);
+      }
+    },
+  );
+  it.each([
+    ['profit-estimator', profit],
+    ['profit-estimator-per-gigawatt', gw],
+  ] as const)(
+    '%s applies the new default to official and unofficial runs',
+    async (view, handler) => {
+      const low = agenticRow({
+        metrics: {
+          ...agenticRow().metrics,
+          p90_itl: 1 / 20,
+          tput_per_gpu: 9000,
+          input_tput_per_gpu: 8100,
+          output_tput_per_gpu: 900,
+        },
+      });
+      const high = agenticRow({
+        id: 2,
+        conc: 2,
+        metrics: {
+          ...low.metrics,
+          p90_itl: 1 / 250,
+          tput_per_gpu: 6000,
+          input_tput_per_gpu: 5400,
+          output_tput_per_gpu: 600,
+        },
+      });
+      mocks.benchmarks.mockImplementation(() => Response.json([low, high]));
+      const runUrl = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/456';
+      mocks.unofficial.mockImplementation(() =>
+        Response.json({
+          benchmarks: [
+            { ...low, id: 456, hardware: 'b300', run_url: runUrl },
+            { ...high, id: 457, hardware: 'b300', run_url: runUrl },
+          ],
+          evaluations: [],
+        }),
+      );
+
+      const response = await handler(
+        req(view, 'model=DeepSeek-V4-Pro&priceSource=custom&unofficialrun=456'),
+      );
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.params.target).toBe(170);
+      expect(hardwareKeys(body.data)).toEqual(['b200_sglang']);
+      expect(hardwareKeys(body.overlays)).toEqual(['b300_sglang']);
     },
   );
   it.each([

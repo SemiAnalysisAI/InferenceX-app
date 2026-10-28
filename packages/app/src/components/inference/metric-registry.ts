@@ -1,4 +1,5 @@
 import type { ChartDefinition } from './types';
+import type { TokenBasis } from '@/lib/benchmarks/benchmark-transform';
 import type { TokenMetricType } from '@/lib/benchmarks/supplemental-benchmarks';
 import { POWER_BASIS_FIELDS } from '@/lib/power/power-basis';
 
@@ -12,9 +13,9 @@ export const COST_TIER_LABELS: Record<
 > = {
   hyperscaler: {
     option: 'Owning at Large Hyperscaler Volume',
-    optionZh: '自有 - 超大规模云大批量',
+    optionZh: '自有 · 超大规模云厂商批量采购',
     label: 'Owning at Large Hyperscaler Volume',
-    labelZh: '自有（超大规模云大批量）',
+    labelZh: '自有 · 超大规模云厂商批量采购',
   },
   rental: {
     option: 'Rent - 3 Year Commit',
@@ -413,6 +414,30 @@ export const METRIC_REGISTRY = {
     titleZh: '每总 token 整体预配焦耳能耗',
     polarity: 'lower',
   },
+  itModeledWatts: {
+    field: 'itModeledWatts.y',
+    label: 'All in Measured IT Power per Chip, no PUE (W)',
+    labelZh: '每芯片整体实测 IT 功耗，不含 PUE（W）',
+    title: 'All in Measured IT Power per Chip (no PUE)',
+    titleZh: '每芯片整体实测 IT 功耗（不含 PUE）',
+    polarity: 'lower',
+  },
+  itModeledJPerOutputToken: {
+    field: 'itModeledJPerOutputToken.y',
+    label: 'All in Measured IT J per Output Token, no PUE (J/tok)',
+    labelZh: '每输出 token 整体实测 IT 能耗，不含 PUE（J/tok）',
+    title: 'All in Measured IT Joules per Output Token (no PUE)',
+    titleZh: '每输出 token 整体实测 IT 焦耳能耗（不含 PUE）',
+    polarity: 'lower',
+  },
+  itModeledJPerTotalToken: {
+    field: 'itModeledJPerTotalToken.y',
+    label: 'All in Measured IT J per Total Token, no PUE (J/tok)',
+    labelZh: '每总 token 整体实测 IT 能耗，不含 PUE（J/tok）',
+    title: 'All in Measured IT Joules per Total Token (no PUE)',
+    titleZh: '每总 token 整体实测 IT 焦耳能耗（不含 PUE）',
+    polarity: 'lower',
+  },
   utilityModeledWatts: {
     field: 'utilityModeledWatts.y',
     label: 'All in Measured Power per Chip (W)',
@@ -558,6 +583,53 @@ export function isMetricKey(metricKey: string): metricKey is MetricKey {
   return Object.hasOwn(METRIC_REGISTRY, metricKey);
 }
 
+/** Metrics that count input tokens, so the uncached token basis rescales them. */
+const INPUT_TOKEN_METRICS: ReadonlySet<MetricKey> = new Set<MetricKey>([
+  'tpPerGpu',
+  'inputTputPerGpu',
+  'tpPerMw',
+  'inputTputPerMw',
+  'powerUser',
+  'costh',
+  'costr',
+  'costhi',
+  'costri',
+  'costUser',
+  'tokensPerDollarH',
+  'tokensPerDollarR',
+  'inputTokensPerDollarH',
+  'inputTokensPerDollarR',
+  'tokensPerDollarUser',
+  'jTotal',
+  'jInput',
+  'measuredJPerTotalToken',
+  'measuredJPerInputToken',
+  'measuredPrefillJPerInputToken',
+  'gpuProvisionedJPerTotalToken',
+  'utilityProvisionedJPerTotalToken',
+  'itModeledJPerTotalToken',
+  'utilityModeledJPerTotalToken',
+]);
+
+export function countsInputTokens(metricConfigKey: string): boolean {
+  const key = metricConfigKey.replace(/^y_/u, '');
+  return isMetricKey(key) && INPUT_TOKEN_METRICS.has(key);
+}
+
+/**
+ * Input-token metrics (input throughput, cost, energy) get a TTFT x-axis option.
+ * Decided from the registry title so display qualifiers can't change the answer.
+ */
+export function isInputMetric(metricConfigKey: string): boolean {
+  const key = metricConfigKey.replace(/^y_/u, '');
+  return isMetricKey(key) && metricOptionTitle(key, 'en').toLowerCase().includes('input');
+}
+
+/** The token basis a metric is charted on: only input-token metrics follow the toggle. */
+export function tokenBasisForMetric(metricConfigKey: string, tokenBasis: TokenBasis): TokenBasis {
+  return countsInputTokens(metricConfigKey) ? tokenBasis : 'total';
+}
+
 export function isBenchmarkMetricKey(metricKey: string): metricKey is BenchmarkMetricKey {
   return isMetricKey(metricKey) && !('source' in METRIC_REGISTRY[metricKey]);
 }
@@ -643,6 +715,9 @@ export const POWER_BASIS_METRIC_CONFIG_KEYS = [
   'y_gpuProvisionedJPerTotalToken',
   'y_utilityProvisionedJPerOutputToken',
   'y_utilityProvisionedJPerTotalToken',
+  'y_itModeledWatts',
+  'y_itModeledJPerOutputToken',
+  'y_itModeledJPerTotalToken',
   'y_utilityModeledWatts',
   'y_utilityModeledJPerOutputToken',
   'y_utilityModeledJPerTotalToken',
@@ -657,9 +732,12 @@ export function isPowerBasisConfigKey(configKey: string): boolean {
 }
 
 const ALL_IN_MEASURED_CONFIG_KEY_SET: ReadonlySet<string> = new Set(
-  Object.values(POWER_BASIS_FIELDS['utility-modeled']).map((field) => `y_${field}`),
+  (['it-modeled', 'utility-modeled'] as const).flatMap((basis) =>
+    Object.values(POWER_BASIS_FIELDS[basis]).map((field) => `y_${field}`),
+  ),
 );
 
+/** The modeled measured boundaries (IT without PUE and the facility meter); both share the All in Measured table rules. */
 export function isAllInMeasuredConfigKey(configKey: string): boolean {
   return ALL_IN_MEASURED_CONFIG_KEY_SET.has(configKey);
 }

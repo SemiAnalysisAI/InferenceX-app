@@ -437,6 +437,11 @@ async function mapWorkflowDir(
 
 async function main(): Promise<void> {
   validateRunBackfills();
+  const githubToken = process.env.GITHUB_TOKEN;
+  if (!githubToken) {
+    console.error('  ERROR: GITHUB_TOKEN is not set (needed to read run metadata from GitHub)');
+    process.exit(1);
+  }
   console.log('=== db:ingest:gcs ===');
   console.log(
     'This will ingest all GCS backup ZIP artifacts into the database.\n' +
@@ -461,10 +466,7 @@ async function main(): Promise<void> {
   const tracker = createSkipTracker();
   const configCache = createConfigCache(sql);
   const { getOrCreateConfig, preloadConfigs } = configCache;
-  const { fetchGithubRun, getOrCreateWorkflowRun } = createWorkflowRunServices(
-    sql,
-    process.env.GITHUB_TOKEN,
-  );
+  const { fetchGithubRun, getOrCreateWorkflowRun } = createWorkflowRunServices(sql, githubToken);
 
   await preloadConfigs();
   console.log(`  ${configCache.size} configs preloaded`);

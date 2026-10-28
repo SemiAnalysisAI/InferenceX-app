@@ -147,6 +147,11 @@ when a duration is requested, compute and label elapsed or inclusive days.
   These projections use raw capture, not a seventh formal evidence workflow.
   When changing a non-sensitive public view, update its read-only API, OpenAPI,
   selector tests, and this package in the same PR; do not create another package.
+- **Model architectures, parameter counts, or architecture diagrams:** use
+  `GET /api/v1/views/model-architectures` (optionally `?model=kimi-k3`) and read
+  [the architecture coverage inventory](references/dashboard-views.md#model-architecture-coverage).
+  Preserve exact counts, optional fields, and vendor source links. This static
+  catalog contains no benchmark measurements or unofficial-run data.
 - **PowerX measured power or energy:** read
   [PowerX](references/powerx.md), then use `inferencex powerx export`. Preserve
   strict-v2 rows with missing metrics, raw topology, observation dates, and source

@@ -39,11 +39,15 @@ const request = (params: Record<string, string> = {}) =>
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.images.mockImplementation(() => Response.json([image, { ...image, disagg: true }]));
-  mocks.releases.mockImplementation(() => Response.json({ sglang: 'v2' }));
+  mocks.releases.mockImplementation(() =>
+    Response.json({ sglang: { tag: 'v2.0.0', publishedAt: '2026-01-01T00:00:00Z', commits: {} } }),
+  );
   mocks.history.mockResolvedValue([
+    { ...image, date: '2026-08-20' },
     image,
-    { ...image, date: '2026-09-18' },
+    { ...image, disagg: true },
     { ...image, hardware: 'h200' },
+    { ...image, spec_method: 'mtp', date: '2026-06-01' },
   ]);
 });
 
@@ -76,14 +80,27 @@ describe('current image selector normalization', () => {
   it('returns the same filtered 90-day series as the UI helper', async () => {
     const response = await GET(request({ hardware: 'b200', includeHistory: 'true' }));
     const body = await response.json();
+    const rows = [image, { ...image, disagg: true }];
     expect(body.ageHistory).toEqual(
-      imageAgeHistory([image, { ...image, date: '2026-09-18' }], '2026-09-19'),
+      imageAgeHistory(rows, [{ ...image, date: '2026-08-20' }, ...rows], '2026-09-19'),
     );
     expect(body.ageHistory).toHaveLength(90);
-    expect(body.ageHistory.at(-1)).toMatchObject({ p90AgeDays: 1, configurationCount: 1 });
+    expect(body.ageHistory.find((p: { date: string }) => p.date === '2026-08-31')).toMatchObject({
+      p90AgeDays: 11,
+      configurationCount: 1,
+    });
     expect(body.params.includeHistory).toBe(true);
     expect(mocks.history).toHaveBeenCalledWith({}, '2026-09-19');
   });
+
+  it.each(['2026-09-19', '2026-08-31'])(
+    'ends history on ageSummary without superseded configurations at asOf=%s',
+    async (asOf) => {
+      const response = await GET(request({ asOf, includeHistory: 'true' }));
+      const body = await response.json();
+      expect(body.ageHistory.at(-1)).toEqual(body.ageSummary);
+    },
+  );
 
   it('rejects invalid history selectors', async () => {
     const response = await GET(request({ includeHistory: 'yes' }));

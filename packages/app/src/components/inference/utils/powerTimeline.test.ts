@@ -9,6 +9,7 @@ import {
   tracePools,
   windowPhase,
   type PowerTimelineTrace,
+  mostCoveredConcurrency,
 } from './powerTimeline';
 
 const RUN_URL = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34716669498';
@@ -116,5 +117,29 @@ describe('prioritizeRuns', () => {
       '2',
       '4',
     ]);
+  });
+});
+
+describe('mostCoveredConcurrency', () => {
+  it('picks the concurrency shared by the most hardware configs', () => {
+    // conc 4 has the most rows (four b200), conc 64 the most distinct configs.
+    expect(
+      mostCoveredConcurrency([
+        { conc: 4, hwKey: 'b200' },
+        { conc: 4, hwKey: 'b200' },
+        { conc: 4, hwKey: 'b200' },
+        { conc: 4, hwKey: 'b200' },
+        { conc: 64, hwKey: 'b200' },
+        { conc: 64, hwKey: 'mi355x' },
+        { conc: 64, hwKey: 'mi355x' },
+      ]),
+    ).toBe(64);
+    // A tie breaks toward the higher load.
+    expect(
+      mostCoveredConcurrency([
+        { conc: 8, hwKey: 'b200' },
+        { conc: 32, hwKey: 'h200' },
+      ]),
+    ).toBe(32);
   });
 });

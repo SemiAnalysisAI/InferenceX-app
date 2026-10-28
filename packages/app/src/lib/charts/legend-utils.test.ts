@@ -52,6 +52,20 @@ describe('filterAndSortLegendItems', () => {
       expect(result).toHaveLength(1);
       expect(result[0].label).toBe('A100');
     });
+
+    it('ignores punctuation in labels and queries', () => {
+      const configs = [
+        makeItem('B300 (vLLM)', true),
+        makeItem('B300 (Dynamo-TRT, MTP)', true),
+        makeItem('H200 (SGLang)', true),
+      ];
+      expect(filterAndSortLegendItems(configs, 'b300 vllm', false).map((r) => r.label)).toEqual([
+        'B300 (vLLM)',
+      ]);
+      expect(
+        filterAndSortLegendItems(configs, 'dynamo trt mtp', false).map((r) => r.label),
+      ).toEqual(['B300 (Dynamo-TRT, MTP)']);
+    });
   });
 
   describe('active-first sorting', () => {

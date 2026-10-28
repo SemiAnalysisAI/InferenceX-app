@@ -4,6 +4,7 @@ import type { BenchmarkRow } from '@/lib/api/api';
 import { rowToAggDataEntry, transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
 import { buildDerivedChartFields, getHardwareKey } from '@/lib/charts/chart-utils';
 import { POWER_BASIS_FIELDS } from '@/lib/power/power-basis';
+import { SYSTEM_POWER_CATEGORIES } from '@/lib/power/system-power-model';
 import { Sequence } from '@/lib/catalog/data-mappings';
 import { buildInferenceSeries } from '@/lib/views-api/series';
 import { rowToLightweightPoint } from '@/components/inference/hooks/interpolated-trend-core';
@@ -129,6 +130,44 @@ describe('power boundaries through the derived-field builder', () => {
     },
   );
 
+  it('derives the IT (no PUE) boundary as the facility figure minus the PUE overhead', () => {
+    const { entry, fields } = derive(row());
+    expect(entry.modeledSystemPower?.status).toBe('supported');
+    if (entry.modeledSystemPower?.status !== 'supported') return;
+    const model = entry.modeledSystemPower;
+    const itWatts = fields.itModeledWatts?.y;
+    const facility = fields.utilityModeledWatts?.y;
+    expect(itWatts).toBeGreaterThan(row().metrics.avg_power_w);
+    expect(itWatts).toBeLessThan(facility!);
+    // IT = deployment IT watts over the measured GPU count = the stacked parts minus facility.
+    expect(itWatts).toBeCloseTo(model.deploymentItWatts / model.gpuCount, 9);
+    const parts = model.deploymentBreakdownWatts;
+    const stackedIt =
+      SYSTEM_POWER_CATEGORIES.filter((key) => key !== 'facility').reduce(
+        (sum, key) => sum + parts[key],
+        0,
+      ) / model.gpuCount;
+    expect(itWatts).toBeCloseTo(stackedIt, 6);
+    expect(facility).toBeCloseTo(itWatts! + parts.facility / model.gpuCount, 6);
+    // Both modeled energies scale measured J/token by their watt ratio.
+    expect(fields.itModeledJPerOutputToken?.y).toBeCloseTo(
+      (row().metrics.joules_per_output_token * itWatts!) / row().metrics.avg_power_w,
+      9,
+    );
+    expect(fields.itModeledJPerOutputToken?.y).toBeLessThan(
+      fields.utilityModeledJPerOutputToken!.y,
+    );
+    expect(fields.itModeledJPerTotalToken?.y).toBeCloseTo(
+      (row().metrics.joules_per_total_token * itWatts!) / row().metrics.avg_power_w,
+      9,
+    );
+    expect(POWER_BASIS_FIELDS['it-modeled']).toEqual({
+      watts: 'itModeledWatts',
+      joulesPerOutputToken: 'itModeledJPerOutputToken',
+      joulesPerTotalToken: 'itModeledJPerTotalToken',
+    });
+  });
+
   it.each(['single_turn', 'agentic_traces'] as const)(
     'keeps %s GPU boundaries when an NVL72 row is not whole compute trays',
     (benchmark_type) => {
@@ -139,6 +178,8 @@ describe('power boundaries through the derived-field builder', () => {
       expect(fields.utilityProvisionedJPerOutputToken).toBeDefined();
       expect(fields.utilityModeledWatts).toBeUndefined();
       expect(fields.utilityModeledJPerOutputToken).toBeUndefined();
+      expect(fields.itModeledWatts).toBeUndefined();
+      expect(fields.itModeledJPerOutputToken).toBeUndefined();
     },
   );
 
@@ -261,12 +302,13 @@ describe('J per total token at every power boundary', () => {
       'interactivity',
       'y_measuredJPerTotalToken',
       null,
-      { powerCompare: 'boundaries' },
+      { powerCompare: 'all' },
     );
     expect(data.map((point) => [point.powerVariant?.id ?? 'base', point.y])).toEqual([
       ['base', official.measuredJPerTotalToken?.y],
       ['gpu-provisioned', official.gpuProvisionedJPerTotalToken?.y],
       ['utility-provisioned', official.utilityProvisionedJPerTotalToken?.y],
+      ['it-modeled', official.itModeledJPerTotalToken?.y],
       ['utility-modeled', official.utilityModeledJPerTotalToken?.y],
     ]);
   });

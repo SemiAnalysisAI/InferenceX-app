@@ -16,8 +16,8 @@ export const HARDWARE_COPY = {
     indexEyebrow: 'InferenceX 研究',
     indexTitle: '硬件结果',
     indexIntro:
-      '新一代加速器系统的 AgentX 对比结果：在相同交互性下，比较每美元 TCO、每 MW 与每颗芯片的 token 数。',
-    indexDescription: `${SITE_NAME} 发布的新一代加速器系统 AgentX 对比结果，在相同交互性下比较每美元 TCO、每 MW 与每颗芯片的 token 数。`,
+      '新一代加速器系统的 AgentX 对比结果：在相同交互性下，比较每美元 TCO、每 MW 和每颗芯片分别产出的 token 数。',
+    indexDescription: `${SITE_NAME} 发布的新一代加速器系统 AgentX 对比结果，在相同交互性下比较每美元 TCO、每 MW 和每颗芯片分别产出的 token 数。`,
     indexEmpty: '即将上线。',
     readResults: '查看结果',
   },

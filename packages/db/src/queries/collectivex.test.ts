@@ -12,6 +12,7 @@ import {
   listCollectiveXRuns,
   refreshCollectiveXRunAttempt,
   type CollectiveXRunInsert,
+  type CollectiveXRunRow,
 } from './collectivex';
 
 interface Captured {
@@ -87,6 +88,15 @@ describe('read queries', () => {
     expect(calls[2].text).toContain('ORDER BY run_id DESC');
     expect(calls[2].text).not.toContain('LIMIT');
   });
+
+  it('reads the recorded source repository with each run row', async () => {
+    const { sql, calls } = fakeSql([[], []]);
+    await getLatestCollectiveXRun(sql, 1);
+    await getCollectiveXRun(sql, 1, '160');
+    for (const call of calls) {
+      expect(call.text).toContain("r.summary->>'source_repository' AS source_repository");
+    }
+  });
 });
 
 describe('insertCollectiveXRun', () => {
@@ -155,32 +165,46 @@ describe('deleteCollectiveXRun', () => {
 });
 
 describe('collectiveXDatasetFromRow', () => {
+  const shard = makeRawShard();
+  // makeRawShard returns loose JSON whose identity shape the fixture fixes.
+  const identity = shard.identity as {
+    case_id: string;
+    case_factors: { sku: string; case: Record<string, unknown> };
+  };
+  const meta = makeRunMeta();
+  const row: CollectiveXRunRow = {
+    run_id: meta.run_id,
+    run_attempt: meta.run_attempt,
+    version: 1,
+    generated_at: meta.generated_at,
+    source_sha: meta.source_sha,
+    source_branch: 'collectivex',
+    source_repository: null,
+    conclusion: meta.conclusion,
+    matrix: makeRawMatrix([
+      {
+        caseId: identity.case_id,
+        sku: identity.case_factors.sku,
+        disposition: 'runnable',
+        case: identity.case_factors.case,
+      },
+    ]),
+    docs: [shard],
+  };
+
   it('assembles a stored row through the shared reader', () => {
-    const shard = makeRawShard();
-    const identity = (
-      shard as { identity: { case_id: string; case_factors: { sku: string; case: unknown } } }
-    ).identity;
-    const meta = makeRunMeta();
-    const dataset = collectiveXDatasetFromRow({
-      run_id: meta.run_id,
-      run_attempt: meta.run_attempt,
-      version: 1,
-      generated_at: meta.generated_at,
-      source_sha: meta.source_sha,
-      source_branch: 'collectivex',
-      conclusion: meta.conclusion,
-      matrix: makeRawMatrix([
-        {
-          caseId: identity.case_id,
-          sku: identity.case_factors.sku,
-          disposition: 'runnable',
-          case: identity.case_factors.case as Record<string, unknown>,
-        },
-      ]),
-      docs: [shard],
-    });
+    const dataset = collectiveXDatasetFromRow(row);
     expect(dataset.run.run_id).toBe(meta.run_id);
     expect(dataset.series).toHaveLength(1);
     expect(dataset.run.measured_cases).toBe(1);
+    expect(JSON.stringify(dataset.run)).not.toContain('source_repository');
+  });
+
+  it('exposes the recorded source repository on the dataset run', () => {
+    const dataset = collectiveXDatasetFromRow({
+      ...row,
+      source_repository: 'ExampleOrg/ExampleBench',
+    });
+    expect(dataset.run.source_repository).toBe('ExampleOrg/ExampleBench');
   });
 });

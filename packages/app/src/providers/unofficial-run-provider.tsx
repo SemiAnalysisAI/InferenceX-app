@@ -15,7 +15,7 @@ import type { ChartDefinition, HardwareConfig, InferenceData } from '@/component
 import { UnofficialBanner } from '@/components/ui/unofficial-banner';
 import { DB_MODEL_TO_DISPLAY, rowToSequence } from '@semianalysisai/inferencex-constants';
 import type { BenchmarkRow, EvalRow } from '@/lib/api/api';
-import { transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
+import { transformBenchmarkRows, type TokenBasis } from '@/lib/benchmarks/benchmark-transform';
 import { normalizeEvalHardwareKey } from '@/lib/charts/chart-utils';
 import { notifyClientSearchChange } from '@/lib/routing/client-navigation';
 import { setProfitRouteUnofficialRuns } from '@/lib/routing/profit-estimator-routes';
@@ -94,6 +94,7 @@ export interface UnofficialRunContextType {
     model: Model,
     sequence: Sequence,
     chartType: 'e2e' | 'interactivity',
+    tokenBasis?: TokenBasis,
   ) => {
     data: InferenceData[];
     hardwareConfig: HardwareConfig;
@@ -122,7 +123,10 @@ export function useOverlayScopeReconciliation(input: OverlayScopeInput | null): 
   }, [input, reconcileOverlayScope]);
 }
 
-export function buildChartData(benchmarks: BenchmarkRow[]): UnofficialChartData {
+export function buildChartData(
+  benchmarks: BenchmarkRow[],
+  tokenBasis: TokenBasis = 'total',
+): UnofficialChartData {
   const groups = new Map<string, BenchmarkRow[]>();
   for (const row of benchmarks) {
     const displayModel = DB_MODEL_TO_DISPLAY[row.model] ?? row.model;
@@ -135,7 +139,12 @@ export function buildChartData(benchmarks: BenchmarkRow[]): UnofficialChartData 
 
   const result: UnofficialChartData = {};
   for (const [key, rows] of groups) {
-    const { chartData, hardwareConfig } = transformBenchmarkRows(rows, 'median', 'external');
+    const { chartData, hardwareConfig } = transformBenchmarkRows(
+      rows,
+      'median',
+      'external',
+      tokenBasis,
+    );
     const e2eIdx = (chartDefinitions as ChartDefinition[]).findIndex((d) => d.chartType === 'e2e');
     const interactivityIdx = (chartDefinitions as ChartDefinition[]).findIndex(
       (d) => d.chartType === 'interactivity',
@@ -392,6 +401,10 @@ export function UnofficialRunProvider({
     () => (unofficialBenchmarkRows ? buildChartData(unofficialBenchmarkRows) : null),
     [unofficialBenchmarkRows],
   );
+  const unofficialUncachedChartData = useMemo(
+    () => (unofficialBenchmarkRows ? buildChartData(unofficialBenchmarkRows, 'uncached') : null),
+    [unofficialBenchmarkRows],
+  );
   const availableModelsAndSequences = useMemo(
     () => parseAvailableModelsAndSequences(unofficialChartData),
     [unofficialChartData],
@@ -460,13 +473,19 @@ export function UnofficialRunProvider({
   }, [unofficialRunInfos]);
 
   const getOverlayData = useCallback(
-    (model: Model, sequence: Sequence, chartType: 'e2e' | 'interactivity') => {
-      const chartGroup = unofficialChartData?.[`${model}_${sequence}`];
+    (
+      model: Model,
+      sequence: Sequence,
+      chartType: 'e2e' | 'interactivity',
+      tokenBasis: TokenBasis = 'total',
+    ) => {
+      const source = tokenBasis === 'uncached' ? unofficialUncachedChartData : unofficialChartData;
+      const chartGroup = source?.[`${model}_${sequence}`];
       if (!chartGroup) return null;
       const dataForChart = chartType === 'e2e' ? chartGroup.e2e : chartGroup.interactivity;
       return { data: dataForChart.data, hardwareConfig: dataForChart.gpus };
     },
-    [unofficialChartData],
+    [unofficialChartData, unofficialUncachedChartData],
   );
 
   const resetOverlaySelection = useCallback(() => {

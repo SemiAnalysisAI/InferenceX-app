@@ -2,17 +2,14 @@ import {
   DB_MODEL_TO_DISPLAY,
   FRAMEWORK_ALIASES,
   GPU_KEYS,
+  GPU_RUNNER_ALIASES,
 } from '@semianalysisai/inferencex-constants';
 
 export { GPU_KEYS };
 
-const HW_ALIASES: Record<string, string> = {
-  vrnvl72: 'vr200',
-};
-
 export function hwToGpuKey(hw: string): string | null {
   const raw = hw.toLowerCase().split(':').pop()!.split('-')[0];
-  const base = HW_ALIASES[raw] ?? raw;
+  const base = GPU_RUNNER_ALIASES[raw] ?? raw;
   return GPU_KEYS.has(base) ? base : null;
 }
 
@@ -71,6 +68,7 @@ export const MODEL_TO_KEY: Record<string, string> = {
   'moonshotai/Kimi-K3': 'kimik3',
   'MiniMaxAI/MiniMax-M2.5': 'minimaxm2.5',
   'MiniMaxAI/MiniMax-M3': 'minimaxm3',
+  'MiniMaxAI/MiniMax-M3.1-Flash': 'minimaxm31flash',
   'zai-org/GLM-5-FP8': 'glm5',
   'amd/GLM-5.1-MXFP4': 'glm5.1',
   'zai-org/GLM-5.2-FP8': 'glm5.2',

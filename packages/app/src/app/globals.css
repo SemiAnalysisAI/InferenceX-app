@@ -480,6 +480,43 @@ html[data-inferencex-embed] .autumn-leaves {
   --overlay-run-6: oklch(0.72 0.2 230);
   --overlay-run-7: oklch(0.78 0.18 60);
 }
+.excalidraw {
+  color-scheme: light;
+  --background: #ffffff;
+  --foreground: #1e1e1e;
+  --card: #ffffff;
+  --card-foreground: #1e1e1e;
+  --popover: #ffffff;
+  --popover-foreground: #1e1e1e;
+  --primary: #6965db;
+  --primary-foreground: #ffffff;
+  --secondary: #1971c2;
+  --secondary-foreground: #ffffff;
+  --brand: var(--primary);
+  --muted: #f1f0ff;
+  --muted-foreground: #5c5c5c;
+  --accent: #e0dfff;
+  --accent-foreground: #1e1e1e;
+  --destructive: #e03131;
+  --border: #1e1e1e;
+  --border-alt: #d6d6d6;
+  --input: #3d3d3d;
+  --ring: #6965db;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #1e1e1e;
+  --sidebar-primary: #6965db;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e0dfff;
+  --sidebar-accent-foreground: #1e1e1e;
+  --sidebar-border: #d6d6d6;
+  --sidebar-ring: #6965db;
+  --radius: 0.5rem;
+}
+.excalidraw .circuit-bg,
+.excalidraw .autumn-leaves {
+  display: none;
+}
+
 .minecraft .circuit-bg,
 .csgo .circuit-bg,
 .csgo .autumn-leaves,
@@ -699,6 +736,72 @@ html[data-inferencex-skin='vllm'] [data-slot='card'] {
 .chart-root .tick text {
   font-size: 10px;
   fill: var(--foreground);
+}
+
+/*
+ * PowerX on phones (ChartDisplay sets data-powerx-surface): 44 px touch targets on
+ * the shared chart chrome without changing the glyphs or the row rhythm, a 28 px
+ * slider thumb, and a 12 px floor on tick labels. Nothing here applies from md up.
+ */
+@media (max-width: 767px) {
+  [data-powerx-surface] [data-slot='info-help'][data-variant='inline'] {
+    width: 2.75rem;
+    height: 2.75rem;
+    margin: -0.625rem;
+  }
+  [data-powerx-surface] .legend-container label[for^='checkbox-'] {
+    min-height: 2.75rem;
+  }
+  [data-powerx-surface] .legend-container [data-testid^='legend-points-'] {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    margin-top: -0.75rem;
+    margin-bottom: -0.75rem;
+  }
+  [data-powerx-surface] [data-testid='legend-close-button'],
+  [data-powerx-surface] [data-testid='legend-open-button'] {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+  [data-powerx-surface] .chart-root .tick text {
+    font-size: 12px;
+  }
+  [data-powerx-surface] .powerx-range {
+    appearance: none;
+    height: 2.75rem;
+    background: transparent;
+  }
+  [data-powerx-surface] .powerx-range::-webkit-slider-runnable-track {
+    height: 0.25rem;
+    border-radius: 9999px;
+    background: var(--border);
+  }
+  [data-powerx-surface] .powerx-range::-webkit-slider-thumb {
+    appearance: none;
+    width: 1.75rem;
+    height: 1.75rem;
+    margin-top: -0.75rem;
+    border-radius: 9999px;
+    border: 2px solid var(--background);
+    background: currentColor;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+  }
+  [data-powerx-surface] .powerx-range::-moz-range-track {
+    height: 0.25rem;
+    border-radius: 9999px;
+    background: var(--border);
+  }
+  [data-powerx-surface] .powerx-range::-moz-range-thumb {
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 9999px;
+    border: 2px solid var(--background);
+    background: currentColor;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+  }
 }
 .chart-root .grid line {
   stroke: var(--border-alt);

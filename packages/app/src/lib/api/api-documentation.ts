@@ -29,6 +29,7 @@ import { operations as fleetViews } from '../views-api/docs/fleet';
 import { operations as gpuSpecsViews } from '../views-api/docs/gpu-specs';
 import { operations as historicalViews } from '../views-api/docs/historical';
 import { operations as inferenceViews } from '../views-api/docs/inference';
+import { operations as modelArchitectureViews } from '../views-api/docs/model-architectures';
 import { operations as optionsViews } from '../views-api/docs/options';
 import { operations as overviewViews } from '../views-api/docs/overview';
 import { operations as rankingsViews } from '../views-api/docs/rankings';
@@ -648,6 +649,7 @@ const collectiveXDatasetSchema = objectSchema(
         generated_at: { type: 'string', format: 'date-time' },
         conclusion: nullableStringSchema,
         source_sha: stringSchema,
+        source_repository: stringSchema,
         requested_cases: integerSchema,
         terminal_cases: integerSchema,
         measured_cases: integerSchema,
@@ -662,7 +664,13 @@ const collectiveXDatasetSchema = objectSchema(
         kv_requested_cases: integerSchema,
         kv_measured_cases: integerSchema,
       },
-      ['kv_requested_cases', 'kv_measured_cases', 'swap_requested_cases', 'swap_measured_cases'],
+      [
+        'source_repository',
+        'kv_requested_cases',
+        'kv_measured_cases',
+        'swap_requested_cases',
+        'swap_measured_cases',
+      ],
     ),
     coverage: arraySchema(anyObjectSchema),
     series: arraySchema(anyObjectSchema),
@@ -703,6 +711,7 @@ const collectiveRunSummarySchema = objectSchemaWithOptional(
     run_attempt: integerSchema,
     generated_at: { type: 'string', format: 'date-time' },
     conclusion: nullableStringSchema,
+    source_repository: stringSchema,
     covered_skus: arraySchema(stringSchema),
     requested_cases: integerSchema,
     measured_cases: integerSchema,
@@ -719,7 +728,7 @@ const collectiveRunSummarySchema = objectSchemaWithOptional(
       measured: integerSchema,
     }),
   },
-  ['kv_cases', 'swap_cases'],
+  ['source_repository', 'kv_cases', 'swap_cases'],
 );
 const percentileSchema = objectSchema({
   mean: numberSchema,
@@ -786,6 +795,19 @@ export const apiDocumentationGroups: readonly ApiDocumentationGroup[] = [
   },
 ];
 
+// OperatorX remains a page-bff, recorded in api-route-catalog.ts rather than
+// published OpenAPI. Its hardware[].reference normalization basis, bandwidth
+// assumptions, cross-backend argument alignment (fastest successful backend per
+// hardware/case, with measurements[].backend provenance), and workload-resolved
+// chart defaults and optional distribution quantiles/normalization selectors are
+// documented in docs/operatorx.md. Ingest-time compact run
+// projections are fetched in one revision-aware bulk query, preserving response
+// and source identities; legacy fallback and
+// partial-read cache behavior are documented there as well. Timeline references
+// share one raw read per run, with at most four concurrent runs; reference order,
+// revision checks, null/known behavior and error contracts are preserved. Merged
+// comparisons may use a revision-keyed shared Blob cache; scope invalidation awaits
+// deletion and partial/concurrently replaced generations remain uncached.
 export const apiOperations: readonly ApiOperation[] = [
   ...extendViewOperations([
     ...optionsViews,
@@ -801,6 +823,7 @@ export const apiOperations: readonly ApiOperation[] = [
     ...compareViews,
   ]),
   ...extensionViews,
+  ...modelArchitectureViews,
 
   {
     id: 'get-pareto',
@@ -1216,8 +1239,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/workflow-info',
     summary: text('Read workflow provenance', '读取工作流溯源信息'),
     description: text(
-      'Returns workflow runs, changelogs, available configurations, and per-run configuration coverage. Omit date for all dates.',
-      '返回工作流运行、变更记录、可用配置，以及各次运行涵盖的配置。省略 date 时返回所有日期的数据。',
+      'Returns workflow runs, changelogs, available configurations, and per-run configuration coverage for one date. date is required.',
+      '返回指定日期的工作流运行、变更记录、可用配置，以及各次运行涵盖的配置。date 为必填参数。',
     ),
     audience: 'public',
     stability: 'stable',
@@ -1225,10 +1248,10 @@ export const apiOperations: readonly ApiOperation[] = [
       parameter(
         'date',
         'query',
-        false,
+        true,
         'date',
-        'Optional YYYY-MM-DD filter.',
-        '可选的 YYYY-MM-DD 筛选条件。',
+        'Required YYYY-MM-DD date.',
+        '必填的 YYYY-MM-DD 日期。',
         { type: 'string', format: 'date' },
         '2026-08-08',
       ),
@@ -1268,8 +1291,8 @@ export const apiOperations: readonly ApiOperation[] = [
       ),
       errorResponse(
         '400',
-        'date is not YYYY-MM-DD.',
-        'date 不是 YYYY-MM-DD。',
+        'date is missing or not YYYY-MM-DD.',
+        '缺少 date，或 date 不是 YYYY-MM-DD。',
         PUBLIC_API_ERRORS.invalidDate,
       ),
       errorResponse(
@@ -1506,7 +1529,7 @@ export const apiOperations: readonly ApiOperation[] = [
       errorResponse(
         '400',
         'A model, date, view, format, workload, tier, weight, or alpha value is invalid.',
-        '模型、日期、视图、格式、负载、档位、权重或 alpha 值无效。',
+        '模型、日期、视图、格式、工作负载、档位、权重或 alpha 值无效。',
         'Invalid tiers: expected comma-separated positive numbers',
       ),
       errorResponse(
@@ -1576,18 +1599,37 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/framework-releases',
     summary: text('Read latest framework releases', '读取最新框架版本'),
     description: text(
-      'Returns the latest non-draft, non-prerelease GitHub release tag for vLLM and SGLang. A null value means the upstream lookup had no usable release.',
-      '返回 vLLM 和 SGLang 最新的非草稿、非预发布 GitHub 版本标签。null 表示上游查询没有可用版本。',
+      'Returns the highest-versioned non-draft, non-prerelease engine release (tag starting with v) among the 20 most recent GitHub releases for vLLM and SGLang, with its publish time. commits maps each unversioned nightly commit in an active benchmark image to its GitHub compare status against that release; behind means the commit is an ancestor of the release. Commits GitHub cannot resolve are omitted. A null value means the upstream lookup had no usable release.',
+      '返回 vLLM 和 SGLang 最近 20 个 GitHub release 中版本号最高的非草稿、非预发布引擎版本（标签以 v 开头）及其发布时间。commits 列出当前基准测试镜像中不带版本号的 nightly commit，以及 GitHub 比较该 commit 与此 release 的结果；behind 表示该 commit 是此 release 的祖先提交。GitHub 无法解析的 commit 不会列出。null 表示上游查询没有可用版本。',
     ),
     audience: 'public',
     stability: 'stable',
     parameters: [],
     responses: [
       success(
-        'Framework keys mapped to release tags or null.',
-        '框架键映射到版本标签或 null。',
-        mapSchema(nullableStringSchema),
-        { vllm: 'v0.10.2', sglang: 'v0.4.10' },
+        'Framework keys mapped to the release tag, ISO 8601 publish time and nightly commit statuses, or null.',
+        '框架键映射到版本标签、ISO 8601 发布时间和 nightly commit 比较结果；无可用版本时为 null。',
+        mapSchema({
+          oneOf: [
+            objectSchema({
+              tag: stringSchema,
+              publishedAt: { type: 'string', format: 'date-time' },
+              commits: mapSchema({
+                type: 'string',
+                enum: ['ahead', 'behind', 'diverged', 'identical'],
+              }),
+            }),
+            { type: 'null' },
+          ],
+        }),
+        {
+          vllm: {
+            tag: 'v0.10.2',
+            publishedAt: '2026-08-01T12:00:00Z',
+            commits: { af7f9488c2210d67: 'behind', e68efc685ab1: 'diverged' },
+          },
+          sglang: { tag: 'v0.4.10', publishedAt: '2026-07-28T09:30:00Z', commits: {} },
+        },
       ),
       errorResponse('500', 'The release lookup failed.', '版本查询失败。', 'Internal server error'),
     ],
@@ -1907,8 +1949,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/collectivex/latest',
     summary: text('Read the latest CollectiveX dataset', '读取最新 CollectiveX 数据集'),
     description: text(
-      'Discovers and ingests the latest sweep when needed, then returns its versioned neutral dataset. A stored run is served if refresh fails. Optional swap_blocks results contain verified copy latency in microseconds and payload GB/s (bytes counted once), with block_bytes, num_blocks, runtime provenance and skipped-point counts. Multi-pool sweeps preserve each GPU pool as an independent result.',
-      '按需发现并导入最新扫描，然后返回带版本的中立数据集。若刷新失败，会返回已存储的运行。可选的 swap_blocks 结果包含校验通过的复制延迟（微秒）和有效载荷 GB/s（字节数仅计算一次），并保留 block_bytes、num_blocks、运行环境来源及未测量组合数。多平台扫描分别保留各 GPU 池的独立结果。',
+      'Discovers and ingests the latest sweep when needed, then returns its versioned neutral dataset. run.source_repository names the GitHub repository that ran the sweep when it is not SemiAnalysisAI/InferenceX. A stored run is served if refresh fails. Optional swap_blocks results contain verified copy latency in microseconds and payload GB/s (bytes counted once), with block_bytes, num_blocks, runtime provenance and skipped-point counts. Multi-pool sweeps preserve each GPU pool as an independent result.',
+      '按需发现并导入最新扫描，然后返回带版本的中立数据集。若扫描并非由 SemiAnalysisAI/InferenceX 执行，run.source_repository 会标明实际执行的 GitHub 仓库。若刷新失败，会返回已存储的运行。可选的 swap_blocks 结果包含校验通过的复制延迟（微秒）和有效载荷 GB/s（字节数仅计算一次），并保留 block_bytes、num_blocks、运行环境来源及未测量组合数。多池扫描分别保留各 GPU 池的独立结果。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -2830,6 +2872,172 @@ export const apiOperations: readonly ApiOperation[] = [
     ],
     responseShapeName: 'TraceAvailabilityMap',
     curlUrl: `${API_BASE_URL}/api/v1/trace-availability?ids=421,422`,
+  },
+  {
+    id: 'get-gpu-metrics-point-stats',
+    group: 'diagnostics',
+    method: 'GET',
+    path: '/api/v1/gpu-metrics-point/stats',
+    summary: text('Read power load-swing statistics', '读取功耗负载波动统计'),
+    description: text(
+      'Load-swing statistics of the PowerX power trace recorded while one benchmark point ran, from the stored one-second buckets of the per-GPU mean: peak, min, idle floor (P5 before the serving window), window mean, P5/P95, largest 1 s and 5 s change, ramp up/down per second and volatility (std ÷ mean), with the recorded serving window and the count of telemetry gaps that were skipped rather than bridged. One entry per linked power series (a single-node artifact, or one validation window of a sweep bundle). The same function serves the PowerX Over time view. scale=nvl72 multiplies by 72 into kW per rack as an upper bound that assumes every GPU swings together. format=csv returns the per-second trace instead. Every read checks the live telemetry revision; responses are no-store.',
+      '一个基准测试点运行期间记录的 PowerX 功耗曲线的负载波动统计，基于已存的每 GPU 均值一秒桶：峰值、最小值、空闲底线（服务窗口前的 P5）、窗口均值、P5/P95、最大 1 秒与 5 秒变化、每秒上升/下降速率以及波动率（标准差 ÷ 均值），并附记录的服务窗口和被跳过（而非补插）的遥测间断数。每个关联功耗序列（单节点产物，或 sweep bundle 的一个验证窗口）各一条。PowerX 的“随时间变化”视图使用同一函数。scale=nvl72 乘以 72 换算为每机架 kW，是假设全部 GPU 同步波动的上限。format=csv 改为返回逐秒曲线。每次读取都核对实时遥测版本；响应为 no-store。',
+    ),
+    audience: 'public',
+    stability: 'beta',
+    parameters: [
+      parameter(
+        'id',
+        'query',
+        true,
+        'integer',
+        'Positive safe-integer benchmark result ID.',
+        '正安全整数基准结果 ID。',
+        safePositiveIdSchema,
+        445805,
+      ),
+      parameter(
+        'format',
+        'query',
+        false,
+        'enum',
+        'json returns the statistics; csv returns the per-second trace (artifact, source, t_s, since_serving_s, in_validated_window, w_per_gpu or kw_per_nvl72_rack).',
+        'json 返回统计；csv 返回逐秒曲线（artifact、source、t_s、since_serving_s、in_validated_window、w_per_gpu 或 kw_per_nvl72_rack）。',
+        { type: 'string', enum: ['json', 'csv'], default: 'json' },
+        'json',
+      ),
+      parameter(
+        'scale',
+        'query',
+        false,
+        'enum',
+        'gpu: W per GPU (the per-GPU mean of each bucket). nvl72: × 72 in kW per NVL72 rack, an upper bound that assumes all GPUs swing together; volatility is unchanged.',
+        'gpu：每 GPU 瓦数（每桶的每 GPU 均值）。nvl72：× 72 换算为每 NVL72 机架 kW，假设全部 GPU 同步波动的上限；波动率不变。',
+        { type: 'string', enum: ['gpu', 'nvl72'], default: 'gpu' },
+        'gpu',
+      ),
+    ],
+    responses: [
+      success(
+        'Statistics per linked power series, with definitions and caveats.',
+        '各关联功耗序列的统计，附定义与注意事项。',
+        objectSchema({
+          benchmarkResultId: safePositiveIdSchema,
+          apiVersion: { type: 'string', enum: ['v1'] },
+          scale: { type: 'string', enum: ['gpu', 'nvl72'] },
+          unit: { type: 'string', enum: ['W per GPU', 'kW per NVL72 rack'] },
+          gpusPerRack: integerSchema,
+          definitions: mapSchema(stringSchema),
+          caveats: arraySchema(stringSchema),
+          series: arraySchema(
+            objectSchema({
+              artifact: stringSchema,
+              source: nullableStringSchema,
+              gpuCount: integerSchema,
+              window: {
+                oneOf: [
+                  objectSchema({ startSeconds: numberSchema, endSeconds: numberSchema }),
+                  { type: 'null' },
+                ],
+              },
+              stats: objectSchema({
+                unit: stringSchema,
+                sampleIntervalSeconds: numberSchema,
+                sampleCount: integerSchema,
+                windowSampleCount: integerSchema,
+                preServingSampleCount: integerSchema,
+                gapCount: integerSchema,
+                peak: numberSchema,
+                min: numberSchema,
+                idleFloor: nullableNumberSchema,
+                mean: nullableNumberSchema,
+                p5: nullableNumberSchema,
+                p95: nullableNumberSchema,
+                maxDelta1s: numberSchema,
+                maxDelta5s: numberSchema,
+                rampUpPerSecond: numberSchema,
+                rampDownPerSecond: numberSchema,
+                volatility: nullableNumberSchema,
+              }),
+            }),
+          ),
+        }),
+        {
+          benchmarkResultId: 445805,
+          apiVersion: 'v1',
+          scale: 'gpu',
+          unit: 'W per GPU',
+          gpusPerRack: 72,
+          definitions: {
+            peak_min_delta_ramp: 'whole run, per-GPU mean of each one-second bucket',
+            mean_p5_p95_volatility: 'validated serving window only',
+            idle_floor: 'P5 of the samples before the serving window starts',
+            ramp: 'largest change over a 5-second span divided by that span',
+            gaps: 'buckets more than 1.5× the sample interval apart are counted and never bridged',
+          },
+          caveats: [
+            'One-second DCGM samples; sub-second swings are not captured.',
+            'Single node or NVL72 rack, inference only.',
+            'The NVL72 scale multiplies the per-GPU trace by 72 and assumes every GPU swings together, so it is an upper bound on rack-level swings.',
+          ],
+          series: [
+            {
+              artifact: 'gpu_metrics_dsv4pro_8k1k_fp4_vllm_tp8_c64',
+              source: null,
+              gpuCount: 8,
+              window: { startSeconds: 212, endSeconds: 1407 },
+              stats: {
+                unit: 'W per GPU',
+                sampleIntervalSeconds: 1,
+                sampleCount: 1480,
+                windowSampleCount: 1196,
+                preServingSampleCount: 212,
+                gapCount: 0,
+                peak: 1012.4,
+                min: 141.2,
+                idleFloor: 143.8,
+                mean: 871.5,
+                p5: 744.1,
+                p95: 968.3,
+                maxDelta1s: 318.6,
+                maxDelta5s: 612.9,
+                rampUpPerSecond: 122.6,
+                rampDownPerSecond: 97.4,
+                volatility: 0.071,
+              },
+            },
+          ],
+        },
+        [
+          {
+            mediaType: 'text/csv',
+            schema: stringSchema,
+            example:
+              'artifact,source,t_s,since_serving_s,in_validated_window,w_per_gpu\r\ngpu_metrics_dsv4pro_8k1k_fp4_vllm_tp8_c64,,0,-212,0,143.8',
+          },
+        ],
+      ),
+      errorResponse(
+        '400',
+        'id is missing or not a positive safe integer, or format / scale is not an allowed value.',
+        'id 缺失或不是正安全整数，或 format / scale 不是允许的值。',
+        PUBLIC_API_ERRORS.idRequired,
+      ),
+      errorResponse(
+        '404',
+        'The point has no linked telemetry or no usable power series.',
+        '该数据点没有关联遥测或没有可用的功耗序列。',
+        PUBLIC_API_ERRORS.notFound,
+      ),
+      errorResponse(
+        '500',
+        'The telemetry lookup failed.',
+        '遥测查询失败。',
+        PUBLIC_API_ERRORS.internal,
+      ),
+    ],
+    responseShapeName: 'GpuMetricsPointLoadSwingStats',
+    curlUrl: `${API_BASE_URL}/api/v1/gpu-metrics-point/stats?id=445805`,
   },
   {
     id: 'get-trace-histograms',

@@ -17,3 +17,13 @@ export function hasYesFlag(): boolean {
 export function hasNoSslFlag(): boolean {
   return process.argv.includes('--no-ssl');
 }
+
+/** Repository for ingest scripts when no argument or run URL names one. Exits when unset. */
+export function requireIngestRepo(): string {
+  const repo = process.env.INGEST_REPO;
+  if (!repo) {
+    console.error('INGEST_REPO is not set');
+    process.exit(1);
+  }
+  return repo;
+}

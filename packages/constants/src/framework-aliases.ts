@@ -46,6 +46,7 @@ export const FRAMEWORK_LABELS: Record<string, string> = {
 export const MODEL_SPEC_METHOD_LABELS: Record<string, Record<string, string>> = {
   'MiniMax-M3': { mtp: 'M3 EAGLE' },
   'Kimi-K3': { mtp: 'DSpark' },
+  'MiniMax-M3.1-Flash': { mtp: 'DSpark' },
 };
 
 export function resolveFrameworkPartLabel(model: string | undefined, part: string): string {

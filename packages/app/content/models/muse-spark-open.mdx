@@ -1,0 +1,25 @@
+---
+title: 'Muse Spark Open'
+developer: 'Meta'
+releaseDate: 'October 15, 2026'
+description: "Meta's 816B-total / 42B-active multimodal MoE with pooled experts, gated residuals, and a 1M-token context window."
+---
+
+## Overview
+
+Muse Spark Open is Meta's open-weight model for coding and agentic work. It accepts text, image, video and audio inputs and generates text. Meta reports 816B total parameters, 42B active per token, and a 1,048,576-token context window. These figures refer to Muse Spark Open, rather than an inferred architecture for the closed Muse Spark service ([Meta documentation](https://dev.meta.ai/docs/muse-spark-open), [release announcement](https://research.meta.ai/blog/muse-spark-open)).
+
+## Architecture
+
+- **Text backbone:** 62 Transformer layers, hidden size 8192, vocabulary size 202048.
+- **Attention:** 128 query heads and 16 KV heads, head dimension 64; QK normalization and attention output gating/normalization.
+- **Layer pattern:** 46 sliding-window layers with a 2048-token window and 16 full-attention layers. Full-attention indices are 1, 5, …, 61 (zero-based). Sliding layers use RoPE; full layers use NoPE.
+- **Experts:** 256 routed experts per layer, top-8 activated, with no shared expert. Pooled MoE uses a 4096-dimensional latent space and expert intermediate width 4096; it should not be drawn as an ordinary hidden-size expert FFN.
+- **Residuals:** learned residual gates, rather than an unqualified ordinary additive residual schematic.
+- **Perception:** image/video perception encoder and an audio encoder feed the language backbone.
+
+The layer and tensor dimensions above are published in [AMD's checkpoint config](https://huggingface.co/amd/Muse-Spark-Open-816B-A42B-Quark-MXFP4/raw/main/config.json) and the [Transformers implementation reference](https://huggingface.co/docs/transformers/v5.20.0/en/model_doc/muse_spark). Meta's raw checkpoint config is gated; these sources make the provenance explicit instead of implying unrestricted access to that file.
+
+## Checkpoints and scope
+
+Meta publishes BF16 and NVFP4 checkpoints under the Muse Model License; AMD also publishes an MXFP4 checkpoint. The 816B vendor headline differs from a repository's tensor count and should retain its stated counting scope. Architecture metadata is static; the embedded InferenceX chart contains the measured serving results ([Meta documentation](https://dev.meta.ai/docs/muse-spark-open)).
