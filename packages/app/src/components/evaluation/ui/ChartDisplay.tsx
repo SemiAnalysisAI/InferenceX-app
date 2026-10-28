@@ -200,6 +200,8 @@ export default function EvaluationChartDisplay() {
             onValueChange={handleViewModeChange}
             ariaLabel={t.viewModeAria}
             testId="evaluation-view-toggle"
+            className="max-md:flex-1"
+            buttonClassName="max-md:flex-1 max-md:justify-center"
           />
         }
       >

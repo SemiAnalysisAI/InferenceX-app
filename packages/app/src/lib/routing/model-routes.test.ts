@@ -178,11 +178,11 @@ describe('modelRoutesForTab', () => {
   it('serves Kimi K3, GLM 5.2/5.3, MiniMax M3, DeepSeek V4 Pro and DeepSeek V4.1 Flash on the profit estimators and every model elsewhere', () => {
     for (const tab of ['profit-estimator', 'profit-estimator-per-gigawatt'] as const) {
       expect(modelRoutesForTab(tab).map((route) => route.model)).toEqual([
-        Model.DeepSeek_V4_Pro,
-        Model.DeepSeek_V4_1_Flash,
         Model.Kimi_K3,
-        Model.MiniMax_M3,
+        Model.DeepSeek_V4_1_Flash,
         Model.GLM_5_2,
+        Model.DeepSeek_V4_Pro,
+        Model.MiniMax_M3,
       ]);
       expect(modelRouteAvailableForTab(tab, Model.Qwen3_5)).toBe(false);
       expect(modelRouteAvailableForTab(tab, Model.GLM_5_2)).toBe(true);

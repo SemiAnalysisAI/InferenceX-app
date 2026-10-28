@@ -2,14 +2,16 @@
 
 import { useLocale } from '@/lib/i18n/use-locale';
 
+import { HuaweiSkuConfigurations } from './HuaweiSkuConfigurations';
 import { TPC_SKYLINE_RUNS } from './tpc-skyline-data';
 import { transformTpcSkylineRun } from './tpc-skyline-transform';
 
 const STRINGS = {
   en: {
-    pageTitle: 'TPC Skyline',
+    pageTitle: 'TPC Skyline & SKU configurations',
     pageSubtitle:
-      'Measured number of TPCs in each GPC, found by observing which SMs thread-block clusters are co-scheduled on.',
+      'NVIDIA scheduling-group measurements and Huawei 950PR SKU configurations, with separate methods and evidence.',
+    nvidia: 'NVIDIA measured TPC groupings',
     product: 'Product',
     gpcs: 'Measured # of GPCs',
     sms: 'Measured # of SMs',
@@ -23,8 +25,10 @@ const STRINGS = {
     aria: 'ubenchX TPC Skyline table',
   },
   zh: {
-    pageTitle: 'TPC Skyline',
-    pageSubtitle: '通过观察线程块集群被协同调度到哪些 SM 上，实测每个 GPC 中的 TPC 数量。',
+    pageTitle: 'TPC Skyline 与 SKU 配置',
+    pageSubtitle:
+      '分别展示 NVIDIA 调度分组实测结果和 Huawei 950PR SKU 配置，并说明各自的方法及证据来源。',
+    nvidia: 'NVIDIA 实测 TPC 分组',
     product: '产品',
     gpcs: '实测 GPC 数量',
     sms: '实测 SM 数量',
@@ -54,6 +58,7 @@ export function TpcSkylineContent() {
         <p className="text-sm text-muted-foreground mt-1">{t.pageSubtitle}</p>
       </div>
 
+      <h3 className="text-xl font-semibold tracking-tight">{t.nvidia}</h3>
       <div className="overflow-x-auto rounded-lg border">
         <table className="w-full text-sm" aria-label={t.aria} data-testid="tpc-skyline-table">
           <thead className="bg-muted/50">
@@ -104,6 +109,7 @@ export function TpcSkylineContent() {
           </p>
         ))}
       </section>
+      <HuaweiSkuConfigurations />
     </div>
   );
 }

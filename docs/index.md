@@ -9,6 +9,7 @@ Design rationale and non-obvious conventions. Repo-wide rules are in [AGENTS.md]
 - [API Skill Examples](./inferencex-api-examples.md) shows how to install the public API skill, query benchmarks, and export measured PowerX data.
 - [PowerX System Power](./powerx-system-power.md) covers the modeled chassis and rack power, its assumptions, and the offline comparison export.
 - [PowerX Permanent View](./powerx-permanent-view.md) covers the measured-energy power metrics, their share links, and the power timeline.
+- [PowerX Tutorial](./powerx-tutorial.md) covers the `.mdx` source behind `/powerx/tutorial`, its syntax, and its widgets.
 - [API Skill Releases](./inferencex-skills-release.md) is the runbook for preparing, verifying, publishing, and recovering `inferencex-skills` releases.
 - [API Skill Discovery](./inferencex-skills-discovery.md) is the acceptance protocol for implicit skill discovery in fresh Codex and Claude Code projects.
 - [CLI Compatibility](./inferencex-cli-compatibility.md) covers the CLI contract, exit semantics, platform scope, and legacy migration.
@@ -32,4 +33,5 @@ Design rationale and non-obvious conventions. Repo-wide rules are in [AGENTS.md]
 - [Chinese Copy Editorial Guide](./chinese-copy.md) covers audience, register, terminology, the review workflow, and the PR checklist for Chinese copy.
 
 - [Agentic Workload Explorer](./agentic-workload-explorer.md) covers the feature-gated explorer over a frozen, anonymized ProxyTrace snapshot and its separate read replica.
+- [Huawei SKU configurations](./ubenchx-huawei-skus.md) documents the 950PR table on TPC Skyline, source limitations and API coverage.
 - [OperatorX](./operatorx.md) covers the GEMM and routed MoE explorer, compact comparison reads, artifact persistence, deployment, and local verification.

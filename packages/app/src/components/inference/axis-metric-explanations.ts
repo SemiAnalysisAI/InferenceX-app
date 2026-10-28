@@ -210,6 +210,23 @@ function measuredPower(phase: MeasuredPhase): MetricExplanation {
   };
 }
 
+/** Why PowerX charges energy to every token: aggregated serving cannot split it by phase. */
+const PHASE_NOTE_EN: Record<TokenType, string> = {
+  total:
+    ' This is the PowerX default: aggregated serving runs prefill and decode on the same GPUs, so their energy cannot be split by phase and every token carries its share.',
+  output:
+    ' On aggregated serving the same GPUs run prefill and decode, so this also charges prompt processing to output tokens. On disaggregated runs, the Decode GPUs scope isolates decode energy.',
+  input: '',
+};
+
+const PHASE_NOTE_ZH: Record<TokenType, string> = {
+  total:
+    '这是 PowerX 的默认能耗指标：聚合式部署中预填充与解码共用同一批 GPU，能耗无法按阶段拆分，因此由全部 token 分摊。',
+  output:
+    '聚合式部署中预填充与解码共用同一批 GPU，因此这一指标也会把提示词处理的能耗计入输出 token。分离式部署可选择“解码 GPU”范围，单独查看解码能耗。',
+  input: '',
+};
+
 function measuredJoulesPerToken(tokenType: TokenType): MetricExplanation {
   return {
     description: {
@@ -217,10 +234,10 @@ function measuredJoulesPerToken(tokenType: TokenType): MetricExplanation {
         `Measured accelerator energy consumed per ${
           tokenType === 'total' ? 'token (including prompt tokens)' : `${tokenType} token`
         }, from runner power telemetry integrated over the run. Lower means the system converts ` +
-        `electricity into tokens more efficiently.${MEASURED_TIER_NOTE_EN}`,
+        `electricity into tokens more efficiently.${PHASE_NOTE_EN[tokenType]}${MEASURED_TIER_NOTE_EN}`,
       zh:
         `每个${TOKEN_TYPE_ZH[tokenType]}消耗的加速器实测能耗，由运行器功耗遥测在整个运行期间积分得到。` +
-        `数值越低，说明系统把电能转化为 token 的效率越高。${MEASURED_TIER_NOTE_ZH}`,
+        `数值越低，说明系统把电能转化为 token 的效率越高。${PHASE_NOTE_ZH[tokenType]}${MEASURED_TIER_NOTE_ZH}`,
     },
     formula: {
       en: `J/tok = measured accelerator energy over the run ÷ ${TOKEN_TYPE_EN[tokenType]} processed`,
@@ -433,6 +450,21 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
       zh: 'J/tok = 额定 TDP（W）× 已分配 GPU 数 ÷ 总输出 token 吞吐（tok/s）',
     },
   },
+  gpuProvisionedJPerTotalToken: {
+    description: {
+      en:
+        'Energy per total token (input + output) if every allocated accelerator drew exactly its ' +
+        'rated TDP for the whole run. Counting prompt tokens spreads prefill energy over every ' +
+        'token the requests process instead of charging it to output tokens alone.',
+      zh:
+        '假设所有已分配加速器在整个运行中恒以额定 TDP 耗电时，每个总 token（输入 + 输出）的能耗。' +
+        '计入提示词 token 后，prefill 能耗由请求处理的全部 token 分摊，而不是只计入输出 token。',
+    },
+    formula: {
+      en: 'J/tok = rated TDP (W) × allocated GPUs ÷ (input + output) tokens per second',
+      zh: 'J/tok = 额定 TDP（W）× 已分配 GPU 数 ÷（输入 + 输出）token 吞吐（tok/s）',
+    },
+  },
   utilityProvisionedJPerOutputToken: {
     description: {
       en:
@@ -446,6 +478,67 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
     formula: {
       en: 'J/tok = all-in provisioned power per GPU (W) × allocated GPUs ÷ total output tokens per second',
       zh: 'J/tok = 每 GPU 整体预配功耗（W）× 已分配 GPU 数 ÷ 总输出 token 吞吐（tok/s）',
+    },
+  },
+  utilityProvisionedJPerTotalToken: {
+    description: {
+      en:
+        'Energy per total token (input + output) at the all-in provisioned power boundary, ' +
+        'normalized by every allocated accelerator. It matches the public All-in Provisioned J ' +
+        'per Total Token metric, which also spreads total tokens across every GPU.',
+      zh:
+        '在整体预配功耗边界下，每个总 token（输入 + 输出）的能耗，按全部已分配加速器归一。' +
+        '公开指标“每总 token 全电源配置能耗”同样按全部 GPU 统计总 token，因此两者数值一致。',
+    },
+    formula: {
+      en: 'J/tok = all-in provisioned power per GPU (W) × allocated GPUs ÷ (input + output) tokens per second',
+      zh: 'J/tok = 每 GPU 整体预配功耗（W）× 已分配 GPU 数 ÷（输入 + 输出）token 吞吐（tok/s）',
+    },
+  },
+  itModeledWatts: {
+    description: {
+      en:
+        'Modeled IT power per allocated accelerator, no PUE: measured GPU power plus the InferenceX ' +
+        'power model’s CPU, server parts, fans and PSU loss, and the scale-out network share for the ' +
+        'run’s workload state. The facility (PUE) overhead is left out. Storage and out-of-rack network ' +
+        'are not modeled. Same hardware coverage as All in Measured.',
+      zh:
+        '每已分配加速器的整体实测 IT 功耗（不含 PUE）：GPU 实测功耗加上 InferenceX 功耗模型按该次运行工作负载状态估算的 CPU、服务器部件、风扇与电源损耗以及 scale-out 网络分摊。' +
+        '不计数据中心（PUE）开销；存储和机架外网络未建模。硬件覆盖范围与整体实测功耗相同。',
+    },
+    formula: {
+      en: 'W/GPU = modeled IT power (W) ÷ allocated GPUs = All in Measured W/GPU ÷ PUE',
+      zh: 'W/GPU = IT 功耗估算（W）÷ 已分配 GPU 数 = 每 GPU 整体实测功耗 ÷ PUE',
+    },
+  },
+  itModeledJPerOutputToken: {
+    description: {
+      en:
+        'Measured energy per output token scaled to the modeled IT boundary (no PUE), so its ratio to ' +
+        'measured GPU energy equals the ratio of modeled IT power to measured GPU power. ' +
+        'Missing where the system power model or validated measured power is unavailable.',
+      zh:
+        '将实测每输出 token 能耗按整体实测 IT 功耗边界（不含 PUE）缩放，其与 GPU 实测能耗之比等于 IT 功耗估算与 GPU 实测功耗之比。' +
+        '系统功耗模型或通过验证的实测功耗缺失时不显示。',
+    },
+    formula: {
+      en: 'J/tok = measured J per output token × modeled IT W per GPU ÷ measured W per GPU',
+      zh: 'J/tok = 实测每输出 token 能耗 × 每 GPU IT 功耗估算（W）÷ 每 GPU 实测功耗（W）',
+    },
+  },
+  itModeledJPerTotalToken: {
+    description: {
+      en:
+        'Measured energy per total token (input + output) scaled to the modeled IT boundary (no PUE) ' +
+        'by the same power ratio as All in Measured IT J per Output Token. Missing where the system ' +
+        'power model or validated measured power is unavailable.',
+      zh:
+        '将每个总 token（输入 + 输出）的实测能耗缩放到整体实测 IT 功耗边界（不含 PUE），缩放比例与每输出 token 整体实测 IT 能耗相同。' +
+        '系统功耗模型或通过验证的实测功耗缺失时不显示。',
+    },
+    formula: {
+      en: 'J/tok = measured J per total token × modeled IT W per GPU ÷ measured W per GPU',
+      zh: 'J/tok = 实测每总 token 能耗 × 每 GPU IT 功耗估算（W）÷ 每 GPU 实测功耗（W）',
     },
   },
   utilityModeledWatts: {
@@ -477,6 +570,21 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
     formula: {
       en: 'J/tok = measured J per output token × modeled facility W per GPU ÷ measured W per GPU',
       zh: 'J/tok = 实测每输出 token 能耗 × 每 GPU 设施级建模功耗（W）÷ 每 GPU 实测功耗（W）',
+    },
+  },
+  utilityModeledJPerTotalToken: {
+    description: {
+      en:
+        'Measured energy per total token (input + output) scaled to the modeled facility ' +
+        'boundary by the same power ratio as All in Measured J per Output Token. Missing where ' +
+        'the system power model or validated measured power is unavailable.',
+      zh:
+        '将每个总 token（输入 + 输出）的实测能耗缩放到整体实测功耗边界，缩放比例与每输出 token 整体实测能耗相同。' +
+        '系统功耗模型或通过验证的实测功耗缺失时不显示。',
+    },
+    formula: {
+      en: 'J/tok = measured J per total token × modeled facility W per GPU ÷ measured W per GPU',
+      zh: 'J/tok = 实测每总 token 能耗 × 每 GPU 设施级建模功耗（W）÷ 每 GPU 实测功耗（W）',
     },
   },
 };

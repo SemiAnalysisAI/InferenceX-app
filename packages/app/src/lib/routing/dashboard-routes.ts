@@ -96,6 +96,16 @@ export const DASHBOARD_ROUTES = [
     shareParamScopes: ['g_', 'i_'],
   },
   {
+    key: 'powerx',
+    path: '/powerx',
+    canonicalPath: '/powerx',
+    navGroup: 'primary',
+    indexable: false,
+    localeMirrored: true,
+    providers: FILTERED_DASHBOARD_PROVIDERS,
+    shareParamScopes: ['g_', 'i_'],
+  },
+  {
     key: 'profit-estimator-per-gigawatt',
     path: '/profit-estimator-per-gigawatt',
     canonicalPath: '/profit-estimator-per-gigawatt',

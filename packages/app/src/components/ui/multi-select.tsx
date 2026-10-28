@@ -4,6 +4,7 @@ import { CheckIcon, ChevronDownIcon, SearchIcon, XIcon } from 'lucide-react';
 import * as React from 'react';
 
 import { track } from '@/lib/analytics/analytics';
+import { matchesSearch } from '@/lib/shared/search-match';
 import { cn } from '@/lib/shared/utils';
 import {
   CONTROL_MIN_HEIGHT,
@@ -215,9 +216,8 @@ function MultiSelect({
 
   const filteredSections = React.useMemo(() => {
     if (!sections?.length) return null;
-    const lower = search.toLowerCase();
     const filterOpts = (opts: MultiSelectOption[]) =>
-      search ? opts.filter((opt) => opt.label.toLowerCase().includes(lower)) : opts;
+      search ? opts.filter((opt) => matchesSearch(opt.label, search)) : opts;
 
     return sections.map((section) => ({
       ...section,
@@ -231,8 +231,7 @@ function MultiSelect({
     }
     const opts = flatOptions;
     if (!search) return opts;
-    const lower = search.toLowerCase();
-    return opts.filter((opt) => opt.label.toLowerCase().includes(lower));
+    return opts.filter((opt) => matchesSearch(opt.label, search));
   }, [filteredSections, flatOptions, search]);
 
   const handleToggle = (optionValue: string) => {

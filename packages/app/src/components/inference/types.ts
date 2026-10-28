@@ -219,20 +219,37 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   powerVariant?: PowerVariant;
 
   gpuProvisionedJPerOutputToken?: { y: number; roof: boolean };
+  gpuProvisionedJPerTotalToken?: { y: number; roof: boolean };
   utilityProvisionedJPerOutputToken?: { y: number; roof: boolean };
+  utilityProvisionedJPerTotalToken?: { y: number; roof: boolean };
+  itModeledWatts?: { y: number; roof: boolean };
+  itModeledJPerOutputToken?: { y: number; roof: boolean };
+  itModeledJPerTotalToken?: { y: number; roof: boolean };
   utilityModeledWatts?: { y: number; roof: boolean };
   utilityModeledJPerOutputToken?: { y: number; roof: boolean };
+  utilityModeledJPerTotalToken?: { y: number; roof: boolean };
 }
 
-export type PowerCompare = 'none' | 'boundaries' | 'roles';
+/**
+ * `boundaries`: GPU only, IT (no PUE) and Facility. `all`: also the two rated provisioned
+ * bounds. `roles`: prefill vs decode GPUs. `breakdown`: the PowerX Where the power goes
+ * view (per-chip stacks at one interactivity); it overlays no series on the chart.
+ */
+export type PowerCompare = 'none' | 'boundaries' | 'provisioned' | 'all' | 'roles' | 'breakdown';
 export type PowerRole = 'all' | 'prefill' | 'decode';
 export type PowerVariant = { kind: 'basis'; id: PowerBasis } | { kind: 'role'; id: PowerRole };
 
 export type PowerBasisFieldKey =
   | 'gpuProvisionedJPerOutputToken'
+  | 'gpuProvisionedJPerTotalToken'
   | 'utilityProvisionedJPerOutputToken'
+  | 'utilityProvisionedJPerTotalToken'
+  | 'itModeledWatts'
+  | 'itModeledJPerOutputToken'
+  | 'itModeledJPerTotalToken'
   | 'utilityModeledWatts'
-  | 'utilityModeledJPerOutputToken';
+  | 'utilityModeledJPerOutputToken'
+  | 'utilityModeledJPerTotalToken';
 
 export type { PowerBasis } from '@/lib/power/power-basis';
 
@@ -309,6 +326,8 @@ export interface ScatterGraphProps {
   xExtentOverride?: [number, number];
   yExtentOverride?: [number, number];
   runNumbering?: Map<string, number>;
+  /** Plot height in px; the default is the shared 600 px chart height. */
+  plotHeight?: number;
 }
 
 export interface LegendItemProps {

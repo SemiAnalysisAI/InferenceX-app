@@ -98,7 +98,9 @@ export function ChartButtons({
       )}
     >
       {leadingControls && (
-        <div className="flex min-w-0 flex-wrap items-center gap-2">{leadingControls}</div>
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 md:flex-none">
+          {leadingControls}
+        </div>
       )}
       {onExportCsv || onExportMp4 ? (
         <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>

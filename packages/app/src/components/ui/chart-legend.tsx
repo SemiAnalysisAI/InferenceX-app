@@ -457,7 +457,25 @@ export default function ChartLegend({
         style={!isSidebar && isOverflowing ? { scrollbarGutter: 'stable' } : undefined}
         className={cn(scrollClasses, 'custom-scrollbar')}
       >
-        {(isSidebar ? sortedItems : items).map((item) => renderItem(item))}
+        {(isSidebar ? sortedItems : items)
+          .filter((item) => !item.section)
+          .map((item) => renderItem(item))}
+        {[...new Set(items.flatMap((item) => (item.section ? [item.section] : [])))].map(
+          (section) => (
+            <React.Fragment key={`section:${section}`}>
+              <li
+                className={cn(
+                  'mt-1.5 border-t border-border/60 pt-1.5 text-xs font-medium text-muted-foreground',
+                  itemsExpanded && 'md:w-full md:block',
+                )}
+                data-testid="legend-section-heading"
+              >
+                {section}
+              </li>
+              {items.filter((item) => item.section === section).map((item) => renderItem(item))}
+            </React.Fragment>
+          ),
+        )}
       </ul>
     );
 
