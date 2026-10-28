@@ -146,6 +146,7 @@ export function DatePicker({
   };
 
   const handleCancel = () => {
+    track('date_picker_cancelled', { changed: tempDate !== date });
     setTempDate(date);
     setOpen(false);
   };
@@ -169,6 +170,7 @@ export function DatePicker({
   };
 
   const handleGoToLatest = () => {
+    track('date_picker_go_to_latest', { date: getLatestDate(), placement: 'popover' });
     setTempDate(getLatestDate());
   };
 
@@ -181,7 +183,7 @@ export function DatePicker({
       return;
     }
     const latestDate = getLatestDate();
-    track('date_picker_go_to_latest', { date: latestDate });
+    track('date_picker_go_to_latest', { date: latestDate, placement: 'toolbar' });
     onChange(latestDate);
   };
 

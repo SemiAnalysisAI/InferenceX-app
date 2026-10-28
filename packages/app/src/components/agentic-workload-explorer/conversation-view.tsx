@@ -17,6 +17,7 @@ import { type ContentBlock } from '@/lib/agentic-workload-explorer/subagent';
 import { normalizeDashboardTrace } from '@semianalysisai/inferencex-db/proxytrace/shared/adapters';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
+import { useSearchTracking } from '@/lib/analytics/use-search-tracking';
 
 interface RequestData {
   id: string;
@@ -510,6 +511,7 @@ export function ConversationView({
   const t = STRINGS[useLocale()];
   const tree = buildConversationTree(requests);
   const [query, setQuery] = useState('');
+  useSearchTracking('agentic_workload_conversation_searched', query);
   const [showSearch, setShowSearch] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 

@@ -5,6 +5,7 @@ import { comparisonDefaults } from '@semianalysisai/inferencex-db/operatorx/visu
 import { useMemo, useState } from 'react';
 
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { track } from '@/lib/analytics/analytics';
 
 import { EmptyChart } from '../charts/empty';
 import { OpxChart, esc, HardwareLegend, tooltipHtml } from '../charts/kit';
@@ -60,7 +61,10 @@ function MetricVsSize({ model }: { model: ComparisonModel }) {
         size="sm"
         searchable
         value={current[0]}
-        onValueChange={setSlice}
+        onValueChange={(value) => {
+          track('operatorx_metric_vs_size_slice_selected', { slice: value, metric: metric.id });
+          setSlice(value);
+        }}
         triggerAriaLabel="Shape"
         groups={[
           {

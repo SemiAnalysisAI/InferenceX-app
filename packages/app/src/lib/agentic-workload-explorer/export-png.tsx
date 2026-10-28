@@ -1,3 +1,4 @@
+import { track } from '@/lib/analytics/analytics';
 import type { Locale } from '@/lib/i18n/i18n';
 
 import { ExpandTrigger } from '@/components/agentic-workload-explorer/expandable-chart';
@@ -74,10 +75,13 @@ export function ExportPngButton({
   onClick,
   label,
   locale = 'en',
+  analyticsChart,
 }: {
   onClick: () => void;
   label?: string;
   locale?: Locale;
+  /** Stable chart id. When set, clicks send `agentic_workload_export_png` with `chart`. */
+  analyticsChart?: string;
 }) {
   const t = STRINGS[locale];
   const ariaLabel = label ?? t.exportPng;
@@ -85,7 +89,10 @@ export function ExportPngButton({
     <>
       <button
         type="button"
-        onClick={onClick}
+        onClick={() => {
+          if (analyticsChart) track('agentic_workload_export_png', { chart: analyticsChart });
+          onClick();
+        }}
         aria-label={ariaLabel}
         className="px-2 py-0.5 text-3xs font-mono rounded border border-border text-subtle hover:text-foreground hover:bg-surface-hover transition-colors"
       >

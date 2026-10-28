@@ -435,7 +435,13 @@ export function PowerXChartConfig({
   const measuredControls = fields.length > 0 && (
     <MeasuredMetricControls
       metric={selection.metric}
-      onChange={(metric) => onSelectionChange({ metric, compare: selection.compare })}
+      onChange={(metric) => {
+        track('inference_powerx_measured_metric_selected', {
+          metric,
+          previous_metric: selection.metric,
+        });
+        onSelectionChange({ metric, compare: selection.compare });
+      }}
       fields={fields}
       className="contents"
     />

@@ -293,10 +293,18 @@ export function RequestTimelineView({
   }, [rows.length]);
 
   const zoomSvgRef = useRef<SVGSVGElement | null>(null);
+  const zoomTrackTimer = useRef<number | undefined>(undefined);
   const handleWheel = useCallback(
     (e: WheelEvent) => {
       if (!e.shiftKey) return;
       e.preventDefault();
+      // One event per wheel gesture, not per wheel tick.
+      window.clearTimeout(zoomTrackTimer.current);
+      const direction = e.deltaY < 0 ? 'in' : 'out';
+      zoomTrackTimer.current = window.setTimeout(
+        () => track('inference_agentic_timeline_zoomed', { direction }),
+        500,
+      );
       const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseRatio = Math.max(0, Math.min(1, mouseX / PLOT_WIDTH));
@@ -461,7 +469,7 @@ export function RequestTimelineView({
                 type="button"
                 onClick={() => {
                   resetZoom();
-                  track('inference_agentic_timeline_zoom_reset', { source: 'summary' });
+                  track('inference_agentic_timeline_zoom_reset', { placement: 'summary' });
                 }}
                 className="text-foreground hover:underline"
               >
@@ -577,7 +585,10 @@ export function RequestTimelineView({
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
                 onMouseLeave={handleMouseLeave}
-                onDoubleClick={resetZoom}
+                onDoubleClick={() => {
+                  track('inference_agentic_timeline_zoom_reset', { placement: 'double_click' });
+                  resetZoom();
+                }}
               >
                 <TimelineBars
                   rows={visibleRows}

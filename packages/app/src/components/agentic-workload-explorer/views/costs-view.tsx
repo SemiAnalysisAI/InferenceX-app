@@ -218,6 +218,7 @@ function DailyCostChart({
           {controls}
           <ExportPngButton
             locale={locale}
+            analyticsChart="daily-cost"
             onClick={() => {
               if (svgRef.current)
                 exportSvgToPng(svgRef.current, {

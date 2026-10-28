@@ -13,6 +13,7 @@ import {
 
 import { useUnofficialDomain } from '@/hooks/useUnofficialDomain';
 import { track } from '@/lib/analytics/analytics';
+import { useSearchTracking } from '@/lib/analytics/use-search-tracking';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { CONTROL_SEARCH_CLEAR_STYLE, CONTROL_SEARCH_STYLE } from '@/components/ui/control-styles';
 import {
@@ -165,6 +166,9 @@ export function DataTable<T>({
       }),
     );
   }, [data, search, columns, searchable]);
+  useSearchTracking(`${analyticsPrefix}_searched`, searchable ? search : '', {
+    results: filtered.length,
+  });
 
   const sorted = useMemo(() => {
     if (sort.dir === null || sort.columnIndex < 0) return filtered;

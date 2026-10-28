@@ -471,6 +471,7 @@ function ReplayPanelContent({
   }, []);
 
   const handleReset = useCallback(() => {
+    track('inference_replay_reset', { fraction: fractionRef.current });
     commitFraction(0, { force: true });
     setPlaying(false);
   }, [commitFraction]);

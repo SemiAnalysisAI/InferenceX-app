@@ -3,6 +3,7 @@
 import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
 import { track } from '@/lib/analytics/analytics';
+import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
 import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
 import { useEphemeralUrlState } from '@/hooks/useUrlState';
 import { useIsCoarsePointer } from '@/hooks/useMediaQuery';
@@ -1209,6 +1210,10 @@ const ScatterGraph = React.memo(
 
     const [pointsTableTarget, setPointsTableTarget] = useState<LegendPointsTarget | null>(null);
     const [quickFiltersOpen, setQuickFiltersOpen] = useState(false);
+    useDialogCloseTracking(quickFiltersOpen, 'inference_quick_filters_dialog_closed');
+    useDialogCloseTracking(pointsTableTarget !== null, 'inference_legend_points_table_closed');
+    useDialogCloseTracking(fixedLogPointId !== null, 'latency_logs_closed');
+    useDialogCloseTracking(powerTelemetryPoint !== null, 'inference_power_telemetry_closed');
     const quickFilterCount =
       quickFilters.vendors.length +
       (lockedFrameworks ? 0 : quickFilters.frameworks.length) +

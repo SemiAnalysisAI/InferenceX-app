@@ -4,6 +4,7 @@ import * as d3 from 'd3';
 import { useMemo, useState } from 'react';
 
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { track } from '@/lib/analytics/analytics';
 
 import { EmptyChart } from '../charts/empty';
 import { OpxChart, esc, HardwareLegend, tooltipHtml } from '../charts/kit';
@@ -72,7 +73,10 @@ function PairwiseScatter({ model }: { model: ComparisonModel }) {
         <SearchableSelect
           size="sm"
           value={a}
-          onValueChange={setA}
+          onValueChange={(value) => {
+            track('operatorx_pairwise_gpu_selected', { axis: 'x', gpu: value });
+            setA(value);
+          }}
           groups={options}
           triggerAriaLabel="X axis GPU"
         />
@@ -80,7 +84,10 @@ function PairwiseScatter({ model }: { model: ComparisonModel }) {
         <SearchableSelect
           size="sm"
           value={b}
-          onValueChange={setB}
+          onValueChange={(value) => {
+            track('operatorx_pairwise_gpu_selected', { axis: 'y', gpu: value });
+            setB(value);
+          }}
           groups={options}
           triggerAriaLabel="Y axis GPU"
         />

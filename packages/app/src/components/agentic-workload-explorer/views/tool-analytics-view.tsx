@@ -673,6 +673,7 @@ function Histogram({
           <div className="flex items-center justify-end mb-2">
             <ExportPngButton
               locale={locale}
+              analyticsChart={exportFilename?.replace(/\.png$/u, '') || 'tool-histogram'}
               onClick={() => {
                 if (svgRef.current)
                   exportSvgToPng(svgRef.current, {
@@ -954,6 +955,7 @@ function TransitionHeatmap({
           </button>
           <ExportPngButton
             locale={locale}
+            analyticsChart="tool-transition-matrix"
             onClick={() => {
               if (svgRef.current)
                 exportSvgToPng(svgRef.current, {
@@ -1652,6 +1654,7 @@ function OsTurnaroundCards({ byOs }: { byOs: ToolTimings['byOs'] }) {
                 </button>
                 <ExportPngButton
                   locale={locale}
+                  analyticsChart="tool-turnaround-by-os"
                   onClick={() => {
                     if (svgRef.current)
                       exportSvgToPng(svgRef.current, {

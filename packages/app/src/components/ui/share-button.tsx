@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ShareLinkedInButton, ShareTwitterButton } from '@/components/ui/share-buttons';
 import { track } from '@/lib/analytics/analytics';
+import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
 import { buildShareUrl } from '@/lib/routing/url-state';
 import { cn } from '@/lib/shared/utils';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -35,6 +36,7 @@ export function ShareButton({ className }: { className?: string } = {}) {
     },
   }[locale];
   const [open, setOpen] = useState(false);
+  useDialogCloseTracking(open, 'share_popover_closed');
   const [copied, setCopied] = useState(false);
   const [url, setUrl] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);

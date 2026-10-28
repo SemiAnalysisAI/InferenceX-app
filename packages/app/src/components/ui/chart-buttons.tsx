@@ -103,7 +103,13 @@ export function ChartButtons({
         </div>
       )}
       {onExportCsv || onExportMp4 ? (
-        <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+        <Popover
+          open={popoverOpen}
+          onOpenChange={(open) => {
+            if (open) track(`${analyticsPrefix}_export_menu_opened`, { chart: chartId });
+            setPopoverOpen(open);
+          }}
+        >
           <PopoverTrigger asChild>
             <Button
               data-testid="export-button"

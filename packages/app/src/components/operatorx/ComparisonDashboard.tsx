@@ -11,11 +11,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
 import { Heading } from '@/components/ui/heading';
 import { Label } from '@/components/ui/label';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { Pending } from '@/components/ui/pending';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { prefetchOperatorXTimelines, useOperatorXComparison } from '@/hooks/api/use-operatorx';
 import { useClientSearch } from '@/hooks/useClientSearch';
+import { track } from '@/lib/analytics/analytics';
+import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
 import { replaceClientSearch } from '@/lib/routing/client-navigation';
 
 import { CaseDetail } from './CaseDetail';
@@ -142,6 +145,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
   const [pickedBaseline, setBaseline] = useState<string | null>(null);
   const [inspected, setInspected] = useState<number | null>(null);
   const queryClient = useQueryClient();
+  useDialogCloseTracking(inspected !== null, 'operatorx_case_closed', { op });
 
   const workload = view?.workloads.find((w) => w.id === view.workload);
   const available = useMemo(() => sortHardware(workload?.hardware ?? []), [workload]);
@@ -158,8 +162,13 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
   const model = useMemo(() => {
     if (!view) return null;
     const toggle = (hw: string) => {
+      track('operatorx_gpu_toggled', { op, gpu: hw, placement: 'chart' });
       const next = toggleHardwareSelection(hardware, hw);
       if (next !== hardware) setPicked(next);
+    };
+    const inspect = (index: number) => {
+      track('operatorx_case_opened', { op, metric: metric.id });
+      setInspected(index);
     };
     const preview = (i: number) =>
       prefetchOperatorXTimelines(
@@ -168,7 +177,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
         caseRefs(view, hardware, i).map((r) => r.ref),
       );
     return buildModel(view, metric, { hardware, available, toggle }, colors, baseline, {
-      inspect: setInspected,
+      inspect,
       preview,
     });
   }, [view, metric, hardware, available, colors, baseline, queryClient, op]);
@@ -202,12 +211,15 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
   return (
     <div className="flex flex-col gap-4">
       <Card className="relative z-10 py-4 md:py-5" data-testid="operatorx-controls">
-        <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
           <ControlGroup label="Workload" htmlFor="operatorx-workload">
             <SearchableSelect
               triggerId="operatorx-workload"
               value={pending?.id ?? view.workload ?? ''}
-              onValueChange={(v) => setParam('workload', v)}
+              onValueChange={(v) => {
+                track('operatorx_workload_selected', { op, workload: v });
+                setParam('workload', v);
+              }}
               groups={[
                 {
                   label: '',
@@ -223,7 +235,10 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
             <SearchableSelect
               triggerId="operatorx-metric"
               value={metric.id}
-              onValueChange={(v) => setParam('metric', v)}
+              onValueChange={(v) => {
+                track('operatorx_metric_selected', { op, metric: v });
+                setParam('metric', v);
+              }}
               searchable={false}
               groups={[
                 {
@@ -233,11 +248,26 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
               ]}
             />
           </ControlGroup>
+          <ControlGroup label="GPUs" htmlFor="operatorx-hardware">
+            <MultiSelect
+              triggerId="operatorx-hardware"
+              options={available.map((h) => ({ value: h, label: hardwareLabel(h) }))}
+              value={hardware}
+              onChange={(next) => {
+                track('operatorx_gpus_changed', { op, gpus: next, gpu_count: next.length });
+                setPicked(next);
+              }}
+              minSelections={1}
+            />
+          </ControlGroup>
           <ControlGroup label="Baseline" htmlFor="operatorx-baseline">
             <SearchableSelect
               triggerId="operatorx-baseline"
               value={baseline ?? NO_BASELINE}
-              onValueChange={setBaseline}
+              onValueChange={(v) => {
+                track('operatorx_baseline_selected', { op, gpu: v });
+                setBaseline(v);
+              }}
               searchable={false}
               groups={[
                 {

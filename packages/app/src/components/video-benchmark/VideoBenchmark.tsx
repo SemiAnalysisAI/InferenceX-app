@@ -267,7 +267,13 @@ const REF_RUN = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34293
 const REF_ARTIFACT = `${REF_RUN}/artifacts/10082823150`;
 const parseInput = (value: string) => (value.trim() === '' ? null : Number(value));
 
-const field = (label: string, value: string, change: (value: string) => void, type = 'number') => (
+const field = (
+  key: string,
+  label: string,
+  value: string,
+  change: (value: string) => void,
+  type = 'number',
+) => (
   <label className="space-y-1 text-sm">
     <span>{label}</span>
     <Input
@@ -276,6 +282,9 @@ const field = (label: string, value: string, change: (value: string) => void, ty
       min={type === 'number' ? 0 : undefined}
       step={type === 'number' ? 'any' : undefined}
       onChange={(e) => change(e.target.value)}
+      onBlur={(e) => {
+        if (e.target.value) track('video_economics_input_set', { field: key });
+      }}
     />
   </label>
 );
@@ -472,11 +481,23 @@ export default function VideoBenchmark({
             <p className="text-muted-foreground mt-2">{s.subtitle}</p>
           </div>
           <div className="flex gap-2">
-            <Button onClick={() => input.current?.click()} disabled={loading}>
+            <Button
+              onClick={() => {
+                track('video_bundle_folder_open_clicked');
+                input.current?.click();
+              }}
+              disabled={loading}
+            >
               {s.open}
             </Button>
             {b && (
-              <Button variant="outline" onClick={clear}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  track('video_bundle_cleared');
+                  clear();
+                }}
+              >
                 {s.clear}
               </Button>
             )}
@@ -495,7 +516,10 @@ export default function VideoBenchmark({
             onChange={(e) => {
               const files = [...(e.target.files ?? [])];
               e.target.value = '';
-              if (files.length > 0) void open(() => folderReader(files));
+              if (files.length > 0) {
+                track('video_bundle_folder_selected', { file_count: files.length });
+                void open(() => folderReader(files));
+              }
             }}
           />
           <details className="rounded-lg border p-4 text-sm">
@@ -504,6 +528,7 @@ export default function VideoBenchmark({
               className="mt-3 flex flex-wrap gap-2"
               onSubmit={(e) => {
                 e.preventDefault();
+                track('video_bundle_url_submitted');
                 void open(() => httpReader(source));
               }}
             >
@@ -691,7 +716,10 @@ export default function VideoBenchmark({
                   <VideoSelect
                     label={s.slot}
                     value={slot}
-                    onValueChange={setSlot}
+                    onValueChange={(value) => {
+                      track('video_slot_selected', { slot: value });
+                      setSlot(value);
+                    }}
                     options={slots.map((o) => ({
                       value: text(at(o, 'slot_id')),
                       label: `${at(o, 'phase') === 'warmup' ? s.warmup : s.measured} · ${text(at(o, 'slot_id'))}`,
@@ -859,11 +887,11 @@ export default function VideoBenchmark({
               <Heading>{s.economics}</Heading>
               <p className="text-sm text-muted-foreground">{s.economicsNote}</p>
               <div className="grid gap-4 md:grid-cols-3">
-                {field(s.price, price, setPrice)}
-                {field(s.cost, cost, setCost)}
-                {field(s.billed, billed, setBilled)}
-                {field(s.assumption, assumption, setAssumption, 'text')}
-                {field(s.date, date, setDate, 'date')}
+                {field('price', s.price, price, setPrice)}
+                {field('cost', s.cost, cost, setCost)}
+                {field('billed', s.billed, billed, setBilled)}
+                {field('assumption', s.assumption, assumption, setAssumption, 'text')}
+                {field('date', s.date, date, setDate, 'date')}
               </div>
               <p className="text-xs text-muted-foreground">{s.needAssumptions}</p>
               <div className="grid gap-6 lg:grid-cols-2">

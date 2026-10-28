@@ -189,6 +189,7 @@ function DailyRequestsChart({
           {controls}
           <ExportPngButton
             locale={locale}
+            analyticsChart="daily-requests"
             onClick={() => {
               if (svgRef.current)
                 exportSvgToPng(svgRef.current, {
@@ -340,6 +341,7 @@ function HourlyHeatmap({
           </button>
           <ExportPngButton
             locale={locale}
+            analyticsChart="request-heatmap"
             onClick={() => {
               if (svgRef.current)
                 exportSvgToPng(svgRef.current, {
@@ -458,6 +460,7 @@ function StreamingChart({
       <div className="flex items-center justify-end mb-2">
         <ExportPngButton
           locale={locale}
+          analyticsChart="streaming-vs-non-streaming"
           onClick={() => {
             if (svgRef.current)
               exportSvgToPng(svgRef.current, {
