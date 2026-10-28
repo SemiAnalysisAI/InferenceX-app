@@ -1315,6 +1315,7 @@ export function InferenceProvider({
   // PowerX Energy per token opens without H200: its joules per token flatten every other chip.
   const powerXSurface = usePowerXSurface();
   const hideH200 = powerXSurface && powerXViewFor(selectedYAxisMetric, powerCompare) === 'energy';
+  const lastHideH200Ref = useRef(hideH200);
   const automaticHardware = useCallback(
     (hardware: Set<string>) => {
       const defaults = defaultInferenceHardware(selectedModel, hardware);
@@ -1371,7 +1372,10 @@ export function InferenceProvider({
     const scopeChanged = lastHwResetKeyRef.current !== hwResetKey;
     const modelChanged = lastHwResetModelRef.current !== selectedModel;
     const presetFilter = presetHwFilterRef.current;
-    if (!scopeChanged && !bestPerSku && !presetFilter) return;
+    // Re-apply the default when the H200 rule flips, unless the reader picked hardware.
+    const hideH200Changed = !hardwareDefaultsOverridden && lastHideH200Ref.current !== hideH200;
+    if (!scopeChanged && !bestPerSku && !presetFilter && !hideH200Changed) return;
+    lastHideH200Ref.current = hideH200;
     lastHwResetKeyRef.current = hwResetKey;
     lastHwResetModelRef.current = selectedModel;
     const previousSelection = modelChanged ? new Set<string>() : undefined;
