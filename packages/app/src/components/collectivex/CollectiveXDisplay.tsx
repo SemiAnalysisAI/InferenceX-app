@@ -127,14 +127,17 @@ const STRINGS = {
     sku: 'SKU',
     backend: 'Backend',
     viewControl: 'View',
-    viewAria: 'Show each series, or one range per SKU across every library',
     viewSeries: 'Series',
     viewRange: 'Range by SKU',
+    viewBest: 'Best by SKU',
+    bestNote:
+      'Each line is the best value (lowest latency, highest rate) across every library and selected mode at that token count; the tooltip names the winner.',
     rangeNote:
       'Each band spans the lowest to the highest value across every library and selected mode at that token count; the line is their median.',
     yAxisControl: 'Y axis',
-    tokenRateOption: 'Token rate at latency percentile',
-    activationRateOption: 'Activation-data rate at latency percentile',
+    tokenRateOption: 'Token rate',
+    activationRateOption: 'Activation rate',
+    payloadRateOption: 'Payload BW / chip',
     noSeries: 'No measured series match these filters.',
     resetFilter: 'Reset filter',
     payloadNote:
@@ -204,13 +207,16 @@ const STRINGS = {
     sku: 'SKU',
     backend: '后端',
     viewControl: '视图',
-    viewAria: '显示每条序列，或按 SKU 显示所有集合通信库的范围',
     viewSeries: '序列',
     viewRange: '按 SKU 显示范围',
+    viewBest: '按 SKU 显示最佳',
+    bestNote:
+      '每条线为该 token 数下所有集合通信库与所选模式中的最佳值（延迟最低、速率最高），提示框会标明最佳的集合通信库。',
     rangeNote: '每个色带覆盖该 token 数下所有集合通信库与所选模式的最低值到最高值，线为其中位数。',
     yAxisControl: 'Y 轴',
-    tokenRateOption: '延迟分位点对应的 token 速率',
-    activationRateOption: '延迟分位点对应的激活数据速率',
+    tokenRateOption: 'Token 速率',
+    activationRateOption: '激活数据速率',
+    payloadRateOption: '每芯片载荷带宽',
     noSeries: '没有实测序列符合当前筛选条件。',
     resetFilter: '重置筛选',
     payloadNote: '逻辑载荷速率按所选延迟分位点派生，不代表物理链路带宽。',
@@ -303,7 +309,7 @@ export default function CollectiveXDisplay() {
   const [yAxis, setYAxis] = useState<CollectiveXYAxis>('latency');
   const [sku, setSku] = useState('all');
   const [backend, setBackend] = useState('all');
-  const [view, setView] = useState<'series' | 'range'>('range');
+  const [view, setView] = useState<'series' | 'range' | 'best'>('range');
   const [hiddenRangeIds, setHiddenRangeIds] = useState<Set<string>>(new Set());
   const [activeSeriesIds, setActiveSeriesIds] = useState<Set<string>>(new Set());
   const [legendExpanded, setLegendExpanded] = useState(true);
@@ -443,8 +449,8 @@ export default function CollectiveXDisplay() {
     () => phaseSeries.filter((item) => activeSeriesIds.has(item.series_id)),
     [activeSeriesIds, phaseSeries],
   );
-  // The range view combines every library, so it only applies while Backend is All.
-  const rangeView = view === 'range' && backend === 'all';
+  // The range and best views combine every library, so they only apply while Backend is All.
+  const rangeView = view !== 'series' && backend === 'all';
   // Built whenever Backend is All (not only in the range view), so legend-hidden bands survive a
   // visit to the series view.
   const rangeBands = useMemo(
@@ -820,21 +826,20 @@ export default function CollectiveXDisplay() {
                     }}
                   />
                   {backend === 'all' && (
-                    <ControlGroup label={t.viewControl}>
-                      <SegmentedToggle
-                        value={view}
-                        options={[
-                          { value: 'series', label: t.viewSeries },
-                          { value: 'range', label: t.viewRange },
-                        ]}
-                        onValueChange={(next) => {
-                          setView(next);
-                          track('collectivex_view_changed', { view: next });
-                        }}
-                        ariaLabel={t.viewAria}
-                        testId="collectivex-view-toggle"
-                      />
-                    </ControlGroup>
+                    <SelectControl
+                      label={t.viewControl}
+                      testId="collectivex-view-select"
+                      value={view}
+                      options={[
+                        { value: 'series', label: t.viewSeries },
+                        { value: 'range', label: t.viewRange },
+                        { value: 'best', label: t.viewBest },
+                      ]}
+                      onChange={(next) => {
+                        setView(next);
+                        track('collectivex_view_changed', { view: next });
+                      }}
+                    />
                   )}
                   <SelectControl
                     label={t.yAxisControl}
@@ -850,9 +855,8 @@ export default function CollectiveXDisplay() {
                         ? ([{ value: 'tokens-per-second', label: t.tokenRateOption }] as const)
                         : []),
                       { value: 'activation-rate', label: t.activationRateOption },
-                      { value: 'payload-rate', label: t.yAxis['payload-rate'] },
+                      { value: 'payload-rate', label: t.payloadRateOption },
                     ]}
-                    className="sm:col-span-2 lg:col-span-2 xl:col-span-2"
                   />
                 </div>
               </Card>
@@ -862,6 +866,7 @@ export default function CollectiveXDisplay() {
                   testId="collectivex-explorer-chart"
                   series={rangeView ? [] : activeSeries}
                   ranges={rangeView ? shownRangeBands : undefined}
+                  rangeMode={view === 'best' ? 'best' : 'range'}
                   colors={colors}
                   operation={operation}
                   percentile={percentile}
@@ -933,7 +938,7 @@ export default function CollectiveXDisplay() {
                     className="mt-2 text-xs text-muted-foreground"
                     data-testid="collectivex-range-note"
                   >
-                    {t.rangeNote}
+                    {view === 'best' ? t.bestNote : t.rangeNote}
                   </p>
                 )}
                 {yAxis === 'activation-rate' && (

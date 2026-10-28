@@ -27,6 +27,8 @@ interface CollectiveXChartProps {
   series: CollectiveXRunSeries[];
   /** When set, draw these SKU ranges (band plus median line) instead of one line per series. */
   ranges?: CollectiveXRangeBand[];
+  /** `range` draws each band and its median; `best` draws only the best value at each point. */
+  rangeMode?: 'range' | 'best';
   colors: Record<string, string>;
   operation: CollectiveXOperation;
   percentile: CollectiveXPercentile;
@@ -67,6 +69,7 @@ const STRINGS = {
     rangeHeading: 'Range across libraries',
     rangeMedian: 'Median',
     rangeCount: (n: number) => `${n} librar${n === 1 ? 'y' : 'ies'} at this point`,
+    best: 'Best',
     aria: 'CollectiveX expert-parallel performance chart',
   },
   zh: {
@@ -98,6 +101,7 @@ const STRINGS = {
     rangeHeading: '各集合通信库的范围',
     rangeMedian: '中位数',
     rangeCount: (n: number) => `该点共 ${n} 个集合通信库`,
+    best: '最佳',
     aria: 'CollectiveX 专家并行性能图表',
   },
 } as const;
@@ -176,6 +180,7 @@ export function CollectiveXChart({
   chartId,
   series,
   ranges,
+  rangeMode = 'range',
   colors,
   operation,
   percentile,
@@ -195,7 +200,7 @@ export function CollectiveXChart({
               seriesLabel: band.label,
               colorKey: band.colorKey,
               x: item.x,
-              y: item.mid,
+              y: rangeMode === 'best' ? item.members[0].y : item.mid,
               point: item.members[0].point,
               range: {
                 lo: item.lo,
@@ -206,7 +211,7 @@ export function CollectiveXChart({
             })),
           )
         : chartPoints(series, operation, percentile, yAxis, locale),
-    [ranges, series, operation, percentile, yAxis, locale],
+    [ranges, rangeMode, series, operation, percentile, yAxis, locale],
   );
   const seriesById = useMemo(() => new Map(series.map((item) => [item.series_id, item])), [series]);
   const fitsBySeries = useMemo(
@@ -228,7 +233,9 @@ export function CollectiveXChart({
   const yDomain = useMemo(
     () =>
       paddedDomain(
-        points.flatMap((point) => (point.range ? [point.range.lo, point.range.hi] : [point.y])),
+        points.flatMap((point) =>
+          point.range && rangeMode === 'range' ? [point.range.lo, point.range.hi] : [point.y],
+        ),
       ),
     [points],
   );
@@ -236,7 +243,7 @@ export function CollectiveXChart({
   // Always mounted, so leaving the range view redraws it empty: D3Chart keeps a removed custom
   // layer's elements on screen.
   const rangeLayer = useMemo(() => {
-    const bands = ranges ?? [];
+    const bands = rangeMode === 'range' ? (ranges ?? []) : [];
     const draw = (
       group: d3.Selection<SVGGElement, unknown, null, undefined>,
       xScale: unknown,
@@ -292,7 +299,7 @@ export function CollectiveXChart({
         draw(group, ctx.newXScale, ctx.newYScale);
       },
     };
-  }, [ranges, colors]);
+  }, [ranges, rangeMode, colors]);
   const xTickValues = useMemo(
     () => [...new Set(points.map((point) => point.x))].toSorted((a, b) => a - b),
     [points],
@@ -397,7 +404,11 @@ export function CollectiveXChart({
             ${pinnedNote}
             <div class="font-semibold mb-1" style="color: ${color}">${escapeHtml(point.seriesLabel)}</div>
             <div>${escapeHtml(t.operation[operation])} ${yAxis === 'latency' ? percentile : t.atLatency(percentile)}</div>
-            <div>${t.rangeMedian}: <strong>${formatMetric(point.y, yAxis)}</strong></div>
+            ${
+              rangeMode === 'best'
+                ? `<div>${t.best}: <strong>${formatMetric(point.y, yAxis)}</strong> · ${escapeHtml(point.range.members[0].label)}</div>`
+                : `<div>${t.rangeMedian}: <strong>${formatMetric(point.y, yAxis)}</strong></div>`
+            }
             <div>${t.rangeHeading}: ${formatMetric(point.range.lo, yAxis)} – ${formatMetric(point.range.hi, yAxis)}</div>
             <div class="text-muted-foreground">${t.tokenCounts(locale === 'zh' ? point.point.tokens_per_rank.toLocaleString('zh-CN') : String(point.point.tokens_per_rank), locale === 'zh' ? point.point.global_tokens.toLocaleString('zh-CN') : String(point.point.global_tokens))}</div>
             <div class="mt-1 text-muted-foreground">${t.rangeCount(point.range.libraries)}</div>
