@@ -24,30 +24,10 @@ import {
 } from '@/lib/compare/compare-slug';
 import { getHardwareConfig, getGpuSpecs } from '@/lib/catalog/constants';
 import { datasetJsonLd } from '@/lib/seo/dataset-jsonld';
+import { clampMetaDescription, META_DESCRIPTION_MAX } from '@/lib/seo/meta-text';
 
 export { getCachedBenchmarks };
 
-export const KNOWN_MODELS = new Set([
-  'Muse-Spark-Open',
-  'Llama-3.3-70B-Instruct-FP8',
-  'Llama-3.1-70B-Instruct-FP8-KV',
-  'DeepSeek-R1-0528',
-  'gpt-oss-120b',
-  'Qwen-3.5-397B-A17B',
-  'Qwen3.8-Flash-Next',
-  'Qwen3.8-27B',
-  'Qwen3.8-27B-Eager',
-  'Kimi-K2.5',
-  'Kimi-K3',
-  'MiniMax-M2.5',
-  'MiniMax-M3',
-  'MiniMax-M3.1-Flash',
-  'GLM-5',
-  'GLM-5.2',
-  'DeepSeek-V4-Pro',
-  'DeepSeek-V4.1-Flash',
-]);
-export const KNOWN_SEQUENCES = new Set(['1k/1k', '1k/8k', '8k/1k', 'agentic-traces']);
 export const KNOWN_PRECISIONS = new Set(['fp4', 'fp4fp8', 'fp8', 'bf16', 'int4', 'nvfp4', 'mxfp4']);
 
 export interface AgenticScenarioIntro {
@@ -62,12 +42,6 @@ export const AGENTIC_SCENARIO_INTRO: AgenticScenarioIntro = {
   linkLabel: 'Learn more about AgentX',
   href: '/agentx',
 };
-
-export function pickString(value: string | string[] | undefined): string | undefined {
-  if (typeof value === 'string') return value;
-  if (Array.isArray(value)) return value[0];
-  return undefined;
-}
 
 export interface PairSummary {
   hardware: string;
@@ -751,8 +725,6 @@ export function computeCompareStat(
   };
 }
 
-export const META_DESCRIPTION_MAX = 155;
-
 function firstUnder(candidates: string[], max: number): string | undefined {
   return candidates.find((c) => c.length <= max);
 }
@@ -774,8 +746,8 @@ export function compareMetaDescription(
         `${gpuLabel} inference benchmark on ${modelName} from ${SITE_NAME} by ${AUTHOR_NAME}.`,
         `${gpuLabel} inference benchmark on ${modelName}.`,
       ],
-      META_DESCRIPTION_MAX,
-    ) ?? `${gpuLabel} inference benchmark`.slice(0, META_DESCRIPTION_MAX);
+      META_DESCRIPTION_MAX.en,
+    ) ?? clampMetaDescription(`${gpuLabel} inference benchmark on ${modelName}.`, 'en');
 
   const stat = computeCompareStat(a, b, ssrRows);
   if (!stat) return fallback;
@@ -802,7 +774,7 @@ export function compareMetaDescription(
         `${core} Verified open-source ${SITE_NAME} benchmarks.`,
         core,
       ],
-      META_DESCRIPTION_MAX,
+      META_DESCRIPTION_MAX.en,
     ) ?? fallback
   );
 }

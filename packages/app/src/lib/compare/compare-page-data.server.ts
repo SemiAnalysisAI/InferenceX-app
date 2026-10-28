@@ -1,3 +1,4 @@
+import { rowToSequence } from '@semianalysisai/inferencex-constants';
 import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
 
 import type { BenchmarkRow } from '@/lib/api/api';
@@ -25,12 +26,18 @@ export interface ComparePageDerivedData {
   initialPairBenchmarkRows: BenchmarkRow[];
 }
 
+/**
+ * Rows embedded in the compare page HTML to seed the chart and table. Only the
+ * page's default sequence is sent; the chart fetches the full model rows when
+ * the reader switches to another sequence. A null sequence (no pair data)
+ * keeps every row so the seed still covers whatever the client selects.
+ */
 export function initialCompareBenchmarkRows(
-  slugModel: string,
-  effectiveModel: string,
   pairRows: BenchmarkRow[],
-): BenchmarkRow[] | undefined {
-  return effectiveModel === slugModel ? pairRows : undefined;
+  sequence: string | null,
+): BenchmarkRow[] {
+  if (!sequence) return pairRows;
+  return pairRows.filter((row) => rowToSequence(row) === sequence);
 }
 
 async function loadComparePairRows(

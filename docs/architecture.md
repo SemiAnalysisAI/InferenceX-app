@@ -59,6 +59,14 @@ Other dashboards keep their existing query-state behavior.
 
 `cachedDerivedData()` is the tagged, `unstable_cache`-only wrapper for compact server payloads. Compare caches one pair-filtered, full-shape hydration row set per model/GPU pair, then recomputes the inexpensive sequence/precision table transform per request; nesting a selector cache around the pair cache would bypass Next.js incremental caching.
 
+### ISR pages and initial data
+
+Compare (`/compare`, `/compare-per-dollar`, `/compare-precision`, `/compare-spec-decode`, their `[scenario]` children and `/zh` mirrors), `/run` and `/rankings` detail pages set `revalidate = 3600` and return `[]` from `generateStaticParams()`. Nothing is prerendered at build time. Each URL renders on its first request and is then served from the ISR cache for up to an hour, or until an ingest expires the `db` tag.
+
+Compare pages embed only the rows for the page's default sequence (`initialCompareBenchmarkRows()`), not the whole pair history. `InferenceContext` passes those rows through `resolveBenchmarkSeed()` (`components/inference/utils/benchmark-seed.ts`), which uses them only while the selection matches the seeded model and sequence, under a sequence-scoped query key. Picking another sequence falls through to the shared full-model benchmarks query, so a partial seed never answers for data it lacks.
+
+The overview page (`/overview`, `/zh/overview`) is prerendered with the default controls and ignores `searchParams` on the server. When a shared URL asks for other controls, `OverviewNavigationProvider` loads that state from `/api/v1/overview` after mount.
+
 ### API responses
 
 `cachedJson()` (`lib/cache/api-cache.ts`) takes the incoming request. It serves brotli, then gzip, then plain JSON according to `Accept-Encoding`, so a client that sends no header (curl, scripts) gets plain JSON. Every response carries `Vary: Accept-Encoding` and a strong `ETag` hashed from the payload and the chosen encoding. A matching `If-None-Match` returns a bodiless `304`. Route handlers that call other handlers directly use `sourceRequest()`, which sends no `Accept-Encoding`, so they always read plain JSON.

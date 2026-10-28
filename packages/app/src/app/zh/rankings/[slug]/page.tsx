@@ -1,12 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import {
-  AUTHOR_NAME,
-  SITE_NAME,
-  SITE_URL,
-  SUPPORTERS_LINE_ZH,
-} from '@semianalysisai/inferencex-constants';
+import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { fmtCostPerMtok, fmtThroughput } from '@/components/live-seo/format';
 import {
@@ -14,7 +9,9 @@ import {
   type RankingsStrings,
 } from '@/components/live-seo/rankings-page-sections';
 import { JsonLd } from '@/components/seo/json-ld';
-import { ZH_LANG_TAG, ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
+import { ZH_LANG_TAG, zhAlternates } from '@/lib/i18n/i18n';
+import { clampMetaDescription } from '@/lib/seo/meta-text';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 import { getRankingPageEntry, scenarioLabel, type RankingPageEntry } from '@/lib/live-seo/rankings';
 import {
   rankingPageDescriptionZh,
@@ -24,7 +21,11 @@ import {
 } from '@/lib/live-seo/rankings-zh';
 import { getRankingPageData, type RankingPageData } from '@/lib/live-seo/run-rankings-data.server';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
+
+export function generateStaticParams(): { slug: string }[] {
+  return [];
+}
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -48,7 +49,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!entry) return {};
   const data = await getRankingPageData(entry.slug);
   const title = rankingPageTitleZh(entry);
-  const description = `${data ? statLedDescriptionZh(entry, data) : rankingPageDescriptionZh(entry)}${SUPPORTERS_LINE_ZH}`;
+  const description = clampMetaDescription(
+    data ? statLedDescriptionZh(entry, data) : rankingPageDescriptionZh(entry),
+    'zh',
+  );
   const url = `${SITE_URL}/zh/rankings/${entry.slug}`;
   return {
     title: { absolute: `${title} | ${SITE_NAME}` },
@@ -56,14 +60,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     keywords: rankingPageKeywordsZh(entry),
     authors: [{ name: AUTHOR_NAME }],
     alternates: zhAlternates(`/rankings/${entry.slug}`),
-    openGraph: {
+    ...socialMetadata({
       title: `${title} | ${SITE_NAME}`,
       description,
       url,
-      locale: ZH_OG_LOCALE,
+      locale: 'zh',
       type: 'article',
-    },
-    twitter: { card: 'summary_large_image', title: `${title} | ${SITE_NAME}`, description },
+    }),
   };
 }
 

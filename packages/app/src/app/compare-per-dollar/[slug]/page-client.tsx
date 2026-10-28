@@ -148,6 +148,7 @@ export default function ComparePerDollarPageClient({
         benchmarkQueryScope={benchmarkQueryScope}
         initialBenchmarkModel={initialModel}
         initialBenchmarkRows={initialBenchmarkRows}
+        initialBenchmarkSequence={defaultSequence ?? undefined}
       >
         <div className="flex flex-col gap-4">
           <Card className="flex w-full min-w-0 flex-col gap-3">

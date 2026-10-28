@@ -1,8 +1,13 @@
 import type { RunPageEntry } from '@/lib/live-seo/run-pages';
+import { fitMetaTitle } from '@/lib/seo/meta-text';
 
 export function runPageTitleZh(entry: RunPageEntry): string {
   const chipLabel = entry.chip.label;
-  return `${entry.model.seoName} 在 ${chipLabel} 上的实测推理吞吐与成本`;
+  return fitMetaTitle([
+    `${entry.model.seoName} 在 ${chipLabel} 上的实测推理吞吐与成本`,
+    `${entry.model.seoName} 在 ${chipLabel} 上的实测结果`,
+    `${entry.model.seoName} 在 ${chipLabel} 上`,
+  ]);
 }
 
 export function runPageHeadingZh(entry: RunPageEntry): string {

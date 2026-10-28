@@ -187,7 +187,9 @@ export function OverviewNavigationProvider({
     setPendingHref(href);
     setData(initialData);
     setNavigationError(false);
-  }, [initialData, initialHref]);
+    // The page is prerendered with the default controls, so a shared URL's controls load here.
+    if (overviewDataKey(actual) !== overviewDataKey(href)) commit(actual, false);
+  }, [commit, initialData, initialHref]);
 
   useEffect(() => {
     const handlePopState = () => {

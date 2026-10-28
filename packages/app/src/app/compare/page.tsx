@@ -5,6 +5,7 @@ import { Suspense } from 'react';
 import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { enAlternates } from '@/lib/i18n/i18n';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 import { AgentXCompareHero } from '@/components/compare/agentx-compare-hero';
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
@@ -22,7 +23,7 @@ import {
 import { bucketComparePairsByVendor, formatModelList } from '@/lib/compare/compare-ssr';
 import { type Model } from '@/lib/catalog/data-mappings';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
 
 const DESCRIPTION =
   'Compare AgentX agentic inference results for Kimi K3, DeepSeek V4 Pro, MiniMax M3, Qwen 3.5, and GLM 5.3, plus fixed-sequence chip comparisons.';
@@ -31,17 +32,12 @@ export const metadata: Metadata = {
   title: 'AgentX Inference Comparisons',
   description: DESCRIPTION,
   alternates: enAlternates('/compare'),
-  openGraph: {
+  ...socialMetadata({
     title: `AgentX Inference Comparisons | ${SITE_NAME}`,
     description: DESCRIPTION,
     url: `${SITE_URL}/compare`,
-    type: 'website',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: `AgentX Inference Comparisons | ${SITE_NAME}`,
-    description: DESCRIPTION,
-  },
+    locale: 'en',
+  }),
 };
 
 interface VendorGroup {
@@ -189,7 +185,7 @@ async function CompareCatalog() {
                       return (
                         <ComparePairCardLink
                           key={slug}
-                          href={comparisonPairHref('en', slug, model)}
+                          href={comparisonPairHref('en', slug)}
                           slug={slug}
                           label={label}
                           archLine={archLine}

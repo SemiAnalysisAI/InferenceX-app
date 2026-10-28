@@ -29,8 +29,9 @@ describe('buildOverviewMetadata', () => {
       title: `${metadata.title} | ${SITE_NAME}`,
       url: `${SITE_URL}/overview`,
       type: 'website',
+      locale: 'en_US',
     });
-    expect(metadata.openGraph).not.toHaveProperty('locale');
+    expect(metadata.twitter).toMatchObject({ card: 'summary_large_image' });
   });
 
   it('uses the Chinese canonical URL, matching OpenGraph title, and locale', () => {

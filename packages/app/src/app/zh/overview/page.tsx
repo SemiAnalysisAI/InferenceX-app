@@ -1,13 +1,9 @@
-import {
-  buildOverviewMetadata,
-  type OverviewRoutePageProps,
-  renderOverviewPage,
-} from '@/lib/overview/overview-route.server';
+import { buildOverviewMetadata, renderOverviewPage } from '@/lib/overview/overview-route.server';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
 
 export const metadata = buildOverviewMetadata('zh');
 
-export default function ZhOverviewPage({ searchParams }: OverviewRoutePageProps) {
-  return renderOverviewPage({ locale: 'zh', searchParams });
+export default function ZhOverviewPage() {
+  return renderOverviewPage({ locale: 'zh' });
 }

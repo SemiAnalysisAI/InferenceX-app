@@ -1,12 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 
-import {
-  HW_REGISTRY,
-  SITE_NAME,
-  SITE_URL,
-  SUPPORTERS_LINE,
-} from '@semianalysisai/inferencex-constants';
+import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { JsonLd } from '@/components/seo/json-ld';
 import {
@@ -16,11 +11,12 @@ import {
 } from '@/lib/compare/compare-scenario-route';
 import { languageAlternates } from '@/lib/i18n/i18n';
 import {
-  AGENTIC_SCENARIO_INTRO,
-  getCachedBenchmarks,
-  KNOWN_SEQUENCES,
-  pickString,
-} from '@/lib/compare/compare-ssr';
+  compareSocialImages,
+  precisionMetaDescription,
+  precisionMetaTitle,
+} from '@/lib/compare/compare-meta';
+import { socialMetadata } from '@/lib/seo/social-metadata';
+import { AGENTIC_SCENARIO_INTRO, getCachedBenchmarks } from '@/lib/compare/compare-ssr';
 import {
   canonicalPrecisionCompareSlug,
   parsePrecisionCompareSlug,
@@ -38,7 +34,11 @@ import {
 
 import ComparePrecisionPageClient from './page-client';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
+
+export function generateStaticParams(): { slug: string }[] {
+  return [];
+}
 
 export interface ScenarioOptions {
   scenarioSegment?: ScenarioSegment;
@@ -52,7 +52,6 @@ function scenarioPath(canonical: string, scenarioSegment?: ScenarioSegment): str
 
 interface Props {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -80,38 +79,34 @@ export function buildPrecisionMetadata(
   const canonicalPath = scenarioPath(canonical);
   const url = `${SITE_URL}${routePath}`;
   const canonicalUrl = `${SITE_URL}${canonicalPath}`;
-  const description = `${gpuLabel} precision comparison of ${aLabel} versus ${bLabel} on ${parsed.model.label}: verified, reproducible results from InferenceX, the independent open-source benchmark by SemiAnalysis. ${SUPPORTERS_LINE} See which quantization level delivers better throughput and cost at every interactivity level.`;
+  const description = precisionMetaDescription(parsed.model.label, gpuLabel, aLabel, bLabel);
+  const title = precisionMetaTitle(parsed.model.label, gpuLabel, aLabel, bLabel);
   return {
-    title: `${parsed.model.label} — ${gpuLabel} ${aLabel} vs ${bLabel} — Precision Comparison`,
+    title,
     description,
     alternates: {
       canonical: canonicalUrl,
       languages: languageAlternates(canonicalPath),
     },
-    openGraph: {
-      title: `${parsed.model.label} — ${gpuLabel} ${aLabel} vs ${bLabel} — Precision Comparison | ${SITE_NAME}`,
+    ...socialMetadata({
+      title: `${title} | ${SITE_NAME}`,
       description,
       url,
-      type: 'website',
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: `${parsed.model.label} — ${gpuLabel} ${aLabel} vs ${bLabel} — Precision Comparison`,
-      description,
-    },
+      locale: 'en',
+      images: compareSocialImages(
+        canonicalPath,
+        `${parsed.model.label} ${gpuLabel} ${aLabel} vs ${bLabel} precision comparison`,
+      ),
+    }),
   };
 }
 
-export default async function ComparePrecisionPage({ params, searchParams }: Props) {
+export default async function ComparePrecisionPage({ params }: Props) {
   const { slug } = await params;
-  return renderPrecisionPage(slug, await searchParams, {});
+  return renderPrecisionPage(slug, {});
 }
 
-export async function renderPrecisionPage(
-  slug: string,
-  sp: Record<string, string | string[] | undefined>,
-  { scenarioSegment }: ScenarioOptions,
-) {
+export async function renderPrecisionPage(slug: string, { scenarioSegment }: ScenarioOptions) {
   const parsed = parsePrecisionCompareSlug(slug);
   if (!parsed) notFound();
 
@@ -122,15 +117,7 @@ export async function renderPrecisionPage(
     parsed.precB,
   );
   if (canonical !== slug.toLowerCase()) {
-    const qs = Object.entries(sp)
-      .flatMap(([k, v]) => {
-        if (Array.isArray(v)) return v.map((vv) => [k, vv] as const);
-        if (v === undefined) return [];
-        return [[k, v] as const];
-      })
-      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
-      .join('&');
-    permanentRedirect(`${scenarioPath(canonical, scenarioSegment)}${qs ? `?${qs}` : ''}`);
+    permanentRedirect(scenarioPath(canonical, scenarioSegment));
   }
 
   const rows = await getCachedBenchmarks(parsed.model.dbKeys);
@@ -145,10 +132,8 @@ export async function renderPrecisionPage(
     sideB,
   );
 
-  const urlSeq = pickString(sp.i_seq);
   const pathSequence = scenarioSegment ? sequenceForScenarioSegment(scenarioSegment) : null;
-  const effectiveSequence =
-    pathSequence ?? (urlSeq && KNOWN_SEQUENCES.has(urlSeq) ? urlSeq : pickedSequence);
+  const effectiveSequence = pathSequence ?? pickedSequence;
 
   const { defaultTargets, ssrRows, interactivityRange } = computeVariantCompareTableData(
     rows,

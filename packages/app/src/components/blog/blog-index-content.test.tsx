@@ -40,9 +40,16 @@ vi.mock('@/lib/blog/blog', async (importOriginal) => {
 vi.mock('next-themes', () => ({ useTheme: () => ({ resolvedTheme: undefined }) }));
 
 import { BlogFeaturedPost } from './blog-featured-post';
-import { BlogIndexContent } from './blog-index-content';
+import { BlogIndexContent, blogIndexData } from './blog-index-content';
+import { BlogIndexPosts } from './blog-index-posts';
 
 const HAN = /\p{Script=Han}/u;
+
+function renderTagged(locale: 'en' | 'zh', tag: string): string {
+  return renderToStaticMarkup(
+    <BlogIndexPosts locale={locale} {...blogIndexData(locale)} activeTag={tag} />,
+  );
+}
 
 describe('BlogIndexContent', () => {
   it('features the newest post once and lists the rest in the grid', () => {
@@ -103,7 +110,7 @@ describe('BlogIndexContent', () => {
   });
 
   it('keeps the ?tag= filter contract and drops the featured card when filtering', () => {
-    const html = renderToStaticMarkup(<BlogIndexContent locale="en" activeTag="nvidia" />);
+    const html = renderTagged('en', 'nvidia');
 
     expect(html).not.toContain('data-testid="blog-featured-post"');
     expect(html.match(/data-testid="blog-post-card"/gu)).toHaveLength(2);
@@ -113,12 +120,12 @@ describe('BlogIndexContent', () => {
   });
 
   it('accepts any casing in the tag query', () => {
-    const html = renderToStaticMarkup(<BlogIndexContent locale="en" activeTag="NVIDIA" />);
+    const html = renderTagged('en', 'NVIDIA');
     expect(html.match(/data-testid="blog-post-card"/gu)).toHaveLength(2);
   });
 
   it('puts the long tail of tags behind a disclosure and keeps the active tail tag visible', () => {
-    const html = renderToStaticMarkup(<BlogIndexContent locale="en" activeTag="qwen" />);
+    const html = renderTagged('en', 'qwen');
 
     expect(html).toContain('<details');
     expect(html).toContain('More tags');
@@ -127,7 +134,7 @@ describe('BlogIndexContent', () => {
   });
 
   it('shows an empty state with a reset link for unknown tags', () => {
-    const html = renderToStaticMarkup(<BlogIndexContent locale="en" activeTag="tpu" />);
+    const html = renderTagged('en', 'tpu');
 
     expect(html).not.toContain('data-testid="blog-post-card"');
     expect(html).toContain('No articles tagged');
@@ -135,7 +142,8 @@ describe('BlogIndexContent', () => {
   });
 
   it('renders Chinese chrome and zh routes for the zh locale', () => {
-    const html = renderToStaticMarkup(<BlogIndexContent locale="zh" activeTag="agentx" />);
+    const html =
+      renderToStaticMarkup(<BlogIndexContent locale="zh" />) + renderTagged('zh', 'agentx');
 
     expect(html).toContain('href="/zh/blog?tag=nvidia"');
     expect(html).toContain('href="/zh/blog/newest"');

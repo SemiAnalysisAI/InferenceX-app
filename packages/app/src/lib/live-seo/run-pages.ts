@@ -1,6 +1,7 @@
 import { getAllChipPages, type ChipPageEntry } from '@/lib/catalog/chip-pages';
 import { COMPARE_MODEL_SLUGS } from '@/lib/compare/compare-slug';
 import { INFERENCE_MODEL_SLUGS, type InferenceModelSlug } from '@/lib/routing/inference-model-slug';
+import { fitMetaTitle } from '@/lib/seo/meta-text';
 
 export interface RunPageEntry {
   slug: string;
@@ -49,7 +50,8 @@ export function runPagePath(entry: RunPageEntry): string {
 }
 
 export function runPageTitle(entry: RunPageEntry): string {
-  return `${entry.model.seoName} on ${entry.chip.label}: Measured Inference Throughput and Cost`;
+  const base = `${entry.model.seoName} on ${entry.chip.label}`;
+  return fitMetaTitle([`${base}: Throughput and Cost`, `${base}: Benchmarks`, base]);
 }
 
 export function runPageHeading(entry: RunPageEntry): string {

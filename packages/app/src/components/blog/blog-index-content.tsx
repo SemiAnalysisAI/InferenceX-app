@@ -12,19 +12,11 @@ import {
 import { type Locale, localePath } from '@/lib/i18n/i18n';
 
 import { BLOG_COPY, blogIndexPath } from './blog-copy';
-import { BlogFeaturedPost } from './blog-featured-post';
-import { BlogPostCard } from './blog-post-card';
-import { BlogTagFilter } from './blog-tag-filter';
-import { BlogTagLink } from './blog-tag-link';
+import { type BlogIndexCard, BlogIndexPostsWithUrlTag } from './blog-index-posts';
 
 const INLINE_TAG_COUNT = 8;
 
-interface BlogIndexContentProps {
-  locale: Locale;
-  activeTag?: string;
-}
-
-function cardProps(post: BlogPostMeta, locale: Locale) {
+function cardProps(post: BlogPostMeta, locale: Locale): BlogIndexCard {
   const t = BLOG_COPY[locale];
   return {
     slug: post.slug,
@@ -39,21 +31,21 @@ function cardProps(post: BlogPostMeta, locale: Locale) {
   };
 }
 
-export function BlogIndexContent({ locale, activeTag: rawTag }: BlogIndexContentProps) {
-  const t = BLOG_COPY[locale];
-  const basePath = blogIndexPath(locale);
+export function blogIndexData(locale: Locale) {
   const posts = getAllPosts(locale);
   const allTags = [...new Set(posts.flatMap((p) => p.tags ?? []))];
-  const activeTag = rawTag
-    ? (allTags.find((tag) => tag.toLowerCase() === rawTag.trim().toLowerCase()) ?? rawTag.trim())
-    : undefined;
   const topTags = getTopTags(posts, INLINE_TAG_COUNT);
   const topSet = new Set(topTags);
-  const moreTags = allTags.filter((tag) => !topSet.has(tag)).toSorted();
-  const filtered = activeTag ? posts.filter((p) => p.tags?.includes(activeTag)) : posts;
-  const [featured, ...rest] = filtered;
-  const showFeatured = !activeTag && featured !== undefined;
-  const grid = showFeatured ? rest : filtered;
+  return {
+    cards: posts.map((post) => cardProps(post, locale)),
+    allTags,
+    topTags,
+    moreTags: allTags.filter((tag) => !topSet.has(tag)).toSorted(),
+  };
+}
+
+export function BlogIndexContent({ locale }: { locale: Locale }) {
+  const t = BLOG_COPY[locale];
 
   return (
     <div
@@ -80,61 +72,7 @@ export function BlogIndexContent({ locale, activeTag: rawTag }: BlogIndexContent
         </p>
       </header>
 
-      {showFeatured && (
-        <BlogFeaturedPost
-          {...cardProps(featured, locale)}
-          labels={{ eyebrow: t.featured, read: t.readArticle, tags: t.tags }}
-        />
-      )}
-
-      <section className="flex flex-col gap-6" aria-labelledby="blog-list-heading">
-        <div className="flex flex-col gap-4 border-t border-border/40 pt-6">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
-            <Heading as="h2" level="section" id="blog-list-heading" className="scroll-mt-24">
-              {activeTag ? t.taggedHeading(activeTag) : t.allPosts}
-            </Heading>
-            <p className="text-sm text-muted-foreground tabular-nums" data-testid="blog-post-count">
-              {t.count(filtered.length)}
-            </p>
-          </div>
-          {topTags.length > 0 && (
-            <BlogTagFilter
-              primary={topTags}
-              more={moreTags}
-              activeTag={activeTag}
-              basePath={basePath}
-              labels={{ all: t.allTag, more: t.moreTags, filter: t.filterLabel }}
-            />
-          )}
-        </div>
-
-        {filtered.length === 0 ? (
-          <div className="flex flex-col items-start gap-3 rounded-2xl border border-dashed border-border/60 p-8">
-            <p className="text-muted-foreground">
-              {activeTag ? t.emptyTag(activeTag) : t.emptyAll}
-            </p>
-            {activeTag && (
-              <BlogTagLink tag="" clear basePath={basePath}>
-                {t.clearFilter}
-              </BlogTagLink>
-            )}
-          </div>
-        ) : (
-          <div
-            className="grid items-start gap-6 md:grid-cols-2 xl:grid-cols-3"
-            data-testid="blog-post-grid"
-          >
-            {grid.map((post, index) => (
-              <BlogPostCard
-                key={post.slug}
-                {...cardProps(post, locale)}
-                tagsLabel={t.tags}
-                priority={index < 3}
-              />
-            ))}
-          </div>
-        )}
-      </section>
+      <BlogIndexPostsWithUrlTag locale={locale} {...blogIndexData(locale)} />
     </div>
   );
 }

@@ -128,6 +128,7 @@ import { defaultInferenceHardware, defaultInferenceXAxisMode } from './utils/mod
 import { powerXViewFor } from './powerx/powerx-views';
 import { usePowerXSurface } from './ui/powerx-surface';
 import { bestSeriesPerSku, withUnrankedSkus } from './utils/best-series-per-sku';
+import { resolveBenchmarkSeed } from './utils/benchmark-seed';
 import {
   EMPTY_QUICK_FILTERS,
   parseDeploymentModes,
@@ -244,6 +245,7 @@ export function InferenceProvider({
   benchmarkQueryScope,
   initialBenchmarkModel,
   initialBenchmarkRows,
+  initialBenchmarkSequence,
   initialYAxisMetric,
   autoSelectAllGpus = false,
   lockedFrameworks,
@@ -257,6 +259,8 @@ export function InferenceProvider({
   benchmarkQueryScope?: string;
   initialBenchmarkModel?: string;
   initialBenchmarkRows?: BenchmarkRow[];
+  /** Sequence the seed rows cover; omit when they cover every sequence. */
+  initialBenchmarkSequence?: string;
   initialYAxisMetric?: string;
   autoSelectAllGpus?: boolean;
   lockedFrameworks?: readonly string[];
@@ -677,7 +681,14 @@ export function InferenceProvider({
     effectiveSelectedRunId && contestedRunIds.has(String(effectiveSelectedRunId))
       ? String(effectiveSelectedRunId)
       : undefined;
-  const seedRows = selectedModel === initialBenchmarkModel ? initialBenchmarkRows : undefined;
+  const { rows: seedRows, scope: chartQueryScope } = resolveBenchmarkSeed({
+    scope: benchmarkQueryScope,
+    seedRows: initialBenchmarkRows,
+    seedModel: initialBenchmarkModel,
+    seedSequence: initialBenchmarkSequence,
+    selectedModel,
+    selectedSequence: effectiveSequence,
+  });
 
   const {
     graphs,
@@ -711,7 +722,7 @@ export function InferenceProvider({
     asOfRunId,
     dataQuickFilters,
     overviewHistoryPair,
-    benchmarkQueryScope,
+    chartQueryScope,
     seedRows,
     tcoBasis,
     activeTab === 'inference' &&
