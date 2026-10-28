@@ -55,3 +55,14 @@ describe('tabMetadataZh', () => {
     expect(meta.openGraph?.url).toBe(`${SITE_URL}/zh/gpu-specs`);
   });
 });
+
+describe('PowerX copy', () => {
+  it('describes energy per token, the PowerX default unit, not per output token', () => {
+    expect(TAB_META.powerx.description).toContain('energy per token');
+    expect(TAB_META.powerx.description).not.toContain('output token');
+    for (const text of [TAB_META_ZH.powerx.description, TAB_INTRO_ZH.powerx]) {
+      expect(text).toContain('每 Token 能耗');
+      expect(text).not.toContain('输出 Token');
+    }
+  });
+});

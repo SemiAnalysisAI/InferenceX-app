@@ -192,8 +192,9 @@ changes: PowerX writes the same `i_metric` and `i_pcompare` state, so share link
 - **Where the power goes** stacks IT only by default; the Include facility switch
   (`PowerXFacilitySwitch`, context state, not a URL parameter) appends the PUE part after a
   gap. `breakdownSeriesAtBoundary` derives the IT series from the breakdown so the chip
-  comparison, the drill-down and the tooltips agree; the note "Storage and out-of-rack
-  network are not modeled" stays under the bars.
+  comparison, the drill-down and the tooltips agree; `FACILITY_PUE_NOTE` ("Facility =
+  measured IT power × assumed PUE") stays under the switch and the bars. Storage and
+  out-of-rack networking are not listed as out of scope because they round to 0 %.
 - **Headroom** (Power draw shown as % of TDP, no comparison): `ScatterGraph` adds a
   `powerx-headroom` layer, beneath the lines, that shades between each chip's P90 line (P90
   W × the point's own % TDP ÷ avg W) and 100 %; the y-axis reaches the rating so the band

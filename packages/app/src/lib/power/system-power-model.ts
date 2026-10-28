@@ -28,6 +28,12 @@ export type RackPowerHardware = keyof typeof RACK_SYSTEMS;
 export const AIR_COOLED_SYSTEM_PUE = SYSTEMS.hopper.default_cooling.pue;
 export const LIQUID_COOLED_RACK_PUE = SYSTEMS['gb200-nvl72'].default_cooling.pue;
 
+/** What every facility figure is: the measured IT boundary times one assumed PUE. */
+export const FACILITY_PUE_NOTE: Record<Locale, string> = {
+  en: `Facility = measured IT power × assumed PUE (${AIR_COOLED_SYSTEM_PUE} air-cooled, ${LIQUID_COOLED_RACK_PUE} liquid-cooled).`,
+  zh: `数据中心功耗 = 实测 IT 功耗 × 假定 PUE（风冷 ${AIR_COOLED_SYSTEM_PUE}，液冷 ${LIQUID_COOLED_RACK_PUE}）。`,
+};
+
 export const isSystemPowerHardware = (hardware: string): hardware is SystemPowerHardware =>
   Object.hasOwn(CHASSIS_SYSTEMS, hardware);
 

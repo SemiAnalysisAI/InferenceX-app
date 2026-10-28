@@ -53,11 +53,6 @@ export const POWER_BASIS_TAG_TITLES: Record<PowerBasisTag, { en: string; zh: str
   facility: { en: 'IT × PUE', zh: 'IT × PUE' },
 };
 
-export const IT_NOT_MODELED_NOTE = {
-  en: 'Storage and out-of-rack network are not modeled.',
-  zh: '存储和机架外网络未建模。',
-};
-
 /** GPUs one megawatt of IT power supports at this point's IT W per GPU. */
 export function gpusPerMegawatt(itWattsPerGpu: number | null | undefined): number | null {
   return isPositive(itWattsPerGpu) ? 1e6 / itWattsPerGpu : null;

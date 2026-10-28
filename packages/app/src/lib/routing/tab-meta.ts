@@ -25,7 +25,7 @@ export const TAB_META: Record<DashboardRouteKey, { title: string; description: s
   powerx: {
     title: 'PowerX: Measured GPU Power and Energy per Token',
     description:
-      'Measured GPU power, energy per output token and power timelines for every InferenceX benchmark point, with modeled server and facility overhead.',
+      'Measured GPU power, energy per token and power timelines for every InferenceX benchmark point, with modeled server and facility overhead.',
   },
   inference: {
     title: 'Agentic Inference Benchmarks',

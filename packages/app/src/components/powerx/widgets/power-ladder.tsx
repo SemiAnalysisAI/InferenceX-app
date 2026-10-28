@@ -22,9 +22,12 @@ const STRINGS = {
     allIn: (watts: string) => `All-in provisioned ${watts} W`,
     allInTitle: 'Vendor all-in provisioned watts per GPU that operators size racks with',
     gpu: (watts: string) => `GPU ${watts} W`,
+    board: (watts: string) => `Bianca board ${watts} W`,
+    boardTitle:
+      'One Bianca board carries two GPUs, one Grace CPU and its LPDDR5X; this is one GPU’s half',
     share: (pct: number) => `${pct.toFixed(1)} % of IT`,
     summary: (gpu: string, it: string, facility: string) =>
-      `Power ladder: measured GPU ${gpu} W, modeled IT ${it} W, facility ${facility} W per GPU`,
+      `Power ladder: measured GPU ${gpu} W, measured IT ${it} W, facility ${facility} W per GPU`,
   },
   zh: {
     it: (watts: string) => `IT ${watts} W`,
@@ -36,9 +39,12 @@ const STRINGS = {
     allIn: (watts: string) => `全系统 provisioned ${watts} W`,
     allInTitle: '厂商给出的每 GPU 全系统 provisioned 功率，运营商按它规划机柜',
     gpu: (watts: string) => `GPU ${watts} W`,
+    board: (watts: string) => `Bianca 板卡 ${watts} W`,
+    boardTitle:
+      '一块 Bianca 板卡搭载 2 颗 GPU、1 颗 Grace CPU 及其 LPDDR5X；这里是单颗 GPU 分摊的一半',
     share: (pct: number) => `占 IT ${pct.toFixed(1)} %`,
     summary: (gpu: string, it: string, facility: string) =>
-      `功耗阶梯：每 GPU 实测 ${gpu} W，建模 IT ${it} W，数据中心 ${facility} W`,
+      `功耗阶梯：每 GPU 实测 ${gpu} W，实测 IT ${it} W，数据中心 ${facility} W`,
   },
 } as const;
 
@@ -48,12 +54,18 @@ const ROW = 15;
 const CHAR = 6.6;
 const RATED = 'var(--muted-foreground)';
 
+/** Estimated label width; CJK glyphs render about twice as wide as Latin ones. */
+const textWidth = (text: string) =>
+  [...text].reduce((width, char) => width + (/\p{Script=Han}/u.test(char) ? 2 * CHAR : CHAR), 0);
+
 interface LadderNumbers {
   gpu: number;
   it: number;
   facility: number;
   tdp: number;
   allIn: number;
+  /** Watts per GPU of the board group, or null on hardware without one. */
+  board: number | null;
   scaleMax: number;
 }
 
@@ -83,6 +95,16 @@ function ladderLabels(
   if (!gpuInline) {
     top.push({ key: 'gpu', x: PAD, anchor: 'start', text: gpuText, title: gpuTitle, width: 0 });
   }
+  if (numbers.board !== null) {
+    top.push({
+      key: 'board',
+      x: PAD,
+      anchor: 'start',
+      text: t.board(formatWatts(numbers.board)),
+      title: t.boardTitle,
+      width: 0,
+    });
+  }
   const bottom: LadderLabel[] = [
     {
       key: 'tdp',
@@ -110,7 +132,7 @@ function ladderLabels(
     },
   ];
   for (const label of [...top, ...bottom]) {
-    label.width = label.text.length * CHAR;
+    label.width = textWidth(label.text);
     // Keep middle-anchored labels inside the frame.
     if (label.anchor === 'middle') {
       label.x = Math.min(Math.max(label.x, label.width / 2 + PAD), width - label.width / 2 - PAD);
@@ -156,6 +178,7 @@ export function PowerLadder({
     allIn: ladder.allInWatts,
   };
   for (const segment of ladder.segments) targets[`seg:${segment.category}`] = segment.watts;
+  const boardCategories = new Set(ladder.board?.categories);
   const shown = useEasedValues(targets);
   const extensionStart =
     BUILD.gpuMs + Math.max(0, ladder.segments.length - 2) * BUILD.stepMs + BUILD.partMs;
@@ -173,9 +196,14 @@ export function PowerLadder({
   const ticks = stepProgress(elapsed, ticksStart, BUILD.ticksMs);
   const gpuLabel = stepProgress(elapsed, BUILD.gpuMs * 0.45, 300);
   const facilityShown = itShown + extension * (shown.facility - itShown);
+  const boardShown = ladder.segments.reduce(
+    (sum, segment, index) => sum + (boardCategories.has(segment.category) ? grown[index] : 0),
+    0,
+  );
   const labelOpacity: Record<string, number> = {
     it: 1,
     gpu: gpuLabel,
+    board: ticks,
     tdp: ticks,
     allIn: ticks,
     facility: extension,
@@ -185,7 +213,7 @@ export function PowerLadder({
   // Rows and the GPU label's placement come from the final numbers so labels never hop mid-ease.
   const finalPx = (width - 2 * PAD) / targets.scaleMax;
   const gpuInline =
-    ladder.gpuWatts * finalPx >= t.gpu(formatWatts(ladder.gpuWatts)).length * CHAR + 24;
+    ladder.gpuWatts * finalPx >= textWidth(t.gpu(formatWatts(ladder.gpuWatts))) + 24;
   const final = ladderLabels(
     t,
     titles.gpu,
@@ -196,6 +224,7 @@ export function PowerLadder({
       facility: ladder.facilityWatts,
       tdp: ladder.tdpWatts,
       allIn: ladder.allInWatts,
+      board: ladder.board?.watts ?? null,
       scaleMax: targets.scaleMax,
     },
     ladder.pue,
@@ -205,7 +234,8 @@ export function PowerLadder({
   const bottomRows = staggerLabels(final.bottom);
   const topRowCount = Math.max(0, ...topRows.values()) + 1;
   const bottomRowCount = Math.max(0, ...bottomRows.values()) + 1;
-  const barY = topRowCount * ROW + 4;
+  // The board bracket sits between the top labels and the bar.
+  const barY = topRowCount * ROW + (ladder.board ? 9 : 4);
   const tickY = barY + barH;
   const height = tickY + 10 + bottomRowCount * ROW + 2;
 
@@ -219,6 +249,7 @@ export function PowerLadder({
       facility: facilityShown,
       tdp: shown.tdp,
       allIn: shown.allIn,
+      board: ladder.board ? boardShown : null,
       scaleMax: shown.scaleMax,
     },
     ladder.pue,
@@ -236,6 +267,7 @@ export function PowerLadder({
     const w = Math.max(0, watts * px - GAP);
     return { ...segment, watts, x0, w, share: (segment.watts / ladder.itWatts) * 100 };
   });
+  const boardEnd = xOf(boardShown) - GAP;
 
   return (
     <div ref={setContainerRef} className={cn('min-w-0', className)}>
@@ -269,6 +301,19 @@ export function PowerLadder({
             {label.text}
           </text>
         ))}
+
+        {ladder.board && (
+          <path
+            data-board="bianca"
+            d={`M${PAD},${barY - 2} V${barY - 6} H${boardEnd} V${barY - 2}`}
+            fill="none"
+            stroke="var(--foreground)"
+            strokeWidth={1}
+            opacity={ticks}
+          >
+            <title>{t.boardTitle}</title>
+          </path>
+        )}
 
         {/* PUE extension: the assumed multiplier from IT to facility. */}
         <rect

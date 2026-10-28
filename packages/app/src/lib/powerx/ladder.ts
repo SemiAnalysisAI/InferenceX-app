@@ -45,11 +45,20 @@ export interface LadderSegment {
   watts: number;
 }
 
+/** The parts one board carries, kept adjacent at the start of the ladder. */
+export interface LadderBoard {
+  categories: readonly LadderCategory[];
+  /** Watts per GPU of those parts. */
+  watts: number;
+}
+
 export interface Ladder {
   hardware: LadderHardware;
   gpuWatts: number;
-  /** GPU first, then modeled parts by size. */
+  /** GPU first, then the rest of its board, then the other modeled parts by size. */
   segments: LadderSegment[];
+  /** NVL72's Bianca board: two GPUs with one Grace CPU and its LPDDR5X. */
+  board: LadderBoard | null;
   itWatts: number;
   facilityWatts: number;
   pue: number;
@@ -71,6 +80,8 @@ const MODELED_CATEGORIES = [
   'network',
 ] as const satisfies readonly LadderCategory[];
 
+const BIANCA_BOARD = ['gpu', 'cpu', 'memory'] as const satisfies readonly LadderCategory[];
+
 const hardwareTdp = (hardware: LadderHardware): number => HW_REGISTRY[hardware].tdp;
 
 /** Runs the pinned power model in its agentic state with the Grace socket modeled. */
@@ -81,21 +92,37 @@ export function buildLadder(hardware: LadderHardware, gpuWatts: number): Ladder 
     : estimateChassisPower(hardware, gpuWatts * gpuCount, AGENTIC);
   if (!unit) return null;
   const perGpu = (watts: number) => watts / gpuCount;
+  const boardCategories: readonly LadderCategory[] = isRackPowerHardware(hardware)
+    ? BIANCA_BOARD
+    : [];
+  const boardRank = (category: LadderCategory) => {
+    const index = boardCategories.indexOf(category);
+    return index === -1 ? boardCategories.length : index;
+  };
   const modeled = MODELED_CATEGORIES.map((category) => ({
     category,
     kind: 'modeled' as const,
     watts: perGpu(unit.breakdown[category]),
   }))
     .filter((segment) => segment.watts > 0)
-    .toSorted((a, b) => b.watts - a.watts);
+    .toSorted((a, b) => boardRank(a.category) - boardRank(b.category) || b.watts - a.watts);
+  const segments: LadderSegment[] = [
+    { category: 'gpu', kind: 'measured', watts: perGpu(unit.breakdown.gpu) },
+    ...modeled,
+  ];
+  const boardSegments = segments.filter((segment) => boardCategories.includes(segment.category));
   const itWatts = perGpu(unit.itWatts);
   return {
     hardware,
     gpuWatts,
-    segments: [
-      { category: 'gpu', kind: 'measured', watts: perGpu(unit.breakdown.gpu) },
-      ...modeled,
-    ],
+    segments,
+    board:
+      boardSegments.length > 0
+        ? {
+            categories: boardSegments.map((segment) => segment.category),
+            watts: boardSegments.reduce((sum, segment) => sum + segment.watts, 0),
+          }
+        : null,
     itWatts,
     facilityWatts: perGpu(unit.facilityWatts),
     pue: unit.pue,

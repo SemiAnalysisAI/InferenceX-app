@@ -13,11 +13,11 @@ import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import {
   gpusPerMegawatt,
-  IT_NOT_MODELED_NOTE,
   modeledFacilityWattsPerGpu,
   modeledItWattsPerGpu,
   POWER_COUNT_LABELS,
 } from '@/lib/power/power-basis';
+import { FACILITY_PUE_NOTE } from '@/lib/power/system-power-model';
 import { getHardwareConfig } from '@/lib/catalog/constants';
 import { Switch } from '@/components/ui/switch';
 import type { InferenceData } from '@/components/inference/types';
@@ -80,7 +80,7 @@ const STRINGS = {
     systemHelp: 'IT × PUE: GPU measured, rest of server and the facility overhead modeled',
     both: 'All',
     bothHelp: 'GPU only (solid), IT (dashed) and Facility (dash-dot) per chip on one chart',
-    systemTokensOnly: 'IT and facility are modeled for All tokens and Output only',
+    systemTokensOnly: 'IT and facility are available for All tokens and Output only',
     readout: {
       it: 'IT',
       wPerGpu: 'W/GPU',
@@ -713,8 +713,8 @@ export function PowerXFacilitySwitch({ pue }: { pue: number | null }) {
           {t.includeFacility(pue === null ? '—' : String(pue))}
         </span>
       </label>
-      <span className="text-xs text-muted-foreground" data-testid="powerx-not-modeled-note">
-        {IT_NOT_MODELED_NOTE[locale]}
+      <span className="text-xs text-muted-foreground" data-testid="powerx-facility-note">
+        {FACILITY_PUE_NOTE[locale]}
       </span>
     </div>
   );
