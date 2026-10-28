@@ -467,8 +467,8 @@ export async function purgeOperatorX({
 }: { immediate?: boolean } = {}): Promise<void> {
   // OperatorX has no unstable_cache layer: once its blobs are gone, the CDN's
   // background refresh reads fresh data, so the stale response is served once.
-  revalidateTag(operatorXCacheTag(), immediate ? { expire: 0 } : 'max');
   await blobPurge(operatorXBlobPrefix());
+  revalidateTag(operatorXCacheTag(), immediate ? { expire: 0 } : 'max');
 }
 
 /**
