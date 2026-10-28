@@ -5,6 +5,7 @@ import {
   type ChartSeries,
 } from './etl/compute-chart-series.js';
 import { createAdminSql } from './etl/db-utils.js';
+import { cacheHitRatesFromChartSeries, writeCacheHitMetrics } from './etl/trace-replay-ingest.js';
 import {
   jsonbParam,
   parseLimitForceFlags,
@@ -123,6 +124,20 @@ async function main(): Promise<void> {
         where id = ${id}
           and coalesce((chart_series->>'version')::int, -1) <= ${CHART_SERIES_VERSION}
       `;
+      // ATOM P/D row cache rates come from this chart series at ingest, so
+      // refresh them with it. Other frameworks keep their ingested values.
+      const atomPd = row.framework === 'mooncake-atom' || row.framework === 'atom-disagg';
+      const rates = atomPd ? cacheHitRatesFromChartSeries(series) : null;
+      if (rates) {
+        const linked = await sql<{ id: number }[]>`
+          select id from benchmark_results where trace_replay_id = ${id}
+        `;
+        await writeCacheHitMetrics(
+          sql,
+          linked.map((r) => r.id),
+          rates,
+        );
+      }
       return 'ok';
     },
   );
