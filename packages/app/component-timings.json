@@ -129,6 +129,28 @@
       ]
     },
     {
+      "spec": "cypress/component/bottom-toast.cy.tsx",
+      "duration": 2500,
+      "tests": [
+        {
+          "title": [
+            "BottomToast",
+            "docks as a single compact bar on a 361px phone and keeps the page end reachable"
+          ],
+          "duration": 1829,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "BottomToast",
+            "keeps the floating corner card on desktop without reserving page space"
+          ],
+          "duration": 656,
+          "attempts": 1
+        }
+      ]
+    },
+    {
       "spec": "cypress/component/chart-buttons.cy.tsx",
       "duration": 2282,
       "tests": [
