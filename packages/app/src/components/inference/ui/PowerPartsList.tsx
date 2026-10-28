@@ -25,6 +25,7 @@ import {
   type PowerPartRow,
   type SystemPowerCategory,
 } from '../utils/power-breakdown';
+import { formatInteractivity } from '../utils/interactivity-format';
 import { usePowerXSurface } from './powerx-surface';
 
 const STRINGS = {
@@ -58,7 +59,6 @@ const STRINGS = {
 
 const watts = d3.format(',.0f');
 const percent = d3.format('.0%');
-const rate = d3.format(',.0f');
 export const SPARKLINE_WIDTH = 72;
 export const SPARKLINE_HEIGHT = 18;
 /** PowerX on a phone: the heaviest parts stay in view, the rest sit behind one row. */
@@ -128,7 +128,7 @@ export default function PowerPartsList({
   const t = STRINGS[locale];
   const rows = useMemo(() => powerPartRows(series, entry), [series, entry]);
   const maxWatts = Math.max(1, ...rows.map((row) => row.watts));
-  const heading = `${series.label} · ${t.at(entry.concurrency, rate(entry.interactivity))}`;
+  const heading = `${series.label} · ${t.at(entry.concurrency, formatInteractivity(entry.interactivity))}`;
   // PowerX under `md`: the accordion; desktop and other surfaces keep the full list.
   const powerX = usePowerXSurface();
   const mobile = useIsMobileViewport();
