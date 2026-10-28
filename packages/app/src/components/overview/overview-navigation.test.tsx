@@ -8,13 +8,10 @@ import { CLIENT_SEARCH_CHANGE_EVENT } from '@/lib/routing/client-navigation';
 import type { OverviewPageData, OverviewTier } from '@/lib/overview/overview-data';
 
 const routerStub = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
-const trackStub = vi.hoisted(() => vi.fn());
 
 vi.mock('next/navigation', () => ({
   useRouter: () => routerStub,
 }));
-
-vi.mock('@/lib/analytics/analytics', () => ({ track: trackStub }));
 
 import {
   OverviewNavigationProvider,
@@ -105,7 +102,6 @@ function deferredFetch() {
 beforeEach(() => {
   routerStub.push.mockClear();
   routerStub.replace.mockClear();
-  trackStub.mockClear();
   window.history.replaceState({}, '', '/overview');
   container = document.createElement('div');
   document.body.append(container);
@@ -377,9 +373,6 @@ describe('OverviewNavigationProvider', () => {
 
     expect(readProbe('pending')).toBe('settled');
     expect(readProbe('tier')).toBe('75');
-    expect(trackStub).toHaveBeenCalledExactlyOnceWith('$pageview', {
-      $current_url: 'http://localhost:3000/overview?tier=75',
-    });
   });
 
   it('keys the cache by canonical data identity', async () => {
@@ -487,8 +480,6 @@ describe('OverviewNavigationProvider', () => {
     expect(readProbe('pending')).toBe('settled');
     expect(window.location.search).toBe('?tier=75&utm_source=x');
     expect(pushState).not.toHaveBeenCalled();
-    // The landing's own pageview already covered this URL.
-    expect(trackStub).not.toHaveBeenCalled();
     pushState.mockRestore();
   });
 

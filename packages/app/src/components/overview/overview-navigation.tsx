@@ -12,7 +12,7 @@ import {
   useState,
 } from 'react';
 
-import { track } from '@/lib/analytics/analytics';
+import { trackVirtualPageview } from '@/lib/analytics/analytics';
 import { notifyClientSearchChange } from '@/lib/routing/client-navigation';
 import {
   OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
@@ -120,7 +120,7 @@ export function OverviewNavigationProvider({
   }, []);
 
   const commit = useCallback(
-    (href: string, updateHistory: boolean, recordPageview = true) => {
+    (href: string, updateHistory: boolean) => {
       const navigationId = ++navigationIdRef.current;
       pendingHrefRef.current = href;
       setPendingHref(href);
@@ -155,11 +155,7 @@ export function OverviewNavigationProvider({
           }
           setData(nextData);
           setNavigationError(false);
-          if (recordPageview) {
-            track('$pageview', {
-              $current_url: new URL(settledHref, window.location.origin).href,
-            });
-          }
+          trackVirtualPageview(settledHref, 'overview_control');
         })
         .catch(() => {
           if (navigationId !== navigationIdRef.current) return;
@@ -190,8 +186,8 @@ export function OverviewNavigationProvider({
     setData(initialData);
     setNavigationError(false);
     // The page is prerendered with the default controls, so a shared URL's controls load here.
-    // The landing already recorded its pageview, so loading them is not another one.
-    if (overviewDataKey(actual) !== overviewDataKey(href)) commit(actual, false, false);
+    // trackVirtualPageview dedupes by pathname, so this load does not repeat the landing pageview.
+    if (overviewDataKey(actual) !== overviewDataKey(href)) commit(actual, false);
   }, [commit, initialData, initialHref]);
 
   useEffect(() => {

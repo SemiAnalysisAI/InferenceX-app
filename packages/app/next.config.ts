@@ -60,8 +60,17 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: allowedDevOriginsFromEnv(),
   transpilePackages: ['@semianalysisai/inferencex-constants'],
   serverExternalPackages: ['shiki'],
+  // PostHog endpoints end in a slash (`/ingest/e/`); the redirects below keep stripping it elsewhere.
+  skipTrailingSlashRedirect: true,
   redirects() {
     return Promise.resolve([
+      // Two rules: Vercel compiles an empty `:rest*` to a trailing slash, which loops.
+      { source: '/:first((?!ingest/)[^/]+)/', destination: '/:first', permanent: true },
+      {
+        source: '/:first((?!ingest/)[^/]+)/:rest+/',
+        destination: '/:first/:rest+',
+        permanent: true,
+      },
       ...SEO_REDIRECTS,
       ...INFERENCE_MODEL_ALIAS_REDIRECTS,
       ...VIDEO_ALIAS_REDIRECTS,
@@ -77,6 +86,19 @@ const nextConfig: NextConfig = {
       },
       { source: '/gpu-metrics', destination: '/inference', permanent: true },
       { source: '/zh/gpu-metrics', destination: '/zh/inference', permanent: true },
+    ]);
+  },
+  rewrites() {
+    return Promise.resolve([
+      {
+        source: '/ingest/static/:path*',
+        destination: 'https://us-assets.i.posthog.com/static/:path*',
+      },
+      {
+        source: '/ingest/array/:path*',
+        destination: 'https://us-assets.i.posthog.com/array/:path*',
+      },
+      { source: '/ingest/:path*', destination: 'https://us.i.posthog.com/:path*' },
     ]);
   },
   headers() {

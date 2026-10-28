@@ -319,7 +319,12 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
         value={search}
         onChange={(e) => handleSearchChange(e.target.value)}
         onBlur={() => {
-          if (search.trim()) track('submissions_table_searched', { query: search.trim() });
+          if (search.trim()) {
+            track('submissions_table_searched', {
+              query_length: search.trim().length,
+              results: filtered.length,
+            });
+          }
         }}
         placeholder={t.searchPlaceholder}
         className="max-w-sm"

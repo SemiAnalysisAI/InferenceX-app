@@ -141,7 +141,7 @@ function MultiSelect({
     (nextOpen: boolean) => {
       if (!nextOpen && isOpen) {
         if (searchUsedRef.current) {
-          track('multi_select_searched', { query: searchStateRef.current });
+          track('multi_select_searched', { query_length: searchStateRef.current.length });
           searchUsedRef.current = false;
         }
         setSearch('');

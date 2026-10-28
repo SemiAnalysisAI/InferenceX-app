@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { convertRedirects } from '@vercel/routing-utils/dist/superstatic';
 import { describe, expect, it } from 'vitest';
 
 import nextConfig from '../../../next.config';
@@ -6,7 +7,7 @@ import nextConfig from '../../../next.config';
 // Next's config tester throws at module load unless the AsyncLocalStorage global its runtime
 // installs exists, so it is imported only after this assignment.
 globalThis.AsyncLocalStorage ??= AsyncLocalStorage;
-const { getRedirectUrl, unstable_getResponseFromNextConfig } =
+const { getRedirectUrl, getRewrittenUrl, unstable_getResponseFromNextConfig } =
   await import('next/experimental/testing/server');
 
 const respond = (path: string) =>
@@ -17,6 +18,8 @@ const respond = (path: string) =>
 
 describe('next.config custom routes', () => {
   it.each([
+    ['/about/', '/about'],
+    ['/zh/blog/some-post/', '/zh/blog/some-post'],
     ['/datasets', '/agentx'],
     ['/zh/datasets', '/zh/agentx'],
     ['/xvideo', '/video'],
@@ -41,6 +44,40 @@ describe('next.config custom routes', () => {
     const response = await respond(from);
     expect(response.status).toBe(308);
     expect(getRedirectUrl(response)).toBe(`https://inferencex.semianalysis.com${to}`);
+  });
+
+  it.each([
+    ['/ingest/e/', 'https://us.i.posthog.com/e'],
+    ['/ingest/decide', 'https://us.i.posthog.com/decide'],
+    ['/ingest/static/array.js', 'https://us-assets.i.posthog.com/static/array.js'],
+    ['/ingest/array/phc_key/config', 'https://us-assets.i.posthog.com/array/phc_key/config'],
+  ])('proxies %s to PostHog without a trailing-slash redirect', async (from, to) => {
+    const response = await respond(from);
+    expect(response.status).toBe(200);
+    expect(getRewrittenUrl(response)).toBe(to);
+  });
+
+  it.each([
+    ['/about/', '/about'],
+    ['/zh/', '/zh'],
+    ['/zh/blog/some-post/', '/zh/blog/some-post'],
+    ['/ingest/e/', null],
+    ['/ingest/i/v0/e/', null],
+  ])('strips the trailing slash from %s as compiled by Vercel', async (from, to) => {
+    const routes = convertRedirects(await nextConfig.redirects!()).flatMap((r) => {
+      const { src, headers } = r as { src?: string; headers?: Record<string, string> };
+      return src && headers?.Location ? [{ src, location: headers.Location }] : [];
+    });
+    const route = routes.find((r) => new RegExp(r.src).test(from));
+    if (to === null) {
+      expect(route).toBeUndefined();
+      return;
+    }
+    const match = from.match(new RegExp(route!.src))!;
+    const location = match
+      .slice(1)
+      .reduce((loc, value, i) => loc.replaceAll(`$${i + 1}`, value ?? ''), route!.location);
+    expect(location).toBe(to);
   });
 
   it.each([

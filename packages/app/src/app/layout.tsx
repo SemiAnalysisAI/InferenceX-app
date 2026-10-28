@@ -27,7 +27,6 @@ import {
 } from '@semianalysisai/inferencex-constants';
 import { QueryProvider } from '@/providers/query-provider';
 import { PostHogProvider, PostHogPageView } from '@/providers/posthog-provider';
-import { VisitTracker } from '@/providers/visit-tracker';
 import {
   LANDING_BANNER_DISMISSED_ATTRIBUTE,
   LANDING_BANNER_STORAGE_KEY,
@@ -204,7 +203,6 @@ export default function RootLayout({
               disableTransitionOnChange
             >
               <PostHogPageView />
-              <VisitTracker />
               <Header />
               <EasterEggThemeLazy />
               <div className="grow flex flex-col">

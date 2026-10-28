@@ -367,7 +367,7 @@ export default function ChartControls({
   const handleModelChange = (value: Model) => {
     setSelectedModel(value);
     const target = inferenceModelRouteForSelection(window.location.pathname, value);
-    if (target !== null) replaceRouterPathname(target, ['g_model']);
+    if (target !== null) replaceRouterPathname(target, ['g_model'], { pageview: true });
     track('inference_model_selected', {
       model: value,
     });
