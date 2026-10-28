@@ -70,11 +70,9 @@ function installRun(body: CollectiveXDataset = dataset, alias = 'run') {
 }
 
 function showView(label: string) {
-  cy.get('[data-testid="collectivex-view-toggle"]').contains('[role="tab"]', label).click();
-  cy.get('[data-testid="collectivex-view-toggle"] [role="tab"][aria-selected="true"]').should(
-    'have.text',
-    label,
-  );
+  cy.get('[data-testid="collectivex-view-select"]').click();
+  cy.contains('[role="option"]', label).click();
+  cy.get('[data-testid="collectivex-view-select"]').should('have.text', label);
 }
 
 function suiteTabs() {
@@ -164,22 +162,19 @@ describe('CollectiveX neutral run view', () => {
 
   it('switches the y-axis to per-GPU payload bandwidth', () => {
     cy.get('[data-testid="collectivex-y-axis-select"]').click();
-    cy.contains('[role="option"]', 'Payload bandwidth').click();
+    cy.contains('[role="option"]', 'Payload BW / chip').click();
     cy.get('[data-testid="collectivex-main-chart"]').should('contain.text', 'Payload bandwidth');
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
 
     cy.get('[data-testid="collectivex-y-axis-select"]').click();
-    cy.contains('[role="option"]', 'Activation-data rate').click();
+    cy.contains('[role="option"]', 'Activation rate').click();
     cy.get('[data-testid="collectivex-main-chart"]')
       .should('contain.text', 'Activation-data rate')
       .and('not.contain.text', 'Payload rate is derived');
   });
 
   it('defaults to one range band per SKU across libraries while Backend is All', () => {
-    cy.get('[data-testid="collectivex-view-toggle"] [role="tab"][aria-selected="true"]').should(
-      'have.text',
-      'Range by SKU',
-    );
+    cy.get('[data-testid="collectivex-view-select"]').should('have.text', 'Range by SKU');
     cy.get('[data-testid="collectivex-explorer-chart"] [data-testid="collectivex-range-band"]')
       .as('band')
       .should('have.length', 1)
@@ -205,7 +200,7 @@ describe('CollectiveX neutral run view', () => {
     showView('Range by SKU');
     cy.get('[data-testid="collectivex-backend-select"]').click();
     cy.get('[role="option"]').not(':contains("All")').first().click();
-    cy.get('[data-testid="collectivex-view-toggle"]').should('not.exist');
+    cy.get('[data-testid="collectivex-view-select"]').should('not.exist');
     cy.get('[data-testid="collectivex-range-band"]').should('not.exist');
   });
 
