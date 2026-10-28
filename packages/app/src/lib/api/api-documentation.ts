@@ -781,8 +781,8 @@ export const apiDocumentationGroups: readonly ApiDocumentationGroup[] = [
     id: 'collectivex',
     title: text('CollectiveX', 'CollectiveX'),
     description: text(
-      'Versioned collective communication benchmark results, one run per results commit.',
-      '带版本的集合通信基准测试结果，每个结果提交对应一次运行。',
+      'Versioned collective communication benchmark results, one run per results upload.',
+      '带版本的集合通信基准测试结果，每次结果上传对应一次运行。',
     ),
   },
   {
@@ -1949,8 +1949,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/collectivex/latest',
     summary: text('Read the latest CollectiveX dataset', '读取最新 CollectiveX 数据集'),
     description: text(
-      'Returns the versioned neutral dataset of the newest stored run. Each run is one SemiAnalysisAI/InferenceX commit on main that changed collectivex/results/ and holds at least one measured result: run_id is that commit time in epoch seconds (raised past the previous results commit when two land in the same second), run_attempt is 1, and run.source_sha is the commit. run.covered_skus lists only pools with a measured result. Runs are ingested when results land on main, never on read. In series[].points[], components.*.latency_us, components.*.activation_data_rate_gbps_at_latency_percentile, components.*.payload_data_rate_gbps_at_latency_percentile and roundtrip_token_rate_at_latency_percentile carry p50, p90, p95 and p99; p90, p95 and p99 are null where the harness withheld a tail because too many samples were misaligned or host-stalled, while p50 is always a number. Optional swap_blocks results contain verified copy latency in microseconds and payload GB/s (bytes counted once), with block_bytes, num_blocks, runtime provenance and skipped-point counts. Multi-pool sweeps preserve each GPU pool as an independent result.',
-      '返回最新已存储运行的带版本中立数据集。每次运行对应 SemiAnalysisAI/InferenceX main 分支上一个修改了 collectivex/results/ 且至少包含一个已测量结果的提交：run_id 为该提交时间的 Unix 秒级时间戳（若两个结果提交落在同一秒，则递增至上一个结果提交之后），run_attempt 为 1，run.source_sha 为该提交。run.covered_skus 只列出有已测量结果的资源池。结果合入 main 时导入，读取时不会导入。 在 series[].points[] 中，components.*.latency_us、components.*.activation_data_rate_gbps_at_latency_percentile、components.*.payload_data_rate_gbps_at_latency_percentile 与 roundtrip_token_rate_at_latency_percentile 包含 p50、p90、p95 和 p99；若测试工具因过多样本未对齐或被主机阻塞而未发布尾部延迟，p90、p95 和 p99 为 null，p50 始终为数值。可选的 swap_blocks 结果包含校验通过的复制延迟（微秒）和有效载荷 GB/s（字节数仅计算一次），并保留 block_bytes、num_blocks、运行环境来源及未测量组合数。多池扫描分别保留各 GPU 池的独立结果。',
+      'Returns the versioned neutral dataset of the newest stored run. Each run is one uploaded CollectiveX results directory laid over the previous latest run (each uploaded case replaces the stored result of the same case) and holds at least one measured result: run_id is the upload time in epoch seconds (raised past the newest stored run when needed), run_attempt is 1, and run.source_sha is the collectivex/ commit the uploaded results were measured from. run.covered_skus lists only pools with a measured result. Runs are ingested when an operator uploads them, never on read. In series[].points[], components.*.latency_us, components.*.activation_data_rate_gbps_at_latency_percentile, components.*.payload_data_rate_gbps_at_latency_percentile and roundtrip_token_rate_at_latency_percentile carry p50, p90, p95 and p99; p90, p95 and p99 are null where the harness withheld a tail because too many samples were misaligned or host-stalled, while p50 is always a number. Optional swap_blocks results contain verified copy latency in microseconds and payload GB/s (bytes counted once), with block_bytes, num_blocks, runtime provenance and skipped-point counts. Multi-pool sweeps preserve each GPU pool as an independent result.',
+      '返回最新已存储运行的带版本中立数据集。每次运行对应一次上传的 CollectiveX 结果目录，叠加在上一次最新运行之上（上传的 case 会替换该 case 已存储的结果），且至少包含一个已测量结果：run_id 为上传时间的 Unix 秒级时间戳（必要时递增至最新已存储运行之后），run_attempt 为 1，run.source_sha 为测量这些上传结果所用的 collectivex/ 提交。run.covered_skus 只列出有已测量结果的资源池。运行在运维人员上传时导入，读取时不会导入。 在 series[].points[] 中，components.*.latency_us、components.*.activation_data_rate_gbps_at_latency_percentile、components.*.payload_data_rate_gbps_at_latency_percentile 与 roundtrip_token_rate_at_latency_percentile 包含 p50、p90、p95 和 p99；若测试工具因过多样本未对齐或被主机阻塞而未发布尾部延迟，p90、p95 和 p99 为 null，p50 始终为数值。可选的 swap_blocks 结果包含校验通过的复制延迟（微秒）和有效载荷 GB/s（字节数仅计算一次），并保留 block_bytes、num_blocks、运行环境来源及未测量组合数。多池扫描分别保留各 GPU 池的独立结果。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -2026,8 +2026,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/collectivex/runs',
     summary: text('List CollectiveX runs', '列出 CollectiveX 运行'),
     description: text(
-      'Returns every stored run summary, newest results commit first. Only commits with at least one measured result are runs, and covered_skus lists only pools with a measured result. Runs are ingested ahead of reads, so discovery_complete is always true; the field is kept for existing clients.',
-      '按结果提交从新到旧返回全部已存储的运行汇总。只有至少包含一个已测量结果的提交才构成运行，covered_skus 只列出有已测量结果的资源池。运行在读取前即已导入，因此 discovery_complete 始终为 true；保留该字段是为了兼容现有客户端。',
+      'Returns every stored run summary, newest upload first. Only uploads with at least one measured result are runs, and covered_skus lists only pools with a measured result. Runs are ingested ahead of reads, so discovery_complete is always true; the field is kept for existing clients.',
+      '按上传时间从新到旧返回全部已存储的运行汇总。只有至少包含一个已测量结果的上传才构成运行，covered_skus 只列出有已测量结果的资源池。运行在读取前即已导入，因此 discovery_complete 始终为 true；保留该字段是为了兼容现有客户端。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -2095,8 +2095,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/collectivex/runs/{runId}',
     summary: text('Read a CollectiveX run', '读取 CollectiveX 运行'),
     description: text(
-      'Returns one stored run as a versioned CollectiveX dataset. The run ID is the results commit time in epoch seconds (raised past the previous results commit on a same-second tie), as listed by /api/v1/collectivex/runs. In series[].points[], components.*.latency_us, components.*.activation_data_rate_gbps_at_latency_percentile, components.*.payload_data_rate_gbps_at_latency_percentile and roundtrip_token_rate_at_latency_percentile carry p50, p90, p95 and p99; p90, p95 and p99 are null where the harness withheld a tail because too many samples were misaligned or host-stalled, while p50 is always a number.',
-      '以带版本的 CollectiveX 数据集返回一次已存储的运行。运行 ID 为结果提交时间的 Unix 秒级时间戳（同一秒出现多个结果提交时递增至上一个之后），与 /api/v1/collectivex/runs 列出的一致。 在 series[].points[] 中，components.*.latency_us、components.*.activation_data_rate_gbps_at_latency_percentile、components.*.payload_data_rate_gbps_at_latency_percentile 与 roundtrip_token_rate_at_latency_percentile 包含 p50、p90、p95 和 p99；若测试工具因过多样本未对齐或被主机阻塞而未发布尾部延迟，p90、p95 和 p99 为 null，p50 始终为数值。',
+      'Returns one stored run as a versioned CollectiveX dataset. The run ID is the upload time in epoch seconds (raised past the newest stored run when needed), as listed by /api/v1/collectivex/runs. In series[].points[], components.*.latency_us, components.*.activation_data_rate_gbps_at_latency_percentile, components.*.payload_data_rate_gbps_at_latency_percentile and roundtrip_token_rate_at_latency_percentile carry p50, p90, p95 and p99; p90, p95 and p99 are null where the harness withheld a tail because too many samples were misaligned or host-stalled, while p50 is always a number.',
+      '以带版本的 CollectiveX 数据集返回一次已存储的运行。运行 ID 为上传时间的 Unix 秒级时间戳（必要时递增至最新已存储运行之后），与 /api/v1/collectivex/runs 列出的一致。 在 series[].points[] 中，components.*.latency_us、components.*.activation_data_rate_gbps_at_latency_percentile、components.*.payload_data_rate_gbps_at_latency_percentile 与 roundtrip_token_rate_at_latency_percentile 包含 p50、p90、p95 和 p99；若测试工具因过多样本未对齐或被主机阻塞而未发布尾部延迟，p90、p95 和 p99 为 null，p50 始终为数值。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -2106,8 +2106,8 @@ export const apiOperations: readonly ApiOperation[] = [
         'path',
         true,
         'integer',
-        'Positive run ID: the results commit time in epoch seconds, below 10^10.',
-        '正整数运行 ID：结果提交时间的 Unix 秒级时间戳，小于 10^10。',
+        'Positive run ID: the upload time in epoch seconds, below 10^10.',
+        '正整数运行 ID：上传时间的 Unix 秒级时间戳，小于 10^10。',
         positiveIdSchema,
         1792089351,
       ),
@@ -3209,8 +3209,8 @@ const overview = {
       id: 'cache',
       title: text('Caching', '缓存'),
       description: text(
-        'Read endpoints may be served from shared caches. CollectiveX responses stay cached until a results ingest purges them, and framework releases use a one-hour shared cache.',
-        '只读端点可能由共享缓存提供。CollectiveX 响应会一直缓存，直到结果导入时被清除；框架版本使用一小时共享缓存。',
+        'Read endpoints may be served from shared caches. CollectiveX responses stay cached until a results upload purges them, and framework releases use a one-hour shared cache.',
+        '只读端点可能由共享缓存提供。CollectiveX 响应会一直缓存，直到结果上传时被清除；框架版本使用一小时共享缓存。',
       ),
     },
     {

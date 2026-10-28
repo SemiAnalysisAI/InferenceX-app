@@ -1,6 +1,6 @@
 /**
  * CollectiveX neutral contract — the version-tagged shape shared by the
- * committed-results reader, the Neon ingest, and the dashboard frontend.
+ * results-upload validator, the Neon ingest, and the dashboard frontend.
  *
  * This module is pure TypeScript (no Node/DB imports) so it is safe to import
  * from client components. UI-only types (chart points, axis modes, display

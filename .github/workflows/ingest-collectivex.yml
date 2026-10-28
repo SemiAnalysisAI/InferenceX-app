@@ -1,42 +1,29 @@
 name: Ingest CollectiveX Results
 
+# CollectiveX results are uploaded from a cluster with
+# `bun run admin:db:ingest:collectivex --dir <results>`; nothing reads them from git. This
+# workflow applies pending migrations and purges the dashboard's CollectiveX cache, and with
+# delete_run first deletes that stored run. Run it with no input after an upload made without
+# APP_URL / VERCEL_INVALIDATE_SECRET to show the new run at once.
 on:
-  repository_dispatch:
-    types: [ingest-collectivex]
   workflow_dispatch:
     inputs:
-      sha:
-        description: InferenceX commit (40 hex) whose collectivex/results/ to ingest
-        required: false
-      ref:
-        description: InferenceX branch or tag, instead of sha
-        required: false
-      backfill:
-        description: Ingest every collectivex/results/ commit on main instead
-        type: boolean
-        default: false
-      prune:
-        description: With backfill, then delete every stored run the backfill did not store
-        type: boolean
-        default: false
       delete_run:
-        description: Delete this one stored run_id instead (no other target)
+        description: Delete this stored run_id before purging the cache (leave empty to only migrate and purge)
         required: false
 
 permissions: {}
 
-# One group for every ingest, prune and delete: runs queue behind each other instead of
-# writing at once (the database also serializes writers with an advisory lock). GitHub
-# keeps a single pending run per group, so a burst of dispatches can supersede a pending
-# one; a backfill then stores anything it skipped.
+# One group for every run: they queue behind each other instead of writing at once (the
+# database also serializes writers with an advisory lock).
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: false
 
 jobs:
   ingest:
-    name: Ingest CollectiveX results
-    timeout-minutes: 60
+    name: Maintain CollectiveX results
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -46,42 +33,15 @@ jobs:
           APP_URL: ${{ vars.APP_URL }}
           VERCEL_INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
           DATABASE_COLLECTIVEX_WRITE_URL: ${{ secrets.DATABASE_COLLECTIVEX_WRITE_URL }}
-          GH_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          SHA: ${{ github.event.client_payload.sha || inputs.sha }}
-          REF: ${{ inputs.ref }}
-          BACKFILL: ${{ inputs.backfill }}
-          PRUNE: ${{ inputs.prune }}
           DELETE_RUN: ${{ inputs.delete_run }}
         run: |
           : "${SLACK_WEBHOOK_URL:?SLACK_WEBHOOK_URL secret is not set}"
           : "${APP_URL:?APP_URL repository variable is not set}"
           : "${VERCEL_INVALIDATE_SECRET:?VERCEL_INVALIDATE_SECRET secret is not set}"
           : "${DATABASE_COLLECTIVEX_WRITE_URL:?DATABASE_COLLECTIVEX_WRITE_URL secret is not set}"
-          : "${GH_TOKEN:?INFX_MAIN_PAT secret is not set}"
-          selected=0
-          [ -n "$SHA" ] && selected=$((selected + 1))
-          [ -n "$REF" ] && selected=$((selected + 1))
-          [ "$BACKFILL" = true ] && selected=$((selected + 1))
-          [ -n "$DELETE_RUN" ] && selected=$((selected + 1))
-          if [ "$selected" -ne 1 ]; then
-            echo "give exactly one of sha, ref, backfill, or delete_run" >&2
-            exit 1
-          fi
-          if [ "$PRUNE" = true ] && [ "$BACKFILL" != true ]; then
-            echo "prune needs backfill" >&2
-            exit 1
-          fi
           if [ -n "$DELETE_RUN" ] && ! [[ "$DELETE_RUN" =~ ^[1-9][0-9]{0,9}$ ]]; then
             echo "delete_run must be a stored run_id" >&2
-            exit 1
-          fi
-          if [ -n "$SHA" ] && ! [[ "$SHA" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "sha must be 40 lowercase hex characters" >&2
-            exit 1
-          fi
-          if [ -n "$REF" ] && { ! [[ "$REF" =~ ^[A-Za-z0-9_][A-Za-z0-9_./-]{0,254}$ ]] || [[ "$REF" == *..* ]]; }; then
-            echo "ref is not a valid branch or tag name" >&2
             exit 1
           fi
 
@@ -111,28 +71,13 @@ jobs:
           DATABASE_COLLECTIVEX_WRITE_URL: ${{ secrets.DATABASE_COLLECTIVEX_WRITE_URL }}
         run: bun run --cwd packages/db src/migrate-collectivex.ts --yes
 
-      - name: Ingest results
+      - name: Delete run
+        if: inputs.delete_run != ''
         env:
           DATABASE_COLLECTIVEX_WRITE_URL: ${{ secrets.DATABASE_COLLECTIVEX_WRITE_URL }}
-          GITHUB_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
-          SHA: ${{ github.event.client_payload.sha || inputs.sha }}
-          REF: ${{ inputs.ref }}
-          BACKFILL: ${{ inputs.backfill }}
-          PRUNE: ${{ inputs.prune }}
           DELETE_RUN: ${{ inputs.delete_run }}
-        run: |
-          if [ -n "$DELETE_RUN" ]; then
-            target=(--delete-run "$DELETE_RUN")
-          elif [ "$BACKFILL" = true ] && [ "$PRUNE" = true ]; then
-            target=(--backfill --prune)
-          elif [ "$BACKFILL" = true ]; then
-            target=(--backfill)
-          elif [ -n "$SHA" ]; then
-            target=(--sha "$SHA")
-          else
-            target=(--ref "$REF")
-          fi
-          bun run --cwd packages/db src/ingest-collectivex.ts "${target[@]}" --yes
+        # APP_URL is not passed here, so the CLI leaves the purge to the next step.
+        run: bun run --cwd packages/db src/ingest-collectivex.ts --delete-run "$DELETE_RUN" --yes
 
       - name: Invalidate CollectiveX cache
         env:

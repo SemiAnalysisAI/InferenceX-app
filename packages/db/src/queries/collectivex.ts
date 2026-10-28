@@ -18,7 +18,7 @@ export interface CollectiveXRunRow {
   docs: unknown[];
 }
 
-/** One results commit's cx_runs row (see collectivex/committed-results.ts). */
+/** One uploaded run's cx_runs row (see collectivex/results-upload.ts). */
 export interface CollectiveXRunInsert {
   run_id: string;
   run_attempt: number;
@@ -39,9 +39,9 @@ function toRunRow(row: Record<string, unknown>): CollectiveXRunRow {
 /**
  * The most recent visible run for a version. A run is visible when its summary
  * requests AMD/NVIDIA cases AND measured at least one of them; the ingest never
- * stores an unmeasured commit, and this keeps any such row hidden regardless.
- * Ordered by run_id, which grows with main's results history, so the newest
- * results commit on main is the latest run.
+ * stores an unmeasured run, and this keeps any such row hidden regardless.
+ * Ordered by run_id, which every upload raises past the highest stored id, so
+ * the newest upload is the latest run.
  *
  * Row and documents come back in ONE query, with docs filtered to the row's
  * run_attempt, so a reader never mixes one ingest's row with another's docs.
@@ -119,23 +119,34 @@ export async function listCollectiveXRuns(
   return rows.map((row) => row.summary as CollectiveXRunSummary);
 }
 
-export type CollectiveXUpsertResult = 'inserted' | 'replaced' | 'conflict';
+/** The highest run_id stored in any version, visible or not; null when nothing is stored. */
+export async function getMaxCollectiveXRunId(sql: DbClient): Promise<string | null> {
+  const rows = await sql`SELECT max(run_id)::text AS run_id FROM cx_runs`;
+  return (rows[0]?.run_id as string | null | undefined) ?? null;
+}
+
+export type CollectiveXUpsertResult = 'inserted' | 'replaced' | 'conflict' | 'stale';
 
 // Every CollectiveX write below first takes the transaction-scoped advisory lock
-// `pg_advisory_xact_lock(7384110219)` (an arbitrary fixed key), so ingests, prunes and
-// deletions run one at a time. Without it two concurrent ingests of one commit each
+// `pg_advisory_xact_lock(7384110219)` (an arbitrary fixed key), so ingests and
+// deletions run one at a time. Without it two concurrent writes of one run each
 // delete only the documents visible to their snapshot and then both insert, storing
 // every document twice.
 
 /**
- * Store one results commit and its raw documents in one transaction: take the
- * write lock, then one statement (data-modifying CTEs) upserts the row and
- * replaces its documents. Readers see the previous contents or the new ones,
- * never a partial run, and concurrent ingests of the same commit serialize on
- * the lock, so the second one's DELETE sees and removes the first one's
- * documents. Re-ingesting a commit replaces its row and documents.
- * `conflict` means run_id already belongs to a different commit (main's
- * results history was rewritten); nothing is written.
+ * Store one run and its raw documents in one transaction: take the write lock,
+ * then one statement (data-modifying CTEs) upserts the row and replaces its
+ * documents. Readers see the previous contents or the new ones, never a partial
+ * run, and concurrent writes of the same run serialize on the lock, so the
+ * second one's DELETE sees and removes the first one's documents. Writing a
+ * run_id again with the same source_sha replaces its row and documents.
+ * `conflict` means run_id already belongs to a different source_sha; nothing is
+ * written.
+ *
+ * With `expectedMaxRunId` (the upload passes the highest run_id it merged
+ * against, or null for an empty table), the write happens only if that is still
+ * the highest stored run_id under the lock; otherwise it returns `stale` and
+ * writes nothing, so two concurrent uploads cannot each drop the other's cases.
  *
  * The `::jsonb`-cast parameters must be raw objects: both drivers
  * JSON-serialize objects exactly once, while pre-stringified values get
@@ -146,9 +157,14 @@ export async function upsertCollectiveXRun(
   sql: Sql,
   run: CollectiveXRunInsert,
   docs: unknown[],
+  { expectedMaxRunId }: { expectedMaxRunId?: string | null } = {},
 ): Promise<CollectiveXUpsertResult> {
   const rows = await sql.begin(async (tx) => {
     await tx`SELECT pg_advisory_xact_lock(7384110219)`;
+    if (expectedMaxRunId !== undefined) {
+      const [current] = await tx`SELECT max(run_id)::text AS run_id FROM cx_runs`;
+      if ((current?.run_id ?? null) !== expectedMaxRunId) return null;
+    }
     return tx`
       WITH upserted AS (
         INSERT INTO cx_runs
@@ -181,36 +197,15 @@ export async function upsertCollectiveXRun(
       SELECT inserted FROM upserted
     `;
   });
+  if (rows === null) return 'stale';
   if (rows.length === 0) return 'conflict';
   return rows[0].inserted ? 'inserted' : 'replaced';
 }
 
-/** A stored run removed by a prune or deletion. */
+/** A stored run removed by a deletion. */
 export interface CollectiveXRemovedRun {
   run_id: string;
   source_sha: string;
-}
-
-/**
- * Delete every stored run whose results commit is not in `keepShas` (with its
- * documents, by cascade). The backfill passes the commits it just stored, so a
- * run whose commit left main, stopped validating or measures nothing is retracted.
- */
-export async function pruneCollectiveXRuns(
-  sql: Sql,
-  keepShas: readonly string[],
-): Promise<CollectiveXRemovedRun[]> {
-  const rows = await sql.begin(async (tx) => {
-    await tx`SELECT pg_advisory_xact_lock(7384110219)`;
-    return tx`
-      DELETE FROM cx_runs
-      WHERE source_sha NOT IN (
-        SELECT jsonb_array_elements_text((${{ shas: keepShas } as never}::jsonb)->'shas')
-      )
-      RETURNING run_id::text, source_sha
-    `;
-  });
-  return rows as unknown as CollectiveXRemovedRun[];
 }
 
 /** Delete one stored run and its documents; null when no such run is stored. */

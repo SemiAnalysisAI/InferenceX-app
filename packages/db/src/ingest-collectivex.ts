@@ -1,45 +1,39 @@
 import { parseArgs } from 'node:util';
 
 import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils';
-import { createAdminSql, type Sql } from './etl/db-utils';
+import type { DbClient } from './connection';
+import { createAdminSql } from './etl/db-utils';
 import {
-  CommittedResultsError,
-  listResultsCommits,
-  loadCommittedRun,
-  MAX_COMMITTED_RUN_ID,
-  RESULTS_BRANCH,
-  RESULTS_DIR,
-  resolveResultsCommit,
-  type ResultsCommit,
-} from './collectivex/committed-results';
+  buildUploadedRun,
+  readResultsDir,
+  RUN_ID_LIMIT,
+  type UploadedRun,
+  validateResults,
+} from './collectivex/results-upload';
 import {
   deleteCollectiveXRun,
-  pruneCollectiveXRuns,
+  getLatestCollectiveXRun,
+  getMaxCollectiveXRunId,
   upsertCollectiveXRun,
 } from './queries/collectivex';
 
-const USAGE =
+export const USAGE =
   'Usage: bun run admin:db:ingest:collectivex ' +
-  '[--sha <sha> | --ref <ref> | --backfill [--prune] | --delete-run <run_id>] [--yes] [--no-ssl]';
+  '(--dir <results-dir> | --delete-run <run_id>) [--yes] [--no-ssl]';
 
 export type IngestCollectiveXArgs =
-  | { mode: 'commit'; ref: string }
-  | { mode: 'backfill'; prune: boolean }
+  | { mode: 'upload'; dir: string }
   | { mode: 'delete'; runId: string };
 
 /**
- * --sha and --ref name one commit (default: main); --backfill walks every results
- * commit on main, and with --prune then deletes stored runs it did not store;
- * --delete-run removes one stored run.
+ * --dir uploads a CollectiveX `results/` directory (cases.json + <sku>/<case_id>.json) as a new
+ * run laid over the latest stored one; --delete-run removes one stored run. Exactly one is required.
  */
 export function parseIngestArgs(argv: string[]): IngestCollectiveXArgs {
   const { values } = parseArgs({
     args: argv,
     options: {
-      sha: { type: 'string' },
-      ref: { type: 'string' },
-      backfill: { type: 'boolean', default: false },
-      prune: { type: 'boolean', default: false },
+      dir: { type: 'string' },
       'delete-run': { type: 'string' },
       yes: { type: 'boolean', short: 'y', default: false },
       'no-ssl': { type: 'boolean', default: false },
@@ -48,136 +42,78 @@ export function parseIngestArgs(argv: string[]): IngestCollectiveXArgs {
     allowPositionals: false,
   });
   const deleteRun = values['delete-run'];
-  if (values.sha !== undefined && values.ref !== undefined) {
-    throw new Error(`--sha and --ref are mutually exclusive\n${USAGE}`);
-  }
-  if (values.backfill && (values.sha !== undefined || values.ref !== undefined)) {
-    throw new Error(`--backfill reads every commit on ${RESULTS_BRANCH}\n${USAGE}`);
-  }
-  if (values.prune && !values.backfill) {
-    throw new Error(
-      `--prune needs --backfill: it keeps exactly the runs a backfill stores\n${USAGE}`,
-    );
-  }
-  if (
-    deleteRun !== undefined &&
-    (values.backfill || values.sha !== undefined || values.ref !== undefined)
-  ) {
-    throw new Error(`--delete-run takes no other target\n${USAGE}`);
-  }
-  if (values.sha !== undefined && !/^[0-9a-f]{7,40}$/u.test(values.sha)) {
-    throw new Error(`Invalid commit sha: ${values.sha}`);
+  if ((values.dir === undefined) === (deleteRun === undefined)) {
+    throw new Error(`Give exactly one of --dir or --delete-run\n${USAGE}`);
   }
   if (deleteRun !== undefined) {
-    if (!/^[1-9]\d{0,9}$/u.test(deleteRun) || Number(deleteRun) >= MAX_COMMITTED_RUN_ID) {
+    if (!/^[1-9]\d{0,9}$/u.test(deleteRun) || Number(deleteRun) >= RUN_ID_LIMIT) {
       throw new Error(`Invalid run id: ${deleteRun}`);
     }
     return { mode: 'delete', runId: deleteRun };
   }
-  if (values.backfill) return { mode: 'backfill', prune: values.prune };
-  return { mode: 'commit', ref: values.sha ?? values.ref ?? RESULTS_BRANCH };
+  if (values.dir === '') throw new Error(`--dir needs a path\n${USAGE}`);
+  return { mode: 'upload', dir: values.dir! };
 }
 
-export interface IngestOutcome {
-  /** Commits whose run is stored (inserted or replaced). */
-  stored: ResultsCommit[];
-  /** Commits not stored: no results tree or file at them, or nothing measured. */
-  skipped: ResultsCommit[];
-  /** The skipped commits GitHub answered 404 for: a prune must not trust this walk. */
-  missing: ResultsCommit[];
+/** Read, validate and merge an upload against what is stored now, without writing. */
+export async function planUpload(
+  sql: DbClient,
+  dir: string,
+  now = new Date(),
+): Promise<UploadedRun & { maxStoredRunId: string | null }> {
+  const upload = validateResults(readResultsDir(dir));
+  const [latest, maxStoredRunId] = await Promise.all([
+    getLatestCollectiveXRun(sql, upload.version),
+    getMaxCollectiveXRunId(sql),
+  ]);
+  return { ...buildUploadedRun(upload, latest, { maxStoredRunId, now }), maxStoredRunId };
 }
 
-/**
- * Ingest each commit in order. A commit with no measured result (for example one
- * that only changed cases.json) is skipped, never stored as an empty run. With
- * `skipMissing` (the backfill), a commit GitHub answers 404 for is skipped too;
- * any other failure stops the walk before later commits.
- */
-export async function ingestCommits(
-  sql: Sql,
-  commits: readonly ResultsCommit[],
-  token: string | undefined,
-  { skipMissing = false }: { skipMissing?: boolean } = {},
-): Promise<IngestOutcome> {
-  const blobCache = new Map<string, Uint8Array>();
-  const outcome: IngestOutcome = { stored: [], skipped: [], missing: [] };
-  for (const commit of commits) {
-    const label = `${commit.sha.slice(0, 12)} (${commit.committedAt})`;
-    let loaded: Awaited<ReturnType<typeof loadCommittedRun>>;
-    try {
-      loaded = await loadCommittedRun(commit, { token, blobCache });
-    } catch (error) {
-      if (error instanceof CommittedResultsError && error.kind === 'absent') {
-        console.log(`  skipped ${label}: ${error.message}`);
-        outcome.skipped.push(commit);
-        continue;
-      }
-      if (skipMissing && error instanceof CommittedResultsError && error.kind === 'not-found') {
-        console.log(`  skipped ${label}: ${error.message}`);
-        outcome.skipped.push(commit);
-        outcome.missing.push(commit);
-        continue;
-      }
-      throw error;
-    }
-    const { run, docs } = loaded;
-    if (run.summary.measured_cases === 0) {
-      console.log(
-        `  skipped ${label}: nothing measured (${run.summary.requested_cases} cases requested)`,
-      );
-      outcome.skipped.push(commit);
-      continue;
-    }
-    const result = await upsertCollectiveXRun(sql, run, docs);
-    if (result === 'conflict') {
-      throw new Error(`run ${run.run_id} already holds a different commit than ${commit.sha}`);
-    }
+export function describeUpload({ run, docs, plan }: UploadedRun): string {
+  const base = plan.baseRunId === null ? 'nothing stored yet' : `latest run ${plan.baseRunId}`;
+  const lines = [
+    `This will store run ${run.run_id} (version ${run.version}, source ${run.source_sha}) over ${base}:`,
+    `  ${plan.uploaded} uploaded (${plan.replaced} replacing a stored case), ${plan.kept} kept, ${plan.dropped.length} dropped`,
+    `  ${run.summary.measured_cases}/${run.summary.requested_cases} cases measured, ${docs.length} docs`,
+    ...plan.dropped.map((drop) => `  drop ${drop.sku}/${drop.caseId}: ${drop.reason}`),
+  ];
+  return `${lines.join('\n')}\n`;
+}
+
+/** Purge the dashboard's CollectiveX CDN tag, as the ingest-collectivex workflow does. */
+export async function invalidateCollectiveXCache(
+  env: Record<string, string | undefined> = process.env,
+  fetchImpl: typeof globalThis.fetch = fetch,
+): Promise<boolean> {
+  const appUrl = env.APP_URL;
+  const secret = env.VERCEL_INVALIDATE_SECRET;
+  if (!appUrl || !secret) {
     console.log(
-      `  ${result} run ${run.run_id} @ ${label}: ` +
-        `${run.summary.measured_cases}/${run.summary.requested_cases} cases measured, ${docs.length} docs`,
+      '  APP_URL / VERCEL_INVALIDATE_SECRET not set: the dashboard picks the new data up when ' +
+        'its cache expires, or run the Ingest CollectiveX Results workflow to purge it now.',
     );
-    outcome.stored.push(commit);
+    return false;
   }
-  return outcome;
-}
-
-function describePlan(args: IngestCollectiveXArgs, commits: readonly ResultsCommit[]): string {
-  if (args.mode === 'delete') {
-    return `This will delete stored run ${args.runId} and its documents.\n`;
+  const headers: Record<string, string> = { Authorization: `Bearer ${secret}` };
+  if (env.VERCEL_PROTECTION_BYPASS_SECRET) {
+    headers['x-vercel-protection-bypass'] = env.VERCEL_PROTECTION_BYPASS_SECRET;
   }
-  if (args.mode === 'commit') {
-    return (
-      `This will store ${RESULTS_DIR} at ${commits[0].sha} (resolved from ${args.ref}) as run ` +
-      `${commits[0].runId}, replacing any run already stored for that commit.\n`
-    );
+  const url = `${appUrl.replace(/\/+$/u, '')}/api/v1/invalidate?scope=collectivex`;
+  const response = await fetchImpl(url, {
+    method: 'POST',
+    headers,
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!response.ok) {
+    throw new Error(`cache invalidation returned HTTP ${response.status}`);
   }
-  const then = args.prune ? ', then DELETE every stored run it did not store' : '';
-  return `This will store ${commits.length} ${RESULTS_DIR} commits from ${RESULTS_BRANCH}, oldest first, replacing any run already stored for the same commit${then}.\n`;
+  console.log('  purged the CollectiveX cache');
+  return true;
 }
 
 async function main(): Promise<void> {
   const args = parseIngestArgs(process.argv.slice(2));
-  const token = process.env.GITHUB_TOKEN || undefined;
   console.log('=== db:ingest:collectivex ===');
-
-  let commits: ResultsCommit[] = [];
-  if (args.mode === 'backfill') {
-    commits = await listResultsCommits(RESULTS_BRANCH, { token });
-    if (commits.length === 0 && !args.prune) {
-      console.log(`No commit on ${RESULTS_BRANCH} touched ${RESULTS_DIR}.`);
-      return;
-    }
-  } else if (args.mode === 'commit') {
-    commits = [await resolveResultsCommit(args.ref, { token })];
-  }
-  console.log(describePlan(args, commits));
-  if (!hasYesFlag()) {
-    const ok = await confirm('Continue? (y/N) ');
-    if (!ok) {
-      console.log('Aborted.');
-      return;
-    }
-  }
 
   const sql = createAdminSql({
     envVar: 'DATABASE_COLLECTIVEX_WRITE_URL',
@@ -185,40 +121,50 @@ async function main(): Promise<void> {
     max: 1,
     onnotice: () => {},
   });
+  let wrote = false;
   try {
     if (args.mode === 'delete') {
+      console.log(`This will delete stored run ${args.runId} and its documents.\n`);
+      if (!hasYesFlag() && !(await confirm('Continue? (y/N) '))) {
+        console.log('Aborted.');
+        return;
+      }
       const removed = await deleteCollectiveXRun(sql, args.runId);
       console.log(
         removed
           ? `  deleted run ${removed.run_id} @ ${removed.source_sha.slice(0, 12)}`
           : `  no stored run ${args.runId}`,
       );
+      wrote = removed !== null;
     } else {
-      const { stored, skipped, missing } = await ingestCommits(sql, commits, token, {
-        skipMissing: args.mode === 'backfill',
-      });
-      console.log(`  ${stored.length} stored, ${skipped.length} skipped`);
-      if (args.mode === 'backfill' && args.prune && missing.length > 0) {
-        // A 404 can be a transient GitHub miss; pruning after it would delete a good run.
+      const planned = await planUpload(sql as unknown as DbClient, args.dir);
+      console.log(describeUpload(planned));
+      if (planned.run.summary.measured_cases === 0) {
         throw new Error(
-          `not pruning: ${missing.length} commit(s) could not be read ` +
-            `(${missing.map((commit) => commit.sha.slice(0, 12)).join(', ')}); rerun the backfill`,
+          `refusing to store run ${planned.run.run_id}: nothing measured ` +
+            `(${planned.run.summary.requested_cases} cases requested)`,
         );
       }
-      if (args.mode === 'backfill' && args.prune) {
-        const removed = await pruneCollectiveXRuns(
-          sql,
-          stored.map((commit) => commit.sha),
-        );
-        for (const run of removed) {
-          console.log(`  pruned run ${run.run_id} @ ${run.source_sha.slice(0, 12)}`);
-        }
-        console.log(`  ${removed.length} pruned`);
+      if (!hasYesFlag() && !(await confirm('Continue? (y/N) '))) {
+        console.log('Aborted.');
+        return;
       }
+      const result = await upsertCollectiveXRun(sql, planned.run, planned.docs, {
+        expectedMaxRunId: planned.maxStoredRunId,
+      });
+      if (result === 'stale') {
+        throw new Error('another run was stored while this upload was planned; rerun it');
+      }
+      if (result === 'conflict') {
+        throw new Error(`run ${planned.run.run_id} is already stored with another source`);
+      }
+      console.log(`  ${result} run ${planned.run.run_id}`);
+      wrote = true;
     }
   } finally {
     await sql.end();
   }
+  if (wrote) await invalidateCollectiveXCache();
   console.log('=== db:ingest:collectivex complete ===');
 }
 
