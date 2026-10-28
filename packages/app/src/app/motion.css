@@ -138,3 +138,23 @@
     transform: none;
   }
 }
+
+/* A page-load entrance that needs no script: fade and rise from the first paint, staggered
+   through --motion-delay. */
+@media (prefers-reduced-motion: no-preference) {
+  .motion-enter {
+    animation: motion-enter 500ms var(--motion-ease-enter) both;
+    animation-delay: var(--motion-delay, 0ms);
+  }
+}
+
+@keyframes motion-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

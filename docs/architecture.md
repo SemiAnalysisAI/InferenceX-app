@@ -16,7 +16,7 @@ Raw-data API routes return raw DB rows with zero transformation, validation, or 
 Some routes serve a purpose that raw DB rows cannot satisfy:
 
 - Dashboard projections under `/api/v1/views/*` use shared pure UI transformations server-side and publish their selectors and assumptions. Keep raw-data contracts separate from these projections.
-- CollectiveX assembles stored sweep documents through its shared reader.
+- CollectiveX assembles its stored committed-result documents through its shared reader.
 - OperatorX uses versioned ingest-time comparison projections for its page-owned API. The reader merges compact timing rows across runs while preserving source revisions, statuses, and timeline references; raw documents remain available for drilldowns. An optional revision-keyed Blob cache shares the merged comparison across instances; partial reads are excluded and OperatorX invalidation purges its deployment subtree. See [OperatorX](./operatorx.md#compact-comparison-reads).
 - `tco-feed` performs server-side frontier interpolation for spreadsheet consumers that cannot run the TypeScript transforms. Its assumptions (tier weights, workload mix, α) enter only as explicit query params with documented defaults, so a published sheet's URL fully records its methodology.
 - `pareto` returns frontier and hinterland coordinates over stored benchmark rows with explicit axis preferences. It reuses the chart dominance algorithm without UI filters. See the [Pareto frontier and hinterland reference](../packages/skills/skills/inferencex-api/references/pareto.md).

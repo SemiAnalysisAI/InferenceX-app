@@ -685,7 +685,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-collectivex-latest',
-    sourceSha256: '6b44f2cc73471dac633282b9f3c65d31f96f3c9032e95b918408033ce159e30c',
+    sourceSha256: 'd1e5ea3e3c7a9c84dabbb7e70dc734ca1583e806f6588404a4c910fa560acf4a',
   },
   {
     source: 'src/app/api/v1/collectivex/runs/route.ts',
@@ -693,7 +693,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'list-collectivex-runs',
-    sourceSha256: '839a6ee0fbf69719a6e6dafab7b6089c8512dc20dcffe4b273666ffe64aa01c7',
+    sourceSha256: '804ff15bad90eebd5cb7ec9b091a526bdedbf20f240e05ce295771a634eb18d3',
   },
   {
     source: 'src/app/api/v1/collectivex/runs/[runId]/route.ts',
@@ -701,18 +701,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-collectivex-run',
-    sourceSha256: '7411dea20ce77bba88827e884dfa29eff4a2d0e0d663d61f5f3b137dd63096e7',
-  },
-  {
-    source: 'src/app/api/v1/collectivex/runs/[runId]/route.ts',
-    path: '/api/v1/collectivex/runs/{runId}',
-    method: 'DELETE',
-    classification: 'admin',
-    exclusionReason: {
-      en: 'Authenticated CollectiveX administration mutation; deletion is not part of the public read API.',
-      zh: '需要身份验证的 CollectiveX 管理写操作；删除不属于公开只读 API。',
-    },
-    sourceSha256: '7411dea20ce77bba88827e884dfa29eff4a2d0e0d663d61f5f3b137dd63096e7',
+    sourceSha256: '2b9f66049330712f391fe0fd2d683bc65abb990385009ffbbf8d7cf5cc4ca17c',
   },
   {
     source: 'src/app/api/v1/datasets/route.ts',
@@ -1316,7 +1305,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/inference/utils/inference-table-data.ts',
-    sourceSha256: '3e21f77c762ec28b824a1afe9ff4027377b25d7ca0cecd125bd41987c78d076b',
+    sourceSha256: 'dd455a89004609d10f1b5cd12a04132db612701ae6e493c3db66c91ab8ce40d8',
     reviewArea: {
       en: 'All in Measured and IT (no PUE) table eligibility, nullable values and unavailable reasons shared by UI, CSV and public views.',
       zh: '界面、CSV 和公开视图共用的整体实测与 IT（不含 PUE）表格行筛选、可空数值与不可用原因。',
@@ -1580,7 +1569,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/cache/api-cache.ts',
-    sourceSha256: 'ceb8b9aeb0d6d75256a243a44660f067f246f78f157dcb7a12eae4d77a58a851',
+    sourceSha256: 'f70cdf1994432842d0249c3d601b95c6c292b86bf7f811253f77c5b09a404e28',
     reviewArea: {
       en: 'Public CDN tags, cache lifetimes, Blob key dimensions, and purge behavior.',
       zh: '公开 CDN 标签、缓存时长、Blob 键维度和清除行为。',
@@ -1652,7 +1641,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/api/api.ts',
-    sourceSha256: 'bceb0916e3643f90f637530c7928bdf67860aab812362e48715432c88d93cdcc',
+    sourceSha256: '1d440ffaafa1573e260bcd2282647cdd2ca83e4ebedc44a5f4e7c212e646ab71',
     reviewArea: {
       en: 'Public API client parameter serialization and TypeScript response contracts.',
       zh: '公开 API 客户端的参数序列化和 TypeScript 响应契约。',
@@ -1704,7 +1693,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/collectivex/types.ts',
-    sourceSha256: '006f87eb54bca94142d6c8f1aa57679ce96330286b30654e0c4bd37600cd0d00',
+    sourceSha256: '9179277cfddf32aedff859f598ac1af68e25ef46abbce3b0748ac48414bf5905',
     reviewArea: {
       en: 'CollectiveX version negotiation and versioned dataset/run response types.',
       zh: 'CollectiveX 版本协商以及带版本的数据集与运行响应类型。',
@@ -1747,10 +1736,10 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/collectivex.ts',
-    sourceSha256: '5b4cd412a1b543a8f26b5daf72ab252bc6c95edd7ca975262eefc1bbddbed3c7',
+    sourceSha256: 'c268a38a78ac9f11b8cf65bf14a7a69eba9b94b5cfa2f94f47cc34475a60b5c1',
     reviewArea: {
-      en: 'CollectiveX dataset projection, run summaries, coverage, series, and discovery state.',
-      zh: 'CollectiveX 数据集投影、运行汇总、覆盖范围、序列和发现状态。',
+      en: 'CollectiveX dataset projection, run summaries, coverage, series, and latest-run ordering.',
+      zh: 'CollectiveX 数据集投影、运行汇总、覆盖范围、序列和最新运行排序。',
     },
   },
   {

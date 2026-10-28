@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { type CSSProperties, useMemo, useRef, useState } from 'react';
 
 import { useResponsiveChartDimensions } from '@/hooks/useResponsiveChartDimensions';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -34,18 +34,18 @@ import {
 
 const STRINGS = {
   en: {
-    view: 'Energy per output token',
+    view: 'Energy per token',
     views: {
       measured: 'Measured GPU',
-      modeled: 'Modeled facility',
+      modeled: 'Measured facility',
     },
     viewTitles: {
-      measured: 'Joules per output token from GPU telemetry alone',
+      measured: 'Joules per token (input + output) from GPU telemetry alone',
       modeled:
-        'The same points scaled by the power model: facility watts per GPU over measured watts',
+        'The same points at the facility boundary: IT watts per GPU × assumed PUE, over measured GPU watts',
     },
     x: 'Interactivity (tok/s/user)',
-    y: 'J per output token, log',
+    y: 'J per token, log',
     preset: 'DeepSeek-V4-Pro · AgentX traces · FP4',
     open: 'Open in PowerX',
     copy: 'Copy API URL',
@@ -54,26 +54,26 @@ const STRINGS = {
     failed: 'The views API did not answer; reload to try again.',
     tooltip: {
       measured: 'Measured GPU',
-      modeled: 'Modeled facility',
+      modeled: 'Measured facility',
       ratio: (ratio: number) => `×${ratio.toFixed(2)}`,
       point: (x: number, concurrency: number) =>
         `${x.toFixed(1)} tok/s/user · concurrency ${concurrency}`,
     },
     aria: (count: number) =>
-      `${count} validated points; the modeled facility curve sits above the measured GPU curve with the same shape`,
+      `${count} validated points; the measured facility curve sits above the measured GPU curve with the same shape`,
   },
   zh: {
-    view: '每输出 token 能量',
+    view: '每 token 能耗',
     views: {
       measured: '实测 GPU',
-      modeled: '建模数据中心',
+      modeled: '实测数据中心',
     },
     viewTitles: {
-      measured: '仅由 GPU 遥测得到的每输出 token 焦耳数',
-      modeled: '同一批数据点按功耗模型换算：乘以每 GPU 数据中心瓦特数 ÷ 实测瓦特数',
+      measured: '仅由 GPU 遥测得到的每 token（输入 + 输出）焦耳数',
+      modeled: '同一批数据点换算到数据中心边界：每 GPU IT 瓦特数 × 假定 PUE ÷ GPU 实测瓦特数',
     },
     x: '交互性（tok/s/user）',
-    y: '每输出 token 焦耳数，对数坐标',
+    y: '每 token 焦耳数，对数坐标',
     preset: 'DeepSeek-V4-Pro · AgentX traces · FP4',
     open: '在 PowerX 中打开',
     copy: '复制 API URL',
@@ -82,17 +82,24 @@ const STRINGS = {
     failed: 'views API 没有响应，请刷新页面重试。',
     tooltip: {
       measured: '实测 GPU',
-      modeled: '建模数据中心',
+      modeled: '实测数据中心',
       ratio: (ratio: number) => `×${ratio.toFixed(2)}`,
       point: (x: number, concurrency: number) => `${x.toFixed(1)} tok/s/user · 并发 ${concurrency}`,
     },
     aria: (count: number) =>
-      `${count} 个通过校验的数据点；建模数据中心曲线位于实测 GPU 曲线之上，形状相同`,
+      `${count} 个通过校验的数据点；实测数据中心曲线位于实测 GPU 曲线之上，形状相同`,
   },
 } as const;
 
 const HASH_KEY = 'mm';
 const MARGIN = { top: 16, right: 20, bottom: 42, left: 50 };
+const WIDE_FROM_PX = 560;
+/** The chart's two heights; the loading box reserves the same one through a container query. */
+const CHART_HEIGHT = { narrow: 300, wide: 380 } as const;
+const RESERVE = {
+  '--chart-narrow': `${CHART_HEIGHT.narrow}px`,
+  '--chart-wide': `${CHART_HEIGHT.wide}px`,
+} as CSSProperties;
 
 function logTicks(min: number, max: number): number[] {
   const ticks: number[] = [];
@@ -133,7 +140,7 @@ export function MeasuredVsModeledWidget({ locale, alt }: WidgetProps) {
   const { resolveColor } = useThemeColors({ highContrast: false, activeKeys: [...MM_GPUS] });
   const { setContainerRef, dimensions } = useResponsiveChartDimensions({ height: 1 });
   const width = Math.max(dimensions.width, 280);
-  const height = width < 560 ? 300 : 380;
+  const height = width < WIDE_FROM_PX ? CHART_HEIGHT.narrow : CHART_HEIGHT.wide;
   const [hover, setHover] = useState<Hover | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -219,20 +226,22 @@ export function MeasuredVsModeledWidget({ locale, alt }: WidgetProps) {
             title: t.viewTitles[key],
           }))}
         />
-        <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 pr-1 text-xs text-muted-foreground">
-          {paired?.map((series) => (
-            <span key={series.hwKey} className="flex items-center gap-1.5">
-              <GrammarSwatch kind="measured" color={resolveColor(series.gpu)} />
-              {series.label}
-            </span>
-          ))}
-          <GrammarLegend locale={locale} kinds={['measured', 'modeled']} />
-        </div>
+        <GrammarLegend locale={locale} kinds={['measured', 'modeled']} className="pr-1" />
       </div>
+      {/* One fixed line, so the series names arriving with the data never move the chart. */}
+      <p className="mt-3 flex h-4 min-w-0 items-center gap-x-4 overflow-hidden text-xs whitespace-nowrap text-muted-foreground">
+        {paired?.map((series) => (
+          <span key={series.hwKey} className="flex items-center gap-1.5">
+            <GrammarSwatch kind="measured" color={resolveColor(series.gpu)} />
+            {series.label}
+          </span>
+        ))}
+      </p>
 
       <div
         ref={setContainerRef}
-        className="relative mt-4 min-w-0"
+        style={RESERVE}
+        className="@container relative mt-3 min-w-0"
         onMouseLeave={() => setHover(null)}
       >
         {status === 'ok' && plot && paired ? (
@@ -411,7 +420,10 @@ export function MeasuredVsModeledWidget({ locale, alt }: WidgetProps) {
             )}
           </>
         ) : (
-          <p role="status" className="flex min-h-40 items-center text-sm text-muted-foreground">
+          <p
+            role="status"
+            className="flex h-(--chart-narrow) items-center text-sm text-muted-foreground @min-[560px]:h-(--chart-wide)"
+          >
             {status === 'loading' ? t.loading : status === 'failed' ? t.failed : t.empty}
           </p>
         )}

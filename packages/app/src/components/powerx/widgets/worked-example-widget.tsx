@@ -12,7 +12,9 @@ import {
   ladderLabel,
 } from '@/lib/powerx/ladder';
 import { pickPoint, viewsInferenceUrl } from '@/lib/powerx/views-api';
+import { cn } from '@/lib/shared/utils';
 
+import { useEasedValues } from './motion';
 import { hardwareStore } from './hardware-store';
 import { PowerLadder } from './power-ladder';
 import {
@@ -67,6 +69,12 @@ const ROW_KIND: Record<RowKey, Provenance> = {
   facility: 'modeled',
   allIn: 'rated',
 };
+const watts = (value: number) => `${formatWatts(value)} W`;
+
+function Readout({ value, format }: { value: number; format: (value: number) => string }) {
+  const shown = useEasedValues({ value });
+  return <>{format(shown.value)}</>;
+}
 
 export function WorkedExampleWidget({ locale, alt }: WidgetProps) {
   const t = STRINGS[locale];
@@ -86,35 +94,54 @@ export function WorkedExampleWidget({ locale, alt }: WidgetProps) {
   const hydrated = useHydrated();
   const color = hydrated ? resolveColor(hardware) : 'var(--foreground)';
   const label = ladderLabel(hardware);
+  const loading = view.status === 'loading';
 
-  const values: Record<RowKey, string> | null =
-    view.status === 'loading' || !ladder
-      ? null
-      : {
-          gpu: `${formatWatts(ladder.gpuWatts)} W`,
-          it: `${formatWatts(ladder.itWatts)} W`,
-          gpusPerMw: Math.round(ladder.gpusPerMw).toLocaleString('en-US'),
-          tdp: `${ladder.percentOfTdp.toFixed(0)} %`,
-          facility: `${formatWatts(ladder.facilityWatts)} W`,
-          allIn: `${formatWatts(ladder.allInWatts)} W`,
-        };
+  const values: Record<RowKey, { value: number; format: (value: number) => string }> | null = ladder
+    ? {
+        gpu: { value: ladder.gpuWatts, format: watts },
+        it: { value: ladder.itWatts, format: watts },
+        gpusPerMw: {
+          value: ladder.gpusPerMw,
+          format: (value) => Math.round(value).toLocaleString('en-US'),
+        },
+        tdp: { value: ladder.percentOfTdp, format: (value) => `${value.toFixed(0)} %` },
+        facility: { value: ladder.facilityWatts, format: watts },
+        allIn: { value: ladder.allInWatts, format: watts },
+      }
+    : null;
 
   return (
     <WidgetFrame name="worked-example" alt={alt}>
-      <p className="font-mono text-xs text-muted-foreground" data-testid="powerx-example-source">
-        {view.status === 'loading'
+      {/* Two lines on phones, where the loaded point wraps. */}
+      <p
+        className="font-mono text-xs text-muted-foreground max-sm:min-h-8"
+        data-testid="powerx-example-source"
+      >
+        {loading
           ? t.loading
           : point
             ? t.point(point.label, point.x, point.concurrency, point.date)
             : t.example(label)}
       </p>
-      <div className="mt-4 min-h-20">
-        {view.status !== 'loading' && ladder && (
-          <PowerLadder ladder={ladder} color={color} locale={locale} compact />
-        )}
-      </div>
+      {/* While the point loads, the example ladder and readouts hold the measured ones' space unseen. */}
+      {ladder && (
+        <PowerLadder
+          key={loading ? 'ladder-placeholder' : 'ladder'}
+          ladder={ladder}
+          color={color}
+          locale={locale}
+          compact
+          className={cn('mt-4', loading && 'invisible')}
+        />
+      )}
       {values && (
-        <dl className="mt-4 grid grid-cols-2 gap-x-8 gap-y-4 border-t border-border/60 pt-4 sm:grid-cols-3">
+        <dl
+          key={loading ? 'values-placeholder' : 'values'}
+          className={cn(
+            'mt-4 grid grid-cols-2 gap-x-8 gap-y-4 border-t border-border/60 pt-4 sm:grid-cols-3',
+            loading && 'invisible',
+          )}
+        >
           {(Object.keys(t.rows) as RowKey[]).map((key) => (
             <div key={key} className="min-w-0">
               <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -125,7 +152,7 @@ export function WorkedExampleWidget({ locale, alt }: WidgetProps) {
                 {t.rows[key][0]}
               </dt>
               <dd className="mt-1 font-mono text-xl font-semibold text-foreground tabular-nums">
-                {values[key]}
+                <Readout value={values[key].value} format={values[key].format} />
               </dd>
               <dd className="text-xs text-muted-foreground">{t.rows[key][1]}</dd>
             </div>

@@ -721,28 +721,31 @@ describe('Workflow run dropdown', () => {
     },
   };
 
-  it('removes run arrows but keeps date navigation, status, run selection, and external links', () => {
+  it('steps between runs and keeps date navigation, status, run selection, and external links', () => {
     mountWithProviders(<WorkflowInfoDisplay />, {
       inference: { availableRuns },
       globalFilters: {},
     });
-    cy.get('[aria-label="Previous run"], [aria-label="Next run"]').should('not.exist');
+    cy.get('[aria-label="Previous run"]').should('be.disabled');
     cy.get('[aria-label="Previous available date"]').should('be.visible');
     cy.get('[aria-label="Next available date"]').should('be.visible');
     cy.get('#run-select').should('contain.text', 'Run 1/2');
     cy.get('#run-select [aria-label="Run succeeded"]').should('exist');
     cy.window().then((win) => cy.stub(win, 'open').as('openRun'));
     cy.get('#run-select [data-external-link] svg').click();
+    cy.get('#run-select').should('have.attr', 'aria-expanded', 'false');
     cy.get('@openRun').should(
       'have.been.calledOnceWith',
       availableRuns['12345678'].runUrl,
       '_blank',
       'noopener,noreferrer',
     );
-    cy.get('#run-select').click();
+    cy.get('#run-select').click('left');
     cy.contains('[role="option"]', 'Run 2/2').click();
     cy.get('@setSelectedRunId').should('have.been.calledOnceWith', '12345679');
     cy.get('#run-select').should('have.attr', 'aria-expanded', 'false');
+    cy.get('[aria-label="Next run"]').click();
+    cy.get('@setSelectedRunId').should('have.been.calledWith', '12345679');
   });
 
   it('keeps the Chinese run dropdown touch-sized on phones', () => {
@@ -755,12 +758,60 @@ describe('Workflow run dropdown', () => {
     );
     cy.get('#run-select')
       .should('have.attr', 'aria-label', '运行')
-      .and('contain.text', '第 1 次运行（共 2 次）')
+      .and('contain.text', '第 1/2 次运行')
       .then(($run) => {
         expect($run[0].getBoundingClientRect().height).to.equal(44);
       });
-    cy.get('#run-select').click();
+    cy.get('#run-select').click('left');
     cy.contains('[role="option"]', '第 2 次运行（共 2 次）').click();
     cy.get('@setSelectedRunId').should('have.been.calledOnceWith', '12345679');
   });
+
+  for (const locale of ['en', 'zh'] as const) {
+    it(`lays the run context out as aligned, equal-height stepper rows on a 361px phone (${locale})`, () => {
+      cy.viewport(361, 780);
+      mountWithProviders(
+        <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
+          <WorkflowInfoDisplay />
+        </PathnameContext.Provider>,
+        { inference: { availableRuns }, globalFilters: {} },
+      );
+      cy.get('[data-testid="inference-run-context"]').then(($panel) => {
+        const panel = $panel[0];
+        const rect = (selector: string) => panel.querySelector(selector)!.getBoundingClientRect();
+        const dateField = panel.querySelector('[data-slot="date-field"]')!.getBoundingClientRect();
+        const runField = panel.querySelector('[data-slot="run-field"]')!.getBoundingClientRect();
+        expect(runField.top, 'run field stacks below the date field').to.be.gte(dateField.bottom);
+        expect(Math.abs(runField.left - dateField.left)).to.be.lte(0.5);
+        expect(Math.abs(runField.width - dateField.width)).to.be.lte(0.5);
+
+        const datePrev = rect(
+          '[aria-label="Previous available date"], [aria-label="上一个可用日期"]',
+        );
+        const runPrev = rect('[aria-label="Previous run"], [aria-label="上一次运行"]');
+        const runNext = rect('[aria-label="Next run"], [aria-label="下一次运行"]');
+        const runTrigger = rect('#run-select');
+        expect(
+          Math.abs(datePrev.left - dateField.left),
+          'stepper starts at the label edge',
+        ).to.be.lte(0.5);
+        expect(Math.abs(runPrev.left - datePrev.left)).to.be.lte(0.5);
+        expect(
+          Math.abs(runNext.right - runField.right),
+          'stepper ends at the field edge',
+        ).to.be.lte(0.5);
+        for (const button of [datePrev, runPrev, runNext]) {
+          expect(button.height).to.equal(runTrigger.height);
+          expect(button.width).to.be.gte(44);
+        }
+        expect(panel.scrollWidth).to.be.lte(panel.clientWidth);
+        const label = panel.querySelector<HTMLElement>(
+          '#run-select [data-slot="select-value"] .truncate',
+        )!;
+        expect(label.scrollWidth, 'selected run label is not truncated').to.be.lte(
+          label.clientWidth,
+        );
+      });
+    });
+  }
 });

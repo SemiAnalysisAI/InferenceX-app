@@ -8,6 +8,7 @@ import { SYSTEM_POWER_CATEGORIES } from '@/lib/power/system-power-model';
 import { Sequence } from '@/lib/catalog/data-mappings';
 import { buildInferenceSeries } from '@/lib/views-api/series';
 import { rowToLightweightPoint } from '@/components/inference/hooks/interpolated-trend-core';
+import { processOverlayChartDataWithClipping } from '@/components/inference/utils';
 
 function row(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
   return {
@@ -44,6 +45,7 @@ function row(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
       avg_total_gpu_power_w: 2798.868,
       total_gpu_energy_j: 120361.299,
       joules_per_output_token: 12.937902,
+      joules_per_total_token: 12.937902 / 9,
       tput_per_gpu: 270,
       output_tput_per_gpu: 30,
       pp: 1,
@@ -155,9 +157,14 @@ describe('power boundaries through the derived-field builder', () => {
     expect(fields.itModeledJPerOutputToken?.y).toBeLessThan(
       fields.utilityModeledJPerOutputToken!.y,
     );
+    expect(fields.itModeledJPerTotalToken?.y).toBeCloseTo(
+      (row().metrics.joules_per_total_token * itWatts!) / row().metrics.avg_power_w,
+      9,
+    );
     expect(POWER_BASIS_FIELDS['it-modeled']).toEqual({
       watts: 'itModeledWatts',
-      energy: 'itModeledJPerOutputToken',
+      joulesPerOutputToken: 'itModeledJPerOutputToken',
+      joulesPerTotalToken: 'itModeledJPerTotalToken',
     });
   });
 
@@ -217,11 +224,92 @@ describe('power boundaries through the derived-field builder', () => {
     const { chartData } = transformBenchmarkRows([row()], 'median', 'external');
     const point = chartData[0][0];
     const official = derive(row()).fields;
-    for (const field of Object.values(POWER_BASIS_FIELDS).flatMap((basis) =>
-      Object.values(basis),
-    )) {
-      expect(point[field]).toBeDefined();
-      expect(point[field]).toEqual(official[field]);
+    for (const fields of Object.values(POWER_BASIS_FIELDS)) {
+      for (const field of Object.values(fields)) {
+        expect(point[field], field).toEqual(official[field]);
+        expect(point[field]?.roof, field).toBe(false);
+      }
     }
+  });
+});
+
+function disaggRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
+  return row({
+    disagg: true,
+    is_multinode: true,
+    workers: [
+      { role: 'prefill', worker_idx: 0, num_gpus: 8, hosts: ['prefill-node'], avg_power_w: 300 },
+      { role: 'decode', worker_idx: 0, num_gpus: 8, hosts: ['decode-node'], avg_power_w: 700 },
+    ],
+    metrics: {
+      ...row().metrics,
+      avg_power_w: 500,
+      avg_total_gpu_power_w: 8000,
+      prefill_avg_power_w: 300,
+      decode_avg_power_w: 700,
+      joules_per_output_token: 9,
+      joules_per_total_token: 1,
+      tput_per_gpu: 270,
+      output_tput_per_gpu: 60,
+    },
+    ...overrides,
+  });
+}
+
+describe('J per total token at every power boundary', () => {
+  it.each([
+    ['aggregate', row()],
+    ['disaggregated single_turn', disaggRow()],
+  ] as const)('keeps the measured token mix on every %s boundary', (_, source) => {
+    const { fields } = derive(source);
+    const tokenMix = source.metrics.joules_per_output_token / source.metrics.joules_per_total_token;
+    for (const [perOutput, perTotal] of [
+      ['measuredJPerOutputToken', 'measuredJPerTotalToken'],
+      ['gpuProvisionedJPerOutputToken', 'gpuProvisionedJPerTotalToken'],
+      ['utilityProvisionedJPerOutputToken', 'utilityProvisionedJPerTotalToken'],
+      ['utilityModeledJPerOutputToken', 'utilityModeledJPerTotalToken'],
+    ] as const) {
+      expect(fields[perTotal]?.y, perTotal).toBeGreaterThan(0);
+      expect(fields[perOutput]!.y / fields[perTotal]!.y, perTotal).toBeCloseTo(tokenMix, 9);
+    }
+    expect(fields.utilityProvisionedJPerTotalToken?.y).toBeCloseTo(fields.jTotal!.y, 9);
+  });
+
+  it('withholds provisioned J per total token where output energy is withheld', () => {
+    const { fields } = derive(disaggRow({ benchmark_type: 'agentic_traces' }));
+    expect(fields.jTotal).toBeDefined();
+    expect(fields.gpuProvisionedJPerOutputToken).toBeUndefined();
+    expect(fields.gpuProvisionedJPerTotalToken).toBeUndefined();
+    expect(fields.utilityProvisionedJPerTotalToken).toBeUndefined();
+  });
+
+  it.each(['power_valid', 'avg_power_w'])(
+    'withholds All in Measured J per total token when GPU telemetry lacks %s',
+    (missingMetric) => {
+      const metrics = { ...row().metrics };
+      delete metrics[missingMetric];
+      const { fields } = derive(row({ metrics }));
+      expect(fields.utilityModeledJPerOutputToken).toBeUndefined();
+      expect(fields.utilityModeledJPerTotalToken).toBeUndefined();
+    },
+  );
+
+  it('draws J per total token boundary siblings for ?unofficialrun= overlay points', () => {
+    const { chartData } = transformBenchmarkRows([row()], 'median', 'external');
+    const official = derive(row()).fields;
+    const { data } = processOverlayChartDataWithClipping(
+      chartData[0],
+      'interactivity',
+      'y_measuredJPerTotalToken',
+      null,
+      { powerCompare: 'all' },
+    );
+    expect(data.map((point) => [point.powerVariant?.id ?? 'base', point.y])).toEqual([
+      ['base', official.measuredJPerTotalToken?.y],
+      ['gpu-provisioned', official.gpuProvisionedJPerTotalToken?.y],
+      ['utility-provisioned', official.utilityProvisionedJPerTotalToken?.y],
+      ['it-modeled', official.itModeledJPerTotalToken?.y],
+      ['utility-modeled', official.utilityModeledJPerTotalToken?.y],
+    ]);
   });
 });

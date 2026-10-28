@@ -634,3 +634,73 @@ describe('ChartLegend points-table icon + dialog', () => {
     cy.get('[data-testid="legend-points-dialog"]').should('be.visible');
   });
 });
+
+const measureLegendSpacing = (selector: string) =>
+  cy.get(`${selector} [data-testid="chart-legend"]`).then(($legend) => {
+    const rows = [...$legend[0].querySelectorAll('ul > li')].map(
+      (li) => li.getBoundingClientRect().top,
+    );
+    const header = $legend[0].firstElementChild as HTMLElement;
+    const switches = [
+      ...$legend[0].querySelectorAll('[data-testid="legend-display-controls"] [role="switch"]'),
+    ].map((el) => el.getBoundingClientRect().top);
+    return {
+      pitches: rows.slice(1).map((top, i) => Math.round(top - rows[i])),
+      switchPitches: switches.slice(1).map((top, i) => Math.round(top - switches[i])),
+      header: Math.round(header.getBoundingClientRect().height),
+    };
+  });
+
+describe('ChartLegend spacing on PowerX surfaces', () => {
+  for (const width of [361, 1280]) {
+    it(`matches the AgentX legend row spacing at ${width}px`, () => {
+      cy.viewport(width, 900);
+      const legend = (
+        <ChartLegend
+          variant="sidebar"
+          legendItems={MOCK_ITEMS}
+          isLegendExpanded
+          onExpandedChange={() => {}}
+          switches={[
+            {
+              id: 'spacing-switch',
+              label: 'One line per GPU',
+              checked: false,
+              onCheckedChange: () => {},
+              infoTooltip: 'Draw every GPU',
+            },
+            {
+              id: 'spacing-switch-raw',
+              label: 'Raw 1-s samples',
+              checked: false,
+              onCheckedChange: () => {},
+              infoTooltip: 'Plot every sample',
+            },
+          ]}
+        />
+      );
+      cy.mount(
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div data-testid="agentx-legend" style={{ width: 300 }}>
+            {legend}
+          </div>
+          <div data-testid="powerx-legend" data-powerx-surface="" style={{ width: 300 }}>
+            {legend}
+          </div>
+        </div>,
+      );
+      measureLegendSpacing('[data-testid="agentx-legend"]').then((agentx) => {
+        expect(agentx.pitches, 'AgentX rows').to.have.length(MOCK_ITEMS.length - 1);
+        expect(Math.max(...agentx.pitches), 'AgentX row pitch').to.be.lessThan(30);
+        measureLegendSpacing('[data-testid="powerx-legend"]').then((powerx) => {
+          expect(powerx.pitches, 'PowerX row pitch').to.deep.equal(agentx.pitches);
+          expect(powerx.header, 'PowerX legend header height').to.equal(agentx.header);
+          expect(agentx.switchPitches, 'AgentX switch rows').to.have.length(1);
+          expect(powerx.switchPitches, 'PowerX switch row pitch').to.deep.equal(
+            agentx.switchPitches,
+          );
+        });
+      });
+    });
+  }
+});

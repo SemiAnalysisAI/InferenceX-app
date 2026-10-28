@@ -1,7 +1,7 @@
 'use client';
 
 import * as d3 from 'd3';
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -13,6 +13,7 @@ import {
   collectiveXRunDasharray,
   fitAlphaBeta,
   formatCollectiveXLatencyPercentiles,
+  type CollectiveXRangeBand,
 } from './data';
 import type {
   CollectiveXChartPoint,
@@ -25,6 +26,10 @@ import type {
 interface CollectiveXChartProps {
   chartId: string;
   series: CollectiveXRunSeries[];
+  /** When set, draw these SKU ranges (band plus median line) instead of one line per series. */
+  ranges?: CollectiveXRangeBand[];
+  /** `range` draws each band and its median; `best` draws only the best value at each point. */
+  rangeMode?: 'range' | 'best';
   colors: Record<string, string>;
   operation: CollectiveXOperation;
   percentile: CollectiveXPercentile;
@@ -62,6 +67,10 @@ const STRINGS = {
     unavailableValue: 'unavailable',
     measured: ' (measured)',
     roundTrip: 'Round trip',
+    rangeHeading: 'Range across libraries',
+    rangeMedian: 'Median',
+    rangeCount: (n: number) => `${n} librar${n === 1 ? 'y' : 'ies'} at this point`,
+    best: 'Best',
     aria: 'CollectiveX expert-parallel performance chart',
   },
   zh: {
@@ -90,6 +99,10 @@ const STRINGS = {
     unavailableValue: '不可用',
     measured: '（实测）',
     roundTrip: '往返',
+    rangeHeading: '各集合通信库的范围',
+    rangeMedian: '中位数',
+    rangeCount: (n: number) => `该点共 ${n} 个集合通信库`,
+    best: '最佳',
     aria: 'CollectiveX 专家并行性能图表',
   },
 } as const;
@@ -122,6 +135,29 @@ function formatMetric(value: number, yAxis: CollectiveXYAxis): string {
   return `${value.toFixed(value >= 100 ? 0 : 2)} GB/s`;
 }
 
+// Light enough that overlapping SKUs stay readable; a hovered or pinned point lifts its own band
+// and fades the rest.
+const BAND_FILL = 0.08;
+const BAND_STROKE = 0.45;
+const BAND_FOCUS_FILL = 0.3;
+const BAND_FOCUS_STROKE = 0.95;
+const BAND_FADED_FILL = 0.03;
+const BAND_FADED_STROKE = 0.15;
+
+/** Lift the band `focusId` and fade the others; null restores every band. */
+function highlightBands(root: Element | null, focusId: string | null): void {
+  if (!root) return;
+  d3.select(root)
+    .selectAll<SVGPathElement, { id: string }>('path.collectivex-range-band')
+    .attr('fill-opacity', (band) =>
+      focusId === null ? BAND_FILL : band.id === focusId ? BAND_FOCUS_FILL : BAND_FADED_FILL,
+    )
+    .attr('stroke-opacity', (band) =>
+      focusId === null ? BAND_STROKE : band.id === focusId ? BAND_FOCUS_STROKE : BAND_FADED_STROKE,
+    )
+    .attr('data-focused', (band) => (focusId !== null && band.id === focusId ? 'true' : null));
+}
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll('&', '&amp;')
@@ -134,6 +170,8 @@ function escapeHtml(value: string): string {
 export function CollectiveXChart({
   chartId,
   series,
+  ranges,
+  rangeMode = 'range',
   colors,
   operation,
   percentile,
@@ -144,9 +182,27 @@ export function CollectiveXChart({
 }: CollectiveXChartProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
-  const points = useMemo(
-    () => chartPoints(series, operation, percentile, yAxis, locale),
-    [series, operation, percentile, yAxis, locale],
+  const points = useMemo<CollectiveXChartPoint[]>(
+    () =>
+      ranges
+        ? ranges.flatMap((band) =>
+            band.points.map((item) => ({
+              seriesId: band.id,
+              seriesLabel: band.label,
+              colorKey: band.colorKey,
+              x: item.x,
+              y: rangeMode === 'best' ? item.members[0].y : item.mid,
+              point: item.members[0].point,
+              range: {
+                lo: item.lo,
+                hi: item.hi,
+                libraries: item.libraries,
+                members: item.members.map(({ label, y }) => ({ label, y })),
+              },
+            })),
+          )
+        : chartPoints(series, operation, percentile, yAxis, locale),
+    [ranges, rangeMode, series, operation, percentile, yAxis, locale],
   );
   const seriesById = useMemo(() => new Map(series.map((item) => [item.series_id, item])), [series]);
   const fitsBySeries = useMemo(
@@ -165,7 +221,76 @@ export function CollectiveXChart({
   }, [points]);
 
   const xDomain = useMemo(() => paddedDomain(points.map((point) => point.x)), [points]);
-  const yDomain = useMemo(() => paddedDomain(points.map((point) => point.y)), [points]);
+  const yDomain = useMemo(
+    () =>
+      paddedDomain(
+        points.flatMap((point) =>
+          point.range && rangeMode === 'range' ? [point.range.lo, point.range.hi] : [point.y],
+        ),
+      ),
+    [points],
+  );
+  const chartSvgRef = useRef<SVGSVGElement | null>(null);
+  // Always mounted, so leaving the range view redraws it empty: D3Chart keeps a removed custom
+  // layer's elements on screen.
+  const rangeLayer = useMemo(() => {
+    const bands = rangeMode === 'range' ? (ranges ?? []) : [];
+    const draw = (
+      group: d3.Selection<SVGGElement, unknown, null, undefined>,
+      xScale: unknown,
+      yScale: unknown,
+    ) => {
+      const x = xScale as d3.ScaleLogarithmic<number, number>;
+      const y = yScale as d3.ScaleLogarithmic<number, number>;
+      const area = d3
+        .area<CollectiveXRangeBand['points'][number]>()
+        .x((item) => x(item.x))
+        .y0((item) => y(item.lo))
+        .y1((item) => y(item.hi))
+        .curve(d3.curveLinear);
+      group
+        .selectAll<SVGPathElement, CollectiveXRangeBand>('path.collectivex-range-band')
+        .data(bands, (band) => band.id)
+        .join('path')
+        .attr('class', 'collectivex-range-band')
+        .attr('data-testid', 'collectivex-range-band')
+        .attr('fill', (band) => colors[band.colorKey] ?? '#888')
+        .attr('fill-opacity', BAND_FILL)
+        .attr('stroke', (band) => colors[band.colorKey] ?? '#888')
+        .attr('stroke-opacity', BAND_STROKE)
+        .attr('stroke-width', 1)
+        .attr('pointer-events', 'none')
+        .attr('d', (band) => area(band.points));
+    };
+    return {
+      type: 'custom' as const,
+      key: 'collectivex-range-bands',
+      render: (
+        group: d3.Selection<SVGGElement, unknown, null, undefined>,
+        ctx: { xScale: unknown; yScale: unknown; tooltipElement: HTMLDivElement },
+      ) => {
+        draw(group, ctx.xScale, ctx.yScale);
+        // Dismissing a pinned tooltip (a click elsewhere) fires no hover end, so restore the
+        // bands once the click has dismissed it.
+        const svg = group.node()?.ownerSVGElement ?? null;
+        chartSvgRef.current = svg;
+        d3.select(svg).on('click.collectivex-range', () => {
+          setTimeout(() => {
+            const shown =
+              ctx.tooltipElement.style.display !== 'none' &&
+              ctx.tooltipElement.style.opacity !== '0';
+            if (!shown) highlightBands(svg, null);
+          }, 0);
+        });
+      },
+      onZoom: (
+        group: d3.Selection<SVGGElement, unknown, null, undefined>,
+        ctx: { newXScale: unknown; newYScale: unknown },
+      ) => {
+        draw(group, ctx.newXScale, ctx.newYScale);
+      },
+    };
+  }, [ranges, rangeMode, colors]);
   const xTickValues = useMemo(
     () => [...new Set(points.map((point) => point.x))].toSorted((a, b) => a - b),
     [points],
@@ -205,16 +330,21 @@ export function CollectiveXChart({
           tickFormat: (value) => formatCompact(Number(value)),
         }}
         layers={[
+          rangeLayer,
           {
             type: 'line',
             key: 'collectivex-lines',
             lines,
             config: {
               getColor: (key) => {
+                const band = ranges?.find((item) => item.id === key);
+                if (band) return colors[band.colorKey] ?? '#888';
                 const item = seriesById.get(key);
                 return colors[item ? collectiveXColorKey(item) : ''] ?? '#888';
               },
               getStrokeDasharray: (key) => {
+                const band = ranges?.find((item) => item.id === key);
+                if (band) return collectiveXRunDasharray(band.runIndex);
                 const item = seriesById.get(key);
                 return item ? collectiveXRunDasharray(item.run_index) : 'none';
               },
@@ -248,9 +378,34 @@ export function CollectiveXChart({
         }}
         tooltip={{
           rulerType: 'crosshair',
-          attachToLayer: 1,
+          attachToLayer: 2,
           content: (point, isPinned) => {
             const color = colors[point.colorKey] ?? '#888';
+            const pinnedNote = isPinned
+              ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>`
+              : '';
+            if (point.range) {
+              const rows = point.range.members
+                .map(
+                  (member) =>
+                    `<div class="flex justify-between gap-3 text-muted-foreground"><span>${escapeHtml(member.label)}</span><span>${formatMetric(member.y, yAxis)}</span></div>`,
+                )
+                .join('');
+              return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 230px; max-width: 380px; user-select: ${isPinned ? 'text' : 'none'}">
+            ${pinnedNote}
+            <div class="font-semibold mb-1" style="color: ${color}">${escapeHtml(point.seriesLabel)}</div>
+            <div>${escapeHtml(t.operation[operation])} ${yAxis === 'latency' ? percentile : t.atLatency(percentile)}</div>
+            ${
+              rangeMode === 'best'
+                ? `<div>${t.best}: <strong>${formatMetric(point.y, yAxis)}</strong> · ${escapeHtml(point.range.members[0].label)}</div>`
+                : `<div>${t.rangeMedian}: <strong>${formatMetric(point.y, yAxis)}</strong></div>`
+            }
+            <div>${t.rangeHeading}: ${formatMetric(point.range.lo, yAxis)} – ${formatMetric(point.range.hi, yAxis)}</div>
+            <div class="text-muted-foreground">${t.tokenCounts(locale === 'zh' ? point.point.tokens_per_rank.toLocaleString('zh-CN') : String(point.point.tokens_per_rank), locale === 'zh' ? point.point.global_tokens.toLocaleString('zh-CN') : String(point.point.global_tokens))}</div>
+            <div class="mt-1 text-muted-foreground">${t.rangeCount(point.range.libraries)}</div>
+            ${rows}
+          </div>`;
+            }
             const measurement = point.point;
             const measuredRoundtrip = measurement.components.roundtrip;
             const fit = fitsBySeries.get(point.seriesId);
@@ -258,7 +413,7 @@ export function CollectiveXChart({
               ? `<div class="mt-1 text-muted-foreground">${t.fit(fit.betaGbps.toFixed(fit.betaGbps >= 100 ? 0 : 1), fit.alphaUs.toFixed(1))}</div>`
               : '';
             return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 230px; max-width: 380px; user-select: ${isPinned ? 'text' : 'none'}">
-            ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
+            ${pinnedNote}
             <div class="font-semibold mb-1" style="color: ${color}">${escapeHtml(point.seriesLabel)}</div>
             <div>${escapeHtml(t.operation[operation])} ${yAxis === 'latency' ? percentile : t.atLatency(percentile)}: <strong>${formatMetric(point.y, yAxis)}</strong></div>
             <div class="text-muted-foreground">${t.tokenCounts(locale === 'zh' ? measurement.tokens_per_rank.toLocaleString('zh-CN') : String(measurement.tokens_per_rank), locale === 'zh' ? measurement.global_tokens.toLocaleString('zh-CN') : String(measurement.global_tokens))}</div>
@@ -275,11 +430,19 @@ export function CollectiveXChart({
               point.x,
             ),
           getRulerY: (point, scale) => scale(point.y),
-          onHoverStart: (selection) => {
+          onHoverStart: (selection, point) => {
             selection.attr('r', 6);
+            if (point.range)
+              highlightBands(selection.node()?.ownerSVGElement ?? null, point.seriesId);
           },
-          onHoverEnd: (selection) => {
+          onHoverEnd: (selection, point) => {
             selection.attr('r', 3.5);
+            if (point.range) highlightBands(selection.node()?.ownerSVGElement ?? null, null);
+          },
+          // Hover callbacks stop while a point is pinned, so pinning another point focuses its
+          // band here.
+          onPointClick: (point) => {
+            highlightBands(chartSvgRef.current, point.range ? point.seriesId : null);
           },
         }}
         transitionDuration={200}

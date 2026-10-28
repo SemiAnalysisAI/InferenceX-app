@@ -42,6 +42,7 @@ const measuredRows = (runUrl: string | null) =>
       avg_power_w: 450 + index * 10,
       p75_power_w: (runUrl ? 550 : 500) + index * 10,
       joules_per_output_token: (runUrl ? 3 : 2) + index,
+      joules_per_total_token: (runUrl ? 3 : 2) + index,
     },
   }));
 
@@ -52,6 +53,7 @@ const boundaryRows = (runUrl: string | null) =>
       ...row.metrics,
       avg_power_w: [900, 200, 700, 650][index] + (runUrl ? 50 : 0),
       joules_per_output_token: [2, 4.5, 4, 5][index] + (runUrl ? 1 : 0),
+      joules_per_total_token: [2, 4.5, 4, 5][index] + (runUrl ? 1 : 0),
     },
   }));
 
@@ -692,7 +694,7 @@ it('replots measured settings for official and unofficial data and preserves ove
   assertMeasuredValues('.dot-group', [500, 510, 520, 530]);
   assertMeasuredValues('.unofficial-overlay-pt', [550, 560, 570, 580]);
   cy.get('[data-testid="powerx-tab-energy"]').click();
-  cy.get('[data-testid="chart-figure"] h2').should('contain', 'Measured Joules per Output Token');
+  cy.get('[data-testid="chart-figure"] h2').should('contain', 'Measured Joules per Token');
   assertMeasuredValues('.dot-group', [2, 3, 4, 5]);
   assertMeasuredValues('.unofficial-overlay-pt', [3, 4, 5, 6]);
   cy.get('[aria-label="Dismiss measured-comparison"]').click();
@@ -770,7 +772,7 @@ it('uses Optimal Only to filter power boundary dots without replacing official o
     });
 
   cy.get('[data-testid="powerx-tab-energy"]').click();
-  cy.get('[data-testid="chart-figure"] h2').should('contain', 'Measured Joules per Output Token');
+  cy.get('[data-testid="chart-figure"] h2').should('contain', 'Measured Joules per Token');
   cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
   assertVisibleMeasuredValues('.dot-group', [2, 4, 5]);
   assertVisibleMeasuredValues('.unofficial-overlay-pt', [3, 5, 6]);
@@ -881,7 +883,7 @@ describe('VR default date preference', () => {
     interceptVrPublicationData(true);
     cy.visit('/inference/deepseek-v4?i_metric=y_tpPerGpu');
     assertVrDate(VR_FIXTURE_DATE);
-    cy.contains('button', 'Run Date:').click();
+    cy.contains('[data-slot="date-field"]', 'Run date').find('button[aria-labelledby]').click();
     cy.get('[role="dialog"]').contains('button', 'Apply').click();
     assertVrDate(VR_LATEST_FIXTURE_DATE);
   });

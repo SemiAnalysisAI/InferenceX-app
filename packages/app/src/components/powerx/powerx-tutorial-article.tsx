@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 
 import { BLOG_PROSE_CLASS } from '@/components/blog/blog-prose';
 import { HashScroll } from '@/components/blog/hash-scroll';
@@ -31,6 +31,10 @@ const TUTORIAL_PROSE_CLASS = cn(
   '[&>details>p]:mt-0 [&>details>p]:mb-4 [&>details>p]:text-muted-foreground',
 );
 
+/** The hero's entrance is a CSS keyframe so it plays from the first paint of the server HTML
+ * instead of waiting for hydration; eyebrow, title and dek step in 60 ms apart. */
+const heroStep = (step: number) => ({ '--motion-delay': `${step * 60}ms` }) as CSSProperties;
+
 export interface PowerXTutorialArticleProps {
   locale: Locale;
   meta: PowerXTutorialMeta;
@@ -52,21 +56,31 @@ export function PowerXTutorialArticle({ locale, meta, content }: PowerXTutorialA
         >
           {t.back}
         </PowerXTutorialLink>
-        <p className="mt-10 font-mono text-xs font-semibold tracking-eyebrow-wide text-brand uppercase">
+        <p
+          className="motion-enter mt-10 font-mono text-xs font-semibold tracking-eyebrow-wide text-brand uppercase"
+          style={heroStep(0)}
+        >
           {t.eyebrow}
         </p>
         <h1
           className={cn(
-            'mt-4 text-4xl font-semibold tracking-heading text-balance text-foreground sm:text-5xl',
+            'motion-enter mt-4 text-4xl font-semibold tracking-heading text-balance text-foreground sm:text-5xl',
             locale === 'en' && 'max-w-[22ch] lg:text-6xl',
           )}
+          style={heroStep(1)}
         >
           {meta.title}
         </h1>
-        <p className="mt-6 max-w-[58ch] text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9">
+        <p
+          className="motion-enter mt-6 max-w-[58ch] text-lg leading-8 text-muted-foreground sm:text-xl sm:leading-9"
+          style={heroStep(2)}
+        >
           {meta.description}
         </p>
-        <p className="mt-5 font-mono text-xs text-muted-foreground">
+        <p
+          className="motion-enter mt-5 font-mono text-xs text-muted-foreground"
+          style={heroStep(2)}
+        >
           {t.updated} <time dateTime={meta.updated}>{formatBlogDate(meta.updated, locale)}</time>
         </p>
       </header>

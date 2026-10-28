@@ -4,6 +4,7 @@ import { bucketPowerSeries, bucketTimeMs } from '@/components/gpu-power/power-se
 import type { InferenceData } from '@/components/inference/types';
 
 import {
+  powerTimelineStatus,
   prioritizeRuns,
   summarizeTraceWindow,
   tracePools,
@@ -141,5 +142,56 @@ describe('mostCoveredConcurrency', () => {
         { conc: 32, hwKey: 'h200' },
       ]),
     ).toBe(32);
+  });
+});
+
+describe('powerTimelineStatus', () => {
+  const base = {
+    loadingRuns: 0,
+    fetchedRuns: 2,
+    failedRuns: 0,
+    hasAnyArtifact: true,
+    visibleTraces: 2,
+    missingWindows: 0,
+    drawable: true,
+  };
+
+  it('shows nothing once lines are drawn and every run has settled', () => {
+    expect(powerTimelineStatus(base)).toBeNull();
+  });
+
+  it('blocks the plot while nothing is drawable yet, so no placeholder axes show', () => {
+    expect(
+      powerTimelineStatus({ ...base, loadingRuns: 2, visibleTraces: 0, drawable: false }),
+    ).toEqual({ kind: 'loading', runs: 2, blocking: true });
+  });
+
+  it('keeps drawn lines visible while further runs are loading', () => {
+    expect(powerTimelineStatus({ ...base, loadingRuns: 1 })).toEqual({
+      kind: 'loading',
+      runs: 1,
+      blocking: false,
+    });
+  });
+
+  it('reports a failure instead of the legend hint when every request failed', () => {
+    expect(
+      powerTimelineStatus({ ...base, failedRuns: 2, visibleTraces: 0, drawable: false }),
+    ).toMatchObject({ kind: 'error', blocking: true });
+    expect(
+      powerTimelineStatus({ ...base, failedRuns: 1, visibleTraces: 0, drawable: false }),
+    ).toMatchObject({ kind: 'empty', reason: 'noTraces' });
+  });
+
+  it('prefers the missing-artifact and missing-window explanations', () => {
+    expect(
+      powerTimelineStatus({ ...base, hasAnyArtifact: false, fetchedRuns: 0, drawable: false }),
+    ).toMatchObject({ kind: 'empty', reason: 'noArtifacts' });
+    expect(powerTimelineStatus({ ...base, missingWindows: 2, drawable: false })).toEqual({
+      kind: 'empty',
+      reason: 'missingWindow',
+      missing: 2,
+      blocking: true,
+    });
   });
 });

@@ -34,8 +34,9 @@ import {
   type SystemPowerCategory,
 } from '../utils/power-breakdown';
 import { chipsWithoutSystemModel } from '../utils/power-chip-coverage';
+import { formatInteractivity } from '../utils/interactivity-format';
 import { PowerBasisPill } from '../powerx/PowerBasisPill';
-import { IT_NOT_MODELED_NOTE } from '@/lib/power/power-basis';
+import { FACILITY_PUE_NOTE } from '@/lib/power/system-power-model';
 import {
   usePowerXCompareTarget,
   usePowerXIncludeFacility,
@@ -131,7 +132,8 @@ const STRINGS = {
 
 const watts = d3.format(',.0f');
 const pct = d3.format('.0%');
-const rate = d3.format(',.0f');
+/** The slider, the rows and the drill-down print interactivity alike. */
+const rate = formatInteractivity;
 const SLIDER_STEPS = 200;
 const MIN_LABEL_SHARE = 0.08;
 
@@ -553,8 +555,8 @@ export default function PowerChipCompare({
         {outOfRange.length > 0 &&
           ` · ${t.outOfRange(outOfRange.map((entry) => entry.label).join(', '))}`}
       </p>
-      <p className="text-xs text-muted-foreground" data-testid="power-chip-compare-not-modeled">
-        {IT_NOT_MODELED_NOTE[locale]}
+      <p className="text-xs text-muted-foreground" data-testid="power-chip-compare-facility-note">
+        {FACILITY_PUE_NOTE[locale]}
       </p>
       {unmodeled.length > 0 && (
         <p

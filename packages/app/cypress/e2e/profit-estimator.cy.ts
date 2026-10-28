@@ -635,9 +635,8 @@ describe('Profit Estimator per GW', () => {
     cy.get('[data-testid="profit-pricing-notice"]').should('not.exist');
     cy.get('[data-testid^="tab-trigger-"]').then(($tabs) => {
       const keys = [...$tabs].map((el) => (el as HTMLElement).dataset.testid);
-      expect(keys.slice(0, 5)).to.deep.equal([
+      expect(keys.slice(0, 4)).to.deep.equal([
         'tab-trigger-inference',
-        'tab-trigger-powerx',
         'tab-trigger-profit-estimator-per-gigawatt',
         'tab-trigger-profit-estimator',
         'tab-trigger-evaluation',

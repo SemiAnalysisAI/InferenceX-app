@@ -8,7 +8,8 @@ export const POWER_BASES = [
   'utility-modeled',
 ] as const;
 export type PowerBasis = (typeof POWER_BASES)[number];
-export type PowerQuantity = 'watts' | 'energy';
+export const POWER_QUANTITIES = ['watts', 'joulesPerOutputToken', 'joulesPerTotalToken'] as const;
+export type PowerQuantity = (typeof POWER_QUANTITIES)[number];
 
 export const POWER_BASIS_LABELS: Record<PowerBasis, { en: string; zh: string }> = {
   'gpu-measured': { en: 'GPU Level Measured', zh: 'GPU 实测功耗' },
@@ -52,11 +53,6 @@ export const POWER_BASIS_TAG_TITLES: Record<PowerBasisTag, { en: string; zh: str
   facility: { en: 'IT × PUE', zh: 'IT × PUE' },
 };
 
-export const IT_NOT_MODELED_NOTE = {
-  en: 'Storage and out-of-rack network are not modeled.',
-  zh: '存储和机架外网络未建模。',
-};
-
 /** GPUs one megawatt of IT power supports at this point's IT W per GPU. */
 export function gpusPerMegawatt(itWattsPerGpu: number | null | undefined): number | null {
   return isPositive(itWattsPerGpu) ? 1e6 / itWattsPerGpu : null;
@@ -88,29 +84,49 @@ export const ALL_IN_MEASURED_EMPTY = {
   zh: '当前选择没有可用的整体实测功耗数值。该边界需要已验证的 GPU 遥测，且硬件在 InferenceX 功耗模型覆盖范围内（八卡 HGX/OAM 系统，或完整的 GB200/GB300 NVL72 计算 tray）。可切换到其他功耗边界以保留数据点。',
 };
 
+export type PowerBasisField =
+  | 'measuredAvgPower'
+  | 'measuredJPerOutputToken'
+  | 'measuredJPerTotalToken'
+  | PowerBasisFieldKey;
+
 export const POWER_BASIS_FIELDS: Record<
-  Exclude<PowerBasis, 'gpu-measured'>,
-  Partial<Record<PowerQuantity, PowerBasisFieldKey>>
+  PowerBasis,
+  Partial<Record<PowerQuantity, PowerBasisField>>
 > = {
-  'gpu-provisioned': { energy: 'gpuProvisionedJPerOutputToken' },
-  'utility-provisioned': { energy: 'utilityProvisionedJPerOutputToken' },
+  'gpu-measured': {
+    watts: 'measuredAvgPower',
+    joulesPerOutputToken: 'measuredJPerOutputToken',
+    joulesPerTotalToken: 'measuredJPerTotalToken',
+  },
+  'gpu-provisioned': {
+    joulesPerOutputToken: 'gpuProvisionedJPerOutputToken',
+    joulesPerTotalToken: 'gpuProvisionedJPerTotalToken',
+  },
+  'utility-provisioned': {
+    joulesPerOutputToken: 'utilityProvisionedJPerOutputToken',
+    joulesPerTotalToken: 'utilityProvisionedJPerTotalToken',
+  },
   'it-modeled': {
     watts: 'itModeledWatts',
-    energy: 'itModeledJPerOutputToken',
+    joulesPerOutputToken: 'itModeledJPerOutputToken',
+    joulesPerTotalToken: 'itModeledJPerTotalToken',
   },
   'utility-modeled': {
     watts: 'utilityModeledWatts',
-    energy: 'utilityModeledJPerOutputToken',
+    joulesPerOutputToken: 'utilityModeledJPerOutputToken',
+    joulesPerTotalToken: 'utilityModeledJPerTotalToken',
   },
 };
 
 export interface PowerBasisInput {
   tdpWatts: number | null;
   utilityWatts: number | null;
-  allocatedGpus: number | null;
-  totalOutputTokPerSec: number | null;
+  gpuSecondsPerOutputToken: number | null;
+  gpuSecondsPerTotalToken: number | null;
   measuredWatts: number | null;
   measuredJPerOutputToken: number | null;
+  measuredJPerTotalToken: number | null;
   /** Modeled IT W per GPU (no PUE); the facility figure minus the PUE overhead. */
   modeledItWattsPerGpu: number | null;
   modeledFacilityWattsPerGpu: number | null;
@@ -127,9 +143,6 @@ export function computePowerBasisFields(input: PowerBasisInput): PowerBasisValue
   const tdp = isPositive(input.tdpWatts) ? input.tdpWatts : null;
   const utility = isPositive(input.utilityWatts) ? input.utilityWatts : null;
   const measuredWatts = isPositive(input.measuredWatts) ? input.measuredWatts : null;
-  const measuredJ = isPositive(input.measuredJPerOutputToken)
-    ? input.measuredJPerOutputToken
-    : null;
   const modeled =
     measuredWatts !== null && isPositive(input.modeledFacilityWattsPerGpu)
       ? input.modeledFacilityWattsPerGpu
@@ -139,33 +152,32 @@ export function computePowerBasisFields(input: PowerBasisInput): PowerBasisValue
       ? input.modeledItWattsPerGpu
       : null;
 
-  const gpuSecondsPerOutputToken =
-    isPositive(input.allocatedGpus) && isPositive(input.totalOutputTokPerSec)
-      ? input.allocatedGpus / input.totalOutputTokPerSec
-      : null;
-  const provisionedEnergy = (watts: number | null) =>
-    watts !== null && gpuSecondsPerOutputToken !== null
-      ? orNull(watts * gpuSecondsPerOutputToken)
-      : null;
+  const provisionedEnergy = (watts: number | null, gpuSecondsPerToken: number | null) =>
+    watts !== null && isPositive(gpuSecondsPerToken) ? orNull(watts * gpuSecondsPerToken) : null;
 
   // Modeled energies scale the measured J/token by the modeled-to-measured watt ratio.
-  const modeledEnergy = (watts: number | null) =>
-    watts !== null && measuredWatts !== null && measuredJ !== null
+  const modeledEnergy = (watts: number | null, measuredJ: number | null) =>
+    watts !== null && measuredWatts !== null && isPositive(measuredJ)
       ? orNull((measuredJ * watts) / measuredWatts)
       : null;
 
   return {
-    gpuProvisionedJPerOutputToken: provisionedEnergy(tdp),
-    utilityProvisionedJPerOutputToken: provisionedEnergy(utility),
+    gpuProvisionedJPerOutputToken: provisionedEnergy(tdp, input.gpuSecondsPerOutputToken),
+    gpuProvisionedJPerTotalToken: provisionedEnergy(tdp, input.gpuSecondsPerTotalToken),
+    utilityProvisionedJPerOutputToken: provisionedEnergy(utility, input.gpuSecondsPerOutputToken),
+    utilityProvisionedJPerTotalToken: provisionedEnergy(utility, input.gpuSecondsPerTotalToken),
     itModeledWatts: modeledIt,
-    itModeledJPerOutputToken: modeledEnergy(modeledIt),
+    itModeledJPerOutputToken: modeledEnergy(modeledIt, input.measuredJPerOutputToken),
+    itModeledJPerTotalToken: modeledEnergy(modeledIt, input.measuredJPerTotalToken),
     utilityModeledWatts: modeled,
-    utilityModeledJPerOutputToken: modeledEnergy(modeled),
+    utilityModeledJPerOutputToken: modeledEnergy(modeled, input.measuredJPerOutputToken),
+    utilityModeledJPerTotalToken: modeledEnergy(modeled, input.measuredJPerTotalToken),
   };
 }
 
 type PowerBasisEntry = Pick<
   AggDataEntry,
+  | 'tput_per_gpu'
   | 'output_tput_per_gpu'
   | 'disagg'
   | 'benchmark_type'
@@ -173,15 +185,21 @@ type PowerBasisEntry = Pick<
   | 'num_decode_gpu'
   | 'avg_power_w'
   | 'joules_per_output_token'
+  | 'joules_per_total_token'
   | 'modeledSystemPower'
 >;
+
+interface PowerBasisNormalization {
+  allocatedGpus: number | null;
+  totalOutputTokPerSec: number | null;
+}
 
 export function powerBasisNormalization(
   entry: Pick<
     PowerBasisEntry,
     'output_tput_per_gpu' | 'disagg' | 'benchmark_type' | 'num_prefill_gpu' | 'num_decode_gpu'
   >,
-): Pick<PowerBasisInput, 'allocatedGpus' | 'totalOutputTokPerSec'> {
+): PowerBasisNormalization {
   const perGpu = entry.output_tput_per_gpu;
   const unavailable = { allocatedGpus: null, totalOutputTokPerSec: null };
   if (!isPositive(perGpu)) return unavailable;
@@ -191,6 +209,19 @@ export function powerBasisNormalization(
   const decode = entry.num_decode_gpu;
   if (!count(prefill) || !count(decode)) return unavailable;
   return { allocatedGpus: prefill + decode, totalOutputTokPerSec: perGpu * decode };
+}
+
+function provisionedGpuSecondsPerToken(
+  entry: PowerBasisEntry,
+): Pick<PowerBasisInput, 'gpuSecondsPerOutputToken' | 'gpuSecondsPerTotalToken'> {
+  const { allocatedGpus, totalOutputTokPerSec } = powerBasisNormalization(entry);
+  if (!isPositive(allocatedGpus) || !isPositive(totalOutputTokPerSec)) {
+    return { gpuSecondsPerOutputToken: null, gpuSecondsPerTotalToken: null };
+  }
+  return {
+    gpuSecondsPerOutputToken: allocatedGpus / totalOutputTokPerSec,
+    gpuSecondsPerTotalToken: isPositive(entry.tput_per_gpu) ? 1 / entry.tput_per_gpu : null,
+  };
 }
 
 export function modeledFacilityWattsPerGpu(
@@ -225,9 +256,10 @@ export function buildPowerBasisChartFields(
   const values = computePowerBasisFields({
     tdpWatts: specs.tdp ?? null,
     utilityWatts: isPositive(specs.power) ? specs.power * 1000 : null,
-    ...powerBasisNormalization(entry),
+    ...provisionedGpuSecondsPerToken(entry),
     measuredWatts: entry.avg_power_w ?? null,
     measuredJPerOutputToken: entry.joules_per_output_token ?? null,
+    measuredJPerTotalToken: entry.joules_per_total_token ?? null,
     modeledItWattsPerGpu: modeledItWattsPerGpu(entry),
     modeledFacilityWattsPerGpu: modeledFacilityWattsPerGpu(entry),
   });

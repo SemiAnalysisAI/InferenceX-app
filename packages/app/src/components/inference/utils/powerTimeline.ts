@@ -447,3 +447,54 @@ export function mostCoveredConcurrency(
   }
   return best;
 }
+
+/** What the timeline shows in place of (or on top of) its plot. */
+export type PowerTimelineStatus =
+  | { kind: 'loading'; runs: number; blocking: boolean }
+  | { kind: 'error'; blocking: true }
+  | { kind: 'empty'; reason: 'noArtifacts' | 'noTraces'; blocking: true }
+  | { kind: 'empty'; reason: 'missingWindow'; missing: number; blocking: true };
+
+export interface PowerTimelineStatusInput {
+  /** Requests still in flight. */
+  loadingRuns: number;
+  /** Requests that were sent (after the per-chart run cap). */
+  fetchedRuns: number;
+  /** Requests that failed. */
+  failedRuns: number;
+  /** Whether any plotted point has a telemetry artifact to request. */
+  hasAnyArtifact: boolean;
+  /** Traces that pass the legend, concurrency and overlay filters. */
+  visibleTraces: number;
+  /** Visible traces omitted because they lack serving-window bounds. */
+  missingWindows: number;
+  /** Whether at least one line can be drawn. */
+  drawable: boolean;
+}
+
+/**
+ * Decides the timeline's status panel. A blocking status replaces the plot (its placeholder axes
+ * are hidden); a non-blocking one is a small notice over lines that are already drawn, so a run
+ * that is still loading never hides the runs that have arrived.
+ */
+export function powerTimelineStatus(input: PowerTimelineStatusInput): PowerTimelineStatus | null {
+  if (input.drawable) {
+    return input.loadingRuns > 0
+      ? { kind: 'loading', runs: input.loadingRuns, blocking: false }
+      : null;
+  }
+  if (input.loadingRuns > 0) return { kind: 'loading', runs: input.loadingRuns, blocking: true };
+  if (!input.hasAnyArtifact) return { kind: 'empty', reason: 'noArtifacts', blocking: true };
+  if (input.fetchedRuns > 0 && input.failedRuns === input.fetchedRuns) {
+    return { kind: 'error', blocking: true };
+  }
+  if (input.visibleTraces > 0 && input.missingWindows === input.visibleTraces) {
+    return {
+      kind: 'empty',
+      reason: 'missingWindow',
+      missing: input.missingWindows,
+      blocking: true,
+    };
+  }
+  return { kind: 'empty', reason: 'noTraces', blocking: true };
+}

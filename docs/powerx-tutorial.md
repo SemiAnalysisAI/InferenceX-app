@@ -56,10 +56,19 @@ Numbers come only from the power model port (`computeBasis` → `buildLadder`), 
 views API. Nothing measured is embedded in source. Every control tracks
 `powerx_tutorial_<widget>_<action>`.
 
+Widgets never move the page. The server render cannot measure width and the views API answers
+after paint, so anything sized by either reserves its final box in CSS: an SVG's height is mirrored
+by a container query (`BANDS` in `power-ladder.tsx`, the flow orientation, the chart height), a
+loading state renders the example invisibly in the loaded layout, and text that changes on hover
+or load sits in a box sized by its longest variant. Ladder label rows snap to the width bands, and
+each band reserves its tallest height across 30–105 % of TDP, so a measured point lands in the
+example's box. `cypress/component/powerx-tutorial-layout.cy.tsx` fails on any reported layout
+shift.
+
 To add one: write the pure model in `src/lib/powerx/<name>.ts`, build the component
 on `widget-chrome.tsx` (`WidgetFrame`, `Chips`, `CopyButton`, `GrammarLegend`, `useView`,
-`useWidgetHash`), register it with a layout in `widgets/index.ts`, and add the `<Widget>` line to
-both `.mdx` files.
+`useWidgetHash`), register it with a layout in `widgets/index.ts`, add the `<Widget>` line to
+both `.mdx` files, and add it to the layout spec.
 
 Both pages stay `noindex` until the PowerX tab is indexable; flip
 `robots` in `tutorial.ts` and add the pair to the sitemap together.

@@ -4,8 +4,8 @@ import { snapTo } from './widget-hash';
 import { type TutorialViewResponse, viewsInferenceUrl } from './views-api';
 
 /**
- * The measured-vs-modeled chart: the same validated points on two metrics, energy per output
- * token from GPU telemetry and the facility-level energy the power model derives from it.
+ * The measured-vs-modeled chart: the same validated points on two metrics, energy per token
+ * (input + output) from GPU telemetry and the facility-level energy the power model derives from it.
  */
 
 export const MM_GPUS = ['b200', 'mi355x'] as const;
@@ -14,8 +14,8 @@ export type MmView = (typeof MM_VIEWS)[number];
 export const DEFAULT_MM_VIEW: MmView = 'measured';
 
 export const MM_METRIC_KEYS: Record<MmView, string> = {
-  measured: 'y_measuredJPerOutputToken',
-  modeled: 'y_utilityModeledJPerOutputToken',
+  measured: 'y_measuredJPerTotalToken',
+  modeled: 'y_utilityModeledJPerTotalToken',
 };
 
 export const mmViewUrl = (view: MmView): string => viewsInferenceUrl(MM_METRIC_KEYS[view], MM_GPUS);

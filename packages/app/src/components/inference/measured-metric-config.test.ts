@@ -28,7 +28,7 @@ describe('measured metric configuration', () => {
 
   it('does not group unrelated metrics or unknown persisted values', () => {
     const grouped = METRIC_CONFIG_KEYS.filter((key) => getMeasuredMetricConfig(key));
-    expect(grouped).toHaveLength(20);
+    expect(grouped).toHaveLength(24);
     expect(new Set(grouped)).toEqual(
       new Set([...MEASURED_ENERGY_METRIC_CONFIG_KEYS, ...POWER_BASIS_METRIC_CONFIG_KEYS]),
     );
@@ -65,12 +65,12 @@ describe('measured metric configuration', () => {
     expect(resolveMetricConfigKey('y_utilityProvisionedWatts')).toBe('y_measuredAvgPower');
   });
 
-  it('starts newly selected families at whole-deployment average power or output energy', () => {
+  it('starts newly selected families at whole-deployment average power or total-token energy', () => {
     expect(changeMeasuredMetricConfig('y_tokensPerDollarH', { family: 'power' })).toBe(
       MEASURED_METRIC_DEFAULTS.power,
     );
     expect(changeMeasuredMetricConfig('y_measuredP90Power', { family: 'energy' })).toBe(
-      'y_measuredJPerOutputToken',
+      'y_measuredJPerTotalToken',
     );
     expect(changeMeasuredMetricConfig('y_measuredWhPerSuccessfulQuery', { family: 'power' })).toBe(
       'y_measuredAvgPower',
@@ -150,4 +150,31 @@ describe('measured metric configuration', () => {
       changeMeasuredMetricConfig('y_measuredPrefillJPerInputToken', { unit: 'wattHours' }),
     ).toBe('y_measuredPrefillJPerInputToken');
   });
+
+  it.each([
+    ['gpu-provisioned', 'y_gpuProvisionedJPerOutputToken', 'y_gpuProvisionedJPerTotalToken'],
+    [
+      'utility-provisioned',
+      'y_utilityProvisionedJPerOutputToken',
+      'y_utilityProvisionedJPerTotalToken',
+    ],
+    ['utility-modeled', 'y_utilityModeledJPerOutputToken', 'y_utilityModeledJPerTotalToken'],
+  ] as const)(
+    'keeps the %s boundary across output and total tokens',
+    (basis, perOutput, perTotal) => {
+      expect(changeMeasuredMetricConfig(perOutput, { denominator: 'total' })).toBe(perTotal);
+      expect(changeMeasuredMetricConfig(perTotal, { denominator: 'output' })).toBe(perOutput);
+      expect(changeMeasuredMetricConfig('y_measuredJPerTotalToken', { basis })).toBe(perTotal);
+      expect(changeMeasuredMetricConfig('y_measuredJPerInputToken', { basis })).toBe(perOutput);
+      expect(changeMeasuredMetricConfig(perTotal, { denominator: 'input' })).toBe(
+        'y_measuredJPerInputToken',
+      );
+      expect(changeMeasuredMetricConfig(perTotal, { denominator: 'query' })).toBe(
+        'y_measuredJPerSuccessfulQuery',
+      );
+      expect(changeMeasuredMetricConfig(perOutput, { scope: 'decode' })).toBe(
+        'y_measuredDecodeJPerOutputToken',
+      );
+    },
+  );
 });

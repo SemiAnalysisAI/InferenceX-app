@@ -7,7 +7,8 @@ sit in the existing ↑↑↓↓-gated **Measured Energy** metric group.
 ## Purpose
 
 The article compares one deployment's power at four boundaries, from the GPU board to the
-utility meter, both as W per GPU and as J per output token. The dashboard already had
+utility meter, as W per GPU, as J per output token and as J per total (input + output)
+token. The dashboard already had
 GPU-measured telemetry (`measured*` metrics) and an ungated all-in provisioned energy
 (`jOutput`). This view adds the other boundaries as ordinary y-axis metrics so every chart
 feature (zoom, tooltip, Perf Ruler, Optimal Only, Table, CSV, PNG, `?unofficialrun=` overlay,
@@ -40,9 +41,13 @@ control change to the nearest registered key. Consequences:
 - One share link per figure, and `i_metric` already round-trips through every existing
   surface (share button, Historical Trends hand-off, Table, CSV header).
 - Existing links are byte-identical: all `measured*` keys carry `basis: 'gpu-measured'`.
-- Choosing a derived boundary snaps to its canonical combination (whole deployment, average
-  watts, joules per output token). Changing any telemetry-only setting while on a derived
-  boundary returns to GPU measured, so no control ever points at a key that does not exist.
+- A derived boundary publishes the `POWER_BASIS_FIELDS` quantities for the whole deployment:
+  joules per output token and joules per total token, plus average watts on All in Measured.
+  Per moves between output and total tokens on it, and choosing it keeps the current
+  combination when it publishes that combination (GPU measured J per total token goes to the
+  boundary's J per total token); otherwise the choice snaps to its first combination (average
+  watts or joules per output token). Changing any other setting while on a derived boundary
+  returns to GPU measured, so no control ever points at a key that does not exist.
 - A gated metric selected through a shared URL keeps its Measured controls, as the
   `measured*` siblings already do.
 - The Y-axis dropdown's collapsed "Measured Power" / "Measured Energy" option for the other
@@ -77,13 +82,25 @@ chrome as `/inference`, so the two tabs read as one dashboard. Nothing in the da
 changes: PowerX writes the same `i_metric` and `i_pcompare` state, so share links,
 `?unofficialrun=` overlays and the views API are untouched.
 
+PowerX sits behind the ↑↑↓↓ feature gate: `/powerx` is a `feature-gated` route, so it is
+listed under **Hidden** only once the gate is unlocked, and the AgentX point detail offers its
+PowerX view on the same condition. It is a soft flag: `PowerXFeatureGate` wraps `/powerx`,
+`/zh/powerx` and both tutorial pages, renders nothing until it reads the gate on the client,
+and replaces a locked visitor onto the landing page (`/` or `/zh`), including after a relock.
+The gate lives in localStorage, so the server still sends the page and the read-only API is
+unchanged; the flag hides PowerX, it does not secure its data. An AgentX `?view=power` share
+link still opens that view for locked visitors.
+
 - Header card (`DashboardSectionHeader` + `ChartControls`, as on `/inference`): title and
   description, then the four views as a tab strip (`PowerXViewTabs`: Energy per token, Power
   draw, Where the power goes, Over time; `powerx-views.ts` maps each tab onto a metric +
   compare pair, see `selectPowerXView`), then the **Benchmark Config** fieldset (Model,
   Scenario, Precision through the shared selectors), the **Chart Config** fieldset (X-Axis
   Metric beside `PowerXChartConfig`: Count, Per or Show as, then Scope and Power statistic
-  on the views they apply to, and the Rated boundaries toggle where rated lines exist, all as
+  on the views they apply to (the Energy view opens on Per: All tokens, J per input + output
+  token, because aggregated serving shares GPUs between prefill and decode and cannot split
+  their energy by phase; only All tokens and Output carry the IT, Facility and rated
+  boundaries, `ENERGY_METRICS` in `powerx-views.ts`), and the Rated boundaries toggle where rated lines exist, all as
   plain labelled controls with no expander) in place of the Y-axis metric pick, the
   **Compare history** fieldset, and the run date / run / changelog row. On phones the Chart Config and
   Compare history fieldsets fold into "More chart controls" exactly as on `/inference`. Under `md`
@@ -160,7 +177,7 @@ changes: PowerX writes the same `i_metric` and `i_pcompare` state, so share link
   through `i_metric` like the other bases (no new URL parameter; old links are unchanged).
   `POWER_COUNT_LABELS` names the three measured boundaries GPU only / IT (no PUE) / Facility
   on PowerX (legend rows, line labels, pills, table series column, CSV); the registry label is
-  "All in Measured IT (no PUE)". Count: All on Power draw (and on Energy per output token)
+  "All in Measured IT (no PUE)". Count: All on Power draw (and on Energy per token or per output token)
   sets `i_pcompare=boundaries`, which draws all three per chip on the one scatter
   (`COUNT_COMPARE_BASES`: GPU only solid, IT dashed, Facility dash-dot) with the Boundary
   legend section; the X-Axis Metric and Show as controls apply as on any Power draw chart.
@@ -184,8 +201,9 @@ changes: PowerX writes the same `i_metric` and `i_pcompare` state, so share link
 - **Where the power goes** stacks IT only by default; the Include facility switch
   (`PowerXFacilitySwitch`, context state, not a URL parameter) appends the PUE part after a
   gap. `breakdownSeriesAtBoundary` derives the IT series from the breakdown so the chip
-  comparison, the drill-down and the tooltips agree; the note "Storage and out-of-rack
-  network are not modeled" stays under the bars.
+  comparison, the drill-down and the tooltips agree; `FACILITY_PUE_NOTE` ("Facility =
+  measured IT power × assumed PUE") stays under the switch and the bars. Storage and
+  out-of-rack networking are not listed as out of scope because they round to 0 %.
 - **Headroom** (Power draw shown as % of TDP, no comparison): `ScatterGraph` adds a
   `powerx-headroom` layer, beneath the lines, that shades between each chip's P90 line (P90
   W × the point's own % TDP ÷ avg W) and 100 %; the y-axis reaches the rating so the band
@@ -223,6 +241,7 @@ no longer offers power metrics. Append:
 | ------ | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 2      | H200 W/GPU, measured boundaries + rated lines | `&i_metric=y_measuredAvgPower&i_pcompare=boundaries` draws GPU Level Measured and All in Measured; the rated lines are on the timeline (`&i_metric=y_measuredPowerTimeline`, all-in switch `&i_ptutility=1`) |
 | 3      | H200 J/output token, all four boundaries      | `&i_metric=y_measuredJPerOutputToken&i_pcompare=all` (single boundary: the matching `…JPerOutputToken` key)                                                                                                  |
+| 3b     | H200 J/total token, all four boundaries       | `&i_metric=y_measuredJPerTotalToken&i_pcompare=all` (single boundary: the matching `…JPerTotalToken` key)                                                                                                    |
 | 4 / 5  | B200 vs B300, GB200 vs GB300 at fixed X       | `&i_metric=<measured key>&i_rulers=<x>` (Perf Ruler, T1)                                                                                                                                                     |
 | 6      | Prefill vs decode W/GPU with the whole deploy | `&i_metric=y_measuredAvgPower&i_pcompare=roles`                                                                                                                                                              |
 | 7      | Reconstructed request energy, prefill share   | `&i_metric=y_measuredJPerOutputToken&i_pcompare=roles` (prefill share in the clone's tooltip)                                                                                                                |

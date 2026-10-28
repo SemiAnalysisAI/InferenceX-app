@@ -106,6 +106,34 @@ describe('Chart Section Tabs — E2E', () => {
     cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate'));
   });
 
+  for (const [path, landing] of [
+    ['/powerx', '/'],
+    ['/zh/powerx', '/zh'],
+    ['/powerx/tutorial', '/'],
+    ['/zh/powerx/tutorial', '/zh'],
+  ] as const) {
+    it(`sends a locked visitor from ${path} to the landing page`, () => {
+      cy.visit(path, {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          win.localStorage.removeItem('inferencex-feature-gate');
+        },
+      });
+      cy.location('pathname').should('eq', landing);
+    });
+  }
+
+  it('keeps PowerX open once the feature gate is unlocked', () => {
+    cy.visit('/powerx', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        win.localStorage.setItem('inferencex-feature-gate', '1');
+      },
+    });
+    cy.get('[data-testid="inference-chart-display"]').should('exist');
+    cy.location('pathname').should('eq', '/powerx');
+  });
+
   it('permanently redirects the retired PowerX page to the inference dashboard', () => {
     cy.request({ url: '/gpu-metrics?gm_runId=12345', followRedirect: false }).then((response) => {
       expect(response.status).to.eq(308);

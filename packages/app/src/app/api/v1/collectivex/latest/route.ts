@@ -7,11 +7,7 @@ import {
   getLatestCollectiveXRun,
 } from '@semianalysisai/inferencex-db/queries/collectivex';
 
-import { COLLECTIVEX_CACHE_CONTROL, cachedJson, collectiveXCacheTag } from '@/lib/cache/api-cache';
-import {
-  collectiveXSweepErrorStatus,
-  ensureLatestCollectiveXRun,
-} from '@/lib/collectivex/collectivex-lazy-ingest';
+import { cachedJson, collectiveXCacheTag } from '@/lib/cache/api-cache';
 import { loadFixture } from '@/lib/testing/test-fixtures';
 
 export const dynamic = 'force-dynamic';
@@ -24,32 +20,11 @@ export async function GET(request: NextRequest) {
   }
   if (FIXTURES_MODE) return cachedJson(request, loadFixture('collectivex-latest'));
 
-  // Discovery failures must not take the page down — serve whatever the DB
-  // already holds and only surface the error when there is no fallback.
-  let ensureError: unknown = null;
   try {
-    await ensureLatestCollectiveXRun(version);
-  } catch (error) {
-    ensureError = error;
-  }
-
-  try {
-    // Discovery may have persisted a run, so read from the same primary.
+    // The primary, so a response cached right after an ingest's purge is never a stale replica read.
     const row = await getLatestCollectiveXRun(getCollectiveXWriteDb(), version);
-    if (row !== null) {
-      if (ensureError)
-        console.error('CollectiveX discovery failed; serving stored run:', ensureError);
-      return cachedJson(request, collectiveXDatasetFromRow(row), {
-        tag: collectiveXCacheTag(),
-        cacheControl: COLLECTIVEX_CACHE_CONTROL,
-      });
-    }
-    if (ensureError) {
-      console.error('CollectiveX discovery failed with no stored fallback:', ensureError);
-      const status = collectiveXSweepErrorStatus(ensureError) ?? 502;
-      return NextResponse.json({ error: 'Unavailable' }, { status });
-    }
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    if (row === null) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    return cachedJson(request, collectiveXDatasetFromRow(row), { tag: collectiveXCacheTag() });
   } catch (error) {
     console.error('Error fetching CollectiveX latest run:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

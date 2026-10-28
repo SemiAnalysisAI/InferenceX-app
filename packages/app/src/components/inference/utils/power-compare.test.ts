@@ -1,10 +1,40 @@
 import { describe, expect, it } from 'vitest';
 
 import type { InferenceData } from '../types';
-import { parsePowerCompare, powerCompareVariants, powerSeriesLabel } from './power-compare';
+import {
+  parsePowerCompare,
+  powerCompareAvailable,
+  powerCompareVariants,
+  powerSeriesLabel,
+} from './power-compare';
 
 const ids = (metric: string, mode: 'boundaries' | 'provisioned' | 'all') =>
   powerCompareVariants(metric, mode).map((series) => series.variant.id);
+
+describe('power comparison on J per total token', () => {
+  it('draws the measured boundaries and the rated bound on total-token fields', () => {
+    expect(powerCompareVariants('y_measuredJPerTotalToken', 'boundaries')).toEqual([
+      { variant: { kind: 'basis', id: 'it-modeled' }, field: 'itModeledJPerTotalToken' },
+      { variant: { kind: 'basis', id: 'utility-modeled' }, field: 'utilityModeledJPerTotalToken' },
+    ]);
+    expect(
+      powerCompareVariants('y_measuredJPerTotalToken', 'provisioned').map(({ field }) => field),
+    ).toEqual(['utilityProvisionedJPerTotalToken']);
+    expect(
+      powerCompareVariants('y_utilityModeledJPerTotalToken', 'all').map(({ field }) => field),
+    ).toEqual([
+      'measuredJPerTotalToken',
+      'gpuProvisionedJPerTotalToken',
+      'utilityProvisionedJPerTotalToken',
+      'itModeledJPerTotalToken',
+    ]);
+  });
+
+  it('offers no role comparison, which is defined on output tokens only', () => {
+    expect(powerCompareVariants('y_measuredJPerTotalToken', 'roles')).toEqual([]);
+    expect(powerCompareAvailable('y_measuredJPerTotalToken', 'roles')).toBe(false);
+  });
+});
 
 describe('powerCompareVariants boundaries', () => {
   it('draws GPU only, IT (no PUE) and Facility for the boundary compare', () => {
@@ -32,7 +62,7 @@ describe('powerCompareVariants boundaries', () => {
     ).toEqual(['utilityProvisionedJPerOutputToken']);
     // No GPU-level TDP line, no IT, no Facility.
     expect(ids('y_measuredJPerOutputToken', 'provisioned')).not.toContain('gpu-provisioned');
-    // The rated bounds are J per output token series only.
+    // The rated bounds are per-token energy series only.
     expect(ids('y_measuredAvgPower', 'provisioned')).toEqual([]);
     expect(parsePowerCompare('provisioned')).toBe('provisioned');
   });

@@ -99,7 +99,7 @@ export const DASHBOARD_ROUTES = [
     key: 'powerx',
     path: '/powerx',
     canonicalPath: '/powerx',
-    navGroup: 'primary',
+    navGroup: 'feature-gated',
     indexable: false,
     localeMirrored: true,
     providers: FILTERED_DASHBOARD_PROVIDERS,

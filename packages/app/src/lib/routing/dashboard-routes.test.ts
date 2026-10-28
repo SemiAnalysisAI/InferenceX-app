@@ -49,13 +49,12 @@ describe('dashboard route registry', () => {
     expect(dashboardRouteForPathname('/historical/kimi-k3')?.key).toBe('historical');
   });
 
-  it('puts PowerX and both profit estimators between Inference Performance and Accuracy Evals', () => {
+  it('puts both profit estimators between Inference Performance and Accuracy Evals', () => {
     const primary = DASHBOARD_ROUTES.filter((route) => route.navGroup === 'primary').map(
       (route) => route.key,
     );
-    expect(primary.slice(0, 5)).toEqual([
+    expect(primary.slice(0, 4)).toEqual([
       'inference',
-      'powerx',
       'profit-estimator-per-gigawatt',
       'profit-estimator',
       'evaluation',
@@ -67,6 +66,15 @@ describe('dashboard route registry', () => {
       'profit-estimator-per-gigawatt',
     );
     expect(dashboardRouteForPathname('/profit-estimator/kimi-k3')?.key).toBe('profit-estimator');
+  });
+
+  it('keeps PowerX behind the feature gate while its routes still resolve', () => {
+    const powerx = getDashboardRoute('powerx');
+    expect(powerx.navGroup).toBe('feature-gated');
+    expect(powerx.indexable).toBe(false);
+    expect(powerx.localeMirrored).toBe(true);
+    expect(dashboardRouteForPathname('/powerx')?.key).toBe('powerx');
+    expect(dashboardRouteForPathname('/zh/powerx')?.key).toBe('powerx');
   });
 
   it('exposes OperatorX in primary navigation for both locales', () => {

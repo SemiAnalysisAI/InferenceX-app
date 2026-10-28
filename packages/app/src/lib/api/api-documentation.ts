@@ -781,8 +781,8 @@ export const apiDocumentationGroups: readonly ApiDocumentationGroup[] = [
     id: 'collectivex',
     title: text('CollectiveX', 'CollectiveX'),
     description: text(
-      'Versioned collective communication sweep results and run discovery.',
-      '带版本的集合通信扫描结果与运行发现数据。',
+      'Versioned collective communication benchmark results, one run per results upload.',
+      '带版本的集合通信基准测试结果，每次结果上传对应一次运行。',
     ),
   },
   {
@@ -1949,8 +1949,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/collectivex/latest',
     summary: text('Read the latest CollectiveX dataset', '读取最新 CollectiveX 数据集'),
     description: text(
-      'Discovers and ingests the latest sweep when needed, then returns its versioned neutral dataset. run.source_repository names the GitHub repository that ran the sweep when it is not SemiAnalysisAI/InferenceX. A stored run is served if refresh fails. Optional swap_blocks results contain verified copy latency in microseconds and payload GB/s (bytes counted once), with block_bytes, num_blocks, runtime provenance and skipped-point counts. Multi-pool sweeps preserve each GPU pool as an independent result.',
-      '按需发现并导入最新扫描，然后返回带版本的中立数据集。若扫描并非由 SemiAnalysisAI/InferenceX 执行，run.source_repository 会标明实际执行的 GitHub 仓库。若刷新失败，会返回已存储的运行。可选的 swap_blocks 结果包含校验通过的复制延迟（微秒）和有效载荷 GB/s（字节数仅计算一次），并保留 block_bytes、num_blocks、运行环境来源及未测量组合数。多池扫描分别保留各 GPU 池的独立结果。',
+      'Returns the versioned neutral dataset of the newest stored run. Each run is one uploaded CollectiveX results directory laid over the previous latest run (each uploaded case replaces the stored result of the same case) and holds at least one measured result: run_id is the upload time in epoch seconds (raised past the newest stored run when needed), run_attempt is 1, and run.source_sha is the collectivex/ commit the uploaded results were measured from. run.covered_skus lists only pools with a measured result. Runs are ingested when an operator uploads them, never on read. In series[].points[], components.*.latency_us, components.*.activation_data_rate_gbps_at_latency_percentile, components.*.payload_data_rate_gbps_at_latency_percentile and roundtrip_token_rate_at_latency_percentile carry p50, p90, p95 and p99; p90, p95 and p99 are null where the harness withheld a tail because too many samples were misaligned or host-stalled, while p50 is always a number. Optional swap_blocks results contain verified copy latency in microseconds and payload GB/s (bytes counted once), with block_bytes, num_blocks, runtime provenance and skipped-point counts. Multi-pool sweeps preserve each GPU pool as an independent result.',
+      '返回最新已存储运行的带版本中立数据集。每次运行对应一次上传的 CollectiveX 结果目录，叠加在上一次最新运行之上（上传的 case 会替换该 case 已存储的结果），且至少包含一个已测量结果：run_id 为上传时间的 Unix 秒级时间戳（必要时递增至最新已存储运行之后），run_attempt 为 1，run.source_sha 为测量这些上传结果所用的 collectivex/ 提交。run.covered_skus 只列出有已测量结果的资源池。运行在运维人员上传时导入，读取时不会导入。 在 series[].points[] 中，components.*.latency_us、components.*.activation_data_rate_gbps_at_latency_percentile、components.*.payload_data_rate_gbps_at_latency_percentile 与 roundtrip_token_rate_at_latency_percentile 包含 p50、p90、p95 和 p99；若测试工具因过多样本未对齐或被主机阻塞而未发布尾部延迟，p90、p95 和 p99 为 null，p50 始终为数值。可选的 swap_blocks 结果包含校验通过的复制延迟（微秒）和有效载荷 GB/s（字节数仅计算一次），并保留 block_bytes、num_blocks、运行环境来源及未测量组合数。多池扫描分别保留各 GPU 池的独立结果。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -1974,11 +1974,11 @@ export const apiOperations: readonly ApiOperation[] = [
         {
           version: 1,
           run: {
-            run_id: '123456789',
+            run_id: '1792089351',
             run_attempt: 1,
-            generated_at: '2026-08-08T03:00:00Z',
+            generated_at: '2026-10-15T18:35:51Z',
             conclusion: 'success',
-            source_sha: '0123456789abcdef',
+            source_sha: 'e65c9045320c78f1fb86200802aceafa0c6310d8',
             requested_cases: 12,
             terminal_cases: 12,
             measured_cases: 10,
@@ -2005,21 +2005,9 @@ export const apiOperations: readonly ApiOperation[] = [
       ),
       errorResponse(
         '404',
-        'No stored or discoverable run exists.',
-        '没有已存储或可发现的运行。',
+        'No run is stored for the version.',
+        '该版本下没有已存储的运行。',
         'Not found',
-      ),
-      errorResponse(
-        '502',
-        'Upstream sweep discovery is unavailable and no stored fallback exists.',
-        '上游扫描发现不可用，且没有已存储的回退数据。',
-        'Unavailable',
-      ),
-      errorResponse(
-        '503',
-        'Upstream sweep processing is temporarily unavailable.',
-        '上游扫描处理暂时不可用。',
-        'Unavailable',
       ),
       errorResponse(
         '500',
@@ -2038,8 +2026,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/collectivex/runs',
     summary: text('List CollectiveX runs', '列出 CollectiveX 运行'),
     description: text(
-      'Returns progressively discovered run summaries. discovery_complete=false means clients may poll while older runs are still being discovered.',
-      '返回逐步发现的运行汇总。discovery_complete=false 表示仍在发现更早的运行，客户端可以轮询。',
+      'Returns every stored run summary, newest upload first. Only uploads with at least one measured result are runs, and covered_skus lists only pools with a measured result. Runs are ingested ahead of reads, so discovery_complete is always true; the field is kept for existing clients.',
+      '按上传时间从新到旧返回全部已存储的运行汇总。只有至少包含一个已测量结果的上传才构成运行，covered_skus 只列出有已测量结果的资源池。运行在读取前即已导入，因此 discovery_complete 始终为 true；保留该字段是为了兼容现有客户端。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -2057,8 +2045,8 @@ export const apiOperations: readonly ApiOperation[] = [
     ],
     responses: [
       success(
-        'Version, run summaries, and discovery state.',
-        '版本、运行汇总和发现状态。',
+        'Version, run summaries, and discovery_complete (always true).',
+        '版本、运行汇总以及 discovery_complete（始终为 true）。',
         objectSchema({
           version: integerSchema,
           runs: arraySchema(collectiveRunSummarySchema),
@@ -2068,9 +2056,9 @@ export const apiOperations: readonly ApiOperation[] = [
           version: 1,
           runs: [
             {
-              run_id: '123456789',
+              run_id: '1792089351',
               run_attempt: 1,
-              generated_at: '2026-08-08T03:00:00Z',
+              generated_at: '2026-10-15T18:35:51Z',
               conclusion: 'success',
               covered_skus: ['h200_sxm'],
               requested_cases: 12,
@@ -2091,18 +2079,6 @@ export const apiOperations: readonly ApiOperation[] = [
         'Unknown version',
       ),
       errorResponse(
-        '502',
-        'Discovery failed and no stored run list exists.',
-        '发现失败，且没有已存储的运行列表。',
-        'Unavailable',
-      ),
-      errorResponse(
-        '503',
-        'Discovery is temporarily unavailable.',
-        '发现暂时不可用。',
-        'Unavailable',
-      ),
-      errorResponse(
         '500',
         'The stored run list query failed.',
         '已存储运行列表查询失败。',
@@ -2119,8 +2095,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/collectivex/runs/{runId}',
     summary: text('Read a CollectiveX run', '读取 CollectiveX 运行'),
     description: text(
-      'Returns one positive numeric run ID as a versioned CollectiveX dataset, discovering and ingesting it on demand when possible.',
-      '按正整数运行 ID 返回带版本的 CollectiveX 数据集，并在可能时按需发现和导入。',
+      'Returns one stored run as a versioned CollectiveX dataset. The run ID is the upload time in epoch seconds (raised past the newest stored run when needed), as listed by /api/v1/collectivex/runs. In series[].points[], components.*.latency_us, components.*.activation_data_rate_gbps_at_latency_percentile, components.*.payload_data_rate_gbps_at_latency_percentile and roundtrip_token_rate_at_latency_percentile carry p50, p90, p95 and p99; p90, p95 and p99 are null where the harness withheld a tail because too many samples were misaligned or host-stalled, while p50 is always a number.',
+      '以带版本的 CollectiveX 数据集返回一次已存储的运行。运行 ID 为上传时间的 Unix 秒级时间戳（必要时递增至最新已存储运行之后），与 /api/v1/collectivex/runs 列出的一致。 在 series[].points[] 中，components.*.latency_us、components.*.activation_data_rate_gbps_at_latency_percentile、components.*.payload_data_rate_gbps_at_latency_percentile 与 roundtrip_token_rate_at_latency_percentile 包含 p50、p90、p95 和 p99；若测试工具因过多样本未对齐或被主机阻塞而未发布尾部延迟，p90、p95 和 p99 为 null，p50 始终为数值。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -2130,10 +2106,10 @@ export const apiOperations: readonly ApiOperation[] = [
         'path',
         true,
         'integer',
-        'Positive GitHub Actions run ID.',
-        'GitHub Actions 正整数运行 ID。',
+        'Positive run ID: the upload time in epoch seconds, below 10^10.',
+        '正整数运行 ID：上传时间的 Unix 秒级时间戳，小于 10^10。',
         positiveIdSchema,
-        123456789,
+        1792089351,
       ),
       parameter(
         'version',
@@ -2154,11 +2130,11 @@ export const apiOperations: readonly ApiOperation[] = [
         {
           version: 1,
           run: {
-            run_id: '123456789',
+            run_id: '1792089351',
             run_attempt: 1,
-            generated_at: '2026-08-08T03:00:00Z',
+            generated_at: '2026-10-15T18:35:51Z',
             conclusion: 'success',
-            source_sha: '0123456789abcdef',
+            source_sha: 'e65c9045320c78f1fb86200802aceafa0c6310d8',
             requested_cases: 12,
             terminal_cases: 12,
             measured_cases: 10,
@@ -2183,23 +2159,11 @@ export const apiOperations: readonly ApiOperation[] = [
         'version 或 runId 无效。',
         'Unknown version or run id',
       ),
-      errorResponse('404', 'The run does not exist.', '该运行不存在。', 'Not found'),
-      errorResponse(
-        '502',
-        'The run cannot be fetched from the upstream source.',
-        '无法从上游来源获取该运行。',
-        'Unavailable',
-      ),
-      errorResponse(
-        '503',
-        'Upstream processing is temporarily unavailable.',
-        '上游处理暂时不可用。',
-        'Unavailable',
-      ),
+      errorResponse('404', 'The run is not stored.', '该运行未存储。', 'Not found'),
       errorResponse('500', 'The run query failed.', '运行查询失败。', 'Internal server error'),
     ],
     responseShapeName: 'CollectiveXDataset',
-    curlUrl: `${API_BASE_URL}/api/v1/collectivex/runs/123456789?version=1`,
+    curlUrl: `${API_BASE_URL}/api/v1/collectivex/runs/1792089351?version=1`,
   },
   {
     id: 'get-agentic-aggregates',
@@ -3245,8 +3209,8 @@ const overview = {
       id: 'cache',
       title: text('Caching', '缓存'),
       description: text(
-        'Read endpoints may be served from shared caches. JSON is brotli- or gzip-compressed when Accept-Encoding allows it and uncompressed otherwise, with Vary: Accept-Encoding. Most database-backed JSON responses carry a strong ETag; send it in If-None-Match to receive an empty 304 while the data is unchanged. Browsers may reuse those responses for 60 seconds. Right after a data ingest, a cache may serve the previous response once while it refreshes. CollectiveX uses short refresh windows, and framework releases use a one-hour shared cache.',
-        '只读端点可能由共享缓存提供。若 Accept-Encoding 允许，JSON 以 brotli 或 gzip 压缩，否则不压缩，并附带 Vary: Accept-Encoding。大多数基于数据库的 JSON 响应带有强 ETag；在 If-None-Match 中回传该值，数据未变化时将收到无响应体的 304。浏览器最多可复用这些响应 60 秒。新数据导入后，缓存刷新期间可能再返回一次旧响应。CollectiveX 使用较短的刷新窗口，框架版本使用一小时共享缓存。',
+        'Read endpoints may be served from shared caches. JSON is brotli- or gzip-compressed when Accept-Encoding allows it and uncompressed otherwise, with Vary: Accept-Encoding. Most database-backed JSON responses carry a strong ETag; send it in If-None-Match to receive an empty 304 while the data is unchanged. Browsers may reuse those responses for 60 seconds. Right after a data ingest, a cache may serve the previous response once while it refreshes. CollectiveX responses stay cached until a results upload purges them, and framework releases use a one-hour shared cache.',
+        '只读端点可能由共享缓存提供。若 Accept-Encoding 允许，JSON 以 brotli 或 gzip 压缩，否则不压缩，并附带 Vary: Accept-Encoding。大多数基于数据库的 JSON 响应带有强 ETag；在 If-None-Match 中回传该值，数据未变化时将收到无响应体的 304。浏览器最多可复用这些响应 60 秒。新数据导入后，缓存刷新期间可能再返回一次旧响应。CollectiveX 响应会一直缓存，直到结果上传时被清除；框架版本使用一小时共享缓存。',
       ),
     },
     {

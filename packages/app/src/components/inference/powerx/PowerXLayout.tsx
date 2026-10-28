@@ -13,11 +13,11 @@ import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import {
   gpusPerMegawatt,
-  IT_NOT_MODELED_NOTE,
   modeledFacilityWattsPerGpu,
   modeledItWattsPerGpu,
   POWER_COUNT_LABELS,
 } from '@/lib/power/power-basis';
+import { FACILITY_PUE_NOTE } from '@/lib/power/system-power-model';
 import { getHardwareConfig } from '@/lib/catalog/constants';
 import { Switch } from '@/components/ui/switch';
 import type { InferenceData } from '@/components/inference/types';
@@ -32,6 +32,7 @@ import { cn, getDisplayLabel } from '@/lib/shared/utils';
 
 import {
   energyPerFor,
+  energyPerHasBoundaries,
   POWERX_VIEWS,
   powerXCountFor,
   powerXMetricFields,
@@ -79,7 +80,7 @@ const STRINGS = {
     systemHelp: 'IT × PUE: GPU measured, rest of server and the facility overhead modeled',
     both: 'All',
     bothHelp: 'GPU only (solid), IT (dashed) and Facility (dash-dot) per chip on one chart',
-    systemOutputOnly: 'IT and facility are modeled per output token only',
+    systemTokensOnly: 'IT and facility are available for All tokens and Output only',
     readout: {
       it: 'IT',
       wPerGpu: 'W/GPU',
@@ -100,11 +101,11 @@ const STRINGS = {
     includeFacilityHelp: 'Appends the PUE overhead after the IT stack; off by default on PowerX.',
     per: 'Per',
     perHelp:
-      'What one unit of energy is charged to: an output token, an input token, every token including the prompt, or one successful query in watt-hours.',
+      'What one unit of energy is charged to: every token including the prompt (the default), an output token, an input token, or one successful query in watt-hours. Aggregated serving runs prefill and decode on the same GPUs, so per output token also bills the prompt to the output.',
     perOptions: {
-      output: 'Output token',
+      total: 'All tokens',
+      output: 'Output',
       input: 'Input',
-      total: 'All',
       query: 'Query',
     } satisfies Record<EnergyPer, string>,
     showAs: 'Show as',
@@ -152,7 +153,7 @@ const STRINGS = {
     systemHelp: 'IT × PUE：GPU 为实测，服务器其他组件与数据中心开销为模型估算',
     both: '全部',
     bothHelp: '在同一图中按芯片对比仅 GPU（实线）、IT（虚线）与数据中心（点划线）',
-    systemOutputOnly: 'IT 与数据中心仅按输出 Token 建模',
+    systemTokensOnly: 'IT 与数据中心能耗仅支持“全部 Token”和“输出”两种计量单位',
     readout: {
       it: 'IT',
       wPerGpu: 'W/GPU',
@@ -173,11 +174,11 @@ const STRINGS = {
     includeFacilityHelp: '在 IT 堆叠之后追加 PUE 开销；PowerX 默认关闭。',
     per: '计量单位',
     perHelp:
-      '能耗的计量单位：每输出 Token、每输入 Token、含提示词的全部 Token，或每次成功查询（以 Wh 计）。',
+      '能耗的计量单位：含提示词的全部 Token（默认）、每输出 Token、每输入 Token，或每次成功查询（以 Wh 计）。聚合式部署中预填充与解码共用同一批 GPU，按输出 Token 计量会把提示词的能耗也算到输出上。',
     perOptions: {
-      output: '输出 Token',
+      total: '全部 Token',
+      output: '输出',
       input: '输入',
-      total: '全部',
       query: '每次查询',
     } satisfies Record<EnergyPer, string>,
     showAs: '显示为',
@@ -299,8 +300,8 @@ export function PowerXCountControls({
   if (view !== 'energy' && view !== 'draw') return null;
   const energyPer = energyPerFor(selection.metric);
   const count = powerXCountFor(selection.metric, selection.compare);
-  // IT and facility are modeled per output token only; W per chip has every boundary.
-  const modeledDisabled = view === 'energy' && energyPer !== 'output';
+  // Input-token and per-query energy are GPU-only; W per chip has every boundary.
+  const modeledDisabled = view === 'energy' && !energyPerHasBoundaries(energyPer);
   return (
     <>
       {/* Four segments: two cells wide from the sm grid up; one per row on phones. */}
@@ -323,19 +324,19 @@ export function PowerXCountControls({
             {
               value: 'it',
               label: POWER_COUNT_LABELS['it-modeled'][locale],
-              title: modeledDisabled ? t.systemOutputOnly : t.itHelp,
+              title: modeledDisabled ? t.systemTokensOnly : t.itHelp,
               disabled: modeledDisabled,
             },
             {
               value: 'system',
               label: POWER_COUNT_LABELS['utility-modeled'][locale],
-              title: modeledDisabled ? t.systemOutputOnly : t.systemHelp,
+              title: modeledDisabled ? t.systemTokensOnly : t.systemHelp,
               disabled: modeledDisabled,
             },
             {
               value: 'both',
               label: t.both,
-              title: modeledDisabled ? t.systemOutputOnly : t.bothHelp,
+              title: modeledDisabled ? t.systemTokensOnly : t.bothHelp,
               disabled: modeledDisabled,
             },
           ]}
@@ -356,7 +357,7 @@ export function PowerXCountControls({
               track('inference_powerx_energy_per_selected', { per: next });
               onSelectionChange(selectPowerXPer(next, selection));
             }}
-            options={(['output', 'input', 'total', 'query'] as const).map((value) => ({
+            options={(['total', 'output', 'input', 'query'] as const).map((value) => ({
               value,
               label: t.perOptions[value],
             }))}
@@ -712,8 +713,8 @@ export function PowerXFacilitySwitch({ pue }: { pue: number | null }) {
           {t.includeFacility(pue === null ? '—' : String(pue))}
         </span>
       </label>
-      <span className="text-xs text-muted-foreground" data-testid="powerx-not-modeled-note">
-        {IT_NOT_MODELED_NOTE[locale]}
+      <span className="text-xs text-muted-foreground" data-testid="powerx-facility-note">
+        {FACILITY_PUE_NOTE[locale]}
       </span>
     </div>
   );

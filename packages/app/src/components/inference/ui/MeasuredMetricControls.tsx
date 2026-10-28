@@ -54,7 +54,7 @@ const STRINGS = {
       'Energy is shown in joules. Energy per successful query can also be shown in watt-hours.',
     compare: 'Compare',
     compareHelp:
-      'Compare power boundaries or prefill and decode on the same benchmark points. Role energy uses a common output-token denominator. Available for average W/chip and J per output token.',
+      'Compare power boundaries or prefill and decode on the same benchmark points. Boundaries are available for average W/chip and for J per output token or all tokens. Prefill vs decode uses a common output-token denominator, so it is available for average W/chip and J per output token.',
     compareNone: 'Off',
     compareBoundaries: 'GPU only + Whole system',
     compareAll: 'All five boundaries (incl. rated)',
@@ -90,7 +90,7 @@ const STRINGS = {
     unitHelp: '能耗以焦耳显示；每个成功请求的能耗也可显示为瓦时。',
     compare: '对比',
     compareHelp:
-      '在同一批基准测试数据点上对比不同功耗边界，或预填充与解码。各角色的能耗统一按输出 token 归一化。支持平均 W/芯片和每输出 token 能耗。',
+      '在同一批基准测试数据点上对比不同功耗边界，或预填充与解码。功耗边界对比支持平均 W/芯片，以及每输出 token 或全部 token 的能耗。预填充与解码对比统一按输出 token 归一化，因此支持平均 W/芯片和每输出 token 能耗。',
     compareNone: '关闭',
     compareBoundaries: '仅 GPU + 整机',
     compareAll: '全部五个边界（含额定）',

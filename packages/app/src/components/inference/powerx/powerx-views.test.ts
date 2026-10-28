@@ -44,6 +44,18 @@ describe('selectPowerXView', () => {
       compare: 'none',
     });
   });
+
+  it('opens the Energy view on J per total token, on the boundary the chart already shows', () => {
+    expect(POWERX_DEFAULT_METRIC).toBe('y_measuredJPerTotalToken');
+    expect(selectPowerXView('energy', { metric: 'y_itModeledWatts', compare: 'none' })).toEqual({
+      metric: 'y_itModeledJPerTotalToken',
+      compare: 'none',
+    });
+    expect(selectPowerXView('energy', { metric: 'y_measuredAvgPower', compare: 'none' })).toEqual({
+      metric: 'y_measuredJPerTotalToken',
+      compare: 'none',
+    });
+  });
 });
 
 describe('Count, Per and Show as', () => {
@@ -60,16 +72,28 @@ describe('Count, Per and Show as', () => {
     expect(powerXBoundaryFor('y_gpuProvisionedJPerOutputToken')).toBe('system');
   });
 
-  it('switches boundary on the current view and overlays all three on output-token energy', () => {
+  it('switches boundary on the current view and overlays all three on the per-token unit', () => {
     const energy = { metric: 'y_measuredJPerInputToken', compare: 'none' as const };
     expect(selectPowerXCount('system', energy)).toEqual({
-      metric: 'y_utilityModeledJPerOutputToken',
+      metric: 'y_utilityModeledJPerTotalToken',
       compare: 'none',
     });
     expect(selectPowerXCount('both', energy)).toEqual({
+      metric: 'y_measuredJPerTotalToken',
+      compare: 'boundaries',
+    });
+    const output = { metric: 'y_measuredJPerOutputToken', compare: 'none' as const };
+    expect(selectPowerXCount('it', output)).toEqual({
+      metric: 'y_itModeledJPerOutputToken',
+      compare: 'none',
+    });
+    expect(selectPowerXCount('both', output)).toEqual({
       metric: 'y_measuredJPerOutputToken',
       compare: 'boundaries',
     });
+    expect(
+      selectPowerXCount('gpu', { metric: 'y_utilityModeledJPerTotalToken', compare: 'none' }),
+    ).toEqual({ metric: 'y_measuredJPerTotalToken', compare: 'none' });
     const draw = { metric: 'y_utilityModeledWatts', compare: 'none' as const };
     expect(selectPowerXCount('gpu', draw)).toEqual({
       metric: 'y_measuredAvgPower',
@@ -79,17 +103,20 @@ describe('Count, Per and Show as', () => {
 
   it('draws only GPU measured and All in Provisioned with the Rated boundaries toggle', () => {
     // On: the GPU-only metric with the provisioned pair, whatever Count was before.
-    const single = { metric: 'y_measuredJPerOutputToken', compare: 'none' as const };
+    const single = { metric: 'y_measuredJPerTotalToken', compare: 'none' as const };
     expect(selectPowerXRated(true, single)).toEqual({
-      metric: 'y_measuredJPerOutputToken',
+      metric: 'y_measuredJPerTotalToken',
       compare: 'provisioned',
     });
     expect(
-      selectPowerXRated(true, { metric: 'y_measuredJPerOutputToken', compare: 'boundaries' }),
-    ).toEqual({ metric: 'y_measuredJPerOutputToken', compare: 'provisioned' });
+      selectPowerXRated(true, { metric: 'y_measuredJPerTotalToken', compare: 'boundaries' }),
+    ).toEqual({ metric: 'y_measuredJPerTotalToken', compare: 'provisioned' });
     expect(
       selectPowerXRated(true, { metric: 'y_utilityModeledJPerOutputToken', compare: 'none' }),
     ).toEqual({ metric: 'y_measuredJPerOutputToken', compare: 'provisioned' });
+    expect(
+      selectPowerXRated(true, { metric: 'y_measuredWhPerSuccessfulQuery', compare: 'none' }),
+    ).toEqual({ metric: 'y_measuredJPerTotalToken', compare: 'provisioned' });
     // Off: back to the single GPU-only series; a no-op when nothing rated is drawn.
     expect(selectPowerXRated(false, { ...single, compare: 'provisioned' })).toEqual(single);
     expect(selectPowerXRated(false, single)).toEqual(single);
@@ -103,7 +130,7 @@ describe('Count, Per and Show as', () => {
     expect(powerXRatedOn('boundaries')).toBe(false);
     // Changing Count drops the rated pair rather than adding a third line to it.
     expect(selectPowerXCount('it', { ...single, compare: 'provisioned' })).toEqual({
-      metric: 'y_itModeledJPerOutputToken',
+      metric: 'y_itModeledJPerTotalToken',
       compare: 'none',
     });
   });
@@ -131,6 +158,21 @@ describe('Count, Per and Show as', () => {
       selectPowerXPer('output', { metric: 'y_measuredJPerInputToken', compare: 'none' }),
     ).toEqual({ metric: 'y_measuredJPerOutputToken', compare: 'none' });
   });
+
+  it('keeps the boundary and the overlay between all tokens and output tokens', () => {
+    expect(
+      selectPowerXPer('output', { metric: 'y_utilityModeledJPerTotalToken', compare: 'none' }),
+    ).toEqual({ metric: 'y_utilityModeledJPerOutputToken', compare: 'none' });
+    expect(
+      selectPowerXPer('total', { metric: 'y_itModeledJPerOutputToken', compare: 'none' }),
+    ).toEqual({ metric: 'y_itModeledJPerTotalToken', compare: 'none' });
+    expect(
+      selectPowerXPer('total', { metric: 'y_measuredJPerOutputToken', compare: 'boundaries' }),
+    ).toEqual({ metric: 'y_measuredJPerTotalToken', compare: 'boundaries' });
+    expect(
+      selectPowerXPer('output', { metric: 'y_measuredJPerTotalToken', compare: 'provisioned' }),
+    ).toEqual({ metric: 'y_measuredJPerOutputToken', compare: 'provisioned' });
+  });
 });
 
 describe('powerXMetricFields', () => {
@@ -150,22 +192,23 @@ describe('powerXChangedCount', () => {
   });
 
   it('counts each Energy control off its default: Count, Per, Scope and Rated boundaries', () => {
-    expect(powerXChangedCount({ metric: 'y_itModeledJPerOutputToken', compare: 'none' })).toBe(1);
+    expect(powerXChangedCount({ metric: 'y_itModeledJPerTotalToken', compare: 'none' })).toBe(1);
+    expect(powerXChangedCount({ metric: 'y_measuredJPerOutputToken', compare: 'none' })).toBe(1);
     expect(powerXChangedCount({ metric: 'y_measuredJPerInputToken', compare: 'none' })).toBe(1);
     expect(powerXChangedCount({ metric: 'y_measuredDecodeJPerOutputToken', compare: 'none' })).toBe(
-      1,
+      2,
     );
     expect(powerXChangedCount({ metric: 'y_measuredPrefillJPerInputToken', compare: 'none' })).toBe(
       2,
     );
-    expect(powerXChangedCount({ metric: 'y_measuredJPerOutputToken', compare: 'boundaries' })).toBe(
+    expect(powerXChangedCount({ metric: 'y_measuredJPerTotalToken', compare: 'boundaries' })).toBe(
       1,
     );
     // The rated pair is one change (Count stays GPU only); a share link's `all` is two.
-    expect(
-      powerXChangedCount({ metric: 'y_measuredJPerOutputToken', compare: 'provisioned' }),
-    ).toBe(1);
-    expect(powerXChangedCount({ metric: 'y_measuredJPerOutputToken', compare: 'all' })).toBe(2);
+    expect(powerXChangedCount({ metric: 'y_measuredJPerTotalToken', compare: 'provisioned' })).toBe(
+      1,
+    );
+    expect(powerXChangedCount({ metric: 'y_measuredJPerTotalToken', compare: 'all' })).toBe(2);
   });
 });
 

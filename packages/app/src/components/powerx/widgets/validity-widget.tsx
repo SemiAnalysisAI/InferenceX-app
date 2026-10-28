@@ -35,7 +35,7 @@ const STRINGS = {
       tokens: {
         title: 'Token counts the energy is divided by are positive',
         detail:
-          'Joules per token needs a denominator. A window with zero output tokens keeps its watts but cannot carry an energy metric.',
+          'Energy per token needs tokens to divide by. A window that served no output tokens keeps its watts but carries no energy metric.',
       },
     },
     reason: 'Recorded as',
@@ -66,7 +66,8 @@ const STRINGS = {
       },
       tokens: {
         title: '用作能量分母的 token 数为正',
-        detail: '每 token 焦耳数需要分母。输出 token 为零的窗口保留瓦特数，但不能给出能量指标。',
+        detail:
+          '每 token 能耗需要用 token 数作分母。没有产出任何输出 token 的窗口保留瓦特数，但不给出能耗指标。',
       },
     },
     reason: '记录为',
