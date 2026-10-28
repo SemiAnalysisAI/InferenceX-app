@@ -21,7 +21,7 @@ export const TAB_META_ZH: Record<DashboardRouteKey, { title: string; description
   powerx: {
     title: 'PowerX：实测 GPU 功耗与每 Token 能耗',
     description:
-      '查看每个 InferenceX 基准测试点的实测 GPU 功耗、每个输出 Token 的能耗和功耗时间线，以及模型估算的服务器与数据中心开销。',
+      '查看每个 InferenceX 基准测试点的实测 GPU 功耗、每 Token 能耗和功耗时间线，以及模型估算的服务器与数据中心开销。',
   },
   inference: {
     title: '智能体推理基准测试',
@@ -117,7 +117,7 @@ export const TAB_META_ZH: Record<DashboardRouteKey, { title: string; description
 
 export const TAB_INTRO_ZH: Record<DashboardRouteKey, string> = {
   powerx:
-    '本页面展示 PowerX 功耗数据：每个基准测试点的实测 GPU 功耗、每个输出 Token 的能耗与运行期间的功耗时间线。GPU 功耗为实测值，服务器其他组件与数据中心 PUE 为模型估算。',
+    '本页面展示 PowerX 功耗数据：每个基准测试点的实测 GPU 功耗、每 Token 能耗与运行期间的功耗时间线。GPU 功耗为实测值，服务器其他组件与数据中心 PUE 为模型估算。',
   inference:
     '本页面展示 InferenceX 的智能体推理与固定序列 AI 推理基准测试结果：跨芯片、推理框架与模型对比吞吐量（token/s/chip）、交互性（token/s/用户）、首 token 延迟（TTFT）等指标。智能体推理数据来自 AgentX；该场景对公开智能体编码轨迹衍生出的长上下文、多轮、含 subagent 工作负载进行回放。每个数据点都来自公开的 GitHub Actions 工作流，可复现、可审计。',
   evaluation:
