@@ -1,6 +1,33 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { describeUpload, invalidateCollectiveXCache, parseIngestArgs } from './ingest-collectivex';
+import type * as Queries from './queries/collectivex';
+import type * as ResultsUpload from './collectivex/results-upload';
+
+const reads: string[] = [];
+vi.mock('./queries/collectivex', async (importOriginal) => ({
+  ...(await importOriginal<typeof Queries>()),
+  getMaxCollectiveXRunId: vi.fn(() => {
+    reads.push('max');
+    return Promise.resolve('200');
+  }),
+  getLatestCollectiveXRun: vi.fn(() => {
+    reads.push('latest');
+    return Promise.resolve(null);
+  }),
+}));
+vi.mock('./collectivex/results-upload', async (importOriginal) => ({
+  ...(await importOriginal<typeof ResultsUpload>()),
+  readResultsDir: vi.fn(() => ({ files: new Map() })),
+  validateResults: vi.fn(() => ({ version: 1 })),
+  buildUploadedRun: vi.fn(() => ({ run: {}, docs: [], plan: {} })),
+}));
+
+import {
+  describeUpload,
+  invalidateCollectiveXCache,
+  parseIngestArgs,
+  planUpload,
+} from './ingest-collectivex';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -120,5 +147,14 @@ describe('invalidateCollectiveXCache', () => {
         fetch as never,
       ),
     ).rejects.toThrow(/HTTP 401/u);
+  });
+});
+
+describe('planUpload', () => {
+  it('reads the highest run_id before the merge base, so a run landing between them is caught', async () => {
+    reads.length = 0;
+    const plan = await planUpload({} as never, '/unused');
+    expect(reads).toEqual(['max', 'latest']);
+    expect(plan.maxStoredRunId).toBe('200');
   });
 });

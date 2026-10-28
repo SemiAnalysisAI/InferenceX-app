@@ -62,10 +62,12 @@ export async function planUpload(
   now = new Date(),
 ): Promise<UploadedRun & { maxStoredRunId: string | null }> {
   const upload = validateResults(readResultsDir(dir));
-  const [latest, maxStoredRunId] = await Promise.all([
-    getLatestCollectiveXRun(sql, upload.version),
-    getMaxCollectiveXRunId(sql),
-  ]);
+  // Read the highest run_id before the merge base. Any upload that commits after this read
+  // raises it, so the write's check (max still equals this value) refuses the stale plan; read
+  // the other way round, an upload landing between the two reads would pass the check while
+  // its cases are missing from this merge.
+  const maxStoredRunId = await getMaxCollectiveXRunId(sql);
+  const latest = await getLatestCollectiveXRun(sql, upload.version);
   return { ...buildUploadedRun(upload, latest, { maxStoredRunId, now }), maxStoredRunId };
 }
 
