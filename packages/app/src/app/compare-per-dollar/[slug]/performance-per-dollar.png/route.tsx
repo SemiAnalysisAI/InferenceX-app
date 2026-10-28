@@ -89,6 +89,7 @@ export async function GET(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     trackServer('compare_per_dollar_png_render_failed', {
+      route_template: '/compare-per-dollar/[slug]/performance-per-dollar.png',
       slug,
       model: parsed.model.slug,
       gpus: [parsed.a, parsed.b],
