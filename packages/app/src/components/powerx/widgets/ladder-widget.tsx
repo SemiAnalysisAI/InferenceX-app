@@ -44,7 +44,7 @@ const STRINGS = {
     context: {
       b200: 'On an HGX chassis the exporter reports GPU board power. Two x86 CPUs, 32 DIMMs, eight NICs, four PCIe switches, ten NVMe drives, fans and PSU loss are modeled around it, and PUE 1.3 covers air cooling.',
       gb200:
-        'On NVL72 the GPU module is measured per compute tray. The Grace socket is measured when the window passes the Grace check and modeled otherwise; NVSwitch trays, fans and power shelves are modeled, and PUE 1.1 covers liquid cooling.',
+        'On NVL72 the GPU module is measured per compute tray. Each Bianca board pairs two GPUs with one Grace CPU and its LPDDR5X; the Grace socket is measured when the window passes the Grace check and modeled otherwise. NVSwitch trays, fans and power shelves are modeled, and PUE 1.1 covers liquid cooling.',
       mi355x:
         'On an AMD OAM chassis the exporter reports package power, a tighter boundary than NVIDIA board power, so the modeled share is a little larger. The chassis around it is modeled like HGX.',
     },
@@ -65,7 +65,7 @@ const STRINGS = {
     context: {
       b200: 'HGX 机箱上 exporter 上报的是 GPU 板卡功耗。周围的 2 颗 x86 CPU、32 条 DIMM、8 块 NIC、4 颗 PCIe 交换芯片、10 块 NVMe 盘、风扇和 PSU 损耗都由模型估算，风冷按 PUE 1.3 计。',
       gb200:
-        'NVL72 上按计算托盘实测 GPU 模组功耗。窗口通过 Grace 校验时 Grace socket 也是实测值，否则由模型估算；NVSwitch 托盘、风扇和电源架由模型估算，液冷按 PUE 1.1 计。',
+        'NVL72 上按计算托盘实测 GPU 模组功耗。每块 Bianca 板卡搭载 2 颗 GPU、1 颗 Grace CPU 及其 LPDDR5X；窗口通过 Grace 校验时 Grace socket 也是实测值，否则由模型估算。NVSwitch 托盘、风扇和电源架由模型估算，液冷按 PUE 1.1 计。',
       mi355x:
         'AMD OAM 机箱上 exporter 上报的是封装功耗，边界比 NVIDIA 的板卡功耗更窄，因此建模部分占比略高。机箱其余部分按 HGX 方式建模。',
     },
