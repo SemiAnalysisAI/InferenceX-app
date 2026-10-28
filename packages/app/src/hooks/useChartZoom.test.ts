@@ -2,10 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import { zoomEventFilter } from './useChartZoom';
 
-/**
- * Extracted logic from useChartZoom's .wheelDelta() for unit testing.
- * Mirrors the inline function in useChartZoom.ts.
- */
 function wheelDelta(event: { deltaY: number; deltaX: number; deltaMode: number }) {
   const delta = event.deltaY || event.deltaX;
   return -delta * (event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002);

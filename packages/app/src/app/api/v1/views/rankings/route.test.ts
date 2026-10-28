@@ -66,7 +66,6 @@ function row(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
   } as BenchmarkRow;
 }
 
-/** One frontier point per overview tier for a single serving series. */
 function frontier(hardware: string, totals: [number, number, number, number]): BenchmarkRow[] {
   return [30, 50, 75, 100].map((intvty, index) =>
     row({
@@ -107,15 +106,12 @@ describe('GET /api/v1/views/rankings', () => {
       format: 'json',
     });
     expect(body.tier).toBe(50);
-    // Qwen3.5 is curated for both overview scenarios; agentx has no rows here
-    // but stays listed for an explicit model so the response is self-describing.
     expect(body.entries.map((entry: { scenario: string }) => entry.scenario)).toEqual([
       'single_turn_8k1k',
       'agentx',
     ]);
     expect(body.entries[1].rows).toEqual([]);
 
-    // Parity: the API rows must match the page derivation exactly.
     const summary = buildOverviewModelSummary(
       Model.Qwen3_5,
       QWEN_ROWS,
@@ -138,7 +134,6 @@ describe('GET /api/v1/views/rankings', () => {
         disagg: rankingRow.disagg,
       })),
     );
-    // cheapest-gpu ranks by ascending $/M tokens.
     const values = body.entries[0].rows.map((r: { value: number }) => r.value);
     expect(values).toEqual([...values].sort((a, b) => a - b));
   });
@@ -151,7 +146,7 @@ describe('GET /api/v1/views/rankings', () => {
     expect(body.entries).toHaveLength(1);
     const rows = body.entries[0].rows;
     expect(rows[0].unit).toBe('tokens_per_second_per_gpu');
-    expect(rows[0].hardware).toBe('b200'); // 1000 tok/s/GPU at tier 50 beats 800
+    expect(rows[0].hardware).toBe('b200');
     expect(rows[0].value).toBe(1000);
     expect(rows[1].value).toBe(800);
   });
@@ -215,6 +210,6 @@ describe('GET /api/v1/views/rankings', () => {
     expect(lines[0]).toBe(
       'kind,model,model_slug,scenario,tier,rank,hardware,hardware_label,chip,value,unit,framework,precision,disagg',
     );
-    expect(lines).toHaveLength(3); // header + b200 + mi355x
+    expect(lines).toHaveLength(3);
   });
 });

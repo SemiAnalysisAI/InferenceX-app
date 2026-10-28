@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** External network devices and allocations, separate from chassis power. */
 
 export { NetworkGroup, ScaleOutNetworkingGear } from './base';
 export {

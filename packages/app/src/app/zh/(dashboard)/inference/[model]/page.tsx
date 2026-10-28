@@ -14,11 +14,6 @@ import {
   inferenceModelPath,
 } from '@/lib/routing/inference-model-slug';
 
-/**
- * `/zh/inference/<model>` — Chinese sibling of `/inference/<model>`. Same
- * pinned-model chart body; metadata and intro copy are Simplified Chinese.
- */
-
 interface Props {
   params: Promise<{ model: string }>;
 }
@@ -57,8 +52,6 @@ export default async function ZhInferenceModelPage({ params }: Props) {
   const { model } = await params;
   const entry = getInferenceModelBySlug(model);
   if (!entry) notFound();
-  // Known aliases are canonicalized in next.config.ts before this SSG route
-  // renders. Next's config redirect also preserves the incoming query string.
   return (
     <>
       <ZhTabIntro tab="inference" />

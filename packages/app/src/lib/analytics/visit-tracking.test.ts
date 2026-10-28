@@ -25,11 +25,6 @@ let mockLocal: ReturnType<typeof makeMockStorage>;
 let mockSession: ReturnType<typeof makeMockStorage>;
 
 function setNow(iso: string) {
-  // Interpret the timestamp in the local time zone to match visit-tracking's
-  // local-calendar-day logic (getFullYear/getMonth/getDate). A trailing 'Z'
-  // forces UTC parsing, which shifts the calendar day in non-UTC zones — e.g.
-  // 2026-05-15T22:00:00Z is 2026-05-16 in Asia/Singapore (UTC+8) — making the
-  // day/month boundary assertions flaky depending on where the suite runs.
   vi.setSystemTime(new Date(iso.replace(/Z$/u, '')));
 }
 
@@ -108,7 +103,7 @@ describe('recordVisitIfNew', () => {
     setNow('2026-05-15T10:00:00Z');
     expect(recordVisitIfNew()).toBe(1);
     mockSession._store.delete(SESSION_KEY);
-    setNow('2026-05-15T22:00:00Z'); // same day, new session
+    setNow('2026-05-15T22:00:00Z');
     expect(recordVisitIfNew()).toBe(1);
   });
 
@@ -139,7 +134,7 @@ describe('recordVisitIfNew', () => {
     mockSession._store.delete(SESSION_KEY);
     setNow('2026-07-01T10:00:00Z');
     recordVisitIfNew();
-    expect(getFirstSeen()).toBe('2026-05-15'); // unchanged
+    expect(getFirstSeen()).toBe('2026-05-15');
   });
 
   it('updates last-seen on every new session', () => {

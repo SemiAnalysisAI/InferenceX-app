@@ -1,6 +1,5 @@
 import type { ApiParameter, ApiSchema, BilingualText } from './api-documentation';
 
-// Shared value constructors must not import the registry at runtime.
 export const text = (en: string, zh: string): BilingualText => ({ en, zh });
 
 export const stringSchema: ApiSchema = { type: 'string' };

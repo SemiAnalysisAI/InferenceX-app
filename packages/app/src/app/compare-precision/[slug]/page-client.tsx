@@ -54,8 +54,6 @@ interface ComparePrecisionPageClientProps {
   precB: string;
   ssrTableData: CompareTableData;
   narrative: string[];
-  /** Set only when the page is rendering the agentic workload. Explains
-   *  what AgentX measures before the head-to-head numbers. */
   agenticIntro?: AgenticScenarioIntro | null;
   gpuLabel: string;
   gpuVendor: string;
@@ -96,8 +94,6 @@ export default function ComparePrecisionPageClient({
 
   const initialModel = toModel(defaultModel);
   const initialSequence = toSequence(defaultSequence);
-  // Seed GlobalFilterProvider with both precisions so the chart renders data
-  // for both quantization levels on load.
   const initialPrecisions = useMemo(() => [precA, precB], [precA, precB]);
   const t = STRINGS[locale];
   const isZh = locale === 'zh';
@@ -264,13 +260,10 @@ function CompareTableSection({
     selectedRunDate,
   );
 
-  // Partition client-side points by precision. Both sides share the same GPU,
-  // so we match on the GPUDataPoint.precision field rather than hw key prefix.
   const { pointsA, pointsB } = useMemo(() => {
     const pA: GPUDataPoint[] = [];
     const pB: GPUDataPoint[] = [];
     for (const [groupKey, points] of Object.entries(gpuDataByGroupKey)) {
-      // Only consider groups matching this GPU.
       const hwKey = groupKey.split('__')[0];
       if (hwKey !== gpu && !hwKey.startsWith(`${gpu}_`)) continue;
       for (const point of points) {

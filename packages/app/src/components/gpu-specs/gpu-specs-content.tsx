@@ -95,7 +95,8 @@ const STRINGS = {
     colScaleOutTopology: 'Scale Out Topology',
     colNic: 'NIC',
     footnote1: 'Dense tensor core peak TFLOP/s (without sparsity).',
-    footnote2: 'Scale out isn’t used in InferenceX™ for rack scale.',
+    footnote2:
+      'NVL72 NIC specifications are shown per GPU; inter-rack switch and topology are not specified here.',
     scaleOutHeading: 'Scale-Out Topology Diagrams',
     scaleOutDescription:
       'Per-server scale-out network topology for each Chip SKU, showing Chip → NIC → leaf switch connectivity.',
@@ -129,7 +130,7 @@ const STRINGS = {
     colScaleOutTopology: '横向扩展拓扑',
     colNic: 'NIC',
     footnote1: '密集 Tensor Core 峰值 TFLOP/s（不含稀疏加速）。',
-    footnote2: 'InferenceX™ 机柜级测试不使用横向扩展。',
+    footnote2: 'NVL72 网卡规格按单 GPU 列出；此处未列出机柜间的交换机和网络拓扑。',
     scaleOutHeading: '横向扩展拓扑图',
     scaleOutDescription: '每台服务器的横向扩展网络拓扑，展示芯片 → NIC → Leaf 交换机的连接方式。',
     scaleUpHeading: '纵向扩展拓扑图',
@@ -372,9 +373,7 @@ export function GpuSpecsContent() {
     [t],
   );
 
-  // Refs for each scale-out topology diagram, keyed by GPU name
   const diagramRefs = useRef<Record<string, TopologyDiagramHandle | null>>({});
-  // Refs for each scale-up topology diagram, keyed by GPU name
   const scaleUpDiagramRefs = useRef<Record<string, ScaleUpTopologyDiagramHandle | null>>({});
 
   const handleTopologyClick = (gpuName: string) => {

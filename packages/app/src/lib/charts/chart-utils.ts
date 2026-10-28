@@ -1,10 +1,9 @@
-/**
- * Runtime-compatible chart utility functions.
- * These functions can be used in API routes and client-side code.
- * They do NOT import Node.js-specific modules (fs, path) or build-time dependencies.
- */
-
-import { GOOGLE_BLUE, resolveFrameworkAlias } from '@semianalysisai/inferencex-constants';
+import {
+  GOOGLE_BLUE,
+  HUAWEI_CHART_COLORS,
+  HUAWEI_CHART_PALETTE,
+  resolveFrameworkAlias,
+} from '@semianalysisai/inferencex-constants';
 import iwanthue from 'iwanthue';
 import { chartPaletteTheme, isDarkTheme } from '@/lib/themes/themes';
 
@@ -24,88 +23,44 @@ import type { Locale } from '@/lib/i18n/i18n';
 import { buildPowerBasisChartFields, type PowerBasisChartFields } from '@/lib/power/power-basis';
 import { reconstructedRoleEnergy } from '@/components/inference/utils/role-energy';
 
-// ---------------------------------------------------------------------------
-// High-contrast color generation (iwanthue — k-means in CIELab)
-// ---------------------------------------------------------------------------
-
-/**
- * Banned hue test per vendor (CIELab hue angle, 0-360).
- * In Lab space: 0° = red, 90° = yellow, 180° = green, 270° = blue.
- * NVIDIA must not be red/rose/pink (wraps around 0°: 320–40°).
- * AMD must not be green (roughly 120–195°).
- */
 const BANNED_HUE_TEST: Record<Vendor, ((hue: number) => boolean) | null> = {
-  nvidia: (hue) => hue >= 320 || hue <= 40, // red/rose/pink zone
-  amd: (hue) => hue >= 120 && hue <= 195, // green zone
-  openai: (hue) => hue < 290 || hue > 350, // keep the purple/violet zone
-  google: (hue) => hue < 255 || hue > 300, // keep blue separate from teal and purple
+  nvidia: (hue) => hue >= 320 || hue <= 40,
+  amd: (hue) => hue >= 120 && hue <= 195,
+  openai: (hue) => hue < 290 || hue > 350,
+  google: (hue) => hue < 255 || hue > 300,
+  huawei: null,
   unknown: null,
 };
 
-/**
- * Preferred hue ranges (CIELab) — used when a vendor has few items so they
- * cluster in the brand-appropriate zone. NVIDIA = greens, AMD = reds/oranges.
- */
 const PREFERRED_ZONE: Record<
   Vendor,
   { hmin: number; hmax: number; cmin?: number; lmin?: number } | null
 > = {
-  nvidia: { hmin: 100, hmax: 195 }, // greens/teals
-  amd: { hmin: 20, hmax: 50, cmin: 70, lmin: 50 }, // vivid reds/oranges
-  openai: { hmin: 300, hmax: 340 }, // purples/violets
-  google: { hmin: 265, hmax: 295 }, // blues (brand hue ~284)
+  nvidia: { hmin: 100, hmax: 195 },
+  amd: { hmin: 20, hmax: 50, cmin: 70, lmin: 50 },
+  openai: { hmin: 300, hmax: 340 },
+  google: { hmin: 265, hmax: 295 },
+  huawei: HUAWEI_CHART_PALETTE.lab,
   unknown: null,
 };
 
-/** Max items that fit distinctly in the preferred zone before we open up. */
 const PREFERRED_MAX = 4;
 
-/** Beyond this count per vendor, drop the hue ban entirely for best spacing. */
 const BAN_MAX = 10;
 
-/**
- * Palette cache. iwanthue's force-vector clustering costs tens of
- * milliseconds per call (quality 50 × 5 attempts) and shows up as main-thread
- * time on every render that recomputes high-contrast colors. The output is
- * fully deterministic (seeded RNG) and — crucially — independent of the key
- * *names*: a vendor group's palette depends only on the item count, vendor
- * zone/ban mode, theme seed, and lightness bounds. Identical requests across
- * renders, charts, and tabs therefore share one entry. Key space is tiny
- * (vendors × themes × counts × 3 modes), so no eviction is needed.
- */
 const PALETTE_CACHE = new Map<string, string[]>();
 
-/**
- * Generates high-contrast colors using iwanthue (k-means in CIELab space).
- *
- * Tiered strategy per vendor (only when >1 vendor is present):
- *   ≤ PREFERRED_MAX → constrain to brand zone (NVIDIA=green, AMD=red)
- *   ≤ BAN_MAX       → full wheel minus rival's brand color
- *   > BAN_MAX       → full wheel, no restrictions, best spacing wins
- *
- * Single-vendor case (e.g. an all-NVIDIA agentic comparison of B200/B300 ×
- * vLLM/SGLang): the brand zone and rival-ban exist to keep vendors apart at a
- * glance, but with one vendor there's no rival — clamping every series into the
- * same narrow hue band just collapses the contrast HC is supposed to maximize.
- * So skip both restrictions and use the full wheel, giving the series the widest
- * possible separation.
- */
 export const generateHighContrastColors = (
   keys: string[],
   theme: string,
   vendorKeyFor?: (key: string) => string,
 ): Record<string, string> => {
   if (keys.length === 0) return {};
-  // Reuse the dark seed as well as its lightness bounds for CS:GO and GTA.
   theme = chartPaletteTheme(theme);
 
   const colors: Record<string, string> = {};
   const [lmin, lmax] = isDarkTheme(theme) ? [50, 100] : [30, 65];
 
-  // Group keys by vendor. When vendorKeyFor is provided, vendor is derived
-  // from the mapped key (e.g. a hwKey) so callers can output colors keyed by
-  // a display identifier (e.g. configLabel) while still getting vendor-aware
-  // preferred-zone and banned-hue logic.
   const groups = new Map<Vendor, string[]>();
   for (const key of keys) {
     const vendor = getVendor(vendorKeyFor ? vendorKeyFor(key) : key);
@@ -117,14 +72,15 @@ export const generateHighContrastColors = (
     list.push(key);
   }
 
-  // Brand-zone / rival-ban only serve to keep DIFFERENT vendors apart. With a
-  // single vendor present there's nothing to separate from, so those
-  // restrictions only shrink the usable hue range and kill contrast — open the
-  // full wheel instead (the common all-NVIDIA agentic comparison case).
   const multiVendor = groups.size > 1;
+  const reserveHuawei = groups.has('huawei');
 
   for (const [vendor, vendorKeys] of groups) {
     const count = vendorKeys.length;
+    if (vendor === 'huawei' && count === 1) {
+      colors[vendorKeys[0]] = HUAWEI_CHART_COLORS[isDarkTheme(theme) ? 'dark' : 'light'];
+      continue;
+    }
     if (vendor === 'google' && count === 1) {
       colors[vendorKeys[0]] = GOOGLE_BLUE;
       continue;
@@ -132,16 +88,13 @@ export const generateHighContrastColors = (
     const isBanned = BANNED_HUE_TEST[vendor] ?? null;
     const preferred = PREFERRED_ZONE[vendor] ?? null;
 
-    // Tier 1: few items → brand zone only
-    // Tier 2: moderate  → full wheel minus rival color
-    // Tier 3: many      → full wheel, no restrictions
-    const usePreferred = multiVendor && preferred && count <= PREFERRED_MAX;
+    const usePreferred =
+      preferred && ((multiVendor && count <= PREFERRED_MAX) || vendor === 'huawei');
     const useBan = multiVendor && !usePreferred && isBanned && count <= BAN_MAX;
 
-    // Everything iwanthue's output depends on (the ban filter and preferred
-    // zone are functions of vendor; the seed is vendor+theme).
+    const excludeAmber = reserveHuawei && vendor !== 'huawei';
     const mode = usePreferred ? 'pref' : useBan ? 'ban' : 'open';
-    const cacheKey = `${vendor}|${theme}|${count}|${mode}|${lmin}|${lmax}`;
+    const cacheKey = `${vendor}|${theme}|${count}|${mode}|${lmin}|${lmax}|${excludeAmber}`;
 
     let palette = PALETTE_CACHE.get(cacheKey);
     if (!palette) {
@@ -156,15 +109,20 @@ export const generateHighContrastColors = (
               lmax,
             }
           : { hmin: 0, hmax: 360, cmin: 30, cmax: 100, lmin, lmax },
-        ...(useBan &&
-          isBanned && {
-            colorFilter: (_rgb: [number, number, number], lab: [number, number, number]) => {
-              // Enforce lightness bounds — force-vector can drift outside colorSpace
-              if (lab[0] < lmin || lab[0] > lmax) return false;
-              const hue = ((Math.atan2(lab[2], lab[1]) * 180) / Math.PI + 360) % 360;
-              return !isBanned(hue);
-            },
-          }),
+        ...((useBan || excludeAmber) && {
+          colorFilter: (_rgb: [number, number, number], lab: [number, number, number]) => {
+            if (lab[0] < lmin || lab[0] > lmax) return false;
+            const hue = ((Math.atan2(lab[2], lab[1]) * 180) / Math.PI + 360) % 360;
+            return (
+              !(useBan && isBanned?.(hue)) &&
+              !(
+                excludeAmber &&
+                hue >= HUAWEI_CHART_PALETTE.reservedLab.hmin &&
+                hue <= HUAWEI_CHART_PALETTE.reservedLab.hmax
+              )
+            );
+          },
+        }),
         seed: `${vendor}-${theme}`,
         clustering: 'force-vector',
         quality: 50,
@@ -181,29 +139,14 @@ export const generateHighContrastColors = (
   return colors;
 };
 
-/**
- * Metrics backed by the benchmark transform. Custom user metrics are derived
- * later from user-entered costs/power and are excluded by the registry.
- */
 export const Y_AXIS_METRICS = ['y', ...BENCHMARK_METRIC_CONFIG_KEYS] as const;
 
 export type YAxisMetric = (typeof Y_AXIS_METRICS)[number];
 
-/**
- * Determines the chart-series hardware key.
- *
- * Fixed-sequence curves keep speculative decoding in their identity. Agentic
- * curves deliberately do not: one production curve may choose a speculative
- * method for some load points and standard decoding for others. The point
- * still carries `spec_decoding` for filters, tooltips, and point-level keys.
- */
 export const getHardwareKey = (entry: AggDataEntry): string => {
   let normalizedHwName = entry.hw.split('-')[0];
   if (entry.framework) {
-    // Resolve legacy/aliased framework names (e.g. atom-disagg → mooncake-atom) so chart
-    // point keys match the canonical keys built by buildAvailabilityHwKey for the GPU filter.
     const fw = resolveFrameworkAlias(entry.framework);
-    // Try framework as-is first, then disagg variant if it exists
     const candidateDirect = `${normalizedHwName}_${fw}`;
     if (isKnownGpu(candidateDirect)) {
       normalizedHwName = candidateDirect;
@@ -224,11 +167,6 @@ export const getHardwareKey = (entry: AggDataEntry): string => {
   return normalizedHwName;
 };
 
-/**
- * Normalizes a hardware key from evaluation/reliability data entries.
- * Handles the looser naming conventions in eval data (e.g. "B200 NB", "H200 CW")
- * by stripping qualifiers and building a normalized hardware key.
- */
 export function normalizeEvalHardwareKey(
   hw: string,
   framework?: string,
@@ -236,11 +174,8 @@ export function normalizeEvalHardwareKey(
 ): string {
   let hwName = hw.toLowerCase().replaceAll('-', '_');
 
-  // Strip additional qualifiers not relevant to GPU identification
-  // e.g., "b200 nb" -> "b200", "h200 cw" -> "h200"
   hwName = hwName.replace(/\s+(?:nb|cw|nv|dgxc|amds|cr|amd)$/iu, '');
 
-  // Try to find a more specific hardware config that includes framework
   if (framework) {
     const frameworkKey = resolveFrameworkAlias(framework).replaceAll('-', '_');
     const specificHwName = `${hwName}_${frameworkKey}`;
@@ -249,7 +184,6 @@ export function normalizeEvalHardwareKey(
       hwName = specificHwName;
     }
 
-    // Also check for configs with spec_decoding in the key
     if (specDecoding && specDecoding !== 'none') {
       const specKey = specDecoding.toLowerCase().replaceAll('-', '_');
       const withSpecHwName = `${hwName}_${specKey}`;
@@ -262,10 +196,6 @@ export function normalizeEvalHardwareKey(
   return isKnownGpu(hwName) ? hwName : 'unknown';
 }
 
-/**
- * Builds a hardware key from availability row fields.
- * Used by InferenceContext to match availability rows to hardware configs.
- */
 export function buildAvailabilityHwKey(
   hardware: string,
   framework?: string,
@@ -276,7 +206,6 @@ export function buildAvailabilityHwKey(
   let hwKey = hardware.split('-')[0];
   const fw = framework ? resolveFrameworkAlias(framework) : undefined;
   if (fw) {
-    // Try framework as-is first, then disagg variant if it exists
     const candidateDirect = `${hwKey}_${fw}`;
     if (isKnownGpu(candidateDirect)) {
       hwKey = candidateDirect;
@@ -294,17 +223,11 @@ export function buildAvailabilityHwKey(
   return hwKey;
 }
 
-// The reconstructed prefill energy is a comparison-only series (never an axis).
 export type DerivedMetricKey = BenchmarkMetricKey | 'reconstructedPrefillJPerOutputToken';
 export type DerivedChartFields = Pick<InferenceData, DerivedMetricKey>;
 
 const chartMetric = (y: number): { y: number; roof: boolean } => ({ y, roof: false });
 
-/**
- * Builds benchmark-derived metric fields. Passing `requestedMetrics` keeps
- * lightweight consumers lightweight while sharing the exact formulas used by
- * full inference points.
- */
 export function buildDerivedChartFields(
   entry: AggDataEntry,
   currentHwKey: string,
@@ -346,8 +269,6 @@ export function buildDerivedChartFields(
     fields.inputTputPerGpu = chartMetric(inputTputPerGpu);
   }
   if (wants('tokenRevenuePerGpuHour')) {
-    // At $1 per million total tokens, million tokens per GPU hour is
-    // numerically equal to gross token revenue in $/GPU/hr.
     fields.tokenRevenuePerGpuHour = chartMetric(millionTokensPerHour);
   }
   if (hardwarePower > 0 && wants('tpPerMw'))
@@ -417,11 +338,6 @@ export function buildDerivedChartFields(
       hardwarePower && tputPerGpu ? (hardwarePower * 1000) / tputPerGpu : 0,
     );
   }
-  // jOutput keeps the historical per-GPU normalization: for disaggregated rows
-  // output_tput_per_gpu is per decode GPU, so this is all-in W of one decode GPU
-  // per output token and ignores the prefill pool. The power-boundary field
-  // utilityProvisionedJPerOutputToken uses the same all-in W but counts every
-  // allocated GPU, so the two differ on disaggregated rows by (P + D) / D.
   if (hardwarePower > 0 && wants('jOutput') && outputTputPerGpu) {
     fields.jOutput = chartMetric(hardwarePower ? (hardwarePower * 1000) / outputTputPerGpu : 0);
   }
@@ -448,15 +364,10 @@ export function buildDerivedChartFields(
   return fields;
 }
 
-/** Physical deployment size, retaining the legacy PP floor and TPU core/chip distinction. */
 export function deploymentChipCount(
   entry: Pick<AggDataEntry, 'disagg' | 'num_prefill_gpu' | 'num_decode_gpu' | 'tp' | 'pp'>,
   currentHwKey: string,
 ): number {
-  // Aggregate role counts describe the same deployment, so never sum them.
-  // TP alone is not the chip count (e.g. Jalapeño TP1/EP8 uses eight chips).
-  // Ingested legacy counts can default to TP × EP without PP. Keep TP × PP
-  // as a floor even when counts are positive, including for unofficial overlays.
   return entry.disagg
     ? entry.num_prefill_gpu + entry.num_decode_gpu
     : Math.max(
@@ -465,8 +376,6 @@ export function deploymentChipCount(
           : entry.num_prefill_gpu > 0
             ? entry.num_prefill_gpu
             : 0,
-        // TPU tensor widths count logical cores, not physical chips. Explicit
-        // counts are authoritative for these rows (including unofficial runs).
         currentHwKey.split('_')[0] === 'tpuv7' &&
           (entry.num_decode_gpu > 0 || entry.num_prefill_gpu > 0)
           ? 0
@@ -474,11 +383,6 @@ export function deploymentChipCount(
       );
 }
 
-/**
- * Creates a single InferenceData point from an AggDataEntry.
- * Spreads all AggDataEntry fields through automatically, then overrides
- * with chart-specific coordinates and canonical derived fields.
- */
 export function createChartDataPoint(
   date: string,
   entry: AggDataEntry,
@@ -541,17 +445,12 @@ type MeasuredPowerChartFields = Partial<
   >
 >;
 
-/** Builds optional runner-telemetry fields for the canonical derived builder. */
 function buildMeasuredPowerChartFields(
   entry: AggDataEntry,
   tdpWatts: number,
 ): MeasuredPowerChartFields {
-  // Prefill energy on the output-token axis, so the roles comparison can
-  // stack it against the decode pool (PowerX Figure 7).
   const roleEnergy = reconstructedRoleEnergy(entry);
   return {
-    // The timeline axis aliases the validated average: the point set (and
-    // its table row) is the same, only the chart body changes.
     ...(typeof entry.avg_power_w === 'number'
       ? {
           measuredAvgPower: chartMetric(entry.avg_power_w),
@@ -579,8 +478,6 @@ function buildMeasuredPowerChartFields(
     ...(typeof entry.joules_per_input_token === 'number'
       ? { measuredJPerInputToken: chartMetric(entry.joules_per_input_token) }
       : {}),
-    // Role-local energy is not additionally gated on power_valid here —
-    // rowToAggDataEntry already scrubbed it, same as the role-watts fields.
     ...(typeof entry.prefill_joules_per_input_token === 'number'
       ? { measuredPrefillJPerInputToken: chartMetric(entry.prefill_joules_per_input_token) }
       : {}),
@@ -599,11 +496,6 @@ function buildMeasuredPowerChartFields(
       : {}),
   };
 }
-/**
- * Remaps a chart-ready point onto a resolved metric and x-axis field. Official
- * and overlay pipelines share this coordinate step while retaining separate
- * clipping and frontier policies.
- */
 export function remapInferencePoint(
   point: InferenceData,
   metricKey: YAxisMetricKey,
@@ -611,9 +503,6 @@ export function remapInferencePoint(
 ): InferenceData {
   const metric = point[metricKey];
   const xCandidate = (point as Partial<AggDataEntry>)[xAxisField];
-  // Absent TTFT values are zero-filled by the row transform. Neither that
-  // sentinel nor an unrelated fallback coordinate is a latency measurement;
-  // the same holds for the mean service fields.
   const requiresMeasuredValue =
     xAxisField.endsWith('_ttft') || xAxisField === 'mean_e2el' || xAxisField === 'mean_tpot_intvty';
   const missingMeasuredValue =
@@ -627,9 +516,6 @@ export function remapInferencePoint(
   };
 }
 
-/**
- * Safely retrieves a nested Y-value from an InferenceData object.
- */
 export const getNestedYValue = <T extends InferenceData>(point: T, key: string): number => {
   if (key.includes('.')) {
     const [mainKey, subKey] = key.split('.');
@@ -642,20 +528,8 @@ export const getNestedYValue = <T extends InferenceData>(point: T, key: string):
   return (point[key as keyof T] as number) ?? 0;
 };
 
-/**
- * Whether a point may sit on the Pareto frontier / "optimal" set. Points with a
- * non-positive or non-finite x (e.g. interactivity = 0 when ITL is missing/zero,
- * or a 0/negative latency) are degenerate — no real config runs there — so they
- * must never be marked optimal. Apply this to a frontier function's INPUT; the
- * points still render in the show-all view, they just lose roofline eligibility.
- * NOTE: filter at the call site, not inside the paretoFront* functions — those are
- * kept 1:1 with the calculator's Python port (iso_interactivity.py).
- */
 export const isFrontierEligible = (p: { x: number }): boolean => Number.isFinite(p.x) && p.x > 0;
 
-/**
- * Calculates the Pareto front (upper right) for a given set of points.
- */
 export const paretoFrontUpperRight = (points: InferenceData[]): InferenceData[] => {
   if (points.length === 0) {
     return [];
@@ -684,9 +558,6 @@ export const paretoFrontUpperRight = (points: InferenceData[]): InferenceData[] 
   return front;
 };
 
-/**
- * Calculates the Pareto front (upper left) for a given set of points.
- */
 export const paretoFrontUpperLeft = (points: InferenceData[]): InferenceData[] => {
   if (points.length === 0) {
     return [];
@@ -717,9 +588,6 @@ export const paretoFrontUpperLeft = (points: InferenceData[]): InferenceData[] =
   return front;
 };
 
-/**
- * Calculates the Pareto front (lower left) for a given set of points.
- */
 export const paretoFrontLowerLeft = (points: InferenceData[]): InferenceData[] => {
   if (points.length === 0) {
     return [];
@@ -744,9 +612,6 @@ export const paretoFrontLowerLeft = (points: InferenceData[]): InferenceData[] =
   return front;
 };
 
-/**
- * Calculates the Pareto front (lower right) for a given set of points.
- */
 export const paretoFrontLowerRight = (points: InferenceData[]): InferenceData[] => {
   if (points.length === 0) {
     return [];
@@ -780,23 +645,12 @@ const PARETO_BY_DIRECTION = {
 
 export type ParetoDirection = keyof typeof PARETO_BY_DIRECTION;
 
-/** Look up the Pareto frontier function for a roofline direction. */
 export const paretoFrontForDirection = (
   dir: ParetoDirection,
 ): ((points: InferenceData[]) => InferenceData[]) => PARETO_BY_DIRECTION[dir];
 
-/**
- * Whether a roofline direction favors higher X. The names are historical:
- * upper_left maximizes X and upper_right minimizes X. Read X direction from
- * the resolved corner, never from chart type: trace-derived and custom X
- * metrics reuse a chart definition whose natural X runs the other way.
- */
 export const paretoMaximizesX = (dir: ParetoDirection): boolean =>
   dir === 'upper_left' || dir === 'lower_right';
-
-// ---------------------------------------------------------------------------
-// Locale-aware metric label/title helpers
-// ---------------------------------------------------------------------------
 
 export function metricTitle(chartDef: ChartDefinition, metricKey: string, locale: Locale): string {
   if (locale === 'zh') {
@@ -806,7 +660,6 @@ export function metricTitle(chartDef: ChartDefinition, metricKey: string, locale
   return (chartDef[`${metricKey}_title`] as string) || '';
 }
 
-/** Heading title for a metric: the metric alone, without its cost tier. */
 export function metricChartTitle(
   chartDef: ChartDefinition,
   metricKey: string,
@@ -829,7 +682,6 @@ export function metricLabel(chartDef: ChartDefinition, metricKey: string, locale
   return (chartDef[`${metricKey}_label`] as string) || '';
 }
 
-/** Resolve the rendered x-axis label without mutating the canonical English label. */
 export function xAxisLabel(chartDef: ChartDefinition, locale: Locale): string {
   return locale === 'zh' && chartDef.x_labelZh ? chartDef.x_labelZh : chartDef.x_label;
 }

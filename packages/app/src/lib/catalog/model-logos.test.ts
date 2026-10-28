@@ -70,8 +70,6 @@ describe('model developer logos', () => {
   });
 
   it('keeps every model logo full-color except monochrome-by-design marks', () => {
-    // `currentColor` fills are the monochrome giveaway: a full-color mark
-    // ships its own brand fills and never inherits the text color.
     for (const model of Object.values(Model)) {
       const logo = getModelLogo(model);
       if (!logo || !logo.endsWith('.svg') || isMonochromeLogo(logo)) continue;

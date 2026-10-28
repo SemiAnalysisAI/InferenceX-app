@@ -189,9 +189,9 @@ describe('createUnofficialWatermark', () => {
       .nodes()
       .map((n) => ({ x: n.getAttribute('x'), y: n.getAttribute('y') }));
     expect(positions).toEqual([
-      { x: '230', y: '65' }, // row 1 centered
-      { x: '0', y: '195' }, // row 2 left seam
-      { x: '460', y: '195' }, // row 2 right seam
+      { x: '230', y: '65' },
+      { x: '0', y: '195' },
+      { x: '460', y: '195' },
     ]);
   });
 
@@ -229,7 +229,6 @@ describe('createUnofficialWatermark', () => {
 
   it('inserts the image and warning rect behind the chart content', () => {
     const { svg, defs } = makeSvg();
-    // Add a dummy child before calling watermark
     svg.append('g').attr('class', 'pre-existing');
     createUnofficialWatermark(svg, defs, innerWidth, innerHeight, margin, 'test');
 

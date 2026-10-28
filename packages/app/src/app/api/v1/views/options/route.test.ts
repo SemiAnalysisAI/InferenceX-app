@@ -57,6 +57,15 @@ describe('GET /api/v1/views/options', () => {
     expect(dsv4.dbKeys).toContain('dsv4');
     expect(typeof dsv4.category).toBe('string');
     expect(body.models.every((m: { dbKeys: string[] }) => m.dbKeys.length > 0)).toBe(true);
+    expect(body.models.find((m: { name: string }) => m.name === 'MiniMax-M3')).toMatchObject({
+      dbKeys: ['minimaxm3'],
+      category: 'deprecated',
+    });
+    expect(
+      body.models.find((m: { name: string }) => m.name === 'MiniMax-M3.1-Flash'),
+    ).toMatchObject({
+      category: 'default',
+    });
   });
 
   it('describes sequences with isl/osl and deprecation flags', async () => {
@@ -67,6 +76,29 @@ describe('GET /api/v1/views/options', () => {
     const agentic = body.sequences.find((s: { key: string }) => s.key === 'agentic-traces');
     expect(agentic).toBeDefined();
     expect(agentic.isl).toBeNull();
+  });
+
+  it('returns default models in selector order without changing the selected default', async () => {
+    const res = await GET(request('/api/v1/views/options'));
+    const body = await res.json();
+    expect(
+      body.models
+        .filter((model: { category: string }) => model.category === 'default')
+        .map((model: { name: string }) => model.name),
+    ).toEqual([
+      'Kimi-K3',
+      'DeepSeek-V4.1-Flash',
+      'GLM-5.2',
+      'MiniMax-M3.1-Flash',
+      'Muse-Spark-Open',
+      'DeepSeek-V4-Pro',
+      'Qwen-3.5-397B-A17B',
+      'Qwen3.8-Flash-Next',
+    ]);
+    expect(body.defaults.model).toBe('DeepSeek-V4-Pro');
+    expect(body.models.some((model: { category: string }) => model.category === 'hidden')).toBe(
+      false,
+    );
   });
 
   it('describes hardware and metrics from the registries', async () => {
@@ -93,7 +125,6 @@ describe('GET /api/v1/views/options', () => {
       percentile: 'p90',
       xmode: 'interactivity',
     });
-    // Same vendors, in the dashboard's quick-filter pill order.
     expect(body.quickFilters.vendors).toEqual(VENDOR_ORDER);
     expect(body.quickFilters.deployments).toEqual(['single-node', 'multi-node', 'disagg']);
     expect(body.fleet.defaults).toEqual({

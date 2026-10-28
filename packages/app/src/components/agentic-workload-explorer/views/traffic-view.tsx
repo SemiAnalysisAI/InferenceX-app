@@ -26,8 +26,6 @@ import { Expandable } from '@/components/agentic-workload-explorer/expandable-ch
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 
-// ── i18n ──────────────────────────────────────────────────────────
-
 const STRINGS = {
   en: {
     trafficOverview: 'Traffic Overview',
@@ -81,8 +79,6 @@ const STRINGS = {
   },
 } as const;
 
-// -- Chart constants --------------------------------------------------------
-
 const CHART_W = 600;
 const CHART_H = 200;
 const MARGIN = { top: 8, right: 12, bottom: 36, left: 56 };
@@ -91,8 +87,6 @@ const PLOT_H = CHART_H - MARGIN.top - MARGIN.bottom;
 
 const SVG_FONT = 'var(--font-mono, ui-monospace, monospace)';
 const SVG_FONT_SIZE = '9px';
-
-// -- Helpers ----------------------------------------------------------------
 
 function niceNum(range: number, round: boolean): number {
   const exponent = Math.floor(Math.log10(range));
@@ -121,7 +115,6 @@ function generateTicks(min: number, max: number, targetCount: number): number[] 
   const spacing = niceNum(range / (targetCount - 1), true);
   const niceMin = Math.floor(min / spacing) * spacing;
   const ticks: number[] = [];
-  // Keep going until a tick reaches max, so the tallest bar is never clipped.
   for (let t = niceMin; t - spacing < max - spacing * 1e-9; t += spacing) {
     ticks.push(Math.round(t * 1e10) / 1e10);
   }
@@ -137,8 +130,6 @@ function formatPeakHour(peakHour: string | null): string {
   return `${h12}:00 ${suffix}`;
 }
 
-// -- Section header ---------------------------------------------------------
-
 function SectionHeader({ label, detail }: { label: string; detail?: string }) {
   return (
     <div className="flex items-center gap-2 mb-2">
@@ -151,8 +142,6 @@ function SectionHeader({ label, detail }: { label: string; detail?: string }) {
   );
 }
 
-// -- Stat card --------------------------------------------------------------
-
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border border-border bg-surface p-3">
@@ -163,8 +152,6 @@ function StatCard({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
-
-// -- Requests Over Time bar chart -------------------------------------------
 
 function DailyRequestsChart({
   data,
@@ -219,7 +206,6 @@ function DailyRequestsChart({
           className="w-full"
           style={{ maxHeight: 240 }}
         >
-          {/* Y-axis grid lines and labels */}
           {yTicks.map((t) => (
             <g key={`y-${t}`}>
               {t > 0 && (
@@ -246,7 +232,6 @@ function DailyRequestsChart({
             </g>
           ))}
 
-          {/* Baseline */}
           <line
             x1={MARGIN.left}
             y1={MARGIN.top + PLOT_H}
@@ -257,7 +242,6 @@ function DailyRequestsChart({
             strokeWidth={0.5}
           />
 
-          {/* Bars */}
           {data.map((d, i) => {
             const x = MARGIN.left + i * (barWidth + barGap);
             const barH = (d.requestCount / yMax) * PLOT_H;
@@ -295,8 +279,6 @@ function DailyRequestsChart({
   );
 }
 
-// -- Hourly Heatmap ---------------------------------------------------------
-
 function HourlyHeatmap({
   heatmap,
   strings,
@@ -326,7 +308,6 @@ function HourlyHeatmap({
     1,
   );
 
-  // Build a lookup map: key = "dow-hour"
   const lookup = new Map<string, number>();
   for (const c of heatmap) {
     lookup.set(`${c.dayOfWeek}-${c.hourOfDay}`, c.requestCount);
@@ -371,7 +352,6 @@ function HourlyHeatmap({
           />
         </div>
         <svg ref={svgRef} viewBox="0 0 600 200" className="w-full" style={{ maxHeight: 240 }}>
-          {/* Row labels (day names) */}
           {strings.dayLabels.map((label, dow) => (
             <text
               key={`row-${dow}`}
@@ -385,7 +365,6 @@ function HourlyHeatmap({
             </text>
           ))}
 
-          {/* Column labels (hours, every 4h) */}
           {Array.from({ length: 7 }, (_, i) => i * 4).map((h) => (
             <text
               key={`col-${h}`}
@@ -399,7 +378,6 @@ function HourlyHeatmap({
             </text>
           ))}
 
-          {/* Grid cells */}
           {Array.from({ length: 7 }, (_row, dow) =>
             Array.from({ length: 24 }, (_col, hour) => {
               const count = lookup.get(`${dow}-${hour}`) || 0;
@@ -440,8 +418,6 @@ function HourlyHeatmap({
     </Expandable>
   );
 }
-
-// -- Streaming vs Non-Streaming stacked bar chart ---------------------------
 
 function StreamingChart({
   data,
@@ -499,7 +475,6 @@ function StreamingChart({
         className="w-full"
         style={{ maxHeight: 240 }}
       >
-        {/* Y-axis grid lines and labels */}
         {yTicks.map((t) => (
           <g key={`y-${t}`}>
             {t > 0 && (
@@ -526,7 +501,6 @@ function StreamingChart({
           </g>
         ))}
 
-        {/* Baseline */}
         <line
           x1={MARGIN.left}
           y1={MARGIN.top + PLOT_H}
@@ -537,7 +511,6 @@ function StreamingChart({
           strokeWidth={0.5}
         />
 
-        {/* Stacked bars */}
         {sliced.map((d, i) => {
           const x = MARGIN.left + i * (barWidth + barGap);
           const total = d.streamingCount + d.nonStreamingCount;
@@ -546,7 +519,6 @@ function StreamingChart({
 
           return (
             <g key={d.day}>
-              {/* Non-streaming (bottom) */}
               <rect
                 x={x}
                 y={sy(total)}
@@ -559,7 +531,6 @@ function StreamingChart({
                   {d.day}: {formatNumber(d.nonStreamingCount)} {strings.tooltipNonStreaming}
                 </title>
               </rect>
-              {/* Streaming (top of stack) */}
               <rect
                 x={x}
                 y={sy(total) + Math.max(nonStreamH, 0)}
@@ -572,7 +543,6 @@ function StreamingChart({
                   {d.day}: {formatNumber(d.streamingCount)} {strings.tooltipStreaming}
                 </title>
               </rect>
-              {/* X-axis labels: show every 5th */}
               {i % 5 === 0 && (
                 <text
                   x={x + barWidth / 2}
@@ -593,7 +563,6 @@ function StreamingChart({
         })}
       </svg>
 
-      {/* Legend */}
       <div className="flex gap-4 mt-2">
         <div className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: '#06b6d4' }} />
@@ -607,8 +576,6 @@ function StreamingChart({
     </div>
   );
 }
-
-// -- Main page --------------------------------------------------------------
 
 export default function TrafficPage() {
   const locale = useLocale();
@@ -643,7 +610,6 @@ function TrafficPageContent() {
 
   return (
     <div className="space-y-6">
-      {/* -- Stats --------------------------------------------------------- */}
       <div>
         <SectionHeader label={t.trafficOverview} />
         {loading ? (
@@ -670,7 +636,6 @@ function TrafficPageContent() {
 
       {data && (
         <>
-          {/* -- Requests Over Time -------------------------------------------- */}
           <div>
             <SectionHeader
               label={t.requestsOverTime}
@@ -696,7 +661,6 @@ function TrafficPageContent() {
             />
           </div>
 
-          {/* -- Hourly Heatmap ------------------------------------------------ */}
           <div>
             <SectionHeader label={t.hourlyHeatmap} detail={t.heatmapDetail} />
             <HourlyHeatmap
@@ -711,7 +675,6 @@ function TrafficPageContent() {
             />
           </div>
 
-          {/* -- Streaming vs Non-Streaming ------------------------------------ */}
           <div>
             <SectionHeader
               label={t.streamingVsNonStreaming}

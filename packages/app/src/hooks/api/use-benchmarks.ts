@@ -3,25 +3,16 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchBenchmarks, type BenchmarkRow } from '@/lib/api/api';
 import { withSupplementalBenchmarks } from '@/lib/benchmarks/supplemental-benchmarks';
 
-/** Shared query options — reused by useQueries for comparison dates. */
 export function benchmarkQueryOptions(
   model: string,
   date: string,
   enabled = true,
   exact?: boolean,
-  /** GitHub run id for the "as of run" view (main chart) or the exact-run comparison. */
   runId?: string,
-  /** When true with a runId, fetch exactly that run's results (GPU comparison). */
   exactRun?: boolean,
   view?: { type: 'calculator'; sequence: string; cacheScope?: string },
   initialData?: BenchmarkRow[],
   scope?: string,
-  /** Keep the previous result rendered (as placeholder data) while a new
-   *  query key for the SAME model fetches, so date/run/scope changes update
-   *  in place instead of unmounting the charts. Model switches still start
-   *  from the loading state — stale rows from another model would render a
-   *  misleading chart. Consumers can distinguish the placeholder window via
-   *  `isPlaceholderData` / `isFetching`. */
   keepPreviousForModel?: boolean,
 ) {
   const canonicalDate = date === 'latest' ? '' : date;
@@ -44,8 +35,6 @@ export function benchmarkQueryOptions(
         { model, date: canonicalDate, exact, runId, view },
       ),
     enabled: enabled && Boolean(model),
-    // Pair-scoped SSR payloads must preserve their exact identity and contents;
-    // supplemental rows are merged on every ordinary network read above.
     ...(initialData ? { initialData } : {}),
     ...(keepPreviousForModel
       ? {

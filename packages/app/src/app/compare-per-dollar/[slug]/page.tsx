@@ -41,12 +41,6 @@ import ComparePerDollarPageClient from './page-client';
 
 export const dynamic = 'force-dynamic';
 
-/**
- * `/compare-per-dollar/<slug>/<scenario>` renders this same page with the workload
- * pinned by the path. The segment is threaded through rather than duplicated
- * in a parallel route file so the body — redirects, JSON-LD, metadata, client
- * props — is written once and cannot drift between the two URLs.
- */
 export interface ScenarioOptions {
   scenarioSegment?: ScenarioSegment;
 }
@@ -76,18 +70,10 @@ export function buildPerDollarMetadata(
   const fullLabel = compareModelDisplayLabel(parsed.model, parsed.a, parsed.b);
   const gpuLabel = compareDisplayLabel(parsed.a, parsed.b);
   const canonical = canonicalCompareSlug(parsed.model.slug, parsed.a, parsed.b);
-  // The scenario segments are views of one comparison, so the bare slug URL
-  // stays the indexable representative and every segment canonicalizes to it.
-  // Without this, `/…/<slug>/<default-scenario>` and `/…/<slug>` would serve
-  // byte-identical pages, each claiming to be canonical.
   const routePath = scenarioPath(canonical, scenarioSegment);
   const canonicalPath = scenarioPath(canonical);
   const url = `${SITE_URL}${routePath}`;
   const canonicalUrl = `${SITE_URL}${canonicalPath}`;
-  // Description leads with the searched GPU pair + model, then the trust
-  // signals (verified/reproducible, what InferenceX is, named supporters)
-  // before weaving the per-dollar SEO terms ("performance per dollar", "cost
-  // per million tokens", "TCO-normalized") without keyword-stuffing.
   const description = `${gpuLabel} performance per dollar on ${parsed.model.label}: verified, reproducible cost-per-million-token results from InferenceX, the independent open-source benchmark by SemiAnalysis, normalized by hyperscaler TCO. ${SUPPORTERS_LINE} See which chip is cheaper at every interactivity level.`;
   return {
     title: `${fullLabel} — Performance per Dollar`,
@@ -123,12 +109,7 @@ export async function renderPerDollarPage(
   const parsed = parseCompareSlug(slug);
   if (!parsed) notFound();
 
-  // Same one-hop 308 normalization as /compare/[slug] — bare-slug fallback,
-  // alias model resolution, GPU alphabetical order — but redirect target lives
-  // under /compare-per-dollar/. Query string is preserved across the hop.
   const canonical = canonicalCompareSlug(parsed.model.slug, parsed.a, parsed.b);
-  // canonical is always lowercase; compare against lowercased input so mixed-case
-  // URLs don't emit a fresh 308 + CDN cache entry every hit.
   if (canonical !== slug.toLowerCase()) {
     const qs = Object.entries(sp)
       .flatMap(([k, v]) => {
@@ -138,8 +119,6 @@ export async function renderPerDollarPage(
       })
       .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
       .join('&');
-    // Keep the scenario segment across the redirect — dropping it would send
-    // the reader to the pair's default workload instead.
     permanentRedirect(`${scenarioPath(canonical, scenarioSegment)}${qs ? `?${qs}` : ''}`);
   }
 
@@ -150,8 +129,6 @@ export async function renderPerDollarPage(
   const urlModel = pickString(sp.g_model);
   const effectiveModel =
     urlModel && KNOWN_MODELS.has(urlModel) ? urlModel : parsed.model.displayName;
-  // Path beats query beats the pair's default: a scenario segment is an
-  // explicit address for one workload, so it outranks a stale `?i_seq=`.
   const pathSequence = scenarioSegment ? sequenceForScenarioSegment(scenarioSegment) : null;
   const requestedSequence = pathSequence ?? (urlSeq && KNOWN_SEQUENCES.has(urlSeq) ? urlSeq : null);
   const requestedPrecision = urlPrec && KNOWN_PRECISIONS.has(urlPrec) ? urlPrec : null;
@@ -210,10 +187,6 @@ export async function renderPerDollarPage(
     ssrRows,
     interactivityRange,
   );
-  // Large-hyperscaler-volume ownership $/GPU/hr — the same `costh` value the per-dollar math
-  // upstream uses to derive cost per million tokens. Rendered in the header
-  // so the reader can audit the underlying pricing inputs without leaving
-  // the page.
   const aCostPerGpuHr = getGpuSpecs(parsed.a).costh;
   const bCostPerGpuHr = getGpuSpecs(parsed.b).costh;
 

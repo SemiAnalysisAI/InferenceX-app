@@ -10,7 +10,6 @@ import {
 } from '@/components/quotes/quotes-data';
 import type { Locale } from '@/lib/i18n/i18n';
 
-// Strip order follows QUOTES order — supporter orgs are listed first there.
 const stripOrgs = [
   ...new Set(
     QUOTES.filter((q) => (CAROUSEL_ORGS as readonly string[]).includes(q.org)).map((q) => q.org),
@@ -33,15 +32,10 @@ export function IntroSection({ locale = 'en' }: { locale?: Locale } = {}) {
   return (
     <section>
       <Card data-testid="intro-section">
-        {/* The splash moved to the AgentX hero, which now opens the landing
-            page — two copies of the same announcement one scroll apart read
-            as a duplicate rather than a callout. */}
         <div className="flex items-start gap-2 mb-4">
           <Quote className="size-5 shrink-0 mt-1 text-brand" />
           <h2 className="text-lg font-semibold">{HEADING[locale]}</h2>
         </div>
-        {/* Quote text lives on /quotes now — the band keeps just the org
-            strip and a link out, saving vertical space above the fold. */}
         <SupportersStrip
           orgs={supporterOrgs(isZh ? '/zh/quotes' : '/quotes')}
           moreHref={isZh ? '/zh/quotes' : '/quotes'}

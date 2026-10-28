@@ -1,11 +1,8 @@
 import { modelSelectionBenchmarks } from './model-selection-fixtures';
 
-// Synthetic navigation data: the captured Qwen fixtures only contain single-turn runs.
 const qwenAgenticRows = modelSelectionBenchmarks
   .filter((row) => row.model === 'dsv4')
   .map((row) => ({ ...row, model: 'qwen3.5', precision: 'fp8' }));
-// An off-scope FP4 winner reproduces production: ranking before the FP8 filter
-// selected Dynamo TRT and left the visible GB300 Dynamo SGLang line unchecked.
 qwenAgenticRows.push(
   ...qwenAgenticRows
     .filter((row) => row.hardware === 'gb300' && row.framework === 'dynamo-sglang')
@@ -32,19 +29,21 @@ export function assertTpuGb300Selected() {
   cy.get('body').type('{esc}');
 }
 
-export function interceptTpuLaunchData() {
-  // Preserve other models and any test-specific availability overrides.
+export function interceptTpuLaunchData(
+  model: 'Qwen-3.5-397B-A17B' | 'Kimi-K3' = 'Qwen-3.5-397B-A17B',
+) {
+  const rows =
+    model === 'Kimi-K3'
+      ? qwenAgenticRows.map((row) => ({ ...row, model: 'kimik3' }))
+      : qwenAgenticRows;
   cy.intercept('GET', '/api/v1/availability*', (request) => {
     request.on('response', (response) => {
-      response.body = [
-        ...response.body,
-        ...qwenAgenticRows.map(({ metrics: _metrics, ...row }) => row),
-      ];
+      response.body = [...response.body, ...rows.map(({ metrics: _metrics, ...row }) => row)];
     });
   });
   cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
-    if (request.query.model === 'Qwen-3.5-397B-A17B') {
-      request.reply({ body: qwenAgenticRows });
+    if (request.query.model === model) {
+      request.reply({ body: rows });
     }
   });
 }

@@ -2,8 +2,10 @@ import { ChevronDownIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { track } from '@/lib/analytics/analytics';
 import { Button } from '@/components/ui/button';
+import { ControlPanel } from '@/components/ui/control-panel';
 import { DatePicker } from '@/components/ui/date-picker';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
+import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select,
@@ -30,8 +32,11 @@ import {
 const WORKFLOW_STRINGS = {
   en: {
     conclusions: { success: 'Run succeeded', failure: 'Run failed', cancelled: 'Run cancelled' },
+    runContext: 'Run context',
+    runDate: 'Run date',
     run: 'Run',
     runCount: (index: number, total: number) => workflowRunCountLabel(index, total, 'en'),
+    runCountShort: (index: number, total: number) => workflowRunCountShortLabel(index, total, 'en'),
     previousRun: 'Previous run',
     nextRun: 'Next run',
     changelog: 'Changelog',
@@ -43,8 +48,11 @@ const WORKFLOW_STRINGS = {
   },
   zh: {
     conclusions: { success: '运行成功', failure: '运行失败', cancelled: '运行已取消' },
+    runContext: '运行信息',
+    runDate: '运行日期',
     run: '运行',
     runCount: (index: number, total: number) => workflowRunCountLabel(index, total, 'zh'),
+    runCountShort: (index: number, total: number) => workflowRunCountShortLabel(index, total, 'zh'),
     previousRun: '上一次运行',
     nextRun: '下一次运行',
     changelog: '变更日志',
@@ -56,15 +64,16 @@ const WORKFLOW_STRINGS = {
   },
 } as const;
 
+const RUN_CONTEXT_GRID = 'grid min-w-0 items-start gap-3 sm:grid-cols-2 lg:max-w-3xl';
+
 export function workflowRunCountLabel(index: number, total: number, locale: Locale): string {
   return locale === 'zh' ? `第 ${index} 次运行（共 ${total} 次）` : `Run ${index}/${total}`;
 }
 
-/**
- * Returns the run id adjacent to `selectedRunId` in `runIds` (which is ordered
- * oldest → newest, matching the "Run i/n" labels), or `undefined` when there is
- * no run in that direction or the selection is unknown.
- */
+export function workflowRunCountShortLabel(index: number, total: number, locale: Locale): string {
+  return locale === 'zh' ? `第 ${index}/${total} 次运行` : `Run ${index}/${total}`;
+}
+
 export function getAdjacentRunId(
   runIds: readonly string[],
   selectedRunId: string,
@@ -76,7 +85,6 @@ export function getAdjacentRunId(
   return target >= 0 && target < runIds.length ? runIds[target] : undefined;
 }
 
-/** The newest run id, i.e. the last entry of the oldest → newest `runIds` list. */
 export function getLatestRunId(runIds: readonly string[]): string | undefined {
   return runIds.at(-1);
 }
@@ -101,6 +109,29 @@ function RunConclusionDot({ conclusion, locale }: { conclusion: string | null; l
   );
 }
 
+function RunOptionLabel({
+  conclusion,
+  label,
+  locale,
+}: {
+  conclusion: string | null;
+  label: string;
+  locale: Locale;
+}) {
+  return (
+    <span className="flex min-w-0 items-center gap-1">
+      <RunConclusionDot conclusion={conclusion} locale={locale} />
+      <span className="truncate">{label}</span>
+      <span
+        data-external-link
+        className="inline-flex ml-1 cursor-pointer [&_svg]:pointer-events-auto"
+      >
+        <ExternalLinkIcon />
+      </span>
+    </span>
+  );
+}
+
 export default function WorkflowInfoDisplay() {
   const locale = useLocale();
   const t = WORKFLOW_STRINGS[locale];
@@ -113,6 +144,7 @@ export default function WorkflowInfoDisplay() {
   const runIds = Object.keys(availableRuns);
   const latestRunId = getLatestRunId(runIds);
   const isLatestRunSelected = latestRunId === undefined || selectedRunId === latestRunId;
+  const selectedRunIndex = runIds.indexOf(selectedRunId);
   const previousRunId = getAdjacentRunId(runIds, selectedRunId, 'previous');
   const nextRunId = getAdjacentRunId(runIds, selectedRunId, 'next');
 
@@ -124,21 +156,23 @@ export default function WorkflowInfoDisplay() {
 
   if (runIds.length === 0) {
     return (
-      <div className="flex flex-col lg:flex-row gap-2 text-muted-foreground">
-        <DatePicker
-          date={selectedRunDate}
-          onChange={(date) => setSelectedRunDate(date)}
-          availableDates={availableDates}
-          isCheckingAvailableDates={isCheckingAvailableDates}
-        />
-      </div>
+      <ControlPanel legend={t.runContext} data-testid="inference-run-context">
+        <div className={RUN_CONTEXT_GRID}>
+          <DatePicker
+            label={t.runDate}
+            date={selectedRunDate}
+            onChange={(date) => setSelectedRunDate(date)}
+            availableDates={availableDates}
+            isCheckingAvailableDates={isCheckingAvailableDates}
+          />
+        </div>
+      </ControlPanel>
     );
   }
 
   const changelog = (() => {
     const raw = availableRuns[selectedRunId]?.changelog || null;
     if (!raw) return null;
-    // Filter config_keys by selected precisions, drop entries with no matching keys
     const filtered = raw.entries
       .map((entry) => ({
         ...entry,
@@ -151,142 +185,160 @@ export default function WorkflowInfoDisplay() {
     return filtered.length > 0 ? { entries: filtered } : null;
   })();
 
+  const changelogPopover = (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="-my-1.5 h-8 px-2"
+          data-testid="run-changelog-trigger"
+        >
+          <strong>{t.changelog}</strong>
+          <ChevronDownIcon />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        collisionPadding={12}
+        className="max-h-[min(32rem,calc(100dvh-1.5rem))] w-[min(400px,calc(100vw-1.5rem))] overflow-y-auto"
+      >
+        <div className="break-words">
+          {changelog && changelog.entries.length > 0 ? (
+            <>
+              {changelog.entries.map((entry, index) => (
+                <div key={index}>
+                  {index > 0 && <hr className="my-3" />}
+                  <div className="flex flex-col gap-2 text-xs line-break-words">
+                    <div className="text-xs font-bold">{t.description}</div>
+                    {formatChangelogDescription(entry.description)}
+                    <div className="text-xs font-bold">{t.updatedConfigs}</div>
+                    <ul className="list-disc pl-4">
+                      {entry.config_keys.map((key: string) => (
+                        <li key={key}>{formatConfigKeys(key)}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              ))}
+              {changelog.entries[0]?.head_ref && (
+                <a
+                  href={`https://github.com/SemiAnalysisAI/InferenceX/commit/${changelog.entries[0].head_ref}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs hover:underline text-foreground underline"
+                >
+                  {t.gitCommit}
+                </a>
+              )}
+            </>
+          ) : (
+            <div className="flex flex-col gap-2 text-xs">
+              <div className="text-xs font-bold">{t.description}</div>
+              <span className="text-muted-foreground">{t.noChangelog}</span>
+              <span className="text-muted-foreground">{t.trackingHistory}</span>
+            </div>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+
   return (
-    <div className="flex flex-wrap gap-2 lg:gap-4 text-muted-foreground">
-      <DatePicker
-        date={selectedRunDate}
-        onChange={(date) => setSelectedRunDate(date)}
-        availableDates={availableDates}
-        isCheckingAvailableDates={isCheckingAvailableDates}
-        isLatestRunSelected={isLatestRunSelected}
-        onGoToLatestRun={() => selectRun(latestRunId, 'latest')}
-      />
-      {runIds.length > 0 ? (
-        <div className="flex items-center gap-0.5">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => selectRun(previousRunId, 'previous')}
-            disabled={previousRunId === undefined}
-            className="size-11 md:size-8"
-            aria-label={t.previousRun}
-          >
-            <ChevronLeft className="size-4" />
-          </Button>
-          <Select value={selectedRunId} onValueChange={(value) => selectRun(value, 'select')}>
-            <SelectTrigger
-              id="run-select"
-              aria-label={t.run}
-              className="w-full [&_[data-external-link]_svg]:pointer-events-auto"
-              onPointerDown={(e) => {
-                const target = e.target as HTMLElement;
-                if (target.closest('[data-external-link]')) {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  const runUrl = availableRuns[selectedRunId]?.runUrl;
-                  if (runUrl) {
-                    window.open(updateRepoUrl(runUrl), '_blank', 'noopener,noreferrer');
-                  }
-                }
-              }}
+    <ControlPanel legend={t.runContext} data-testid="inference-run-context">
+      <div className={RUN_CONTEXT_GRID}>
+        <DatePicker
+          label={t.runDate}
+          date={selectedRunDate}
+          onChange={(date) => setSelectedRunDate(date)}
+          availableDates={availableDates}
+          isCheckingAvailableDates={isCheckingAvailableDates}
+          isLatestRunSelected={isLatestRunSelected}
+          onGoToLatestRun={() => selectRun(latestRunId, 'latest')}
+        />
+        <div className="flex min-w-0 flex-col space-y-1.5" data-slot="run-field">
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor="run-select">{t.run}</Label>
+            {changelogPopover}
+          </div>
+          <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => selectRun(previousRunId, 'previous')}
+              disabled={previousRunId === undefined}
+              aria-label={t.previousRun}
             >
-              <SelectValue placeholder={t.run} />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.keys(availableRuns).map((run, index) => {
-                const runUrl = updateRepoUrl(availableRuns[run].runUrl);
-                return (
-                  <SelectItem
-                    key={run}
-                    value={run}
-                    onPointerDown={(e) => {
-                      const target = e.target as HTMLElement;
-                      if (target.closest('[data-external-link]')) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        window.open(runUrl, '_blank', 'noopener,noreferrer');
-                      }
-                    }}
-                  >
-                    <span className="flex items-center gap-1">
-                      <RunConclusionDot
+              <ChevronLeft className="size-4" />
+            </Button>
+            <Select value={selectedRunId} onValueChange={(value) => selectRun(value, 'select')}>
+              <SelectTrigger
+                id="run-select"
+                aria-label={t.run}
+                className="w-full [&_[data-external-link]_svg]:pointer-events-auto"
+                onClick={(e) => {
+                  if ((e.target as HTMLElement).closest('[data-external-link]')) e.preventDefault();
+                }}
+                onPointerDown={(e) => {
+                  const target = e.target as HTMLElement;
+                  if (target.closest('[data-external-link]')) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const runUrl = availableRuns[selectedRunId]?.runUrl;
+                    if (runUrl) {
+                      window.open(updateRepoUrl(runUrl), '_blank', 'noopener,noreferrer');
+                    }
+                  }
+                }}
+              >
+                <SelectValue placeholder={t.run}>
+                  {selectedRunIndex !== -1 && (
+                    <RunOptionLabel
+                      conclusion={availableRuns[selectedRunId].conclusion}
+                      label={t.runCountShort(selectedRunIndex + 1, runIds.length)}
+                      locale={locale}
+                    />
+                  )}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {runIds.map((run, index) => {
+                  const runUrl = updateRepoUrl(availableRuns[run].runUrl);
+                  return (
+                    <SelectItem
+                      key={run}
+                      value={run}
+                      onPointerDown={(e) => {
+                        const target = e.target as HTMLElement;
+                        if (target.closest('[data-external-link]')) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          window.open(runUrl, '_blank', 'noopener,noreferrer');
+                        }
+                      }}
+                    >
+                      <RunOptionLabel
                         conclusion={availableRuns[run].conclusion}
+                        label={t.runCount(index + 1, runIds.length)}
                         locale={locale}
                       />
-                      {t.runCount(index + 1, runIds.length)}
-                      <span
-                        data-external-link
-                        className="inline-flex ml-1 cursor-pointer [&_svg]:pointer-events-auto"
-                      >
-                        <ExternalLinkIcon />
-                      </span>
-                    </span>
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => selectRun(nextRunId, 'next')}
-            disabled={nextRunId === undefined}
-            className="size-11 md:size-8"
-            aria-label={t.nextRun}
-          >
-            <ChevronRight className="size-4" />
-          </Button>
-        </div>
-      ) : null}
-      <div>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline">
-              <strong>{t.changelog}</strong>
-              <ChevronDownIcon />
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => selectRun(nextRunId, 'next')}
+              disabled={nextRunId === undefined}
+              aria-label={t.nextRun}
+            >
+              <ChevronRight className="size-4" />
             </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-[400px]">
-            <div className="break-words">
-              {changelog && changelog.entries.length > 0 ? (
-                <>
-                  {changelog.entries.map((entry, index) => (
-                    <div key={index}>
-                      {index > 0 && <hr className="my-3" />}
-                      <div className="flex flex-col gap-2 text-xs line-break-words">
-                        <div className="text-xs font-bold">{t.description}</div>
-                        {formatChangelogDescription(entry.description)}
-                        <div className="text-xs font-bold">{t.updatedConfigs}</div>
-                        <ul className="list-disc pl-4">
-                          {entry.config_keys.map((key: string) => (
-                            <li key={key}>{formatConfigKeys(key)}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  ))}
-                  {changelog.entries[0]?.head_ref && (
-                    <a
-                      href={`https://github.com/SemiAnalysisAI/InferenceX/commit/${changelog.entries[0].head_ref}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs hover:underline text-foreground underline"
-                    >
-                      {t.gitCommit}
-                    </a>
-                  )}
-                </>
-              ) : (
-                <div className="flex flex-col gap-2 text-xs">
-                  <div className="text-xs font-bold">{t.description}</div>
-                  <span className="text-muted-foreground">{t.noChangelog}</span>
-                  <span className="text-muted-foreground">{t.trackingHistory}</span>
-                </div>
-              )}
-            </div>
-          </PopoverContent>
-        </Popover>
+          </div>
+        </div>
       </div>
-    </div>
+    </ControlPanel>
   );
 }

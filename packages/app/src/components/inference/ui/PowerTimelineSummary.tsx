@@ -68,11 +68,6 @@ const validatedWatts = (point: InferenceData, role: PowerPoolRole) =>
       : point.measuredAvgPower
   )?.y ?? null;
 
-/**
- * Per-trace provenance behind the Timeline curves: which run and telemetry file
- * each trace came from, the validated window length, and per pool its GPU
- * count, the row's validated average, the drawn peak and the rated pool TDP.
- */
 export default function PowerTimelineSummary({
   traces,
   responses,
@@ -152,9 +147,14 @@ export default function PowerTimelineSummary({
                               {`run ${trace.runId}`}
                             </a>
                             {attempt === null ? '' : ` · ${t.attempt(attempt)}`}
-                            <span className="block break-all text-muted-foreground">
+                            {/* The file name is provenance, not something to read in a table:
+                                one truncated line, full name on hover. */}
+                            <span
+                              className="block truncate text-muted-foreground"
+                              title={name ? `power_validation_${name}.json` : undefined}
+                            >
+                              {source ? `${t.source[source]} · ` : ''}
                               {name ? `power_validation_${name}.json` : '—'}
-                              {source ? ` · ${t.source[source]}` : ''}
                             </span>
                           </td>
                           <td className="p-2 align-top" rowSpan={summary.pools.length}>

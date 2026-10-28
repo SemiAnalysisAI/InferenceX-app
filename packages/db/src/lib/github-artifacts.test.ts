@@ -1,9 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+const { mockExecSync } = vi.hoisted(() => ({ mockExecSync: vi.fn() }));
+vi.mock('node:child_process', () => ({ execSync: mockExecSync }));
 
 import {
   RUNNER_SUFFIX_RE,
   assertRequestedRunAttempt,
   dedupeArtifactsByLogicalName,
+  fetchRunAttempt,
 } from './github-artifacts.js';
 
 const art = (name: string, created_at: string) => ({
@@ -19,8 +23,6 @@ describe('RUNNER_SUFFIX_RE', () => {
   });
 
   it('does not over-match across earlier underscore separators', () => {
-    // The (conc, offload) variant tokens must survive — only the final
-    // `_<pool>_<digits>` pair is stripped.
     expect('bmk_agentic_glm5_offload_on_b200-nb_2'.replace(RUNNER_SUFFIX_RE, '')).toBe(
       'bmk_agentic_glm5_offload_on',
     );
@@ -51,4 +53,21 @@ it('rejects a run URL whose requested attempt is no longer the current one', () 
     'GitHub attempt 2 differs from requested 1',
   );
   expect(() => assertRequestedRunAttempt(url, 1)).not.toThrow();
+});
+
+describe('fetchRunAttempt', () => {
+  it('returns the attempt reported by GitHub', () => {
+    mockExecSync.mockReturnValueOnce('3\n');
+    expect(fetchRunAttempt('owner/repo', '42')).toBe(3);
+  });
+
+  it.each(['', 'null', 'abc', '0'])(
+    'throws instead of defaulting when GitHub returns %j',
+    (out) => {
+      mockExecSync.mockReturnValueOnce(`${out}\n`);
+      expect(() => fetchRunAttempt('owner/repo', '42')).toThrow(
+        'GitHub returned no valid run_attempt for owner/repo run 42',
+      );
+    },
+  );
 });

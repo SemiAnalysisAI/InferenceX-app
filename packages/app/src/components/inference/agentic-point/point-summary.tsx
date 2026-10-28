@@ -70,7 +70,6 @@ function offloadDisplay(meta: PointMeta, locale: Locale): string {
   return meta.offload_mode.toLowerCase() === 'on' ? t.enabledLegacy : t.disabledLegacy;
 }
 
-/** Selected-point header: runtime components, concurrency, cache hit rates, and ISL/OSL. */
 export function PointSummary({ meta }: { meta: PointMeta }) {
   const locale = useLocale();
   const t = POINT_SUMMARY_STRINGS[locale];
@@ -99,7 +98,7 @@ export function PointSummary({ meta }: { meta: PointMeta }) {
               className="text-xs text-muted-foreground hover:text-foreground underline"
             />
           )}
-          {meta.run_url && (
+          {meta.run_url && !meta.hardware.startsWith('tpu') && (
             <a
               href={meta.run_url}
               target="_blank"

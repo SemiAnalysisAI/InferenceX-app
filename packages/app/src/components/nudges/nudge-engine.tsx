@@ -15,7 +15,7 @@ import {
 } from '@/lib/nudges/persistence';
 import { dismissesOnAction } from '@/lib/nudges/policy';
 import { NUDGE_REGISTRY } from '@/lib/nudges/registry';
-import type { NudgeDefinition, NudgeScope, NudgeTrigger } from '@/lib/nudges/types';
+import type { NudgeAction, NudgeDefinition, NudgeScope, NudgeTrigger } from '@/lib/nudges/types';
 import { LANDING_BANNER_DISMISSED_ATTRIBUTE } from '@/lib/nudges/landing-banner';
 import { BottomToast } from '@/components/ui/bottom-toast';
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
@@ -23,24 +23,11 @@ import { CoachMark } from '@/components/ui/coach-mark';
 import { Button } from '@/components/ui/button';
 import { NewBadge } from '@/components/ui/new-badge';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 function trackNudgeEvent(def: NudgeDefinition, event: 'shown' | 'dismissed' | 'action'): void {
   const name = def.analytics?.[event] ?? `${def.id}_${event}`;
   track(name, def.analytics?.properties);
 }
 
-/**
- * `requireAnchor` separates the two questions the engine asks.
- *
- * Trigger *setup* asks "could this nudge ever fire?" and must not consult the
- * anchor: a coach mark's anchor only exists once the chart has painted, and
- * skipping setup at mount would mean its triggers are never wired up at all.
- * Showing asks "can it fire right now?" — there a missing anchor is
- * disqualifying, and the show is simply retried on the next trigger.
- */
 function isEligible(
   def: NudgeDefinition,
   { requireAnchor = true, requireConditions = true } = {},
@@ -53,24 +40,10 @@ function isEligible(
   return true;
 }
 
-// ---------------------------------------------------------------------------
-// NudgeEngine
-// ---------------------------------------------------------------------------
-
 interface NudgeEngineProps {
   scope: NudgeScope;
 }
 
-/**
- * Three independent slots:
- *  - **banner** — inline content (one at a time)
- *  - **overlay** — toasts and modals (one at a time)
- *  - **coach mark** — a callout anchored to a live element (one at a time)
- *
- * All three can be visible simultaneously because they occupy different
- * visual layers: a banner sits in the document flow, an overlay in the
- * bottom-right corner, and a coach mark next to the element it explains.
- */
 export function NudgeEngine({ scope }: NudgeEngineProps) {
   const scopeNudges = useMemo(() => NUDGE_REGISTRY.filter((n) => n.scope === scope), [scope]);
 
@@ -154,11 +127,6 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
     coachMarkShownRef.current = false;
   }, [activeCoachMark]);
 
-  /**
-   * The user performed the interaction the coach mark was teaching (clicked a
-   * point). That is engagement, not rejection — record it as an action and,
-   * per `dismissesOnAction`, stop showing the tip.
-   */
   const handleCoachMarkAction = useCallback(() => {
     if (!activeCoachMark) return;
     trackNudgeEvent(activeCoachMark, 'action');
@@ -174,9 +142,6 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
     if (!activeBanner) return;
     trackNudgeEvent(activeBanner, 'action');
     activeBanner.content.onLinkClick?.();
-    // For navigation-style banners (default `dismissOnAction: false`), the
-    // banner stays visible until the page transitions. We deliberately leave
-    // `bannerShownRef`/`activeBannerId` set — the slot is still occupied.
     if (!dismissesOnAction(activeBanner)) return;
     markDismissed(activeBanner.storageKey, activeBanner.dismissal);
     if (activeBanner.renderOnInitialLoad) {
@@ -187,27 +152,26 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
     bannerShownRef.current = false;
   }, [activeBanner]);
 
-  const handleOverlayAction = useCallback(() => {
-    if (!activeOverlay) return;
-    trackNudgeEvent(activeOverlay, 'action');
-    const detail = eventDetailRef.current ?? undefined;
+  const handleOverlayAction = useCallback(
+    (action?: NudgeAction) => {
+      if (!activeOverlay) return;
+      trackNudgeEvent(activeOverlay, 'action');
+      const detail = eventDetailRef.current ?? undefined;
 
-    if (activeOverlay.type === 'toast') {
-      activeOverlay.content.action?.onClick(detail);
-    } else if (activeOverlay.type === 'modal') {
-      activeOverlay.content.primaryAction?.onClick(detail);
-    }
+      if (activeOverlay.type === 'toast') {
+        activeOverlay.content.action?.onClick(detail);
+      } else if (activeOverlay.type === 'modal') {
+        (action ?? activeOverlay.content.primaryAction)?.onClick(detail);
+      }
 
-    if (!dismissesOnAction(activeOverlay)) return;
-    markDismissed(activeOverlay.storageKey, activeOverlay.dismissal);
-    sessionDismissedRef.current.add(activeOverlay.id);
-    setActiveOverlayId(null);
-    overlayShownRef.current = false;
-  }, [activeOverlay]);
-
-  // -------------------------------------------------------------------------
-  // Trigger setup
-  // -------------------------------------------------------------------------
+      if (!dismissesOnAction(activeOverlay)) return;
+      markDismissed(activeOverlay.storageKey, activeOverlay.dismissal);
+      sessionDismissedRef.current.add(activeOverlay.id);
+      setActiveOverlayId(null);
+      overlayShownRef.current = false;
+    },
+    [activeOverlay],
+  );
 
   useEffect(() => {
     if (activeBanner && !isEligible(activeBanner)) {
@@ -220,13 +184,8 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
     const sorted = [...scopeNudges].toSorted((a, b) => b.priority - a.priority);
 
     for (const def of sorted) {
-      // Already occupying its slot — re-arming would keep re-running the
-      // (potentially expensive) eligibility check for no benefit.
       if (def.id === activeBannerId || def.id === activeOverlayId) continue;
       if (def.id === activeCoachMarkId) continue;
-      // Conditions are evaluated when a trigger fires. Wiring triggers only
-      // while a condition is already true strands route-dependent nudges when
-      // the persistent dashboard shell moves between tabs.
       if (!isEligible(def, { requireAnchor: false, requireConditions: false })) continue;
       if (sessionDismissedRef.current.has(def.id)) continue;
 
@@ -240,9 +199,6 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
         if (cleanup) cleanups.push(cleanup);
       }
 
-      // A condition may need re-evaluation on an event that is not itself a
-      // display trigger. Avoid a duplicate listener when the trigger already
-      // owns the same event and its configured threshold/delay.
       for (const condition of def.conditions ?? []) {
         const event = condition.listenEvent;
         if (!event || triggerEvents.has(event)) continue;
@@ -257,10 +213,6 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeBannerId, activeOverlayId, activeCoachMarkId, scope]);
-
-  // -------------------------------------------------------------------------
-  // Permanent suppress event listener
-  // -------------------------------------------------------------------------
 
   useEffect(() => {
     const handlers: [string, () => void][] = [];
@@ -283,13 +235,8 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
         if (def.permanentSuppressKey) {
           try {
             localStorage.setItem(def.permanentSuppressKey, '1');
-          } catch {
-            // Storage unavailable.
-          }
+          } catch {}
         }
-        // For nudges without a separate permanentSuppressKey (e.g. eval-samples),
-        // also write the dismissal storage so the suppression survives reload.
-        // Harmless when permanentSuppressKey is set since both keys persist.
         markDismissed(def.storageKey, def.dismissal);
       };
       window.addEventListener(def.permanentSuppressEvent, handler);
@@ -303,13 +250,6 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
     };
   }, [activeBannerId, activeOverlayId, activeCoachMarkId, scopeNudges]);
 
-  // -------------------------------------------------------------------------
-  // Render — banner and overlay can coexist
-  // -------------------------------------------------------------------------
-
-  // A phone has room for one floating card. While a coach mark is teaching an
-  // on-chart interaction, hold the bottom toast back (it is not dismissed) so
-  // the two never stack over the plot; it returns once the coach mark closes.
   const deferToastForCoachMark = isMobileViewport && Boolean(activeCoachMark?.content.anchor);
 
   return (
@@ -325,7 +265,7 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
         <ToastRenderer
           def={activeOverlay}
           onDismiss={dismissOverlay}
-          onAction={handleOverlayAction}
+          onAction={() => handleOverlayAction()}
         />
       )}
       {activeOverlay?.type === 'modal' && (
@@ -345,10 +285,6 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
     </>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Trigger setup — returns a cleanup function
-// ---------------------------------------------------------------------------
 
 function setupTrigger(
   trigger: NudgeTrigger,
@@ -423,10 +359,6 @@ function setupTrigger(
   return null;
 }
 
-// ---------------------------------------------------------------------------
-// Locale helpers
-// ---------------------------------------------------------------------------
-
 function localized(locale: Locale, en: string, zh?: string): string {
   return locale === 'zh' && zh ? zh : en;
 }
@@ -440,10 +372,6 @@ const RENDERER_STRINGS = {
   },
   zh: { explore: '探索', maybeLater: '稍后再看', close: '关闭', dismissBanner: '关闭发布横幅' },
 } as const;
-
-// ---------------------------------------------------------------------------
-// Renderers
-// ---------------------------------------------------------------------------
 
 function ToastRenderer({
   def,
@@ -484,7 +412,7 @@ function ModalRenderer({
 }: {
   def: NudgeDefinition;
   onDismiss: () => void;
-  onAction: () => void;
+  onAction: (action?: NudgeAction) => void;
 }) {
   const locale = useLocale();
   const rs = RENDERER_STRINGS[locale];
@@ -498,8 +426,6 @@ function ModalRenderer({
   const onDismissRef = useRef(onDismiss);
   onDismissRef.current = onDismiss;
 
-  // A centered modal covers the page, so it owns the keyboard: focus moves
-  // in, Tab cycles inside, Escape dismisses, and focus returns on close.
   useEffect(() => {
     if (!centered) return;
     const dialogEl = dialogRef.current;
@@ -531,8 +457,6 @@ function ModalRenderer({
       const first = items[0];
       const last = items.at(-1)!;
       const active = document.activeElement;
-      // The panel itself (focusable via tabIndex=-1 on click) counts as outside
-      // the item cycle, so Tab from it never escapes to the backdrop.
       const outside = active === dialogEl || !dialogEl.contains(active);
       if (event.shiftKey && (active === first || outside)) {
         event.preventDefault();
@@ -560,57 +484,98 @@ function ModalRenderer({
       aria-describedby={descriptionId}
       className={
         centered
-          ? `relative z-50 w-[calc(100vw-2rem)] max-w-md rounded-lg border bg-background p-6 shadow-lg ${content.containerClassName ?? ''}`
+          ? `relative z-50 w-[calc(100vw-2rem)] max-w-md rounded-xl border bg-background p-6 shadow-lg sm:p-8 ${content.containerClassName ?? ''}`
           : `fixed bottom-4 right-4 z-50 w-[calc(100vw-2rem)] max-w-md rounded-lg border bg-background p-6 shadow-lg ${content.containerClassName ?? ''}`
       }
     >
       <button
         type="button"
         onClick={onDismiss}
-        className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none"
+        className={`absolute rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none ${centered ? 'right-2 top-2 flex size-9 items-center justify-center focus-visible:ring-2 focus-visible:ring-ring' : 'right-4 top-4'}`}
         aria-label={rs.close}
       >
-        <X className="size-4" />
+        <X className={centered ? 'size-5' : 'size-4'} />
       </button>
       {content.renderContent ? (
         content.renderContent({ dismiss: onDismiss, titleId, descriptionId })
       ) : (
-        <div className="flex flex-col gap-4">
-          <div className="space-y-1.5 pr-6">
-            <h2 id={titleId} className="flex items-center gap-2 text-lg font-semibold">
-              <Icon className={`size-5 ${content.iconClassName ?? ''}`} />
+        <div className={`flex flex-col ${centered ? 'gap-7' : 'gap-4'}`}>
+          <div className={centered ? 'text-center' : 'space-y-1.5 pr-6'}>
+            {centered && (
+              <div className="mb-5 flex min-h-5 items-center justify-center gap-2">
+                <Icon className={`size-6 shrink-0 ${content.iconClassName ?? ''}`} />
+                {content.badge && (
+                  <NewBadge data-new-badge="launch-modal" flashing>
+                    {localized(locale, content.badge, content.badgeZh)}
+                  </NewBadge>
+                )}
+              </div>
+            )}
+            <h2
+              id={titleId}
+              className={
+                centered
+                  ? 'text-balance text-dialog-title font-semibold'
+                  : 'flex items-center gap-2 text-lg font-semibold'
+              }
+            >
+              {!centered && <Icon className={`size-5 shrink-0 ${content.iconClassName ?? ''}`} />}
               {localized(locale, content.title, content.titleZh)}
-              {content.badge && (
+              {!centered && content.badge && (
                 <NewBadge data-new-badge="launch-modal" className="ml-1" flashing>
                   {localized(locale, content.badge, content.badgeZh)}
                 </NewBadge>
               )}
             </h2>
-            <p id={descriptionId} className="text-sm text-muted-foreground">
+            <p
+              id={descriptionId}
+              className={`text-sm text-muted-foreground ${centered ? 'mt-3' : ''}`}
+            >
               {localized(locale, content.description, content.descriptionZh)}
             </p>
           </div>
-          <div className="flex flex-row justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={onDismiss}
-              data-testid={content.testId ? `${content.testId}-dismiss` : undefined}
-            >
-              {localized(
-                locale,
-                content.dismissLabel ?? 'Maybe Later',
-                content.dismissLabelZh ?? rs.maybeLater,
-              )}
-            </Button>
+          <div
+            className={
+              centered &&
+              content.hideDismissButton &&
+              content.primaryAction &&
+              content.secondaryAction
+                ? 'grid grid-cols-2 gap-3'
+                : `flex flex-row flex-wrap gap-2 ${centered ? 'justify-center' : 'justify-end'}`
+            }
+          >
+            {!content.hideDismissButton && (
+              <Button
+                variant="outline"
+                onClick={onDismiss}
+                data-testid={content.testId ? `${content.testId}-dismiss` : undefined}
+              >
+                {localized(
+                  locale,
+                  content.dismissLabel ?? 'Maybe Later',
+                  content.dismissLabelZh ?? rs.maybeLater,
+                )}
+              </Button>
+            )}
             {content.primaryAction && (
               <Button
-                onClick={onAction}
+                onClick={() => onAction(content.primaryAction)}
                 data-modal-primary=""
                 data-testid={content.testId ? `${content.testId}-action` : undefined}
-                className={content.actionClassName}
+                className={`${centered ? 'min-h-11 [&_img]:size-5' : ''} ${content.actionClassName ?? ''}`}
               >
                 {content.primaryAction.icon}
                 {localized(locale, content.primaryAction.label, content.primaryAction.labelZh)}
+              </Button>
+            )}
+            {content.secondaryAction && (
+              <Button
+                onClick={() => onAction(content.secondaryAction)}
+                data-testid={content.testId ? `${content.testId}-secondary-action` : undefined}
+                className={`${centered ? 'min-h-11 [&_img]:size-5' : ''} ${content.actionClassName ?? ''}`}
+              >
+                {content.secondaryAction.icon}
+                {localized(locale, content.secondaryAction.label, content.secondaryAction.labelZh)}
               </Button>
             )}
           </div>
@@ -625,8 +590,6 @@ function ModalRenderer({
         <button
           type="button"
           aria-label={rs.close}
-          // Mouse-only dimmer: keyboard users close with Escape or the X, so
-          // it stays out of the Tab order.
           tabIndex={-1}
           onClick={onDismiss}
           className="absolute inset-0 cursor-default bg-black/50"
@@ -651,7 +614,6 @@ function CoachMarkRenderer({
   const locale = useLocale();
   const { content } = def;
   const Icon = content.icon;
-  // Guarded by the caller — `isEligible` also refuses anchorless coach marks.
   const anchor = content.anchor!;
 
   return (
@@ -713,7 +675,6 @@ function BannerRenderer({
         </span>
         <div className="relative flex flex-1 flex-col sm:flex-row sm:items-center sm:gap-3 min-w-0">
           <div className="flex-1 min-w-0">
-            {/* leading-snug leaves room for the NEW badge when the title wraps on narrow screens. */}
             <p className="text-sm font-semibold leading-snug break-words">
               <span className="align-middle">
                 {localized(locale, content.title, content.titleZh)}

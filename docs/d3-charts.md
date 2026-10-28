@@ -17,15 +17,9 @@ Custom layers that own scale-neutral decorations declare a `displayIdentity` and
 
 `ScatterGraph` further partitions Effect 4 because its controls have disjoint mutation scopes. Mark visibility, palette/shape, trace metadata, point-label visibility/collision, line-label placement, and known-issue annotations each have a dedicated layout effect. It deliberately omits the generic scatter `displayIdentity`: point-label toggles update only `.point-label` nodes, while the unofficial overlay layer's own display callback updates only `.overlay-label` nodes. Recombining these passes causes label toggles to restamp thousands of unchanged shape, visibility, and trace attributes.
 
-## In-Place Y-Value Mutation
+## In-Place Datum Mutation
 
-Effect 3 mutates `datum.y` directly on D3-bound data:
-
-```js
-dotGroups.each(function (d) {
-  d.y = resolveY(d);
-});
-```
+Effect 3 copies each point's new values onto its D3-bound datum by join key (`Object.assign(bound, next)` in `updateLayerForMetric`), then re-applies transforms.
 
 This is an intentional React anti-pattern. D3's data binding means each DOM element holds a reference to its datum. Mutating the datum and re-applying transforms is 10x faster than D3's full enter/update/exit cycle because there's no DOM creation or destruction.
 
@@ -38,18 +32,9 @@ The zoom handler runs on every mouse/touch event during drag. It reads scales, r
 
 ## requestAnimationFrame Throttling in Zoom
 
-During zoom/pan, point repositioning (cheap: transform attr update) runs every frame. Grid and roofline updates (expensive: full path recalculation) are batched via rAF:
+During zoom/pan, point repositioning (cheap: transform attr update) runs on every zoom event. Axis, grid, and roofline updates (expensive: full path recalculation) go through `createZoomFrameBatcher`, which keeps at most one frame queued and runs only the latest transform's work.
 
-```js
-if (!rafId) {
-  rafId = requestAnimationFrame(() => {
-    updateGridAndRooflines(lastTransform);
-    rafId = null;
-  });
-}
-```
-
-This keeps zoom at 60fps while deferring expensive work. The `rafId` guard prevents queuing multiple frames. Pending rAF is cancelled on unmount to prevent updates on removed DOM.
+This keeps zoom at 60fps while deferring expensive work. Effect cleanup cancels a pending frame so it never updates removed DOM.
 
 ## HTML Strings for Tooltips
 
@@ -58,18 +43,9 @@ Tooltips are built as HTML template literal strings, injected via D3's `.html()`
 1. `ReactDOM.render()` inside a D3 event handler (breaks React's lifecycle)
 2. Or lifting tooltip state to React (causes re-render cascade on every mousemove)
 
-HTML strings bypass React entirely. The tooltip div is a plain DOM element appended to `document.body`, positioned absolutely. This keeps tooltip updates at <1ms per frame.
+HTML strings bypass React entirely. D3 writes them into a tooltip div that is portaled to `document.body` and positioned with `position: fixed`. This keeps tooltip updates at <1ms per frame.
 
-## Pareto Front: 4 Directions
-
-Different metrics need different "optimal" directions:
-
-| Direction   | "Best" means   | Example metric                                                        |
-| ----------- | -------------- | --------------------------------------------------------------------- |
-| upper_right | High x, high y | (not currently used)                                                  |
-| upper_left  | Low x, high y  | Interactivity chart: low latency (x), high throughput (y)             |
-| lower_right | High x, low y  | Cost/energy chart: high interactivity (x), low $/M tok or J/token (y) |
-| lower_left  | Low x, low y   | (not currently used)                                                  |
+## Pareto Front Direction
 
 The metric registry declares whether higher or lower values are preferable. Chart definitions derive the concrete corner from that polarity and the chart's x-axis direction, which keeps the choice in data rather than rendering code.
 
@@ -78,8 +54,8 @@ The metric registry declares whether higher or lower values are preferable. Char
 ### Global Pareto highlights
 
 For machine-readable frontier and hinterland observations, see the
-[Pareto boundary API](./pareto-api.md). The server and chart share
-`src/lib/charts/pareto-frontier.ts`; their input-selection pipelines differ.
+[Pareto frontier and hinterland reference](../packages/skills/skills/inferencex-api/references/pareto.md).
+The server and chart share `src/lib/charts/pareto-frontier.ts`; their input-selection pipelines differ.
 
 Inference scatter charts with a performance-preference X axis expose a **Pareto Frontier** switch under
 **Advanced**, off by default.
@@ -130,22 +106,6 @@ Upper boundaries use monotone interpolation between unique-X vertices, including
 
 There is no concurrency x-axis mode. GPU count varies across configurations, so the same concurrency is not a comparable load between them; `conc` stays a point attribute in tooltips, tables, CSV and the API. Exact topology quick filters (`pointTopologyKey`) select allocation and parallelism without filtering concurrency.
 
-### Unofficial runs in date comparisons
-
-`GPUGraph` plots `?unofficialrun=` rows next to the compared dates as their own (run, hardware) series, `overlay-run<index>_<hwKey>`. They pass the same precision, quick-filter and overlay-hardware (`activeOverlayHwTypes`) gates as `ScatterGraph`, draw as X markers in `overlayRunColor(runIndex)`, and their curves take `overlayRooflineDasharray(runIndex)` through the roofline layer's per-curve `getDasharray`. They are not date series, so `activeDates` toggles leave them on; the legend lists them first, one `UNOFFICIAL: <branch>` group per run, and dismissing the run removes them. Pinned tooltips, official and overlay alike, offer **View power trace**, which opens the comparison Timeline focused on that trace; official points also keep **View PowerX**. With Perf Ruler on, an overlay marker selects its run's curve like an official point, and hiding the run's hardware removes rulers on that curve.
-
-## Gradient Roofline Labels
-
-Parallelism strategies (TP4, TEP8, DPAEP4) color roofline paths with gradient stops and use one label per contiguous strategy segment. The reasoning:
-
-- A roofline may have 8+ points with different strategies. Individual labels would overlap.
-- Gradient coloring shows strategy territories: "this segment of the curve uses TP8, that segment uses EP4"
-- Blend zones (5-20% of gap between label changes) create smooth transitions between strategies
-
-The territory rule: each point "owns" the region ±50% to its neighbors. When adjacent points share a label, they merge into a single color band.
-
-Measured-power gradient labels use the displayed upper-boundary points, with the same single-date restriction as other gradient curves. They describe configuration changes, not numeric slope or efficiency. A boundary with one configuration keeps a solid line and its configuration label. Unofficial overlays also use one label per contiguous configuration segment, while their strokes and labels retain the run color shown in the legend.
-
 ## Axis Domains from Visible Data Only
 
 D3 axis domains are computed from only the visible (non-hidden) data points. Using all points (including toggled-off GPUs) would leave large blank areas when most GPUs are hidden, wasting chart space. This means axes rescale when toggling GPUs — intentional behavior that maximizes data density.
@@ -162,20 +122,6 @@ When Effect 2 rebuilds the SVG (data shape change), the current zoom transform i
 4. **Dismiss**: Click elsewhere, or zoom starts (via deferred rAF to avoid re-render during zoom event)
 
 The rAF deferral on zoom-dismiss is critical — calling `setState` synchronously inside a D3 zoom handler causes React to re-render mid-zoom, creating visible jank.
-
-## Tooltip & Chart Wrapper Abstractions
-
-Three higher-level abstractions sit above the raw D3 tooltip logic:
-
-- **`useStickyTooltip`** (`src/hooks/useStickyTooltip.ts`) — Manages pin/dismiss state, position, and content for a single tooltip instance. Encapsulates the ref+state pattern from the Pin/Dismiss lifecycle above so individual chart components don't reimplement it.
-- **`useChartTooltipHandlers`** (`src/hooks/useChartTooltipHandlers.ts`) — Wires mouse/touch events to a `useStickyTooltip` instance. Handles hover-follow, click-to-pin, and click-away-to-dismiss as a composable hook.
-- **`D3ChartWrapper`** (`src/components/ui/d3-chart-wrapper.tsx`) — Shared container for D3 charts. Handles the SVG ref, resize observer, tooltip portal div, and cleanup. Charts pass a render callback instead of managing their own container lifecycle.
-
-These exist because multiple chart types (scatter, GPU, bar) all need the same tooltip and container behavior. The abstractions prevent each chart from reimplementing the Pin/Dismiss lifecycle and resize handling.
-
-## Dynamic Left Margin Measurement
-
-D3 bar charts measure actual Y-axis label widths using a temporary SVG `<text>` element before rendering. Hardcoded margins truncate labels when GPU names get long (e.g., "GB200 NVL72 (Dynamo TRT, MTP) (FP4)"). The formula `max(80, ceil(measuredWidth * 0.6) + 12)` ensures labels always fit while maintaining a minimum margin for short labels.
 
 ## One Animation System per Property
 
@@ -195,3 +141,11 @@ Label loops that size a background rect to its text (`.ll-bg`/`.pl-bg`, point-la
 Every `setAttribute`, inline-style write, `textContent` assignment, and node move produces a `MutationObserver` record, **even when the value is unchanged**. PostHog session replay (rrweb) serializes each record — a moved node is re-serialized with its whole subtree — and the agentic-point coach mark rescans on them. A throttled Chrome profile of a legend toggle attributed ~40% of the main-thread work to rrweb processing these records; most came from blind re-syncs of hundreds of point labels, decoration rings, gradient stops, and `.raise()` calls that were already in order.
 
 Hot re-sync paths (data, metric, and display phases; zoom frames; point-label placement) therefore use the write-if-changed helpers in `src/lib/d3-chart/chart-update.ts`: `setAttrIfChanged`, `setStyleIfChanged`, `setTextIfChanged`, and `raiseInOrder` (sequential `.raise()` semantics, skipped when each parent's tail is already in that order). They compare against the live DOM, not a cache, so a label the placement pass moved is still restored correctly. Reads of attributes and inline styles never force layout. Initial enter-path construction can keep plain `.attr()` chains — new nodes produce one add record regardless. Tests for these paths assert a repeated pass emits zero mutation records.
+
+## Huawei series identity
+
+Huawei uses a shared amber/gold identity, separate from NVIDIA green, AMD red, Google blue and OpenAI purple. `HUAWEI_CHART_PALETTE` (including the `HUAWEI_CHART_COLORS` tokens) in `packages/constants/src/gpu-keys.ts` defines a darker amber for light canvases and a brighter gold for dark canvases. Both base colors exceed 4.5:1 contrast against the tested white and `#111214` reference backgrounds.
+
+`getVendor` recognizes canonical Ascend keys, framework-suffixed keys and Huawei/Ascend display names. The shared normal, date and high-contrast generators retain this identity; multiple Huawei chips/configurations use related amber shades. High-contrast palettes reserve the amber band from other vendors when Huawei is present. OperatorX delegates to the shared generator instead of maintaining a local crimson override. ubenchX uses the same generator for Huawei marks, legend swatches and tooltips while retaining its existing GPU palette. Theme changes update display decoration without changing measurement coordinates.
+
+These colors encode vendor identity, not a measurement. Sequential heatmap scales encode values and are independent of categorical vendor colors; official logo artwork is also separate. This is presentation-only: no API values, filters, hardware specifications or normalization references change.

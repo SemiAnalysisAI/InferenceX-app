@@ -339,6 +339,43 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
   };
 }
 
+/**
+ * Which input tokens the token-rate metrics count. `uncached` drops each
+ * agentic trace's theoretically cacheable prompt prefix (its infinite-cache
+ * hit rate), so throughput, cost, and energy metrics count only the new input
+ * suffix plus output. Fixed-sequence prompts share no prefix, so both bases
+ * are identical there.
+ */
+export type TokenBasis = 'total' | 'uncached';
+
+/**
+ * Rescale an agentic entry's token rates to the uncached basis in place.
+ * Returns false when the entry lacks the rate or input throughput needed to
+ * do so, so callers can drop it instead of mixing bases on one chart.
+ */
+export function applyUncachedTokenBasis(entry: AggDataEntry): boolean {
+  if (entry.benchmark_type !== 'agentic_traces') return true;
+  const rate = entry.theoretical_cache_hit_rate;
+  if (typeof rate !== 'number' || !(rate >= 0 && rate <= 1) || !entry.input_tput_per_gpu) {
+    return false;
+  }
+  const totalTput = entry.tput_per_gpu;
+  const prefixTput = entry.input_tput_per_gpu * rate;
+  entry.input_tput_per_gpu -= prefixTput;
+  entry.tput_per_gpu = Math.max(0, totalTput - prefixTput);
+  const inputScale = rate < 1 ? 1 / (1 - rate) : undefined;
+  const scaleInputJoules = (joules: number | undefined) =>
+    joules === undefined || inputScale === undefined ? undefined : joules * inputScale;
+  entry.joules_per_input_token = scaleInputJoules(entry.joules_per_input_token);
+  entry.prefill_joules_per_input_token = scaleInputJoules(entry.prefill_joules_per_input_token);
+  if (entry.joules_per_total_token !== undefined) {
+    entry.joules_per_total_token = entry.tput_per_gpu
+      ? (entry.joules_per_total_token * totalTput) / entry.tput_per_gpu
+      : undefined;
+  }
+  return true;
+}
+
 interface PreparedEntry {
   entry: AggDataEntry;
   hwKey: string;
@@ -417,11 +454,14 @@ export function mergeRunScopedRows(
  *   (default 'median'). Swaps `median_intvty`/`median_e2el` in the chart
  *   definition for the chosen percentile — only agentic rows carry the
  *   full set (median/p90/p99/p99.9) so this mainly affects that scenario.
+ * @param tokenBasis Whether token-rate metrics count cached prompt prefix
+ *   tokens; see {@link TokenBasis}.
  */
 export function transformBenchmarkRows(
   rows: BenchmarkRow[],
   percentile = 'median',
   tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
+  tokenBasis: TokenBasis = 'total',
 ): {
   chartData: InferenceData[][];
   hardwareConfig: HardwareConfig;
@@ -430,10 +470,10 @@ export function transformBenchmarkRows(
 
   // Phase 1: Convert rows once + resolve hardware keys.
   const entriesByHw = new Map<string, AggDataEntry[]>();
-  const prepared: PreparedEntry[] = Array.from({ length: rows.length });
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
+  const prepared: PreparedEntry[] = [];
+  for (const row of rows) {
     const entry = rowToAggDataEntry(row);
+    if (tokenBasis === 'uncached' && !applyUncachedTokenBasis(entry)) continue;
     const hwKey = getHardwareKey(entry);
     entry.hwKey = hwKey;
 
@@ -441,12 +481,12 @@ export function transformBenchmarkRows(
     entries.push(entry);
     entriesByHw.set(hwKey, entries);
 
-    prepared[i] = {
+    prepared.push({
       entry,
       hwKey,
       date: row.date,
       derivedFields: buildDerivedChartFields(entry, hwKey, undefined, tcoBasis),
-    };
+    });
   }
 
   // Labels depend on contributing runs, not only on the canonical hardware key.

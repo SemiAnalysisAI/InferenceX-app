@@ -1,24 +1,5 @@
 import { Precision, PRECISION_OPTIONS } from '../catalog/data-mappings';
 
-/**
- * Default precision selection.
- *
- * Historically every model defaulted to FP4-only, which left FP8-heavy models
- * (e.g. MiniMax M3, whose FP4 lives on a single GPU while FP8 spans seven)
- * showing a near-empty chart on first load. Instead we default to whichever
- * precision has the most data, with a guard against committing to a sparse one.
- *
- * "Curves" = distinct chart series that would render for a precision. Fixed-
- * sequence series include `spec_method`; agentic series do not because one line
- * can contain points from multiple speculative-decoding methods.
- */
-
-/**
- * Curve threshold for picking a sole default. We only commit to a single
- * precision when *every* available precision clears it; if any is below (e.g.
- * MiniMax M3's lone FP4 curve next to its FP8 fleet) we show all of them so the
- * sparse precision isn't silently dropped (per #470 discussion).
- */
 export const MIN_SOLE_DEFAULT_CURVES = 4;
 
 interface CurveRow {
@@ -30,7 +11,6 @@ interface CurveRow {
   benchmark_type?: string;
 }
 
-/** Count distinct curves per precision from already-filtered rows (model + sequence). */
 export function countCurvesByPrecision(rows: CurveRow[]): Record<string, number> {
   const seen = new Map<string, Set<string>>();
   for (const r of rows) {
@@ -47,10 +27,6 @@ export function countCurvesByPrecision(rows: CurveRow[]): Record<string, number>
   return counts;
 }
 
-/**
- * Tie-break rank (lower sorts first): FP4 wins ties so models that previously
- * defaulted to FP4 are unchanged, then canonical enum order, unknowns last.
- */
 function precisionRank(p: string): number {
   if (p === Precision.FP4) return -1;
   const i = (PRECISION_OPTIONS as readonly string[]).indexOf(p);
@@ -61,14 +37,6 @@ function byRank(a: string, b: string): number {
   return precisionRank(a) - precisionRank(b);
 }
 
-/**
- * Pick the default precision selection from per-precision curve counts:
- * - the single densest precision when *every* available precision has
- *   >= `minCurves` curves;
- * - otherwise every precision present, so a sparse precision (e.g. M3's lone FP4
- *   alongside its dense FP8) is shown rather than silently dropped.
- * Returns [] when there are no precisions.
- */
 export function pickDefaultPrecisions(
   counts: Record<string, number>,
   minCurves = MIN_SOLE_DEFAULT_CURVES,
@@ -85,18 +53,6 @@ export function pickDefaultPrecisions(
   return [densest];
 }
 
-/**
- * Resolve the effective precision selection for the current model + sequence.
- *
- * - When the user has explicitly chosen a precision (URL `i_prec`, a preset, or
- *   a manual toggle), honor it — intersected with what's available, falling back
- *   to the first available precision (preserves prior behavior).
- * - Otherwise start from the model's fixed default set when it has one for this
- *   scenario (`getModelDefaultPrecisions`, intersected with what is available),
- *   else auto-pick the densest precision (see `pickDefaultPrecisions`), and union
- *   in any precisions present in a loaded unofficial run, so an overlay the user
- *   explicitly opened is visible by default instead of hidden behind FP4.
- */
 export function resolveEffectivePrecisions(opts: {
   selectedPrecisions: string[];
   availablePrecisions: string[];
@@ -104,7 +60,6 @@ export function resolveEffectivePrecisions(opts: {
   unofficialPrecisions?: string[];
   explicit: boolean;
   minCurves?: number;
-  /** Per-model default set (`getModelDefaultPrecisions`); ignored when explicit. */
   modelDefaultPrecisions?: readonly string[];
 }): string[] {
   const { selectedPrecisions, availablePrecisions, curveCounts, explicit } = opts;

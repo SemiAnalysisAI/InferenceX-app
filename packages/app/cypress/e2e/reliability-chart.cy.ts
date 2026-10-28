@@ -1,5 +1,4 @@
 function visitReliability(path: string) {
-  // Keep the June snapshot inside its date windows regardless of when CI runs.
   cy.clock(Date.UTC(2026, 5, 15, 12), ['Date']);
   cy.visit(path);
 }
@@ -24,7 +23,6 @@ describe('Reliability Chart — Content & Interactions', () => {
 
         cy.get('#reliability-chart svg rect.bar').should('have.length.lessThan', initialCount);
 
-        // Reset back to All time so subsequent tests have data
         cy.get('[data-testid="reliability-date-range"]').click();
         cy.contains('[role="option"]', 'All time').click();
         cy.get('#reliability-chart svg rect.bar').should('have.length.greaterThan', 0);
@@ -52,12 +50,10 @@ describe('Reliability Chart — Content & Interactions', () => {
       .find('.sidebar-legend li label')
       .then(($labels) => {
         if ($labels.length < 2) {
-          // With only one model the toggle is a no-op (solo mode), so "Reset filter" cannot appear
           cy.log('Skipping: only one legend item — toggle cannot deactivate it');
           return;
         }
 
-        // First click unchecks all others, which shows "Reset filter"
         cy.wrap($labels.first()).click();
 
         cy.get('#reliability-chart')
@@ -108,9 +104,6 @@ describe('Reliability Chart — Chinese route and settled states', () => {
   });
 
   it('shows a safe Chinese error and recovers through the tracked retry control', () => {
-    // Keep every automatic query attempt failing until the retry button is
-    // clicked. Counting attempts is race-prone because a remount can consume
-    // the first healthy response before the error UI is asserted.
     let failRequests = true;
     cy.fixture('api/reliability.json').then((fixture) => {
       cy.intercept('GET', '**/api/v1/reliability', (req) => {

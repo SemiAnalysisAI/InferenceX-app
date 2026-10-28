@@ -6,12 +6,6 @@ import type { Locale } from '@/lib/i18n/i18n';
 
 import { AgentXOptimizationsLink } from './agentx-optimizations-link';
 
-/**
- * Entry point from /agentx into the optimizations pages: the headline claim,
- * a button to the index, and one link per project so a reader who already
- * knows which engine they care about can go straight there. Rendered inside
- * the AgentX methodology card, so it is a section rather than its own card.
- */
 export function AgentXOptimizationsCallout({ locale }: { locale: Locale }) {
   const overview = getOptimizationsOverview(locale);
   const frameworks = getLocalizedFrameworks(locale);

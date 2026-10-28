@@ -130,7 +130,6 @@ describe('ATOM KV capacity', () => {
   });
 
   it('scans oversized server logs in bounded chunks instead of one regex buffer', async () => {
-    // LMCache runs stored 290-690 MiB logs; PostgreSQL rejects regex buffers over 1 GiB (4 B/char).
     const chunkCalls: { offset: number; width: number; probe: number }[] = [];
     const chunks = [
       { has_more: true, lines: [capacity(60372, 256)] },

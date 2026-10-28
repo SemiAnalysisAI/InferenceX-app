@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** An example using a one-GPU reference scope and the agreed 1.5 IT multiplier. */
 
 import {
   type ITPowerBreakdown,

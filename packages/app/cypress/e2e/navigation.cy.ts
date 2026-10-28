@@ -4,9 +4,6 @@ import { servingArtifact, videoRun } from '../support/video-artifacts';
 
 const datum = (el: Element) => (el as Element & { __data__: { x: number; y: number } }).__data__;
 
-// Merged from tabs.cy.ts and first-load-navigation.cy.ts
-// to reduce per-file Cypress startup overhead (~500ms per file)
-
 describe('Chart Section Tabs — E2E', () => {
   before(() => {
     cy.window().then((win) => {
@@ -86,9 +83,6 @@ describe('Chart Section Tabs — E2E', () => {
   });
 
   it('keeps the sliding indicator aligned after the ↑↑↓↓ unlock inserts the Hidden trigger', () => {
-    // Start locked: testIsolation is off, so an unlock persisted by an earlier
-    // test would make the konami sequence below a no-op (nothing would insert,
-    // nothing would shift, and the assertion would pass vacuously).
     cy.visit('/inference', {
       onBeforeLoad(win) {
         win.localStorage.removeItem('inferencex-feature-gate');
@@ -96,10 +90,6 @@ describe('Chart Section Tabs — E2E', () => {
     });
     cy.get('[data-testid="tab-trigger-hidden"]').should('not.exist');
     cy.get('[data-testid="chart-section-tabs"] .tab-indicator').should('exist');
-    // Unlock mid-session: inserting the Hidden trigger reflows the
-    // justify-evenly tabs WITHOUT resizing the nav box, so the nav's
-    // ResizeObserver never fires — only the gateUnlocked remeasure keeps
-    // the indicator under the active tab.
     cy.get('body').type('{upArrow}{upArrow}{downArrow}{downArrow}');
     cy.get('[data-testid="tab-trigger-hidden"]').should('be.visible');
     cy.get('[data-testid="chart-section-tabs"] .tab-indicator').should(($indicator) => {
@@ -113,7 +103,6 @@ describe('Chart Section Tabs — E2E', () => {
       expect(Number(match!.groups!.left)).to.be.closeTo(active.offsetLeft, 1);
       expect(indicator.getBoundingClientRect().width).to.be.closeTo(active.offsetWidth, 1);
     });
-    // Re-lock so the unlock doesn't leak into later tests (testIsolation off).
     cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate'));
   });
 
@@ -134,9 +123,6 @@ describe('First-load navigation', () => {
     cy.visit('/', {
       onBeforeLoad(win) {
         win.localStorage.removeItem('inferencex-starred');
-        // Snoozed, not cleared: the star modal is the eligible landing nudge
-        // on first load, and its corner card would sit over the footer links
-        // these specs click.
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         win.localStorage.removeItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed');
       },
@@ -177,7 +163,6 @@ describe('First-load navigation', () => {
 
   it('leads the landing page with the AgentX hero and its two CTAs', () => {
     cy.get('[data-testid="compare-agentx-primary"]').within(() => {
-      // The hero owns /compare's h1; on the landing page it is a section heading.
       cy.get('h2').should('have.text', 'Compare Realistic Agentic Inference Perf');
       cy.get('h1').should('not.exist');
       cy.get('[data-testid="compare-agentx-revenue-calculator-link"]')
@@ -187,21 +172,16 @@ describe('First-load navigation', () => {
         .should('have.text', 'Dashboard')
         .and('have.attr', 'href', '/inference/kimi-k3');
       cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
-      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 5);
-      // Landing curation preserves the relative editorial order.
+      cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 2);
+      for (const hidden of ['minimax-m3', 'kimi-k3', 'glm-5-3']) {
+        cy.get(`[data-testid="compare-agentx-model-${hidden}"]`).should('not.exist');
+      }
       cy.get('[data-testid^="compare-agentx-model-"]').then(($rows) => {
         const slugs = [...$rows].map((row) =>
           (row.dataset.testid ?? '').replace('compare-agentx-model-', ''),
         );
-        expect(slugs).to.deep.equal([
-          'kimi-k3',
-          'muse-spark-open',
-          'deepseek-v41-flash',
-          'glm-5-3',
-          'minimax-m3',
-        ]);
+        expect(slugs).to.deep.equal(['muse-spark-open', 'deepseek-v41-flash']);
       });
-      // NEW is reserved for the TPUv7 launch — no ledger row carries the pill.
       cy.get('[data-testid^="compare-agentx-model-"] [data-new-badge="agentx-ledger"]').should(
         'not.exist',
       );
@@ -224,7 +204,6 @@ describe('TPUv7 AgentX launch banner', { testIsolation: true }, () => {
     it(`opens Qwen3.5 AgentX results from ${locale || '/'} landing page`, () => {
       cy.visit(locale || '/', {
         onBeforeLoad(win) {
-          // Dismissing the previous Rubin MiniMax M3 launch must not hide this banner.
           win.localStorage.setItem('inferencex-rubin-minimax-m3-banner-dismissed', '1');
           win.localStorage.removeItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed');
           win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -240,8 +219,8 @@ describe('TPUv7 AgentX launch banner', { testIsolation: true }, () => {
         .and(
           'contain.text',
           locale
-            ? 'TPUv7 Qwen3.5 397B AgentX 预览结果：单位 TCO 性能提升 1.7 倍'
-            : 'TPUv7 Qwen3.5 397B AgentX Preview Results, 1.7x better perf per TCO',
+            ? 'TPUv7 Kimi K3 2.8T 初步提交：成绩具有竞争力'
+            : 'TPUv7 Kimi K3 2.8T prelimary Submisison: Competitive Results',
         )
         .click();
       cy.location('pathname').should('eq', `${locale}/inference/qwen-3-5`);
@@ -257,7 +236,6 @@ describe('TPUv7 results', { testIsolation: true }, () => {
       cy.location('pathname').should('eq', `${locale}/inference`);
       cy.get('[data-testid="inference-chart-display"]').should('be.visible');
       cy.get('.dot-group[data-hw-key^="tpuv7"]').should('have.length.at.least', 1);
-      // Verify the rendered values, then reload the share URL in each locale.
       cy.location('href').then((href) => {
         const url = new URL(href);
         url.searchParams.set('g_model', 'Qwen-3.5-397B-A17B');
@@ -268,7 +246,6 @@ describe('TPUv7 results', { testIsolation: true }, () => {
       });
       const dots = '.dot-group[data-hw-key^="tpuv7"]';
 
-      // Internal owner cost is the default basis; External is the opt-in.
       cy.get('[data-testid="tco-basis-internal"]').should('have.attr', 'aria-pressed', 'true');
       cy.get(dots)
         .first()

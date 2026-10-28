@@ -10,7 +10,6 @@ export type PercentileKey = 'mean' | 'p50' | 'p75' | 'p90' | 'p95' | 'p99';
 
 interface PercentileLine {
   key: PercentileKey;
-  /** Display label in legend / tooltip. */
   label: string;
   color: string;
 }
@@ -24,24 +23,14 @@ const PERCENTILE_LINES: PercentileLine[] = [
   { key: 'p99', label: 'P99', color: PERCENTILE_COLORS.p99 },
 ];
 
-// Wider bottom/left padding than CHART_PAD — the x-axis carries rotated
-// per-config labels instead of time ticks.
 const PAD = { top: 16, right: 16, bottom: 90, left: 64 };
 
 export interface AggregatePoint {
-  /** Sibling label rendered on x-axis (e.g. "TP8 • c=8"). */
   label: string;
-  /** Per-percentile value; missing percentiles are dropped from the plot. */
   values: Partial<Record<PercentileKey, number>>;
-  /** Sibling id — purely informational, used in the tooltip title. */
   id?: number;
 }
 
-/**
- * Multi-line chart: one x-position per sibling config, one line per
- * percentile (mean/p50/p75/p90/p95/p99). Designed for the "Aggregates across
- * configs" view on the agentic detail page.
- */
 export function AggregateChart({
   points,
   unit,
@@ -52,9 +41,7 @@ export function AggregateChart({
 }: {
   points: readonly AggregatePoint[];
   unit: string;
-  /** Optional fixed y-axis upper bound (e.g. 1 for percentages). */
   yMax?: number;
-  /** Optional value formatter (e.g. percentage → "30%"). */
   yFmt?: (v: number) => string;
   width?: number;
   height?: number;
@@ -96,16 +83,12 @@ export function AggregateChart({
   }
   const { yTop, innerW, innerH } = computed;
 
-  // X positions: evenly spaced across the inner width.
   const xOf = (i: number) =>
     points.length === 1 ? PAD.left + innerW / 2 : PAD.left + (i / (points.length - 1)) * innerW;
   const yOf = (v: number) => PAD.top + (1 - v / yTop) * innerH;
 
-  // 5 y-axis ticks evenly between 0 and yTop.
   const yTicks = Array.from({ length: 5 }, (_, i) => (yTop * i) / 4);
 
-  // Resolve hover: snap to nearest sibling index and emit all percentiles
-  // that have data at that x.
   const resolve = (fraction: number) => {
     const idx = Math.round(fraction * (points.length - 1));
     const p = points[Math.max(0, Math.min(points.length - 1, idx))];
@@ -135,7 +118,6 @@ export function AggregateChart({
         </span>
       </div>
       <ChartHover pad={PAD} width={W} height={H} resolve={resolve}>
-        {/* y-axis ticks + gridlines */}
         {yTicks.map((v, i) => {
           const y = yOf(v);
           return (
@@ -162,7 +144,6 @@ export function AggregateChart({
           );
         })}
 
-        {/* X-axis tick labels — one per sibling, rotated 30° to fit. */}
         {points.map((p, i) => {
           const x = xOf(i);
           return (
@@ -190,7 +171,6 @@ export function AggregateChart({
           );
         })}
 
-        {/* X axis baseline */}
         <line
           x1={PAD.left}
           x2={PAD.left + innerW}
@@ -200,8 +180,6 @@ export function AggregateChart({
           opacity={0.25}
         />
 
-        {/* Horizontal connecting lines per percentile — faint backdrop so the
-            eye can follow how each percentile changes across configs. */}
         {percentileLines.map((line) => {
           const segments: { x1: number; y1: number; x2: number; y2: number }[] = [];
           let prev: { x: number; y: number } | null = null;
@@ -233,12 +211,8 @@ export function AggregateChart({
           );
         })}
 
-        {/* Per-sibling vertical bar spanning the percentile range, with a
-            colored tick at each percentile level. Mean rendered as a small
-            diamond to distinguish from the percentile ticks. */}
         {points.map((p, i) => {
           const x = xOf(i);
-          // Collect percentile values present for this sibling.
           const present = percentileLines
             .filter(
               (line) =>
@@ -246,8 +220,6 @@ export function AggregateChart({
             )
             .map((line) => ({ ...line, value: p.values[line.key]! }));
           if (present.length === 0) return null;
-          // Only the *percentile* values define the bar extent; mean might be
-          // outside the percentile span on weird distributions.
           const pctlOnly = present.filter((p2) => p2.key !== 'mean');
           const bandValues = pctlOnly.length > 0 ? pctlOnly : present;
           const bandYs = bandValues.map((b) => yOf(b.value));
@@ -267,7 +239,6 @@ export function AggregateChart({
               {present.map((b) => {
                 const ty = yOf(b.value);
                 if (b.key === 'mean') {
-                  // Diamond marker for mean.
                   const s = 4;
                   return (
                     <polygon
@@ -278,7 +249,6 @@ export function AggregateChart({
                     />
                   );
                 }
-                // Horizontal tick at each percentile.
                 return (
                   <line
                     key={`tk-${b.key}`}

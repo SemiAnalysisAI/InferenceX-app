@@ -1,10 +1,5 @@
 import type { SearchDoc } from './search-index';
 
-/**
- * Subtrees that are site chrome, controls or non-text rendering. Charts are
- * SVG/canvas: their axis ticks are noise for a content search. The search
- * dialog itself opts out with `data-site-search-ignore`.
- */
 const EXCLUDED_SELECTOR = [
   'script',
   'style',
@@ -44,14 +39,6 @@ function anchorFor(heading: Element): string | undefined {
   return section?.id || undefined;
 }
 
-/**
- * Split a document (live or parsed) into heading-delimited sections.
- *
- * Text before the first heading becomes an untitled intro section together
- * with the meta description, so a page with no headings is still one doc.
- * Parsed documents from `DOMParser` are inert: no scripts run and no
- * subresources load, so extraction has no side effects.
- */
 export function extractSections(doc: Document, path: string): SearchDoc[] {
   const root = doc.querySelector('main') ?? doc.body;
   if (!root) return [];
@@ -65,13 +52,11 @@ export function extractSections(doc: Document, path: string): SearchDoc[] {
   const walker = doc.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
       if (node.nodeType === Node.ELEMENT_NODE) {
-        // REJECT skips the whole subtree; SKIP still visits children.
         if ((node as Element).matches(EXCLUDED_SELECTOR)) return NodeFilter.FILTER_REJECT;
         return (node as Element).matches(HEADING_SELECTOR)
           ? NodeFilter.FILTER_ACCEPT
           : NodeFilter.FILTER_SKIP;
       }
-      // Heading text is captured from the heading element itself.
       return node.parentElement?.closest(HEADING_SELECTOR)
         ? NodeFilter.FILTER_SKIP
         : NodeFilter.FILTER_ACCEPT;
@@ -92,13 +77,11 @@ export function extractSections(doc: Document, path: string): SearchDoc[] {
   for (const { heading, text } of sections) {
     const body = clean(text.join(' ')).slice(0, MAX_SECTION_CHARS);
     const title = heading ? clean(heading.textContent ?? '') : undefined;
-    // The H1 usually repeats the page title; keep its body but not the label.
     const section = title && title !== pageTitle ? title : undefined;
     if (!body && !section) continue;
     const anchor = heading ? anchorFor(heading) : undefined;
     const url = anchor ? `${path}#${anchor}` : path;
     const previous = docs.at(-1);
-    // Untitled runs sharing a URL (description, pre-H1 text, H1 body) are one result.
     if (previous && previous.url === url && !section && !previous.section) {
       previous.text = `${previous.text} ${body}`.trim().slice(0, MAX_SECTION_CHARS);
       continue;
@@ -115,22 +98,15 @@ export function extractSections(doc: Document, path: string): SearchDoc[] {
 }
 
 export interface SeedPage {
-  /** Same-origin path, e.g. `/chips/b200`. */
   path: string;
   title: string;
   description: string;
-  /** The `##` group the link was listed under in llms.txt. */
   group: string;
 }
 
 const LINK_LINE = /^- \[(?<title>[^\]]+)\]\((?<href>[^)\s]+)\)(?::\s*(?<desc>.*))?$/u;
 const NON_PAGE_PATH = /\.(?:xml|txt|json|pdf|png|jpe?g|webp|svg)$/iu;
 
-/**
- * Parse the public `llms.txt` site index into same-site page seeds. It is a
- * small cached text file that already lists every curated page with a title
- * and summary, so results appear before any page has been fetched.
- */
 export function parseLlmsTxt(text: string, siteOrigins: readonly string[]): SeedPage[] {
   const seeds: SeedPage[] = [];
   const seen = new Set<string>();

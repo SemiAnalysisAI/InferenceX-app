@@ -2,19 +2,12 @@ import { Card } from '@/components/ui/card';
 import type { DashboardRouteKey } from '@/lib/routing/dashboard-routes';
 import { TAB_INTRO_ZH, TAB_META_ZH } from '@/lib/routing/tab-meta-zh';
 
-/**
- * Server-rendered Chinese intro above the interactive dashboard on /zh tab
- * pages. The charts below render in English; this block gives crawlers and
- * readers genuine Chinese content describing what the page shows.
- */
 export function ZhTabIntro({
   tab,
   title,
   intro,
 }: {
   tab: DashboardRouteKey;
-  /** Model-specific overrides used by the per-model routes
-   *  (/zh/historical/<slug>); the tab defaults apply when omitted. */
   title?: string;
   intro?: string;
 }) {

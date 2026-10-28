@@ -1,13 +1,3 @@
-/**
- * Prefix Cache Reuse (`/cache-reuse`).
- *
- * Stacked shares of prompt tokens per concurrency for one configuration: HBM
- * hits, host-tier hits, and the rest. The agentic overlay fixtures report
- * gpu 0.8 / external 0.1 / cpu 0.05 with offload on, so every bar must read
- * 80 / 5 / 15 — the host tier is the CPU-offload figure and the router's
- * external figure is not added on top. The fixed-sequence fixtures carry no
- * cache tier at all, which is the page's honest empty state for that scenario.
- */
 import { interceptDerivedAgenticMetrics, unlockAgenticGate } from '../support/e2e';
 import {
   b300Rows,

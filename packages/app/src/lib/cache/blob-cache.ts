@@ -38,18 +38,23 @@ export async function blobSet(key: string, data: unknown): Promise<void> {
   }
 }
 
-/** Delete all cached blobs. Returns 0 when blob is not configured. */
-export async function blobPurge(): Promise<number> {
+/**
+ * Delete cached blobs, optionally within a key prefix and keeping the key
+ * subtrees in `keep`. No-op when unconfigured.
+ */
+export async function blobPurge(keyPrefix = '', keep: string[] = []): Promise<number> {
   if (!blobEnabled()) return 0;
-  const prefix = getPrefix();
+  const prefix = `${getPrefix()}${keyPrefix}`;
+  const kept = keep.map((key) => `${getPrefix()}${key}`);
   let deleted = 0;
   let cursor: string | undefined;
 
   do {
     const result = await list({ prefix, cursor });
-    if (result.blobs.length > 0) {
-      await del(result.blobs.map((b) => b.url));
-      deleted += result.blobs.length;
+    const blobs = result.blobs.filter((b) => !kept.some((k) => b.pathname.startsWith(k)));
+    if (blobs.length > 0) {
+      await del(blobs.map((b) => b.url));
+      deleted += blobs.length;
     }
     cursor = result.hasMore ? result.cursor : undefined;
   } while (cursor);

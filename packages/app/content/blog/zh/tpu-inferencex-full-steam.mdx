@@ -55,7 +55,7 @@ Google 用十多年时间展示了自己能用 TPU 做出什么。现在，轮�
 
 在 100 tokens/s/user 的交互速度下，Ironwood 每百万 total token 的成本约为 $0.181，B200 为 $0.222，B300 为 $0.276。也就是说，在提供相同单用户生成速度的前提下，成本比 B200 低约 19%，比 B300 低约 34%。
 
-这一对比使用的是外部 TPU TCO，即一家超大规模实验室（hyperscaler lab）购买 TPU 时的成本，对照 B200/B300 的 TCO。[去年，SemiAnalysis Accelerator Model 率先披露 Google 正在直接销售 TPU，而不再只是通过 Google Cloud 出租](https://semianalysis.com/accelerator-hbm-model/)。在大部分交互速度区间内，TPU 更低的小时成本足以抵消其较低的吞吐量。[SemiAnalysis TCO Model 提供了 TPU BoM 估算与 TCO 估算的完整拆解。](https://semianalysis.com/ai-cloud-tco-model/)
+这一对比使用的是外部 TPU TCO，即一家超大规模实验室（hyperscaler lab）购买 TPU 时的成本，并以 B200/B300 的 TCO 作为对照。[去年，SemiAnalysis Accelerator Model 率先披露 Google 正在直接销售 TPU，而不再只是通过 Google Cloud 出租](https://semianalysis.com/accelerator-hbm-model/)。在大部分交互速度区间内，TPU 更低的小时成本足以抵消其较低的吞吐量。[SemiAnalysis TCO Model 提供了 TPU BoM 估算与 TCO 估算的完整拆解。](https://semianalysis.com/ai-cloud-tco-model/)
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/8047a697-0d6f-41fe-8c16-71998778ecb4_2048x1228.png"
@@ -69,7 +69,7 @@ Google 用十多年时间展示了自己能用 TPU 做出什么。现在，轮�
   caption="来源：InferenceX Preview"
 />
 
-在原始性能曲线的大部分区间里，TPU 并没有超过 NVIDIA GPU。但这种对比没有考虑 TPU 更低的 TCO。**TPU 的买家真正关心的是能赚多少收入，也就是每美元性能和每瓦性能。**
+在原始性能曲线的大部分区间里，TPU 并没有超过 NVIDIA GPU。但这种对比没有考虑 TPU 更低的 TCO。**TPU 的买家主要关心的是能赚多少收入，也就是每美元性能和每瓦性能。**
 
 即便如此，在 20 tok/s/user 的交互速度下，Ironwood 在原始吞吐量上同样领先：达到 9,364 total tokens/s/chip，B200 为 8,903，B300 为 8,925。在这些运行中，这比两款 GPU 都高出约 5%。再叠加更低的建模小时成本，Ironwood 的每美元 token 数比 B200 多 50.4%，比 B300 多 96.0%。
 
@@ -127,7 +127,7 @@ Google 在内部生产环境中运行分离式推理已有多年，那条路径�
   点击查看完整 InferenceX 仪表板 →
 </DashboardCTA>
 
-## 全新原生、一等公民的 TorchTPU 后端对比此前的 TorchAX 软件栈
+## 推理服务：全新原生、一等公民的 TorchTPU 后端对比此前的 TorchAX 软件栈
 
 ### 此前的 TorchAX vLLM 后端
 
@@ -139,7 +139,7 @@ vLLM 对 TPU 的支持经历了三个阶段：
 - 当前公开的后端 [tpu-inference](https://vllm.ai/blog/2025-10-16-vllm-tpu) 在有针对 TPU 优化的 JAX 实现时优先使用它；否则由 TorchAX 把原始 PyTorch 模型翻译成 JAX 可以执行的算子。目标是复用成熟的 TPU 原语和并行支持，而不必重写每一个 PyTorch 模型。
 - 即将推出的第三种设计 TorchTPU，让 vLLM 把 TPU 当作原生 PyTorch 设备。它将成为今后 SGLang 和 vLLM 在 TPU 上的首选后端。
 
-下图聚焦第二阶段，展示了 vLLM 的 tpu-inference 后端如何把直接的 JAX 模型与通过 TorchAX 运行的 PyTorch 模型结合起来。
+下图聚焦第二阶段，展示了 vLLM 的 tpu-inference 后端如何把直接以 JAX 实现的模型与通过 TorchAX 运行的 PyTorch 模型结合起来。
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/678ca15d-f0c0-4c36-a63f-b1108939cbb1_2048x1620.png"
@@ -205,7 +205,7 @@ vLLM 和 SGLang 是两大主流开源生产级推理服务栈。Inferact、Radix
 
 ## TPU 推理优化深度解析
 
-为原生 TorchTPU 服务栈的首个 bring-up 模型优化 TPU 推理，是一场投入了数百工程小时和大量 PR 的冲刺。正如后文所述，TPU 架构与 GPU 架构不同，因此需要一套专属优化才能高效运行模型。下面介绍在 Ironwood 上提升（某些情况下是首次实现）Qwen3.5-397B 及其他模型性能的各项优化。大部分 Pallas kernel 优化都可以迁移到全新的原生 TorchTPU 软件栈。
+为原生 TorchTPU 服务栈的首个 bring-up 模型优化 TPU 推理，是一场投入了数百工程小时和大量 PR 的冲刺。正如后文所述，TPU 架构与 GPU 架构不同，因此需要一套专属优化才能高效运行模型。下面介绍在 Ironwood 上改善 Qwen3.5-397B 及其他模型性能的各项优化；其中一些改动使这些模型得以运行。大部分 Pallas kernel 优化都可以迁移到全新的原生 TorchTPU 软件栈。
 
 ### DP Attention 优化
 
@@ -249,7 +249,7 @@ Google 还[在 SparseCore 上实现了 ReduceScatter 集合通信](https://githu
 
 ### 优化 MoE 路由与专家 Kernel
 
-混合专家层会为每个专家产生大小不规则的 token 分组，这些参差不齐的分组必须被重排成 TPU 矩阵单元能够高效消费的形式。下面的一些改动是对路由和 grouped-matmul 后端的通用改进，任何 MoE 模型都能受益；另一些则是直接在 Qwen3.5 上测得的。
+混合专家层会为每个专家产生大小不规则的 token 分组，这些参差不齐的分组必须被重排成 TPU 矩阵单元能够高效处理的形式。下面的一些改动是对路由和 grouped-matmul 后端的通用改进，任何 MoE 模型都能受益；另一些则是直接在 Qwen3.5 上测得的。
 
 [第二版 grouped matmul](https://github.com/vllm-project/tpu-inference/pull/1688) 重新设计了向 MXU 馈送专家输入的方式。它去掉了冗余的 tile 计算，按有效行数而非 padding 后的最大值确定传输大小，对专家权重做三重缓冲以便在计算当前分组时下一分组的权重已在传输途中，并把分组元数据的生成融合进 kernel。
 
@@ -357,7 +357,7 @@ Qwen3.5 是一个混合模型，有两类状态：GQA 层积累随每个 token �
 
 ### Paged Attention 中的 Lane 布局与流水线深度
 
-有两个硬件事实决定了 KV cache 在 TPU 上的布局方式；下一节会更详细地讨论 TPU 硬件。第一，向量单元处理的 tile 最后一维宽度为 128 个 lane，因此任何末尾维度小于 128 的数组都会被 padding 到 128。第二，Pallas kernel 通过双缓冲来隐藏 HBM 延迟：在计算当前 block 的同时预取下一个 block。两个 block 都必须放进 VMEM，因此计算 block 的大小决定了预取能走多远。这两个约束此前都在消耗容量和吞吐量。
+有两个硬件事实决定了 KV cache 在 TPU 上的布局方式；下一节会更详细地讨论 TPU 硬件。第一，向量单元所处理的 tile，其最后一维宽度为 128 个 lane，因此任何末尾维度小于 128 的数组都会被 padding 到 128。第二，Pallas kernel 通过双缓冲来隐藏 HBM 延迟：在计算当前 block 的同时预取下一个 block。两个 block 都必须放进 VMEM，因此计算 block 的大小决定了预取能走多远。这两个约束此前都在消耗容量和吞吐量。
 
 在批量注意力 kernel 中，KV cache 沿 head 维度打包 key 和 value，FP8 下的打包因子为 4。而每个设备只有一个 KV head 的模型只有两样东西可以打包，于是每个 tile 有一半浪费在 padding 上。[sequence-on-lane 布局](https://github.com/vllm-project/tpu-inference/pull/3170)改为把 page 内的 token 放在 128 lane 的轴上，把 head 维度放在 sublane 轴上，从而解决了这一问题。可用 KV page 数翻倍（在报告的配置中从 5,141 增至 10,283），head 维度也只需是 32 的倍数而非 128 的倍数，使 head dim 为 64 的模型同样能使用该 kernel。这一布局在低并发下使每 token 延迟增加约 3%，但在 8k1k、并发 128 下，多出来的容量把吞吐量提升了 16.5%，并把 TTFT 中位数降低了 95%，因为请求不再需要等待 KV 空间。
 
@@ -367,7 +367,7 @@ Qwen3.5 是一个混合模型，有两类状态：GQA 层积累随每个 token �
   caption="来源：SemiAnalysis"
 />
 
-RPA v3 的 block 大小启发式规则也有类似的盲点。在 v7x 的 decode 阶段，它把 KV 计算 block 设为与 KV 读取 block 相同，约 16k 个 token，几乎没有给预取缓冲区留下任何 VMEM。[把两者拆开](https://github.com/vllm-project/tpu-inference/pull/3102)后，KV 读取 block 保持 16k 个 token，计算 block 缩小到 4k。这给了流水线在 MXU 之前跑起来的空间，使 decode 吞吐量从 64.9k 提升到 96.3k tokens/s，提升 49%，并在 Qwen3-0.6B 上通过四次运行复现。在 block 大小的扫描中，吞吐量呈现出干净的倒 U 形曲线。由于调优参数表为每种形状只存一个 block 大小，无法表达这一改进，因此该改动最初以环境变量覆盖的形式落地。后续改动扩展了该表，以分别保存读取和计算两个大小。
+RPA v3 的 block 大小启发式规则也有类似的盲点。在 v7x 的 decode 阶段，它把 KV 计算 block 设为与 KV 读取 block 相同，约 16k 个 token，几乎没有给预取缓冲区留下任何 VMEM。[把两者拆开](https://github.com/vllm-project/tpu-inference/pull/3102)后，KV 读取 block 保持 16k 个 token，计算 block 缩小到 4k。这给了流水线在 MXU 之前跑起来的空间，使 decode 吞吐量从 64.9k 提升到 96.3k tokens/s，提升 49%，并在 Qwen3-0.6B 上通过四次运行复现。在 block 大小的扫描中，吞吐量呈现出清晰的倒 U 形曲线。由于调优参数表为每种形状只存一个 block 大小，无法表达这一改进，因此该改动最初以环境变量覆盖的形式落地。后续改动扩展了该表，以分别保存读取和计算两个大小。
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/72c0863c-a506-404a-8522-70bcadb3a89a_2048x756.png"
@@ -413,7 +413,7 @@ TPUv7 Ironwood 打破了 TPU v4 和 TPU v5p 所采用的「MegaCore」惯例：�
 
 #### TPU 很挑剔
 
-GPU 的矩阵核心消费的是小 tile，因此各种 head 维度、专家宽度和切分后的 KV head 数量都能接近峰值。在 H100 或 B200 上，把维度从 128 改成 64 几乎没有代价，还能换来更便宜的注意力层。GPU 架构让研究人员可以优先追求评估表现，而不损失推理性能。但在 TPU 上，这个超参数变成了一种取舍。
+GPU 的矩阵核心处理的是小 tile，因此各种 head 维度、专家宽度和切分后的 KV head 数量都能接近峰值。在 H100 或 B200 上，把维度从 128 改成 64 几乎没有代价，还能换来更便宜的注意力层。GPU 架构让研究人员可以优先追求评估表现，而不损失推理性能。但在 TPU 上，这个超参数变成了一种取舍。
 
 如前所述，这些选择在 256 宽的 systolic array 上并不免费。按照把 Llama 3 8B 注意力矩阵乘法上限压到 50% 的同一套算术，head 维度 64 在写下第一行 kernel 代码之前就把上限压到了 25%。gpt-oss 的 head 维度就是 64。DeepSeek 的 MLA 把 query/key 维度拆成 128 加 64、共 192，对任何 2 的幂次阵列都不友好，对更宽的阵列更是如此。
 
@@ -426,7 +426,7 @@ GPU 的矩阵核心消费的是小 tile，因此各种 head 维度、专家宽�
 
 ### Torus 拓扑
 
-大规模推理和训练运行在数千颗需要持续相互通信的芯片上。TPU 通过一种名为 ICI（芯片间互连）的定制网络点对点连接。ICI 完全绕过主机 CPU，让芯片可以直接交换激活值和梯度，而不必经过 PCIe 和通用网卡。ICI 背后的拓扑随代际演进：TPU v2 和 v3 使用 2D torus，每颗芯片连接 4 个邻居；从 TPU v4 和 v5p 开始，Google 转向 3D torus，每颗芯片沿 +/-X、+/-Y、+/-Z 三个轴连接 6 个邻居。Ironwood（TPUv7）沿用了这一 3D torus。基本构建单元是一个由 64 颗芯片组成的 4x4x4 立方体，其规模恰好能整齐地映射到一个物理服务器机架上。
+大规模推理和训练运行在数千颗需要持续相互通信的芯片上。TPU 之间通过一种名为 ICI（芯片间互连）的定制网络点对点互连。ICI 完全绕过主机 CPU，让芯片可以直接交换激活值和梯度，而不必经过 PCIe 和通用网卡。ICI 背后的拓扑随代际演进：TPU v2 和 v3 使用 2D torus，每颗芯片连接 4 个邻居；从 TPU v4 和 v5p 开始，Google 转向 3D torus，每颗芯片沿 +/-X、+/-Y、+/-Z 三个轴连接 6 个邻居。Ironwood（TPUv7）沿用了这一 3D torus。基本构建单元是一个由 64 颗芯片组成的 4x4x4 立方体，其规模恰好能整齐地映射到一个物理服务器机架上。
 
 <Figure
   src="https://substack-post-media.s3.amazonaws.com/public/images/f07dc2e7-090b-472a-a2bf-82c6fbb1cb67_1456x1956.png"

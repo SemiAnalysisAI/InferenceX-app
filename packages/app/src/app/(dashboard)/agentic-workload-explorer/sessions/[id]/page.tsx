@@ -14,7 +14,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return explorerSessionMetadata(decodeURIComponent(id), 'conversation', 'en');
 }
 
-/** A bare session URL opens its conversation tab, keeping the trace-version filter. */
 export default async function ExplorerSessionPage({ params, searchParams }: Props) {
   const [{ id }, { version }] = await Promise.all([params, searchParams]);
   redirect(explorerHref(`/sessions/${id}/conversation`, 'en') + versionQuery(version));

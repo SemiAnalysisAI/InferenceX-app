@@ -19,8 +19,6 @@ const STRINGS = {
   },
 } as const;
 
-// ── Replay Hook ────────────────────────────────────────────────────
-
 type Speed = 1 | 2 | 5 | 10;
 
 interface UseSessionReplayReturn {
@@ -73,13 +71,11 @@ export function useSessionReplay(nodeCount: number, timestamps: number[]): UseSe
       return;
     }
 
-    // Compute delay based on timestamp gaps
     let delay: number;
     if (idx < ts.length - 1 && ts[idx + 1] > 0 && ts[idx] > 0) {
       const gap = ts[idx + 1] - ts[idx];
       delay = Math.max(100, Math.min(2000, gap)) / spd;
     } else {
-      // Default gap when no timestamp data
       delay = 500 / spd;
     }
 
@@ -95,7 +91,6 @@ export function useSessionReplay(nodeCount: number, timestamps: number[]): UseSe
     }, delay);
   }, [clearTimer]);
 
-  // Schedule next tick whenever playing and currentIndex changes
   useEffect(() => {
     if (!isPlaying) {
       clearTimer();
@@ -143,7 +138,6 @@ export function useSessionReplay(nodeCount: number, timestamps: number[]): UseSe
     setCurrentIndex(0);
   }, []);
 
-  // Cleanup on unmount
   useEffect(() => clearTimer, [clearTimer]);
 
   return {
@@ -158,8 +152,6 @@ export function useSessionReplay(nodeCount: number, timestamps: number[]): UseSe
     reset,
   };
 }
-
-// ── Replay Controls Component ──────────────────────────────────────
 
 const SPEED_CYCLE: Speed[] = [1, 2, 5, 10];
 
@@ -194,7 +186,6 @@ export function ReplayControls({
 
   return (
     <div className="bg-surface border border-border rounded-md px-3 py-2 flex items-center gap-3 font-mono text-2xs">
-      {/* Play/Pause */}
       <button
         onClick={() => {
           onToggle();
@@ -206,7 +197,6 @@ export function ReplayControls({
         {isPlaying ? `\u23F8 ${t.pause}` : `\u25B6 ${t.play}`}
       </button>
 
-      {/* Reset */}
       <button
         onClick={() => {
           onReset();
@@ -218,7 +208,6 @@ export function ReplayControls({
         {'\u23EE'}
       </button>
 
-      {/* Speed */}
       <button
         onClick={cycleSpeed}
         className="bg-surface hover:bg-surface-hover border border-border rounded px-2 py-1 font-mono text-2xs text-emerald-500 transition-colors min-w-[36px]"
@@ -227,7 +216,6 @@ export function ReplayControls({
         {speed}x
       </button>
 
-      {/* Scrubber */}
       <input
         type="range"
         min={0}
@@ -237,7 +225,6 @@ export function ReplayControls({
         className="flex-1 h-1 accent-emerald-500 cursor-pointer"
       />
 
-      {/* Counter */}
       <span className="text-muted-foreground shrink-0">
         {currentIndex} / {total}
       </span>

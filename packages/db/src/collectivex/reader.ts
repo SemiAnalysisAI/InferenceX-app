@@ -1,15 +1,3 @@
-/**
- * CollectiveX neutral-contract reader: assembles the dashboard dataset from a
- * sweep run's raw matrix + case-attempt docs. Shared by the ingest script
- * (validation + summary precompute) and the app's API routes (assembly at
- * read time), so the transform can never drift between the two.
- *
- * The sweep JSON contract is expected to change; when it does, update this
- * reader (and bump the `version` tag in the harness's sweep config). Raw docs
- * are stored untouched in the DB, so reader fixes retroactively apply to
- * already-ingested runs.
- */
-
 import { readSwapResults, isSwapMatrix } from './swap-reader';
 
 import type {
@@ -44,9 +32,7 @@ interface RawCase {
   scale_up_domain: number;
   scale_up_transport: string;
   scale_out_transport: string | null;
-  /** `kv-transfer` on KV handoff cases; absent on EP cases. */
   suite?: string;
-  /** KV workload preset name (e.g. `kv-dsv4`); absent on EP cases. */
   workload?: string;
 }
 
@@ -61,21 +47,12 @@ interface RawRow {
   token_rate_at_latency_percentile: CollectiveXPercentiles;
   components: Record<string, RawComponent | null>;
   byte_provenance: Record<string, { activation_data_bytes: number; total_logical_bytes?: number }>;
-  /**
-   * Bytes the kernels actually move: per-(token, expert) for the low-latency layouts
-   * that do not rank-deduplicate (DeepEP/UCCL/NCCL LL), identical to `byte_provenance`
-   * everywhere else. Absent on artifacts written before the wire basis shipped —
-   * for those, LL rates derived from `byte_provenance` are a lower bound (~34% low
-   * on nccl-ep LL EP8 at T=128), never an overstatement.
-   */
   wire_byte_provenance?: Record<
     string,
     { activation_data_bytes: number; total_logical_bytes?: number }
   >;
 }
 
-// KV shards report per-burst rows instead of per-ladder-token rows; the two
-// families share the shard envelope and are told apart by `case.suite`.
 interface RawKvRow {
   kind: string;
   isl: number;
@@ -93,7 +70,6 @@ interface RawKvRow {
 }
 
 interface RawShard {
-  /** Numeric in EP artifacts; the kv entrypoint emitted it as a string. */
   version: number | string;
   record_type: 'case-attempt';
   identity: {
@@ -130,6 +106,7 @@ export interface CollectiveXNeutralRunMeta {
   generated_at: string;
   conclusion: string | null;
   source_sha: string;
+  source_repository?: string;
 }
 
 function toSupportedVendor(raw: string): CollectiveXVendor | null {
@@ -165,20 +142,14 @@ function toTerminalStatus(outcome: CollectiveXOutcome): CollectiveXTerminalStatu
   return outcome === 'success' ? 'measured' : outcome;
 }
 
-// Artifacts predating the FP8 dispatch dimension carry no precision field and
-// were all measured in bf16.
 function toPrecision(raw: string | undefined): CollectiveXPrecision {
   return raw === 'fp8' ? 'fp8' : 'bf16';
 }
 
-// Artifacts predating the low-latency kernel dimension carry no mode field
-// and were all measured with the normal (throughput) kernels.
 function toMode(raw: string | undefined): CollectiveXMode {
   return raw === 'low-latency' ? 'low-latency' : 'normal';
 }
 
-// GB/s = bytes / (latency_us * 1e-6) / 1e9 = (bytes / latency_us) * 1e-3. `divisor`
-// splits an aggregate world byte count into a per-GPU figure (divisor = ep_size).
 function ratesFrom(
   bytes: number,
   latency: CollectiveXPercentiles,
@@ -199,10 +170,6 @@ function mapComponent(
   ep: number,
 ): CollectiveXComponent | null {
   if (!raw?.percentiles_us || raw.availability === 'unavailable') return null;
-  // Byte counts are aggregate across the EP world (routed_copies = fanout.sum()).
-  // Activation rate stays aggregate (unchanged); payload rate is per-GPU over the
-  // full logical payload, falling back to activation bytes for pre-provenance
-  // artifacts that carry no total_logical_bytes.
   const payloadBytes = bytes ? (bytes.total_logical_bytes ?? bytes.activation_data_bytes) : null;
   return {
     latency_us: raw.percentiles_us,
@@ -216,9 +183,6 @@ function mapComponent(
 }
 
 function mapPoint(row: RawRow, ep: number): CollectiveXPoint {
-  // Divide rates from the wire basis when the artifact carries it: for the LL layouts
-  // that move one copy per (token, expert), `byte_provenance` is rank-deduplicated and
-  // publishing a rate from it presented a lower bound as the wire bandwidth.
   const provenance = row.wire_byte_provenance ?? row.byte_provenance;
   const component = (name: string) => mapComponent(row.components[name], provenance[name], ep);
   return {
@@ -283,10 +247,6 @@ function reasonId(value: string): string {
 
 function measuredPoints(shard: RawShard, kase: RawCase): CollectiveXCoveragePoint[] {
   const rows = new Map(shard.measurement.rows.map((row) => [row.tokens_per_rank, row]));
-  // null when the shard measured nothing. `Math.max()` of an empty list is
-  // -Infinity, which would put every ladder point above the largest measured
-  // value and report a backend token-capacity limit that was never observed —
-  // an unmeasured case would read as a hard capability wall.
   const largestMeasured = rows.size > 0 ? Math.max(...rows.keys()) : null;
   return ladderTokens(kase).map((tokens) => {
     const row = rows.get(tokens);
@@ -298,7 +258,6 @@ function measuredPoints(shard: RawShard, kase: RawCase): CollectiveXCoveragePoin
         reason: null,
       };
     }
-    // Only a point beyond something we actually measured is evidence of a capacity limit.
     const beyondCapacity = largestMeasured !== null && tokens > largestMeasured;
     return {
       tokens_per_rank: tokens,
@@ -331,14 +290,12 @@ function mapKvRow(row: RawKvRow): CollectiveXKvRow {
     kind: row.kind === 'bulk' ? 'bulk' : 'paged',
     isl: row.isl,
     page_tokens: row.page_tokens ?? null,
-    // Rows predating the batch dimension measured one request per burst.
     batch: row.batch ?? 1,
     op: row.op === 'push' ? 'push' : 'pull',
     descs: row.descs,
     req_bytes: row.req_bytes,
     prep_ms: row.prep_ms ?? 0,
     latency_ms: row.latency_ms,
-    // Absent on rows measured before the harness recorded per-request marks.
     ...(row.request_ms ? { request_ms: row.request_ms } : {}),
     gbps_p50: row.gbps_p50,
     ...(typeof row.gbps_p50_incl_prep === 'number'
@@ -485,9 +442,6 @@ export function buildDatasetFromNeutral(
   });
   const kv = buildKvCases(matrix.requested_cases, successful, terminal, hiddenCaseIds);
   const points = coverage.flatMap((item) => item.points);
-  // KV cases count into the run's case totals (the run picker's visibility
-  // gate is `requested_cases > 0`, and a kv-only sweep is a real run), but
-  // carry no ladder points — point totals stay EP-only.
   return {
     version: matrix.version,
     run: {
@@ -542,6 +496,7 @@ export function buildRunSummary(dataset: CollectiveXDataset): CollectiveXRunSumm
     run_attempt: run.run_attempt,
     generated_at: run.generated_at,
     conclusion: run.conclusion,
+    source_repository: run.source_repository,
     covered_skus: run.covered_skus,
     requested_cases: run.requested_cases,
     measured_cases: run.measured_cases,
@@ -563,11 +518,6 @@ export function buildRunSummary(dataset: CollectiveXDataset): CollectiveXRunSumm
   };
 }
 
-/**
- * Structural identity check for the matrix document (it carries no
- * `record_type` tag): requested_cases[] + include[] arrays plus a valid
- * numeric `version` — the content axis the frontend selects on.
- */
 export function isMatrixDoc(doc: unknown): boolean {
   if (isSwapMatrix(doc)) return true;
   const candidate = doc as { requested_cases?: unknown; include?: unknown } | null;
@@ -578,7 +528,6 @@ export function isMatrixDoc(doc: unknown): boolean {
   );
 }
 
-/** Read the matrix doc's numeric version tag; null when absent or invalid. */
 export function matrixVersion(doc: unknown): number | null {
   if (isSwapMatrix(doc)) return 1;
   const value = (doc as { version?: unknown } | null)?.version;

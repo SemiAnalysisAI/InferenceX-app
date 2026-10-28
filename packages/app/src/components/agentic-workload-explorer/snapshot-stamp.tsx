@@ -18,14 +18,10 @@ const STRINGS = {
   zh: {
     stamp: '冻结快照',
     dataEnds: '数据截至',
-    title: `冻结的只读快照，不再有新数据写入；所有”最后 24 小时””最后一天””最后 30 天”窗口均截止于 ${LAST_DAY_LABEL} ${SNAPSHOT_END_CLOCK}。实验性仪表板：除已发布的 HuggingFace 数据集外，不保证数据质量。`,
+    title: `冻结的只读快照，不再有新数据写入；所有“最后 24 小时”、“最后一天”、“最后 30 天”窗口均截止于 ${LAST_DAY_LABEL} ${SNAPSHOT_END_CLOCK}。实验性仪表板：除已发布的 HuggingFace 数据集外，不保证数据质量。`,
   },
 };
 
-/**
- * Stamp making the frozen-snapshot nature of the explorer explicit on every
- * page: nothing here is live, and "last N" windows end at the snapshot.
- */
 export function SnapshotStamp() {
   const strings = STRINGS[useLocale()];
   return (

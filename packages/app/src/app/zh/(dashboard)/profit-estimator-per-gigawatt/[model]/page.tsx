@@ -11,9 +11,6 @@ import { modelRouteAvailableForTab, resolveModelRouteSlug } from '@/lib/routing/
 import { modelTabCanonicalPath } from '@/lib/routing/tab-meta';
 import { MODEL_TAB_META_ZH, modelTabMetadataZh } from '@/lib/routing/tab-meta-zh';
 
-/** Chinese sibling of `/profit-estimator/<model>` (see that page for the
- *  routing and client-side model-switch behavior). */
-
 type Props = ProfitRouteProps;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {

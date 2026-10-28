@@ -32,8 +32,6 @@ import { useExplorerHref } from '@/hooks/agentic-workload-explorer/use-explorer-
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 
-// ── i18n ────────────────────────────────────────────────────────
-
 const STRINGS = {
   en: {
     sessions: 'Sessions',
@@ -66,7 +64,7 @@ const STRINGS = {
   zh: {
     sessions: '会话列表',
     total: '总计',
-    searchPlaceholder: '搜索会话...',
+    searchPlaceholder: '搜索会话…',
     minReqs: { '20': '> 20 请求', '100': '> 100 请求', '0': '全部' } as Record<string, string>,
     allVersions: '所有版本',
     allHarnesses: '全部 harness',
@@ -93,18 +91,6 @@ const STRINGS = {
   },
 } as const;
 
-/**
- * API Cache Hit Rate as displayed in the list — `cache_read / (cache_read +
- * cache_write + input)` summed across every request in the session. Returns
- * null when the session has zero prompt tokens (mostly clients that only sent
- * empty bodies — show '—' instead of '0.0%' so it reads as "no signal").
- *
- * `bigint` SQL columns arrive as strings over the wire; `Number()` each one
- * before adding so `+` doesn't concatenate `"12345" + "67890"` into the giant
- * string `"1234567890"` and silently zero out the ratio. (Division coerces
- * strings to numbers, so the existing read/output ratios kept working —
- * addition doesn't.)
- */
 function apiCacheHitRate(session: Session): number | null {
   const read = Number(session.totalCacheRead);
   const write = Number(session.totalCacheWrite);
@@ -114,7 +100,6 @@ function apiCacheHitRate(session: Session): number | null {
   return (read / denom) * 100;
 }
 
-/** Loading / loaded / error state for a single row's lazy upper-bound fetch. */
 type HashStatsState =
   | { status: 'pending' }
   | { status: 'loading' }
@@ -146,8 +131,6 @@ function SortButton({
     <button
       type="button"
       onClick={() => onSort(col)}
-      // Hug the label: a stretched grid item made the click target run well
-      // past the text into the next column's space.
       className={`flex w-fit items-center gap-1 transition-colors ${
         align === 'right' ? 'justify-self-end' : 'justify-self-start'
       } ${active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
@@ -182,11 +165,8 @@ const HARNESS_BADGE_CLASSES: Record<Harness, string> = {
   other: 'border-border bg-surface-hover text-muted-foreground',
 };
 
-// Harnesses whose sessions carry a version (see `parseUserAgent`). Pi sends
-// none and "Other" mixes unrelated products, so neither sorts by version.
 const VERSIONED_HARNESSES: readonly HarnessFilter[] = ['claude-code', 'codex', 'omp'];
 
-// The read-only snapshot only contains the current trace version.
 const VERSION_FILTERS: { value: VersionFilter; label: string }[] = [
   { value: 'all', label: 'All Versions' },
   { value: String(CURRENT_TRACE_VERSION), label: `v${CURRENT_TRACE_VERSION}` },
@@ -200,18 +180,10 @@ function parseHarnessFilter(v: string | null): HarnessFilter {
   return isHarness(v) ? v : 'all';
 }
 
-// Default to the snapshot's trace version (the only one it contains); "All
-// Versions" is persisted in the URL because it isn't the default.
 function parseVersionFilter(v: string | null): VersionFilter {
   return v === 'all' ? 'all' : String(CURRENT_TRACE_VERSION);
 }
 
-/**
- * Resolve the cliVersion / os / arch shown in the row. Prefers values the
- * proxy already wrote to metadata (Stainless-SDK clients), then falls back to
- * parsing `metadata.userAgent` (Codex CLI / Desktop don't send stainless
- * headers, so their os/arch live in the UA suffix).
- */
 function sessionUaInfo(session: Session): {
   cliVersion: string | null;
   os: string | null;
@@ -260,9 +232,6 @@ function SessionsPageContent() {
 
   function setFilter(key: 'minReqs' | 'harness' | 'version', value: string) {
     const params = new URLSearchParams(searchParams.toString());
-    // Defaults are stripped from the URL. `version` defaults to the latest
-    // trace version (`CURRENT_TRACE_VERSION`); everything else defaults to a
-    // wide-open filter.
     const defaultValue =
       key === 'minReqs' ? '20' : key === 'version' ? String(CURRENT_TRACE_VERSION) : 'all';
     if (value === defaultValue) {
@@ -318,8 +287,6 @@ function SessionsPageContent() {
     if (versionFilter !== 'all') params.set('version', versionFilter);
     if (harnessFilter !== 'all') params.set('harness', harnessFilter);
     if (minReqsFilter !== '0') params.set('minReqs', minReqsFilter);
-    // Sorting runs on the server over every matching session, not just the
-    // pages loaded so far.
     params.set('sort', sortKey);
     params.set('dir', sortDir);
     const r = await fetch(`/api/v1/agentic-workload-explorer/sessions?${params}`);
@@ -359,7 +326,6 @@ function SessionsPageContent() {
 
   return (
     <div className="space-y-5">
-      {/* Stats */}
       <div className="flex items-center gap-2 mb-2">
         <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
           {t.sessions}
@@ -375,7 +341,6 @@ function SessionsPageContent() {
         )}
       </div>
 
-      {/* Search + Filter */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
@@ -473,7 +438,6 @@ function SessionsPageContent() {
         )}
       </div>
 
-      {/* Table */}
       {loading ? (
         <div className="space-y-2">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -486,7 +450,6 @@ function SessionsPageContent() {
         </div>
       ) : (
         <div className="rounded-lg border border-border overflow-x-auto">
-          {/* Header */}
           <div className="grid min-w-[1160px] gap-4 px-4 py-2.5 bg-surface text-3xs font-mono uppercase tracking-wider text-muted-foreground border-b border-border grid-cols-[1fr_80px_140px_72px_80px_88px_112px_80px_80px]">
             <SortButton col="session" sortKey={sortKey} sortDir={sortDir} onSort={handleSort}>
               {t.colSession}
@@ -545,7 +508,6 @@ function SessionsPageContent() {
             </SortButton>
           </div>
 
-          {/* Rows */}
           <div className="min-w-[1160px] divide-y divide-border">
             {sessions.map((session) => (
               <SessionRow key={session.id} session={session} />
@@ -554,7 +516,6 @@ function SessionsPageContent() {
         </div>
       )}
 
-      {/* Infinite scroll sentinel + spinner */}
       {!loading && hasMore && (
         <div ref={sentinelRef} className="flex justify-center py-6">
           {loadingMore && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
@@ -594,7 +555,6 @@ function SessionRow({ session }: { session: Session }) {
         aria-label={t.openSession(session.id)}
         className="absolute inset-0 z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       />
-      {/* Session info */}
       <div className="min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
           <span className="font-mono text-sm font-medium truncate block">
@@ -630,7 +590,6 @@ function SessionRow({ session }: { session: Session }) {
         </div>
       </div>
 
-      {/* Harness version */}
       <span className="font-mono text-2xs truncate" title={cliVersion ?? undefined}>
         {cliVersion ? (
           <span className="text-muted-foreground">v{cliVersion}</span>
@@ -639,15 +598,12 @@ function SessionRow({ session }: { session: Session }) {
         )}
       </span>
 
-      {/* User */}
       <span className="font-mono text-2xs truncate">
         <span className="text-muted-foreground">{truncateHash(session.clientApiKeyHash)}</span>
       </span>
 
-      {/* Requests */}
       <span className="text-right font-mono text-sm tabular-nums">{session.requestCount}</span>
 
-      {/* Total cost (estimated, frozen at insert time) */}
       <span className="text-right font-mono text-2xs tabular-nums">
         {Number(session.totalCost) > 0 ? (
           <span className="text-foreground">{formatCost(Number(session.totalCost))}</span>
@@ -656,7 +612,6 @@ function SessionRow({ session }: { session: Session }) {
         )}
       </span>
 
-      {/* API Cache Hit Rate */}
       <span className="text-right font-mono text-2xs tabular-nums">
         {apiHit === null ? (
           <span className="text-subtle">—</span>
@@ -665,7 +620,6 @@ function SessionRow({ session }: { session: Session }) {
         )}
       </span>
 
-      {/* Exact hash-trie upper bound — loaded only on explicit request. */}
       <button
         type="button"
         className="relative z-20 text-right font-mono text-2xs tabular-nums hover:text-foreground"
@@ -675,12 +629,10 @@ function SessionRow({ session }: { session: Session }) {
         <HashHitRateCell state={hashState} />
       </button>
 
-      {/* Started */}
       <span className="text-right text-3xs font-mono text-muted-foreground">
         {formatSnapshotTime(session.startedAt)}
       </span>
 
-      {/* Active */}
       <span className="text-right text-3xs font-mono text-muted-foreground">
         {formatSnapshotTime(session.lastActiveAt)}
       </span>

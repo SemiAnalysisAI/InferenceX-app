@@ -29,7 +29,6 @@ export async function profitRouteInput(
 
   const { i_pctl, percentile, ...activeQuery } = query;
   const merged = { ...activeQuery, ...Object.fromEntries(route) };
-  // Filtered paths are authoritative; retain legacy model queries on bare model pages.
   if (filters.length > 0) merged.g_model = resolved.route.model;
   const retiredPercentile =
     i_pctl !== undefined ||

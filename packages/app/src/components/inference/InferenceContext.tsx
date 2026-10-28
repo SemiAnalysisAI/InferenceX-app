@@ -46,8 +46,10 @@ import type {
   PowerCompare,
   TokenRevenuePriceSource,
 } from '@/components/inference/types';
-import { resolveMetricConfigKey } from '@/components/inference/metric-registry';
-import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
+import {
+  resolveMetricConfigKey,
+  tokenBasisForMetric,
+} from '@/components/inference/metric-registry';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -75,7 +77,7 @@ import {
 } from '@/components/inference/perf-ruler-store';
 import { useParetoHighlightToggle } from './hooks/useParetoHighlightToggle';
 import { useOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
-import { defaultYAxisMetric } from '@/lib/routing/url-state';
+import { DEFAULT_Y_AXIS_METRIC } from '@/lib/routing/url-state';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import { buildAvailabilityHwKey } from '@/lib/charts/chart-utils';
 import { getHardwareConfig, getModelSortIndex, isKnownGpu } from '@/lib/catalog/constants';
@@ -101,6 +103,7 @@ import {
   resolveExclusionToggle,
   type ExclusionConflictPolicy,
 } from '@/lib/benchmarks/exclusion';
+import type { TokenBasis } from '@/lib/benchmarks/benchmark-transform';
 import { filterRunsByModel, getDisplayLabel } from '@/lib/shared/utils';
 import {
   isAgenticOnlyXAxisMode,
@@ -172,7 +175,6 @@ function useStableInferenceActions(
   }, []);
 }
 
-/** @internal Shared by the route provider and focused context-isolation tests. */
 export function InferenceContextsProvider({
   children,
   data,
@@ -239,58 +241,20 @@ export function InferenceProvider({
   autoSelectAllGpus = false,
   lockedFrameworks,
   minimalChrome = false,
+  quietEngineResolution = false,
 }: {
   children: ReactNode;
   activeTab: string;
-  /**
-   * Initial legend filter (activeHwTypes) when the URL has no `i_active` param.
-   * Used by `/compare/[a]-vs-[b]` pages to focus the chart on the two GPUs from
-   * the slug. Series for other GPUs are omitted — only matching hw keys remain.
-   */
   initialActiveHwTypes?: string[];
-  /**
-   * When set (canonical `/compare` pages), benchmark data is filtered to these two
-   * registry GPU base keys so other hardware never appears on the legend or plots.
-   */
   compareGpuPair?: readonly [string, string];
-  /** Isolates pair-filtered compare hydration from canonical dashboard queries. */
   benchmarkQueryScope?: string;
   initialBenchmarkModel?: string;
   initialBenchmarkRows?: BenchmarkRow[];
-  /**
-   * Initial y-axis metric key when the URL has no `?i_metric=` param. Used by
-   * `/compare-per-dollar/[slug]` to default the chart to
-   * `y_costh` (Cost per Million Total Tokens — Owning at Large Hyperscaler Volume) instead of
-   * the dashboard's default `y_tokensPerDollarH`. URL param still wins so
-   * existing shared links are unaffected.
-   */
   initialYAxisMetric?: string;
-  /**
-   * When true, all chip configs with data for the current model/scenario/
-   * precision selection are selected once availability settles and no
-   * `?i_gpus=` URL param is present. Used by the `/model/[slug]` pages, which
-   * embed the chart without the selector controls — an empty default there
-   * would leave the embed permanently blank. One-shot: after the initial
-   * auto-selection (or when the URL provided chips), user deselections stick.
-   */
   autoSelectAllGpus?: boolean;
-  /**
-   * Serving-framework families (quick-filter keys such as `vllm`) the chart is
-   * pinned to. Used by the `/embed/model/[slug]` routes so a host page can
-   * scope the chart to the engine it documents. The lock replaces the
-   * user-editable framework quick filter (URL `i_fw` and dialog edits are
-   * ignored) and removes other engines' chip configs from the selectable set,
-   * so nothing outside the lock reaches the plot, legend, or changelog.
-   * `undefined` / empty = no lock.
-   */
   lockedFrameworks?: readonly string[];
-  /**
-   * Strip the dashboard down to the chart and a plain legend: no x-axis mode
-   * selector, config changelog, chart toolbar, quick-filter chips, or legend
-   * switches/actions. Used by `/embed/model/[slug]`, where the host page owns
-   * the surrounding UI and a bare chart is what gets pasted.
-   */
   minimalChrome?: boolean;
+  quietEngineResolution?: boolean;
 }) {
   const locale = useLocale();
   const localeStrings = INFERENCE_CONTEXT_STRINGS[locale];
@@ -319,8 +283,6 @@ export function InferenceProvider({
   } = useGlobalFilterAvailability();
   const { availableRuns, workflowError } = useGlobalFilterWorkflow();
   const { isUnofficialRun } = useUnofficialRun();
-  // ↑↑↓↓ insiders' gate: when unlocked, the cross-engine comparability guard is
-  // lifted so vLLM and SGLang configs can share one graph while tuning configs.
   const featureGateUnlocked = useFeatureGate();
   const engineGuardLifted = isEngineGuardLifted(isUnofficialRun, featureGateUnlocked);
   const engineConsent = useEngineComparisonConsent(
@@ -378,7 +340,6 @@ export function InferenceProvider({
   );
   const exclusionPolicy: ExclusionConflictPolicy = comparisonExclusionPolicy(effectiveSequence);
 
-  // ── GPU comparison state (owned by inference, not global) ─────────────────
   const [selectedDates, setSelectedDates] = useState<string[]>(() => {
     const urlDates = getUrlParam('i_dates');
     return urlDates ? urlDates.split(',').filter(Boolean) : [];
@@ -394,15 +355,12 @@ export function InferenceProvider({
   const [isCheckingAvailableDates] = useState(false);
   const [showDateRangeDialog, setShowDateRangeDialog] = useState(false);
 
-  // --- Cross-engine comparison conflict toast state ---
   const [engineConflict, setEngineConflict] = useState<EngineComparisonConflictDetail | null>(null);
   const dismissEngineConflict = useCallback(() => setEngineConflict(null), []);
   useEffect(() => {
     if (comparisonGuardLifted) setEngineConflict(null);
   }, [comparisonGuardLifted]);
 
-  // ── Inference-specific filter state ─────────────────────────────────────────
-  // Defer URL restoration until after mount so the first client render matches SSR.
   const [selectedGpuState, setSelectedGpuState] = useState<string[]>([]);
   const [gpuUrlHydrated, setGpuUrlHydrated] = useState(false);
   useEffect(() => {
@@ -451,11 +409,7 @@ export function InferenceProvider({
     }
   }, [selectedGpuResolution]);
   const [selectedYAxisMetric, setSelectedYAxisMetric] = useState<string>(() =>
-    resolveMetricConfigKey(
-      getUrlParam('i_metric'),
-      initialYAxisMetric ??
-        defaultYAxisMetric(parsePowerTiers(splitUrlList(getUrlParam('i_power')))),
-    ),
+    resolveMetricConfigKey(getUrlParam('i_metric'), initialYAxisMetric ?? DEFAULT_Y_AXIS_METRIC),
   );
   const [tokenRevenuePriceSource, setTokenRevenuePriceSource] = useState<TokenRevenuePriceSource>(
     () => (getUrlParam('i_revenue') === 'openrouter' ? 'openrouter' : 'normalized'),
@@ -483,15 +437,6 @@ export function InferenceProvider({
   const [requestedE2eXAxisMetric] = useState<string | null>(
     () => getUrlParam('i_e2e_xmetric') || 'p90_ttft',
   );
-  // Selected chart variant. Initialize from URL only — SSR cannot read URL, so
-  // computing a kind-based default here would diverge between server and client
-  // and cause a hydration mismatch. The scenario-kind default is applied in a
-  // post-mount effect below (and a ref tracks whether the user has overridden).
-  //
-  // SSR has no URL access, so seed with a fixed default and apply the URL
-  // value (if any) in a post-mount effect — keeps server + client first render
-  // identical and avoids "didn't match" hydration warnings when the URL holds
-  // a non-default mode.
   const [requestedXAxisMode, setRequestedXAxisMode] = useState<XAxisMode | null>(null);
   const xAxisModeFromUrlRef = useRef(false);
   useEffect(() => {
@@ -520,8 +465,14 @@ export function InferenceProvider({
     setFixedSequenceStatistic(getUrlParam('i_mstat') === 'mean' ? 'mean' : 'median');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  const [requestedTokenBasis, setTokenBasis] = useState<TokenBasis>('total');
+  useEffect(() => {
+    setTokenBasis(getUrlParam('i_tokens') === 'uncached' ? 'uncached' : 'total');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // The Horace He Metric is hidden behind the feature gate; locked viewers always see the total basis.
+  const tokenBasis: TokenBasis = featureGateUnlocked ? requestedTokenBasis : 'total';
 
-  // Agentic x-axis latency basis is fixed at p90 (no Latency Percentile control).
   const selectedPercentile = 'p90';
   const selectedE2eXAxisMetric = resolveE2eXAxisMetric(
     requestedE2eXAxisMetric,
@@ -533,25 +484,12 @@ export function InferenceProvider({
   const [scaleType, setScaleType] = useState<'auto' | 'linear' | 'log'>(
     () => (getUrlParam('i_scale') as 'auto' | 'linear' | 'log') || 'auto',
   );
-  // Comparison series on a gated power metric (`i_pcompare`). Kept while the
-  // metric changes: a key without a common axis simply yields no siblings, and
-  // the Measured controls say so, so a link's intent survives a detour.
   const [powerCompare, setPowerCompare] = useState<PowerCompare>(() =>
     parsePowerCompare(getUrlParam('i_pcompare')),
   );
 
-  // ── Quick filters (vendor / framework / deployment / mtp-stp / power tier) ──
-  // Coarse pre-filters applied to the point set. Empty = no constraint.
-  //
-  // Initialized empty rather than from the URL so the first client render matches
-  // SSR (which has no query string). Reading the params in these initializers would
-  // desync the pills' aria-pressed/disabled between server and client; React does
-  // not patch hydration mismatches, so a shared link would leave the pills frozen
-  // inactive/disabled even while the chart filters. The URL selections are applied
-  // just below, after mount.
   const [quickFilterVendors, setQuickFilterVendors] = useState<string[]>([]);
   const [quickFilterFrameworksState, setQuickFilterFrameworksState] = useState<string[]>([]);
-  // A framework lock pins the filter and makes edits no-ops; see the prop doc.
   const frameworkLock = useMemo<string[] | null>(
     () => (lockedFrameworks && lockedFrameworks.length > 0 ? [...lockedFrameworks] : null),
     [lockedFrameworks],
@@ -573,8 +511,6 @@ export function InferenceProvider({
       splitUrlList(getUrlParam(key));
     const vendors = parse('i_vendor');
     const frameworks = parse('i_fw');
-    // Preserve old shared links: `agg` used to mean every non-disaggregated
-    // point, so expand it to both aggregate deployment modes.
     const deployment = parseDeploymentModes(parse('i_disagg'));
     const spec = parse('i_spec') as SpecMode[];
     const power = parsePowerTiers(parse('i_power'));
@@ -604,10 +540,6 @@ export function InferenceProvider({
       quickFilterTopologies,
     ],
   );
-  // Historical Trends hides Quick Filters, so never apply invisible selections there.
-  // Agentic charts expose vendor, framework, and deployment filters, but speculative
-  // decoding is intentionally not an agentic option. Ignore stale `i_spec` state from
-  // an older shared URL without discarding it when the reader returns to fixed-seq.
   const dataQuickFilters = useMemo(
     () =>
       activeTab === 'historical'
@@ -622,10 +554,6 @@ export function InferenceProvider({
   });
 
   const [hideNonOptimal, setHideNonOptimal] = useState(() => getUrlParam('i_optimal') !== '0');
-  // `i_best` records an explicit reader choice ('0' off, '1' on). Absent, the
-  // mode follows the model + scenario default, so charts that open with every
-  // configuration (MODEL_BEST_PER_SKU_DEFAULT_OFF) need no URL flag and the
-  // default can change later without breaking share links.
   const [bestPerSkuChoice, setBestPerSku] = useState<boolean | null>(() => {
     if (activeTab !== 'inference') return false;
     const raw = getUrlParam('i_best');
@@ -662,15 +590,10 @@ export function InferenceProvider({
   const [userCosts, setUserCosts] = useState<Record<string, number | undefined> | null>(null);
   const [userPowers, setUserPowers] = useState<Record<string, number | undefined> | null>(null);
 
-  // --- Favorite presets state ---
   const [pendingHwFilter, setPendingHwFilter] = useState<string[] | null>(null);
   const [activePresetId, setActivePresetId] = useState<string | null>(null);
-  // Persists the preset's desired hw filter beyond pendingHwFilter consumption.
-  // Cleared when the user manually changes filters (clearing the preset).
   const presetHwFilterRef = useRef<string[] | null>(null);
 
-  // Pending legend-active selection restored from `i_active` URL param.
-  // Consumed once when hwTypesWithData first populates (see effect below).
   const [pendingActiveHwTypes, setPendingActiveHwTypes] = useState<Set<string> | null>(() => {
     const v = getUrlParam('i_active');
     if (v) {
@@ -686,12 +609,8 @@ export function InferenceProvider({
     Boolean(getUrlParam('i_active') || initialActiveHwTypes?.length || autoSelectAllGpus),
   );
 
-  // ── Data fetching (gated by isActive) ──────────────────────────────────────
   const latestDate = availableDates.length > 0 ? availableDates.at(-1) : undefined;
 
-  // Runs available for the current model selection, and which one is selected.
-  // Computed here (above useChartData) so the chart can query "as of" the selected
-  // run. Re-exposed on the context value below.
   const modelPrefixes = useMemo(
     () =>
       Object.entries(MODEL_PREFIX_MAPPING)
@@ -705,11 +624,6 @@ export function InferenceProvider({
     [availableRuns, modelPrefixes, effectivePrecisions],
   );
 
-  // The latest run for this model on the selected date, by start time. Run ids
-  // are assigned at dispatch and a queued or re-run sweep can start after a
-  // later-dispatched one, so the greatest id is not necessarily the newest run
-  // (see `latestRunId`). The DB side already tiebreaks by `run_started_at`;
-  // this keeps the client's notion of "latest" consistent with it.
   const latestRunIdForModel = useMemo(
     () => latestRunId(filteredAvailableRuns),
     [filteredAvailableRuns],
@@ -721,31 +635,11 @@ export function InferenceProvider({
     return latestRunIdForModel;
   }, [filteredAvailableRuns, selectedRunId, latestRunIdForModel]);
 
-  // Only constrain the base query when an earlier-than-latest run is selected.
   const asOfRunId =
     effectiveSelectedRunId && latestRunIdForModel && effectiveSelectedRunId !== latestRunIdForModel
       ? effectiveSelectedRunId
       : undefined;
 
-  // Run-selector scoping: only constrain benchmark data to a specific run when
-  // there's actually a disambiguation to make for the CURRENT model. The
-  // raw `availableRuns` is across ALL models on the date, so the picker may
-  // auto-select a run that produced nothing for the current model — passing
-  // that runId would return zero rows and hide the chart entirely.
-  // Compute the set of runs whose CHANGELOG explicitly mentions this model +
-  // precision. We can't reuse `filterRunsByModel` here because it has a
-  // fallback that returns all runs when nothing matches (so the picker still
-  // renders) — which would make us pass a runId that produced no rows for
-  // the current model, hiding the chart.
-  // Map each FULL config_key (model-precision-hardware-framework) a run's
-  // changelog claims to the set of runs claiming it. Single-run scoping should
-  // only kick in when two runs contest the SAME full key — e.g. a same-day
-  // re-run of one hardware — because then a DISTINCT ON merge could mix them
-  // and the user needs to pick which run wins. Runs covering DIFFERENT hardware
-  // of the same model (e.g. a B300 run and a B200 run on the same date) are
-  // complementary: both must render via carry-forward. Matching on model+
-  // precision alone (the old behavior) wrongly treated those as alternatives
-  // and scoped the chart to one run, hiding the other GPU's curve.
   const contestedRunIds = useMemo(() => {
     const runsByConfigKey = new Map<string, Set<string>>();
     if (availableRuns) {
@@ -766,12 +660,6 @@ export function InferenceProvider({
         }
       }
     }
-    // A run is "contested" only if some full config_key it claims is also claimed
-    // by another run. Only then does picking a run disambiguate anything.
-    // Downstream (useChartData / mergeRunScopedRows) this no longer scopes the
-    // WHOLE chart to the run: only the configs the run actually produced are
-    // pinned to it, and every other config (e.g. another framework's same-day
-    // run) still carries forward from the normal latest-per-config rows.
     const contested = new Set<string>();
     for (const runs of runsByConfigKey.values()) {
       if (runs.size > 1) for (const r of runs) contested.add(r);
@@ -806,11 +694,6 @@ export function InferenceProvider({
     tokenRevenuePricing,
     tokenRevenuePriceSource,
     effectiveRunDate,
-    // Gate benchmark fetching on sequenceResolved: before availability loads we
-    // don't yet know the model's real sequence, and the selection (e.g. an
-    // agentic `?i_seq=` link) may be a scenario the model doesn't have. Fetching
-    // now would fire the wrong data path, then refetch once availability snaps
-    // the sequence. The chart's normal loading state covers this brief window.
     isActive && sequenceResolved,
     latestDate,
     selectedPercentile,
@@ -830,9 +713,9 @@ export function InferenceProvider({
       selectedRunDateRev === 0,
     powerCompare,
     fixedSequenceStatistic,
+    tokenBasisForMetric(selectedYAxisMetric, tokenBasis),
   );
 
-  // For GPU comparison date picker — use shared availability data from global filters
   const dbModelKeys = useMemo<string[]>(
     () => DISPLAY_MODEL_TO_DB[selectedModel] ?? [selectedModel],
     [selectedModel],
@@ -866,9 +749,6 @@ export function InferenceProvider({
     availableDates,
   ]);
 
-  // ── Derived state ─────────────────────────────────────────────────────────
-
-  // GPU dropdown: only show configs that have data for current model + sequence + precision
   const availableGPUs = useMemo(() => {
     if (!availabilityRows) return [];
     const hwKeys = new Set<string>();
@@ -905,11 +785,6 @@ export function InferenceProvider({
     frameworkLock,
   ]);
 
-  // One-shot auto-selection of every available chip config (see the
-  // `autoSelectAllGpus` prop doc). The selection is pre-resolved through the
-  // exclusion groups so the embed doesn't open with a cross-engine conflict
-  // toast — setting an already-resolved list keeps `selectedGpuResolution`
-  // null, which is the no-notification path.
   const autoSelectedGpusRef = useRef(false);
   useEffect(() => {
     if (!autoSelectAllGpus || autoSelectedGpusRef.current) return;
@@ -921,8 +796,6 @@ export function InferenceProvider({
     if (availableGPUs.length === 0) return;
     autoSelectedGpusRef.current = true;
     const all = new Set(availableGPUs.map((gpu) => gpu.value));
-    // `exclusion` is null when the model/scenario has no comparability guard —
-    // in that case every available chip config is selectable together.
     const selection = exclusion
       ? [
           ...resolveExclusionGroups(
@@ -961,9 +834,6 @@ export function InferenceProvider({
     setShowLineLabels(labelState.showLineLabels);
   }, [labelScenarioKind, sequenceResolved, getUrlParam]);
 
-  // Ref guard: when true, filter changes don't clear the active preset.
-  // FavoritePresetsDropdown sets this while applying a preset so its own
-  // programmatic setter calls don't accidentally deactivate it.
   const presetGuardRef = useRef(false);
   const clearPresetOnChange = useCallback(() => {
     if (presetGuardRef.current) return;
@@ -976,8 +846,6 @@ export function InferenceProvider({
   }, [clearOverviewHistoryPair, clearPresetOnChange]);
   const setSelectedModelAndClear = useCallback(
     (v: typeof selectedModel) => {
-      // Reset deliberate model changes, not initial URL hydration or presets.
-      // Entering Qwen resets the axis; direct links still keep their explicit mode.
       if (v !== selectedModel) {
         if (activeTab === 'inference' && v === Model.Qwen3_5) {
           setRequestedXAxisMode(null);
@@ -1021,22 +889,6 @@ export function InferenceProvider({
       clearPresetOnChange();
     },
     [setSelectedYAxisMetric, clearPresetOnChange],
-  );
-  // A tier filter is only meaningful on a power chart. The move happens once, on
-  // entry, so a metric picked while the filter is on survives later tier edits.
-  // The URL restore keeps the raw setter so a link's explicit `i_metric` wins.
-  const setQuickFilterPowerAndMetric = useCallback(
-    (tiers: PowerTier[]) => {
-      setQuickFilterPower(tiers);
-      if (
-        quickFilterPower.length === 0 &&
-        tiers.length > 0 &&
-        !getMeasuredMetricConfig(selectedYAxisMetric)
-      ) {
-        setSelectedYAxisMetricAndClear(defaultYAxisMetric(tiers));
-      }
-    },
-    [quickFilterPower, selectedYAxisMetric, setSelectedYAxisMetricAndClear],
   );
   const setSelectedGPUsAndClear = useCallback(
     (next: string[]) => {
@@ -1110,9 +962,6 @@ export function InferenceProvider({
     ],
   );
   const setSelectedDatesAndClear = useCallback(
-    // Accept a React state updater (value OR function) so callers adding several
-    // dates/runs in quick succession can use the functional form and avoid the
-    // stale-closure race where each click overwrites the last.
     (v: SetStateAction<string[]>) => {
       setSelectedDates(v);
       clearScopedSelectionOnChange();
@@ -1127,10 +976,6 @@ export function InferenceProvider({
     [setSelectedDateRange, clearScopedSelectionOnChange],
   );
 
-  // A failed availability lookup leaves `sequenceResolved` false forever, so
-  // the gated benchmark query never produces rows and `chartDataLoading` would
-  // pin the chart on its first-load skeleton. Availability errors are terminal:
-  // drop the loading flag so ChartDisplay surfaces the error instead.
   const openRouterPricingLoading =
     usesTokenSalePricing(selectedYAxisMetric) &&
     tokenRevenuePriceSource === 'openrouter' &&
@@ -1139,11 +984,6 @@ export function InferenceProvider({
   const refreshing = !availabilityError && chartDataRefreshing;
   const error = availabilityError || workflowError || chartDataError;
 
-  // ── Perf rulers (persisted chart) ────────────────────────────────────────
-  // The axis identity follows the graph ChartDisplay renders as `chart-0`
-  // (picked by x mode, like `bestHwTypes` below), so an x-mode switch that
-  // swaps the rendered chart or its x units clears the rulers the same way
-  // the chart's own `usePerfRulerAxisReset` does for local state.
   const perfRulerStore = usePerfRulerStoreValue(
     PERSISTED_PERF_RULER_CHART_ID,
     getUrlParam('i_rulers'),
@@ -1153,8 +993,6 @@ export function InferenceProvider({
     () => serializePerfRulers(perfRulerStore.state),
     [perfRulerStore.state],
   );
-
-  // ── Toggle sets ───────────────────────────────────────────────────────────
 
   const {
     activeSet: activeHwTypes,
@@ -1255,19 +1093,10 @@ export function InferenceProvider({
     [],
   );
 
-  // Wrap setActiveHwTypes to intercept resets and apply pendingHwFilter atomically.
-  // Without this, useChartDataFilter resets to "all GPUs" in one render and the
-  // pendingHwFilter effect filters it down in the next — causing a flash/race.
   const pendingHwFilterRef = useRef(pendingHwFilter);
   pendingHwFilterRef.current = pendingHwFilter;
-  // Read selectedModel via a ref so the callback identity below stays stable —
-  // matchesPresetHwFilter only consults the model to gate the bare-prefix
-  // exclusion-suffix skip, and we want the current value at call time.
   const selectedModelRef = useRef(selectedModel);
   selectedModelRef.current = selectedModel;
-  // Note: setActiveHwTypes is a useState dispatcher that accepts functional updaters,
-  // but useChartToggleSet narrows the type to (set: Set<string>) => void.
-  // We cast once here to allow passthrough of functional updaters from useChartDataFilter.
   const setActiveHwTypesDispatch = setActiveHwTypes as (
     u: Set<string> | ((prev: Set<string>) => Set<string>),
   ) => void;
@@ -1281,8 +1110,6 @@ export function InferenceProvider({
         });
         return;
       }
-      // Preset filter is active: evaluate updater to get all available items, then filter.
-      // Passing empty set makes useChartDataFilter's updater return itemsWithData (all items).
       const base: Set<string> = typeof update === 'function' ? update(new Set()) : update;
       const filtered = new Set(
         [...base].filter((k) => matchesPresetHwFilter(k, filter, selectedModelRef.current)),
@@ -1297,13 +1124,6 @@ export function InferenceProvider({
     [resolveHwSelection, setActiveHwTypes, setActiveHwTypesDispatch],
   );
 
-  // `selectableHwTypes` is the universe the legend selection lives in: every
-  // config in scope for the current model / sequence / precision, whether or
-  // not it carries the selected y-metric. `hwTypesWithData` stays metric-aware
-  // and drives what the legend renders and what the chart draws. Keeping the
-  // two apart is what makes a y-axis switch non-destructive — the selection is
-  // never intersected with metric coverage, so nothing has to be restored when
-  // the user switches back.
   const selectableHwTypes = useChartDataFilter(
     hwSelectablePoints,
     setActiveHwTypesWithFilter,
@@ -1318,7 +1138,6 @@ export function InferenceProvider({
     const wantedType = selectedXAxisMode === 'interactivity' ? 'interactivity' : 'e2e';
     const graph = graphs.find((candidate) => candidate.chartDefinition.chartType === wantedType);
     if (!graph) return hwTypesWithData;
-    // All in Measured can have GPU-valid table rows without a numeric estimate to rank.
     const tableCandidates = graph.tableData?.filter((point) =>
       effectivePrecisions.includes(point.precision),
     );
@@ -1339,7 +1158,6 @@ export function InferenceProvider({
     }
     const best = bestSeriesPerSku(graph.data, direction, effectivePrecisions);
     if (best.size === 0) return unrankedHwTypes;
-    // Rankable SKUs keep their winner; table-only SKUs stay visible.
     return tableCandidates ? withUnrankedSkus(best, graph.data, tableCandidates) : best;
   }, [
     graphs,
@@ -1366,9 +1184,6 @@ export function InferenceProvider({
         return;
       setHardwareDefaultsOverridden(true);
       setBestPerSku(enabled);
-      // Overlay-mode legend edits own a temporary unified selection. They can
-      // disable the automatic mode without replacing the context selection
-      // that should be restored when the overlay is dismissed.
       if (options?.applySelection === false) return;
       const target = enabled ? bestHwTypes : selectableHwTypes;
       setActiveHwTypes(resolveHwSelection(target).result);
@@ -1378,8 +1193,6 @@ export function InferenceProvider({
     [bestHwTypes, selectableHwTypes, resolveHwSelection, setActiveHwTypes, requestEngineComparison],
   );
 
-  // Direct fallback: apply pendingHwFilter when selectableHwTypes is already populated
-  // but useChartDataFilter didn't fire (e.g. re-selecting the same preset).
   useEffect(() => {
     if (!pendingHwFilter || selectableHwTypes.size === 0) return;
     const filtered = new Set(
@@ -1397,7 +1210,6 @@ export function InferenceProvider({
     (hw: string) => {
       const proposed = computeToggle(activeHwTypes, hw, selectableHwTypes);
       if (
-        // Solo/restore clicks retain the exclusion-aware selection below.
         !activeHwTypes.has(hw) &&
         requestEngineComparison(proposed, () => {
           setHardwareDefaultsOverridden(true);
@@ -1408,9 +1220,6 @@ export function InferenceProvider({
         })
       )
         return;
-      // Toggle against the selection universe, not the metric-filtered legend:
-      // computeToggle's "everything is on, so solo this one" branch compares
-      // set sizes, and activeHwTypes is sized against selectableHwTypes.
       const next = toggleComparisonSelection(activeHwTypes, hw, selectableHwTypes);
       if (!next) return;
       setHardwareDefaultsOverridden(true);
@@ -1490,37 +1299,17 @@ export function InferenceProvider({
     [selectAllDatesRaw, allDateIds],
   );
 
-  // ── Side effects ──────────────────────────────────────────────────────────
-
-  // Reset legend HW toggles to "all enabled" when model, sequence, or precision changes.
-  // Use a stable string key for precisions so array reference changes don't trigger a reset.
-  // Skip the reset when a preset hw filter is pending — the fallback effect below handles it.
-  // When a preset is still active (presetHwFilterRef), re-apply the filter instead of resetting
-  // to all GPUs — this handles deferred effectivePrecisions changes from late availability data.
-  // Track the last applied key with a ref and include selectableHwTypes in the deps so the
-  // reset commits as soon as data for the new model arrives — without this, switching models
-  // bails on the empty-data tick and never re-fires, leaving the legend at the prior intersection.
   const precisionsKey = effectivePrecisions.join(',');
-  // Keyed on the resolved guard state rather than isUnofficialRun alone: the
-  // feature gate hydrates from localStorage after mount, so the first-paint
-  // official resolution must be revisited once the gate unlocks (or re-locks).
   const hwResetKey = `${selectedModel}|${effectiveSequence}|${precisionsKey}|${
     engineGuardLifted ? 'preview' : 'official'
   }`;
   const lastHwResetKeyRef = useRef('');
   const lastHwResetModelRef = useRef(selectedModel);
 
-  // Restore legend-active selection from URL on first availability of
-  // selectableHwTypes. Sets lastHwResetKeyRef so the reset effect below treats
-  // the current key as already-applied and bails. Empty intersections fall back
-  // to all available configs before the active exclusion policy is applied.
   useEffect(() => {
     if (!pendingActiveHwTypes) return;
     if (pendingHwFilterRef.current) return;
     if (selectableHwTypes.size === 0) return;
-    // Match exact hwKeys (URL-restored) AND bare GPU prefixes (used by
-    // /compare/[a]-vs-[b] pages, which know the GPU key but not which framework
-    // configs exist for it).
     const prefixes = [...pendingActiveHwTypes].filter((k) => !k.includes('_'));
     let restored = new Set(
       [...selectableHwTypes].filter(
@@ -1528,8 +1317,6 @@ export function InferenceProvider({
           pendingActiveHwTypes.has(k) || prefixes.some((p) => k.startsWith(`${p}_`) || k === p),
       ),
     );
-    // Empty intersection (e.g. URL referenced GPUs no longer in availability,
-    // or every referenced key disappeared) falls back to all available configs.
     if (restored.size === 0) restored = selectableHwTypes;
     if (exclusion) {
       const proposed = restored;
@@ -1565,14 +1352,9 @@ export function InferenceProvider({
     const scopeChanged = lastHwResetKeyRef.current !== hwResetKey;
     const modelChanged = lastHwResetModelRef.current !== selectedModel;
     const presetFilter = presetHwFilterRef.current;
-    // Metric changes must preserve manual legend subsets, but automatic
-    // selections still need to follow the newly selected axes. In particular,
-    // Best per SKU is metric-aware and would otherwise keep the previous
-    // metric's winners while its toggle remained enabled.
     if (!scopeChanged && !bestPerSku && !presetFilter) return;
     lastHwResetKeyRef.current = hwResetKey;
     lastHwResetModelRef.current = selectedModel;
-    // Keep engine stickiness within a model, never across model navigation.
     const previousSelection = modelChanged ? new Set<string>() : undefined;
     if (modelChanged) preferredHwTypesRef.current = new Set();
     if (presetFilter) {
@@ -1580,8 +1362,6 @@ export function InferenceProvider({
         [...selectableHwTypes].filter((k) => matchesPresetHwFilter(k, presetFilter, selectedModel)),
       );
       if (filtered.size > 0) {
-        // Presets explicitly choose configs. Resolve any engine conflict
-        // silently so loading a preset never flashes an invalid comparison.
         setActiveHwTypes(resolveHwSelection(filtered, previousSelection).result);
         return;
       }
@@ -1592,10 +1372,6 @@ export function InferenceProvider({
         ? defaultInferenceHardware(selectedModel, candidates)
         : candidates;
     if (exclusion) {
-      // Automatic resets must never surface multiple incomparable engine groups.
-      // Scenarios that restrict standard-token engines (8K/1K, AgentX) keep one
-      // sticky group so their charts remain useful; variant-only rules retain
-      // the existing clear-all behavior.
       const { result, droppedGroups } = resolveHwSelection(automaticSelection, previousSelection);
       setActiveHwTypes(result);
       if (droppedGroups.length > 0) {
@@ -1622,8 +1398,6 @@ export function InferenceProvider({
     hardwareDefaultsOverridden,
   ]);
 
-  // Remove selected GPUs only after successful availability has settled. An
-  // empty successful scope is different from the transient empty loading state.
   useEffect(() => {
     if (!availabilitySettled || !sequenceResolved || selectedGPUs.length === 0) return;
     const validKeys = new Set(availableGPUs.map((gpu) => gpu.value));
@@ -1640,12 +1414,9 @@ export function InferenceProvider({
     }
   }, [gpuUrlHydrated, selectedGPUs]);
 
-  // Reset date range when selected dates are no longer available (e.g. precision change)
   useEffect(() => {
     if (!selectedDateRange.startDate || !selectedDateRange.endDate) return;
     if (selectedGPUs.length === 0) return;
-    // Skip while availability is still loading — empty here means "not loaded yet",
-    // not "no dates", so clearing would wipe URL-restored selections on mount.
     if (dateRangeAvailableDates.length === 0) return;
     const dateSet = new Set(dateRangeAvailableDates);
     if (!dateSet.has(selectedDateRange.startDate) || !dateSet.has(selectedDateRange.endDate)) {
@@ -1666,11 +1437,6 @@ export function InferenceProvider({
       setUserPowers((prev) => (prev === null ? prev : null));
   }, [selectedModel, effectiveSequence, effectivePrecisions, selectedYAxisMetric]);
 
-  // ── Debounced GPU selection tracking ─────────────────────────────────────
-  // Fire after 3s of no changes so we capture the "settled" selection.
-  // Skip the first render (initial data load) to avoid noise.
-
-  // Scatter chart — tracks activeHwTypes
   const scatterTrackMounted = useRef(false);
   useEffect(() => {
     if (!scatterTrackMounted.current) {
@@ -1692,7 +1458,6 @@ export function InferenceProvider({
     return () => clearTimeout(timer);
   }, [activeHwTypes]);
 
-  // Interactivity / E2E chart — tracks activeDates (date+gpu pairs)
   const e2eTrackMounted = useRef(false);
   useEffect(() => {
     if (!e2eTrackMounted.current) {
@@ -1714,7 +1479,6 @@ export function InferenceProvider({
     return () => clearTimeout(timer);
   }, [activeDates]);
 
-  // Fire once on mount to capture the initial y-axis metric (default or URL-restored)
   useEffect(() => {
     track('inference_chart_view', {
       yAxisMetric: selectedYAxisMetric,
@@ -1722,12 +1486,6 @@ export function InferenceProvider({
     });
   }, []);
 
-  // ── URL sync ──────────────────────────────────────────────────────────────
-
-  // Serialize the legend-active set, omitting (empty string → URL default) when
-  // it equals the full selectable set. Comparing against the selectable set
-  // rather than the metric-filtered one keeps a Measured Energy axis from
-  // baking that axis's coverage into the share URL. Keeps share URLs short.
   const iActiveStr = useMemo(() => {
     if (activeHwTypes.size === 0) return '';
     const defaultSelection = (items: Set<string>) =>
@@ -1777,11 +1535,12 @@ export function InferenceProvider({
   useUrlStateSync(
     {
       i_metric:
-        selectedYAxisMetric === (initialYAxisMetric ?? defaultYAxisMetric(quickFilterPower))
+        selectedYAxisMetric === (initialYAxisMetric ?? DEFAULT_Y_AXIS_METRIC)
           ? ''
           : selectedYAxisMetric,
       i_revenue: usesTokenSalePricing(selectedYAxisMetric) ? tokenRevenuePriceSource : 'normalized',
       i_mstat: fixedSequenceStatistic,
+      i_tokens: tokenBasis,
       i_gpus: selectedGPUs.join(','),
       i_dates: selectedDates.join(','),
       i_dstart: selectedDateRange.startDate,
@@ -1825,6 +1584,7 @@ export function InferenceProvider({
       selectedXAxisMode,
       requestedXAxisMode,
       fixedSequenceStatistic,
+      tokenBasis,
       scaleType,
       selectedGPUs,
       selectedDates,
@@ -1854,10 +1614,6 @@ export function InferenceProvider({
     ],
   );
 
-  // ── URL preset loading ───────────────────────────────────────────────────
-  // Reads ?preset= from the URL on mount and applies it. This is the only
-  // place preset URL params are consumed — the landing page links here.
-
   const urlPresetAppliedRef = useRef(false);
   const presetVersionRef = useRef(0);
   const [pendingTimelinePreset, setPendingTimelinePreset] = useState<
@@ -1865,7 +1621,6 @@ export function InferenceProvider({
   >(null);
   const pendingPresetVersionRef = useRef(0);
 
-  // Once dateRangeAvailableDates resolves for a timeline preset, set the full range.
   useEffect(() => {
     if (!pendingTimelinePreset || dateRangeAvailableDates.length === 0) return;
     if (pendingPresetVersionRef.current !== presetVersionRef.current) {
@@ -1951,24 +1706,12 @@ export function InferenceProvider({
     applyPreset(preset);
   }, [applyPreset]);
 
-  // ── Filtered runs ─────────────────────────────────────────────────────────
-  // filteredAvailableRuns / effectiveSelectedRunId are computed above the data
-  // fetch (so the chart can query "as of" the selected run).
-  //
-  // NOTE: We intentionally do not sync effectiveSelectedRunId back through the
-  // global run action. filteredAvailableRuns depends on effectivePrecisions, so
-  // doing so would replace the user's global run intent with an inference-only
-  // fallback whenever the precision scope changes. The inference filter domain
-  // exposes effectiveSelectedRunId directly instead.
-
   const handleDateRangeDialogOk = () => {
     clearOverviewHistoryPair();
     setSelectedDateRange({ startDate: '', endDate: '' });
     setSelectedDates([]);
     setShowDateRangeDialog(false);
   };
-
-  // ── Domain context values ─────────────────────────────────────────────────
 
   const dataValue = useMemo<InferenceDataContextType>(
     () => ({
@@ -2066,6 +1809,7 @@ export function InferenceProvider({
       selectedE2eXAxisMetric,
       selectedXAxisMode,
       fixedSequenceStatistic,
+      tokenBasis,
       defaultXAxisMode,
       scaleType,
       powerCompare,
@@ -2093,6 +1837,7 @@ export function InferenceProvider({
       selectedE2eXAxisMetric,
       selectedXAxisMode,
       fixedSequenceStatistic,
+      tokenBasis,
       defaultXAxisMode,
       scaleType,
       powerCompare,
@@ -2126,6 +1871,7 @@ export function InferenceProvider({
     setSelectedYAxisMetric: setSelectedYAxisMetricAndClear,
     setTokenRevenuePriceSource,
     setFixedSequenceStatistic,
+    setTokenBasis,
     setSelectedXAxisMetric,
     setSelectedXAxisMode: handleSetXAxisMode,
     setScaleType,
@@ -2134,7 +1880,7 @@ export function InferenceProvider({
     setQuickFilterFrameworks,
     setQuickFilterDeployment,
     setQuickFilterSpec,
-    setQuickFilterPower: setQuickFilterPowerAndMetric,
+    setQuickFilterPower,
     setQuickFilterTopologies,
     setIsLegendExpanded,
     setHideNonOptimal,
@@ -2171,7 +1917,11 @@ export function InferenceProvider({
         </PerfRulerStoreContext.Provider>
       </InferenceContextsProvider>
       <EngineComparisonConflictToast
-        detail={comparisonGuardLifted ? null : engineConflict}
+        detail={
+          comparisonGuardLifted || (quietEngineResolution && engineConflict?.kind === 'resolved')
+            ? null
+            : engineConflict
+        }
         onDismiss={dismissEngineConflict}
         onCompare={
           consentSupported

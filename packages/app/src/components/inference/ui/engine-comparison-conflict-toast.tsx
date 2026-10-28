@@ -10,11 +10,6 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import type { Locale } from '@/lib/i18n/i18n';
 import { BottomToast } from '@/components/ui/bottom-toast';
 
-/**
- * Detail for a rejected or automatically resolved cross-engine selection.
- * Explicit conflicting adds are blocked; reset/select-all paths report which
- * comparability groups were kept or removed.
- */
 export type EngineComparisonConflictDetail =
   | { kind: 'blocked'; attempted: string; existing: string | null }
   | { kind: 'resolved'; kept: string[]; dropped: string[]; partial: string[] };

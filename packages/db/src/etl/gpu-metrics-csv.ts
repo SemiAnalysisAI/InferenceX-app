@@ -1,17 +1,6 @@
-/**
- * Parser and per-GPU statistics for the producer's `gpu_metrics.csv` telemetry.
- *
- * The InferenceX runner samples `nvidia-smi --query-gpu=…` or `amd-smi metric
- * --csv` once per second for the lifetime of a benchmark job. This module is
- * pure (no I/O): CI ingest and the historical backfill parse with it, stored
- * reads compute statistics with it, and the app's GitHub fallback path shares
- * its timestamp and CSV line parsers.
- */
-
 export type GpuMetricsVendor = 'nvidia' | 'amd';
 
 export interface GpuMetricSample {
-  /** Sample instant in epoch milliseconds (UTC). */
   timestampMs: number;
   gpuIndex: number;
   powerW: number | null;
@@ -103,11 +92,6 @@ export function parseMetricCell(value: string | undefined): number | null {
 const NVIDIA_TIMESTAMP_RE =
   /^(?<y>\d{4})\/(?<mo>\d{2})\/(?<d>\d{2}) (?<h>\d{2}):(?<mi>\d{2}):(?<s>\d{2})(?:\.(?<ms>\d{1,3}))?$/u;
 
-/**
- * nvidia-smi prints `YYYY/MM/DD HH:MM:SS.mmm` in the collector's local zone.
- * The producer runs its collectors with TZ=UTC; callers can pass a different
- * fixed offset (minutes east of UTC) when a context sidecar says otherwise.
- */
 export function parseNvidiaTimestamp(raw: string, offsetMinutes = 0): number | null {
   const match = NVIDIA_TIMESTAMP_RE.exec(raw.trim());
   if (!match?.groups) return null;
@@ -129,7 +113,7 @@ export function parseAmdTimestamp(raw: string): number | null {
   const trimmed = raw.trim();
   if (/^\d+(?:\.\d+)?$/u.test(trimmed)) {
     const numeric = Number.parseFloat(trimmed);
-    if (numeric > 1e12) return Math.round(numeric); // already milliseconds
+    if (numeric > 1e12) return Math.round(numeric);
     if (numeric > 1e9) return Math.round(numeric * 1000);
     return null;
   }
@@ -158,12 +142,6 @@ export function emptySample(timestampMs: number, gpuIndex: number): GpuMetricSam
   };
 }
 
-/**
- * Columns: timestamp, index, power.draw [W], temperature.gpu,
- * clocks.current.sm [MHz], clocks.current.memory [MHz], utilization.gpu [%],
- * utilization.memory [%]. Header order is fixed by NVIDIA_GPU_MONITOR_QUERY in
- * the producer, but we still resolve by name so a reordered query keeps working.
- */
 function parseNvidiaCsv(lines: readonly string[], offsetMinutes: number): GpuMetricSample[] {
   const header = splitCsvLine(lines[0]!).map((h) => h.toLowerCase().replace(/\s*\[.*\]$/u, ''));
   const col = (name: string) => header.indexOf(name);
@@ -197,12 +175,6 @@ function parseNvidiaCsv(lines: readonly string[], offsetMinutes: number): GpuMet
   return samples;
 }
 
-/**
- * amd-smi `metric --csv` is a wide table. The consumed subset mirrors the
- * dashboard: socket_power, gfx_activity, umc_activity, mm_activity, the first
- * gfx/mem/fclk/socclk clock domains, hotspot/edge/mem temperatures and the
- * three voltage rails.
- */
 function parseAmdCsv(lines: readonly string[]): GpuMetricSample[] {
   const colMap = buildColumnMap(lines[0]!);
   const col = (name: string) => colMap.get(name) ?? -1;
@@ -255,14 +227,9 @@ function parseAmdCsv(lines: readonly string[]): GpuMetricSample[] {
 }
 
 export interface ParseGpuMetricsOptions {
-  /** Fixed offset of the NVIDIA collector clock, minutes east of UTC. */
   nvidiaUtcOffsetMinutes?: number;
 }
 
-/**
- * Parse one gpu_metrics CSV, auto-detecting the vendor from the header.
- * Samples are returned in file order; callers sort per GPU as needed.
- */
 export function parseGpuMetricsCsv(
   csvText: string,
   options: ParseGpuMetricsOptions = {},
@@ -338,7 +305,6 @@ export interface GpuMetricSeriesSummary {
   gpuCount: number;
   startedAtMs: number;
   endedAtMs: number;
-  /** Median gap between consecutive samples of one GPU, in seconds. */
   sampleIntervalS: number | null;
 }
 

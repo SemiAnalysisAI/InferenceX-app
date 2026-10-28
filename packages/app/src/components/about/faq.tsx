@@ -17,14 +17,10 @@ export interface FaqLink {
 }
 
 export interface FaqItem {
-  /** Stable, locale-independent fragment identifier for direct links. */
   readonly id: string;
   readonly question: string;
-  /** Intro text shown before any list. */
   readonly answer: string;
-  /** Optional link rendered inline after the answer text. */
   readonly link?: FaqLink;
-  /** Optional bullet list rendered below the answer text. */
   readonly list?: readonly string[];
 }
 
@@ -36,8 +32,6 @@ const gpusByVendor = [...GPU_KEYS].reduce<Record<string, string[]>>((groups, key
 
 export const GENERATED_FAQ_DATA = {
   gpuGroups: Object.entries(gpusByVendor).map(([vendor, gpus]) => `${vendor}: ${gpus.join(', ')}`),
-  // /about lists each DB bucket separately, including point releases that other
-  // surfaces collapse under one display name.
   modelNames: Object.values({
     ...DB_MODEL_TO_DISPLAY,
     'kimik2.6': 'Kimi-K2.6',

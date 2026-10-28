@@ -1,10 +1,5 @@
 import { unlockAgenticGate } from '../support/e2e';
 
-/**
- * `/inference/agentic` is the telemetry catalog: a hero drawn from the AgentX
- * telemetry tutorial, then one card per (model, SKU, engine, precision) config
- * that has stored per-request telemetry.
- */
 describe('AgentX telemetry catalog', () => {
   beforeEach(() => {
     cy.window().then((win) => {

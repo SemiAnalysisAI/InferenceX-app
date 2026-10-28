@@ -23,7 +23,6 @@ function readDays(): string[] {
   }
 }
 
-/** Distinct calendar days the user has visited this month. */
 export function getMonthlyVisitCount(): number {
   try {
     if (localStorage.getItem(MONTH_KEY) !== currentMonth()) return 0;
@@ -33,7 +32,6 @@ export function getMonthlyVisitCount(): number {
   }
 }
 
-/** ISO date (YYYY-MM-DD) of first ever visit, or null if storage unavailable / first visit not yet recorded. */
 export function getFirstSeen(): string | null {
   try {
     return localStorage.getItem(FIRST_SEEN_KEY);
@@ -42,7 +40,6 @@ export function getFirstSeen(): string | null {
   }
 }
 
-/** ISO date (YYYY-MM-DD) of the most recent prior session, or null. */
 export function getLastSeen(): string | null {
   try {
     return localStorage.getItem(LAST_SEEN_KEY);
@@ -51,10 +48,6 @@ export function getLastSeen(): string | null {
   }
 }
 
-/**
- * Once per browser session: record today as a visit day, refresh first/last seen.
- * Returns the post-record distinct-day count for the current month.
- */
 export function recordVisitIfNew(): number {
   try {
     if (sessionStorage.getItem(SESSION_KEY) !== null) return getMonthlyVisitCount();

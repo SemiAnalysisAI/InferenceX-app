@@ -52,26 +52,16 @@ const STRINGS = {
   },
 } as const;
 
-/**
- * Quick Comparisons is hidden for now. The card, its `quickComparisons*`
- * strings, `CuratedViewCard`, and `FAVORITE_PRESETS` are all left in place —
- * flip this to `true` to bring the section back.
- */
 const SHOW_QUICK_COMPARISONS = false;
 
 export function LandingPage({ locale = 'en' }: { locale?: Locale } = {}) {
   const t = STRINGS[locale];
-  // Internal links stay within the current language tree.
   const prefix = locale === 'zh' ? '/zh' : '';
   return (
     <main className="relative">
       <LandingPageAnalytics />
       <NudgeEngine scope="landing" />
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-6 lg:gap-4">
-        {/* Same AgentX hero that leads /compare, above the quote carousel. The
-            landing page owns no h1 of its own, but keep this an h2 so the hero
-            stays a section within the page rather than retitling the whole
-            site. */}
         <Reveal>
           <AgentXCompareHero locale={locale} headingLevel="h2" surface="landing" />
         </Reveal>
@@ -80,9 +70,7 @@ export function LandingPage({ locale = 'en' }: { locale?: Locale } = {}) {
           <IntroSection locale={locale} />
         </Reveal>
 
-        {/* Split: exploration entry points vs presets */}
         <section className="flex flex-col gap-4 pb-8">
-          {/* Reproducibility callout */}
           <Reveal>
             <Card>
               <div className="flex items-center gap-2 mb-3">
@@ -140,7 +128,6 @@ export function LandingPage({ locale = 'en' }: { locale?: Locale } = {}) {
             </Card>
           </Reveal>
 
-          {/* Right - Curated Presets (temporarily hidden, see SHOW_QUICK_COMPARISONS) */}
           {SHOW_QUICK_COMPARISONS && (
             <Card data-testid="landing-quick-comparisons">
               <div className="flex items-center gap-2 mb-3">

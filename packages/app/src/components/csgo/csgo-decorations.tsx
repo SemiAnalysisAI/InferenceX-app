@@ -25,10 +25,6 @@ export function CsgoThemeBanner() {
   );
 }
 
-/**
- * Follow the root class, like Minecraft's decorations, because this mounts
- * outside ThemeProvider. No image requests until CS:GO is selected.
- */
 export function CsgoDecorations() {
   const [active, setActive] = useState(false);
 

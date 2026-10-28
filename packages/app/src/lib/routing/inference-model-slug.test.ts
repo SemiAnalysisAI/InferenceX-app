@@ -42,6 +42,16 @@ describe('INFERENCE_MODEL_SLUGS registry', () => {
       expect(INFERENCE_MODEL_SLUGS).toContain(entry);
     }
   });
+
+  it('keeps the MiniMax M3 page addressable without promoting it as active', () => {
+    expect(getInferenceModelBySlug('minimax-m3')?.model).toBe(Model.MiniMax_M3);
+    expect(ACTIVE_INFERENCE_MODEL_SLUGS.some((entry) => entry.model === Model.MiniMax_M3)).toBe(
+      false,
+    );
+    expect(
+      ACTIVE_INFERENCE_MODEL_SLUGS.some((entry) => entry.model === Model.MiniMax_M3_1_Flash),
+    ).toBe(true);
+  });
 });
 
 describe('getInferenceModelBySlug', () => {

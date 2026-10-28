@@ -54,8 +54,6 @@ function buildOverviewFormatters(locale: OverviewLocale): Formatters {
     timeZone: 'UTC',
   });
   return {
-    // Three decimals: at hyperscaler $/GPU/hr over TOTAL tokens, real platforms
-    // land in the $0.0x–$0.1x band, which two decimals would collapse.
     cost: new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
@@ -72,8 +70,6 @@ function buildOverviewFormatters(locale: OverviewLocale): Formatters {
   };
 }
 
-/** Built once per locale. Constructing ICU formatters is not free and the page
- *  body calls this on every render; the inputs are two fixed locales. */
 const FORMATTER_CACHE = new Map<OverviewLocale, Formatters>();
 
 export function overviewFormatters(locale: OverviewLocale): Formatters {
@@ -103,9 +99,6 @@ function missingReasonCopy(platform: OverviewPlatformResult, strings: OverviewSt
 const RAW_SOURCE_LINK_CLASS =
   'inline-flex min-h-11 items-center rounded-sm underline decoration-dotted underline-offset-4 hover:decoration-solid focus-visible:outline-none';
 
-/** No result for this GPU. The reason reads as visible text, mirroring the
- *  stack line on a populated cell — a `title` tooltip reaches neither keyboard
- *  nor touch users, and this is the only per-cell string with no other surface. */
 function CellMissing({ hardware, reason }: { hardware: string; reason: string }) {
   return (
     <div
@@ -123,12 +116,8 @@ function CellMissing({ hardware, reason }: { hardware: string; reason: string })
   );
 }
 
-/** Deltas inside this band read as parity, not polarity. */
 const COST_DELTA_NEUTRAL_BAND = 0.05;
-/** Magnitudes at or beyond this saturate the shade ramp. */
 const COST_DELTA_SATURATION = 0.5;
-// Missing comparison evidence is neutral gray, never red/green: availability
-// is not a better/worse judgment.
 const COST_DELTA_CLASS = {
   cheaper: 'text-emerald-900 dark:text-emerald-200',
   pricier: 'text-red-900 dark:text-red-200',
@@ -138,11 +127,9 @@ const COST_DELTA_CLASS = {
 const COST_DELTA_HUE = {
   cheaper: '16 185 129',
   pricier: '239 68 68',
-  // Parity and missing comparison evidence both read as neutral gray.
   even: '148 163 184',
   'no-baseline': '148 163 184',
 } as const;
-/** Flat wash for the two neutral states — they carry no magnitude to ramp. */
 const COST_DELTA_NEUTRAL_ALPHA = '0.10';
 
 type CostDeltaPolarity = keyof typeof COST_DELTA_CLASS;
@@ -153,10 +140,6 @@ interface DisplayedComparison {
   baselineDate: string | null;
 }
 
-/** `referenceCost` is the reference column's cost for this row, or null when it
- *  has no priced read. The ratio is recomputed here rather than read from
- *  `costVsReferencePct` because the payload may have been cached for a
- *  different reference — `ref` never reaches the server on a client commit. */
 function displayedComparison(
   platform: OverviewPlatformResult,
   comparisonMode: OverviewComparisonMode,
@@ -229,18 +212,11 @@ function comparisonAria(
       );
 }
 
-/** Continuous shade: only background alpha tracks the magnitude, so every
- *  cell reads on one ramp instead of stepping through discrete bins. */
 function costDeltaAlpha(pct: number): string {
   const strength = Math.min(Math.abs(pct), COST_DELTA_SATURATION) / COST_DELTA_SATURATION;
   return (0.08 + strength * 0.32).toFixed(2);
 }
 
-/**
- * The whole cell carries the comparison shade, not just its badge: at a glance
- * the matrix should read as a heat map, with the badge stating the number.
- * A cell with no priced read stays untinted — there is nothing to compare.
- */
 export function costDeltaCellStyle(
   platform: OverviewPlatformResult,
   comparisonMode: OverviewComparisonMode = 'hardware',
@@ -261,8 +237,6 @@ export function costDeltaCellStyle(
   return { backgroundColor: `rgb(${COST_DELTA_HUE[polarity]} / ${alpha})` };
 }
 
-/** Relative comparison badge. Missing reference evidence stays neutral and
- *  uses `∞` instead of manufacturing a percentage. */
 function CostDeltaBadge({
   comparison,
   comparisonMode,
@@ -297,8 +271,6 @@ function CostDeltaBadge({
       data-cost-polarity={polarity}
       data-history-status={comparisonMode === 'hardware' ? undefined : status}
       title={aria}
-      // The cell behind it carries the shade, so the badge itself stays
-      // untinted — two washes of the same hue would double up.
       className={`inline-flex translate-y-px items-center whitespace-nowrap rounded-sm px-1 py-0.5 text-3xs font-semibold tabular-nums ${
         phoneRow ? 'col-start-2 justify-self-start' : 'xl:col-start-2 xl:justify-self-end'
       } ${COST_DELTA_CLASS[polarity]}`}
@@ -343,8 +315,6 @@ function CellValue({
       : config.specMethod === 'none' || config.specMethod === ''
         ? strings.standardDecodeLabel
         : config.specLabel;
-  // Speculative decode is the expected case, so a cell only calls out the
-  // exception: a standard-decode read, badged STP.
   const decodeLabel =
     config !== null && (config.specMethod === 'none' || config.specMethod === '')
       ? strings.standardDecodeLabel
@@ -374,8 +344,6 @@ function CellValue({
   const estimateExplanation = member.read.estimated
     ? strings.estimatedTooltip(evidenceTopologies)
     : undefined;
-  // No visible date, but the evidence link's hover/focus/SR label keeps the
-  // run date so the number stays reproducible.
   const evidenceAria =
     config === null || stack === null
       ? null
@@ -388,8 +356,6 @@ function CellValue({
       : null;
   return (
     <div className="min-w-0 space-y-0.5 text-sm">
-      {/* Fixed cost | delta grids keep comparisons scannable on desktop and phones;
-          the delta slot is reserved on the reference too, aligning every row. */}
       <div
         className={
           phoneRow
@@ -412,8 +378,6 @@ function CellValue({
               {costText}
             </span>
           ) : (
-            /* The cost itself is the evidence entry point into the filtered
-               dashboard for exactly this configuration. */
             <a
               data-testid="overview-cost-evidence-link"
               href={buildOverviewDashboardHref(locale, model, config)}
@@ -510,9 +474,6 @@ function ModelName({ model, strings }: { model: OverviewModelSummary; strings: O
   return (
     <div>
       <h2 className="text-sm font-semibold leading-snug">
-        {/* Full-color creator mark, same treatment as the /inference chart
-            caption and /model pages. `ModelLogo` renders nothing when the
-            model has no configured logo or the asset fails to load. */}
         <ModelLogo model={model.model} className="mr-1.5" />
         {model.modelLabel}
         {badge === undefined ? null : (
@@ -523,11 +484,6 @@ function ModelName({ model, strings }: { model: OverviewModelSummary; strings: O
             className="ml-1.5 inline-block rounded-sm border border-border/60 px-1 py-px align-middle text-3xs font-medium uppercase tracking-wide text-muted-foreground"
           >
             {badge}
-            {/* `title` reaches a hovering mouse and nothing else, so a screen
-                reader announced this badge as a bare label with no reason
-                attached. `normal-case` because the badge's `uppercase` inherits
-                and browsers expose the transformed string to the accessibility
-                tree, which turns the sentence into shouted, mis-parsed words. */}
             <span className="sr-only normal-case">{strings.categoryBadgeTitle}</span>
           </span>
         )}
@@ -571,10 +527,6 @@ export function DesktopOverviewMatrix({
   const platforms = models[0]?.platforms ?? [];
   const referenceLabel = overviewHardwareLabel(referenceHardware);
   return (
-    // The `xl` gate asks whether the viewport can hold the matrix, which stops
-    // being the question once presenting: the deck lays out at a fixed width and
-    // is scaled by `zoom`, so on a projector narrower than 1280px this would
-    // hide the matrix on a slide whose phone list has already been dropped.
     <div className={presenting ? 'block' : 'hidden xl:block'}>
       <table data-testid="overview-desktop-matrix" className="w-full border-collapse text-sm">
         <caption className="sr-only">
@@ -588,10 +540,6 @@ export function DesktopOverviewMatrix({
             <col key={platform.hardware} className="w-[15.6%]" />
           ))}
         </colgroup>
-        {/* Sticky so the platform a column belongs to stays readable while
-            scrolling a nine-row matrix. `top-14` clears the site header (h-14,
-            sticky top-0, z-50), and z-10 keeps this under it. Opaque, or the
-            scrolled rows show through. */}
         <thead className="sticky top-14 z-10 bg-card">
           <tr className="border-b border-border/50 text-sm uppercase tracking-wider text-muted-foreground">
             <th scope="col" className="bg-card px-4 py-2 text-left font-semibold lg:px-6">
@@ -612,8 +560,6 @@ export function DesktopOverviewMatrix({
         </thead>
         <tbody>
           {models.map((model) => {
-            // One lookup per row, not one per cell. Every row carries all five
-            // platforms, so this misses only when the reference has no read.
             const referenceCost =
               model.platforms.find((platform) => platform.hardware === referenceHardware)
                 ?.costPerMtok ?? null;
@@ -627,8 +573,6 @@ export function DesktopOverviewMatrix({
               >
                 <th scope="row" className="px-4 py-2.5 text-left align-top font-normal lg:px-6">
                   <ModelName model={model} strings={strings} />
-                  {/* The link lives with the model it drills into, so the matrix
-                    spends no column on a header that is the same every row. */}
                   {comparisonMode === 'hardware' && (
                     <OverviewDetailLink
                       href={detailHref(locale, model)}
@@ -756,14 +700,6 @@ export function MobileOverviewList({
   );
 }
 
-/**
- * The active option of a switcher. It replaces the anchor the user activated,
- * which destroys the focused node and drops focus to <body>; when the click
- * came from the keyboard, this takes that focus back.
- *
- * `tabIndex={-1}` keeps a non-interactive span out of the tab order while still
- * allowing programmatic focus.
- */
 function ActiveSwitcherOption({
   control,
   children,
@@ -775,10 +711,6 @@ function ActiveSwitcherOption({
     if (focusIntent.current !== control) return;
     focusIntent.current = null;
     ref.current?.focus({ preventScroll: true });
-    // Mount-only by construction: `control` is a literal per call site and
-    // `focusIntent` is a stable ref, so this runs exactly on the commit that
-    // swapped the anchor out. Dropping the deps would consume the intent one
-    // render early and leave focus on <body>.
   }, [control, focusIntent]);
   return (
     <span {...props} ref={ref} tabIndex={-1}>
@@ -787,7 +719,6 @@ function ActiveSwitcherOption({
   );
 }
 
-/** The six benchmarked service levels are exposed as discrete slider stops. */
 export function OverviewTierSwitcher({
   tier,
   engineScope,
@@ -825,7 +756,6 @@ export function OverviewTierSwitcher({
   );
 }
 
-/** Scope links keep their native href while preserving the other controls. */
 export function OverviewEngineScopeSwitcher({
   engineScope,
   tier,
@@ -937,11 +867,6 @@ export function OverviewComparisonSwitcher({
     label: strings.historyWindowOptions[window],
     href: overviewHref(locale, tier, engineScope, window, referenceHardware, modelScope),
   }));
-  // The inactive-only classes live on the inactive branch, not here: Tailwind
-  // emits `border-transparent` after the active border at equal specificity,
-  // so sharing them left the active underline invisible in light mode. The
-  // darker light-theme blue also keeps this small active label above AA
-  // contrast on the page background; dark mode retains the brand primary.
   const optionClass =
     'relative inline-flex min-h-11 min-w-[130px] items-center justify-center whitespace-nowrap border-b-2 px-4 py-2 text-sm font-semibold transition-colors duration-200 focus-visible:outline-none sm:min-w-[140px]';
   const inactiveOptionClass =
@@ -1027,23 +952,11 @@ export function OverviewComparisonSwitcher({
   );
 }
 
-/**
- * Where a scope toggle is drawn. `section` is the chip in the footer bar
- * beneath the matrix; `toolbar` is the same chip riding the deck toolbar while
- * presenting, where the count badge would be noise at projection size.
- */
 type OverviewScopeToggleVariant = 'section' | 'toolbar';
 
-/**
- * Matches Exit, so the right end of the deck toolbar reads as one row of
- * actions. Deliberately not filled-when-engaged: these labels name the click
- * rather than the state, and a filled "Show all rows" contradicts itself.
- */
 const SCOPE_CHIP_CLASS =
   'inline-flex min-h-11 items-center whitespace-nowrap rounded-md border border-border/60 px-3 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground';
 
-/** The count the chip's short label elides; the full sentence stays on the
- *  accessible name, so the badge is presentation only. */
 function ScopeChipCount({ count }: { count: number }) {
   return (
     <span
@@ -1079,13 +992,7 @@ export function OverviewModelScopeToggle({
   variant?: OverviewScopeToggleVariant;
 }) {
   const target: OverviewModelScope = modelScope === 'all' ? 'default' : 'all';
-  // Inactive models rarely post a 30-day change, so revealing them under the
-  // changed-only scope would filter them straight back out and read as a dead
-  // link. Asking for more models asks for more rows.
   const targetRowScope: OverviewRowScope = target === 'all' ? 'all' : rowScope;
-  // Same trap in hardware mode, and a deeper one: an inactive model is the most
-  // likely to have no result on any platform, which is exactly what the
-  // priced-only scope removes.
   const targetHardwareRowScope: OverviewHardwareRowScope =
     target === 'all' ? 'all' : hardwareRowScope;
   const sentence = modelScope === 'all' ? strings.modelScopeHide : strings.modelScopeShow;
@@ -1123,11 +1030,6 @@ export function OverviewModelScopeToggle({
   );
 }
 
-/**
- * Opt-in narrowing to the rows that moved in the window, and the way back.
- * Rendered only when the two scopes would differ, so a fully-comparable window
- * shows no dead control.
- */
 export function OverviewRowScopeToggle({
   rowScope,
   unchangedRowCount,
@@ -1141,8 +1043,6 @@ export function OverviewRowScopeToggle({
   variant = 'section',
 }: {
   rowScope: OverviewRowScope;
-  /** Days of the active history window; the copy must name the window the
-   *  filter actually reads. */
   windowDays: number;
   unchangedRowCount: number;
   tier: OverviewTier;
@@ -1193,9 +1093,6 @@ export function OverviewRowScopeToggle({
   );
 }
 
-/** The hardware-mode sibling of {@link OverviewRowScopeToggle}. Kept separate
- *  rather than parameterised: the two filters answer different questions, name
- *  different counts, and each mode remembers its own answer. */
 export function OverviewHardwareRowScopeToggle({
   hardwareRowScope,
   emptyRowCount,

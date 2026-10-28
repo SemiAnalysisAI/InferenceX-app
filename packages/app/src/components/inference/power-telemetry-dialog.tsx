@@ -10,6 +10,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
+import { getInferenceHardwareConfig } from '@/lib/benchmarks/inference-labels';
+import { getDisplayLabel } from '@/lib/shared/utils';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
@@ -35,8 +37,15 @@ export function PowerTelemetryDialog({ point, onOpenChange }: Props) {
         <DialogHeader className="pr-6">
           <DialogTitle>PowerX</DialogTitle>
           <DialogDescription className="break-words">
-            {t.point} #{point.id} · {point.hwKey} · {point.precision.toUpperCase()} ·{' '}
-            {t.concurrency} {point.conc}
+            <span className="font-medium text-foreground">
+              {getDisplayLabel(
+                getInferenceHardwareConfig(String(point.hwKey), point.model, [point]),
+              )}
+            </span>{' '}
+            · {point.precision.toUpperCase()} · {t.concurrency} {point.conc} ·{' '}
+            <span title={String(point.hwKey)}>
+              {t.point} #{point.id}
+            </span>
           </DialogDescription>
         </DialogHeader>
         <PowerTelemetryView

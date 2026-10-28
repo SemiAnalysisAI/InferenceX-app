@@ -10,8 +10,6 @@ import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 import { Model, Precision } from '../catalog/data-mappings';
 import type { OverviewPageData } from './overview-data';
 
-/** `throughput` is TOTAL tok/s per GPU — the overview's cost basis. The
- *  output metric is a decoy so a regression to output pricing surfaces here. */
 function row(
   hardware: string,
   framework: string,

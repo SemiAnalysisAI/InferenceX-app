@@ -1,30 +1,3 @@
-/**
- * Backfill `agentic_trace_replay.chart_series` for rows that are missing it
- * or were computed by an older `CHART_SERIES_VERSION`.
- *
- * The ingest path now computes the time-series inline, but existing rows
- * (and rows whose computation logic has since changed) still need this
- * pass. Run after the agentic schema migration and any time `CHART_SERIES_VERSION`
- * bumps.
- *
- * Strategy:
- *   - Stream rows one at a time (server_metrics_json_gz can decompress
- *     past 500 MB on high-conc TP+EP points — one in memory at a time
- *     avoids OOM).
- *   - Skip rows whose stored version already matches.
- *   - Recompute via the same `computeChartSeries()` helper the ingest
- *     path uses, so behavior cannot drift.
- *
- * Usage:
- *   bun run --cwd packages/db db:backfill-chart-series
- *     [--limit N]   only process the first N candidate rows
- *     [--force]     recompute every row, even if version already matches
- *     [--shard-count N] split work across N independent processes
- *     [--shard-index N] zero-based shard handled by this process
- *     [--run-id N] only process trace rows linked to one GitHub workflow run
- *     [--yes]       skip the confirmation prompt
- */
-
 import { hasNoSslFlag } from './cli-utils.js';
 import {
   CHART_SERIES_VERSION,
@@ -61,11 +34,6 @@ async function main(): Promise<void> {
 
   await runCandidateIdBackfill(
     async () => {
-      // Only rows that actually have a server_metrics blob can produce a
-      // chart_series. Rows without the blob legitimately keep `chart_series`
-      // null and the API serves them via the slow path (which also returns
-      // null because there's no blob to parse — so the page falls into the
-      // "no stored trace_replay blob" branch).
       const runFilter = githubRunId
         ? sql`
             and exists (

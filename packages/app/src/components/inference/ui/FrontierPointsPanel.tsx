@@ -52,7 +52,6 @@ export default function FrontierPointsPanel({
   hardwareColor,
 }: {
   chartId: string;
-  /** Observations that competed: the chart's visible, frontier-eligible points. */
   eligible: readonly InferenceData[];
   frontier: readonly InferenceData[];
   xLabel: string;

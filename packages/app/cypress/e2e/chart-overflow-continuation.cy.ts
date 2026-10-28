@@ -1,8 +1,3 @@
-/**
- * Intentional cost/TTFT clipping must read as a deliberate chart boundary,
- * not as a mysteriously truncated benchmark line. Covers both official rows
- * and the mandatory `?unofficialrun=` overlay path.
- */
 const MODEL_DISPLAY = 'DeepSeek-V4-Pro';
 const MODEL_DB = 'dsv4';
 const RUN_DATE = '2026-07-30';
@@ -56,9 +51,6 @@ const row = (
   run_url: runUrl,
 });
 
-// C=1 and C=2 exceed $5/M, C=1024 exceeds 60s TTFT, while C=256
-// and C=512 stay in bounds. The complete lower-left cost frontier crosses the
-// visible region on both sides, so the chart should draw two continuations.
 const rows = (runUrl: string | null) => [
   row(910001, 1, 162.6, 0.35, 80, runUrl),
   row(910004, 2, 140, 0.6, 85, runUrl),

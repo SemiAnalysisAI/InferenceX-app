@@ -36,7 +36,7 @@ remains config, scenario, sequence, offload mode, recipe fingerprint, and concur
 API routes use the view when no date filter is specified; date-filtered requests
 use the same `benchmark_curve_runs` view and `benchmark_curve_scope` function.
 
-`REFRESH CONCURRENTLY` allows reads during refresh (no downtime). The trade-off is a brief window where the view is stale after ingest — acceptable since data changes at most daily.
+`REFRESH CONCURRENTLY` allows reads during refresh (no downtime). The trade-off is a brief window where the view is stale after ingest, which is acceptable because ingests are infrequent.
 
 ### Why Idempotent Ingestion
 
@@ -60,25 +60,14 @@ If one sweep contains both AGG and disagg points, both remain visible.
 Fixed-sequence workloads retain their existing separate spec-method, disagg, and
 offload scopes. Models, hardware, frameworks and precisions always stay separate.
 
-For example, producer PR #2939 replaced GLM-5.2 / GB300 / Dynamo TensorRT-LLM / FP4
-with six disagg points in run `34413290524`. The old AGG TP8 concurrency-1 point
-from run `33219706372` belongs to the earlier snapshot and is no longer in latest.
-It remains accessible through history, the earlier date, and the earlier exact run.
-No benchmark rows, logs, trace sidecars, or recipe attributes are removed.
 The client uses the same replacement scope when selecting official runs. An
 unofficial overlay remains a separate comparison; it does not replace official data.
 
-Migration `014_agentic_curve_snapshots.sql` adds the shared SQL scope/view and
-rebuilds `latest_benchmarks`. Apply it before deploying the new readers. The existing
-application can read the rebuilt materialized view; the new readers require the
-migration. Deployment must invalidate the shared data cache (including derived
-pages); benchmark API cache keys are versioned in this change. No re-ingest is needed.
-
-Eligibility is unchanged: successful benchmark rows from the latest stored run
+Eligible rows are the successful benchmark rows from the latest stored run
 attempt. Overall workflow status is not a completeness signal: accepted benchmarks
 can come from workflows whose later upload or evaluation failed. Detecting an
 incomplete sweep requires an explicit producer completion manifest and publication
-contract; this change does not infer completion from a missing config or workflow
+contract; the app does not infer completion from a missing config or workflow
 conclusion. A normal partial sweep still replaces its curve, so intentional deltas
 must use the append-only contract below.
 
@@ -143,7 +132,7 @@ whose stored fingerprint is null. The full identity is required because one run 
 contain multiple serving configurations and recipes at the same sequence lengths and
 concurrency.
 
-`bun run db:apply-overrides` previews every matching row and requires confirmation
+`bun run admin:db:apply-overrides` previews every matching row and requires confirmation
 before deleting it in a transaction. It also removes unreferenced server logs and
 trace-replay sidecars, clears availability entries that no remaining successful row
 supports, and refreshes `latest_benchmarks`. The override remains in source control,
@@ -222,13 +211,11 @@ writes. ETL uses the primary writer in `DATABASE_WRITE_URL`.
 
 All text keys (model, hardware, framework, precision) have `CHECK (field = lower(field))`. This prevents case-sensitivity bugs where `H100` and `h100` create duplicate configs. The constraint is enforced at the DB level, not the application level, because multiple ingest paths (CI action, GCS backfill, manual scripts) all write to the same tables.
 
+### Append-Only Migrations
+
+Never rewrite an applied migration; add a new numbered file. `runMigrations` (`packages/db/src/lib/migration-runner.ts`) keys `schema_migrations` on the filename only, so an edited file is skipped on every database that already ran it.
+
 ## ETL Design
-
-### Two-Phase Parallel Ingestion
-
-Phase 1 (parallel 20): ZIP reading + JSON parsing + row mapping. IO-bound (network + disk), so high parallelism.
-
-Phase 2 (parallel 10): DB writes. Connection-limited (max 20 connections), and each write does config lookup + bulk insert. Half-pool concurrency leaves capacity for metadata and summary queries while improving ingest throughput.
 
 ### Config Cache
 
@@ -250,9 +237,9 @@ Ranks remain inside each worker's source; native-only endpoints retain their fal
 The all-endpoints view summarizes workers, while selecting a worker exposes its ranks.
 
 For runs ingested before a server-metric adapter was available, dispatch
-`Recompute Agentic Metrics` on `master` with the benchmark run ID. It force-rebuilds
-chart series and aggregate statistics from stored blobs for that run in production,
-then invalidates the app cache. It does not rerun benchmarks or replace raw artifacts.
+`Recompute Agentic Metrics` on the default branch (`master`) with the benchmark run ID.
+It force-rebuilds chart series and aggregate statistics from stored blobs for that run
+in the `DATABASE_WRITE_URL` database, then invalidates the app cache. It does not rerun benchmarks or replace raw artifacts.
 
 ### Logical Engines vs Raw Series
 
@@ -293,8 +280,8 @@ aggregate recomputation; no benchmark rerun or raw-artifact replacement is neede
 
 The Recompute Agentic Metrics workflow accepts an optional `neon-branch` to
 rebuild a stored run in an existing child database. It verifies the child and
-connection endpoint before writing; production recomputation still requires
-`master`. Preview environments use branch-scoped database and cache settings.
+connection endpoint before writing; writing `DATABASE_WRITE_URL` still requires the
+default branch. Preview environments use branch-scoped database and cache settings.
 After a child-database repair, refresh its isolated `CACHE_NAMESPACE` and
 `BLOB_CACHE_PREFIX` and redeploy that preview to retire cached payloads.
 
@@ -368,8 +355,11 @@ Each stored file is capped at 128 MiB of UTF-8 text (override with
 `SERVER_LOG_MAX_FILE_BYTES`). PostgreSQL rejects any value over 1 GB and drops the connection,
 and verbose multinode decode workers can exceed that. An oversized file keeps its first and last
 halves, cut at line boundaries, around a marker recording the original size; the complete file
-remains in the GitHub artifact and GCS backup. KV-cache metadata is still derived from the full
-`server.log` before capping. Server-log and trace-replay writes retry up to three times with
+remains in the GitHub artifact and GCS backup. Artifact files are read from disk only up to those
+kept bytes, so a multi-GiB frontend log neither exhausts memory nor stalls the event loop long
+enough for the pooler to drop the connection. KV-cache metadata is derived from the stored
+`server.log`, whose kept head holds the engine startup lines that report KV-cache size.
+Server-log writes, trace-replay link checks and trace-replay writes retry up to three times with
 backoff on transient connection errors (`CONNECTION_CLOSED`, auth timeouts, SQLSTATE class 08)
 because both writers are transactional and re-check existing links.
 
@@ -470,27 +460,6 @@ network whole. A legacy timeline of another version, another request count, or
 other content is kept and reported as a failed row. A default run never clears
 legacy data.
 
-#### Migration order
-
-Migration 017 ships in its own change and must reach a database before the
-readers that select its columns. The ingest workflows and Recompute Agentic
-Metrics apply pending migrations before they run; Vercel deploys do not. Apply
-`017_request_timeline_gz.sql` to every database the app reads (from the
-repository root, with credentials for the reviewed target database, run
-`bun run admin:db:migrate --yes` after checking pending migrations), then
-deploy the readers. Without the columns, the timeline, chart, and histogram
-reads fail until the migration runs. The migration only adds columns and is
-idempotent, so the code that predates it keeps working and a repeated run
-changes nothing.
-
-The Recompute Agentic Metrics workflow applies pending migrations in one job
-before its shards start, so the run triggered by merging the readers converts
-stale rows only after the columns exist. Its integrity check accepts the
-JSONB-to-gzip conversion when a timeline keeps its version and request count,
-and still requires identical stored bytes when the container is unchanged. A
-later migration drops `request_timeline` once every row has been converted and
-its JSONB cleared.
-
 ### Agentic Full-Response Interactivity
 
 Large raw AgentX profiles use `agentic_trace_profile_chunks` (migration 018).
@@ -502,11 +471,9 @@ verify each part's size and the complete checksum while streaming the original
 gzip bytes. No requests, metrics or timing samples are removed or approximated.
 This avoids PostgreSQL's single-value limit even for profiles over 1 GiB.
 
-Apply migrations 017 and 018 before deploying the readers and writer. Chart
-availability recognizes both inline and chunked profiles. After deployment,
-re-ingest failed traces from their existing benchmark artifacts; already-linked
-traces remain unchanged. Trace storage size failures are errors rather than
-warnings, so an incomplete chart import cannot produce a green ingestion run.
+Chart availability recognizes both inline and chunked profiles. Trace storage size
+failures are errors rather than warnings, so an incomplete chart import cannot
+produce a green ingestion run.
 
 Agentic charts use full-response inter-token latency as their canonical ITL and
 define each interactivity percentile as the reciprocal of the matching ITL
@@ -537,73 +504,6 @@ JSON parsing, React Query memory, and cache-transfer cost by data the visible
 charts do not consume. The Timeline view also virtualizes rows, so the number of
 SVG bar/link nodes is bounded by the scroll viewport rather than total request
 count.
-
-## Frontend Transform Pipeline
-
-### Why transformBenchmarkRows Exists
-
-API returns flat `BenchmarkRow[]`. Charts need `InferenceData[]` with:
-
-- Hardware key resolution (combines hw + framework + precision + spec_decoding)
-- Display name mapping (DB keys → human labels)
-- Derived metrics (cost per token, energy per token, throughput per MW)
-- Roofline computation (Pareto fronts per metric per hardware group)
-
-This transform runs client-side because:
-
-1. It depends on HW_REGISTRY (shared constants with vendor, arch, costs, power)
-2. Different chart types need different x/y metric extractions
-3. Roofline computation depends on the user's selected metric direction
-
-### Why Spline Interpolation Uses Steffen Method
-
-The TCO Calculator and Historical Trends interpolate metrics at a target interactivity value. The Steffen method (monotone cubic Hermite) was chosen because:
-
-1. **Monotonicity**: Prevents the spline from overshooting between data points. Standard cubic splines can produce negative throughput values between two positive points.
-2. **D3 compatibility**: Matches `d3.curveMonotoneX`, so the interpolated values align visually with the roofline curves drawn on charts.
-3. **Clamping**: Even with Steffen, edge cases (sparse data, steep gradients) can produce negative values. All results are clamped to `Math.max(0, ...)`.
-
-### Why Multi-Precision Uses Composite Keys
-
-When comparing FP4 vs FP8 for the same GPU, each precision needs its own Pareto front. Without composite keys (`hwKey__precision`), all precisions would be mixed into one front, producing invalid rooflines that connect FP4 and FP8 data points.
-
-The `__` separator is intentional — it can't appear in hwKey (which uses `-` and `_`) or precision names.
-
-## Normalizer Resolution Order
-
-All normalizer logic lives in `packages/db/src/etl/normalizers.ts`. The functions below are called by `mapBenchmarkRow()` in `benchmark-mapper.ts`; any row that cannot be fully resolved is counted by `SkipTracker` and dropped.
-
-### Model Key Resolution
-
-`resolveModelKey(row)` applies the following steps in order:
-
-1. **Prefer `infmax_model_prefix`** (or `model_prefix` for eval artifacts). This canonical field was added 2025-12-08 and is the authoritative source for all recent runs.
-2. **Strip precision suffixes** from the prefix (`-fp4`, `-fp8`, `-mxfp4`, `-nvfp4`), then check the resulting string against `DB_MODEL_KEYS` (derived from `DB_MODEL_TO_DISPLAY`).
-3. **Check `PREFIX_ALIASES`** for prefixes that still don't match after suffix stripping (e.g. `gptoss` → `gptoss120b`).
-4. **Fall back to `model` field** → lookup in `MODEL_TO_KEY`. This map covers all historical variants: HuggingFace paths (`deepseek-ai/DeepSeek-R1`), local mounts (`/mnt/lustre01/models/...`), and shorthand names (`dsr1-fp8`).
-5. **Return null** if neither path resolves. The row is skipped and the raw value is added to `tracker.unmappedModels` so operators can detect new model names in CI artifacts.
-
-### Hardware Key Resolution
-
-`hwToGpuKey(hw)` applies the following steps in order:
-
-1. Lowercase and **strip runner index suffix** with `/_\d+$/` (e.g. `mi355x_0` → `mi355x`).
-2. **Strip known framework/config suffixes** in a fixed order: `-trt`, `-multinode-slurm`, `-multinode`, `-nvs`, `-disagg`, `-amds`, `-amd`, `-nvd`, `-dgxc`, `-nb`, `-nv`. The order matters — longer suffixes (`-multinode-slurm`) are matched before their substrings (`-multinode`, `-slurm`).
-3. **Validate against `HW_REGISTRY`** (the canonical GPU registry from `@semianalysisai/inferencex-constants`).
-4. **Return null** if the stripped base is not in the set. The raw value is added to `tracker.unmappedHws`.
-
-### Framework Normalization
-
-`normalizeFramework(fw, disaggField)` resolves a raw framework string to a canonical name and a disaggregated-inference flag:
-
-1. Look up `fw.toLowerCase()` in `FRAMEWORK_ALIASES` (defined in `packages/constants/src/framework-aliases.ts`).
-2. If a match exists, use `alias.canonical` as the framework name and `alias.disagg` as the disagg flag. Example: `sglang-disagg` → `{ framework: 'mori-sglang', disagg: true }`.
-3. If no alias exists, the lowercased raw string is used as-is.
-4. An explicit `disagg` field is authoritative for canonical `dynamo-*` and `mori-*` frameworks. A framework series can include both aggregate and disaggregated deployments; MoRI expert parallelism alone does not imply prefill/decode separation. Boolean and lowercase/Python-style string values are accepted.
-5. Legacy `dynamo-*` and `mori-*` artifacts that omit or do not provide a recognizable `disagg` value fall back to `true`. Explicit disaggregated aliases such as `sglang-disagg` remain intrinsically disaggregated.
-6. Mapper-level topology validation still marks a deployment as disaggregated when it has a non-zero decode worker pool, preserving older genuinely disaggregated Dynamo artifacts that incorrectly emitted `disagg: false`.
-
-`FRAMEWORK_ALIASES` keys are sorted longest-first in `SORTED_ALIASES` (used by `resolveFrameworkAliasesInString`) to prevent substring conflicts — `dynamo-trtllm` must be matched before `trtllm`.
 
 ### Schema Version Detection
 
@@ -748,11 +648,24 @@ bun packages/db/src/verify-power-publication.ts /path/power-publication.json htt
 ```
 
 For protected previews, follow the bypass handling in
-`.github/workflows/ingest-results.yml`; the cache scripts send no bypass header.
-The verifier accepts `CACHE_PROTECTION_BYPASS_SECRET`. Check remaining receipt gaps
+`.github/workflows/ingest-results.yml`. The cache scripts and the verifier send
+`VERCEL_PROTECTION_BYPASS_SECRET` as the bypass header when it is set. Check remaining receipt gaps
 and API values; ingest success alone does not establish complete coverage. To undo a
 repair, restore the snapshotted rows or original bytes under the same identities.
 Do not delete a shared series to repair one point.
+
+### Per-run ingest report
+
+`admin:db:ingest:ci` writes `INGEST_REPORT_OUTPUT` (JSON, `packages/db/src/etl/ingest-run-report.ts`)
+and appends the same counts to the job summary, for success and failure alike. It counts what this
+run wrote, unlike `admin:db:verify`, which prints whole-database totals. Rows are `benchmark`
+(benchmark_results rows), `eval` (eval_results rows), `trace` (agentic benchmark rows linked to a
+trace_replay blob) and `power` (gpu_metrics series; `unmapped` counts power result rows the mapper
+could not place). Columns are `new`, `duplicate`, `skipped` (failed-run rows, rows held by per-job
+files, purged points, missing siblings, telemetry not collected), `unmapped` and `failed` (database
+write or telemetry errors). For
+dispatched merge ingests it also sends `ingest-results-completed` to `BENCHMARK_REPO`, whose
+`ingest-results-callback` workflow comments the counts on the merged PR.
 
 ### PowerX publication receipts
 
@@ -771,9 +684,7 @@ postgres.js client code. The workflow step "Check database writes" runs even aft
 an earlier step fails, annotates each entry on the run page, fails on errors, and
 adds a short summary to the Slack failure message. Known failures listed in
 `DB_WRITE_WARNING_RULES` (`etl/skip-tracker.ts`) are warnings instead: they are
-annotated but not counted or fatal. Today that is only `trace_replay` with SQLSTATE
-`54000`, a `request_timeline` past the Postgres jsonb size limit, until trace storage
-changes.
+annotated but not counted or fatal.
 
 After ingestion and cache invalidation, `bun packages/db/src/verify-power-publication.ts
 power-publication.json` compares every expected point against the exact database

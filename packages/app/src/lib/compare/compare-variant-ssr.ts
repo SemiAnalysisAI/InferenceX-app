@@ -1,15 +1,3 @@
-/**
- * Server-side helpers for the /compare-precision and /compare-spec-decode
- * SSR routes. Mirrors the shape of compare-ssr.ts but both sides share ONE
- * hardware and differ by variant dimension (precision or speculative decoding).
- *
- * - computeVariantCompareTableData: same interpolation pipeline as
- *   computeCompareTableData but filtering each side by its VariantCompareSide.
- * - pickVariantPairDefaults: overlap-maximising (sequence, precision) defaults
- *   adapted from compare-pair-defaults.ts for variant dimensions.
- * - variantCompareNarrative: deterministic English prose, 3-4 templates per pool.
- * - buildVariantJsonLd / buildVariantBreadcrumbJsonLd: structured data.
- */
 import {
   AUTHOR_NAME,
   AUTHOR_URL,
@@ -34,10 +22,6 @@ import {
   type SsrInterpolatedRow,
 } from '@/lib/compare/compare-ssr';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 export type VariantCompareKind = 'precision' | 'spec-decode';
 
 export interface VariantCompareSide {
@@ -45,13 +29,6 @@ export interface VariantCompareSide {
   specMethod?: string;
 }
 
-// ---------------------------------------------------------------------------
-// Data point construction helpers
-// ---------------------------------------------------------------------------
-
-/** Build GPUDataPoints for one side of a variant comparison.
- *  For kind='precision': side = {precision}, no specMethod filter.
- *  For kind='spec-decode': side = {specMethod, precision}. */
 function buildSidePoints(
   rows: BenchmarkRow[],
   hw: string,
@@ -59,9 +36,6 @@ function buildSidePoints(
   osl: number,
   side: VariantCompareSide,
 ): GPUDataPoint[] {
-  // A side without a concrete precision matches nothing — mirrors the existing
-  // compare pages, where a null pickPairDefaults precision yields an empty
-  // table rather than silently defaulting to one precision.
   if (side.precision === null || side.precision === undefined) return [];
   return buildGpuDataPoints(rows, hw, isl, osl, side.precision, side.specMethod);
 }
@@ -77,10 +51,6 @@ function interactivityRangeOf(pts: GPUDataPoint[]): { min: number; max: number }
   return { min, max };
 }
 
-// ---------------------------------------------------------------------------
-// pickVariantPairDefaults
-// ---------------------------------------------------------------------------
-
 export function pickVariantPairDefaults(
   kind: VariantCompareKind,
   rows: BenchmarkRow[],
@@ -92,8 +62,6 @@ export function pickVariantPairDefaults(
   if (hwRows.length === 0) return { sequence: null, precision: null };
 
   if (kind === 'precision') {
-    // Bucket by sequence only; variantId = framework|spec_method|conc.
-    // Count variants present in BOTH precision buckets.
     const seenA = new Map<string, Set<string>>();
     const seenB = new Map<string, Set<string>>();
     for (const row of hwRows) {
@@ -126,9 +94,6 @@ export function pickVariantPairDefaults(
     return { sequence: best[0], precision: null };
   }
 
-  // kind === 'spec-decode'
-  // Precision is FIXED by the caller — filter to it and bucket by sequence
-  // only. variantId = framework|conc. Overlap between method and none buckets.
   const fixedPrecision = sideA.precision;
   const seenMethod = new Map<string, Set<string>>();
   const seenNone = new Map<string, Set<string>>();
@@ -162,10 +127,6 @@ export function pickVariantPairDefaults(
   })[0];
   return { sequence: best[0], precision: sideA.precision ?? null };
 }
-
-// ---------------------------------------------------------------------------
-// computeVariantCompareTableData
-// ---------------------------------------------------------------------------
 
 export function computeVariantCompareTableData(
   rows: BenchmarkRow[],
@@ -236,10 +197,6 @@ export function computeVariantCompareTableData(
   return { defaultTargets, ssrRows, interactivityRange };
 }
 
-// ---------------------------------------------------------------------------
-// computeVariantCompareImageRows
-// ---------------------------------------------------------------------------
-
 export function computeVariantCompareImageRows(
   rows: BenchmarkRow[],
   hw: string,
@@ -282,10 +239,6 @@ export function computeVariantCompareImageRows(
   }));
 }
 
-// ---------------------------------------------------------------------------
-// summarizeVariantSide / dateRangeForVariantPair
-// ---------------------------------------------------------------------------
-
 export function summarizeVariantSide(
   rows: BenchmarkRow[],
   hw: string,
@@ -293,8 +246,6 @@ export function summarizeVariantSide(
 ): PairSummary {
   const filtered = rows.filter((r) => {
     if (r.hardware !== hw) return false;
-    // No concrete precision matches nothing — keeps the JSON-LD summary
-    // consistent with buildSidePoints/the rendered table (both empty).
     if (side.precision === null || side.precision === undefined) return false;
     if (r.precision !== side.precision) return false;
     if (side.specMethod !== undefined && r.spec_method !== side.specMethod) return false;
@@ -332,7 +283,6 @@ export function dateRangeForVariantPair(
   for (const row of rows) {
     if (row.hardware !== hw) continue;
     if (!row.date) continue;
-    // Must match at least one side
     const matchA =
       (sideA.precision === undefined || row.precision === sideA.precision) &&
       (sideA.specMethod === undefined || row.spec_method === sideA.specMethod);
@@ -345,10 +295,6 @@ export function dateRangeForVariantPair(
   }
   return { oldest, newest };
 }
-
-// ---------------------------------------------------------------------------
-// Narrative templates — precision comparison
-// ---------------------------------------------------------------------------
 
 export interface VariantBoth {
   modelLabel: string;
@@ -387,7 +333,6 @@ function variantFullSummary(i: VariantBoth): string {
     : 'comparable data is unavailable at this point';
 }
 
-// Precision-specific "both sides" templates — mention quantization tradeoff.
 const PRECISION_BOTH_TEMPLATES: ((i: VariantBoth) => string)[] = [
   (i) =>
     `At ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}), ${i.aLabel} delivers ${i.aValue.toFixed(0)} tok/s/chip at ${fmtCost(i.aCost)} per million tokens; ${i.bLabel} delivers ${i.bValue.toFixed(0)} tok/s/chip at ${fmtCost(i.bCost)}. ${variantFullSummary(i)}. Lower-precision quantization trades model accuracy for throughput — check the evaluation page for quality impact.`,
@@ -399,7 +344,6 @@ const PRECISION_BOTH_TEMPLATES: ((i: VariantBoth) => string)[] = [
     `${BAND_PHRASE[i.band].charAt(0).toUpperCase() + BAND_PHRASE[i.band].slice(1)} of the ${i.range} interactivity band, at ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}): ${i.aLabel} runs ${i.aValue.toFixed(0)} tok/s/chip at ${fmtCost(i.aCost)}/M tokens, ${i.bLabel} runs ${i.bValue.toFixed(0)} at ${fmtCost(i.bCost)}/M. ${variantFullSummary(i)}. Precision changes affect both inference speed and model quality — consult the evaluation tab for accuracy benchmarks.`,
 ];
 
-// Spec-decode-specific "both sides" templates — mention speculative decoding.
 const SPEC_DECODE_BOTH_TEMPLATES: ((i: VariantBoth) => string)[] = [
   (i) =>
     `At ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}), ${i.aLabel} delivers ${i.aValue.toFixed(0)} tok/s/chip at ${fmtCost(i.aCost)} per million tokens; ${i.bLabel} delivers ${i.bValue.toFixed(0)} tok/s/chip at ${fmtCost(i.bCost)}. ${variantFullSummary(i)}. Speculative decoding accepts draft tokens to reduce per-token latency — gains vary by workload and prompt distribution.`,
@@ -411,7 +355,6 @@ const SPEC_DECODE_BOTH_TEMPLATES: ((i: VariantBoth) => string)[] = [
     `${BAND_PHRASE[i.band].charAt(0).toUpperCase() + BAND_PHRASE[i.band].slice(1)} of the ${i.range} interactivity band, at ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}): ${i.aLabel} runs ${i.aValue.toFixed(0)} tok/s/chip at ${fmtCost(i.aCost)}/M tokens, ${i.bLabel} runs ${i.bValue.toFixed(0)} at ${fmtCost(i.bCost)}/M. ${variantFullSummary(i)}. Gains from speculative decoding vary by workload; short-output prompts tend to benefit less.`,
 ];
 
-// Single-side templates (shared by both kinds).
 const VARIANT_SINGLE_TEMPLATES: ((args: {
   modelLabel: string;
   gpuLabel: string;
@@ -428,10 +371,6 @@ const VARIANT_SINGLE_TEMPLATES: ((args: {
   (i) =>
     `${i.presentLabel}: ${i.presentValue.toFixed(0)} tok/s/chip, ${fmtCost(i.presentCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel} (${i.gpuLabel}). ${i.missingLabel} is unmeasured here.`,
 ];
-
-// ---------------------------------------------------------------------------
-// variantCompareNarrative
-// ---------------------------------------------------------------------------
 
 export function variantCompareNarrative(
   kind: VariantCompareKind,
@@ -504,10 +443,6 @@ export function variantCompareNarrative(
 
   return paragraphs;
 }
-
-// ---------------------------------------------------------------------------
-// JSON-LD helpers
-// ---------------------------------------------------------------------------
 
 export function variantJsonLdEntryFor(label: string, summary: PairSummary, position: number) {
   const props: { name: string; value: string | number }[] = [
@@ -700,5 +635,4 @@ export function buildVariantBreadcrumbJsonLd(
   };
 }
 
-// Re-export types used by callers
 export type { PairSummary, SsrInterpolatedRow } from '@/lib/compare/compare-ssr';

@@ -3,6 +3,8 @@
 import { ExternalLink, Loader2, Trash2 } from 'lucide-react';
 import { useRef } from 'react';
 
+import { GITHUB_REPO_FULL } from '@semianalysisai/inferencex-constants';
+
 import { Button } from '@/components/ui/button';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -17,7 +19,6 @@ interface CollectiveXRunsTableProps {
   visibleRunIds: ReadonlySet<string>;
   loadingRunIds: ReadonlySet<string>;
   deletingRunIds: ReadonlySet<string>;
-  /** Applies one visibility state to every listed run (one id, or a shift-click range). */
   onVisibleChange: (runIds: string[], visible: boolean) => void;
   onDelete: (runId: string) => void;
   emptyMessage?: string;
@@ -99,7 +100,6 @@ export function CollectiveXRunsTable({
 }: CollectiveXRunsTableProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
-  // Anchor for shift-click range selection: the last row whose checkbox was clicked.
   const anchorRunIdRef = useRef<string | null>(null);
 
   if (runs.length === 0) {
@@ -136,7 +136,6 @@ export function CollectiveXRunsTable({
             const deleting = deletingRunIds.has(run.run_id);
             const conclusion = run.conclusion;
             const selectedRunIndex = selectedRunIndexById.get(run.run_id);
-            // Summaries stored before the kv suite carry no kv_cases: EP-only.
             const kvRequested = run.kv_cases?.requested ?? 0;
             const kvMeasured = run.kv_cases?.measured ?? 0;
             const swapRequested = run.swap_cases?.requested ?? 0;
@@ -165,7 +164,6 @@ export function CollectiveXRunsTable({
                       title={t.shownHint}
                       onChange={(event) => {
                         const next = event.target.checked;
-                        // React dispatches checkbox onChange from the native click event.
                         const shiftKey = (event.nativeEvent as MouseEvent).shiftKey === true;
                         const anchorIndex = runs.findIndex(
                           (candidate) => candidate.run_id === anchorRunIdRef.current,
@@ -222,7 +220,7 @@ export function CollectiveXRunsTable({
                       </svg>
                     )}
                     <a
-                      href={`https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${run.run_id}`}
+                      href={`https://github.com/${run.source_repository ?? GITHUB_REPO_FULL}/actions/runs/${run.run_id}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label={t.openRun(run.run_id)}

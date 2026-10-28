@@ -1,7 +1,6 @@
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Mock next/cache before importing the module under test
 vi.mock('next/cache', () => ({
   revalidateTag: vi.fn(),
   unstable_cache: vi.fn((fn: (...args: any[]) => any, _keys: string[], _opts: unknown) => fn),
@@ -31,7 +30,6 @@ const originalCacheNamespace = process.env.CACHE_NAMESPACE;
 beforeEach(() => {
   vi.clearAllMocks();
   delete process.env.CACHE_NAMESPACE;
-  // Default: unstable_cache returns the original function as-is
   mockUnstableCache.mockImplementation((fn: (...args: any[]) => any) => fn as any);
 });
 
@@ -237,6 +235,15 @@ describe('purgeAll', () => {
     await purgeAll();
 
     expect(mockRevalidateTag).toHaveBeenCalledWith('collectivex', { expire: 0 });
+  });
+
+  it('keeps the OperatorX CDN tag and Blob subtree — results ingests do not change OperatorX', async () => {
+    mockBlobPurge.mockResolvedValue(0);
+
+    await purgeAll();
+
+    expect(mockBlobPurge).toHaveBeenCalledWith('', ['operatorx/']);
+    expect(mockRevalidateTag).not.toHaveBeenCalledWith('operatorx', expect.anything());
   });
 
   it('returns 0 when no blobs were deleted', async () => {

@@ -15,7 +15,6 @@ import {
   collectiveXRunDasharray,
 } from './data';
 
-/** Line-key suffix marking a series' bulk wire-ceiling line (not an envelope). */
 const CEILING_SUFFIX = '__collectivex-kv-wire-ceiling';
 
 interface CollectiveXKvFrontierChartProps {
@@ -131,9 +130,6 @@ export function CollectiveXKvFrontierChart({
     () => new Map(cases.map((kase) => [`${kase.run_id}:${kase.case_id}`, kase.run_index])),
     [cases],
   );
-  // Roofline per series in the /inference style, drawn through the best batch
-  // at every measured ISL: the full (ISL, batch) grid is plotted as points and
-  // the per-ISL envelope is the achievable bandwidth curve for that backend.
   const lines = useMemo(() => {
     const bySeries: Record<string, CollectiveXKvFrontierPoint[]> = {};
     for (const point of points) {
@@ -144,8 +140,6 @@ export function CollectiveXKvFrontierChart({
     for (const [seriesId, seriesPoints] of Object.entries(bySeries)) {
       result[seriesId] = seriesPoints
         .toSorted((a, b) => a.x - b.x)
-        // Ties (two batches at the same peak) stay on the frontier as points
-        // but the line only needs one vertex per ISL.
         .filter((point, index, sorted) => index === 0 || point.x !== sorted[index - 1].x)
         .map((point) => ({ x: point.x, y: point.y }));
     }
@@ -155,9 +149,6 @@ export function CollectiveXKvFrontierChart({
     () => new Map(points.map((point) => [point.seriesId, point.colorKey])),
     [points],
   );
-  // Each series' bulk single-descriptor rows, drawn as a dotted line above the
-  // envelope: what the fabric itself moves at that ISL. The gap from a paged
-  // rung up to this line is per-descriptor software overhead, not the wire.
   const ceilings = useMemo(
     () => collectiveXKvWireCeilings(cases, selection.op),
     [cases, selection.op],
@@ -166,7 +157,6 @@ export function CollectiveXKvFrontierChart({
     const merged: Record<string, { x: number; y: number }[]> = { ...lines };
     if (!showWireCeilings) return merged;
     for (const [seriesId, ceiling] of ceilings) {
-      // Only series that are actually plotted get a ceiling line.
       if (!(seriesId in lines) || ceiling.length < 2) continue;
       merged[`${seriesId}${CEILING_SUFFIX}`] = ceiling.map(({ x, y }) => ({ x, y }));
     }
@@ -224,8 +214,6 @@ export function CollectiveXKvFrontierChart({
                 : key;
               return colors[colorBySeries.get(seriesId) ?? ''] ?? '#888';
             },
-            // Ceiling lines are dotted ('1 4' is used by no run dasharray) so
-            // they read as reference lines, not another measured envelope.
             getStrokeDasharray: (key) =>
               key.endsWith(CEILING_SUFFIX)
                 ? '1 4'

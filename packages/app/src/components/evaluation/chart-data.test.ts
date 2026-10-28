@@ -81,10 +81,8 @@ describe('buildEvaluationChartRows', () => {
 
   it('keeps the latest date per (config, conc) when no date cutoff is provided', () => {
     const rows = [
-      // Same config_id (1), same conc (64): older date should drop.
       evalRow({ date: '2026-03-01', conc: 64, metrics: { em_strict: 0.81 } }),
       evalRow({ date: '2026-03-04', conc: 64, metrics: { em_strict: 0.85 } }),
-      // Same config_id, different conc: must stay as a separate data point.
       evalRow({ date: '2026-03-04', conc: 256, metrics: { em_strict: 0.92 } }),
     ];
 
@@ -174,9 +172,6 @@ describe('buildEvaluationChartRows', () => {
 
 describe('aggregateEvaluationChartRows', () => {
   it('averages repeated rows of the same config and keeps min/max/error bounds', () => {
-    // Same config_id (same configs.id row) run on the same date with different
-    // scores — e.g. a rerun on the same workflow. Dedup groups by configId so
-    // they collapse into one bar with mean/min/max/error-range metadata.
     const rows = buildEvaluationChartRows(
       [
         evalRow({
@@ -211,7 +206,6 @@ describe('aggregateEvaluationChartRows', () => {
   });
 
   it('keeps distinct configs as separate bars even when labels overlap', () => {
-    // Two rows with different configIds should render as two bars, not merge.
     const rows = buildEvaluationChartRows(
       [
         evalRow({ config_id: 1, metrics: { em_strict: 0.8 } }),

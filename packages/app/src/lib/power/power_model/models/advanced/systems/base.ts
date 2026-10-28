@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
 /* oxlint-disable max-classes-per-file -- mirrors the upstream Python module, class for class */
-/** Complete equipment power and operating-state propagation before facility PUE. */
 
 import {
   DEFAULT_OPERATING_STATE,
@@ -28,7 +27,6 @@ function parameters(value: JsonValue): JsonValue {
   return value;
 }
 
-/** Export parameters once; provenance belongs to the component result tree. */
 export function _profile_parameters(model: FrozenModel): JsonObject {
   return Object.fromEntries(
     Object.entries(model.model_dump())
@@ -38,9 +36,7 @@ export function _profile_parameters(model: FrozenModel): JsonObject {
 }
 
 export interface SystemEstimateOptions {
-  /** Watts per Grace socket; systems without Grace ignore it. */
   cpu_and_dram_measured_power_per_socket?: number | null;
-  /** Watts per x86 CPU package; systems without x86 CPUs ignore it. */
   cpu_measured_power_per_socket?: number | null;
   operating_state?: OperatingState;
 }
@@ -50,7 +46,6 @@ export interface GPUSystemFields {
   provenance?: Provenance;
 }
 
-/** A concrete system class: the catalog constructs it with every default. */
 export type GPUSystemType = (new () => GPUSystem) & {
   readonly typeName: string;
   readonly default_cooling: CoolingProfile;
@@ -87,15 +82,10 @@ export abstract class GPUSystem extends FrozenModel {
     return this.type.system_unit;
   }
 
-  /** Hardware family identifier supplied by concrete systems. */
   get system_type(): string {
     return this.typeName;
   }
 
-  /**
-   * Evaluate one system without PUE. The measured inputs cover CPU and DRAM,
-   * or CPU alone, in watts per socket.
-   */
   abstract estimate_it_power(
     gpu_level_power_per_gpu: number,
     options?: SystemEstimateOptions,

@@ -1,22 +1,8 @@
-/**
- * Restore runtime component metadata that older app ingest versions dropped.
- *
- * The benchmark producer began emitting nested router/offload component objects
- * and `kv_p2p_transfer` on 2026-07-13. The raw GitHub Actions benchmark
- * artifacts remain authoritative, so this script downloads only the small
- * benchmark-result artifacts and merges those metadata keys into matching DB
- * rows. It never replaces measured metrics or topology/config data.
- *
- * Usage:
- *   bun run --cwd packages/db db:backfill-runtime-metadata
- *   bun run --cwd packages/db db:backfill-runtime-metadata --yes
- */
-
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { hasNoSslFlag } from './cli-utils.js';
+import { hasNoSslFlag, requireIngestRepo } from './cli-utils.js';
 import { mapBenchmarkRow } from './etl/benchmark-mapper.js';
 import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils.js';
 import { createSkipTracker } from './etl/skip-tracker.js';
@@ -27,7 +13,6 @@ import {
   selectBenchmarkArtifacts,
 } from './lib/runtime-metadata-artifacts.js';
 
-const REPO = 'SemiAnalysisAI/InferenceX';
 const FIRST_METADATA_DATE = '2026-07-13';
 const RUNTIME_KEYS = [
   'kv_offloading',
@@ -120,7 +105,7 @@ async function main(): Promise<void> {
   // oxlint-disable-next-line no-unreachable-loop -- runs are intentionally processed sequentially
   for (const [index, run] of runs.entries()) {
     const runId = Number(run.github_run_id);
-    const repository = repositoryFromRunUrl(run.html_url) ?? REPO;
+    const repository = repositoryFromRunUrl(run.html_url) ?? requireIngestRepo();
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `runtime-metadata-${runId}-`));
     try {
       const artifacts = selectBenchmarkArtifacts(listRunArtifacts(repository, String(runId)));

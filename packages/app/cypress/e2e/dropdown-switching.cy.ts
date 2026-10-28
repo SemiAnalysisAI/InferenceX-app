@@ -1,8 +1,3 @@
-// Regression test for issue #274: clicking a second filter dropdown while
-// another is open should close the first and open the second in a single click.
-// Also covers the Escape-key close path, which was lost when these dropdowns
-// migrated from Radix Select to MultiSelect.
-
 describe('Dropdown one-click switching', () => {
   beforeEach(() => {
     cy.window().then((win) => {
@@ -25,13 +20,9 @@ describe('Dropdown one-click switching', () => {
   });
 
   it('only one MultiSelect content panel is open at a time when switching dropdowns', () => {
-    // The default model is FP4-only, so Precision is disabled. Wait for
-    // the multi-precision model's availability to enable the combobox.
     cy.visit('/inference?g_model=DeepSeek-R1-0528');
     cy.get('[data-testid="inference-chart-display"]').should('exist');
 
-    // Frame both controls below the sticky header. Start with the lower
-    // control so its open menu does not physically cover the next trigger.
     cy.get('[data-testid="precision-multiselect"][role="combobox"]:enabled')
       .scrollIntoView({ offset: { top: -240, left: 0 } })
       .click({ scrollBehavior: false });
@@ -44,8 +35,6 @@ describe('Dropdown one-click switching', () => {
   });
 
   it('keeps NEW pills off AgentX models in the model dropdown', () => {
-    // The availability fixture predates DeepSeek V4.1 Flash, so splice one
-    // agentic row in: the dropdown only lists models with availability rows.
     cy.fixture('api/availability.json').then((rows: Record<string, unknown>[]) => {
       cy.intercept('GET', '/api/v1/availability', {
         body: [
@@ -69,7 +58,6 @@ describe('Dropdown one-click switching', () => {
     cy.get('[data-testid="inference-chart-display"]').should('exist');
     cy.get('[data-testid="model-selector"]').click();
 
-    // NEW is reserved for the TPUv7 launch, so featured AgentX models…
     cy.contains('[role="option"]', 'DeepSeek V4.1 Flash 552B')
       .find('[data-new-badge="model-option"]')
       .should('not.exist');
@@ -79,7 +67,6 @@ describe('Dropdown one-click switching', () => {
     cy.contains('[role="option"]', 'DeepSeek V4 Pro 0813 1.6T')
       .find('[data-new-badge="model-option"]')
       .should('not.exist');
-    // …as do models that were never featured.
     cy.contains('[role="option"]', 'DeepSeek R1 0528 671B')
       .find('[data-new-badge="model-option"]')
       .should('not.exist');

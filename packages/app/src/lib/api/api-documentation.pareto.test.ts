@@ -49,7 +49,6 @@ describe('Pareto public contract', () => {
         .find((item) => item.id === 'get-pareto')!;
       expect(operation.parameters.map((item) => item.name)).not.toContain('i_frontier');
       expect(operation.parameters.map((item) => item.name)).not.toContain('i_hinterland');
-      // Prose must still name the retired share keys so agents do not invent them as query params.
       expect(operation.description).toMatch(/i_hinterland/u);
       expect(operation.description).toMatch(/i_frontier=1/u);
       if (locale === 'zh') expect(operation.description).toMatch(/[㐀-鿿]/u);

@@ -1,15 +1,10 @@
 # Releasing the InferenceX API skill
 
-The public package is `@semianalysisai/inferencex-skills`. Versions `0.1.0`,
-`0.2.0`, `0.3.0`, `0.4.0`, `0.5.0`, `0.6.0`, `0.7.0`, `0.8.0`, `0.9.0`, `0.10.0`, and
-`0.11.0` are immutable public releases. The website advertises the verified
-`0.11.0` release. For later releases, keep website commands pinned until publication
-and public verification succeed. The current 1.0.0 candidate establishes the
-[1.x compatibility guarantees](./inferencex-cli-compatibility.md); evidence format
-versions remain independent of the package version. The
+The public package is `@semianalysisai/inferencex-skills`; published versions are
+immutable. Releases keep the [1.x compatibility guarantees](./inferencex-cli-compatibility.md);
+evidence format versions remain independent of the package version. The
 [`publish-skills.yml`](../.github/workflows/publish-skills.yml) workflow prepares
 future releases; it does not run on application tags or database-backup releases.
-Adding this workflow does not configure npm access or prove a successful OIDC release.
 
 ## Release ownership and one-time setup
 
@@ -32,11 +27,8 @@ release assets after public verification. It needs no npm token secret. npm chec
 repository and workflow identity during publication, not when settings are saved.
 See [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/).
 
-Configure this only after the reviewed workflow is integrated. Owner setup and
-the first successful OIDC release are separate completion gates. Do not publish a
-throwaway version just to test authentication. GitHub repository write access is
-required to dispatch the workflow; npm package ownership is required to configure
-the trust relationship.
+GitHub repository write access is required to dispatch the workflow; npm package
+ownership is required to configure the trust relationship.
 
 ## Prepare and review a candidate
 
@@ -44,7 +36,10 @@ The [`Tests (Skills)` workflow](../.github/workflows/tests-skills.yml) runs one 
 packed archive on Node 24 and 26 across Linux and macOS. A separate schema-consumer
 step installs the pinned development dependency from `bun.lock` and validates actual
 packed outputs. The suite also runs the Python release-verifier tests. Publication
-remains on Node 24 with one publisher runtime.
+remains on Node 24 with one publisher runtime. Pull requests run the full suite on
+Linux/Node 24 and only the installer, CLI and filesystem tests on the other three
+cells, so they record one platform acceptance; dispatch the workflow manually to run
+the full suite on all four cells and record the release-qualification matrix.
 
 1. Modify the source, choose a new stable version, and update package metadata,
    the unified CLI version, installation examples, and installed-version
@@ -90,25 +85,14 @@ each bundle offline, and audits every result against its saved responses with an
 independent Python implementation. Missing and null values remain missing; real
 `0` and `false` values remain explicit. No new benchmarks run.
 
-For the 1.0.0 candidate, retain the exact four platform results (Linux/macOS by Node
-24/26) and both native runtime results. Each native result covers PowerX, AgentX,
-result provenance, TCO, releases, CollectiveX, and offline replay, with archive,
-case-set, prompt transcript, and answer transcript hashes. Keep
-`tested_source_commit` separate from the archive identity; merging and repreparing
-identical bytes must not rewrite which source was actually tested.
-
-Each platform entry also records the Actions run and attempt as numeric strings,
-the tested 40-hex commit SHA, the exact matrix job name, and the matching
-`SemiAnalysisAI/InferenceX-app` Actions evidence URL. A retried matrix cell may have
-a later attempt than the other cells; all four must still share the run, tested
-commit, and archive SHA-256. Download each selected successful record from
+In the qualification record, keep `tested_source_commit` separate from the archive
+identity; merging and repreparing identical bytes must not rewrite which source was
+actually tested.
+Download each selected successful platform record from
 `inferencex-skills-<linux|macos>-node-<24|26>-attempt-<attempt>`. The pack job retains
 `inferencex-skills-platform-archive-attempt-<attempt>` and passes its exact artifact
 name to the matrix, so retrying a failed cell reuses that successful pack. Full
-reruns save new artifacts without replacing earlier attempts. Each native entry retains its
-aggregate hashes and every maintained case record (13 per runtime); every case records its case ID,
-runtime and assessor pass statuses, and prompt/answer transcript hashes. Known
-limitations use the maintained stable codes with descriptions.
+reruns save new artifacts without replacing earlier attempts.
 
 The maintained cases include discovery, topology interpretation, a selected trace, result-ID-only provenance, missing prices, and a P99 ITL requirement. Assess final prose and supplemental derived files against the captured responses as well as verifying formal bundles. Preserve failures and grade any retry separately.
 
@@ -240,7 +224,10 @@ packed-example tests and should also be exercised naturally when they change.
 ## Publish and verify
 
 After source integration, dispatch **Publish InferenceX skills** on the repository's
-default branch. Supply the manifest version, accepted archive SHA-256, and reviewed
+default branch. That branch must already contain non-empty release notes at
+`docs/releases/inferencex-skills-<version>.md` (English, then a `## 中文说明` section):
+the workflow stops before npm publication without them and uses them as the GitHub
+release notes. Supply the manifest version, accepted archive SHA-256, and reviewed
 qualification JSON. Avoid expanding the large nested JSON directly in the command.
 Build a workflow-input file and let `gh` read it from standard input:
 
@@ -263,25 +250,6 @@ It performs a clean candidate install/export, checks the digest again,
 and publishes that same tarball using OIDC. It then verifies public metadata and
 tarball identity and performs anonymous pinned installations/exports with fresh
 caches for both targets. Evidence is uploaded even when a check fails.
-
-### Authorized 1.0.0 native-report exception
-
-The maintainer explicitly accepted the remaining report errors and incomplete retest
-for archive `b6ee16ef5d359f2055e4a86e156f1045e64f2a048ca6662b1859ce4b0f1480a2`.
-Only that 1.0.0 archive permits the workflow input
-`accept_native_report_limitations: true`, together with qualification field
-`native_report_exception: "accepted-1.0.0-report-limitations"`.
-The declaration retains all 26 case identities as `not_run` on the final archive,
-which includes a subsequent installer concurrency fix. The preceding candidate's
-focused retest had two passes and one failure; those results remain historical.
-Do not substitute older-archive passes or invent transcript
-hashes for unrun cases. The release summary preserves these outcomes and the reason
-for the exception. Other versions, archives, platform failures, and failed
-candidate/public verification remain rejected; the normal all-pass gate is unchanged.
-
-For recovery of this release's summary, retain the original declaration and supply
-`ALLOW_NATIVE_REPORT_LIMITATIONS=true` only to the `release-summary.mjs` commands
-below. This reuses the original authorization; it does not approve another archive.
 
 Public verification retries only an npm install failure containing `ETARGET` and
 `No matching version found for @semianalysisai/inferencex-skills@<exact-version>.`
@@ -314,6 +282,14 @@ Do not rerun publication or bump the version just to hide a failed verification.
 Announce availability only after the public verification passes. A prepared
 workflow, saved npm settings, and a successful upload each establish less than a
 successful end-to-end release.
+
+After public verification passes, bump the published-version pins outside the
+package: `packages/app/src/lib/api/published-inferencex-skills.json` (both website
+locales read it), the `package_version` default and `CHECK_PACKAGE_VERSION` fallback
+in `.github/workflows/check-skills-api.yml`, and the install commands in
+`docs/inferencex-api-examples.md`. The packaged `packages/skills/README.md` and
+`packages/skills/skills/inferencex-api/references/cli-contract.md` examples already
+changed with the source version bump in step 1 of candidate preparation.
 
 ### Recover missing GitHub release assets after npm publication
 
@@ -380,8 +356,8 @@ gh release create "$skills_release_tag" \
   "$skills_release_dir/semianalysisai-inferencex-skills-${skills_release_version}.tgz" \
   "$skills_release_dir/release.json" "$skills_recovery_dir/release-summary.json" \
   --repo SemiAnalysisAI/InferenceX-app --target "$skills_release_commit" \
-  --title "InferenceX skills ${skills_release_version}" \
-  --notes "Accepted public package archive, release identity, and sanitized qualification summary."
+  --title "InferenceX skills ${skills_release_version} / InferenceX 技能包 ${skills_release_version}" \
+  --notes-file "docs/releases/inferencex-skills-${skills_release_version}.md"
 ```
 
 If the release already exists, download and verify its assets first. A timeout may
@@ -389,32 +365,3 @@ have occurred after creation succeeded. Do not overwrite existing assets; missin
 or differing assets require maintainer review. If the original candidate or
 qualification evidence cannot be recovered, stop rather than manufacture a passed
 release record. Recovery never invokes `npm publish`.
-
-## Structured failures and recoverable upgrades
-
-The unified CLI emits machine-readable failures by default. Candidate and public
-verification cover its invalid-input, operational, cancellation, bundle-completion,
-and policy exit codes through the packed suite and six installed workflows.
-
-Packed tests cover operational error categories, graceful cancellation and output
-rollback, the five-second stdout deadline, failed staging and receipt writes,
-interrupted activation/cleanup, and concurrent installation/recovery. Preserve
-failed attempts and inspect the exact archive after any package-byte change.
-A local source test or a successful installer invocation does not establish
-native skill discovery; run the natural-language acceptance separately.
-
-The installer stages a merged destination and receipt before activation, then
-recovers supported owned process-crash states on the next actual installation.
-`status` and `--dry-run` inspect recovery without changing files. These checks do
-not establish fsync/power-loss durability or repair arbitrary external edits.
-The installed [command cookbook](../packages/skills/skills/inferencex-api/references/cli-contract.md)
-defines the error envelope, exit policy, read-only inspection and recovery limits.
-
-## User upgrades
-
-Installed skill files do not auto-update. Users select a **published** version and
-rerun the installer with `--force`, which overwrites packaged files and preserves
-other local files. Review local skill edits first. `npm update` alone does not
-replace the copied skill. The installed-version status command can confirm the
-result; see the [package README](../packages/skills/README.md). New benchmark data
-comes from the live API and does not require a package release.

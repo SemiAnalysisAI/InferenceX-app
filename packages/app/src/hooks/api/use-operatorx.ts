@@ -1,4 +1,4 @@
-import { type QueryClient, useQuery } from '@tanstack/react-query';
+import { type QueryClient, queryOptions, useQuery } from '@tanstack/react-query';
 
 import type { OperatorXRunRef } from '@semianalysisai/inferencex-db/operatorx/bundle';
 import type { ComparisonOp, ComparisonView } from '@semianalysisai/inferencex-db/operatorx/compare';
@@ -46,10 +46,10 @@ export function useOperatorXResult(runId: string | null, index: number | null) {
   });
 }
 
-export function useOperatorXComparison(op: ComparisonOp | null, workload: string | null) {
+export function operatorXComparisonQuery(op: ComparisonOp | null, workload: string | null) {
   const params = new URLSearchParams({ op: op ?? '' });
   if (workload) params.set('workload', workload);
-  return useQuery({
+  return queryOptions({
     queryKey: ['operatorx', 'compare', op, workload],
     queryFn: ({ signal }) => get<ComparisonView>(`/api/v1/operatorx/compare?${params}`, signal),
     enabled: op !== null,
@@ -58,9 +58,12 @@ export function useOperatorXComparison(op: ComparisonOp | null, workload: string
   });
 }
 
+export function useOperatorXComparison(op: ComparisonOp | null, workload: string | null) {
+  return useQuery(operatorXComparisonQuery(op, workload));
+}
+
 export type OperatorXTimelines = Record<string, OperatorXTimeline | null>;
 
-/** Kernel timelines of stored `runId:index:revision` results. */
 function timelinesQuery(op: ComparisonOp, refs: string[]) {
   return {
     queryKey: ['operatorx', 'timelines', TIMELINE_VERSION, op, refs.join(',')],

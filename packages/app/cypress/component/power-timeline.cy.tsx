@@ -18,10 +18,6 @@ import {
 } from '../support/mock-data';
 import { mountWithProviders } from '../support/test-utils';
 
-// PowerTimeline joins chart points to `gpu_metrics_<RESULT_FILENAME>` artifacts
-// by the `power_audit.source` file name and draws one trace per config. Overlay
-// runs keep their run colour and follow the overlay hardware filter.
-
 const RUN_ID = '34716669498';
 const RUN_URL = `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${RUN_ID}`;
 const OVERLAY_RUN_ID = '31415926535';
@@ -35,7 +31,6 @@ const HW_TYPES = new Set(['b200', 'h100']);
 const resultName = (hardware: string, conc: number) =>
   `dsv4_8k1k_fp4_sglang_tp8-pp1-dcp1-pcp1-ep1-dpafalse_disagg-false_spec-none_conc${conc}_${hardware}-host-0123456789abcdef0123`;
 const WINDOW = {
-  // Window covers the last 20 s of a 60 s job.
   window_start_unix: (START_MS + 40_000) / 1000,
   window_end_unix: (START_MS + 60_000) / 1000,
 };
@@ -64,7 +59,6 @@ function measuredPoint(
   });
 }
 
-/** 61 one-second buckets: idle 200 W, ramps to `peak` inside the window. */
 function series(hwKey: string, conc: number, peak: number, gpus = [0, 1]): GpuPowerSeries {
   const t = Array.from({ length: 61 }, (_, i) => i);
   return {
@@ -133,7 +127,6 @@ function mountTimeline(
   );
 }
 
-/** One measured run at mount; a button adds a second run to the same plot. */
 function GrowingTimeline() {
   const [data, setData] = useState(() => [measuredPoint('b200', 16, 700)]);
   return (
@@ -170,7 +163,6 @@ const overlayData = (data: InferenceData[]) => ({
   runUrl: OVERLAY_RUN_URL,
 });
 
-/** Context overrides for one loaded `?unofficialrun=` whose overlay legend shows `hw`. */
 function overlayRun(hw: string): Parameters<typeof createMockUnofficialRunContext>[0] {
   return {
     isUnofficialRun: true,
@@ -222,12 +214,17 @@ describe('PowerTimeline', () => {
         .should('have.length', 1)
         .and('have.attr', 'stroke', overlayRunColor(0));
       cy.get('path.power-trace[data-hw="b200"][data-segment="window"]').should('have.length', 1);
-      // Two runs: the axis defaults to elapsed time so traces overlap by phase.
       cy.get('text').contains('Time since telemetry start').should('exist');
-      // Reference lines cover both hardware SKUs.
       cy.get('.power-reference[data-reference="tdp"]').should('have.length', 2);
     });
     cy.get('[data-testid="chart-legend"]').should('contain.text', '✕ powerx-timeline');
+    cy.get('[data-testid="power-timeline-utility"]').click();
+    svg()
+      .find('.power-reference[data-reference="utility"]')
+      .should(($lines) => {
+        const watts = [...$lines].map((line) => Math.round(Number(line.dataset.watts)));
+        expect(watts.toSorted((a, b) => a - b)).to.deep.equal([1370, 1710]);
+      });
   });
 
   it('joins a run that arrives after mount without a hook-shape warning', () => {
@@ -253,8 +250,6 @@ describe('PowerTimeline', () => {
     cy.get('[data-testid="add-run"]').click();
     cy.wait('@second');
     svg().find('path.power-trace[data-segment="window"]').should('have.length', 2);
-    // React logs this when a memo's dependency array changes length between
-    // renders; one query per run used to be spread into that array.
     cy.get('@consoleError').then((stub) => {
       const calls = (stub as unknown as { args: unknown[][] }).args;
       const shapeWarnings = calls.filter((args) =>
@@ -351,7 +346,6 @@ describe('PowerTimeline', () => {
     );
     cy.wait(['@earlier', '@later']);
 
-    // One legend row per compared date, under the hardware, as in GPUGraph.
     cy.get('[data-testid="chart-legend"] .gpu-legend-title').should('have.text', 'B200');
     cy.get('[data-testid="chart-legend"] label').then(($labels) => {
       const rows = $labels.toArray().map((label) => label.textContent?.trim());
@@ -370,7 +364,6 @@ describe('PowerTimeline', () => {
       });
     });
 
-    // Soloing the later date removes the earlier date's trace.
     cy.get('[data-testid="chart-legend"] label').contains(DATES[1]).click();
     svg().within(() => {
       cy.get('path.power-trace[data-segment="window"]')
@@ -381,8 +374,6 @@ describe('PowerTimeline', () => {
   });
 
   it('follows dates-only range comparison (i_dstart/i_dend, no ~r runs)', () => {
-    // Range endpoints alone (empty selectedDates) must still drive per-date
-    // colours, legend toggles and end labels — the dates-only share/reload path.
     const EARLIER_RUN_ID = '34600000002';
     const EARLIER_RUN_URL = `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${EARLIER_RUN_ID}`;
     const DATES = ['2026-09-01', '2026-09-09'] as const;

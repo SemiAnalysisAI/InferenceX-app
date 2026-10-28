@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// Dynamic imports are intentional: each test resets the module-scope URL snapshot after stubbing window.
 function setupWindow(search = '', pathname = '/inference', hash = '') {
   const location = {
     search,
@@ -37,22 +36,15 @@ describe('PARAM_DEFAULTS', () => {
   });
 
   it('has an EMPTY default for i_seq so the selected scenario is always written', async () => {
-    // Per-route `initialSequence` seeds (e.g. /compare pages) make the no-param
-    // resolution route-dependent. An '8k/1k' default would strip an explicit
-    // 8K/1K selection from the URL, which then resolves back to the route's
-    // seeded scenario on reload/share. Empty means no scenario value ever
-    // matches the default, so it's always persisted.
     const { PARAM_DEFAULTS } = await import('@/lib/routing/url-state');
     expect(PARAM_DEFAULTS.i_seq).toBe('');
   });
 
-  it('opens on tokens per dollar, or on measured power under any power tier filter', async () => {
-    const { defaultYAxisMetric } = await import('@/lib/routing/url-state');
+  it('opens on tokens per dollar', async () => {
+    const { DEFAULT_Y_AXIS_METRIC } = await import('@/lib/routing/url-state');
     const { DEFAULT_METRIC_CONFIG_KEY } = await import('@/components/inference/metric-registry');
-    expect(defaultYAxisMetric([])).toBe('y_tokensPerDollarH');
-    expect(defaultYAxisMetric([])).toBe(DEFAULT_METRIC_CONFIG_KEY);
-    expect(defaultYAxisMetric(['certified'])).toBe('y_measuredAvgPower');
-    expect(defaultYAxisMetric(['legacy'])).toBe('y_measuredAvgPower');
+    expect(DEFAULT_Y_AXIS_METRIC).toBe('y_tokensPerDollarH');
+    expect(DEFAULT_Y_AXIS_METRIC).toBe(DEFAULT_METRIC_CONFIG_KEY);
   });
 
   it('has expected default for r_range', async () => {
@@ -96,22 +88,6 @@ describe('PARAM_DEFAULTS', () => {
   it('has empty string default for i_advlabel', async () => {
     const { PARAM_DEFAULTS } = await import('@/lib/routing/url-state');
     expect(PARAM_DEFAULTS.i_advlabel).toBe('');
-  });
-
-  it('drops retired comparison controls from old share links while preserving analysis toggles', async () => {
-    setupWindow(
-      '?i_servicecompare=1&i_servicebase=baseline&i_servicepeer=comparator&i_servicetarget=8&i_roleshare=1&i_powerfit=1',
-    );
-    const { readUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
-    const params = readUrlParams();
-    const shared = new URL(buildShareUrl()).searchParams;
-    expect(params).toMatchObject({ i_roleshare: '1', i_powerfit: '1' });
-    expect(shared.get('i_roleshare')).toBe('1');
-    expect(shared.get('i_powerfit')).toBe('1');
-    for (const key of ['i_servicecompare', 'i_servicebase', 'i_servicepeer', 'i_servicetarget']) {
-      expect(params).not.toHaveProperty(key);
-      expect(shared.has(key)).toBe(false);
-    }
   });
 
   it('strips the normalized revenue source but preserves OpenRouter as explicit state', async () => {
@@ -204,11 +180,6 @@ describe('readUrlParams', () => {
   });
 
   it('skips the deferred cleanup entirely when the URL has no share-link params', async () => {
-    // The module initializes when dashboard chunks are evaluated, which on a
-    // landing → dashboard client navigation happens mid-transition. A
-    // replaceState here — even a same-URL one — routed through the Next-patched
-    // method would dispatch a stale router restore and revert the committed
-    // navigation (the "first dashboard click replays the landing" regression).
     const { history } = setupWindow('?unrelated=1', '/');
     await import('@/lib/routing/url-state');
     await vi.runAllTimersAsync();
@@ -217,9 +188,6 @@ describe('readUrlParams', () => {
   });
 
   it('cleans share-link params via the pristine History prototype, not the patched method', async () => {
-    // Next patches `window.history.replaceState` to sync the App Router; the
-    // cleanup must bypass it (same trick as `replaceClientSearch`) so the
-    // router never sees a mid-transition restore.
     const { history } = setupWindow('?g_model=test&eval=42', '/inference');
     const pristine = vi.fn();
     vi.stubGlobal('History', { prototype: { replaceState: pristine } });
@@ -229,7 +197,6 @@ describe('readUrlParams', () => {
     expect(history.replaceState).not.toHaveBeenCalled();
     expect(pristine).toHaveBeenCalledTimes(1);
     expect(pristine.mock.calls[0]).toEqual([history.state, '', '/inference?eval=42']);
-    // `this` must be the history object for the prototype call to work.
     expect(pristine.mock.contexts[0]).toBe(history);
   });
 });
@@ -245,10 +212,6 @@ describe('refreshUrlParams', () => {
     vi.unstubAllGlobals();
   });
 
-  // A client-side navigation does not reload the module, so the load-time
-  // snapshot still describes the page the user came FROM. Every AgentX card on
-  // the landing page linked to `/inference?g_model=<model>` and opened the
-  // default model instead, because the snapshot from `/` had no g_model.
   it('picks up params that arrived via a client-side navigation', async () => {
     const { location } = setupWindow('', '/');
     const { readUrlParams, refreshUrlParams } = await import('@/lib/routing/url-state');
@@ -260,7 +223,6 @@ describe('refreshUrlParams', () => {
 
     expect(refreshed.g_model).toBe('Qwen-3.5-397B-A17B');
     expect(refreshed.i_seq).toBe('agentic-traces');
-    // Same object the load-time readers already hold, so they see it too.
     expect(readUrlParams().g_model).toBe('Qwen-3.5-397B-A17B');
   });
 
@@ -272,8 +234,6 @@ describe('refreshUrlParams', () => {
     const refreshed = refreshUrlParams();
 
     expect(refreshed.i_seq).toBe('8k/1k');
-    // Not cleared: the provider writes params back as the user filters, and a
-    // partial URL must not wipe state the user did not touch.
     expect(refreshed.g_model).toBe('Kimi-K3');
   });
 
@@ -392,7 +352,6 @@ describe('writeUrlParams + buildShareUrl', () => {
     setupWindow('', '/inference');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
 
-    // write default value, should be omitted
     writeUrlParams({ g_model: 'DeepSeek-V4-Pro' });
     await vi.advanceTimersByTimeAsync(200);
 
@@ -404,8 +363,6 @@ describe('writeUrlParams + buildShareUrl', () => {
     setupWindow('?i_revenue=openrouter', '/inference');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
 
-    // InferenceContext writes the default source when token revenue is not the
-    // active metric, which must clear stale state without serializing i_revenue=.
     writeUrlParams({ i_revenue: 'normalized' });
     await vi.advanceTimersByTimeAsync(200);
 
@@ -427,9 +384,6 @@ describe('writeUrlParams + buildShareUrl', () => {
     setupWindow('', '/inference');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
 
-    // Picking the fixed-seq scenario must survive into the share URL; on routes
-    // seeded with a different initialSequence (e.g. /compare pages), stripping
-    // it would revert the pick back to the seeded scenario on reload.
     writeUrlParams({ i_seq: '8k/1k' });
     await vi.advanceTimersByTimeAsync(200);
 
@@ -464,7 +418,6 @@ describe('writeUrlParams + buildShareUrl', () => {
     const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
 
     writeUrlParams({ g_model: 'immediate' });
-    // don't advance timers, buildShareUrl should flush synchronously
     const url = buildShareUrl();
     expect(url).toContain('g_model=immediate');
   });
@@ -606,7 +559,6 @@ describe('buildShareUrl tab filtering', () => {
       await import('@/lib/routing/url-state');
     expect(readUrlParams().c_ivtarget).toBe('24');
 
-    // The estimator writes '' when the target equals the selected model's default.
     writeUrlParams({ c_ivtarget: '' });
     await vi.advanceTimersByTimeAsync(200);
 
@@ -667,7 +619,6 @@ describe('buildShareUrl tab filtering', () => {
       location.search = url.search;
       if (firstWrite) {
         firstWrite = false;
-        // A control edit lands before React's pathname-driven hydration effect.
         state.writeUrlParams({ g_tco: 'external', g_runid: '123', i_prec: 'fp8' });
       }
     });
@@ -789,7 +740,6 @@ describe('buildShareUrl unofficialrun handling', () => {
     const { buildShareUrl } = await import('@/lib/routing/url-state');
 
     const url = buildShareUrl();
-    // URLSearchParams encodes comma as %2C — accept either form.
     expect(url).toMatch(/unofficialruns=111(?:,|%2C)222(?:,|%2C)333/u);
   });
 
@@ -831,14 +781,6 @@ describe('buildShareUrl unofficialrun handling', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Carrying chart state across a full-document navigation.
-//
-// Filter changes only ever reach the in-memory store — the address bar is
-// stripped clean after load — so the history entry behind a detail-page link
-// was a bare `/inference` that rebuilt from defaults on Back.
-// ---------------------------------------------------------------------------
-
 describe('currentChartSearch', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -855,8 +797,6 @@ describe('currentChartSearch', () => {
     const { currentChartSearch, writeUrlParams } = await import('@/lib/routing/url-state');
 
     writeUrlParams({ g_model: 'Kimi-K3', i_active: 'gb200_dynamo-vllm', i_seq: 'agentic-traces' });
-    // Reads through the debounce rather than around it: the click that
-    // navigates away can land inside the 150ms window.
     const search = currentChartSearch();
 
     expect(new URLSearchParams(search).get('g_model')).toBe('Kimi-K3');
@@ -871,8 +811,6 @@ describe('currentChartSearch', () => {
     writeUrlParams({ g_model: 'Kimi-K3', r_range: 'all-time' });
     const params = new URLSearchParams(currentChartSearch());
 
-    // `inference` prefixes, not the reliability tab's — a detail page carries
-    // the chart it was opened from.
     expect(params.get('g_model')).toBe('Kimi-K3');
     expect(params.has('r_range')).toBe(false);
   });
@@ -915,8 +853,6 @@ describe('rememberChartStateInUrl', () => {
     expect(history.replaceState).toHaveBeenCalledTimes(1);
     const [state] = history.replaceState.mock.calls[0] as [unknown, string, string];
     const url = (history.replaceState.mock.calls[0] as [unknown, string, string])[2];
-    // Next patches replaceState and keeps its routing bookkeeping in `state`;
-    // dropping it would strand the router on the entry we just rewrote.
     expect(state).toEqual({ __NA: 1 });
     expect(url.startsWith('/inference?')).toBe(true);
     const params = new URLSearchParams(url.slice(url.indexOf('?')));
@@ -1026,8 +962,6 @@ describe('refreshUrlParamsOnNavigation', () => {
     const { location } = setupWindow('', '/');
     const { readUrlParams, refreshUrlParamsOnNavigation } = await import('@/lib/routing/url-state');
 
-    // First call on a fresh document still refreshes — the load-time snapshot
-    // and the live URL agree, so it is a no-op in effect.
     expect(refreshUrlParamsOnNavigation('/')).toBe(true);
 
     location.search = '?g_model=Kimi-K3&i_active=gb200_dynamo-vllm';
@@ -1044,9 +978,6 @@ describe('refreshUrlParamsOnNavigation', () => {
     expect(refreshUrlParamsOnNavigation('/inference')).toBe(true);
     expect(readUrlParams().g_model).toBe('Kimi-K3');
 
-    // The user picks another model. Writes go to the in-memory store, never the
-    // address bar, so the stale URL must not be replayed over the new choice
-    // when some unrelated component mounts.
     location.search = '?g_model=Kimi-K3';
     expect(refreshUrlParamsOnNavigation('/inference')).toBe(false);
   });

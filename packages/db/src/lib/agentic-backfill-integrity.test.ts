@@ -18,7 +18,6 @@ const before: BackfillState = {
 };
 const versions = { chart: 20, stats: 10, timeline: 6 };
 const after = { ...before, chart_version: 20, stats_version: 10 };
-/** The same point after its JSONB timeline was converted to gzip. */
 const converted: BackfillState = {
   ...after,
   timeline_format: 'gzip',

@@ -58,7 +58,6 @@ function discoverRouteFiles(directory: string): string[] {
     .toSorted();
 }
 
-/** Uses the compiler AST so factory-assigned handlers such as `export const GET = idQueryRoute(...)` count. */
 function exportedHttpMethods(file: string): ApiRouteHttpMethod[] {
   const sourceFile = ts.createSourceFile(
     file,

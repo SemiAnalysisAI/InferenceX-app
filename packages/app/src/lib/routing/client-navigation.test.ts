@@ -37,10 +37,6 @@ describe('navigateInApp', () => {
   });
 
   it('pushes the route exactly once — no timer-based re-push', () => {
-    // The old 250ms retry re-read `window.location.pathname`, which a stale
-    // mid-transition restore could revert to the origin page; the retry then
-    // pushed again, stacking a duplicate history entry and visibly restarting
-    // the transition (landing "Full dashboard" regression).
     const router = { push: vi.fn() };
     const { event, preventDefault } = makeEvent();
 
@@ -49,8 +45,6 @@ describe('navigateInApp', () => {
     expect(router.push).toHaveBeenCalledTimes(1);
     expect(router.push).toHaveBeenCalledWith('/inference/kimi-k3');
 
-    // Even if the address bar still shows the origin (slow commit or a stale
-    // revert), no second push may fire later.
     vi.advanceTimersByTime(5000);
     expect(router.push).toHaveBeenCalledTimes(1);
   });

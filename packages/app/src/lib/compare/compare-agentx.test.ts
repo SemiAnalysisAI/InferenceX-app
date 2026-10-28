@@ -38,8 +38,6 @@ describe('AgentX comparison links', () => {
       (model) => model.displayName,
     );
     expect(new Set(ledgerNew)).toEqual(AGENTX_NEW_MODEL_DISPLAY_NAMES);
-    // Every NEW model is a featured row — the pill never marks a model the
-    // ledger does not show.
     for (const model of COMPARE_MODEL_SLUGS) {
       if (AGENTX_NEW_MODEL_DISPLAY_NAMES.has(model.displayName)) {
         expect(FEATURED_AGENTX_MODELS).toContain(model);
@@ -63,8 +61,6 @@ describe('AgentX comparison links', () => {
   });
 
   it('routes DeepSeek V4.1 Flash to AgentX from the featured ledger', () => {
-    // V4.1 Flash has no 8K/1K sweep, so the 8K/1K fallback would SSR an empty
-    // compare page. Its compare cards point at the agentic workload.
     const flash = COMPARE_MODEL_SLUGS.find((model) => model.slug === 'deepseek-v41-flash')!;
     expect(comparisonScenarioForModel(flash)).toEqual({
       label: 'AgentX',
@@ -94,13 +90,20 @@ describe('AgentX comparison links', () => {
     expect(overviewScenariosForModel(Model.Muse_Spark_Open)).toEqual(['agentx']);
   });
 
+  it('routes MiniMax M3.1 Flash to AgentX without featuring it on the ledger', () => {
+    const flash = COMPARE_MODEL_SLUGS.find((model) => model.slug === 'minimax-m31-flash')!;
+    expect(comparisonScenarioForModel(flash)).toEqual({
+      label: 'AgentX',
+      sequence: 'agentic-traces',
+    });
+    expect(comparisonPairHref('en', 'minimax-m31-flash-b300-vs-b200', flash)).toBe(
+      '/compare/minimax-m31-flash-b300-vs-b200/agentic',
+    );
+    expect(FEATURED_AGENTX_MODELS).not.toContain(flash);
+    expect(overviewScenariosForModel(Model.MiniMax_M3_1_Flash)).toEqual(['agentx']);
+  });
+
   it('agrees with the overview matrix about which models are AgentX-only', () => {
-    // Two modules encode the same fact — the compare scenario set here and
-    // OVERVIEW_MODEL_SCENARIOS in overview-data.ts. This pins the agreement so
-    // curating one without the other fails here instead of silently SSRing an
-    // empty compare page. compare-agentx.ts cannot import the overview module
-    // directly: ChartControls is a client component, and the import would drag
-    // the matrix builder into the browser bundle.
     const modelValues = new Set<string>(Object.values(Model));
     for (const entry of COMPARE_MODEL_SLUGS) {
       if (!modelValues.has(entry.displayName)) continue;
@@ -131,7 +134,6 @@ describe('AgentX comparison links', () => {
     expect(comparisonPairHref('zh', 'deepseek-r1-h100-vs-h200', deepSeekR1)).toBe(
       '/zh/compare/deepseek-r1-h100-vs-h200/8k-1k',
     );
-    // The per-dollar catalog links the same workloads under its own family.
     expect(
       comparisonPairHref('en', 'deepseek-v4-h100-vs-h200', deepSeekV4, 'compare-per-dollar'),
     ).toBe('/compare-per-dollar/deepseek-v4-h100-vs-h200/agentic');

@@ -2,7 +2,6 @@ import type { BenchmarkRow } from '@/lib/api/api';
 import { benchmarkCurveDate } from '@/lib/benchmarks/benchmark-run-selection';
 import { Model, Sequence } from '@/lib/catalog/data-mappings';
 
-/** Default inference snapshot. Disable when a newer VR baseline is approved. */
 export const VR_DEFAULT_RUN = {
   enabled: true,
   model: Model.DeepSeek_V4_Pro,
@@ -10,7 +9,6 @@ export const VR_DEFAULT_RUN = {
   date: '2026-09-09',
 } as const;
 
-/** Only the affected line; other VR models, engines and workloads keep their defaults. */
 export function isPreferredVrLine(row: BenchmarkRow): boolean {
   return (
     row.hardware === 'vr200' &&
@@ -23,12 +21,6 @@ export function isPreferredVrLine(row: BenchmarkRow): boolean {
   );
 }
 
-/**
- * Replace the complete line with the exact-date API snapshot, including changed
- * topologies. The API selects one logical curve for that date, independently of
- * the result/run IDs assigned during import. Keep point provenance and metrics
- * intact, including older producer points carried into that logical snapshot.
- */
 export function preferVrDefaultRun(
   rows: BenchmarkRow[],
   preferredRows: BenchmarkRow[],

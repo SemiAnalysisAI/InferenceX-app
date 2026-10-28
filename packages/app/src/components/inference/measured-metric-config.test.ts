@@ -4,11 +4,13 @@ import {
   MEASURED_ENERGY_METRIC_CONFIG_KEYS,
   METRIC_CONFIG_KEYS,
   POWER_BASIS_METRIC_CONFIG_KEYS,
+  resolveMetricConfigKey,
 } from './metric-registry';
 import {
   changeMeasuredMetricConfig,
   getMeasuredMetricConfig,
   MEASURED_METRIC_DEFAULTS,
+  measuredMetricBases,
 } from './measured-metric-config';
 
 describe('measured metric configuration', () => {
@@ -35,6 +37,32 @@ describe('measured metric configuration', () => {
     }
     expect(getMeasuredMetricConfig('y_removedMetric')).toBeUndefined();
     expect(getMeasuredMetricConfig('')).toBeUndefined();
+  });
+
+  it('offers provisioned boundaries for energy only and lands old provisioned-watt links on measured power', () => {
+    expect(measuredMetricBases('power')).toEqual(['gpu-measured', 'it-modeled', 'utility-modeled']);
+    expect(measuredMetricBases('energy')).toEqual([
+      'gpu-measured',
+      'gpu-provisioned',
+      'utility-provisioned',
+      'it-modeled',
+      'utility-modeled',
+    ]);
+    expect(getMeasuredMetricConfig('y_itModeledWatts')).toMatchObject({
+      family: 'power',
+      basis: 'it-modeled',
+      display: 'watts',
+    });
+    expect(getMeasuredMetricConfig('y_itModeledJPerOutputToken')).toMatchObject({
+      family: 'energy',
+      basis: 'it-modeled',
+      denominator: 'output',
+    });
+    expect(changeMeasuredMetricConfig('y_gpuProvisionedJPerOutputToken', { family: 'power' })).toBe(
+      'y_measuredAvgPower',
+    );
+    expect(resolveMetricConfigKey('y_gpuProvisionedWatts')).toBe('y_measuredAvgPower');
+    expect(resolveMetricConfigKey('y_utilityProvisionedWatts')).toBe('y_measuredAvgPower');
   });
 
   it('starts newly selected families at whole-deployment average power or output energy', () => {

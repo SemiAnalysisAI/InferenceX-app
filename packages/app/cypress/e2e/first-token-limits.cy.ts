@@ -1,16 +1,3 @@
-/**
- * First-Token Limits (`/first-token`).
- *
- * The page reads *measured* rows: for each time-to-first-token cap, the cheapest
- * configuration per vendor that also clears an interactivity floor. The
- * fixed-sequence overlay fixtures suit it well — every row reports a 0.5 s
- * median TTFT, so a 0.1 s cap empties every slot and a 2 s cap fills them, and
- * the floor decides which concurrency wins.
- *
- * Official data: B300 (tput ×1) and B200 (×0.6), both NVIDIA, so the page shows
- * one vendor series. The unofficial run adds B300 (×1.3) and an overlay-only
- * MI355X (×0.8), which must render as the run's own bar rather than an AMD bar.
- */
 import {
   interceptCalculatorOverlayRun,
   OVERLAY_ONLY_HARDWARE,
@@ -33,10 +20,6 @@ const dismissNudges = (win: Cypress.AUTWindow) => {
   win.sessionStorage.setItem('inferencex-reproducibility-nudge-shown', '1');
 };
 
-/**
- * A named cell of the first table row, resolved by header text so a new column
- * cannot silently re-point an assertion at its neighbour.
- */
 const firstRowCell = (header: string) =>
   cy.get('[data-testid="first-token-table"] thead th').then(($ths) => {
     const index = $ths.toArray().findIndex((th) => (th.textContent ?? '').includes(header));
@@ -62,8 +45,6 @@ describe('First-Token Limits', () => {
         'contain.text',
         'Minimum Median Interactivity',
       );
-      // Fixed sequences default to the calculator's floor; the field shows it
-      // as a placeholder rather than writing the default into the URL.
       cy.get('[data-testid="first-token-min-interactivity"]')
         .should('have.value', '')
         .and('have.attr', 'placeholder', '35');
@@ -80,14 +61,11 @@ describe('First-Token Limits', () => {
         expect(labels).to.deep.equal(['', 'B300 only']);
       });
 
-      // At the 35 tok/s floor the 48-concurrency row (10.6 tok/s) is out, so the
-      // winner is the next-highest-throughput row: concurrency 8.
       expect(concurrenciesAtOrAbove(35)).to.deep.equal([8, 2, 1]);
       firstRowCell('Concurrency').should('have.text', '8');
       firstRowCell('Configuration').should('contain.text', 'B300');
       firstRowCell('Median TTFT').should('have.text', '0.50');
 
-      // Raising the floor above 111 tok/s leaves only the single-user row.
       cy.get('[data-testid="first-token-min-interactivity"]').clear().type('120').blur();
       firstRowCell('Concurrency').should('have.text', '1');
       cy.get(BARS).should('have.length', 1);
@@ -97,8 +75,6 @@ describe('First-Token Limits', () => {
     });
 
     it('re-picks the winner when the legend isolates another chip', () => {
-      // Clicking a visible entry while everything is visible solos it, the
-      // calculator's legend convention; clicking the lone entry restores all.
       cy.get('.sidebar-legend label').contains('B200').click();
       cy.get(BARS).should('have.attr', 'data-hw', 'b200_sglang');
       cy.get(SUMMARY).last().should('have.text', 'B200 only');
@@ -142,8 +118,6 @@ describe('First-Token Limits', () => {
 
   describe('share-link seeding', () => {
     it('reads the interactivity floor and cap ladder from the URL', () => {
-      // Share-link params are stripped from the address bar on load and carried
-      // by the share button instead, so seeding is asserted on the controls.
       interceptCalculatorOverlayRun();
       cy.visit(`/first-token?i_seq=${encodeURIComponent(SEQUENCE)}&c_ivmin=120&c_ttft=1`, {
         onBeforeLoad: dismissNudges,
@@ -174,7 +148,6 @@ describe('First-Token Limits', () => {
         const fills = [...$bars].map((el) => el.getAttribute('fill') ?? '');
         expect(fills.filter((f) => f.includes('overlay-run-0'))).to.have.length(1);
       });
-      // The run's cheapest qualifying row is its faster B300, not the overlay-only MI355X.
       cy.get(`${BARS}[data-series="run:0"]`).should('have.attr', 'data-hw', 'b300_sglang');
       cy.get(EMPTY_MARKS).should('have.length', 2);
       cy.get('.sidebar-legend').should('contain.text', OVERLAY_RUN_BRANCH);
@@ -185,8 +158,6 @@ describe('First-Token Limits', () => {
     });
 
     it('lets the legend hide hardware inside the run too', () => {
-      // Solo the overlay-only MI355X: no official chip is visible, so the vendor
-      // bar goes, and the run's bar moves off its (hidden) B300 onto MI355X.
       cy.get('.sidebar-legend label').contains(OVERLAY_ONLY_HARDWARE.toUpperCase()).click();
       cy.get(BARS).should('have.length', 1);
       cy.get(BARS)

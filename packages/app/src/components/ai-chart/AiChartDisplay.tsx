@@ -269,7 +269,6 @@ export default function AiChartDisplay() {
         )}
       </div>
 
-      {/* Loading state */}
       {isLoading && (
         <Card>
           <CardContent className="space-y-4">
@@ -280,7 +279,6 @@ export default function AiChartDisplay() {
         </Card>
       )}
 
-      {/* Error state */}
       {error && (
         <Card className="border-destructive">
           <CardContent className="flex items-start gap-3">
@@ -304,7 +302,6 @@ export default function AiChartDisplay() {
         </Card>
       )}
 
-      {/* Result */}
       {result && (
         <>
           <UnofficialDomainNotice />

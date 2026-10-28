@@ -22,8 +22,6 @@ export function CuratedViewCard({ preset }: { preset: FavoritePreset }) {
       preset_id: preset.id,
       preset_title: preset.title,
     });
-    // Hard navigation so the `?preset=` param is guaranteed to be in the URL
-    // when InferenceContext first mounts and reads window.location.search.
     window.location.href = href;
   };
   return (

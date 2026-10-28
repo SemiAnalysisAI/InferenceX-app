@@ -19,7 +19,6 @@ interface Pair {
   y: number;
 }
 
-/** Number of cases both GPUs measured. */
 function shared(model: ComparisonModel, a: string | undefined, b: string): number {
   return a
     ? model.view.cases.filter((_, i) => model.value(a, i) !== null && model.value(b, i) !== null)
@@ -152,8 +151,8 @@ function PairwiseScatter({ model }: { model: ComparisonModel }) {
                 rows: [
                   esc(view.cases[p.i].precision),
                   ...originRows(view, p.i),
-                  `${hardwareLabel(a)} <strong>${metric.format(p.x)}</strong>`,
-                  `${hardwareLabel(b)} <strong>${metric.format(p.y)}</strong>`,
+                  `${hardwareLabel(a)} ${esc(view.measurements[a].backend?.[p.i] ?? '')} <strong>${metric.format(p.x)}</strong>`,
+                  `${hardwareLabel(b)} ${esc(view.measurements[b].backend?.[p.i] ?? '')} <strong>${metric.format(p.y)}</strong>`,
                 ],
                 footer: 'Click for kernel timeline',
               }),

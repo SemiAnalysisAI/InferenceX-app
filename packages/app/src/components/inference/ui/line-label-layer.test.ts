@@ -92,7 +92,6 @@ describe('line-label placement', () => {
       { collisionWidth: 60 },
     );
 
-    // A 20px gap cleared the old 18px threshold, but not a 13px label plus padding.
     expect(labels[1]).toMatchObject({ x: 100, y: 100, visible: true });
   });
 
@@ -149,9 +148,6 @@ describe('line-label placement', () => {
   });
 
   it('staggers anchor slots so converging curves spread along the line instead of stacking at the endpoint', () => {
-    // Frontier-shaped curves that all converge on the same right-edge region,
-    // like the e2e latency chart: endpoint placement used to pile every label
-    // on top of the shared endpoint.
     const converging = (key: string, startY: number): LineLabelSeries<Point> =>
       series(
         key,
@@ -166,8 +162,6 @@ describe('line-label placement', () => {
 
     expect(labels).toHaveLength(4);
     expect(labels.every((label) => label.visible)).toBe(true);
-    // Labels occupy distinct anchor slots along the x-range rather than all
-    // sitting at the shared endpoint (x = 100).
     const distinctX = new Set(labels.map((label) => label.x));
     expect(distinctX.size).toBeGreaterThanOrEqual(3);
     expect(labels.filter((label) => label.x === 100).length).toBeLessThanOrEqual(1);

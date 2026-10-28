@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** B300 HGX: eight GPUs, two Blackwell NVSwitches, and eight ConnectX-8 NICs. */
 
 import {
   type OperatingState,
@@ -34,7 +33,6 @@ export class B300HGXBoard extends NVIDIA8WayHGXBoard {
     validate_instance(nic, ConnectX8NICCard);
     super({
       gpu_tdp_w,
-      // Derived from the switches and NIC state unless supplied.
       non_gpu_power_w:
         non_gpu_power_w ??
         sum_watts(B300HGXBoard._board_groups(nic).map((g) => g.estimate_breakdown().power_w)),

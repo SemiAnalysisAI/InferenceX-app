@@ -44,7 +44,6 @@ describe('AgentX optimizations', () => {
         'have.length',
         FRAMEWORK_SLUGS.length,
       );
-      // Direct route into one project, for a reader who knows which engine they run.
       cy.get('[data-testid="agentx-optimizations-framework-link"][data-framework="sglang"]').should(
         'have.attr',
         'href',
@@ -75,7 +74,6 @@ describe('AgentX optimizations', () => {
         'A brief introduction to the distributed inference ecosystem',
       );
       cy.get('[data-testid="agentx-optimizations-figure-servingStack"] img').should('be.visible');
-      // The day-zero section keeps its own upstream references.
       cy.get('[data-testid="agentx-optimizations-section-other"]')
         .find('[data-testid="agentx-optimizations-pr"]')
         .first()
@@ -108,7 +106,6 @@ describe('AgentX optimizations', () => {
           .first()
           .should('have.attr', 'href', 'https://github.com/vllm-project/vllm/pull/43447')
           .and('contain.text', 'vLLM #43447');
-        // Sibling projects stay one click away.
         cy.get('[data-testid="agentx-optimizations-card"]').should(
           'have.length',
           FRAMEWORK_SLUGS.length - 1,
@@ -122,9 +119,6 @@ describe('AgentX optimizations', () => {
   });
 
   it('renders the index and representative projects at 1440px and 390px in both locales', () => {
-    // Project pages share one template and differ only in typechecked data, so
-    // the route matrix visits two representatives (one with a hyphenated slug)
-    // instead of all nine; the tests above deep-cover vllm (en) and sglang (zh).
     const matrixSlugs = ['tensorrt-llm', 'mooncake'] as const;
     for (const viewport of ROUTE_VIEWPORTS) {
       for (const locale of ['', '/zh']) {
@@ -203,7 +197,6 @@ describe('AgentX optimizations', () => {
 
     cy.visit('/zh/agentx/optimizations/sglang', { onBeforeLoad: unlockAgenticGate });
     cy.get('[data-testid="agentx-optimizations-article"]').within(() => {
-      // Product names stay English; the prose around them is translated.
       cy.get('h1').should('have.text', 'SGLang');
       cy.contains('HiCache offload').should('be.visible');
       cy.contains('并发 384 下输出吞吐量提升 26.75%').should('be.visible');

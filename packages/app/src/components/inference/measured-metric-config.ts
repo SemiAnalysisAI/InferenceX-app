@@ -1,19 +1,13 @@
-import type { PowerBasis } from '@/lib/power/power-basis';
+import { POWER_BASES, type PowerBasis } from '@/lib/power/power-basis';
 import type { MetricConfigKey } from './metric-registry';
 
 export type MeasuredMetricFamily = 'power' | 'energy';
 type MeasuredScope = 'all' | 'prefill' | 'decode';
-/**
- * How whole-deployment average power is shown: per-chip watts, percent of
- * TDP, or the per-second telemetry trace behind the average (`timeline`, which
- * ChartDisplay renders with `PowerTimeline` instead of the scatter chart).
- */
 export type MeasuredPowerDisplay = 'watts' | 'tdp' | 'timeline';
 
 export type MeasuredMetricConfig =
   | {
       family: 'power';
-      /** Power boundary the key plots; only `gpu-measured` publishes the other dimensions. */
       basis: PowerBasis;
       scope: MeasuredScope;
       statistic: 'average' | 'p75' | 'p90';
@@ -44,7 +38,6 @@ export const MEASURED_METRIC_DEFAULTS = {
 
 const measured = { basis: 'gpu-measured' } as const;
 
-// Presentation settings resolve to existing metrics; they do not own chart state.
 const MEASURED_METRIC_CONFIGS: readonly (readonly [MetricConfigKey, MeasuredMetricConfig])[] = [
   [
     'y_measuredAvgPower',
@@ -102,19 +95,46 @@ const MEASURED_METRIC_CONFIGS: readonly (readonly [MetricConfigKey, MeasuredMetr
     'y_measuredWhPerSuccessfulQuery',
     { family: 'energy', ...measured, scope: 'all', denominator: 'query', unit: 'wattHours' },
   ],
-  // Derived boundaries publish one canonical combination per family: whole
-  // deployment, average watts, joules per output token (lib/power/power-basis.ts).
+  [
+    'y_itModeledWatts',
+    {
+      family: 'power',
+      basis: 'it-modeled',
+      scope: 'all',
+      statistic: 'average',
+      display: 'watts',
+    },
+  ],
+  [
+    'y_utilityModeledWatts',
+    {
+      family: 'power',
+      basis: 'utility-modeled',
+      scope: 'all',
+      statistic: 'average',
+      display: 'watts',
+    },
+  ],
   ...(
     [
-      ['gpu-provisioned', 'y_gpuProvisionedWatts', 'y_gpuProvisionedJPerOutputToken'],
-      ['utility-provisioned', 'y_utilityProvisionedWatts', 'y_utilityProvisionedJPerOutputToken'],
-      ['utility-modeled', 'y_utilityModeledWatts', 'y_utilityModeledJPerOutputToken'],
-    ] as const satisfies readonly (readonly [PowerBasis, MetricConfigKey, MetricConfigKey])[]
-  ).flatMap(([basis, watts, energy]): (readonly [MetricConfigKey, MeasuredMetricConfig])[] => [
-    [watts, { family: 'power', basis, scope: 'all', statistic: 'average', display: 'watts' }],
-    [energy, { family: 'energy', basis, scope: 'all', denominator: 'output', unit: 'joules' }],
+      ['gpu-provisioned', 'y_gpuProvisionedJPerOutputToken'],
+      ['utility-provisioned', 'y_utilityProvisionedJPerOutputToken'],
+      ['it-modeled', 'y_itModeledJPerOutputToken'],
+      ['utility-modeled', 'y_utilityModeledJPerOutputToken'],
+    ] as const satisfies readonly (readonly [PowerBasis, MetricConfigKey])[]
+  ).map(([basis, energy]): readonly [MetricConfigKey, MeasuredMetricConfig] => [
+    energy,
+    { family: 'energy', basis, scope: 'all', denominator: 'output', unit: 'joules' },
   ]),
 ];
+
+export function measuredMetricBases(family: MeasuredMetricFamily): PowerBasis[] {
+  return POWER_BASES.filter((basis) =>
+    MEASURED_METRIC_CONFIGS.some(
+      ([, config]) => config.family === family && config.basis === basis,
+    ),
+  );
+}
 
 export function getMeasuredMetricConfig(metric: string): MeasuredMetricConfig | undefined {
   const config = MEASURED_METRIC_CONFIGS.find(([key]) => key === metric)?.[1];
@@ -133,11 +153,6 @@ export function changeMeasuredMetricConfig(
     current?.family === family
       ? current
       : getMeasuredMetricConfig(MEASURED_METRIC_DEFAULTS[family])!;
-  // Choosing a derived boundary snaps the other dimensions to its canonical
-  // combination. Changing any of those dimensions while on a derived boundary
-  // returns to GPU-measured telemetry, the only basis that publishes variants,
-  // so every control change lands on a real key. A family switch keeps the
-  // boundary: the metric key is what carries it.
   const changesOtherDimension = OTHER_DIMENSIONS.some((key) => change[key] !== undefined);
   const basis =
     change.basis ?? (changesOtherDimension ? 'gpu-measured' : (current ?? config).basis);
@@ -167,7 +182,6 @@ export function changeMeasuredMetricConfig(
   }
 
   const denominator = change.denominator ?? config.denominator;
-  // Input/output normalization does not imply a prefill/decode attribution.
   if (
     (scope === 'prefill' && denominator !== 'input') ||
     (scope === 'decode' && denominator !== 'output')

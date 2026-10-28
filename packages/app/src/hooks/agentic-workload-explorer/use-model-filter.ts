@@ -10,7 +10,6 @@ export function useModelFilter() {
   useEffect(() => {
     fetch('/api/v1/agentic-workload-explorer/models')
       .then((r) => r.json())
-      // `other` groups unlisted models and cannot be filtered on (the API rejects it).
       .then((data: { tokensByModel: { model: string }[] }) =>
         setModels(
           [...new Set(data.tokensByModel.map((m) => m.model))]

@@ -14,11 +14,6 @@ interface ModelIndexLinkProps extends Omit<ComponentProps<typeof Link>, 'href'> 
   locale: Locale;
 }
 
-/**
- * Model detail routes are generated from MDX. Use the shared same-document
- * navigation path already used by dashboard entry links, so background audio
- * and layout state survive the transition.
- */
 export function ModelIndexLink({ href, slug, locale, onClick, ...props }: ModelIndexLinkProps) {
   const router = useRouter();
 

@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
 /* oxlint-disable max-classes-per-file -- mirrors the upstream Python module, class for class */
-/** Four-GPU compute trays, with hardware selection owned by the system models. */
 
 import {
   DEFAULT_OPERATING_STATE,

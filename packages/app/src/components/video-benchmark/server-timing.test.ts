@@ -6,7 +6,6 @@ import {
   timingDistribution,
 } from './server-timing';
 
-// Synthetic timing records test the contract; no server timing was measured here.
 const distribution = {
   values: [0, 1, 2, 3],
   sample_count: 4,

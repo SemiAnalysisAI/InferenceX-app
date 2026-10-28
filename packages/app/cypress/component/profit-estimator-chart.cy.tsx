@@ -2,15 +2,8 @@ import ProfitEstimatorChart from '@/components/calculator/ProfitEstimatorChart';
 import type { ProfitEstimatorRow } from '@/components/calculator/profit-estimator';
 import type { HardwareConfig } from '@/components/inference/types';
 
-/**
- * The seven bars from a July-2026 DeepSeek V4 Pro estimate on a phone: three
- * NVIDIA stacks within 30% of each other and three AMD stacks within 20%, so
- * neighbouring revenue figures sit at almost the same height. Revenue is
- * $/GW-year; every row keeps the same 60% TCO / 20% license-fee split.
- */
 function estimateRow(hwKey: string, revenueBn: number, profitBn?: number): ProfitEstimatorRow {
   const revenue = revenueBn * 1e9;
-  // A losing row keeps the TCO stack tall enough to leave `profitBn` below zero.
   const tco = profitBn === undefined ? revenue * 0.06 : revenue - profitBn * 1e9;
   const labCut = profitBn === undefined ? revenue * 0.02 : 0;
   return {
@@ -37,11 +30,6 @@ const ROWS: ProfitEstimatorRow[] = [
   estimateRow('mi355x_vllm', 21.7),
 ];
 
-/**
- * The five bars from a DeepSeek V4.1 Flash estimate on a phone: two SKUs lose
- * money, one by $561.2M and the last one by $4.9B, and "Loss -$561.2M" used
- * to run across both neighbouring bands while "Loss -$4.9B" ran off the plot.
- */
 const LOSING_ROWS: ProfitEstimatorRow[] = [
   estimateRow('b200_vllm', 14, 5.14),
   estimateRow('b300_vllm', 11.9, 1.46),
@@ -73,7 +61,6 @@ function mountChart(widthPx: number, rows: ProfitEstimatorRow[] = ROWS) {
   );
 }
 
-/** Horizontal extent of every bar column, keyed by the column's centre. */
 function barColumns(): Cypress.Chainable<{ left: number; right: number }[]> {
   return cy.get('[data-testid="profit-estimator-chart"] rect.bar').then(($rects) => {
     const byLeft = new Map<number, { left: number; right: number }>();
@@ -86,7 +73,6 @@ function barColumns(): Cypress.Chainable<{ left: number; right: number }[]> {
   });
 }
 
-/** Combined revenue and margin bounds for each bar, in left-to-right order. */
 function labelBoxes(): Cypress.Chainable<DOMRect[]> {
   return cy
     .get('[data-testid="profit-estimator-chart"] .revenue-label')
@@ -126,7 +112,6 @@ describe('ProfitEstimatorChart revenue labels', () => {
   });
 
   it('never lets neighbouring revenue figures overlap on a phone', () => {
-    // iPhone 15/16 viewport: the 361px card viewport scrolls across the wider plot.
     cy.viewport(393, 852);
     mountChart(393);
     cy.screenshot('profit-estimator-chart-phone', { overwrite: true });
@@ -137,7 +122,6 @@ describe('ProfitEstimatorChart revenue labels', () => {
         }
       }
     });
-    // Every figure keeps its compact unit even once the decimal has to go.
     cy.get('[data-testid="profit-estimator-chart"] .revenue-amount').each(($el) => {
       expect($el.text()).to.match(/^\$\d+(?:\.\d)?B$/);
     });
@@ -148,7 +132,6 @@ describe('ProfitEstimatorChart revenue labels', () => {
     mountChart(393, LOSING_ROWS);
     cy.get('[data-testid="profit-estimator-chart"] .loss-label').should('have.length', 2);
     cy.screenshot('profit-estimator-chart-phone-loss', { overwrite: true });
-    // The scrollable plot has room to retain the loss label as well as the signed amount.
     cy.get('[data-testid="profit-estimator-chart"] .loss-label').then(($labels) => {
       expect([...$labels].map((el) => el.textContent)).to.deep.equal([
         'Loss -$561M',
@@ -164,12 +147,10 @@ describe('ProfitEstimatorChart revenue labels', () => {
         barColumns().then((columns) => {
           cy.get('[data-testid="profit-estimator-chart"] .loss-label').each(($label) => {
             const box = $label[0].getBoundingClientRect();
-            // The deepest loss reaches the domain floor; its figure must still clear the axis line.
             expect(box.bottom, `"${$label.text()}" sits on the x axis`).to.be.lessThan(axisTop);
             const centre = (box.left + box.right) / 2;
             const own = columns.find((c) => c.left <= centre && centre <= c.right);
             expect(own, `no bar under "${$label.text()}"`).to.not.equal(undefined);
-            // The figure may overhang its bar into the gap, but never reach the next bar.
             for (const other of columns) {
               if (other === own) continue;
               const intrudes = box.left < other.right && other.left < box.right;
@@ -183,7 +164,6 @@ describe('ProfitEstimatorChart revenue labels', () => {
             expect(box.right, `"${$label.text()}" runs off the right of the plot`).to.be.at.most(
               plot.right,
             );
-            // Sign and compact unit survive whatever the fit dropped.
             expect($label.text()).to.match(/^(?:Loss )?-\$\d+(?:\.\d)?[MB]$/);
           });
         });

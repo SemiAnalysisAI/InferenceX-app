@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** ConnectX-7 modeled at 400 Gbit/s. */
 
 import { nic_power_baseline } from '../../profiles';
 import { ScaleOutNICCard, type ScaleOutNICCardFields } from './nic';

@@ -7,7 +7,5 @@ export function pointLabelText(
   showConcurrency: boolean,
 ): string {
   const base = advanced ? getPointLabel(point) : `${point.physicalChips ?? point.tp}`;
-  // Concurrency is opt-in via the advanced "# Concurrent Sessions" toggle so
-  // the default labels stay light-weight.
   return showConcurrency ? `${base}\nC=${point.conc}` : base;
 }

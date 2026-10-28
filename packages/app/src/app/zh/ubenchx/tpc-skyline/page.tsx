@@ -5,8 +5,9 @@ import { UbenchxHub } from '@/components/ubenchx/UbenchxHub';
 import { zhAlternates, ZH_OG_LOCALE } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
-const TITLE = 'ubenchX：TPC Skyline';
-const DESCRIPTION = '基于线程块集群协同调度，实测 NVIDIA GPU 的 TPC per GPC 分组。';
+const TITLE = 'ubenchX：TPC Skyline 与 SKU 配置';
+const DESCRIPTION =
+  '展示 NVIDIA GPU 实测 TPC per GPC 分组，以及 Huawei 950PR 各 SKU 的核心数、频率、内存和缓存配置。';
 
 export const metadata: Metadata = {
   title: TITLE,

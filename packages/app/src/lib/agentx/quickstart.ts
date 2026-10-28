@@ -46,7 +46,7 @@ export const AGENTX_QUICKSTART = {
       'Set your model, server URL, and session concurrency, then run this with Python 3.11–3.13. The full guide includes optional routing headers.',
   },
   zh: {
-    title: '用 AgentX 测试自己的芯片',
+    title: '用 AgentX 对自己的芯片做基准测试',
     description:
       '安装 agentx-harness，连接推理服务器，即可在自己的硬件上回放公开的智能体工作负载。',
     run: '运行 AgentX',
@@ -64,7 +64,7 @@ export const AGENTX_QUICKSTART = {
     guide: '查看完整快速入门指南',
     back: 'AgentX 数据集',
     methodology: '基准测试方法',
-    repository: '测试工具文档',
+    repository: 'Harness 文档',
     summary:
       '设置模型、服务器 URL 和并发会话数，然后使用 Python 3.11–3.13 运行以下命令。完整指南包含可选路由 header。',
   },

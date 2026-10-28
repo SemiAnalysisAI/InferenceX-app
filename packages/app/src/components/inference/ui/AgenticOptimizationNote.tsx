@@ -11,11 +11,10 @@ const STRINGS = {
   zh: {
     label: '已启用推理优化',
     aria: '关于推理优化',
-    details: '每项配置可能使用推测解码等推理优化。将鼠标悬停在数据点上可查看其具体设置。',
+    details: '每项配置可能使用投机解码等推理优化。将鼠标悬停在数据点上可查看其具体设置。',
   },
 } as const;
 
-/** Agentic-only info-footer note; point tooltips carry the exact optimization method. */
 export function AgenticOptimizationNote() {
   const t = STRINGS[useLocale()];
 

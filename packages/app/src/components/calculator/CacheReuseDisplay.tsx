@@ -145,7 +145,6 @@ interface ConfigOption {
   key: string;
   meta: GroupMeta;
   label: string;
-  /** No official rows; the configuration exists only in a loaded run. */
   overlayOnly: boolean;
 }
 
@@ -180,12 +179,7 @@ function CacheReuseInner() {
   const { availablePrecisions, availableSequences, availableModels } =
     useGlobalFilterAvailability();
 
-  // URL-seeded so an article can link the exact configuration; empty means
-  // "the configuration with the most tiered rows", which is why the default
-  // is never written back.
   const [configInput, setConfigInput] = useState<string>(() => readUrlParams().c_cfg ?? '');
-  // Empty means the recipe with the most tiered rows; like `c_cfg`, the
-  // default is never written back.
   const [recipeInput, setRecipeInput] = useState<string>(() => readUrlParams().c_recipe ?? '');
   const [showCeiling, setShowCeiling] = useState(false);
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
@@ -335,7 +329,6 @@ function CacheReuseInner() {
   }, []);
   const handleConfigChange = useCallback((key: string) => {
     setConfigInput(key);
-    // Recipe keys belong to one configuration; carry none across a switch.
     setRecipeInput('');
     writeUrlParams({ c_cfg: key, c_recipe: '' });
     track('cache_reuse_config_selected', { config: key });

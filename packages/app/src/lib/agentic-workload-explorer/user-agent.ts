@@ -1,7 +1,3 @@
-// Fall back to the verbatim User-Agent when clients omit x-stainless-* metadata.
-// Codex CLI/Desktop encode version in the product token and OS/arch in its parenthesized suffix.
-// Oh My Pi sends `omp/<version>` (`pi/<version>` on its 17.x line); Pi sends no version.
-
 import { normalizePlatformOs } from '@semianalysisai/inferencex-db/proxytrace/shared/platform';
 
 const CLI_VERSION_RE = /\b(?:claude-cli|codex[\w-]*|Codex Desktop|omp|pi)\/(?<version>\S+)/u;
@@ -43,11 +39,6 @@ export function parseUserAgent(rawUa: string | null | undefined): ParsedUserAgen
   };
 }
 
-/**
- * Semver-style ordering: dot-separated numeric parts compare numerically
- * (2.1.10 > 2.1.9 > 2.0.100); on a tie, a release sorts after any suffixed
- * prerelease and two suffixes compare as strings.
- */
 export function compareVersions(a: string, b: string): number {
   const coreA = a.match(VERSION_CORE_RE)?.[0] ?? '';
   const coreB = b.match(VERSION_CORE_RE)?.[0] ?? '';

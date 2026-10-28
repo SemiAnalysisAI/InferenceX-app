@@ -182,8 +182,6 @@ describe('TraceReplayWorkerPool', () => {
     const expectedFingerprint = fingerprint(expected);
     expect(result.direct).toEqual({
       ...expectedFingerprint,
-      // Gzip bytes depend on the runtime's zlib (Bun spawns the smoke, Node runs
-      // vitest), so compare the decompressed payload hashes instead.
       profileGz: result.direct.profileGz,
       serverMetricsJsonGz: result.direct.serverMetricsJsonGz,
       requestTimelineGz: result.direct.requestTimelineGz,

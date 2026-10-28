@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** GB300 logical board variant, with a provisional shared LPDDR5X profile. */
 
 import { ValidationError } from '../../../../base';
 import { BiancaBoard, type BiancaBoardFields } from './bianca';
