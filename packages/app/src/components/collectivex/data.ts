@@ -218,6 +218,7 @@ export function chartPoints(
 /** One library-and-mode value inside a SKU range at one token count. */
 export interface CollectiveXRangeMember {
   seriesId: string;
+  backend: string;
   label: string;
   y: number;
   point: CollectiveXPoint;
@@ -229,6 +230,8 @@ export interface CollectiveXRangePoint {
   lo: number;
   mid: number;
   hi: number;
+  /** Distinct libraries among the members (a library can contribute one series per mode). */
+  libraries: number;
   /** Every contributing series, best first for the y-axis (lowest latency, highest rate). */
   members: CollectiveXRangeMember[];
 }
@@ -289,7 +292,13 @@ export function collectiveXRangeBands(
       const y = metricValue(point, operation, percentile, yAxis);
       if (!Number.isFinite(x) || x <= 0 || y === null || y <= 0 || !Number.isFinite(y)) continue;
       const members = entry.byX.get(x) ?? [];
-      members.push({ seriesId: item.series_id, label: rangeMemberLabel(item, locale), y, point });
+      members.push({
+        seriesId: item.series_id,
+        backend: item.backend,
+        label: rangeMemberLabel(item, locale),
+        y,
+        point,
+      });
       entry.byX.set(x, members);
     }
   }
@@ -306,6 +315,7 @@ export function collectiveXRangeBands(
             lo: ys[0],
             mid,
             hi: ys.at(-1)!,
+            libraries: new Set(members.map((member) => member.backend)).size,
             members: members.toSorted((a, b) => (higherIsBetter ? b.y - a.y : a.y - b.y)),
           };
         })

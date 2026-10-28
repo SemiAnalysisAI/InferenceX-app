@@ -48,6 +48,7 @@ export interface CollectiveXChartPoint {
   range?: {
     lo: number;
     hi: number;
+    libraries: number;
     members: { label: string; y: number }[];
   };
 }

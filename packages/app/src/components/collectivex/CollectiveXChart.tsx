@@ -140,6 +140,29 @@ function formatPercentiles(
   return `${us(p50)} / ${us(p90)} / ${us(p95)} / ${us(p99)} µs`;
 }
 
+// Light enough that overlapping SKUs stay readable; a hovered or pinned point lifts its own band
+// and fades the rest.
+const BAND_FILL = 0.08;
+const BAND_STROKE = 0.45;
+const BAND_FOCUS_FILL = 0.3;
+const BAND_FOCUS_STROKE = 0.95;
+const BAND_FADED_FILL = 0.03;
+const BAND_FADED_STROKE = 0.15;
+
+/** Lift the band `focusId` and fade the others; null restores every band. */
+function highlightBands(root: Element | null, focusId: string | null): void {
+  if (!root) return;
+  d3.select(root)
+    .selectAll<SVGPathElement, { id: string }>('path.collectivex-range-band')
+    .attr('fill-opacity', (band) =>
+      focusId === null ? BAND_FILL : band.id === focusId ? BAND_FOCUS_FILL : BAND_FADED_FILL,
+    )
+    .attr('stroke-opacity', (band) =>
+      focusId === null ? BAND_STROKE : band.id === focusId ? BAND_FOCUS_STROKE : BAND_FADED_STROKE,
+    )
+    .attr('data-focused', (band) => (focusId !== null && band.id === focusId ? 'true' : null));
+}
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll('&', '&amp;')
@@ -177,6 +200,7 @@ export function CollectiveXChart({
               range: {
                 lo: item.lo,
                 hi: item.hi,
+                libraries: item.libraries,
                 members: item.members.map(({ label, y }) => ({ label, y })),
               },
             })),
@@ -232,10 +256,10 @@ export function CollectiveXChart({
         .attr('class', 'collectivex-range-band')
         .attr('data-testid', 'collectivex-range-band')
         .attr('fill', (band) => colors[band.colorKey] ?? '#888')
-        .attr('fill-opacity', 0.22)
+        .attr('fill-opacity', BAND_FILL)
         .attr('stroke', (band) => colors[band.colorKey] ?? '#888')
-        .attr('stroke-opacity', 0.35)
-        .attr('stroke-width', 0.75)
+        .attr('stroke-opacity', BAND_STROKE)
+        .attr('stroke-width', 1)
         .attr('pointer-events', 'none')
         .attr('d', (band) => area(band.points));
     };
@@ -244,9 +268,20 @@ export function CollectiveXChart({
       key: 'collectivex-range-bands',
       render: (
         group: d3.Selection<SVGGElement, unknown, null, undefined>,
-        ctx: { xScale: unknown; yScale: unknown },
+        ctx: { xScale: unknown; yScale: unknown; tooltipElement: HTMLDivElement },
       ) => {
         draw(group, ctx.xScale, ctx.yScale);
+        // Dismissing a pinned tooltip (a click elsewhere) fires no hover end, so restore the
+        // bands once the click has dismissed it.
+        const svg = group.node()?.ownerSVGElement ?? null;
+        d3.select(svg).on('click.collectivex-range', () => {
+          setTimeout(() => {
+            const shown =
+              ctx.tooltipElement.style.display !== 'none' &&
+              ctx.tooltipElement.style.opacity !== '0';
+            if (!shown) highlightBands(svg, null);
+          }, 0);
+        });
       },
       onZoom: (
         group: d3.Selection<SVGGElement, unknown, null, undefined>,
@@ -363,7 +398,7 @@ export function CollectiveXChart({
             <div>${t.rangeMedian}: <strong>${formatMetric(point.y, yAxis)}</strong></div>
             <div>${t.rangeHeading}: ${formatMetric(point.range.lo, yAxis)} – ${formatMetric(point.range.hi, yAxis)}</div>
             <div class="text-muted-foreground">${t.tokenCounts(locale === 'zh' ? point.point.tokens_per_rank.toLocaleString('zh-CN') : String(point.point.tokens_per_rank), locale === 'zh' ? point.point.global_tokens.toLocaleString('zh-CN') : String(point.point.global_tokens))}</div>
-            <div class="mt-1 text-muted-foreground">${t.rangeCount(point.range.members.length)}</div>
+            <div class="mt-1 text-muted-foreground">${t.rangeCount(point.range.libraries)}</div>
             ${rows}
           </div>`;
             }
@@ -391,11 +426,14 @@ export function CollectiveXChart({
               point.x,
             ),
           getRulerY: (point, scale) => scale(point.y),
-          onHoverStart: (selection) => {
+          onHoverStart: (selection, point) => {
             selection.attr('r', 6);
+            if (point.range)
+              highlightBands(selection.node()?.ownerSVGElement ?? null, point.seriesId);
           },
-          onHoverEnd: (selection) => {
+          onHoverEnd: (selection, point) => {
             selection.attr('r', 3.5);
+            if (point.range) highlightBands(selection.node()?.ownerSVGElement ?? null, null);
           },
         }}
         transitionDuration={200}

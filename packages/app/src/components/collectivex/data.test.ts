@@ -397,6 +397,18 @@ describe('collectiveXRangeBands', () => {
     expect(last.lo).toBe(last.hi);
   });
 
+  it('counts libraries, not library-and-mode series', () => {
+    const lowLatency = { ...scaled('a', 2), series_id: '7:a-ll', mode: 'low-latency' as const };
+    const [band] = collectiveXRangeBands(
+      [scaled('a', 1), lowLatency, scaled('b', 3)],
+      'dispatch',
+      'p50',
+      'latency',
+    );
+    expect(band.points[0].members).toHaveLength(3);
+    expect(band.points[0].libraries).toBe(2);
+  });
+
   it('keeps SKUs and EP sizes apart', () => {
     const other = collectiveXSeriesForRun([scaleOut], '7')[0];
     const bands = collectiveXRangeBands([scaled('a', 1), other], 'dispatch', 'p50', 'latency');

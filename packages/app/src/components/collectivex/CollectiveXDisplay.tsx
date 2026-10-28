@@ -303,7 +303,7 @@ export default function CollectiveXDisplay() {
   const [yAxis, setYAxis] = useState<CollectiveXYAxis>('latency');
   const [sku, setSku] = useState('all');
   const [backend, setBackend] = useState('all');
-  const [view, setView] = useState<'series' | 'range'>('series');
+  const [view, setView] = useState<'series' | 'range'>('range');
   const [hiddenRangeIds, setHiddenRangeIds] = useState<Set<string>>(new Set());
   const [activeSeriesIds, setActiveSeriesIds] = useState<Set<string>>(new Set());
   const [legendExpanded, setLegendExpanded] = useState(true);
@@ -450,6 +450,11 @@ export default function CollectiveXDisplay() {
       rangeView ? collectiveXRangeBands(phaseSeries, operation, percentile, yAxis, locale) : [],
     [locale, operation, percentile, phaseSeries, rangeView, yAxis],
   );
+  const rangeBandsKey = rangeBands.map((band) => band.id).join('\u0000');
+  // Like the series toggles, legend-hidden bands reset whenever the set of bands changes.
+  useEffect(() => {
+    setHiddenRangeIds(new Set());
+  }, [rangeBandsKey]);
   const shownRangeBands = useMemo(
     () => rangeBands.filter((band) => !hiddenRangeIds.has(band.id)),
     [hiddenRangeIds, rangeBands],
