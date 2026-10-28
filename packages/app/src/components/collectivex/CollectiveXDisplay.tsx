@@ -31,6 +31,8 @@ import { CollectiveXSupportMatrices } from './CollectiveXSupportMatrices';
 import {
   collectiveXColorKey,
   collectiveXLegendLabel,
+  collectiveXRangeBands,
+  collectiveXRangeColorKey,
   collectiveXRunDasharray,
   collectiveXSeriesForRun,
   collectiveXTopologyLabel,
@@ -124,6 +126,12 @@ const STRINGS = {
     percentileAria: 'CollectiveX percentile',
     sku: 'SKU',
     backend: 'Backend',
+    viewControl: 'View',
+    viewAria: 'Show each series, or one range per SKU across every library',
+    viewSeries: 'Series',
+    viewRange: 'Range by SKU',
+    rangeNote:
+      'Each band spans the lowest to the highest value across every library and selected mode at that token count; the line is their median.',
     yAxisControl: 'Y axis',
     tokenRateOption: 'Token rate at latency percentile',
     activationRateOption: 'Activation-data rate at latency percentile',
@@ -195,6 +203,11 @@ const STRINGS = {
     percentileAria: 'CollectiveX 延迟分位点',
     sku: 'SKU',
     backend: '后端',
+    viewControl: '视图',
+    viewAria: '显示每条序列，或按 SKU 显示所有集合通信库的范围',
+    viewSeries: '序列',
+    viewRange: '按 SKU 显示范围',
+    rangeNote: '每个色带覆盖该 token 数下所有集合通信库与所选模式的最低值到最高值，线为其中位数。',
     yAxisControl: 'Y 轴',
     tokenRateOption: '延迟分位点对应的 token 速率',
     activationRateOption: '延迟分位点对应的激活数据速率',
@@ -290,6 +303,8 @@ export default function CollectiveXDisplay() {
   const [yAxis, setYAxis] = useState<CollectiveXYAxis>('latency');
   const [sku, setSku] = useState('all');
   const [backend, setBackend] = useState('all');
+  const [view, setView] = useState<'series' | 'range'>('range');
+  const [hiddenRangeIds, setHiddenRangeIds] = useState<Set<string>>(new Set());
   const [activeSeriesIds, setActiveSeriesIds] = useState<Set<string>>(new Set());
   const [legendExpanded, setLegendExpanded] = useState(true);
   const operationOptions: SelectOption<CollectiveXOperation>[] = [
@@ -428,9 +443,34 @@ export default function CollectiveXDisplay() {
     () => phaseSeries.filter((item) => activeSeriesIds.has(item.series_id)),
     [activeSeriesIds, phaseSeries],
   );
+  // The range view combines every library, so it only applies while Backend is All.
+  const rangeView = view === 'range' && backend === 'all';
+  // Built whenever Backend is All (not only in the range view), so legend-hidden bands survive a
+  // visit to the series view.
+  const rangeBands = useMemo(
+    () =>
+      backend === 'all'
+        ? collectiveXRangeBands(phaseSeries, operation, percentile, yAxis, locale)
+        : [],
+    [backend, locale, operation, percentile, phaseSeries, yAxis],
+  );
+  const rangeBandsKey = rangeBands.map((band) => band.id).join('\u0000');
+  // Like the series toggles, legend-hidden bands reset whenever the set of bands changes.
+  useEffect(() => {
+    setHiddenRangeIds(new Set());
+  }, [rangeBandsKey]);
+  const shownRangeBands = useMemo(
+    () => rangeBands.filter((band) => !hiddenRangeIds.has(band.id)),
+    [hiddenRangeIds, rangeBands],
+  );
   const colorKeys = useMemo(
-    () => [...new Set(phaseSeries.map(collectiveXColorKey))],
-    [phaseSeries],
+    () => [
+      ...new Set([
+        ...phaseSeries.map(collectiveXColorKey),
+        ...(rangeView ? phaseSeries.map(collectiveXRangeColorKey) : []),
+      ]),
+    ],
+    [phaseSeries, rangeView],
   );
   const { resolveColor, getCssColor } = useThemeColors({
     highContrast: false,
@@ -462,6 +502,27 @@ export default function CollectiveXDisplay() {
         },
       })),
     [activeSeriesIds, colors, locale, phaseSeries],
+  );
+  const rangeLegendItems = useMemo(
+    () =>
+      rangeBands.map((band) => ({
+        name: band.id,
+        label: band.label,
+        color: colors[band.colorKey] ?? 'var(--muted-foreground)',
+        lineDasharray: collectiveXRunDasharray(band.runIndex),
+        isActive: !hiddenRangeIds.has(band.id),
+        title: band.label,
+        onClick: () => {
+          setHiddenRangeIds((previous) => {
+            const next = new Set(previous);
+            if (next.has(band.id)) next.delete(band.id);
+            else next.add(band.id);
+            return next;
+          });
+          track('collectivex_range_toggled', { range: band.id });
+        },
+      })),
+    [colors, hiddenRangeIds, rangeBands],
   );
   const handleRefresh = useCallback(() => {
     track('collectivex_data_refreshed');
@@ -758,6 +819,23 @@ export default function CollectiveXDisplay() {
                       track('collectivex_backend_changed', { backend: next });
                     }}
                   />
+                  {backend === 'all' && (
+                    <ControlGroup label={t.viewControl}>
+                      <SegmentedToggle
+                        value={view}
+                        options={[
+                          { value: 'series', label: t.viewSeries },
+                          { value: 'range', label: t.viewRange },
+                        ]}
+                        onValueChange={(next) => {
+                          setView(next);
+                          track('collectivex_view_changed', { view: next });
+                        }}
+                        ariaLabel={t.viewAria}
+                        testId="collectivex-view-toggle"
+                      />
+                    </ControlGroup>
+                  )}
                   <SelectControl
                     label={t.yAxisControl}
                     testId="collectivex-y-axis-select"
@@ -782,7 +860,8 @@ export default function CollectiveXDisplay() {
                 <CollectiveXChart
                   chartId="collectivex-explorer"
                   testId="collectivex-explorer-chart"
-                  series={activeSeries}
+                  series={rangeView ? [] : activeSeries}
+                  ranges={rangeView ? shownRangeBands : undefined}
                   colors={colors}
                   operation={operation}
                   percentile={percentile}
@@ -799,9 +878,14 @@ export default function CollectiveXDisplay() {
                   legendElement={
                     <ChartLegend
                       variant="sidebar"
-                      legendItems={legendItems}
+                      legendItems={rangeView ? rangeLegendItems : legendItems}
                       disableActiveSort
                       onItemRemove={(id) => {
+                        if (rangeView) {
+                          setHiddenRangeIds((previous) => new Set([...previous, id]));
+                          track('collectivex_range_toggled', { range: id, visible: false });
+                          return;
+                        }
                         setActiveSeriesIds(
                           (previous) => new Set([...previous].filter((item) => item !== id)),
                         );
@@ -813,24 +897,45 @@ export default function CollectiveXDisplay() {
                         track('collectivex_legend_expanded', { expanded });
                       }}
                       actions={
-                        activeSeries.length < phaseSeries.length
-                          ? [
-                              {
-                                id: 'collectivex-reset-filter',
-                                label: t.resetFilter,
-                                onClick: () => {
-                                  setActiveSeriesIds(
-                                    new Set(phaseSeries.map((item) => item.series_id)),
-                                  );
-                                  track('collectivex_series_filter_reset');
+                        rangeView
+                          ? hiddenRangeIds.size > 0
+                            ? [
+                                {
+                                  id: 'collectivex-reset-filter',
+                                  label: t.resetFilter,
+                                  onClick: () => {
+                                    setHiddenRangeIds(new Set());
+                                    track('collectivex_series_filter_reset');
+                                  },
                                 },
-                              },
-                            ]
-                          : []
+                              ]
+                            : []
+                          : activeSeries.length < phaseSeries.length
+                            ? [
+                                {
+                                  id: 'collectivex-reset-filter',
+                                  label: t.resetFilter,
+                                  onClick: () => {
+                                    setActiveSeriesIds(
+                                      new Set(phaseSeries.map((item) => item.series_id)),
+                                    );
+                                    track('collectivex_series_filter_reset');
+                                  },
+                                },
+                              ]
+                            : []
                       }
                     />
                   }
                 />
+                {rangeView && (
+                  <p
+                    className="mt-2 text-xs text-muted-foreground"
+                    data-testid="collectivex-range-note"
+                  >
+                    {t.rangeNote}
+                  </p>
+                )}
                 {yAxis === 'activation-rate' && (
                   <p className="mt-2 text-xs text-muted-foreground">{t.payloadNote}</p>
                 )}

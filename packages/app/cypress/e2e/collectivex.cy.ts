@@ -69,6 +69,14 @@ function installRun(body: CollectiveXDataset = dataset, alias = 'run') {
   cy.intercept('GET', `/api/v1/collectivex/runs/${body.run.run_id}*`, { body }).as(alias);
 }
 
+function showView(label: string) {
+  cy.get('[data-testid="collectivex-view-toggle"]').contains('[role="tab"]', label).click();
+  cy.get('[data-testid="collectivex-view-toggle"] [role="tab"][aria-selected="true"]').should(
+    'have.text',
+    label,
+  );
+}
+
 function suiteTabs() {
   return cy.get('[data-testid="collectivex-suite-filter"] [role="tab"]');
 }
@@ -118,6 +126,7 @@ describe('CollectiveX neutral run view', () => {
   });
 
   it('selects the EP16 series through the identity controls', () => {
+    showView('Series');
     cy.get('[data-testid="collectivex-ep-select"]').should('be.visible');
     cy.get('[data-testid="collectivex-phase-toggle"]').should('be.visible');
     cy.get('[data-testid="collectivex-precision-toggle"]').should('be.visible');
@@ -148,6 +157,7 @@ describe('CollectiveX neutral run view', () => {
     cy.reload();
     cy.wait('@runs');
     cy.wait('@run');
+    showView('Series');
     cy.get('[data-testid="collectivex-main-chart"]').should('contain.text', 'nccl-ep');
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
   });
@@ -165,6 +175,74 @@ describe('CollectiveX neutral run view', () => {
       .and('not.contain.text', 'Payload rate is derived');
   });
 
+  it('defaults to one range band per SKU across libraries while Backend is All', () => {
+    cy.get('[data-testid="collectivex-view-toggle"] [role="tab"][aria-selected="true"]').should(
+      'have.text',
+      'Range by SKU',
+    );
+    cy.get('[data-testid="collectivex-explorer-chart"] [data-testid="collectivex-range-band"]')
+      .as('band')
+      .should('have.length', 1)
+      .and('have.attr', 'd');
+    cy.get('@band').should('have.attr', 'fill-opacity', '0.08');
+    cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
+    cy.get('[data-testid="collectivex-range-note"]').should('be.visible');
+
+    cy.get('[data-testid="collectivex-explorer-chart"] .point').first().click({ force: true });
+    cy.get('[data-chart-tooltip]:visible')
+      .should('contain.text', 'Range across libraries')
+      .and('contain.text', 'Median')
+      .and('contain.text', '1 library at this point');
+    cy.get('@band')
+      .should('have.attr', 'data-focused', 'true')
+      .and('have.attr', 'fill-opacity', '0.3');
+    cy.get('[data-testid="collectivex-explorer-chart"] svg').first().click(5, 5, { force: true });
+    cy.get('@band').should('not.have.attr', 'data-focused');
+    cy.get('@band').should('have.attr', 'fill-opacity', '0.08');
+
+    showView('Series');
+    cy.get('[data-testid="collectivex-range-band"]').should('not.exist');
+    showView('Range by SKU');
+    cy.get('[data-testid="collectivex-backend-select"]').click();
+    cy.get('[role="option"]').not(':contains("All")').first().click();
+    cy.get('[data-testid="collectivex-view-toggle"]').should('not.exist');
+    cy.get('[data-testid="collectivex-range-band"]').should('not.exist');
+  });
+
+  it('moves the band focus to a newly pinned SKU and keeps hidden bands across a view visit', () => {
+    const twoSkus = buildDataset({
+      shards: [
+        makeRawShard(),
+        makeRawShard({ sku: 'b200-nscale', backend: 'nccl-ep', implName: 'nccl-ep' }),
+      ],
+    });
+    installRuns([twoSkus]);
+    installRun(twoSkus);
+    cy.reload();
+    cy.wait('@runs');
+    cy.wait('@run');
+    cy.get(
+      '[data-testid="collectivex-explorer-chart"] [data-testid="collectivex-range-band"]',
+    ).should('have.length', 2);
+
+    cy.get('[data-testid="collectivex-explorer-chart"] .point').first().click({ force: true });
+    cy.get('[data-testid="collectivex-range-band"][data-focused="true"]').should('have.length', 1);
+    cy.get('[data-testid="collectivex-range-band"][data-focused="true"]').then(($first) => {
+      const firstFill = $first.attr('fill');
+      cy.get('[data-testid="collectivex-explorer-chart"] .point').last().click({ force: true });
+      cy.get('[data-testid="collectivex-range-band"][data-focused="true"]')
+        .should('have.length', 1)
+        .and(($next) => expect($next.attr('fill')).not.to.eq(firstFill));
+    });
+    cy.get('[data-testid="collectivex-explorer-chart"] svg').first().click(5, 5, { force: true });
+
+    cy.get('[data-testid="collectivex-main-chart"]').contains('B200 · EP8').click();
+    cy.get('[data-testid="collectivex-range-band"]').should('have.length', 1);
+    showView('Series');
+    showView('Range by SKU');
+    cy.get('[data-testid="collectivex-range-band"]').should('have.length', 1);
+  });
+
   it('selects normal and low-latency kernel modes by default', () => {
     const withLowLatency = buildDataset({
       shards: [makeRawShard(), makeRawShard({ mode: 'low-latency' }), makeRawShard({ ep: 16 })],
@@ -174,6 +252,7 @@ describe('CollectiveX neutral run view', () => {
     cy.reload();
     cy.wait('@runs');
     cy.wait('@run');
+    showView('Series');
 
     cy.get('[data-testid="collectivex-mode-select"]')
       .should('have.attr', 'role', 'combobox')
@@ -264,6 +343,7 @@ describe('CollectiveX neutral run view', () => {
   });
 
   it('pins a compact tooltip on point click', () => {
+    showView('Series');
     cy.get('[data-testid="collectivex-explorer-chart"] .point').first().click({ force: true });
     cy.get('[data-chart-tooltip]:visible')
       .should('contain.text', 'Click elsewhere to dismiss')
@@ -398,6 +478,7 @@ describe('CollectiveX neutral run view', () => {
     cy.visit('/zh/collectivex');
     cy.wait('@runs');
     cy.wait('@run');
+    showView('序列');
 
     cy.get('[data-testid="collectivex-display"]')
       .should('contain.text', '终态用例')
