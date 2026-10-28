@@ -21,6 +21,7 @@ import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { isZhPathname, ZH_PREFIX } from '@/lib/i18n/i18n';
 import { withChartState } from '@/lib/routing/url-state';
+import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 
 import { AggregatesGrid } from './aggregates-grid';
 import { MetricSourceToolbar } from './metric-source-toolbar';
@@ -120,6 +121,33 @@ export const AGENTIC_POINT_DETAIL_STRINGS = {
   },
 } as const;
 
+type AgenticPointDetailStrings =
+  (typeof AGENTIC_POINT_DETAIL_STRINGS)[keyof typeof AGENTIC_POINT_DETAIL_STRINGS];
+
+/**
+ * The detail views offered in the view toggle. PowerX is feature-gated: its view appears
+ * once the gate is unlocked, or stays while a shared `?view=power` link has it open (the
+ * same rule a locked gated dashboard tab follows).
+ */
+export function agenticDetailViewOptions(
+  t: Pick<
+    AgenticPointDetailStrings,
+    'perPoint' | 'requestTimeline' | 'powerX' | 'aggregatesAcrossConfigs' | 'logs'
+  >,
+  { featureGateUnlocked, currentView }: { featureGateUnlocked: boolean; currentView: DetailView },
+): SegmentedToggleOption<DetailView>[] {
+  const showPowerView = featureGateUnlocked || currentView === 'power';
+  return [
+    { value: 'point', label: t.perPoint, testId: 'detail-view-point' },
+    { value: 'timeline', label: t.requestTimeline, testId: 'detail-view-timeline' },
+    ...(showPowerView
+      ? [{ value: 'power' as const, label: t.powerX, testId: 'detail-view-power' }]
+      : []),
+    { value: 'aggregates', label: t.aggregatesAcrossConfigs, testId: 'detail-view-aggregates' },
+    { value: 'logs', label: t.logs, testId: 'detail-view-logs' },
+  ];
+}
+
 const RequestTimelineView = dynamic(() =>
   import('./request-timeline').then((module_) => module_.RequestTimelineView),
 );
@@ -140,23 +168,17 @@ export function AgenticPointDetail({ id }: Props) {
   useEffect(() => {
     setInferenceHref(withChartState(inferenceBaseHref));
   }, [inferenceBaseHref]);
-  const viewOptions: SegmentedToggleOption<DetailView>[] = useMemo(
-    () => [
-      { value: 'point', label: t.perPoint, testId: 'detail-view-point' },
-      { value: 'timeline', label: t.requestTimeline, testId: 'detail-view-timeline' },
-      { value: 'power', label: t.powerX, testId: 'detail-view-power' },
-      { value: 'aggregates', label: t.aggregatesAcrossConfigs, testId: 'detail-view-aggregates' },
-      { value: 'logs', label: t.logs, testId: 'detail-view-logs' },
-    ],
-    [t],
+  const featureGateUnlocked = useFeatureGate();
+  const [view, setView] = useDetailView();
+  const viewOptions = useMemo(
+    () => agenticDetailViewOptions(t, { featureGateUnlocked, currentView: view }),
+    [t, featureGateUnlocked, view],
   );
   const metricsQuery = useTraceServerMetrics(id, true);
   const siblingsQuery = useBenchmarkSiblings(id);
 
   const metrics = metricsQuery.data;
   const siblingsData = siblingsQuery.data;
-
-  const [view, setView] = useDetailView();
   const [metricSourceId, setMetricSourceId] = useState('all');
   const [requestActivityView, setRequestActivityView] = useState<RequestActivityView>('queue');
   const [throughputSeries, setThroughputSeries] = useState<ReadonlySet<ThroughputSeriesKey>>(
