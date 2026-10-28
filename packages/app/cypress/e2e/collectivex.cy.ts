@@ -209,6 +209,40 @@ describe('CollectiveX neutral run view', () => {
     cy.get('[data-testid="collectivex-range-band"]').should('not.exist');
   });
 
+  it('moves the band focus to a newly pinned SKU and keeps hidden bands across a view visit', () => {
+    const twoSkus = buildDataset({
+      shards: [
+        makeRawShard(),
+        makeRawShard({ sku: 'b200-nscale', backend: 'nccl-ep', implName: 'nccl-ep' }),
+      ],
+    });
+    installRuns([twoSkus]);
+    installRun(twoSkus);
+    cy.reload();
+    cy.wait('@runs');
+    cy.wait('@run');
+    cy.get(
+      '[data-testid="collectivex-explorer-chart"] [data-testid="collectivex-range-band"]',
+    ).should('have.length', 2);
+
+    cy.get('[data-testid="collectivex-explorer-chart"] .point').first().click({ force: true });
+    cy.get('[data-testid="collectivex-range-band"][data-focused="true"]').should('have.length', 1);
+    cy.get('[data-testid="collectivex-range-band"][data-focused="true"]').then(($first) => {
+      const firstFill = $first.attr('fill');
+      cy.get('[data-testid="collectivex-explorer-chart"] .point').last().click({ force: true });
+      cy.get('[data-testid="collectivex-range-band"][data-focused="true"]')
+        .should('have.length', 1)
+        .and(($next) => expect($next.attr('fill')).not.to.eq(firstFill));
+    });
+    cy.get('[data-testid="collectivex-explorer-chart"] svg').first().click(5, 5, { force: true });
+
+    cy.get('[data-testid="collectivex-main-chart"]').contains('B200 · EP8').click();
+    cy.get('[data-testid="collectivex-range-band"]').should('have.length', 1);
+    showView('Series');
+    showView('Range by SKU');
+    cy.get('[data-testid="collectivex-range-band"]').should('have.length', 1);
+  });
+
   it('selects normal and low-latency kernel modes by default', () => {
     const withLowLatency = buildDataset({
       shards: [makeRawShard(), makeRawShard({ mode: 'low-latency' }), makeRawShard({ ep: 16 })],

@@ -445,10 +445,14 @@ export default function CollectiveXDisplay() {
   );
   // The range view combines every library, so it only applies while Backend is All.
   const rangeView = view === 'range' && backend === 'all';
+  // Built whenever Backend is All (not only in the range view), so legend-hidden bands survive a
+  // visit to the series view.
   const rangeBands = useMemo(
     () =>
-      rangeView ? collectiveXRangeBands(phaseSeries, operation, percentile, yAxis, locale) : [],
-    [locale, operation, percentile, phaseSeries, rangeView, yAxis],
+      backend === 'all'
+        ? collectiveXRangeBands(phaseSeries, operation, percentile, yAxis, locale)
+        : [],
+    [backend, locale, operation, percentile, phaseSeries, yAxis],
   );
   const rangeBandsKey = rangeBands.map((band) => band.id).join('\u0000');
   // Like the series toggles, legend-hidden bands reset whenever the set of bands changes.

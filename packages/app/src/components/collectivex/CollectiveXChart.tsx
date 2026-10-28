@@ -1,7 +1,7 @@
 'use client';
 
 import * as d3 from 'd3';
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -232,6 +232,7 @@ export function CollectiveXChart({
       ),
     [points],
   );
+  const chartSvgRef = useRef<SVGSVGElement | null>(null);
   // Always mounted, so leaving the range view redraws it empty: D3Chart keeps a removed custom
   // layer's elements on screen.
   const rangeLayer = useMemo(() => {
@@ -274,6 +275,7 @@ export function CollectiveXChart({
         // Dismissing a pinned tooltip (a click elsewhere) fires no hover end, so restore the
         // bands once the click has dismissed it.
         const svg = group.node()?.ownerSVGElement ?? null;
+        chartSvgRef.current = svg;
         d3.select(svg).on('click.collectivex-range', () => {
           setTimeout(() => {
             const shown =
@@ -434,6 +436,11 @@ export function CollectiveXChart({
           onHoverEnd: (selection, point) => {
             selection.attr('r', 3.5);
             if (point.range) highlightBands(selection.node()?.ownerSVGElement ?? null, null);
+          },
+          // Hover callbacks stop while a point is pinned, so pinning another point focuses its
+          // band here.
+          onPointClick: (point) => {
+            highlightBands(chartSvgRef.current, point.range ? point.seriesId : null);
           },
         }}
         transitionDuration={200}
