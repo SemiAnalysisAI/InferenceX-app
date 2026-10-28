@@ -99,7 +99,7 @@ describe('ingestCommits', () => {
     expect(first.token).toBe('token');
     expect(first.blobCache).toBe(second.blobCache);
     expect(mocks.upsert).toHaveBeenCalledTimes(3);
-    expect(outcome).toEqual({ stored: commits, skipped: [] });
+    expect(outcome).toEqual({ stored: commits, skipped: [], missing: [] });
   });
 
   it('skips a commit with nothing measured instead of storing an empty run', async () => {
@@ -128,6 +128,7 @@ describe('ingestCommits', () => {
     await expect(ingestCommits(sql, commits, undefined)).rejects.toThrow('gone');
     const outcome = await ingestCommits(sql, commits, undefined, { skipMissing: true });
     expect(outcome.skipped).toEqual([commits[0]]);
+    expect(outcome.missing).toEqual([commits[0]]);
     expect(outcome.stored).toEqual(commits.slice(1));
   });
 

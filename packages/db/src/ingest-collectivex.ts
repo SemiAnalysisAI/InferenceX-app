@@ -83,6 +83,8 @@ export interface IngestOutcome {
   stored: ResultsCommit[];
   /** Commits not stored: no results tree or file at them, or nothing measured. */
   skipped: ResultsCommit[];
+  /** The skipped commits GitHub answered 404 for: a prune must not trust this walk. */
+  missing: ResultsCommit[];
 }
 
 /**
@@ -98,7 +100,7 @@ export async function ingestCommits(
   { skipMissing = false }: { skipMissing?: boolean } = {},
 ): Promise<IngestOutcome> {
   const blobCache = new Map<string, Uint8Array>();
-  const outcome: IngestOutcome = { stored: [], skipped: [] };
+  const outcome: IngestOutcome = { stored: [], skipped: [], missing: [] };
   for (const commit of commits) {
     const label = `${commit.sha.slice(0, 12)} (${commit.committedAt})`;
     let loaded: Awaited<ReturnType<typeof loadCommittedRun>>;
@@ -108,6 +110,7 @@ export async function ingestCommits(
       if (skipMissing && error instanceof CommittedResultsError && error.kind === 'not-found') {
         console.log(`  skipped ${label}: ${error.message}`);
         outcome.skipped.push(commit);
+        outcome.missing.push(commit);
         continue;
       }
       throw error;
@@ -186,10 +189,17 @@ async function main(): Promise<void> {
           : `  no stored run ${args.runId}`,
       );
     } else {
-      const { stored, skipped } = await ingestCommits(sql, commits, token, {
+      const { stored, skipped, missing } = await ingestCommits(sql, commits, token, {
         skipMissing: args.mode === 'backfill',
       });
       console.log(`  ${stored.length} stored, ${skipped.length} skipped`);
+      if (args.mode === 'backfill' && args.prune && missing.length > 0) {
+        // A 404 can be a transient GitHub miss; pruning after it would delete a good run.
+        throw new Error(
+          `not pruning: ${missing.length} commit(s) could not be read ` +
+            `(${missing.map((commit) => commit.sha.slice(0, 12)).join(', ')}); rerun the backfill`,
+        );
+      }
       if (args.mode === 'backfill' && args.prune) {
         const removed = await pruneCollectiveXRuns(
           sql,

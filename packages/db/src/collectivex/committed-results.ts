@@ -123,8 +123,19 @@ async function request(
       });
       if (response.ok) return response;
       failure = new Error(`${url} returned HTTP ${response.status}`);
-      if (response.status === 404 || response.status === 422) {
+      // A raw file the trees API already listed exists, so its 404 is a CDN miss worth retrying;
+      // only the API's own 404/422 means the commit or tree is really absent.
+      const listedFile = new URL(url).hostname === 'raw.githubusercontent.com';
+      if (!listedFile && (response.status === 404 || response.status === 422)) {
         throw new CommittedResultsError('not-found', `${url} returned HTTP ${response.status}`);
+      }
+      if (listedFile && response.status === 404) {
+        if (attempt < FETCH_ATTEMPTS) {
+          await new Promise((settle) => {
+            setTimeout(settle, 1000 * attempt);
+          });
+        }
+        continue;
       }
       if (response.status < 500 && response.status !== 429) break;
     } catch (error) {

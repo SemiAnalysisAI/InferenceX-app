@@ -369,6 +369,26 @@ describe('GitHub reads', () => {
     expect(blobCache.has('b1')).toBe(true);
   });
 
+  it('retries a listed raw file that 404s and reports it unavailable, not missing', async () => {
+    vi.useFakeTimers();
+    const fetch = vi.fn((url: string) =>
+      new URL(url).hostname === 'raw.githubusercontent.com'
+        ? new Response('', { status: 404 })
+        : jsonResponse({ tree: [{ path: 'cases.json', type: 'blob', sha: 'c1', size: 2 }] }),
+    );
+    const read = fetchResultsSource(
+      { sha: SHA, committedAt: COMMITTED_AT, runId: COMMITTED_SECONDS },
+      { fetch: fetch as unknown as typeof globalThis.fetch },
+    );
+    const settled = expect(read).rejects.toMatchObject({ kind: 'unavailable' });
+    await vi.runAllTimersAsync();
+    await settled;
+    vi.useRealTimers();
+    expect(
+      fetch.mock.calls.filter(([url]) => url.startsWith('https://raw.')).length,
+    ).toBeGreaterThan(1);
+  });
+
   it('reports a commit without a results directory as not found and oversize files as invalid', async () => {
     const missing = vi.fn(() => new Response('', { status: 404 }));
     await expect(
