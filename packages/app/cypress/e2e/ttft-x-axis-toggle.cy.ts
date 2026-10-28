@@ -523,6 +523,7 @@ describe('Measured prefill metrics preserve the selected x-axis', () => {
       {
         onBeforeLoad(win) {
           win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          win.localStorage.setItem('inferencex-feature-gate', '1');
         },
       },
     );
