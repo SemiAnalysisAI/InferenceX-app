@@ -100,7 +100,7 @@ export const DASHBOARD_ROUTES = [
     path: '/powerx',
     canonicalPath: '/powerx',
     navGroup: 'primary',
-    indexable: false,
+    indexable: true,
     localeMirrored: true,
     providers: FILTERED_DASHBOARD_PROVIDERS,
     shareParamScopes: ['g_', 'i_'],

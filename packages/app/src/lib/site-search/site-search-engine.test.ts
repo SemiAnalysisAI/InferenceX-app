@@ -95,7 +95,7 @@ describe('SiteSearchEngine', () => {
     engine.start();
     await settle(engine);
 
-    expect(engine.search('watts')[0]).toMatchObject({
+    expect(engine.search('blackwell watts')[0]).toMatchObject({
       url: '/chips/b200#power',
       source: 'page',
       section: 'Power',

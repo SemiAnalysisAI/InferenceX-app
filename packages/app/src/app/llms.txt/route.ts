@@ -22,6 +22,8 @@ export async function GET() {
     `- [AgentX](${SITE_URL}/agentx)`,
     `- [Benchmark your own chips with AgentX](${SITE_URL}/agentx/quickstart): agentx-harness 1.0.7 installation, public trace replay, and optional session-routing headers`,
     `- [AgentX Methodology](${SITE_URL}/agentx/methodology)`,
+    `- [PowerX](${SITE_URL}/powerx): measured GPU power and energy per token for every benchmark point`,
+    `- [PowerX tutorial](${SITE_URL}/powerx/tutorial): how PowerX measures power and models IT and facility power`,
     `- [Articles](${SITE_URL}/blog)`,
     `- [Hardware Results](${SITE_URL}/hardware)`,
     `- [Whitepapers](${SITE_URL}/whitepaper)`,

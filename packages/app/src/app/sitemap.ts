@@ -19,6 +19,8 @@ import {
 } from '@/lib/compare/compare-variant-slug';
 import { getAllChipRouteSlugs } from '@/lib/catalog/chip-pages';
 import { getAllGlossaryEntries } from '@/lib/content/glossary';
+import { getPowerXTutorial } from '@/lib/powerx/tutorial';
+import { POWERX_TUTORIAL_PATH } from '@/lib/powerx/tutorial-path';
 import {
   ACTIVE_INFERENCE_MODEL_SLUGS,
   INFERENCE_MODEL_SLUGS,
@@ -90,6 +92,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }),
     ...localizedPair('/quotes', { lastModified: now, changeFrequency: 'monthly', priority: 0.6 }),
     ...localizedPair('/about', { lastModified: now, changeFrequency: 'monthly', priority: 0.6 }),
+    ...localizedPair(POWERX_TUTORIAL_PATH, {
+      lastModified: `${getPowerXTutorial('en').meta.updated}T00:00:00Z`,
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    }),
     ...localizedPair('/land-acknowledgement', {
       lastModified: now,
       changeFrequency: 'yearly',

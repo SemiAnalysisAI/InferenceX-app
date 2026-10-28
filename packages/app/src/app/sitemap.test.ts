@@ -74,6 +74,16 @@ describe('sitemap locale parity', () => {
     vi.clearAllMocks();
   });
 
+  it('lists the PowerX tab and tutorial in both languages with hreflang pairs', async () => {
+    const entries = await sitemap();
+    for (const enPath of ['/powerx', '/powerx/tutorial']) {
+      for (const path of [enPath, `/zh${enPath}`]) {
+        const entry = entries.find((item) => item.url === `${SITE_URL}${path}`);
+        expect(entry?.alternates?.languages).toEqual(languageAlternates(enPath));
+      }
+    }
+  });
+
   it('emits both locales for every indexable dashboard route and omits non-indexable routes', async () => {
     const entries = await sitemap();
     const urls = new Set(entries.map((entry) => entry.url));

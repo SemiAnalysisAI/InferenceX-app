@@ -83,8 +83,6 @@ export function powerxTutorialMetadata(meta: PowerXTutorialMeta, locale: Locale)
     description: meta.description,
     alternates:
       locale === 'zh' ? zhAlternates(POWERX_TUTORIAL_PATH) : enAlternates(POWERX_TUTORIAL_PATH),
-    // The /powerx tab is not indexable until the article ships; flip both sides together.
-    robots: { index: false, follow: true },
     openGraph: {
       title: `${title} | ${SITE_NAME}`,
       description: meta.description,
