@@ -1,3 +1,5 @@
+import { AIR_COOLED_SYSTEM_PUE, LIQUID_COOLED_RACK_PUE } from '@/lib/power/system-power-model';
+
 import { metricOptionTitle, type MetricKey } from './metric-registry';
 
 export interface LocalizedText {
@@ -498,38 +500,38 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
   itModeledWatts: {
     description: {
       en:
-        'Modeled IT power per allocated accelerator, no PUE: measured GPU power plus the InferenceX ' +
+        'Measured IT power per allocated accelerator, no PUE: measured GPU power plus the InferenceX ' +
         'power model’s CPU, server parts, fans and PSU loss, and the scale-out network share for the ' +
-        'run’s workload state. The facility (PUE) overhead is left out. Storage and out-of-rack network ' +
-        'are not modeled. Same hardware coverage as All in Measured.',
+        'run’s workload state. The facility (PUE) overhead is left out. Same hardware coverage as ' +
+        'All in Measured.',
       zh:
         '每已分配加速器的整体实测 IT 功耗（不含 PUE）：GPU 实测功耗加上 InferenceX 功耗模型按该次运行工作负载状态估算的 CPU、服务器部件、风扇与电源损耗以及 scale-out 网络分摊。' +
-        '不计数据中心（PUE）开销；存储和机架外网络未建模。硬件覆盖范围与整体实测功耗相同。',
+        '不计数据中心（PUE）开销。硬件覆盖范围与整体实测功耗相同。',
     },
     formula: {
-      en: 'W/GPU = modeled IT power (W) ÷ allocated GPUs = All in Measured W/GPU ÷ PUE',
-      zh: 'W/GPU = IT 功耗估算（W）÷ 已分配 GPU 数 = 每 GPU 整体实测功耗 ÷ PUE',
+      en: 'W/GPU = measured IT power (W) ÷ allocated GPUs = All in Measured W/GPU ÷ PUE',
+      zh: 'W/GPU = 实测 IT 功耗（W）÷ 已分配 GPU 数 = 每 GPU 整体实测功耗 ÷ PUE',
     },
   },
   itModeledJPerOutputToken: {
     description: {
       en:
-        'Measured energy per output token scaled to the modeled IT boundary (no PUE), so its ratio to ' +
-        'measured GPU energy equals the ratio of modeled IT power to measured GPU power. ' +
+        'Measured energy per output token scaled to the measured IT boundary (no PUE), so its ratio to ' +
+        'measured GPU energy equals the ratio of measured IT power to measured GPU power. ' +
         'Missing where the system power model or validated measured power is unavailable.',
       zh:
-        '将实测每输出 token 能耗按整体实测 IT 功耗边界（不含 PUE）缩放，其与 GPU 实测能耗之比等于 IT 功耗估算与 GPU 实测功耗之比。' +
+        '将实测每输出 token 能耗按整体实测 IT 功耗边界（不含 PUE）缩放，其与 GPU 实测能耗之比等于实测 IT 功耗与 GPU 实测功耗之比。' +
         '系统功耗模型或通过验证的实测功耗缺失时不显示。',
     },
     formula: {
-      en: 'J/tok = measured J per output token × modeled IT W per GPU ÷ measured W per GPU',
-      zh: 'J/tok = 实测每输出 token 能耗 × 每 GPU IT 功耗估算（W）÷ 每 GPU 实测功耗（W）',
+      en: 'J/tok = measured J per output token × measured IT W per GPU ÷ measured W per GPU',
+      zh: 'J/tok = 实测每输出 token 能耗 × 每 GPU 实测 IT 功耗（W）÷ 每 GPU 实测功耗（W）',
     },
   },
   itModeledJPerTotalToken: {
     description: {
       en:
-        'Measured energy per total token (input + output) scaled to the modeled IT boundary (no PUE) ' +
+        'Measured energy per total token (input + output) scaled to the measured IT boundary (no PUE) ' +
         'by the same power ratio as All in Measured IT J per Output Token. Missing where the system ' +
         'power model or validated measured power is unavailable.',
       zh:
@@ -537,45 +539,46 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
         '系统功耗模型或通过验证的实测功耗缺失时不显示。',
     },
     formula: {
-      en: 'J/tok = measured J per total token × modeled IT W per GPU ÷ measured W per GPU',
-      zh: 'J/tok = 实测每总 token 能耗 × 每 GPU IT 功耗估算（W）÷ 每 GPU 实测功耗（W）',
+      en: 'J/tok = measured J per total token × measured IT W per GPU ÷ measured W per GPU',
+      zh: 'J/tok = 实测每总 token 能耗 × 每 GPU 实测 IT 功耗（W）÷ 每 GPU 实测功耗（W）',
     },
   },
   utilityModeledWatts: {
     description: {
       en:
-        'Modeled facility power per allocated accelerator: the InferenceX power model carries measured ' +
-        'GPU power to IT power for the run’s workload state and scale-out, then multiplies once by PUE. ' +
+        'Measured facility power per allocated accelerator: the InferenceX power model carries measured ' +
+        'GPU power to IT power for the run’s workload state and scale-out, then multiplies once by an ' +
+        `assumed PUE (${AIR_COOLED_SYSTEM_PUE} air-cooled, ${LIQUID_COOLED_RACK_PUE} liquid-cooled). ` +
         'Supports eight-GPU HGX/OAM chassis and GB200/GB300 NVL72, where measured Grace-socket power ' +
         'is a second input and every compute tray takes an equal share of a modeled rack.',
       zh:
-        '每个已分配加速器的设施级建模功耗：InferenceX 功耗模型根据该次运行的工作负载状态和 scale-out 设置，将 GPU 实测功耗换算为 IT 功耗，再乘以一次 PUE。' +
+        `每个已分配加速器的实测数据中心功耗：InferenceX 功耗模型根据该次运行的工作负载状态和 scale-out 设置，将 GPU 实测功耗换算为 IT 功耗，再乘以一次假定 PUE（风冷 ${AIR_COOLED_SYSTEM_PUE}，液冷 ${LIQUID_COOLED_RACK_PUE}）。` +
         '支持八卡 HGX/OAM 机箱和 GB200/GB300 NVL72；NVL72 另以 Grace socket 实测功耗为输入，每个计算 tray 平均分摊建模机架的功耗。',
     },
     formula: {
-      en: 'W/GPU = modeled IT power (W) × PUE ÷ allocated GPUs',
-      zh: 'W/GPU = IT 建模功耗（W）× PUE ÷ 已分配 GPU 数',
+      en: 'W/GPU = measured IT power (W) × PUE ÷ allocated GPUs',
+      zh: 'W/GPU = 实测 IT 功耗（W）× PUE ÷ 已分配 GPU 数',
     },
   },
   utilityModeledJPerOutputToken: {
     description: {
       en:
-        'Measured energy per output token scaled to the modeled facility boundary, so its ratio to ' +
-        'measured GPU energy equals the ratio of modeled facility power to measured GPU power. ' +
+        'Measured energy per output token scaled to the measured facility boundary, so its ratio to ' +
+        'measured GPU energy equals the ratio of measured facility power to measured GPU power. ' +
         'Missing where the system power model or validated measured power is unavailable.',
       zh:
-        '将实测每输出 token 能耗按设施级建模功耗边界缩放，其与 GPU 实测能耗之比等于设施级建模功耗与 GPU 实测功耗之比。' +
+        '将实测每输出 token 能耗按实测数据中心功耗边界缩放，其与 GPU 实测能耗之比等于实测数据中心功耗与 GPU 实测功耗之比。' +
         '系统功耗模型或通过验证的实测功耗缺失时不显示。',
     },
     formula: {
-      en: 'J/tok = measured J per output token × modeled facility W per GPU ÷ measured W per GPU',
-      zh: 'J/tok = 实测每输出 token 能耗 × 每 GPU 设施级建模功耗（W）÷ 每 GPU 实测功耗（W）',
+      en: 'J/tok = measured J per output token × measured facility W per GPU ÷ measured W per GPU',
+      zh: 'J/tok = 实测每输出 token 能耗 × 每 GPU 实测数据中心功耗（W）÷ 每 GPU 实测功耗（W）',
     },
   },
   utilityModeledJPerTotalToken: {
     description: {
       en:
-        'Measured energy per total token (input + output) scaled to the modeled facility ' +
+        'Measured energy per total token (input + output) scaled to the measured facility ' +
         'boundary by the same power ratio as All in Measured J per Output Token. Missing where ' +
         'the system power model or validated measured power is unavailable.',
       zh:
@@ -583,8 +586,8 @@ export const METRIC_EXPLANATIONS: Record<MetricKey, MetricExplanation> = {
         '系统功耗模型或通过验证的实测功耗缺失时不显示。',
     },
     formula: {
-      en: 'J/tok = measured J per total token × modeled facility W per GPU ÷ measured W per GPU',
-      zh: 'J/tok = 实测每总 token 能耗 × 每 GPU 设施级建模功耗（W）÷ 每 GPU 实测功耗（W）',
+      en: 'J/tok = measured J per total token × measured facility W per GPU ÷ measured W per GPU',
+      zh: 'J/tok = 实测每总 token 能耗 × 每 GPU 实测数据中心功耗（W）÷ 每 GPU 实测功耗（W）',
     },
   },
 };

@@ -5,6 +5,7 @@ import {
   AIR_COOLED_SYSTEM_PUE,
   estimateChassisPower,
   estimateRackPower,
+  FACILITY_PUE_NOTE,
   isRackPowerHardware,
   isSystemPowerHardware,
   LIQUID_COOLED_RACK_PUE,
@@ -161,6 +162,13 @@ describe('system power model adapter', () => {
   it('quotes the upstream cooling PUEs', () => {
     expect(AIR_COOLED_SYSTEM_PUE).toBe(estimateChassisPower('b200', 5600, STATE)!.pue);
     expect(LIQUID_COOLED_RACK_PUE).toBe(estimateRackPower('gb300', 700, null, STATE)!.pue);
+  });
+
+  it('names the PUEs the tutorial and the facility note quote', () => {
+    expect(FACILITY_PUE_NOTE).toEqual({
+      en: 'Facility = measured IT power × assumed PUE (1.3 air-cooled, 1.1 liquid-cooled).',
+      zh: '数据中心功耗 = 实测 IT 功耗 × 假定 PUE（风冷 1.3，液冷 1.1）。',
+    });
   });
 
   it('returns null where the upstream model rejects the input', () => {

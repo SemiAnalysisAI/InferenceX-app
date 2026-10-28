@@ -37,12 +37,12 @@ const STRINGS = {
     view: 'Energy per token',
     views: {
       measured: 'Measured GPU',
-      modeled: 'Modeled facility',
+      modeled: 'Measured facility',
     },
     viewTitles: {
       measured: 'Joules per token (input + output) from GPU telemetry alone',
       modeled:
-        'The same points scaled by the power model: facility watts per GPU over measured watts',
+        'The same points at the facility boundary: IT watts per GPU × assumed PUE, over measured GPU watts',
     },
     x: 'Interactivity (tok/s/user)',
     y: 'J per token, log',
@@ -54,23 +54,23 @@ const STRINGS = {
     failed: 'The views API did not answer; reload to try again.',
     tooltip: {
       measured: 'Measured GPU',
-      modeled: 'Modeled facility',
+      modeled: 'Measured facility',
       ratio: (ratio: number) => `×${ratio.toFixed(2)}`,
       point: (x: number, concurrency: number) =>
         `${x.toFixed(1)} tok/s/user · concurrency ${concurrency}`,
     },
     aria: (count: number) =>
-      `${count} validated points; the modeled facility curve sits above the measured GPU curve with the same shape`,
+      `${count} validated points; the measured facility curve sits above the measured GPU curve with the same shape`,
   },
   zh: {
     view: '每 token 能耗',
     views: {
       measured: '实测 GPU',
-      modeled: '建模数据中心',
+      modeled: '实测数据中心',
     },
     viewTitles: {
       measured: '仅由 GPU 遥测得到的每 token（输入 + 输出）焦耳数',
-      modeled: '同一批数据点按功耗模型换算：乘以每 GPU 数据中心瓦特数 ÷ 实测瓦特数',
+      modeled: '同一批数据点换算到数据中心边界：每 GPU IT 瓦特数 × 假定 PUE ÷ GPU 实测瓦特数',
     },
     x: '交互性（tok/s/user）',
     y: '每 token 焦耳数，对数坐标',
@@ -82,12 +82,12 @@ const STRINGS = {
     failed: 'views API 没有响应，请刷新页面重试。',
     tooltip: {
       measured: '实测 GPU',
-      modeled: '建模数据中心',
+      modeled: '实测数据中心',
       ratio: (ratio: number) => `×${ratio.toFixed(2)}`,
       point: (x: number, concurrency: number) => `${x.toFixed(1)} tok/s/user · 并发 ${concurrency}`,
     },
     aria: (count: number) =>
-      `${count} 个通过校验的数据点；建模数据中心曲线位于实测 GPU 曲线之上，形状相同`,
+      `${count} 个通过校验的数据点；实测数据中心曲线位于实测 GPU 曲线之上，形状相同`,
   },
 } as const;
 

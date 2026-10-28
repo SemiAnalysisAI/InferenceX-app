@@ -31,11 +31,11 @@ Measured watts cover the accelerator only: the GPU board on HGX systems, the GPU
 
 ## Explore PowerX
 
-The modeled curve sits above the measured one with the same shape, because the parts the model adds barely move with load.
+The facility curve sits above the GPU curve with the same shape, because the parts the model adds barely move with load. Facility is measured IT power times an assumed PUE: 1.3 for an air-cooled chassis, 1.1 for a liquid-cooled NVL72 rack.
 
 <Widget
   name="measured-vs-modeled"
-  alt="Measured GPU energy per token against modeled facility energy per token for the same points"
+  alt="Measured GPU energy per token against measured facility energy per token for the same points"
 />
 
 Lower is better, and both lines are Pareto frontiers against interactivity like the rest of the dashboard.
