@@ -75,8 +75,8 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'enum',
     description: text(
-      'X-axis mode. Defaults to e2e for Qwen3.5 and interactivity for other models. An explicit value overrides the model default. e2e-normalized-interactivity uses persisted derived AgentX metrics; points without eligible derived values are omitted.',
-      'X 轴模式。Qwen3.5 默认为 e2e，其他模型默认为 interactivity；显式值覆盖模型默认值。e2e-normalized-interactivity 使用已持久化的 AgentX 派生指标；没有合格派生值的数据点不参与此视图。',
+      'X-axis mode. Defaults to e2e for Qwen3.5 and interactivity for other models. An explicit value overrides the model default. e2e-normalized-interactivity uses persisted derived AgentX metrics, and unofficialrun overlays use the values reported by their run; points without eligible values are omitted.',
+      'X 轴模式。Qwen3.5 默认为 e2e，其他模型默认为 interactivity；显式值覆盖模型默认值。e2e-normalized-interactivity 使用已持久化的 AgentX 派生指标，unofficialrun 叠加数据则使用该 run 自身报告的数值；没有合格数值的数据点不参与此视图。',
     ),
     schema: { type: 'string', enum: X_MODE_ENUM },
     example: 'e2e',

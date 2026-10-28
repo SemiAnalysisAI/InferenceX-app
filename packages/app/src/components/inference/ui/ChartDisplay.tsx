@@ -45,10 +45,7 @@ import type {
   InferenceData,
   OverlayData,
 } from '@/components/inference/types';
-import {
-  processOverlayChartDataWithClipping,
-  selectUnofficialOverlayForMode,
-} from '@/components/inference/utils';
+import { processOverlayChartDataWithClipping } from '@/components/inference/utils';
 import {
   isRunComparisonEntry,
   makeRunComparisonEntry,
@@ -931,11 +928,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
   const rolesHaveData = useMemo(() => {
     const graph = renderableGraphs[0];
     if (!powerXSurface || !graph || graph.data.length === 0) return undefined;
-    const overlay = selectUnofficialOverlayForMode(
-      selectedXAxisMode,
-      graph.chartDefinition.chartType,
-      overlayDataByChartType,
-    );
+    const overlay = overlayDataByChartType[graph.chartDefinition.chartType];
     const isGpuComparison =
       selectedGPUs.length > 0 &&
       ((selectedDateRange.startDate && selectedDateRange.endDate) || selectedDates.length > 0);
@@ -1001,11 +994,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
           replayAvailable ? () => replayHandlesRef.current[graphIndex]?.open() : undefined
         }
         onExportCsv={() => {
-          const overlay = selectUnofficialOverlayForMode(
-            selectedXAxisMode,
-            graph.chartDefinition.chartType,
-            overlayDataByChartType,
-          );
+          const overlay = overlayDataByChartType[graph.chartDefinition.chartType];
           const tableMode = getViewMode(graphIndex) === 'table';
           const exportData = tableMode
             ? (graph.tableData ?? [
@@ -1059,11 +1048,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
   const powerXReadoutPoints = useMemo(() => {
     const graph = renderableGraphs[0];
     if (!powerXLayout || !graph || powerXTab === 'where' || powerXTab === 'time') return null;
-    const overlay = selectUnofficialOverlayForMode(
-      selectedXAxisMode,
-      graph.chartDefinition.chartType,
-      overlayDataByChartType,
-    );
+    const overlay = overlayDataByChartType[graph.chartDefinition.chartType];
     const isGpuComparison =
       selectedGPUs.length > 0 &&
       ((selectedDateRange.startDate && selectedDateRange.endDate) || selectedDates.length > 0);
@@ -1118,11 +1103,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
               selectedGPUs.length > 0 &&
               ((selectedDateRange.startDate && selectedDateRange.endDate) ||
                 selectedDates.length > 0);
-            const footerOverlay = selectUnofficialOverlayForMode(
-              selectedXAxisMode,
-              graph.chartDefinition.chartType,
-              overlayDataByChartType,
-            );
+            const footerOverlay = overlayDataByChartType[graph.chartDefinition.chartType];
             const footerPoints = [
               ...graph.data,
               ...(footerOverlay?.data ?? []),
@@ -1364,11 +1345,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                       );
 
                       if (getViewMode(graphIndex) === 'table') {
-                        const overlay = selectUnofficialOverlayForMode(
-                          selectedXAxisMode,
-                          graph.chartDefinition.chartType,
-                          overlayDataByChartType,
-                        );
+                        const overlay = overlayDataByChartType[graph.chartDefinition.chartType];
                         const tableOfficialData = graph.tableData ?? [
                           ...graph.data,
                           ...(graph.clippedData ?? []).map((entry) => entry.point),
@@ -1407,11 +1384,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                                 ...(graph.clippedData ?? []).map((entry) => entry.point),
                               ]}
                               overlayData={
-                                selectUnofficialOverlayForMode(
-                                  selectedXAxisMode,
-                                  graph.chartDefinition.chartType,
-                                  overlayDataByChartType,
-                                ) ?? undefined
+                                overlayDataByChartType[graph.chartDefinition.chartType] ?? undefined
                               }
                               caption={chartCaption}
                               comparison={Boolean(isGpuComparison)}
@@ -1448,11 +1421,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                             chartDefinition={graph.chartDefinition}
                             caption={caption}
                             overlayData={
-                              selectUnofficialOverlayForMode(
-                                selectedXAxisMode,
-                                graph.chartDefinition.chartType,
-                                overlayDataByChartType,
-                              ) ?? undefined
+                              overlayDataByChartType[graph.chartDefinition.chartType] ?? undefined
                             }
                             plotHeight={powerXChartHeight}
                           />
@@ -1485,11 +1454,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                       powerXTab === 'where' &&
                       getViewMode(graphIndex) !== 'table' &&
                       (() => {
-                        const overlay = selectUnofficialOverlayForMode(
-                          selectedXAxisMode,
-                          graph.chartDefinition.chartType,
-                          overlayDataByChartType,
-                        );
+                        const overlay = overlayDataByChartType[graph.chartDefinition.chartType];
                         const { officialRows, overlayRows } = isGpuComparison
                           ? visibleDateComparisonRows(graph.data, overlay)
                           : visibleComparisonRows(graph.data, overlay);

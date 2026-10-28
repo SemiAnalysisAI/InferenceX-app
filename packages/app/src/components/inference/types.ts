@@ -74,6 +74,8 @@ export interface AggDataEntry {
   p95_e2el: number;
   p99_e2el: number;
   'p99.9_e2el': number;
+  p75_e2e_norm_intvty?: number;
+  p90_e2e_norm_intvty?: number;
   power_valid?: number;
   power_invalid_reasons?: string[];
   power_audit?: PowerAudit;

@@ -1711,6 +1711,18 @@ describe('mapBenchmarkRow — v3 agentic nested agg schema', () => {
     expect(metrics).not.toHaveProperty('p99_intvty');
   });
 
+  it('flattens the run-reported E2E normalized interactivity percentiles', () => {
+    const tracker = createSkipTracker();
+    const row = makeV3AgenticRow();
+    row.request_metrics.latency.e2e_norm_intvty = { mean: 21.9, p50: 29.8, p75: 22.6, p90: 16.2 };
+
+    const metrics = mapBenchmarkRow(row, tracker)!.metrics;
+
+    expect(metrics.median_e2e_norm_intvty).toBe(29.8);
+    expect(metrics.p75_e2e_norm_intvty).toBe(22.6);
+    expect(metrics.p90_e2e_norm_intvty).toBe(16.2);
+  });
+
   it("maps kv_offloading 'none' to offload off and skips the empty backend", () => {
     const tracker = createSkipTracker();
     const result = mapBenchmarkRow(makeV3AgenticRow(), tracker);
