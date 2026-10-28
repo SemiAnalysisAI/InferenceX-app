@@ -123,9 +123,9 @@ export function CostTierSelector({
         model: selectedModel,
         sequence: selectedSequence,
         precision: selectedPrecisions.join(','),
-        yAxisMetric: value,
-        yAxisMetricLabel: isMetricKey(tierKey) ? metricOptionTitle(tierKey, 'en') : value,
-        yAxisMetricGroup:
+        metric: value,
+        metric_label: isMetricKey(tierKey) ? metricOptionTitle(tierKey, 'en') : value,
+        metric_group:
           METRIC_CONTROL_GROUPS.find((group) =>
             (group.metrics as readonly string[]).includes(value),
           )?.label ?? 'Unknown',

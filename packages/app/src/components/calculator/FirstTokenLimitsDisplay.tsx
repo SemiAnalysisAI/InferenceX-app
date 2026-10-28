@@ -665,7 +665,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
       isLegendExpanded={isLegendExpanded}
       onExpandedChange={(expanded) => {
         setIsLegendExpanded(expanded);
-        track('first_token_legend_expanded', { expanded });
+        track('first_token_legend_expanded', { enabled: expanded });
       }}
       switches={[
         {
@@ -811,7 +811,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
                         const next = values[0];
                         if (!next) return;
                         setCostType(next as CostType);
-                        track('first_token_cost_type_changed', { costType: next });
+                        track('first_token_cost_type_changed', { cost_type: next });
                       }}
                       open={openDropdown === 'costType'}
                       onOpenChange={handleDropdownOpenChange('costType')}

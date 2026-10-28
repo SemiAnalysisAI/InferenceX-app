@@ -285,7 +285,7 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
           disabled={!prev}
           onClick={() => {
             if (prev) {
-              track('agentic_siblings_navigated', { direction: 'prev', targetId: prev.id });
+              track('agentic_siblings_navigated', { direction: 'prev', target_id: prev.id });
               router.push(hrefFor(prev.id));
             }
           }}
@@ -303,7 +303,7 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
                 type="button"
                 onClick={() => {
                   if (!active) {
-                    track('agentic_siblings_navigated', { direction: 'chip', targetId: s.id });
+                    track('agentic_siblings_navigated', { direction: 'chip', target_id: s.id });
                     router.push(hrefFor(s.id));
                   }
                 }}
@@ -324,7 +324,7 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
           disabled={!next}
           onClick={() => {
             if (next) {
-              track('agentic_siblings_navigated', { direction: 'next', targetId: next.id });
+              track('agentic_siblings_navigated', { direction: 'next', target_id: next.id });
               router.push(hrefFor(next.id));
             }
           }}

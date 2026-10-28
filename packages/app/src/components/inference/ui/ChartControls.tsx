@@ -359,9 +359,9 @@ export default function ChartControls({
         model: selectedModel,
         sequence: selectedSequence,
         precision: selectedPrecisions.join(','),
-        yAxisMetric: selectedYAxisMetric,
-        yAxisMetricLabel: METRIC_TITLE_MAP.get(selectedYAxisMetric) ?? selectedYAxisMetric,
-        yAxisMetricGroup: metricGroupMap.get(selectedYAxisMetric) ?? 'Unknown',
+        metric: selectedYAxisMetric,
+        metric_label: METRIC_TITLE_MAP.get(selectedYAxisMetric) ?? selectedYAxisMetric,
+        metric_group: metricGroupMap.get(selectedYAxisMetric) ?? 'Unknown',
       });
     }
   };
@@ -430,7 +430,7 @@ export default function ChartControls({
     setScaleType(value);
     track('inference_scale_type_selected', {
       ...analyticsContext,
-      scaleType: value,
+      scale_type: value,
     });
   };
 
@@ -439,8 +439,8 @@ export default function ChartControls({
   const handleDateRangeChange = (range: { startDate: string; endDate: string }) => {
     setSelectedDateRange(range);
     track('inference_date_range_changed', {
-      startDate: range.startDate,
-      endDate: range.endDate,
+      start_date: range.startDate,
+      end_date: range.endDate,
     });
   };
 
@@ -659,7 +659,7 @@ export default function ChartControls({
                           onClick={() => {
                             track('inference_openrouter_pricing_opened', {
                               model: selectedModel,
-                              openRouterModelId,
+                              openrouter_model_id: openRouterModelId,
                             });
                           }}
                         >

@@ -491,8 +491,8 @@ function ReplayPanelContent({
     const startedAt = performance.now();
     track('inference_replay_export_started', {
       model: selectedModel,
-      chartType: chartDefinition.chartType,
-      hasWebCodecs,
+      chart_type: chartDefinition.chartType,
+      has_web_codecs: hasWebCodecs,
     });
     let stage: Mp4ExportStage = 'init';
     let frameCount = 0;
@@ -527,17 +527,17 @@ function ReplayPanelContent({
       });
       track('inference_replay_export_completed', {
         model: selectedModel,
-        chartType: chartDefinition.chartType,
-        durationMs: Math.round(performance.now() - startedAt),
+        chart_type: chartDefinition.chartType,
+        duration_ms: Math.round(performance.now() - startedAt),
       });
     } catch (error) {
       if (ac.signal.aborted) {
         track('inference_replay_export_cancelled', {
           model: selectedModel,
-          chartType: chartDefinition.chartType,
-          frameCount,
+          chart_type: chartDefinition.chartType,
+          frame_count: frameCount,
           stage,
-          durationMs: Math.round(performance.now() - startedAt),
+          duration_ms: Math.round(performance.now() - startedAt),
         });
         return;
       }
@@ -558,15 +558,16 @@ function ReplayPanelContent({
       );
       track('inference_replay_export_failed', {
         reason: message.slice(0, 500),
-        errorName,
-        userAgent: typeof navigator === 'undefined' ? 'unknown' : navigator.userAgent.slice(0, 200),
-        hasWebCodecs,
-        frameCount,
-        durationMs: Math.round(performance.now() - startedAt),
+        error_name: errorName,
+        user_agent:
+          typeof navigator === 'undefined' ? 'unknown' : navigator.userAgent.slice(0, 200),
+        has_web_codecs: hasWebCodecs,
+        frame_count: frameCount,
+        duration_ms: Math.round(performance.now() - startedAt),
         stage,
-        encoderState,
-        queuedFrames,
-        elapsedSinceLastProgressMs,
+        encoder_state: encoderState,
+        queued_frames: queuedFrames,
+        elapsed_since_last_progress_ms: elapsedSinceLastProgressMs,
       });
     } finally {
       setIsExporting(false);

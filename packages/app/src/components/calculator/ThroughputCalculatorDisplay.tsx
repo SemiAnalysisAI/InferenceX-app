@@ -622,7 +622,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
 
   const handleCostTypeChange = useCallback((value: string) => {
     setCostType(value as CostType);
-    track('calculator_cost_type_changed', { costType: value });
+    track('calculator_cost_type_changed', { cost_type: value });
   }, []);
 
   const handleModelChange = useCallback(
@@ -728,7 +728,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
       visible: new Set(legendHwKeys),
       known: new Set(legendHwKeys),
     });
-    track('calculator_gpu_reset', { gpuCount: legendHwKeys.length });
+    track('calculator_gpu_reset', { gpu_count: legendHwKeys.length });
   }, [legendHwKeys, selectionKey]);
 
   const runUrl = availableRuns[selectedRunId]?.runUrl;
@@ -738,10 +738,10 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
       const next = new Set(selectedBars);
       if (next.has(resultKey)) {
         next.delete(resultKey);
-        track('calculator_bar_deselected', { resultKey });
+        track('calculator_bar_deselected', { result_key: resultKey });
       } else {
         next.add(resultKey);
-        track('calculator_bar_selected', { resultKey, totalSelected: next.size });
+        track('calculator_bar_selected', { result_key: resultKey, total_selected: next.size });
       }
       setBarSelectionIntent({ resultsKey: barResultsKey, selected: next });
     },
@@ -1201,7 +1201,9 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
           titleWhenOpen={false}
           toggleLabel={t.toggleSection}
           testId="calculator-chart-collapse"
-          onToggle={(open) => track('calculator_section_toggled', { section: 'chart', open })}
+          onToggle={(open) =>
+            track('calculator_section_toggled', { section: 'chart', enabled: open })
+          }
         >
           <figure data-testid="calculator-figure" className="relative rounded-lg">
             <ChartButtons
@@ -1375,7 +1377,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                               isLegendExpanded={isLegendExpanded}
                               onExpandedChange={(expanded) => {
                                 setIsLegendExpanded(expanded);
-                                track('calculator_legend_expanded', { expanded });
+                                track('calculator_legend_expanded', { enabled: expanded });
                               }}
                               switches={[
                                 {
@@ -1451,7 +1453,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
               <button
                 type="button"
                 onClick={() => {
-                  track('calculator_selection_cleared', { clearedCount: selectedBars.size });
+                  track('calculator_selection_cleared', { cleared_count: selectedBars.size });
                   setBarSelectionIntent({ resultsKey: barResultsKey, selected: new Set() });
                 }}
                 className="text-xs text-muted-foreground hover:text-foreground underline shrink-0"

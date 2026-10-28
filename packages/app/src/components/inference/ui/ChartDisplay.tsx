@@ -479,7 +479,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
   const getViewMode = (index: number): InferenceViewMode => viewModes[index] ?? 'chart';
   const handleViewModeChange = (index: number, value: InferenceViewMode) => {
     setViewModes((prev) => ({ ...prev, [index]: value }));
-    track('inference_view_changed', { view: value, chartIndex: index });
+    track('inference_view_changed', { view: value, chart_index: index });
   };
 
   const viewModeOptions = useMemo<SegmentedToggleOption<InferenceViewMode>[]>(

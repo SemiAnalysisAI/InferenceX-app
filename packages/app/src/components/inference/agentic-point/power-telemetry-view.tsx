@@ -175,7 +175,7 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
   );
   const toggleGpu = (gpuIndex: number) => {
     if (!selectedSeries) return;
-    track('inference_agentic_power_gpu_toggled', { id, gpuIndex });
+    track('inference_agentic_power_gpu_toggled', { id, gpu_index: gpuIndex });
     const next = new Set(hiddenGpus);
     if (next.has(gpuIndex)) next.delete(gpuIndex);
     else next.add(gpuIndex);
@@ -300,7 +300,7 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
                   track('inference_agentic_power_series_selected', {
                     ...analyticsContext,
                     id,
-                    seriesId: Number(value),
+                    series_id: Number(value),
                   });
                   setSeriesSelection({ id, seriesId: Number(value) });
                 }}
@@ -421,7 +421,7 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
               isLegendExpanded={isLegendExpanded}
               onExpandedChange={(expanded) => {
                 setIsLegendExpanded(expanded);
-                track('inference_agentic_power_legend_expanded', { id, expanded });
+                track('inference_agentic_power_legend_expanded', { id, enabled: expanded });
               }}
               switches={
                 metricKey === 'power' && hardware && allInWattsForHardware(hardware) !== null

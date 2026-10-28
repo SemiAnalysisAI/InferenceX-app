@@ -316,7 +316,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
       visible: new Set(availableHwKeys),
       known: new Set(availableHwKeys),
     });
-    track('fleet_gpu_reset', { gpuCount: availableHwKeys.length });
+    track('fleet_gpu_reset', { gpu_count: availableHwKeys.length });
   }, [availableHwKeys, selectionKey]);
 
   const legendItems = useMemo(
@@ -473,7 +473,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                         const next = values[0];
                         if (!next) return;
                         setCostType(next as CostType);
-                        track('fleet_cost_type_changed', { costType: next });
+                        track('fleet_cost_type_changed', { cost_type: next });
                       }}
                       open={openDropdown === 'costType'}
                       onOpenChange={handleDropdownOpenChange('costType')}

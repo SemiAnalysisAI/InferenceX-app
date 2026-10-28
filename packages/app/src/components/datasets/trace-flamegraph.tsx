@@ -331,7 +331,7 @@ export function TraceFlamegraph({
                         type="button"
                         onClick={() => {
                           track('datasets_flamegraph_group_toggled', {
-                            expanded: !row.isExpanded,
+                            enabled: !row.isExpanded,
                           });
                           if (row.groupIndex !== undefined) toggle(row.groupIndex);
                         }}

@@ -942,7 +942,7 @@ function TransitionHeatmap({
           <button
             type="button"
             onClick={() => {
-              track('agentic_workload_transition_hide_small_toggled', { hideSmall: !hideSmall });
+              track('agentic_workload_transition_hide_small_toggled', { enabled: !hideSmall });
               setHideSmall((h) => !h);
             }}
             className={`px-2 py-0.5 text-3xs font-mono rounded border transition-colors ${
@@ -1640,7 +1640,7 @@ function OsTurnaroundCards({ byOs }: { byOs: ToolTimings['byOs'] }) {
                   type="button"
                   onClick={() => {
                     track('agentic_workload_turnaround_split_arch_toggled', {
-                      splitArch: !splitArch,
+                      enabled: !splitArch,
                     });
                     setSplitArch((v) => !v);
                   }}
@@ -2780,7 +2780,7 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
                 type="button"
                 onClick={() => {
                   track('agentic_workload_transition_mode_toggled', {
-                    showProbability: !showProbability,
+                    show_probability: !showProbability,
                   });
                   setShowProbability((v) => !v);
                 }}

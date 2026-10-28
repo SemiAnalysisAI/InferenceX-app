@@ -74,7 +74,7 @@ function Distribution({ model }: { model: ComparisonModel }) {
               checked={distribution.matchedOnly}
               onCheckedChange={(checked) => {
                 setCommon(checked);
-                track('operatorx_distribution_matched_changed', { checked });
+                track('operatorx_distribution_matched_changed', { enabled: checked });
               }}
             />
             <Label htmlFor="opx-dist-common" className="text-sm font-normal text-muted-foreground">
@@ -90,7 +90,7 @@ function Distribution({ model }: { model: ComparisonModel }) {
               onCheckedChange={(checked) => {
                 setNormalized(checked);
                 track('operatorx_distribution_normalized_changed', {
-                  checked,
+                  enabled: checked,
                   metric: model.metric.id,
                 });
               }}

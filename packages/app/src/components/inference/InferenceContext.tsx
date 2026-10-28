@@ -1504,7 +1504,7 @@ export function InferenceProvider({
         model: selectedModel,
         sequence: effectiveSequence,
         preset_id: activePresetId,
-        yAxisMetric: selectedYAxisMetric,
+        metric: selectedYAxisMetric,
       });
     }, 3000);
     return () => clearTimeout(timer);
@@ -1525,7 +1525,7 @@ export function InferenceProvider({
         gpus: [...new Set(pairs.map((p) => p.split('_').slice(1).join('_')))].toSorted(),
         model: selectedModel,
         sequence: effectiveSequence,
-        yAxisMetric: selectedYAxisMetric,
+        metric: selectedYAxisMetric,
       });
     }, 3000);
     return () => clearTimeout(timer);
@@ -1533,7 +1533,7 @@ export function InferenceProvider({
 
   useEffect(() => {
     trackOncePerPageview('inference_chart_view', {
-      yAxisMetric: selectedYAxisMetric,
+      metric: selectedYAxisMetric,
       source: getUrlParam('i_metric') ? 'url' : 'default',
     });
   }, []);

@@ -583,7 +583,7 @@ export function CollectiveXKvSection({
                     isLegendExpanded={legendExpanded}
                     onExpandedChange={(expanded) => {
                       setLegendExpanded(expanded);
-                      track('collectivex_kv_legend_expanded', { expanded });
+                      track('collectivex_kv_legend_expanded', { enabled: expanded });
                     }}
                   />
                 }
@@ -615,7 +615,7 @@ export function CollectiveXKvSection({
                     isLegendExpanded={legendExpanded}
                     onExpandedChange={(expanded) => {
                       setLegendExpanded(expanded);
-                      track('collectivex_kv_legend_expanded', { expanded });
+                      track('collectivex_kv_legend_expanded', { enabled: expanded });
                     }}
                   />
                 }

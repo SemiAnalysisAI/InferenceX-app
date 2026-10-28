@@ -36,7 +36,7 @@ export function usePowerTraceAction(chartRef: RefObject<D3ChartHandle | null>) {
         chartRef.current?.dismissTooltip();
         setSelectedYAxisMetric(POWER_TIMELINE_METRIC_KEY);
         track('inference_power_trace_opened', {
-          hwKey: String(d.hwKey),
+          gpu: String(d.hwKey),
           conc: d.conc,
           overlay,
         });

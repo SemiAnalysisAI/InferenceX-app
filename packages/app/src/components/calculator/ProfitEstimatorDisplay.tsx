@@ -443,7 +443,7 @@ function InfoFold({
         className="flex w-full items-center gap-1.5 text-left text-foreground cursor-pointer"
         onClick={() => {
           setOpen((prev) => !prev);
-          track('profit_formula_toggled', { open: !open });
+          track('profit_formula_toggled', { enabled: !open });
         }}
       >
         <Info className="size-3.5 text-muted-foreground" aria-hidden />
@@ -729,7 +729,10 @@ function ProfitEstimatorInner({
       setSelectedDateRange(range);
       setUrlParam('i_dstart', range.startDate);
       setUrlParam('i_dend', range.endDate);
-      track('profit_history_date_range_changed', range);
+      track('profit_history_date_range_changed', {
+        start_date: range.startDate,
+        end_date: range.endDate,
+      });
     },
     [setUrlParam],
   );
@@ -1078,7 +1081,7 @@ function ProfitEstimatorInner({
       visible: new Set(legendHwKeys),
       known: new Set(legendHwKeys),
     });
-    track('profit_gpu_reset', { gpuCount: legendHwKeys.length });
+    track('profit_gpu_reset', { gpu_count: legendHwKeys.length });
   }, [legendHwKeys, selectionKey]);
 
   const legendItems = useMemo(

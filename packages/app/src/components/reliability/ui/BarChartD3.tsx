@@ -436,7 +436,7 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
             isLegendExpanded={isLegendExpanded}
             onExpandedChange={(expanded) => {
               setIsLegendExpanded(expanded);
-              track('reliability_legend_expanded', { expanded });
+              track('reliability_legend_expanded', { enabled: expanded });
             }}
             switches={[
               {

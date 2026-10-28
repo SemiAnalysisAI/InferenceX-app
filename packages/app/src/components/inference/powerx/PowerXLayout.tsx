@@ -495,7 +495,7 @@ export function PowerXChartConfig({
           data-testid="powerx-more"
           onClick={() => {
             setMoreOpen((open) => !open);
-            track('powerx_more_toggled', { expanded: !moreOpen, changed });
+            track('powerx_more_toggled', { enabled: !moreOpen, changed });
           }}
           className="col-span-full flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 rounded-md border border-border/70 bg-muted/10 px-3 text-left text-sm font-medium text-foreground"
         >

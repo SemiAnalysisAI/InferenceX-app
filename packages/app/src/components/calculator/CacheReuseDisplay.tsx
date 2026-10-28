@@ -504,7 +504,7 @@ function CacheReuseInner() {
       isLegendExpanded={isLegendExpanded}
       onExpandedChange={(expanded) => {
         setIsLegendExpanded(expanded);
-        track('cache_reuse_legend_expanded', { expanded });
+        track('cache_reuse_legend_expanded', { enabled: expanded });
       }}
       switches={[
         {

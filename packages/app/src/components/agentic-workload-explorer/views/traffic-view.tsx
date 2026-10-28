@@ -329,7 +329,7 @@ function HourlyHeatmap({
             type="button"
             onClick={() => {
               setHideSmall((h) => !h);
-              track('agentic_workload_traffic_heatmap_toggle', { hideSmall: !hideSmall });
+              track('agentic_workload_traffic_heatmap_toggle', { enabled: !hideSmall });
             }}
             className={`px-2 py-0.5 text-3xs font-mono rounded border transition-colors ${
               hideSmall

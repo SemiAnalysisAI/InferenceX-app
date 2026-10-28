@@ -423,7 +423,7 @@ export function CurrentImageContent() {
                   <Select
                     value={selectedHardware}
                     onValueChange={(v) => {
-                      track('current_image_hardware_changed', { hardware: v });
+                      track('current_image_hardware_changed', { gpu: v });
                       setSelectedHardware(v);
                     }}
                   >

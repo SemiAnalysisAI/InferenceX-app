@@ -249,7 +249,7 @@ export default function FeedbackViewer() {
                 type="button"
                 onClick={() => {
                   setShowKey((v) => !v);
-                  track('feedback_viewer_key_visibility_toggled', { visible: !showKey });
+                  track('feedback_viewer_key_visibility_toggled', { enabled: !showKey });
                 }}
                 aria-label={showKey ? t.hideKey : t.showKey}
                 className="absolute right-0 top-0 flex size-11 items-center justify-center text-muted-foreground hover:text-foreground sm:size-9"

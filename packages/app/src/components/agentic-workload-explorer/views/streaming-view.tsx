@@ -413,7 +413,7 @@ function Histogram({
               onClick={() => {
                 track('agentic_workload_streaming_histogram_export', {
                   title,
-                  filename: exportFilename,
+                  file_name: exportFilename,
                 });
                 if (svgRef.current) {
                   exportSvgToPng(svgRef.current, {

@@ -186,7 +186,7 @@ export function CompareInterpolatedTable({
         return next;
       });
       if (committed) {
-        track('compare_table_target_changed', { colIndex });
+        track('compare_table_target_changed', { col_index: colIndex });
       }
       return committed;
     },

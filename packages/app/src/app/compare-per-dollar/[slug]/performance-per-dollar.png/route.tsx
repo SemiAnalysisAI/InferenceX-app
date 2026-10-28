@@ -91,8 +91,7 @@ export async function GET(
     trackServer('compare_per_dollar_png_render_failed', {
       slug,
       model: parsed.model.slug,
-      a: parsed.a,
-      b: parsed.b,
+      gpus: [parsed.a, parsed.b],
       sequence,
       precision,
       error_name: error instanceof Error ? error.name : 'Unknown',

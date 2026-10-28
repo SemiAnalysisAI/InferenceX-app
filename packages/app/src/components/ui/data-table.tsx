@@ -150,7 +150,10 @@ export function DataTable<T>({
       } else {
         nextDir = 'desc';
       }
-      track(`${analyticsPrefix}_sort_changed`, { column: col.header, dir: nextDir ?? 'none' });
+      track(`${analyticsPrefix}_sort_changed`, {
+        sort_key: col.header,
+        sort_dir: nextDir ?? 'none',
+      });
       return { columnIndex: colIndex, dir: nextDir };
     });
     setPage(0);

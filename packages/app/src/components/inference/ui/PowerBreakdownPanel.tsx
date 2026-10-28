@@ -1527,7 +1527,7 @@ export default function PowerBreakdownPanel({
     setCompareTarget(readoutEntry.interactivity);
     setScrubIndex(null);
     track('powerx_compare_at_scrub', {
-      hw: series.hwKey,
+      gpu: series.hwKey,
       concurrency: readoutEntry.concurrency,
       interactivity: readoutEntry.interactivity,
       source: readoutSource,

@@ -1718,7 +1718,7 @@ const ScatterGraph = React.memo(
             });
             track('inference_power_compare_series_toggled', {
               series: id,
-              visible: hiddenPowerVariants.has(key),
+              enabled: hiddenPowerVariants.has(key),
             });
           },
         };
@@ -2271,15 +2271,15 @@ const ScatterGraph = React.memo(
           const ruler = perfRulerRef.current;
           if (ruler.mode) {
             track('latency_data_point_clicked', {
-              hw: String(d.hwKey),
+              gpu: String(d.hwKey),
               x: d.x,
               y: d.y,
-              perfRuler: true,
+              perf_ruler: true,
             });
             ruler.onPointClick(d, 'official');
             return;
           }
-          track('latency_data_point_clicked', { hw: String(d.hwKey), x: d.x, y: d.y });
+          track('latency_data_point_clicked', { gpu: String(d.hwKey), x: d.x, y: d.y });
           const tooltipEl = chartRef.current?.getTooltipElement();
           if (!tooltipEl) return;
 
@@ -2290,7 +2290,7 @@ const ScatterGraph = React.memo(
               if (!ephemeralUrlState) rememberChartStateInUrl();
               track('latency_view_charts_opened', {
                 id: d.id,
-                hwKey: String(d.hwKey),
+                gpu: String(d.hwKey),
                 conc: d.conc,
               });
             });
@@ -2301,7 +2301,7 @@ const ScatterGraph = React.memo(
               event.stopPropagation();
               setPowerTelemetryPoint(d);
               chartRef.current?.dismissTooltip();
-              track('inference_power_telemetry_opened', { id: d.id, hwKey: d.hwKey, conc: d.conc });
+              track('inference_power_telemetry_opened', { id: d.id, gpu: d.hwKey, conc: d.conc });
             });
           }
           const logsBtn = tooltipEl.querySelector('[data-action="view-logs"]');
@@ -2315,9 +2315,9 @@ const ScatterGraph = React.memo(
               }
               track('latency_view_logs_opened', {
                 id: d.id,
-                hwKey: String(d.hwKey),
+                gpu: String(d.hwKey),
                 conc: d.conc,
-                benchmarkType: d.benchmark_type ?? 'single_turn',
+                benchmark_type: d.benchmark_type ?? 'single_turn',
               });
             });
           }
@@ -3188,17 +3188,17 @@ const ScatterGraph = React.memo(
                   const ruler = perfRulerRef.current;
                   if (ruler.mode) {
                     track('latency_data_point_clicked', {
-                      hw: String(point.hwKey),
+                      gpu: String(point.hwKey),
                       x: point.x,
                       y: point.y,
                       overlay: true,
-                      perfRuler: true,
+                      perf_ruler: true,
                     });
                     ruler.onPointClick(point, 'overlay');
                     return;
                   }
                   track('latency_data_point_clicked', {
-                    hw: String(point.hwKey),
+                    gpu: String(point.hwKey),
                     x: point.x,
                     y: point.y,
                     overlay: true,
@@ -3397,7 +3397,7 @@ const ScatterGraph = React.memo(
           onLinkClick: (annotation) =>
             annotation.issue &&
             track('inference_known_issue_clicked', {
-              hwKey: annotation.issue.hwKey,
+              gpu: annotation.issue.hwKey,
               issue: annotation.issue.issueRef,
             }),
         };
@@ -4171,7 +4171,7 @@ const ScatterGraph = React.memo(
                               branch,
                             });
                             track('inference_legend_points_table_opened', {
-                              hw: `overlay-run-${info.id}`,
+                              gpu: `overlay-run-${info.id}`,
                               framework: 'overlay',
                             });
                           },
@@ -4228,12 +4228,12 @@ const ScatterGraph = React.memo(
                         ? () => {}
                         : () => {
                             handleToggleHwType(key);
-                            track('latency_hw_type_toggled', { hw: key });
+                            track('latency_hw_type_toggled', { gpu: key });
                           },
                       onShowPoints: () => {
                         setPointsTableTarget({ kind: 'official', hwKey: key });
                         track('inference_legend_points_table_opened', {
-                          hw: key,
+                          gpu: key,
                           framework: hwConfig.framework ?? '',
                         });
                       },
@@ -4250,7 +4250,7 @@ const ScatterGraph = React.memo(
               isLegendExpanded={isLegendExpanded}
               onExpandedChange={(expanded) => {
                 setIsLegendExpanded(expanded);
-                track('latency_legend_expanded', { expanded });
+                track('latency_legend_expanded', { enabled: expanded });
               }}
               switches={[
                 ...(selectedYAxisMetric === 'y_inputTputPerGpu'
@@ -4392,7 +4392,7 @@ const ScatterGraph = React.memo(
                 },
               ]}
               onAdvancedExpandedChange={(expanded) => {
-                track('latency_advanced_controls_toggled', { expanded });
+                track('latency_advanced_controls_toggled', { enabled: expanded });
               }}
               actions={[
                 ...(effectiveOfficialHwTypes.size < hwTypesWithData.size ||
@@ -4458,7 +4458,7 @@ const ScatterGraph = React.memo(
             isOverlay={pointsTable.isOverlay}
             onRowClick={(row) =>
               track('inference_legend_points_table_row_clicked', {
-                hw: pointsTable.hw,
+                gpu: pointsTable.hw,
                 conc: row.conc,
                 href: row.href ?? '',
               })

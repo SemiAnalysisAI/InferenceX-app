@@ -1559,7 +1559,7 @@ export default function PowerTimeline({
           isActive: activeDates.has(id),
           onClick: () => {
             toggleActiveDate(id);
-            track('interactivity_date_toggled', { date, hw: hwKey, view: 'power_timeline' });
+            track('interactivity_date_toggled', { date, gpu: hwKey, view: 'power_timeline' });
           },
           tooltip: null,
         }));
@@ -1578,7 +1578,7 @@ export default function PowerTimeline({
           isActive: officialHwTypes.has(key),
           onClick: () => {
             handleToggleHwType(key);
-            track('latency_hw_type_toggled', { hw: key });
+            track('latency_hw_type_toggled', { gpu: key });
           },
           tooltip: null,
         };
@@ -1643,7 +1643,7 @@ export default function PowerTimeline({
       checked: windowOnly,
       onCheckedChange: (checked) => {
         setWindowOnly(checked);
-        track('inference_power_timeline_window_changed', { windowOnly: checked });
+        track('inference_power_timeline_window_changed', { window_only: checked });
       },
       infoTooltip: t.windowOnlyHelp,
     },
@@ -1686,7 +1686,7 @@ export default function PowerTimeline({
       isLegendExpanded={isLegendExpanded}
       onExpandedChange={(expanded) => {
         setIsLegendExpanded(expanded);
-        track('latency_legend_expanded', { expanded });
+        track('latency_legend_expanded', { enabled: expanded });
       }}
       onItemHover={(id) => setHighlight(id)}
       onItemHoverEnd={() => setHighlight(null)}

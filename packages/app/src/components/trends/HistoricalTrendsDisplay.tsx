@@ -526,13 +526,13 @@ export default function HistoricalTrendsDisplay() {
                         isActive: activeHwTypes.has(key),
                         onClick: () => {
                           toggleHwType(key);
-                          track('historical_hw_type_toggled', { hw: key });
+                          track('historical_hw_type_toggled', { gpu: key });
                         },
                       }))}
                     isLegendExpanded={isLegendExpanded}
                     onExpandedChange={(expanded) => {
                       setIsLegendExpanded(expanded);
-                      track('historical_legend_expanded', { expanded });
+                      track('historical_legend_expanded', { enabled: expanded });
                     }}
                     switches={[
                       ...(chartView === 'line'

@@ -100,7 +100,7 @@ export function GpuSpecsRadarChart({ caption }: GpuSpecsRadarChartProps) {
       } else {
         next.add(name);
       }
-      track('gpu_specs_radar_gpu_toggled', { gpu: name, visible: !prev.has(name) });
+      track('gpu_specs_radar_gpu_toggled', { gpu: name, enabled: !prev.has(name) });
       return next;
     });
   }, []);
@@ -212,7 +212,7 @@ export function GpuSpecsRadarChart({ caption }: GpuSpecsRadarChartProps) {
             isLegendExpanded={isLegendExpanded}
             onExpandedChange={(expanded) => {
               setIsLegendExpanded(expanded);
-              track('gpu_specs_radar_legend_expanded', { expanded });
+              track('gpu_specs_radar_legend_expanded', { enabled: expanded });
             }}
             grouped={false}
             actions={

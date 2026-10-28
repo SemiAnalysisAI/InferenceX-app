@@ -600,7 +600,7 @@ export function ConversationView({
           ) : (
             <button
               onClick={() => {
-                track('agentic_workload_conversation_search_toggled', { open: true });
+                track('agentic_workload_conversation_search_toggled', { enabled: true });
                 setShowSearch(true);
                 requestAnimationFrame(() => inputRef.current?.focus());
               }}
@@ -671,7 +671,7 @@ function SubagentGroup({ group, highlight }: { group: SubagentGroupNode; highlig
       <button
         onClick={() => {
           track('agentic_workload_conversation_subagent_toggled', {
-            expanded: !expanded,
+            enabled: !expanded,
             label: group.label,
           });
           setExpanded(!expanded);
@@ -998,7 +998,7 @@ function TextContent({
         <button
           type="button"
           onClick={() => {
-            track('agentic_workload_conversation_text_toggled', { expanded: !expanded });
+            track('agentic_workload_conversation_text_toggled', { enabled: !expanded });
             setExpanded((value) => !value);
           }}
           className="text-3xs font-mono text-subtle hover:text-foreground uppercase tracking-eyebrow"

@@ -527,7 +527,7 @@ export function RequestTimelineView({
                         onClick={() => {
                           toggleSubagent(row.key);
                           track('inference_agentic_timeline_streams_toggled', {
-                            expanded: !isExpanded,
+                            enabled: !isExpanded,
                           });
                         }}
                         className="size-3.5 flex items-center justify-center text-muted-foreground hover:text-foreground shrink-0"
