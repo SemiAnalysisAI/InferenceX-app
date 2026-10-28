@@ -76,13 +76,13 @@ export const ScaleUpTopologyDiagram = forwardRef<
   const t = STRINGS[locale];
   const [open, setOpen] = useState(false);
   const [displayedIndex, setDisplayedIndex] = useState(0);
-  useDialogCloseTracking(open, 'gpu_specs_scaleup_topology_closed', { gpu: spec.name });
   const displayedIndexRef = useRef(0);
   displayedIndexRef.current = displayedIndex;
 
   const compactConfig = getScaleUpTopologyConfig(spec);
 
   const displayedSpec = allSpecs[displayedIndex] ?? spec;
+  useDialogCloseTracking(open, 'gpu_specs_scaleup_topology_closed', { gpu: displayedSpec.name });
   const displayedConfig = getScaleUpTopologyConfig(displayedSpec);
 
   const navigate = useCallback(

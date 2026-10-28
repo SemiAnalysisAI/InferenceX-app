@@ -10,6 +10,7 @@ import {
   requestIdleStats,
   shouldHandleTimelineBarClick,
   splitTimelineCid,
+  timelineWheelZoomDirection,
   type TimelineViewSnapshot,
 } from './request-timeline';
 
@@ -293,6 +294,18 @@ describe('shouldHandleTimelineBarClick', () => {
     expect(shouldHandleTimelineBarClick({ button: 0, shiftKey: true })).toBe(false);
     expect(shouldHandleTimelineBarClick({ button: 0, altKey: true })).toBe(false);
     expect(shouldHandleTimelineBarClick({ button: 1 })).toBe(false);
+  });
+});
+
+describe('timelineWheelZoomDirection', () => {
+  it('reports the same direction the zoom step applies, including horizontal-only wheels', () => {
+    expect(timelineWheelZoomDirection({ deltaX: 0, deltaY: -100 })).toBe('in');
+    expect(timelineWheelZoomDirection({ deltaX: 0, deltaY: 100 })).toBe('out');
+    // Shift+wheel on many platforms arrives as deltaX with deltaY === 0.
+    expect(timelineWheelZoomDirection({ deltaX: 100, deltaY: 0 })).toBe('out');
+    expect(timelineWheelZoomDirection({ deltaX: -100, deltaY: 0 })).toBe('in');
+    // Vertical wins when both are present.
+    expect(timelineWheelZoomDirection({ deltaX: 100, deltaY: -100 })).toBe('in');
   });
 });
 

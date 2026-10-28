@@ -75,6 +75,20 @@ export function shouldHandleTimelineBarClick({
   return button === 0 && !altKey && !ctrlKey && !metaKey && !shiftKey;
 }
 
+/**
+ * Shift+wheel zoom direction. Vertical scroll wins, horizontal scroll (trackpads, Shift remapping)
+ * is the fallback. Both the zoom step and its analytics event read this so they cannot disagree.
+ */
+export function timelineWheelZoomDirection({
+  deltaX,
+  deltaY,
+}: {
+  deltaX: number;
+  deltaY: number;
+}): 'in' | 'out' {
+  return (deltaY || deltaX) > 0 ? 'out' : 'in';
+}
+
 const ROW_MODE_OPTIONS: Record<'en' | 'zh', SegmentedToggleOption<RowMode>[]> = {
   en: [
     { value: 'conversation', label: 'By conversation', testId: 'timeline-mode-conversation' },
@@ -300,7 +314,7 @@ export function RequestTimelineView({
       e.preventDefault();
       // One event per wheel gesture, not per wheel tick.
       window.clearTimeout(zoomTrackTimer.current);
-      const direction = e.deltaY < 0 ? 'in' : 'out';
+      const direction = timelineWheelZoomDirection(e);
       zoomTrackTimer.current = window.setTimeout(
         () => track('inference_agentic_timeline_zoomed', { direction }),
         500,
@@ -311,8 +325,7 @@ export function RequestTimelineView({
       const curStart = vStart;
       const curEnd = vEnd;
       const curDur = curEnd - curStart;
-      const delta = e.deltaY || e.deltaX;
-      const factor = delta > 0 ? 1.2 : 1 / 1.2;
+      const factor = direction === 'out' ? 1.2 : 1 / 1.2;
       const newDur = Math.min(Math.max(curDur * factor, totalNs * 0.001), totalNs);
       const pivot = curStart + mouseRatio * curDur;
       let newStart = pivot - mouseRatio * newDur;

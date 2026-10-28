@@ -70,13 +70,13 @@ export const TopologyDiagram = forwardRef<
   const t = STRINGS[locale];
   const [open, setOpen] = useState(false);
   const [displayedIndex, setDisplayedIndex] = useState(0);
-  useDialogCloseTracking(open, 'gpu_specs_topology_closed', { gpu: spec.name });
   const displayedIndexRef = useRef(0);
   displayedIndexRef.current = displayedIndex;
 
   const compactConfig = getTopologyConfig(spec);
 
   const displayedSpec = allSpecs[displayedIndex] ?? spec;
+  useDialogCloseTracking(open, 'gpu_specs_topology_closed', { gpu: displayedSpec.name });
   const displayedConfig = getTopologyConfig(displayedSpec);
 
   const navigate = useCallback(
