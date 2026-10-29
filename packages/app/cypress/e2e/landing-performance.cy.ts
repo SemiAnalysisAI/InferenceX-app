@@ -78,7 +78,7 @@ describe('Landing page performance', () => {
 
     cy.visit(pageUnderTest, {
       onBeforeLoad(win) {
-        win.localStorage.removeItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed');
+        win.localStorage.removeItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed');
         observeLayoutShifts(win);
       },
     });
@@ -103,7 +103,7 @@ describe('Landing page performance', () => {
     cy.viewport(412, 823);
     cy.visit('/', {
       onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed', '1');
+        win.localStorage.setItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed', '1');
         observeLayoutShifts(win);
       },
     });
