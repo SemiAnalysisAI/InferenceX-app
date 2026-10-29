@@ -19,7 +19,7 @@ import { track } from '@/lib/analytics/analytics';
 import { toModel, toPrecisions, toSequence } from '@/lib/compare/compare-enum-coerce';
 import { SPEC_METHODS_ACTIVE } from '@/lib/compare/compare-variant-slug';
 import type { AgenticScenarioIntro } from '@/lib/compare/compare-ssr';
-import type { CompareTableData } from '@/lib/compare/compare-table-view';
+import { type CompareTableData, pinTablePrecisions } from '@/lib/compare/compare-table-view';
 
 const STRINGS = {
   en: {
@@ -252,7 +252,7 @@ export default function CompareSpecDecodePageClient({
               ssrTableData={ssrTableData}
               ssrSequence={defaultSequence}
               ssrModel={initialModel}
-              ssrPrecisions={initialPrecisions ?? []}
+              ssrPrecisions={defaultPrecision ? [defaultPrecision] : (initialPrecisions ?? [])}
               emptyStateText={t.emptyState}
             />
           </Card>
@@ -334,8 +334,8 @@ function CompareTableSection({
       effectiveSequence={effectiveSequence}
       sequenceResolved={sequenceResolved}
       selectedModel={selectedModel}
-      selectedPrecisions={selectedPrecisions}
-      effectivePrecisions={effectivePrecisions}
+      selectedPrecisions={pinTablePrecisions(selectedPrecisions, precision)}
+      effectivePrecisions={pinTablePrecisions(effectivePrecisions, precision)}
       latestRun={!selectedRunDate || selectedRunDate === availableDates.at(-1)}
       pointsA={pointsA}
       pointsB={pointsB}

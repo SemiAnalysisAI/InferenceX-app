@@ -129,6 +129,14 @@ export type CompareTableView =
   | { status: 'empty' };
 
 /**
+ * Precisions the table actually shows when it is pinned to one page precision: other
+ * control precisions only change the chart, so they must not count as a different selection.
+ */
+export function pinTablePrecisions(list: string[], pinned: string | null): string[] {
+  return pinned !== null && list.includes(pinned) ? [pinned] : list;
+}
+
+/**
  * Decides what the compare table shows. Server-rendered cells and the server's empty
  * state describe only the server's sequence, model, precisions, and latest run, so they
  * are used only while the controls show exactly that selection. Any other selection shows

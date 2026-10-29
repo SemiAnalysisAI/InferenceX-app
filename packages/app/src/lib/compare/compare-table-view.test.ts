@@ -5,6 +5,7 @@ import {
   type CompareTableData,
   type CompareTableViewInput,
   compareTableDataFromPoints,
+  pinTablePrecisions,
   resolveCompareTableView,
 } from '@/lib/compare/compare-table-view';
 
@@ -29,6 +30,17 @@ function makePoint(interactivity: number, throughput: number): GPUDataPoint {
     outputTpPerMw: 1100,
   };
 }
+
+describe('pinTablePrecisions', () => {
+  it('keeps only the pinned precision when the controls include it', () => {
+    expect(pinTablePrecisions(['fp8', 'fp4'], 'fp8')).toEqual(['fp8']);
+  });
+
+  it('keeps the control precisions when the pinned one is deselected or absent', () => {
+    expect(pinTablePrecisions(['fp4'], 'fp8')).toEqual(['fp4']);
+    expect(pinTablePrecisions(['fp8', 'fp4'], null)).toEqual(['fp8', 'fp4']);
+  });
+});
 
 const CLIENT_A = [makePoint(40, 900), makePoint(60, 700), makePoint(80, 500)];
 const CLIENT_B = [makePoint(50, 800), makePoint(70, 600), makePoint(90, 400)];
