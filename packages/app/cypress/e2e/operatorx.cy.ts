@@ -96,6 +96,7 @@ it('defaults to a measured 950PR shape and normalized BF16, while honoring preci
   cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view).as('ascend');
   cy.visit('/operatorx');
   cy.wait('@ascend');
+  cy.get('[data-testid="operatorx-viz-metric-vs-size"]').scrollIntoView();
   cy.get('[data-testid="operatorx-viz-metric-vs-size"] [data-testid="chart-legend"]').should(
     'contain.text',
     '950PR',
@@ -173,9 +174,10 @@ describe('OperatorX progressive rendering', { testIsolation: true }, () => {
       cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm).as('comparison');
       cy.visit(`${prefix}/operatorx`);
       cy.wait('@comparison');
-      cy.get('[data-testid="operatorx-viz-metric-vs-size"] svg').should('exist');
       const lower = '[data-testid="operatorx-viz-pairwise-scatter"]';
       cy.get(lower).should('have.attr', 'aria-busy', 'true').find('svg').should('not.exist');
+      cy.get('[data-testid="operatorx-viz-metric-vs-size"]').scrollIntoView();
+      cy.get('[data-testid="operatorx-viz-metric-vs-size"] svg').should('exist');
       cy.get(lower).scrollIntoView();
       cy.get(lower).should('have.attr', 'aria-busy', 'false').find('svg').should('exist');
       cy.get('[data-testid="operatorx-viz-distribution"]').scrollIntoView();
