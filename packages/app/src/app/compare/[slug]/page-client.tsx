@@ -5,10 +5,7 @@ import { useEffect, useMemo } from 'react';
 
 import type { GPUDataPoint } from '@/components/calculator/types';
 import { useThroughputData } from '@/components/calculator/useThroughputData';
-import {
-  CompareTableRenderer,
-  type CompareTableData,
-} from '@/components/compare/compare-table-renderer';
+import { CompareTableRenderer } from '@/components/compare/compare-table-renderer';
 import {
   GlobalFilterProvider,
   useGlobalFilterAvailability,
@@ -23,6 +20,7 @@ import type { BenchmarkRow } from '@/lib/api/api';
 import { toCalculatorBenchmarkRows } from '@/lib/benchmarks/benchmark-api-view';
 import { toModel, toPrecisions, toSequence } from '@/lib/compare/compare-enum-coerce';
 import type { AgenticScenarioIntro } from '@/lib/compare/compare-ssr';
+import type { CompareTableData } from '@/lib/compare/compare-table-view';
 
 const STRINGS = {
   en: {
@@ -120,6 +118,7 @@ export default function ComparePageClient({
         benchmarkQueryScope={benchmarkQueryScope}
         initialBenchmarkModel={initialModel}
         initialBenchmarkRows={initialBenchmarkRows}
+        initialBenchmarkSequence={defaultSequence ?? undefined}
       >
         <div className="flex flex-col gap-4">
           <Card className="flex flex-col gap-3">
@@ -204,6 +203,8 @@ export default function ComparePageClient({
               aLabel={aLabel}
               bLabel={bLabel}
               ssrTableData={ssrTableData}
+              ssrSequence={defaultSequence}
+              ssrPrecisions={initialPrecisions}
               initialModel={initialModel}
               initialSequence={initialSequence}
               initialCalculatorRows={initialCalculatorRows}
@@ -223,9 +224,11 @@ function CompareTableSection({
   aLabel,
   bLabel,
   ssrTableData,
+  ssrSequence,
   initialModel,
   initialSequence,
   initialCalculatorRows,
+  ssrPrecisions,
   emptyStateText,
 }: {
   a: string;
@@ -233,13 +236,21 @@ function CompareTableSection({
   aLabel: string;
   bLabel: string;
   ssrTableData: CompareTableData;
+  ssrSequence: string | null;
+  ssrPrecisions: string[] | undefined;
   initialModel: ReturnType<typeof toModel>;
   initialSequence: ReturnType<typeof toSequence>;
   initialCalculatorRows?: BenchmarkRow[];
   emptyStateText: string;
 }) {
-  const { effectiveSequence, effectivePrecisions, selectedModel, sequenceResolved } =
-    useGlobalFilterSelection();
+  const {
+    selectedSequence,
+    effectiveSequence,
+    effectivePrecisions,
+    selectedModel,
+    selectedPrecisions,
+    sequenceResolved,
+  } = useGlobalFilterSelection();
   const { availableDates } = useGlobalFilterAvailability();
   const { selectedRunDate } = useGlobalFilterRun();
   const latestAvailableDate = availableDates.at(-1) ?? '';
@@ -254,7 +265,7 @@ function CompareTableSection({
       ? initialCalculatorRows
       : undefined;
 
-  const { gpuDataByGroupKey, ranges, hasData } = useThroughputData(
+  const { gpuDataByGroupKey, ranges, hasData, loading, error } = useThroughputData(
     selectedModel,
     effectiveSequence,
     effectivePrecisions,
@@ -276,16 +287,26 @@ function CompareTableSection({
     return { pointsA: pA, pointsB: pB };
   }, [gpuDataByGroupKey, a, b]);
 
-  const clientRange = hasData ? ranges.interactivity : ssrTableData.interactivityRange;
-
   return (
     <CompareTableRenderer
       aLabel={aLabel}
       bLabel={bLabel}
       ssrTableData={ssrTableData}
-      interactivityRange={clientRange}
-      gpuDataPointsA={pointsA}
-      gpuDataPointsB={pointsB}
+      ssrSequence={ssrSequence}
+      ssrModel={initialModel}
+      ssrPrecisions={ssrPrecisions ?? []}
+      selectedSequence={selectedSequence}
+      effectiveSequence={effectiveSequence}
+      sequenceResolved={sequenceResolved}
+      selectedModel={selectedModel}
+      selectedPrecisions={selectedPrecisions}
+      effectivePrecisions={effectivePrecisions}
+      latestRun={calculatorRunDate === ''}
+      pointsA={pointsA}
+      pointsB={pointsB}
+      clientInteractivityRange={hasData ? ranges.interactivity : null}
+      loading={loading}
+      error={error}
       emptyStateText={emptyStateText}
     />
   );

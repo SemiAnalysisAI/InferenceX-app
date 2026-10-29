@@ -2,6 +2,7 @@ import { NextResponse, type NextFetchEvent, type NextRequest } from 'next/server
 
 import { EMBED_SKIN_HEADER, EMBED_THEME_HEADER, isEmbedPathname } from '@/lib/embed/embed-route';
 import { captureClientRequest } from '@/lib/analytics/cli-request-analytics';
+import { compareCanonicalRedirectUrl } from '@/lib/compare/compare-canonical-redirect';
 import { powerXRedirectUrl } from '@/lib/routing/powerx-redirect';
 
 const EMBED_CSP = 'frame-ancestors *';
@@ -11,6 +12,8 @@ export function proxy(request: NextRequest, event: Pick<NextFetchEvent, 'waitUnt
   if (capture) event.waitUntil(capture);
   const powerX = powerXRedirectUrl(request.nextUrl);
   if (powerX) return NextResponse.redirect(powerX);
+  const compare = compareCanonicalRedirectUrl(request.nextUrl);
+  if (compare) return NextResponse.redirect(compare, 308);
   const isEmbedRoute = isEmbedPathname(request.nextUrl.pathname);
   const requestHeaders = new Headers(request.headers);
   if (isEmbedRoute) {

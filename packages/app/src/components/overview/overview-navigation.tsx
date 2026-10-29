@@ -120,7 +120,7 @@ export function OverviewNavigationProvider({
   }, []);
 
   const commit = useCallback(
-    (href: string, updateHistory: boolean) => {
+    (href: string, updateHistory: boolean, recordPageview = true) => {
       const navigationId = ++navigationIdRef.current;
       pendingHrefRef.current = href;
       setPendingHref(href);
@@ -155,9 +155,11 @@ export function OverviewNavigationProvider({
           }
           setData(nextData);
           setNavigationError(false);
-          track('$pageview', {
-            $current_url: new URL(settledHref, window.location.origin).href,
-          });
+          if (recordPageview) {
+            track('$pageview', {
+              $current_url: new URL(settledHref, window.location.origin).href,
+            });
+          }
         })
         .catch(() => {
           if (navigationId !== navigationIdRef.current) return;
@@ -187,7 +189,10 @@ export function OverviewNavigationProvider({
     setPendingHref(href);
     setData(initialData);
     setNavigationError(false);
-  }, [initialData, initialHref]);
+    // The page is prerendered with the default controls, so a shared URL's controls load here.
+    // The landing already recorded its pageview, so loading them is not another one.
+    if (overviewDataKey(actual) !== overviewDataKey(href)) commit(actual, false, false);
+  }, [commit, initialData, initialHref]);
 
   useEffect(() => {
     const handlePopState = () => {

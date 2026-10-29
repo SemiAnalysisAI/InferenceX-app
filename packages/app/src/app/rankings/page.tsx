@@ -1,21 +1,22 @@
 import type { Metadata } from 'next';
 
-import { SITE_NAME, SITE_URL, SUPPORTERS_LINE } from '@semianalysisai/inferencex-constants';
+import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
 import { CatalogLinkCard } from '@/components/catalog/catalog-link-card';
 import { enAlternates } from '@/lib/i18n/i18n';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 import { INFERENCE_MODEL_SLUGS } from '@/lib/routing/inference-model-slug';
 import { getAllRankingPageEntries } from '@/lib/live-seo/rankings';
 
 const title = 'GPU Rankings for LLM Inference';
 const description =
-  'Live rankings of the fastest and cheapest GPUs for DeepSeek, Kimi, GLM, MiniMax & Qwen inference.';
+  'Live leaderboards of the fastest and cheapest GPUs for open LLMs like DeepSeek, Kimi, GLM and Qwen, ranked by measured tokens/s per GPU and $ per M tokens.';
 
 export const metadata: Metadata = {
   title,
-  description: `${description} ${SUPPORTERS_LINE}`,
+  description,
   keywords: [
     'fastest GPU for LLM inference',
     'cheapest GPU for LLM inference',
@@ -27,13 +28,12 @@ export const metadata: Metadata = {
     'GPU inference rankings',
   ],
   alternates: enAlternates('/rankings'),
-  openGraph: {
+  ...socialMetadata({
     title: `${title} | ${SITE_NAME}`,
     description,
     url: `${SITE_URL}/rankings`,
-    type: 'website',
-  },
-  twitter: { card: 'summary_large_image', title, description },
+    locale: 'en',
+  }),
 };
 
 export default function RankingsIndexPage() {

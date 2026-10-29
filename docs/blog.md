@@ -7,6 +7,7 @@ Blog posts are MDX files in `packages/app/content/blog/`, compiled at build time
 - **No runtime dependency**: Posts are part of the repo, versioned in git, reviewed in PRs. No CMS outage can break the blog.
 - **MDX flexibility**: Authors can embed custom React components (`Figure`, `Blur`) alongside Markdown. This matters for image-heavy technical articles with captions, paywall teasers, and code blocks.
 - **Static generation**: `generateStaticParams()` pre-renders all post pages. No server-side rendering at request time.
+- **Client-side tag filtering**: `/blog` and `/zh/blog` render one static index. `?tag=` is read in the browser by `blog-index-posts.tsx` (`useSearchParams()` inside a Suspense boundary), which filters the already-rendered cards, so tag links never create extra server renders or cache entries.
 
 Syntax highlighting uses Shiki with dual light/dark themes (CSS class-based switching, not runtime theme detection).
 

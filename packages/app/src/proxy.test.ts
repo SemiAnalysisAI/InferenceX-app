@@ -65,3 +65,27 @@ it('sends an old Inference Performance power link to PowerX with its filters', (
     'https://inferencex.semianalysis.com/powerx?g_model=DeepSeek-R1-0528&i_metric=y_measuredAvgPower',
   );
 });
+
+it('canonicalizes a compare slug with any query intact, including i_metric and utm tags', () => {
+  vi.stubGlobal('fetch', vi.fn());
+  const response = proxy(
+    new NextRequest(
+      'https://inferencex.semianalysis.com/zh/compare/deepseek-r1-h100-vs-gb200?i_metric=y_tpPerGpu&utm_source=newsletter&utm_campaign=launch',
+    ),
+    { waitUntil: vi.fn() },
+  );
+  expect(response.status).toBe(308);
+  expect(response.headers.get('location')).toBe(
+    'https://inferencex.semianalysis.com/zh/compare/deepseek-r1-gb200-vs-h100?i_metric=y_tpPerGpu&utm_source=newsletter&utm_campaign=launch',
+  );
+});
+
+it('passes a compare URL without a query through to the page', () => {
+  vi.stubGlobal('fetch', vi.fn());
+  const response = proxy(
+    new NextRequest('https://inferencex.semianalysis.com/compare/deepseek-r1-h100-vs-gb200'),
+    { waitUntil: vi.fn() },
+  );
+  expect(response.headers.get('x-middleware-next')).toBe('1');
+  expect(response.headers.has('location')).toBe(false);
+});

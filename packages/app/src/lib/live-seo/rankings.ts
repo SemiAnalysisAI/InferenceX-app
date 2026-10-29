@@ -6,6 +6,7 @@ import type {
   OverviewPlatformResult,
   OverviewScenario,
 } from '@/lib/overview/overview-data';
+import { fitMetaTitle } from '@/lib/seo/meta-text';
 
 export const RANKING_KINDS = ['fastest-gpu', 'cheapest-gpu'] as const;
 export type RankingKind = (typeof RANKING_KINDS)[number];
@@ -108,9 +109,18 @@ export function scenarioLabel(scenario: OverviewScenario, locale: 'en' | 'zh'): 
 }
 
 export function rankingPageTitle(entry: RankingPageEntry): string {
+  const model = entry.model.seoName;
   return entry.kind === 'fastest-gpu'
-    ? `Fastest GPU for ${entry.model.seoName} Inference: Live Rankings`
-    : `Cheapest GPU to Run ${entry.model.seoName}: $ per Million Tokens`;
+    ? fitMetaTitle([
+        `Fastest GPU for ${model} Inference: Live Rankings`,
+        `Fastest GPU for ${model} Inference`,
+        `Fastest GPU for ${model}`,
+      ])
+    : fitMetaTitle([
+        `Cheapest GPU to Run ${model}: $ per Million Tokens`,
+        `Cheapest GPU to Run ${model}: $/M Tokens`,
+        `Cheapest GPU for ${model}`,
+      ]);
 }
 
 export function rankingPageHeading(entry: RankingPageEntry): string {

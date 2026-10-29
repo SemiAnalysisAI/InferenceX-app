@@ -145,22 +145,20 @@ describe('Chinese (/zh) pages', () => {
   });
 
   describe('Run and Rankings model links', () => {
-    it('adds index supporter attribution only to the search description, matching English scope', () => {
+    it('keeps index descriptions free of supporter attribution and identical across search, social, and JSON-LD', () => {
       for (const path of ['/zh/run', '/zh/rankings']) {
         cy.request(path).then(({ body }) => {
           const document = new DOMParser().parseFromString(body, 'text/html');
           const content = (selector: string) =>
             document.querySelector(selector)?.getAttribute('content');
-          const baseDescription = content('meta[property="og:description"]');
-          expect(baseDescription).to.be.a('string').and.not.include(SUPPORTERS_LINE_ZH);
-          expect(content('meta[name="description"]')).to.eq(
-            `${baseDescription}${SUPPORTERS_LINE_ZH}`,
-          );
-          expect(content('meta[name="twitter:description"]')).to.eq(baseDescription);
+          const description = content('meta[name="description"]');
+          expect(description).to.be.a('string').and.not.include(SUPPORTERS_LINE_ZH);
+          expect(content('meta[property="og:description"]')).to.eq(description);
+          expect(content('meta[name="twitter:description"]')).to.eq(description);
           const collection = [...document.querySelectorAll('script[type="application/ld+json"]')]
             .map((script) => JSON.parse(script.textContent ?? '{}'))
             .find((data) => data['@type'] === 'CollectionPage');
-          expect(collection?.description).to.eq(baseDescription);
+          expect(collection?.description).to.eq(description);
         });
       }
     });
@@ -179,7 +177,8 @@ describe('Chinese (/zh) pages', () => {
 
         cy.get('meta[name="description"]')
           .invoke('attr', 'content')
-          .should('match', new RegExp(`${SUPPORTERS_LINE_ZH}$`, 'u'))
+          .should('be.a', 'string')
+          .and('not.include', SUPPORTERS_LINE_ZH)
           .then((description) => {
             cy.get('meta[property="og:description"]').should('have.attr', 'content', description);
             cy.get('meta[name="twitter:description"]').should('have.attr', 'content', description);

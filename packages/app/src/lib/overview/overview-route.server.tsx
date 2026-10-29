@@ -3,29 +3,10 @@ import type { Metadata } from 'next';
 import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { OverviewPageContent } from '@/components/overview/overview-page';
-import { enAlternates, type Locale, ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
-import {
-  OVERVIEW_HARDWARE,
-  overviewHardwareLabel,
-  resolveOverviewComparisonMode,
-  resolveOverviewEngineScope,
-  resolveOverviewHardwareRowScope,
-  resolveOverviewModelScope,
-  resolveOverviewReferenceHardware,
-  resolveOverviewRowScope,
-  resolveOverviewTier,
-} from '@/lib/overview/overview-data';
+import { enAlternates, type Locale, zhAlternates } from '@/lib/i18n/i18n';
+import { OVERVIEW_HARDWARE, overviewHardwareLabel } from '@/lib/overview/overview-data';
 import { getOverviewPageData } from '@/lib/overview/overview-data.server';
-
-export type OverviewSearchParams = Record<string, string | string[] | undefined>;
-
-export interface OverviewRoutePageProps {
-  searchParams: Promise<OverviewSearchParams>;
-}
-
-interface OverviewRouteProps extends OverviewRoutePageProps {
-  locale: Locale;
-}
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 function overviewPlatformList(locale: Locale): string {
   const labels = OVERVIEW_HARDWARE.map((hardware) => overviewHardwareLabel(hardware));
@@ -46,32 +27,20 @@ export function buildOverviewMetadata(locale: Locale): Metadata {
     title,
     description,
     alternates: locale === 'zh' ? zhAlternates('/overview') : enAlternates('/overview'),
-    openGraph: {
+    ...socialMetadata({
       title: `${title} | ${SITE_NAME}`,
       description,
       url: `${SITE_URL}${path}`,
-      type: 'website',
-      ...(locale === 'zh' ? { locale: ZH_OG_LOCALE } : {}),
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: `${title} | ${SITE_NAME}`,
-      description,
-    },
+      locale,
+    }),
   };
 }
 
-export async function renderOverviewPage({ locale, searchParams }: OverviewRouteProps) {
-  const params = await searchParams;
-  const data = await getOverviewPageData(
-    resolveOverviewTier(params.tier),
-    resolveOverviewEngineScope(params.engine),
-    resolveOverviewComparisonMode(params.compare),
-    resolveOverviewReferenceHardware(params.ref),
-    resolveOverviewModelScope(params.models),
-    resolveOverviewRowScope(params.rows),
-    resolveOverviewHardwareRowScope(params.hwrows),
-  );
-
+/**
+ * Overview pages are prerendered with the default controls; `OverviewNavigationProvider`
+ * loads any other state a shared URL asks for from `/api/v1/overview` after mount.
+ */
+export async function renderOverviewPage({ locale }: { locale: Locale }) {
+  const data = await getOverviewPageData();
   return <OverviewPageContent data={data} locale={locale} />;
 }

@@ -1,5 +1,7 @@
 import { GPU_KEYS, HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
+import { fitMetaTitle } from '../seo/meta-text';
+
 const SEPARATOR = '-vs-';
 
 export interface CompareModelSlug {
@@ -265,7 +267,9 @@ export function compareModelSeoName(model: CompareModelSlug): string {
 }
 
 export function compareSeoTitle(gpuLabel: string, modelSeoName: string): string {
-  const full = `${gpuLabel}: ${modelSeoName} Inference Benchmark`;
-  if (full.length <= 60) return full;
-  return `${gpuLabel}: ${modelSeoName} Benchmark`;
+  return fitMetaTitle([
+    `${gpuLabel}: ${modelSeoName} Inference Benchmark`,
+    `${gpuLabel}: ${modelSeoName} Benchmark`,
+    `${gpuLabel}: ${modelSeoName}`,
+  ]);
 }

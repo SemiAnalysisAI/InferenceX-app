@@ -1,12 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import {
-  HW_REGISTRY,
-  SITE_NAME,
-  SITE_URL,
-  SUPPORTERS_LINE_ZH,
-} from '@semianalysisai/inferencex-constants';
+import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
 import { JsonLd } from '@/components/seo/json-ld';
@@ -22,11 +17,13 @@ import {
   precisionDisplayLabel,
   specMethodDisplayLabel,
 } from '@/lib/compare/compare-variant-slug';
-import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
+import { zhAlternates } from '@/lib/i18n/i18n';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
 
-const DESCRIPTION = `投机解码（例如 MTP 式多 token 预测，以及 MiniMax M3 所采用的 EAGLE 等模型专用方法）能否提升推理吞吐量并降低成本？InferenceX 是 SemiAnalysis 推出的独立开源基准测试平台，测试结果均经过验证且可复现。${SUPPORTERS_LINE_ZH}每个页面都会在同一模型和芯片上，对比启用某种投机解码方法与关闭投机解码时的表现。`;
+const DESCRIPTION =
+  '投机解码（MTP、EAGLE 等）能否提升推理吞吐量并降低成本？每个页面在同一模型和芯片上对比启用与关闭投机解码时的表现，数据来自 InferenceX 开源基准测试。';
 
 /** Search snippet; the longer DESCRIPTION stays in the JSON-LD. */
 const META_DESCRIPTION =
@@ -36,18 +33,12 @@ export const metadata: Metadata = {
   title: '芯片投机解码对比',
   description: META_DESCRIPTION,
   alternates: zhAlternates('/compare-spec-decode'),
-  openGraph: {
+  ...socialMetadata({
     title: `芯片投机解码对比 | ${SITE_NAME}`,
     description: META_DESCRIPTION,
     url: `${SITE_URL}/zh/compare-spec-decode`,
-    type: 'website',
-    locale: ZH_OG_LOCALE,
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: `芯片投机解码对比 | ${SITE_NAME}`,
-    description: META_DESCRIPTION,
-  },
+    locale: 'zh',
+  }),
 };
 
 const jsonLd = {
