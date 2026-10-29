@@ -9,7 +9,7 @@ import { socialMetadata } from '@/lib/seo/social-metadata';
 
 const TITLE = 'Exploring Agentic Workloads: Detailed Telemetry';
 const DESCRIPTION =
-  'How to read the telemetry behind a single AgentX point: the per-point charts, the request timeline, KV offload markers, and the per-conversation flamegraph.';
+  'How to read the telemetry behind one AgentX point: the per-point charts, the request timeline, KV offload markers, and the per-conversation flamegraph.';
 
 export const metadata: Metadata = {
   title: 'AgentX Telemetry Tutorial',

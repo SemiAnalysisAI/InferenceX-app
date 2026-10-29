@@ -12,7 +12,7 @@ import { rankingPageHeadingZh } from '@/lib/live-seo/rankings-zh';
 
 const title = 'LLM 推理 GPU 排行榜';
 const description =
-  'DeepSeek、Kimi、GLM、MiniMax、Qwen 等开源大模型推理的最快与最省钱 GPU 实时排行。按实测单 GPU 每秒 token 数与每百万 token 成本排名，数据持续更新。';
+  'DeepSeek、Kimi、GLM、MiniMax、Qwen 等开源大模型推理的最快与最省钱 GPU 实时排行，按实测吞吐量与每百万 token 成本排名。';
 
 export const metadata: Metadata = {
   title,

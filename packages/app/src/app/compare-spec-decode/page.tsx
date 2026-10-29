@@ -29,20 +29,24 @@ export const dynamic = 'force-dynamic';
 
 const DESCRIPTION = `Does speculative decoding (MTP-style multi-token prediction, model-specific methods like EAGLE for MiniMax M3) improve inference throughput and cost? InferenceX is the independent, open-source benchmark from SemiAnalysis, with verified, reproducible results. ${SUPPORTERS_LINE} Each page compares a model + chip with the speculative decoding method ON versus OFF.`;
 
+/** Search snippet; the longer DESCRIPTION stays in the JSON-LD. */
+const META_DESCRIPTION =
+  'Speculative decoding on vs off for the same model and chip: does MTP or EAGLE raise inference throughput and cut cost? Independent, open-source benchmarks.';
+
 export const metadata: Metadata = {
   title: 'Chip Speculative Decoding Comparisons',
-  description: DESCRIPTION,
+  description: META_DESCRIPTION,
   alternates: enAlternates('/compare-spec-decode'),
   openGraph: {
     title: `Chip Speculative Decoding Comparisons | ${SITE_NAME}`,
-    description: DESCRIPTION,
+    description: META_DESCRIPTION,
     url: `${SITE_URL}/compare-spec-decode`,
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
     title: `Chip Speculative Decoding Comparisons | ${SITE_NAME}`,
-    description: DESCRIPTION,
+    description: META_DESCRIPTION,
   },
 };
 

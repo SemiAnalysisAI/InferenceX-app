@@ -26,13 +26,17 @@ export const dynamic = 'force-dynamic';
 
 const DESCRIPTION = `哪款芯片的每美元推理性能更高？InferenceX 是 SemiAnalysis 推出的独立开源基准测试平台，测试结果均经过验证且可复现。${SUPPORTERS_LINE_ZH}对比 DeepSeek V4 Pro、DeepSeek R1、Kimi K2、MiniMax M3、GLM 5、Qwen 3.5 等模型按 Hyperscaler TCO 归一化后的每百万 token 成本。`;
 
+/** Search snippet; the longer DESCRIPTION stays in the JSON-LD. */
+const META_DESCRIPTION =
+  '对比各芯片按 Hyperscaler TCO 归一化后的每百万 token 成本，覆盖 DeepSeek、Kimi、MiniMax、GLM、Qwen 等模型。独立开源基准测试，结果可复现。';
+
 export const metadata: Metadata = {
   title: '芯片每美元性能',
-  description: DESCRIPTION,
+  description: META_DESCRIPTION,
   alternates: zhAlternates('/compare-per-dollar'),
   openGraph: {
     title: `芯片每美元性能 | ${SITE_NAME}`,
-    description: DESCRIPTION,
+    description: META_DESCRIPTION,
     url: `${SITE_URL}/zh/compare-per-dollar`,
     type: 'website',
     locale: ZH_OG_LOCALE,
@@ -40,7 +44,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: `芯片每美元性能 | ${SITE_NAME}`,
-    description: DESCRIPTION,
+    description: META_DESCRIPTION,
   },
 };
 

@@ -7,7 +7,7 @@ import { socialMetadata } from '@/lib/seo/social-metadata';
 
 const TITLE = '面向 LLM 推理的 AI 芯片：规格、价格与基准测试';
 const DESCRIPTION =
-  'NVIDIA Hopper 与 Blackwell（H100、H200、B200、B300、GB200 NVL72、GB300 NVL72）以及 AMD Instinct（MI300X、MI325X、MI355X）芯片的规格、云端价格与持续测量的 LLM 推理基准测试。';
+  'NVIDIA H100、H200、B200、B300、GB200 NVL72、GB300 NVL72 与 AMD MI300X、MI325X、MI355X 的芯片规格、云端价格与持续测量的 LLM 推理基准测试。';
 
 export const metadata: Metadata = {
   title: TITLE,

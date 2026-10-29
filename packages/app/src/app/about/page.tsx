@@ -14,7 +14,7 @@ import { GITHUB_OWNER, GITHUB_REPO, SITE_URL } from '@semianalysisai/inferencex-
 const faqJsonLd = buildFaqJsonLd(FAQ_ITEMS);
 
 const ABOUT_DESCRIPTION =
-  'InferenceX benchmarks agentic and fixed-sequence AI inference across accelerators and serving stacks. AgentX is its long-context, multi-turn coding scenario.';
+  'InferenceX benchmarks agentic and fixed-sequence inference across accelerators and serving stacks. AgentX is its long-context, multi-turn coding scenario.';
 
 export const metadata: Metadata = {
   title: 'About',

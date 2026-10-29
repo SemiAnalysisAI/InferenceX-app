@@ -6,7 +6,7 @@ import { socialMetadata } from '@/lib/seo/social-metadata';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const DESCRIPTION =
-  'InferenceX 获得了众多大型算力采购方和 ML 社区知名人士的认可。以下评价来自 MiniMax、Moonshot Kimi、Alibaba Qwen、OpenAI、Microsoft、vLLM、PyTorch Foundation 和 Oracle 等机构的相关人士。';
+  '大型算力采购方与 ML 社区对 InferenceX 的评价，来自 MiniMax、Moonshot Kimi、Alibaba Qwen、OpenAI、Microsoft、vLLM、PyTorch Foundation、Oracle 等。';
 
 export const metadata: Metadata = {
   title: '业界与社区评价',

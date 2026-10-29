@@ -10,7 +10,7 @@ import { socialMetadata } from '@/lib/seo/social-metadata';
 
 const TITLE = 'AgentX Telemetry';
 const DESCRIPTION =
-  'Browse every AgentX benchmark run with stored per-request telemetry, grouped by model and serving stack. Each configuration opens its point-detail charts, request timeline, and cache behavior.';
+  'Every AgentX benchmark run with per-request telemetry, grouped by model and serving stack, with point-detail charts, request timelines and cache behavior.';
 
 export const metadata: Metadata = {
   title: TITLE,

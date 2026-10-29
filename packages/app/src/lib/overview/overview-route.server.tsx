@@ -39,7 +39,7 @@ export function buildOverviewMetadata(locale: Locale): Metadata {
   const description =
     locale === 'zh'
       ? `对比 ${platforms} 在 AgentX 长上下文、多轮编码场景及固定序列场景下，按超大规模云厂商口径计算的每百万总 token 成本；仅展示具备对应数据的模型。`
-      : `Compare hyperscaler cost per million total tokens across ${platforms} for the AgentX long-context, multi-turn coding scenario and fixed-sequence scenarios where data is available.`;
+      : `Hyperscaler cost per million total tokens on ${platforms} for AgentX long-context coding and fixed-sequence scenarios.`;
   const path = locale === 'zh' ? '/zh/overview' : '/overview';
 
   return {

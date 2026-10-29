@@ -26,20 +26,24 @@ export const dynamic = 'force-dynamic';
 
 const DESCRIPTION = `Which chip delivers more inference performance per dollar? InferenceX is the independent, open-source benchmark from SemiAnalysis, with verified, reproducible results. ${SUPPORTERS_LINE} Compare cost per million tokens, normalized by hyperscaler TCO, across DeepSeek V4 Pro, DeepSeek R1, Kimi K2, MiniMax M3, GLM 5, Qwen 3.5 & more.`;
 
+/** Search snippet; the longer DESCRIPTION stays in the JSON-LD. */
+const META_DESCRIPTION =
+  'Compare cost per million tokens, normalized by hyperscaler TCO, across chips for DeepSeek, Kimi, MiniMax, GLM, Qwen & more. Open, reproducible benchmarks.';
+
 export const metadata: Metadata = {
   title: 'Chip Performance per Dollar',
-  description: DESCRIPTION,
+  description: META_DESCRIPTION,
   alternates: enAlternates('/compare-per-dollar'),
   openGraph: {
     title: `Chip Performance per Dollar | ${SITE_NAME}`,
-    description: DESCRIPTION,
+    description: META_DESCRIPTION,
     url: `${SITE_URL}/compare-per-dollar`,
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
     title: `Chip Performance per Dollar | ${SITE_NAME}`,
-    description: DESCRIPTION,
+    description: META_DESCRIPTION,
   },
 };
 
