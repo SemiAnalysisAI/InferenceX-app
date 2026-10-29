@@ -777,7 +777,17 @@ export default function VideoDashboard() {
             data-testid="results-overlay-dismiss"
             className="underline"
             onClick={() => {
-              update({ unofficialRun: null });
+              const approvedWorkloads = resultProjection(points, {
+                ...state,
+                unofficialRun: null,
+              }).options.workloads;
+              update({
+                unofficialRun: null,
+                ...(state.workload !== null &&
+                !approvedWorkloads.some((workload) => workload.key === state.workload)
+                  ? { workload: null }
+                  : {}),
+              });
               track('video_results_overlay_dismissed');
             }}
           >

@@ -683,14 +683,15 @@ Example: `/api/v1/views/video?view=overview&r_tier=r&r_deadline=120&r_price_t2v=
 The plural shared-link alias accepts exactly one positive run ID in this overview. Multiple IDs or both aliases together return HTTP 400; no extra source is ingested.
 
 Default points require a matching publication approval. The named channel never
-admits another run and clearing it cannot promote unapproved evidence. Approved
+admits another run and clearing it cannot promote unapproved evidence. Dismissal
+retains a workload selector only if it remains in the approved choices. Approved
 cohorts retain default preference; a workload found only in the named run requires
 explicit selection or no matching approved cohort. Both channels use the same
 qualification and metric rules. Legacy dashboard/compare views stay approved-only.
 The overview returns JSON only; `format=csv` is unsupported and returns HTTP 400.
 
 中文：默认结果必须有匹配的发布批准记录。指定运行的通道只包含该运行，保留实际批准状态；
-清除叠加运行后不会将未批准数据转为正式结果。默认优先选择有已批准结果的工作负载；
+清除叠加运行后不会将未批准数据转为正式结果。移除时，工作负载选择仅在已批准选项中仍然有效时保留。默认优先选择有已批准结果的工作负载；
 仅由指定运行提供的工作负载须明确选择，或在没有匹配的已批准结果时作为回退。两条通道共用准入和计算规则。
 旧 dashboard/compare 视图仍仅接纳已批准结果。overview 只返回 JSON，`format=csv` 返回 400。
 

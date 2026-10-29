@@ -4,6 +4,8 @@ import type {
   VideoHistoryObservation,
   VideoHistoryPage,
 } from '@/components/video-benchmark/history';
+import { videoPoints } from '@/components/video-benchmark/points';
+import { servingArtifact } from '../support/video-artifacts';
 import {
   assertResultsFit,
   readOnlyVideoRequests,
@@ -155,6 +157,107 @@ describe('VideoGenX results', () => {
       else costRow('h200').should('exist');
     });
   }
+
+  it('restores the approved workload after dismissing an explicitly selected named-only workload', () => {
+    mount({
+      search: '?unofficialrun=34341996789',
+      editPage: (page) => {
+        const entry = page.entries.find((item) => item.runId === '34341996789')!;
+        entry.approved = false;
+        for (const source of entry.sources)
+          for (const observation of source.observations) {
+            const workload = JSON.parse(observation.workloadKey!);
+            workload.plan.cases[0].seed += 1;
+            observation.workloadKey = JSON.stringify(workload);
+            if (observation.concurrency === 1) cy.wrap(observation.id).as('namedWorkload');
+          }
+      },
+    });
+    costRow('h200').should('exist');
+    cy.get<string>('@namedWorkload').then((sourceId) => {
+      cy.get('[data-testid="results-workload"]').click('left');
+      cy.get('[data-select-option]')
+        .filter((_, option) => option.dataset.value === sourceId)
+        .click();
+    });
+    costRow('b200').should('have.attr', 'data-overlay', 'true');
+    costRow('h200').should('not.exist');
+    cy.get('[data-testid="results-overlay-dismiss"]').click();
+    costRow('h200').should('have.attr', 'data-overlay', 'false');
+    costRow('b200').should('not.exist');
+    cy.location('search').should('not.contain', 'r_workload=').and('not.contain', 'unofficialrun');
+  });
+
+  it('preserves an explicitly selected approved workload when dismissing an overlay', () => {
+    mount({ search: '?unofficialrun=34342452354' });
+    cy.get('[data-testid="results-workload"]').click('left');
+    cy.get('[data-select-option]').last().click();
+    cy.location('search').then((search) => {
+      const selected = new URLSearchParams(search).get('r_workload');
+      expect(selected).not.to.equal(null);
+      cy.get('[data-testid="results-overlay-dismiss"]').click();
+      cy.location('search').should((cleared) => {
+        expect(new URLSearchParams(cleared).get('r_workload')).to.equal(selected);
+        expect(cleared).not.to.contain('unofficialrun');
+      });
+      costRow('h200').should('have.attr', 'data-overlay', 'false');
+    });
+  });
+
+  it('requests the new artifact when a named run re-exports the same observation ID', () => {
+    const namedRun = '90000000001';
+    mount({
+      editPage: (page) => {
+        const original = page.entries.find((entry) => entry.runId === '34341996789')!;
+        const reexport = structuredClone(original);
+        reexport.runId = namedRun;
+        reexport.artifact.id = 99991;
+        reexport.approved = false;
+        page.entries.unshift(reexport);
+        const point = videoPoints([page]).find(
+          (item) => item.hardwareKey === 'b200' && item.concurrency === 1,
+        )!;
+        const saved = servingArtifact(Number(point.runId), point.artifactId, 'NVIDIA B200');
+        saved.sources[0].checksums = saved.sources[0].checksums.map(([path, sha]) => [
+          path,
+          path === 'manifest.json' ? point.id.split(':')[0] : sha,
+        ]);
+        cy.intercept('GET', 'https://media.test/**', {
+          fixture: 'video-results/candidate.mp4',
+          headers: { 'Content-Type': 'video/mp4' },
+        });
+        cy.intercept(
+          'GET',
+          `/api/video-runs?run=${point.runId}&artifact=${point.artifactId}&format=published`,
+          saved,
+        ).as('approvedMedia');
+        cy.intercept('GET', `/api/video-runs?run=${namedRun}&artifact=99991&format=published`, {
+          statusCode: 204,
+        }).as('namedMedia');
+      },
+    });
+    cy.wait('@approvedMedia');
+    cy.get('[data-testid="video-results-clip"][data-hardware="b200"] video').should('exist');
+    cy.window().then((win) => {
+      win.history.replaceState(null, '', `${win.location.pathname}?unofficialrun=${namedRun}`);
+      win.dispatchEvent(new win.PopStateEvent('popstate'));
+    });
+    costRow('b200').filter('[data-overlay="true"]').should('exist');
+    cy.wait('@namedMedia');
+    cy.get('[data-testid="video-results-clip"][data-hardware="b200"] video').should('not.exist');
+    cy.get('[data-testid="video-results-sources"] summary').click();
+    cy.get('[data-testid="video-results-sources"] tbody tr')
+      .contains('td', /^B200$/u)
+      .parent()
+      .should('contain', namedRun)
+      .and('contain', '99991')
+      .and('contain', 'No matching receipt')
+      .find('a')
+      .should('not.exist');
+    cy.get('[data-testid="results-overlay-dismiss"]').click();
+    cy.get('[data-testid="video-results-clip"][data-hardware="b200"] video').should('exist');
+    cy.get('@approvedMedia.all').should('have.length', 1);
+  });
 
   it('keeps matching summaries distinct and selects the exact source ID', () => {
     mount({

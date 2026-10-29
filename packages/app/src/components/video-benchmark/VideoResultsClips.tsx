@@ -161,18 +161,19 @@ export default function VideoResultsClips({
     setSides([]);
     void Promise.allSettled(
       selected.map(async (point) => {
-        if (cache.current.has(point.id)) return cache.current.get(point.id)!;
+        const sourceKey = JSON.stringify([point.runId, point.artifactId, point.id]);
+        if (cache.current.has(sourceKey)) return cache.current.get(sourceKey)!;
         const response = await fetch(
           `/api/video-runs?run=${encodeURIComponent(point.runId)}&artifact=${encodeURIComponent(String(point.artifactId))}&format=published`,
           { signal: controller.signal },
         );
         if (response.status === 204) {
-          cache.current.set(point.id, null);
+          cache.current.set(sourceKey, null);
           return null;
         }
         if (!response.ok) throw new Error('Published media read failed');
         const side = publishedResultsSide((await response.json()) as StoredArtifact, point);
-        cache.current.set(point.id, side);
+        cache.current.set(sourceKey, side);
         return side;
       }),
     ).then((results) => {

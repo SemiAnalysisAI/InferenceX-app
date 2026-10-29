@@ -39,7 +39,8 @@ registry scope. `?unofficialrun=<id>` reads only that stored run through
 `namedRunPoints`, retaining its actual approval status. While selected, that run
 appears only in `overlayCells`, even if approved; it leaves official cells,
 deployment cells and workload mix. Clearing the selection cannot promote an
-unapproved source. All comparison filters and sample requirements still apply.
+unapproved source. Dismissal clears a workload selection absent from the approved
+choices and preserves valid approved selections. All comparison filters and sample requirements still apply.
 Unknown or unstored runs remain unavailable; the URL cannot trigger publication,
 storage writes or GPU work.
 
@@ -159,6 +160,7 @@ Difference 是相对已记录 H200 H3 50-step 视频的浏览器 RGB 差异预�
 保留其发布批准状态，并单独放入 overlayCells；选中期间，即使已批准也不进入正式结果、部署或工作负载构成。
 默认优先选择有已批准结果的工作负载；仅由指定运行提供的工作负载须明确选择，
 或在没有匹配的已批准结果时作为回退。
-支持隐藏硬件及移除；清除叠加运行后不会将未批准数据转为正式结果。overview 仅返回 JSON，`format=csv` 返回 400。
+支持隐藏硬件及移除；清除叠加运行后不会将未批准数据转为正式结果。
+移除时，工作负载选择仅在已批准选项中仍然有效时保留。overview 仅返回 JSON，`format=csv` 返回 400。
 读取不会启动 GPU、写入 Blob 或发布媒体。测试覆盖 API 一致性、样本门槛、
 两种成本口径、缺失证据、同步视频与中英文 390px 布局。
