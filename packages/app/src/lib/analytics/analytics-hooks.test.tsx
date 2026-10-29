@@ -68,4 +68,13 @@ describe('useSearchTracking', () => {
     act(() => vi.advanceTimersByTime(SEARCH_TRACK_DELAY_MS));
     expect(track).toHaveBeenCalledTimes(2);
   });
+
+  it('drops a pending search event when the component unmounts first', () => {
+    act(() => root.render(<SearchProbe query="h100" />));
+    act(() => vi.advanceTimersByTime(SEARCH_TRACK_DELAY_MS - 1));
+    act(() => root.unmount());
+    root = createRoot(document.createElement('div'));
+    vi.advanceTimersByTime(SEARCH_TRACK_DELAY_MS);
+    expect(track).not.toHaveBeenCalled();
+  });
 });

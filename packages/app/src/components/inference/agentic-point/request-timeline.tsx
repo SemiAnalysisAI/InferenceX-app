@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { type RequestRecord, type RequestTimeline } from '@/hooks/api/use-request-timeline';
@@ -308,6 +308,8 @@ export function RequestTimelineView({
 
   const zoomSvgRef = useRef<SVGSVGElement | null>(null);
   const zoomTrackTimer = useRef<number | undefined>(undefined);
+  // Drop a pending zoom event on unmount so it is never attributed to the next page.
+  useEffect(() => () => window.clearTimeout(zoomTrackTimer.current), []);
   const handleWheel = useCallback(
     (e: WheelEvent) => {
       if (!e.shiftKey) return;
