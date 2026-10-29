@@ -29,6 +29,7 @@ import { CollectiveXSwapSection } from './CollectiveXSwapSection';
 import { CollectiveXKvSection } from './CollectiveXKvSection';
 import { CollectiveXSupportMatrices } from './CollectiveXSupportMatrices';
 import {
+  collectiveXBackendLabel,
   collectiveXColorKey,
   collectiveXLegendLabel,
   collectiveXRangeBands,
@@ -248,11 +249,11 @@ function ControlGroup({
 function selectOptions(
   values: string[],
   allLabel: string,
-  uppercase = false,
+  format: (value: string) => string = (value) => value,
 ): SelectOption<string>[] {
   return values.map((value) => ({
     value,
-    label: value === 'all' ? allLabel : uppercase ? value.toUpperCase() : value,
+    label: value === 'all' ? allLabel : format(value),
   }));
 }
 
@@ -496,7 +497,7 @@ export default function CollectiveXDisplay() {
         color: colors[collectiveXColorKey(item)] ?? 'var(--muted-foreground)',
         lineDasharray: collectiveXRunDasharray(item.run_index),
         isActive: activeSeriesIds.has(item.series_id),
-        title: `#${item.run_id} · EP${item.system.ep_size} · ${collectiveXTopologyLabel(item.system, locale)}`,
+        title: `EP${item.system.ep_size} · ${collectiveXTopologyLabel(item.system, locale)}`,
         onClick: () => {
           setActiveSeriesIds((previous) => {
             const next = new Set(previous);
@@ -815,7 +816,7 @@ export default function CollectiveXDisplay() {
                     label={t.sku}
                     testId="collectivex-sku-select"
                     value={sku}
-                    options={selectOptions(skuOptions, t.all, true)}
+                    options={selectOptions(skuOptions, t.all, (value) => value.toUpperCase())}
                     onChange={(next) => {
                       setSku(next);
                       track('collectivex_sku_changed', { gpu: next });
@@ -825,7 +826,7 @@ export default function CollectiveXDisplay() {
                     label={t.backend}
                     testId="collectivex-backend-select"
                     value={backend}
-                    options={selectOptions(backendOptions, t.all)}
+                    options={selectOptions(backendOptions, t.all, collectiveXBackendLabel)}
                     onChange={(next) => {
                       setBackend(next);
                       track('collectivex_backend_changed', { backend: next });
@@ -958,7 +959,7 @@ export default function CollectiveXDisplay() {
           )}
         </>
       )}
-      <CollectiveXSupportMatrices />
+      <CollectiveXSupportMatrices series={combinedSeries} />
     </section>
   );
 }

@@ -287,3 +287,45 @@ export function collectiveXKnownFootnoteOrder(mode: 'normal' | 'low-latency'): s
   }
   return seen;
 }
+
+/** The fields of a measured series the matrix reads its backend versions from. */
+export interface CollectiveXVersionedSeries {
+  mode: 'normal' | 'low-latency';
+  backend: string;
+  library_version?: string | null;
+  system: { sku: string };
+}
+
+/** The matrix row of a pool: `h100-dgxc` and `b200-nscale` are the H100 and B200 rows. */
+export function collectiveXKnownSkuOf(poolSku: string): CollectiveXKnownSku | null {
+  const sku = poolSku.toLowerCase().split('-')[0];
+  return (COLLECTIVEX_KNOWN_SKUS as readonly string[]).includes(sku)
+    ? (sku as CollectiveXKnownSku)
+    : null;
+}
+
+/**
+ * The cell's label for a recorded version: the first token (uccl appends its build flags), with
+ * any commit hash cut to seven characters.
+ */
+export function collectiveXShortLibraryVersion(version: string): string {
+  const head = version.trim().split(/\s+/)[0] ?? '';
+  return head.replaceAll(/[0-9a-f]{12,40}/g, (hash) => hash.slice(0, 7));
+}
+
+/** The distinct recorded versions of each `mode/sku/library` cell, sorted. */
+export function collectiveXKnownVersions(
+  series: readonly CollectiveXVersionedSeries[],
+): Map<string, string[]> {
+  const versions = new Map<string, Set<string>>();
+  for (const item of series) {
+    const sku = collectiveXKnownSkuOf(item.system.sku);
+    const version = item.library_version?.trim();
+    if (!sku || !version) continue;
+    const key = `${item.mode}/${sku}/${item.backend}`;
+    const recorded = versions.get(key) ?? new Set<string>();
+    recorded.add(version);
+    versions.set(key, recorded);
+  }
+  return new Map([...versions].map(([key, recorded]) => [key, [...recorded].toSorted()]));
+}

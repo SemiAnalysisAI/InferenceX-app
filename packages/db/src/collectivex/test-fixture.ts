@@ -23,6 +23,7 @@ export interface ShardOverrides {
   sku?: string;
   backend?: string;
   implName?: string;
+  libraryVersion?: string;
   ep?: number;
   phase?: string;
   mode?: string | null;
@@ -140,7 +141,10 @@ export function makeRawShard(options: ShardOverrides = {}): Json {
       case_id: caseId,
       case_factors: { sku, case: makeRawCase({ ...options, backend }, caseId) },
     },
-    implementation: { name: options.implName ?? backend },
+    implementation: {
+      name: options.implName ?? backend,
+      ...(options.libraryVersion ? { library_version: options.libraryVersion } : {}),
+    },
     runtime: { vendor: options.vendor ?? 'nvidia' },
     measurement: { rows: rows.map((row, index) => makeRawRow(index, row, worldSize)) },
     outcome: {

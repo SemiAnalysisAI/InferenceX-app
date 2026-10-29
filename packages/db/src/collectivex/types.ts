@@ -81,6 +81,8 @@ export interface CollectiveXSeries {
   mode: CollectiveXMode;
   precision: CollectiveXPrecision;
   backend: string;
+  /** The backend build the case ran (`implementation.library_version`), when recorded. */
+  library_version?: string | null;
   system: CollectiveXTopology & {
     sku: string;
     vendor: 'nvidia' | 'amd';

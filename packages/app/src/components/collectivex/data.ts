@@ -47,6 +47,13 @@ export function collectiveXSkuLabel(sku: string): string {
   return normalizeCollectiveXSku(sku).toUpperCase();
 }
 
+/** Display names for backends whose project styles the name differently from the backend id. */
+const COLLECTIVEX_BACKEND_LABELS: Record<string, string> = { mori: 'MoRI' };
+
+export function collectiveXBackendLabel(backend: string): string {
+  return COLLECTIVEX_BACKEND_LABELS[backend] ?? backend;
+}
+
 export function collectiveXCaseLabel(label: string, sku: string): string {
   return label.startsWith(sku) ? `${collectiveXSkuLabel(sku)}${label.slice(sku.length)}` : label;
 }
@@ -84,15 +91,14 @@ export function collectiveXTopologyLabel(
 export function collectiveXLegendLabel(series: CollectiveXSeries, locale: Locale = 'en'): string {
   const mode = locale === 'zh' ? COLLECTIVEX_MODE_LABELS_ZH[series.mode] : series.mode;
   const phase = locale === 'zh' ? COLLECTIVEX_PHASE_LABELS_ZH[series.phase] : series.phase;
-  return `${collectiveXSkuLabel(series.system.sku)} · ${series.backend} · EP${series.system.ep_size} · ${mode} · ${phase} · ${series.precision}`;
+  return `${collectiveXSkuLabel(series.system.sku)} · ${collectiveXBackendLabel(series.backend)} · EP${series.system.ep_size} · ${mode} · ${phase} · ${series.precision}`;
 }
 
 export function collectiveXSeriesLabel(
   series: CollectiveXSeries | CollectiveXRunSeries,
   locale: Locale = 'en',
 ): string {
-  const runPrefix = 'run_id' in series ? `#${series.run_id} · ` : '';
-  return `${runPrefix}${collectiveXLegendLabel(series, locale)}`;
+  return collectiveXLegendLabel(series, locale);
 }
 
 export function collectiveXColorKey(series: CollectiveXSeries | CollectiveXRunSeries): string {
@@ -270,7 +276,7 @@ export function collectiveXRangeColorKey(series: CollectiveXSeries | CollectiveX
 
 function rangeMemberLabel(series: CollectiveXSeries, locale: Locale): string {
   const mode = locale === 'zh' ? COLLECTIVEX_MODE_LABELS_ZH[series.mode] : series.mode;
-  return `${series.backend} · ${mode}`;
+  return `${collectiveXBackendLabel(series.backend)} · ${mode}`;
 }
 
 /**
@@ -294,11 +300,10 @@ export function collectiveXRangeBands(
     const id = `${item.run_id}:${collectiveXRangeColorKey(item)}`;
     let entry = bands.get(id);
     if (!entry) {
-      const runPrefix = item.run_index > 0 ? `#${item.run_id} · ` : '';
       entry = {
         band: {
           id,
-          label: `${runPrefix}${collectiveXSkuLabel(item.system.sku)} · EP${item.system.ep_size}`,
+          label: `${collectiveXSkuLabel(item.system.sku)} · EP${item.system.ep_size}`,
           colorKey: collectiveXRangeColorKey(item),
           runIndex: item.run_index,
         },
@@ -428,7 +433,7 @@ export function collectiveXKvFrontierPoints(
       return [
         {
           seriesId: `${kase.run_id}:${kase.case_id}`,
-          seriesLabel: `#${kase.run_id} · ${collectiveXKvLegendLabel(kase)}`,
+          seriesLabel: collectiveXKvLegendLabel(kase),
           colorKey: collectiveXKvColorKey(kase),
           sku: normalizeCollectiveXSku(kase.sku),
           x,
@@ -472,7 +477,7 @@ export function collectiveXKvOverlapPoints(
       return [
         {
           seriesId,
-          seriesLabel: `#${kase.run_id} · ${collectiveXKvLegendLabel(kase)}`,
+          seriesLabel: collectiveXKvLegendLabel(kase),
           colorKey: collectiveXKvColorKey(kase),
           x: row.batch,
           y,
@@ -560,7 +565,7 @@ export function collectiveXKvChartPoints(
     const seriesId = `${kase.run_id}:${kase.case_id}`;
     return rows.map((row) => ({
       seriesId,
-      seriesLabel: `#${kase.run_id} · ${collectiveXKvLegendLabel(kase)}`,
+      seriesLabel: collectiveXKvLegendLabel(kase),
       colorKey: collectiveXKvColorKey(kase),
       x: selection.x === 'batch' ? row.batch : row.isl,
       y: selection.y === 'bandwidth' ? row.gbps_p50 : row.latency_ms.p50,

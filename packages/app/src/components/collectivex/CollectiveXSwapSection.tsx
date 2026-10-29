@@ -32,7 +32,6 @@ const STRINGS = {
     blocks: (count: number) => `${count} ${count === 1 ? 'block' : 'blocks'}`,
     log: 'log',
     payload: 'Copied payload',
-    run: 'Run',
     description:
       'Host-observed copy latency includes submission and CUDA synchronization. Bandwidth counts copied payload once (GB/s, linear). Each line holds the number of blocks fixed.',
     roofline: 'Nominal hardware roofline',
@@ -61,7 +60,6 @@ const STRINGS = {
     blocks: (count: number) => `${count} 个块`,
     log: '对数',
     payload: '复制的有效载荷',
-    run: '运行',
     description:
       '主机侧观测的复制延迟包含提交和 CUDA 同步时间。带宽按复制的有效载荷计算一次（GB/s，线性坐标）。每条线对应固定的块数量。',
     roofline: '标称硬件带宽上限',
@@ -316,7 +314,7 @@ export function CollectiveXSwapSection({
           attachToLayer: 1,
           rulerType: 'crosshair',
           content: (p) =>
-            `<div class="rounded-md border bg-background p-3 text-xs shadow-md"><strong>${escapeHtml(p.device)} · ${t.blocks(p.row.num_blocks)}</strong><div>${t.run} #${escapeHtml(p.runId)} · ${formatSwapBytes(p.x)}</div><div>${t.payload}: ${formatSwapBytes(p.row.payload_bytes)}</div><div>${percentile}: ${p.y.toFixed(3)} ${metric === 'bandwidth' ? 'GB/s' : 'µs'}</div><div>${p.row.sample_count} ${t.samples} · ${t.verified}</div></div>`,
+            `<div class="rounded-md border bg-background p-3 text-xs shadow-md"><strong>${escapeHtml(p.device)} · ${t.blocks(p.row.num_blocks)}</strong><div>${formatSwapBytes(p.x)}</div><div>${t.payload}: ${formatSwapBytes(p.row.payload_bytes)}</div><div>${percentile}: ${p.y.toFixed(3)} ${metric === 'bandwidth' ? 'GB/s' : 'µs'}</div><div>${p.row.sample_count} ${t.samples} · ${t.verified}</div></div>`,
           getRulerX: (p, scale) => (scale as d3.ScaleLogarithmic<number, number>)(p.x),
           getRulerY: (p, scale) => scale(p.y),
         }}
@@ -343,7 +341,6 @@ export function CollectiveXSwapSection({
             legendItems={series.map((p) => ({
               name: p.seriesId,
               label: `${p.device} · ${t.blocks(p.row.num_blocks)}`,
-              title: `${t.run} #${p.runId}`,
               color: color(p),
               lineDasharray: collectiveXRunDasharray(runIndexById.get(p.runId) ?? 0),
               isActive: !hidden.has(p.seriesId),

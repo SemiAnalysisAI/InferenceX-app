@@ -9,6 +9,7 @@ import {
   collectiveXSeriesForRun,
   collectiveXSeriesLabel,
   collectiveXSkuLabel,
+  collectiveXBackendLabel,
   collectiveXTopologyLabel,
   fitAlphaBeta,
   formatCollectiveXLatencyPercentiles,
@@ -55,6 +56,8 @@ describe('collectiveXSeriesLabel', () => {
     expect(normalizeCollectiveXSku('B200-nscale')).toBe('b200');
     expect(normalizeCollectiveXSku('H100-DGXC')).toBe('h100');
     expect(collectiveXSkuLabel('B200-nscale')).toBe('B200');
+    expect(collectiveXBackendLabel('mori')).toBe('MoRI');
+    expect(collectiveXBackendLabel('deepep-v2')).toBe('deepep-v2');
     expect(collectiveXCaseLabel('h100-dgxc · deepep-v2', 'h100-dgxc')).toBe('H100 · deepep-v2');
     expect(normalizeCollectiveXSku('future-accelerator')).toBe('future-accelerator');
   });
@@ -73,10 +76,10 @@ describe('collectiveXSeriesLabel', () => {
     expect(collectiveXSeriesLabel(scaleOut)).toContain('EP16 · normal · decode');
   });
 
-  it('includes the run id for namespaced multi-run series', () => {
+  it('keeps the stored snapshot id out of the label', () => {
     const [runSeries] = collectiveXSeriesForRun([scaleUp], '30165164821');
     expect(collectiveXSeriesLabel(runSeries)).toBe(
-      '#30165164821 · H200 · deepep-v2 · EP8 · normal · decode · bf16',
+      'H200 · deepep-v2 · EP8 · normal · decode · bf16',
     );
   });
 
@@ -569,7 +572,7 @@ describe('collectiveXKvChartPoints', () => {
       [16, 15.12],
     ]);
     expect(points[0].seriesId).toBe('318:gb200-nixl-kv-dsv4-rdma-xfer-ep2-paged-fp8');
-    expect(points[0].seriesLabel).toContain('#318');
+    expect(points[0].seriesLabel).not.toContain('#318');
   });
 
   it('plots ISL scaling at batch 1 with latency as the metric', () => {

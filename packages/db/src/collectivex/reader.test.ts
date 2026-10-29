@@ -172,6 +172,13 @@ describe('CollectiveX artifact assembly', () => {
     expect(series.points).toHaveLength(10);
   });
 
+  it('carries the recorded backend version, and null where a result has none', () => {
+    expect(
+      makeCollectiveXSeries({ libraryVersion: ' 2.1.0+local@01dc3aaac820 ' }).library_version,
+    ).toBe('2.1.0+local@01dc3aaac820');
+    expect(makeCollectiveXSeries().library_version).toBeNull();
+  });
+
   it('displays only AMD and NVIDIA vendor cases', () => {
     const dataset = buildDataset({
       shards: [
