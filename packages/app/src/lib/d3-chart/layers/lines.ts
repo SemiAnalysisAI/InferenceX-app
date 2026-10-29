@@ -43,12 +43,13 @@ export function renderLines(
     .selectAll<SVGPathElement, LineEntry>('.line-path')
     .data(entries, (d) => d.key);
 
-  const entered = selection.enter().append('path').attr('class', 'line-path').attr('fill', 'none');
+  const entered = selection.enter().append('path').attr('fill', 'none');
 
   selection.exit().remove();
 
   entered
     .merge(selection)
+    .attr('class', (d) => `line-path line-${d.key}`)
     .attr('data-line-key', (d) => d.key)
     .attr('stroke', (d) => config.getColor(d.key))
     .attr('stroke-dasharray', (d) => config.getStrokeDasharray?.(d.key) ?? null)
