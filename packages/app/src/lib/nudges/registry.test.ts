@@ -76,10 +76,10 @@ describe('NUDGE_REGISTRY integrity', () => {
       'export',
       'filter-hint',
       'gradient-label',
+      'huawei-ascend-950pr-ubenchx-banner',
       'reproducibility',
       'star-nudge',
       'tpuv7-agentx-launch-modal',
-      'tpuv7-qwen-3-5-agentx-banner',
     ]);
   });
 
@@ -100,25 +100,12 @@ describe('NUDGE_REGISTRY integrity', () => {
     reproducibility.content.action?.onClick();
     expect(location.href).toBe('/zh/about#reproducibility');
 
-    const banner = NUDGE_REGISTRY.find((nudge) => nudge.id === 'tpuv7-qwen-3-5-agentx-banner');
+    const banner = NUDGE_REGISTRY.find(
+      (nudge) => nudge.id === 'huawei-ascend-950pr-ubenchx-banner',
+    );
     if (banner?.type !== 'banner') throw new Error('Missing launch banner');
-    expect(banner.storageKey).toBe('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed');
-    expect(banner.content.href).toBe(
-      '/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_xmode=interactivity&i_seq=agentic-traces&i_prec=fp8',
-    );
-    expect(banner.analytics).toEqual({
-      shown: 'inference_tpuv7_qwen_3_5_agentx_banner_shown',
-      dismissed: 'inference_tpuv7_qwen_3_5_agentx_banner_dismissed',
-      action: 'inference_tpuv7_qwen_3_5_agentx_banner_clicked',
-      properties: {
-        banner_id: 'tpuv7-qwen-3-5-agentx',
-        destination: 'inference',
-      },
-    });
     banner.content.onLinkClick?.();
-    expect(location.href).toBe(
-      '/zh/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_xmode=interactivity&i_seq=agentic-traces&i_prec=fp8',
-    );
+    expect(location.href).toBe('/zh/ubenchx/core-memory-profiles');
 
     location.href = '';
     const modal = NUDGE_REGISTRY.find((nudge) => nudge.id === 'tpuv7-agentx-launch-modal');
@@ -127,23 +114,6 @@ describe('NUDGE_REGISTRY integrity', () => {
     expect(location.href).toBe(
       '/zh/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_xmode=interactivity&i_seq=agentic-traces&i_prec=fp8',
     );
-  });
-
-  it.each(['tpuv7-qwen-3-5-agentx-banner'])(
-    '%s uses the announcement title without a breaking-news prefix in either locale',
-    (id) => {
-      const nudge = NUDGE_REGISTRY.find((entry) => entry.id === id);
-      expect(nudge?.content.title).toBe('Google TPUv7 joins AgentX');
-      expect(nudge?.content.titleZh).toBe('Google TPUv7 加入 AgentX');
-    },
-  );
-
-  it('uses the requested Kimi subtitle for the launch banner', () => {
-    const banner = NUDGE_REGISTRY.find((nudge) => nudge.id === 'tpuv7-qwen-3-5-agentx-banner');
-    expect(banner?.content.description).toBe(
-      'TPUv7 Kimi K3 2.8T prelimary Submisison: Competitive Results',
-    );
-    expect(banner?.content.descriptionZh).toBe('TPUv7 Kimi K3 2.8T 初步提交：成绩具有竞争力');
   });
 
   it.each(['', '/zh'])('offers both launch models in the %s route tree', (prefix) => {

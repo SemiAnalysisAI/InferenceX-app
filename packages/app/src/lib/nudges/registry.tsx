@@ -13,7 +13,11 @@ import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants'
 
 import { MOBILE_VIEWPORT_QUERY } from '@/hooks/useMediaQuery';
 import { isZhPathname, localePath } from '@/lib/i18n/i18n';
-import { LANDING_BANNER_STORAGE_KEY, TPUV7_QWEN_3_5_AGENTX_URL } from '@/lib/nudges/landing-banner';
+import {
+  HUAWEI_UBENCHX_URL,
+  LANDING_BANNER_STORAGE_KEY,
+  TPUV7_QWEN_3_5_AGENTX_URL,
+} from '@/lib/nudges/landing-banner';
 
 import { GitHubIcon } from '@/components/ui/github-icon';
 import { GoogleIcon } from '@/components/ui/google-icon';
@@ -297,7 +301,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     },
   },
   {
-    id: 'tpuv7-qwen-3-5-agentx-banner',
+    id: 'huawei-ascend-950pr-ubenchx-banner',
     type: 'banner',
     trigger: { type: 'immediate' },
     dismissal: { type: 'permanent' },
@@ -308,27 +312,27 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     content: {
       icon: Sparkles,
       iconClassName: 'text-brand',
-      title: 'Google TPUv7 joins AgentX',
-      titleZh: 'Google TPUv7 加入 AgentX',
-      description: 'TPUv7 Kimi K3 2.8T prelimary Submisison: Competitive Results',
-      descriptionZh: 'TPUv7 Kimi K3 2.8T 初步提交：成绩具有竞争力',
+      title: 'Huawei Ascend 950PR Microbenchmarks',
+      titleZh: 'Huawei Ascend 950PR 微基准测试',
+      description: 'Cycle Level Core memory-access MicroBenchmarks (Beta)',
+      descriptionZh: '周期级核心访存微基准测试（Beta）',
       testId: 'launch-banner',
       badge: 'New',
       badgeZh: '最新',
-      href: TPUV7_QWEN_3_5_AGENTX_URL,
+      href: HUAWEI_UBENCHX_URL,
       linkLabel: 'View results',
       linkLabelZh: '查看结果',
       onLinkClick: () => {
-        window.location.href = localizedNudgeHref(TPUV7_QWEN_3_5_AGENTX_URL);
+        window.location.href = localizedNudgeHref(HUAWEI_UBENCHX_URL);
       },
     },
     analytics: {
-      shown: 'inference_tpuv7_qwen_3_5_agentx_banner_shown',
-      dismissed: 'inference_tpuv7_qwen_3_5_agentx_banner_dismissed',
-      action: 'inference_tpuv7_qwen_3_5_agentx_banner_clicked',
+      shown: 'inference_huawei_ascend_950pr_ubenchx_banner_shown',
+      dismissed: 'inference_huawei_ascend_950pr_ubenchx_banner_dismissed',
+      action: 'inference_huawei_ascend_950pr_ubenchx_banner_clicked',
       properties: {
-        banner_id: 'tpuv7-qwen-3-5-agentx',
-        destination: 'inference',
+        banner_id: 'huawei-ascend-950pr-ubenchx',
+        destination: 'ubenchx',
       },
     },
   },
