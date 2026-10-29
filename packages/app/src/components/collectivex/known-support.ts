@@ -67,9 +67,9 @@ export const COLLECTIVEX_KNOWN_FOOTNOTES: Record<string, CollectiveXKnownFootnot
     en: 'Crashes at NCCL communicator setup on this pool (unhandled CUDA error, 4/4 attempts on 2026-08-28) while deepep-v2 EP16 ran green concurrently — uccl-specific here, under investigation; the earlier wall-clock rationale is superseded.',
     zh: '在该集群上于 NCCL 通信器建立阶段崩溃（unhandled CUDA error，2026-08-28 四次尝试全部失败），而同期 deepep-v2 EP16 正常通过——为该集群上 uccl 特有问题，调查中；早先的超时说法已被取代。',
   },
-  'uccl-hseries-topend': {
-    en: 'Works and passes correctness at every rung (audited 2026-08-28); top-of-ladder periods run ~2–3.7x slower than bare-metal B200 — the CPU proxy on this virtualized IB — at parity through T=16.',
-    zh: '可用且所有梯级正确性通过（2026-08-28 审计）；梯级顶端周期比裸金属 B200 慢约 2–3.7 倍（虚拟化 IB 上的 CPU 代理），T≤16 时与其持平。',
+  'uccl-h200-rdma-recv-ring': {
+    en: 'Runs with a deeper RDMA receive ring (1040 tokens, labelled -rdmarecv1040): at the default depth the two-node BF16 prefill dispatch deadlocks (uccl-project/uccl#1110). Decode is unchanged by the deeper ring (within 1%); both phases move about 25 GB/s per rank through the CPU proxy, roughly 4x behind DeepEP V2 at the top of the ladder.',
+    zh: '使用更深的 RDMA 接收环（1040 token，标记为 -rdmarecv1040）运行：默认深度下双节点 BF16 prefill 的 dispatch 会死锁（uccl-project/uccl#1110）。更深的接收环对 decode 无影响（差异在 1% 以内）；两个阶段经 CPU 代理每 rank 约 25 GB/s，在梯级顶端约比 DeepEP V2 慢 4 倍。',
   },
   'uccl-not-brought-up': {
     en: 'Not brought up on this pool (untested compute capability or no scale-out NIC path for the CPU proxy).',
@@ -149,7 +149,7 @@ const NORMAL: KnownMatrix = {
   h200: {
     'deepep-v2': bothWork,
     mori: off('amd-only'),
-    'uccl-ep': cell(works, worksWith('uccl-hseries-topend')),
+    'uccl-ep': cell(works, worksWith('uccl-h200-rdma-recv-ring')),
     'nccl-ep': cell(works, worksWith('nccl-v02-gin')),
     'flashinfer-ep': off('gb-only'),
   },
