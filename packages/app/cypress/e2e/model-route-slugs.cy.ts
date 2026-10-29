@@ -103,6 +103,8 @@ function expectBestPerSku(enabled: boolean) {
     enabled ? 'checked' : 'unchecked',
   );
   cy.get('[data-testid="quick-filters-dialog"]').contains('button', 'Done').click();
+  // Reopening mid exit-animation reuses the old content under a new overlay, which then covers it.
+  cy.get('[data-testid="quick-filters-dialog"]').should('not.exist');
 }
 
 function visitModel(model: string, extra = '', path = '/inference') {

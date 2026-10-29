@@ -256,7 +256,9 @@ it('filters both devices on one page and preserves their API values and units', 
   cy.get('[data-testid="core-profile-hardware"]').click();
   cy.contains('[role="option"]', 'Huawei 950PR').click();
   cy.get('[data-testid="sm-l2-heatmap"]').should('not.exist');
-  cy.get('[data-testid="profile-scalar_128MiB_cube_isolated"] svg').focus();
+  // Radix returns focus to the trigger after the close animation; focusing the chart earlier blurs it.
+  cy.get('[data-testid="core-profile-hardware"]').should('have.focus');
+  cy.get('[data-testid="profile-scalar_128MiB_cube_isolated"] svg').focus().should('have.focus');
   cy.get('[data-testid="profile-scalar_128MiB_cube_isolated-value"]').should(
     'contain',
     '0 ↔ 1: 19.03 SYS_CNT ticks',
