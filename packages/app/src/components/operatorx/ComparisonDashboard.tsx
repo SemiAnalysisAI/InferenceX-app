@@ -179,9 +179,13 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
   );
   const model = useMemo(() => {
     if (!chartView) return null;
+    // Legend clicks resolve against the GPU list the charts show, so a toggle never pairs a newer
+    // workload's GPUs with the older chart data.
     const toggle = (hw: string) =>
       setPicked((previous) => {
-        const current = previous ? available.filter((h) => previous.includes(h)) : available;
+        const current = previous
+          ? chartAvailable.filter((h) => previous.includes(h))
+          : chartAvailable;
         const next = toggleHardwareSelection(current, hw);
         return next === current ? previous : next;
       });
@@ -204,7 +208,6 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
     chartMetric,
     chartHardware,
     chartAvailable,
-    available,
     chartColors,
     chartBaseline,
     queryClient,
