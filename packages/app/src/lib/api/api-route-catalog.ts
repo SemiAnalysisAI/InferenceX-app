@@ -559,10 +559,10 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'page-bff',
     exclusionReason: {
-      en: 'OperatorX page backend; cross-hardware comparisons include hardware references, workload-resolved defaults, and optional distribution quantiles with resolved normalization controls.',
-      zh: 'OperatorX 页面后端；跨硬件对比包含硬件参考值、按工作负载确定的默认值，以及可选的分布分位数和归一化参数。',
+      en: 'OperatorX page backend; comparisons include hardware references, defaults, optional distribution quantiles and shared-cohort roofline median/best summaries with resolved controls.',
+      zh: 'OperatorX 页面后端；对比结果包含硬件参考值和默认设置，并可按需返回分布分位数及基于共同用例的 roofline 中位数与最佳值汇总，同时附带实际生效的参数。',
     },
-    sourceSha256: '26f0b3c9a6f82b6e96aed9f5d19c0c0b8e14b072bc917978e7ba02dc530e0aea',
+    sourceSha256: '95aa4f4ee67bf00edfe290d3076a94cd4b3a3c7d144954633527080885428f3e',
   },
   {
     source: 'src/app/api/v1/operatorx/timelines/route.ts',
@@ -1220,6 +1220,14 @@ export const apiContractSourceDigests = [
     reviewArea: {
       en: 'OperatorX page-owned comparison: workload filtering and optional hardware normalization references; excluded from published OpenAPI.',
       zh: 'OperatorX 页面专属对比：workload 筛选及可选的硬件归一化参考值；不纳入公开 OpenAPI。',
+    },
+  },
+  {
+    source: 'src/lib/operatorx/roofline-summary.ts',
+    sourceSha256: '4ab7b1c6a4b9733e1e1cf516efafd908b65e7d9550136f86572d272192fc775e',
+    reviewArea: {
+      en: 'OperatorX shared compute-bound cohort, median/best throughput, precision and normalized values shared by the roofline bars and API.',
+      zh: 'OperatorX 的共同计算受限用例、吞吐量中位数与最佳值、精度及归一化数值，由 roofline 柱状图与 API 共用。',
     },
   },
   {

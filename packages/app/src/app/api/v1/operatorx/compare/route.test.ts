@@ -8,6 +8,7 @@ import {
 } from '@semianalysisai/inferencex-db/operatorx/compare';
 
 import { distributionView } from '@/lib/operatorx/distribution-view';
+import { rooflineSummary } from '@/lib/operatorx/roofline-summary';
 import { getComparison } from '@/lib/operatorx/service';
 
 import { GET } from './route';
@@ -101,4 +102,54 @@ it('rejects invalid distribution selectors without changing the default comparis
     new NextRequest('http://localhost/api/v1/operatorx/compare?op=gemm'),
   );
   expect(await defaultResponse.json()).not.toHaveProperty('distribution');
+});
+
+it('returns the same shared-cohort median and best values as the roofline chart', async () => {
+  const source = comparison();
+  vi.mocked(getComparison).mockResolvedValue(source);
+  const response = await GET(
+    new NextRequest(
+      'http://localhost/api/v1/operatorx/compare?op=gemm&rooflinePrecision=bf16&rooflineHardware=ascend950pr,h200&rooflineNormalized=false',
+    ),
+  );
+  const body = await response.json();
+  expect(response.status).toBe(200);
+  expect(body.rooflineSummary).toEqual(
+    rooflineSummary(comparisonView(source, null), {
+      precision: 'bf16',
+      hardware: ['ascend950pr', 'h200'],
+      normalized: false,
+    }),
+  );
+  expect(body.rooflineSummary.bars).toMatchObject([
+    { hardware: 'ascend950pr', n: 1, median: 378, best: 378 },
+    { hardware: 'h200', n: 1, median: 189, best: 189 },
+  ]);
+});
+
+it.each([
+  'rooflinePrecision=other',
+  'rooflineNormalized=yes',
+  'rooflineHardware=unknown',
+  'rooflineHardware=',
+])('rejects an invalid roofline selector: %s', async (query) => {
+  vi.mocked(getComparison).mockResolvedValue(comparison());
+  const response = await GET(
+    new NextRequest(`http://localhost/api/v1/operatorx/compare?op=gemm&${query}`),
+  );
+  expect(response.status).toBe(400);
+});
+
+it('returns an empty summary when the selected workload has no measured hardware', async () => {
+  vi.mocked(getComparison).mockResolvedValue({ op: 'gemm', hardware: [], workloads: [], rows: [] });
+  const response = await GET(
+    new NextRequest('http://localhost/api/v1/operatorx/compare?op=gemm&rooflineNormalized=true'),
+  );
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  expect(body.rooflineSummary).toMatchObject({
+    hardware: [],
+    bars: [],
+    caseIndices: [],
+  });
 });

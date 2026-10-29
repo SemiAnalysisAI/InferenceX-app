@@ -118,6 +118,71 @@ it('defaults to a measured 950PR shape and normalized BF16, while honoring preci
 });
 
 for (const prefix of ['', '/zh']) {
+  it(`shows matching median and best bars beside the roofline at ${prefix || '/'}`, () => {
+    const datasets = ['ascend950pr-external', 'h200-dgxc'].map((runner, gpu) => {
+      const dataset = normalizeBundle(run(`summary-${gpu}`, runner, [64, 128]));
+      dataset.results = dataset.results.map((row, i) => ({
+        ...row,
+        args: {
+          m: 1024 * (i + 1),
+          n: 1024,
+          k: 1024,
+          a: { dtype: 'bf16' },
+          b: { dtype: 'bf16' },
+          out: 'bf16',
+        },
+        latencyUs: gpu === 0 ? 10 : 5,
+      }));
+      return { runner, dataset };
+    });
+    const view = comparisonView(buildComparison('gemm', datasets), null);
+    cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view).as('summary');
+    cy.visit(`${prefix}/operatorx`);
+    cy.wait('@summary');
+    cy.get('[data-testid="operatorx-roofline-summary"]')
+      .scrollIntoView()
+      .within(() => {
+        cy.get('.summary-row').should('have.length', 2);
+        cy.get('.summary-row')
+          .first()
+          .should(($row) => {
+            const d = (
+              $row[0] as unknown as {
+                __data__: { hardware: string; n: number; median: number; best: number };
+              }
+            ).__data__;
+            expect(d.hardware).to.equal('ascend950pr');
+            expect(d.n).to.equal(2);
+            expect(d.median).to.be.closeTo(322.1225472 / 378, 1e-12);
+            expect(d.best).to.be.closeTo(429.4967296 / 378, 1e-12);
+          });
+        cy.get('.summary-median').should('have.length', 2);
+        cy.get('.summary-best').should('have.length', 2);
+      });
+    cy.get('[data-testid="operatorx-viz-roofline"]').screenshot(
+      `roofline-summary-${prefix ? 'zh' : 'en'}-normalized`,
+    );
+    cy.get('#opx-roofline-normalized').click();
+    cy.get('[data-testid="operatorx-roofline-summary"] .summary-row')
+      .first()
+      .should(($row) => {
+        const d = (
+          $row[0] as unknown as { __data__: { hardware: string; median: number; best: number } }
+        ).__data__;
+        expect(d.hardware).to.equal('h200');
+        expect(d.median).to.be.closeTo(644.2450944, 1e-9);
+        expect(d.best).to.be.closeTo(858.9934592, 1e-9);
+      });
+    cy.get('[data-testid="operatorx-viz-roofline"]').screenshot(
+      `roofline-summary-${prefix ? 'zh' : 'en'}-absolute`,
+    );
+    cy.viewport(390, 844);
+    cy.get('[data-testid="operatorx-roofline-summary"]')
+      .scrollIntoView()
+      .should('be.visible')
+      .screenshot(`roofline-summary-${prefix ? 'zh' : 'en'}-mobile`);
+  });
+
   it(`keeps 950PR FP8 points visible when normalized at ${prefix || '/'}`, () => {
     const dataset = normalizeBundle(run('950pr-fp8', 'ascend950pr-external', [64, 128]));
     dataset.results = dataset.results.map((row, i) => ({
