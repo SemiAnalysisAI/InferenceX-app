@@ -3,7 +3,6 @@
 import * as d3 from 'd3';
 import { useMemo, useRef } from 'react';
 
-import { globalParetoFrontier } from '@/lib/charts/pareto-frontier';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { Locale } from '@/lib/i18n/i18n';
@@ -155,15 +154,11 @@ const BAND_FADED_FILL = 0.03;
 const BAND_FADED_STROKE = 0.15;
 
 /**
- * Like the inference charts, a line follows the Pareto frontier of its points: more tokens at
- * lower latency, or a higher rate at fewer tokens, is better. Sorted by x.
+ * Every measured point, left to right. The token count is a ladder we set, not an outcome, so no
+ * point is filtered as dominated; the monotone curve smooths between them.
  */
-function paretoLine<T extends { x: number; y: number }>(
-  points: readonly T[],
-  yAxis: CollectiveXYAxis,
-): T[] {
-  const lowerIsBetter = yAxis === 'latency';
-  return globalParetoFrontier(points, lowerIsBetter, !lowerIsBetter);
+function sortedLine<T extends { x: number; y: number }>(points: readonly T[]): T[] {
+  return points.toSorted((a, b) => a.x - b.x);
 }
 
 /** Mean log-height of a band, i.e. how wide it looks on the log y axis. */
@@ -239,16 +234,16 @@ export function CollectiveXChart({
     () => new Map(series.map((item) => [item.series_id, fitAlphaBeta(item, operation)])),
     [series, operation],
   );
-  // Each line follows its series' Pareto frontier; dominated points keep their dot.
+  // Each line runs through every point of its series with a monotone curve.
   const lines = useMemo(() => {
     const bySeries: Record<string, { x: number; y: number }[]> = {};
     for (const point of points) {
       (bySeries[point.seriesId] ??= []).push({ x: point.x, y: point.y });
     }
     const result: Record<string, { x: number; y: number }[]> = {};
-    for (const [id, line] of Object.entries(bySeries)) result[id] = paretoLine(line, yAxis);
+    for (const [id, line] of Object.entries(bySeries)) result[id] = sortedLine(line);
     return result;
-  }, [points, yAxis]);
+  }, [points]);
 
   const xDomain = useMemo(() => paddedDomain(points.map((point) => point.x)), [points]);
   const yDomain = useMemo(
@@ -274,22 +269,16 @@ export function CollectiveXChart({
     ) => {
       const x = xScale as d3.ScaleLogarithmic<number, number>;
       const y = yScale as d3.ScaleLogarithmic<number, number>;
-      // Each edge follows its own Pareto frontier with the same monotone curve as the lines; the
-      // lower edge runs back right to left to close the shape.
+      // Each edge runs through every highest or lowest value with the same monotone curve as the
+      // lines; the lower edge runs back right to left to close the shape.
       const edge = d3
         .line<{ x: number; y: number }>()
         .x((item) => x(item.x))
         .y((item) => y(item.y))
         .curve(d3.curveMonotoneX);
       const area = (bandPoints: CollectiveXRangeBand['points']) => {
-        const hi = paretoLine(
-          bandPoints.map((item) => ({ x: item.x, y: item.hi })),
-          yAxis,
-        );
-        const lo = paretoLine(
-          bandPoints.map((item) => ({ x: item.x, y: item.lo })),
-          yAxis,
-        ).toReversed();
+        const hi = sortedLine(bandPoints.map((item) => ({ x: item.x, y: item.hi })));
+        const lo = sortedLine(bandPoints.map((item) => ({ x: item.x, y: item.lo }))).toReversed();
         if (hi.length === 0 || lo.length === 0) return null;
         return `${edge(hi)}L${edge(lo)!.slice(1)}Z`;
       };
@@ -336,7 +325,7 @@ export function CollectiveXChart({
         draw(group, ctx.newXScale, ctx.newYScale);
       },
     };
-  }, [ranges, rangeMode, colors, yAxis]);
+  }, [ranges, rangeMode, colors]);
   const xTickValues = useMemo(
     () => [...new Set(points.map((point) => point.x))].toSorted((a, b) => a - b),
     [points],
