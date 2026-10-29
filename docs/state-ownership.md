@@ -17,6 +17,13 @@ Workflow query updates therefore do not notify selection or action consumers. Se
 updates do not notify workflow-only consumers. Components should subscribe only to the
 domains they read.
 
+`InferencePageIntro` reads the selected model and the live client pathname on the English
+and Chinese inference pages. Model switches use shallow history updates, so the intro also
+synchronizes the browser title, descriptions, social metadata, canonical URL, and language
+alternates without remounting the chart. Server metadata remains defined by each route.
+This is presentation-only: the read-only API and `inferencex-skills` model/filter contracts
+and returned benchmark data are unchanged.
+
 Availability owns explicit settled and error states. Consumers must distinguish an
 unresolved request from a settled empty result. Inference fetches are gated on
 `sequenceResolved` and render `availabilityError` rather than an indefinite skeleton.

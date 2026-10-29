@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 
 import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
-import { TabIntro } from '@/components/dashboard/tab-intro';
+import { InferencePageIntro } from '@/components/inference/inference-page-intro';
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { enAlternates } from '@/lib/i18n/i18n';
@@ -42,10 +42,9 @@ export default async function InferenceModelPage({ params }: Props) {
   const { model } = await params;
   const entry = getInferenceModelBySlug(model);
   if (!entry) notFound();
-  const meta = inferenceModelMeta(entry);
   return (
     <>
-      <TabIntro tab="inference" title={meta.title} intro={meta.intro} />
+      <InferencePageIntro locale="en" />
       <InferenceProvider activeTab="inference">
         <InferenceChartDisplay />
       </InferenceProvider>
