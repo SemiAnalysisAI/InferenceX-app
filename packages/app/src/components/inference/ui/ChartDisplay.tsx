@@ -307,7 +307,10 @@ function renderInferenceTcoBadges(props: {
   );
 }
 
-export default function ChartDisplay({ embedded = false }: { embedded?: boolean } = {}) {
+export default function ChartDisplay({
+  embedded = false,
+  centerOnEnter = false,
+}: { embedded?: boolean; centerOnEnter?: boolean } = {}) {
   const locale = useLocale();
   const t = STRINGS[locale];
   const chartRootRef = useRef<HTMLDivElement>(null);
@@ -1535,7 +1538,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
           });
 
   useCenterOnEnter(chartRootRef, '[data-testid="chart-figure"]', {
-    enabled: !embedded && !minimalChrome && !powerXSurface,
+    enabled: centerOnEnter && !embedded && !minimalChrome && !powerXSurface,
     ready: !isFirstLoad && !isDerivedXAxisLoading && renderableGraphs.length > 0,
   });
 

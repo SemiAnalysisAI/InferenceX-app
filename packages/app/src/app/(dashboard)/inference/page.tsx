@@ -12,7 +12,7 @@ export default function InferencePage() {
     <>
       <InferencePageIntro locale="en" />
       <InferenceProvider activeTab="inference">
-        <InferenceChartDisplay />
+        <InferenceChartDisplay centerOnEnter />
       </InferenceProvider>
     </>
   );

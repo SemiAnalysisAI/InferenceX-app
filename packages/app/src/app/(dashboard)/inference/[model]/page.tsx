@@ -46,7 +46,7 @@ export default async function InferenceModelPage({ params }: Props) {
     <>
       <InferencePageIntro locale="en" />
       <InferenceProvider activeTab="inference">
-        <InferenceChartDisplay />
+        <InferenceChartDisplay centerOnEnter />
       </InferenceProvider>
     </>
   );
