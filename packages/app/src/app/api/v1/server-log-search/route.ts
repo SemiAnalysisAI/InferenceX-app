@@ -38,7 +38,11 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    return cachedJson({ id, query, ...(await searchServerLogs(getDb(), id, query, limit)) });
+    return cachedJson(request, {
+      id,
+      query,
+      ...(await searchServerLogs(getDb(), id, query, limit)),
+    });
   } catch (error) {
     console.error('Error searching server logs:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

@@ -18,13 +18,13 @@ export async function GET(request: NextRequest) {
   if (!version) {
     return NextResponse.json({ error: 'Unknown version' }, { status: 400 });
   }
-  if (FIXTURES_MODE) return cachedJson(loadFixture('collectivex-latest'));
+  if (FIXTURES_MODE) return cachedJson(request, loadFixture('collectivex-latest'));
 
   try {
     // The primary, so a response cached right after an ingest's purge is never a stale replica read.
     const row = await getLatestCollectiveXRun(getCollectiveXWriteDb(), version);
     if (row === null) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    return cachedJson(collectiveXDatasetFromRow(row), { tag: collectiveXCacheTag() });
+    return cachedJson(request, collectiveXDatasetFromRow(row), { tag: collectiveXCacheTag() });
   } catch (error) {
     console.error('Error fetching CollectiveX latest run:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

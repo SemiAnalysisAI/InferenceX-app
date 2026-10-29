@@ -8,7 +8,7 @@ import { buildCompareTable } from '@/lib/views-api/compare-view';
 
 const { mockGetComparePageDerivedData, mockCachedJson, mockCachedText } = vi.hoisted(() => ({
   mockGetComparePageDerivedData: vi.fn(),
-  mockCachedJson: vi.fn((data: unknown) => Response.json(data)),
+  mockCachedJson: vi.fn((_request: Request, data: unknown) => Response.json(data)),
   mockCachedText: vi.fn(
     (data: string, contentType: string) =>
       new Response(data, { headers: { 'Content-Type': contentType } }),

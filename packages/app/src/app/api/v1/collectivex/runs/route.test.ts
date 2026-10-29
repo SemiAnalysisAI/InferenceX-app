@@ -6,7 +6,7 @@ import { makeCollectiveXDataset } from '@semianalysisai/inferencex-db/collective
 const { mockList, mockGetWriteDb, mockCachedJson } = vi.hoisted(() => ({
   mockList: vi.fn(),
   mockGetWriteDb: vi.fn(() => 'mock-write-sql'),
-  mockCachedJson: vi.fn((data: unknown) => Response.json(data)),
+  mockCachedJson: vi.fn((_request: Request, data: unknown) => Response.json(data)),
 }));
 
 vi.mock('@semianalysisai/inferencex-db/connection', () => ({
@@ -54,7 +54,7 @@ describe('GET /api/v1/collectivex/runs', () => {
     const body = { version: 1, runs: [summary], discovery_complete: true };
     expect(await res.json()).toEqual(body);
     expect(mockList).toHaveBeenCalledWith('mock-write-sql', 1);
-    expect(mockCachedJson).toHaveBeenCalledWith(body, { tag: 'collectivex' });
+    expect(mockCachedJson).toHaveBeenCalledWith(expect.anything(), body, { tag: 'collectivex' });
   });
 
   it('returns an empty list, not an error, when nothing is stored', async () => {

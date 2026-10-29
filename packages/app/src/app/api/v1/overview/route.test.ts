@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server';
 
 const { mockGetOverviewPageData, mockCachedJson } = vi.hoisted(() => ({
   mockGetOverviewPageData: vi.fn(),
-  mockCachedJson: vi.fn((data: unknown) => Response.json(data)),
+  mockCachedJson: vi.fn((_request: Request, data: unknown) => Response.json(data)),
 }));
 
 vi.mock('@/lib/overview/overview-data.server', () => ({
@@ -53,7 +53,7 @@ describe('GET /api/v1/overview', () => {
       'changed',
       'priced',
     );
-    expect(mockCachedJson).toHaveBeenCalledWith(data);
+    expect(mockCachedJson).toHaveBeenCalledWith(expect.anything(), data);
   });
 
   it('normalizes unsupported query values to overview defaults', async () => {

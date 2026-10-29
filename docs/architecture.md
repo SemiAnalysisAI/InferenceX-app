@@ -59,6 +59,18 @@ Other dashboards keep their existing query-state behavior.
 
 `cachedDerivedData()` is the tagged, `unstable_cache`-only wrapper for compact server payloads. Compare caches one pair-filtered, full-shape hydration row set per model/GPU pair, then recomputes the inexpensive sequence/precision table transform per request; nesting a selector cache around the pair cache would bypass Next.js incremental caching.
 
+### API responses
+
+`cachedJson()` (`lib/cache/api-cache.ts`) takes the incoming request. It serves brotli, then gzip, then plain JSON according to `Accept-Encoding`, so a client that sends no header (curl, scripts) gets plain JSON. Every response carries `Vary: Accept-Encoding` and a strong `ETag` hashed from the payload and the chosen encoding. A matching `If-None-Match` returns a bodiless `304`. Route handlers that call other handlers directly use `sourceRequest()`, which sends no `Accept-Encoding`, so they always read plain JSON.
+
+`Cache-Control` is `public, max-age=60, s-maxage=86400, stale-while-revalidate=86400`. Vercel strips `s-maxage` and `stale-while-revalidate` before the browser, so a browser reuses a response for 60 s and then revalidates it with its ETag, which costs a round trip but no body. Browsers get no stale-while-revalidate window, which keeps a returning visitor from seeing pre-ingest data for longer than a minute.
+
+Fixture builds (`E2E_FIXTURES=1`) send `Cache-Control: no-store` instead, so every E2E request reaches the network where `cy.intercept` stubs it.
+
+Server data (`unstable_cache` plus Blob) and CDN responses (the `db-cdn` tag) are tagged separately. `cachedQuery` keeps two `unstable_cache` entries per query. Route handlers read the `db`-tagged one, and ISR renders (sitemap included) read a separately keyed `db-page` one. On ingest, `purgeAll()` deletes the blobs, expires `db` immediately, and only marks `db-page` and `db-cdn` stale (`revalidateTag(tag, 'max')`). The next visitor gets the previous response at once while the CDN refetches in the background, and that refetch reads the database because the route entries are already gone. Expiring route data with `'max'` instead would hand the stale entry to the CDN's refetch and cache it for another day. ISR pages keep serving their previous HTML, because a stale `unstable_cache` entry is refetched in the foreground during regeneration, and the stale value is kept if that refetch fails. Corrections and retractions (`apply-run-overrides.yml`, `cache-refresh.yml`) run `admin:cache:invalidate <origin> --immediate`, which posts `/api/v1/invalidate?immediate=true` and expires every tag outright so retracted data is never served again. CollectiveX and OperatorX have no server data layer, so their tags are marked stale too, and their scoped purges (`?scope=collectivex` or `?scope=operatorx`) also honor `immediate=true`. Deleting a CollectiveX run purges immediately, because the admin who deleted it reloads right away.
+
+The ingest workflow then runs `bun run admin:cache:warmup <origin> --dashboard`, and production promotions run the same warmup in `warm-after-deploy.yml`. The script requests the dashboard APIs with a browser `Accept-Encoding` and reads every body, because the CDN keeps one variant per encoding and only caches a streamed response that was read to the end. The post-ingest PowerX verifier sends `Pragma: no-cache`, which makes the CDN revalidate a stale entry before it answers.
+
 ## React Query Configuration
 
 - **staleTime Infinity / gcTime Infinity**: Data changes only when CI ingests new results. Infinite TTLs mean React Query never refetches or garbage-collects on its own — data is fetched once per page load and held for the session. The server-side CDN cache ensures fast responses.

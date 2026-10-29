@@ -308,6 +308,12 @@ jobs:
           fi
           curl --retry 3 --retry-delay 2 --retry-connrefused -sSf -X POST "$CACHE_INVALIDATE_URL" "${headers[@]}"
 
+      # The purge only marks CDN responses stale. Requesting the dashboard APIs
+      # starts their background refresh now instead of on a visitor's load.
+      - name: Warm dashboard caches
+        continue-on-error: true
+        run: bun run admin:cache:warmup "${CACHE_INVALIDATE_URL%/api/v1/invalidate}" --dashboard
+
       - name: Verify PowerX source, database and public API
         id: powerx
         run: bun packages/db/src/verify-power-publication.ts power-publication.json "${CACHE_INVALIDATE_URL%/api/v1/invalidate}"
