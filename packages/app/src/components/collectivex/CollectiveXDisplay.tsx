@@ -497,7 +497,7 @@ export default function CollectiveXDisplay() {
         color: colors[collectiveXColorKey(item)] ?? 'var(--muted-foreground)',
         lineDasharray: collectiveXRunDasharray(item.run_index),
         isActive: activeSeriesIds.has(item.series_id),
-        title: `#${item.run_id} · EP${item.system.ep_size} · ${collectiveXTopologyLabel(item.system, locale)}`,
+        title: `EP${item.system.ep_size} · ${collectiveXTopologyLabel(item.system, locale)}`,
         onClick: () => {
           setActiveSeriesIds((previous) => {
             const next = new Set(previous);

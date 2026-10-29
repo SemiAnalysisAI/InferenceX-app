@@ -98,8 +98,7 @@ export function collectiveXSeriesLabel(
   series: CollectiveXSeries | CollectiveXRunSeries,
   locale: Locale = 'en',
 ): string {
-  const runPrefix = 'run_id' in series ? `#${series.run_id} · ` : '';
-  return `${runPrefix}${collectiveXLegendLabel(series, locale)}`;
+  return collectiveXLegendLabel(series, locale);
 }
 
 export function collectiveXColorKey(series: CollectiveXSeries | CollectiveXRunSeries): string {
@@ -301,11 +300,10 @@ export function collectiveXRangeBands(
     const id = `${item.run_id}:${collectiveXRangeColorKey(item)}`;
     let entry = bands.get(id);
     if (!entry) {
-      const runPrefix = item.run_index > 0 ? `#${item.run_id} · ` : '';
       entry = {
         band: {
           id,
-          label: `${runPrefix}${collectiveXSkuLabel(item.system.sku)} · EP${item.system.ep_size}`,
+          label: `${collectiveXSkuLabel(item.system.sku)} · EP${item.system.ep_size}`,
           colorKey: collectiveXRangeColorKey(item),
           runIndex: item.run_index,
         },
@@ -435,7 +433,7 @@ export function collectiveXKvFrontierPoints(
       return [
         {
           seriesId: `${kase.run_id}:${kase.case_id}`,
-          seriesLabel: `#${kase.run_id} · ${collectiveXKvLegendLabel(kase)}`,
+          seriesLabel: collectiveXKvLegendLabel(kase),
           colorKey: collectiveXKvColorKey(kase),
           sku: normalizeCollectiveXSku(kase.sku),
           x,
@@ -479,7 +477,7 @@ export function collectiveXKvOverlapPoints(
       return [
         {
           seriesId,
-          seriesLabel: `#${kase.run_id} · ${collectiveXKvLegendLabel(kase)}`,
+          seriesLabel: collectiveXKvLegendLabel(kase),
           colorKey: collectiveXKvColorKey(kase),
           x: row.batch,
           y,
@@ -567,7 +565,7 @@ export function collectiveXKvChartPoints(
     const seriesId = `${kase.run_id}:${kase.case_id}`;
     return rows.map((row) => ({
       seriesId,
-      seriesLabel: `#${kase.run_id} · ${collectiveXKvLegendLabel(kase)}`,
+      seriesLabel: collectiveXKvLegendLabel(kase),
       colorKey: collectiveXKvColorKey(kase),
       x: selection.x === 'batch' ? row.batch : row.isl,
       y: selection.y === 'bandwidth' ? row.gbps_p50 : row.latency_ms.p50,
