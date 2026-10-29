@@ -12,6 +12,10 @@ import { markNavigationStart } from '@/lib/analytics/navigation-timing';
 import { maskCapturedNetworkRequest } from '@/lib/analytics/network-request-mask';
 import { installOutboundLinkTracking } from '@/lib/analytics/outbound-links';
 import {
+  assignedLandingBannerVariant,
+  LANDING_BANNER_VARIANT_PROPERTY,
+} from '@/lib/nudges/landing-banner';
+import {
   CLIENT_PATHNAME_CHANGE_EVENT,
   isPageviewPathnameChange,
 } from '@/lib/routing/client-navigation';
@@ -57,6 +61,11 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
             disable_surveys: true,
             session_recording: { maskCapturedNetworkRequestFn: maskCapturedNetworkRequest },
           });
+          // Before replaying queued events, so they carry the arm too.
+          const landingBannerVariant = assignedLandingBannerVariant();
+          if (landingBannerVariant) {
+            posthog.register({ [LANDING_BANNER_VARIANT_PROPERTY]: landingBannerVariant });
+          }
           registerAnalyticsClient(posthog);
         })
         .catch(() => {

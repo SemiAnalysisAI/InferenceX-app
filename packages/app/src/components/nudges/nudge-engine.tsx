@@ -16,7 +16,10 @@ import {
 import { dismissesOnAction } from '@/lib/nudges/policy';
 import { NUDGE_REGISTRY } from '@/lib/nudges/registry';
 import type { NudgeAction, NudgeDefinition, NudgeScope, NudgeTrigger } from '@/lib/nudges/types';
-import { LANDING_BANNER_DISMISSED_ATTRIBUTE } from '@/lib/nudges/landing-banner';
+import {
+  assignedLandingBannerVariant,
+  LANDING_BANNER_DISMISSED_ATTRIBUTE,
+} from '@/lib/nudges/landing-banner';
 import { BottomToast } from '@/components/ui/bottom-toast';
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { CoachMark } from '@/components/ui/coach-mark';
@@ -34,6 +37,7 @@ function isEligible(
 ): boolean {
   if (requireAnchor && def.type === 'coach-mark' && !def.content.anchor?.resolve()) return false;
   if (!isWithinSchedule(def.schedule)) return false;
+  if (def.variant && def.variant !== assignedLandingBannerVariant()) return false;
   if (def.permanentSuppressKey && isPermanentlySuppressed(def.permanentSuppressKey)) return false;
   if (isDismissed(def.storageKey, def.dismissal)) return false;
   if (requireConditions && def.conditions?.some((condition) => !condition.check())) return false;
@@ -47,17 +51,26 @@ interface NudgeEngineProps {
 export function NudgeEngine({ scope }: NudgeEngineProps) {
   const scopeNudges = useMemo(() => NUDGE_REGISTRY.filter((n) => n.scope === scope), [scope]);
 
-  const [activeBannerId, setActiveBannerId] = useState<string | null>(() => {
-    const initialBanner = scopeNudges
-      .filter((nudge) => {
-        if (nudge.type !== 'banner' || !nudge.renderOnInitialLoad) return false;
-        if (!isWithinSchedule(nudge.schedule)) return false;
-        const triggers = Array.isArray(nudge.trigger) ? nudge.trigger : [nudge.trigger];
-        return triggers.some((trigger) => trigger.type === 'immediate');
-      })
-      .toSorted((a, b) => b.priority - a.priority)[0];
-    return initialBanner?.id ?? null;
-  });
+  const initialBanners = useMemo(
+    () =>
+      scopeNudges
+        .filter((nudge) => {
+          if (nudge.type !== 'banner' || !nudge.renderOnInitialLoad) return false;
+          if (!isWithinSchedule(nudge.schedule)) return false;
+          const triggers = Array.isArray(nudge.trigger) ? nudge.trigger : [nudge.trigger];
+          return triggers.some((trigger) => trigger.type === 'immediate');
+        })
+        .toSorted((a, b) => b.priority - a.priority),
+    [scopeNudges],
+  );
+  const [activeBannerId, setActiveBannerId] = useState<string | null>(
+    () => initialBanners[0]?.id ?? null,
+  );
+  // The server cannot know the visitor's A/B arm, so every arm is rendered until the
+  // client reads the arm the pre-paint script assigned. CSS hides the other arms meanwhile.
+  const [bannerVariantResolved, setBannerVariantResolved] = useState(
+    () => !initialBanners.some((nudge) => nudge.variant),
+  );
   const [activeOverlayId, setActiveOverlayId] = useState<string | null>(null);
   const [activeCoachMarkId, setActiveCoachMarkId] = useState<string | null>(null);
   const bannerShownRef = useRef(false);
@@ -174,6 +187,19 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
   );
 
   useEffect(() => {
+    if (bannerVariantResolved) return;
+    const variant = assignedLandingBannerVariant();
+    const assigned = initialBanners.find((nudge) => nudge.variant === variant);
+    if (assigned && activeBanner?.variant) {
+      setActiveBannerId(assigned.id);
+      if (isEligible(assigned)) trackNudgeEvent(assigned, 'shown');
+    }
+    setBannerVariantResolved(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!bannerVariantResolved) return;
     if (activeBanner && !isEligible(activeBanner)) {
       setActiveBannerId(null);
       bannerShownRef.current = false;
@@ -212,7 +238,7 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
       for (const fn of cleanups) fn();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeBannerId, activeOverlayId, activeCoachMarkId, scope]);
+  }, [activeBannerId, activeOverlayId, activeCoachMarkId, scope, bannerVariantResolved]);
 
   useEffect(() => {
     const handlers: [string, () => void][] = [];
@@ -254,13 +280,19 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
 
   return (
     <>
-      {activeBanner && (
+      {(!bannerVariantResolved && activeBanner?.variant
+        ? initialBanners.filter((nudge) => nudge.variant)
+        : activeBanner
+          ? [activeBanner]
+          : []
+      ).map((banner) => (
         <BannerRenderer
-          def={activeBanner}
+          key={banner.id}
+          def={banner}
           onDismiss={dismissBanner}
           onAction={handleBannerAction}
         />
-      )}
+      ))}
       {activeOverlay?.type === 'toast' && !deferToastForCoachMark && (
         <ToastRenderer
           def={activeOverlay}
@@ -680,6 +712,7 @@ function BannerRenderer({
     <section
       className="container mx-auto px-4 lg:px-8 mb-6 lg:mb-4"
       data-initial-banner={def.renderOnInitialLoad ? '' : undefined}
+      data-banner-variant={def.variant}
     >
       <a
         href={href}
