@@ -1,6 +1,7 @@
 'use client';
 
 import { useId } from 'react';
+import { cn } from '@/lib/shared/utils';
 import {
   Select,
   SelectContent,
@@ -14,11 +15,15 @@ export default function VideoSelect({
   value,
   onValueChange,
   options,
+  testId,
+  contentClassName,
 }: {
   label: string;
   value: string;
   onValueChange: (value: string) => void;
   options: { value: string; label: string }[];
+  testId?: string;
+  contentClassName?: string;
 }) {
   const id = useId();
   return (
@@ -29,12 +34,18 @@ export default function VideoSelect({
       <Select value={value} onValueChange={onValueChange} disabled={options.length === 0}>
         <SelectTrigger
           id={id}
+          data-testid={testId}
           aria-label={label}
-          className="w-full focus-visible:ring-2 focus-visible:ring-ring"
+          className="w-full min-w-0 focus-visible:ring-2 focus-visible:ring-ring *:data-[slot=select-value]:block *:data-[slot=select-value]:min-w-0 *:data-[slot=select-value]:truncate"
         >
           <SelectValue placeholder="—" />
         </SelectTrigger>
-        <SelectContent className="w-(--radix-select-trigger-width) max-w-[calc(100vw-2rem)]">
+        <SelectContent
+          className={cn(
+            'w-(--radix-select-trigger-width) max-w-[calc(100vw-2rem)]',
+            contentClassName,
+          )}
+        >
           {options.map((option) => (
             <SelectItem
               key={option.value}

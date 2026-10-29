@@ -21,6 +21,20 @@
   min-width: 0;
   gap: 6px;
 }
+.workloadField {
+  min-width: 0;
+}
+.workloadField [data-slot='select-trigger'] {
+  height: 36px;
+  font-size: 12px;
+}
+.workloadMenu {
+  width: min(32rem, calc(100vw - 2rem));
+}
+.workloadMenu [data-slot='select-item'] {
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
 .field select,
 .field input:not([type='range']) {
   height: 36px;
@@ -171,9 +185,13 @@
     gap: 12px;
   }
   .field select,
+  .workloadField [data-slot='select-trigger'],
   .field input:not([type='range']) {
     height: 44px;
     font-size: 16px;
+  }
+  .workloadMenu [data-slot='select-item'] {
+    min-height: 44px;
   }
   .segments button {
     min-height: 44px;

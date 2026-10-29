@@ -38,6 +38,7 @@ import {
   type ResultSeries,
 } from './VideoResultsCharts';
 import VideoHistory from './VideoHistory';
+import VideoSelect from './VideoSelect';
 import styles from './results.module.css';
 
 const STRINGS = {
@@ -532,7 +533,7 @@ export default function VideoDashboard() {
   );
   const trace = representatives.find((c) => c.point.id === traceHardware) ?? representatives[0];
   const selector = (
-    key: 'model' | 'workload' | 'engine' | 'date',
+    key: 'model' | 'engine' | 'date',
     label: string,
     choices: { value: string; label: string }[],
     fallback: string,
@@ -606,12 +607,19 @@ export default function VideoDashboard() {
           options.models.map((v) => ({ value: v, label: v })),
           s.all,
         )}
-        {selector(
-          'workload',
-          s.workload,
-          options.workloads.map((v) => ({ value: v.key, label: v.label })),
-          s.automatic,
-        )}
+        <div className={styles.workloadField}>
+          <VideoSelect
+            label={s.workload}
+            testId="results-workload"
+            value={state.workload ?? 'automatic'}
+            onValueChange={(value) => update({ workload: value === 'automatic' ? null : value })}
+            options={[
+              { value: 'automatic', label: s.automatic },
+              ...options.workloads.map((v) => ({ value: v.key, label: v.label })),
+            ]}
+            contentClassName={styles.workloadMenu}
+          />
+        </div>
         <div className={`${styles.field} text-xs`}>
           <span className="text-muted-foreground">{s.gpus}</span>
           <div
