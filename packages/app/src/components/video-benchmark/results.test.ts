@@ -113,6 +113,11 @@ describe('VideoGenX results contract', () => {
     expect(result.cells.map((c) => c.point.id)).toEqual(['official:c1']);
     expect(result.overlayCells.map((c) => c.point.id)).toEqual(['overlay:c1']);
     expect(result.overlayCells[0].overlay).toBe(true);
+    expect(result.deploymentCells.map((cell) => cell.point.id)).toEqual(['official:c1']);
+    expect(result.workloadMix.map((cell) => cell.point.id)).toEqual(['official:c1']);
+    expect(resultProjection([official, overlay], selection, [overlay]).overlayCells).toHaveLength(
+      1,
+    );
     expect(resultProjection([official], selection).overlayCells).toEqual([]);
     expect(resultProjection([official, overlay], { ...selection, hidden: ['h200'] }).cells).toEqual(
       [],
@@ -122,6 +127,80 @@ describe('VideoGenX results contract', () => {
     expect(
       resultProjection([official, overlay], { ...state(), gpuCount: 2 }).deploymentCells,
     ).toHaveLength(2);
+  });
+
+  it('keeps an exact unapproved overlay out of official cells, options for other runs and aggregates', () => {
+    const official = { ...eligible, id: 'official:c1', runId: '100', results: evidence() };
+    const named = {
+      ...official,
+      id: 'named:c1',
+      runId: '200',
+      hardwareKey: 'b200',
+      approved: false,
+      allocated: null,
+    };
+    const other = { ...named, id: 'other:c1', runId: '300', model: 'Other model' };
+    const selection = { ...state(), unofficialRun: '200' };
+    const result = resultProjection([official], selection, [named, other]);
+    expect(result.cells.map((cell) => cell.point.id)).toEqual(['official:c1']);
+    expect(result.deploymentCells.map((cell) => cell.point.id)).toEqual(['official:c1']);
+    expect(result.workloadMix.map((cell) => cell.point.id)).toEqual(['official:c1']);
+    expect(result.overlayCells).toHaveLength(1);
+    expect(result.overlayCells[0].point).toMatchObject({ id: 'named:c1', approved: false });
+    expect(result.overlayCells[0].cost.participating).not.toBeNull();
+    expect(result.overlayCells[0].cost.allocated).toBeNull();
+    expect(JSON.stringify(result)).not.toContain('other:c1');
+    for (const filter of [
+      { hidden: ['b200'] },
+      { gpuCount: 2 },
+      { engine: 'other' },
+      { date: '1900-01-01' },
+      { model: 'other' },
+      { resolution: '1×1' },
+      { duration: 1 },
+      { mode: 'i2v' },
+      { steps: 1 },
+    ])
+      expect(
+        resultProjection([official], { ...selection, ...filter }, [named]).overlayCells,
+      ).toEqual([]);
+    const cleared = resultProjection([official], state(), [named, other]);
+    expect(cleared.overlayCells).toEqual([]);
+    expect(cleared.cells.map((cell) => cell.point.id)).toEqual(['official:c1']);
+  });
+
+  it('prefers an approved cohort but permits explicit or fallback diagnostic-only selection', () => {
+    const identity = JSON.parse(eligible.workloadKey!);
+    identity.plan.generation.width = 512;
+    const named = {
+      ...eligible,
+      id: 'diagnostic:c1',
+      runId: '200',
+      approved: false,
+      workloadKey: JSON.stringify(identity),
+    };
+    const selection = { ...state(), unofficialRun: '200' };
+    const preferred = resultProjection([eligible], selection, [named]);
+    expect(preferred.workloadKey).toBe(eligible.workloadKey);
+    expect(preferred.overlayCells).toEqual([]);
+    const explicit = resultProjection([eligible], { ...selection, workload: named.id }, [named]);
+    expect(explicit.cells).toEqual([]);
+    expect(explicit.overlayCells[0].point.id).toBe(named.id);
+    expect(explicit.workloadMix.every((cell) => cell.point.approved === true)).toBe(true);
+    const fallback = resultProjection([], selection, [named]);
+    expect(fallback.cells).toEqual([]);
+    expect(fallback.deploymentCells).toEqual([]);
+    expect(fallback.workloadMix).toEqual([]);
+    expect(fallback.overlayCells[0].point.id).toBe(named.id);
+    expect(fallback.state.workload).toBe(named.id);
+    expect(resultProjection([], state(), [named]).options.workloads).toEqual([]);
+    for (const change of [
+      { samples: 9 },
+      { scheduled: 4 },
+      { concurrency: 2 },
+      { workloadKey: null },
+    ])
+      expect(resultProjection([], selection, [{ ...named, ...change }]).overlayCells).toEqual([]);
   });
 
   it('round-trips all controls, including per-mode prices, through the shared URL/API parser', () => {

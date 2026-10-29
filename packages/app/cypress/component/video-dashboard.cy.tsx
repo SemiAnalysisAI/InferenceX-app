@@ -113,13 +113,48 @@ describe('VideoGenX results', () => {
     cy.location('search').should('not.contain', 'r_workload=');
   });
 
-  it('retains a published overlay alias until it is dismissed', () => {
+  it('retains an approved named run as an overlay until it is dismissed', () => {
     mount({ search: '?unofficialrun=34342452354&other=1' });
     cy.get('[data-testid="results-overlay"]').should('contain', '34342452354');
+    costRow('h200').should('have.attr', 'data-overlay', 'true');
     cy.get('[data-testid="results-overlay-dismiss"]').click();
     cy.get('[data-testid="results-overlay"]').should('not.exist');
+    costRow('h200').should('have.attr', 'data-overlay', 'false');
     cy.location('search').should('contain', 'other=1').and('not.contain', 'unofficialrun=');
   });
+
+  for (const onlyDiagnostic of [false, true]) {
+    it(`shows a named unapproved run with ${onlyDiagnostic ? 'no approved cohort' : 'an approved cohort'} and clears it without promotion`, () => {
+      mount({
+        search: '?unofficialrun=34341996789',
+        editPage: (page) => {
+          for (const entry of page.entries)
+            if (onlyDiagnostic || entry.runId === '34341996789') entry.approved = false;
+        },
+      });
+      costRow('b200').should('have.attr', 'data-overlay', 'true');
+      cy.get('[data-testid="video-results-clip"][data-hardware="b200"]').should(
+        'contain',
+        'Unofficial run',
+      );
+      cy.get('[data-testid="video-results-sources"] summary').click();
+      cy.get('[data-testid="video-results-sources"]').should('contain', 'No matching receipt');
+      if (onlyDiagnostic)
+        cy.get('[data-testid="results-cost-table"] [data-overlay="false"]').should('not.exist');
+      else costRow('h200').should('have.attr', 'data-overlay', 'false');
+      cy.get('@history.all')
+        .its('length')
+        .then((requestCount) => {
+          cy.get('[data-testid="results-overlay-dismiss"]').click();
+          cy.get('@history.all').should('have.length', requestCount);
+        });
+      costRow('b200').should('not.exist');
+      cy.get('[data-testid="results-overlay"]').should('not.exist');
+      if (onlyDiagnostic)
+        cy.get('[data-testid="results-cost-table"] [data-hardware]').should('not.exist');
+      else costRow('h200').should('exist');
+    });
+  }
 
   it('keeps matching summaries distinct and selects the exact source ID', () => {
     mount({
@@ -351,6 +386,35 @@ describe('VideoGenX results', () => {
       cy.get('[data-testid="video-results-clip"][data-hardware="b200"]')
         .should('contain', 'TCO')
         .and('contain', pathname.startsWith('/zh') ? '分配 GPU' : 'Allocated');
+      cy.get('[data-testid="video-results-sources"] summary').click();
+      cy.get('[data-testid="video-results-sources"] table').should(($table) => {
+        expect($table[0].getBoundingClientRect().width).to.be.at.least(640);
+        const container = $table[0].parentElement!;
+        const bounds = container.getBoundingClientRect();
+        expect(bounds.left).to.be.at.least(0);
+        expect(bounds.right).to.be.at.most(width);
+        expect(getComputedStyle(container).overflowX).to.equal('auto');
+        if (width < 768) expect(container.scrollWidth).to.be.greaterThan(container.clientWidth);
+      });
+      cy.get('[data-testid="video-results-sources"] th').each(($header) => {
+        expect($header).to.have.css('white-space', 'nowrap');
+        expect($header[0].getBoundingClientRect().height).to.be.at.most(
+          parseFloat(getComputedStyle($header[0]).lineHeight) + 2,
+        );
+      });
+      cy.get('[data-testid="video-results-sources"] tbody td:nth-child(5)').each(($status) => {
+        expect($status).to.have.css('white-space', 'nowrap');
+      });
+      assertResultsFit();
+      if (width < 768) {
+        cy.get('[data-testid="video-results-sources"] table').parent().scrollTo('right');
+        cy.get('[data-testid="video-results-sources"] th')
+          .last()
+          .should(($header) => {
+            expect($header[0].getBoundingClientRect().right).to.be.at.most(width);
+          });
+      }
+      cy.get('[data-testid="video-results-sources"] summary').click();
       cy.get('[data-testid="results-workload"]').click('left');
       cy.get('[role="grid"]')
         .should('be.visible')

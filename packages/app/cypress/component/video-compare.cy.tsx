@@ -394,11 +394,11 @@ describe('Video results synchronized clips', () => {
     cy.get('[data-testid="video-results-clip"][data-hardware="mi355x"] video').should('not.exist');
     cy.get('[data-testid="video-results-clip"][data-hardware="gb200"]').should(
       'not.contain',
-      'Unofficial published run',
+      'Unofficial run',
     );
     cy.get('[data-testid="video-results-clip"][data-hardware="mi355x"]').should(
       'not.contain',
-      'Unofficial published run',
+      'Unofficial run',
     );
     cy.get('[data-testid="video-results-clip"][data-hardware="h200"] video').then(($video) => {
       const video = $video[0] as HTMLVideoElement;

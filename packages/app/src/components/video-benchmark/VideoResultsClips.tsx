@@ -21,7 +21,10 @@ import type { StoredArtifact } from './stored';
 const STRINGS = {
   en: {
     label: 'Comparison clips',
-    unofficial: 'Unofficial published run',
+    unofficial: 'Unofficial run',
+    approval: 'Approval',
+    approved: 'Approved',
+    unapproved: 'No matching receipt',
     prompt: 'Prompt',
     sources: 'Prompt & sources',
     source: 'Source',
@@ -66,7 +69,10 @@ const STRINGS = {
   },
   zh: {
     label: '视频对比',
-    unofficial: '非官方已发布运行',
+    unofficial: '非官方运行',
+    approval: '发布批准',
+    approved: '已批准',
+    unapproved: '暂无匹配记录',
     prompt: 'Prompt',
     sources: 'Prompt 与来源',
     source: '来源',
@@ -394,13 +400,14 @@ function SynchronizedClips({
           )}
         </div>
         <div className="mt-3 overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="text-muted-foreground">
+          <table className="w-full min-w-[44rem] text-left">
+            <thead className="whitespace-nowrap text-muted-foreground">
               <tr>
                 <th className="pr-3 font-medium">{s.source}</th>
                 <th className="pr-3 font-medium">{s.run}</th>
                 <th className="pr-3 font-medium">{s.artifact}</th>
                 <th className="pr-3 font-medium">{s.runtime}</th>
+                <th className="pr-3 font-medium">{s.approval}</th>
                 <th className="font-medium">{s.media}</th>
               </tr>
             </thead>
@@ -414,7 +421,10 @@ function SynchronizedClips({
                     <td className="pr-3">{point?.runId ?? '—'}</td>
                     <td className="pr-3">{point?.artifactId ?? '—'}</td>
                     <td className="pr-3 break-all">{point?.runtime || '—'}</td>
-                    <td>
+                    <td className="pr-3 whitespace-nowrap">
+                      {point ? (point.approved === true ? s.approved : s.unapproved) : '—'}
+                    </td>
+                    <td className="whitespace-nowrap">
                       {clip ? (
                         <a
                           className="underline"

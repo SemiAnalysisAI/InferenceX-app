@@ -1,18 +1,30 @@
-import { assertResultsFit, readOnlyVideoRequests, RESULT_GROUPS } from '../support/video-results';
+import { videoPoints } from '../../src/components/video-benchmark/points';
+import { parseResultsState, resultProjection } from '../../src/components/video-benchmark/results';
+import {
+  assertResultsFit,
+  readOnlyVideoRequests,
+  resultHistory,
+  RESULT_GROUPS,
+} from '../support/video-results';
 
 describe('VideoGenX results routes', () => {
-  beforeEach(() => readOnlyVideoRequests());
+  beforeEach(() => {
+    readOnlyVideoRequests();
+    resultHistory().then((page) => {
+      cy.intercept('GET', '/api/video-runs?format=history&page=1', {
+        body: page,
+        headers: { 'X-VideoGenX-Replay': '1' },
+      }).as('history');
+    });
+  });
 
-  it('shares the same hidden hardware and cost projection with the read-only API', () => {
+  it('keeps the shared fixture projection across reload and language changes', () => {
     const search = 'r_hidden=b200&r_tier=r';
-    cy.request(`/api/v1/views/video?view=overview&${search}`).then(({ body }) => {
-      const h200 = body.cells.find(
-        (cell: { point: { hardwareKey: string } }) => cell.point.hardwareKey === 'h200',
-      );
+    resultHistory().then((page) => {
+      const projection = resultProjection(videoPoints([page]), parseResultsState(search));
+      const h200 = projection.cells.find((cell) => cell.point.hardwareKey === 'h200');
       expect(h200, 'H200 remains admitted').not.to.equal(undefined);
-      expect(
-        body.cells.map((cell: { point: { hardwareKey: string } }) => cell.point.hardwareKey),
-      ).to.deep.equal(['h200']);
+      expect(projection.cells.map((cell) => cell.point.hardwareKey)).to.deep.equal(['h200']);
       cy.visit(`/video?${search}`);
       cy.get(
         '[data-testid="results-cost-table"] [data-hardware="h200"][data-basis="participating"]',
@@ -21,9 +33,10 @@ describe('VideoGenX results routes', () => {
         .first()
         .invoke('attr', 'data-value')
         .then((value) => {
-          expect(Number(value), 'UI and API use the same cost').to.equal(
-            h200.cost.participating.perVideo,
-          );
+          expect(
+            Number(value),
+            'UI matches the shared projection for the intercepted fixture',
+          ).to.equal(h200!.cost.participating!.perVideo);
         });
     });
     cy.get('[data-testid="results-hardware-b200"]').should('not.be.checked');

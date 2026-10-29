@@ -5,7 +5,7 @@ import {
   type VideoHistoryPage,
 } from '@/components/video-benchmark/history';
 import { servingCells } from '@/components/video-benchmark/serving';
-import { videoPoints } from '@/components/video-benchmark/points';
+import { namedRunPoints, videoPoints } from '@/components/video-benchmark/points';
 import { parseResultsState, resultProjection } from '@/components/video-benchmark/results';
 import { storedBundle, type StoredArtifact } from '@/components/video-benchmark/stored';
 import {
@@ -48,9 +48,11 @@ async function dashboardResponse(request: NextRequest, view: 'dashboard' | 'comp
     if (nextPage === null) break;
   }
   if (view === 'overview') {
+    const state = parseResultsState(request.nextUrl.search);
     const projection = resultProjection(
       videoPoints(pages),
-      parseResultsState(request.nextUrl.search),
+      state,
+      namedRunPoints(pages, state.unofficialRun),
     );
     return NextResponse.json(
       {

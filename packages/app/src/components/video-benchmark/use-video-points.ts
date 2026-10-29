@@ -1,13 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { VIDEO_HISTORY_MAX_PAGES, type VideoHistoryPage } from './history';
-import type { VideoPoint } from './metrics';
-import { videoPoints } from './points';
+import { namedRunPoints, videoPoints } from './points';
 
-/** Load every published history page (bounded) and flatten it into chart points. */
-export function useVideoPoints() {
-  const [points, setPoints] = useState<VideoPoint[]>([]);
+/** Read bounded stored history once; derive approved and exact named-run points. */
+export function useVideoPoints(runId: string | null) {
+  const [pages, setPages] = useState<VideoHistoryPage[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [replay, setReplay] = useState(false);
@@ -17,7 +16,7 @@ export function useVideoPoints() {
     setLoading(true);
     setLoadError(null);
     (async () => {
-      const pages: VideoHistoryPage[] = [];
+      const loadedPages: VideoHistoryPage[] = [];
       let replayed = false;
       for (let page = 1; page <= VIDEO_HISTORY_MAX_PAGES; page++) {
         const response = await fetch(`/api/video-runs?format=history&page=${page}`, {
@@ -29,11 +28,11 @@ export function useVideoPoints() {
         const data = (await response.json()) as VideoHistoryPage;
         if (data.schemaVersion !== 1 || !Array.isArray(data.entries))
           throw new Error('Unsupported published history projection');
-        pages.push(data);
+        loadedPages.push(data);
         if (data.nextPage === null) break;
       }
       if (controller.signal.aborted) return;
-      setPoints(videoPoints(pages));
+      setPages(loadedPages);
       setReplay(replayed);
     })()
       .catch((error: unknown) => {
@@ -45,6 +44,8 @@ export function useVideoPoints() {
       });
     return () => controller.abort();
   }, [attempt]);
+  const points = useMemo(() => videoPoints(pages), [pages]);
+  const namedPoints = useMemo(() => namedRunPoints(pages, runId), [pages, runId]);
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
-  return { points, loading, error: loadError, replay, retry };
+  return { points, namedPoints, loading, error: loadError, replay, retry };
 }

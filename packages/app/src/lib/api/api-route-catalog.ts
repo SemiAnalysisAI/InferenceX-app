@@ -211,7 +211,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-video-view',
-    sourceSha256: '2b9cbeb00d8601a70ef228bd345f32a39d13a43f825f66ec5790607b29fdc0ca',
+    sourceSha256: '862055b2554fdb036adaf2c30ce788d933fd594a98f61406635ccb703cc01ff0',
   },
   // Agentic Workload Explorer page backend (frozen ProxyTrace snapshot).
   {
@@ -1444,7 +1444,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results.ts',
-    sourceSha256: '21a51335700dc931d48ebf59634d17b0a687d68f308b29d9f2b48038027946ba',
+    sourceSha256: 'daf2b45c1f1dad99ed47fcd94f08746404907f865d8d9e4c93aec5467c35bede',
     reviewArea: {
       en: 'Shared nine-group VideoGenX selectors, sample admission, dual GPU cost bases and modelled profit.',
       zh: '九组 VideoGenX 指标共用的筛选、样本准入、两种 GPU 成本口径及估算利润。',
@@ -1484,7 +1484,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/points.ts',
-    sourceSha256: 'f6605710c606555b7eb5aeee8ea28acec3e996c0ba619482c5ffdd22c8ab96d2',
+    sourceSha256: '7a1b2e3895fe943c3fd519b4d8f37db9177630202c2e1800c5bdf34f737be565',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',

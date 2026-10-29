@@ -7,7 +7,7 @@ import type {
 } from '@/components/video-benchmark/history';
 import { metricValue } from '@/components/video-benchmark/metrics';
 import { listedVideoCells, plotVideoPoints } from '@/components/video-benchmark/plot';
-import { dashboardCells, videoPoints } from '@/components/video-benchmark/points';
+import { dashboardCells, namedRunPoints, videoPoints } from '@/components/video-benchmark/points';
 import { parseResultsState, resultProjection } from '@/components/video-benchmark/results';
 import { servingFixture } from '@/components/video-benchmark/serving.fixture';
 import type { StoredArtifact } from '@/components/video-benchmark/stored';
@@ -210,6 +210,74 @@ describe('published VideoGenX dashboard projection', () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.rows).toEqual([]);
+  });
+
+  it('shows only the explicitly named unapproved run in overview overlays', async () => {
+    const history = structuredClone(retainedHistory) as unknown as VideoHistoryPage;
+    history.nextPage = null;
+    const run = videoPoints([history]).find((point) => point.hardwareKey === 'b200')!.runId;
+    const selected = history.entries.find((entry) => entry.runId === run)!;
+    selected.approved = false;
+    const other = structuredClone(selected);
+    other.runId = '987654321';
+    other.id = `${other.runId}.${other.artifact.id}`;
+    for (const item of other.sources)
+      for (const row of item.observations) row.id = `other:${row.id}`;
+    history.entries.unshift(other);
+    source.mockImplementation(() => Response.json(history));
+
+    const response = await GET(request(`view=overview&unofficialrun=${run}`));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.overlayCells).toHaveLength(1);
+    expect(body).toMatchObject(
+      resultProjection(
+        videoPoints([history]),
+        parseResultsState(`unofficialrun=${run}`),
+        namedRunPoints([history], run),
+      ),
+    );
+    expect(body.overlayCells[0]).toMatchObject({
+      overlay: true,
+      point: { runId: run, approved: false, artifactId: selected.artifact.id },
+    });
+    expect(body.cells.map((cell: { point: { runId: string } }) => cell.point.runId)).not.toContain(
+      run,
+    );
+    expect(JSON.stringify(body)).not.toContain(other.runId);
+
+    const clearedResponse = await GET(request('view=overview'));
+    const cleared = await clearedResponse.json();
+    expect(cleared.overlayCells).toEqual([]);
+    expect(
+      cleared.cells.map((cell: { point: { runId: string } }) => cell.point.runId),
+    ).not.toContain(run);
+    expect(
+      source.mock.calls.every(([req]) => req.nextUrl.searchParams.get('format') === 'history'),
+    ).toBe(true);
+  });
+
+  it('returns the shared diagnostic-only projection and keeps CSV unsupported', async () => {
+    const history = structuredClone(retainedHistory) as unknown as VideoHistoryPage;
+    history.nextPage = null;
+    const run = videoPoints([history]).find((point) => point.hardwareKey === 'b200')!.runId;
+    for (const entry of history.entries) entry.approved = false;
+    source.mockImplementation(() => Response.json(history));
+    const response = await GET(request(`view=overview&unofficialruns=${run}`));
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body.cells).toEqual([]);
+    expect(body.workloadMix).toEqual([]);
+    expect(body.overlayCells).toHaveLength(1);
+    expect(body).toMatchObject(
+      resultProjection(
+        videoPoints([history]),
+        parseResultsState(`unofficialruns=${run}`),
+        namedRunPoints([history], run),
+      ),
+    );
+    const csv = await GET(request('view=overview&format=csv'));
+    expect(csv.status).toBe(400);
   });
   it('defaults to the current dashboard, reads history pages and preserves numerical parity', async () => {
     const response = await GET(request());

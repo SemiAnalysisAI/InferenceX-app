@@ -292,31 +292,50 @@ const latest = (input: VideoPoint[]) => {
   return [...groups.values()].flatMap(latestVideoCells);
 };
 
-export function resultProjection(points: VideoPoint[], state: ResultsState) {
-  const qualified = points.filter(
-    (p) =>
-      RESULTS_HARDWARE.some((key) => key === p.hardwareKey) &&
-      p.workloadKey &&
-      resultMetadata(p).canonicalWorkload &&
-      p.concurrency === 1 &&
-      p.scheduled === 20 &&
-      p.samples >= DASHBOARD_SAMPLE_FLOOR &&
-      positive(p.valid) &&
-      p.valid >= DASHBOARD_SAMPLE_FLOOR &&
-      p.status === 'complete',
+function qualifies(p: VideoPoint): boolean {
+  return Boolean(
+    RESULTS_HARDWARE.some((key) => key === p.hardwareKey) &&
+    p.workloadKey &&
+    resultMetadata(p).canonicalWorkload &&
+    p.concurrency === 1 &&
+    p.scheduled === 20 &&
+    p.samples >= DASHBOARD_SAMPLE_FLOOR &&
+    positive(p.valid) &&
+    p.valid >= DASHBOARD_SAMPLE_FLOOR &&
+    p.status === 'complete',
   );
-  const metadata = qualified.map(resultMetadata);
+}
+
+export function resultProjection(
+  points: VideoPoint[],
+  state: ResultsState,
+  namedPoints: VideoPoint[] = [],
+) {
+  const qualified = points.filter(qualifies);
+  const named =
+    state.unofficialRun === null
+      ? []
+      : [
+          ...new Map(
+            [...qualified, ...namedPoints]
+              .filter((point) => point.runId === state.unofficialRun && qualifies(point))
+              .map((point) => [point.id, point]),
+          ).values(),
+        ];
+  const approvedIds = new Set(qualified.map((point) => point.id));
+  const available = [...qualified, ...named.filter((point) => !approvedIds.has(point.id))];
+  const metadata = available.map(resultMetadata);
   // Share a source point ID, not the canonical JSON containing every prompt and seed.
   // Comparison still uses the complete canonical identity after resolving the selector.
   const workloads = new Map<string, { key: string; label: string; model: string }>();
-  for (const point of qualified)
+  for (const point of available)
     if (!workloads.has(point.workloadKey!))
       workloads.set(point.workloadKey!, {
         key: point.id,
         label: point.workload,
         model: point.model,
       });
-  const matches = qualified.filter((p) => {
+  const matchesFilters = (p: VideoPoint) => {
     const m = resultMetadata(p);
     return (
       (!state.model || m.model === state.model) &&
@@ -327,9 +346,11 @@ export function resultProjection(points: VideoPoint[], state: ResultsState) {
       (!state.engine || m.engine === state.engine) &&
       (!state.date || m.date === state.date)
     );
-  });
+  };
+  const matches = qualified.filter(matchesFilters);
+  const namedMatches = named.filter(matchesFilters);
   const coverage = new Map<string, Set<string>>();
-  for (const p of matches)
+  for (const p of matches.length > 0 ? matches : namedMatches)
     coverage.set(p.workloadKey!, (coverage.get(p.workloadKey!) ?? new Set()).add(p.hardwareKey!));
   const preferred = [...coverage].toSorted((a, b) => b[1].size - a[1].size)[0]?.[0] ?? null;
   const workloadKey =
@@ -346,9 +367,10 @@ export function resultProjection(points: VideoPoint[], state: ResultsState) {
     (p) => state.gpuCount === null || p.point.participating === state.gpuCount,
   );
   const overlayCells = latest(
-    common.filter(
+    namedMatches.filter(
       (p) =>
-        p.runId === state.unofficialRun &&
+        p.workloadKey === workloadKey &&
+        !state.hidden.includes(p.hardwareKey ?? '') &&
         (state.gpuCount === null || p.participating === state.gpuCount),
     ),
   ).map((p) => resultCell(p, state));
@@ -387,7 +409,7 @@ export function resultProjection(points: VideoPoint[], state: ResultsState) {
       durations: values(metadata.map((m) => m.duration)),
       modes: values(metadata.map((m) => m.mode)),
       steps: values(metadata.map((m) => m.steps)),
-      gpuCounts: values(qualified.map((p) => p.participating)),
+      gpuCounts: values(available.map((p) => p.participating)),
       engines: values(metadata.map((m) => m.engine)),
       dates: values(metadata.map((m) => m.date)),
       workloads: [...workloads.values()]

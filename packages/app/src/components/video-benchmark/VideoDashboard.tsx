@@ -61,7 +61,7 @@ const STRINGS = {
     date: 'Run date',
     all: 'All',
     automatic: 'Matched workload',
-    publishedLabel: 'Published label',
+    publishedLabel: 'Source label',
     sourceId: 'Source ID',
     stepsUnit: 'steps',
     latest: 'Latest published',
@@ -181,9 +181,9 @@ const STRINGS = {
       'Per-hardware measured deployments: lower P50, higher valid clips per participating GPU-hour. One deployment is a point; missing topologies are not interpolated.',
     history: 'Performance history',
     historyNote: 'Stored evidence, including unapproved, low-sample and unmatched runs.',
-    overlay: 'Unofficial published run',
+    overlay: 'Unofficial run',
     overlayMissing:
-      'No matching published observation for this run. Loading it does not publish or generate media.',
+      'No matching stored observation for this run. Loading it does not publish or generate media.',
     dismiss: 'Dismiss',
     sources: 'Read-only data',
     api: 'View API',
@@ -205,7 +205,7 @@ const STRINGS = {
     date: '运行日期',
     all: '全部',
     automatic: '匹配的工作负载',
-    publishedLabel: '已发布标签',
+    publishedLabel: '来源标签',
     sourceId: '来源 ID',
     stepsUnit: '步',
     latest: '最新已发布结果',
@@ -321,8 +321,8 @@ const STRINGS = {
       '按硬件展示实测部署：P50 越低、每参与 GPU 小时的有效视频数越高越好。只有一个部署时只显示一个点，缺失拓扑不插值。',
     history: '性能历史',
     historyNote: '已存储的结果，包括尚无发布批准、样本不足及工作负载未匹配的运行。',
-    overlay: '非正式已发布运行',
-    overlayMissing: '这个运行没有匹配的已发布观测；加载不会发布或生成媒体。',
+    overlay: '非官方运行',
+    overlayMissing: '这个运行没有匹配的已存储观测；加载不会发布或生成媒体。',
     dismiss: '移除',
     sources: '只读数据',
     api: '视图 API',
@@ -427,8 +427,10 @@ const cellLabel = (cell: ResultCell) =>
 export default function VideoDashboard() {
   const locale = useLocale(),
     s = STRINGS[locale];
-  const { points, loading, error, replay, retry } = useVideoPoints();
   const [state, setState] = useState<ResultsState>(DEFAULT_RESULTS_STATE);
+  const { points, namedPoints, loading, error, replay, retry } = useVideoPoints(
+    state.unofficialRun,
+  );
   const [energyBasis, setEnergyBasis] = useState<'clip' | 'frame'>('clip');
   const [traceHardware, setTraceHardware] = useState('h200');
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -465,10 +467,13 @@ export default function VideoDashboard() {
     });
     track('video_results_config_changed', { controls: Object.keys(patch).join(',') });
   }, []);
-  const projection = useMemo(() => resultProjection(points, state), [points, state]);
+  const projection = useMemo(
+    () => resultProjection(points, state, namedPoints),
+    [points, state, namedPoints],
+  );
   const { options, overlayCells } = projection;
   const workloadOptions = useMemo(() => {
-    const byId = new Map(points.map((point) => [point.id, point]));
+    const byId = new Map([...namedPoints, ...points].map((point) => [point.id, point]));
     const rows = options.workloads.map(({ key, label }) => {
       const metadata = resultMetadata(byId.get(key)!);
       const summary = [
@@ -507,7 +512,7 @@ export default function VideoDashboard() {
         ),
       } satisfies SearchableSelectOption;
     });
-  }, [options.workloads, points, s]);
+  }, [options.workloads, points, namedPoints, s]);
   const resolvedWorkload = workloadOptions.find(
     (option) => option.value === projection.state.workload,
   );
@@ -987,7 +992,11 @@ export default function VideoDashboard() {
                   value={trace?.point.id ?? ''}
                   onValueChange={(value) => {
                     setTraceHardware(value);
-                    track('video_results_trace_changed', { gpu: value });
+                    track('video_results_trace_changed', {
+                      gpu:
+                        representatives.find((cell) => cell.point.id === value)?.point
+                          .hardwareKey ?? '',
+                    });
                   }}
                   groups={[
                     {

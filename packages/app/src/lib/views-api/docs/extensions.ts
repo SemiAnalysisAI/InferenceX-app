@@ -480,8 +480,8 @@ export function viewParameter(view: ReadonlyView, name: string): ApiParameter {
   const note: readonly [string, string] =
     view === 'video' && (name === 'unofficialrun' || name === 'unofficialruns')
       ? [
-          'Single already-published run ID (unofficialrun or canonical unofficialruns alias; multiple IDs and both aliases together return 400) for separate overview overlayCells; official cells stay distinct. Unknown or ineligible runs return no overlay. No publication is triggered.',
-          '单个已发布运行 ID，可用 unofficialrun 或分享链接的 unofficialruns 别名；多个 ID 或同时使用两个别名返回 400。结果放入独立 overlayCells，正式结果保留；未知或未达准入要求的运行不返回叠加结果，不触发发布。',
+          'Single stored run ID (unofficialrun or canonical unofficialruns alias; multiple IDs and both aliases together return 400) for separate overview overlayCells, whether approved or unapproved. Actual approval is preserved; the selected run is excluded from official cells. Unknown or ineligible runs return no overlay. No publication is triggered.',
+          '单个已存储运行 ID，可用 unofficialrun 或分享链接的 unofficialruns 别名；多个 ID 或同时使用两个别名返回 400。所选运行无论是否已批准，都只放入 overview 中独立的 overlayCells，保留实际批准状态，并从正式结果中排除；未知或未达准入要求的运行不返回叠加结果。该参数不会触发发布。',
         ]
       : view === 'current-inferencex-image' && name === 'sequence'
         ? ([
@@ -661,8 +661,8 @@ const NEW_VIEWS = {
 } as const;
 
 const RESULTS_OVERVIEW_NOTES = {
-  en: 'view=overview shares resultProjection with the nine-group UI, admits one canonical 20-clip C1 workload with ten valid samples per hardware, and returns measured metrics plus separately labelled participating/allocated cost and modelled profit. Missing allocation remains null. unofficialrun reads only matching already-published rows into overlayCells while preserving official cells. Missing quality, stage timing, memory and startup evidence stays null. Play/pause, scrub, difference rendering, theme and expand controls are presentation-only; media uses the published-only read path. ',
-  zh: 'view=overview 与九组指标界面共用 resultProjection，只准入同一份计划 20 条视频的 C1 工作负载，各硬件统一至少 10 个有效样本。响应包含实测指标及分别标注的参与/已分配 GPU 成本和估算利润；分配证据缺失时保留 null。unofficialrun 仅把匹配的已发布结果放入独立 overlayCells，保留正式结果。质量、阶段计时、内存和启动证据缺失时保留 null。播放、拖动、差异显示、主题和展开控件只影响展示；媒体使用只读已发布路径。',
+  en: 'view=overview shares resultProjection with the nine-group UI, admits one canonical 20-clip C1 workload with ten valid samples per hardware, and returns measured metrics plus separately labelled participating/allocated cost and modelled profit. Missing allocation remains null. Default points require publication approval. unofficialrun selects only the exact stored run into overlayCells with its actual approval, excluding it from official cells, deployments and workload mix. Approved cohorts retain default preference; named-only workloads require explicit selection or no matching approved cohort. Clearing never promotes unapproved evidence. The overview is JSON-only; format=csv returns 400. Missing quality, stage timing, memory and startup evidence stays null. Play/pause, scrub, difference rendering, theme and expand controls are presentation-only; media uses the published-only read path. ',
+  zh: 'view=overview 与九组指标界面共用 resultProjection，只准入同一份计划 20 条视频的 C1 工作负载，各硬件统一至少 10 个有效样本。响应包含实测指标及分别标注的参与/已分配 GPU 成本和估算利润；分配证据缺失时保留 null。默认数据点须有发布批准。unofficialrun 只把指定的已存储运行放入 overlayCells，保留其实际批准状态，并将其排除在正式结果、部署和工作负载构成之外。默认优先选择有已批准结果的工作负载；仅由指定运行提供的工作负载须明确选择，或在没有匹配的已批准结果时作为回退。清除叠加运行后也不会把未批准数据转为正式结果。overview 仅返回 JSON，format=csv 返回 400。质量、阶段计时、内存和启动证据缺失时保留 null。播放、拖动、差异显示、主题和展开控件只影响展示；媒体使用只读已发布路径。',
 };
 
 export const operations: ApiOperation[] = Object.entries(NEW_VIEWS).map(

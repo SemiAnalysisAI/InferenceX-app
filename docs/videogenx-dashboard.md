@@ -35,13 +35,22 @@ cohort separately rather than averaging across resolutions, durations or modes.
 `r_*` URL parameters record filters, hidden hardware, deadline, cost tier, entered
 mode prices and utilization. `r_workload` uses a compact source point identifier;
 canonical workload JSON stays inside the projection. Share includes the `r_`
-registry scope. `?unofficialrun=<id>` adds a separately identified published
-observation in the overlay color, obeys hardware visibility and can be dismissed.
-An unknown or unpublished run is explicitly unavailable; this URL cannot trigger
-publication, storage writes or GPU work.
+registry scope. `?unofficialrun=<id>` reads only that stored run through
+`namedRunPoints`, retaining its actual approval status. While selected, that run
+appears only in `overlayCells`, even if approved; it leaves official cells,
+deployment cells and workload mix. Clearing the selection cannot promote an
+unapproved source. All comparison filters and sample requirements still apply.
+Unknown or unstored runs remain unavailable; the URL cannot trigger publication,
+storage writes or GPU work.
+
+Approved evidence determines the preferred cohort. A workload available only in
+the named run requires explicit selection, or becomes the fallback when no approved
+cohort matches. The browser retains one bounded History read and rederives both
+lists when the URL changes. Legacy dashboard/compare APIs remain approved-only.
+The overview API returns JSON; `format=csv` remains unsupported and returns 400.
 
 The Workload menu shows compact summaries derived from recorded model and generation
-metadata. Its existing help control shows the full published label and exact source
+metadata. Its existing help control shows the full source label, exact source
 point ID. Matching summaries get distinct source-ID suffixes. This is presentation
 only; query IDs and API projection values remain unchanged.
 
@@ -114,7 +123,7 @@ reduces revenue, not the hours billed. This does not establish sustained capacit
 | Control                                                                     | Read-only API coverage                                                                 |
 | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | Model, workload, resolution, duration, mode, steps, GPU count, engine, date | `r_*` selection fields                                                                 |
-| Hardware visibility, published unofficial run                               | `r_hidden`, `unofficialrun`, separate overlay cells                                    |
+| Hardware visibility, named stored run                                       | `r_hidden`, `unofficialrun`, separate overlay cells preserving approval                |
 | Deadline, cost tier, mode prices, utilization                               | Same pure calculations in `resultProjection`                                           |
 | Clip/frame energy                                                           | Both normalized values returned; toggle is presentation only                           |
 | Power trace hardware                                                        | All selected cell traces returned; selector is presentation only                       |
@@ -146,6 +155,10 @@ Difference 是相对已记录 H200 H3 50-step 视频的浏览器 RGB 差异预�
 
 成本同时按参与计算和分配的 GPU 数量估算，分配证据缺失时不填补。利润输入默认空白，属于用户
 场景假设；利用率只降低收入，不减少付费时长。模式未知时不套用 T2V/I2V/R2V 价格。
-只读 API 与页面共用选择和计算逻辑，`r_*` 参数可以分享，`?unofficialrun=` 单独标识已发布观测，
-支持隐藏硬件及移除。读取不会启动 GPU、写入 Blob 或发布媒体。测试覆盖 API 一致性、样本门槛、
+只读 API 与页面共用选择和计算逻辑，`r_*` 参数可以分享，`?unofficialrun=` 只读取指定的已存储运行，
+保留其发布批准状态，并单独放入 overlayCells；选中期间，即使已批准也不进入正式结果、部署或工作负载构成。
+默认优先选择有已批准结果的工作负载；仅由指定运行提供的工作负载须明确选择，
+或在没有匹配的已批准结果时作为回退。
+支持隐藏硬件及移除；清除叠加运行后不会将未批准数据转为正式结果。overview 仅返回 JSON，`format=csv` 返回 400。
+读取不会启动 GPU、写入 Blob 或发布媒体。测试覆盖 API 一致性、样本门槛、
 两种成本口径、缺失证据、同步视频与中英文 390px 布局。
