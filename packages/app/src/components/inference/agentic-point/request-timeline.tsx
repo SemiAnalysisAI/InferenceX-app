@@ -601,6 +601,7 @@ export function RequestTimelineView({
                 onMouseUp={handleMouseUp}
                 onMouseLeave={handleMouseLeave}
                 onDoubleClick={() => {
+                  if (!isZoomed) return;
                   track('inference_agentic_timeline_zoom_reset', { placement: 'double_click' });
                   resetZoom();
                 }}

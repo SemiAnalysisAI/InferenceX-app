@@ -45,13 +45,23 @@ let container: HTMLDivElement;
 let root: Root;
 let mounted: boolean;
 
-function shiftWheel(deltaY: number) {
+function timelineSvg() {
   const svg = container.querySelector('[data-testid="request-timeline-svg"]');
   if (!svg) throw new Error('timeline svg not rendered');
+  return svg;
+}
+
+function shiftWheel(deltaY: number) {
   act(() => {
-    svg.dispatchEvent(
+    timelineSvg().dispatchEvent(
       new WheelEvent('wheel', { deltaY, shiftKey: true, bubbles: true, cancelable: true }),
     );
+  });
+}
+
+function doubleClick() {
+  act(() => {
+    timelineSvg().dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
   });
 }
 
@@ -94,5 +104,20 @@ describe('RequestTimelineView zoom tracking', () => {
     mounted = false;
     vi.advanceTimersByTime(1000);
     expect(track).not.toHaveBeenCalled();
+  });
+
+  it('ignores a double-click reset while the timeline is not zoomed', () => {
+    doubleClick();
+    expect(track).not.toHaveBeenCalled();
+  });
+
+  it('tracks a double-click reset after zooming in', () => {
+    shiftWheel(-100);
+    act(() => vi.advanceTimersByTime(500));
+    vi.mocked(track).mockClear();
+    doubleClick();
+    expect(vi.mocked(track).mock.calls).toEqual([
+      ['inference_agentic_timeline_zoom_reset', { placement: 'double_click' }],
+    ]);
   });
 });
