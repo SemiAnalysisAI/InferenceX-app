@@ -133,20 +133,31 @@ describe('AgentX All in Measured chart and table', () => {
       };
       cy.intercept('GET', '/api/unofficial-run*', { body: overlayBody }).as('agenticOverlay');
       let csvBlob: Blob | undefined;
-      cy.visit(
-        `${locale === 'zh' ? '/zh' : ''}/powerx?g_model=Kimi-K3&i_seq=agentic-traces&i_prec=fp4&i_pctl=p90&i_metric=y_utilityModeledWatts&i_optimal=0&i_best=0&unofficialrun=${OVERLAY_RUN_ID}`,
-        {
-          onBeforeLoad(win) {
-            win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-            unlockAgenticGate(win);
-            win.URL.createObjectURL = (object) => {
-              if (object instanceof win.Blob) csvBlob = object;
-              return 'blob:agentic-power';
-            };
-            win.HTMLAnchorElement.prototype.click = () => {};
-          },
+      // Whether the stripped share params come back depends on hydration timing, so
+      // later loads rebuild the URL instead of reading cy.location() or cy.reload().
+      const chartUrl = (overrides: Record<string, string> = {}) =>
+        `${locale === 'zh' ? '/zh' : ''}/powerx?${new URLSearchParams({
+          g_model: 'Kimi-K3',
+          i_seq: 'agentic-traces',
+          i_prec: 'fp4',
+          i_pctl: 'p90',
+          i_metric: 'y_utilityModeledWatts',
+          i_optimal: '0',
+          i_best: '0',
+          unofficialrun: OVERLAY_RUN_ID,
+          ...overrides,
+        })}`;
+      cy.visit(chartUrl(), {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          unlockAgenticGate(win);
+          win.URL.createObjectURL = (object) => {
+            if (object instanceof win.Blob) csvBlob = object;
+            return 'blob:agentic-power';
+          };
+          win.HTMLAnchorElement.prototype.click = () => {};
         },
-      );
+      });
       cy.wait(['@agenticAvailability', '@agenticBenchmarks', '@agenticOverlay']);
       cy.get('[data-testid="chart-figure"]').first().find('.dot-group').should('have.length', 2);
       cy.get('[data-testid="chart-figure"]')
@@ -229,7 +240,7 @@ describe('AgentX All in Measured chart and table', () => {
           benchmarks: [{ ...agenticRows[2], id: 0, run_url: OVERLAY_RUN_URL }],
         },
       }).as('missingOverlay');
-      cy.reload();
+      cy.visit(chartUrl());
       cy.wait(['@missingOnly', '@missingOverlay']);
       cy.get('[data-testid="inference-table-view-btn"]').first().click();
       cy.get('[data-testid="chart-figure"]')
@@ -237,12 +248,7 @@ describe('AgentX All in Measured chart and table', () => {
         .find('tbody tr')
         .should('have.length', 2)
         .and('contain.text', 'GB200');
-      cy.location('href').then((href) => {
-        const url = new URL(href);
-        url.searchParams.set('i_best', '1');
-        url.searchParams.set('i_xmode', 'e2e');
-        cy.visit(url.toString());
-      });
+      cy.visit(chartUrl({ i_best: '1', i_xmode: 'e2e' }));
       cy.get('[data-testid="inference-table-view-btn"]').first().click();
       cy.get('[data-testid="chart-figure"]').first().find('tbody tr').should('have.length', 2);
     });
