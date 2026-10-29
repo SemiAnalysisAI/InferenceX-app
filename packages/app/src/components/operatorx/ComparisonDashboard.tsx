@@ -4,7 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from 'next-themes';
 import { isDarkTheme } from '@/lib/themes/themes';
-import { memo, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { ComparisonOp } from '@semianalysisai/inferencex-db/operatorx/compare';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -155,64 +155,24 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
     [picked, available],
   );
   const baseline = pickedBaseline && hardware.includes(pickedBaseline) ? pickedBaseline : null;
-  // Controls update urgently; the charts rebuild from one deferred snapshot so a GPU, metric,
-  // baseline or workload change paints before every visualization re-renders, and the charts
-  // never mix a new view with old selections.
-  const chartInputs = useMemo(
-    () => ({ view, hardware, metric, baseline }),
-    [view, hardware, metric, baseline],
-  );
-  const {
-    view: chartView,
-    hardware: chartHardware,
-    metric: chartMetric,
-    baseline: chartBaseline,
-  } = useDeferredValue(chartInputs);
-  const chartWorkload = chartView?.workloads.find((w) => w.id === chartView.workload);
-  const chartAvailable = useMemo(
-    () => sortHardware(chartWorkload?.hardware ?? []),
-    [chartWorkload],
-  );
-  const chartColors = useMemo(
-    () => operatorXColors(chartView?.hardware.map((h) => h.id) ?? [], theme),
-    [chartView, theme],
-  );
+  // Charts, legend, GPU control and case detail all read this same live state.
   const model = useMemo(() => {
-    if (!chartView) return null;
-    // Legend clicks resolve against the GPU list the charts show, so a toggle never pairs a newer
-    // workload's GPUs with the older chart data.
-    const toggle = (hw: string) =>
-      setPicked((previous) => {
-        const current = previous
-          ? chartAvailable.filter((h) => previous.includes(h))
-          : chartAvailable;
-        const next = toggleHardwareSelection(current, hw);
-        return next === current ? previous : next;
-      });
+    if (!view) return null;
+    const toggle = (hw: string) => {
+      const next = toggleHardwareSelection(hardware, hw);
+      if (next !== hardware) setPicked(next);
+    };
     const preview = (i: number) =>
       prefetchOperatorXTimelines(
         queryClient,
         op,
-        caseRefs(chartView, chartHardware, i).map((r) => r.ref),
+        caseRefs(view, hardware, i).map((r) => r.ref),
       );
-    return buildModel(
-      chartView,
-      chartMetric,
-      { hardware: chartHardware, available: chartAvailable, toggle },
-      chartColors,
-      chartBaseline,
-      { inspect: setInspected, preview },
-    );
-  }, [
-    chartView,
-    chartMetric,
-    chartHardware,
-    chartAvailable,
-    chartColors,
-    chartBaseline,
-    queryClient,
-    op,
-  ]);
+    return buildModel(view, metric, { hardware, available, toggle }, colors, baseline, {
+      inspect: setInspected,
+      preview,
+    });
+  }, [view, metric, hardware, available, colors, baseline, queryClient, op]);
 
   if (error)
     return (
@@ -308,7 +268,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
       <Pending active={switching} label={`Loading ${pending?.label ?? 'workload'}…`}>
         <div className="grid gap-4 lg:grid-cols-2">
           {layout(
-            VISUALIZATIONS.filter((v) => v.ops.includes(op) && (chartBaseline || !v.needsBaseline)),
+            VISUALIZATIONS.filter((v) => v.ops.includes(op) && (baseline || !v.needsBaseline)),
           ).map(({ viz, wide }, index) => (
             <VizCard key={viz.id} model={model} viz={viz} wide={wide} eager={index === 0} />
           ))}

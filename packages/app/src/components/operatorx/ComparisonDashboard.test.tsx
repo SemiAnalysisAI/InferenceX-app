@@ -19,6 +19,7 @@ import type { VizDefinition } from './viz/types';
 const state = vi.hoisted(() => ({
   views: new Map<string | null, ComparisonView>(),
   models: [] as ComparisonModel[],
+  detail: null as null | { view: ComparisonView; hardware: string[]; caseIndex: number | null },
 }));
 
 vi.mock('next/navigation', () => ({ usePathname: () => '/operatorx' }));
@@ -32,7 +33,12 @@ vi.mock('@/hooks/api/use-operatorx', () => ({
   }),
   prefetchOperatorXTimelines: () => undefined,
 }));
-vi.mock('./CaseDetail', () => ({ CaseDetail: () => null }));
+vi.mock('./CaseDetail', () => ({
+  CaseDetail: (props: { view: ComparisonView; hardware: string[]; caseIndex: number | null }) => {
+    state.detail = props;
+    return null;
+  },
+}));
 // One eager card that records every model it renders.
 vi.mock('./viz', () => ({
   VISUALIZATIONS: [
@@ -126,6 +132,7 @@ beforeEach(() => {
     [single.id, singleView],
   ]);
   state.models = [];
+  state.detail = null;
   window.history.replaceState(null, '', '/operatorx');
   container = document.createElement('div');
   document.body.append(container);
@@ -145,35 +152,56 @@ afterEach(() => {
   container.remove();
 });
 
-describe('ComparisonDashboard deferred charts', () => {
-  it('keeps the chart model until the deferred workload snapshot commits', () => {
+describe('ComparisonDashboard live state', () => {
+  it('rebuilds the chart model from the new workload and its own GPU list', () => {
     expect(shared.hardware).toHaveLength(2);
     expect(single.hardware).toHaveLength(1);
-    expect(state.models).toHaveLength(1);
-    expect(state.models[0].view).toBe(sharedView);
+    expect(state.models.at(-1)!.view).toBe(sharedView);
 
     act(() => replaceClientSearch(new URLSearchParams({ workload: single.id })));
 
-    // The urgent render only updates the controls. The chart sees one new model, built from
-    // the new view and its own GPU list, never the old view paired with the new GPU list.
-    expect(state.models).toHaveLength(2);
-    expect(state.models[1].view).toBe(singleView);
-    expect(state.models[1].available).toEqual(single.hardware);
-    expect(state.models[1].hardware).toEqual(single.hardware);
+    // Every model the charts rendered pairs a view with that view's GPU list.
+    for (const model of state.models) {
+      const workload = model.view.workloads.find((w) => w.id === model.view.workload)!;
+      expect([...model.available].toSorted()).toEqual([...workload.hardware].toSorted());
+    }
+    const latest = state.models.at(-1)!;
+    expect(latest.view).toBe(singleView);
+    expect(latest.hardware).toEqual(single.hardware);
+  });
+
+  it('never empties the GPU selection when toggling after a workload switch', () => {
+    act(() => state.models.at(-1)!.toggle(state.models.at(-1)!.available[0]));
+    expect(state.models.at(-1)!.hardware).toHaveLength(1);
+
+    act(() => replaceClientSearch(new URLSearchParams({ workload: single.id })));
+    const [only] = state.models.at(-1)!.available;
+    expect(state.models.at(-1)!.hardware).toEqual([only]);
+
+    // The last selected GPU stays selected, so the chart does not rebuild.
+    const rendered = state.models.length;
+    act(() => state.models.at(-1)!.toggle(only));
+    expect(state.models).toHaveLength(rendered);
+    expect(state.models.at(-1)!.hardware).toEqual([only]);
   });
 
   it('toggles legend GPUs within the GPU list the charts show', () => {
-    const [first, second] = state.models[0].available;
+    const [first, second] = state.models.at(-1)!.available;
 
     act(() => state.models.at(-1)!.toggle(first));
     expect(state.models.at(-1)!.hardware).toEqual([second]);
 
-    // The last selected GPU stays selected, so the chart does not rebuild.
-    const rendered = state.models.length;
-    act(() => state.models.at(-1)!.toggle(second));
-    expect(state.models).toHaveLength(rendered);
-
     act(() => state.models.at(-1)!.toggle(first));
     expect(state.models.at(-1)!.hardware).toEqual([first, second]);
+  });
+
+  it('opens case detail with the view and GPUs of the clicked chart', () => {
+    act(() => replaceClientSearch(new URLSearchParams({ workload: single.id })));
+    const clicked = state.models.at(-1)!;
+
+    act(() => clicked.inspect(0));
+    expect(state.detail?.caseIndex).toBe(0);
+    expect(state.detail?.view).toBe(clicked.view);
+    expect(state.detail?.hardware).toEqual(clicked.hardware);
   });
 });
