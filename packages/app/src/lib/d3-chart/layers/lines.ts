@@ -43,17 +43,13 @@ export function renderLines(
     .selectAll<SVGPathElement, LineEntry>('.line-path')
     .data(entries, (d) => d.key);
 
-  const entered = selection
-    .enter()
-    .append('path')
-    .attr('class', (d) => `line-path line-${d.key}`)
-    .attr('fill', 'none');
+  const entered = selection.enter().append('path').attr('class', 'line-path').attr('fill', 'none');
 
   selection.exit().remove();
 
   entered
     .merge(selection)
-    .attr('class', (d) => `line-path line-${d.key}`)
+    .attr('data-line-key', (d) => d.key)
     .attr('stroke', (d) => config.getColor(d.key))
     .attr('stroke-dasharray', (d) => config.getStrokeDasharray?.(d.key) ?? null)
     .attr('stroke-width', (d) => config.getStrokeWidth?.(d.key) ?? config.strokeWidth ?? 2)
@@ -77,7 +73,9 @@ export function updateLinesOnZoom(
     lineGenerator.defined(config.isDefined);
   }
 
-  for (const [key, points] of Object.entries(lines)) {
-    group.select(`.line-${key}`).datum(points).attr('d', lineGenerator);
-  }
+  // Keys are data (e.g. "Huawei 950PR"), so match the attribute instead of building a selector.
+  group.selectAll<SVGPathElement, unknown>('.line-path').each(function () {
+    const key = this.dataset.lineKey ?? '';
+    if (Object.hasOwn(lines, key)) d3.select(this).datum(lines[key]).attr('d', lineGenerator);
+  });
 }
