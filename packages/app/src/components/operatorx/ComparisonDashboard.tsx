@@ -11,7 +11,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
 import { Heading } from '@/components/ui/heading';
 import { Label } from '@/components/ui/label';
-import { MultiSelect } from '@/components/ui/multi-select';
 import { Pending } from '@/components/ui/pending';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { SearchableSelect } from '@/components/ui/searchable-select';
@@ -211,7 +210,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
   return (
     <div className="flex flex-col gap-4">
       <Card className="relative z-10 py-4 md:py-5" data-testid="operatorx-controls">
-        <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
           <ControlGroup label="Workload" htmlFor="operatorx-workload">
             <SearchableSelect
               triggerId="operatorx-workload"
@@ -248,18 +247,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
               ]}
             />
           </ControlGroup>
-          <ControlGroup label="GPUs" htmlFor="operatorx-hardware">
-            <MultiSelect
-              triggerId="operatorx-hardware"
-              options={available.map((h) => ({ value: h, label: hardwareLabel(h) }))}
-              value={hardware}
-              onChange={(next) => {
-                track('operatorx_gpus_changed', { op, gpus: next, gpu_count: next.length });
-                setPicked(next);
-              }}
-              minSelections={1}
-            />
-          </ControlGroup>
+
           <ControlGroup label="Baseline" htmlFor="operatorx-baseline">
             <SearchableSelect
               triggerId="operatorx-baseline"
