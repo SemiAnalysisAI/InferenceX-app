@@ -144,6 +144,7 @@ import ReplayLauncher, { type ReplayLauncherHandle } from '../replay/ReplayLaunc
 
 import WorkflowInfoDisplay from './WorkflowInfoDisplay';
 import { hasRoleTelemetry } from '../utils/power-chip-coverage';
+import { useFirstChartRenderTiming } from './use-first-chart-render-timing';
 
 // Off by default (table view, GPU-over-time, power timeline and PowerX Where panels), so they
 // load on first use instead of shipping with every dashboard, compare page and blog chart.
@@ -307,6 +308,8 @@ function renderInferenceTcoBadges(props: {
 export default function ChartDisplay({ embedded = false }: { embedded?: boolean } = {}) {
   const locale = useLocale();
   const t = STRINGS[locale];
+  const chartRootRef = useRef<HTMLDivElement>(null);
+  useFirstChartRenderTiming(chartRootRef);
   const { graphs, loading, refreshing, error, dateRangeAvailableDates } = useInferenceData();
   const {
     selectedGPUs,
@@ -1525,6 +1528,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
 
   return (
     <div
+      ref={chartRootRef}
       data-testid="inference-chart-display"
       // PowerX phones: globals.css enlarges shared chart chrome under this marker.
       data-powerx-surface={powerXLayout ? '' : undefined}

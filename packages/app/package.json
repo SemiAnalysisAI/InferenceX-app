@@ -96,6 +96,7 @@
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.5",
     "@types/three": "^0.185.4",
+    "@vercel/routing-utils": "^6.6.0",
     "@vitest/coverage-v8": "^4.1.11",
     "axe-core": "^4.13.0",
     "cypress": "15.21.1",

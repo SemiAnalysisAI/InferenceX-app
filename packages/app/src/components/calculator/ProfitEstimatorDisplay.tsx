@@ -552,7 +552,9 @@ function ProfitEstimatorInner({
   }, [availableModels, availabilityRows, basis]);
   const modelAllowed = agenticModels.includes(selectedModel);
   useEffect(() => {
-    if (!modelAllowed && agenticModels[0]) setSelectedModel(agenticModels[0]);
+    if (!modelAllowed && agenticModels[0]) {
+      setSelectedModel(agenticModels[0], { userSelection: false });
+    }
   }, [modelAllowed, agenticModels, setSelectedModel]);
   useEffect(() => {
     if (sequenceResolved && effectiveSequence !== Sequence.AgenticTraces) {

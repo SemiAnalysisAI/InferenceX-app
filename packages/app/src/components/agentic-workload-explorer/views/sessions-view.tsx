@@ -353,7 +353,7 @@ function SessionsPageContent() {
               clearTimeout(searchDebounceRef.current);
               searchDebounceRef.current = setTimeout(() => {
                 setActiveSearch(value.trim());
-                track('agentic_workload_sessions_search', { query: value.trim() });
+                track('agentic_workload_sessions_search', { query_length: value.trim().length });
               }, 300);
             }}
             onKeyDown={(e) => {

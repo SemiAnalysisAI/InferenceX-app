@@ -367,7 +367,10 @@ export default function ChartControls({
   const handleModelChange = (value: Model) => {
     setSelectedModel(value);
     const target = inferenceModelRouteForSelection(window.location.pathname, value);
-    if (target !== null) replaceRouterPathname(target, ['g_model']);
+    // Re-picking the shown model only canonicalizes a bare /inference path. That is not a new page.
+    if (target !== null) {
+      replaceRouterPathname(target, ['g_model'], { pageview: value !== selectedModel });
+    }
     track('inference_model_selected', {
       model: value,
     });

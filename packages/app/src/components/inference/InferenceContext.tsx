@@ -1700,7 +1700,7 @@ export function InferenceProvider({
       const version = ++presetVersionRef.current;
       const { config } = preset;
       presetGuardRef.current = true;
-      setSelectedModel(config.model);
+      setSelectedModel(config.model, { userSelection: false });
       setSelectedSequence(config.sequence);
       setSelectedPrecisions(config.precisions);
       setSelectedYAxisMetric(config.yAxisMetric);

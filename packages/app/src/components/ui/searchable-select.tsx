@@ -126,7 +126,10 @@ export function SearchableSelect({
     if (nextOpen) escapeDismissedRef.current = false;
     if (!nextOpen && isOpen) {
       if (searchUsedRef.current && trackPrefix) {
-        track(`${trackPrefix}_searched`, { query: search });
+        track(`${trackPrefix}_searched`, {
+          query_length: search.length,
+          results: filteredGroups.reduce((count, group) => count + group.options.length, 0),
+        });
         searchUsedRef.current = false;
       }
       setSearch('');

@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-import { navigateInApp } from '@/lib/routing/client-navigation';
+import {
+  CLIENT_PATHNAME_CHANGE_EVENT,
+  isPageviewPathnameChange,
+  navigateInApp,
+  replaceClientPathname,
+  replaceRouterPathname,
+} from '@/lib/routing/client-navigation';
 
 import type { MouseEvent } from 'react';
 
@@ -68,5 +74,55 @@ describe('navigateInApp', () => {
 
     expect(preventDefault).not.toHaveBeenCalled();
     expect(router.push).not.toHaveBeenCalled();
+  });
+});
+
+describe('pathname change pageview signalling', () => {
+  let pathnameEvents: Event[];
+
+  beforeEach(() => {
+    pathnameEvents = [];
+    const location = {
+      pathname: '/profit/dsr1',
+      search: '',
+      hash: '',
+      origin: 'https://example.com',
+    };
+    const replaceState = (_state: unknown, _title: string, href: string) => {
+      const url = new URL(href, location.origin);
+      location.pathname = url.pathname;
+      location.search = url.search;
+    };
+    vi.stubGlobal('History', { prototype: { replaceState } });
+    vi.stubGlobal('window', {
+      location,
+      history: { state: null, replaceState },
+      dispatchEvent: (event: Event) => {
+        if (event.type === CLIENT_PATHNAME_CHANGE_EVENT) pathnameEvents.push(event);
+        return true;
+      },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('does not mark filter-driven path rewrites as pageviews', () => {
+    replaceClientPathname('/profit/dsr1/h100');
+    expect(pathnameEvents).toHaveLength(1);
+    expect(pathnameEvents.filter(isPageviewPathnameChange)).toHaveLength(0);
+  });
+
+  it('marks a model switch as exactly one pageview', () => {
+    replaceClientPathname('/inference/kimi-k3', [], { pageview: true });
+    expect(pathnameEvents.filter(isPageviewPathnameChange)).toHaveLength(1);
+  });
+
+  it('marks router model switches as a pageview only when requested', () => {
+    replaceRouterPathname('/inference/kimi-k3', [], { pageview: true });
+    replaceRouterPathname('/inference/kimi-k3/b200');
+    expect(pathnameEvents).toHaveLength(2);
+    expect(pathnameEvents.filter(isPageviewPathnameChange)).toHaveLength(1);
   });
 });

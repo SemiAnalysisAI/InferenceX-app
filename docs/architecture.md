@@ -30,7 +30,7 @@ Two rules keep the overview BFF honest, both enforced in `overview-navigation.ts
 - **One cache key per data state.** Requests and the in-memory cache are keyed on a canonical href rebuilt from the resolved params (`overviewDataKey`), not the address bar. Explicit defaults, reordered params and campaign tags collapse to one key, so the CDN's day-long `s-maxage` is not fragmented by link variants.
 - **`ref` never reaches that key.** The reference hardware only chooses which column the percentages are measured against, and every cost that needs is already in the payload, so the client derives it from the URL and recomputes the ratio per row. The server still resolves `ref` for SSR, shared links and no-JS.
 
-Because the selector commit uses `History.prototype.pushState` rather than Next's patched version, `useSearchParams()` and `usePathname()` stay at the load-time URL on `/overview`. Anything that needs the live URL there listens for `CLIENT_SEARCH_CHANGE_EVENT`; the provider emits its own `$pageview`. Do not add a `useSearchParams()` consumer to the overview tree.
+Because the selector commit uses `History.prototype.pushState` rather than Next's patched version, `useSearchParams()` and `usePathname()` stay at the load-time URL on `/overview`. Anything that needs the live URL there listens for `CLIENT_SEARCH_CHANGE_EVENT`. The provider calls `trackVirtualPageview`, which records a `$pageview` only when the pathname changes, so control changes are not pageviews. Do not add a `useSearchParams()` consumer to the overview tree.
 
 ## URL State Persistence
 
@@ -54,6 +54,18 @@ Other dashboards keep their existing query-state behavior.
 **Why snapshot-and-clear on load?** Initial params are read into the URL-state snapshot, then stripped from the visible address bar with `history.replaceState` while preserving the pathname and hash. Route-owned entry points can also pass typed server seeds. Subsequent debounced writes update the in-memory share state.
 
 **Prefix convention**: `g_` (global), `i_` (inference), `e_` (evaluation), `r_` (reliability), and `c_` (calculator). The canonical dashboard route registry declares which scopes belong in each share URL.
+
+## Analytics
+
+PostHog loads after `window.load` plus an idle callback to keep it off the critical path. If the page is hidden (`visibilitychange` to hidden or `pagehide`) while events are still queued, it starts loading immediately instead, so a visitor who switches tabs or leaves before the idle callback still sends the pageview. It posts through the first-party `/ingest` rewrites in `next.config.ts`, with dead-click capture off and autocapture on. Network timing in recordings drops `search`, `q` and `query` URL params (`lib/analytics/network-request-mask.ts`) so typed search text is never captured.
+
+Until the client loads, `track()` in `lib/analytics/analytics.ts` queues events (capped at `MAX_PENDING_EVENTS`, later events are dropped). Each queued event keeps the URL and time at which it was tracked and is replayed with PostHog's `timestamp` option. The first tracked event of a page load records that page's `$pageview` ahead of it, so page effects such as `landing_page_viewed` never precede the pageview.
+
+Pageviews are manual. `PageViewTracker` records one per Next pathname or search change, deduplicated by URL. Model switches rewrite the pathname outside the Next router, so it also records a virtual `$pageview` (`navigation_type: 'client_pathname_change'`) on `CLIENT_PATHNAME_CHANGE_EVENT`, but only when the event detail has `pageview: true` (pass `{ pageview: true }` to `replaceClientPathname`/`replaceRouterPathname`). `GlobalFilterProvider` passes it only when the rewrite applies a model the user picked through `setSelectedModel`. Programmatic picks (URL presets, the profit estimator's model correction) call `setSelectedModel(model, { userSelection: false })`. Bare-route canonicalization (`/calculator` → `/calculator/<slug>`), filter-driven path rewrites (profit estimator) and query-only rewrites (filters, `/overview` controls) are not pageviews.
+
+`inference_chart_rendered` fires once per navigation when the first chart has data points. `ms_since_navigation` counts from the latest navigation start (`lib/analytics/navigation-timing.ts`: document load, or the pathname change for soft navigations) and `soft_navigation` tells the two apart. Every pageview carries and registers `route_template` (for example `/inference/[model]`, shared by `/zh`) and `locale`, so pageviews and web vitals group by template. Add new dynamic routes to `lib/analytics/route-template.ts`.
+
+A delegated click listener sends `outbound_link_clicked` (`host`, `path`, `is_newsletter`, `is_semianalysis`) for links to other hosts. 404 pages send `not_found_page_shown`. Search events send `query_length` and result counts, never the typed text.
 
 ## Server-Side Caching
 
