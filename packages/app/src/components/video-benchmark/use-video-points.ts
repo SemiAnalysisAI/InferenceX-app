@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { VIDEO_HISTORY_MAX_PAGES, type VideoHistoryPage } from './history';
 import { namedRunPoints, videoPoints } from './points';
 
-/** Read bounded stored history once; derive approved and exact named-run points. */
 export function useVideoPoints(runId: string | null) {
   const [pages, setPages] = useState<VideoHistoryPage[]>([]);
   const [loading, setLoading] = useState(true);
