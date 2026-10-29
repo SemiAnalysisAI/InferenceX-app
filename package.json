@@ -48,6 +48,7 @@
     "admin:db:backfill-power-series": "bun run --cwd packages/db db:backfill-power-series",
     "admin:db:backfill-server-log-files": "bun run --cwd packages/db db:backfill-server-log-files",
     "admin:db:reset": "bun run --cwd packages/db db:reset",
+    "admin:db:sync-public": "bun run --cwd packages/db db:sync-public",
     "admin:db:verify": "bun run --cwd packages/db db:verify",
     "admin:db:migrate:operatorx": "bun run --cwd packages/db db:migrate:operatorx",
     "admin:db:ingest:operatorx": "bun run --cwd packages/db db:ingest:operatorx",

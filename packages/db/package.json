@@ -36,6 +36,7 @@
     "db:backfill-runtime-metadata": "bun --env-file=../../.env src/backfill-runtime-metadata.ts",
     "db:backfill-server-log-files": "bun --env-file=../../.env src/backfill-server-log-files.ts",
     "db:reset": "bun --env-file=../../.env src/reset-db.ts",
+    "db:sync-public": "bun --env-file=../../.env src/sync-public-db.ts",
     "db:verify": "bun --env-file=../../.env src/verify-db.ts",
     "test:unit": "vitest run",
     "test:unit:coverage": "vitest run --coverage",
