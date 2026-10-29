@@ -25,7 +25,16 @@ describe('next.config custom routes', () => {
     ['/zh/run/glm-5-2-on-mi355x', '/zh/run/glm-5-3-on-mi355x'],
     ['/zh/rankings/cheapest-gpu-for-glm-5-2', '/zh/rankings/cheapest-gpu-for-glm-5-3'],
     ['/rankings/fastest-gpu-for-minimax-m3-1', '/rankings/fastest-gpu-for-minimax-m31-flash'],
+    ['/zh/rankings/fastest-gpu-for-minimax-m3-1', '/zh/rankings/fastest-gpu-for-minimax-m31-flash'],
+    ['/rankings/fastest-gpu-for-qwen-3-5-0', '/rankings/fastest-gpu-for-qwen-3-5'],
+    ['/zh/rankings/fastest-gpu-for-qwen-3-5-0', '/zh/rankings/fastest-gpu-for-qwen-3-5'],
+    ['/zh/rankings/fastest-gpu-for-minimax-m27-0', '/zh/rankings/fastest-gpu-for-minimax-m27'],
+    [
+      '/zh/blog/minimax-m3-agentx-b200-b300-vs-rack-scale-0',
+      '/zh/blog/minimax-m3-agentx-b200-b300-vs-rack-scale',
+    ],
     ['/media', '/quotes'],
+    ['/zh/media', '/zh/quotes'],
   ])('permanently redirects %s to %s in one hop', async (from, to) => {
     const response = await respond(from);
     expect(response.status).toBe(308);

@@ -21,24 +21,24 @@ const SEO_REDIRECTS = [
       source: `${prefix}/rankings/cheapest-gpu-for-glm-5-2`,
       destination: `${prefix}/rankings/cheapest-gpu-for-glm-5-3`,
     },
+    {
+      source: `${prefix}/rankings/fastest-gpu-for-qwen-3-5-0`,
+      destination: `${prefix}/rankings/fastest-gpu-for-qwen-3-5`,
+    },
+    {
+      source: `${prefix}/rankings/fastest-gpu-for-minimax-m3-1`,
+      destination: `${prefix}/rankings/fastest-gpu-for-minimax-m31-flash`,
+    },
+    {
+      source: `${prefix}/rankings/fastest-gpu-for-minimax-m27-0`,
+      destination: `${prefix}/rankings/fastest-gpu-for-minimax-m27`,
+    },
+    {
+      source: `${prefix}/blog/minimax-m3-agentx-b200-b300-vs-rack-scale-0`,
+      destination: `${prefix}/blog/minimax-m3-agentx-b200-b300-vs-rack-scale`,
+    },
+    { source: `${prefix}/media`, destination: `${prefix}/quotes` },
   ]),
-  {
-    source: '/rankings/fastest-gpu-for-qwen-3-5-0',
-    destination: '/rankings/fastest-gpu-for-qwen-3-5',
-  },
-  {
-    source: '/rankings/fastest-gpu-for-minimax-m3-1',
-    destination: '/rankings/fastest-gpu-for-minimax-m31-flash',
-  },
-  {
-    source: '/rankings/fastest-gpu-for-minimax-m27-0',
-    destination: '/rankings/fastest-gpu-for-minimax-m27',
-  },
-  {
-    source: '/blog/minimax-m3-agentx-b200-b300-vs-rack-scale-0',
-    destination: '/blog/minimax-m3-agentx-b200-b300-vs-rack-scale',
-  },
-  { source: '/media', destination: '/quotes' },
 ].map((redirect) => ({ ...redirect, permanent: true }));
 
 const nextConfig: NextConfig = {
