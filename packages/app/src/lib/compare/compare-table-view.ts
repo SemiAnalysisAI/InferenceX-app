@@ -85,11 +85,23 @@ export interface CompareTableViewInput {
   ssrTableData: CompareTableData;
   /** Sequence the server computed `ssrTableData` for; null when it found no data. */
   ssrSequence: string | null;
+  /** Model the server computed `ssrTableData` for; undefined when it is not a known model. */
+  ssrModel: string | undefined;
+  /** Precisions the server computed `ssrTableData` for. */
+  ssrPrecisions: readonly string[];
   /** Sequence requested by the controls, before availability resolves it. */
   selectedSequence: string;
   /** Sequence the client fetches rows for. */
   effectiveSequence: string;
   sequenceResolved: boolean;
+  /** Model the controls select, which the client fetches rows for. */
+  selectedModel: string;
+  /** Precisions requested by the controls, before availability resolves them. */
+  selectedPrecisions: readonly string[];
+  /** Precisions the client fetches rows for. */
+  effectivePrecisions: readonly string[];
+  /** True while the controls show the latest run, which is the only run the server reads. */
+  latestRun: boolean;
   /** Client rows for `effectiveSequence`, split into the two compared sides. */
   pointsA: GPUDataPoint[];
   pointsB: GPUDataPoint[];
@@ -118,15 +130,22 @@ export type CompareTableView =
 
 /**
  * Decides what the compare table shows. Server-rendered cells and the server's empty
- * state describe only `ssrSequence`, so they are used only while the controls show that
- * sequence. Any other sequence shows the client's loading, error, empty, or table state.
+ * state describe only the server's sequence, model, precisions, and latest run, so they
+ * are used only while the controls show exactly that selection. Any other selection shows
+ * the client's loading, error, empty, or table state.
  */
 export function resolveCompareTableView({
   ssrTableData,
   ssrSequence,
+  ssrModel,
+  ssrPrecisions,
   selectedSequence,
   effectiveSequence,
   sequenceResolved,
+  selectedModel,
+  selectedPrecisions,
+  effectivePrecisions,
+  latestRun,
   pointsA,
   pointsB,
   clientInteractivityRange,
@@ -136,7 +155,17 @@ export function resolveCompareTableView({
   // Before availability resolves, the client may still be fetching the app default sequence,
   // so its rows describe neither the controls nor the server table.
   const clientSequence = sequenceResolved ? effectiveSequence : selectedSequence;
-  const matchesSsr = ssrSequence === null ? !sequenceResolved : clientSequence === ssrSequence;
+  const clientPrecisions = sequenceResolved ? effectivePrecisions : selectedPrecisions;
+  // With no server sequence the server found no data for its model at all, so its empty
+  // state holds for any precision of that model until the client resolves its sequence.
+  const matchesSsr =
+    latestRun &&
+    selectedModel === ssrModel &&
+    (ssrSequence === null
+      ? !sequenceResolved
+      : clientSequence === ssrSequence &&
+        clientPrecisions.length === ssrPrecisions.length &&
+        clientPrecisions.every((p) => ssrPrecisions.includes(p)));
 
   if (matchesSsr) {
     if (ssrTableData.defaultTargets.length === 0) return { status: 'ssr-empty' };
@@ -158,7 +187,7 @@ export function resolveCompareTableView({
     const data = compareTableDataFromPoints(pointsA, pointsB);
     return {
       status: 'table',
-      key: `client:${effectiveSequence}`,
+      key: `client:${selectedModel}:${effectiveSequence}:${effectivePrecisions.join(',')}`,
       data,
       interactivityRange: data.interactivityRange,
       pointsA,

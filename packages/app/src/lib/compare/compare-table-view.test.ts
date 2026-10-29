@@ -43,9 +43,15 @@ function input(overrides: Partial<CompareTableViewInput> = {}): CompareTableView
   return {
     ssrTableData: SSR_TABLE,
     ssrSequence: '1k1k',
+    ssrModel: 'dsr1',
+    ssrPrecisions: ['fp8'],
     selectedSequence: '1k1k',
     effectiveSequence: '1k1k',
     sequenceResolved: true,
+    selectedModel: 'dsr1',
+    selectedPrecisions: ['fp8'],
+    effectivePrecisions: ['fp8'],
+    latestRun: true,
     pointsA: [],
     pointsB: [],
     clientInteractivityRange: null,
@@ -114,7 +120,7 @@ describe('resolveCompareTableView', () => {
           pointsB: CLIENT_B,
         }),
       ),
-    ).toMatchObject({ status: 'table', key: 'client:8k1k' });
+    ).toMatchObject({ status: 'table', key: 'client:dsr1:8k1k:fp8' });
   });
 
   it('shows loading instead of server cells while a shared sequence is pending', () => {
@@ -162,7 +168,7 @@ describe('resolveCompareTableView', () => {
     );
     expect(view).toMatchObject({
       status: 'table',
-      key: 'client:8k1k',
+      key: 'client:dsr1:8k1k:fp8',
       data: compareTableDataFromPoints(CLIENT_A, CLIENT_B),
       interactivityRange: { min: 50, max: 80 },
     });
@@ -173,6 +179,52 @@ describe('resolveCompareTableView', () => {
       resolveCompareTableView(input({ selectedSequence: '8k1k', effectiveSequence: '1k1k' }))
         .status,
     ).toBe('table');
+  });
+
+  it('uses client state instead of server cells when the model differs from the server model', () => {
+    expect(
+      resolveCompareTableView(input({ selectedModel: 'gptoss', sequenceResolved: false })).status,
+    ).toBe('loading');
+    expect(resolveCompareTableView(input({ selectedModel: 'gptoss', loading: true })).status).toBe(
+      'loading',
+    );
+    expect(
+      resolveCompareTableView(
+        input({ selectedModel: 'gptoss', pointsA: CLIENT_A, pointsB: CLIENT_B }),
+      ),
+    ).toMatchObject({
+      status: 'table',
+      key: 'client:gptoss:1k1k:fp8',
+      data: compareTableDataFromPoints(CLIENT_A, CLIENT_B),
+    });
+  });
+
+  it('uses client state instead of server cells when precisions differ from the server precisions', () => {
+    expect(
+      resolveCompareTableView(
+        input({
+          selectedPrecisions: ['fp4'],
+          effectivePrecisions: ['fp4'],
+          sequenceResolved: false,
+        }),
+      ).status,
+    ).toBe('loading');
+    expect(
+      resolveCompareTableView(input({ effectivePrecisions: ['fp8', 'fp4'], error: 'HTTP 500' }))
+        .status,
+    ).toBe('error');
+    expect(resolveCompareTableView(input({ effectivePrecisions: ['fp4'] })).status).toBe('empty');
+    expect(
+      resolveCompareTableView(
+        input({ ssrPrecisions: ['fp4', 'fp8'], effectivePrecisions: ['fp8', 'fp4'] }),
+      ),
+    ).toMatchObject({ status: 'table', key: 'ssr' });
+  });
+
+  it('uses client state instead of server cells for an earlier run', () => {
+    expect(resolveCompareTableView(input({ latestRun: false, loading: true })).status).toBe(
+      'loading',
+    );
   });
 
   it('keeps the server empty state until the client knows its sequence when the server had none', () => {

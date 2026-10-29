@@ -8,6 +8,7 @@ import { useThroughputData } from '@/components/calculator/useThroughputData';
 import { CompareTableRenderer } from '@/components/compare/compare-table-renderer';
 import {
   GlobalFilterProvider,
+  useGlobalFilterAvailability,
   useGlobalFilterRun,
   useGlobalFilterSelection,
 } from '@/providers/GlobalFilterContext';
@@ -222,6 +223,8 @@ export default function ComparePrecisionPageClient({
               bLabel={bLabel}
               ssrTableData={ssrTableData}
               ssrSequence={defaultSequence}
+              ssrModel={initialModel}
+              ssrPrecisions={initialPrecisions}
               emptyStateText={t.emptyState}
             />
           </Card>
@@ -240,6 +243,8 @@ function CompareTableSection({
   bLabel,
   ssrTableData,
   ssrSequence,
+  ssrModel,
+  ssrPrecisions,
   emptyStateText,
 }: {
   gpu: string;
@@ -249,6 +254,8 @@ function CompareTableSection({
   bLabel: string;
   ssrTableData: CompareTableData;
   ssrSequence: string | null;
+  ssrModel: ReturnType<typeof toModel>;
+  ssrPrecisions: string[];
   emptyStateText: string;
 }) {
   const {
@@ -256,9 +263,11 @@ function CompareTableSection({
     effectiveSequence,
     effectivePrecisions,
     selectedModel,
+    selectedPrecisions,
     sequenceResolved,
   } = useGlobalFilterSelection();
   const { selectedRunDate } = useGlobalFilterRun();
+  const { availableDates } = useGlobalFilterAvailability();
 
   const { gpuDataByGroupKey, ranges, hasData, loading, error } = useThroughputData(
     selectedModel,
@@ -287,9 +296,15 @@ function CompareTableSection({
       bLabel={bLabel}
       ssrTableData={ssrTableData}
       ssrSequence={ssrSequence}
+      ssrModel={ssrModel}
+      ssrPrecisions={ssrPrecisions}
       selectedSequence={selectedSequence}
       effectiveSequence={effectiveSequence}
       sequenceResolved={sequenceResolved}
+      selectedModel={selectedModel}
+      selectedPrecisions={selectedPrecisions}
+      effectivePrecisions={effectivePrecisions}
+      latestRun={!selectedRunDate || selectedRunDate === availableDates.at(-1)}
       pointsA={pointsA}
       pointsB={pointsB}
       clientInteractivityRange={hasData ? ranges.interactivity : null}

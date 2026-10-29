@@ -283,6 +283,7 @@ export default function ComparePerDollarPageClient({
               bLabel={bLabel}
               ssrTableData={ssrTableData}
               ssrSequence={defaultSequence}
+              ssrPrecisions={initialPrecisions}
               initialModel={initialModel}
               initialSequence={initialSequence}
               initialCalculatorRows={initialCalculatorRows}
@@ -307,6 +308,7 @@ function CompareTableSection({
   initialModel,
   initialSequence,
   initialCalculatorRows,
+  ssrPrecisions,
   emptyStateText,
   isZh,
 }: {
@@ -316,6 +318,7 @@ function CompareTableSection({
   bLabel: string;
   ssrTableData: CompareTableData;
   ssrSequence: string | null;
+  ssrPrecisions: string[] | undefined;
   initialModel: ReturnType<typeof toModel>;
   initialSequence: ReturnType<typeof toSequence>;
   initialCalculatorRows?: BenchmarkRow[];
@@ -327,6 +330,7 @@ function CompareTableSection({
     effectiveSequence,
     effectivePrecisions,
     selectedModel,
+    selectedPrecisions,
     sequenceResolved,
   } = useGlobalFilterSelection();
   const { availableDates } = useGlobalFilterAvailability();
@@ -371,9 +375,15 @@ function CompareTableSection({
       bLabel={bLabel}
       ssrTableData={ssrTableData}
       ssrSequence={ssrSequence}
+      ssrModel={initialModel}
+      ssrPrecisions={ssrPrecisions ?? []}
       selectedSequence={selectedSequence}
       effectiveSequence={effectiveSequence}
       sequenceResolved={sequenceResolved}
+      selectedModel={selectedModel}
+      selectedPrecisions={selectedPrecisions}
+      effectivePrecisions={effectivePrecisions}
+      latestRun={calculatorRunDate === ''}
       pointsA={pointsA}
       pointsB={pointsB}
       clientInteractivityRange={hasData ? ranges.interactivity : null}

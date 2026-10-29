@@ -40,9 +40,15 @@ function renderTable(overrides: Partial<React.ComponentProps<typeof CompareTable
         bLabel="B200"
         ssrTableData={SSR_TABLE}
         ssrSequence="1k1k"
+        ssrModel="dsr1"
+        ssrPrecisions={['fp8']}
         selectedSequence="1k1k"
         effectiveSequence="1k1k"
         sequenceResolved
+        selectedModel="dsr1"
+        selectedPrecisions={['fp8']}
+        effectivePrecisions={['fp8']}
+        latestRun
         pointsA={[]}
         pointsB={[]}
         clientInteractivityRange={null}
