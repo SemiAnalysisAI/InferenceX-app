@@ -1,6 +1,6 @@
 ---
 title: 'B200 NVFP4 vs H100 FP8 运行 MiniMax-M2.5：vLLM 下每美元性能最高提升 8.2 倍'
-subtitle: 'vLLM PR #36307 为 MiniMax 在 B200 上解锁了 trtllm-gen FP8 MoE 模块化内核；结合 NVFP4，在 8K/1K 负载下性能/成本从 22 tok/s/user 时的 4.0 倍扩大到 110 tok/s/user 时的 8.2 倍'
+subtitle: 'vLLM PR #36307 为 MiniMax 在 B200 上解锁了 trtllm-gen FP8 MoE 模块化 kernel；结合 NVFP4，在 8K/1K 负载下性能/成本从 22 tok/s/user 时的 4.0 倍扩大到 110 tok/s/user 时的 8.2 倍'
 seoDescription: 'B200 NVFP4 在 vLLM 下运行 MiniMax-M2.5，每美元性能比 H100 FP8 最高提升 8.2 倍——trtllm-gen FP8 MoE 结合 NVFP4（8K/1K）。'
 date: '2026-05-26'
 publishDate: '2026-05-26'
@@ -18,7 +18,7 @@ tags:
 
 在 MiniMax-M2.5 8K/1K 负载下使用 vLLM，NVIDIA 的 NVFP4 量化版 MiniMax-M2.5 在 B200 上实现了**等交互性下相比 H100 vLLM FP8 最高 8.2 倍的每美元性能提升**——110 tok/s/user 时 H100 为 $0.74/M tokens，B200 NVFP4 为 $0.09/M tokens。提升幅度在 H100 的 21–111 tok/s/user 工作区间内单调递增，从低端的 4.0 倍（22 tok/s/user，$0.12 vs $0.031）增长到高端的 8.2 倍。测量于 2026-05-22 的 InferenceX。
 
-这 8.2 倍在峰值处可以清晰分解。在 110 tok/s/user 时，**B200 vLLM FP8 相比 H100 vLLM FP8 实现了 2.94 倍的每美元性能提升**——这是纯硬件代际提升，两个 SKU 上使用相同的 `MiniMaxAI/MiniMax-M2.5` 权重和相同的 vLLM 构建。**将 B200 权重切换为 `nvidia/MiniMax-M2.5-NVFP4` 后又叠加了 2.77 倍**——这是纯精度提升，由 [vllm-project/vllm #36307](https://github.com/vllm-project/vllm/pull/36307) 解锁——该 PR 添加了 trtllm-gen FP8 MoE 内核的**模块化变体**，使 MiniMax 的非标准路由方法得以使用该内核。2.94 × 2.77 ≈ 8.14。精度提升随交互性增长而扩大（22 tok/s/user 时 1.65 倍 → 110 时 2.77 倍），这是因为 trtllm-gen 内核相比旧版 triton 路径的优势在 GEMM 天花板成为瓶颈时更为突出。
+这 8.2 倍在峰值处可以清晰分解。在 110 tok/s/user 时，**B200 vLLM FP8 相比 H100 vLLM FP8 实现了 2.94 倍的每美元性能提升**——这是纯硬件代际提升，两个 SKU 上使用相同的 `MiniMaxAI/MiniMax-M2.5` 权重和相同的 vLLM 构建。**将 B200 权重切换为 `nvidia/MiniMax-M2.5-NVFP4` 后又叠加了 2.77 倍**——这是纯精度提升，由 [vllm-project/vllm #36307](https://github.com/vllm-project/vllm/pull/36307) 解锁——该 PR 添加了 trtllm-gen FP8 MoE kernel 的**模块化变体**，使 MiniMax 的非标准路由方法得以使用该 kernel。2.94 × 2.77 ≈ 8.14。精度提升随交互性增长而扩大（22 tok/s/user 时 1.65 倍 → 110 时 2.77 倍），这是因为 trtllm-gen kernel 相比旧版 triton 路径的优势在 GEMM 天花板成为瓶颈时更为突出。
 
 <DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-05-22&g_runid=26306422380&g_model=MiniMax-M2.5&i_prec=fp4%2Cfp8&i_active=b200_vllm%2Ch100_vllm&i_linelabel=1&i_advlabel=1">
   点击查看完整的 InferenceX 仪表板 →
@@ -33,7 +33,7 @@ tags:
 
 MiniMax-M2.5 是 MiniMax AI 的旗舰 MoE 模型：**总参数 230B，每 token 激活 10B**，采用 256 个小专家（架构不同于早期 MiniMax-Text-01 的 32 个大专家）。公开权重发布于 [`MiniMaxAI/MiniMax-M2.5`](https://huggingface.co/MiniMaxAI/MiniMax-M2.5)，NVIDIA 发布了量化版 [`nvidia/MiniMax-M2.5-NVFP4`](https://huggingface.co/nvidia/MiniMax-M2.5-NVFP4)，将所有 MoE GEMM 权重从 BF16/FP8 重新量化为 NVFP4（16 元素分组、FP8 逐组缩放因子、FP32 逐张量缩放因子）。KV cache 保持 FP8。图表中 B200 NVFP4 曲线加载 NVIDIA 量化权重；B200 FP8 和 H100 FP8 曲线加载原始 MiniMaxAI 权重。
 
-本文涉及的关键架构细节是**路由方法**。MiniMax M2 的专家路由层生成的 routing logits 使用的数据类型不被原始（"单体式"）trtllm-gen FP8 MoE 内核接受——这就是为何 MiniMax 在 B200 上一直被限制在较慢的 triton MoE 路径上，直到 vLLM PR #36307 添加了在外部处理路由的模块化内核变体。我们将在"关键技术贡献"部分详细展开。
+本文涉及的关键架构细节是**路由方法**。MiniMax M2 的专家路由层生成的 routing logits 使用的数据类型不被原始（“单体式”）trtllm-gen FP8 MoE kernel 接受——这就是为何 MiniMax 在 B200 上一直被限制在较慢的 triton MoE 路径上，直到 vLLM PR #36307 添加了在外部处理路由的模块化 kernel 变体。我们将在"关键技术贡献"部分详细展开。
 
 ## 为何 MiniMax-M2.5 值得投入优化
 
@@ -43,19 +43,19 @@ MiniMax-M2.5 是 M2 系列中面向编码和智能体的开源权重模型。其
   srcLight="/images/b200-minimax-m2-5-vllm-nvfp4-vs-h100-fp8-perf-per-dollar/quality-benchmarks-light.png"
   srcDark="/images/b200-minimax-m2-5-vllm-nvfp4-vs-h100-fp8-perf-per-dollar/quality-benchmarks-dark.png"
   alt="六个柱状图对比 MiniMax M2.5（红色）和 MiniMax M2.1（浅红色）与 Claude Opus 4.5、Claude Opus 4.6、Gemini 3 Pro 和 GPT-5.2 在 SWE-Bench Verified、SWE-Bench Pro、Terminal Bench 2、Multi-SWE-Bench、SWE-Bench Multilingual 和 VIBE-Pro (AVG) 上的表现。MiniMax M2.5 在每项基准测试上与 Claude Opus 的差距仅几分，在 Multi-SWE-Bench（51.3 vs 50.3）上领先，在与 Gemini 3 Pro 的对比中在 Multi-SWE-Bench 和 VIBE-Pro 上领先。"
-  caption="MiniMax-M2.5 与前沿编码模型在智能体和软件工程基准测试上的对比（MiniMax 发布的得分）。M2.5 在 SWE-Bench 系列和 Terminal Bench 上与 Claude Opus 4.5/4.6 持平或差距 0–4 分，在 Multi-SWE-Bench 上领先，在已报告的项目中与 GPT-5.2 持平或领先，在六项中的三项上领先 Gemini 3 Pro。M2.7（相同的 230B / 10B 激活架构，经过后训练优化）继承了这些结果并继续使用相同的 vLLM 内核路径。"
+  caption="MiniMax-M2.5 与前沿编码模型在智能体和软件工程基准测试上的对比（MiniMax 发布的得分）。M2.5 在 SWE-Bench 系列和 Terminal Bench 上与 Claude Opus 4.5/4.6 持平或差距 0–4 分，在 Multi-SWE-Bench 上领先，在已报告的项目中与 GPT-5.2 持平或领先，在六项中的三项上领先 Gemini 3 Pro。M2.7（相同的 230B / 10B 激活架构，经过后训练优化）继承了这些结果并继续使用相同的 vLLM kernel 路径。"
 />
 
 质量水准是服务成本故事的前提。一个**激活参数仅 10B** 的开源 MoE 模型，在前沿专有编码模型的射程范围内——在 B200 NVFP4 的吞吐量锚点处仅需 **$0.031/M tokens**——相比将同样的工作负载路由到闭源 API 前沿模型，完全是不同的部署成本量级。下文介绍的 vLLM PR + NVFP4 + B200 技术栈，将这类智能体/SWE 循环工作负载的推理成本从"连续运行成本高昂"压缩到了可以让自主编码智能体持续运行数小时而不至于账单本身成为架构约束的区间。
 
 ## H100 vs B200 纸面规格对比
 
-在介绍具体配方之前，先看硬件。H100 SXM（Hopper，2023）和 B200 SXM（Blackwell，2025）相隔两代。下方雷达图将每个轴归一化到 [`/gpu-specs`](/gpu-specs) 中所有 NVIDIA + AMD SKU 的最大值——因此 H100 和 B200 的可见多边形在 GB200/GB300 NVL72 设定天花板的轴上（特别是扩展域显存容量和扩展域显存带宽，按 72-GPU NVLink 域扩展）被压缩。
+在介绍具体配方之前，先看硬件。H100 SXM（Hopper，2023）和 B200 SXM（Blackwell，2025）相隔两代。下方雷达图将每个轴归一化到 [`/gpu-specs`](/gpu-specs) 中所有 NVIDIA + AMD SKU 的最大值——因此 H100 和 B200 的可见多边形在 GB200/GB300 NVL72 设定天花板的轴上（特别是 scale-up 域的显存容量和显存带宽，按 72-GPU NVLink 域扩展）被压缩。
 
 <Figure
   srcLight="/images/b200-minimax-m2-5-vllm-nvfp4-vs-h100-fp8-perf-per-dollar/specs-radar-light.png"
   srcDark="/images/b200-minimax-m2-5-vllm-nvfp4-vs-h100-fp8-perf-per-dollar/specs-radar-dark.png"
-  alt="雷达图对比 H100 SXM 和 B200 SXM 在显存容量、显存带宽、FP4/FP8/BF16 TFLOP/s、扩展带宽、扩展域显存容量和扩展域显存带宽上的表现。各轴按 /gpu-specs 中所有 GPU 的最大值归一化。"
+  alt="雷达图对比 H100 SXM 和 B200 SXM 在显存容量、显存带宽、FP4/FP8/BF16 TFLOP/s、scale-up 带宽、scale-up 域的显存容量和显存带宽上的表现。各轴按 /gpu-specs 中所有 GPU 的最大值归一化。"
   caption="H100 SXM vs B200 SXM 在 InferenceX /gpu-specs 雷达图上的对比。各轴按每个指标的跨厂商最大值归一化（例如 FP4 最大值为 GB300 NVL72 的 15 PFLOP/s/GPU，因此 B200 的 9 PFLOP/s 读数约 60%；扩展域显存和带宽最大值由 GB200/GB300 NVL72 的 72-GPU NVLink 域设定，因此 H100 和 B200 的 8-GPU 域读数都较低）。H100 的 FP4 读数为 0%，因为 Hopper 没有 FP4 张量核心。"
 />
 
@@ -68,27 +68,27 @@ MiniMax-M2.5 是 M2 系列中面向编码和智能体的开源权重模型。其
 | 密集 FP4 (TFLOP/s)                | —                   | 9,000               | —           |
 | 密集 FP8 (TFLOP/s)                | 1,979               | 4,500               | 2.27x       |
 | 密集 BF16 (TFLOP/s)               | 989                 | 2,250               | 2.28x       |
-| 每 GPU 扩展带宽（单向）           | 450 GB/s (NVLink 4) | 900 GB/s (NVLink 5) | 2.00x       |
-| 扩展域 GPU 数                     | 8                   | 8                   | 1.00x       |
-| 扩展域 HBM 容量                   | 640 GB              | 1,440 GB            | 2.25x       |
-| 扩展域 HBM 带宽（聚合）           | 26.8 TB/s           | 64.0 TB/s           | 2.39x       |
+| 每 GPU scale-up 带宽（单向）      | 450 GB/s (NVLink 4) | 900 GB/s (NVLink 5) | 2.00x       |
+| scale-up 域 GPU 数                | 8                   | 8                   | 1.00x       |
+| scale-up 域 HBM 容量              | 640 GB              | 1,440 GB            | 2.25x       |
+| scale-up 域 HBM 带宽（聚合）      | 26.8 TB/s           | 64.0 TB/s           | 2.39x       |
 | TCO（SemiAnalysis AI Cloud 模型） | $1.30/GPU/hr        | $1.95/GPU/hr        | 1.50x       |
 
 硅片本身带来了什么？**B200 的 FP8 算力是 H100 的 2.27 倍**（4,500 vs 1,979 TFLOP/s），**B200 的 FP4 算力是 H100 FP8 算力的 4.55 倍**（9,000 vs 1,979 TFLOP/s——Hopper 没有 FP4 张量核心，因此精度步骤是跨精度算力提升，而非同精度对比），**HBM 带宽提升 2.39 倍**（8.0 vs 3.35 TB/s），TCO 仅为 1.50 倍。这些原始比率限定了性能/成本的天花板：**FP8 vs FP8 计算瓶颈下为 1.51 倍**（`2.27 / 1.50`），**HBM 带宽瓶颈下为 1.59 倍**（`2.39 / 1.50`），或者 **B200 NVFP4 vs H100 FP8 跨精度算力轴下为 3.03 倍**（`4.55 / 1.50`）。
 
-实测数据更为出色。2.94 倍的 FP8 代际提升**几乎是 FP8 硅片天花板的 2 倍**，8.16 倍的综合提升**约为跨精度 FP4 硅片天花板的 2.7 倍**——超出硅片天花板的部分来自 trtllm-gen 模块化 FP8 MoE 内核（vLLM PR #36307），实现了旧版 triton MoE 路径无法做到的优化。H100 上的 vLLM 技术栈在运行 MiniMax-M2.5 时相比 B200 上 trtllm-gen 内核路径的发挥还留有大量空间。NVFP4 在此基础上叠加了精度步骤的提升，因为 B200 拥有 9 PFLOP/s 的 FP4 算力，而 H100 为零。
+实测数据更为出色。2.94 倍的 FP8 代际提升**几乎是 FP8 硅片天花板的 2 倍**，8.16 倍的综合提升**约为跨精度 FP4 硅片天花板的 2.7 倍**——超出硅片天花板的部分来自 trtllm-gen 模块化 FP8 MoE kernel（vLLM PR #36307），实现了旧版 triton MoE 路径无法做到的优化。H100 上的 vLLM 技术栈在运行 MiniMax-M2.5 时相比 B200 上 trtllm-gen kernel 路径的发挥还留有大量空间。NVFP4 在此基础上叠加了精度步骤的提升，因为 B200 拥有 9 PFLOP/s 的 FP4 算力，而 H100 为零。
 
-## TensorRT-LLM MoE 内核集成至 vLLM
+## TensorRT-LLM MoE kernel 集成至 vLLM
 
-**上游：vLLM PR #36307——TRTLLM FP8 MoE 模块化内核。** [vllm-project/vllm #36307](https://github.com/vllm-project/vllm/pull/36307)，由 [Wei Zhao](https://github.com/wzhao18) 提交，2026-03-12 合入，为 Blackwell 添加了 trtllm-gen FP8 MoE 内核的**模块化**变体。此前的"单体式"trtllm-gen 内核仅接受特定数据类型的 routing logits，这排除了 MiniMax M2 等路由层输出不同数据类型的模型。模块化内核在外部完成路由，从而消除了数据类型约束——MiniMax M2（及更广泛的 MoE 模型）现在可以使用 DeepSeek/Kimi/GLM-5 在 B200 上已有的快速 attention + MoE 内核路径。该 PR 的测试计划在 `MiniMaxAI/MiniMax-M2.5` 上以 TP=2 + 专家并行运行，与下方 B200 前沿使用的配方形状相同。
+**上游：vLLM PR #36307——TRTLLM FP8 MoE 模块化 kernel。** [vllm-project/vllm #36307](https://github.com/vllm-project/vllm/pull/36307)，由 [Wei Zhao](https://github.com/wzhao18) 提交，2026-03-12 合入，为 Blackwell 添加了 trtllm-gen FP8 MoE kernel 的**模块化**变体。此前的"单体式"trtllm-gen kernel 仅接受特定数据类型的 routing logits，这排除了 MiniMax M2 等路由层输出不同数据类型的模型。模块化 kernel 在外部完成路由，从而消除了数据类型约束——MiniMax M2（及更广泛的 MoE 模型）现在可以使用 DeepSeek/Kimi/GLM-5 在 B200 上已有的快速 attention + MoE kernel 路径。该 PR 的测试计划在 `MiniMaxAI/MiniMax-M2.5` 上以 TP=2 + 专家并行运行，与下方 B200 前沿使用的配方形状相同。
 
-内核的选择至关重要。以下是 MiniMax-M2.5 上的逐内核对比（1K/1K——_不是_ 8K/1K，但内核排序一致），展示了 vLLM 中各 MoE 后端的表现：
+kernel 的选择至关重要。以下是 MiniMax-M2.5 上的逐 kernel 对比（1K/1K——_不是_ 8K/1K，但 kernel 排序一致），展示了 vLLM 中各 MoE 后端的表现：
 
 <Figure
   srcLight="/images/b200-minimax-m2-5-vllm-nvfp4-vs-h100-fp8-perf-per-dollar/moe-kernel-comparison-light.png"
   srcDark="/images/b200-minimax-m2-5-vllm-nvfp4-vs-h100-fp8-perf-per-dollar/moe-kernel-comparison-dark.png"
-  alt="两个并排散点图对比 trtllm（蓝色）、deep_gemm（橙色）和 triton（绿色虚线）MoE 内核在 MiniMax-M2.5 ISL=1024 OSL=1024 下的表现。左图：生成 TPS vs 交互性 TPS。右图：总 TPS vs 交互性 TPS。trtllm 在全曲线上位于 triton 之上，且远超 deep_gemm（后者坍缩至约 250 gen TPS）。"
-  caption="vLLM MoE 后端在 B200 上运行 MiniMax-M2.5 ISL=1024 / OSL=1024 的对比。trtllm-gen 模块化（蓝色）是 vLLM PR #36307 解锁的内核；triton（绿色虚线）是此前的回退路径；deep_gemm（橙色）在此路由方法下无法产生有竞争力的工作点。1K/1K 负载相比本文其他部分使用的 8K/1K 放大了内核间差距（8K/1K 将每步内核时间分摊到更多的 prefill 带宽中），但排序相同。"
+  alt="两个并排散点图对比 trtllm（蓝色）、deep_gemm（橙色）和 triton（绿色虚线）MoE kernel 在 MiniMax-M2.5 ISL=1024 OSL=1024 下的表现。左图：生成 TPS vs 交互性 TPS。右图：总 TPS vs 交互性 TPS。trtllm 在全曲线上位于 triton 之上，且远超 deep_gemm（后者坍缩至约 250 gen TPS）。"
+  caption="vLLM MoE 后端在 B200 上运行 MiniMax-M2.5 ISL=1024 / OSL=1024 的对比。trtllm-gen 模块化（蓝色）是 vLLM PR #36307 解锁的 kernel；triton（绿色虚线）是此前的回退路径；deep_gemm（橙色）在此路由方法下无法产生有竞争力的工作点。1K/1K 负载相比本文其他部分使用的 8K/1K 放大了 kernel 间差距（8K/1K 将每步 kernel 时间分摊到更多的 prefill 带宽中），但排序相同。"
 />
 
 ## 数据详情
@@ -174,7 +174,7 @@ NVFP4 组合帕累托前沿从 21 tok/s/user 时的 $0.031/M（TP=2，conc=512�
 | 150                 | _unreachable_ | _unreachable_ | $0.250         | _∞_                       |
 | 175                 | _unreachable_ | _unreachable_ | $0.569         | _∞_                       |
 
-B200 NVFP4 相对于 H100 的性能/成本优势**从 22 tok/s/user 时的 3.96 倍单调递增至 110 tok/s/user 时的 8.16 倍**，峰值 8.23 倍出现在 110.8 tok/s/user——H100 可测量范围的右端。与同代对比中提升基本恒定不同，此处提升增长迅速：H100 的前沿在右端急剧下降（其 conc=4 点仅为 476 tok/s/GPU、$0.76/M），而 B200 NVFP4 在相同交互性下仍有 4–5 倍的吞吐量。纯精度提升（B200 FP8 → B200 NVFP4）从 22 tok/s/user 时的 1.65 倍扩大到 110 时的 2.77 倍——随着批量缩小，trtllm-gen 内核的 GEMM 优势相比 triton 路径成为主导约束。在 110 tok/s/user 以上，对比不再成立：H100 没有任何配方能再提供一个 tok/s/user，而 B200 NVFP4 将可用范围延伸至 TP=8 下的 180 tok/s/user。
+B200 NVFP4 相对于 H100 的性能/成本优势**从 22 tok/s/user 时的 3.96 倍单调递增至 110 tok/s/user 时的 8.16 倍**，峰值 8.23 倍出现在 110.8 tok/s/user——H100 可测量范围的右端。与同代对比中提升基本恒定不同，此处提升增长迅速：H100 的前沿在右端急剧下降（其 conc=4 点仅为 476 tok/s/GPU、$0.76/M），而 B200 NVFP4 在相同交互性下仍有 4–5 倍的吞吐量。纯精度提升（B200 FP8 → B200 NVFP4）从 22 tok/s/user 时的 1.65 倍扩大到 110 时的 2.77 倍——随着批量缩小，trtllm-gen kernel 的 GEMM 优势相比 triton 路径成为主导约束。在 110 tok/s/user 以上，对比不再成立：H100 没有任何配方能再提供一个 tok/s/user，而 B200 NVFP4 将可用范围延伸至 TP=8 下的 180 tok/s/user。
 
 <Figure
   srcLight="/images/b200-minimax-m2-5-vllm-nvfp4-vs-h100-fp8-perf-per-dollar/benchmark-light.png"
@@ -195,7 +195,7 @@ B200 NVFP4 相对于 H100 的性能/成本优势**从 22 tok/s/user 时的 3.96 
 
 ## 致谢
 
-NVIDIA 的 [Wei Zhao](https://github.com/wzhao18) 于 2026-03-12 在 vLLM 中合入了 [trtllm FP8 MoE 模块化内核](https://github.com/vllm-project/vllm/pull/36307)。感谢 Wei Zhao 和 vLLM TRT-LLM 内核协作者、InferenceX 配方维护者以及 MiniMax AI 团队发布的开源权重。
+NVIDIA 的 [Wei Zhao](https://github.com/wzhao18) 于 2026-03-12 在 vLLM 中合入了 [trtllm FP8 MoE 模块化 kernel](https://github.com/vllm-project/vllm/pull/36307)。感谢 Wei Zhao 和 vLLM TRT-LLM kernel 协作者、InferenceX 配方维护者以及 MiniMax AI 团队发布的开源权重。
 
 <DashboardCTA href="https://inferencex.semianalysis.com/inference?g_rundate=2026-05-22&g_runid=26306422380&g_model=MiniMax-M2.5&i_prec=fp4%2Cfp8&i_active=b200_vllm%2Ch100_vllm&i_linelabel=1&i_advlabel=1">
   点击查看完整的 InferenceX 仪表板 →
@@ -218,7 +218,7 @@ NVIDIA 的 [Wei Zhao](https://github.com/wzhao18) 于 2026-03-12 在 vLLM 中合
       "name": "vLLM PR #36307 做了什么？为什么对 B200 上的 MiniMax-M2.5 至关重要？",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "vllm-project/vllm PR #36307 由 Wei Zhao 提交（2026-03-12 合入），为 Blackwell 添加了 trtllm-gen FP8 MoE 内核的模块化变体。此前的单体式 trtllm-gen 内核有 routing logits 数据类型约束，排除了 MiniMax M2 等路由器输出不同数据类型的模型。模块化内核在外部完成路由，消除了约束。有了 #36307，B200 上的 MiniMax M2 vLLM 终于可以使用 DeepSeek、Kimi 和 GLM-5 已有的快速 attention + MoE 内核路径。在 1K/1K 的补充逐内核对比中，trtllm-gen 模块化内核在低交互性时生成 TPS 比 triton MoE 回退路径高约 1.4 倍，总 TPS 高约 2 倍；deep_gemm 在此路由方法下无竞争力。"
+        "text": "vllm-project/vllm PR #36307 由 Wei Zhao 提交（2026-03-12 合入），为 Blackwell 添加了 trtllm-gen FP8 MoE kernel 的模块化变体。此前的单体式 trtllm-gen kernel 有 routing logits 数据类型约束，排除了 MiniMax M2 等路由器输出不同数据类型的模型。模块化 kernel 在外部完成路由，消除了约束。有了 #36307，B200 上的 MiniMax M2 vLLM 终于可以使用 DeepSeek、Kimi 和 GLM-5 已有的快速 attention + MoE kernel 路径。在 1K/1K 的补充逐 kernel 对比中，trtllm-gen 模块化 kernel 在低交互性时生成 TPS 比 triton MoE 回退路径高约 1.4 倍，总 TPS 高约 2 倍；deep_gemm 在此路由方法下无竞争力。"
       }
     },
     {
@@ -226,7 +226,7 @@ NVIDIA 的 [Wei Zhao](https://github.com/wzhao18) 于 2026-03-12 在 vLLM 中合
       "name": "B200 NVFP4 vs H100 FP8 的 8.2 倍每美元性能提升中，代际和精度各贡献了多少？",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "提升在峰值处可以清晰分解。保持精度不变，B200 vLLM FP8 在 110 tok/s/user 时相比 H100 vLLM FP8 实现约 2.94 倍的每美元性能提升——这是 Blackwell 代际加软件步骤，两个 SKU 使用相同的 MiniMaxAI/MiniMax-M2.5 权重和相同的 vLLM 构建。将 B200 权重切换为 nvidia/MiniMax-M2.5-NVFP4 后在 110 时又叠加了 2.77 倍——纯精度步骤，依赖 vLLM PR #36307 解锁的 trtllm-gen FP8 MoE 模块化内核。2.94 乘以 2.77 约为 8.14。在 H100 的工作区间内，代际贡献在 2.40 倍（22 tok/s/user）到 2.99 倍（103）之间，精度贡献在 1.65 倍（22）到 2.81 倍（110）之间；两个步骤在更高交互性下都扩大，这就是综合提升从 3.96 倍增长到 8.16 倍而非保持恒定的原因。"
+        "text": "提升在峰值处可以清晰分解。保持精度不变，B200 vLLM FP8 在 110 tok/s/user 时相比 H100 vLLM FP8 实现约 2.94 倍的每美元性能提升——这是 Blackwell 代际加软件步骤，两个 SKU 使用相同的 MiniMaxAI/MiniMax-M2.5 权重和相同的 vLLM 构建。将 B200 权重切换为 nvidia/MiniMax-M2.5-NVFP4 后在 110 时又叠加了 2.77 倍——纯精度步骤，依赖 vLLM PR #36307 解锁的 trtllm-gen FP8 MoE 模块化 kernel。2.94 乘以 2.77 约为 8.14。在 H100 的工作区间内，代际贡献在 2.40 倍（22 tok/s/user）到 2.99 倍（103）之间，精度贡献在 1.65 倍（22）到 2.81 倍（110）之间；两个步骤在更高交互性下都扩大，这就是综合提升从 3.96 倍增长到 8.16 倍而非保持恒定的原因。"
       }
     },
     {
@@ -234,7 +234,7 @@ NVIDIA 的 [Wei Zhao](https://github.com/wzhao18) 于 2026-03-12 在 vLLM 中合
       "name": "为什么 B200 vs H100 的代际提升（2.94 倍）几乎是纸面 FP8 天花板（1.51 倍）的 2 倍？",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "从原始硅片看，B200 的密集 FP8 吞吐量是 H100 的 2.27 倍，TCO 为 1.50 倍，在计算瓶颈下的纸面 FP8 性能/成本天花板为 1.51 倍，在显存带宽瓶颈下为 1.59 倍。实测 110 tok/s/user 时 2.94 倍几乎是该天花板的 2 倍，这意味着对比不受硅片能力限制——H100 上的 vLLM 技术栈在运行 MiniMax-M2.5 时相比 B200 通过 PR #36307 获得的 trtllm-gen 内核路径还留有大量性能空间。如果 H100 技术栈采用 FP8 KV cache、FlashInfer 注意力升级或类似的快速 MoE 内核，代际步骤将向其纸面天花板收窄。"
+        "text": "从原始硅片看，B200 的密集 FP8 吞吐量是 H100 的 2.27 倍，TCO 为 1.50 倍，在计算瓶颈下的纸面 FP8 性能/成本天花板为 1.51 倍，在显存带宽瓶颈下为 1.59 倍。实测 110 tok/s/user 时 2.94 倍几乎是该天花板的 2 倍，这意味着对比不受硅片能力限制——H100 上的 vLLM 技术栈在运行 MiniMax-M2.5 时相比 B200 通过 PR #36307 获得的 trtllm-gen kernel 路径还留有大量性能空间。如果 H100 技术栈采用 FP8 KV cache、FlashInfer 注意力升级或类似的快速 MoE kernel，代际步骤将向其纸面天花板收窄。"
       }
     },
     {
@@ -242,7 +242,7 @@ NVIDIA 的 [Wei Zhao](https://github.com/wzhao18) 于 2026-03-12 在 vLLM 中合
       "name": "B200 NVFP4 vs H100 FP8 的 MiniMax-M2.5 对比中还有哪些未覆盖的领域？",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "仍有三处差距。（1）投机解码：两个配方均未在 MiniMax-M2.5 上运行 MTP 或 EAGLE，因为 vLLM 对 MiniMax M2 路由层的 MTP 支持落后于 DeepSeek/Kimi/GLM-5；一旦实现，高交互性下的精度步骤应收窄，低交互性下的绝对下限应进一步降低。（2）NVL72 上的分离式服务：本次对比为单节点聚合；NVL72 上的宽专家并行在 Kimi K2.5 上已展示约 3 倍的每 GPU 吞吐量提升，将进一步提升 MiniMax-M2.5 的性能/成本。（3）H100 vLLM 技术栈仍有提升空间：当前运行 vllm/vllm-openai v0.18.0；FlashInfer 注意力升级和 H100 上的 FP8 KV 路径均可推高 H100 曲线。"
+        "text": "仍有三处差距。（1）投机解码：两个配方均未在 MiniMax-M2.5 上运行 MTP 或 EAGLE，因为 vLLM 对 MiniMax M2 路由层的 MTP 支持落后于 DeepSeek/Kimi/GLM-5；一旦实现，高交互性下的精度步骤应收窄，低交互性下的绝对下限应进一步降低。（2）NVL72 上的分离式推理：本次对比为单节点聚合；NVL72 上的宽专家并行在 Kimi K2.5 上已展示约 3 倍的每 GPU 吞吐量提升，将进一步提升 MiniMax-M2.5 的性能/成本。（3）H100 vLLM 技术栈仍有提升空间：当前运行 vllm/vllm-openai v0.18.0；FlashInfer 注意力升级和 H100 上的 FP8 KV 路径均可推高 H100 曲线。"
       }
     }
   ]

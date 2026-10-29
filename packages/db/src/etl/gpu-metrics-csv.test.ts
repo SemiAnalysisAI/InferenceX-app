@@ -36,7 +36,6 @@ describe('parseGpuMetricsCsv — NVIDIA', () => {
     expect(first.gpuUtilPct).toBe(0);
     expect(first.memUtilPct).toBe(0);
     expect(first.edgeTempC).toBeNull();
-    // The `[N/A]` power row for GPU 1 is not a usable sample.
     expect(parsed!.samples.filter((s) => s.gpuIndex === 1)).toHaveLength(1);
   });
 });

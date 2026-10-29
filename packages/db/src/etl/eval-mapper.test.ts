@@ -3,7 +3,6 @@ import { configCacheKey } from './config-cache';
 import { mapEvalRow, mapAggEvalRow } from './eval-mapper';
 import { createSkipTracker } from './skip-tracker';
 
-/** Minimal valid meta_env.json for eval ZIPs. */
 function makeMeta(overrides: Record<string, any> = {}): Record<string, any> {
   return {
     infmax_model_prefix: 'dsr1',
@@ -19,7 +18,6 @@ function makeMeta(overrides: Record<string, any> = {}): Record<string, any> {
   };
 }
 
-/** Minimal valid results JSON for eval ZIPs. */
 function makeResults(overrides: Record<string, any> = {}): Record<string, any> {
   return {
     lm_eval_version: '0.4.7',
@@ -39,7 +37,6 @@ function makeResults(overrides: Record<string, any> = {}): Record<string, any> {
   };
 }
 
-/** Minimal valid flat row from agg_eval_all.json. */
 function makeAggRow(overrides: Record<string, any> = {}): Record<string, any> {
   return {
     infmax_model_prefix: 'dsr1',
@@ -357,7 +354,6 @@ describe('mapAggEvalRow', () => {
   });
 
   describe('v2 schema (disagg / multinode)', () => {
-    /** Row carrying the v2 prefill/decode fields produced by disagg CI runs. */
     function makeV2Row(overrides: Record<string, any> = {}): Record<string, any> {
       return makeAggRow({
         hw: 'B300',
@@ -425,8 +421,6 @@ describe('mapAggEvalRow', () => {
         tracker,
       );
 
-      // dynamo-* / mori-* canonicals carry disagg semantics via their name — the
-      // standalone disagg signal (workers, multinode) is moot under these frameworks.
       expect(result!.config.disagg).toBe(true);
     });
 
@@ -505,7 +499,6 @@ describe('mapAggEvalRow', () => {
         tracker,
       )!.config;
 
-      // Any difference in the natural-key fields is enough to separate configs.
       expect(configCacheKey(a)).not.toBe(configCacheKey(b));
     });
   });

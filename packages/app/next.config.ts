@@ -4,18 +4,74 @@ import { allowedDevOriginsFromEnv } from './src/lib/runtime/allowed-dev-origins'
 import { INFERENCE_MODEL_ALIAS_REDIRECTS } from './src/lib/routing/inference-model-redirects';
 import { VIDEO_ALIAS_REDIRECTS } from './src/lib/video/video-alias-redirects';
 
+// Public files keep stable names across deploys, so they revalidate daily instead of being immutable.
+// Each source must match files only. `/whitepaper` and `/whitepaper/<slug>` are pages, while every
+// file in public/whitepaper sits in a per-paper folder, so that source requires two segments.
+const PUBLIC_ASSET_CACHE_CONTROL = 'public, max-age=86400, stale-while-revalidate=604800';
+const PUBLIC_ASSET_SOURCES = [
+  '/images/:path+',
+  '/brand/:path+',
+  '/logos/:path+',
+  '/decorative/:path+',
+  '/whitepaper/:paper/:file+',
+  String.raw`/:file(favicon\.ico|favicon-32\.webp|favicon-192\.webp|apple-touch-icon\.webp|og-image\.png|promo-poster\.webp)`,
+];
+
+const LOCALE_PREFIXES = ['', '/zh'] as const;
+
+const SEO_REDIRECTS = [
+  { source: '/datasets', destination: '/agentx' },
+  { source: '/zh/datasets', destination: '/zh/agentx' },
+  ...LOCALE_PREFIXES.flatMap((prefix) => [
+    { source: `${prefix}/xvideo`, destination: `${prefix}/video` },
+    { source: `${prefix}/xxvideo`, destination: `${prefix}/video` },
+    { source: `${prefix}/ubenchx`, destination: `${prefix}/ubenchx/mem-bw` },
+    { source: `${prefix}/run/glm-5-2-on-:chip`, destination: `${prefix}/run/glm-5-3-on-:chip` },
+    {
+      source: `${prefix}/rankings/fastest-gpu-for-glm-5-2`,
+      destination: `${prefix}/rankings/fastest-gpu-for-glm-5-3`,
+    },
+    {
+      source: `${prefix}/rankings/cheapest-gpu-for-glm-5-2`,
+      destination: `${prefix}/rankings/cheapest-gpu-for-glm-5-3`,
+    },
+    {
+      source: `${prefix}/rankings/fastest-gpu-for-qwen-3-5-0`,
+      destination: `${prefix}/rankings/fastest-gpu-for-qwen-3-5`,
+    },
+    {
+      source: `${prefix}/rankings/fastest-gpu-for-minimax-m3-1`,
+      destination: `${prefix}/rankings/fastest-gpu-for-minimax-m31-flash`,
+    },
+    {
+      source: `${prefix}/rankings/fastest-gpu-for-minimax-m27-0`,
+      destination: `${prefix}/rankings/fastest-gpu-for-minimax-m27`,
+    },
+    {
+      source: `${prefix}/blog/minimax-m3-agentx-b200-b300-vs-rack-scale-0`,
+      destination: `${prefix}/blog/minimax-m3-agentx-b200-b300-vs-rack-scale`,
+    },
+    { source: `${prefix}/media`, destination: `${prefix}/quotes` },
+  ]),
+].map((redirect) => ({ ...redirect, permanent: true }));
+
 const nextConfig: NextConfig = {
-  // Allow a second, isolated dev server (e.g. a dump-mode instance on another
-  // port) to run from the same project dir by pointing it at a separate build
-  // dir via NEXT_DIST_DIR. Defaults to '.next' so the primary server and all
-  // CI/prod builds are unaffected. Next.js's single-dev-server lock lives under
-  // distDir, so distinct dirs let the two coexist.
   distDir: process.env.NEXT_DIST_DIR || '.next',
   allowedDevOrigins: allowedDevOriginsFromEnv(),
   transpilePackages: ['@semianalysisai/inferencex-constants'],
   serverExternalPackages: ['shiki'],
+  // PostHog endpoints end in a slash (`/ingest/e/`); the redirects below keep stripping it elsewhere.
+  skipTrailingSlashRedirect: true,
   redirects() {
     return Promise.resolve([
+      // Two rules: Vercel compiles an empty `:rest*` to a trailing slash, which loops.
+      { source: '/:first((?!ingest/)[^/]+)/', destination: '/:first', permanent: true },
+      {
+        source: '/:first((?!ingest/)[^/]+)/:rest+/',
+        destination: '/:first/:rest+',
+        permanent: true,
+      },
+      ...SEO_REDIRECTS,
       ...INFERENCE_MODEL_ALIAS_REDIRECTS,
       ...VIDEO_ALIAS_REDIRECTS,
       {
@@ -28,32 +84,44 @@ const nextConfig: NextConfig = {
         destination: '/zh/agentx/:path*',
         permanent: true,
       },
-      // PowerX moved into the inference dashboard.
       { source: '/gpu-metrics', destination: '/inference', permanent: true },
       { source: '/zh/gpu-metrics', destination: '/zh/inference', permanent: true },
     ]);
   },
+  rewrites() {
+    return Promise.resolve([
+      {
+        source: '/ingest/static/:path*',
+        destination: 'https://us-assets.i.posthog.com/static/:path*',
+      },
+      {
+        source: '/ingest/array/:path*',
+        destination: 'https://us-assets.i.posthog.com/array/:path*',
+      },
+      { source: '/ingest/:path*', destination: 'https://us.i.posthog.com/:path*' },
+    ]);
+  },
+  headers() {
+    return Promise.resolve([
+      ...PUBLIC_ASSET_SOURCES.map((source) => ({
+        source,
+        headers: [{ key: 'Cache-Control', value: PUBLIC_ASSET_CACHE_CONTROL }],
+      })),
+      {
+        source: '/:path((?!zh(?:/|$)).*)',
+        headers: [{ key: 'Content-Language', value: 'en' }],
+      },
+      { source: '/zh', headers: [{ key: 'Content-Language', value: 'zh-CN' }] },
+      { source: '/zh/:path*', headers: [{ key: 'Content-Language', value: 'zh-CN' }] },
+    ]);
+  },
   experimental: {
     optimizePackageImports: ['lucide-react', 'd3', '@tanstack/react-query'],
-    // NOTE: route transitions (src/app/motion.css "Route transitions" block)
-    // need no config here. Next 15–16.2 gated React's <ViewTransition> behind
-    // `experimental.viewTransition`; the React build vendored by Next 16.3
-    // exports it as stable `React.ViewTransition`, and 16.3 removed the flag
-    // from the config schema (setting it now fails validation).
-    // components/motion/route-transition.tsx feature-detects the export, so
-    // navigation correctness never depends on it.
-    // NOTE: experimental.inlineCss was evaluated (2026-07) for the PageSpeed
-    // "Render-blocking requests" insight and rejected: it embeds the full CSS
-    // text in every route's RSC payload (~46 KiB gz, duplicated 2×), so every
-    // client-side tab navigation re-downloads CSS that is otherwise a
-    // one-time immutable fetch. Net regression for this SPA-heavy dashboard.
-    // Persist Turbopack's compiler cache under .next/cache in GitHub Actions
-    // so the workflow cache step makes warm builds fast. Gated on
-    // GITHUB_ACTIONS (not CI, which Vercel also sets) to keep the
-    // experimental flag out of production builds.
     ...(process.env.GITHUB_ACTIONS === 'true' && { turbopackFileSystemCacheForBuild: true }),
   },
   images: {
+    formats: ['image/webp'],
+    minimumCacheTTL: 86400,
     qualities: [75, 100],
     remotePatterns: [
       { hostname: 'placehold.co' },

@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { Search, X } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
 
+import { track } from '@/lib/analytics/analytics';
+import { useSearchTracking } from '@/lib/analytics/use-search-tracking';
 import type { GlossaryCategory, GlossaryPreview } from '@/lib/content/glossary';
 import { cn } from '@/lib/shared/utils';
 
@@ -98,11 +100,21 @@ export function GlossaryBrowser({
     );
   }, [categories, filteredEntries, groupBy]);
   const hasFilters = Boolean(query || category || letter);
+  useSearchTracking('glossary_searched', query, { results: filteredEntries.length });
 
-  const clearFilters = () => {
+  const clearFilters = (placement: 'toolbar' | 'empty_state') => {
+    track('glossary_filters_cleared', { placement });
     setQuery('');
     setCategory(null);
     setLetter(null);
+  };
+  const toggleCategory = (item: GlossaryCategory) => {
+    track('glossary_category_toggled', { category: item, enabled: category !== item });
+    setCategory((current) => (current === item ? null : item));
+  };
+  const toggleLetter = (item: string) => {
+    track('glossary_letter_toggled', { letter: item, enabled: letter !== item });
+    setLetter((current) => (current === item ? null : item));
   };
 
   return (
@@ -125,7 +137,10 @@ export function GlossaryBrowser({
             {query && (
               <button
                 type="button"
-                onClick={() => setQuery('')}
+                onClick={() => {
+                  track('glossary_search_cleared');
+                  setQuery('');
+                }}
                 aria-label={labels.clearSearch}
                 className="absolute top-1/2 right-3 flex size-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
               >
@@ -140,7 +155,7 @@ export function GlossaryBrowser({
                 key={item}
                 type="button"
                 aria-pressed={category === item}
-                onClick={() => setCategory((current) => (current === item ? null : item))}
+                onClick={() => toggleCategory(item)}
                 className={cn(
                   'cursor-pointer rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
                   category === item
@@ -162,7 +177,10 @@ export function GlossaryBrowser({
             <button
               type="button"
               aria-pressed={letter === null}
-              onClick={() => setLetter(null)}
+              onClick={() => {
+                if (letter !== null) track('glossary_letter_cleared');
+                setLetter(null);
+              }}
               className={cn(
                 'flex h-8 min-w-10 cursor-pointer items-center justify-center rounded-md border px-2 font-mono text-xs transition-colors',
                 letter === null
@@ -180,7 +198,7 @@ export function GlossaryBrowser({
                   type="button"
                   disabled={!available}
                   aria-pressed={letter === item}
-                  onClick={() => setLetter((current) => (current === item ? null : item))}
+                  onClick={() => toggleLetter(item)}
                   className={cn(
                     'flex size-8 shrink-0 items-center justify-center rounded-md border font-mono text-xs transition-colors',
                     available ? 'cursor-pointer' : 'cursor-not-allowed opacity-25',
@@ -206,7 +224,7 @@ export function GlossaryBrowser({
           {hasFilters && (
             <button
               type="button"
-              onClick={clearFilters}
+              onClick={() => clearFilters('toolbar')}
               className="cursor-pointer font-medium text-brand hover:underline"
             >
               {labels.clearFilters}
@@ -294,7 +312,7 @@ export function GlossaryBrowser({
           <p className="mt-2 text-sm text-muted-foreground">{labels.noResultsDescription}</p>
           <button
             type="button"
-            onClick={clearFilters}
+            onClick={() => clearFilters('empty_state')}
             className="mt-5 cursor-pointer rounded-md border border-brand/40 bg-brand/10 px-4 py-2 text-sm font-medium text-brand hover:bg-brand/15"
           >
             {labels.showAllTerms}

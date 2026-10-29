@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** System selection shared by the model API and presentation layers. */
 
 import { ValueError } from '../../../base';
 import { GPUSystem, type GPUSystemType } from './base';

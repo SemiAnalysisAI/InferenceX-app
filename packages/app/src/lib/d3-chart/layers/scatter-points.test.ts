@@ -73,7 +73,6 @@ describe('renderScatterPoints with getShapeKey', () => {
 
   it('swaps shape elements in place when the accessor result changes', () => {
     const group = makeZoomGroup();
-    // Single selected precision: everything is a circle.
     const shapeState: { fp4: ShapeKey } = { fp4: 'circle' };
     const config = {
       getColor: () => '#123456',
@@ -88,15 +87,11 @@ describe('renderScatterPoints with getShapeKey', () => {
         .every((n) => n.tagName.toLowerCase() === 'circle'),
     ).toBe(true);
 
-    // Second precision selected: fp4 points become squares. Same config
-    // object — the accessor reads current state, mirroring the ref-based
-    // accessors ScatterGraph passes so a precision toggle doesn't have to
-    // recreate the layer config.
     shapeState.fp4 = 'square';
     renderScatterPoints(group, POINTS, xScale, yScale, config, keyFn);
 
     const dotGroups = group.selectAll<SVGGElement, TestPoint>('.dot-group');
-    expect(dotGroups.size()).toBe(3); // reused, not recreated
+    expect(dotGroups.size()).toBe(3);
     const fp4Shape = dotGroups
       .filter((d) => d.precision === 'fp4')
       .select<SVGElement>('.visible-shape');
@@ -157,7 +152,7 @@ describe('syncPointShape', () => {
 
     syncPointShape(g, 'circle', '#00ff00');
     const shape = g.select<SVGElement>('.visible-shape');
-    expect(shape.node()).toBe(node); // same element, no swap
+    expect(shape.node()).toBe(node);
     expect(shape.attr('fill')).toBe('#00ff00');
   });
 
@@ -171,9 +166,20 @@ describe('syncPointShape', () => {
     expect(after.node()).not.toBe(before);
     expect(after.node()!.tagName.toLowerCase()).toBe('rect');
     expect(after.attr('data-shape-key')).toBe('square');
-    // Only one visible shape remains.
     expect(g.selectAll('.visible-shape').size()).toBe(1);
   });
+});
+
+const rect = (width: number, height: number, left = 0, top = 0) => ({
+  width,
+  height,
+  left,
+  top,
+  right: left + width,
+  bottom: top + height,
+  x: left,
+  y: top,
+  toJSON: () => ({}),
 });
 
 describe('computeTooltipPosition', () => {
@@ -294,9 +300,50 @@ describe('computeTooltipPosition', () => {
       top: 316,
     });
   });
+
+  it('keeps the tooltip below the sticky site header instead of underneath it', () => {
+    let frame: FrameRequestCallback | undefined;
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn((callback: FrameRequestCallback) => {
+        frame = callback;
+        return 1;
+      }),
+    );
+    const header = document.createElement('header');
+    header.className = 'vt-site-header';
+    Object.defineProperty(header, 'getBoundingClientRect', { value: () => rect(800, 56) });
+    document.body.append(header);
+    const tooltipNode = document.createElement('div');
+    Object.defineProperty(tooltipNode, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => rect(100, 300),
+    });
+    const container = document.createElement('div');
+    Object.defineProperties(container, {
+      clientWidth: { get: () => 800 },
+      clientHeight: { get: () => 400 },
+      getBoundingClientRect: { value: () => rect(800, 400, 0, -200) },
+    });
+    try {
+      // The chart has scrolled 200px under the header; the tooltip would start at y=4.
+      const below = computeTooltipPosition(20, 20, d3.select(tooltipNode), container);
+      expect(below.top).toBe(60);
+      // A tooltip taller than the space under the header keeps the plain viewport clamp.
+      Object.defineProperty(tooltipNode, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => rect(100, 760),
+      });
+      invalidateTooltipGeometry(tooltipNode);
+      expect(computeTooltipPosition(20, 20, d3.select(tooltipNode), container).top).toBe(4);
+    } finally {
+      header.remove();
+      frame?.(0);
+      vi.unstubAllGlobals();
+    }
+  });
 });
 
-/** Attribute, style, and text records a MutationObserver sees while `run` executes. */
 function recordMutations(root: Node, run: () => void): string[] {
   const observer = new MutationObserver(() => undefined);
   observer.observe(root, { attributes: true, childList: true, characterData: true, subtree: true });
@@ -340,7 +387,6 @@ describe('syncPointLabel', () => {
     syncPointLabel(group, 'TP8', '#fff', false);
 
     expect(recordMutations(group, () => syncPointLabel(group, 'TP4', '#fff', true))).toEqual([
-      // display + opacity, then the tspan text node.
       'text.style',
       'text.style',
       'childList',

@@ -5,8 +5,12 @@ import { listDatasets } from '@semianalysisai/inferencex-db/queries/datasets';
 import { AGENTX_OPTIMIZATION_SLUGS } from '@/lib/agentx/agentx-optimizations';
 import { DASHBOARD_ROUTES } from '@/lib/routing/dashboard-routes';
 import { getAllPosts } from '@/lib/blog/blog';
+import { getAllHardwarePages } from '@/lib/hardware/hardware';
 import { getModelPageSlugs } from '@/lib/catalog/model-pages';
-import { getAllComparableCompareSlugs } from '@/lib/compare/compare-availability';
+import {
+  getAllComparableCompareSlugs,
+  getCachedAvailability,
+} from '@/lib/compare/compare-availability';
 import { canonicalCompareSlug } from '@/lib/compare/compare-slug';
 import {
   getAllComparablePrecisionSlugs,
@@ -32,14 +36,28 @@ import {
 import { getAllRankingPageEntries } from '@/lib/live-seo/rankings';
 import { getAvailableRunEntries } from '@/lib/live-seo/run-rankings-data.server';
 import { getAllWhitepapers } from '@/lib/content/whitepapers';
+import { EXPLORER_BASE_PATH } from '@/lib/agentic-workload-explorer/paths';
+import { EXPLORER_SECTION_META } from '@/lib/agentic-workload-explorer/page-meta';
+import { dataLastModified } from '@/lib/seo/sitemap-lastmod';
+import { cachedQuery } from '@/lib/cache/api-cache';
 import { SITE_URL as BASE_URL } from '@semianalysisai/inferencex-constants';
+
+export const revalidate = 3600;
+
+const getCachedDatasets = cachedQuery(() => listDatasets(getDb()), 'sitemap-datasets');
 
 type SitemapEntry = MetadataRoute.Sitemap[number];
 
-/**
- * Emit an English page and its Chinese sibling as a pair, both carrying the
- * full hreflang set so crawlers link the two versions.
- */
+function dayIso(date: string): string {
+  return new Date(`${date.slice(0, 10)}T00:00:00Z`).toISOString();
+}
+
+function newestDate(dates: readonly string[]): string | undefined {
+  let newest: string | undefined;
+  for (const date of dates) if (newest === undefined || date > newest) newest = date;
+  return newest && dayIso(newest);
+}
+
 function localizedPair(
   enPath: string,
   entry: Omit<SitemapEntry, 'url' | 'alternates'>,
@@ -56,185 +74,200 @@ function localizedPair(
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const now = new Date().toISOString();
-  // Only emit (model, pair) URLs that have benchmark data on both sides —
-  // avoids polluting the sitemap with empty pages that hurt crawl budget.
-  const [compareSlugs, precisionSlugs, specDecodeSlugs, datasets, runEntries] = await Promise.all([
-    getAllComparableCompareSlugs(),
-    getAllComparablePrecisionSlugs(),
-    getAllComparableSpecDecodeSlugs(),
-    FIXTURES_MODE ? Promise.resolve([]) : listDatasets(getDb()),
-    getAvailableRunEntries(),
-  ]);
+  const [compareSlugs, precisionSlugs, specDecodeSlugs, datasets, runEntries, availability] =
+    await Promise.all([
+      getAllComparableCompareSlugs(),
+      getAllComparablePrecisionSlugs(),
+      getAllComparableSpecDecodeSlugs(),
+      FIXTURES_MODE ? Promise.resolve([]) : getCachedDatasets(),
+      getAvailableRunEntries(),
+      getCachedAvailability(),
+    ]);
+  const dataDates = dataLastModified(availability);
+  const latestData = dataDates.latest;
+  const modelData = (modelSlug: string) => dataDates.forModel(modelSlug) ?? latestData;
+  const posts = getAllPosts();
+  const hardwarePages = getAllHardwarePages();
+  const whitepapers = getAllWhitepapers();
   const zhPosts = new Set(getAllPosts('zh').map((post) => post.slug));
+  const zhHardwarePages = new Set(getAllHardwarePages('zh').map((page) => page.slug));
 
   return [
+    ...localizedPair('/', { lastModified: latestData, changeFrequency: 'daily', priority: 1 }),
     ...DASHBOARD_ROUTES.filter((route) => route.indexable).flatMap((route) =>
       localizedPair(route.canonicalPath, {
-        lastModified: now,
+        lastModified: latestData,
         changeFrequency: 'daily' as const,
-        priority: route.canonicalPath === '/' ? 1 : 0.9,
+        priority: 0.9,
       }),
     ),
-    // Per-model tab routes (/calculator/<slug>, /historical/<slug>). The
-    // default model's pages canonicalize to the bare tab paths (already
-    // emitted above), so they stay out of the sitemap.
+    ...Object.keys(EXPLORER_SECTION_META).flatMap((section) =>
+      localizedPair(`${EXPLORER_BASE_PATH}${section}`, {
+        changeFrequency: 'monthly' as const,
+        priority: 0.5,
+      }),
+    ),
     ...MODEL_ROUTE_TABS.flatMap((tab) =>
       modelRoutesForTab(tab)
         .filter((route) => route.model !== defaultRouteModel(tab))
         .flatMap((route) =>
           localizedPair(modelRoutePath(tab, route.slug), {
-            lastModified: now,
+            lastModified: modelData(route.slug),
             changeFrequency: 'daily' as const,
             priority: 0.8,
           }),
         ),
     ),
     ...localizedPair('/overview', {
-      lastModified: now,
+      lastModified: latestData,
       changeFrequency: 'daily',
       priority: 0.9,
     }),
-    ...localizedPair('/quotes', { lastModified: now, changeFrequency: 'monthly', priority: 0.6 }),
-    ...localizedPair('/about', { lastModified: now, changeFrequency: 'monthly', priority: 0.6 }),
-    ...localizedPair('/land-acknowledgement', {
-      lastModified: now,
-      changeFrequency: 'yearly',
-      priority: 0.4,
-    }),
-    // Per-model inference pages — the indexable path form of
-    // `/inference?g_model=…`. Deprecated models keep their pages (historical
-    // data stays reachable) at a lower priority than actively benchmarked ones.
+    ...localizedPair('/quotes', { changeFrequency: 'monthly', priority: 0.6 }),
+    ...localizedPair('/about', { changeFrequency: 'monthly', priority: 0.6 }),
+    ...localizedPair('/land-acknowledgement', { changeFrequency: 'yearly', priority: 0.4 }),
     ...INFERENCE_MODEL_SLUGS.flatMap((entry) =>
       localizedPair(`/inference/${entry.slug}`, {
-        lastModified: now,
+        lastModified: modelData(entry.slug),
         changeFrequency: 'daily' as const,
         priority: ACTIVE_INFERENCE_MODEL_SLUGS.includes(entry) ? 0.8 : 0.5,
       }),
     ),
-    // The catalog index is indexable; the per-point detail pages it links to
-    // stay noindex, so only this page enters the sitemap.
     ...localizedPair('/inference/agentic', {
-      lastModified: now,
+      lastModified: latestData,
       changeFrequency: 'daily',
       priority: 0.7,
     }),
-    ...localizedPair('/compare', { lastModified: now, changeFrequency: 'daily', priority: 0.8 }),
+    ...localizedPair('/compare', {
+      lastModified: latestData,
+      changeFrequency: 'daily',
+      priority: 0.8,
+    }),
     ...localizedPair('/compare-per-dollar', {
-      lastModified: now,
+      lastModified: latestData,
       changeFrequency: 'daily',
       priority: 0.8,
     }),
     ...localizedPair('/compare-precision', {
-      lastModified: now,
+      lastModified: latestData,
       changeFrequency: 'daily',
       priority: 0.8,
     }),
     ...localizedPair('/compare-spec-decode', {
-      lastModified: now,
+      lastModified: latestData,
       changeFrequency: 'daily',
       priority: 0.8,
     }),
-    ...localizedPair('/agentx', { lastModified: now, changeFrequency: 'weekly', priority: 0.6 }),
+    ...localizedPair('/agentx', {
+      lastModified: newestDate(datasets.map((dataset) => dataset.ingested_at)),
+      changeFrequency: 'weekly',
+      priority: 0.6,
+    }),
     ...datasets.flatMap((dataset) =>
       localizedPair(`/agentx/${dataset.slug}`, {
-        lastModified: now,
+        lastModified: dayIso(dataset.ingested_at),
         changeFrequency: 'monthly' as const,
         priority: 0.5,
       }),
     ),
     ...localizedPair('/agentx/quickstart', {
-      lastModified: now,
       changeFrequency: 'monthly',
       priority: 0.7,
     }),
     ...localizedPair('/agentx/methodology', {
-      lastModified: now,
       changeFrequency: 'monthly',
       priority: 0.6,
     }),
     ...localizedPair('/agentx/telemetry', {
-      lastModified: now,
       changeFrequency: 'monthly',
       priority: 0.6,
     }),
     ...localizedPair('/agentx/optimizations', {
-      lastModified: now,
       changeFrequency: 'monthly',
       priority: 0.7,
     }),
     ...AGENTX_OPTIMIZATION_SLUGS.flatMap((slug) =>
       localizedPair(`/agentx/optimizations/${slug}`, {
-        lastModified: now,
         changeFrequency: 'monthly' as const,
         priority: 0.6,
       }),
     ),
-    ...localizedPair('/api', { lastModified: now, changeFrequency: 'monthly', priority: 0.7 }),
-    ...localizedPair('/blog', { lastModified: now, changeFrequency: 'weekly', priority: 0.8 }),
+    ...localizedPair('/api', { changeFrequency: 'monthly', priority: 0.7 }),
+    ...localizedPair('/blog', {
+      lastModified: newestDate(posts.map((post) => post.modifiedDate ?? post.date)),
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    }),
     ...localizedPair('/glossary', {
-      lastModified: now,
       changeFrequency: 'monthly',
       priority: 0.7,
     }),
     ...getAllGlossaryEntries().flatMap((entry) =>
       localizedPair(`/glossary/${entry.slug}`, {
-        lastModified: now,
         changeFrequency: 'monthly' as const,
         priority: 0.6,
       }),
     ),
     ...localizedPair('/chips', {
-      lastModified: now,
       changeFrequency: 'weekly',
       priority: 0.8,
     }),
     ...getAllChipRouteSlugs().flatMap((slug) =>
       localizedPair(`/chips/${slug}`, {
-        lastModified: now,
         changeFrequency: 'weekly' as const,
         priority: 0.7,
       }),
     ),
-    // Live GPU rankings per model (fastest / cheapest). The registry is
-    // static; page bodies render from live benchmark data on request.
-    ...localizedPair('/rankings', { lastModified: now, changeFrequency: 'daily', priority: 0.8 }),
+    ...localizedPair('/rankings', {
+      lastModified: latestData,
+      changeFrequency: 'daily',
+      priority: 0.8,
+    }),
     ...getAllRankingPageEntries().flatMap((entry) =>
       localizedPair(`/rankings/${entry.slug}`, {
-        lastModified: now,
+        lastModified: modelData(entry.model.slug),
         changeFrequency: 'daily' as const,
         priority: 0.7,
       }),
     ),
-    // Model-on-hardware pages, availability-filtered so only pairings with
-    // benchmark rows enter the sitemap (same crawl-budget rule as /compare).
-    ...localizedPair('/run', { lastModified: now, changeFrequency: 'daily', priority: 0.8 }),
+    ...localizedPair('/run', { lastModified: latestData, changeFrequency: 'daily', priority: 0.8 }),
     ...runEntries.flatMap((entry) =>
       localizedPair(`/run/${entry.slug}`, {
-        lastModified: now,
+        lastModified: dataDates.forModelChips(entry.model.slug, [entry.chip.hwKey]) ?? latestData,
         changeFrequency: 'daily' as const,
         priority: 0.7,
       }),
     ),
-    ...getAllPosts().flatMap((post) => {
+    ...posts.flatMap((post) => {
       const entry = {
         lastModified: new Date(`${post.modifiedDate ?? post.date}T00:00:00Z`).toISOString(),
         changeFrequency: 'monthly' as const,
         priority: 0.7,
       };
-      // Posts without a Chinese translation stay English-only in the sitemap.
       if (!zhPosts.has(post.slug)) return [{ ...entry, url: `${BASE_URL}/blog/${post.slug}` }];
       return localizedPair(`/blog/${post.slug}`, entry);
     }),
-    // Whitepaper landing pages. Every paper ships both locales from the same
-    // registry entry, and the Figure 1 PNG is listed so image crawlers find it
-    // next to the canonical URL (the Chinese page reuses the English asset).
+    ...localizedPair('/hardware', {
+      lastModified: newestDate(hardwarePages.map((page) => page.date)),
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    }),
+    ...hardwarePages.flatMap((page) => {
+      const enPath = `/hardware/${page.slug}`;
+      const entry = {
+        lastModified: new Date(`${page.date}T00:00:00Z`).toISOString(),
+        changeFrequency: 'monthly' as const,
+        priority: 0.7,
+      };
+      if (!zhHardwarePages.has(page.slug)) return [{ ...entry, url: `${BASE_URL}${enPath}` }];
+      return localizedPair(enPath, entry);
+    }),
     ...localizedPair('/whitepaper', {
-      lastModified: now,
+      lastModified: newestDate(whitepapers.map((paper) => paper.publishedDate)),
       changeFrequency: 'monthly',
       priority: 0.7,
     }),
-    ...getAllWhitepapers().flatMap((paper) =>
+    ...whitepapers.flatMap((paper) =>
       localizedPair(`/whitepaper/${paper.slug}`, {
         images: [`${BASE_URL}${paper.heroImagePath}`],
         lastModified: new Date(`${paper.publishedDate}T00:00:00Z`).toISOString(),
@@ -242,54 +275,47 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.7,
       }),
     ),
-    // Model deep-dive pages (architecture + vendor evals + embedded dashboard).
     ...localizedPair('/model', {
-      lastModified: now,
       changeFrequency: 'weekly' as const,
       priority: 0.7,
     }),
     ...getModelPageSlugs().flatMap((slug) =>
       localizedPair(`/model/${slug}`, {
-        lastModified: now,
+        lastModified: modelData(slug),
         changeFrequency: 'weekly' as const,
         priority: 0.7,
       }),
     ),
     ...compareSlugs.flatMap(({ modelSlug, a, b }) =>
       localizedPair(`/compare/${canonicalCompareSlug(modelSlug, a, b)}`, {
-        lastModified: now,
+        lastModified: dataDates.forModelChips(modelSlug, [a, b]) ?? latestData,
         changeFrequency: 'daily' as const,
         priority: 0.7,
       }),
     ),
-    // Every indexed per-dollar landing page has a stable data graphic so image
-    // crawlers discover the PNG alongside the canonical comparison URL. The
-    // Chinese sibling references the same English-hosted PNG.
     ...compareSlugs.flatMap(({ modelSlug, a, b }) => {
       const enPath = `/compare-per-dollar/${canonicalCompareSlug(modelSlug, a, b)}`;
       return localizedPair(enPath, {
         images: [`${BASE_URL}${enPath}/performance-per-dollar.png`],
-        lastModified: now,
+        lastModified: dataDates.forModelChips(modelSlug, [a, b]) ?? latestData,
         changeFrequency: 'daily' as const,
         priority: 0.7,
       });
     }),
-    // Precision comparison pages — each slug page has a hero PNG chart.
     ...precisionSlugs.flatMap(({ modelSlug, gpu, precA, precB }) => {
       const enPath = `/compare-precision/${canonicalPrecisionCompareSlug(modelSlug, gpu, precA, precB)}`;
       return localizedPair(enPath, {
         images: [`${BASE_URL}${enPath}/precision-comparison.png`],
-        lastModified: now,
+        lastModified: dataDates.forModelChips(modelSlug, [gpu]) ?? latestData,
         changeFrequency: 'daily' as const,
         priority: 0.7,
       });
     }),
-    // Speculative decoding comparison pages — each slug page has a hero PNG chart.
     ...specDecodeSlugs.flatMap(({ modelSlug, gpu, precision, method }) => {
       const enPath = `/compare-spec-decode/${canonicalSpecDecodeCompareSlug(modelSlug, gpu, precision, method)}`;
       return localizedPair(enPath, {
         images: [`${BASE_URL}${enPath}/spec-decode-comparison.png`],
-        lastModified: now,
+        lastModified: dataDates.forModelChips(modelSlug, [gpu]) ?? latestData,
         changeFrequency: 'daily' as const,
         priority: 0.7,
       });

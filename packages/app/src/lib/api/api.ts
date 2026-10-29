@@ -14,6 +14,8 @@ import type { EvalRow } from '@semianalysisai/inferencex-db/queries/evaluations'
 
 import type { SubmissionsResponse } from '../submissions/submissions-types';
 
+import { ApiRequestError } from './api-request-error';
+
 export type { BenchmarkRow, EvalRow };
 
 export interface WorkflowRunRow {
@@ -82,7 +84,8 @@ export interface ReliabilityRow {
 
 async function fetchJson<T>(url: string, signal?: AbortSignal): Promise<T> {
   const res = await fetch(url, { signal });
-  if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`);
+  if (!res.ok)
+    throw new ApiRequestError(`API error: ${res.status} ${res.statusText}`, res.status, url);
   return res.json();
 }
 
@@ -265,7 +268,7 @@ export function fetchSubmissions(signal?: AbortSignal) {
   return fetchJson<SubmissionsResponse>('/api/v1/submissions', signal);
 }
 
-/** Stored sweep runs plus whether lazy discovery has reached the end of history. */
+/** Stored CollectiveX run summaries, one per results upload; `discovery_complete` is always true. */
 export function fetchCollectiveXRunList(
   version: CollectiveXVersion = COLLECTIVEX_DEFAULT_VERSION,
   signal?: AbortSignal,
@@ -277,7 +280,7 @@ export function fetchCollectiveXRunList(
   }>(`/api/v1/collectivex/runs?version=${version}`, signal);
 }
 
-/** Resolve a specific ingested sweep run's neutral view dataset by run_id. */
+/** Resolve a CollectiveX run's neutral view dataset by run_id. */
 export function fetchCollectiveXRun(
   version: CollectiveXVersion,
   runId: string,
@@ -287,22 +290,6 @@ export function fetchCollectiveXRun(
     `/api/v1/collectivex/runs/${runId}?version=${version}`,
     signal,
   );
-}
-
-/**
- * Admin deletion of an ingested run. Requires the dedicated CollectiveX admin
- * Bearer secret (COLLECTIVEX_ADMIN_SECRET — deliberately not the CI-held
- * INVALIDATE_SECRET); resolves false on 401 so callers can clear a stale
- * stored token, throws on other failures.
- */
-export async function deleteCollectiveXRun(runId: string, token: string): Promise<boolean> {
-  const response = await fetch(`/api/v1/collectivex/runs/${runId}`, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (response.status === 401) return false;
-  if (!response.ok) throw new Error(`CollectiveX delete failed (${response.status}).`);
-  return true;
 }
 
 export interface FeedbackListRow {
@@ -339,7 +326,17 @@ export function fetchLatestImages(signal?: AbortSignal) {
   return fetchJson<LatestImageRow[]>('/api/v1/latest-images', signal);
 }
 
-export type FrameworkReleases = Record<string, string | null>;
+/** GitHub compare status of a benchmarked commit against the release tag. */
+export type CommitStatus = 'ahead' | 'behind' | 'diverged' | 'identical';
+
+export interface FrameworkRelease {
+  tag: string;
+  publishedAt: string;
+  /** Unversioned nightly commits from active benchmark images that GitHub resolved. */
+  commits: Record<string, CommitStatus>;
+}
+
+export type FrameworkReleases = Record<string, FrameworkRelease | null>;
 
 export function fetchFrameworkReleases(signal?: AbortSignal) {
   return fetchJson<FrameworkReleases>('/api/v1/framework-releases', signal);

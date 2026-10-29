@@ -14,21 +14,24 @@ const STRINGS = {
   en: {
     title: 'Performance history',
     intro:
-      'Published H3 results, including older runs. Each entry keeps its original execution and artifact identity.',
+      'Stored H3 evidence, including older runs without publication approval. Each entry keeps its original execution and artifact identity.',
     note: 'Recorded observations only; no matched version baseline has been selected. Media validity does not establish perceptual quality or serving capacity.',
     order:
-      'Newest publication first. Execution time is shown separately; re-exporting a result does not make it a new measurement.',
-    loading: 'Loading published results…',
-    error: 'Could not load published history.',
+      'Newest stored index first. Execution time is shown separately; re-exporting a result does not make it a new measurement.',
+    loading: 'Loading stored results…',
+    error: 'Could not load stored history.',
     retry: 'Retry',
-    older: 'More published results',
+    older: 'More stored results',
     empty: 'No matching entries among the loaded results.',
-    loaded: 'Filters apply to loaded entries. Load more published results to search older pages.',
+    loaded: 'Filters apply to loaded entries. Load more stored results to search older pages.',
     all: 'All',
     hardware: 'Hardware',
     concurrency: 'Client concurrency',
     workload: 'Search workload or runtime',
-    published: 'Published',
+    published: 'Stored',
+    publication: 'Publication',
+    approved: 'Approved for dashboard',
+    unapproved: 'No matching approval receipt',
     execution: 'Original execution',
     source: 'Source run',
     sourceSha: 'Source SHA',
@@ -61,20 +64,23 @@ const STRINGS = {
   },
   zh: {
     title: '性能历史',
-    intro: '查看已发布的 H3 结果，包括较早运行；每条记录保留原始执行与产物标识。',
+    intro: '查看已存储的 H3 结果，包括尚无发布批准记录的旧运行；每条记录保留原始执行与产物标识。',
     note: '当前仅展示观测值，尚未选择匹配的版本基线。媒体有效性不代表感知质量或服务容量已通过验收。',
-    order: '按发布时间从新到旧排列。执行时间单独列出；重新导出不代表重新测量。',
-    loading: '正在加载已发布结果…',
+    order: '按索引存储时间从新到旧排列。执行时间单独列出；重新导出不代表重新测量。',
+    loading: '正在加载已存储结果…',
     error: '无法加载性能历史。',
     retry: '重试',
-    older: '更多已发布结果',
+    older: '更多已存储结果',
     empty: '已加载的结果中暂无匹配记录。',
-    loaded: '筛选仅作用于已加载的记录；查看更早页面请加载更多已发布结果。',
+    loaded: '筛选仅作用于已加载的记录；查看更早页面请加载更多已存储结果。',
     all: '全部',
     hardware: '硬件',
     concurrency: '客户端并发数',
     workload: '搜索工作负载或运行时版本',
-    published: '发布时间',
+    published: '存储时间',
+    publication: '发布批准',
+    approved: '已批准用于仪表板',
+    unapproved: '暂无匹配的发布批准回执',
     execution: '原始执行时间',
     source: '原始运行',
     sourceSha: '源码 SHA',
@@ -269,6 +275,9 @@ export default function VideoHistory() {
               {s.published}: {date(entry.publishedAt)}
             </span>
           </div>
+          <p className="text-xs text-muted-foreground" data-testid="video-history-publication">
+            {s.publication}: {entry.approved === true ? s.approved : s.unapproved}
+          </p>
           {entry.error && <p role="alert">{entry.error}</p>}
           {entry.sources.map((source) => (
             <div key={source.id} className="min-w-0 space-y-3">

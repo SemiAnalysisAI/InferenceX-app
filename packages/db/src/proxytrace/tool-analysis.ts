@@ -10,11 +10,6 @@ export type SessionOutcome =
   | 'fail_unrecovered'
   | 'ambiguous';
 
-// Rows are produced by the analytics queries in operations.ts and
-// consumed here by analyzeToolOutcomes. Classification fields
-// (verification_kind, status) are pre-computed at ingest time by
-// extractRequestStats and stored in request_stats.
-
 export interface ToolUseRow {
   session_id: string;
   request_id: string;

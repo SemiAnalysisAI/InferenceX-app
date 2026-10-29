@@ -37,13 +37,6 @@ export interface ProviderOverrides {
   unofficial?: Partial<UnofficialRunContextType>;
 }
 
-/**
- * Build a nested provider tree from the given overrides.
- * Only providers whose keys are present in `overrides` are included;
- * the rest are omitted so components that don't need them aren't forced
- * into a provider. A `QueryClientProvider` is always included as the
- * outermost wrapper since any React Query hook will need it.
- */
 export function mountWithProviders(
   component: React.ReactElement,
   overrides: ProviderOverrides = {},

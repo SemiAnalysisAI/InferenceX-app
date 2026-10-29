@@ -2,7 +2,6 @@ import type { Bundle, Json } from './bundle';
 
 const hash = (name: string) => name.padEnd(64, '0');
 
-// Synthetic contract data, shaped after the C1/C2/C4 backend artifact.
 export function servingFixture(
   runId = '123',
   hardware = 'NVIDIA H200',

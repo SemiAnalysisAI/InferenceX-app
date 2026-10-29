@@ -87,15 +87,13 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
 
   const openDrawer = (row: EvaluationChartData) => {
     setDrawerRow(row);
-    // Notify the first-visit nudge to dismiss itself once the user has
-    // discovered the affordance on their own.
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('inferencex:eval-samples-opened'));
     }
     track('evaluation_samples_open', {
       eval_result_id: row.evalResultId,
       task: row.benchmark,
-      hw_key: row.hwKey,
+      gpu: row.hwKey,
     });
   };
 
@@ -120,7 +118,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
     track('evaluation_samples_open', {
       eval_result_id: sharedRow.evalResultId,
       task: sharedRow.benchmark,
-      hw_key: sharedRow.hwKey,
+      gpu: sharedRow.hwKey,
       source: 'shared_link',
     });
   }, [sharedRow, sharedTarget?.evalResultId]);
@@ -130,8 +128,6 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
       {
         header: '',
         cell: (row) => {
-          // Official rows have a real eval_results.id; unofficial rows ship -1 but can
-          // still be served live as long as we have a workflow URL to fetch the artifact from.
           const canOpen = row.evalResultId > 0 || (row.evalResultId <= 0 && Boolean(row.runUrl));
           return canOpen ? (
             <button
@@ -153,9 +149,6 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
         header: t.chip,
         cell: (row) => {
           const isUnofficial = row.evalResultId <= 0;
-          // Inset a per-run colored dot — same palette the unofficial banner and
-          // overlay chart points use, so a row, its banner chip, and its bar in
-          // the bar chart all share the same color.
           const runIdx = isUnofficial ? overlayRunIndex(row.runUrl, runIndexByUrl) : 0;
           return (
             <span className="inline-flex items-center gap-1.5">

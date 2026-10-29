@@ -1,10 +1,5 @@
 import type { Locale } from '@/lib/i18n/i18n';
 
-/**
- * Hand-written UI strings for the article index and post pages. Both locales
- * live side by side so a change to one surface is made in both languages at
- * once. Article bodies themselves come from MDX and are not covered here.
- */
 export const BLOG_COPY = {
   en: {
     indexEyebrow: 'InferenceX Research',

@@ -1,18 +1,11 @@
 /**
- * Server-side PostHog event capture via the public /capture/ endpoint.
- *
- * Same wire format as posthog-node / posthog-js, but pulled into a tiny
- * fire-and-forget fetch so we don't add a dependency for one-off route-handler
- * observability. Falls back to console.error if NEXT_PUBLIC_POSTHOG_KEY isn't
- * configured — we don't want a missing env var to silently swallow the signal
- * (the local dev case where capture is intentionally disabled still hits the
- * console fallback, which is what Vercel's runtime log expects).
+ * Server events never create or update a PostHog person: they all share one aggregate distinct id, so
+ * `$process_person_profile` is always false. Pass `route_template` when the route is known.
  */
 export function trackServer(eventName: string, properties?: Record<string, unknown>): void {
   void captureServer(eventName, properties);
 }
 
-/** Return delivery to the request lifetime so serverless shutdown cannot cut it short. */
 export async function captureServer(
   eventName: string,
   properties?: Record<string, unknown>,
@@ -24,15 +17,12 @@ export async function captureServer(
     return;
   }
   const host = process.env.NEXT_PUBLIC_POSTHOG_HOST ?? 'https://us.i.posthog.com';
-  // Use a stable synthetic distinct_id for server events — no user context
-  // available at this layer, and the event is about server-side health, not
-  // a user action.
   try {
     const body = JSON.stringify({
       api_key: key,
       event: eventName,
       distinct_id: distinctId,
-      properties: { ...properties, $lib: 'inferencex-server' },
+      properties: { ...properties, $lib: 'inferencex-server', $process_person_profile: false },
       timestamp: new Date().toISOString(),
     });
     const response = await fetch(`${host.replace(/\/$/u, '')}/capture/`, {
@@ -46,7 +36,6 @@ export async function captureServer(
     if (!response.ok) console.error(`[analytics-server] capture rejected for ${eventName}`);
     await response.body?.cancel();
   } catch {
-    // Do not log request URLs, credentials, or provider response bodies.
     console.error(`[analytics-server] capture failed for ${eventName}`);
   }
 }

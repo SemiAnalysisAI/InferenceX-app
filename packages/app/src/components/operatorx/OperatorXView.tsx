@@ -4,6 +4,8 @@ import { Card } from '@/components/ui/card';
 import { Heading } from '@/components/ui/heading';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useClientSearch } from '@/hooks/useClientSearch';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { replaceClientSearch } from '@/lib/routing/client-navigation';
 
 import { ComparisonDashboard } from './ComparisonDashboard';
@@ -21,6 +23,7 @@ function isCategory(value: string | null): value is Category {
 }
 
 function selectCategory(value: string) {
+  track('operatorx_category_selected', { category: value });
   const params = new URLSearchParams(window.location.search);
   params.set('op', value);
   params.delete('workload');
@@ -28,6 +31,7 @@ function selectCategory(value: string) {
 }
 
 export default function OperatorXView() {
+  const locale = useLocale();
   const requested = new URLSearchParams(useClientSearch()).get('op');
   const category: Category = isCategory(requested) ? requested : 'gemm';
   return (
@@ -39,7 +43,7 @@ export default function OperatorXView() {
     >
       <Card>
         <Heading as="h1" level="card">
-          OperatorX
+          {locale === 'zh' ? 'OperatorX（实验性 Beta）' : 'OperatorX (Experimental Beta)'}
         </Heading>
         <TabsList className="mt-4">
           {CATEGORIES.map((c) => (

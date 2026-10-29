@@ -1,9 +1,6 @@
 import { GROUND, ROAD, type Point, type World } from './gta-world';
 
-// Raster map of San Fierro drawn once from the same OpenStreetMap data as the
-// 3D city, then cropped and rotated for the radar.
-
-export const MAP_SCALE = 4; // metres per pixel
+export const MAP_SCALE = 4;
 
 const COLORS: Record<number, [number, number, number]> = {
   [GROUND.urban]: [222, 219, 210],
@@ -83,7 +80,6 @@ export interface RadarMarks {
   route?: Point[];
 }
 
-/** Rotating GTA-style radar: north follows the player's heading. */
 export function paintRadar(
   out: HTMLCanvasElement,
   map: HTMLCanvasElement,
@@ -99,7 +95,6 @@ export function paintRadar(
   ctx.fillStyle = '#76a6c4';
   ctx.fillRect(0, 0, size, size);
   ctx.translate(size / 2, size / 2);
-  // Heading up: rotate the world so the player's facing points to the top.
   ctx.rotate(m.player.angle - Math.PI);
   ctx.scale(k * MAP_SCALE, k * MAP_SCALE);
   ctx.translate(-(m.player.x - world.x0) / MAP_SCALE, -(m.player.z - world.z0) / MAP_SCALE);
@@ -118,7 +113,6 @@ export function paintRadar(
     ctx.stroke();
   }
   ctx.restore();
-  // Target blip (clamped to the edge) and police.
   const toRadar = (p: Point) => {
     const dx = p.x - m.player.x,
       dz = p.z - m.player.z;
@@ -159,7 +153,6 @@ export function paintRadar(
   ctx.stroke();
 }
 
-/** Whole-city overview with numbered mission stops. */
 export function paintOverview(
   out: HTMLCanvasElement,
   map: HTMLCanvasElement,

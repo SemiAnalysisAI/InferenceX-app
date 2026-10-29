@@ -13,8 +13,6 @@ import { getFastModeMultiplier } from '@semianalysisai/inferencex-db/proxytrace/
 import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
 import { useLocale } from '@/lib/i18n/use-locale';
 
-// ── i18n ────────────────────────────────────────────────────────
-
 const STRINGS = {
   en: {
     summary: 'Summary',
@@ -78,8 +76,6 @@ const STRINGS = {
 
 type Strings = (typeof STRINGS)[keyof typeof STRINGS];
 
-// ── Types ───────────────────────────────────────────────────────
-
 interface FastModeSummaryRow {
   isFastMode: boolean;
   count: number;
@@ -111,8 +107,6 @@ interface FastModeData {
   byModel: FastModeModelRow[];
 }
 
-// ── Chart constants ─────────────────────────────────────────────
-
 const CHART_W = 600;
 const CHART_H = 200;
 const MARGIN = { top: 8, right: 12, bottom: 36, left: 56 };
@@ -121,8 +115,6 @@ const PLOT_H = CHART_H - MARGIN.top - MARGIN.bottom;
 
 const SVG_FONT = 'var(--font-mono, ui-monospace, monospace)';
 const SVG_FONT_SIZE = '9px';
-
-// ── Helpers ─────────────────────────────────────────────────────
 
 function formatDollars(v: number): string {
   if (v >= 1000) return `$${(v / 1000).toFixed(1)}K`;
@@ -146,8 +138,6 @@ function truncateModel(model: string, maxLen = 32): string {
   return `${model.slice(0, maxLen - 1)}...`;
 }
 
-// ── Section header ──────────────────────────────────────────────
-
 function SectionHeader({ label, detail }: { label: string; detail?: string }) {
   return (
     <div className="flex items-center gap-2 mb-2">
@@ -160,8 +150,6 @@ function SectionHeader({ label, detail }: { label: string; detail?: string }) {
   );
 }
 
-// ── Stat card ───────────────────────────────────────────────────
-
 function StatCard({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
     <div className="rounded-md border border-border bg-surface p-3">
@@ -173,8 +161,6 @@ function StatCard({ label, value, detail }: { label: string; value: string; deta
     </div>
   );
 }
-
-// ── Daily fast mode ratio bar chart ─────────────────────────────
 
 function DailyFastModeChart({ daily, t }: { daily: FastModeDaily[]; t: Strings }) {
   const locale = useLocale();
@@ -189,7 +175,6 @@ function DailyFastModeChart({ daily, t }: { daily: FastModeDaily[]; t: Strings }
     );
   }
 
-  // Y-axis is percentage 0-100
   const yMax = 100;
   const yTicks = [0, 25, 50, 75, 100];
 
@@ -204,6 +189,7 @@ function DailyFastModeChart({ daily, t }: { daily: FastModeDaily[]; t: Strings }
         <div className="flex items-center justify-end mb-2">
           <ExportPngButton
             locale={locale}
+            analyticsChart="daily-fast-mode"
             onClick={() => {
               if (svgRef.current)
                 exportSvgToPng(svgRef.current, {
@@ -221,7 +207,6 @@ function DailyFastModeChart({ daily, t }: { daily: FastModeDaily[]; t: Strings }
           className="w-full"
           style={{ maxHeight: 240 }}
         >
-          {/* Y-axis grid lines and labels */}
           {yTicks.map((tv) => (
             <g key={`y-${tv}`}>
               {tv > 0 && (
@@ -248,7 +233,6 @@ function DailyFastModeChart({ daily, t }: { daily: FastModeDaily[]; t: Strings }
             </g>
           ))}
 
-          {/* Baseline */}
           <line
             x1={MARGIN.left}
             y1={MARGIN.top + PLOT_H}
@@ -259,7 +243,6 @@ function DailyFastModeChart({ daily, t }: { daily: FastModeDaily[]; t: Strings }
             strokeWidth={0.5}
           />
 
-          {/* Bars */}
           {data.map((d, i) => {
             const x = MARGIN.left + i * (barWidth + barGap);
             const pct = d.totalCount > 0 ? (d.fastCount / d.totalCount) * 100 : 0;
@@ -284,7 +267,6 @@ function DailyFastModeChart({ daily, t }: { daily: FastModeDaily[]; t: Strings }
                     )}
                   </title>
                 </rect>
-                {/* X-axis labels: show every 5th */}
                 {i % 5 === 0 && (
                   <text
                     x={x + barWidth / 2}
@@ -308,8 +290,6 @@ function DailyFastModeChart({ daily, t }: { daily: FastModeDaily[]; t: Strings }
     </Expandable>
   );
 }
-
-// ── Model breakdown table ───────────────────────────────────────
 
 interface ModelBreakdown {
   model: string;
@@ -437,8 +417,6 @@ function ModelBreakdownTable({ byModel, t }: { byModel: FastModeModelRow[]; t: S
   );
 }
 
-// ── Main page ───────────────────────────────────────────────────
-
 export default function FastModePage() {
   return (
     <Suspense>
@@ -464,7 +442,6 @@ function FastModePageContent() {
     key: String(traceVersionParam),
   });
 
-  // Derive computed stats
   const stats = useMemo(() => {
     if (!data) return null;
     const fastRow = data.summary.find((r) => r.isFastMode === true);
@@ -478,12 +455,6 @@ function FastModePageContent() {
     const fastCost = fastRow?.totalCost ?? 0;
     const regularCost = regularRow?.totalCost ?? 0;
 
-    // Cost premium: fast-mode multiplier is per-model (e.g. Opus 4.6/4.7 are
-    // 6x, Opus 4.8 is 2x). The aggregate `summary` row collapses across
-    // models, so derive the premium by summing per-model fast costs from
-    // `byModel`: for each model with multiplier m, the cost at regular rates
-    // would be fastCost / m, so the premium is fastCost * (m - 1) / m. Rows
-    // for models with no fast-mode pricing contribute zero premium.
     const costPremium = data.byModel.reduce((acc, row) => {
       if (!row.isFastMode || row.totalCost <= 0) return acc;
       const m = getFastModeMultiplier(row.model);
@@ -517,7 +488,6 @@ function FastModePageContent() {
 
   return (
     <div className="space-y-6">
-      {/* ── Stats ───────────────────────────────────────────────── */}
       <div>
         <SectionHeader label={t.summary} />
         {loading ? (
@@ -574,7 +544,6 @@ function FastModePageContent() {
 
       {data && stats && (
         <>
-          {/* ── Daily Fast Mode Ratio ─────────────────────────────── */}
           <div>
             <SectionHeader
               label={t.dailyFastModePct}
@@ -583,7 +552,6 @@ function FastModePageContent() {
             <DailyFastModeChart daily={data.daily} t={t} />
           </div>
 
-          {/* ── Model Breakdown ───────────────────────────────────── */}
           <div>
             <SectionHeader
               label={t.modelBreakdown}

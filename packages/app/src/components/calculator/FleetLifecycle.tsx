@@ -34,6 +34,7 @@ import { Heading } from '@/components/ui/heading';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { track } from '@/lib/analytics/analytics';
+import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
 import { exportToCsv } from '@/lib/export/csv-export';
 import { getGpuSpecs, getHardwareConfig, type TcoBasis } from '@/lib/catalog/constants';
 import {
@@ -71,25 +72,15 @@ interface FleetLifecycleProps {
   hardwareConfig: HardwareConfig;
   costProvider: CostProvider;
   costType: CostType;
-  /** Current target interactivity (tok/s/user) from the calculator's slider. */
   targetValue: number;
   mode: CalculatorMode;
-  /** Legend visibility by base hwKey — shared with the chart above. */
   visibleHwKeys: Set<string>;
   selectedModel: Model;
   selectedSequence: Sequence;
   selectedPrecisions: string[];
   selectedPercentile?: Percentile;
-  /** Facility power budget in MW, shared with the fleet planner. */
-  /**
-   * The facility power budget, raw. Owned by the parent because the URL seed and
-   * the fleet-sizing basis are shared, but the *input* lives here: this section
-   * is the only thing that consumes it, and a control in one section feeding a
-   * table in another is what the old Fleet Projection split got wrong.
-   */
   mwInput: string;
   onMwInputChange: (raw: string) => void;
-  /** Resolves a series colour from the calculator's theme palette. */
   colorResolver: (hwKey: string) => string;
 }
 
@@ -262,7 +253,7 @@ const STRINGS = {
     captionPrices: (input: string, output: string, cachedPct: string | null) =>
       `输入 $${input} / 输出 $${output} 每百万 token${cachedPct === null ? '' : `，缓存 ${cachedPct}%`}`,
     description:
-      '固定集群自模型发布之日起的表现。芯片始终不变，变化的是为其提供服务的软件。每次推广采用的配置都优于此前所有配置，并从集群当前服务水平逐步爬升至新配置水平。曲线与成本线之间的差距，就是这些优化工作的回报。',
+      '固定集群自模型发布之日起的表现。芯片始终不变，变化的是为其提供服务的软件。每次部署采用的配置都优于此前所有配置，并从集群当前服务水平逐步爬升至新配置水平。曲线与成本线之间的差距，就是这些优化工作的回报。',
     tooSmall: '该功率预算不足以为所示任一芯片供电。请尝试更大的数值。',
     mwLabel: '设施功率 (MW)',
     mwTooltip:
@@ -342,9 +333,9 @@ const STRINGS = {
       `在该功率预算下无法为 ${chips} 组建集群。该芯片缺少已登记的功耗数据，或其实测吞吐无法组成任何规模。此处列出而非直接剔除，以免图表静默遗漏芯片。`,
     note: '注意：',
     disagg:
-      '台阶可以由解耦配置取得，且该次交接是同类比较：两种部署方式的总 tok/s/chip 均按芯片总数报告，且预填充与解码使用的是同一种硅片，因此切换时集群规模与成本线均不发生变化。当本模块需要输入或输出 token 的单独数值时（用于台阶排序，或将两类 token 分别计价），它由该总量与该次运行实测的 token 构成比推导得出，而非直接读取每芯片的输入/输出速率。在解耦部署下，这两个速率分别按预填充芯片与解码芯片计算，这也正是别处吞吐图表标注其不可直接比较的原因；改为推导可使本模块的所有比较统一在同一分母上。真正改变的是集群形态。自该配置开始推广起，其预填充:解码比例被假定应用于整个集群。实际部署中，这相当于一次重新部署，由爬坡期窗口代为体现，并非实测值。每一级台阶标注的配置即说明其类型。',
+      '台阶可以由分离式配置取得，且该次交接是同类比较：两种部署方式的总 tok/s/chip 均按芯片总数报告，且预填充与解码使用的是同一款芯片，因此切换时集群规模与成本线均不发生变化。当本模块需要输入或输出 token 的单独数值时（用于台阶排序，或将两类 token 分别计价），它由该总量与该次运行实测的 token 构成比推导得出，而非直接读取每芯片的输入/输出速率。在分离式部署下，这两个速率分别按预填充芯片与解码芯片计算，这也正是别处吞吐图表标注其不可直接比较的原因；改为推导可使本模块的所有比较统一在同一分母上。真正改变的是集群形态。自该配置开始部署起，其预填充:解码比例被假定应用于整个集群。实际部署中，这相当于一次重新部署，由爬坡期窗口代为体现，并非实测值。每一级台阶标注的配置即说明其类型。',
     hybrid:
-      '每款芯片一条曲线，而非每个软件配置一条：曲线在任一时刻都跟随当时领先的框架、精度与投机解码组合，因此服务集群的配置会沿曲线变化，每一级台阶都标注接管的配置。图例项仍可筛选配置，被隐藏的配置将不参与竞争。每一级台阶都是一个实测运行日期，其在目标交互性下的插值吞吐量优于此前所有日期；未能超越现有配置的扫描不构成台阶，因为集群仍在运行原有配置。配置不会在扫描发现的瞬间生效，因此每个配置都会在推广期内从集群当前已提供的水平爬升至其自身水平。功率与 $/chip/hr 为 TCO 模型的当前值，成本在整个期间保持水平，因为任何配置都不会改变这两项。两种情况下都是同一款芯片。超出某次运行实测交互性区间的结果会被排除而非钳制。',
+      '每款芯片一条曲线，而非每个软件配置一条：曲线在任一时刻都跟随当时领先的框架、精度与投机解码组合，因此服务集群的配置会沿曲线变化，每一级台阶都标注接管的配置。图例项仍可筛选配置，被隐藏的配置将不参与竞争。每一级台阶都是一个实测运行日期，其在目标交互性下的插值吞吐量优于此前所有日期；未能超越现有配置的扫描不构成台阶，因为集群仍在运行原有配置。配置不会在扫描发现的瞬间生效，因此每个配置都会在爬坡期内从集群当前已提供的水平爬升至其自身水平。功率与 $/chip/hr 为 TCO 模型的当前值，成本在整个期间保持水平，因为任何配置都不会改变这两项。两种情况下都是同一款芯片。超出某次运行实测交互性区间的结果会被排除而非钳制。',
     overlayExempt:
       '通过运行链接加载的非官方运行不会显示在此，因为运行历史 API 仅提供已入库的官方结果。',
     metricLabel: 'Y 轴',
@@ -382,28 +373,11 @@ const STRINGS = {
 
 const DEFAULTS = LIFECYCLE_DEFAULTS;
 
-/**
- * A price for a field, in as few digits as say it.
- *
- * `toFixed(4)` alone is wrong at the bottom of the range: a fleet cheap enough,
- * or a ratio small enough, produces a real price below 0.00005 and rounds it to
- * "0.0000" — a field that reads as "these tokens are free" when they are not.
- * Small values fall back to significant digits instead.
- */
 function formatPrice(value: number): string {
   if (!Number.isFinite(value) || value <= 0) return '0';
   return value < 0.0001 ? value.toPrecision(3) : value.toFixed(4);
 }
 
-/**
- * Same price, for reading rather than editing.
- *
- * The input fields are padded to four decimals so a seeded break-even figure
- * lines up as you type into it; a caption is prose, and `$12.0000` there reads
- * as spurious precision. Trailing zeros are dropped — `12`, `12.5`, `0.1234` —
- * which keeps sub-cent prices intact, since a break-even figure on a large fleet
- * routinely lands below a cent and rounding it to one would print `$0`.
- */
 function formatCaptionPrice(value: number): string {
   const fixed = formatPrice(value);
   return fixed.includes('.') ? fixed.replace(/\.?0+$/u, '') : fixed;
@@ -414,15 +388,6 @@ function parseNonNegative(raw: string): number | null {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
 
-/**
- * Resolve the two-field price seed from a share link.
- *
- * `c_price` predates the input/output split, so an old link supplies only the
- * input side. Preserve that explicit value and derive its missing peer at the
- * default ratio; otherwise marking the pair as URL-owned leaves output blank and
- * silently bills every output token at $0. The symmetric case makes a manually
- * authored output-only link complete for the same reason.
- */
 function initialPriceInputs(params: ReturnType<typeof readUrlParams>): {
   input: string;
   output: string;
@@ -447,12 +412,6 @@ function getLabel(hwKey: string, hardwareConfig: HardwareConfig): string {
   return config ? getDisplayLabel(config) : hwKey;
 }
 
-/**
- * The software half of a hwKey's label — what distinguishes it from bare silicon.
- * Display labels put it in parentheses ("B200 (SGLang, MTP)"); when they don't,
- * fall back to the hwKey's own suffix so the cell is never blank for a config
- * that genuinely differs.
- */
 function configSuffix(hwKey: string, baseGpu: string, hardwareConfig: HardwareConfig): string {
   if (hwKey === baseGpu) return '—';
   const label = getLabel(hwKey, hardwareConfig);
@@ -462,11 +421,6 @@ function configSuffix(hwKey: string, baseGpu: string, hardwareConfig: HardwareCo
   return suffix || '—';
 }
 
-/**
- * Signed money. Carries a trillions step: a cumulative margin at a
- * hyperscaler-sized power budget genuinely reaches it, and `$1532.50B` is
- * harder to read than `$1.53T`.
- */
 function formatMoney(value: number): string {
   const abs = Math.abs(value);
   const sign = value < 0 ? '-' : '';
@@ -477,7 +431,6 @@ function formatMoney(value: number): string {
   return `${sign}$${abs.toFixed(0)}`;
 }
 
-/** Short label for the config behind a step, for the tooltip. */
 function configLabel(result: InterpolatedResult): string {
   const point = result.nearestPoints[0];
   if (!point) return '';
@@ -487,7 +440,6 @@ function configLabel(result: InterpolatedResult): string {
   return parts.join(' · ');
 }
 
-/** A run date, linked to its workflow run when one is recorded. */
 function runLink(date: string, runUrls: string[]) {
   if (runUrls.length === 0) return <>{date}</>;
   return (
@@ -501,14 +453,10 @@ function runLink(date: string, runUrls: string[]) {
 interface LifecycleRow {
   progression: ChipProgression;
   label: string;
-  /** The config the chip is running at the latest rung, e.g. "SGLang, MTP". */
   configNow: string;
-  /** A real hwKey to resolve the series colour from. */
   colorKey: string;
   tpPerMw: number;
-  /** Chips the power budget provisions — flat across the whole lifecycle. */
   gpus: number;
-  /** Streams the fleet serves at the target interactivity on its latest config. */
   concurrentUsersNow: number;
   disagg: boolean;
   series: LifecycleSeries;
@@ -532,7 +480,6 @@ export default function FleetLifecycle({
   const { tcoBasis } = useGlobalFilterSelection();
   const locale = useLocale();
   const t = STRINGS[locale];
-  /** A zero or blank budget sizes no fleet, so it is treated as unset. */
   const mw = useMemo(() => {
     const parsed = parseNonNegative(mwInput);
     return parsed !== null && parsed > 0 ? parsed : null;
@@ -548,8 +495,6 @@ export default function FleetLifecycle({
     costProvider,
     costType,
     percentile: selectedPercentile,
-    // The history payload is several MB — do not fetch it until the section can
-    // actually produce something.
     enabled: Boolean(mw),
   });
 
@@ -565,25 +510,15 @@ export default function FleetLifecycle({
   const [cacheInput, setCacheInput] = useState(
     () => readUrlParams().c_cache ?? String(DEFAULTS.cachedInputPct),
   );
-  /**
-   * Only agentic runs record a cache hit rate, so only they can be discounted.
-   * The control is hidden elsewhere rather than shown as a no-op — a knob that
-   * moves nothing is worse than no knob.
-   */
   const isAgentic = selectedSequence === Sequence.AgenticTraces;
   const cacheReadRatio = isAgentic
     ? Math.min(1, (parseNonNegative(cacheInput) ?? DEFAULTS.cachedInputPct) / 100)
     : 1;
 
   const [horizonInput, setHorizonInput] = useState(() => readUrlParams().c_life ?? '');
-  // Like the price, the horizon is seeded from the data until the user takes it
-  // over: a fixed 60-month default spends most of the axis on a flat tail
-  // projecting the last config forward, which carries no information.
   const horizonEdited = useRef(Boolean(readUrlParams().c_life));
   const [yMetric, setYMetric] = useState<LifecycleMetric>(() => {
     const seeded = readUrlParams().c_ly;
-    // Allowlisted rather than cast: the param is user-editable, and an unknown
-    // value must fall back to the default instead of reaching `metricValue`.
     return seeded === 'revenue' ||
       seeded === 'revenuePerMw' ||
       seeded === 'cumulativeRevenue' ||
@@ -594,19 +529,7 @@ export default function FleetLifecycle({
   const [initialPrices] = useState(() => initialPriceInputs(readUrlParams()));
   const [priceInput, setPriceInput] = useState(initialPrices.input);
   const [outputPriceInput, setOutputPriceInput] = useState(initialPrices.output);
-  // A price arriving from the URL is the user's, so it must not be overwritten
-  // by the break-even default. Either field counts: they are seeded as a pair,
-  // so re-seeding one after the user set the other would silently move the ratio
-  // they chose.
   const priceEdited = useRef(initialPrices.edited);
-  /**
-   * Ratio the pair is seeded at, and restored to by a reset.
-   *
-   * State rather than derived from the two fields: deriving it would make the
-   * seed depend on the values the seed just wrote, and the re-seed that follows a
-   * reset would read the ratio it had itself produced. Only a user edit moves it,
-   * so a reader who set 3x gets 3x back rather than the default.
-   */
   const [seedMultiple, setSeedMultiple] = useState(() => {
     const input = parseNonNegative(initialPrices.input);
     const output = parseNonNegative(initialPrices.output);
@@ -614,17 +537,7 @@ export default function FleetLifecycle({
     return DEFAULTS.outputPriceMultiple;
   });
 
-  /**
-   * Anchor for the timeline. The model's release date is the honest zero — the
-   * question is how far the software has come since the weights existed. Models
-   * without a sourced release date fall back to their first measured run.
-   */
   const releaseDate = getModelReleaseDate(selectedModel);
-  /**
-   * One series per chip, not per hwKey. The legend still filters hwKeys, so
-   * hiding a framework removes it from candidacy for its chip's envelope — the
-   * legend stays the control it always was, one level below the lines.
-   */
   const visibleHistoricalProgressions = useMemo(
     () => historical.progressions.filter((progression) => visibleHwKeys.has(progression.hwKey)),
     [historical.progressions, visibleHwKeys],
@@ -663,7 +576,6 @@ export default function FleetLifecycle({
     [historical.unmeasured, visibleHwKeys],
   );
 
-  /** Months from the anchor to the last measured sweep, across visible chips. */
   const measuredMonths = useMemo(() => {
     if (!Number.isFinite(anchorMs)) return null;
     let latest = -Infinity;
@@ -677,24 +589,13 @@ export default function FleetLifecycle({
 
   useEffect(() => {
     if (horizonEdited.current || measuredMonths === null) return;
-    // A short tail past the last sweep so the final step is readable rather than
-    // pinned to the right edge.
     setHorizonInput(String(Math.max(1, Math.ceil(measuredMonths + 2))));
   }, [measuredMonths]);
 
   const horizonMonths = parseNonNegative(horizonInput) ?? 0;
 
-  /**
-   * Per chip: the step schedule (one rung per measured improvement) plus the flat
-   * fleet cost. Chip count and $/chip/hr do not move when a config improves, so
-   * cost is computed once from the opening rung.
-   */
   const { fleets, unplottable } = useMemo(() => {
     if (!mw || !Number.isFinite(anchorMs)) return { fleets: [], unplottable: [] };
-    // Chips that survived selection but cannot be turned into a fleet — no
-    // registered power figure for the base GPU, or a throughput that sizes to
-    // nothing. They are named below rather than dropped: a chip that is in the
-    // legend and in no row, with no explanation, reads as a bug in the data.
     const absent: string[] = [];
     const sized = visibleProgressions.flatMap((progression) => {
       const fleet = buildFleetSchedule(progression.steps, {
@@ -724,9 +625,6 @@ export default function FleetLifecycle({
     tcoBasis,
   ]);
 
-  // Interrupts sell fewer tokens off the same racks, so they raise break-even.
-  // The seeded price has to carry the same haircut the plotted margin does, or
-  // the default lands slightly below break-even instead of on it.
   const availability = useMemo(
     () =>
       availabilityFromInterrupts(
@@ -736,19 +634,11 @@ export default function FleetLifecycle({
     [mtbiInput, recoveryInput],
   );
 
-  /**
-   * Break-even of the cheapest visible fleet at its latest config — the
-   * competitive floor as it stands today, not as it stood at release.
-   */
-
   const breakEven = useMemo(() => {
     let cheapest: number | null = null;
     for (const { steps, costPerHour } of fleets) {
       const latest = steps.at(-1);
       if (!latest) continue;
-      // Two prices make break-even a line, not a point. Fixing the ratio picks
-      // one solution off it: solve the input price against a rate that already
-      // counts each output token as `multiple` input tokens' worth of revenue.
       const price = breakEvenPricePerMTok(
         costPerHour,
         effectiveTokPerSec(latest.billableInputTokPerSec, latest.outputTokPerSec, seedMultiple),
@@ -760,7 +650,6 @@ export default function FleetLifecycle({
     return cheapest;
   }, [fleets, availability, seedMultiple]);
 
-  // Seed and re-seed both prices from break-even until the user takes them over.
   useEffect(() => {
     if (priceEdited.current || breakEven === null) return;
     setPriceInput(formatPrice(breakEven));
@@ -795,13 +684,8 @@ export default function FleetLifecycle({
           return [
             {
               progression,
-              // The chip, not the config: the config is what changes along the line.
               label: getLabel(progression.baseGpu, hardwareConfig),
               configNow: configSuffix(latestHwKey, progression.baseGpu, hardwareConfig),
-              // The palette is built over the *active* hwKeys, so a bare base key
-              // resolves to the fallback grey. Colour the line by the config it is
-              // running now, which is both a real key and the legend entry a reader
-              // would look for.
               colorKey: latestHwKey,
               tpPerMw: latest.rankValue,
               gpus,
@@ -817,11 +701,6 @@ export default function FleetLifecycle({
 
   const hasDisagg = useMemo(() => rows.some((r) => r.disagg), [rows]);
 
-  /**
-   * Every plotted chip is a single measured date, so no line has a step in it.
-   * Worth saying out loud: a flat line here means the history is one date deep,
-   * not that the software stopped improving.
-   */
   const allSingleRung = useMemo(
     () => rows.length > 0 && rows.every((r) => r.progression.steps.length < 2),
     [rows],
@@ -845,16 +724,12 @@ export default function FleetLifecycle({
   const chartData = useMemo<LifecycleChartSeries[]>(
     () =>
       rows.map((r) => {
-        // Step risers are keyed by month so the tooltip can name the run behind
-        // each one; months come from the same arithmetic the schedule used.
         const stepInfo = new Map<
           number,
           { date: string; config: string; factor: number; runUrls: string[] }
         >();
         for (const step of r.progression.steps) {
           const month = (Date.parse(`${step.date}T00:00:00Z`) - anchorMs) / MS_PER_MONTH;
-          // The config is now the thing that changes along the line, so name the
-          // framework that took over here, not just its precision.
           const hwKey = step.result.hwKey ?? r.progression.baseGpu;
           const software = configSuffix(hwKey, r.progression.baseGpu, hardwareConfig);
           const detail = configLabel(step.result);
@@ -935,8 +810,6 @@ export default function FleetLifecycle({
   const handlePriceReset = useCallback(() => {
     priceEdited.current = false;
     if (breakEven !== null) {
-      // Scale both, keeping whatever ratio the user had set — the pair is what
-      // break-even is solved for, so resetting one alone would land off the line.
       setPriceInput(formatPrice(breakEven));
       setOutputPriceInput(formatPrice(breakEven * seedMultiple));
     }
@@ -944,10 +817,6 @@ export default function FleetLifecycle({
     track('calculator_lifecycle_price_reset', {});
   }, [breakEven, seedMultiple]);
 
-  /**
-   * The table's own numbers, not the chart's samples: one row per chip, which is
-   * what a reader who asked for this section is comparing.
-   */
   const handleExportCsv = useCallback(() => {
     const headers = [
       t.colChip,
@@ -984,8 +853,6 @@ export default function FleetLifecycle({
       r.series.availability,
     ]);
     exportToCsv(`InferenceX_fleet_lifecycle_${selectedModel}`, headers, body, [
-      // The assumptions are not in the rows, and a CSV read six months later
-      // cannot be reconstructed without them.
       t.csvAssumptions({
         priceInput,
         outputPriceInput,
@@ -1012,19 +879,6 @@ export default function FleetLifecycle({
     tcoBasis,
   ]);
 
-  /**
-   * The two token prices, for the caption. Revenue — and so every margin plotted
-   * here — is linear in these, and on the margin metrics they are *seeded* from
-   * break-even rather than typed, so a reader comparing two screenshots needs to
-   * see them next to the MW figure to know whether they are looking at the same
-   * scenario.
-   *
-   * Null until the seed lands: the fields start empty and a break-even effect
-   * fills them, and `$/M tok` with nothing in front of it is worse than silence.
-   * The cached tier is quoted only for agentic, which is the only sequence that
-   * measures a hit rate for it to apply to — and there it is load-bearing, since
-   * most input tokens bill at it rather than at the input price beside it.
-   */
   const captionPrices = useMemo(() => {
     const input = parseNonNegative(priceInput);
     const output = parseNonNegative(outputPriceInput);
@@ -1036,12 +890,6 @@ export default function FleetLifecycle({
     );
   }, [priceInput, outputPriceInput, isAgentic, cacheReadRatio, t]);
 
-  /**
-   * The figure's own header, in the same shape the bar chart above uses: title,
-   * then the provenance a reader needs to know what they are looking at. The
-   * chart renders it as its caption; the table view renders it as a figcaption,
-   * so switching tabs never loses the heading.
-   */
   const caption = (
     <>
       <Heading as="h2" level="card">
@@ -1066,15 +914,12 @@ export default function FleetLifecycle({
       },
       {
         header: t.colConfigNow,
-        // The line is one chip across many configs, so which config it ended on
-        // is part of reading the row.
         cell: (r) => <span className="whitespace-nowrap">{r.configNow}</span>,
         sortValue: (r) => r.configNow,
         className: 'text-muted-foreground',
       },
       {
         header: t.colFirst,
-        // Provenance is not optional: every rung of the line is a real sweep.
         cell: (r) => {
           const first = r.progression.steps[0]!;
           return <span className="whitespace-nowrap">{runLink(first.date, first.runUrls)}</span>;
@@ -1104,9 +949,6 @@ export default function FleetLifecycle({
         className: 'tabular-nums',
       },
       {
-        // The physical sizing the whole projection rests on. It used to live in a
-        // separate Fleet Projection section, which meant the budget that produced
-        // it and the economics that consume it were three sections apart.
         header: t.colChips,
         align: 'right',
         cell: (r) => formatCompact(r.gpus, 0),
@@ -1121,7 +963,6 @@ export default function FleetLifecycle({
         className: 'tabular-nums',
       },
       {
-        // Streams, not tokens: the same fleet throughput read as demand served.
         header: t.colUsers,
         align: 'right',
         cell: (r) => formatCompact(r.concurrentUsersNow, 0),
@@ -1348,11 +1189,15 @@ export default function FleetLifecycle({
             <ChartButtons
               chartId="fleet-lifecycle"
               analyticsPrefix="calculator_lifecycle"
+              analyticsContext={selectionAnalyticsContext({
+                model: selectedModel,
+                sequence: selectedSequence,
+                precisions: selectedPrecisions,
+                gpuCount: visibleHwKeys.size,
+              })}
               zoomResetEvent="d3chart_zoom_reset_fleet-lifecycle"
               onExportCsv={handleExportCsv}
               exportFileName={`InferenceX_fleet_lifecycle_${selectedModel}`}
-              // A PNG of a paginated HTML table is not a useful artefact; the CSV
-              // is the export for that view.
               hideImageExport={view === 'table'}
               leadingControls={
                 <SegmentedToggle
@@ -1376,8 +1221,6 @@ export default function FleetLifecycle({
                   columns={columns}
                   testId="calculator-lifecycle-table"
                   analyticsPrefix="calculator_lifecycle_table"
-                  // One row per chip, every one of them named in the legend and on
-                  // the chart. A search box over five rows is furniture.
                   searchable={false}
                 />
               </>
@@ -1417,10 +1260,6 @@ export default function FleetLifecycle({
             )}
           </figure>
         ) : (
-          /* Nothing to plot has two causes, and blaming the wrong one sends the
-             reader to the wrong control: chips were selected but none could be
-             sized (the budget), versus nothing measured at this speed (the
-             slider). `unplottable` distinguishes them. */
           <p className="text-sm text-muted-foreground" data-testid="calculator-lifecycle-none">
             {unplottable.length > 0 ? t.tooSmall : t.noneMeasured}
           </p>
@@ -1525,9 +1364,6 @@ export default function FleetLifecycle({
         <Card>
           <div className="flex flex-col gap-4">
             <DashboardSectionHeader title={t.title} description={t.description} />
-            {/* Outside `body()` on purpose: every other control is only meaningful
-                once a fleet exists, but this is the one that brings it into being,
-                so it has to render in the empty state too. */}
             <ControlPanel legend={t.fleetSizingGroup} className="sm:max-w-md">
               <div className="flex min-w-0 flex-col space-y-1.5">
                 <LabelWithTooltip htmlFor="calc-fleet-mw" label={t.mwLabel} tooltip={t.mwTooltip} />

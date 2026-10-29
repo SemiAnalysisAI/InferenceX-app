@@ -185,7 +185,7 @@ export async function GET(request: NextRequest) {
       if (format === 'csv') {
         return cachedText(tcoScoresToCsv(scores, workloads), 'text/csv; charset=utf-8');
       }
-      return cachedJson({
+      return cachedJson(request, {
         model,
         db_model_keys: dbModelKeys,
         date: date ?? null,
@@ -201,7 +201,7 @@ export async function GET(request: NextRequest) {
     if (format === 'csv') {
       return cachedText(tcoFeedToCsv(rows), 'text/csv; charset=utf-8');
     }
-    return cachedJson({
+    return cachedJson(request, {
       model,
       db_model_keys: dbModelKeys,
       date: date ?? null,

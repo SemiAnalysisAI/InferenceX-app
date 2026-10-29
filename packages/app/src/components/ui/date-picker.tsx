@@ -1,7 +1,7 @@
 'use client';
 
 import { Calendar, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 
 import { track } from '@/lib/analytics/analytics';
 
@@ -26,6 +26,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
@@ -72,22 +73,16 @@ export interface DatePickerProps {
   placeholder?: string;
   availableDates?: string[];
   isCheckingAvailableDates?: boolean;
-  /**
-   * Whether the newest run on the selected date is currently selected. When
-   * false, the external "Latest" button stays enabled even on the latest date
-   * so it can jump to the newest run. Defaults to true.
-   */
   isLatestRunSelected?: boolean;
-  /**
-   * Called by the external "Latest" button when the latest date is already
-   * selected but an older run is active, so the caller can select the newest run.
-   */
   onGoToLatestRun?: () => void;
+  /**
+   * Renders the picker as a labelled form field: the label sits above the control with
+   * Latest on its right, and the stepper fills the field width so it lines up with the
+   * other selectors in a control panel.
+   */
+  label?: string;
 }
 
-/**
- * Single date picker component that allows selecting a date via a modal calendar.
- */
 export function DatePicker({
   date,
   onChange,
@@ -98,7 +93,12 @@ export function DatePicker({
   isCheckingAvailableDates,
   isLatestRunSelected = true,
   onGoToLatestRun,
+  label,
 }: DatePickerProps) {
+  const fieldId = useId();
+  const triggerId = `${fieldId}-trigger`;
+  const labelId = `${fieldId}-label`;
+  const valueId = `${fieldId}-value`;
   const locale = useLocale();
   const t = STRINGS[locale];
   const resolvedPlaceholder = placeholder ?? t.placeholder;
@@ -107,7 +107,6 @@ export function DatePicker({
   const [isApplying, _setIsApplying] = useState(false);
   const [error, setError] = useState('');
 
-  // Get display text for the input
   const getDisplayText = () => {
     if (!date) {
       return resolvedPlaceholder;
@@ -115,7 +114,6 @@ export function DatePicker({
     return formatDisplayDate(date, locale);
   };
 
-  // Handle date selection in calendar
   const handleDateClick = (dateObj: Date) => {
     const dateStr = formatCalendarDate(dateObj);
     const isSelected = tempDate === dateStr;
@@ -131,7 +129,6 @@ export function DatePicker({
     });
   };
 
-  // Apply selection
   const handleApply = () => {
     if (!tempDate) {
       setError(t.selectDateError);
@@ -148,15 +145,14 @@ export function DatePicker({
     setOpen(false);
   };
 
-  // Cancel selection
   const handleCancel = () => {
+    track('date_picker_cancelled', { changed: tempDate !== date });
     setTempDate(date);
     setOpen(false);
   };
 
   const getLatestDate = () => getLatestSelectableDate(availableDates, maxDate);
 
-  // Check if the selected date is already the latest
   const isLatestDateSelected = () => {
     if (!tempDate) {
       return false;
@@ -165,23 +161,19 @@ export function DatePicker({
     return tempDate === getLatestDate();
   };
 
-  // Check if the current date prop is already the latest (for external button)
   const isCurrentDateLatest = () => {
     if (!date) {
       return false;
     }
     const latestDate = getLatestDate();
-    // date prop is already in YYYY-MM-DD format
     return date === latestDate;
   };
 
-  // Go to latest date (for calendar dialog)
   const handleGoToLatest = () => {
+    track('date_picker_go_to_latest', { date: getLatestDate(), placement: 'popover' });
     setTempDate(getLatestDate());
   };
 
-  // Go to latest date directly (for external button). When the latest date is
-  // already selected, fall through to the latest run instead.
   const handleGoToLatestExternal = () => {
     if (isCurrentDateLatest()) {
       if (!isLatestRunSelected && onGoToLatestRun) {
@@ -191,13 +183,12 @@ export function DatePicker({
       return;
     }
     const latestDate = getLatestDate();
-    track('date_picker_go_to_latest', { date: latestDate });
+    track('date_picker_go_to_latest', { date: latestDate, placement: 'toolbar' });
     onChange(latestDate);
   };
 
   const isLatestDisabled = isCurrentDateLatest() && isLatestRunSelected;
 
-  // Get current date index in available dates
   const getCurrentDateIndex = () => {
     if (!date || !availableDates || availableDates.length === 0) {
       return -1;
@@ -205,19 +196,16 @@ export function DatePicker({
     return availableDates.indexOf(date);
   };
 
-  // Check if we can go to previous date
   const canGoPrevious = () => {
     const index = getCurrentDateIndex();
     return index > 0;
   };
 
-  // Check if we can go to next date
   const canGoNext = () => {
     const index = getCurrentDateIndex();
     return index >= 0 && index < (availableDates?.length ?? 0) - 1;
   };
 
-  // Go to previous available date
   const handleGoPrevious = () => {
     const index = getCurrentDateIndex();
     if (index > 0 && availableDates) {
@@ -226,7 +214,6 @@ export function DatePicker({
     }
   };
 
-  // Go to next available date
   const handleGoNext = () => {
     const index = getCurrentDateIndex();
     if (availableDates && index >= 0 && index < availableDates.length - 1) {
@@ -235,7 +222,6 @@ export function DatePicker({
     }
   };
 
-  // Reset when opening
   const handleOpenChange = (isOpen: boolean) => {
     track(isOpen ? 'date_picker_opened' : 'date_picker_closed');
     setError('');
@@ -245,97 +231,145 @@ export function DatePicker({
     setOpen(isOpen);
   };
 
+  const latestButton = (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={handleGoToLatestExternal}
+      disabled={isLatestDisabled || Boolean(isCheckingAvailableDates)}
+      className={label ? '-my-1.5 h-8 px-2' : 'px-2'}
+    >
+      {t.latest}
+    </Button>
+  );
+
+  const previousButton = (
+    <Button
+      variant={label ? 'outline' : 'ghost'}
+      size="icon"
+      onClick={handleGoPrevious}
+      disabled={!canGoPrevious() || Boolean(isCheckingAvailableDates)}
+      className={label ? undefined : 'size-11 md:size-8'}
+      suppressHydrationWarning
+      aria-label={t.previousDate}
+    >
+      <ChevronLeft className="size-4" />
+    </Button>
+  );
+
+  const nextButton = (
+    <Button
+      variant={label ? 'outline' : 'ghost'}
+      size="icon"
+      onClick={handleGoNext}
+      disabled={!canGoNext() || Boolean(isCheckingAvailableDates)}
+      className={label ? undefined : 'size-11 md:size-8'}
+      aria-label={t.nextDate}
+    >
+      <ChevronRight className="size-4" />
+    </Button>
+  );
+
+  const dialog = (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogTrigger asChild>
+        {label ? (
+          <Button
+            id={triggerId}
+            variant="outline"
+            aria-labelledby={`${labelId} ${valueId}`}
+            className="w-full min-w-0 justify-start overflow-hidden px-3"
+          >
+            <Calendar className="size-4 text-muted-foreground" aria-hidden="true" />
+            <span id={valueId} className="min-w-0 truncate text-left tabular-nums">
+              {getDisplayText()}
+            </span>
+          </Button>
+        ) : (
+          <Button
+            variant="outline"
+            className="min-w-0 flex-1 overflow-hidden px-3 sm:min-w-[200px] sm:flex-none"
+          >
+            <Calendar className="mr-0 hidden size-4 sm:block" />
+            <strong className="sr-only sm:not-sr-only">{t.runDate}</strong>
+            <span className="tabular-nums inline-block min-w-0 truncate text-left sm:min-w-[6.5em]">
+              {getDisplayText()}
+            </span>
+          </Button>
+        )}
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[600px]">
+        <DialogHeader>
+          <DialogTitle>{t.title}</DialogTitle>
+          <DialogDescription>{t.description}</DialogDescription>
+        </DialogHeader>
+        <div className="py-4 relative">
+          <CalendarGrid
+            selectedDate={tempDate}
+            onDateClick={handleDateClick}
+            minDate={minDate}
+            maxDate={maxDate}
+            availableDates={availableDates}
+            isCheckingAvailableDates={isCheckingAvailableDates}
+          />
+          {isCheckingAvailableDates && (
+            <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-md">
+              <div className="flex flex-col items-center gap-2">
+                <Loader2 className="size-6 animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">{t.checking}</p>
+              </div>
+            </div>
+          )}
+        </div>
+        {error && <p className="text-md text-center text-red-500">{error}</p>}
+        <div className="flex justify-between items-center gap-2 sm:flex-row flex-col-reverse sm:space-x-2">
+          <Button
+            variant="outline"
+            onClick={handleGoToLatest}
+            disabled={isLatestDateSelected() || Boolean(isCheckingAvailableDates)}
+          >
+            {t.goToLatest}
+          </Button>
+          <div className="flex gap-2">
+            <DialogClose asChild>
+              <Button variant="outline" onClick={handleCancel}>
+                {t.cancel}
+              </Button>
+            </DialogClose>
+            <Button onClick={handleApply} disabled={isApplying}>
+              {isApplying ? t.applying : t.apply}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+
+  if (label) {
+    return (
+      <div className="flex min-w-0 flex-col space-y-1.5" data-slot="date-field">
+        <div className="flex items-center justify-between gap-2">
+          <Label id={labelId} htmlFor={triggerId}>
+            {label}
+          </Label>
+          {latestButton}
+        </div>
+        <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1">
+          {previousButton}
+          {dialog}
+          {nextButton}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-2">
       <div className="flex max-w-full items-center gap-0.5">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleGoToLatestExternal}
-          disabled={isLatestDisabled || Boolean(isCheckingAvailableDates)}
-          className="px-2"
-        >
-          {t.latest}
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleGoPrevious}
-          disabled={!canGoPrevious() || Boolean(isCheckingAvailableDates)}
-          className="size-11 md:size-8"
-          suppressHydrationWarning
-          aria-label={t.previousDate}
-        >
-          <ChevronLeft className="size-4" />
-        </Button>
-        <Dialog open={open} onOpenChange={handleOpenChange}>
-          <DialogTrigger asChild>
-            <Button
-              variant="outline"
-              className="min-w-0 flex-1 overflow-hidden px-3 sm:min-w-[200px] sm:flex-none"
-            >
-              <Calendar className="mr-0 hidden size-4 sm:block" />
-              <strong className="sr-only sm:not-sr-only">{t.runDate}</strong>
-              <span className="tabular-nums inline-block min-w-0 truncate text-left sm:min-w-[6.5em]">
-                {getDisplayText()}
-              </span>
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[600px]">
-            <DialogHeader>
-              <DialogTitle>{t.title}</DialogTitle>
-              <DialogDescription>{t.description}</DialogDescription>
-            </DialogHeader>
-            <div className="py-4 relative">
-              <CalendarGrid
-                selectedDate={tempDate}
-                onDateClick={handleDateClick}
-                minDate={minDate}
-                maxDate={maxDate}
-                availableDates={availableDates}
-                isCheckingAvailableDates={isCheckingAvailableDates}
-              />
-              {isCheckingAvailableDates && (
-                <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-md">
-                  <div className="flex flex-col items-center gap-2">
-                    <Loader2 className="size-6 animate-spin text-primary" />
-                    <p className="text-sm text-muted-foreground">{t.checking}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-            {error && <p className="text-md text-center text-red-500">{error}</p>}
-            <div className="flex justify-between items-center gap-2 sm:flex-row flex-col-reverse sm:space-x-2">
-              <Button
-                variant="outline"
-                onClick={handleGoToLatest}
-                disabled={isLatestDateSelected() || Boolean(isCheckingAvailableDates)}
-              >
-                {t.goToLatest}
-              </Button>
-              <div className="flex gap-2">
-                <DialogClose asChild>
-                  <Button variant="outline" onClick={handleCancel}>
-                    {t.cancel}
-                  </Button>
-                </DialogClose>
-                <Button onClick={handleApply} disabled={isApplying}>
-                  {isApplying ? t.applying : t.apply}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleGoNext}
-          disabled={!canGoNext() || Boolean(isCheckingAvailableDates)}
-          className="size-11 md:size-8"
-          aria-label={t.nextDate}
-        >
-          <ChevronRight className="size-4" />
-        </Button>
+        {latestButton}
+        {previousButton}
+        {dialog}
+        {nextButton}
       </div>
     </div>
   );

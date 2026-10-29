@@ -57,10 +57,6 @@ export function OverviewPageContent({ data, locale }: OverviewPageProps) {
         data.hardwareRowScope,
       )}
     >
-      {/* Passed as `children`, never rendered inside the provider's own JSX:
-          that keeps this element's identity stable so a pending-state change
-          re-renders the provider without re-rendering the whole matrix. The
-          presentation provider is in the same slot for the same reason. */}
       <OverviewPresentationProvider locale={locale}>
         <OverviewPageBody locale={locale} />
       </OverviewPresentationProvider>
@@ -68,9 +64,6 @@ export function OverviewPageContent({ data, locale }: OverviewPageProps) {
   );
 }
 
-/** Both pending consumers live outside `OverviewPageBody` on purpose: reading
- *  `isPending` there would re-render the whole matrix on every click, which is
- *  exactly the cost the split context removes. */
 function OverviewPendingStatus({ label }: { label: string }) {
   const { isPending } = useOverviewNavigation();
   return (
@@ -108,8 +101,6 @@ function OverviewMatrixCard({ children }: { children: ReactNode }) {
 
 function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
   const data = useOverviewData();
-  // Not `data.referenceHardware`: the reference follows the URL directly, so a
-  // cached payload built for another reference still renders the right column.
   const referenceHardware = useOverviewReference();
   const { presenting } = useOverviewPresentation();
   const strings = OVERVIEW_STRINGS[locale];
@@ -118,22 +109,11 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
     <section data-testid="overview-page" className="flex flex-col gap-4">
       <OverviewPendingStatus label={strings.loadingStatus} />
       <OverviewNavigationErrorStatus label={strings.navigationError} />
-      {/* Held in a stable child slot: swapping the header out for the surface
-          would remount the surface and drop the browser out of fullscreen. The
-          browser already stops painting it, so this only keeps the hidden
-          duplicates of the SLO and engine controls out of the accessibility
-          tree while the surface renders its own. */}
       {presenting ? null : (
-        /* Tighter than the default card rhythm: every pixel spent here pushes
-           the matrix further below the fold on a laptop viewport. */
         <Card className="md:py-5">
           <header>
-            {/* Two rows at every width: the title, then the metric it is
-              measured in and where that measure comes from. */}
             <div className="flex flex-col gap-y-1">
               <h1 className="text-lg font-semibold">{strings.title}</h1>
-              {/* Metric, direction and provenance read as one line: the numbers
-                and the model they are priced from belong together. */}
               <p
                 data-testid="overview-scope"
                 aria-label={strings.scopeAria}
@@ -207,13 +187,6 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
   );
 }
 
-/**
- * The strip above the matrix. On the page it is just the view tabs plus the
- * button that starts a presentation. Presenting turns it into the deck's only
- * toolbar, so it splits into three columns — what is being measured on the
- * left, which view on the centre, and the way out on the right — rather than
- * letting a centred row push the tabs off-centre and read Exit as a third tab.
- */
 function OverviewControlRow({ locale }: { locale: OverviewLocale }) {
   const data = useOverviewData();
   const referenceHardware = useOverviewReference();
@@ -235,9 +208,6 @@ function OverviewControlRow({ locale }: { locale: OverviewLocale }) {
   );
 
   if (!presenting) {
-    // Same three-column skeleton as the presenting toolbar below: the tabs
-    // keep the matrix centre and Present anchors the right edge as an action,
-    // instead of trailing the tabs and reading as a third view.
     return (
       <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 md:grid md:grid-cols-[1fr_auto_1fr]">
         <div className="hidden md:block" />
@@ -253,9 +223,6 @@ function OverviewControlRow({ locale }: { locale: OverviewLocale }) {
 
   return (
     <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-x-6">
-      {/* The header card carrying the SLO is gone while presenting, so the
-          control comes along here rather than stranding the audience on
-          whichever tier the deck happened to open on. */}
       <div className="justify-self-start">
         <OverviewTierSwitcher
           tier={data.tier}
@@ -270,10 +237,6 @@ function OverviewControlRow({ locale }: { locale: OverviewLocale }) {
         />
       </div>
       <div className="justify-self-center">{views}</div>
-      {/* The scope filters live under the matrix on the page, where their full
-          sentences fit. Here they ride next to Exit as chips: the left column
-          is already 355px of SLO, and moving the tabs off the matrix centre to
-          make room there would cost more than it buys. */}
       <div className="flex items-center gap-x-2 justify-self-end">
         {data.comparisonMode === 'hardware' ? (
           <OverviewHardwareRowScopeToggle
@@ -319,14 +282,10 @@ function OverviewControlRow({ locale }: { locale: OverviewLocale }) {
   );
 }
 
-/** The half of the page that goes fullscreen: the view tabs and the matrix. */
 function OverviewMatrixSection({ locale }: { locale: OverviewLocale }) {
   const data = useOverviewData();
   const referenceHardware = useOverviewReference();
   const { presenting } = useOverviewPresentation();
-  // Both surfaces used to render on every width and hide one with CSS, so every
-  // selection built the matrix twice. The Tailwind classes stay — they carry
-  // SSR and the pre-hydration frame — and this only drops the unused one after.
   const wide = useWideViewport();
   const strings = OVERVIEW_STRINGS[locale];
   const formatters = overviewFormatters(locale);
@@ -364,14 +323,7 @@ function OverviewMatrixSection({ locale }: { locale: OverviewLocale }) {
     <>
       <OverviewControlRow locale={locale} />
 
-      {/* Official-only summary; uploaded runs remain in the linked dashboard. */}
-      {/* Clip cell backgrounds to the card's corners without creating the
-          scroll container that overflow-hidden would give the sticky header. */}
       <OverviewMatrixCard>
-        {/* A deck lays out at a fixed width and is scaled by `zoom`, so the
-            viewport no longer decides which surface fits: the matrix is the
-            slide at every projector size and the phone list would only ever be
-            dead weight behind it. */}
         {presenting ? (
           matrix
         ) : (
@@ -387,9 +339,6 @@ function OverviewMatrixSection({ locale }: { locale: OverviewLocale }) {
                 referenceHardware={referenceHardware}
               />
             )}
-            {/* One footer bar instead of three stacked link rows: the notes
-                keep the left edge, the scope chips keep the right, and the card
-                ends on a single rule. */}
             <div className="flex flex-col gap-x-6 gap-y-2 border-t border-border/50 px-4 py-3 lg:flex-row lg:items-center lg:justify-between lg:px-6">
               <OverviewMethodology
                 strings={strings}

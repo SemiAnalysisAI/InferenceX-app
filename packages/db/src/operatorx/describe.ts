@@ -1,8 +1,3 @@
-/**
- * Human labels and useful-FLOP counts for OperatorX ops (gemm, moe). Pure functions
- * of an op's type and args; other op types fall back to generic labels.
- */
-
 type Args = Record<string, unknown>;
 
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
@@ -10,7 +5,6 @@ const str = (v: unknown): string | null => (typeof v === 'string' && v ? v : nul
 const obj = (v: unknown): Args | null =>
   typeof v === 'object' && v !== null && !Array.isArray(v) ? (v as Args) : null;
 
-/** Scale granularity of an operand scale group `[rows, cols]` (-1 spans the dimension). */
 export function describeGroup(group: unknown): string {
   if (!Array.isArray(group) || group.length !== 2) return '?';
   const [r, c] = group as number[];
@@ -20,7 +14,6 @@ export function describeGroup(group: unknown): string {
   return `${r === -1 ? 'all' : r}×${c === -1 ? 'all' : c}`;
 }
 
-/** `e4m3 (1×128 fp32)`, `e2m1 (1×16 e4m3 + tensor fp32)`, `bf16`. */
 export function describeOperand(value: unknown): string {
   const d = obj(value);
   if (!d) return '?';
@@ -76,11 +69,6 @@ export function opLabels(type: string, args: Args): OpLabels {
   }
 }
 
-/**
- * Useful matmul FLOPs of one op call (2 per multiply-add), or null when the op has no
- * defined count here. MoE counts router, routed experts at their active top-k, latent
- * projections and shared experts; it excludes activations, routing and combine work.
- */
 export function usefulFlops(type: string, a: Args): number | null {
   if (type === 'gemm') {
     const [m, n, k] = [num(a.m), num(a.n), num(a.k)];
@@ -115,7 +103,6 @@ const ELEMENT_BYTES: Record<string, number> = {
 };
 const SCALE_BYTES: Record<string, number> = { fp32: 4, bf16: 2, fp16: 2, e4m3: 1, ue8m0: 1 };
 
-/** Bytes of an operand descriptor over a rows×cols tensor: elements plus scales. */
 function operandBytes(d: Args | null, rows: number, cols: number, stored = true): number {
   if (!d) return rows * cols * 2;
   const dtype = str(stored ? d.dtype : (d.input ?? 'bf16')) ?? 'bf16';
@@ -132,13 +119,6 @@ function operandBytes(d: Args | null, rows: number, cols: number, stored = true)
   return bytes;
 }
 
-/**
- * Minimum bytes one op call must move to/from memory: each input read once, output
- * written once. GEMM reads A as it enters the op (bf16 unless pre-quantized) and B as
- * stored. MoE reads the weights of the experts the tokens are expected to touch
- * (E·(1-(1-k/E)^T) distinct experts under uniform routing), the shared experts and
- * the router, plus the activations in and out.
- */
 export function usefulBytes(type: string, a: Args): number | null {
   if (type === 'gemm') {
     const [m, n, k] = [num(a.m), num(a.n), num(a.k)];

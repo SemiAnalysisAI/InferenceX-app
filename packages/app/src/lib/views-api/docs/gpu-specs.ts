@@ -13,14 +13,6 @@ import {
 } from '@/lib/api/api-documentation-helpers';
 import { GPU_CHART_METRICS } from '@/lib/catalog/gpu-specs';
 
-/**
- * Docs fragment for GET /api/v1/views/gpu-specs.
- *
- * Assembled into the registry by the coordinator — this module only exports
- * `operations`. The `views` group id is added to `ApiGroupId` during that
- * integration, hence the local cast below.
- */
-
 const VIEWS_GROUP: ApiOperation['group'] = 'views';
 
 const METRIC_KEYS = GPU_CHART_METRICS.map((metric) => metric.key);
@@ -68,9 +60,17 @@ const chipSchema = objectSchema({
   scaleUpWorldSize: integerSchema,
   scaleOutBandwidth: nullableStringSchema,
   scaleOutTech: nullableStringSchema,
-  nic: nullableStringSchema,
+  nic: {
+    ...nullableStringSchema,
+    description:
+      'Installed NIC model and per-GPU port rate; GB200 NVL72 uses ConnectX-7 400G and GB300 NVL72 uses ConnectX-8 800G.',
+  },
   scaleOutSwitch: nullableStringSchema,
-  scaleOutTopology: nullableStringSchema,
+  scaleOutTopology: {
+    ...nullableStringSchema,
+    description:
+      'Null means the topology is unspecified; it does not imply that a known NIC or network is absent.',
+  },
   scaleUpTopology: stringSchema,
   scaleUpSwitch: nullableStringSchema,
   memoryGB: nullableNumberSchema,
@@ -198,8 +198,8 @@ export const operations: ApiOperation[] = [
     path: '/api/v1/views/gpu-specs',
     summary: text('Get the GPU specs view', '获取 GPU 规格视图'),
     description: text(
-      'Returns the static chip specification table behind the /gpu-specs page — usable memory, bandwidth, dense tensor-core TFLOP/s, and scale-up/scale-out interconnect details — plus the chartable metric metadata. No database read; compute TFLOPS are dense (no sparsity) and memory capacities are driver-usable values.',
-      '返回 /gpu-specs 页面背后的静态芯片规格表——可用显存、带宽、稠密 Tensor Core TFLOP/s，以及 scale-up/scale-out 互连细节——并附带可作图指标的元数据。不读取数据库；算力为稠密（不含稀疏）值，显存容量为驱动可用值。',
+      'Returns the static chip specification table behind the /gpu-specs page — usable memory, bandwidth, dense tensor-core TFLOP/s, and scale-up/scale-out interconnect details — plus the chartable metric metadata. No database read; compute TFLOPS are dense (no sparsity) and memory capacities are driver-usable values. NVL72 NICs and per-GPU network bandwidth are included (GB200: ConnectX-7 400G NDR; GB300: ConnectX-8 800G XDR), while inter-rack switch/topology remain null. MI355X uses fourth-generation Infinity Fabric.',
+      '返回 /gpu-specs 页面背后的静态芯片规格表——可用显存、带宽、稠密 Tensor Core TFLOP/s，以及 scale-up/scale-out 互连细节——并附带可作图指标的元数据。不读取数据库；算力为稠密（不含稀疏）值，显存容量为驱动可用值。NVL72 包含网卡及单 GPU 网络带宽（GB200：ConnectX-7 400G NDR；GB300：ConnectX-8 800G XDR），机柜间交换机和拓扑仍为 null。MI355X 使用第四代 Infinity Fabric。',
     ),
     audience: 'public',
     stability: 'beta',

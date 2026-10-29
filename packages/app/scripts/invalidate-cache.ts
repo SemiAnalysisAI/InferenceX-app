@@ -1,28 +1,25 @@
-/**
- * Invalidate the Next.js data cache by hitting the /api/v1/invalidate endpoint.
- *
- * Usage:
- *   bun run admin:cache:invalidate [url]           (default: http://localhost:3000)
- *   bun run admin:cache:invalidate https://inferencex.semianalysis.com
- */
-
 if (!process.env.INVALIDATE_SECRET) {
   console.error('INVALIDATE_SECRET is required');
   process.exit(1);
 }
 
-const rawUrl = process.argv.filter((a) => a !== '--').slice(2)[0] ?? 'http://localhost:3000';
+const cliArgs = process.argv.filter((a) => a !== '--').slice(2);
+const immediate = cliArgs.includes('--immediate');
+const rawUrl = cliArgs.find((a) => !a.startsWith('--')) ?? 'http://localhost:3000';
 
-// Strip hash, query params, and trailing path — keep just origin
 const parsed = new URL(rawUrl);
-const endpoint = `${parsed.origin}/api/v1/invalidate`;
+const endpoint = `${parsed.origin}/api/v1/invalidate${immediate ? '?immediate=true' : ''}`;
 
 console.log(`Invalidating: ${endpoint}`);
 
 async function invalidateCache() {
+  const bypassSecret = process.env.VERCEL_PROTECTION_BYPASS_SECRET;
   const res = await fetch(endpoint, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${process.env.INVALIDATE_SECRET!}` },
+    headers: {
+      Authorization: `Bearer ${process.env.INVALIDATE_SECRET!}`,
+      ...(bypassSecret ? { 'x-vercel-protection-bypass': bypassSecret } : {}),
+    },
   });
 
   if (!res.ok) {

@@ -23,12 +23,6 @@ import { renderDiagram } from './model-architecture-diagram-renderer';
 interface ModelArchitectureDiagramProps {
   model: Model;
   className?: string;
-  /**
-   * `drawer` (default) renders the collapsible bar used inside dashboard
-   * cards. `inline` renders the diagram always-expanded with no toggle —
-   * used by the `/model/[slug]` pages where the architecture is the content,
-   * not an aside.
-   */
   variant?: 'drawer' | 'inline';
 }
 
@@ -55,6 +49,12 @@ const ARCHITECTURE_STRINGS = {
     source: 'Source',
     releasedBy: 'Released by',
     releasedOn: ' on',
+    contextNote: (advertised: number, configured: number) =>
+      `Advertised context: ${advertised.toLocaleString('en-US')} tokens; checkpoint position limit: ${configured.toLocaleString('en-US')} tokens.`,
+    latentNote:
+      'Routed experts operate in a 3,584-dimensional latent space; their combined output is projected back to 7,168 dimensions. Shared experts operate at the full hidden size. AttnRes aggregates representations across depth; the diagram groups layers by attention type and does not draw every dependency.',
+    pooledNote: (latent: number, hidden: number) =>
+      `Pooled experts operate in ${latent.toLocaleString('en-US')} dimensions. Pool/unpool projections connect this latent space to the ${hidden.toLocaleString('en-US')}-dimensional residual stream; the expanded FFN shows one routed expert.`,
     hybrid:
       'are two KV sources, not two separate attentions: each query attends in a single softmax to the union of sliding-window + selected compressed keys, with a learnable per-head attention sink.',
     mhc: (count: number) =>
@@ -66,6 +66,12 @@ const ARCHITECTURE_STRINGS = {
     source: '来源',
     releasedBy: '发布方',
     releasedOn: '，发布于',
+    contextNote: (advertised: number, configured: number) =>
+      `标称上下文为 ${advertised.toLocaleString('en-US')} token；checkpoint 配置的位置上限为 ${configured.toLocaleString('en-US')} token。`,
+    latentNote:
+      '路由 expert 在 3,584 维潜在空间中计算，合并后的输出再投影回 7,168 维；共享 expert 使用完整隐藏维度。AttnRes 聚合不同深度的表示；图中按注意力类型归类各层，未逐一绘出所有依赖关系。',
+    pooledNote: (latent: number, hidden: number) =>
+      `Pooled expert 在 ${latent.toLocaleString('en-US')} 维潜在空间中计算，通过 pool/unpool 投影连接 ${hidden.toLocaleString('en-US')} 维残差流；展开的 FFN 展示单个路由 expert。`,
     hybrid:
       '是两路 KV 来源，而非两套独立注意力：每个 query 都通过一次 softmax 同时关注滑动窗口与筛选后的压缩 key，并为每个 attention head 使用可学习的 attention sink。',
     mhc: (count: number) =>
@@ -103,9 +109,7 @@ function ArchitectureContent({ model, arch, isExpanded, locale }: ArchitectureCo
     const container = containerRef.current;
     if (!isExpanded || !svg || !container) return;
 
-    // Match the renderer's effective width so ResizeObserver notifications that
-    // cannot change the SVG (including its initial callback) stay no-ops.
-    const width = Math.min(container.clientWidth || 600, 640);
+    const width = Math.min(svg.clientWidth || container.clientWidth || 600, 640);
     const isDark = isDarkTheme(resolvedTheme);
     const previous = lastRenderRef.current;
     if (
@@ -137,9 +141,16 @@ function ArchitectureContent({ model, arch, isExpanded, locale }: ArchitectureCo
     }
 
     renderIfChanged();
-    const observer = new ResizeObserver(renderIfChanged);
+    let resizeFrame: number | undefined;
+    const observer = new ResizeObserver(() => {
+      if (resizeFrame !== undefined) cancelAnimationFrame(resizeFrame);
+      resizeFrame = requestAnimationFrame(renderIfChanged);
+    });
     observer.observe(containerRef.current);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      if (resizeFrame !== undefined) cancelAnimationFrame(resizeFrame);
+    };
   }, [isExpanded, renderIfChanged]);
 
   return (
@@ -151,13 +162,19 @@ function ArchitectureContent({ model, arch, isExpanded, locale }: ArchitectureCo
     >
       <div ref={containerRef} className="px-4 pb-4">
         <svg ref={svgRef} className="w-full" data-testid="model-architecture-svg" />
-        {/* The drill-down only renders while its parent block is expanded, so gate
-              the caption on the parent too — collapsing the parent leaves the child
-              id in expandedBlocks (state is restored on re-expand), and the caption
-              must not outlive the drawing it explains. */}
-        {/* Mirrors `altAttnExpandable` in renderDiagram: the caption describes the
-              CSA/HCA local-vs-compressed drill-down, so hybrids that opt out of that
-              drill-down must not show it either. */}
+        {arch.advertisedContextWindow && arch.contextWindow && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            {t.contextNote(arch.advertisedContextWindow, arch.contextWindow)}
+          </p>
+        )}
+        {arch.residualType === 'AttnRes' && (
+          <p className="mt-2 text-xs text-muted-foreground">{t.latentNote}</p>
+        )}
+        {arch.routedExpertHiddenSize && arch.hiddenSize && arch.residualType !== 'AttnRes' && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            {t.pooledNote(arch.routedExpertHiddenSize, arch.hiddenSize)}
+          </p>
+        )}
         {arch.attentionType === 'Hybrid' &&
           arch.alternatingAttentionExpandable !== false &&
           [0, 1].some(
@@ -183,13 +200,19 @@ function ArchitectureContent({ model, arch, isExpanded, locale }: ArchitectureCo
               {t.mhc(arch.hyperConnections ?? 0)}
             </p>
           )}
-        {arch.features && arch.features.length > 0 && (
+        {((arch.features?.length ?? 0) > 0 || arch.sourceUrl) && (
           <div className="mt-3 pt-3 border-t border-border/50">
             <div className="flex flex-wrap gap-1.5 items-center">
-              <span className="text-xs text-muted-foreground mr-1">{t.features}</span>
-              {arch.features.map((feature) => (
-                <Badge key={feature} variant="secondary" className="text-xs py-0">
-                  {feature}
+              {(arch.features?.length ?? 0) > 0 && (
+                <span className="text-xs text-muted-foreground mr-1">{t.features}</span>
+              )}
+              {arch.features?.map((feature, index) => (
+                <Badge
+                  key={feature}
+                  variant="secondary"
+                  className="text-xs py-0 max-w-full whitespace-normal text-left"
+                >
+                  {locale === 'zh' ? (arch.featuresZh?.[index] ?? feature) : feature}
                 </Badge>
               ))}
               {arch.sourceUrl && (
@@ -262,7 +285,7 @@ export default function ModelArchitectureDiagram({
   const handleToggle = () => {
     const newState = !isExpanded;
     setIsExpanded(newState);
-    track('model_architecture_toggled', { model, expanded: newState });
+    track('model_architecture_toggled', { model, enabled: newState });
   };
 
   return (

@@ -68,8 +68,8 @@ const STRINGS = {
     unknown: 'Not recorded',
     hardware: 'Hardware',
     notMeasured: 'Not measured',
-    loading: 'Loading published results…',
-    error: 'Could not load published results.',
+    loading: 'Loading video results…',
+    error: 'Could not load video results.',
     retry: 'Retry',
     planned: 'planned',
     tbd: 'tbd',
@@ -180,7 +180,7 @@ const STRINGS = {
     paretoNote:
       'Per-hardware measured deployments: lower P50, higher valid clips per participating GPU-hour. One deployment is a point; missing topologies are not interpolated.',
     history: 'Performance history',
-    historyNote: 'All retained published runs, including low-sample and unmatched workloads.',
+    historyNote: 'Stored evidence, including unapproved, low-sample and unmatched runs.',
     overlay: 'Unofficial published run',
     overlayMissing:
       'No matching published observation for this run. Loading it does not publish or generate media.',
@@ -212,8 +212,8 @@ const STRINGS = {
     unknown: '未记录',
     hardware: '硬件',
     notMeasured: '未测得',
-    loading: '正在加载已发布结果…',
-    error: '无法加载已发布结果。',
+    loading: '正在加载视频结果…',
+    error: '无法加载视频结果。',
     retry: '重试',
     planned: '计划中',
     tbd: '待确认',
@@ -320,7 +320,7 @@ const STRINGS = {
     paretoNote:
       '按硬件展示实测部署：P50 越低、每参与 GPU 小时的有效视频数越高越好。只有一个部署时只显示一个点，缺失拓扑不插值。',
     history: '性能历史',
-    historyNote: '所有已保留的发布结果，包括低样本量和未匹配的工作负载。',
+    historyNote: '已存储的结果，包括尚无发布批准、样本不足及工作负载未匹配的运行。',
     overlay: '非正式已发布运行',
     overlayMissing: '这个运行没有匹配的已发布观测；加载不会发布或生成媒体。',
     dismiss: '移除',
@@ -792,7 +792,7 @@ export default function VideoDashboard() {
                 if (next.has(key)) next.delete(key);
                 else next.add(key);
                 update({ hidden: [...next] });
-                track('video_results_hardware_toggled', { hardware: key });
+                track('video_results_hardware_toggled', { gpu: key });
               }}
             />
             <span className={styles.dot} style={{ background: colorFor(key) }} />
@@ -831,7 +831,7 @@ export default function VideoDashboard() {
               <details
                 className="text-xs"
                 onToggle={(event) =>
-                  track('video_results_hashes_toggled', { open: event.currentTarget.open })
+                  track('video_results_hashes_toggled', { enabled: event.currentTarget.open })
                 }
               >
                 <summary className="cursor-pointer text-muted-foreground">{s.hashDetails}</summary>
@@ -987,7 +987,7 @@ export default function VideoDashboard() {
                   value={trace?.point.id ?? ''}
                   onValueChange={(value) => {
                     setTraceHardware(value);
-                    track('video_results_trace_changed', { hardware: value });
+                    track('video_results_trace_changed', { gpu: value });
                   }}
                   groups={[
                     {
@@ -1176,7 +1176,9 @@ export default function VideoDashboard() {
               <details
                 className="text-xs text-muted-foreground"
                 onToggle={(event) =>
-                  track('video_results_rating_schema_toggled', { open: event.currentTarget.open })
+                  track('video_results_rating_schema_toggled', {
+                    enabled: event.currentTarget.open,
+                  })
                 }
               >
                 <summary className="cursor-pointer">{s.schemaEmpty}</summary>
@@ -1258,7 +1260,7 @@ export default function VideoDashboard() {
               const open = e.currentTarget.open;
               if (open !== historyOpen) {
                 setHistoryOpen(open);
-                track('video_results_history_toggled', { open });
+                track('video_results_history_toggled', { enabled: open });
               }
             }}
           >

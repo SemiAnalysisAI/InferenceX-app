@@ -11,7 +11,6 @@ describe('buildOverviewMetadata', () => {
 
     for (const hardware of OVERVIEW_HARDWARE) {
       const label = RegExp.escape(overviewHardwareLabel(hardware));
-      // B200/B300 must not match only the GB200/GB300 rack names.
       expect(metadata.description).toMatch(new RegExp(`\\b${label}\\b`, 'u'));
     }
     if (locale === 'zh') {
@@ -30,8 +29,9 @@ describe('buildOverviewMetadata', () => {
       title: `${metadata.title} | ${SITE_NAME}`,
       url: `${SITE_URL}/overview`,
       type: 'website',
+      locale: 'en_US',
     });
-    expect(metadata.openGraph).not.toHaveProperty('locale');
+    expect(metadata.twitter).toMatchObject({ card: 'summary_large_image' });
   });
 
   it('uses the Chinese canonical URL, matching OpenGraph title, and locale', () => {

@@ -25,8 +25,6 @@ import {
 } from '@/components/agentic-workload-explorer/range-toggle';
 import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
 
-// -- i18n -------------------------------------------------------------------
-
 const STRINGS = {
   en: {
     stats: 'Stats',
@@ -78,8 +76,6 @@ const STRINGS = {
   },
 };
 
-// -- Chart constants --------------------------------------------------------
-
 const CHART_W = 600;
 const CHART_H = 200;
 const MARGIN = { top: 8, right: 12, bottom: 36, left: 48 };
@@ -88,8 +84,6 @@ const PLOT_H = CHART_H - MARGIN.top - MARGIN.bottom;
 
 const SVG_FONT = 'var(--font-mono, ui-monospace, monospace)';
 const SVG_FONT_SIZE = '9px';
-
-// -- Helpers ----------------------------------------------------------------
 
 function formatDurationLabel(seconds: number): string {
   seconds = Number(seconds);
@@ -131,14 +125,11 @@ function generateTicks(min: number, max: number, targetCount: number): number[] 
   const spacing = niceNum(range / (targetCount - 1), true);
   const niceMin = Math.floor(min / spacing) * spacing;
   const ticks: number[] = [];
-  // Keep going until a tick reaches max, so the tallest bar is never clipped.
   for (let t = niceMin; t - spacing < max - spacing * 1e-9; t += spacing) {
     ticks.push(Math.round(t * 1e10) / 1e10);
   }
   return ticks;
 }
-
-// -- Section header ---------------------------------------------------------
 
 function SectionHeader({ label, detail }: { label: string; detail?: string }) {
   return (
@@ -152,8 +143,6 @@ function SectionHeader({ label, detail }: { label: string; detail?: string }) {
   );
 }
 
-// -- Stat card --------------------------------------------------------------
-
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border border-border bg-surface p-3">
@@ -164,8 +153,6 @@ function StatCard({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
-
-// -- Histogram chart --------------------------------------------------------
 
 const PERCENTILE_COLORS: Record<string, string> = {
   p25: '#94a3b8',
@@ -210,7 +197,6 @@ function HistogramChart({
 
   const sy = (v: number) => MARGIN.top + PLOT_H - (v / yMax) * PLOT_H;
 
-  // Show ~5 evenly spaced x-axis labels
   const labelInterval = Math.max(1, Math.floor(bins.length / 5));
 
   return (
@@ -223,7 +209,7 @@ function HistogramChart({
               onClick={() => {
                 track('agentic_workload_session_histogram_export', {
                   title,
-                  filename: exportFilename || 'histogram.png',
+                  file_name: exportFilename || 'histogram.png',
                 });
                 if (svgRef.current)
                   exportSvgToPng(svgRef.current, {
@@ -242,7 +228,6 @@ function HistogramChart({
           className="w-full"
           style={{ maxHeight: 240 }}
         >
-          {/* Y-axis grid lines and labels */}
           {yTicks.map((t) => (
             <g key={`y-${t}`}>
               {t > 0 && (
@@ -269,7 +254,6 @@ function HistogramChart({
             </g>
           ))}
 
-          {/* Baseline */}
           <line
             x1={MARGIN.left}
             y1={MARGIN.top + PLOT_H}
@@ -280,7 +264,6 @@ function HistogramChart({
             strokeWidth={0.5}
           />
 
-          {/* Bars */}
           {bins.map((b, i) => {
             const x = MARGIN.left + i * (barWidth + barGap);
             const barH = (b.count / yMax) * PLOT_H;
@@ -313,7 +296,6 @@ function HistogramChart({
             );
           })}
 
-          {/* Percentile vertical lines */}
           {percentiles &&
             (() => {
               const xMin = bins[0].min;
@@ -359,7 +341,6 @@ function HistogramChart({
             })()}
         </svg>
 
-        {/* Percentile stats row */}
         {percentiles && (
           <div className="grid grid-cols-6 gap-1.5 mt-3 pt-3 border-t border-border">
             {(
@@ -390,8 +371,6 @@ function HistogramChart({
     </Expandable>
   );
 }
-
-// -- Bar chart (daily sessions) ---------------------------------------------
 
 function DailySessionsChart({
   data: slice,
@@ -449,7 +428,6 @@ function DailySessionsChart({
           className="w-full"
           style={{ maxHeight: 240 }}
         >
-          {/* Y-axis */}
           {yTicks.map((t) => (
             <g key={`y-${t}`}>
               {t > 0 && (
@@ -476,7 +454,6 @@ function DailySessionsChart({
             </g>
           ))}
 
-          {/* Baseline */}
           <line
             x1={MARGIN.left}
             y1={MARGIN.top + PLOT_H}
@@ -487,7 +464,6 @@ function DailySessionsChart({
             strokeWidth={0.5}
           />
 
-          {/* Bars */}
           {slice.map((d, i) => {
             const x = MARGIN.left + i * (barWidth + barGap);
             const barH = (d.sessionCount / yMax) * PLOT_H;
@@ -525,8 +501,6 @@ function DailySessionsChart({
   );
 }
 
-// -- Line chart (concurrent sessions) ---------------------------------------
-
 function ConcurrentSessionsChart({
   data,
   emptyLabel,
@@ -555,7 +529,6 @@ function ConcurrentSessionsChart({
 
   const points = data.map((d, i) => `${sx(i)},${sy(d.activeSessions)}`).join(' ');
 
-  // Area fill path
   const areaPath = [
     `M ${sx(0)},${MARGIN.top + PLOT_H}`,
     ...data.map((d, i) => `L ${sx(i)},${sy(d.activeSessions)}`),
@@ -563,7 +536,6 @@ function ConcurrentSessionsChart({
     'Z',
   ].join(' ');
 
-  // Show ~6 evenly spaced x-axis labels
   const labelInterval = Math.max(1, Math.floor(data.length / 6));
 
   return (
@@ -589,7 +561,6 @@ function ConcurrentSessionsChart({
         className="w-full"
         style={{ maxHeight: 240 }}
       >
-        {/* Y-axis */}
         {yTicks.map((t) => (
           <g key={`y-${t}`}>
             {t > 0 && (
@@ -616,7 +587,6 @@ function ConcurrentSessionsChart({
           </g>
         ))}
 
-        {/* Baseline */}
         <line
           x1={MARGIN.left}
           y1={MARGIN.top + PLOT_H}
@@ -627,13 +597,10 @@ function ConcurrentSessionsChart({
           strokeWidth={0.5}
         />
 
-        {/* Area fill */}
         <path d={areaPath} fill="#6366f1" opacity={0.15} />
 
-        {/* Line */}
         <polyline points={points} fill="none" stroke="#6366f1" strokeWidth={1.5} />
 
-        {/* X-axis labels */}
         {data.map((d, i) => {
           if (i % labelInterval !== 0) return null;
           const date = new Date(d.hour);
@@ -657,7 +624,6 @@ function ConcurrentSessionsChart({
           );
         })}
 
-        {/* Data point dots */}
         {data.map((d, i) => (
           <circle key={d.hour} cx={sx(i)} cy={sy(d.activeSessions)} r={1.5} fill="#6366f1">
             <title>
@@ -669,8 +635,6 @@ function ConcurrentSessionsChart({
     </div>
   );
 }
-
-// -- Main page --------------------------------------------------------------
 
 export default function SessionInsightsPage() {
   const t = STRINGS[useLocale()];
@@ -712,7 +676,6 @@ function SessionInsightsPageContent() {
 
   return (
     <div className="space-y-6">
-      {/* -- Stats --------------------------------------------------------- */}
       <div>
         <SectionHeader label={t.stats} />
         {loading ? (
@@ -740,7 +703,6 @@ function SessionInsightsPageContent() {
 
       {data && (
         <>
-          {/* -- Session Duration Distribution --------------------------------- */}
           <div>
             <SectionHeader
               label={t.sessionDurationDistribution}
@@ -757,7 +719,6 @@ function SessionInsightsPageContent() {
             />
           </div>
 
-          {/* -- Turns Per Session Distribution -------------------------------- */}
           <div>
             <SectionHeader label={t.turnsPerSessionDistribution} detail={t.sessions(turnCount)} />
             <HistogramChart
@@ -771,7 +732,6 @@ function SessionInsightsPageContent() {
             />
           </div>
 
-          {/* -- Session Cost Distribution ------------------------------------- */}
           <div>
             <SectionHeader label={t.sessionCostDistribution} detail={t.sessions(costCount)} />
             <HistogramChart
@@ -785,7 +745,6 @@ function SessionInsightsPageContent() {
             />
           </div>
 
-          {/* -- Sessions Over Time -------------------------------------------- */}
           <div>
             <SectionHeader label={t.sessionsOverTime} />
             <DailySessionsChart
@@ -799,7 +758,6 @@ function SessionInsightsPageContent() {
             />
           </div>
 
-          {/* -- Concurrent Sessions ------------------------------------------- */}
           <div>
             <SectionHeader label={t.concurrentSessions} detail={t.concurrentDetail} />
             <ConcurrentSessionsChart

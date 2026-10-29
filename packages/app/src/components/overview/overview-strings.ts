@@ -5,11 +5,8 @@ export type OverviewLocale = 'en' | 'zh';
 export const OVERVIEW_STRINGS = {
   en: {
     title: 'Agentic Inference Costs',
-    // The active tier is not repeated here — the SLO selector below already
-    // states it.
     scopeMetric: 'Hyperscaler cost',
     scopeDirection: '↓ Lower is better',
-    // The unit is dropped from the visible line but kept for screen readers.
     scopeAria: 'Hyperscaler cost per one million total tokens. Lower is better.',
     sourcePrefix: 'Source: InferenceX & ',
     sourceLinkText: TCO_SOURCE_TITLE,
@@ -42,9 +39,6 @@ export const OVERVIEW_STRINGS = {
       single_turn_8k1k: '8K/1K',
       agentx: 'Long Context Multi-Turn Realistic Agentic Scenario (AgentX)',
     },
-    // Rendered in the row header; the full label above stays the accessible
-    // name and the hover title, so nothing is lost by not wrapping it to three
-    // lines in a 22%-wide column.
     scenarioLabelsShort: {
       single_turn_8k1k: '8K/1K',
       agentx: 'AgentX',
@@ -96,9 +90,6 @@ export const OVERVIEW_STRINGS = {
       `Show ${count} ${count === 1 ? 'row' : 'rows'} with no result on any platform`,
     hardwareRowScopeHide: (count: number) =>
       `Hide ${count} ${count === 1 ? 'row' : 'rows'} with no result on any platform`,
-    // Short forms of the sentences above, for the presentation toolbar. They
-    // carry the same verb, so they flip with the scope the same way; the
-    // sentence with the count stays on the accessible name.
     rowScopeChipHide: 'Hide unchanged',
     rowScopeChipShow: 'Show all rows',
     hardwareRowScopeChipHide: 'Hide blanks',

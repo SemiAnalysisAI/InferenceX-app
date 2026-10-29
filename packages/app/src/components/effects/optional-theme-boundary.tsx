@@ -2,7 +2,6 @@
 
 import { Component, Suspense, type ReactNode } from 'react';
 
-/** Optional decorations must never replace the page with a loading or error screen. */
 export class OptionalThemeBoundary extends Component<
   { children: ReactNode; fallback?: ReactNode },
   { failed: boolean }

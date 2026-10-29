@@ -8,8 +8,6 @@ import {
   type UseResponsiveChartDimensionsResult,
 } from './useResponsiveChartDimensions';
 
-// Minimal ResizeObserver stand-in — jsdom doesn't implement it. Tests fire
-// observations manually via `trigger`.
 class MockResizeObserver {
   static instances: MockResizeObserver[] = [];
   callback: ResizeObserverCallback;
@@ -72,7 +70,6 @@ function renderHook<T>(hook: () => T): {
   };
 }
 
-/** Create a container div whose getBoundingClientRect reports `width`. */
 function makeContainer(width: number): HTMLDivElement {
   const el = document.createElement('div');
   vi.spyOn(el, 'getBoundingClientRect').mockReturnValue({ width } as DOMRect);
@@ -113,9 +110,6 @@ describe('useResponsiveChartDimensions', () => {
     });
     const initial = result.current.dimensions;
 
-    // ResizeObserver fires once right after observe() with the width the ref
-    // callback already measured. The object identity must not change — a new
-    // identity makes every chart treat it as a resize and fully rebuild.
     MockResizeObserver.instances.at(-1)!.trigger(800);
 
     expect(result.current.dimensions).toBe(initial);
@@ -173,7 +167,6 @@ describe('useResponsiveChartDimensions', () => {
     });
 
     expect(observer.disconnected).toBe(true);
-    // Last measured dimensions are retained (no reset to 0 on detach).
     expect(result.current.dimensions).toEqual({ width: 800, height: 600 });
     unmount();
   });

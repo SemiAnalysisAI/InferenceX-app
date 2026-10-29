@@ -119,10 +119,6 @@ const STRINGS = {
   },
 } as const;
 
-/**
- * Vendor pills, in display order. Values must match `HW_REGISTRY` vendors so
- * `pointVendor` can resolve them. Google covers the TPU series (TPU7x).
- */
 const VENDORS = [
   { value: 'NVIDIA', label: 'NVIDIA' },
   { value: 'AMD', label: 'AMD' },
@@ -146,8 +142,6 @@ export function QuickFiltersDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Optional Best per SKU control (scatter chart only) — the chart owns the
-   * toggle logic because overlay mode manages a temporary unified selection. */
   bestPerSku?: { checked: boolean; onCheckedChange: (checked: boolean) => void };
 }) {
   const locale = useLocale();
@@ -214,8 +208,6 @@ export function QuickFiltersDialog({
       })),
       selected: quickFilters.vendors,
     },
-    // A framework lock (embed routes) is not user-editable, so its group is
-    // omitted rather than rendered as a row of disabled pills.
     ...(frameworkOptions.length > 0 && !lockedFrameworks
       ? [
           {
@@ -254,8 +246,6 @@ export function QuickFiltersDialog({
             selected: quickFilters.spec,
           },
         ]),
-    // Shown for agentic too — the options auto-disable when no measured
-    // telemetry exists for the current selection.
     {
       key: 'power' as const,
       label: t.power,
@@ -280,8 +270,6 @@ export function QuickFiltersDialog({
 
   const selectedCount = groups.reduce((count, group) => count + group.selected.length, 0);
 
-  // Every option is a visible toggle: one tap adds or removes it, no dropdown
-  // to open first. Empty selection in a group means "all".
   const handleToggle = (
     category: 'vendor' | 'framework' | 'deployment' | 'spec' | 'power' | 'topology',
     value: string,

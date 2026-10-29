@@ -5,11 +5,10 @@ import { roofline } from './roofline';
 import { speedupVsBaseline } from './speedup-vs-baseline';
 import type { VizDefinition } from './types';
 
-/** Dashboard visualizations, in display order. */
 export const VISUALIZATIONS: VizDefinition[] = [
   speedupVsBaseline,
-  metricVsSize,
   roofline,
+  metricVsSize,
   distribution,
   pairwiseScatter,
 ];

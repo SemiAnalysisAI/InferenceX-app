@@ -5,13 +5,9 @@ import { Maximize2 } from 'lucide-react';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { track } from '@/lib/analytics/analytics';
+import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
 import { useLocale } from '@/lib/i18n/use-locale';
 
-/**
- * Wraps a chart in a card with a header + expand button. Click the button to
- * open the chart in a large dialog. The `render` prop receives `expanded:true`
- * inside the dialog so charts can pick larger width/height.
- */
 export function ExpandableChart({
   title,
   render,
@@ -24,6 +20,7 @@ export function ExpandableChart({
   testId?: string;
 }) {
   const [open, setOpen] = useState(false);
+  useDialogCloseTracking(open, 'agentic_chart_closed', { title });
   const locale = useLocale();
 
   return (

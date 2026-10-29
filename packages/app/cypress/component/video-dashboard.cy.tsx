@@ -1,6 +1,9 @@
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import VideoDashboard from '@/components/video-benchmark/VideoDashboard';
-import type { VideoHistoryObservation } from '@/components/video-benchmark/history';
+import type {
+  VideoHistoryObservation,
+  VideoHistoryPage,
+} from '@/components/video-benchmark/history';
 import {
   assertResultsFit,
   readOnlyVideoRequests,
@@ -12,13 +15,16 @@ function mount({
   pathname = '/video',
   search = '',
   edit,
+  editPage,
 }: {
   pathname?: string;
   search?: string;
   edit?: (observation: VideoHistoryObservation) => void;
+  editPage?: (page: VideoHistoryPage) => void;
 } = {}) {
   readOnlyVideoRequests();
   resultHistory(edit).then((page) => {
+    editPage?.(page);
     cy.intercept('GET', '/api/video-runs?format=history&page=1', page).as('history');
   });
   cy.window().then((win) =>
@@ -37,6 +43,49 @@ const costRow = (hardware: string, basis = 'participating') =>
   cy.get(`[data-testid="results-cost-table"] [data-hardware="${hardware}"][data-basis="${basis}"]`);
 
 describe('VideoGenX results', () => {
+  it('keeps unapproved stored evidence in History and out of the default comparison', () => {
+    mount({
+      editPage: (page) => {
+        for (const entry of page.entries) entry.approved = false;
+      },
+    });
+    cy.get('[data-testid="results-cost-table"] [data-hardware]').should('not.exist');
+    cy.get('[data-testid="video-results-clip"] video').should('not.exist');
+    cy.contains('summary', 'Performance history').click();
+    cy.get('[data-testid="video-history-entry"]').should('have.length', 7);
+    cy.get('[data-testid="video-history-publication"]').each(($entry) => {
+      expect($entry).to.contain('No matching approval receipt');
+    });
+  });
+
+  for (const pathname of ['/video', '/zh/video']) {
+    it(`retains publication approval and source power verdicts in ${pathname} History`, () => {
+      const zh = pathname.startsWith('/zh');
+      mount({
+        pathname,
+        editPage: (page) => {
+          page.entries[0].sources[0].powerVerified = true;
+          page.entries[2].sources[0].powerVerified = false;
+        },
+      });
+      cy.contains('summary', zh ? '性能历史' : 'Performance history').click();
+      cy.get('[data-testid="video-history-entry"]').should('have.length', 7);
+      cy.get('[data-testid="video-history-publication"]')
+        .first()
+        .should('contain', zh ? '已批准用于仪表板' : 'Approved for dashboard');
+      cy.get('[data-testid="video-history-publication"]')
+        .eq(4)
+        .should('contain', zh ? '暂无匹配的发布批准回执' : 'No matching approval receipt');
+      cy.get('[data-testid="video-history-power"]').should(($verdicts) => {
+        expect([...$verdicts].map((el) => el.textContent?.trim())).to.deep.equal(
+          zh
+            ? ['· GPU 功率: 已测得', '· GPU 功率: 未测得', '· GPU 功率: 已测得']
+            : ['· GPU power: Measured', '· GPU power: Not measured', '· GPU power: Measured'],
+        );
+      });
+    });
+  }
+
   it('uses one shared control panel and concise workload choices with published identity in help', () => {
     mount();
     cy.get('[data-slot="control-panel"]').should('have.length', 1);

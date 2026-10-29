@@ -62,6 +62,7 @@ export async function GET(request: NextRequest) {
   if (FIXTURES_MODE) {
     const fixture = loadFixture('benchmarks-history');
     return cachedJson(
+      request,
       calculatorView && Array.isArray(fixture) ? applyCalculatorView(fixture, isl, osl) : fixture,
     );
   }
@@ -76,7 +77,7 @@ export async function GET(request: NextRequest) {
       : await getCachedBenchmarkHistory(modelKeys, isl!, osl!);
     // Both trims run after the cache, so every view shares one cached query.
     const trimmed = agenticWorkflowMetadataOnly(rows);
-    return cachedJson(calculatorView ? applyCalculatorView(trimmed, isl, osl) : trimmed);
+    return cachedJson(request, calculatorView ? applyCalculatorView(trimmed, isl, osl) : trimmed);
   } catch (error) {
     console.error('Error fetching benchmark history:', error);
     return publicApiError(PUBLIC_API_ERRORS.internal, 500);

@@ -5,7 +5,6 @@ import { configKeyMatchesHwKey } from './changelogFormatters';
 
 type LegendPoint = Pick<InferenceData, 'hwKey' | 'model' | 'precision' | 'run_url'>;
 
-/** A hardware legend must not attribute a mixed-run curve to one run's changelog. */
 export function legendChangelogsByHardware(
   points: readonly LegendPoint[],
   availableRuns: Record<string, RunInfo> | null | undefined,

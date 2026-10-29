@@ -1,50 +1,17 @@
 import { GPU_KEYS, HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
+import { fitMetaTitle } from '../seo/meta-text';
+
 const SEPARATOR = '-vs-';
 
-// ---------------------------------------------------------------------------
-// Model registry for compare URLs
-// ---------------------------------------------------------------------------
-//
-// The compare URL is `/compare/{model-slug}-{a}-vs-{b}` where {model-slug} is
-// one of CANONICAL_MODEL_SLUGS. URL slugs are deliberately finer-grained than
-// the dashboard's display-grouped model dropdown — `kimi-k25` and `kimi-k26`
-// are distinct slugs even though both DB keys roll up to the single "Kimi-K2.5"
-// display option in the UI. The slug encodes which DB bucket to query.
-//
-// `LEGACY_BARE_DEFAULT_MODEL_SLUG` is the model the parser falls back to when
-// the URL has no model prefix at all (e.g. `/compare/h100-vs-h200`). PR #351
-// shipped without a model prefix, so all pre-existing inbound links resolve
-// here and get 308-redirected to the canonical model-prefixed URL.
-
 export interface CompareModelSlug {
-  /** Canonical URL slug, e.g. 'deepseek-r1'. Lowercase, hyphen-separated. */
   slug: string;
-  /** Matches Model enum value passed via `?g_model=`, e.g. 'DeepSeek-R1-0528'. */
   displayName: string;
-  /** DB keys to fetch from getLatestBenchmarks. Most models map to one key,
-   *  but the slug stays finer-grained than the dashboard display grouping —
-   *  e.g. `kimi-k26` only queries 'kimik2.6', not also 'kimik2.5'. */
   dbKeys: string[];
-  /** Human label for OG image, metadata, and page header. */
   label: string;
-  /** Single, natural, current-version model name for SEO `<title>` tags and
-   *  meta descriptions — e.g. `GLM-5` (not the version-grouped `GLM 5/5.1`)
-   *  or `Kimi K2.6` (the primary version the slug represents). Kept short so
-   *  the GPU-pair-led title survives Google's ~60-char SERP truncation, and
-   *  written the way people actually search rather than the fully-qualified
-   *  HF checkpoint id. See `compareModelSeoName`. */
   seoName: string;
 }
 
-// Order matches the master /compare and /compare-per-dollar index display:
-// DeepSeek V4 Pro → R1 → Kimi → GLM → MiniMax M3 → MiniMax M2 → Qwen →
-// gpt-oss → Llama 70B. Per product spec — flagship Chinese-developed models
-// first, smaller open US-developed models at the bottom. Qwen sits between
-// MiniMax and gpt-oss to keep the Chinese-lab cluster contiguous before the
-// US transition. The two MiniMax entries stay adjacent with the newer M3
-// flagship leading the older M2 series; the two Kimi entries follow the same
-// rule, with K3 leading the K2.5/K2.6/K2.7-Code group.
 export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
   {
     slug: 'muse-spark-open',
@@ -63,8 +30,6 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
   {
     slug: 'deepseek-v41-flash',
     displayName: 'DeepSeek-V4.1-Flash',
-    // Causal Encoder-Decoder + CSA2 architecture, not a V4-Pro point release,
-    // so it gets its own slug and DB bucket rather than joining deepseek-v4.
     dbKeys: ['dsv41flash'],
     label: 'DeepSeek V4.1 Flash 552B',
     seoName: 'DeepSeek V4.1 Flash',
@@ -79,9 +44,6 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
   {
     slug: 'kimi-k3',
     displayName: 'Kimi-K3',
-    // K3 is a new 2.8T architecture (Kimi Delta Attention + gated MLA), not a
-    // point release of the K2 series, so it gets its own slug and dbKey rather
-    // than joining the kimi-k26 group — same treatment as minimax-m3.
     dbKeys: ['kimik3'],
     label: 'Kimi K3 2.8T',
     seoName: 'Kimi K3',
@@ -89,22 +51,13 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
   {
     slug: 'kimi-k26',
     displayName: 'Kimi-K2.5',
-    // K2.5, K2.6, and K2.7-Code point releases share an architecture (mirroring
-    // DISPLAY_MODEL_TO_DB in packages/constants/src/models.ts). The slug uses
-    // the K2.6 version name for URL stability; the dbKey list pulls data from
-    // all three DB buckets so the slug stays populated across point releases.
     dbKeys: ['kimik2.7-code', 'kimik2.6', 'kimik2.5'],
-    // Slug groups three point releases sharing one architecture — the header
-    // surfaces every version so the URL doesn't read as "only K2.6". Param
-    // count appended so the label conveys model scale alongside the version.
     label: 'Kimi K2.5/K2.6/K2.7-Code 1T',
-    // SEO name uses the primary version the slug canonicalizes to (K2.6).
     seoName: 'Kimi K2.6',
   },
   {
     slug: 'glm-5-1',
     displayName: 'GLM-5',
-    // GLM-5 and GLM-5.1 remain grouped under the stable canonical slug.
     dbKeys: ['glm5.1', 'glm5'],
     label: 'GLM 5/5.1',
     seoName: 'GLM-5',
@@ -113,39 +66,34 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
     slug: 'glm-5-3',
     displayName: 'GLM-5.2',
     dbKeys: ['glm5.2', 'glm5.3'],
-    // GLM-5.2 and GLM-5.3 share one display bucket (see MODEL_CONFIG); the card
-    // and the slug follow the current release ("newer version supersedes", as
-    // with kimi-k26), and `glm-5-2` aliases here so old links 308. `displayName`
-    // stays on 5.2 so the `g_model` param keeps resolving; `dbKeys` carries both
-    // prefixes because InferenceX reports the GLM-5.3 checkpoint as `glm5.3`.
     label: 'GLM 5.3 744B',
     seoName: 'GLM-5.3',
   },
   {
     slug: 'minimax-m3',
     displayName: 'MiniMax-M3',
-    // M3 is a new 428B architecture (MiniMax Sparse Attention), not a point
-    // release of the M2 series, so it gets its own slug and dbKey rather than
-    // joining the minimax-m27 group.
     dbKeys: ['minimaxm3'],
     label: 'MiniMax M3 428B',
     seoName: 'MiniMax M3',
   },
   {
+    slug: 'minimax-m31-flash',
+    displayName: 'MiniMax-M3.1-Flash',
+    dbKeys: ['minimaxm31flash'],
+    label: 'MiniMax M3.1 Flash 428B',
+    seoName: 'MiniMax M3.1 Flash',
+  },
+  {
     slug: 'minimax-m27',
     displayName: 'MiniMax-M2.5',
-    // Same point-release grouping pattern as Kimi and GLM.
     dbKeys: ['minimaxm2.7', 'minimaxm2.5'],
     label: 'MiniMax M2.5/M2.7',
-    // Primary version the slug canonicalizes to (M2.7).
     seoName: 'MiniMax M2.7',
   },
   {
     slug: 'qwen-3-8-flash-next',
     displayName: 'Qwen3.8-Flash-Next',
     dbKeys: ['qwen3.8next'],
-    // 176B total: a 125B main model plus a 51B n-gram embedding table, with 6B
-    // active per forward pass (MoE). The 4B MTP head sits outside that total.
     label: 'Qwen 3.8 Flash Next 176B-A6B',
     seoName: 'Qwen3.8-Flash-Next',
   },
@@ -153,7 +101,6 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
     slug: 'qwen-3-8-27b',
     displayName: 'Qwen3.8-27B',
     dbKeys: ['qwen3.827b'],
-    // Dense 27B: total and active parameter counts coincide.
     label: 'Qwen 3.8 27B',
     seoName: 'Qwen3.8-27B',
   },
@@ -161,7 +108,6 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
     slug: 'qwen-3-8-27b-eager',
     displayName: 'Qwen3.8-27B-Eager',
     dbKeys: ['qwen3.827beager'],
-    // Same checkpoint with CUDA graphs disabled; kept as its own bucket.
     label: 'Qwen 3.8 27B (eager)',
     seoName: 'Qwen3.8-27B Eager',
   },
@@ -169,7 +115,6 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
     slug: 'qwen-3-5',
     displayName: 'Qwen-3.5-397B-A17B',
     dbKeys: ['qwen3.5'],
-    // 397B total parameters, 17B active per forward pass (MoE).
     label: 'Qwen 3.5 397B-A17B',
     seoName: 'Qwen3.5',
   },
@@ -189,9 +134,6 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
   },
 ];
 
-/** Family-level and older-version slugs that 308 to the canonical slug above.
- *  Used for backward compat ("deepseek" → "deepseek-r1") and for "same
- *  architecture, newer version supersedes" ("glm-5" → "glm-5-1"). */
 export const COMPARE_MODEL_ALIASES: Record<string, string> = {
   deepseek: 'deepseek-r1',
   kimi: 'kimi-k26',
@@ -206,9 +148,6 @@ export const COMPARE_MODEL_ALIASES: Record<string, string> = {
   gptoss: 'gptoss-120b',
 };
 
-/** Default model the bare-slug (no model prefix) URL form maps to. PR #351 had
- *  no model dimension and pinned to DeepSeek R1, so legacy inbound links from
- *  that era resolve here. */
 export const LEGACY_BARE_DEFAULT_MODEL_SLUG = 'deepseek-r1';
 
 const SLUG_TO_MODEL: Record<string, CompareModelSlug> = Object.fromEntries(
@@ -216,7 +155,6 @@ const SLUG_TO_MODEL: Record<string, CompareModelSlug> = Object.fromEntries(
 );
 const CANONICAL_MODEL_SLUGS = new Set(COMPARE_MODEL_SLUGS.map((m) => m.slug));
 
-/** Lookup helper. Returns null for unknown slugs (not even an alias). */
 export function getCompareModelBySlug(slug: string): CompareModelSlug | null {
   const canonical = COMPARE_MODEL_ALIASES[slug] ?? slug;
   return SLUG_TO_MODEL[canonical] ?? null;
@@ -226,19 +164,9 @@ const DISPLAY_NAME_TO_SLUG: Record<string, CompareModelSlug> = Object.fromEntrie
   COMPARE_MODEL_SLUGS.map((m) => [m.displayName, m]),
 );
 
-/**
- * Resolve a dashboard model (the `Model` enum value / `g_model` param) to its
- * canonical model-page slug entry. Used by the `/model/[slug]` pages and by
- * the dashboard's "learn more about the architecture" link. Returns null for
- * models without a public slug (e.g. hidden models like Llama 3.1 70B).
- */
 export function getModelSlugEntryForDisplayName(displayName: string): CompareModelSlug | null {
   return DISPLAY_NAME_TO_SLUG[displayName] ?? null;
 }
-
-// ---------------------------------------------------------------------------
-// Slug parsing and canonicalization
-// ---------------------------------------------------------------------------
 
 export interface ComparePair {
   a: string;
@@ -249,23 +177,10 @@ export interface CompareSlug {
   model: CompareModelSlug;
   a: string;
   b: string;
-  /** True if the URL had no model prefix at all (legacy PR #351 form).
-   *  Caller should redirect to the canonical model-prefixed URL. */
   isLegacyBareSlug: boolean;
-  /** True if the URL used a model alias (e.g. `kimi` instead of `kimi-k26`,
-   *  or `glm-5` instead of `glm-5-1`). Caller should redirect to canonical. */
   isAliasModel: boolean;
 }
 
-/** Parse a compare slug. Accepts both the legacy bare form (`h100-vs-h200`)
- *  and the new model-prefixed form (`deepseek-r1-h100-vs-h200`). Returns null
- *  on invalid input.
- *
- *  Algorithm: split on `-vs-`, validate the right side as a GPU key, then walk
- *  the left side backwards to find the longest suffix that's a GPU key. That
- *  suffix is the `a` GPU; the remainder is the model slug (or empty for the
- *  bare form). GPU keys contain no hyphens, so a single `lastIndexOf('-')`
- *  finds the split point. */
 export function parseCompareSlug(slug: string): CompareSlug | null {
   if (!slug) return null;
   const lower = slug.toLowerCase();
@@ -278,10 +193,6 @@ export function parseCompareSlug(slug: string): CompareSlug | null {
   const prefix = lower.slice(0, sepIdx);
   if (!prefix) return null;
 
-  // Split prefix into model + a GPU.
-  // GPU keys have no hyphens (h100, gb200, mi355x), so the last hyphen in
-  // `prefix` separates the model slug from the a GPU. If there's no hyphen,
-  // the entire prefix is the a GPU (legacy bare form).
   let a: string;
   let modelPart: string;
   const lastDash = prefix.lastIndexOf('-');
@@ -300,7 +211,6 @@ export function parseCompareSlug(slug: string): CompareSlug | null {
 
   if (!GPU_KEYS.has(a) || a === b) return null;
 
-  // Resolve model slug.
   let modelSlug: string;
   let isLegacyBareSlug = false;
   let isAliasModel = false;
@@ -321,17 +231,11 @@ export function parseCompareSlug(slug: string): CompareSlug | null {
   return { model, a, b, isLegacyBareSlug, isAliasModel };
 }
 
-/** Canonical model-prefixed slug. GPUs sorted alphabetically so a stable URL
- *  always exists for each (model, pair) combination. */
 export function canonicalCompareSlug(modelSlug: string, a: string, b: string): string {
   const [first, second] = [a, b].toSorted();
   return `${modelSlug}-${first}${SEPARATOR}${second}`;
 }
 
-/** All distinct GPU pairs in alphabetical order. Model-agnostic — callers that
- *  need (model × pair) combinations should compose this with
- *  COMPARE_MODEL_SLUGS, or use `allCanonicalCompareSlugs()` for the flattened
- *  cross-product. */
 export function allCanonicalComparePairs(): ComparePair[] {
   const keys = [...GPU_KEYS].toSorted();
   const pairs: ComparePair[] = [];
@@ -343,45 +247,29 @@ export function allCanonicalComparePairs(): ComparePair[] {
   return pairs;
 }
 
-/** Flattened cross-product of canonical model slugs and canonical GPU pairs.
- *  Used by sitemap.ts and generateStaticParams. Only emits canonical slugs
- *  (not aliases) — alias URLs would just 308 to these. */
 export function allCanonicalCompareSlugs(): { modelSlug: string; a: string; b: string }[] {
   const pairs = allCanonicalComparePairs();
   return COMPARE_MODEL_SLUGS.flatMap((m) => pairs.map((p) => ({ modelSlug: m.slug, ...p })));
 }
 
-/** "H100 vs H200" or "GB200 NVL72 vs MI355X" — GPU-only display label. */
 export function compareDisplayLabel(a: string, b: string): string {
   const aLabel = HW_REGISTRY[a]?.label ?? a.toUpperCase();
   const bLabel = HW_REGISTRY[b]?.label ?? b.toUpperCase();
   return `${aLabel} vs ${bLabel}`;
 }
 
-/** "DeepSeek R1 — H100 vs H200" — model-aware display label for headings,
- *  metadata titles, and OG image text. */
 export function compareModelDisplayLabel(model: CompareModelSlug, a: string, b: string): string {
   return `${model.label} — ${compareDisplayLabel(a, b)}`;
 }
 
-/** Single natural, current-version model name for SEO titles / descriptions —
- *  e.g. `GLM-5`, `Kimi K2.6`, `DeepSeek R1`. Unlike `label`, it never contains
- *  version-group slashes ("GLM 5/5.1"), param-count suffixes ("1.6T"), or the
- *  fully-qualified checkpoint id — it reads the way people search. */
 export function compareModelSeoName(model: CompareModelSlug): string {
   return model.seoName;
 }
 
-/** Pre-pipe portion of the SEO `<title>`, GPU-pair first so the actual search
- *  query ("B200 vs B300") survives Google's ~60-char truncation. Falls back
- *  from "Inference Benchmark" to "Benchmark" when the longer suffix would push
- *  the pair-led phrase past ~60 chars for a long GPU pair / model name.
- *
- *  Returns the text before the " | InferenceX" site-name suffix; callers add
- *  the suffix via `title: { absolute: ... }` so the long root template
- *  ("%s | InferenceX by SemiAnalysis") does not apply and truncate the query. */
 export function compareSeoTitle(gpuLabel: string, modelSeoName: string): string {
-  const full = `${gpuLabel}: ${modelSeoName} Inference Benchmark`;
-  if (full.length <= 60) return full;
-  return `${gpuLabel}: ${modelSeoName} Benchmark`;
+  return fitMetaTitle([
+    `${gpuLabel}: ${modelSeoName} Inference Benchmark`,
+    `${gpuLabel}: ${modelSeoName} Benchmark`,
+    `${gpuLabel}: ${modelSeoName}`,
+  ]);
 }

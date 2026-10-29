@@ -61,7 +61,7 @@ const COST_PROVIDER_OPTIONS: {
   {
     value: 'costh',
     label: 'Owning at Large Hyperscaler Volume',
-    labelZh: '自有 - 超大规模云大批量',
+    labelZh: '自有 · 超大规模云厂商批量采购',
   },
   { value: 'costr', label: 'Rent - 3 Year Commit', labelZh: '租赁 - 3 年承诺' },
 ];
@@ -103,10 +103,10 @@ const STRINGS = {
       '选择模型、工作负载和目标交互性。下方会根据设施功率预算，分别确定各款芯片的固定集群规模，并按目标交互性读取历次运行的数据。各条曲线的含义见下方说明。',
     benchmarkGroup: '基准测试配置',
     chartGroup: '图表配置',
-    costProviderLabel: '成本供应商',
+    costProviderLabel: '计价方式',
     costProviderTooltip:
-      '集群成本线采用的定价层级。按超大规模云厂商大批量采购价自有（如 AWS/GCP）或 3 年承诺租赁。带锁的租赁期限（按需至 2 年承诺）收录于 SemiAnalysis AI Cloud TCO 模型。',
-    costProviderPlaceholder: '成本供应商',
+      '集群成本线采用的定价层级。按超大规模云厂商的大批量采购价格自购（如 AWS/GCP）或 3 年承诺租赁。带锁的租赁期限（按需至 2 年承诺）收录于 SemiAnalysis AI Cloud TCO 模型。',
+    costProviderPlaceholder: '计价方式',
     tokenTypeLabel: 'Token 类型',
     tokenTypeTooltip:
       '表格中每芯片指标按总 token、仅输入 token 还是仅输出 token 计。收入始终同时计入两类 token。',
@@ -148,8 +148,6 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
   const t = STRINGS[locale];
   const { setUrlParam } = useUrlState();
   const { openDropdown, handleDropdownOpenChange } = useOpenDropdown();
-  // Shorter-commit rental tiers are listed but locked; picking one opens the
-  // TCO model dialog instead of changing the cost provider.
   const { interceptLocked: interceptLockedTier, dialog: tcoModelDialog } =
     useLockedTierDialog('fleet_cost_provider');
 
@@ -171,8 +169,6 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
   const [inputValue, setInputValue] = useState<string>('35');
   const [isTargetInputFocused, setIsTargetInputFocused] = useState(false);
   const [selectedPercentile, setSelectedPercentile] = useState<Percentile>(initialPercentile);
-  // Owned here so the `c_mw` URL seed is read once, at the page level — the
-  // lifecycle section renders the input and is its only consumer.
   const [mwInput, setMwInput] = useState<string>(() => readUrlParams().c_mw ?? DEFAULT_FLEET_MW);
   const [visibilityIntent, setVisibilityIntent] = useState<CalculatorVisibilityIntent | null>(null);
   const [highContrast, setHighContrast] = useState(false);
@@ -191,8 +187,6 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
   );
 
   const isAgenticSequence = selectedSequence === Sequence.AgenticTraces;
-  // AgentX publishes on P90, so the percentile control stays behind the
-  // ↑↑↓↓ feature gate, matching the calculator.
   const featureGateUnlocked = useFeatureGate();
   const percentileLabel = selectedPercentile.toUpperCase();
 
@@ -202,8 +196,6 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
     writeUrlParams({ c_mw: Number.isFinite(parsed) && parsed > 0 ? raw : '' });
   }, []);
 
-  // The selection key represents user-driven scope, mirroring the calculator's
-  // rule: a data or filter transition reseeds visibility to everything.
   const selectionKey = `${selectedModel}|${selectedSequence}|${[...selectedPrecisions]
     .toSorted()
     .join(',')}|${selectedRunDate}|${[...availableHwKeys].toSorted().join(',')}`;
@@ -324,14 +316,9 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
       visible: new Set(availableHwKeys),
       known: new Set(availableHwKeys),
     });
-    track('fleet_gpu_reset', { gpuCount: availableHwKeys.length });
+    track('fleet_gpu_reset', { gpu_count: availableHwKeys.length });
   }, [availableHwKeys, selectionKey]);
 
-  // The legend filters which chips are candidates for the lifecycle lines,
-  // exactly as the calculator's chart legend did when the section lived there.
-  // It renders in the controls card rather than inside the chart so it stays
-  // reachable from the table view and — critically — after isolating a config
-  // that is unplottable at the current target, when the chart itself unmounts.
   const legendItems = useMemo(
     () =>
       Object.entries(hardwareConfig)
@@ -486,7 +473,7 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                         const next = values[0];
                         if (!next) return;
                         setCostType(next as CostType);
-                        track('fleet_cost_type_changed', { costType: next });
+                        track('fleet_cost_type_changed', { cost_type: next });
                       }}
                       open={openDropdown === 'costType'}
                       onOpenChange={handleDropdownOpenChange('costType')}
@@ -514,7 +501,6 @@ function FleetLifecycleInner({ initialPercentile }: { initialPercentile: Percent
                   </div>
                 )}
 
-                {/* Target value slider + input */}
                 {!loading && hasData && (
                   <div className="space-y-2 md:col-span-2 xl:col-span-3">
                     <LabelWithTooltip

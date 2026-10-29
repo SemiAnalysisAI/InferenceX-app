@@ -140,7 +140,6 @@ describe('diff', () => {
 
     const snap = tracker.snapshot();
 
-    // Simulate processing more rows
     tracker.skips.unmappedModel += 3;
     tracker.skips.unmappedHw += 2;
     tracker.skips.noIslOsl += 1;
@@ -174,7 +173,6 @@ describe('diff', () => {
 
     const snap = tracker.snapshot();
 
-    // Add the same ones again — they should not appear as new
     tracker.unmappedModels.add('old');
     tracker.unmappedHws.add('old-hw');
 

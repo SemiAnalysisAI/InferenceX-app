@@ -360,7 +360,6 @@ export function tradeoffCurves<T extends TradeoffPoint & { x: number; y: number 
 
 export function latencyValue(point: TradeoffPoint, axis: LatencyAxis): number | null {
   const a = point.latencies;
-  // Ten samples is a display floor, not statistical or release qualification.
   if (axis === 'p90') return a.length >= 10 ? a[Math.ceil(a.length * 0.9) - 1] : null;
   if (a.length === 0) return point.medianSeconds;
   const middle = Math.floor(a.length / 2);

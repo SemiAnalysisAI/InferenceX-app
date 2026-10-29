@@ -23,9 +23,6 @@ vi.mock('@/lib/cache/api-cache', () => ({
 describe('benchmark-query-cache.server', () => {
   it('declares each shared cache slot once, under the page-endpoint keys', async () => {
     await import('./benchmark-query-cache.server');
-    // The views (inference, calculator, historical, fleet) import these same
-    // bindings instead of re-declaring wrappers, so a page endpoint rolling a
-    // key can no longer leave a view on a stale, doubled cache slot.
     expect(keys.toSorted()).toEqual([
       'benchmark-history',
       'benchmark-history-agentic-curve-scope-v2',

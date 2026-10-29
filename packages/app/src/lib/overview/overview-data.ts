@@ -373,6 +373,9 @@ const OVERVIEW_MODEL_SCENARIOS: Partial<Record<Model, readonly OverviewScenario[
   // (InferenceX#2493, MODELS.md), so the matrix must not keep a fixed-sequence
   // row that will never refresh; AgentX is the model's only active scenario.
   [Model.MiniMax_M3]: ['agentx'],
+  // M3.1 Flash entered the fleet on AgentX only (first sweep 2026-10-23,
+  // InferenceX#4426, B200 agentic traces); no 8K/1K sweep exists.
+  [Model.MiniMax_M3_1_Flash]: ['agentx'],
   [Model.Qwen3_5]: ['single_turn_8k1k', 'agentx'],
   [Model.Kimi_K3]: ['agentx'],
   [Model.GLM_5_2]: ['agentx'],

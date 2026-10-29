@@ -1,11 +1,23 @@
 'use client';
 
 import { track } from '@/lib/analytics/analytics';
-import { Car, Crosshair, Moon, Pickaxe, Shield, Skull, Sun, type LucideIcon } from 'lucide-react';
+import {
+  Car,
+  Crosshair,
+  Moon,
+  PencilLine,
+  Pickaxe,
+  Shield,
+  Skull,
+  Sun,
+  UtensilsCrossed,
+  type LucideIcon,
+} from 'lucide-react';
 import { useTheme } from 'next-themes';
 import * as React from 'react';
 
 import { nextTheme } from '@/lib/themes/themes';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
 import { HEADER_ACTION_STYLE } from './control-styles';
 
@@ -17,9 +29,15 @@ const THEME_ICONS: Record<string, LucideIcon> = {
   gta: Car,
   doom: Skull,
   halo: Shield,
+  'orange-chicken': UtensilsCrossed,
+  excalidraw: PencilLine,
 };
 
-/** Neutral half-moon shown before hydration, when the saved theme is unknown. */
+const STRINGS = {
+  en: { orangeChicken: 'Switch theme (currently orange chicken mode)' },
+  zh: { orangeChicken: '切换主题（当前为陈皮鸡主题）' },
+};
+
 function PendingIcon() {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" className="fill-current">
@@ -28,9 +46,9 @@ function PendingIcon() {
   );
 }
 
-/** One click advances to the next presentation theme. */
 export function ModeToggle() {
   const { setTheme, theme } = useTheme();
+  const strings = STRINGS[useLocale()];
   const [mounted, setMounted] = React.useState(false);
 
   React.useEffect(() => {
@@ -39,7 +57,6 @@ export function ModeToggle() {
 
   const buttonClasses = cn(HEADER_ACTION_STYLE, 'size-11');
 
-  // Keep the button mounted and clickable while the saved theme hydrates.
   const current = mounted ? theme : undefined;
   const ActiveIcon = THEME_ICONS[current ?? ''];
 
@@ -54,7 +71,13 @@ export function ModeToggle() {
       type="button"
       data-testid="theme-toggle"
       className={buttonClasses}
-      aria-label={mounted ? `Switch theme (currently ${theme} mode)` : 'Switch theme'}
+      aria-label={
+        current === 'orange-chicken'
+          ? strings.orangeChicken
+          : mounted
+            ? `Switch theme (currently ${theme} mode)`
+            : 'Switch theme'
+      }
       onClick={toggleTheme}
     >
       {ActiveIcon ? <ActiveIcon size={20} aria-hidden="true" /> : <PendingIcon />}

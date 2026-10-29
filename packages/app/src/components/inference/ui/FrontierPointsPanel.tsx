@@ -3,6 +3,7 @@
 import * as d3 from 'd3';
 import { useMemo } from 'react';
 
+import { useInferenceAnalyticsContext } from '@/components/inference/InferenceContext';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import { Heading } from '@/components/ui/heading';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
@@ -52,7 +53,6 @@ export default function FrontierPointsPanel({
   hardwareColor,
 }: {
   chartId: string;
-  /** Observations that competed: the chart's visible, frontier-eligible points. */
   eligible: readonly InferenceData[];
   frontier: readonly InferenceData[];
   xLabel: string;
@@ -62,6 +62,7 @@ export default function FrontierPointsPanel({
   hardwareColor: (point: InferenceData) => string;
 }) {
   const locale = useLocale();
+  const analyticsContext = useInferenceAnalyticsContext();
   const t = STRINGS[locale];
   const { runIndexByUrl } = useUnofficialRun();
   const overlaySet = useMemo(() => new Set(overlayPoints), [overlayPoints]);
@@ -164,6 +165,7 @@ export default function FrontierPointsPanel({
       <ChartButtons
         chartId={sectionId}
         analyticsPrefix="frontier_points"
+        analyticsContext={analyticsContext}
         hideZoomReset
         hideImageExport
         onExportCsv={exportCsv}

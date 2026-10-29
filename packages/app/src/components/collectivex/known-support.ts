@@ -1,21 +1,7 @@
-/**
- * The curated CollectiveX support picture: every SKU × library × mode ×
- * expert-parallel degree, independent of which runs are checked. Green means
- * the combination is known to work on the fleet; red means it is known NOT to
- * work, with the investigated reason; gray means the combination is unavailable or awaiting qualification
- * (see the note for the distinction).
- *
- * This mirrors `collectivex/configs/platform_config.json` in the
- * InferenceX repo plus the wall investigations documented in its README and
- * methodology. It is maintained by hand: when a registry row flips or a wall
- * falls upstream, update the cell and its footnote here.
- */
-
 export type CollectiveXKnownStatus = 'works' | 'broken' | 'na';
 
 export interface CollectiveXKnownEp {
   status: CollectiveXKnownStatus;
-  /** Footnote id; required whenever status is not plain `works`. */
   note?: string;
 }
 
@@ -93,16 +79,13 @@ export const COLLECTIVEX_KNOWN_FOOTNOTES: Record<string, CollectiveXKnownFootnot
     en: "UCCL's low-latency kernel asserts on AMD CU counts (kNumMaxTopK+1 exceeds the warp-group budget) — an upstream kernel limitation, not an integration gap.",
     zh: 'UCCL 低延迟 Kernel 在 AMD 的 CU 数量下触发断言（kNumMaxTopK+1 超出 warp 组预算），为上游 Kernel 限制而非集成问题。',
   },
-  // B300 throughput EP16 verification confirmed by the maintainer on 2026-10-13.
-  // Qualification source: InferenceX 20c8fba9, collectivex/README.md (2026-10-13).
-  // https://github.com/SemiAnalysisAI/InferenceX/blob/20c8fba9eabd41f7e0b49aada0d1c147a180e7fc/collectivex/README.md
   'nccl-v02-gin': {
     en: 'NCCL EP v0.2 fixes the v0.1 cross-node GIN failure. Throughput EP16 has been revalidated on B200, B300, H100 and H200; GB200/GB300 use MNNVL. Qualification is BF16 only.',
     zh: 'NCCL EP v0.2 已修复 v0.1 的跨节点 GIN 故障。吞吐量 EP16 已在 B200、B300、H100 和 H200 上复验通过；GB200/GB300 使用 MNNVL。当前仅验证 BF16。',
   },
   'nccl-v02-ll': {
     en: 'NCCL EP v0.2 ships the combine-recv shared-memory fence, resolving the v0.1 race. Low-latency EP8 is enabled on all NVIDIA pools, with EP16 enabled on B200/GB200/GB300. The full decode ladder is restored; qualification is BF16 only.',
-    zh: 'NCCL EP v0.2 已加入 combine-recv 共享内存栅栏，修复 v0.1 的竞争问题。所有 NVIDIA 集群均已启用低延迟 EP8，B200/GB200/GB300 另已启用 EP16。完整 decode 测试梯度已恢复；当前仅验证 BF16。',
+    zh: 'NCCL EP v0.2 已加入 combine-recv 共享内存栅栏，修复 v0.1 的竞争问题。所有 NVIDIA 集群均已启用低延迟 EP8，B200/GB200/GB300 另已启用 EP16。完整 decode 测试阶梯已恢复；当前仅验证 BF16。',
   },
   'nccl-ll-ep16-not-enabled': {
     en: 'NCCL EP low-latency EP16 is not enabled on this pool; it is enabled on B200/GB200/GB300 with v0.2.',
@@ -292,10 +275,6 @@ export const COLLECTIVEX_KNOWN_SUPPORT: Record<'normal' | 'low-latency', KnownMa
   'low-latency': LOW_LATENCY,
 };
 
-/**
- * Footnotes in first-use order for one mode's table, so the rendered numbers
- * read top-to-bottom, left-to-right.
- */
 export function collectiveXKnownFootnoteOrder(mode: 'normal' | 'low-latency'): string[] {
   const seen: string[] = [];
   for (const sku of COLLECTIVEX_KNOWN_SKUS) {
@@ -307,4 +286,46 @@ export function collectiveXKnownFootnoteOrder(mode: 'normal' | 'low-latency'): s
     }
   }
   return seen;
+}
+
+/** The fields of a measured series the matrix reads its backend versions from. */
+export interface CollectiveXVersionedSeries {
+  mode: 'normal' | 'low-latency';
+  backend: string;
+  library_version?: string | null;
+  system: { sku: string };
+}
+
+/** The matrix row of a pool: `h100-dgxc` and `b200-nscale` are the H100 and B200 rows. */
+export function collectiveXKnownSkuOf(poolSku: string): CollectiveXKnownSku | null {
+  const sku = poolSku.toLowerCase().split('-')[0];
+  return (COLLECTIVEX_KNOWN_SKUS as readonly string[]).includes(sku)
+    ? (sku as CollectiveXKnownSku)
+    : null;
+}
+
+/**
+ * The cell's label for a recorded version: the first token (uccl appends its build flags), with
+ * any commit hash cut to seven characters.
+ */
+export function collectiveXShortLibraryVersion(version: string): string {
+  const head = version.trim().split(/\s+/)[0] ?? '';
+  return head.replaceAll(/[0-9a-f]{12,40}/g, (hash) => hash.slice(0, 7));
+}
+
+/** The distinct recorded versions of each `mode/sku/library` cell, sorted. */
+export function collectiveXKnownVersions(
+  series: readonly CollectiveXVersionedSeries[],
+): Map<string, string[]> {
+  const versions = new Map<string, Set<string>>();
+  for (const item of series) {
+    const sku = collectiveXKnownSkuOf(item.system.sku);
+    const version = item.library_version?.trim();
+    if (!sku || !version) continue;
+    const key = `${item.mode}/${sku}/${item.backend}`;
+    const recorded = versions.get(key) ?? new Set<string>();
+    recorded.add(version);
+    versions.set(key, recorded);
+  }
+  return new Map([...versions].map(([key, recorded]) => [key, [...recorded].toSorted()]));
 }

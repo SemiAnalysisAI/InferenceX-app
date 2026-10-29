@@ -15,12 +15,14 @@ import type { ChartDefinition, HardwareConfig, InferenceData } from '@/component
 import { UnofficialBanner } from '@/components/ui/unofficial-banner';
 import { DB_MODEL_TO_DISPLAY, rowToSequence } from '@semianalysisai/inferencex-constants';
 import type { BenchmarkRow, EvalRow } from '@/lib/api/api';
-import { transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
+import { benchmarkCurveDate } from '@/lib/benchmarks/benchmark-run-selection';
+import { transformBenchmarkRows, type TokenBasis } from '@/lib/benchmarks/benchmark-transform';
 import { normalizeEvalHardwareKey } from '@/lib/charts/chart-utils';
 import { notifyClientSearchChange } from '@/lib/routing/client-navigation';
 import { setProfitRouteUnofficialRuns } from '@/lib/routing/profit-estimator-routes';
 import { useClientRouteSearch } from '@/hooks/useClientSearch';
 import { Model, Sequence } from '@/lib/catalog/data-mappings';
+import { ApiRequestError } from '@/lib/api/api-request-error';
 
 import chartDefinitions from '@/components/inference/metric-registry';
 
@@ -94,6 +96,7 @@ export interface UnofficialRunContextType {
     model: Model,
     sequence: Sequence,
     chartType: 'e2e' | 'interactivity',
+    tokenBasis?: TokenBasis,
   ) => {
     data: InferenceData[];
     hardwareConfig: HardwareConfig;
@@ -115,7 +118,6 @@ export function useUnofficialRun() {
   }
   return context;
 }
-/** Registers derived chart availability; the provider reducer owns reconciliation. */
 export function useOverlayScopeReconciliation(input: OverlayScopeInput | null): void {
   const { reconcileOverlayScope } = useUnofficialRun();
   useEffect(() => {
@@ -123,7 +125,10 @@ export function useOverlayScopeReconciliation(input: OverlayScopeInput | null): 
   }, [input, reconcileOverlayScope]);
 }
 
-export function buildChartData(benchmarks: BenchmarkRow[]): UnofficialChartData {
+export function buildChartData(
+  benchmarks: BenchmarkRow[],
+  tokenBasis: TokenBasis = 'total',
+): UnofficialChartData {
   const groups = new Map<string, BenchmarkRow[]>();
   for (const row of benchmarks) {
     const displayModel = DB_MODEL_TO_DISPLAY[row.model] ?? row.model;
@@ -131,23 +136,33 @@ export function buildChartData(benchmarks: BenchmarkRow[]): UnofficialChartData 
     if (!sequence) continue;
     const key = `${displayModel}_${sequence}`;
     if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(row);
+    // Same date semantics as the official chart: snapshot date, with the measured date kept.
+    const chartRow = {
+      ...row,
+      date: benchmarkCurveDate(row),
+      actualDate: row.date,
+    };
+    groups.get(key)!.push(chartRow);
   }
 
   const result: UnofficialChartData = {};
   for (const [key, rows] of groups) {
-    // Overlay points are always priced on the external basis here;
-    // `processOverlayChartDataWithClipping` reprices them to the selected
-    // basis at render time, so seeding them with the app default would
-    // double-apply the internal/external ratio.
-    const { chartData, hardwareConfig } = transformBenchmarkRows(rows, 'median', 'external');
+    const { chartData, hardwareConfig } = transformBenchmarkRows(
+      rows,
+      'median',
+      'external',
+      tokenBasis,
+    );
     const e2eIdx = (chartDefinitions as ChartDefinition[]).findIndex((d) => d.chartType === 'e2e');
     const interactivityIdx = (chartDefinitions as ChartDefinition[]).findIndex(
       (d) => d.chartType === 'interactivity',
     );
     result[key] = {
       e2e: { data: chartData[e2eIdx] ?? [], gpus: hardwareConfig },
-      interactivity: { data: chartData[interactivityIdx] ?? [], gpus: hardwareConfig },
+      interactivity: {
+        data: chartData[interactivityIdx] ?? [],
+        gpus: hardwareConfig,
+      },
     };
   }
   return result;
@@ -184,7 +199,6 @@ export function parseAvailableModelsAndSequences(
   return result;
 }
 
-/** Canonicalize the first unofficial-run URL value without changing server validation policy. */
 export function parseUnofficialRunIds(search: string): string[] {
   const params = new URLSearchParams(search);
   for (const [key, value] of params) {
@@ -353,12 +367,14 @@ async function fetchUnofficialRuns(
   ids: string[],
   signal: AbortSignal,
 ): Promise<UnofficialRunResponse> {
-  const response = await fetch(`/api/unofficial-run?runId=${encodeURIComponent(ids.join(','))}`, {
-    cache: 'no-store',
-    signal,
-  });
-  const data = (await response.json()) as Partial<UnofficialRunResponse> & { error?: string };
-  if (!response.ok) throw new Error(data.error || 'Failed to fetch unofficial run');
+  const url = `/api/unofficial-run?runId=${encodeURIComponent(ids.join(','))}`;
+  const response = await fetch(url, { cache: 'no-store', signal });
+  const data = (await response.json()) as Partial<UnofficialRunResponse> & {
+    error?: string;
+  };
+  if (!response.ok) {
+    throw new ApiRequestError(data.error || 'Failed to fetch unofficial run', response.status, url);
+  }
   return selectUnofficialRunResponse(
     {
       runInfos: Array.isArray(data.runInfos) ? data.runInfos : [],
@@ -396,6 +412,10 @@ export function UnofficialRunProvider({
   const unofficialEvalRows = query.data?.evaluations ?? null;
   const unofficialChartData = useMemo(
     () => (unofficialBenchmarkRows ? buildChartData(unofficialBenchmarkRows) : null),
+    [unofficialBenchmarkRows],
+  );
+  const unofficialUncachedChartData = useMemo(
+    () => (unofficialBenchmarkRows ? buildChartData(unofficialBenchmarkRows, 'uncached') : null),
     [unofficialBenchmarkRows],
   );
   const availableModelsAndSequences = useMemo(
@@ -466,13 +486,19 @@ export function UnofficialRunProvider({
   }, [unofficialRunInfos]);
 
   const getOverlayData = useCallback(
-    (model: Model, sequence: Sequence, chartType: 'e2e' | 'interactivity') => {
-      const chartGroup = unofficialChartData?.[`${model}_${sequence}`];
+    (
+      model: Model,
+      sequence: Sequence,
+      chartType: 'e2e' | 'interactivity',
+      tokenBasis: TokenBasis = 'total',
+    ) => {
+      const source = tokenBasis === 'uncached' ? unofficialUncachedChartData : unofficialChartData;
+      const chartGroup = source?.[`${model}_${sequence}`];
       if (!chartGroup) return null;
       const dataForChart = chartType === 'e2e' ? chartGroup.e2e : chartGroup.interactivity;
       return { data: dataForChart.data, hardwareConfig: dataForChart.gpus };
     },
-    [unofficialChartData],
+    [unofficialChartData, unofficialUncachedChartData],
   );
 
   const resetOverlaySelection = useCallback(() => {
@@ -540,7 +566,6 @@ export function UnofficialRunProvider({
   );
 }
 
-/** Allows dashboard navigation to own banner placement while the provider owns its state. */
 export function UnofficialRunBanner({ attached = false }: { attached?: boolean }) {
   const { unofficialRunInfos, dismissRun, clearUnofficialRun } = useUnofficialRun();
   return (

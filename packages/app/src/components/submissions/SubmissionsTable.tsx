@@ -196,7 +196,6 @@ interface SubmissionsTableProps {
 }
 
 function getModelDisplayName(dbModel: string): string {
-  // MODEL_PREFIX_MAPPING maps prefix → display model name
   const displayModel = MODEL_PREFIX_MAPPING[dbModel];
   if (displayModel) return getModelLabel(displayModel);
   return dbModel;
@@ -256,7 +255,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
         setSortKey(key);
         setSortDir('desc');
       }
-      track('submissions_table_sorted', { column: key });
+      track('submissions_table_sorted', { sort_key: key });
     },
     [sortKey],
   );
@@ -320,7 +319,12 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
         value={search}
         onChange={(e) => handleSearchChange(e.target.value)}
         onBlur={() => {
-          if (search.trim()) track('submissions_table_searched', { query: search.trim() });
+          if (search.trim()) {
+            track('submissions_table_searched', {
+              query_length: search.trim().length,
+              results: filtered.length,
+            });
+          }
         }}
         placeholder={t.searchPlaceholder}
         className="max-w-sm"
@@ -502,7 +506,7 @@ function SubmissionRow({
                           source: 'inline',
                           config: submissionRowKey(row),
                           model: row.model,
-                          hardware: row.hardware,
+                          gpu: row.hardware,
                           framework: row.framework,
                           previous_date: previousRun.date,
                           new_date: row.date,
@@ -627,7 +631,7 @@ function SubmissionRow({
                             source: 'expanded',
                             config: submissionRowKey(row),
                             model: row.model,
-                            hardware: row.hardware,
+                            gpu: row.hardware,
                             framework: row.framework,
                             previous_date: previousRun.date,
                             new_date: row.date,

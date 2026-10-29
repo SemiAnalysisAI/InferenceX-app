@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** Scale-out NIC types and their shared two-state interface. */
 
 export { ConnectX7NICCard } from './connectx7';
 export { ConnectX8NICCard } from './connectx8';

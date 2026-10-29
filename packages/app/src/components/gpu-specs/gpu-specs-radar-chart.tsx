@@ -15,12 +15,10 @@ import ChartLegend from '@/components/ui/chart-legend';
 const NVIDIA_COLOR = '#76b900';
 const AMD_COLOR = '#ed1c24';
 
-/** Metrics to display on the radar chart axes. Excludes worldSize (discrete) and scaleOutBandwidth (nullable). */
 const RADAR_METRICS = GPU_CHART_METRICS.filter(
   (m) => m.key !== 'scaleUpWorldSize' && m.key !== 'scaleOutBandwidth',
 );
 
-/** Get a unique color per GPU. NVIDIA GPUs get green-ish hues, AMD gets red-ish hues. */
 function getGpuColor(spec: GpuSpec, _index: number): string {
   const nvidiaColors = ['#76b900', '#5a9e00', '#8fd400', '#4a8400', '#a0e800', '#3d6e00'];
   const amdColors = ['#ed1c24', '#c41920', '#ff4d52'];
@@ -41,7 +39,6 @@ interface NormalizedGpu {
   color: string;
 }
 
-/** Normalize values across all GPUs for each metric to 0-1 range. */
 export function normalizeGpuData(specs: GpuSpec[], metrics: typeof RADAR_METRICS): NormalizedGpu[] {
   const maxValues = metrics.map((metric) => {
     const values = specs
@@ -103,7 +100,7 @@ export function GpuSpecsRadarChart({ caption }: GpuSpecsRadarChartProps) {
       } else {
         next.add(name);
       }
-      track('gpu_specs_radar_gpu_toggled', { gpu: name, visible: !prev.has(name) });
+      track('gpu_specs_radar_gpu_toggled', { gpu: name, enabled: !prev.has(name) });
       return next;
     });
   }, []);
@@ -215,7 +212,7 @@ export function GpuSpecsRadarChart({ caption }: GpuSpecsRadarChartProps) {
             isLegendExpanded={isLegendExpanded}
             onExpandedChange={(expanded) => {
               setIsLegendExpanded(expanded);
-              track('gpu_specs_radar_legend_expanded', { expanded });
+              track('gpu_specs_radar_legend_expanded', { enabled: expanded });
             }}
             grouped={false}
             actions={

@@ -15,10 +15,6 @@ interface MobileControlSectionProps {
   testId?: string;
 }
 
-/**
- * A secondary control group that starts collapsed on phones and remains part of
- * the normal desktop layout. `md:contents` keeps the desktop grid unchanged.
- */
 export function MobileControlSection({
   label,
   count,
@@ -27,8 +23,6 @@ export function MobileControlSection({
   testId,
 }: MobileControlSectionProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  // URL-backed settings can differ from server defaults on the first client
-  // render. Only announce their changed count after hydration has completed.
   const hydrated = useSyncExternalStore(subscribeToHydration, clientSnapshot, serverSnapshot);
   const contentId = useId();
   return (
@@ -39,7 +33,7 @@ export function MobileControlSection({
         aria-controls={contentId}
         onClick={() => {
           setMobileOpen((open) => !open);
-          track('selector_secondary_controls_toggled', { section: testId, expanded: !mobileOpen });
+          track('selector_secondary_controls_toggled', { section: testId, enabled: !mobileOpen });
         }}
         className="mb-3 flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 rounded-md border border-border/70 bg-muted/10 px-3 text-left text-sm font-medium text-foreground md:hidden"
       >

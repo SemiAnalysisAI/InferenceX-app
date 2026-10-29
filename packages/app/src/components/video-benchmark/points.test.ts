@@ -61,6 +61,7 @@ const page: VideoHistoryPage = {
       runId: '34342452354',
       artifact,
       publishedAt: '2026-09-10T00:00:00Z',
+      approved: true,
       error: null,
       sources: [
         source,
@@ -80,6 +81,7 @@ const page: VideoHistoryPage = {
       runId: '34342452354',
       artifact: { ...artifact, id: 1 },
       publishedAt: '2026-09-01T00:00:00Z',
+      approved: true,
       error: null,
       sources: [{ ...source, observations: [{ ...observation, p50: 999 }] }],
     },
@@ -87,6 +89,13 @@ const page: VideoHistoryPage = {
 };
 
 describe('videoPoints', () => {
+  it('keeps a legacy stored source in History without turning it into an official chart point', () => {
+    const legacy = structuredClone(page);
+    delete legacy.entries[0].approved;
+    legacy.entries[1].approved = false;
+    expect(legacy.entries[0].sources[0].observations).toHaveLength(2);
+    expect(videoPoints([legacy])).toEqual([]);
+  });
   it('flattens observation cells, maps hardware keys and keeps the newest publication of a source', () => {
     const points = videoPoints([page]);
     expect(points.map((p) => [p.id, p.concurrency])).toEqual([
@@ -265,6 +274,18 @@ describe('dashboardCells', () => {
     expect(result.cells.map((p) => p.id)).toEqual(['b:c1', 'formal:c1']);
     expect(result.otherWorkloads).toBe(1);
     expect(result.workload).toBe(FORMAL.split(' · ').slice(0, 5).join(' · '));
+  });
+
+  it('breaks a full hardware and cell tie by the newer publication, not roster order', () => {
+    // Newer publication of an older artifact (backfill) on the later roster SKU.
+    const newer = pageOf('1', 'NVIDIA H200', [cell({ id: 'new:c1', workloadKey: 'new-plan' })]);
+    newer.entries[0].publishedAt = '2026-09-12T00:00:00Z';
+    const older = pageOf('2', 'NVIDIA B200', [
+      cell({ id: 'old:c1', hardware: 'NVIDIA B200', workloadKey: 'old-plan' }),
+    ]);
+    const result = dashboardCells(videoPoints([newer, older]));
+    expect(result.cells.map((p) => p.id)).toEqual(['new:c1']);
+    expect(result.otherWorkloads).toBe(1);
   });
 
   it('keeps legacy cells together only inside their sealed source, never by label', () => {

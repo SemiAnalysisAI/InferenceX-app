@@ -5,15 +5,9 @@ import { gpuMetricsArtifactSuffix } from './gpu-metrics-artifacts';
 
 export interface TelemetryObservation {
   identity: Record<string, unknown>;
-  /** Exact selected artifact names, or both allowed sibling names when absent. */
   artifactNames: string[];
   produced: boolean | null;
   error?: string;
-  /**
-   * The artifact was produced but holds no telemetry files (no GPU metrics CSV
-   * or multinode power samples), for example a sweep run with power collection
-   * off. Nothing was collected, so nothing is stored or API-checked.
-   */
   notCollected?: true;
 }
 
@@ -28,9 +22,7 @@ export interface TelemetryPointReceipt extends TelemetryObservation {
   benchmarkResultId: number | null;
   series: (TelemetrySeriesCoverage & { id: number })[];
   storage: {
-    /** `not_collected`: the artifact held no telemetry files, so no series is expected. */
     status: 'complete' | 'incomplete' | 'unknown' | 'not_collected';
-    /** Null means the original artifact inventory was not retained. */
     expectedSeries: TelemetrySeriesCoverage[] | null;
   };
   linkedSeriesIds: number[];
@@ -49,15 +41,11 @@ export interface TelemetryReceipt {
   runId: number;
   runAttempt: number;
   checkedAt: string;
-  /** This is attachment coverage for known benchmark points, not a full-sweep verdict. */
   expectedSource: 'benchmark_artifacts' | 'database_benchmarks' | 'unknown';
-  /** No complete independent planned matrix is available to this attachment reader. */
   plannedPointCount: null;
   databaseError?: string;
   recoveryError?: string;
-  /** Missing on older receipts or when the failed recovery covered the whole run. */
   recoveryArtifactNames?: string[];
-  /** The sibling is known, but a download/parse failure prevents identifying its points. */
   expectationErrors?: { benchmarkArtifact: string; artifactNames: string[]; error: string }[];
   points: TelemetryPointReceipt[];
   counts: {
@@ -67,11 +55,8 @@ export interface TelemetryReceipt {
     storedPoints: number | null;
     linkedPoints: number | null;
     storageUnknownPoints: number;
-    /** Points whose artifact held no telemetry files; neither stored nor a storage miss. */
     notCollectedPoints: number;
-    /** Actual successful HTTP reads, including readable but incomplete artifacts. */
     apiReadablePoints: number;
-    /** Readable, fully stored/linked points with no outstanding corrective-ingest failure. */
     apiCompletePoints: number;
     apiUnknownPoints: number;
     producedArtifacts: number;
@@ -158,7 +143,6 @@ function seriesCoverage(
   };
 }
 
-/** GitHub's run-wide listing also retains artifacts from earlier attempts. */
 export function telemetryArtifactsForAttempt(
   artifacts: readonly ArtifactMeta[],
   source: Pick<RunMeta, 'run_attempt' | 'run_started_at'>,
@@ -174,7 +158,6 @@ export function telemetryArtifactsForAttempt(
   return artifacts.filter((artifact) => Date.parse(artifact.created_at) >= start);
 }
 
-/** Count identities, artifacts, series and samples separately; shared series count once. */
 export function summarizeTelemetryReceipt(receipt: TelemetryReceipt): TelemetryReceipt {
   const points = receipt.points;
   const series = new Map(points.flatMap((point) => point.series.map((s) => [s.id, s] as const)));
@@ -212,7 +195,6 @@ export function summarizeTelemetryReceipt(receipt: TelemetryReceipt): TelemetryR
   return receipt;
 }
 
-/** Absent observations name alternative siblings, not two required uploads. */
 function coversArtifactScope(
   current: TelemetryObservation,
   previous: TelemetryObservation,
@@ -231,7 +213,6 @@ function coversArtifactScope(
   );
 }
 
-/** Read actual persistence/link state, preserving unrelated points on targeted recovery. */
 export async function readTelemetryReceipt(
   sql: Sql,
   run: { runId: number; runAttempt: number },
@@ -240,10 +221,8 @@ export async function readTelemetryReceipt(
     expectedSource?: TelemetryReceipt['expectedSource'];
     previous?: TelemetryReceipt;
     targeted?: boolean;
-    /** Mapped identity -> persisted ID, only from the historical resolver's unique fallback. */
     uniqueFallbacks?: ReadonlyMap<string, number>;
     recoveryError?: string;
-    /** Omitted/null means the current failure covers the whole run. */
     recoveryArtifactName?: string | null;
     expectationErrors?: TelemetryReceipt['expectationErrors'];
   } = {},
@@ -297,7 +276,6 @@ export async function readTelemetryReceipt(
     const observation = observed.get(key);
     const row = storedById.get(id);
     if (receipt.databaseError || !observation || !row || stored.has(key)) continue;
-    // The resolver allows historical offload drift only; keep every other dimension exact.
     const identity = { ...observation.identity, offload_mode: row.offload_mode };
     const canonicalKey = stablePowerPointIdentity(identity);
     if (canonicalKey !== stablePowerPointIdentity(row)) continue;
@@ -385,7 +363,6 @@ export async function readTelemetryReceipt(
     if (receipt.databaseError) reasons.push('database_check_failed');
     else {
       if (benchmarkResultId === null) reasons.push('benchmark_not_stored');
-      // No telemetry files existed for not-collected points, so no series is expected.
       if (!observation.notCollected) {
         if (matching.length === 0) reasons.push('series_not_stored');
         else if (matching.some((s) => Number(s.sample_count) === 0))
@@ -420,7 +397,6 @@ export async function readTelemetryReceipt(
     });
   }
   receipt.points.sort((a, b) => a.key.localeCompare(b.key));
-  // Merge current failures after resolving prior ones, before counts can claim completeness.
   if (options.recoveryError) {
     const priorError = receipt.recoveryError;
     const priorScope = receipt.recoveryArtifactNames;
@@ -447,14 +423,12 @@ export async function readTelemetryReceipt(
   return summarizeTelemetryReceipt(receipt);
 }
 
-/** Only an actual HTTP read advances API status; DB-queryable is not API-readable. */
 export async function verifyTelemetryApi(
   receipt: TelemetryReceipt,
   origin: string,
   options: { fetch?: typeof fetch; headers?: HeadersInit } = {},
 ): Promise<TelemetryReceipt> {
   for (const point of receipt.points) {
-    // Nothing was collected for not-collected points, so there is nothing to read back.
     if (point.benchmarkResultId === null || point.notCollected) continue;
     const url = new URL('/api/v1/gpu-metrics-point', origin);
     url.searchParams.set('id', String(point.benchmarkResultId));

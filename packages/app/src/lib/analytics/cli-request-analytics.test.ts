@@ -47,17 +47,25 @@ describe('client request attribution', () => {
       distinct_id: 'inferencex-client-request-volume',
       timestamp: expect.any(String),
       properties: {
-        source: 'skill',
+        client: 'skill',
         version: '1.0.0',
-        route: '/api/v1/datasets/{slug}/conversations/{convId}',
+        route_template: '/api/v1/datasets/{slug}/conversations/{convId}',
         environment: 'production',
         traffic: 'validation',
-        $process_person_profile: false,
         $geoip_disable: true,
         $lib: 'inferencex-server',
+        $process_person_profile: false,
       },
     });
     expect(options.body).not.toContain('secret');
+  });
+
+  it.each([
+    ['inferencex-cli/2.3.4', 'cli', '2.3.4'],
+    ['inferencex-skill/0.9.0', 'skill', '0.9.0'],
+  ])('reads client and version from the %s user agent', async (userAgent, client, version) => {
+    await captureClientRequest(request(undefined, { 'user-agent': userAgent }));
+    expect(JSON.parse(send.mock.calls[0][1].body).properties).toMatchObject({ client, version });
   });
 
   it('normalizes every public GET and OpenAPI from the catalog', async () => {
@@ -71,7 +79,7 @@ describe('client request attribution', () => {
         (entry.classification === 'published-read' || entry.path === '/api/openapi.json');
       expect(send.mock.calls.length, `${entry.method} ${entry.path}`).toBe(eligible ? 1 : 0);
       if (eligible)
-        expect(JSON.parse(send.mock.calls[0][1].body).properties.route).toBe(entry.path);
+        expect(JSON.parse(send.mock.calls[0][1].body).properties.route_template).toBe(entry.path);
     }
   });
 

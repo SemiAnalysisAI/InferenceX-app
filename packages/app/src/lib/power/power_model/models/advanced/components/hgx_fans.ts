@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
 /* oxlint-disable max-classes-per-file -- mirrors the upstream Python module, class for class */
-/** Shared fan control and TDP-based cooling capacity for normalized HGX comparisons. */
 
 import {
   type Details,
@@ -58,7 +57,6 @@ export interface AffinityFanPowerFields {
   provenance?: Provenance;
 }
 
-/** Infer PWM from thermal load, then apply electrical nameplate times PWM cubed. */
 export class AffinityFanPower extends FanPower {
   static override readonly typeName: string = 'AffinityFanPower';
   readonly electrical_nameplate_w: number;
@@ -129,7 +127,6 @@ export interface HGXFanPolicyFields {
   fan_power_ratio_at_design?: number;
 }
 
-/** A common controller and cooling-efficiency assumption, independent of GPU family. */
 export class HGXFanPolicy extends FrozenModel {
   static override readonly typeName: string = 'HGXFanPolicy';
   readonly min_pwm_frac: number;
@@ -171,7 +168,6 @@ export interface NormalizedHGXFanPowerFields {
   provenance?: Provenance;
 }
 
-/** Size cooling from GPU TDP and host design power, then apply the shared policy. */
 export class NormalizedHGXFanPower extends FanPower {
   static override readonly typeName: string = 'NormalizedHGXFanPower';
   readonly gpu_tdp_w: number;
@@ -242,7 +238,6 @@ export class NormalizedHGXFanPower extends FanPower {
       gpu_count: this.gpu_count,
       design_non_gpu_power_w: this.design_non_gpu_power_w,
       policy: this.policy,
-      // pydantic computed fields serialize with the model.
       full_cooling_load_w: this.full_cooling_load_w,
       electrical_nameplate_w: this.electrical_nameplate_w,
     };

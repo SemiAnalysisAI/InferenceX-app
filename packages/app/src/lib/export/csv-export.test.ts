@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import { buildCsv, csvLicensePreamble, downloadCsv, exportToCsv } from './csv-export';
 
-/** Strip the license preamble to isolate data assertions */
 function dataLines(csv: string): string {
   return csv
     .split('\n')
@@ -40,7 +39,6 @@ describe('buildCsv', () => {
     const noteIndex = lines.indexOf(`# ${note}`);
     expect(noteIndex).toBeGreaterThan(-1);
     expect(lines[noteIndex + 1]).toBe('A');
-    // Notes must not disturb the data section
     expect(dataLines(result)).toBe('A\n1');
   });
 

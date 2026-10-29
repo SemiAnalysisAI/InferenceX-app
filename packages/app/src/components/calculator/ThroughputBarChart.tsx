@@ -32,7 +32,6 @@ import type {
   InterpolatedResult,
 } from './types';
 
-/** Locale-specific tooltip strings; technical identifiers and units remain unchanged. */
 const OVERLAY_STRINGS = {
   en: {
     unofficialRun: 'UNOFFICIAL RUN',
@@ -76,12 +75,9 @@ interface ThroughputBarChartProps {
   onBarSelect: (resultKey: string) => void;
   legendElement?: React.ReactNode;
   caption?: React.ReactNode;
-  /** Optional color resolver — when provided, overrides static hardware config colors. */
   colorResolver?: (hwKey: string) => string;
 }
 
-// Pure accessors live in `power-ranking.ts` so server code (views API) can
-// share them without importing this 'use client' d3 module.
 import { getThroughputForType, getTpPerMwForType } from './power-ranking';
 export {
   getComparableTpPerMwForType,
@@ -170,7 +166,7 @@ export function getCostProviderLabel(provider: CostProvider, locale: Locale = 'e
   if (locale === 'zh') {
     switch (provider) {
       case 'costh': {
-        return '自有设备 · 超大规模云大批量';
+        return '自有设备 · 超大规模云厂商批量采购';
       }
       case 'costr': {
         return '租赁设备 · 3 年承诺';
@@ -230,17 +226,14 @@ export function getSortedResults(
   const sorted = [...results];
   switch (barMetric) {
     case 'power': {
-      // Most efficient first (descending)
       sorted.sort((a, b) => getTpPerMwForType(b, costType) - getTpPerMwForType(a, costType));
       return sorted;
     }
     case 'cost': {
-      // Cheapest first (ascending cost)
       sorted.sort((a, b) => getCostForType(a, costType) - getCostForType(b, costType));
       return sorted;
     }
     default: {
-      // Highest throughput first (descending, using token-type-appropriate value)
       sorted.sort((a, b) => getThroughputForType(b, costType) - getThroughputForType(a, costType));
       return sorted;
     }
@@ -259,14 +252,6 @@ export function getCostTypeLabel(costType: CostType): string {
   return '/M tok';
 }
 
-/**
- * Display label for a result: `B300`, `B300 (FP4)` when multiple precisions are
- * selected, and `B300 (✕ my-branch)` / `B300 (FP4 · ✕ my-branch)` for an
- * unofficial-run overlay bar.
- *
- * The suffix always stays inside one pair of parens so the y-axis customizer
- * `twoRowYAxisLabels({ split: 'parens' })` keeps splitting it into two rows.
- */
 export function getResultLabel(d: InterpolatedResult, hardwareConfig: HardwareConfig): string {
   const config = hardwareConfig[d.hwKey] || getHardwareConfig(d.hwKey);
   const baseName = config ? getDisplayLabel(config) : d.hwKey;
@@ -287,9 +272,6 @@ export function generateTooltipHTML(
   overlayStrings: OverlayTooltipStrings = OVERLAY_STRINGS.en,
   locale: Locale = 'en',
 ): string {
-  // Everything interpolated below is escaped if it can carry text this codebase
-  // did not author — today that is the overlay branch name and run URL, which
-  // come from the GitHub API for whatever run id the user pasted.
   const label = escapeHtml(getResultLabel(d, hardwareConfig));
   const costLabel = getCostTypeLabel(costType);
   const costValue = getCostForType(d, costType);
@@ -322,7 +304,6 @@ export function generateTooltipHTML(
           : 'tok/s/user';
   const metricValue = getMetricValue(d, barMetric, costType);
 
-  // Get parallelism info from nearest data points
   const nearest = d.nearestPoints[0];
   const tp = nearest?.tp ?? 0;
   const ep = nearest?.ep;
@@ -344,8 +325,6 @@ export function generateTooltipHTML(
       ? `$${metricValue.toFixed(3)}${metricUnit}`
       : `${metricValue.toFixed(barMetric === 'power' ? 0 : 1)} ${metricUnit}`;
 
-  // Overlay bars link to their own workflow run, not the official run behind
-  // the DB data — the two are unrelated.
   const effectiveRunUrl = d.isOverlay ? d.runUrl : runUrl;
   const runLinkLabel = d.isOverlay
     ? overlayStrings.viewRun
@@ -356,10 +335,6 @@ export function generateTooltipHTML(
     ? `<div style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px;"><a href="${escapeHtml(effectiveRunUrl)}" target="_blank" rel="noopener noreferrer" style="color: var(--primary); font-size: 11px; text-decoration: underline; cursor: pointer;">${runLinkLabel} &#8599;</a></div>`
     : '';
 
-  // The target can sit outside a given series' measured range — series ranges
-  // differ, and a loaded unofficial run widens the slider to cover its own
-  // operating points. Say so rather than letting a clamped edge value read as a
-  // measurement at the current target.
   const clampedHtml = d.clamped
     ? `<div style="color: var(--muted-foreground); font-size: 10px; font-style: italic; margin-bottom: 4px;">${overlayStrings.clamped}</div>`
     : '';
@@ -400,15 +375,12 @@ export function generateTooltipHTML(
   `;
 }
 
-// ── Helpers at module scope for use in memos and layers ──
-
 const getLabel = getResultLabel;
 
 function getColor(): string {
   return 'var(--foreground)';
 }
 
-/** Position value + overlay labels together, flipping both when the longer one doesn't fit. */
 function positionLabelPairs(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
   xScale: d3.ScaleLinear<number, number>,
@@ -420,7 +392,6 @@ function positionLabelPairs(
   const valueLabels = group.selectAll<SVGTextElement, InterpolatedResult>('.value-label');
   const overlayLabels = group.selectAll<SVGTextElement, InterpolatedResult>('.overlay-label');
 
-  // Build a map of max text width per resultKey (pretext, no reflow)
   const maxWidths = new Map<string, number>();
   valueLabels.each(function (d) {
     const text = d3.select(this).text();
@@ -437,9 +408,6 @@ function positionLabelPairs(
       const barEnd = xScale(getMetricValue(d, barMetric, costType));
       const maxW = maxWidths.get(d.resultKey) ?? 0;
       const fitsInside = barEnd > maxW + 24;
-      // On narrow (phone) plots the longest bars can leave too little room to
-      // their right. Pull the label left so it ends at the plot edge instead
-      // of clipping, and give it a background halo where it overlaps the bar.
       const outsideX = Math.min(barEnd + 6, Math.max(0, chartWidth - maxW - 2));
       const clamped = !fitsInside && outsideX < barEnd + 6;
       const fill = fitsInside ? contrastColors(getBarColor(d)) : 'var(--foreground)';
@@ -486,9 +454,6 @@ export default function ThroughputBarChart({
   const chartRef = useRef<D3ChartHandle>(null);
   const locale = useLocale();
 
-  // Color resolution: unofficial-run overlay bars take the run's palette color
-  // (so they match the banner + legend swatch — see lib/charts/overlay-run-style.ts);
-  // official bars prefer the dynamic colorResolver, falling back to static config.
   const resolveBarColor = useCallback(
     (datum: InterpolatedResult) =>
       datum.isOverlay
@@ -499,7 +464,6 @@ export default function ThroughputBarChart({
     [colorResolver],
   );
 
-  // Stable refs to avoid re-running the D3 effect
   const hoveredBarXRef = useRef(0);
   const selectedBarsRef = useRef(selectedBars);
   selectedBarsRef.current = selectedBars;
@@ -512,13 +476,11 @@ export default function ThroughputBarChart({
     [results, barMetric, costType],
   );
 
-  // Dynamic height based on bar count
   const dynamicHeight = useMemo(() => {
     const barCount = sortedResults.length || 1;
     return Math.max(600, barCount * 55 + 120);
   }, [sortedResults.length]);
 
-  // Dynamic left margin: measure longest Y-axis label via pretext
   const dynamicMargin = useMemo(() => {
     if (sortedResults.length === 0) return { top: 20, right: 20, bottom: 60, left: 80 };
     const labels = sortedResults.map((r) => getLabel(r, hardwareConfig));
@@ -530,13 +492,11 @@ export default function ThroughputBarChart({
     };
   }, [sortedResults, hardwareConfig]);
 
-  // X domain
   const maxBarValue = useMemo(() => {
     const max = d3.max(sortedResults, (d) => getMetricValue(d, barMetric, costType)) || 1;
     return max * 1.15;
   }, [sortedResults, barMetric, costType]);
 
-  // Y domain — reversed because useD3ChartRenderer builds band scale with range [height, 0]
   const yDomain = useMemo(
     () => [...sortedResults].toReversed().map((r) => r.resultKey),
     [sortedResults],
@@ -596,8 +556,6 @@ export default function ThroughputBarChart({
     [maxBarValue],
   );
 
-  // ── Layers ──
-
   const layers = useMemo(() => {
     const barLayer: HorizontalBarLayerConfig<InterpolatedResult> = {
       type: 'horizontalBar',
@@ -613,7 +571,6 @@ export default function ThroughputBarChart({
       },
     };
 
-    // Combined label layer — value + overlay labels flip inside/outside together
     const labelLayer: CustomLayerConfig = {
       type: 'custom',
       key: 'bar-labels',
@@ -622,7 +579,6 @@ export default function ThroughputBarChart({
         const xScale = ctx.xScale as d3.ScaleLinear<number, number>;
         const yScale = ctx.yScale as d3.ScaleBand<string>;
 
-        // Render value labels
         zoomGroup
           .selectAll<SVGTextElement, InterpolatedResult>('.value-label')
           .data(sortedResults, (d) => d.resultKey)
@@ -636,7 +592,6 @@ export default function ThroughputBarChart({
           .style('pointer-events', 'none')
           .text((d) => getValueLabel(d, barMetric, mode, costType));
 
-        // Render overlay labels
         zoomGroup
           .selectAll<SVGTextElement, InterpolatedResult>('.overlay-label')
           .data(sortedResults, (d) => d.resultKey)
@@ -658,7 +613,6 @@ export default function ThroughputBarChart({
             return `$${getCostForType(d, costType).toFixed(3)}${costLbl}`;
           });
 
-        // Position both labels together using the longer text width
         const barColor = (d: InterpolatedResult) => resolveBarColor(d);
         positionLabelPairs(zoomGroup, xScale, ctx.width, barMetric, costType, barColor);
       },
@@ -686,7 +640,6 @@ export default function ThroughputBarChart({
     return [barLayer, labelLayer];
   }, [sortedResults, barMetric, costType, mode, maxBarValue, paletteIdentity, resolveBarColor]);
 
-  // ── Tooltip ──
   const tooltipStateRef = useRef({ hardwareConfig, mode, barMetric, costType, runUrl, locale });
   tooltipStateRef.current = { hardwareConfig, mode, barMetric, costType, runUrl, locale };
 
@@ -739,8 +692,6 @@ export default function ThroughputBarChart({
     [],
   );
 
-  // ── Y axis customize: map resultKey → display label, then split into two-line GPU labels ──
-
   const yAxisConfig = useMemo(() => {
     const labelMap = new Map(sortedResults.map((r) => [r.resultKey, getLabel(r, hardwareConfig)]));
     return {
@@ -749,9 +700,6 @@ export default function ThroughputBarChart({
     };
   }, [sortedResults, hardwareConfig]);
 
-  // Phones: fewer ticks, SI-compact only for large values ("100k") so labels
-  // never collide. Small values (e.g. cost) keep plain decimals: '~s' would
-  // turn 0.1 into "100m".
   const isMobileViewport = useIsMobileViewport();
   const xAxisConfig = useMemo(
     () =>
@@ -767,12 +715,9 @@ export default function ThroughputBarChart({
     [isMobileViewport],
   );
 
-  // ── onRender: x-axis label + initial selection opacities ──
-
   const onRender = useMemo(
     () => (ctx: RenderContext) => {
       const { layout, width, height } = ctx;
-      // X axis label
       let xLabelEl = layout.g.select<SVGTextElement>('.x-axis-label-calc');
       if (xLabelEl.empty()) {
         xLabelEl = layout.g.append('text').attr('class', 'x-axis-label-calc');
@@ -785,14 +730,12 @@ export default function ThroughputBarChart({
         .style('fill', 'var(--muted-foreground)')
         .text(getMetricLabel(barMetric, mode, costType, locale));
 
-      // Apply initial selection opacities — use g (not zoomGroup) since clipContent=false
       const renderGroup = layout.g;
       applySelectionOpacities(renderGroup, selectedBarsRef.current);
     },
     [barMetric, mode, costType, locale],
   );
 
-  // React to selection changes without full re-render
   useEffect(() => {
     const svgEl = chartRef.current?.getSvgElement();
     if (!svgEl) return;
@@ -845,8 +788,6 @@ export default function ThroughputBarChart({
     />
   );
 }
-
-// ── Selection opacity helper ──
 
 function applySelectionOpacities(
   group: d3.Selection<any, unknown, null, undefined>,

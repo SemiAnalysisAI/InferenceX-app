@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { ApiRequestError } from '@/lib/api/api-request-error';
+
 import { useByIdQuery } from './benchmark-id-query';
 
 export interface TimeSeriesPoint {
-  /** Seconds from benchmark start. */
   t: number;
   value: number;
 }
@@ -92,43 +93,33 @@ export interface TraceServerMetrics {
   promptTokensBySource: Record<string, TimeSeriesPoint[]>;
   prefillTps: TimeSeriesPoint[];
   decodeTps: TimeSeriesPoint[];
-  /** Tokens served from prefix cache per scrape (vllm:prefix_cache_hits rate). */
   prefixCacheHitsTps: TimeSeriesPoint[];
-  /** Host (CPU offload) KV cache utilization, 0..1. SGLang hicache only. */
   hostKvCacheUsage: TimeSeriesPoint[];
-  /**
-   * Per-DP-rank KV cache utilization. Empty for single-engine deployments —
-   * the cluster-average `kvCacheUsage` line covers that case alone.
-   */
   kvCacheUsageByEngine: { engineLabel: string; points: TimeSeriesPoint[] }[];
-  /**
-   * Deployment KV-pool capacity in tokens, derived at ingestion for vLLM/ATOM.
-   * Nominal capacity: ATOM checkpoints can share this pool with token KV.
-   */
   kvCachePoolTokens: number | null;
-  /** Orchestrator-normalized metrics grouped by endpoint/worker. */
   metricSources: MetricSourceDescriptor[];
 }
 
-/**
- * Lazy-fetch parsed server-metric time-series for one agentic point.
- * Enabled only when the caller passes `enabled=true` (the detail panel opens),
- * so we don't pay the parse cost on every hover.
- */
 export function useTraceServerMetrics(id: number | null, enabled = false) {
   return useByIdQuery<TraceServerMetrics>('trace-server-metrics', id, enabled && Boolean(id));
 }
 
-/** Fetch one endpoint/worker's full arrays only after it is selected. */
 export function useTraceServerMetricSource(id: number | null, source: string, enabled = false) {
   return useQuery({
     queryKey: ['trace-server-metric-source', id, source] as const,
     queryFn: async ({ signal }): Promise<MetricSourceSeries | null> => {
       if (!id || !source || source === 'all') return null;
       const params = new URLSearchParams({ id: String(id), source });
-      const response = await fetch(`/api/v1/trace-server-metric-source?${params}`, { signal });
+      const url = `/api/v1/trace-server-metric-source?${params}`;
+      const response = await fetch(url, { signal });
       if (response.status === 404) return null;
-      if (!response.ok) throw new Error(`trace-server-metric-source ${response.status}`);
+      if (!response.ok) {
+        throw new ApiRequestError(
+          `trace-server-metric-source ${response.status}`,
+          response.status,
+          url,
+        );
+      }
       return (await response.json()) as MetricSourceSeries;
     },
     enabled: enabled && Boolean(id) && source !== 'all',

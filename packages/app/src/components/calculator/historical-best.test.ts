@@ -14,10 +14,6 @@ import {
 } from './historical-best';
 import type { InterpolatedResult } from './types';
 
-/**
- * Rows go through the real `buildGpuGroups`, so `hardware` must exist in the
- * hardware registry and isl/osl must match the selected sequence.
- */
 function makeRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
   return {
     id: 1,
@@ -56,7 +52,6 @@ function makeRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
   };
 }
 
-/** A sweep point: one row at a given interactivity / throughput on a given date. */
 function sweep(
   date: string,
   interactivity: number,
@@ -77,7 +72,6 @@ function sweep(
   });
 }
 
-/** Ranks by total-token throughput — stands in for the injected cost-matrix accessor. */
 const rankByThroughput = (r: InterpolatedResult) => r.value;
 
 function options(
@@ -103,7 +97,6 @@ describe('selectHistoricalBest', () => {
   });
 
   it('promotes an earlier date when it beat the latest at the target', () => {
-    // June sweep is stronger at the target; July explored elsewhere and regressed.
     const rows = [
       sweep('2026-06-01', 20, 1200),
       sweep('2026-06-01', 50, 900),
@@ -123,7 +116,6 @@ describe('selectHistoricalBest', () => {
     expect(entry.datesConsidered).toBe(2);
     expect(entry.datesMeasured).toBe(2);
     expect(entry.result.value).toBeCloseTo(900, 6);
-    // The latest date is still reported, so the UI can show what was given up.
     expect(entry.latestRankValue).toBeCloseTo(600, 6);
   });
 
@@ -142,9 +134,6 @@ describe('selectHistoricalBest', () => {
   });
 
   it('never lets a clamped read win', () => {
-    // The June sweep tops out at 30 tok/s/user but is very high throughput
-    // there. Clamping would credit 5000 tok/s/gpu at a target of 50, which
-    // June never measured — that is the artifact this rule exists to kill.
     const rows = [
       sweep('2026-06-01', 10, 6000),
       sweep('2026-06-01', 30, 5000),
@@ -157,7 +146,6 @@ describe('selectHistoricalBest', () => {
     expect(entry.datesMeasured).toBe(1);
     expect(entry.datesConsidered).toBe(2);
     expect(entry.result.clamped).toBeFalsy();
-    // Nowhere near June's clamped 5000.
     expect(entry.result.value).toBeLessThan(1000);
   });
 
@@ -167,20 +155,12 @@ describe('selectHistoricalBest', () => {
     const { best, unmeasured } = selectHistoricalBest(options(rows, { targetValue: 20 }));
     expect(best).toEqual([]);
     expect(unmeasured).toHaveLength(1);
-    // The nearest measured point lets the UI explain *why* there is no number.
-    // Everything this chip has is above the target, so there is no value below.
     expect(unmeasured[0]!.nearestBelow).toBeNull();
     expect(unmeasured[0]!.nearestAbove).toBe(60);
     expect(unmeasured[0]!.datesConsidered).toBe(1);
   });
 
   it('never reports a neighbourhood that brackets the target it just excluded', () => {
-    // Two dates, each a single point, on opposite sides of the target. The old
-    // disclosure took the union of raw points across dates and reported
-    // "measured 20.0-80.0" for a target of 50 — an interval no sweep covered,
-    // which reads as a bug in the exclusion rather than an explanation of it.
-    // Neither date can be read at 50: a one-point frontier is only readable at
-    // its own interactivity.
     const rows = [sweep('2026-06-01', 20, 1000), sweep('2026-07-01', 80, 400)];
 
     const { best, unmeasured } = selectHistoricalBest(options(rows, { targetValue: 50 }));
@@ -190,9 +170,6 @@ describe('selectHistoricalBest', () => {
     expect(entry.nearestBelow).toBe(20);
     expect(entry.nearestAbove).toBe(80);
     expect(entry.datesConsidered).toBe(2);
-    // The claim the pair makes is "nothing at 50", not "measured 20 through 80".
-    // Whatever is reported, the target must not sit strictly inside a span any
-    // single date covered — no such date exists, or there would be a winner.
     expect(entry.nearestBelow).toBeLessThan(50);
     expect(entry.nearestAbove).toBeGreaterThan(50);
   });
@@ -205,8 +182,6 @@ describe('selectHistoricalBest', () => {
       sweep('2026-07-01', 60, 700),
     ];
 
-    // Inverting the ranking must invert the winner — proof the caller's
-    // cost-matrix accessor is what decides, not a hardcoded field.
     const highest = selectHistoricalBest(options(rows)).best[0]!;
     const lowest = selectHistoricalBest(options(rows, { rank: (r) => -r.value })).best[0]!;
     expect(highest.date).toBe('2026-06-01');
@@ -221,9 +196,6 @@ describe('selectHistoricalBest', () => {
   });
 
   it('keeps each date on its own frontier', () => {
-    // If dates were pooled, the June high-throughput point and the July
-    // high-interactivity point would form one frontier and interpolate to a
-    // config no single sweep ever produced.
     const rows = [
       sweep('2026-06-01', 30, 2000),
       sweep('2026-06-01', 40, 1800),
@@ -232,7 +204,6 @@ describe('selectHistoricalBest', () => {
     ];
 
     const { best, unmeasured } = selectHistoricalBest(options(rows, { targetValue: 50 }));
-    // Neither date measured 50, and pooling is the only way to get a read.
     expect(best).toEqual([]);
     expect(unmeasured).toHaveLength(1);
   });
@@ -247,17 +218,13 @@ describe('selectHistoricalBest', () => {
 
     const { best } = selectHistoricalBest(options(rows, { precisions: ['fp4', 'fp8'] }));
     expect(best).toHaveLength(2);
-    // Ranked best first.
     expect(best[0]!.rankValue).toBeGreaterThan(best[1]!.rankValue);
     expect(best[0]!.hwKey).toContain('b300');
     expect(best[1]!.hwKey).toContain('h200');
-    // One series per hwKey, keyed for the legend.
     for (const entry of best) expect(entry.result.resultKey).toBe(entry.hwKey);
   });
 
   it('pools precisions into one frontier per hwKey', () => {
-    // Precision is part of the config, and the question is what the chip's best
-    // config does — so fp8 winning on one date must be eligible.
     const rows = [
       sweep('2026-06-01', 40, 700, { precision: 'fp4' }),
       sweep('2026-06-01', 60, 500, { precision: 'fp4' }),
@@ -267,7 +234,6 @@ describe('selectHistoricalBest', () => {
 
     const { best } = selectHistoricalBest(options(rows, { precisions: ['fp4', 'fp8'] }));
     expect(best).toHaveLength(1);
-    // The fp8 frontier dominates, so the read reflects it.
     expect(best[0]!.result.value).toBeGreaterThan(1000);
   });
 
@@ -301,13 +267,10 @@ describe('selectHistoricalBest', () => {
 
     const entry = selectHistoricalBest(options(rows)).best[0]!;
     expect(entry.date).toBe('2026-06-01');
-    // Only the winning date's run — the number has to be traceable to it.
     expect(entry.runUrls).toEqual([june]);
   });
 
   it('reports every run pooled into a winning date', () => {
-    // getAllBenchmarksForHistory has no DISTINCT ON, so a same-day re-sweep
-    // lands in one bucket. Surfacing both URLs makes that visible.
     const a = 'https://github.com/org/repo/actions/runs/111';
     const b = 'https://github.com/org/repo/actions/runs/222';
     const rows = [
@@ -337,15 +300,12 @@ describe('selectHistoricalBest', () => {
       options(rows, { mode: 'throughput_to_interactivity', targetValue: 600 }),
     );
     expect(best).toHaveLength(1);
-    // Reads an interactivity, and June's curve is the higher one.
     expect(best[0]!.date).toBe('2026-06-01');
     expect(best[0]!.result.value).toBeGreaterThan(10);
     expect(best[0]!.result.value).toBeLessThan(30);
   });
 
   it('reuses one grouping across several targets', () => {
-    // The two stages exist so moving the slider re-reads the frontiers without
-    // rebuilding them; the staged path must agree with the composed one.
     const rows = [
       sweep('2026-06-01', 20, 1200),
       sweep('2026-06-01', 50, 900),
@@ -380,13 +340,9 @@ describe('selectHistoricalBest', () => {
 
 describe('bestSoFarProgression', () => {
   it('keeps only the dates that beat every earlier date', () => {
-    // The MI355X shape: a baseline, a big jump, a regression that must not
-    // register, then another jump.
     const rows = [
       ...[30, 60].map((iv) => sweep('2026-04-25', iv, iv === 30 ? 400 : 200)),
       ...[30, 60].map((iv) => sweep('2026-05-02', iv, iv === 30 ? 900 : 500)),
-      // A sweep exploring elsewhere that came out worse at the target — the
-      // fleet kept serving the config it already had, so this is not a step.
       ...[30, 60].map((iv) => sweep('2026-05-10', iv, iv === 30 ? 700 : 400)),
       ...[30, 60].map((iv) => sweep('2026-05-27', iv, iv === 30 ? 1600 : 800)),
     ];
@@ -430,8 +386,6 @@ describe('bestSoFarProgression', () => {
   });
 
   it('never lets a clamped read become a step', () => {
-    // April tops out at 30 tok/s/user; at a target of 45 it must not contribute,
-    // so the progression opens at the May sweep.
     const rows = [
       ...[10, 30].map((iv) => sweep('2026-04-25', iv, iv === 10 ? 6000 : 5000)),
       ...[40, 60].map((iv) => sweep('2026-05-02', iv, iv === 40 ? 800 : 500)),
@@ -455,8 +409,6 @@ describe('bestSoFarProgression', () => {
   });
 
   it('ends at the same config the all-time best selection reports', () => {
-    // The staircase's last rung and the headline figure must agree, or the table
-    // would contradict the chart.
     const rows = [
       ...[30, 60].map((iv) => sweep('2026-04-25', iv, iv === 30 ? 400 : 200)),
       ...[30, 60].map((iv) => sweep('2026-05-27', iv, iv === 30 ? 1600 : 800)),
@@ -493,12 +445,9 @@ describe('bestSoFarProgression', () => {
 });
 
 describe('mergeProgressionsByChip', () => {
-  /** Two frameworks on one B300, each improving on its own dates. */
   const twoFrameworks = [
-    // sglang: opens strong, then a modest gain.
     ...[30, 60].map((iv) => sweep('2026-04-25', iv, iv === 30 ? 900 : 500)),
     ...[30, 60].map((iv) => sweep('2026-06-01', iv, iv === 30 ? 1000 : 600)),
-    // trtllm: starts behind, then overtakes.
     ...[30, 60].map((iv) =>
       sweep('2026-05-02', iv, iv === 30 ? 600 : 300, { framework: 'trtllm' }),
     ),
@@ -513,7 +462,6 @@ describe('mergeProgressionsByChip', () => {
   };
 
   it('draws one line per chip, not one per software config', () => {
-    // Four hwKey-level progressions' worth of history, one piece of silicon.
     const chips = mergeAt(twoFrameworks);
     expect(chips).toHaveLength(1);
     expect(chips[0]!.baseGpu).toBe('b300');
@@ -523,8 +471,6 @@ describe('mergeProgressionsByChip', () => {
   it('follows whichever config is ahead at each moment', () => {
     const chips = mergeAt(twoFrameworks);
     const steps = chips[0]!.steps;
-    // trtllm's 2026-05-02 read (600) loses to sglang's incumbent 900, so it is
-    // not a rung; its 2026-07-04 read (1600) takes over and is.
     expect(steps.map((s) => s.date)).toEqual(['2026-04-25', '2026-06-01', '2026-07-04']);
     expect(steps.map((s) => s.result.hwKey)).toEqual(['b300_sglang', 'b300_sglang', 'b300_trt']);
     expect(chips[0]!.hwKeysUsed).toEqual(['b300_sglang', 'b300_trt']);
@@ -540,8 +486,6 @@ describe('mergeProgressionsByChip', () => {
   it('measures gain against the merged opening rung, not the winner own first run', () => {
     const steps = mergeAt(twoFrameworks)[0]!.steps;
     expect(steps[0]!.factorOverFirst).toBe(1);
-    // The last rung is trtllm's, but the gain is over sglang's opening read —
-    // that is what the fleet actually improved from.
     expect(steps.at(-1)!.factorOverFirst).toBeCloseTo(
       steps.at(-1)!.rankValue / steps[0]!.rankValue,
       9,
@@ -552,7 +496,6 @@ describe('mergeProgressionsByChip', () => {
   it('lets disagg compete for the same line as aggregated configs', () => {
     const rows = [
       ...[30, 60].map((iv) => sweep('2026-04-25', iv, iv === 30 ? 900 : 500)),
-      // Same silicon, run disaggregated, and stronger at the target.
       ...[30, 60].map((iv) =>
         sweep('2026-05-02', iv, iv === 30 ? 1600 : 800, {
           framework: 'sglang-disagg',
@@ -564,9 +507,7 @@ describe('mergeProgressionsByChip', () => {
     expect(chips).toHaveLength(1);
     const chip = chips[0]!;
     expect(chip.baseGpu).toBe('b300');
-    // Both rungs are on the one line, and the disagg run took over.
     expect(chip.steps.map((s) => s.date)).toEqual(['2026-04-25', '2026-05-02']);
-    // The chip is flagged so the section can carry the basis caveat.
     expect(chip.disagg).toBe(true);
   });
 
@@ -603,7 +544,6 @@ describe('mergeProgressionsByChip', () => {
 });
 
 describe('agentic traces', () => {
-  /** An agentic sweep point: no ISL/OSL, interactivity read at the percentile. */
   function agenticSweep(
     date: string,
     interactivity: number,
@@ -618,12 +558,9 @@ describe('agentic traces', () => {
       osl: null,
       conc: Math.round(tputPerGpu / interactivity),
       metrics: {
-        // Agentic interactivity is always derived as 1/itl — `*_intvty` straight
-        // off the artifact is dropped, the harness definition having drifted.
         p90_itl: 1 / interactivity,
         p90_e2el: 10,
         tput_per_gpu: tputPerGpu,
-        // The agentic mix: input tokens dominate by two orders of magnitude.
         output_tput_per_gpu: tputPerGpu * 0.008,
         input_tput_per_gpu: tputPerGpu * 0.992,
         ...(cacheHitRate === undefined ? {} : { server_gpu_cache_hit_rate: cacheHitRate }),
@@ -639,8 +576,6 @@ describe('agentic traces', () => {
   ];
 
   it('groups rows that have no ISL/OSL, keyed on the agentic sequence', () => {
-    // The section refused agentic traces on the premise that history could not be
-    // keyed without ISL/OSL. It can: `rowToSequence` keys on benchmark_type.
     const groups = groupHistoryByHwKeyAndDate({
       rows: agenticRows,
       sequence: Sequence.AgenticTraces,
@@ -650,7 +585,6 @@ describe('agentic traces', () => {
     const dated = [...groups.byHwKey.values()][0]!;
     expect(dated).toHaveLength(2);
     expect(dated[0]!.points).toHaveLength(2);
-    // And the interactivity came from the percentile metric, not median_intvty.
     expect(dated[0]!.points.map((p) => p.interactivity).toSorted((a, b) => a - b)).toEqual([
       40, 80,
     ]);
@@ -675,7 +609,6 @@ describe('agentic traces', () => {
     expect(rate).toBeGreaterThan(0.88);
     expect(rate).toBeLessThan(0.95);
 
-    // The same pipeline on fixed-sequence rows reports nothing to discount.
     const fixed = selectBestFromGroups(
       groupHistoryByHwKeyAndDate(
         options([sweep('2026-07-19', 40, 800), sweep('2026-07-19', 80, 500)]),

@@ -39,6 +39,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { track } from '@/lib/analytics/analytics';
+import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
 import { getModelSortIndex } from '@/lib/catalog/constants';
 import { exportToCsv } from '@/lib/export/csv-export';
 import {
@@ -145,7 +146,6 @@ interface ConfigOption {
   key: string;
   meta: GroupMeta;
   label: string;
-  /** No official rows; the configuration exists only in a loaded run. */
   overlayOnly: boolean;
 }
 
@@ -180,12 +180,7 @@ function CacheReuseInner() {
   const { availablePrecisions, availableSequences, availableModels } =
     useGlobalFilterAvailability();
 
-  // URL-seeded so an article can link the exact configuration; empty means
-  // "the configuration with the most tiered rows", which is why the default
-  // is never written back.
   const [configInput, setConfigInput] = useState<string>(() => readUrlParams().c_cfg ?? '');
-  // Empty means the recipe with the most tiered rows; like `c_cfg`, the
-  // default is never written back.
   const [recipeInput, setRecipeInput] = useState<string>(() => readUrlParams().c_recipe ?? '');
   const [showCeiling, setShowCeiling] = useState(false);
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
@@ -335,7 +330,6 @@ function CacheReuseInner() {
   }, []);
   const handleConfigChange = useCallback((key: string) => {
     setConfigInput(key);
-    // Recipe keys belong to one configuration; carry none across a switch.
     setRecipeInput('');
     writeUrlParams({ c_cfg: key, c_recipe: '' });
     track('cache_reuse_config_selected', { config: key });
@@ -510,7 +504,7 @@ function CacheReuseInner() {
       isLegendExpanded={isLegendExpanded}
       onExpandedChange={(expanded) => {
         setIsLegendExpanded(expanded);
-        track('cache_reuse_legend_expanded', { expanded });
+        track('cache_reuse_legend_expanded', { enabled: expanded });
       }}
       switches={[
         {
@@ -673,6 +667,11 @@ function CacheReuseInner() {
             <ChartButtons
               chartId="cache-reuse"
               analyticsPrefix="cache_reuse"
+              analyticsContext={selectionAnalyticsContext({
+                model: selectedModel,
+                sequence: selectedSequence,
+                precisions: selectedPrecisions,
+              })}
               hideZoomReset
               onExportCsv={handleExportCsv}
               exportFileName={`InferenceX_cache_reuse_${selectedModel}`}

@@ -146,9 +146,6 @@ describe('CollectiveX artifact assembly', () => {
   });
 
   it('does not read a success shard with no rows as a capacity wall', () => {
-    // Math.max() of no rows is -Infinity, which would put every ladder point
-    // "beyond the largest measured" and report a token-capacity limit that was
-    // never observed. Nothing was measured, so every point is pending.
     const dataset = buildDataset({ shards: [makeRawShard({ rows: [] })] });
     const points = dataset.coverage[0].points;
     expect(points.map((point) => point.terminal_status)).toEqual(points.map(() => 'pending'));
@@ -173,6 +170,13 @@ describe('CollectiveX artifact assembly', () => {
     expect(series.backend).toBe('nccl-ep');
     expect(series.series_id).toContain('nccl-ep');
     expect(series.points).toHaveLength(10);
+  });
+
+  it('carries the recorded backend version, and null where a result has none', () => {
+    expect(
+      makeCollectiveXSeries({ libraryVersion: ' 2.1.0+local@01dc3aaac820 ' }).library_version,
+    ).toBe('2.1.0+local@01dc3aaac820');
+    expect(makeCollectiveXSeries().library_version).toBeNull();
   });
 
   it('displays only AMD and NVIDIA vendor cases', () => {
@@ -200,15 +204,22 @@ describe('CollectiveX artifact assembly', () => {
     });
   });
 
+  it('carries the recorded source repository into the run and its summary', () => {
+    const dataset = buildDataset({ meta: { source_repository: 'ExampleOrg/ExampleBench' } });
+    expect(dataset.run.source_repository).toBe('ExampleOrg/ExampleBench');
+    expect(buildRunSummary(dataset).source_repository).toBe('ExampleOrg/ExampleBench');
+
+    const legacy = buildDataset();
+    expect(JSON.stringify(legacy.run)).not.toContain('source_repository');
+    expect(JSON.stringify(buildRunSummary(legacy))).not.toContain('source_repository');
+  });
+
   it('derives a per-GPU payload bandwidth from total_logical_bytes', () => {
     const dispatch = makeCollectiveXSeries().points[0].components.dispatch;
-    // total_logical_bytes (400000000) / ep (8) / p50 latency (417 µs) → GB/s.
     expect(dispatch?.payload_data_rate_gbps_at_latency_percentile?.p50).toBeCloseTo(
       (400000000 / 8 / 417) * 1e-3,
       3,
     );
-    // Distinct from the aggregate activation rate (activation bytes, no ep split):
-    // the payload rate reads total_logical_bytes and divides by the EP world size.
     expect(dispatch?.payload_data_rate_gbps_at_latency_percentile?.p50).not.toBeCloseTo(
       dispatch?.activation_data_rate_gbps_at_latency_percentile?.p50 ?? 0,
       1,
@@ -216,9 +227,6 @@ describe('CollectiveX artifact assembly', () => {
   });
 
   it('prefers wire_byte_provenance when the artifact carries it', () => {
-    // A token-expert LL row moves one copy per (token, expert); its deduplicated
-    // byte_provenance is a lower bound (~34% low on nccl-ep LL EP8 at T=128), so
-    // rates must divide from the wire basis when present.
     const dispatch = makeCollectiveXSeries({ rows: [{ wireBytesFactor: 1.5 }] }).points[0]
       .components.dispatch;
     expect(dispatch?.payload_data_rate_gbps_at_latency_percentile?.p50).toBeCloseTo(
@@ -237,13 +245,36 @@ describe('CollectiveX artifact assembly', () => {
     ).toBeNull();
   });
 
-  it('rejects malformed and cross-version artifacts', () => {
+  it('keeps a withheld tail null through the derived rates', () => {
+    const shard = makeRawShard({ rows: [{}] });
+    const row = (shard.measurement as { rows: Record<string, any>[] }).rows[0];
+    row.components.dispatch.percentiles_us.p99 = null;
+    row.token_rate_at_latency_percentile.p99 = null;
+    const point = buildDatasetFromNeutral(
+      makeRawMatrix([requestedOf(shard)]),
+      [shard],
+      makeRunMeta(),
+    ).series[0].points[0];
+    const dispatch = point.components.dispatch;
+    expect(dispatch?.latency_us.p99).toBeNull();
+    expect(dispatch?.activation_data_rate_gbps_at_latency_percentile?.p99).toBeNull();
+    expect(dispatch?.payload_data_rate_gbps_at_latency_percentile?.p99).toBeNull();
+    expect(dispatch?.payload_data_rate_gbps_at_latency_percentile?.p50).toBeCloseTo(
+      (400000000 / 8 / 417) * 1e-3,
+      3,
+    );
+    expect(point.roundtrip_token_rate_at_latency_percentile.p99).toBeNull();
+  });
+
+  it('rejects malformed and cross-version artifacts, naming the mismatched case', () => {
     expect(() => buildDatasetFromNeutral({}, [], makeRunMeta())).toThrow(/matrix/);
     const shard = makeRawShard();
     shard.version = 2;
     expect(() =>
       buildDatasetFromNeutral(makeRawMatrix([requestedOf(shard)]), [shard], makeRunMeta()),
-    ).toThrow(/version/);
+    ).toThrow(
+      'CollectiveX version mismatch: h200-dgxc-deepep-v2-deepseek-v3-normal-decode-ep8-uniform-bf16 has version 2, cases.json has 1',
+    );
   });
 });
 
@@ -273,7 +304,6 @@ describe('CollectiveX kv-transfer assembly', () => {
       gbps_p50: 7.39,
       verify_passed: true,
     });
-    // KV cases count into the run totals (the visibility gate) but not points.
     expect(dataset.run).toMatchObject({
       requested_cases: 2,
       measured_cases: 2,
@@ -303,7 +333,7 @@ describe('CollectiveX kv-transfer assembly', () => {
   it('marks a requested kv case with no shard as pending', () => {
     const dataset = buildDataset({ kv: [{ omitShard: true }] });
     expect(dataset.kv![0]).toMatchObject({ outcome: 'pending', vendor: null, rows: [] });
-    expect(dataset.run.terminal_cases).toBe(1); // the EP shard only
+    expect(dataset.run.terminal_cases).toBe(1);
   });
 
   it('summarizes kv case counts for the run picker', () => {

@@ -90,10 +90,6 @@ export interface DateRangePickerProps {
   isCheckingAvailableDates?: boolean;
 }
 
-/**
- * Date range picker component that allows selecting a start and end date via a modal calendar.
- * Displays "Start - End" when both dates are selected.
- */
 export function DateRangePicker({
   dateRange,
   onChange,
@@ -114,7 +110,6 @@ export function DateRangePicker({
   const [isApplying, _setIsApplying] = useState(false);
   const [hoveredDate, setHoveredDate] = useState<string | null>(null);
 
-  // Get display text for the input
   const getDisplayText = () => {
     if (!dateRange.startDate && !dateRange.endDate) {
       return resolvedPlaceholder;
@@ -131,7 +126,6 @@ export function DateRangePicker({
     return resolvedPlaceholder;
   };
 
-  // Handle date selection in calendar
   const handleDateClick = (date: Date) => {
     const dateStr = formatCalendarDate(date);
     track('date_range_picker_date_clicked', { date: dateStr });
@@ -151,7 +145,6 @@ export function DateRangePicker({
     }
   };
 
-  // Apply selection
   const handleApply = () => {
     if (tempRange.startDate && tempRange.endDate) {
       if (availableDates) {
@@ -168,8 +161,11 @@ export function DateRangePicker({
     }
   };
 
-  // Cancel selection
   const handleCancel = () => {
+    track('date_range_picker_cancelled', {
+      changed:
+        tempRange.startDate !== dateRange.startDate || tempRange.endDate !== dateRange.endDate,
+    });
     setTempRange(dateRange);
     setSelectingStart(true);
     setOpen(false);
@@ -398,19 +394,16 @@ function CalendarGrid({
     [dateRange.startDate, dateRange.endDate],
   );
 
-  // Get the effective range for highlighting (includes hover)
   const getEffectiveRange = () => {
     if (!dateRange.startDate) {
       return { start: null, end: null };
     }
 
-    // If hovering and first date is selected, show preview range in either direction
     if (hoveredDate && !dateRange.endDate && !selectingStart) {
       const [start, end] = [dateRange.startDate, hoveredDate].toSorted();
       return { start, end };
     }
 
-    // Otherwise use the actual range
     if (dateRange.startDate && dateRange.endDate) {
       return { start: dateRange.startDate, end: dateRange.endDate };
     }
@@ -426,7 +419,6 @@ function CalendarGrid({
     }
     const dateStr = formatCalendarDate(date);
 
-    // Don't highlight if it's the start or end date
     if (dateStr === effectiveRange.start || dateStr === effectiveRange.end) {
       return false;
     }
@@ -450,7 +442,6 @@ function CalendarGrid({
     };
   };
 
-  // Get second month (next month)
   const secondMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1);
   const { canGoPrevious, canGoNext } = getCalendarMonthNavState(
     currentMonth,
@@ -487,7 +478,6 @@ function CalendarGrid({
       return;
     }
 
-    // Only show hover effect when start date is selected and we're selecting end date
     if (!selectingStart && dateRange.startDate) {
       onDateHover(formatCalendarDate(date));
     } else {

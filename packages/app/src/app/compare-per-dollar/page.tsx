@@ -1,14 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import {
-  HW_REGISTRY,
-  SITE_NAME,
-  SITE_URL,
-  SUPPORTERS_LINE,
-} from '@semianalysisai/inferencex-constants';
+import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { enAlternates } from '@/lib/i18n/i18n';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
 import { JsonLd } from '@/components/seo/json-ld';
@@ -22,25 +18,25 @@ import {
 } from '@/lib/compare/compare-slug';
 import { bucketComparePairsByVendor, formatModelList } from '@/lib/compare/compare-ssr';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
 
-const DESCRIPTION = `Which chip delivers more inference performance per dollar? InferenceX is the independent, open-source benchmark from SemiAnalysis, with verified, reproducible results. ${SUPPORTERS_LINE} Compare cost per million tokens, normalized by hyperscaler TCO, across DeepSeek V4 Pro, DeepSeek R1, Kimi K2, MiniMax M3, GLM 5, Qwen 3.5 & more.`;
+const DESCRIPTION =
+  'Which chip delivers more LLM inference per dollar? Compare cost per million tokens, normalized by hyperscaler TCO, for DeepSeek, Kimi, MiniMax, GLM & Qwen.';
+
+/** Search snippet; the longer DESCRIPTION stays in the JSON-LD. */
+const META_DESCRIPTION =
+  'Compare cost per million tokens, normalized by hyperscaler TCO, across chips for DeepSeek, Kimi, MiniMax, GLM, Qwen & more. Open, reproducible benchmarks.';
 
 export const metadata: Metadata = {
   title: 'Chip Performance per Dollar',
-  description: DESCRIPTION,
+  description: META_DESCRIPTION,
   alternates: enAlternates('/compare-per-dollar'),
-  openGraph: {
+  ...socialMetadata({
     title: `Chip Performance per Dollar | ${SITE_NAME}`,
-    description: DESCRIPTION,
+    description: META_DESCRIPTION,
     url: `${SITE_URL}/compare-per-dollar`,
-    type: 'website',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: `Chip Performance per Dollar | ${SITE_NAME}`,
-    description: DESCRIPTION,
-  },
+    locale: 'en',
+  }),
 };
 
 interface VendorGroup {
@@ -88,11 +84,6 @@ const jsonLd = {
 };
 
 export default async function ComparePerDollarIndexPage() {
-  // Server-side filter (Neon availability): only show (model, pair) combos
-  // where both GPUs have benchmark data for that model. Matches the /compare
-  // index's behavior — no empty-state cards in navigation. The page-level
-  // handler at /compare-per-dollar/[slug] still renders the empty-state for
-  // direct URL hits.
   const comparablePairsByModel = await getComparablePairsByModelSlug();
   const totalUrls = [...comparablePairsByModel.values()].reduce((s, p) => s + p.length, 0);
   const modelsWithPairs = COMPARE_MODEL_SLUGS.filter(
@@ -156,8 +147,6 @@ export default async function ComparePerDollarIndexPage() {
       {modelsWithPairs.map((model) => {
         const pairs = comparablePairsByModel.get(model.slug) ?? [];
         const groups = groupPairsByVendorForModel(model, pairs);
-        // Same scenario split /compare uses: models with AgentX data open the
-        // agentic trace replay, the rest open the fixed 8K/1K workload.
         const scenario = comparisonScenarioForModel(model);
         return (
           <section key={model.slug} id={model.slug}>
@@ -183,7 +172,7 @@ export default async function ComparePerDollarIndexPage() {
                       return (
                         <ComparePairCardLink
                           key={slug}
-                          href={comparisonPairHref('en', slug, model, 'compare-per-dollar')}
+                          href={comparisonPairHref('en', slug, 'compare-per-dollar')}
                           slug={slug}
                           label={label}
                           archLine={archLine}

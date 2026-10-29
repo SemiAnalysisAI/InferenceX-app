@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { META_TITLE_MAX } from '@/lib/seo/meta-text';
+
 import {
   RANKING_KINDS,
   buildRankingRows,
@@ -57,7 +59,7 @@ describe('rankings registry', () => {
   it('has one page per (kind, model) pair', () => {
     const entries = getAllRankingPageEntries();
     expect(entries.length).toBe(RANKING_KINDS.length * INFERENCE_MODEL_SLUGS.length);
-    expect(entries.length).toBe(32);
+    expect(entries.length).toBe(34);
   });
 
   it('has unique, well-formed slugs', () => {
@@ -91,6 +93,13 @@ describe('rankings copy', () => {
       expect(rankingPageTitleZh(entry)).toMatch(CJK);
       expect(rankingPageDescriptionZh(entry)).toMatch(CJK);
       expect(rankingPageTitleZh(entry)).toContain(entry.model.seoName);
+    }
+  });
+
+  it('keeps every title within the meta title budget in both locales', () => {
+    for (const entry of getAllRankingPageEntries()) {
+      expect(rankingPageTitle(entry).length).toBeLessThanOrEqual(META_TITLE_MAX);
+      expect(rankingPageTitleZh(entry).length).toBeLessThanOrEqual(META_TITLE_MAX);
     }
   });
 });

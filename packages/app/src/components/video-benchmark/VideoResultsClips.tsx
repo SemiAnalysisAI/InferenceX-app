@@ -376,7 +376,7 @@ function SynchronizedClips({
         data-testid="video-results-sources"
         className="text-xs"
         onToggle={(event) =>
-          track('video_results_sources_toggled', { open: event.currentTarget.open })
+          track('video_results_sources_toggled', { enabled: event.currentTarget.open })
         }
       >
         <summary className="cursor-pointer" tabIndex={0}>
@@ -419,9 +419,7 @@ function SynchronizedClips({
                         <a
                           className="underline"
                           href={clip.url}
-                          onClick={() =>
-                            track('video_results_media_source_opened', { hardware: key })
-                          }
+                          onClick={() => track('video_results_media_source_opened', { gpu: key })}
                         >
                           {s.media}
                         </a>

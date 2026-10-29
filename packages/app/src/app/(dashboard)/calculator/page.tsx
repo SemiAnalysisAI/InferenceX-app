@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import ThroughputCalculatorDisplay from '@/components/calculator/ThroughputCalculatorDisplay';
 import { resolveCalculatorUrlSeed } from '@/components/calculator/url-seed';
 import { tabMetadata } from '@/lib/routing/tab-meta';
+import { TabIntro } from '@/components/dashboard/tab-intro';
 
 export const metadata: Metadata = tabMetadata('calculator');
 
@@ -13,5 +14,10 @@ interface Props {
 export default async function CalculatorPage({ searchParams }: Props) {
   const sp = await searchParams;
   const seed = resolveCalculatorUrlSeed(sp);
-  return <ThroughputCalculatorDisplay urlSeed={seed} />;
+  return (
+    <>
+      <TabIntro tab="calculator" />
+      <ThroughputCalculatorDisplay urlSeed={seed} />
+    </>
+  );
 }

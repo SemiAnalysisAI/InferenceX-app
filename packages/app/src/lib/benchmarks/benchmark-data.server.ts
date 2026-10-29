@@ -8,9 +8,6 @@ import { cachedQuery } from '@/lib/cache/api-cache';
 import { agenticWorkflowMetadataOnly } from '@/lib/benchmarks/agentic-workflow-metadata';
 import { loadFixture } from '@/lib/testing/test-fixtures';
 
-/** Cache slot is keyed on the dbKeys array. Both `/compare/<slug>` and
- *  `/compare-per-dollar/<slug>` for the same model hit the same blob entry —
- *  the per-dollar route doesn't duplicate the fetch or the cache. */
 export const getCachedBenchmarks = cachedQuery(
   (dbModelKeys: string[]) => {
     if (FIXTURES_MODE) return Promise.resolve(loadFixture<BenchmarkRow[]>('benchmarks'));
@@ -21,8 +18,6 @@ export const getCachedBenchmarks = cachedQuery(
   { blobOnly: true },
 );
 
-/** Historical overview snapshots use the same line-level as-of semantics as
- * the dashboard, cached separately from the absolute-latest read. */
 export const getCachedBenchmarksAsOf = cachedQuery(
   (dbModelKeys: string[], date: string) => {
     if (FIXTURES_MODE) return Promise.resolve(loadFixture<BenchmarkRow[]>('benchmarks'));

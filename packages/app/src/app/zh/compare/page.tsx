@@ -20,9 +20,10 @@ import {
 import { bucketComparePairsByVendor } from '@/lib/compare/compare-ssr';
 import { formatModelListZh } from '@/lib/compare/compare-ssr-zh';
 import { type Model } from '@/lib/catalog/data-mappings';
-import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
+import { zhAlternates } from '@/lib/i18n/i18n';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
 
 const DESCRIPTION =
   '对比 Kimi K3、DeepSeek V4 Pro、MiniMax M3、Qwen 3.5 与 GLM 5.3 的 AgentX 智能体推理结果，并浏览定长序列芯片对比。';
@@ -31,18 +32,12 @@ export const metadata: Metadata = {
   title: 'AgentX 智能体推理对比',
   description: DESCRIPTION,
   alternates: zhAlternates('/compare'),
-  openGraph: {
+  ...socialMetadata({
     title: `AgentX 智能体推理对比 | ${SITE_NAME}`,
     description: DESCRIPTION,
     url: `${SITE_URL}/zh/compare`,
-    type: 'website',
-    locale: ZH_OG_LOCALE,
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: `AgentX 智能体推理对比 | ${SITE_NAME}`,
-    description: DESCRIPTION,
-  },
+    locale: 'zh',
+  }),
 };
 
 interface VendorGroup {
@@ -95,7 +90,6 @@ export default function CompareIndexPageZh() {
     <>
       <JsonLd data={jsonLd} />
       <AgentXCompareHero locale="zh" />
-      {/* In-page Suspense, not loading.tsx — see the English page for why. */}
       <Suspense fallback={<CompareRouteSkeleton />}>
         <CompareCatalogZh />
       </Suspense>
@@ -169,10 +163,6 @@ async function CompareCatalogZh() {
           <section key={model.slug} id={model.slug}>
             <Card className="flex flex-col gap-4">
               <div>
-                {/* `displayName` 按约定即 Model 枚举值（见 compare-slug.ts 中的
-                    CompareModelSlug），因此共享的 ModelLogo 可从 MODEL_CONFIG
-                    解析各区块的品牌标识（DeepSeek、MiniMax、Kimi 等）；没有
-                    配置 logo 的模型则不渲染任何内容。 */}
                 <h2 className="flex items-center gap-2.5 text-xl lg:text-2xl font-bold tracking-tight">
                   <ModelLogo model={model.displayName as Model} className="size-6 lg:size-7" />
                   {model.label}
@@ -195,7 +185,7 @@ async function CompareCatalogZh() {
                       return (
                         <ComparePairCardLink
                           key={slug}
-                          href={comparisonPairHref('zh', slug, model)}
+                          href={comparisonPairHref('zh', slug)}
                           slug={slug}
                           label={label}
                           archLine={archLine}

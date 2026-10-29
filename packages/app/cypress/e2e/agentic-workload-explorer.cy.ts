@@ -1,9 +1,5 @@
-// The Agentic Workload Explorer reads a separate ProxyTrace snapshot database
-// that is not available in CI, so its page-owned API is stubbed with small
-// responses captured from the snapshot (cypress/fixtures/agentic-workload-explorer).
 const API = '/api/v1/agentic-workload-explorer';
 
-// Synthetic daily rollup: deterministic coverage without the private snapshot DB.
 function stubTrends() {
   const days = ['2026-09-23', '2026-09-24', '2026-09-25'];
   cy.intercept('GET', `${API}/trends?*`, {
@@ -63,7 +59,6 @@ describe('Agentic Workload Explorer', () => {
     cy.get('[data-testid="agentic-workload-explorer"]')
       .should('contain.text', 'Agentic Workload Explorer')
       .and('contain.text', 'Frozen snapshot');
-    // The explorer has its own section nav, so the dashboard tab strip is hidden.
     cy.get('[data-testid="chart-section-tabs"]').should('not.exist');
     cy.get('[data-testid="mobile-chart-select"]').should('not.exist');
     cy.get('nav[aria-label="Agentic Workload Explorer sections"]')

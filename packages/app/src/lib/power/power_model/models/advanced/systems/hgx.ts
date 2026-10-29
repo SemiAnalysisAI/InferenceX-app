@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
 /* oxlint-disable max-classes-per-file -- mirrors the upstream Python module, class for class */
-/** HGX chassis with a GPU-bearing UBB and a shared CPU, NIC, DIMM, and drive inventory. */
 
 import {
   DEFAULT_OPERATING_STATE,
@@ -332,7 +331,6 @@ export class MI355HGXSystemChassis extends HGXSystemChassis {
   }
 }
 
-/** Shared HGX chassis model for H100 and H200 GPUs on a Hopper board. */
 export class HopperHGXSystemChassis extends HGXSystemChassis {
   static override readonly typeName: string = 'HopperHGXSystemChassis';
   static override readonly default_networking: readonly NetworkGroup[] = [QM9790_TWO_TIER_NETWORK];

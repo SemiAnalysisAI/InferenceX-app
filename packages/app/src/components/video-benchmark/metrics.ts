@@ -1,7 +1,7 @@
 import { costPerGpuHour, type CostTier } from './hardware';
 import type { ResultsEvidence } from './results-evidence';
 
-/** One published serving cell (hardware × client concurrency) flattened for the dashboard. */
+/** One stored serving cell (hardware × client concurrency) flattened for the dashboard. */
 export interface VideoPoint {
   results?: ResultsEvidence | null;
   id: string;
@@ -42,6 +42,10 @@ export interface VideoPoint {
   server: { tp: number | null; ulysses: number | null; attention: string | null } | null;
   status: string;
   observedAt: string | null;
+  /** When the artifact entered published history; orders publications with `artifactId`. */
+  publishedAt?: string | null;
+  /** True only when an immutable publication receipt matches the stored source. */
+  approved?: boolean;
 }
 
 export type XMetricId = 'p90Latency' | 'p50Latency';

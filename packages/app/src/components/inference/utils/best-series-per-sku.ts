@@ -4,14 +4,9 @@ import { isFrontierEligible, paretoFrontForDirection } from '@/lib/charts/chart-
 
 type Direction = 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
 
-// Named separately so the sampling density is obvious in test failures and can
-// be changed without leaving a magic number in the scoring loop.
 const SAMPLE_COUNT = 9;
-// A singleton can be a useful preview, but it should not displace a measured
-// curve merely because its lone point scores well.
 const MIN_CURVE_FRONTIER_POINTS = 2;
 
-/** The physical SKU portion shared by framework/speculative-decoding variants. */
 export function baseSku(point: Pick<InferenceData, 'hw' | 'hwKey'>): string {
   const rawHardware = String(point.hw || '').split('-')[0];
   return rawHardware || String(point.hwKey).split(/[_-]/u)[0];
@@ -24,18 +19,6 @@ interface ScoredSeries {
   maxX: number;
 }
 
-/**
- * Select the best configuration line per physical SKU using normalized frontier AUC.
- *
- * Every candidate is sampled over the common measured x-domain for that SKU,
- * so a curve cannot win merely because it spans a wider range. The chart's
- * existing Pareto direction and monotone interpolation are reused to keep the
- * ranking aligned with the line users see. Ties are deterministic by hwKey.
- *
- * TileRT is the deliberate exception to the one-line policy. Its specialized
- * operating points can be exceptional even when a broader serving curve wins
- * the AUC comparison, so every eligible TileRT series remains visible.
- */
 export function bestSeriesPerSku(
   points: InferenceData[],
   direction: Direction,
@@ -44,10 +27,7 @@ export function bestSeriesPerSku(
   const bySku = new Map<string, Map<string, InferenceData[]>>();
   const featured = new Set<string>();
   for (const point of points) {
-    // Rank within the visible precision scope, before picking a winner.
     if (precisions && !precisions.includes(point.precision)) continue;
-    // Comparison clones re-plot the same configs at another boundary or role;
-    // the best series per SKU is judged on the selected metric alone.
     if (point.powerVariant || !isFrontierEligible(point) || !Number.isFinite(point.y)) continue;
     const sku = baseSku(point);
     const key = String(point.hwKey);
@@ -85,8 +65,6 @@ export function bestSeriesPerSku(
     const comparable = usable.filter(
       (candidate) => candidate.points.length >= MIN_CURVE_FRONTIER_POINTS,
     );
-    // When every candidate is a singleton, retain all candidates for the
-    // existing score + deterministic key tie-break.
     const scoringPool =
       comparable.length > 0
         ? comparable
@@ -107,8 +85,6 @@ export function bestSeriesPerSku(
       const xs = candidate.points.map((point) => point.x);
       const ys = candidate.points.map((point) => point.y);
       if (!hasCommonDomain) {
-        // No honest AUC comparison is possible. Prefer the best measured point;
-        // the key tie-break below keeps the choice stable.
         return higherYIsBetter ? Math.max(...ys) : -Math.min(...ys);
       }
       const slopes = monotoneSlopes(xs, ys);
@@ -131,14 +107,6 @@ export function bestSeriesPerSku(
   return selected;
 }
 
-/**
- * Keep SKUs that the ranking could not score.
- *
- * All in Measured can have GPU-valid table rows for a SKU (for example NVL72
- * without complete Grace telemetry) but no numeric estimate to rank. Those SKUs
- * have no winner in `best`, so every candidate series for them is kept instead
- * of letting a ranked SKU elsewhere in the selection hide them.
- */
 export function withUnrankedSkus(
   best: ReadonlySet<string>,
   rankedPoints: readonly InferenceData[],

@@ -8,25 +8,69 @@ import { useLocale } from '@/lib/i18n/use-locale';
 
 const DISMISS_EVENT = 'inferencex:dismiss-toast';
 
-/** Horizontal swipe distance (px) that dismisses the toast on touch screens. */
 const SWIPE_DISMISS_PX = 80;
 
+const PHONE_QUERY = '(max-width: 639px)';
+
+/**
+ * Heights reserved by every docked toast currently mounted. A replacement toast mounts
+ * while the outgoing one is still animating out, so reservations are shared: body padding
+ * is the largest active reservation, and the original padding is restored only when the
+ * last one is released.
+ */
+const reservations = new Map<symbol, number>();
+let paddingBeforeReservations: string | null = null;
+
+function syncBodyPadding() {
+  const { body } = document;
+  if (reservations.size === 0) {
+    if (paddingBeforeReservations !== null) body.style.paddingBottom = paddingBeforeReservations;
+    paddingBeforeReservations = null;
+    return;
+  }
+  if (paddingBeforeReservations === null) paddingBeforeReservations = body.style.paddingBottom;
+  const height = Math.max(...reservations.values());
+  body.style.paddingBottom = height > 0 ? `${height}px` : paddingBeforeReservations;
+}
+
+/**
+ * On phones the toast is docked to the bottom edge, so reserve its height as body padding
+ * while it is visible: the end of the page can always scroll clear of it.
+ */
+function useReserveBottomSpace(ref: React.RefObject<HTMLElement | null>, active: boolean) {
+  useEffect(() => {
+    const el = ref.current;
+    if (!active || !el || typeof window === 'undefined') return;
+    if (typeof window.matchMedia !== 'function' || typeof ResizeObserver === 'undefined') return;
+    const media = window.matchMedia(PHONE_QUERY);
+    const key = Symbol('bottom-toast');
+    const apply = () => {
+      reservations.set(key, media.matches ? el.getBoundingClientRect().height : 0);
+      syncBodyPadding();
+    };
+    apply();
+    const observer = new ResizeObserver(apply);
+    observer.observe(el);
+    media.addEventListener('change', apply);
+    return () => {
+      observer.disconnect();
+      media.removeEventListener('change', apply);
+      reservations.delete(key);
+      syncBodyPadding();
+    };
+  }, [ref, active]);
+}
+
 interface BottomToastProps {
-  /** Icon to display on the left */
   icon: React.ReactNode;
-  /** Title text */
   title: string;
-  /** Description text */
   description: string;
-  /** Optional action button */
   action?: {
     label: string;
     icon?: React.ReactNode;
     onClick: () => void;
   };
-  /** Called only when dismissed via X button or external event (not after action click) */
   onDismiss?: () => void;
-  /** data-testid for the toast container */
   testId?: string;
 }
 
@@ -46,6 +90,8 @@ export function BottomToast({
   const [drag, setDrag] = useState<{ dx: number; dy: number } | null>(null);
   const onDismissRef = useRef(onDismiss);
   onDismissRef.current = onDismiss;
+  const toastRef = useRef<HTMLDivElement>(null);
+  useReserveBottomSpace(toastRef, visible);
 
   const dismiss = useCallback(() => {
     setAnimate(false);
@@ -56,7 +102,6 @@ export function BottomToast({
     }, 300);
   }, [title]);
 
-  // On mount: dismiss any existing toast, then animate in
   useEffect(() => {
     window.dispatchEvent(new CustomEvent(DISMISS_EVENT));
     requestAnimationFrame(() => setAnimate(true));
@@ -68,7 +113,7 @@ export function BottomToast({
 
   const handleAction = useCallback(() => {
     actionClickedRef.current = true;
-    track('toast_action_clicked', { title, actionLabel: action?.label });
+    track('toast_action_clicked', { title, action_label: action?.label });
     action?.onClick();
     dismiss();
   }, [action, dismiss, title]);
@@ -79,6 +124,7 @@ export function BottomToast({
 
   return (
     <div
+      ref={toastRef}
       data-testid={testId}
       role="status"
       aria-live="polite"
@@ -94,8 +140,6 @@ export function BottomToast({
         setDrag({ dx: touch.clientX - start.x, dy: touch.clientY - start.y });
       }}
       onTouchEnd={(event) => {
-        // Measure from the gesture's own end point: the `drag` state can lag
-        // the last touchmove, and a quick flick may never set it at all.
         const start = touchStartRef.current;
         const touch = event.changedTouches[0];
         touchStartRef.current = null;
@@ -103,8 +147,6 @@ export function BottomToast({
         if (!start || !touch) return;
         const dx = touch.clientX - start.x;
         const dy = touch.clientY - start.y;
-        // Horizontal-dominant swipes only: vertical motion belongs to page
-        // scroll (`touch-pan-y`), so it must never dismiss the toast.
         if (Math.abs(dx) > SWIPE_DISMISS_PX && Math.abs(dx) > Math.abs(dy)) {
           dismiss();
         }
@@ -122,38 +164,43 @@ export function BottomToast({
             }
           : undefined
       }
-      className={`fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-50 touch-pan-y transition-all duration-300 ease-out sm:inset-x-auto sm:right-6 sm:bottom-6 sm:max-w-sm ${
+      className={`fixed inset-x-0 bottom-0 z-50 touch-pan-y transition-all duration-300 ease-out sm:inset-x-auto sm:right-6 sm:bottom-6 sm:max-w-sm ${
         animate ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
       }`}
     >
-      <div className="relative flex items-start gap-3 rounded-xl border border-border bg-card p-3 shadow-lg sm:rounded-lg sm:p-4">
+      <div className="relative grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-x-2 rounded-t-xl border-t border-border bg-card px-3 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] shadow-[0_-8px_24px_-12px_rgb(0_0_0/0.35)] sm:grid-cols-[auto_minmax(0,1fr)] sm:items-start sm:gap-x-3 sm:rounded-lg sm:border sm:p-4 sm:shadow-lg">
+        <div className="shrink-0 [&_svg]:h-3.5 [&_svg]:w-3.5 sm:mt-0.5">{icon}</div>
+
+        <div className="flex min-w-0 flex-col gap-0.5 sm:gap-2 sm:pr-4">
+          <p className="truncate text-sm font-medium text-foreground sm:whitespace-normal">
+            {title}
+          </p>
+          <p className="line-clamp-1 text-xs text-muted-foreground sm:line-clamp-none">
+            {description}
+          </p>
+        </div>
+
+        {action && (
+          <button
+            type="button"
+            onClick={handleAction}
+            className="flex min-h-9 shrink-0 items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium whitespace-nowrap text-primary-foreground transition-colors hover:bg-primary/90 sm:col-start-2 sm:mt-2 sm:min-h-0 sm:justify-self-end"
+          >
+            {action.icon}
+            {action.label}
+          </button>
+        )}
+
         <button
           type="button"
           onClick={dismiss}
-          className="absolute top-1 right-1 inline-flex size-9 items-center justify-center rounded-md text-muted-foreground hover:text-foreground transition-colors sm:top-2 sm:right-2 sm:size-auto"
+          className={`inline-flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground sm:absolute sm:top-2 sm:right-2 sm:size-auto ${
+            action ? '' : 'col-start-4 sm:col-start-auto'
+          }`}
           aria-label={locale === 'zh' ? '关闭' : 'Dismiss'}
         >
           <X className="size-4 sm:size-3.5" />
         </button>
-
-        <div className="shrink-0 mt-0.5 [&_svg]:h-3.5 [&_svg]:w-3.5">{icon}</div>
-
-        <div className="flex min-w-0 flex-1 flex-col gap-1.5 pr-7 sm:gap-2 sm:pr-0">
-          <p className="text-sm font-medium text-foreground">{title}</p>
-          <p className="line-clamp-2 text-xs text-muted-foreground sm:line-clamp-none">
-            {description}
-          </p>
-          {action && (
-            <button
-              type="button"
-              onClick={handleAction}
-              className="flex min-h-9 items-center gap-1.5 self-end px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors sm:min-h-0"
-            >
-              {action.icon}
-              {action.label}
-            </button>
-          )}
-        </div>
       </div>
     </div>
   );

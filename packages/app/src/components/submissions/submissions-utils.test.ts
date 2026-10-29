@@ -45,9 +45,9 @@ describe('isNonNvidia', () => {
 
 describe('groupVolumeByWeek', () => {
   const volume: SubmissionVolumeRow[] = [
-    { date: '2026-01-05', hardware: 'h100', datapoints: 10 }, // Monday
-    { date: '2026-01-06', hardware: 'mi300x', datapoints: 5 }, // Tuesday same week
-    { date: '2026-01-12', hardware: 'h100', datapoints: 20 }, // Next Monday
+    { date: '2026-01-05', hardware: 'h100', datapoints: 10 },
+    { date: '2026-01-06', hardware: 'mi300x', datapoints: 5 },
+    { date: '2026-01-12', hardware: 'h100', datapoints: 20 },
   ];
 
   it('groups by ISO week', () => {
@@ -167,7 +167,7 @@ describe('computePreviousImages', () => {
     const rows: SubmissionSummaryRow[] = [
       { ...base, date: '2026-05-10', image: oldImg },
       { ...base, date: '2026-05-11', image: oldImg },
-      { ...base, date: '2026-05-12', image: newImg }, // bump day
+      { ...base, date: '2026-05-12', image: newImg },
       { ...base, date: '2026-05-13', image: newImg },
     ];
     const map = computePreviousImages(rows);
@@ -278,7 +278,6 @@ describe('buildInferenceCompareUrl', () => {
     expect(parsed.searchParams.get('i_dstart')).toBe('2026-05-10');
     expect(parsed.searchParams.get('i_dend')).toBe('2026-05-12');
     expect(parsed.searchParams.get('i_prec')).toBe('fp8');
-    // hwKey reflects framework + spec_method
     expect(parsed.searchParams.get('i_gpus')).toContain('h200');
     expect(parsed.searchParams.get('i_gpus')).toContain('mtp');
   });

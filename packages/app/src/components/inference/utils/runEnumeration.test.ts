@@ -39,11 +39,7 @@ describe('dataRunsForDate', () => {
   });
 
   it('dedupes a run that appears in multiple matching rows into one entry', () => {
-    const rows = [
-      rc({ github_run_id: 100 }),
-      // same run id appearing again (e.g. another covered row) — still one run
-      rc({ github_run_id: 100 }),
-    ];
+    const rows = [rc({ github_run_id: 100 }), rc({ github_run_id: 100 })];
     const runs = dataRunsForDate(rows, SCOPE);
     expect(runs).toHaveLength(1);
     expect(runs[0].runId).toBe('100');
@@ -78,11 +74,11 @@ describe('dataRunsForDate', () => {
 
   it('excludes runs for other models, precisions, and GPUs', () => {
     const rows = [
-      rc({ github_run_id: 1 }), // matches
-      rc({ github_run_id: 2, model: 'dsr1' }), // other model
-      rc({ github_run_id: 3, precision: 'fp4' }), // other precision
-      rc({ github_run_id: 4, hardware: 'b200' }), // other gpu
-      rc({ github_run_id: 5, framework: 'sglang' }), // other framework
+      rc({ github_run_id: 1 }),
+      rc({ github_run_id: 2, model: 'dsr1' }),
+      rc({ github_run_id: 3, precision: 'fp4' }),
+      rc({ github_run_id: 4, hardware: 'b200' }),
+      rc({ github_run_id: 5, framework: 'sglang' }),
     ];
     const runs = dataRunsForDate(rows, SCOPE);
     expect(runs.map((r) => r.runId)).toEqual(['1']);
@@ -98,8 +94,6 @@ describe('dataRunsForDate', () => {
   });
 
   it('carries run url and head sha through', () => {
-    // The single-run changelog block links off these per-run fields (#408), so a
-    // date with unrelated same-day runs cannot borrow another run's commit/run links.
     const rows = [
       rc({
         github_run_id: 7,

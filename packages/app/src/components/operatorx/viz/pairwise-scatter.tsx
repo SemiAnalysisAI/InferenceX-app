@@ -4,6 +4,7 @@ import * as d3 from 'd3';
 import { useMemo, useState } from 'react';
 
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { track } from '@/lib/analytics/analytics';
 
 import { EmptyChart } from '../charts/empty';
 import { OpxChart, esc, HardwareLegend, tooltipHtml } from '../charts/kit';
@@ -19,7 +20,6 @@ interface Pair {
   y: number;
 }
 
-/** Number of cases both GPUs measured. */
 function shared(model: ComparisonModel, a: string | undefined, b: string): number {
   return a
     ? model.view.cases.filter((_, i) => model.value(a, i) !== null && model.value(b, i) !== null)
@@ -73,7 +73,10 @@ function PairwiseScatter({ model }: { model: ComparisonModel }) {
         <SearchableSelect
           size="sm"
           value={a}
-          onValueChange={setA}
+          onValueChange={(value) => {
+            track('operatorx_pairwise_gpu_selected', { axis: 'x', gpu: value });
+            setA(value);
+          }}
           groups={options}
           triggerAriaLabel="X axis GPU"
         />
@@ -81,7 +84,10 @@ function PairwiseScatter({ model }: { model: ComparisonModel }) {
         <SearchableSelect
           size="sm"
           value={b}
-          onValueChange={setB}
+          onValueChange={(value) => {
+            track('operatorx_pairwise_gpu_selected', { axis: 'y', gpu: value });
+            setB(value);
+          }}
           groups={options}
           triggerAriaLabel="Y axis GPU"
         />
@@ -152,8 +158,8 @@ function PairwiseScatter({ model }: { model: ComparisonModel }) {
                 rows: [
                   esc(view.cases[p.i].precision),
                   ...originRows(view, p.i),
-                  `${hardwareLabel(a)} <strong>${metric.format(p.x)}</strong>`,
-                  `${hardwareLabel(b)} <strong>${metric.format(p.y)}</strong>`,
+                  `${hardwareLabel(a)} ${esc(view.measurements[a].backend?.[p.i] ?? '')} <strong>${metric.format(p.x)}</strong>`,
+                  `${hardwareLabel(b)} ${esc(view.measurements[b].backend?.[p.i] ?? '')} <strong>${metric.format(p.y)}</strong>`,
                 ],
                 footer: 'Click for kernel timeline',
               }),

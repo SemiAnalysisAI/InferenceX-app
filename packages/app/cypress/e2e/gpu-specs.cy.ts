@@ -1,10 +1,3 @@
-/**
- * Hover a chart point until its tooltip opens, then assert the tooltip text.
- * The D3 charts re-render after the container is measured, which can detach
- * the hovered point (so the first synthetic mouseenter is lost) and can hide
- * the tooltip again before a retrying `:visible` assertion samples it — so
- * re-trigger (bounded) and assert the content at the moment it is displayed.
- */
 function hoverGpuSpecsPointAndAssertTooltip(
   pointSelector: string,
   tooltipSelector: string,
@@ -38,12 +31,10 @@ describe('GPU Specs Tab', () => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
     cy.visit('/gpu-specs');
-    // Wait for GPU Specs tab content to be present in the DOM
     cy.get('h2').contains('Chip Specifications').should('exist');
   });
 
   it('specs table is visible with all GPUs', () => {
-    // Dismiss any open dialogs first
     cy.get('body').then(($body) => {
       if ($body.find('[role="dialog"]').length > 0) {
         cy.get('body').type('{esc}');
@@ -73,6 +64,26 @@ describe('GPU Specs Tab', () => {
     cy.get('[data-testid="topology-gb300-nvl72"]').should('not.exist');
   });
 
+  it('matches the public API for installed NVL72 NICs and MI355X fabric', () => {
+    cy.request('/api/v1/views/gpu-specs?metric=scaleOutBandwidth').then(({ body }) => {
+      for (const [name, nic, bandwidth] of [
+        ['GB200 NVL72', 'ConnectX-7 400G', 400],
+        ['GB300 NVL72', 'ConnectX-8 800G', 800],
+      ] as const) {
+        cy.contains('table tr', name)
+          .should('contain.text', nic)
+          .and('contain.text', `${bandwidth} Gbit/s`);
+        const chip = body.chips.find((row: { name: string }) => row.name === name);
+        expect(chip.nic).to.equal(nic);
+        expect(chip.scaleOutTopology).to.equal(null);
+        expect(body.ranking.find((row: { chip: string }) => row.chip === chip.key).value).to.equal(
+          bandwidth,
+        );
+      }
+      cy.contains('table tr', 'MI355X').should('contain.text', '4th Gen Infinity Fabric');
+    });
+  });
+
   it('preserves the English expand button label and identifies the scale-out SVG', () => {
     cy.get('[data-testid="topology-h200-sxm"] button').should(
       'have.attr',
@@ -99,7 +110,6 @@ describe('GPU Specs Bar Chart View', () => {
     });
     cy.visit('/gpu-specs');
     cy.get('h2').contains('Chip Specifications').should('exist');
-    // Dismiss any Radix Dialog scroll locks from topology diagram components
     cy.get('body').then(($body) => {
       if ($body.attr('data-scroll-locked')) {
         cy.get('body').type('{esc}', { force: true });
@@ -127,10 +137,8 @@ describe('GPU Specs Bar Chart View', () => {
   });
 
   it('FP4 metric excludes GPUs without FP4 support', () => {
-    // Change metric to FP4
     cy.get('[data-testid="gpu-specs-metric-select"]').click({ force: true });
     cy.get('[data-slot="select-item"]').contains('FP4').click({ force: true });
-    // FP4 should show fewer bars (H100, H200, MI300X, MI325X excluded)
     cy.get('[data-testid="gpu-specs-bar-chart"] svg .bar').should('have.length', 5);
     cy.get('[data-testid="gpu-specs-bar-chart"]').should('contain.text', 'without FP4 support');
   });
@@ -166,15 +174,12 @@ describe('GPU Specs Radar Chart View', () => {
   });
 
   it('toggling a GPU off via sidebar legend removes its polygon', () => {
-    // Count initial polygons (all 9 GPUs)
     cy.get('[data-testid="gpu-specs-radar-chart"] svg .radar-polygon').should('have.length', 9);
-    // Toggle off H100 SXM by clicking its legend label
     cy.get('[data-testid="gpu-specs-radar-chart"] .sidebar-legend')
       .contains('H100 SXM')
       .click({ force: true });
     cy.get('[data-testid="gpu-specs-radar-chart"] svg .radar-polygon').should('have.length', 8);
 
-    // GPU already toggled off from previous test
     cy.get('[data-testid="gpu-specs-radar-chart"] .sidebar-legend')
       .contains('Reset filter')
       .click({ force: true });
@@ -381,4 +386,27 @@ describe('GPU Specs Chinese route', () => {
       .invoke('attr', 'href')
       .should('include', '/zh/gpu-specs');
   });
+});
+
+describe('Chinese chip specification copy', () => {
+  for (const width of [1280, 390]) {
+    it(`preserves ownership pricing and throughput units at ${width}px`, () => {
+      cy.viewport(width, 844);
+      cy.visit('/zh/chips/b300-vs-b200');
+      cy.contains('超大规模云厂商批量采购').should('exist');
+      cy.contains('B300 为 $2.26/hr').should('exist');
+      cy.contains('每秒 token 数').should('exist');
+      cy.get('main').should('not.contain.text', '小时租价');
+      cy.contains('B300 为 $2.26/hr').scrollIntoView();
+      cy.screenshot(`chip-pricing-zh-${width}`, { capture: 'viewport' });
+      cy.visit('/zh/chips/gb300-nvl72');
+      cy.contains('ConnectX-8 800G').should('exist');
+      cy.contains('72 颗芯片').should('exist');
+      cy.contains('显存带宽').should('exist');
+      cy.visit('/zh/gpu-specs');
+      cy.contains('table tr', 'GB200 NVL72').should('contain.text', 'ConnectX-7 400G');
+      cy.contains('table tr', 'GB300 NVL72').should('contain.text', 'ConnectX-8 800G');
+      cy.contains('table tr', 'MI355X').should('contain.text', '4th Gen Infinity Fabric');
+    });
+  }
 });

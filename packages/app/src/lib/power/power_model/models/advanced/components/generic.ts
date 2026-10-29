@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
 /* oxlint-disable max-classes-per-file -- mirrors the upstream Python module, class for class */
-/** Generic host components; unspecified hardware wattages remain explicit inputs. */
 
 import {
   type Details,
@@ -31,12 +30,10 @@ export const OPTICS_800G_POWER_W = 15;
 
 type OptionalPower = Omit<FixedPowerComponentFields, 'power_w'> & { power_w?: number };
 
-/** CPU power under the caller's stated component boundary. */
 export class CPU extends FixedPowerComponent {
   static override readonly typeName: string = 'CPU';
 }
 
-/** Measured CPU and attached DRAM power for one socket. */
 export class CPUAndDRAM extends FixedPowerComponent {
   static override readonly typeName: string = 'CPUAndDRAM';
 }
@@ -57,7 +54,6 @@ const X86_WORKLOAD_STATE: Record<WorkloadState, X86CPUState> = {
   [WorkloadState.AGENTIC_CPU_OFFLOADING]: 'AgenticOffloadingOn',
 };
 
-/** One x86 CPU with fixed state power, excluding separately modeled DIMMs. */
 export class X86CPU extends CPU {
   static override readonly typeName: string = 'X86CPU';
   static readonly architecture = 'x86';
@@ -99,7 +95,6 @@ export class X86CPU extends CPU {
   }
 }
 
-/** One DDR5 DIMM, idle at 3.8 W or active during CPU offloading at 7 W. */
 export class DDR5DIMM extends GenericComponent {
   static override readonly typeName: string = 'DDR5DIMM';
   static readonly memory_type = 'DDR5';
@@ -129,7 +124,6 @@ export class DDR5DIMM extends GenericComponent {
     return this.power_w;
   }
 
-  /** Return a validated scenario instance, preserving the original configuration. */
   for_cpu_offload(cpu_offload: boolean): DDR5DIMM {
     const enabled = validate_cpu_offload(cpu_offload);
     return new DDR5DIMM({
@@ -155,15 +149,12 @@ export class DDR5DIMM extends GenericComponent {
   }
 }
 
-/** System-side optics, excluded from external scale-out gear. */
 export class SystemSideTransceiver extends FixedPowerComponent {
   static override readonly typeName: string = 'SystemSideTransceiver';
 }
 
-/** A system-side transceiver class: constructible with its own baseline defaults. */
 export type SystemSideTransceiverType = new () => SystemSideTransceiver;
 
-/** One always-powered 400 Gbit/s optical transceiver at 8 W. */
 export class SystemSide400GTransceiver extends SystemSideTransceiver {
   static override readonly typeName: string = 'SystemSide400GTransceiver';
   static readonly bandwidth_gbps = 400;
@@ -187,7 +178,6 @@ export class SystemSide400GTransceiver extends SystemSideTransceiver {
   }
 }
 
-/** One always-powered 800 Gbit/s optical transceiver at 15 W. */
 export class SystemSide800GTransceiver extends SystemSideTransceiver {
   static override readonly typeName: string = 'SystemSide800GTransceiver';
   static readonly bandwidth_gbps = 800;
@@ -220,7 +210,6 @@ const SWITCH_SIDE_800G_SR8_BASELINE = new Provenance({
   assumptions: ['15 W per 800G SR8 optic, always powered in both switch states.'],
 });
 
-/** One always-powered switch-side 800G SR8 optic, using the shared 800G power budget. */
 export class SwitchSide800GSR8Transceiver extends FixedPowerComponent {
   static override readonly typeName: string = 'SwitchSide800GSR8Transceiver';
   static readonly bandwidth_gbps = 800;
@@ -245,17 +234,14 @@ export class SwitchSide800GSR8Transceiver extends FixedPowerComponent {
   }
 }
 
-/** A frontend data processing unit. */
 export class FrontendDPU extends FixedPowerComponent {
   static override readonly typeName: string = 'FrontendDPU';
 }
 
-/** A PCIe switch that is not already included in the UBB input. */
 export class PCIeSwitch extends FixedPowerComponent {
   static override readonly typeName: string = 'PCIeSwitch';
 }
 
-/** An always-active Broadcom PCIe 5.0, 144-lane switch at 45 W. */
 export class PEX89144PCIeSwitch extends PCIeSwitch {
   static override readonly typeName: string = 'PEX89144PCIeSwitch';
   static readonly vendor = 'Broadcom';
@@ -293,7 +279,6 @@ export class PEX89144PCIeSwitch extends PCIeSwitch {
   }
 }
 
-/** A generic PCIe 4.0 x16 retimer with caller-supplied power. */
 export class PCIe4x16Retimer extends FixedPowerComponent {
   static override readonly typeName: string = 'PCIe4x16Retimer';
   static readonly pcie_generation = 4;
@@ -308,7 +293,6 @@ export class PCIe4x16Retimer extends FixedPowerComponent {
   }
 }
 
-/** A generic PCIe 5.0 x16 retimer using the agreed 12 W baseline. */
 export class PCIe5x16Retimer extends FixedPowerComponent {
   static override readonly typeName: string = 'PCIe5x16Retimer';
   static readonly pcie_generation = 5;

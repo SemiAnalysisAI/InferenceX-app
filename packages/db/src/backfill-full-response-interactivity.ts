@@ -1,17 +1,4 @@
 import { readTraceProfileLines } from './lib/trace-profile-storage';
-/**
- * Backfill canonical AgentX ITL/interactivity from retained AIPerf profiles.
- *
- * New aggregate artifacts provide `full_response_itl` during normal ingest.
- * Historical rows predate that field, but retain the request lifecycle
- * timestamps, TTFT, and output token count needed to reconstruct it.
- *
- * Usage:
- *   bun run --cwd packages/db db:backfill-full-response-interactivity
- *     [--limit N]   only process the first N candidate benchmark rows
- *     [--force]     recompute rows that already have the namespaced metric
- *     [--yes]       skip the confirmation prompt
- */
 
 import { hasNoSslFlag } from './cli-utils.js';
 import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils.js';

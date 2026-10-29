@@ -4,12 +4,6 @@ import {
   modelSelectionBenchmarks,
 } from '../support/model-selection-fixtures';
 
-/**
- * Per-model SEO routes: /historical/<model> and /calculator/<model> (and
- * their /zh siblings) render the tab seeded to the routed model. Switching
- * models on the page rewrites the pathname in place via history.replaceState
- * — no full page reload and no App Router remount.
- */
 const visitOptions = {
   onBeforeLoad(win: Cypress.AUTWindow) {
     win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -31,8 +25,6 @@ describe('Per-model dashboard routes', () => {
     cy.get('[data-testid="historical-trends-display"]').should('be.visible');
     cy.get('[data-testid="model-selector"]').should('contain.text', 'MiniMax');
 
-    // A full page load (or App Router remount via hard navigation) would wipe
-    // this marker; the in-place history.replaceState rewrite must keep it.
     cy.window().then((win) => {
       (win as MarkerWindow).__modelRouteNoReloadMarker = true;
     });
@@ -104,13 +96,18 @@ function selectModel(label: string) {
 }
 
 function expectBestPerSku(enabled: boolean) {
+  // Opening the dialog while a select popover or the previous dialog is still exiting can leave
+  // it under Radix's pointer-events lock; a person cannot click that fast, so let them unmount.
+  cy.get('[data-radix-popper-content-wrapper], [role="dialog"]').should('not.exist');
   cy.get('[data-testid="scatter-quick-filters"]').click();
   cy.get('[data-testid="quick-filter-best-per-sku"]').should(
     'have.attr',
     'data-state',
     enabled ? 'checked' : 'unchecked',
   );
-  cy.contains('button', 'Done').click();
+  cy.get('[data-testid="quick-filters-dialog"]').contains('button', 'Done').click();
+  // Reopening mid exit-animation reuses the old content under a new overlay, which then covers it.
+  cy.get('[data-testid="quick-filters-dialog"]').should('not.exist');
 }
 
 function visitModel(model: string, extra = '', path = '/inference') {
@@ -129,11 +126,124 @@ function visitModel(model: string, extra = '', path = '/inference') {
     {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        win.localStorage.removeItem('inferencex-feature-gate');
+        win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
       },
     },
   );
 }
+
+describe('Inference model presentation', () => {
+  for (const locale of ['', '/zh']) {
+    for (const width of [1280, 375]) {
+      it(`updates model copy and metadata without reloading on ${locale || '/'} at ${width}px`, () => {
+        cy.viewport(width, 900);
+        cy.intercept('GET', '/api/v1/availability', {
+          body: ['kimik3', 'glm5.3', 'dsv41flash'].map((model) => ({
+            ...modelSelectionAvailability[0],
+            model,
+          })),
+        });
+        cy.visit(
+          `${locale}/inference/kimi-k3?i_seq=agentic-traces&i_xmode=interactivity#benchmark`,
+          visitOptions,
+        );
+        cy.window().then((win) => {
+          (win as MarkerWindow).__modelRouteNoReloadMarker = true;
+        });
+        const intro = `[data-testid="${locale ? 'zh-' : ''}tab-intro"]`;
+        const suffix = locale ? '推理基准测试' : 'Inference Benchmarks';
+        const expectModel = (name: string, slug: string) => {
+          const title = `${name} ${suffix}`;
+          cy.get(`${intro} h1`).should('have.text', title);
+          cy.get(`${intro} p`).first().should('contain.text', name);
+          cy.title().should('eq', `${title} | InferenceX`);
+          cy.get('meta[name="description"]').should('have.attr', 'content').and('contain', name);
+          cy.get('meta[property="og:title"]').should(
+            'have.attr',
+            'content',
+            `${title} | InferenceX`,
+          );
+          cy.get('meta[name="twitter:description"]')
+            .should('have.attr', 'content')
+            .and('contain', name);
+          const path = `${locale}/inference/${slug}`;
+          cy.location('pathname').should('eq', path);
+          cy.get('link[rel="canonical"]').should(
+            'have.attr',
+            'href',
+            `https://inferencex.semianalysis.com${path}`,
+          );
+          cy.get('meta[property="og:url"]').should(
+            'have.attr',
+            'content',
+            `https://inferencex.semianalysis.com${path}`,
+          );
+          cy.get('link[hreflang="zh-CN"]').should(
+            'have.attr',
+            'href',
+            `https://inferencex.semianalysis.com/zh/inference/${slug}`,
+          );
+        };
+
+        expectModel('Kimi K3', 'kimi-k3');
+        selectModel('GLM5.2/GLM5.3 744B');
+        expectModel('GLM-5.3', 'glm-5-3');
+        cy.document().then((document) => {
+          document.querySelector('title')!.firstChild!.nodeValue = `Kimi K3 ${suffix} | InferenceX`;
+          document.querySelector('meta[name="description"]')!.setAttribute('content', 'Kimi K3');
+        });
+        expectModel('GLM-5.3', 'glm-5-3');
+        selectModel(FLASH);
+        expectModel('DeepSeek V4.1 Flash', 'deepseek-v41-flash');
+        selectModel('Kimi K3 2.8T');
+        expectModel('Kimi K3', 'kimi-k3');
+        cy.window().its('__modelRouteNoReloadMarker').should('eq', true);
+        cy.location('search').should('contain', 'i_seq=agentic-traces');
+        cy.location('search').should('contain', 'i_xmode=interactivity');
+        cy.location('hash').should('eq', '#benchmark');
+        cy.reload();
+        expectModel('Kimi K3', 'kimi-k3');
+        cy.viewport(1280, 900);
+        cy.get(`a[href="${locale}/evaluation"]`).filter(':visible').first().click();
+        cy.location('pathname').should('eq', `${locale}/evaluation`);
+        cy.title().should('not.contain', 'Kimi K3');
+        cy.go('back');
+        expectModel('Kimi K3', 'kimi-k3');
+      });
+    }
+
+    it(`updates a bare ${locale}/inference intro when the selector creates a model route`, () => {
+      visitModel('DeepSeek-V4.1-Flash', '', `${locale}/inference`);
+      selectModel(PRO);
+      cy.get(`[data-testid="${locale ? 'zh-' : ''}tab-intro"] h1`).should(
+        'contain.text',
+        'DeepSeek V4 Pro',
+      );
+      cy.title().should('contain', 'DeepSeek V4 Pro');
+    });
+
+    it(`follows an explicit query-model override on ${locale}/inference/kimi-k3`, () => {
+      visitModel('DeepSeek-V4.1-Flash', '', `${locale}/inference/kimi-k3`);
+      cy.get('[data-testid="model-selector"]').should('contain.text', FLASH);
+      cy.get(`[data-testid="${locale ? 'zh-' : ''}tab-intro"] h1`).should(
+        'contain.text',
+        'DeepSeek V4.1 Flash',
+      );
+      cy.title().should('contain', 'DeepSeek V4.1 Flash');
+    });
+
+    it(`keeps model copy in server-rendered HTML on ${locale}/inference/kimi-k3`, () => {
+      cy.request(`${locale}/inference/kimi-k3`).then(({ body }) => {
+        const document = new DOMParser().parseFromString(body, 'text/html');
+        expect(document.querySelector('h1')?.textContent).to.eq(
+          locale ? 'Kimi K3 推理基准测试' : 'Kimi K3 Inference Benchmarks',
+        );
+        expect(document.querySelector('h1 + p')?.textContent).to.contain('Kimi K3 2.8T');
+        expect(document.title).to.contain('Kimi K3');
+      });
+    });
+  }
+});
 
 describe('Model-local manual legend selection', () => {
   it('restores destination winners after soloing an engine on another model', () => {
@@ -152,7 +262,6 @@ describe('Model-local manual legend selection', () => {
     cy.get('.dot-group[data-hw-key="gb300_vllm"]').should('have.css', 'opacity', '1');
     cy.get('.dot-group[data-hw-key="gb300_dynamo-sglang"]').should('have.css', 'opacity', '0');
 
-    // Returning to the source model must not resurrect its earlier manual mode.
     selectModel(PRO);
     expectSelection(['checkbox-b200_vllm', 'checkbox-gb300_dynamo-sglang']);
     expectBestPerSku(true);
@@ -168,7 +277,6 @@ describe('Model-local manual legend selection', () => {
     expectSelection(['checkbox-gb300_dynamo-sglang']);
     expectBestPerSku(false);
 
-    // Flash has not loaded yet: the reset must survive an empty-data interval.
     selectModel(FLASH);
     expectSelection(['checkbox-b200_vllm', 'checkbox-gb300_vllm']);
     expectBestPerSku(true);

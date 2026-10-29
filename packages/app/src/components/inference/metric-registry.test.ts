@@ -99,7 +99,6 @@ describe('metric registry', () => {
     for (const metricKey of metricKeys) {
       expect(METRIC_REGISTRY[metricKey].label, metricKey).toContain(' TCO ');
       expect(METRIC_REGISTRY[metricKey].labelZh, metricKey).toContain(' TCO ');
-      // Chart titles end at the metric (the cost tier is no longer appended).
       expect(METRIC_REGISTRY[metricKey].title, metricKey).toMatch(/ TCO$/u);
       expect(METRIC_REGISTRY[metricKey].titleZh, metricKey).toContain(' TCO ');
     }
@@ -147,15 +146,15 @@ describe('metric registry', () => {
     expect(metricOptionTitle('costr', 'en')).toBe(
       'Cost per Million Total Tokens (Rent - 3 Year Commit)',
     );
-    expect(metricOptionTitle('costh', 'zh')).toBe('每百万总 token 成本（自有 - 超大规模云大批量）');
+    expect(metricOptionTitle('costh', 'zh')).toBe(
+      '每百万总 token 成本（自有 · 超大规模云厂商批量采购）',
+    );
     expect(metricOptionTitle('tpPerGpu', 'en')).toBe('Token Throughput per Chip');
 
     expect(costTierLabel('hyperscaler', 'en')).toBe('Owning at Large Hyperscaler Volume');
     expect(costTierLabel('rental', 'en')).toBe('Rent - 3 Year Commit');
-    expect(costTierLabel('hyperscaler', 'zh')).toBe('自有（超大规模云大批量）');
+    expect(costTierLabel('hyperscaler', 'zh')).toBe('自有 · 超大规模云厂商批量采购');
 
-    // Chart definitions carry both spellings so the selector and the heading
-    // read from the same registry entry.
     const [interactivity] = chartDefinitions;
     expect(interactivity.y_tokensPerDollarH_title).toBe(
       'Total Tokens per $1 TCO (Owning at Large Hyperscaler Volume)',
@@ -166,8 +165,6 @@ describe('metric registry', () => {
   });
 
   it('groups tiered metrics into families the Cost Tier selector can swap between', () => {
-    // Every family member carries the tier it is filed under, and every tiered
-    // registry metric belongs to exactly one family.
     const familyMembers = new Set<string>();
     for (const [family, members] of Object.entries(COST_METRIC_FAMILIES)) {
       for (const [tier, metricKey] of Object.entries(members)) {
@@ -185,14 +182,11 @@ describe('metric registry', () => {
     expect(costMetricFamily('tpPerGpu')).toBeUndefined();
     expect(costMetricFamily('costUser')).toBe('cost');
 
-    // Selector order: published tiers first, custom last; families without a
-    // custom axis stop at rental.
     expect(costTiersForFamily('tokensPerDollar')).toEqual(['hyperscaler', 'rental', 'custom']);
     expect(costTiersForFamily('costOutput')).toEqual(['hyperscaler', 'rental']);
     expect(metricForCostTier('cost', 'rental')).toBe('costr');
     expect(metricForCostTier('costInput', 'custom')).toBeUndefined();
 
-    // Family members share a chart title, so the y-axis option can drop the tier.
     for (const members of Object.values(COST_METRIC_FAMILIES)) {
       const titles = new Set(
         Object.entries(members)
@@ -204,8 +198,6 @@ describe('metric registry', () => {
   });
 
   it('keeps the Measured Energy key list in lockstep with the registry', () => {
-    // Every registry key starting `measured` must be in the exported list, so
-    // a new telemetry metric cannot silently miss the tier decorations.
     const measuredRegistryKeys = Object.keys(METRIC_REGISTRY)
       .filter((key) => key.startsWith('measured'))
       .map((key) => `y_${key}`);

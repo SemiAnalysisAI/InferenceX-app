@@ -1,27 +1,5 @@
-/**
- * AgentX detailed-telemetry tutorial — how to read the per-point views that
- * sit behind every dot on an AgentX Pareto curve.
- *
- * English content lives here; the Simplified Chinese port is a 1:1 mirror in
- * `agentx-telemetry-zh.ts`, keyed by the same section ids.
- * `agentx-telemetry.test.ts` enforces that the two stay structurally
- * identical, so a section added here without a translation fails CI.
- *
- * The counts in `highlights` describe the live UI, not the screenshots: the
- * test asserts them against `AGENTIC_DETAIL_SURFACE`, which mirrors what
- * `components/inference/agentic-point/agentic-point-detail.tsx` renders. If a
- * chart or view is added there, update both and the copy that cites them.
- */
-
-/**
- * What the per-point detail page actually ships, as a machine-checkable
- * record. Keeps the tutorial's numeric claims from drifting once the page
- * grows another chart.
- */
 export const AGENTIC_DETAIL_SURFACE = {
-  /** SegmentedToggle options: per-point, request timeline, aggregates. */
   views: 3,
-  /** Cards in the per-point grid, in render order. */
   perPointCharts: [
     'input-sequence-length',
     'output-sequence-length',
@@ -35,13 +13,10 @@ export const AGENTIC_DETAIL_SURFACE = {
     'cumulative-unique-input-tokens',
     'inflight-unique-input-tokens',
   ],
-  /** Replay stages the Stage toggle switches between. */
   stages: ['profiling', 'warmup'],
-  /** Request-timeline groupings. */
   timelineGroupings: ['by conversation', 'by worker'],
 } as const;
 
-/** Figures exported from the source document, served from /public. */
 export const TELEMETRY_FIGURES = {
   perPointOverview: {
     src: '/images/agentx-telemetry/per-point-overview.png',
@@ -72,7 +47,6 @@ export const TELEMETRY_FIGURES = {
 
 export type TelemetryFigureKey = keyof typeof TELEMETRY_FIGURES;
 
-/** Prose that a translation replaces; the asset itself is language-neutral. */
 export interface TelemetryFigureCopy {
   alt: string;
   caption: string;
@@ -88,12 +62,10 @@ export interface TelemetryLink {
 }
 
 export interface TelemetrySection {
-  /** Anchor id — stable across languages, so deep links survive a locale switch. */
   id: string;
   heading: string;
   paragraphs: readonly string[];
   figure?: TelemetryFigure;
-  /** Bulleted detail, used where the source document enumerates rather than argues. */
   bullets?: readonly string[];
   links?: readonly TelemetryLink[];
 }
@@ -110,7 +82,6 @@ export interface TelemetryGuide {
   intro: readonly string[];
   highlights: readonly TelemetryHighlight[];
   sections: readonly TelemetrySection[];
-  /** Chrome around the article: back links, figure CTA, section nav. */
   ui: {
     backToAgentX: string;
     onThisPage: string;
@@ -235,7 +206,6 @@ export const AGENTX_TELEMETRY_GUIDE: TelemetryGuide = {
   },
 };
 
-/** Section ids, for the on-this-page nav and the parity test. */
 export const AGENTX_TELEMETRY_SECTION_IDS = AGENTX_TELEMETRY_GUIDE.sections.map(
   (section) => section.id,
 );

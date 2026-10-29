@@ -1,11 +1,3 @@
-/**
- * SVG renderer for known-issue warning annotations on the inference scatter
- * chart: a stacked column of warning boxes at the top of the plot, each with
- * an arrow pointing at its affected series. Drawn inside the chart SVG so PNG
- * exports carry the warnings; colors are passed in resolved because CSS
- * variables don't survive html-to-image.
- */
-
 import * as d3 from 'd3';
 
 import type { KnownConfigIssue } from '@/lib/benchmarks/known-issues';
@@ -14,15 +6,11 @@ import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { CHART_TYPE } from '@/lib/d3-chart/typography';
 
 interface AnnotationBase {
-  /** Display label of the affected series, e.g. "GB300 NVL72 (Dynamo TRTLLM, MTP)" */
   label: string;
-  /** Resolved stroke color of the affected series */
   color: string;
-  /** Data-space coordinates of the series' visible points (arrow targets) */
   points: { x: number; y: number }[];
 }
 
-/** A filed upstream issue or a non-interactive preview notice rendered inside a chart. */
 export type KnownIssueAnnotation = AnnotationBase &
   (
     | { issue: KnownConfigIssue; preview?: never }
@@ -46,10 +34,6 @@ export interface AnnotationRenderOptions {
   background: string;
   foreground: string;
   mutedForeground: string;
-  /**
-   * Horizontal space reserved at the plot's right edge (e.g. for a legend
-   * panel floating over the SVG). Boxes right-align against it.
-   */
   rightInset?: number;
   onLinkClick?: (annotation: KnownIssueAnnotation) => void;
 }
@@ -59,7 +43,6 @@ export type KnownIssueLayerOptions = Omit<
   'width' | 'height' | 'xScale' | 'yScale' | 'rightInset'
 >;
 
-/** Build the shared render/zoom lifecycle for chart-level known-issue callouts. */
 export function createKnownIssueLayer(
   resolveOptions: () => KnownIssueLayerOptions,
   displayIdentity?: string,
@@ -119,24 +102,16 @@ const SWATCH_SPACE = 14;
 const ARROW_STANDOFF = 9;
 const MIN_ARROW_LEN = 24;
 
-/** getComputedTextLength with an estimate fallback for jsdom/test environments. */
 function measureTextWidth(node: SVGTextElement | null, chars: number, fontSize: number): number {
   if (node && typeof node.getComputedTextLength === 'function') {
     try {
       const len = node.getComputedTextLength();
       if (Number.isFinite(len) && len > 0) return len;
-    } catch {
-      // fall through to estimate
-    }
+    } catch {}
   }
   return chars * fontSize * 0.58;
 }
 
-/**
- * Ellipsize `full` into `target` until the measured width fits `maxWidth`.
- * `measureNode` is the element whose rendered width is read (the parent
- * <text> when `target` is a <tspan>). Returns the final width.
- */
 function fitTextToWidth(
   target:
     | d3.Selection<SVGTextElement, unknown, null, undefined>
@@ -152,8 +127,6 @@ function fitTextToWidth(
   let chars = full.length;
   let width = measureTextWidth(node, chars, fontSize);
   while (chars > 1 && width > maxWidth) {
-    // Jump close to the target using the current average glyph width, then
-    // step down one character at a time.
     const ratio = maxWidth / width;
     chars = Math.max(1, Math.min(chars - 1, Math.floor(chars * ratio)));
     const text = `${full.slice(0, chars).trimEnd()}…`;
@@ -167,11 +140,6 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-/**
- * Live overlap of the floating legend panel over the SVG's right edge, used
- * as `rightInset` so warning boxes sit beside the legend instead of under it.
- * Returns 0 when no legend is present (or outside the browser).
- */
 export function measureLegendRightInset(
   chartId: string,
   svgNode: SVGSVGElement | null,
@@ -259,9 +227,6 @@ export function renderKnownIssueAnnotations(
     }
 
     const boxRight = width - BOX_RIGHT_GAP - (opts.rightInset ?? 0);
-    // Narrow (phone-width) plots: keep the box inside the plot instead of
-    // letting its text run past the right edge. Preview notices drop to their
-    // short summary first; anything still too wide is ellipsized.
     const maxTextW = Math.max(0, boxRight - 2 - PAD_X * 2);
     let w1 = measureTextWidth(text1.node(), label.length, LINE1_SIZE) + SWATCH_SPACE;
     if (w1 > maxTextW) {
@@ -305,9 +270,6 @@ export function renderKnownIssueAnnotations(
     text1.attr('x', bx + PAD_X + SWATCH_SPACE).attr('y', by + PAD_Y + LINE1_H - 4);
     text2.attr('x', bx + PAD_X).attr('y', by + PAD_Y + LINE1_H + LINE2_H - 4);
 
-    // Arrow from the box's bottom edge to the nearest on-screen point of the
-    // affected series. Skipped when the series is panned/zoomed out of view or
-    // the target sits right under the box.
     const bottomY = by + boxH;
     const onScreen = points
       .map((p) => ({ px: xScale(p.x), py: yScale(p.y) }))
@@ -327,7 +289,6 @@ export function renderKnownIssueAnnotations(
       if (len >= MIN_ARROW_LEN) {
         const endX = target.px - (dx / len) * ARROW_STANDOFF;
         const endY = target.py - (dy / len) * ARROW_STANDOFF;
-        // Slight quadratic bend so stacked arrows don't read as one straight rule
         const midX = (startX + endX) / 2 + (dy > 0 ? -dx * 0.12 : dx * 0.12);
         const midY = (bottomY + endY) / 2;
         arrowGroup

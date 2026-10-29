@@ -195,6 +195,7 @@ function buildOptionsPayload() {
       serviceCompare: false,
       roleShare: false,
       powerFit: false,
+      powerBreakdown: false,
       xmetric: 'p90_ttft',
       scale: 'auto',
       precisions: 'auto',
@@ -215,7 +216,7 @@ export function GET(request: NextRequest) {
     }
 
     return Promise.resolve(
-      cachedJson({
+      cachedJson(request, {
         view: 'options',
         apiVersion: 'v1',
         params: { format: 'json' },

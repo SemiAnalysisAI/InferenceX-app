@@ -346,7 +346,11 @@ test('the explicit 1.0.0 report exception records all current-archive native cas
     record,
     exceptionOptions,
   );
-  assert.deepEqual(summary.native_report_exception.counts, { passed: 0, failed: 0, not_run: 26 });
+  assert.deepEqual(summary.native_report_exception.counts, {
+    passed: 0,
+    failed: 0,
+    not_run: caseIds.length * 2,
+  });
   assert.equal(summary.native_report_exception.code, 'accepted-1.0.0-report-limitations');
   assert.match(summary.native_report_exception.reason, /not fully qualified/u);
   assert.deepEqual(summary.native_acceptance, record.native_acceptance);
@@ -380,6 +384,7 @@ test('the report exception requires both opt-ins and the exact release identity'
     );
   for (const changed of [
     { ...archive, version: '1.0.1', filename: 'semianalysisai-inferencex-skills-1.0.1.tgz' },
+    { ...archive, version: '1.2.0', filename: 'semianalysisai-inferencex-skills-1.2.0.tgz' },
     { ...archive, sha256: hash },
   ]) {
     const rebound = structuredClone(record);
@@ -530,7 +535,7 @@ test('both CLI modes enable the one-off exception only for the literal true envi
         assert.deepEqual(JSON.parse(result.stdout).native_report_exception.counts, {
           passed: 0,
           failed: 0,
-          not_run: 26,
+          not_run: caseIds.length * 2,
         });
       } else {
         assert.notEqual(result.status, 0);

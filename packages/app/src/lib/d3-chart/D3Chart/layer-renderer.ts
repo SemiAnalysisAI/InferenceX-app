@@ -27,10 +27,6 @@ import { renderRadar } from '../layers/radar';
 import type { BuiltScale } from './scale-builders';
 import type { LayerConfig, RenderContext, ZoomContext } from './types';
 
-/**
- * Render a single layer into the chart's zoomGroup (or g for non-clipped charts).
- * Returns the D3 selection if the layer produces one (for tooltip attachment).
- */
 export function renderLayer<T>(
   layer: LayerConfig<T>,
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
@@ -136,9 +132,6 @@ export function renderLayer<T>(
   }
 }
 
-/**
- * Cheap geometry updates that should follow every zoom event.
- */
 export function updateLayerPositionOnZoom<T>(
   layer: LayerConfig<T>,
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
@@ -180,10 +173,6 @@ export function updateLayerPositionOnZoom<T>(
   }
 }
 
-/**
- * Expensive path, label, and annotation work. The renderer coalesces this
- * phase through one animation frame.
- */
 export function updateLayerDecorationOnZoom<T>(
   layer: LayerConfig<T>,
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
@@ -236,9 +225,6 @@ export function updateLayerDecorationOnZoom<T>(
   }
 }
 
-/**
- * Update metric coordinates without re-running the scatter data join.
- */
 export function updateLayerForMetric<T>(
   layer: LayerConfig<T>,
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
@@ -274,7 +260,6 @@ export function updateLayerForMetric<T>(
   return selection;
 }
 
-/** Update scale-neutral decoration without rebuilding joins, scales, or paths. */
 export function updateLayerForDisplay<T>(
   layer: LayerConfig<T>,
   group: d3.Selection<SVGGElement, unknown, null, undefined>,

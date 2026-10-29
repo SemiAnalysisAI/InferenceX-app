@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { track } from '@/lib/analytics/analytics';
+import { track, trackOncePerPageview } from '@/lib/analytics/analytics';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChartButtons } from '@/components/ui/chart-buttons';
@@ -91,7 +91,7 @@ export default function SubmissionsDisplay() {
   );
 
   useEffect(() => {
-    track('submissions_page_viewed');
+    trackOncePerPageview('submissions_page_viewed');
   }, []);
 
   const handleModeChange = useCallback((mode: ChartMode) => {
@@ -133,7 +133,6 @@ export default function SubmissionsDisplay() {
 
   return (
     <div data-testid="submissions-display" className="flex flex-col gap-4">
-      {/* Header */}
       <section>
         <Card>
           <DashboardSectionHeader
@@ -144,7 +143,6 @@ export default function SubmissionsDisplay() {
         </Card>
       </section>
 
-      {/* Stats summary */}
       {stats && (
         <section>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -171,7 +169,6 @@ export default function SubmissionsDisplay() {
         </section>
       )}
 
-      {/* Activity chart */}
       <section>
         <figure className="relative rounded-lg">
           <ChartButtons
@@ -218,7 +215,6 @@ export default function SubmissionsDisplay() {
         </figure>
       </section>
 
-      {/* Submissions table */}
       <section>
         <Card>
           <div className="mb-4">

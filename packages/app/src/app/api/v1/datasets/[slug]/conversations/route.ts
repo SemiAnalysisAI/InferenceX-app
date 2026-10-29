@@ -63,7 +63,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const data = await getCachedConversations(slug, search, limit, offset, sort);
     if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    return cachedJson(data);
+    return cachedJson(request, data);
   } catch (error) {
     console.error('Error fetching dataset conversations:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

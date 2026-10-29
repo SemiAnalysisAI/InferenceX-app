@@ -1,43 +1,17 @@
-/**
- * Ingest OperatorX runs into the OperatorX database.
- *
- * Stores each run's RAW documents (the manifest and every shard's operatorx results
- * JSON); the normalizer in src/operatorx/normalize.ts is the single transform point and
- * runs at API-read time. It also runs once here, so a run that cannot be read is never
- * stored. Re-ingesting a run replaces it.
- *
- * Sweep runs are accepted from any branch of the source repo; only the workflow
- * identity is checked.
- *
- * Three modes:
- *   --download <run-url-or-id> [repo]  Download a sweep run's artifacts from GitHub
- *   --bundle <file.json> [...]         Store raw bundles (`OperatorXRawBundle`) as they are
- *   (no flag)                          Read pre-downloaded artifacts from INGEST_ARTIFACTS_PATH
- *
- * Environment variables:
- *   DATABASE_OPERATORX_WRITE_URL — Postgres connection string (direct, non-pooled)
- *   GITHUB_TOKEN                 — GitHub token for run metadata + artifact download
- *   INGEST_RUN_ID                — (env mode) Workflow run ID
- *   INGEST_ARTIFACTS_PATH        — (env mode) Local path to pre-downloaded artifacts
- *   INGEST_REPO                  — (env mode) Source repo slug (owner/name)
- */
-
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
-import { hasNoSslFlag } from './cli-utils';
+import { hasNoSslFlag, requireIngestRepo } from './cli-utils';
 import { createAdminSql } from './etl/db-utils';
 import { downloadArtifact, fetchRunMeta, listRunArtifacts } from './lib/github-artifacts';
 import type { OperatorXRawBundle } from './operatorx/bundle';
 import { saveOperatorXBundle } from './queries/operatorx';
 
-const DEFAULT_REPO = 'SemiAnalysisAI/InferenceX';
 const SWEEP_WORKFLOW_PATH = '.github/workflows/operatorx-sweep.yml';
 const MANIFEST_FILE = 'operatorx-manifest.json';
 const SHARD_RE = /^operatorx-shard-(?<run>\d+)-(?<attempt>\d+)-(?<shard>.+)$/u;
 
-/** Every results JSON under an artifact's results/, except counter dumps. */
 function readResultDocs(dir: string): unknown[] {
   const root = path.join(dir, 'results');
   if (!fs.existsSync(root)) return [];
@@ -56,7 +30,6 @@ function readResultDocs(dir: string): unknown[] {
   return docs;
 }
 
-/** The newest artifact name per shard, from attempts up to `attempt`. */
 function selectShards(names: string[], runId: string, attempt: number) {
   const shards = new Map<string, { name: string; attempt: number }>();
   for (const name of names) {
@@ -69,7 +42,6 @@ function selectShards(names: string[], runId: string, attempt: number) {
   return shards;
 }
 
-/** A sweep run's bundle from its artifacts in `dir`, downloading them first if asked. */
 export function sweepBundle(repo: string, runId: string, dir: string, download: boolean) {
   const run = fetchRunMeta(repo, runId);
   if (run.path !== SWEEP_WORKFLOW_PATH)
@@ -128,14 +100,21 @@ function parseRunId(input: string | undefined): string {
 }
 
 function checkRepo(repo: string): string {
-  // reaches shell-interpolated `gh api` calls
   if (!/^[\w.-]+\/[\w.-]+$/u.test(repo)) throw new Error(`Invalid repo slug: ${repo}`);
   return repo;
 }
 
 async function main(): Promise<void> {
   const mode = process.argv[2];
+  const replaceIndex = process.argv.indexOf('--replace-run');
+  const replaceRunKey = replaceIndex === -1 ? undefined : process.argv[replaceIndex + 1];
+  if (
+    replaceIndex !== -1 &&
+    (mode !== '--bundle' || !replaceRunKey || replaceRunKey.startsWith('--'))
+  )
+    throw new Error('--replace-run requires --bundle and an existing run key');
   const args = process.argv.slice(3).filter((a) => !a.startsWith('--'));
+  if (replaceRunKey) args.splice(args.indexOf(replaceRunKey), 1);
   const bundles: OperatorXRawBundle[] = [];
   let tempDir: string | null = null;
   try {
@@ -146,16 +125,14 @@ async function main(): Promise<void> {
       const runId = parseRunId(args[0]);
       tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'opx-ingest-'));
       console.log(`=== run ${runId} ===`);
-      bundles.push(sweepBundle(checkRepo(args[1] ?? DEFAULT_REPO), runId, tempDir, true));
+      bundles.push(sweepBundle(checkRepo(args[1] ?? requireIngestRepo()), runId, tempDir, true));
     } else {
       const dir = process.env.INGEST_ARTIFACTS_PATH;
       if (!process.env.INGEST_RUN_ID || !dir)
         throw new Error('INGEST_RUN_ID and INGEST_ARTIFACTS_PATH are required without a flag');
       const runId = parseRunId(process.env.INGEST_RUN_ID);
       console.log(`=== run ${runId} ===`);
-      bundles.push(
-        sweepBundle(checkRepo(process.env.INGEST_REPO ?? DEFAULT_REPO), runId, dir, false),
-      );
+      bundles.push(sweepBundle(checkRepo(requireIngestRepo()), runId, dir, false));
     }
 
     const sql = createAdminSql({
@@ -165,8 +142,10 @@ async function main(): Promise<void> {
       onnotice: () => {},
     });
     try {
+      if (replaceRunKey && bundles.length !== 1)
+        throw new Error('--replace-run requires exactly one bundle');
       for (const bundle of bundles) {
-        const { docs, results } = await saveOperatorXBundle(sql, bundle);
+        const { docs, results } = await saveOperatorXBundle(sql, bundle, replaceRunKey);
         console.log(
           `  stored run ${bundle.run.run_id}: ${bundle.shards.length} shards, ${docs} docs, ${results} results`,
         );

@@ -6,9 +6,13 @@ and sealed media loader. All visible copy lives in component-local `STRINGS`.
 
 ## Selection and evidence
 
-Published Blob indexes → `GET /api/video-runs?format=history` → `videoPoints` →
+Stored Blob indexes and matching publication approvals →
+`GET /api/video-runs?format=history` → `videoPoints` →
 `resultProjection`. Reads stop after five pages; the view API reports pagination
-coverage. The browser never publishes a run or generates a clip. The read-only
+coverage. History retains unapproved stored sources; `videoPoints` admits only
+entries with an approval receipt matching their original source and checkout.
+Approval is separate from full-sweep or release qualification. The browser never
+publishes a run or generates a clip. The read-only
 `GET /api/v1/views/video?view=overview` returns the same selectors and calculations.
 Legacy dashboard, compare, results, tradeoff and discovery API modes remain.
 
@@ -128,7 +132,8 @@ browser playback and difference failure, bilingual layout and 390px overflow.
 `/video` 与 `/zh/video` 共用结果页，沿用现有路由、功能开关、History 和封存媒体读取器。
 比较要求固定的 20 条视频 C1 工作负载，每种硬件至少 10 个有效样本；完整身份包含模型版本、
 生成参数、prompt、seed 和测量语义。较短 smoke、未完成及未匹配结果留在性能历史，不混入比较。
-界面按有效性、延迟、吞吐量、资源与能耗、成本、质量、稳定性、启动、并行与部署的顺序展示。
+历史记录保留尚无发布批准的存储结果；默认图表仅接纳发布回执与原始来源及 checkout 匹配的记录。
+发布批准与 full-sweep 或发布资格验收分开。界面按有效性、延迟、吞吐量、资源与能耗、成本、质量、稳定性、启动、并行与部署的顺序展示。
 待采集指标是真正的斜线空态，不使用示意数值。功率无效时不展示功率或能耗结论。
 页首用一个共享控件区域展示五项筛选条件；硬件开关位于四栏视频对比上方。指标说明、
 完整哈希及尚未校准的人工评分维度按需展开，图表图例与 TCO 估算口径仍直接可见。

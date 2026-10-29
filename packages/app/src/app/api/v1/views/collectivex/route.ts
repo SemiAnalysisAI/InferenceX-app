@@ -193,7 +193,7 @@ export function GET(request: NextRequest) {
       metric: swapMetric,
       percentile: swapPercentile,
     }).filter((p) => active('swapSeries', p.seriesId));
-    return cachedJson({
+    return cachedJson(request, {
       apiVersion: 'v1',
       view: 'collectivex',
       knownSupport: COLLECTIVEX_KNOWN_SUPPORT,

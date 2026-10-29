@@ -22,7 +22,6 @@ export type RequestRun<T extends SubagentGroupableRequest> =
       baseLabel: string;
       label: string;
       threadId: string | null;
-      /** Stable Claude Code agent identity, independent of system-prompt label drift. */
       agentId: string | null;
       requests: T[];
     };
@@ -46,14 +45,12 @@ export function getRequestThreadId(headers: Record<string, string> | null): stri
   return headers.sessionId ?? headers.session_id ?? null;
 }
 
-// Claude Code >= 2.1.139 identifies sub-agents by header; main and utility calls omit it.
 export function getRequestClaudeCodeAgentId(headers: Record<string, string> | null): string | null {
   if (!headers) return null;
   const id = headers['x-claude-code-agent-id'];
   return typeof id === 'string' && id.length > 0 ? id : null;
 }
 
-// Distinguish concurrent agents that share a label with a stable ID suffix.
 function getSubagentRunLabel(
   baseLabel: string,
   agentId: string | null,
@@ -64,8 +61,6 @@ function getSubagentRunLabel(
 }
 
 export function getRequestSubagentLabel(req: SubagentGroupableRequest): string | null {
-  // Agent-ID-capable clients omit the header on main/utility calls, even when a
-  // stored label suggests a sub-agent. The header takes precedence over that label.
   const userAgent = req.requestHeaders?.['user-agent'] ?? null;
   if (isClaudeCodeWithAgentIdSupport(userAgent)) {
     const agentId = getRequestClaudeCodeAgentId(req.requestHeaders);
@@ -102,7 +97,6 @@ export function buildRequestRuns<T extends SubagentGroupableRequest>(
     agentId: getRequestClaudeCodeAgentId(req.requestHeaders),
   }));
 
-  // Group stable IDs across the whole session, including interleaved main-agent turns.
   const idGroups = new Map<string, TaggedRequest<T>[]>();
   for (const item of tagged) {
     const key = idGroupKey(item);
@@ -111,7 +105,6 @@ export function buildRequestRuns<T extends SubagentGroupableRequest>(
     idGroups.get(key)!.push(item);
   }
 
-  // Emit ID groups at their first request; without stable IDs, group only contiguous labels.
   const runs: RequestRun<T>[] = [];
   const emitted = new Set<string>();
   let i = 0;
@@ -134,9 +127,6 @@ export function buildRequestRuns<T extends SubagentGroupableRequest>(
       continue;
     }
 
-    // Label-only fallback (pre-2.1.139 Claude Code, no headers). Same
-    // stretch-based grouping as before: contiguous same-label requests
-    // collapse into one group; a main-agent interruption ends the run.
     const stretch: TaggedRequest<T>[] = [];
     while (i < tagged.length && tagged[i].subagentLabel && !idGroupKey(tagged[i])) {
       stretch.push(tagged[i]);
@@ -167,18 +157,11 @@ function buildSubagentGroup<T extends SubagentGroupableRequest>(
   key: string,
   items: TaggedRequest<T>[],
 ): Extract<RequestRun<T>, { kind: 'subagent_group' }> {
-  // Sort by timestamp so the group's requests appear chronologically in
-  // the conversation/timeline views, even if the input wasn't strictly
-  // sorted. (Defensive — buildRequestRuns is typically called with
-  // already-sorted requests, but cheap to enforce.)
   const sorted = [...items].toSorted(
     (a, b) => new Date(a.req.timestamp).getTime() - new Date(b.req.timestamp).getTime(),
   );
   const threadId = sorted[0].threadId;
   const agentId = sorted[0].agentId;
-  // For agent-id groups the per-request label drifts arbitrarily across
-  // the agent's life; we don't try to name them. The semantic name lives
-  // in Claude Code's local subagents/*.meta.json which isn't on the wire.
   const baseLabel = agentId ? 'Subagent' : (sorted[0].subagentLabel ?? 'Subagent');
   return {
     kind: 'subagent_group',

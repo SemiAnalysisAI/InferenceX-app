@@ -54,7 +54,7 @@ const STRINGS = {
     title: '按操作系统分组的工具结果错误率',
     comparableResults: (n: string) => `(${n} 个可比较结果)`,
     description:
-      '错误率使用 Anthropic 匹配结果计算，因为该协议携带显式错误信号。OpenAI 和 Codex 仅参与总调用量和流量占比统计，不被默认计为成功。OS 指请求发送端，不一定是工具执行主机。Coverage 为 matched/comparable 调用比；Signal Share 为 comparable/全部 matched 结果比。',
+      '错误率使用 Anthropic 匹配结果计算，因为该协议携带显式错误信号。OpenAI 和 Codex 仅参与总调用量和流量占比统计，不被默认计为成功。OS 指请求发送端，不一定是工具执行主机。覆盖率为 matched/comparable 调用比；信号占比为 comparable/全部 matched 结果比。',
     caption:
       '按请求发送端操作系统分组的 Anthropic 工具结果错误数及百分比，附全 provider 流量构成。',
     emptyState: '暂无按操作系统分组的结果数据',

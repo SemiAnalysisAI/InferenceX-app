@@ -1,9 +1,3 @@
-/**
- * Differential fuzz of the port against upstream (2026-10-12) reached behaviour the
- * catalog grid cannot: structurally typed parts of the wrong family, a dropped chassis
- * provenance, and Python-only text formatting. Each case reproduces one finding with
- * the exact upstream outcome.
- */
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -33,7 +27,6 @@ import {
 } from './power_model/models/advanced/systems/rack_scale/compute_tray';
 import { GB300NVL72RackScaleSystem } from './power_model/models/advanced/systems/rack_scale/gb300';
 
-// CPython 3.12 `format(value, 'g')` for each value; exact-tie rows round half to even.
 const PYTHON_G: [number, string][] = [
   [1234565, '1.23456e+06'],
   [1234575, '1.23458e+06'],

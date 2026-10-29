@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-import { navigateInApp } from '@/lib/routing/client-navigation';
+import {
+  CLIENT_PATHNAME_CHANGE_EVENT,
+  isPageviewPathnameChange,
+  navigateInApp,
+  replaceClientPathname,
+  replaceRouterPathname,
+} from '@/lib/routing/client-navigation';
 
 import type { MouseEvent } from 'react';
 
@@ -37,10 +43,6 @@ describe('navigateInApp', () => {
   });
 
   it('pushes the route exactly once — no timer-based re-push', () => {
-    // The old 250ms retry re-read `window.location.pathname`, which a stale
-    // mid-transition restore could revert to the origin page; the retry then
-    // pushed again, stacking a duplicate history entry and visibly restarting
-    // the transition (landing "Full dashboard" regression).
     const router = { push: vi.fn() };
     const { event, preventDefault } = makeEvent();
 
@@ -49,8 +51,6 @@ describe('navigateInApp', () => {
     expect(router.push).toHaveBeenCalledTimes(1);
     expect(router.push).toHaveBeenCalledWith('/inference/kimi-k3');
 
-    // Even if the address bar still shows the origin (slow commit or a stale
-    // revert), no second push may fire later.
     vi.advanceTimersByTime(5000);
     expect(router.push).toHaveBeenCalledTimes(1);
   });
@@ -74,5 +74,55 @@ describe('navigateInApp', () => {
 
     expect(preventDefault).not.toHaveBeenCalled();
     expect(router.push).not.toHaveBeenCalled();
+  });
+});
+
+describe('pathname change pageview signalling', () => {
+  let pathnameEvents: Event[];
+
+  beforeEach(() => {
+    pathnameEvents = [];
+    const location = {
+      pathname: '/profit/dsr1',
+      search: '',
+      hash: '',
+      origin: 'https://example.com',
+    };
+    const replaceState = (_state: unknown, _title: string, href: string) => {
+      const url = new URL(href, location.origin);
+      location.pathname = url.pathname;
+      location.search = url.search;
+    };
+    vi.stubGlobal('History', { prototype: { replaceState } });
+    vi.stubGlobal('window', {
+      location,
+      history: { state: null, replaceState },
+      dispatchEvent: (event: Event) => {
+        if (event.type === CLIENT_PATHNAME_CHANGE_EVENT) pathnameEvents.push(event);
+        return true;
+      },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('does not mark filter-driven path rewrites as pageviews', () => {
+    replaceClientPathname('/profit/dsr1/h100');
+    expect(pathnameEvents).toHaveLength(1);
+    expect(pathnameEvents.filter(isPageviewPathnameChange)).toHaveLength(0);
+  });
+
+  it('marks a model switch as exactly one pageview', () => {
+    replaceClientPathname('/inference/kimi-k3', [], { pageview: true });
+    expect(pathnameEvents.filter(isPageviewPathnameChange)).toHaveLength(1);
+  });
+
+  it('marks router model switches as a pageview only when requested', () => {
+    replaceRouterPathname('/inference/kimi-k3', [], { pageview: true });
+    replaceRouterPathname('/inference/kimi-k3/b200');
+    expect(pathnameEvents).toHaveLength(2);
+    expect(pathnameEvents.filter(isPageviewPathnameChange)).toHaveLength(1);
   });
 });

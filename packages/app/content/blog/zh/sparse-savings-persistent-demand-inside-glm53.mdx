@@ -97,7 +97,7 @@ GLM 5.2 / 5.3 的注意力架构降低了内存需求，但长时间运行的智
 
 ### TileRT
 
-TileRT 对 GLM5.3 的支持首先落地于 AMD MI355X。TileRT 是一种低延迟 LLM 推理引擎，将 decode 编译成单个持久化内核，减少内核启动开销，并让计算、内存访问和通信重叠。
+TileRT 对 GLM5.3 的支持首先落地于 AMD MI355X。TileRT 是一种低延迟 LLM 推理引擎，将 decode 编译成单个持久化 kernel，减少 kernel 启动开销，并让计算、内存访问和通信重叠。
 
 它优先提高单用户 token 生成速度，而非追求最大批处理吞吐量；prefill 则由 vLLM 处理。
 
@@ -138,7 +138,7 @@ lightning indexer 在功能上类似**轻量级注意力机制**。query 和 key
 
 ### 稀疏 MLA
 
-[我们在 Kimi K3 文章中解释过](https://newsletter.semianalysis.com/i/209189055/multi-head-latent-attention)，MLA 有 Multi-Head Attention（MHA）和 Multi-Query Attention（MQA）两种运行模式。两者各有取舍：MHA 的 FLOPs 较少，但内存成本是 42 倍；MQA 的内存成本较低，但 FLOPs 最多达到 3.4 倍。DSA 使用 MQA 模式，因为稀疏注意力关注的 token 更少，可以缓解其较高的计算量。不过，实际存在一个序列长度阈值，低于该阈值时 MHA 反而更高效。直观上，较短序列下内存加载时间的主导性较弱，FLOPs 较少的 MHA 就可能占优。vLLM 实现了这一机制：数据并行时，序列长度从 2K 到约 5K 使用 MHA；张量并行时，则从 2K 到约 77K 使用 MHA。下限设为 2K，是因为 top K 为 2048，而低于 2K 时使用稠密注意力。
+[我们在 Kimi K3 文章中解释过](https://newsletter.semianalysis.com/i/209189055/multi-head-latent-attention)，MLA 有 Multi-Head Attention（MHA）和 Multi-Query Attention（MQA）两种运行模式。两者各有取舍：MHA 的 FLOPs 较少，但内存成本是 MQA 的 42 倍；MQA 的内存成本较低，但 FLOPs 最多为 MHA 的 3.4 倍。DSA 使用 MQA 模式，因为稀疏注意力关注的 token 更少，可以缓解其较高的计算量。不过，实际存在一个序列长度阈值，低于该阈值时 MHA 反而更高效。直观上，较短序列下内存加载时间的主导性较弱，FLOPs 较少的 MHA 就可能占优。vLLM 实现了这一机制：数据并行时，序列长度从 2K 到约 5K 使用 MHA；张量并行时，则从 2K 到约 77K 使用 MHA。下限设为 2K，是因为 top K 为 2048，而低于 2K 时使用稠密注意力。
 
 <Figure
   src="/images/sparse-savings-persistent-demand-inside-glm53/sparse-mla-mha-vs-mqa.png"

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { isDismissed, markDismissed, markShown } from './persistence';
 
 import {
   NUDGE_REGISTRY,
@@ -7,6 +8,7 @@ import {
 } from './registry';
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe('NUDGE_REGISTRY integrity', () => {
@@ -15,8 +17,8 @@ describe('NUDGE_REGISTRY integrity', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('has no duplicate storage keys', () => {
-    const keys = NUDGE_REGISTRY.map((n) => n.storageKey);
+  it('has no duplicate storage keys outside A/B arms of one nudge', () => {
+    const keys = NUDGE_REGISTRY.filter((n) => n.variant !== 'operatorx').map((n) => n.storageKey);
     expect(new Set(keys).size).toBe(keys.length);
   });
 
@@ -74,20 +76,18 @@ describe('NUDGE_REGISTRY integrity', () => {
       'export',
       'filter-hint',
       'gradient-label',
+      'huawei-ascend-950pr-ubenchx-banner',
+      'operatorx-banner',
       'reproducibility',
       'star-nudge',
       'tpuv7-agentx-launch-modal',
-      'tpuv7-qwen-3-5-agentx-banner',
     ]);
   });
 
   it('renders the telemetry tutorial as an uncentered card on the agentic detail scope', () => {
     const tutorial = NUDGE_REGISTRY.find((n) => n.id === 'agentx-telemetry-tutorial');
     expect(tutorial?.scope).toBe('agentic-detail');
-    // A backdrop would cover the very charts the tutorial describes.
     expect(tutorial?.content.centered).toBeUndefined();
-    // cypress/support/e2e.ts seeds this key so the card can't sit over the
-    // charts under test; a rename here has to be mirrored there.
     expect(tutorial?.storageKey).toBe(TELEMETRY_TUTORIAL_STORAGE_KEY);
     expect(TELEMETRY_TUTORIAL_STORAGE_KEY).toBe('inferencex-agentx-telemetry-tutorial-dismissed');
   });
@@ -101,28 +101,17 @@ describe('NUDGE_REGISTRY integrity', () => {
     reproducibility.content.action?.onClick();
     expect(location.href).toBe('/zh/about#reproducibility');
 
-    const banner = NUDGE_REGISTRY.find((nudge) => nudge.id === 'tpuv7-qwen-3-5-agentx-banner');
+    const banner = NUDGE_REGISTRY.find(
+      (nudge) => nudge.id === 'huawei-ascend-950pr-ubenchx-banner',
+    );
     if (banner?.type !== 'banner') throw new Error('Missing launch banner');
-    // New storage key so visitors who dismissed the previous launch banner
-    // see this one; cypress specs seed/clear this key and must stay in sync.
-    expect(banner.storageKey).toBe('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed');
-    expect(banner.content.href).toBe(
-      '/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_xmode=interactivity&i_seq=agentic-traces&i_prec=fp8',
-    );
-    expect(banner.analytics).toEqual({
-      shown: 'inference_tpuv7_qwen_3_5_agentx_banner_shown',
-      dismissed: 'inference_tpuv7_qwen_3_5_agentx_banner_dismissed',
-      action: 'inference_tpuv7_qwen_3_5_agentx_banner_clicked',
-      properties: {
-        banner_id: 'tpuv7-qwen-3-5-agentx',
-        destination: 'inference',
-      },
-    });
-    // Clicks preserve the Chinese locale and model-specific destination.
     banner.content.onLinkClick?.();
-    expect(location.href).toBe(
-      '/zh/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_xmode=interactivity&i_seq=agentic-traces&i_prec=fp8',
-    );
+    expect(location.href).toBe('/zh/ubenchx/core-memory-profiles');
+
+    const operatorxBanner = NUDGE_REGISTRY.find((nudge) => nudge.id === 'operatorx-banner');
+    if (operatorxBanner?.type !== 'banner') throw new Error('Missing OperatorX banner');
+    operatorxBanner.content.onLinkClick?.();
+    expect(location.href).toBe('/zh/operatorx');
 
     location.href = '';
     const modal = NUDGE_REGISTRY.find((nudge) => nudge.id === 'tpuv7-agentx-launch-modal');
@@ -133,27 +122,89 @@ describe('NUDGE_REGISTRY integrity', () => {
     );
   });
 
-  it.each(['tpuv7-agentx-launch-modal', 'tpuv7-qwen-3-5-agentx-banner'])(
-    '%s uses the announcement title without a breaking-news prefix in either locale',
-    (id) => {
-      const nudge = NUDGE_REGISTRY.find((entry) => entry.id === id);
-      expect(nudge?.content.title).toBe('Google TPUv7 joins AgentX');
-      expect(nudge?.content.titleZh).toBe('Google TPUv7 加入 AgentX');
-    },
-  );
+  it('splits the landing banner into comparable A/B arms', () => {
+    const arms = NUDGE_REGISTRY.filter((nudge) => nudge.variant);
+    expect(arms.map((arm) => [arm.variant, arm.content.href])).toEqual([
+      ['ubenchx', '/ubenchx/core-memory-profiles'],
+      ['operatorx', '/operatorx'],
+    ]);
+    for (const arm of arms) {
+      // Same slot, same dismissal, same event names: only the destination differs.
+      expect(arm).toMatchObject({
+        type: 'banner',
+        scope: 'landing',
+        renderOnInitialLoad: true,
+        priority: arms[0].priority,
+        storageKey: arms[0].storageKey,
+        analytics: {
+          shown: 'landing_banner_shown',
+          dismissed: 'landing_banner_dismissed',
+          action: 'landing_banner_clicked',
+          properties: { experiment: 'landing_banner_destination', variant: arm.variant },
+        },
+      });
+    }
+  });
+
+  it.each(['', '/zh'])('offers both launch models in the %s route tree', (prefix) => {
+    const location = { pathname: prefix || '/', href: '' };
+    vi.stubGlobal('window', { location });
+    const modal = NUDGE_REGISTRY.find((nudge) => nudge.id === 'tpuv7-agentx-launch-modal');
+    expect(modal?.content.title).toBe('TPUv7 prelimary results across multiple models');
+    expect(modal?.content.titleZh).toBe('TPUv7 多模型初步结果');
+    expect(modal?.content.description).toBe('AgentX Preview Submissions');
+    expect(modal?.content.descriptionZh).toBe('AgentX 预览版提交结果');
+    expect(modal?.content.primaryAction?.label).toBe('Qwen3.5');
+    modal?.content.primaryAction?.onClick();
+    expect(location.href).toBe(
+      `${prefix}/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_xmode=interactivity&i_seq=agentic-traces&i_prec=fp8`,
+    );
+    expect(modal?.content.secondaryAction?.label).toBe('Kimi K3');
+    modal?.content.secondaryAction?.onClick();
+    expect(location.href).toBe(`${prefix}/inference/kimi-k3`);
+  });
 
   it('centers the TPUv7 launch modal on the landing page', () => {
     const modal = NUDGE_REGISTRY.find((nudge) => nudge.id === 'tpuv7-agentx-launch-modal');
     expect(modal?.scope).toBe('landing');
     expect(modal?.content.centered).toBe(true);
-    // cypress/support/e2e.ts seeds this key; a rename has to be mirrored there.
     expect(modal?.storageKey).toBe(TPUV7_LAUNCH_MODAL_STORAGE_KEY);
-    expect(TPUV7_LAUNCH_MODAL_STORAGE_KEY).toBe('inferencex-tpuv7-agentx-modal-dismissed');
+    expect(TPUV7_LAUNCH_MODAL_STORAGE_KEY).toBe(
+      'inferencex-tpuv7-agentx-multiple-model-modal-dismissed',
+    );
+    expect(modal?.dismissal).toEqual({ type: 'timed', durationMs: 3 * 24 * 60 * 60 * 1000 });
     expect(modal?.analytics).toEqual({
       shown: 'inference_tpuv7_agentx_modal_shown',
       dismissed: 'inference_tpuv7_agentx_modal_dismissed',
       action: 'inference_tpuv7_agentx_modal_clicked',
     });
+  });
+
+  it('ignores the old launch dismissal and waits exactly three days after each new dismissal', () => {
+    const oldKey = 'inferencex-tpuv7-agentx-modal-dismissed';
+    const storage = new Map<string, string>([[oldKey, '1']]);
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+    });
+    let now = Date.parse('2026-10-18T12:00:00Z');
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    const modal = NUDGE_REGISTRY.find((nudge) => nudge.id === 'tpuv7-agentx-launch-modal')!;
+    expect(isDismissed(modal.storageKey, modal.dismissal)).toBe(false);
+    markShown(modal.storageKey, modal.dismissal);
+    expect(storage.has(modal.storageKey)).toBe(false);
+    markDismissed(modal.storageKey, modal.dismissal);
+    expect(storage.get(modal.storageKey)).toBe(String(now));
+    now += 3 * 24 * 60 * 60 * 1000 - 1;
+    expect(isDismissed(modal.storageKey, modal.dismissal)).toBe(true);
+    now += 1;
+    expect(isDismissed(modal.storageKey, modal.dismissal)).toBe(false);
+    markShown(modal.storageKey, modal.dismissal);
+    expect(isDismissed(modal.storageKey, modal.dismissal)).toBe(false);
+    markDismissed(modal.storageKey, modal.dismissal);
+    expect(isDismissed(modal.storageKey, modal.dismissal)).toBe(true);
+    expect(storage.get(modal.storageKey)).toBe(String(now));
+    expect(storage.get(oldKey)).toBe('1');
   });
 
   it('gives every coach mark an anchor to point at', () => {
@@ -189,7 +240,13 @@ describe('NUDGE_REGISTRY integrity', () => {
   it('only server-renders deterministic immediate banners', () => {
     const initialNudges = NUDGE_REGISTRY.filter((nudge) => nudge.renderOnInitialLoad);
 
-    expect(initialNudges).toHaveLength(1);
+    // Several server-rendered banners are allowed only as A/B arms, one per arm.
+    if (initialNudges.length > 1) {
+      const arms = initialNudges.map((nudge) => nudge.variant);
+      expect(arms.every(Boolean)).toBe(true);
+      expect(new Set(arms).size).toBe(arms.length);
+    }
+    expect(initialNudges.length).toBeGreaterThan(0);
     for (const nudge of initialNudges) {
       const triggers = Array.isArray(nudge.trigger) ? nudge.trigger : [nudge.trigger];
       expect(nudge.type).toBe('banner');

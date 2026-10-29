@@ -16,7 +16,7 @@ vi.mock('@semianalysisai/inferencex-db/queries/workflow-info', () => ({
 
 vi.mock('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: any[]) => any) => fn,
-  cachedJson: (data: unknown) => Response.json(data),
+  cachedJson: (_request: Request, data: unknown) => Response.json(data),
 }));
 
 import { GET } from './route';
@@ -30,7 +30,7 @@ describe('GET /api/v1/availability', () => {
     const mockData = { dsr1: ['2026-03-01', '2026-03-02'], llama70b: ['2026-03-01'] };
     mockGetAvailabilityData.mockResolvedValueOnce(mockData);
 
-    const res = await GET();
+    const res = await GET(new Request('https://example.test/api/v1/availability'));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual(mockData);
@@ -40,7 +40,7 @@ describe('GET /api/v1/availability', () => {
   it('returns empty object when no data', async () => {
     mockGetAvailabilityData.mockResolvedValueOnce({});
 
-    const res = await GET();
+    const res = await GET(new Request('https://example.test/api/v1/availability'));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual({});
@@ -49,7 +49,7 @@ describe('GET /api/v1/availability', () => {
   it('returns 500 when query throws', async () => {
     mockGetAvailabilityData.mockRejectedValueOnce(new Error('Connection failed'));
 
-    const res = await GET();
+    const res = await GET(new Request('https://example.test/api/v1/availability'));
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.error).toBe('Internal server error');
