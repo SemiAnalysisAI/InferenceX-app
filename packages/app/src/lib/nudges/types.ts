@@ -2,6 +2,8 @@ import type { ComponentType, ReactNode } from 'react';
 
 export type NudgeTrigger =
   | { type: 'immediate' }
+  /** After the page has loaded and the main thread is idle, so it never delays first paint. */
+  | { type: 'idle' }
   | { type: 'timer'; delayMs: number }
   | {
       type: 'event';

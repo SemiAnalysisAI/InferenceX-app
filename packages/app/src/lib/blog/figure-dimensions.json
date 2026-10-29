@@ -1,0 +1,1149 @@
+{
+  "/images/agentx-methodology/pareto-b200-minimax-m3.png": [2048, 1167],
+  "/images/agentx-methodology/replay-multi-subagent.png": [4200, 5130],
+  "/images/agentx-methodology/request-distributions.png": [4200, 4110],
+  "/images/b200-glm5-nvfp4-vs-h200-fp8-3-6x-perf-per-dollar/benchmark-dark.png": [1144, 686],
+  "/images/b200-glm5-nvfp4-vs-h200-fp8-3-6x-perf-per-dollar/benchmark-light.png": [1144, 686],
+  "/images/b200-glm5-nvfp4-vs-h200-fp8-3-6x-perf-per-dollar/specs-radar-dark.png": [1072, 610],
+  "/images/b200-glm5-nvfp4-vs-h200-fp8-3-6x-perf-per-dollar/specs-radar-light.png": [1072, 610],
+  "/images/b200-minimax-m2-5-vllm-nvfp4-vs-h100-fp8-perf-per-dollar/benchmark-dark.png": [
+    1141, 702
+  ],
+  "/images/b200-minimax-m2-5-vllm-nvfp4-vs-h100-fp8-perf-per-dollar/benchmark-light.png": [
+    1141, 702
+  ],
+  "/images/b200-minimax-m2-5-vllm-nvfp4-vs-h100-fp8-perf-per-dollar/moe-kernel-comparison-dark.png": [
+    2000, 853
+  ],
+  "/images/b200-minimax-m2-5-vllm-nvfp4-vs-h100-fp8-perf-per-dollar/moe-kernel-comparison-light.png": [
+    2000, 853
+  ],
+  "/images/b200-minimax-m2-5-vllm-nvfp4-vs-h100-fp8-perf-per-dollar/quality-benchmarks-dark.png": [
+    2000, 1208
+  ],
+  "/images/b200-minimax-m2-5-vllm-nvfp4-vs-h100-fp8-perf-per-dollar/quality-benchmarks-light.png": [
+    2000, 1208
+  ],
+  "/images/b200-minimax-m2-5-vllm-nvfp4-vs-h100-fp8-perf-per-dollar/specs-radar-dark.png": [
+    1063, 638
+  ],
+  "/images/b200-minimax-m2-5-vllm-nvfp4-vs-h100-fp8-perf-per-dollar/specs-radar-light.png": [
+    1063, 638
+  ],
+  "/images/b200-nvfp4-vs-h200-int4-kimi-k2-vllm-perf-per-dollar/benchmark-dark.png": [2000, 1241],
+  "/images/b200-nvfp4-vs-h200-int4-kimi-k2-vllm-perf-per-dollar/benchmark-light.png": [2000, 1241],
+  "/images/b200-nvfp4-vs-h200-int4-kimi-k2-vllm-perf-per-dollar/kimi-k2-architecture-dark.png": [
+    2000, 1084
+  ],
+  "/images/b200-nvfp4-vs-h200-int4-kimi-k2-vllm-perf-per-dollar/kimi-k2-architecture-light.png": [
+    2000, 1084
+  ],
+  "/images/b200-nvfp4-vs-h200-int4-kimi-k2-vllm-perf-per-dollar/specs-radar-dark.png": [2000, 1155],
+  "/images/b200-nvfp4-vs-h200-int4-kimi-k2-vllm-perf-per-dollar/specs-radar-light.png": [
+    2000, 1155
+  ],
+  "/images/brief-overview-of-agentic-workloads/context-accumulation.png": [2000, 963],
+  "/images/deepseekv4-16t-day-0-to-day-43-performance/ascend-950-architecture.jpg": [1456, 925],
+  "/images/deepseekv4-16t-day-0-to-day-43-performance/ascend-950-david-codename.jpg": [976, 1532],
+  "/images/deepseekv4-16t-day-0-to-day-43-performance/ascend-950dt-decode-streams.png": [1456, 496],
+  "/images/deepseekv4-16t-day-0-to-day-43-performance/ascend-950dt-mc2-operators.png": [1456, 505],
+  "/images/deepseekv4-16t-day-0-to-day-43-performance/ascend-950dt-profile-overview.png": [
+    1456, 724
+  ],
+  "/images/deepseekv4-16t-day-0-to-day-43-performance/ascend-aic-aiv-architecture.png": [1094, 686],
+  "/images/deepseekv4-16t-day-0-to-day-43-performance/atom-frontier-over-time.png": [1456, 899],
+  "/images/deepseekv4-16t-day-0-to-day-43-performance/b200-tokens-per-mw.png": [1456, 1101],
+  "/images/deepseekv4-16t-day-0-to-day-43-performance/b300-sglang-over-time.png": [1456, 889],
+  "/images/deepseekv4-16t-day-0-to-day-43-performance/cann-open-source-slide.jpg": [1456, 817],
+  "/images/deepseekv4-16t-day-0-to-day-43-performance/coreweave-gb300-nvl72-racks.jpg": [
+    1456, 1933
+  ],
+  "/images/deepseekv4-16t-day-0-to-day-43-performance/current-sglang-pareto.png": [1456, 794],
+  "/images/deepseekv4-16t-day-0-to-day-43-performance/day0-gb200-nvl72-disagg-vllm.png": [
+    1456, 825
+  ],
+  "/images/deepseekv4-16t-day-0-to-day-43-performance/day0-mi355x-rocm.png": [1456, 892],
+  "/images/deepseekv4-16t-day-0-to-day-43-performance/day0-sglang-pareto.png": [1456, 886],
+  "/images/deepseekv4-16t-day-0-to-day-43-performance/day0-vllm-pareto.png": [1456, 812],
+  "/images/deepseekv4-16t-day-0-to-day-43-performance/day3-sglang-mtp.png": [1456, 868],
+  "/images/deepseekv4-16t-day-0-to-day-43-performance/deepseek-day0-huawei-support.jpg": [
+    1456, 750
+  ],
+  "/images/deepseekv4-16t-day-0-to-day-43-performance/dsv4-architecture-diagram.png": [1384, 1478],
+  "/images/deepseekv4-16t-day-0-to-day-43-performance/dsv4-csa-sparse-attention.png": [1456, 719],
+  "/images/deepseekv4-16t-day-0-to-day-43-performance/dsv4-hca-compression.png": [1408, 892],
+  "/images/deepseekv4-16t-day-0-to-day-43-performance/dsv4-megamoe-overlap.png": [1456, 589],
+  "/images/deepseekv4-16t-day-0-to-day-43-performance/gb300-cost-per-million-tokens.png": [
+    1456, 937
+  ],
+  "/images/deepseekv4-16t-day-0-to-day-43-performance/gb300-nvl72-mtp-over-time.png": [1456, 804],
+  "/images/deepseekv4-16t-day-0-to-day-43-performance/inferencex-github-repo.png": [1242, 663],
+  "/images/deepseekv4-16t-day-0-to-day-43-performance/inferencex-supporters.png": [1456, 432],
+  "/images/deepseekv4-16t-day-0-to-day-43-performance/mi355x-100x-over-time.png": [1456, 882],
+  "/images/deepseekv4-16t-day-0-to-day-43-performance/rocm-vllm-lag.png": [1456, 896],
+  "/images/deepseekv4-16t-day-0-to-day-43-performance/vllm-vs-sglang-twitter-drama-meme.png": [
+    485, 574
+  ],
+  "/images/engrams-embedding-entendre-codesign/figure-01.png": [1456, 547],
+  "/images/engrams-embedding-entendre-codesign/figure-02.png": [1456, 504],
+  "/images/engrams-embedding-entendre-codesign/figure-03.png": [1456, 837],
+  "/images/engrams-embedding-entendre-codesign/figure-04.png": [1034, 752],
+  "/images/engrams-embedding-entendre-codesign/figure-05.png": [1456, 864],
+  "/images/engrams-embedding-entendre-codesign/figure-06.png": [1290, 1080],
+  "/images/engrams-embedding-entendre-codesign/figure-07.png": [1422, 592],
+  "/images/engrams-embedding-entendre-codesign/figure-08.png": [1456, 477],
+  "/images/engrams-embedding-entendre-codesign/figure-09.png": [1456, 598],
+  "/images/engrams-embedding-entendre-codesign/figure-10.png": [1456, 473],
+  "/images/engrams-embedding-entendre-codesign/figure-11.png": [1456, 1176],
+  "/images/engrams-embedding-entendre-codesign/figure-12.png": [1456, 1316],
+  "/images/engrams-embedding-entendre-codesign/figure-13.png": [1456, 1169],
+  "/images/engrams-embedding-entendre-codesign/figure-14.png": [1456, 952],
+  "/images/engrams-embedding-entendre-codesign/figure-15.png": [1456, 995],
+  "/images/engrams-embedding-entendre-codesign/figure-16.png": [1456, 997],
+  "/images/engrams-embedding-entendre-codesign/figure-17.png": [1456, 1219],
+  "/images/engrams-embedding-entendre-codesign/figure-18.png": [1456, 920],
+  "/images/engrams-embedding-entendre-codesign/figure-19.png": [1456, 1290],
+  "/images/gb200-nvl72-kimi-k2-5-vllm-wide-ep-3x-vs-b200/benchmark-dark.png": [2040, 1190],
+  "/images/gb200-nvl72-kimi-k2-5-vllm-wide-ep-3x-vs-b200/benchmark-light.png": [2040, 1190],
+  "/images/gb200-nvl72-vs-b200-disagg-deepseek-r1-fp4-dynamo-trt/benchmark-dark.png": [1087, 668],
+  "/images/gb200-nvl72-vs-b200-disagg-deepseek-r1-fp4-dynamo-trt/benchmark-light.png": [1087, 668],
+  "/images/gb200-nvl72-vs-b200-disagg-deepseek-r1-fp4-dynamo-trt/gb200-nvl72-rack-dark.png": [
+    810, 780
+  ],
+  "/images/gb200-nvl72-vs-b200-disagg-deepseek-r1-fp4-dynamo-trt/gb200-nvl72-rack-light.png": [
+    810, 780
+  ],
+  "/images/gb300-nvl72-vs-gb200-nvl72-dsv4-pro-vllm-fp4/benchmark-dark.png": [2514, 1424],
+  "/images/gb300-nvl72-vs-gb200-nvl72-dsv4-pro-vllm-fp4/benchmark-light.png": [2514, 1424],
+  "/images/gb300-nvl72-vs-gb200-nvl72-dsv4-pro-vllm-fp4/specs-radar-dark.png": [2000, 1163],
+  "/images/gb300-nvl72-vs-gb200-nvl72-dsv4-pro-vllm-fp4/specs-radar-light.png": [2000, 1163],
+  "/images/kimi-k3-the-manos-the-mythos-the/attention-residual-equations.png": [2378, 472],
+  "/images/kimi-k3-the-manos-the-mythos-the/b200-dynamo-vllm-kimi-k3-throughput.png": [2048, 1214],
+  "/images/kimi-k3-the-manos-the-mythos-the/block-attention-residuals.png": [1327, 736],
+  "/images/kimi-k3-the-manos-the-mythos-the/cross-stage-caching-model-split.png": [2048, 1041],
+  "/images/kimi-k3-the-manos-the-mythos-the/cross-stage-caching-virtual-stages.png": [2048, 1152],
+  "/images/kimi-k3-the-manos-the-mythos-the/full-attention-residuals.png": [1438, 995],
+  "/images/kimi-k3-the-manos-the-mythos-the/gdn-vs-kda-update-rule.png": [866, 129],
+  "/images/kimi-k3-the-manos-the-mythos-the/gpu-memory-hierarchy.png": [2090, 1196],
+  "/images/kimi-k3-the-manos-the-mythos-the/inferencex-agentic-trace-distributions.png": [
+    2048, 1103
+  ],
+  "/images/kimi-k3-the-manos-the-mythos-the/inter-block-attention-phase-1.png": [1389, 947],
+  "/images/kimi-k3-the-manos-the-mythos-the/intra-block-attention-phase-2.png": [1236, 961],
+  "/images/kimi-k3-the-manos-the-mythos-the/kda-cache-retention-intervals.png": [1396, 378],
+  "/images/kimi-k3-the-manos-the-mythos-the/kimi-k3-architecture-overview.png": [1554, 1380],
+  "/images/kimi-k3-the-manos-the-mythos-the/kimi-linear-vs-kimi-k3-config.png": [786, 403],
+  "/images/kimi-k3-the-manos-the-mythos-the/kv-throughput-by-sequence-length.png": [969, 196],
+  "/images/kimi-k3-the-manos-the-mythos-the/latentmoe-block.png": [1504, 1022],
+  "/images/kimi-k3-the-manos-the-mythos-the/linear-attention-recurrence.png": [417, 121],
+  "/images/kimi-k3-the-manos-the-mythos-the/linear-attention-reordering.png": [459, 692],
+  "/images/kimi-k3-the-manos-the-mythos-the/openrouter-kimi-k3-providers.png": [2002, 926],
+  "/images/kimi-k3-the-manos-the-mythos-the/prefix-cache-hit.png": [2635, 628],
+  "/images/kimi-k3-the-manos-the-mythos-the/qb-solver-algorithm.png": [1848, 564],
+  "/images/kimi-k3-the-manos-the-mythos-the/quantile-balancing.png": [2322, 716],
+  "/images/kimi-k3-the-manos-the-mythos-the/residual-connections-vs-rnn-hidden-state.png": [
+    1628, 1116
+  ],
+  "/images/kimi-k3-the-manos-the-mythos-the/sequence-wise-vs-depth-wise-attention.png": [
+    1736, 1068
+  ],
+  "/images/kimi-k3-the-manos-the-mythos-the/softmax-vs-linear-attention.png": [632, 427],
+  "/images/mi355x-deepseek-v4-pro-sglang-110x-in-26-days/b200-vs-mi355x-dark.png": [1120, 698],
+  "/images/mi355x-deepseek-v4-pro-sglang-110x-in-26-days/b200-vs-mi355x-light.png": [1120, 698],
+  "/images/mi355x-deepseek-v4-pro-sglang-110x-in-26-days/benchmark-dark.png": [2308, 1424],
+  "/images/mi355x-deepseek-v4-pro-sglang-110x-in-26-days/benchmark-light.png": [2308, 1424],
+  "/images/mi355x-deepseek-v4-pro-sglang-110x-in-26-days/quality-benchmarks-dark.png": [1080, 742],
+  "/images/mi355x-deepseek-v4-pro-sglang-110x-in-26-days/quality-benchmarks-light.png": [1080, 742],
+  "/images/mi355x-deepseek-v4-pro-sglang-110x-in-26-days/specs-radar-dark.png": [1100, 654],
+  "/images/mi355x-deepseek-v4-pro-sglang-110x-in-26-days/specs-radar-light.png": [1100, 654],
+  "/images/mi355x-glm5-fp8-sglang-40-cheaper-than-b200/benchmark-dark.png": [2412, 1682],
+  "/images/mi355x-glm5-fp8-sglang-40-cheaper-than-b200/benchmark-light.png": [2412, 1682],
+  "/images/mi355x-kimi-k2-5-vllm-aiter-7x-speedup/benchmark-dark.png": [2080, 1320],
+  "/images/mi355x-kimi-k2-5-vllm-aiter-7x-speedup/benchmark-light.png": [2080, 1320],
+  "/images/mi355x-qwen3-5-sglang-v0-5-12-up-to-17x/benchmark-dark.png": [1238, 756],
+  "/images/mi355x-qwen3-5-sglang-v0-5-12-up-to-17x/benchmark-light.png": [1238, 756],
+  "/images/sglang-0-5-6-b200-deepseek-r1-fp4-up-to-1-8x/benchmark-dark.png": [1936, 1240],
+  "/images/sglang-0-5-6-b200-deepseek-r1-fp4-up-to-1-8x/benchmark-light.png": [1936, 1240],
+  "/images/sparse-savings-persistent-demand-inside-glm53/b200-cache-reuse.png": [2048, 1772],
+  "/images/sparse-savings-persistent-demand-inside-glm53/cached-attention-layer-overlap.png": [
+    1126, 174
+  ],
+  "/images/sparse-savings-persistent-demand-inside-glm53/dsa-training-stages.png": [1258, 264],
+  "/images/sparse-savings-persistent-demand-inside-glm53/glm5-post-training-pipeline.png": [
+    2048, 1432
+  ],
+  "/images/sparse-savings-persistent-demand-inside-glm53/glm53-output-token-cost.png": [2700, 2160],
+  "/images/sparse-savings-persistent-demand-inside-glm53/glm53-total-token-cost.png": [2700, 1900],
+  "/images/sparse-savings-persistent-demand-inside-glm53/glm53-ttft-constrained-cost.png": [
+    2700, 1800
+  ],
+  "/images/sparse-savings-persistent-demand-inside-glm53/hisparse-memory-capacity.png": [1600, 900],
+  "/images/sparse-savings-persistent-demand-inside-glm53/indexcache-latency.png": [944, 654],
+  "/images/sparse-savings-persistent-demand-inside-glm53/indexcache-throughput.png": [2048, 629],
+  "/images/sparse-savings-persistent-demand-inside-glm53/indexer-weighted-scores.png": [2048, 2048],
+  "/images/sparse-savings-persistent-demand-inside-glm53/lightning-indexer.png": [1404, 682],
+  "/images/sparse-savings-persistent-demand-inside-glm53/mla-dimension-comparison.png": [1258, 204],
+  "/images/sparse-savings-persistent-demand-inside-glm53/multi-task-rollout-orchestrator.png": [
+    2048, 1039
+  ],
+  "/images/sparse-savings-persistent-demand-inside-glm53/rl-advantage-comparison.png": [2048, 479],
+  "/images/sparse-savings-persistent-demand-inside-glm53/rl-importance-sampling.png": [1654, 484],
+  "/images/sparse-savings-persistent-demand-inside-glm53/rl-token-objectives.png": [2048, 472],
+  "/images/sparse-savings-persistent-demand-inside-glm53/sao-rollout-straggler.png": [1255, 669],
+  "/images/sparse-savings-persistent-demand-inside-glm53/sao-value-model-training.png": [335, 597],
+  "/images/sparse-savings-persistent-demand-inside-glm53/sparse-mla-mha-vs-mqa.png": [1898, 1265],
+  "/images/sparse-savings-persistent-demand-inside-glm53/tilert-agentx-interactivity.png": [
+    1582, 1450
+  ],
+  "/images/ultra-high-interactivity-on-nvidia/agentx-benchmark-characteristics.png": [2048, 1654],
+  "/images/ultra-high-interactivity-on-nvidia/cerebras-groq-sambanova-comparison.png": [2048, 1217],
+  "/images/ultra-high-interactivity-on-nvidia/cuda-graphs-vs-persistent-kernel.png": [1578, 1410],
+  "/images/ultra-high-interactivity-on-nvidia/dataflow-accelerator-comparison.png": [2048, 1089],
+  "/images/ultra-high-interactivity-on-nvidia/hbm-bandwidth-vs-latency.png": [778, 773],
+  "/images/ultra-high-interactivity-on-nvidia/inferencex-dashboard.png": [1918, 1046],
+  "/images/ultra-high-interactivity-on-nvidia/inferencex-github.png": [2048, 1098],
+  "/images/ultra-high-interactivity-on-nvidia/multi-turn-thinking.png": [2048, 1364],
+  "/images/ultra-high-interactivity-on-nvidia/prefill-decode-phases.png": [1112, 548],
+  "/images/ultra-high-interactivity-on-nvidia/shared-prefill-specialized-decode-pools.png": [
+    1594, 1078
+  ],
+  "/images/ultra-high-interactivity-on-nvidia/throughput-vs-interactivity-curve.png": [1456, 954],
+  "/images/ultra-high-interactivity-on-nvidia/tilert-1k1k-interactivity-chart.png": [2496, 1348],
+  "/images/ultra-high-interactivity-on-nvidia/tilert-1k1k-vs-gb200-bar.png": [2048, 290],
+  "/images/ultra-high-interactivity-on-nvidia/tilert-8k1k-interactivity-chart.png": [2368, 1284],
+  "/images/ultra-high-interactivity-on-nvidia/tilert-8k1k-vs-gb300-bar.png": [2048, 310],
+  "/images/ultra-high-interactivity-on-nvidia/tilert-end-to-end-latency.png": [2614, 1424],
+  "/images/ultra-high-interactivity-on-nvidia/tilert-gpu-specialization-glm51.png": [849, 513],
+  "/images/ultra-high-interactivity-on-nvidia/tilert-warp-specialization.png": [1280, 720],
+  "/images/ultra-high-interactivity-on-nvidia/vllm-tilert-pd-architecture.png": [1780, 1227],
+  "/images/vera-rubin-nvl72-agentic-inference/agentic-workload-cache-reuse.png": [2048, 909],
+  "/images/vera-rubin-nvl72-agentic-inference/inferencex-cross-vendor-benchmarks.png": [2142, 1232],
+  "/images/vera-rubin-nvl72-agentic-inference/inferencex-industry-support.png": [1964, 680],
+  "/images/vera-rubin-nvl72-agentic-inference/rubin-annual-revenue-profit-per-gw.png": [2048, 1336],
+  "/images/vera-rubin-nvl72-agentic-inference/rubin-blackwell-gtc-performance.png": [2048, 1131],
+  "/images/vera-rubin-nvl72-agentic-inference/rubin-blackwell-performance-per-mw.png": [2048, 1131],
+  "/images/vera-rubin-nvl72-agentic-inference/rubin-cross-vendor-throughput-per-mw.png": [
+    2048, 1279
+  ],
+  "/images/vera-rubin-nvl72-agentic-inference/rubin-gb300-e2e-latency.png": [2048, 1320],
+  "/images/vera-rubin-nvl72-agentic-inference/rubin-gb300-interactivity.png": [2048, 1322],
+  "/images/vera-rubin-nvl72-agentic-inference/rubin-gb300-owning-tco.png": [2048, 1322],
+  "/images/vera-rubin-nvl72-agentic-inference/rubin-gb300-rental-tco.png": [2048, 1331],
+  "/images/vera-rubin-nvl72-agentic-inference/rubin-h200-owning-tco.png": [2048, 1317],
+  "/images/vera-rubin-nvl72-agentic-inference/rubin-iso-interactivity-table.png": [1600, 900],
+  "/images/vera-rubin-nvl72-agentic-inference/rubin-single-node-e2e-latency.png": [2048, 1325],
+  "/images/vera-rubin-nvl72-agentic-inference/rubin-single-node-owning-tco.png": [2048, 1312],
+  "/images/vera-rubin-nvl72-agentic-inference/ti-84-calculator.png": [2000, 2000],
+  "/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/coreweave-2025-baseline.png": [1456, 316],
+  "/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/coreweave-optimizations.png": [1456, 559],
+  "/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/coreweave-rubin-10x-per-mw.png": [1456, 821],
+  "/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/coreweave-vr-nvl72-es-rack.jpg": [1098, 1552],
+  "/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/cost-bars-legend.png": [1456, 49],
+  "/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/feynman-sparsity-data-movement.png": [
+    1456, 670
+  ],
+  "/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/per-mw-bars-legend.png": [1456, 49],
+  "/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-activation-sparsity.png": [1456, 1215],
+  "/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-blackwell-tco-per-gpu-hr.png": [
+    1456, 235
+  ],
+  "/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-exp-throughput.png": [1456, 1143],
+  "/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-hbm4-bandwidth.png": [1456, 1061],
+  "/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-lut-formats-comparison.png": [1456, 398],
+  "/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-lut-mma-ptx.png": [1456, 851],
+  "/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-nvlink-counted-writes.png": [1456, 707],
+  "/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-pdl-threadblock-overlap.png": [
+    1456, 859
+  ],
+  "/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-smem-triton-pr.png": [1446, 400],
+  "/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-tensor-core-k-dim.png": [1456, 851],
+  "/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-tma-inline-descriptor.png": [1456, 519],
+  "/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-ue5m3-block-scale.png": [1456, 594],
+  "/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-vs-blackwell-cost-bars.png": [1456, 463],
+  "/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-vs-blackwell-cost-pareto.png": [
+    1456, 919
+  ],
+  "/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-vs-blackwell-cost-table.png": [
+    1456, 414
+  ],
+  "/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-vs-blackwell-per-mw-bars.png": [
+    1456, 491
+  ],
+  "/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-vs-blackwell-per-mw-pareto.png": [
+    1456, 919
+  ],
+  "/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/rubin-vs-blackwell-per-mw-table.png": [
+    1456, 421
+  ],
+  "/images/vera-rubin-nvl72-vs-gb200-nvl72-inference/vr-nvl72-bom-buildup.png": [733, 1702],
+  "https://substack-post-media.s3.amazonaws.com/public/images/00b459b8-9c4c-4c8c-8659-07e14bf5699f_2048x784.png": [
+    2048, 784
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/0186cfbc-1b42-46ae-ae1a-0d7791afcb20_2081x1306.png": [
+    2081, 1306
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/01cfa04c-b0fe-456d-ba3c-367c434f373c_2048x1223.png": [
+    2048, 1223
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/028672d5-2c24-4dbd-974d-9f50d163df27_1796x1182.png": [
+    1796, 1182
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/058757ed-531f-4cfb-a1ad-a06b1499ecbd_1360x612.png": [
+    1360, 612
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/076f3327-558d-481f-91be-87edecf55135_2153x1624.png": [
+    2153, 1624
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/078ad449-7657-4468-9ff9-3480a7999d89_2048x720.png": [
+    2048, 720
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/0aa98f63-d0f8-4666-85fd-47a1bbf78c7a_1645x1121.png": [
+    1645, 1121
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/0bc87a96-aa31-4b37-99c6-603c98f332f3_1318x733.png": [
+    1318, 733
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/0be8b8f5-b627-4dc9-938b-4a407ef19c34_2103x1233.png": [
+    2103, 1233
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/0d7d181a-2bb9-45d4-bd67-2f7e525ce6d1_1426x376.png": [
+    1426, 376
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/101c2a16-c861-40f5-8079-3f2e38038980_2491x1123.png": [
+    2491, 1123
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/10e95c72-6372-415e-8e51-d8021815182c_2142x1784.png": [
+    2142, 1784
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/1143164c-b38f-4ca9-888a-e9e270d6ef48_1757x1187.png": [
+    1757, 1187
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/1217e5ad-909c-419e-b4a5-304a7145275e_1736x1165.png": [
+    1736, 1165
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/129e616b-82d6-413b-ae0c-e28f07b27d84_1661x1121.png": [
+    1661, 1121
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/12cd94ca-2aa7-4e06-a4bd-3153982234c5_1220x680.png": [
+    1220, 680
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/132f55e4-43c7-4df3-bb4e-1408d85c2782_2718x1796.png": [
+    2718, 1796
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/1629db8a-7dbb-4d06-b58c-60c58b66a248_1826x1237.png": [
+    1826, 1237
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/1755b498-ab4d-4c02-b6fd-152ee538a34d_2126x1788.png": [
+    2126, 1788
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/18326fc6-9e43-4998-838b-b2b7087de7f1_2853x1341.png": [
+    2853, 1341
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/1883d94c-1996-47de-942b-c8eef7cf3eb1_1576x808.png": [
+    1576, 808
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/18adec21-15d9-40cd-af7d-0772da4a9af0_2048x1729.png": [
+    2048, 1729
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/18c9a3dd-3777-44d5-a3e2-b4d28140df38_2106x1380.png": [
+    2106, 1380
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/193e605e-579b-4ed2-9637-5bfdbee5cf71_1286x1515.png": [
+    1286, 1515
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/19a7f45a-df8e-436e-ba04-df5d8610f3da_2048x1330.png": [
+    2048, 1330
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/19e48a4c-0c1b-4681-b180-03ef0c8c2ce3_2346x1340.png": [
+    2346, 1340
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/1ae2668e-28ef-4a1f-8ab1-0b5f1373a1d1_8476x3546.png": [
+    8476, 3546
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/1c3573d3-b885-4a29-abc4-998df6ab3399_2048x263.png": [
+    2048, 263
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/1d5636b8-69d8-4676-9c3c-823da8d03514_2638x1840.png": [
+    2638, 1840
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/1e2801db-53ff-4029-8b55-01b3c1a7037d_1632x1140.png": [
+    1632, 1140
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/1e9a8353-ca83-4bd3-ab4a-3541132f6665_1680x1175.png": [
+    1680, 1175
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/1eb79a88-ef6f-40fc-ae5d-392967666f11_1874x1772.png": [
+    1874, 1772
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/1f027e38-879b-4074-960e-928ceca839e2_2112x1227.png": [
+    2112, 1227
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/1f93df86-2ea2-4904-8fd1-e0e5eff4b410_1638x854.png": [
+    1638, 854
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/20662be0-c311-49e9-8e39-0973d8a1865d_2048x1169.png": [
+    2048, 1169
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/25a7c41e-fa99-4117-8e49-ac121a22bf0f_2092x1241.png": [
+    2092, 1241
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/2690029e-8ec9-4b9e-b517-ec6d2950e8a2_1999x1130.png": [
+    1999, 1130
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/2755907c-48bb-47aa-99be-6058c695ac85_1857x1121.png": [
+    1857, 1121
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/27a3f80e-7959-4651-90eb-f498989908a3_1934x1284.png": [
+    1934, 1284
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/27ee5a46-78b5-40dd-b76d-1f096e0ae06d_1755x1154.png": [
+    1755, 1154
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/282af9ce-a0c4-4c7b-8053-00026f16f945_1112x548.png": [
+    1112, 548
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/290f8a5a-3e55-45c6-a0e4-7c1dc6065175_2293x1701.png": [
+    2293, 1701
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/29485790-238d-4e1d-aa48-0559c79c9855_2132x1247.png": [
+    2132, 1247
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/29cfd340-d61b-46c4-8d87-e081d937b80c_2048x1303.png": [
+    2048, 1303
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/2b40624a-223c-44db-a403-0be563b2af82_2048x1298.png": [
+    2048, 1298
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/2c25289d-8cf8-4d1a-9be6-69a4e12f9886_2353x1271.png": [
+    2353, 1271
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/2c2cfea4-a217-47ad-934b-dbd226bb248c_2048x837.png": [
+    2048, 837
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/2d82d32f-089b-405d-b4ef-94b4956676ed_2078x1233.png": [
+    2078, 1233
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/2eb19374-5a08-4d82-84a3-9875b3fc0f5b_1980x1220.png": [
+    1980, 1220
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/2ed3fe4a-93e9-4c47-8fb2-91f17da1b7c5_2392x1418.png": [
+    2392, 1418
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/2f3e8a00-c9fe-4a81-be97-6a3681eb15ee_1668x1121.png": [
+    1668, 1121
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/2f923fd4-57c0-418e-8b01-49025b9c48d5_8236x3544.png": [
+    8236, 3544
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/3088f64c-9bee-46d9-a445-6818248ba573_2048x1366.png": [
+    2048, 1366
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/30a51cf2-e628-4c20-a4a5-5978234ca713_952x541.png": [
+    952, 541
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/327f95f7-ab6b-44ae-9b8f-17c1ff5d296b_1712x1300.png": [
+    1712, 1300
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/32c734aa-1f52-47af-a98e-334978b4e6fa_1778x1386.png": [
+    1778, 1386
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/3350a97b-7c28-4e46-9c80-519555da1eb6_2342x1124.jpeg": [
+    2342, 1124
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/35b683ee-7e31-401a-8a8a-31c53e253aa2_2048x819.png": [
+    2048, 819
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/36087d46-94e1-4629-90cb-4b0dfad1a8c1_1856x827.png": [
+    1856, 827
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/360a051c-6117-4860-a704-b50198f01521_1978x1246.png": [
+    1978, 1246
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/36899201-da3b-42ec-888f-2443c63980aa_2048x1260.png": [
+    2048, 1260
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/3a807d67-383b-4aa9-93af-e8f3a68313f4_855x634.png": [
+    855, 634
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/3b56d901-ef89-43c9-8d11-c18062f1b7b9_1165x1165.png": [
+    1165, 1165
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/3b5b1ecd-8df1-48c8-8e21-5bfa9f21352b_1654x1121.png": [
+    1654, 1121
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/3b921859-49f3-4b0b-b02e-dd0bf7a36e2e_3000x975.png": [
+    3000, 975
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/3d5f01ad-1736-496b-91b4-31672002bf47_1920x2048.png": [
+    1920, 2048
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/3e287d0e-947f-4fd7-9dc8-d697fad9ac7d_1781x822.png": [
+    1781, 822
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/402b23af-7ad6-46e4-97af-a5698ea2bd87_2176x1416.png": [
+    2176, 1416
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/43184e50-b71a-4a48-a569-98d6906cb259_2048x1167.png": [
+    2048, 1167
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/44f22920-4b5c-4e9c-9606-bd0199e77bd0_2351x1121.png": [
+    2351, 1121
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/46159be7-8b5b-49d7-990f-2ce1cf1217d0_1110x687.png": [
+    1110, 687
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/465df901-046f-4109-84b4-7ccaf092f79e_2810x867.png": [
+    2810, 867
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/4686438a-1880-4162-92c9-e64d2ab7718b_2852x993.png": [
+    2852, 993
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/471369b0-e290-4560-a348-b3079c8b6e88_2329x1393.png": [
+    2329, 1393
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/478b3a9a-c57d-4766-bde1-c3ee1fef550a_2068x1178.png": [
+    2068, 1178
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/47ce130f-13f2-4732-8431-17e26184b8c3_1846x806.png": [
+    1846, 806
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/48045991-20d7-4685-863d-c9aa1d6d3142_1812x2048.png": [
+    1812, 2048
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/4a21d140-b588-4b33-941d-7c8090ac42b5_2048x1286.png": [
+    2048, 1286
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/4a4dc479-c4ae-4fa2-8f35-76858a36a401_2276x1540.png": [
+    2276, 1540
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/4b8c3b9b-7536-4cba-8b85-854d25169864_1922x1726.png": [
+    1922, 1726
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/4bb71482-fe77-4e33-b5cb-b7db512b61c1_1700x439.png": [
+    1700, 439
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/4be54ad9-692e-4500-948c-38beb5018814_1734x922.png": [
+    1734, 922
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/4c82923a-c144-4447-8b73-f622ba7df27e_2048x1357.png": [
+    2048, 1357
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/4fec3378-2cf4-4c1c-a40d-bcbd788c9a70_3022x1964.jpeg": [
+    3022, 1964
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/512c3a96-2ab4-452f-be6a-4fa60900575c_2048x651.png": [
+    2048, 651
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/512c6225-5816-493e-839d-e4f539e5b1c4_2048x1215.png": [
+    2048, 1215
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/5179bd8e-c147-46c8-aeb4-b347049b28a7_2048x1303.png": [
+    2048, 1303
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/519a7cd0-ac51-4a5c-9c45-ba7c41f6d058_2048x1300.png": [
+    2048, 1300
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/52bd05ab-914f-4dc5-9f16-a0ea1b495383_959x501.png": [
+    959, 501
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/539b0f8f-9421-41b4-9e89-a53f2697b0c8_1976x1454.png": [
+    1976, 1454
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/53a95093-3d25-4d01-9d64-64ea9e113749_2376x1760.png": [
+    2376, 1760
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/5789e0ea-2d0d-4924-b338-f0559c7e7ee9_1928x1292.png": [
+    1928, 1292
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/58ac4a3a-cc05-4ff6-9d1e-b28dc0d0f760_1814x2048.png": [
+    1814, 2048
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/58c7b664-76a7-454b-ac99-036b0b6f4abb_2132x1456.png": [
+    2132, 1456
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/594bc030-2862-4521-acf4-d06304a30dce_1687x1121.png": [
+    1687, 1121
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/596ca531-3bde-44fa-8d1b-34d04b8cc6b8_1304x1382.png": [
+    1304, 1382
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/59c3d46f-7b88-4e65-8715-f160b83c3d6e_2048x771.png": [
+    2048, 771
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/5c880335-e1e3-44d9-a123-8e316c9c3808_822x555.png": [
+    822, 555
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/5ca10b5a-f80e-45b4-8d22-e3134d30b54d_2232x1446.png": [
+    2232, 1446
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/5dde0cca-4570-4e17-a685-f8aa0fc9685c_1774x1178.png": [
+    1774, 1178
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/61956823-2928-44ec-b00c-8bb5581b8a13_2048x892.png": [
+    2048, 892
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/61e2a61e-1b95-4ecb-a03d-061d15615c40_2086x1214.png": [
+    2086, 1214
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/6254047b-173b-4b1b-9f43-2057eb720b05_2048x1200.png": [
+    2048, 1200
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/62a1acf1-77d0-4c16-85da-9a046d56f2f8_1974x1342.png": [
+    1974, 1342
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/63ea9afd-01ea-4df3-b632-3524e2507d04_2048x1742.png": [
+    2048, 1742
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/6621150f-7da2-44ae-9695-493374487825_1972x1122.png": [
+    1972, 1122
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/66509f21-d3e5-435f-9163-50d9be56c789_1930x1162.png": [
+    1930, 1162
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/678ca15d-f0c0-4c36-a63f-b1108939cbb1_2048x1620.png": [
+    2048, 1620
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/679784de-e6df-4cb4-8bf6-3347cb9ed002_1200x588.png": [
+    1200, 588
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/68f7ad68-3886-4980-9b01-390582728e47_2048x1292.png": [
+    2048, 1292
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/69317046-6bae-4d80-9b8b-f9777076792d_2048x1228.png": [
+    2048, 1228
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/69dc13f6-ffb1-4d56-8df7-b75b57280382_1980x1254.png": [
+    1980, 1254
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/6b0d71aa-e6aa-425f-bbcc-25e2c1de2f4d_1900x1744.png": [
+    1900, 1744
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/6c4a7c01-3d56-486d-b959-cb4b6468f56f_2408x1390.png": [
+    2408, 1390
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/6e6e4785-cd71-4160-90b8-40bf02e1483e_1456x542.png": [
+    1456, 542
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/6e8f9fd2-ec7f-45fa-80b9-dc132e32c661_2048x1450.png": [
+    2048, 1450
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/6ff82904-c377-4bbd-97a7-ad6eb54932ec_1875x925.png": [
+    1875, 925
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/70638c7e-69a6-43f2-96a4-23766bcabbd2_2121x1248.png": [
+    2121, 1248
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/70a7a7c7-7918-459c-a4e0-f7fc1edca816_2048x887.png": [
+    2048, 887
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/7123b5de-9942-4298-8ccd-1b69b8a71df0_2048x1799.png": [
+    2048, 1799
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/717be24a-af21-4e21-a829-c907bf3aaa88_1883x1121.png": [
+    1883, 1121
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/725b7e9e-8c46-4d02-880e-5a7de8886e87_2048x915.png": [
+    2048, 915
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/729199d9-66c0-42b5-b1b8-f228503c1585_2048x1289.png": [
+    2048, 1289
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/72b64a02-8a1f-4a19-929c-85c0ed4803cd_2048x909.png": [
+    2048, 909
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/72c0863c-a506-404a-8522-70bcadb3a89a_2048x756.png": [
+    2048, 756
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/73ded698-c86e-411b-8e7c-f9bb125487b7_2048x1459.png": [
+    2048, 1459
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/74936db5-88cb-418e-932a-e7a8693a6857_2904x2845.png": [
+    2904, 2845
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/767f2f58-fa9d-40d3-8711-751d243cae9a_500x487.png": [
+    500, 487
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/770b205f-12a1-4d34-81a7-fb235742d005_2048x1305.png": [
+    2048, 1305
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/77c591fb-74ef-46ce-bba2-9f82a52f5f6f_2362x1752.png": [
+    2362, 1752
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/7ace6118-029a-44df-b0ef-2e7595e6f388_2032x1339.png": [
+    2032, 1339
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/7af8faf5-300e-4ee5-bc0c-040b7630e923_1016x671.png": [
+    1016, 671
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/7b9491f1-0669-458d-84ea-3921c5aeb10f_2370x1544.png": [
+    2370, 1544
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/7ce2b96f-840d-411b-9c6c-2f821219fba5_2130x1444.png": [
+    2130, 1444
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/7e493590-cb03-43cf-851a-816a576d2083_1876x976.png": [
+    1876, 976
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/7ed2a472-3511-4b29-afbd-0c593795085a_2434x1430.png": [
+    2434, 1430
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/8047a697-0d6f-41fe-8c16-71998778ecb4_2048x1228.png": [
+    2048, 1228
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/80eb810f-a9ea-4f01-a41b-e19e3409ce74_2048x1459.png": [
+    2048, 1459
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/81475383-510e-4823-9373-751b8a3722e3_2048x1202.png": [
+    2048, 1202
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/8184b9e6-883b-446c-884b-226b5e9fcca1_2048x549.png": [
+    2048, 549
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/8304bd1c-ed83-4091-a71b-00ec572542a4_1200x675.png": [
+    1200, 675
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/83cff324-fa52-4b79-b901-80da6f9345a9_2000x1268.png": [
+    2000, 1268
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/85116f5f-be0d-405b-a5d9-6a9237b44cc3_2048x895.png": [
+    2048, 895
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/864512bf-1feb-445d-a03a-bbf9f4f1b791_1928x1234.png": [
+    1928, 1234
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/8664f48c-037c-45cc-b6f8-1999ed0cee0e_2298x1430.png": [
+    2298, 1430
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/871631ee-8f0d-4fb6-869c-a6fb298e800e_2048x832.png": [
+    2048, 832
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/8742f134-05d4-4a07-9257-8c93b4730cd7_2704x1790.png": [
+    2704, 1790
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/878dd41d-fc0f-407e-8421-ad05ad9e740c_1087x624.png": [
+    1087, 624
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/88c2d49d-2612-4334-90c2-8a76ab55fd60_1418x1004.png": [
+    1418, 1004
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/89827e17-6cfd-42f1-b250-d7f07cbe6a09_2120x1242.png": [
+    2120, 1242
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/89c2f79c-a704-4144-a900-ddd69ce306dd_1112x667.png": [
+    1112, 667
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/8a065d23-de1d-4e2f-a3ae-7af724409c9d_1350x653.png": [
+    1350, 653
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/90eb3363-3d59-4c46-aff7-521af7ecc45b_1679x1121.png": [
+    1679, 1121
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/9126a39f-54f9-4df1-bd09-4d0d64deaf17_2048x559.png": [
+    2048, 559
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/918c3a71-6c31-400a-a5c9-fb0930f8a2f7_1879x1121.png": [
+    1879, 1121
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/91abef64-d639-4da8-8d7e-3499be750011_1001x1541.png": [
+    1001, 1541
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/91dfd9ca-d13d-43e9-a57e-3be0fcc4a5cf_2048x1315.png": [
+    2048, 1315
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/92d363ab-c391-4b9a-9f67-516dac22f534_1364x938.png": [
+    1364, 938
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/9302da60-5bc1-46e1-9392-74e912b5c200_2024x1236.png": [
+    2024, 1236
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/9337ed5b-a320-49f7-b31b-cc4b5751e0ff_2048x1290.png": [
+    2048, 1290
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/939b9197-321d-4869-ba13-f0b800343b7b_2048x1300.png": [
+    2048, 1300
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/945da9bc-59ec-4084-9f3a-da58da04b3c5_2048x638.png": [
+    2048, 638
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/9534de11-42bd-44c9-9398-16bb9deedcfd_1864x1121.png": [
+    1864, 1121
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/963dce62-c49b-4deb-afee-e8dd448526c5_2048x1322.png": [
+    2048, 1322
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/96f9c9f9-eb86-4f87-8332-c85f23040836_2048x916.png": [
+    2048, 916
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/96fd0617-347d-49a1-a971-19e42faeab25_1435x1289.png": [
+    1435, 1289
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/99728443-e697-49cc-8416-7a380c60ad12_2147x1249.png": [
+    2147, 1249
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/9ca94316-e44c-4bec-9d0a-041ad73df31e_2048x909.png": [
+    2048, 909
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/9d86a8b7-cc12-4730-9b6a-a77258ad60c5_1860x720.png": [
+    1860, 720
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/9e472a49-d228-4d8d-876a-6bc0d59f9d97_746x594.png": [
+    746, 594
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/9ec4708c-148e-42ee-a7c5-3bf4d9cbdfaa_1938x1246.png": [
+    1938, 1246
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/9f245dd7-c6b7-48a3-9215-3976633bb77f_2048x1366.png": [
+    2048, 1366
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/9f3a37f8-0996-4dea-9631-02ade61d7fae_1358x938.png": [
+    1358, 938
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/a0e991d9-6ab6-43e7-9cc9-93ac9ca5b7bd_2048x879.png": [
+    2048, 879
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/a1440922-e1ea-4a74-ab62-f1263ae31ca0_2048x1473.png": [
+    2048, 1473
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/a154ae09-41cd-487b-a99c-30f89c793381_1946x1302.png": [
+    1946, 1302
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/a18d5611-f7c1-4e34-8919-99b1c683054f_2048x1485.png": [
+    2048, 1485
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/a46e880d-4076-46ff-84d1-5be99ba50a8a_2634x1582.png": [
+    2634, 1582
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/a4e8da6f-c4ee-4d39-96ae-9143459d3ea9_2102x1236.png": [
+    2102, 1236
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/a5b9e7bc-c484-4400-9ffe-96ed4bbfb70f_2138x1236.png": [
+    2138, 1236
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/a6c58331-c05a-4823-9c4b-aae90705bb53_2048x1485.png": [
+    2048, 1485
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/a7625f0e-7e35-4170-8986-4fe0d66f7925_2125x1247.png": [
+    2125, 1247
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/a7bb7f74-e5a3-4da3-b954-89905e54c4da_2048x420.png": [
+    2048, 420
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/a8a1c7d6-51e3-4b5f-85ea-41568792ac21_1937x1121.png": [
+    1937, 1121
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/a9544ced-f418-44e0-8910-0cbc63fa26ec_2048x768.png": [
+    2048, 768
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/aa169f01-a0c1-493e-9fcf-15e0c3e9e2dd_1646x1121.png": [
+    1646, 1121
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/ab1ad749-fe92-4209-9347-4456d22b0cfd_2088x1432.png": [
+    2088, 1432
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/ab7479c2-7b29-4ede-9796-9e8126a92b40_2048x756.png": [
+    2048, 756
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/ac73c91e-efa3-4f2a-a9ea-2f5eb15e4a27_2048x1222.png": [
+    2048, 1222
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/add2d50c-a0be-4771-a00b-e6b4f1fe8502_2048x1256.png": [
+    2048, 1256
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/ae9b26b8-471a-43b2-a60c-cd99ce2b9b07_3480x1342.png": [
+    3480, 1342
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/aec34e63-34fd-4c42-87a1-97e5c14661ed_2048x1302.png": [
+    2048, 1302
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/af5c4776-221b-43b4-b2fd-d46e46f1ab38_1772x960.png": [
+    1772, 960
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/b160a968-2cdc-4ce8-8a74-cd5eb63e1141_2048x1223.png": [
+    2048, 1223
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/b29e003e-db43-45d4-93be-bac0be04d869_1209x646.png": [
+    1209, 646
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/b2b2aa12-c308-4f4b-84f7-969228600ce5_2296x1126.png": [
+    2296, 1126
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/b38d958b-6d53-4ebe-b92f-c2cb58de05c2_2048x1485.png": [
+    2048, 1485
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/b5aee8b4-d11a-48d8-823c-1ca53412e689_2048x1253.png": [
+    2048, 1253
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/b668c1ec-765e-4bfd-9e17-66c2bfb91c76_1590x1582.png": [
+    1590, 1582
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/b7ff2d61-bdab-4c2f-96a0-ec5a52469489_2048x884.png": [
+    2048, 884
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/ba6532b3-aa46-4477-be84-8979b1cce35d_2048x1297.png": [
+    2048, 1297
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/bb59cacc-1f16-4c6a-98a5-0f0db74dada7_2048x411.png": [
+    2048, 411
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/bc992849-b42d-4899-81a3-77105c86886b_1950x1250.png": [
+    1950, 1250
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/bec7ee8f-a2bc-4458-be18-76fa434ff7f1_2477x1470.png": [
+    2477, 1470
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/bfdcb99e-dc02-4468-bd72-b25a7be6c15d_2380x1386.png": [
+    2380, 1386
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/bfe9255c-33f0-4f1b-ab82-acf2321ae8f1_2124x1245.png": [
+    2124, 1245
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/c028f756-4748-4583-91b2-5c4a63893cb5_2048x1153.png": [
+    2048, 1153
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/c09d8e99-682d-43dd-9292-3cf29295f79e_1074x1148.png": [
+    1074, 1148
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/c0cd68d1-b16d-442d-87e4-ca98067ae979_2048x856.png": [
+    2048, 856
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/c15f47a8-fcb3-4220-80ee-4b95bfa7b0b0_2048x1376.png": [
+    2048, 1376
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/c1a1da73-425c-4800-b396-01c7d2151be9_1200x1432.png": [
+    1200, 1432
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/c34192a3-3ddc-4f85-8708-289261c4ec7a_2219x1024.png": [
+    2219, 1024
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/c47d1e6a-dad4-48bc-8239-9194bea17544_2048x838.png": [
+    2048, 838
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/c5396c3d-1823-4818-83de-d89cd8242451_2048x1286.png": [
+    2048, 1286
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/c53a37b8-dd9f-4142-b114-60e6e2c7f3e7_3446x1946.png": [
+    3446, 1946
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/c5795c45-d23b-403c-8bc4-f13d5ba6fb45_2048x394.png": [
+    2048, 394
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/c6dad690-9354-48a2-846f-1f7107907e3d_2048x672.png": [
+    2048, 672
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/c8fc6236-52bd-45ff-ac2e-539899c00d87_2048x1097.png": [
+    2048, 1097
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/c92da639-dcff-4e39-b9b5-49742677e93c_2048x1289.png": [
+    2048, 1289
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/c9556f28-f5c9-4ffb-935a-d85b790bbe44_2125x1121.png": [
+    2125, 1121
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/c98fcaff-2665-406e-8ce0-c63c456532e4_1374x839.png": [
+    1374, 839
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/ca0fbb96-36c4-4040-a022-49f2185b661a_2074x1224.png": [
+    2074, 1224
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/cad37655-7b9a-4c86-81a8-3314ad0526fe_1694x348.png": [
+    1694, 348
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/cb664d13-b2f7-42e5-824d-fbf6319c0f7f_2406x1432.png": [
+    2406, 1432
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/cb76eccd-5bb3-480e-98b0-e821f11b8d88_1849x1121.png": [
+    1849, 1121
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/cc2cf6c7-aa58-4a76-a0a2-ee0457d9243c_2048x1298.png": [
+    2048, 1298
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/ccabb1a5-220a-4623-a615-245053808f24_2086x1738.png": [
+    2086, 1738
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/ce2b58fc-b7b7-46c2-ae05-baa14419d233_2048x1459.png": [
+    2048, 1459
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/ce356c05-883b-4c63-a359-8cfd72dddb63_1408x1046.png": [
+    1408, 1046
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/ce79108c-8341-4100-86de-943d8ca3c34e_916x1190.png": [
+    916, 1190
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/cf5af414-7def-47ca-bcee-7e4123d29560_1932x1760.png": [
+    1932, 1760
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/d0bd5df8-c675-4dce-a853-dfa6f4d381af_1498x1102.png": [
+    1498, 1102
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/d13280a5-ddc2-4610-84bb-bf470301cc8e_2086x1233.png": [
+    2086, 1233
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/d2210f76-7a91-405e-a3ba-a1692b080618_1550x842.png": [
+    1550, 842
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/d2f465f9-372c-4ee1-b42f-e79fa9fe352b_1677x2048.png": [
+    1677, 2048
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/d306f42c-a30b-45c7-82c9-dbaff7e654b3_2048x1228.png": [
+    2048, 1228
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/d40e2253-8285-466f-8f16-6459c1051fb4_2373x1419.png": [
+    2373, 1419
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/d410878f-5f19-40bd-ad2c-d92ad45d65a9_1252x1232.png": [
+    1252, 1232
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/d4628887-37be-4563-ad68-091282e20ddf_2350x1486.png": [
+    2350, 1486
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/d68490f3-adfd-4ab7-b6d1-80bae3921ef9_1868x1121.png": [
+    1868, 1121
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/d6c3bf7c-a035-48fb-bfaf-5ae0169e5c1a_2097x1225.png": [
+    2097, 1225
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/d6dd3138-e228-4121-a061-4aa92c84d6a4_2334x1390.png": [
+    2334, 1390
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/d8274bbd-4310-44b0-9545-809260cfca44_1669x1121.png": [
+    1669, 1121
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/d8337140-b620-476a-abd3-59d6cc447d30_2048x1256.png": [
+    2048, 1256
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/d913a30b-22dc-42bd-93bc-f81500ac9d18_1415x864.png": [
+    1415, 864
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/d96697d9-bf24-4093-a7db-16d27a52aa08_2048x1200.png": [
+    2048, 1200
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/da3b4a10-0f65-403d-a9f6-093b86753c02_2120x1258.png": [
+    2120, 1258
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/db4fa8dc-176c-4224-9ab5-6ebfe8f6af9c_1493x1280.png": [
+    1493, 1280
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/dbc1dd2c-e15c-45b7-acf7-508d38ad1913_2406x1430.png": [
+    2406, 1430
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/dcf44984-9cb9-49ae-b35a-aeb5b5d14244_1566x1778.png": [
+    1566, 1778
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/dd7aad58-ba30-4364-9565-980ae6464534_3000x975.png": [
+    3000, 975
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/dd8c102c-4041-4e37-be5f-5b308b06adfc_1672x1121.png": [
+    1672, 1121
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/df1a505d-b8c3-45f9-b03c-a8798fba54c0_2048x632.png": [
+    2048, 632
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/e17e8c63-bc2a-4ce2-a9c9-0d00a586de3a_1566x1121.png": [
+    1566, 1121
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/e1b62a52-bd6a-4cd1-82e7-65b6903d82ac_2996x1774.png": [
+    2996, 1774
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/e1f13662-fc12-400e-889e-9958d0ad45f7_2048x770.png": [
+    2048, 770
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/e242f6a3-f0a2-4a95-9301-c4bdc6695544_1839x1121.png": [
+    1839, 1121
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/e3039950-98e0-4cd0-b7fe-929a120bd7d2_2048x576.png": [
+    2048, 576
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/e346a4e5-76cb-4fd9-be95-00321116b605_1846x510.png": [
+    1846, 510
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/e58e6323-b5d1-4221-9c51-ff39b44d1f98_1779x1180.png": [
+    1779, 1180
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/e8d915c0-c962-4277-b62c-a1b08b8e7179_1924x1262.png": [
+    1924, 1262
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/e8eeb92e-1aad-4a97-b3c1-28409005809e_2048x769.png": [
+    2048, 769
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/e97525a9-216a-4624-91c6-373ee7a3850e_1123x437.png": [
+    1123, 437
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/e9c2975f-0974-414f-8af6-300bc8613121_2048x1202.png": [
+    2048, 1202
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/ec6b5d7e-af79-484b-bcf7-ebc50d36c3e3_2048x1204.png": [
+    2048, 1204
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/ed24f1b9-b591-4674-bc94-06394962d03f_2048x544.png": [
+    2048, 544
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/eddd9541-ed5a-4e49-aab2-291d49fd7e68_2132x1252.png": [
+    2132, 1252
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/f07dc2e7-090b-472a-a2bf-82c6fbb1cb67_1456x1956.png": [
+    1456, 1956
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/f200bfa6-02b5-464f-a4ea-ffe88cb6ed49_2520x81.png": [
+    2520, 81
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/f22c9c7e-44ba-4ffd-bdc3-58fbbef8f30d_2048x2004.png": [
+    2048, 2004
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/f3ba43db-8f65-4b28-a4a2-66282670449f_2117x1236.png": [
+    2117, 1236
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/f41d237c-16c2-4a9d-b681-a6668b01f62b_2398x1526.png": [
+    2398, 1526
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/f4792809-087e-431b-acce-aecdd3855b3b_2048x1390.png": [
+    2048, 1390
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/f48290ac-3361-4b0c-a085-ff84dd3dce51_2048x1347.png": [
+    2048, 1347
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/f51b3df9-ffa4-408f-b617-1eb3dde40740_2039x975.png": [
+    2039, 975
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/f5dcfed6-70d1-460f-8963-14784577ca44_1695x1121.png": [
+    1695, 1121
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/f67a92c3-b159-4b2a-bf87-ecbb7002b23c_2118x1306.png": [
+    2118, 1306
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/f6dfa226-93d7-4596-9dc5-feebd5ef1dce_1966x1098.png": [
+    1966, 1098
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/f79e53f5-c8ff-4ed0-a8a3-c05b9e0b4bab_2048x1191.png": [
+    2048, 1191
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/f7fc9e49-b04b-41b0-b0ec-df0d912c0a3c_800x434.jpeg": [
+    800, 434
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/f85bdb45-792c-4330-9745-674b38b03425_2048x1289.png": [
+    2048, 1289
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/f86888c4-c1a7-47b0-a580-d1a74876cb9c_2048x898.png": [
+    2048, 898
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/f88b30b6-aa73-4ad2-a008-b2e8f940cfd0_1958x1104.png": [
+    1958, 1104
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/fb5fc8fa-d129-475c-bb87-664e08bc6179_1773x1151.png": [
+    1773, 1151
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/fbf9bb59-ada3-44b0-8cba-c6ee11097b3f_1839x1344.png": [
+    1839, 1344
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/fc7f1e6f-b854-4da5-b6c1-8f1bbdb49cb8_1456x1505.png": [
+    1456, 1505
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/fcea5602-9449-4cd3-9b9d-d9f58cc83f23_2296x1458.png": [
+    2296, 1458
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/fd2a22ee-c300-4fbd-a782-bdf5ac918c02_1882x1776.png": [
+    1882, 1776
+  ],
+  "https://substack-post-media.s3.amazonaws.com/public/images/fef10e0d-261e-4978-8650-b10304ec04d0_2048x897.png": [
+    2048, 897
+  ]
+}

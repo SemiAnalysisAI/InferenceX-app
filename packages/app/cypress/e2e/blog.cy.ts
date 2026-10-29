@@ -1,3 +1,9 @@
+/** Original asset path of a figure, read through the next/image optimizer URL when present. */
+function imageSourcePath(src: string | null): string {
+  const url = new URL(src ?? '', 'http://localhost');
+  return url.pathname === '/_next/image' ? (url.searchParams.get('url') ?? '') : url.pathname;
+}
+
 describe('Blog', () => {
   describe('Rubin agentic article port', () => {
     for (const locale of ['', '/zh']) {
@@ -6,7 +12,10 @@ describe('Blog', () => {
         cy.visit(`${locale}/blog/${slug}`);
         cy.get('h1').should('have.length', 1).and('contain.text', 'Rubin NVL72');
         cy.get('article.prose').within(() => {
-          cy.get(`figure img[src^="/images/${slug}/"]`)
+          cy.get('figure img')
+            .filter((_, image) =>
+              imageSourcePath(image.getAttribute('src')).startsWith(`/images/${slug}/`),
+            )
             .should('have.length.greaterThan', 0)
             .each(($image) => {
               cy.wrap($image)
@@ -210,15 +219,17 @@ describe('Blog', () => {
         });
       cy.get('article.prose figure img').each(($img) => {
         expect($img[0].getAttribute('alt') ?? '').to.have.length.greaterThan(0);
-        expect($img[0].getAttribute('src') ?? '').to.match(
+        expect(imageSourcePath($img[0].getAttribute('src'))).to.match(
           /^\/images\/kimi-k3-the-manos-the-mythos-the\//u,
         );
       });
 
       cy.get('article.prose figure img').then(($imgs) => {
-        const srcs = [...new Set([...$imgs].map((img) => img.getAttribute('src') ?? ''))];
-        for (const src of srcs) {
-          cy.request({ url: src, encoding: 'binary' }).its('status').should('eq', 200);
+        const paths = [
+          ...new Set([...$imgs].map((img) => imageSourcePath(img.getAttribute('src')))),
+        ];
+        for (const path of paths) {
+          cy.request({ url: path, encoding: 'binary' }).its('status').should('eq', 200);
         }
       });
     });

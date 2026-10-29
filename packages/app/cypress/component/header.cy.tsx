@@ -186,7 +186,7 @@ describe('Header', () => {
     cy.get('[data-testid="mobile-menu"]').within(() => {
       cy.contains('a', 'Overview').should('be.visible').and('have.attr', 'href', '/overview');
       cy.contains('a', 'Dashboard').should('be.visible').and('have.attr', 'href', '/inference');
-      cy.contains('a', 'ubenchX').should('be.visible').and('have.attr', 'href', '/ubenchx');
+      cy.contains('a', 'ubenchX').should('be.visible').and('have.attr', 'href', '/ubenchx/mem-bw');
       cy.contains('a', 'AgentX')
         .should('be.visible')
         .and('have.attr', 'href', '/agentx')
