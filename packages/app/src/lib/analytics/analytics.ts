@@ -91,8 +91,10 @@ export function track(
   options?: AnalyticsCaptureOptions,
 ): void {
   if (typeof window === 'undefined') return;
-  // Events from page effects can run before PageViewTracker's effect. The page's own pageview goes first.
-  if (!lastPageview && currentHref()) trackPageview();
+  // Page effects run before PageViewTracker's effect on first load and after client navigations alike,
+  // so record the current page's pageview first whenever the pathname moved since the last one.
+  const href = currentHref();
+  if (href && lastPageview?.pathname !== pageviewHref(href).pathname) trackPageview(href);
   dispatch(eventName, properties, options);
 }
 

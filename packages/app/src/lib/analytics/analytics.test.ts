@@ -127,6 +127,40 @@ describe('pageviews', () => {
     expect(capture.mock.calls.map(([name]) => name)).toEqual(['$pageview', 'landing_page_viewed']);
   });
 
+  it('sends the pageview of a client navigation before events fired ahead of the tracker', async () => {
+    const capture = vi.fn();
+    const analytics = await import('./analytics');
+    analytics.registerAnalyticsClient({ capture });
+    analytics.trackPageview();
+
+    setUrl('/submissions');
+    analytics.track('submissions_page_viewed');
+    analytics.trackPageview();
+
+    expect(capture.mock.calls.map(([name, props]) => [name, props?.$current_url])).toEqual([
+      ['$pageview', 'https://inferencex.semianalysis.com/'],
+      ['$pageview', 'https://inferencex.semianalysis.com/submissions'],
+      ['submissions_page_viewed', undefined],
+    ]);
+  });
+
+  it('queues the pageview of a client navigation before events fired ahead of the tracker', async () => {
+    const capture = vi.fn();
+    const analytics = await import('./analytics');
+    analytics.trackPageview();
+
+    setUrl('/submissions');
+    analytics.track('submissions_page_viewed');
+    analytics.trackPageview();
+    analytics.registerAnalyticsClient({ capture });
+
+    expect(capture.mock.calls.map(([name, props]) => [name, props.$current_url])).toEqual([
+      ['$pageview', 'https://inferencex.semianalysis.com/'],
+      ['$pageview', 'https://inferencex.semianalysis.com/submissions'],
+      ['submissions_page_viewed', 'https://inferencex.semianalysis.com/submissions'],
+    ]);
+  });
+
   it('sends a virtual pageview when a client rewrite changes the pathname', async () => {
     const capture = vi.fn();
     const register = vi.fn();
