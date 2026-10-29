@@ -10,8 +10,8 @@ export const metadata: Metadata = { ...meta, robots: { index: false, follow: fal
 export default function FeedbackPage() {
   return (
     <>
-      <TabIntro tab="feedback" />
       <FeedbackViewer />
+      <TabIntro tab="feedback" />
     </>
   );
 }

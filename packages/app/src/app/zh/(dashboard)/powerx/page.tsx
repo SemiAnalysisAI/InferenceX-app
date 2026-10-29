@@ -12,12 +12,12 @@ export const metadata: Metadata = tabMetadataZh('powerx');
 export default function ZhPowerXPage() {
   return (
     <PowerXFeatureGate locale="zh">
-      <ZhTabIntro tab="powerx" />
       <PowerXSurfaceProvider>
         <InferenceProvider activeTab="inference">
           <InferenceChartDisplay />
         </InferenceProvider>
       </PowerXSurfaceProvider>
+      <ZhTabIntro tab="powerx" />
     </PowerXFeatureGate>
   );
 }
