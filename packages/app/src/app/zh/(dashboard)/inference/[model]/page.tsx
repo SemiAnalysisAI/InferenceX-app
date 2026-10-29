@@ -5,7 +5,7 @@ import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
-import { ZhTabIntro } from '@/components/zh/zh-tab-intro';
+import { InferencePageIntro } from '@/components/inference/inference-page-intro';
 import { zhAlternates, zhPath } from '@/lib/i18n/i18n';
 import { inferenceModelMetaZh } from '@/lib/routing/inference-model-meta';
 import {
@@ -42,10 +42,9 @@ export default async function ZhInferenceModelPage({ params }: Props) {
   const { model } = await params;
   const entry = getInferenceModelBySlug(model);
   if (!entry) notFound();
-  const meta = inferenceModelMetaZh(entry);
   return (
     <>
-      <ZhTabIntro tab="inference" title={meta.title} intro={meta.intro} />
+      <InferencePageIntro locale="zh" />
       <InferenceProvider activeTab="inference">
         <InferenceChartDisplay />
       </InferenceProvider>
