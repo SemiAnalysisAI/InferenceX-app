@@ -174,6 +174,11 @@ describe('OperatorX progressive rendering', { testIsolation: true }, () => {
       cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm).as('comparison');
       cy.visit(`${prefix}/operatorx`);
       cy.wait('@comparison');
+      cy.get('[data-testid^="operatorx-viz-"]')
+        .first()
+        .should('have.attr', 'aria-busy', 'false')
+        .find('svg')
+        .should('exist');
       const lower = '[data-testid="operatorx-viz-pairwise-scatter"]';
       cy.get(lower).should('have.attr', 'aria-busy', 'true').find('svg').should('not.exist');
       cy.get('[data-testid="operatorx-viz-metric-vs-size"]').scrollIntoView();
