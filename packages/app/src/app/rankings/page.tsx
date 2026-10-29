@@ -11,7 +11,7 @@ import { getAllRankingPageEntries } from '@/lib/live-seo/rankings';
 
 const title = 'GPU Rankings for LLM Inference';
 const description =
-  'Live leaderboards of the fastest and cheapest GPUs for serving open LLMs like DeepSeek, Kimi, GLM, MiniMax, and Qwen. Ranked by measured tokens/s per GPU and $ per million tokens, re-benchmarked continuously.';
+  'Live rankings of the fastest and cheapest GPUs for DeepSeek, Kimi, GLM, MiniMax & Qwen inference.';
 
 export const metadata: Metadata = {
   title,

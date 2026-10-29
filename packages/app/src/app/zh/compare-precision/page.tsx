@@ -24,13 +24,17 @@ export const dynamic = 'force-dynamic';
 
 const DESCRIPTION = `数值精度如何影响芯片推理性能？InferenceX 是 SemiAnalysis 推出的独立开源基准测试平台，测试结果均经过验证且可复现。${SUPPORTERS_LINE_ZH}在同一芯片上直接对比 FP4、FP8、BF16、INT4 等不同精度格式，观察它们对 DeepSeek V4 Pro、DeepSeek R1、Kimi K2、MiniMax M3、GLM 5、Qwen 3.5 等模型推理性能的影响。`;
 
+/** Search snippet; the longer DESCRIPTION stays in the JSON-LD. */
+const META_DESCRIPTION =
+  '在同一芯片上直接对比 FP4、FP8、BF16、INT4 等精度格式对 DeepSeek、Kimi、MiniMax、GLM、Qwen 等模型推理性能的影响。独立开源基准测试，结果可复现。';
+
 export const metadata: Metadata = {
   title: '芯片精度对比',
-  description: DESCRIPTION,
+  description: META_DESCRIPTION,
   alternates: zhAlternates('/compare-precision'),
   openGraph: {
     title: `芯片精度对比 | ${SITE_NAME}`,
-    description: DESCRIPTION,
+    description: META_DESCRIPTION,
     url: `${SITE_URL}/zh/compare-precision`,
     type: 'website',
     locale: ZH_OG_LOCALE,
@@ -38,7 +42,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: `芯片精度对比 | ${SITE_NAME}`,
-    description: DESCRIPTION,
+    description: META_DESCRIPTION,
   },
 };
 

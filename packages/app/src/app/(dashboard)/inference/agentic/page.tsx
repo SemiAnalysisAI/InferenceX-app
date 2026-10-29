@@ -6,21 +6,22 @@ import { JsonLd } from '@/components/seo/json-ld';
 import { getAgenticCatalogGroups } from '@/lib/agentx/agentic-catalog';
 import { enAlternates } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 const TITLE = 'AgentX Telemetry';
 const DESCRIPTION =
-  'Browse every AgentX benchmark run with stored per-request telemetry, grouped by model and serving stack. Each configuration opens its point-detail charts, request timeline, and cache behavior.';
+  'Every AgentX benchmark run with per-request telemetry, grouped by model and serving stack, with point-detail charts, request timelines and cache behavior.';
 
 export const metadata: Metadata = {
   title: TITLE,
   description: DESCRIPTION,
   alternates: enAlternates('/inference/agentic'),
-  openGraph: {
+  ...socialMetadata({
     title: `${TITLE} | InferenceX`,
     description: DESCRIPTION,
     url: `${SITE_URL}/inference/agentic`,
-  },
-  twitter: { title: `${TITLE} | InferenceX`, description: DESCRIPTION },
+    locale: 'en',
+  }),
 };
 
 export const dynamic = 'force-dynamic';

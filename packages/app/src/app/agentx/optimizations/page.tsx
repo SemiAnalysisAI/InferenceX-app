@@ -5,6 +5,7 @@ import { JsonLd } from '@/components/seo/json-ld';
 import { OPTIMIZATIONS_OVERVIEW } from '@/lib/agentx/agentx-optimizations';
 import { enAlternates } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 const TITLE = 'AgentX Industry Impact: Optimizations for Agentic Workloads';
 const DESCRIPTION =
@@ -14,12 +15,12 @@ export const metadata: Metadata = {
   title: 'AgentX Industry Impact',
   description: DESCRIPTION,
   alternates: enAlternates('/agentx/optimizations'),
-  openGraph: {
+  ...socialMetadata({
     title: `${TITLE} | InferenceX`,
     description: DESCRIPTION,
     url: `${SITE_URL}/agentx/optimizations`,
-  },
-  twitter: { title: `${TITLE} | InferenceX`, description: DESCRIPTION },
+    locale: 'en',
+  }),
 };
 
 const jsonLd = {

@@ -28,13 +28,17 @@ export const dynamic = 'force-dynamic';
 
 const DESCRIPTION = `投机解码（例如 MTP 式多 token 预测，以及 MiniMax M3 所采用的 EAGLE 等模型专用方法）能否提升推理吞吐量并降低成本？InferenceX 是 SemiAnalysis 推出的独立开源基准测试平台，测试结果均经过验证且可复现。${SUPPORTERS_LINE_ZH}每个页面都会在同一模型和芯片上，对比启用某种投机解码方法与关闭投机解码时的表现。`;
 
+/** Search snippet; the longer DESCRIPTION stays in the JSON-LD. */
+const META_DESCRIPTION =
+  '在同一模型和芯片上对比开启与关闭投机解码（MTP、EAGLE 等）时的推理吞吐量与成本。独立开源基准测试，结果可复现。';
+
 export const metadata: Metadata = {
   title: '芯片投机解码对比',
-  description: DESCRIPTION,
+  description: META_DESCRIPTION,
   alternates: zhAlternates('/compare-spec-decode'),
   openGraph: {
     title: `芯片投机解码对比 | ${SITE_NAME}`,
-    description: DESCRIPTION,
+    description: META_DESCRIPTION,
     url: `${SITE_URL}/zh/compare-spec-decode`,
     type: 'website',
     locale: ZH_OG_LOCALE,
@@ -42,7 +46,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: `芯片投机解码对比 | ${SITE_NAME}`,
-    description: DESCRIPTION,
+    description: META_DESCRIPTION,
   },
 };
 

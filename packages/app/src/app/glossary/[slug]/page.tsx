@@ -12,12 +12,9 @@ import {
   getRelatedGlossaryEntries,
 } from '@/lib/content/glossary';
 import { enAlternates } from '@/lib/i18n/i18n';
-import {
-  AUTHOR_HANDLE,
-  AUTHOR_NAME,
-  SITE_NAME,
-  SITE_URL,
-} from '@semianalysisai/inferencex-constants';
+import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
+import { clampMetaDescription } from '@/lib/seo/meta-text';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -34,7 +31,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const entry = getGlossaryEntry(slug);
   if (!entry) return {};
 
-  const title = `${entry.term}: AI Inference Definition`;
+  const title = `What Is ${entry.term}?`;
+  const description = clampMetaDescription(entry.definition, 'en');
   const url = `${SITE_URL}/glossary/${entry.slug}`;
   const keywords = [
     entry.term,
@@ -46,23 +44,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   return {
     title,
-    description: entry.definition,
+    description,
     keywords,
     authors: [{ name: AUTHOR_NAME }],
     alternates: enAlternates(`/glossary/${entry.slug}`),
-    openGraph: {
+    ...socialMetadata({
       title: `${title} | ${SITE_NAME}`,
-      description: entry.definition,
+      description,
       url,
+      locale: 'en',
       type: 'article',
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title,
-      description: entry.definition,
-      site: AUTHOR_HANDLE,
-      creator: AUTHOR_HANDLE,
-    },
+    }),
   };
 }
 

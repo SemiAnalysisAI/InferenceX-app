@@ -15,7 +15,7 @@ describe('Chinese (/zh) pages', () => {
 
     it('renders the AgentX hero on the Chinese landing page', () => {
       cy.get('[data-testid="compare-agentx-primary"]').within(() => {
-        cy.get('h2').should('have.text', '真实智能体工作负载下的推理性能对比');
+        cy.get('h1').should('have.text', '真实智能体工作负载下的推理性能对比');
         cy.get('[data-testid="compare-agentx-revenue-calculator-link"]')
           .should('contain.text', 'Token 收入计算器')
           .and('have.attr', 'href', '/zh/profit-estimator-per-gigawatt');
@@ -77,6 +77,16 @@ describe('Chinese (/zh) pages', () => {
         .should('contain.text', '准确率评估')
         .and('have.attr', 'href')
         .and('match', /^\/zh\/evaluation/u);
+    });
+  });
+
+  describe('zh per-model inference page', () => {
+    it('renders a model-specific Chinese h1 and intro', () => {
+      cy.visit('/zh/inference/kimi-k3');
+      cy.get('[data-testid="zh-tab-intro"]').within(() => {
+        cy.get('h1').should('contain.text', 'Kimi').and('contain.text', '推理基准测试');
+        cy.get('p').first().should('contain.text', 'Kimi').and('contain.text', '本页面展示');
+      });
     });
   });
 

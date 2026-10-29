@@ -25,20 +25,24 @@ export const dynamic = 'force-dynamic';
 
 const DESCRIPTION = `How does precision affect chip inference performance? InferenceX is the independent, open-source benchmark from SemiAnalysis, with verified, reproducible results. ${SUPPORTERS_LINE} Compare FP4, FP8, BF16, INT4, and more quantization levels head-to-head on the same chip across DeepSeek V4 Pro, DeepSeek R1, Kimi K2, MiniMax M3, GLM 5, Qwen 3.5 & more.`;
 
+/** Search snippet; the longer DESCRIPTION stays in the JSON-LD. */
+const META_DESCRIPTION =
+  'Compare FP4, FP8, BF16, INT4 and more precisions head-to-head on the same chip for DeepSeek, Kimi, MiniMax, GLM, Qwen & more. Independent, open benchmarks.';
+
 export const metadata: Metadata = {
   title: 'Chip Precision Comparisons',
-  description: DESCRIPTION,
+  description: META_DESCRIPTION,
   alternates: enAlternates('/compare-precision'),
   openGraph: {
     title: `Chip Precision Comparisons | ${SITE_NAME}`,
-    description: DESCRIPTION,
+    description: META_DESCRIPTION,
     url: `${SITE_URL}/compare-precision`,
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
     title: `Chip Precision Comparisons | ${SITE_NAME}`,
-    description: DESCRIPTION,
+    description: META_DESCRIPTION,
   },
 };
 

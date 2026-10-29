@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
+import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
+import { TabIntro } from '@/components/dashboard/tab-intro';
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { enAlternates } from '@/lib/i18n/i18n';
@@ -12,6 +13,7 @@ import {
   INFERENCE_MODEL_SLUGS,
   inferenceModelPath,
 } from '@/lib/routing/inference-model-slug';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 interface Props {
   params: Promise<{ model: string }>;
@@ -29,20 +31,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const enPath = inferenceModelPath(entry.slug);
   const url = `${SITE_URL}${enPath}`;
   return {
-    title: { absolute: `${title} | ${SITE_NAME} by ${AUTHOR_NAME}` },
+    title: { absolute: `${title} | ${SITE_NAME}` },
     description,
     alternates: enAlternates(enPath),
-    openGraph: {
-      title: `${title} | ${SITE_NAME}`,
-      description,
-      url,
-      type: 'website',
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: `${title} | ${SITE_NAME}`,
-      description,
-    },
+    ...socialMetadata({ title: `${title} | ${SITE_NAME}`, description, url, locale: 'en' }),
   };
 }
 
@@ -50,9 +42,13 @@ export default async function InferenceModelPage({ params }: Props) {
   const { model } = await params;
   const entry = getInferenceModelBySlug(model);
   if (!entry) notFound();
+  const meta = inferenceModelMeta(entry);
   return (
-    <InferenceProvider activeTab="inference">
-      <InferenceChartDisplay />
-    </InferenceProvider>
+    <>
+      <TabIntro tab="inference" title={meta.title} intro={meta.intro} />
+      <InferenceProvider activeTab="inference">
+        <InferenceChartDisplay />
+      </InferenceProvider>
+    </>
   );
 }

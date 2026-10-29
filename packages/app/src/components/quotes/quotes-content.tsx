@@ -105,7 +105,7 @@ export function QuotesContent({ locale = 'en' }: { locale?: Locale } = {}) {
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-4">
         <section className="flex flex-col gap-4">
           <Card>
-            <h2 className="text-2xl lg:text-4xl font-bold tracking-tight">{t.heading}</h2>
+            <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">{t.heading}</h1>
             <p className="mt-3 text-base lg:text-lg text-muted-foreground">{t.intro}</p>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
               {orgLogos.map(({ org, logo }) => (

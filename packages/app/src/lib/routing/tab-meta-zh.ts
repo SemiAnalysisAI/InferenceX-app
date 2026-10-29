@@ -1,13 +1,14 @@
 import type { Metadata } from 'next';
 
-import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
-import { ZH_OG_LOCALE, zhAlternates, zhPath } from '@/lib/i18n/i18n';
+import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
+import { zhAlternates, zhPath } from '@/lib/i18n/i18n';
 import type { ModelRoute, ModelRouteTab } from '@/lib/routing/model-routes';
 import {
   getDashboardRoute,
   isDashboardRouteKey,
   type DashboardRouteKey,
 } from '@/lib/routing/dashboard-routes';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 export const LANDING_META_ZH = {
   title: 'AI 加速器系统基准测试',
@@ -192,8 +193,6 @@ export const NAV_LABELS_ZH: Record<HeaderNavHref, string> = {
   '/about': '关于',
 };
 
-const TITLE_SUFFIX = `${SITE_NAME} by ${AUTHOR_NAME}`;
-
 export const MODEL_TAB_META_ZH: Record<
   ModelRouteTab,
   {
@@ -245,16 +244,7 @@ export function modelTabMetadataZh(
     title,
     description,
     alternates: zhAlternates(canonicalEnPath),
-    openGraph: {
-      title: `${title} | ${SITE_NAME}`,
-      description,
-      url,
-      locale: ZH_OG_LOCALE,
-    },
-    twitter: {
-      title: `${title} | ${TITLE_SUFFIX}`,
-      description,
-    },
+    ...socialMetadata({ title: `${title} | ${SITE_NAME}`, description, url, locale: 'zh' }),
   };
 }
 
@@ -266,15 +256,11 @@ export function tabMetadataZh(tab: DashboardRouteKey): Metadata {
     title: meta.title,
     description: meta.description,
     alternates: zhAlternates(enPath),
-    openGraph: {
+    ...socialMetadata({
       title: `${meta.title} | ${SITE_NAME}`,
       description: meta.description,
       url,
-      locale: ZH_OG_LOCALE,
-    },
-    twitter: {
-      title: `${meta.title} | ${TITLE_SUFFIX}`,
-      description: meta.description,
-    },
+      locale: 'zh',
+    }),
   };
 }
