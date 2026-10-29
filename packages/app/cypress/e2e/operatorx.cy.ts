@@ -96,7 +96,10 @@ it('defaults to a measured 950PR shape and normalized BF16, while honoring preci
   cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view).as('ascend');
   cy.visit('/operatorx');
   cy.wait('@ascend');
-  cy.get('#operatorx-hardware').should('contain.text', '950PR');
+  cy.get('[data-testid="operatorx-viz-metric-vs-size"] [data-testid="chart-legend"]').should(
+    'contain.text',
+    '950PR',
+  );
   cy.get('[data-testid="operatorx-viz-metric-vs-size"] [aria-label="Shape"]').should(
     'contain.text',
     'bf16',
