@@ -1,10 +1,14 @@
-// Runs against the E2E_FIXTURES=1 server, which serves the retained
-// H100/H200/B200 C1/C2/C4 observations from cypress/fixtures/api/video-history.json.
+// The spec injects retained H100/H200/B200 C1/C2/C4 observations from
+// cypress/fixtures/api/video-history.json, including when CI starts a production server.
 // Lead (C1) cells, per participating GPU: H100 5.37 videos/GPU-hr at $1.17/GPU-hr,
 // H200 5.97 at $1.22, B200 11.53 at $1.73. Every clip is 8 s, so the $0.080/video-s
 // API reference lists at $0.640 per video.
 describe('Video hardware dashboard (E2E fixtures)', () => {
   beforeEach(() => {
+    cy.intercept('GET', '/api/video-runs?format=history&page=1', {
+      fixture: 'api/video-history.json',
+      headers: { 'X-VideoGenX-Replay': '1' },
+    }).as('history');
     // The Compare panel fetches two published artifacts once in view; keep the spec offline.
     cy.intercept('GET', '/api/video-runs?run=*', { statusCode: 204 }).as('media');
   });
