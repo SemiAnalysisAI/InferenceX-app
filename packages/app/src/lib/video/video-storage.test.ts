@@ -1,14 +1,22 @@
 import { createHash } from 'node:crypto';
 import { strToU8, zipSync } from 'fflate';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { head, put } from '@vercel/blob';
+import { BlobNotFoundError, head, put, list } from '@vercel/blob';
 import type * as BlobSdk from '@vercel/blob';
-import { readStoredArtifact, storeVideoArtifact } from './video-storage';
+import {
+  approveVideoPublication,
+  publishedVideoHistory,
+  readVideoPublication,
+  readStoredArtifact,
+  storeVideoArtifact,
+  storedArtifacts,
+} from './video-storage';
 import { storedBundle, storedFidelityBundle } from '@/components/video-benchmark/stored';
 import { fidelityFixture } from '@/components/video-benchmark/fidelity.fixture';
 
 vi.mock('@vercel/blob', async (original) => ({
   ...(await original<typeof BlobSdk>()),
+  list: vi.fn(),
   head: vi.fn((path: string) =>
     Promise.resolve({
       url: `https://test.public.blob.vercel-storage.com/${path}`,
@@ -60,6 +68,125 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 describe('persistent H3 media', () => {
+  it('writes one immutable approval after the index and verifies source seal on replay', async () => {
+    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
+    const zip = archive();
+    const withDigest = {
+      ...artifact,
+      digest: `sha256:${createHash('sha256')
+        .update(Buffer.from(await zip.arrayBuffer()))
+        .digest('hex')}`,
+    };
+    const saved = await storeVideoArtifact('10', withDigest, zip, new AbortController().signal);
+    const before = vi.mocked(put).mock.calls.length;
+    let receipt: unknown;
+    vi.mocked(head).mockRejectedValueOnce(new BlobNotFoundError());
+    vi.mocked(put).mockImplementationOnce((path, body) => {
+      receipt = JSON.parse(String(body));
+      return Promise.resolve({
+        url: `https://test.public.blob.vercel-storage.com/${path}`,
+        downloadUrl: `https://test.public.blob.vercel-storage.com/${path}?download=1`,
+      } as Awaited<ReturnType<typeof put>>);
+    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(Response.json(receipt)));
+    const approved = await approveVideoPublication(
+      '10',
+      withDigest,
+      saved,
+      '99',
+      new AbortController().signal,
+    );
+    expect(approved).toMatchObject({
+      version: 1,
+      runId: '10',
+      artifactId: 20,
+      artifactName: artifact.name,
+      artifactDigest: withDigest.digest,
+      mergeRunId: '99',
+      sources: [{ id: '10', kind: 'observation', checkoutSha: 'a'.repeat(40) }],
+    });
+    expect(approved.sources[0].sha256).toBe(storedBundle(saved.sources[0]).manifestSha256);
+    expect(vi.mocked(put).mock.calls[before][0]).toBe(
+      'h3-video-media/v1/approvals/10/h3-video-10-1_20.json',
+    );
+    expect(await readVideoPublication('10', artifact, saved)).toEqual(approved);
+    await approveVideoPublication('10', withDigest, saved, '99', new AbortController().signal);
+    expect(vi.mocked(put).mock.calls).toHaveLength(before + 1);
+    await expect(
+      approveVideoPublication('10', withDigest, saved, '100', new AbortController().signal),
+    ).rejects.toThrow('different merge identity');
+    expect(vi.mocked(put).mock.calls).toHaveLength(before + 1);
+    vi.mocked(list).mockResolvedValue({
+      blobs: [
+        {
+          ...blob(10),
+          pathname: 'h3-video-media/v1/runs/10/h3-video-10-1_20.json',
+          url: 'https://test.public.blob.vercel-storage.com/runs/10/index',
+        },
+      ],
+      hasMore: false,
+      cursor: undefined,
+    });
+    vi.mocked(fetch).mockImplementation((url) =>
+      Promise.resolve(Response.json(String(url).includes('/runs/') ? saved : approved)),
+    );
+    const history = await publishedVideoHistory(1);
+    expect(history.entries[0].approved).toBe(true);
+  });
+
+  it('fails closed for a missing or mismatched approval without changing the stored source', async () => {
+    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
+    const saved = await storeVideoArtifact('10', artifact, archive(), new AbortController().signal);
+    vi.mocked(head).mockRejectedValueOnce(new BlobNotFoundError());
+    expect(await readVideoPublication('10', artifact, saved)).toBeNull();
+    expect(saved.sources).toHaveLength(1);
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json({
+        version: 1,
+        runId: '11',
+        artifactId: artifact.id,
+        artifactName: artifact.name,
+        artifactDigest: null,
+        mergeRunId: null,
+        sources: [],
+      }),
+    );
+    await expect(readVideoPublication('10', artifact, saved)).rejects.toThrow('does not match');
+    fetcher.mockResolvedValue(
+      Response.json({
+        version: 1,
+        runId: '10',
+        artifactId: artifact.id,
+        artifactName: artifact.name,
+        artifactDigest: null,
+        mergeRunId: null,
+        sources: [
+          { id: '10', kind: 'observation', sha256: '0'.repeat(64), checkoutSha: 'a'.repeat(40) },
+        ],
+      }),
+    );
+    await expect(readVideoPublication('10', artifact, saved)).rejects.toThrow('does not match');
+    expect(vi.mocked(put).mock.calls.some(([path]) => path.includes('/approvals/'))).toBe(false);
+  });
+
+  it('leaves the immutable media index intact when approval upload fails', async () => {
+    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
+    const saved = await storeVideoArtifact('10', artifact, archive(), new AbortController().signal);
+    const indexWrites = vi.mocked(put).mock.calls.filter(([path]) => path.includes('/runs/'));
+    expect(indexWrites).toHaveLength(1);
+    vi.mocked(head)
+      .mockRejectedValueOnce(new BlobNotFoundError())
+      .mockRejectedValueOnce(new BlobNotFoundError())
+      .mockRejectedValueOnce(new BlobNotFoundError());
+    vi.mocked(put).mockRejectedValueOnce(new Error('Approval upload failed'));
+    await expect(
+      approveVideoPublication('10', artifact, saved, null, new AbortController().signal),
+    ).rejects.toThrow('Approval upload failed');
+    expect(saved.sources).toHaveLength(1);
+    expect(vi.mocked(put).mock.calls.filter(([path]) => path.includes('/runs/'))).toHaveLength(1);
+    expect(await readVideoPublication('10', artifact, saved)).toBeNull();
+  });
+
   it('publishes native fidelity metadata while reusing already published original videos', async () => {
     vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
     const fixture = await fidelityFixture();
@@ -248,6 +375,92 @@ describe('persistent H3 media', () => {
     await expect(
       storeVideoArtifact('10', artifact, archive(true), new AbortController().signal),
     ).rejects.toThrow('checksum mismatch');
+    expect(put).not.toHaveBeenCalled();
+  });
+});
+
+const blob = (id: number) => ({
+  pathname: `h3-video-media/v1/runs/${id}/h3-video-${id}-1_${id}.json`,
+  url: `https://test.public.blob.vercel-storage.com/${id}`,
+  downloadUrl: '',
+  size: 1,
+  etag: 'synthetic',
+  uploadedAt: new Date(`2026-09-${String(id).padStart(2, '0')}T00:00:00Z`),
+});
+
+describe('published video history catalog', () => {
+  it('retains a legacy stored index in History without an approval receipt', async () => {
+    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
+    vi.mocked(list).mockResolvedValue({ blobs: [blob(10)], hasMore: false, cursor: undefined });
+    vi.mocked(head).mockRejectedValueOnce(new BlobNotFoundError());
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      Response.json({
+        storageVersion: 1,
+        runId: '10',
+        artifact: { ...artifact, id: 10, name: 'h3-video-10-1' },
+        sources: [],
+      }),
+    );
+    const page = await publishedVideoHistory(1);
+    expect(page.entries).toHaveLength(1);
+    expect(page.entries[0].approved).toBe(false);
+    expect(put).not.toHaveBeenCalled();
+  });
+  it('keeps suffixed native matrix indexes discoverable and rejects a different run in the name', async () => {
+    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
+    const name = `h3-results-10-2-${'a'.repeat(64)}`;
+    const native = { ...blob(10), pathname: `h3-video-media/v1/runs/10/${name}_20.json` };
+    const wrong = { ...native, pathname: native.pathname.replace('results-10', 'results-11') };
+    vi.mocked(list).mockResolvedValue({
+      blobs: [native, wrong],
+      hasMore: false,
+      cursor: undefined,
+    });
+    const saved = { storageVersion: 1, runId: '10', artifact: { id: 20, name }, sources: [] };
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json(saved));
+    const artifacts = await storedArtifacts('10');
+    expect(artifacts.map((item) => item.name)).toEqual([name]);
+    const history = await publishedVideoHistory(1);
+    expect(history.entries.map((entry) => entry.artifact.name)).toEqual([name]);
+    expect(put).not.toHaveBeenCalled();
+  });
+  it('lists every index page, orders by publication date, and reads only ten indexes without media writes', async () => {
+    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
+    for (let i = 0; i < 10; i++) vi.mocked(head).mockRejectedValueOnce(new BlobNotFoundError());
+    vi.mocked(list)
+      .mockResolvedValueOnce({ blobs: [blob(1)], hasMore: true, cursor: 'next' })
+      .mockResolvedValueOnce({
+        blobs: Array.from({ length: 11 }, (_, i) => blob(12 - i)),
+        hasMore: false,
+        cursor: undefined,
+      });
+    const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
+      const id = String(url).split('/').at(-1)!;
+      return Promise.resolve(
+        Response.json({
+          storageVersion: 1,
+          runId: id,
+          artifact: { id: Number(id), name: `h3-video-${id}-1`, expired: false, size_in_bytes: 1 },
+          sources: [],
+        }),
+      );
+    });
+    const page = await publishedVideoHistory(1);
+    expect(page.entries.map((entry) => entry.runId)).toEqual([
+      '12',
+      '11',
+      '10',
+      '9',
+      '8',
+      '7',
+      '6',
+      '5',
+      '4',
+      '3',
+    ]);
+    expect(page.nextPage).toBe(2);
+    expect(fetcher).toHaveBeenCalledTimes(10);
+    expect(list).toHaveBeenLastCalledWith({ prefix: 'h3-video-media/v1/runs/', cursor: 'next' });
     expect(put).not.toHaveBeenCalled();
   });
 });

@@ -1,14 +1,14 @@
 name: 'Publish H3 media'
 
 on:
-  schedule:
-    - cron: '*/15 * * * *'
+  repository_dispatch:
+    types: [publish-video-results]
   workflow_dispatch:
     inputs:
       run_id:
-        description: 'Optional InferenceX CI run ID to persist'
+        description: 'InferenceX CI source run ID to publish explicitly'
         type: string
-        required: false
+        required: true
 
 permissions:
   contents: read
@@ -20,7 +20,7 @@ concurrency:
 jobs:
   publish:
     name: 'Publish H3 media'
-    if: github.repository == 'SemiAnalysisAI/InferenceX-app'
+    if: github.repository == 'SemiAnalysisAI/InferenceX-app' && (github.event_name == 'workflow_dispatch' || (github.event.client_payload.source_run_id && github.event.client_payload.merge_run_id))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -32,9 +32,13 @@ jobs:
           bun-version-file: package.json
       - name: Persist completed H3 artifacts
         env:
-          H3_RUN_ID: ${{ inputs.run_id }}
+          H3_RUN_ID: ${{ inputs.run_id || github.event.client_payload.source_run_id }}
+          H3_MERGE_RUN_ID: ${{ github.event.client_payload.merge_run_id }}
+          H3_PUBLICATION_EVENT: ${{ github.event_name }}
           INFERENCEX_APP_URL: ${{ vars.APP_URL }}
+          INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
           VERCEL_PROTECTION_BYPASS_SECRET: ${{ secrets.VERCEL_PROTECTION_BYPASS_SECRET }}
         run: |
           : "${INFERENCEX_APP_URL:?APP_URL repository variable is not set}"
+          : "${INVALIDATE_SECRET:?VERCEL_INVALIDATE_SECRET is not set}"
           bun packages/app/scripts/warm-video-results.ts

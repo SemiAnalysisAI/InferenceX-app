@@ -3566,273 +3566,304 @@
       ]
     },
     {
-      "spec": "cypress/component/video-ci-runs.cy.tsx",
-      "duration": 5955,
+      "spec": "cypress/component/video-api-reference.cy.tsx",
+      "duration": 1120,
       "tests": [
         {
           "title": [
-            "H3 automatic CI viewer (synthetic API fixtures)",
-            "keeps an open long-label menu within mobile bounds and supports keyboard selection"
+            "VideoApiReference",
+            "shows the dated reference with its source and applies valid prices as typed"
           ],
-          "duration": 328,
+          "duration": 335,
           "attempts": 1
         },
         {
           "title": [
-            "H3 automatic CI viewer (synthetic API fixtures)",
-            "loads the newest run automatically and switches to a failed run without inventing media"
+            "VideoApiReference",
+            "keeps the last valid price while the box is empty or zero and snaps back on blur"
           ],
-          "duration": 447,
+          "duration": 273,
           "attempts": 1
         },
         {
           "title": [
-            "H3 automatic CI viewer (synthetic API fixtures)",
-            "starts shared-artifact loading before run metadata finishes"
+            "VideoApiReference",
+            "resets to the reference, adopts external values and tracks committed changes"
           ],
-          "duration": 69,
+          "duration": 440,
           "attempts": 1
         },
         {
-          "title": [
-            "H3 automatic CI viewer (synthetic API fixtures)",
-            "keeps navigation and bundle validation errors visible on an empty tradeoff link"
-          ],
-          "duration": 158,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "H3 automatic CI viewer (synthetic API fixtures)",
-            "keeps the shared run selected when browsing the first catalog page"
-          ],
-          "duration": 358,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "H3 automatic CI viewer (synthetic API fixtures)",
-            "keeps a direct selection and its download active when an older catalog arrives"
-          ],
-          "duration": 3387,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "H3 automatic CI viewer (synthetic API fixtures)",
-            "shows stored measurements without downloading the archive"
-          ],
-          "duration": 116,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "H3 automatic CI viewer (synthetic API fixtures)",
-            "opens the shared serving cell and switches from the chart without reloading the CI artifact"
-          ],
-          "duration": 760,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "H3 automatic CI viewer (synthetic API fixtures)",
-            "shows a malformed serving matrix error instead of empty paired results"
-          ],
-          "duration": 44,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "H3 automatic CI viewer (synthetic API fixtures)",
-            "reports expiration without downloading or substituting another artifact"
-          ],
-          "duration": 34,
-          "attempts": 1
-        },
-        {
-          "title": [
-            "H3 automatic CI viewer (synthetic API fixtures)",
-            "withholds invalid generation measurements and separates warmup energy"
-          ],
-          "duration": 207,
+          "title": ["VideoApiReference", "renders Chinese copy under /zh"],
+          "duration": 53,
           "attempts": 1
         }
       ]
     },
     {
-      "spec": "cypress/component/video-fidelity.cy.tsx",
-      "duration": 1069,
+      "spec": "cypress/component/video-compare.cy.tsx",
+      "duration": 1803,
       "tests": [
         {
           "title": [
-            "Native paired fidelity UI (synthetic artifacts)",
-            "distinguishes valid media from 18 threshold failures and changes both selected videos"
+            "Video compare panel (retained fixture)",
+            "plays the same case from the slowest and fastest hardware side by side by default"
           ],
-          "duration": 498,
+          "duration": 216,
           "attempts": 1
         },
         {
           "title": [
-            "Native paired fidelity UI (synthetic artifacts)",
-            "rewrites report media/download links and removes scripts and external resources"
+            "Video compare panel (retained fixture)",
+            "steps through cases with the arrows, keeping v_case in the URL"
           ],
-          "duration": 226,
+          "duration": 365,
+          "attempts": 1
+        },
+        {
+          "title": ["Video compare panel (retained fixture)", "drives both players together"],
+          "duration": 301,
           "attempts": 1
         },
         {
           "title": [
-            "Native paired fidelity UI (synthetic artifacts)",
-            "loads a raw sealed bundle and revokes owned object URLs when unmounted"
+            "Video compare panel (retained fixture)",
+            "switches the candidate, fetching only the new side, and swaps on collision or request"
           ],
-          "duration": 94,
+          "duration": 675,
           "attempts": 1
         },
         {
           "title": [
-            "Native paired fidelity UI (synthetic artifacts)",
-            "clears old evidence and reports an invalid or empty comparison"
+            "Video compare panel (retained fixture)",
+            "restores v_base and v_cand from the URL and reports a failed media read with a retry"
           ],
-          "duration": 105,
+          "duration": 57,
           "attempts": 1
         },
         {
           "title": [
-            "Native paired fidelity UI (synthetic artifacts)",
-            "renders Chinese status and original-audio controls without relabeling failures as invalid media"
+            "Video compare panel (retained fixture)",
+            "says when a run publishes no clips and keeps the metric deltas"
           ],
-          "duration": 122,
+          "duration": 50,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Video compare panel (retained fixture)",
+            "disables the selects when fewer than two hardware are measured"
+          ],
+          "duration": 30,
+          "attempts": 1
+        },
+        {
+          "title": ["Video compare panel (retained fixture)", "renders Chinese copy on /zh/video"],
+          "duration": 86,
           "attempts": 1
         }
       ]
     },
     {
-      "spec": "cypress/component/video-serving-results.cy.tsx",
-      "duration": 2301,
+      "spec": "cypress/component/video-dashboard.cy.tsx",
+      "duration": 3618,
       "tests": [
         {
           "title": [
-            "H3 serving results (synthetic fixtures)",
-            "follows chart-driven cell changes while the result remains mounted"
+            "Video hardware dashboard (retained fixture)",
+            "plots one C1 point per measured hardware and lists MI355X as unavailable"
           ],
-          "duration": 567,
+          "duration": 124,
           "attempts": 1
         },
         {
           "title": [
-            "H3 serving results (synthetic fixtures)",
-            "renders a parent-created blob in the report while keeping scripts disabled"
+            "Video hardware dashboard (retained fixture)",
+            "states model, workload and deployment as facts; the legend offers only Optimal Only"
           ],
-          "duration": 242,
+          "duration": 73,
           "attempts": 1
         },
         {
           "title": [
-            "H3 serving results (synthetic fixtures)",
-            "shows each concurrency without manufacturing a candidate and separates participating and allocated GPU counts"
+            "Video hardware dashboard (retained fixture)",
+            "switches the cost tier, repricing the cards, the badges and the URL"
           ],
-          "duration": 646,
+          "duration": 245,
           "attempts": 1
         },
         {
           "title": [
-            "H3 serving results (synthetic fixtures)",
-            "shows server stages separately from delivery and retains partial coverage"
+            "Video hardware dashboard (retained fixture)",
+            "never plots queued cells, even when a stale URL asks for them"
           ],
-          "duration": 223,
+          "duration": 240,
           "attempts": 1
         },
         {
           "title": [
-            "H3 serving results (synthetic fixtures)",
-            "distinguishes requested and decoded duration and withholds invalid power"
+            "Video hardware dashboard (retained fixture)",
+            "lists the plotted cells with the full column set on demand and no concurrency column"
           ],
-          "duration": 267,
+          "duration": 150,
           "attempts": 1
         },
         {
           "title": [
-            "H3 serving results (synthetic fixtures)",
-            "withholds headline metrics and power for an unverified configuration"
+            "Video hardware dashboard (retained fixture)",
+            "hides a hardware from the legend and shows the table view"
           ],
-          "duration": 61,
+          "duration": 287,
           "attempts": 1
         },
         {
           "title": [
-            "H3 serving results (synthetic fixtures)",
-            "supports Chinese copy and missing request, media, and allocation data"
+            "Video hardware dashboard (retained fixture)",
+            "restores hidden hardware from a shared table URL"
           ],
-          "duration": 264,
+          "duration": 140,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Video hardware dashboard (retained fixture)",
+            "restores v_ params from the URL and opens the history section for history deep links"
+          ],
+          "duration": 73,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Video hardware dashboard (retained fixture)",
+            "reprices the API list price beside the TCO cost, in the cards, the table and the URL"
+          ],
+          "duration": 629,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Video hardware dashboard (retained fixture)",
+            "toggles Optimal Only from the legend and restores it from v_optimal"
+          ],
+          "duration": 253,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Video hardware dashboard (retained fixture)",
+            "folds Compare and the evidence by default and opens Compare for compare deep links"
+          ],
+          "duration": 253,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Video hardware dashboard (retained fixture)",
+            "shows placeholders while loading instead of a false \"Not measured\""
+          ],
+          "duration": 872,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Video hardware dashboard (retained fixture)",
+            "renders Chinese copy on /zh/video"
+          ],
+          "duration": 229,
           "attempts": 1
         }
       ]
     },
     {
-      "spec": "cypress/component/video-tradeoff.cy.tsx",
-      "duration": 4419,
+      "spec": "cypress/component/video-evidence.cy.tsx",
+      "duration": 607,
       "tests": [
         {
           "title": [
-            "Video tradeoff chart (synthetic fixtures)",
-            "plots participating GPU efficiency by default and requires assumptions for the cost axis"
+            "Video performance evidence (retained fixture)",
+            "keeps the concurrency table within the stated shared layout (en, 1280px)"
           ],
-          "duration": 2525,
+          "duration": 150,
           "attempts": 1
         },
         {
           "title": [
-            "Video tradeoff chart (synthetic fixtures)",
-            "still withholds P90 for single-request results until median diagnostics are selected"
+            "Video performance evidence (retained fixture)",
+            "keeps the concurrency table within the stated shared layout (zh, 390px)"
           ],
-          "duration": 170,
+          "duration": 137,
           "attempts": 1
         },
         {
           "title": [
-            "Video tradeoff chart (synthetic fixtures)",
-            "shows an empty state without inventing fixture results"
+            "Video performance evidence (retained fixture)",
+            "does not call low board power compute saturation"
           ],
-          "duration": 39,
+          "duration": 26,
           "attempts": 1
         },
         {
           "title": [
-            "Video tradeoff chart (synthetic fixtures)",
-            "distinguishes groups with the same short label and exposes their full workload"
+            "Video performance evidence (retained fixture)",
+            "does not call higher throughput and lower latency a queueing plateau"
           ],
-          "duration": 496,
+          "duration": 25,
           "attempts": 1
         },
         {
           "title": [
-            "Video serving matrix chart (synthetic contract fixture)",
-            "shows server coverage in point details without changing the client latency axis"
+            "Video performance evidence (retained fixture)",
+            "reads board power against the recorded enforced limit per measured hardware"
           ],
-          "duration": 187,
+          "duration": 31,
           "attempts": 1
         },
         {
           "title": [
-            "Video serving matrix chart (synthetic contract fixture)",
-            "defaults to P90 when individual serving cells have enough samples"
+            "Video performance evidence (retained fixture)",
+            "bounds the power meter to its declared range when mean power exceeds the recorded limit"
           ],
-          "duration": 78,
+          "duration": 27,
           "attempts": 1
         },
         {
           "title": [
-            "Video serving matrix chart (synthetic contract fixture)",
-            "shows three labeled cell medians and opens the selected concurrency result"
+            "Video performance evidence (retained fixture)",
+            "tabulates concurrency measurements with ratios against each hardware C1 cell"
           ],
-          "duration": 754,
+          "duration": 36,
           "attempts": 1
         },
         {
           "title": [
-            "Video serving matrix chart (synthetic contract fixture)",
-            "shows the Chinese serving labels with per-cell medians"
+            "Video performance evidence (retained fixture)",
+            "compares observed speedups with spec-sheet ratios without attributing a bottleneck"
           ],
-          "duration": 120,
+          "duration": 31,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Video performance evidence (retained fixture)",
+            "renders Chinese copy on /zh/video at mobile width"
+          ],
+          "duration": 102,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Video performance evidence (retained fixture)",
+            "hides the plateau and scaling exhibits when only one hardware at C1 is measured"
+          ],
+          "duration": 28,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "Video performance evidence (retained fixture)",
+            "renders nothing when no cell is measured"
+          ],
+          "duration": 6,
           "attempts": 1
         }
       ]

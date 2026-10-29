@@ -11,3 +11,6 @@ packages/app/cypress/fixtures/api/collectivex-runs.json
 # The power-model parity fixture is upstream Python output, regenerated wholesale by
 # packages/app/scripts/generate-power-model-parity.py; pretty-printed it is ~5x larger.
 packages/app/src/lib/power/power-model.parity.json
+# The native H3 bundle fixture is a checksum-sealed copy of the InferenceX producer's
+# output: SHA256SUMS and the manifest bind every byte, so reformatting breaks the seal.
+packages/app/src/components/video-benchmark/fixtures/native-serving-bundle/
