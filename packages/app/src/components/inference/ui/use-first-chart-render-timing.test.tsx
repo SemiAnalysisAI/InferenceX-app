@@ -29,6 +29,11 @@ function drawPoint() {
   container.querySelector('[data-testid="chart-root"]')!.append(point);
 }
 
+function mutateControls() {
+  const control = document.createElement('button');
+  container.querySelector('[data-testid="chart-root"]')!.append(control);
+}
+
 beforeEach(() => {
   track.mockClear();
   container = document.createElement('div');
@@ -106,6 +111,40 @@ describe('useFirstChartRenderTiming', () => {
       ms_since_navigation: 420,
       soft_navigation: true,
       route: '/inference/kimi-k3',
+    });
+  });
+
+  it('ignores stale points and control updates after a soft navigation until new points render', async () => {
+    const useTiming = await loadHook();
+    const { markNavigationStart } = await import('@/lib/analytics/navigation-timing');
+    const now = vi.spyOn(performance, 'now').mockReturnValue(500);
+    act(() => root.render(<Chart useTiming={useTiming} />));
+    await act(async () => {
+      drawPoint();
+      await Promise.resolve();
+    });
+    expect(track).toHaveBeenCalledTimes(1);
+
+    window.history.pushState(null, '', '/inference/gpt-oss');
+    now.mockReturnValue(90_000);
+    markNavigationStart(window.location.pathname);
+    now.mockReturnValue(90_010);
+    await act(async () => {
+      mutateControls();
+      await Promise.resolve();
+    });
+    expect(track).toHaveBeenCalledTimes(1);
+
+    now.mockReturnValue(90_750);
+    await act(async () => {
+      drawPoint();
+      await Promise.resolve();
+    });
+    expect(track).toHaveBeenCalledTimes(2);
+    expect(track).toHaveBeenLastCalledWith('inference_chart_rendered', {
+      ms_since_navigation: 750,
+      soft_navigation: true,
+      route: '/inference/gpt-oss',
     });
   });
 });
