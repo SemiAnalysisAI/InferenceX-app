@@ -97,6 +97,8 @@ Server data (`unstable_cache` plus Blob) and CDN responses (the `db-cdn` tag) ar
 
 The ingest workflow then runs `bun run admin:cache:warmup <origin> --dashboard`, and production promotions run the same warmup in `warm-after-deploy.yml`. The script requests the dashboard APIs with a browser `Accept-Encoding` and reads every body, because the CDN keeps one variant per encoding and only caches a streamed response that was read to the end. The post-ingest PowerX verifier sends `Pragma: no-cache`, which makes the CDN revalidate a stale entry before it answers.
 
+Vercel Blob counts every deleted blob as one operation toward its rate limit (4,500 a minute on Pro), and a purge can delete a few thousand blobs while live traffic shares the same budget. `blobPurge()` therefore deletes in batches of 100. When Blob answers `rate_limited`, it waits the returned `retryAfter` (60 s) and resends that call, up to three waits per purge so the request stays inside the 300 s function limit. The blobs are deleted before any tag expires, so a purge that still fails leaves every tag untouched and the next invalidation redoes it.
+
 ## React Query Configuration
 
 - **staleTime Infinity / gcTime Infinity**: Data changes only when CI ingests new results. Infinite TTLs mean React Query never refetches or garbage-collects on its own — data is fetched once per page load and held for the session. The server-side CDN cache ensures fast responses. Keys use canonical values (sorted, deduplicated ids, `''` for the latest date), so equivalent requests share one cache entry.
