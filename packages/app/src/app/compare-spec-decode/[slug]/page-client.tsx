@@ -19,7 +19,11 @@ import { track } from '@/lib/analytics/analytics';
 import { toModel, toPrecisions, toSequence } from '@/lib/compare/compare-enum-coerce';
 import { SPEC_METHODS_ACTIVE } from '@/lib/compare/compare-variant-slug';
 import type { AgenticScenarioIntro } from '@/lib/compare/compare-ssr';
-import { type CompareTableData, pinTablePrecisions } from '@/lib/compare/compare-table-view';
+import {
+  type CompareTableData,
+  compareTableDataFromPoints,
+  pinTablePrecisions,
+} from '@/lib/compare/compare-table-view';
 
 const STRINGS = {
   en: {
@@ -297,7 +301,7 @@ function CompareTableSection({
   const { selectedRunDate } = useGlobalFilterRun();
   const { availableDates } = useGlobalFilterAvailability();
 
-  const { gpuDataByGroupKey, ranges, hasData, loading, error } = useThroughputData(
+  const { gpuDataByGroupKey, loading, error } = useThroughputData(
     selectedModel,
     effectiveSequence,
     effectivePrecisions,
@@ -322,6 +326,14 @@ function CompareTableSection({
     return { pointsA: pA, pointsB: pB };
   }, [gpuDataByGroupKey, gpu, method, precision]);
 
+  const pinnedRange = useMemo(
+    () =>
+      pointsA.length > 0 || pointsB.length > 0
+        ? compareTableDataFromPoints(pointsA, pointsB).interactivityRange
+        : null,
+    [pointsA, pointsB],
+  );
+
   return (
     <CompareTableRenderer
       aLabel={aLabel}
@@ -339,7 +351,7 @@ function CompareTableSection({
       latestRun={!selectedRunDate || selectedRunDate === availableDates.at(-1)}
       pointsA={pointsA}
       pointsB={pointsB}
-      clientInteractivityRange={hasData ? ranges.interactivity : null}
+      clientInteractivityRange={pinnedRange}
       loading={loading}
       error={error}
       emptyStateText={emptyStateText}
