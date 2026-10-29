@@ -4,7 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from 'next-themes';
 import { isDarkTheme } from '@/lib/themes/themes';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { ComparisonOp } from '@semianalysisai/inferencex-db/operatorx/compare';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -21,7 +21,12 @@ import { replaceClientSearch } from '@/lib/routing/client-navigation';
 
 import { CaseDetail } from './CaseDetail';
 import { CoverageStrip } from './CoverageStrip';
-import { hardwareLabel, operatorXColors, sortHardware } from './compare/hardware';
+import {
+  hardwareLabel,
+  operatorXColors,
+  sortHardware,
+  toggleHardwareSelection,
+} from './compare/hardware';
 import { METRICS, metricById } from './compare/metrics';
 import { buildModel, caseRefs, type ComparisonModel } from './compare/model';
 import { VISUALIZATIONS } from './viz';
@@ -66,60 +71,62 @@ function ControlGroup({
   );
 }
 
-function VizCard({
-  model,
-  viz,
-  wide,
-  eager,
-}: {
-  model: ComparisonModel;
-  viz: VizDefinition;
-  wide: boolean;
-  eager: boolean;
-}) {
-  const [mounted, setMounted] = useState(eager);
-  const card = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (mounted) return;
-    if (eager || typeof IntersectionObserver === 'undefined') {
-      setMounted(true);
-      return;
-    }
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          setMounted(true);
-        }
-      },
-      { rootMargin: '300px' },
+const VizCard = memo(
+  ({
+    model,
+    viz,
+    wide,
+    eager,
+  }: {
+    model: ComparisonModel;
+    viz: VizDefinition;
+    wide: boolean;
+    eager: boolean;
+  }) => {
+    const [mounted, setMounted] = useState(eager);
+    const card = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+      if (mounted) return;
+      if (eager || typeof IntersectionObserver === 'undefined') {
+        setMounted(true);
+        return;
+      }
+      const observer = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((entry) => entry.isIntersecting)) {
+            setMounted(true);
+          }
+        },
+        { rootMargin: '300px' },
+      );
+      if (card.current) observer.observe(card.current);
+      return () => observer.disconnect();
+    }, [eager, mounted]);
+    return (
+      <Card
+        ref={card}
+        data-testid={`operatorx-viz-${viz.id}`}
+        aria-busy={!mounted}
+        aria-labelledby={`operatorx-title-${viz.id}`}
+        tabIndex={mounted ? undefined : 0}
+        onFocus={() => setMounted(true)}
+        className={`min-w-0 ${wide ? 'lg:col-span-2' : ''}`}
+      >
+        <Heading id={`operatorx-title-${viz.id}`} as="h2" level="card" className="mb-4">
+          {viz.title}
+        </Heading>
+        {mounted ? (
+          <viz.Component model={model} />
+        ) : (
+          <Skeleton
+            aria-hidden="true"
+            className={viz.id === 'roofline' ? 'h-[460px]' : 'h-[420px]'}
+          />
+        )}
+      </Card>
     );
-    if (card.current) observer.observe(card.current);
-    return () => observer.disconnect();
-  }, [eager, mounted]);
-  return (
-    <Card
-      ref={card}
-      data-testid={`operatorx-viz-${viz.id}`}
-      aria-busy={!mounted}
-      aria-labelledby={`operatorx-title-${viz.id}`}
-      tabIndex={mounted ? undefined : 0}
-      onFocus={() => setMounted(true)}
-      className={`min-w-0 ${wide ? 'lg:col-span-2' : ''}`}
-    >
-      <Heading id={`operatorx-title-${viz.id}`} as="h2" level="card" className="mb-4">
-        {viz.title}
-      </Heading>
-      {mounted ? (
-        <viz.Component model={model} />
-      ) : (
-        <Skeleton
-          aria-hidden="true"
-          className={viz.id === 'roofline' ? 'h-[460px]' : 'h-[420px]'}
-        />
-      )}
-    </Card>
-  );
-}
+  },
+);
 
 export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
   const search = new URLSearchParams(useClientSearch());
@@ -148,11 +155,12 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
     [picked, available],
   );
   const baseline = pickedBaseline && hardware.includes(pickedBaseline) ? pickedBaseline : null;
+  // Charts, legend, GPU control and case detail all read this same live state.
   const model = useMemo(() => {
     if (!view) return null;
     const toggle = (hw: string) => {
-      const next = hardware.includes(hw) ? hardware.filter((h) => h !== hw) : [...hardware, hw];
-      if (next.length > 0) setPicked(next);
+      const next = toggleHardwareSelection(hardware, hw);
+      if (next !== hardware) setPicked(next);
     };
     const preview = (i: number) =>
       prefetchOperatorXTimelines(
@@ -177,7 +185,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
     );
   if (isLoading || !view || !model)
     return (
-      <Card data-testid="operatorx-loading" className="min-h-80 items-center justify-center">
+      <Card data-testid="operatorx-loading" className="min-h-svh items-center justify-center">
         <Loader2 className="size-6 animate-spin text-muted-foreground" />
         <p className="mt-3 text-sm text-muted-foreground">Loading results…</p>
       </Card>

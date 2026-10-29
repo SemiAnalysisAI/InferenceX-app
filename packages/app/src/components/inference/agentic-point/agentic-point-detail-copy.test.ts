@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { AGENTIC_POINT_DETAIL_STRINGS, agenticDetailViewOptions } from './agentic-point-detail';
+import {
+  AGENTIC_POINT_DETAIL_STRINGS,
+  agenticDetailViewOptions,
+  showMetricSourceToolbar,
+} from './agentic-point-detail';
 import { metricSourceLabel, stagePhaseLabels } from './metric-source-toolbar';
 import { timelinePhaseLabels } from './request-timeline';
 import { formatSubagentLabel } from './timeline-rows';
@@ -61,5 +65,17 @@ describe('agentic point detail views', () => {
 
   it('keeps the PowerX view for a locked visitor who opened a shared ?view=power link', () => {
     expect(values(false, 'power')).toContain('power');
+  });
+});
+
+describe('metric source toolbar slot', () => {
+  it('shows the toolbar for warmup points or several metric sources', () => {
+    expect(showMetricSourceToolbar({ sourceCount: 0, hasWarmup: true })).toBe(true);
+    expect(showMetricSourceToolbar({ sourceCount: 2, hasWarmup: false })).toBe(true);
+  });
+
+  it('hides the toolbar for a single source without warmup, including while loading', () => {
+    expect(showMetricSourceToolbar({ sourceCount: 0, hasWarmup: false })).toBe(false);
+    expect(showMetricSourceToolbar({ sourceCount: 1, hasWarmup: false })).toBe(false);
   });
 });

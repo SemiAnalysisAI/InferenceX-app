@@ -117,6 +117,7 @@ export const noop = () => {};
 export function baseInferenceState() {
   return {
     activeHwTypes: new Set(['h100', 'b200']),
+    blockedHwToggles: new Map(),
     hardwareConfig: HARDWARE_CONFIG,
     toggleHwType: noop,
     removeHwType: noop,

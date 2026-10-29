@@ -65,6 +65,7 @@ import { ALL_IN_MEASURED_NOTE, POWER_BASIS_LABELS } from '@/lib/power/power-basi
 import { AIR_COOLED_SYSTEM_PUE, LIQUID_COOLED_RACK_PUE } from '@/lib/power/system-power-model';
 import { useComparisonChangelogs } from '@/hooks/api/use-comparison-changelogs';
 import { useOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
+import { useHeldHeight } from '@/hooks/useHeldHeight';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
@@ -801,6 +802,8 @@ function ProfitEstimatorInner({
     [historyRunNumbering],
   );
   const loading = throughputLoading || history.loading;
+  const rootRef = useHeldHeight<HTMLDivElement>(loading);
+  const controlsRef = useHeldHeight<HTMLElement>(loading);
 
   const [customCosts, setCustomCosts] = useState<Record<string, string>>({});
   const customCostBases = useMemo(
@@ -1431,8 +1434,8 @@ function ProfitEstimatorInner({
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <section data-testid="profit-controls">
+    <div ref={rootRef} className="flex flex-col gap-4">
+      <section ref={controlsRef} data-testid="profit-controls">
         <Card className="relative z-30">
           <div className="flex flex-col gap-4">
             <DashboardSectionHeader title={t.title[basis]} actions={<ChartShareActions />} />

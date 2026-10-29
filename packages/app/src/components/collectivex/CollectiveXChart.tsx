@@ -12,6 +12,7 @@ import {
   collectiveXColorKey,
   collectiveXRunDasharray,
   fitAlphaBeta,
+  formatCollectiveXLatencyPercentiles,
   type CollectiveXRangeBand,
 } from './data';
 import type {
@@ -132,16 +133,6 @@ function formatMetric(value: number, yAxis: CollectiveXYAxis): string {
   if (yAxis === 'latency') return `${value.toFixed(value >= 100 ? 0 : 1)} µs`;
   if (yAxis === 'tokens-per-second') return `${formatCompact(value)} tok/s`;
   return `${value.toFixed(value >= 100 ? 0 : 2)} GB/s`;
-}
-
-function formatPercentiles(
-  value: CollectiveXRunSeries['points'][number]['components']['dispatch'],
-  unavailable: string,
-): string {
-  if (value === null) return unavailable;
-  const { p50, p90, p95, p99 } = value.latency_us;
-  const us = (v: number | null) => (v === null ? unavailable : v.toFixed(1));
-  return `${us(p50)} / ${us(p90)} / ${us(p95)} / ${us(p99)} µs`;
 }
 
 // Light enough that overlapping SKUs stay readable; a hovered or pinned point lifts its own band
@@ -427,10 +418,10 @@ export function CollectiveXChart({
             <div>${escapeHtml(t.operation[operation])} ${yAxis === 'latency' ? percentile : t.atLatency(percentile)}: <strong>${formatMetric(point.y, yAxis)}</strong></div>
             <div class="text-muted-foreground">${t.tokenCounts(locale === 'zh' ? measurement.tokens_per_rank.toLocaleString('zh-CN') : String(measurement.tokens_per_rank), locale === 'zh' ? measurement.global_tokens.toLocaleString('zh-CN') : String(measurement.global_tokens))}</div>
             <div class="mt-1 text-muted-foreground">${t.latencyRanks}</div>
-            <div class="text-muted-foreground">${t.operation.dispatch}: ${formatPercentiles(measurement.components.dispatch, t.unavailableValue)}</div>
-            <div class="text-muted-foreground">${t.operation.stage}: ${formatPercentiles(measurement.components.stage, t.unavailableValue)}</div>
-            <div class="text-muted-foreground">${t.operation.combine}: ${formatPercentiles(measurement.components.combine, t.unavailableValue)}</div>
-            <div class="text-muted-foreground">${t.roundTrip}: ${formatPercentiles(measuredRoundtrip, t.unavailableValue)}${measuredRoundtrip ? t.measured : ''}</div>
+            <div class="text-muted-foreground">${t.operation.dispatch}: ${formatCollectiveXLatencyPercentiles(measurement.components.dispatch, t.unavailableValue)}</div>
+            <div class="text-muted-foreground">${t.operation.stage}: ${formatCollectiveXLatencyPercentiles(measurement.components.stage, t.unavailableValue)}</div>
+            <div class="text-muted-foreground">${t.operation.combine}: ${formatCollectiveXLatencyPercentiles(measurement.components.combine, t.unavailableValue)}</div>
+            <div class="text-muted-foreground">${t.roundTrip}: ${formatCollectiveXLatencyPercentiles(measuredRoundtrip, t.unavailableValue)}${measuredRoundtrip ? t.measured : ''}</div>
             ${fitLine}
           </div>`;
           },

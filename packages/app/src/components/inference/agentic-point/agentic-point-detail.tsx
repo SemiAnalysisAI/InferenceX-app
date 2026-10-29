@@ -148,6 +148,22 @@ export function agenticDetailViewOptions(
   ];
 }
 
+/**
+ * Whether the per-point view shows the metric-source / phase toolbar. Both inputs arrive
+ * from client queries, so the page keeps a same-height slot whenever this is false (while
+ * loading and after). Releasing the slot once the queries settle would shift the cards up.
+ * Almost every production point has a warmup phase, so the toolbar is the usual outcome.
+ */
+export function showMetricSourceToolbar({
+  sourceCount,
+  hasWarmup,
+}: {
+  sourceCount: number;
+  hasWarmup: boolean;
+}): boolean {
+  return sourceCount > 1 || hasWarmup;
+}
+
 const RequestTimelineView = dynamic(() =>
   import('./request-timeline').then((module_) => module_.RequestTimelineView),
 );
@@ -281,13 +297,17 @@ export function AgenticPointDetail({ id }: Props) {
       ) : siblingsData ? (
         <SiblingNav sku={siblingsData.sku} siblings={siblingsData.siblings} />
       ) : siblingsQuery.isLoading ? (
-        <div className="text-sm text-muted-foreground">{t.loadingSku}</div>
+        <div className="mb-4 min-h-58 border-b border-border/40 pb-4 text-sm text-muted-foreground sm:min-h-33">
+          {t.loadingSku}
+        </div>
       ) : null}
 
       {metrics ? (
         <PointSummary meta={metrics.meta} />
       ) : metricsQuery.isLoading ? (
-        <div className="text-sm text-muted-foreground">{t.loadingPoint}</div>
+        <div className="mb-4 min-h-34 text-sm text-muted-foreground lg:min-h-[66px]">
+          {t.loadingPoint}
+        </div>
       ) : null}
 
       {view !== 'logs' && metricsQuery.isError && (
@@ -330,152 +350,157 @@ export function AgenticPointDetail({ id }: Props) {
         )}
       </div>
 
-      {view === 'point' && (metricSources.length > 1 || hasWarmup) && (
-        <MetricSourceToolbar
-          hasWarmup={hasWarmup}
-          phase={phase}
-          onPhaseChange={setPhase}
-          metricSources={metricSources}
-          selectedSource={selectedMetricSource}
-          onSourceChange={setMetricSourceId}
-          fallbackAdapter={metrics?.meta.framework}
-        />
-      )}
-
-      {view === 'logs' ? (
-        <ServerLogViewer id={id} enabled />
-      ) : view === 'power' ? (
-        <PowerTelemetryView id={id} enabled hardware={siblingsData?.sku.hardware} />
-      ) : view === 'aggregates' ? (
-        aggregatesQuery.isError ? (
-          <RetryableQueryError
-            message={t.aggregatesError}
-            analyticsEvent="inference_agentic_aggregates_retry_clicked"
-            onRetry={aggregatesQuery.refetch}
-            testId="agentic-aggregates-query-error"
+      {view === 'point' &&
+        (showMetricSourceToolbar({ sourceCount: metricSources.length, hasWarmup }) ? (
+          <MetricSourceToolbar
+            hasWarmup={hasWarmup}
+            phase={phase}
+            onPhaseChange={setPhase}
+            metricSources={metricSources}
+            selectedSource={selectedMetricSource}
+            onSourceChange={setMetricSourceId}
+            fallbackAdapter={metrics?.meta.framework}
           />
         ) : (
-          <AggregatesGrid
-            siblings={siblingsData?.siblings ?? []}
-            aggregates={aggregatesQuery.data}
-            isLoading={aggregatesQuery.isLoading}
-          />
-        )
-      ) : view === 'timeline' ? (
-        timelineQuery.isLoading ? (
-          <div className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground">
-            {t.loadingTimeline}
-          </div>
-        ) : timelineQuery.isError ? (
-          <RetryableQueryError
-            message={t.timelineError}
-            analyticsEvent="inference_agentic_timeline_retry_clicked"
-            onRetry={timelineQuery.refetch}
-            testId="agentic-timeline-query-error"
-          />
-        ) : timelineQuery.data ? (
-          <RequestTimelineView
-            data={timelineQuery.data}
-            datasetSlug={siblingsQuery.data?.sku.dataset_slug}
-            pointId={id}
-          />
+          <div aria-hidden="true" className="h-[50px]" />
+        ))}
+
+      <div className={view === 'point' ? 'contents' : 'min-h-svh'}>
+        {view === 'logs' ? (
+          <ServerLogViewer id={id} enabled />
+        ) : view === 'power' ? (
+          <PowerTelemetryView id={id} enabled hardware={siblingsData?.sku.hardware} />
+        ) : view === 'aggregates' ? (
+          aggregatesQuery.isError ? (
+            <RetryableQueryError
+              message={t.aggregatesError}
+              analyticsEvent="inference_agentic_aggregates_retry_clicked"
+              onRetry={aggregatesQuery.refetch}
+              testId="agentic-aggregates-query-error"
+            />
+          ) : (
+            <AggregatesGrid
+              siblings={siblingsData?.siblings ?? []}
+              aggregates={aggregatesQuery.data}
+              isLoading={aggregatesQuery.isLoading}
+            />
+          )
+        ) : view === 'timeline' ? (
+          timelineQuery.isLoading ? (
+            <div className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground">
+              {t.loadingTimeline}
+            </div>
+          ) : timelineQuery.isError ? (
+            <RetryableQueryError
+              message={t.timelineError}
+              analyticsEvent="inference_agentic_timeline_retry_clicked"
+              onRetry={timelineQuery.refetch}
+              testId="agentic-timeline-query-error"
+            />
+          ) : timelineQuery.data ? (
+            <RequestTimelineView
+              data={timelineQuery.data}
+              datasetSlug={siblingsQuery.data?.sku.dataset_slug}
+              pointId={id}
+            />
+          ) : (
+            <div className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground">
+              {withId(t.missingTimeline)}
+            </div>
+          )
         ) : (
-          <div className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground">
-            {withId(t.missingTimeline)}
-          </div>
-        )
-      ) : (
-        <>
-          {requestChartQuery.isError && (
-            <RetryableQueryError
-              message={t.requestChartsError}
-              analyticsEvent="inference_agentic_request_charts_retry_clicked"
-              onRetry={requestChartQuery.refetch}
-              testId="agentic-request-charts-query-error"
-            />
-          )}
-          {!requestChartQuery.isError && effectivePhase === 'warmup' && (
-            <p
-              className="rounded-md border-l-2 border-amber-500/60 bg-amber-500/10 px-3 py-2 text-xs text-muted-foreground"
-              data-testid="warmup-phase-note"
-            >
-              {t.warmupNotePrefix}
-              <span className="font-medium text-foreground">{t.warmupWord}</span>
-              {t.warmupNoteBody}
-              {!slicedHasServerData && t.warmupNoServerData}
-            </p>
-          )}
-          {metricSourceQuery.isError && (
-            <RetryableQueryError
-              message={t.metricSourceError}
-              analyticsEvent="inference_agentic_metric_source_retry_clicked"
-              onRetry={metricSourceQuery.refetch}
-              testId="agentic-metric-source-query-error"
-            />
-          )}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {!requestChartQuery.isError && (
-              <>
-                <SequenceMetricCard
-                  metric="isl"
-                  timeline={phaseRequestData}
-                  timelineLoading={requestChartQuery.isLoading}
-                />
-                <SequenceMetricCard
-                  metric="osl"
-                  timeline={phaseRequestData}
-                  timelineLoading={requestChartQuery.isLoading}
-                />
-
-                <RequestMetricOverTime
-                  title={t.interactivityOverTime}
-                  metric="interactivity"
-                  timeline={phaseRequestData}
-                  isLoading={requestChartQuery.isLoading}
-                />
-
-                <RequestMetricOverTime
-                  title={t.ttftOverTime}
-                  metric="ttft"
-                  timeline={phaseRequestData}
-                  isLoading={requestChartQuery.isLoading}
-                  latencySelector
-                />
-              </>
-            )}
-
-            <KvCacheUtilizationCard sliced={sliced} />
-
-            <RequestActivityCard
-              sliced={sliced}
-              phaseTimeline={phaseRequestData}
-              timelineLoading={requestChartQuery.isLoading}
-              timelineError={requestChartQuery.isError ? t.requestChartsError : undefined}
-              view={requestActivityView}
-              onViewChange={setRequestActivityView}
-            />
-
-            <PrefixCacheHitRateCard sliced={sliced} />
-
-            <ThroughputCard
-              sliced={sliced}
-              selectedSource={selectedMetricSource}
-              selected={throughputSeries}
-              onSelectedChange={setThroughputSeries}
-            />
-
-            <PromptTokenSourceCard sliced={sliced} />
-
-            {!requestChartQuery.isError && (
-              <InflightUniqueTokensCard
-                phaseTimeline={phaseRequestData}
-                timelineLoading={requestChartQuery.isLoading}
-                kvCachePoolTokens={metrics?.kvCachePoolTokens ?? null}
+          <>
+            {requestChartQuery.isError && (
+              <RetryableQueryError
+                message={t.requestChartsError}
+                analyticsEvent="inference_agentic_request_charts_retry_clicked"
+                onRetry={requestChartQuery.refetch}
+                testId="agentic-request-charts-query-error"
               />
             )}
-          </div>
-        </>
-      )}
+            {!requestChartQuery.isError && effectivePhase === 'warmup' && (
+              <p
+                className="rounded-md border-l-2 border-amber-500/60 bg-amber-500/10 px-3 py-2 text-xs text-muted-foreground"
+                data-testid="warmup-phase-note"
+              >
+                {t.warmupNotePrefix}
+                <span className="font-medium text-foreground">{t.warmupWord}</span>
+                {t.warmupNoteBody}
+                {!slicedHasServerData && t.warmupNoServerData}
+              </p>
+            )}
+            {metricSourceQuery.isError && (
+              <RetryableQueryError
+                message={t.metricSourceError}
+                analyticsEvent="inference_agentic_metric_source_retry_clicked"
+                onRetry={metricSourceQuery.refetch}
+                testId="agentic-metric-source-query-error"
+              />
+            )}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {!requestChartQuery.isError && (
+                <>
+                  <SequenceMetricCard
+                    metric="isl"
+                    timeline={phaseRequestData}
+                    timelineLoading={requestChartQuery.isLoading}
+                  />
+                  <SequenceMetricCard
+                    metric="osl"
+                    timeline={phaseRequestData}
+                    timelineLoading={requestChartQuery.isLoading}
+                  />
+
+                  <RequestMetricOverTime
+                    title={t.interactivityOverTime}
+                    metric="interactivity"
+                    timeline={phaseRequestData}
+                    isLoading={requestChartQuery.isLoading}
+                  />
+
+                  <RequestMetricOverTime
+                    title={t.ttftOverTime}
+                    metric="ttft"
+                    timeline={phaseRequestData}
+                    isLoading={requestChartQuery.isLoading}
+                    latencySelector
+                  />
+                </>
+              )}
+
+              <KvCacheUtilizationCard sliced={sliced} />
+
+              <RequestActivityCard
+                sliced={sliced}
+                phaseTimeline={phaseRequestData}
+                timelineLoading={requestChartQuery.isLoading}
+                timelineError={requestChartQuery.isError ? t.requestChartsError : undefined}
+                view={requestActivityView}
+                onViewChange={setRequestActivityView}
+              />
+
+              <PrefixCacheHitRateCard sliced={sliced} />
+
+              <ThroughputCard
+                sliced={sliced}
+                selectedSource={selectedMetricSource}
+                selected={throughputSeries}
+                onSelectedChange={setThroughputSeries}
+              />
+
+              <PromptTokenSourceCard sliced={sliced} />
+
+              {!requestChartQuery.isError && (
+                <InflightUniqueTokensCard
+                  phaseTimeline={phaseRequestData}
+                  timelineLoading={requestChartQuery.isLoading}
+                  kvCachePoolTokens={metrics?.kvCachePoolTokens ?? null}
+                />
+              )}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

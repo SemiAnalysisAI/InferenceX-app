@@ -538,7 +538,7 @@ export default function CollectiveXDisplay() {
 
   if (runsQuery.isLoading) {
     return (
-      <Card data-testid="collectivex-loading" className="min-h-80 items-center justify-center">
+      <Card data-testid="collectivex-loading" className="min-h-svh items-center justify-center">
         <Loader2 className="size-6 animate-spin text-muted-foreground" />
         <p className="mt-3 text-sm text-muted-foreground">{t.loadingRuns}</p>
       </Card>
@@ -672,11 +672,17 @@ export default function CollectiveXDisplay() {
             </Button>
           </div>
         </div>
-        {datasets.length > 0 && (
+        {(datasets.length > 0 || orderedVisibleRunIds.length > 0) && (
           <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <Stat value={seriesCount} label={t.seriesCount} />
-            <Stat value={`${measuredCases}/${requestedCases}`} label={t.measuredCases} />
-            <Stat value={`${terminalCases}/${requestedCases}`} label={t.terminalCases} />
+            <Stat value={datasets.length > 0 ? seriesCount : '-'} label={t.seriesCount} />
+            <Stat
+              value={datasets.length > 0 ? `${measuredCases}/${requestedCases}` : '-'}
+              label={t.measuredCases}
+            />
+            <Stat
+              value={datasets.length > 0 ? `${terminalCases}/${requestedCases}` : '-'}
+              label={t.terminalCases}
+            />
           </div>
         )}
       </Card>
