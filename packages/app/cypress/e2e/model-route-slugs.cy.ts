@@ -190,9 +190,7 @@ describe('Inference model presentation', () => {
         expectModel('GLM-5.3', 'glm-5-3');
         cy.document().then((document) => {
           document.title = `Kimi K3 ${suffix} | InferenceX`;
-          document
-            .querySelector('meta[name="description"]')!
-            .setAttribute('content', 'Kimi K3');
+          document.querySelector('meta[name="description"]')!.setAttribute('content', 'Kimi K3');
         });
         expectModel('GLM-5.3', 'glm-5-3');
         selectModel(FLASH);
@@ -206,7 +204,7 @@ describe('Inference model presentation', () => {
         cy.reload();
         expectModel('Kimi K3', 'kimi-k3');
         cy.viewport(1280, 900);
-        cy.get(`a[href="${locale}/evaluation"]`).first().click();
+        cy.get(`a[href="${locale}/evaluation"]`).filter(':visible').first().click();
         cy.location('pathname').should('eq', `${locale}/evaluation`);
         cy.title().should('not.contain', 'Kimi K3');
         cy.go('back');
