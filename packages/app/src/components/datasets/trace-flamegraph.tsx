@@ -30,7 +30,7 @@ export type {
   TimedRequest,
 } from './trace-flamegraph-model';
 
-const SEG = {
+export const SEG = {
   cached: '#10b981',
   uncached: '#f59e0b',
   output: '#8b5cf6',
