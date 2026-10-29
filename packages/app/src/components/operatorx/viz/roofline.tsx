@@ -93,10 +93,12 @@ function Roofline({ model }: { model: ComparisonModel }) {
           const bound = rooflineBound(c, hw);
           const tflops = c.flops / (us * 1e6);
           // ridge-normalized: the share of peak the bound allows on the slope, else past the ridge
+          // without a bound (a stage's peak or the link bandwidth unknown), plain FLOP/byte
+          const plain = c.flops / c.bytes;
           const reach = peak && bw && bound ? c.flops / (peak * 1e6) / bound.us : null;
           const ridged =
-            reach === null ? null : reach < 0.999 ? reach : ((c.flops / c.bytes) * bw!) / peak!;
-          const ai = ridged === null ? c.flops / c.bytes : (ridged * peak!) / bw!;
+            peak && bw ? (reach !== null && reach < 0.999 ? reach : (plain * bw) / peak) : null;
+          const ai = ridged === null ? plain : (ridged * peak!) / bw!;
           return [
             normalized
               ? { hw, i, ai, tflops, us, bound, x: ridged!, y: tflops / peak! }

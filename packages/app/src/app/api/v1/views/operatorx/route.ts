@@ -47,7 +47,7 @@ function flatten(view: ComparisonView, hardware: readonly string[]) {
         {
           case_key: c.key,
           op_type: c.opType,
-          parallel: view.parallel,
+          parallel: view.parallel || ONE_DEVICE,
           testlist: c.testlist,
           sources: c.sources.map((s) => ({ model: view.models[s.model], roles: s.roles })),
           shape: c.shape,

@@ -52,6 +52,7 @@ import {
   subView,
 } from './layers';
 import { track } from '@/lib/analytics/analytics';
+import { isDarkTheme } from '@/lib/themes/themes';
 
 import { barsHeight, binTokens, gpuValues, inBin, OpBars, sizeBin } from './OpBars';
 
@@ -625,7 +626,7 @@ export function ModelView() {
   const gemm = useOperatorXModel('gemm', requested, requestedSplit);
   const moe = useOperatorXModel('moe', requested, requestedSplit);
   const attention = useOperatorXModel('attention', requested, requestedSplit);
-  const isDark = useTheme().resolvedTheme === 'dark';
+  const isDark = isDarkTheme(useTheme().resolvedTheme);
   const [picked, setPicked] = useState<string[] | null>(null);
   const [pickedPrecision, setPrecision] = useState<ComputePrecision | null>(null);
   const [open, setOpen] = useState<SlotData | null>(null);

@@ -177,7 +177,7 @@ const responseSchema = objectSchema(
 const exampleRow = {
   case_key: '{"batch":{"groups":[{"count":1,"ctx":1024,"q":1}]},...}|vllm',
   op_type: 'dsv4_attn',
-  parallel: '',
+  parallel: '1',
   testlist: 'attn_deepseek_v4',
   sources: [{ model: 'DeepSeek-V4-Pro', roles: ['attn'] }],
   shape: 'V4 attention ÷4 · 1×q1 ctx1024',
@@ -255,7 +255,7 @@ const responses: readonly ApiResponse[] = [
         mediaType: 'text/csv',
         schema: stringSchema,
         example:
-          'case_key,op_type,parallel,testlist,sources,shape,precision,compute_precision,x,dims,flops,bytes,hardware,status,latency_us,tflops,tb_s\r\n...,dsv4_attn,,attn_deepseek_v4,DeepSeek-V4-Pro: attn,V4 attention ÷4 · 1×q1 ctx1024,proj e4m3 (128×128 ue8m0) · kv fp8,fp8,1,tokens=1 hidden=7168 heads=128 compressRatio=4,1200000000,110000000,b200,ok,41.2,29.1,2.67',
+          'case_key,op_type,parallel,testlist,sources,shape,precision,compute_precision,x,dims,flops,bytes,hardware,status,latency_us,tflops,tb_s\r\n...,dsv4_attn,1,attn_deepseek_v4,DeepSeek-V4-Pro: attn,V4 attention ÷4 · 1×q1 ctx1024,proj e4m3 (128×128 ue8m0) · kv fp8,fp8,1,tokens=1 hidden=7168 heads=128 compressRatio=4,1200000000,110000000,b200,ok,41.2,29.1,2.67',
       },
     ],
   },
