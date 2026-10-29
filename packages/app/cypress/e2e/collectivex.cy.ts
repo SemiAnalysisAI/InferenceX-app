@@ -179,7 +179,7 @@ describe('CollectiveX neutral run view', () => {
       .as('band')
       .should('have.length', 1)
       .and('have.attr', 'd');
-    cy.get('@band').should('have.attr', 'fill-opacity', '0.08');
+    cy.get('@band').should('have.attr', 'fill-opacity', '0.16');
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
     cy.get('[data-testid="collectivex-range-note"]').should('be.visible');
 
@@ -193,7 +193,7 @@ describe('CollectiveX neutral run view', () => {
       .and('have.attr', 'fill-opacity', '0.3');
     cy.get('[data-testid="collectivex-explorer-chart"] svg').first().click(5, 5, { force: true });
     cy.get('@band').should('not.have.attr', 'data-focused');
-    cy.get('@band').should('have.attr', 'fill-opacity', '0.08');
+    cy.get('@band').should('have.attr', 'fill-opacity', '0.16');
 
     showView('Series');
     cy.get('[data-testid="collectivex-range-band"]').should('not.exist');

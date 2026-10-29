@@ -146,12 +146,20 @@ function formatPercentiles(
 
 // Light enough that overlapping SKUs stay readable; a hovered or pinned point lifts its own band
 // and fades the rest.
-const BAND_FILL = 0.08;
-const BAND_STROKE = 0.45;
+const BAND_FILL = 0.16;
+const BAND_STROKE = 0.6;
 const BAND_FOCUS_FILL = 0.3;
 const BAND_FOCUS_STROKE = 0.95;
 const BAND_FADED_FILL = 0.03;
 const BAND_FADED_STROKE = 0.15;
+
+/** Mean log-height of a band, i.e. how wide it looks on the log y axis. */
+function bandSpread(band: CollectiveXRangeBand): number {
+  if (band.points.length === 0) return 0;
+  let total = 0;
+  for (const item of band.points) total += Math.log(item.hi / item.lo);
+  return total / band.points.length;
+}
 
 /** Lift the band `focusId` and fade the others; null restores every band. */
 function highlightBands(root: Element | null, focusId: string | null): void {
@@ -243,7 +251,9 @@ export function CollectiveXChart({
   // Always mounted, so leaving the range view redraws it empty: D3Chart keeps a removed custom
   // layer's elements on screen.
   const rangeLayer = useMemo(() => {
-    const bands = rangeMode === 'range' ? (ranges ?? []) : [];
+    // Widest first, so it paints at the bottom and narrower bands stay visible on top of it.
+    const bands =
+      rangeMode === 'range' ? (ranges ?? []).toSorted((a, b) => bandSpread(b) - bandSpread(a)) : [];
     const draw = (
       group: d3.Selection<SVGGElement, unknown, null, undefined>,
       xScale: unknown,
@@ -269,7 +279,8 @@ export function CollectiveXChart({
         .attr('stroke-opacity', BAND_STROKE)
         .attr('stroke-width', 1)
         .attr('pointer-events', 'none')
-        .attr('d', (band) => area(band.points));
+        .attr('d', (band) => area(band.points))
+        .order();
     };
     return {
       type: 'custom' as const,
@@ -397,9 +408,11 @@ export function CollectiveXChart({
               const rows = point.range.members
                 .map(
                   (member) =>
-                    `<div class="flex justify-between gap-3 text-muted-foreground"><span>${escapeHtml(member.label)}</span><span>${formatMetric(member.y, yAxis)}</span></div>`,
+                    `<span>${escapeHtml(member.label)}</span><span>${formatMetric(member.y, yAxis)}</span>`,
                 )
                 .join('');
+              // Two-column grid, so every value starts at the same left edge.
+              const table = `<div class="grid text-muted-foreground" style="grid-template-columns: max-content max-content; column-gap: 1.5rem">${rows}</div>`;
               return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 230px; max-width: 380px; user-select: ${isPinned ? 'text' : 'none'}">
             ${pinnedNote}
             <div class="font-semibold mb-1" style="color: ${color}">${escapeHtml(point.seriesLabel)}</div>
@@ -412,7 +425,7 @@ export function CollectiveXChart({
             <div>${t.rangeHeading}: ${formatMetric(point.range.lo, yAxis)} – ${formatMetric(point.range.hi, yAxis)}</div>
             <div class="text-muted-foreground">${t.tokenCounts(locale === 'zh' ? point.point.tokens_per_rank.toLocaleString('zh-CN') : String(point.point.tokens_per_rank), locale === 'zh' ? point.point.global_tokens.toLocaleString('zh-CN') : String(point.point.global_tokens))}</div>
             <div class="mt-1 text-muted-foreground">${t.rangeCount(point.range.libraries)}</div>
-            ${rows}
+            ${table}
           </div>`;
             }
             const measurement = point.point;
