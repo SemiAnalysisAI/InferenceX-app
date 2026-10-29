@@ -1,7 +1,7 @@
+// @vitest-environment jsdom
 import * as d3 from 'd3';
 import { describe, expect, it } from 'vitest';
 
-import { createMockGroup } from './test-helpers';
 import { renderLines, updateLinesOnZoom, type LineConfig } from './lines';
 
 const COLORS: Record<string, string> = {
@@ -36,156 +36,128 @@ function makeScales() {
   return { xScale, yScale };
 }
 
+function makeGroup() {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  return d3.select(svg).append('g') as unknown as d3.Selection<
+    SVGGElement,
+    unknown,
+    null,
+    undefined
+  >;
+}
+
+function pathsByKey(group: d3.Selection<SVGGElement, unknown, null, undefined>) {
+  const paths = [...group.node()!.querySelectorAll<SVGPathElement>('path.line-path')];
+  return Object.fromEntries(paths.map((path) => [path.dataset.lineKey, path]));
+}
+
 describe('renderLines', () => {
-  it('creates one path per line series', () => {
-    const group = createMockGroup();
+  it('creates one path per non-empty series, tagged with its key', () => {
+    const group = makeGroup();
     const { xScale, yScale } = makeScales();
-    renderLines(group as any, SAMPLE_LINES, xScale, yScale, makeConfig());
+    renderLines(group, { ...SAMPLE_LINES, empty: [] }, xScale, yScale, makeConfig());
 
-    const paths = group.selectAll('.line-path');
-    expect(paths.elements).toHaveLength(2);
+    expect(Object.keys(pathsByKey(group)).toSorted()).toEqual(['seriesA', 'seriesB']);
   });
 
-  it('sets class including series key', () => {
-    const group = createMockGroup();
-    const { xScale, yScale } = makeScales();
-    renderLines(group as any, SAMPLE_LINES, xScale, yScale, makeConfig());
-
-    const paths = group.selectAll('.line-path');
-    const classes = paths.elements.map((el) => el.attrs['class']);
-    expect(classes).toContain('line-path line-seriesA');
-    expect(classes).toContain('line-path line-seriesB');
-  });
-
-  it('sets fill to none', () => {
-    const group = createMockGroup();
-    const { xScale, yScale } = makeScales();
-    renderLines(group as any, SAMPLE_LINES, xScale, yScale, makeConfig());
-
-    const paths = group.selectAll('.line-path');
-    for (const el of paths.elements) {
-      expect(el.attrs['fill']).toBe('none');
-    }
-  });
-
-  it('sets stroke from config.getColor', () => {
-    const group = createMockGroup();
-    const { xScale, yScale } = makeScales();
-    renderLines(group as any, SAMPLE_LINES, xScale, yScale, makeConfig());
-
-    const paths = group.selectAll('.line-path');
-    const strokeByClass: Record<string, string | number> = {};
-    for (const el of paths.elements) {
-      strokeByClass[el.attrs['class'] as string] = el.attrs['stroke'];
-    }
-    expect(strokeByClass['line-path line-seriesA']).toBe('#f00');
-    expect(strokeByClass['line-path line-seriesB']).toBe('#0f0');
-  });
-
-  it('sets a per-series stroke dash pattern when configured', () => {
-    const group = createMockGroup();
+  it('applies per-series stroke color and dash pattern', () => {
+    const group = makeGroup();
     const { xScale, yScale } = makeScales();
     renderLines(
-      group as any,
+      group,
       SAMPLE_LINES,
       xScale,
       yScale,
-      makeConfig({
-        getStrokeDasharray: (key) => (key === 'seriesA' ? 'none' : '9 4'),
-      }),
+      makeConfig({ getStrokeDasharray: (key) => (key === 'seriesA' ? 'none' : '9 4') }),
     );
 
-    const paths = group.selectAll('.line-path');
-    const dashByClass: Record<string, string | number> = {};
-    for (const el of paths.elements) {
-      dashByClass[el.attrs['class'] as string] = el.attrs['stroke-dasharray'];
-    }
-    expect(dashByClass['line-path line-seriesA']).toBe('none');
-    expect(dashByClass['line-path line-seriesB']).toBe('9 4');
+    const paths = pathsByKey(group);
+    expect(paths.seriesA.getAttribute('stroke')).toBe('#f00');
+    expect(paths.seriesB.getAttribute('stroke')).toBe('#0f0');
+    expect(paths.seriesA.getAttribute('stroke-dasharray')).toBe('none');
+    expect(paths.seriesB.getAttribute('stroke-dasharray')).toBe('9 4');
+    expect(paths.seriesA.getAttribute('fill')).toBe('none');
   });
 
-  it('uses default strokeWidth of 2 when not specified', () => {
-    const group = createMockGroup();
+  it('uses a stroke width of 2 unless one is configured', () => {
     const { xScale, yScale } = makeScales();
-    renderLines(group as any, SAMPLE_LINES, xScale, yScale, makeConfig());
+    const defaults = makeGroup();
+    renderLines(defaults, SAMPLE_LINES, xScale, yScale, makeConfig());
+    const custom = makeGroup();
+    renderLines(custom, SAMPLE_LINES, xScale, yScale, makeConfig({ strokeWidth: 3 }));
 
-    const paths = group.selectAll('.line-path');
-    for (const el of paths.elements) {
-      expect(el.attrs['stroke-width']).toBe(2);
-    }
+    expect(pathsByKey(defaults).seriesA.getAttribute('stroke-width')).toBe('2');
+    expect(pathsByKey(custom).seriesA.getAttribute('stroke-width')).toBe('3');
   });
 
-  it('uses custom strokeWidth when specified', () => {
-    const group = createMockGroup();
+  it('draws the configured curve through the scaled points', () => {
+    const group = makeGroup();
     const { xScale, yScale } = makeScales();
-    renderLines(group as any, SAMPLE_LINES, xScale, yScale, makeConfig({ strokeWidth: 3 }));
+    renderLines(group, SAMPLE_LINES, xScale, yScale, makeConfig({ curve: d3.curveLinear }));
 
-    const paths = group.selectAll('.line-path');
-    for (const el of paths.elements) {
-      expect(el.attrs['stroke-width']).toBe(3);
-    }
+    expect(pathsByKey(group).seriesB.getAttribute('d')).toBe('M0,180L100,140L200,100');
   });
 
-  it('generates valid d attribute from line generator', () => {
-    const group = createMockGroup();
+  it('breaks the path where isDefined rejects a point', () => {
+    const group = makeGroup();
     const { xScale, yScale } = makeScales();
-    renderLines(group as any, SAMPLE_LINES, xScale, yScale, makeConfig());
-
-    const paths = group.selectAll('.line-path');
-    for (const el of paths.elements) {
-      const d = el.attrs['d'] as string;
-      expect(d).toBeTruthy();
-      expect(String(d).startsWith('M')).toBe(true);
-    }
-  });
-
-  it('filters out empty series', () => {
-    const group = createMockGroup();
-    const { xScale, yScale } = makeScales();
-    const lines = {
-      ...SAMPLE_LINES,
-      emptyLine: [],
+    const gapped = {
+      gapped: [
+        { x: 0, y: 10 },
+        { x: 1, y: 0 },
+        { x: 2, y: 20 },
+      ],
     };
-    renderLines(group as any, lines, xScale, yScale, makeConfig());
+    renderLines(
+      group,
+      gapped,
+      xScale,
+      yScale,
+      makeConfig({ curve: d3.curveLinear, isDefined: (d) => d.y > 0 }),
+    );
 
-    const paths = group.selectAll('.line-path');
-    expect(paths.elements).toHaveLength(2);
+    expect(pathsByKey(group).gapped.getAttribute('d')).toBe('M0,160ZM200,120Z');
+  });
+});
+
+describe('updateLinesOnZoom', () => {
+  it('redraws each series with the new scales and curve', () => {
+    const group = makeGroup();
+    const { xScale, yScale } = makeScales();
+    renderLines(group, SAMPLE_LINES, xScale, yScale, makeConfig({ curve: d3.curveLinear }));
+
+    const zoomedX = d3.scaleLinear().domain([0, 2]).range([0, 300]);
+    const zoomedY = d3.scaleLinear().domain([0, 100]).range([200, 0]);
+    updateLinesOnZoom(group, SAMPLE_LINES, zoomedX, zoomedY, { curve: d3.curveLinear });
+
+    expect(pathsByKey(group).seriesB.getAttribute('d')).toBe('M0,190L150,170L300,150');
   });
 
-  it('handles all empty series', () => {
-    const group = createMockGroup();
+  it('updates series whose key is not a valid CSS class name', () => {
+    const lines = { 'Huawei 950PR': SAMPLE_LINES.seriesB, 'H100 SXM (8x)': SAMPLE_LINES.seriesA };
+    const group = makeGroup();
     const { xScale, yScale } = makeScales();
-    renderLines(group as any, { a: [], b: [] }, xScale, yScale, makeConfig());
+    renderLines(group, lines, xScale, yScale, makeConfig({ curve: d3.curveLinear }));
 
-    const paths = group.selectAll('.line-path');
-    expect(paths.elements).toHaveLength(0);
+    const zoomedX = d3.scaleLinear().domain([0, 2]).range([0, 300]);
+    updateLinesOnZoom(group, lines, zoomedX, yScale, { curve: d3.curveLinear });
+
+    expect(pathsByKey(group)['Huawei 950PR'].getAttribute('d')).toBe('M0,180L150,140L300,100');
   });
 
-  it('handles empty lines object', () => {
-    const group = createMockGroup();
+  it('leaves paths alone for series absent from the update', () => {
+    const group = makeGroup();
     const { xScale, yScale } = makeScales();
-    renderLines(group as any, {}, xScale, yScale, makeConfig());
+    renderLines(group, SAMPLE_LINES, xScale, yScale, makeConfig({ curve: d3.curveLinear }));
+    const before = pathsByKey(group).seriesA.getAttribute('d');
 
-    const paths = group.selectAll('.line-path');
-    expect(paths.elements).toHaveLength(0);
+    const zoomedX = d3.scaleLinear().domain([0, 2]).range([0, 300]);
+    updateLinesOnZoom(group, { seriesB: SAMPLE_LINES.seriesB, constructor: [] }, zoomedX, yScale);
+
+    expect(pathsByKey(group).seriesA.getAttribute('d')).toBe(before);
   });
 
-  it('handles single-point series', () => {
-    const group = createMockGroup();
-    const { xScale, yScale } = makeScales();
-    const lines = { single: [{ x: 1, y: 20 }] };
-    renderLines(group as any, lines, xScale, yScale, makeConfig());
-
-    const paths = group.selectAll('.line-path');
-    expect(paths.elements).toHaveLength(1);
-  });
-
-  it('respects isDefined to create gaps', () => {
-    const group = createMockGroup();
-    const { xScale, yScale } = makeScales();
-    const config = makeConfig({
-      isDefined: (d) => d.y > 0,
-    });
+  it('applies isDefined gaps when redrawing', () => {
     const lines = {
       gapped: [
         { x: 0, y: 10 },
@@ -193,78 +165,15 @@ describe('renderLines', () => {
         { x: 2, y: 20 },
       ],
     };
-    renderLines(group as any, lines, xScale, yScale, config);
-
-    const paths = group.selectAll('.line-path');
-    expect(paths.elements).toHaveLength(1);
-    const d = String(paths.elements[0].attrs['d']);
-    expect(d).toBeTruthy();
-  });
-
-  it('uses curveMonotoneX by default', () => {
-    const group = createMockGroup();
+    const group = makeGroup();
     const { xScale, yScale } = makeScales();
-    renderLines(group as any, SAMPLE_LINES, xScale, yScale, makeConfig());
+    renderLines(group, lines, xScale, yScale, makeConfig({ curve: d3.curveLinear }));
 
-    const paths = group.selectAll('.line-path');
-    const d = String(paths.elements[0].attrs['d']);
-    expect(d.includes('C') || d.includes('M')).toBe(true);
-  });
+    updateLinesOnZoom(group, lines, xScale, yScale, {
+      curve: d3.curveLinear,
+      isDefined: (d) => d.y > 0,
+    });
 
-  it('accepts custom curve factory', () => {
-    const group = createMockGroup();
-    const { xScale, yScale } = makeScales();
-    renderLines(group as any, SAMPLE_LINES, xScale, yScale, makeConfig({ curve: d3.curveLinear }));
-
-    const paths = group.selectAll('.line-path');
-    const d = String(paths.elements[0].attrs['d']);
-    expect(d.includes('L')).toBe(true);
-  });
-});
-
-describe('updateLinesOnZoom', () => {
-  it('does not throw on empty group', () => {
-    const group = createMockGroup();
-    const { xScale, yScale } = makeScales();
-    updateLinesOnZoom(group as any, {}, xScale, yScale);
-  });
-
-  it('updates d attribute with new scales', () => {
-    const group = createMockGroup();
-    const { xScale, yScale } = makeScales();
-    renderLines(group as any, SAMPLE_LINES, xScale, yScale, makeConfig());
-
-    const newXScale = d3.scaleLinear().domain([0, 2]).range([0, 300]);
-    const newYScale = d3.scaleLinear().domain([0, 100]).range([200, 0]);
-
-    updateLinesOnZoom(group as any, SAMPLE_LINES, newXScale, newYScale);
-  });
-
-  it('skips series not present in the group', () => {
-    const group = createMockGroup();
-    const { xScale, yScale } = makeScales();
-    renderLines(group as any, { seriesA: SAMPLE_LINES.seriesA }, xScale, yScale, makeConfig());
-
-    updateLinesOnZoom(group as any, { seriesZ: [{ x: 0, y: 0 }] }, xScale, yScale);
-  });
-
-  it('respects isDefined in zoom update', () => {
-    const group = createMockGroup();
-    const { xScale, yScale } = makeScales();
-    const config: LineConfig = {
-      getColor: () => '#000',
-      isDefined: (d) => d.y !== 0,
-    };
-    renderLines(group as any, SAMPLE_LINES, xScale, yScale, config);
-
-    updateLinesOnZoom(group as any, SAMPLE_LINES, xScale, yScale, { isDefined: config.isDefined });
-  });
-
-  it('respects custom curve in zoom update', () => {
-    const group = createMockGroup();
-    const { xScale, yScale } = makeScales();
-    renderLines(group as any, SAMPLE_LINES, xScale, yScale, makeConfig({ curve: d3.curveLinear }));
-
-    updateLinesOnZoom(group as any, SAMPLE_LINES, xScale, yScale, { curve: d3.curveLinear });
+    expect(pathsByKey(group).gapped.getAttribute('d')).toBe('M0,160ZM200,120Z');
   });
 });

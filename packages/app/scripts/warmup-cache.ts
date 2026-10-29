@@ -59,7 +59,10 @@ async function hitBatched(paths: string[]): Promise<void> {
 
 async function availableDates(): Promise<{ all: string[]; latestPerModel: string[] }> {
   try {
-    const res = await fetch(`${origin}/api/v1/availability`, { headers });
+    // After an ingest the CDN may still hold the stale payload; ask it to revalidate first.
+    const res = await fetch(`${origin}/api/v1/availability`, {
+      headers: { ...headers, Pragma: 'no-cache', 'Cache-Control': 'no-cache' },
+    });
     if (!res.ok) return { all: [], latestPerModel: [] };
     const rows = (await res.json()) as { model: string; date: string }[];
     const latest = new Map<string, string>();
