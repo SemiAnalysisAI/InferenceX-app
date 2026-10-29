@@ -101,10 +101,10 @@
       "topLevel": "object"
     },
     "video-history": {
-      "bytes": 108039,
+      "bytes": 108159,
       "capturedAt": "2026-10-17T05:15:55.279Z",
-      "sha256": "f27fbbcd2c6a8154b030939714501b8480b59fd3b0d5701007cd2e29e2a1559e",
-      "source": "Retained public H3 metadata replay from original runs via videoHistoryEntry (canonical workload identity, per-cell GPU counts, board power and server layout); publication time unavailable. No new benchmark or publication.",
+      "sha256": "79593e777e5935e6f5807a5f0a78291f8860434f056601a0eaa8f1f93a3f2d77",
+      "source": "Retained public H3 metadata replay; fixture-only synthetic approval flags exercise chart layout and do not record an actual publication. No new benchmark or production publication.",
       "topLevel": "object"
     }
   }

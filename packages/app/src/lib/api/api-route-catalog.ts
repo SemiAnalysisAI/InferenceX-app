@@ -623,10 +623,21 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'ui-artifact-read',
     exclusionReason: {
-      en: 'Hidden H3 viewer transport for live public CI runs, checksum-verified artifact ZIPs, and read-only published history (format=history). Discovery includes standard sweeps and paginates their artifacts; publication admits checksum-verified legacy and uniquely named native artifacts. History and format=published read existing immutable indexes without publishing media; these UI contracts are not a public data API.',
-      zh: '供隐藏的 H3 查看器读取公开 CI 运行、校验和已验证的产物 ZIP，以及只读的已发布历史（format=history）。发现列表包含标准 sweep，并读取运行的全部产物分页；发布流程接收校验通过的旧产物和唯一命名的原生产物。历史视图和 format=published 从既有不可变索引读取，不发布媒体；这些界面契约不作为公开数据 API。',
+      en: 'Hidden H3 viewer transport for public CI runs, checksum-verified artifact ZIPs and stored History. Every GET is read-only, including format=media on a cache miss (204). Synthetic History replay is development-only. History retains legacy indexes but labels only source-bound approval receipts as approved; default charts use those approved entries. This UI contract is not a public data API.',
+      zh: '供隐藏的 H3 查看器读取公开 CI 运行、校验和已验证的产物 ZIP 与已存历史。所有 GET 都只读，包括 format=media 未命中时返回 204。合成历史回放仅用于开发环境。历史保留旧索引，但只有与来源绑定的批准回执才标为 approved；默认图表只使用这些条目。此界面契约不是公开数据 API。',
     },
-    sourceSha256: '27f071ac4da20035dddbe1751fa2461ead409548e6cb0ff9653febe6586c5f58',
+    sourceSha256: 'cf6b6a756c6b0a8e9b4c02ec027f303365ea3097ee2c77034e932f1f7ab50909',
+  },
+  {
+    source: 'src/app/api/video-runs/route.ts',
+    path: '/api/video-runs',
+    method: 'POST',
+    classification: 'admin',
+    exclusionReason: {
+      en: 'Bearer-protected mutation for one explicit H3 source/artifact. It stores verified media and an immutable source-bound publication receipt; authorization does not assert benchmark qualification. This operator path is outside the public read API.',
+      zh: '受 Bearer 密钥保护的单个 H3 来源与产物写操作。它存储已校验媒体和绑定来源的不可变发布回执；授权不代表 benchmark 质量验收。此运维入口不属于公开只读 API。',
+    },
+    sourceSha256: 'cf6b6a756c6b0a8e9b4c02ec027f303365ea3097ee2c77034e932f1f7ab50909',
   },
   {
     source: 'src/app/api/unofficial-run/route.ts',
@@ -1441,7 +1452,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/history.ts',
-    sourceSha256: 'c57714065521100046c4d9e452f1890b41ba73d1f857aa12e7f8903dba46d778',
+    sourceSha256: '0dc86d885b6fbb1fdfe21b63152335519f245b7254ed542034c8e08b6066b7b9',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
@@ -1449,7 +1460,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/metrics.ts',
-    sourceSha256: 'c3287d813019c51df7bb62e00a8dd99b82837c189ffd371ddd1013ef2a48ff17',
+    sourceSha256: 'd3713e5e2aca210c55be48c702d3d32f609cfa34b26fbda7d411d593ad963e2b',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
@@ -1457,7 +1468,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/points.ts',
-    sourceSha256: '1c861be5791caf75e062c8ba773b43fffe07fcd86c6044c2c6d663f45a2d4ce0',
+    sourceSha256: '81cfbf1e92b68598978db1b6a1a91c2b344719bae771d4eb3ba7ae357f544ec6',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',

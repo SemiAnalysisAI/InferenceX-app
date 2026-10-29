@@ -60,6 +60,7 @@ function page(observations: VideoHistoryObservation[], nextPage: number | null):
         id: '123.456',
         runId: '123',
         publishedAt: '2026-09-20T00:00:00Z',
+        approved: true,
         error: null,
         artifact: {
           id: 456,
@@ -170,6 +171,21 @@ beforeEach(() => {
 });
 
 describe('published VideoGenX dashboard projection', () => {
+  it('keeps a stored legacy entry out of the default public dashboard', async () => {
+    source.mockImplementation((req: NextRequest) =>
+      req.nextUrl.searchParams.get('format') === 'history'
+        ? Response.json({
+            ...pages[0],
+            nextPage: null,
+            entries: [{ ...pages[0].entries[0], approved: false }],
+          })
+        : new Response(null, { status: 204 }),
+    );
+    const response = await GET(request());
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.rows).toEqual([]);
+  });
   it('defaults to the current dashboard, reads history pages and preserves numerical parity', async () => {
     const response = await GET(request());
     expect(response.status).toBe(200);

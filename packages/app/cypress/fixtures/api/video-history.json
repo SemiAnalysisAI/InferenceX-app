@@ -13,6 +13,7 @@
         "stored": true
       },
       "publishedAt": null,
+      "approved": true,
       "sources": [
         {
           "id": "34336635063",
@@ -110,6 +111,7 @@
         "stored": true
       },
       "publishedAt": null,
+      "approved": true,
       "sources": [
         {
           "id": "34344378350",
@@ -174,6 +176,7 @@
         "stored": true
       },
       "publishedAt": null,
+      "approved": true,
       "sources": [
         {
           "id": "34342452354",
@@ -304,6 +307,7 @@
         "stored": true
       },
       "publishedAt": null,
+      "approved": true,
       "sources": [
         {
           "id": "34341996789",
@@ -493,6 +497,7 @@
         "stored": true
       },
       "publishedAt": null,
+      "approved": true,
       "sources": [
         {
           "id": "39002901777",

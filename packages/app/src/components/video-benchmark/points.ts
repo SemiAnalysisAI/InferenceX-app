@@ -7,26 +7,28 @@ const num = (value: unknown): number | null =>
   typeof value === 'number' && Number.isFinite(value) ? value : null;
 
 /**
- * Flatten published history pages (newest publication first) into chartable
- * points. A source re-exported under a later artifact repeats its observation
- * ids; the first occurrence wins, which is the newest publication.
+ * Flatten explicitly approved history entries (newest publication first) into
+ * chartable points. Legacy stored sources stay in History but cannot become an
+ * official dashboard point merely because their samples and shape match.
  */
 export function videoPoints(pages: VideoHistoryPage[]): VideoPoint[] {
   const seen = new Set<string>();
   const points: VideoPoint[] = [];
   for (const page of pages)
     for (const entry of page.entries)
-      for (const source of entry.sources) {
-        if (source.kind !== 'observation') continue;
-        for (const observation of source.observations) {
-          if (seen.has(observation.id)) continue;
-          seen.add(observation.id);
-          points.push({
-            ...toPoint(observation, entry.runId, entry.artifact.id, source.observedAt),
-            publishedAt: entry.publishedAt,
-          });
+      if (entry.approved === true)
+        for (const source of entry.sources) {
+          if (source.kind !== 'observation') continue;
+          for (const observation of source.observations) {
+            if (seen.has(observation.id)) continue;
+            seen.add(observation.id);
+            points.push({
+              ...toPoint(observation, entry.runId, entry.artifact.id, source.observedAt),
+              publishedAt: entry.publishedAt,
+              approved: true,
+            });
+          }
         }
-      }
   return points.toSorted(
     (a, b) =>
       hardwareSort(a.hardwareKey ?? '') - hardwareSort(b.hardwareKey ?? '') ||

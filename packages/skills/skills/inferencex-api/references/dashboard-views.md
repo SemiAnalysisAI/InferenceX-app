@@ -202,7 +202,11 @@ which API selectors belong together.
 ### VideoGenX selection and coverage
 
 With no `run`/`artifact`, `/api/v1/views/video` returns the current dashboard's
-published-history projection, not CI discovery. Copy its URL selectors directly:
+approved-history projection, not CI discovery. Legacy stored sources remain in
+Performance history but cannot enter default charts without a matching immutable
+publication receipt. Authorization to publish is separate from benchmark qualification.
+All public video GET paths, including a `format=media` cache miss, are read-only;
+the miss returns 204. Copy its URL selectors directly:
 `v_x`, `v_y`, `v_tier`, `v_optimal`, `v_api`, `v_hidden`, `v_base`, `v_cand`, `v_case`.
 `v_view=chart|table` is presentation only. Read resolved `params`; malformed values
 use the same defaults as the UI. Unknown/repeated query names still return 400.

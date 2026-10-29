@@ -48,6 +48,25 @@ const ALL_COLUMNS = [
 ];
 
 describe('Video hardware dashboard (retained fixture)', () => {
+  it('shows stored legacy evidence without promoting it to default chart points', () => {
+    cy.fixture('api/video-history.json').then((page: VideoHistoryPage) => {
+      for (const entry of page.entries) entry.approved = false;
+      cy.intercept('GET', '/api/video-runs?format=history&page=1', page).as('legacy');
+    });
+    cy.intercept('GET', '/api/video-runs?run=*', { statusCode: 204 });
+    cy.mount(
+      <PathnameContext.Provider value="/video">
+        <VideoDashboard />
+      </PathnameContext.Provider>,
+    );
+    cy.wait('@legacy');
+    points().should('have.length', 0);
+    cy.get('[data-testid="video-history-section"] summary').click();
+    cy.get('[data-testid="video-history-entry"]').should('have.length', 7);
+    cy.get('[data-testid="video-history-publication"]')
+      .first()
+      .should('contain', 'No matching approval receipt');
+  });
   it('plots one C1 point per measured hardware and lists MI355X as unavailable', () => {
     mount();
     points().should('have.length', 3);
@@ -359,6 +378,12 @@ describe('Video hardware dashboard (retained fixture)', () => {
     );
     cy.wait('@verdicts');
     cy.get('[data-testid="video-history-entry"]').should('have.length', 7);
+    cy.get('[data-testid="video-history-publication"]')
+      .first()
+      .should('contain', 'Approved for dashboard');
+    cy.get('[data-testid="video-history-publication"]')
+      .eq(4)
+      .should('contain', 'No matching approval receipt');
     cy.get('[data-testid="video-history-power"]').should(($verdicts) => {
       expect([...$verdicts].map((el) => el.textContent?.trim())).to.deep.equal([
         '· GPU power: Measured',
@@ -412,5 +437,10 @@ describe('Video hardware dashboard (retained fixture)', () => {
         '每 1 美元 TCO 生成视频数（Hyperscaler 自有设备）',
       ]);
     });
+    cy.get('[data-testid="video-history-section"] summary').click();
+    cy.get('[data-testid="video-history-publication"]')
+      .first()
+      .should('contain', '发布批准')
+      .and('contain', '已批准用于仪表板');
   });
 });

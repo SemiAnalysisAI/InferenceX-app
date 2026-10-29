@@ -64,6 +64,8 @@ export interface VideoHistoryEntry {
   runId: string;
   artifact: CIArtifact;
   publishedAt: string | null;
+  /** Explicit publisher authorization; absent on legacy stored indexes. */
+  approved?: boolean;
   sources: VideoHistorySource[];
   error: string | null;
 }

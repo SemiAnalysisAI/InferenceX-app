@@ -281,7 +281,7 @@ export default function VideoCompare({
     if (other?.hardwareKey === hardware && own)
       patch[side === 'baseline' ? 'candidate' : 'baseline'] = own.hardwareKey;
     update(patch);
-    track(`video_compare_${side}_changed`, { hardware });
+    track(`video_compare_${side}_changed`, { gpu: hardware });
   };
   const swap = () => {
     if (!baseline || !candidate) return;

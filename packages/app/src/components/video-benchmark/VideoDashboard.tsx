@@ -83,9 +83,9 @@ const STRINGS = {
       `${hardware} (${used} of ${reserved})`,
     deployments: (n: number) => `${n} deployments`,
     history: 'Performance history',
-    historyHint: 'Every published H3 result, including older runs.',
-    loading: 'Loading published results…',
-    error: 'Could not load published results',
+    historyHint: 'Stored H3 evidence, including older runs without approval.',
+    loading: 'Loading video results…',
+    error: 'Could not load video results',
     retry: 'Retry',
     replay: 'Replaying retained results (local fixture), not a new measurement.',
     vs: 'vs.',
@@ -116,9 +116,9 @@ const STRINGS = {
       `${hardware}（${used} / ${reserved} 张）`,
     deployments: (n: number) => `${n} 种部署`,
     history: '性能历史',
-    historyHint: '所有已发布的 H3 结果，包括较早的运行。',
-    loading: '正在加载已发布结果…',
-    error: '无法加载已发布结果',
+    historyHint: '已存储的 H3 结果，包括尚无发布批准记录的旧运行。',
+    loading: '正在加载视频结果…',
+    error: '无法加载视频结果',
     retry: '重试',
     replay: '正在回放保留结果（本地 fixture），不是新的测量。',
     vs: 'vs.',
@@ -221,7 +221,7 @@ export default function VideoDashboard() {
         if (next.has(name)) next.delete(name);
         else next.add(name);
         update({ hidden: [...next] });
-        track('video_legend_toggled', { hardware: name });
+        track('video_legend_toggled', { gpu: name });
       },
     };
   });
@@ -428,7 +428,7 @@ export default function VideoDashboard() {
                     colorFor={colorFor}
                     hidden={hidden}
                     onSelect={(p: VideoPoint) =>
-                      track('video_point_selected', { hardware: p.hardwareKey ?? '', run: p.runId })
+                      track('video_point_selected', { gpu: p.hardwareKey ?? '', run: p.runId })
                     }
                   />
                 ) : (
@@ -470,7 +470,7 @@ export default function VideoDashboard() {
             defaultOpen={compareOpen}
             titleWhenOpen={false}
             testId="video-compare-toggle"
-            onToggle={(open) => track('video_compare_section_toggled', { open })}
+            onToggle={(enabled) => track('video_compare_section_toggled', { enabled })}
           >
             <VideoCompare points={cells} options={options} colorFor={colorFor} />
           </CollapsibleSection>
@@ -480,7 +480,7 @@ export default function VideoDashboard() {
             defaultOpen={false}
             titleWhenOpen={false}
             testId="video-evidence-toggle"
-            onToggle={(open) => track('video_evidence_section_toggled', { open })}
+            onToggle={(enabled) => track('video_evidence_section_toggled', { enabled })}
           >
             <VideoEvidence points={cells} colorFor={colorFor} />
           </CollapsibleSection>
@@ -494,7 +494,7 @@ export default function VideoDashboard() {
           const open = event.currentTarget.open;
           if (open === historyOpen) return;
           setHistoryOpen(open);
-          track('video_history_section_toggled', { open });
+          track('video_history_section_toggled', { enabled: open });
         }}
       >
         <summary className="cursor-pointer text-sm font-medium">

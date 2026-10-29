@@ -4,7 +4,7 @@
 
 ## Read path
 
-`GET /api/video-runs?format=history&page=1` returns a versioned UI projection of existing published H3 indexes. It lists `h3-video-media/v1/runs/` metadata, validates pathname identities, sorts by index publication time (artifact ID breaks ties), then reads at most ten indexes for one page. It neither downloads media nor calls the publication path. The repository visibility check still applies. This UI transport is not a stable public benchmark API.
+`GET /api/video-runs?format=history&page=1` returns a versioned UI projection of existing stored H3 indexes. It lists `h3-video-media/v1/runs/` metadata, validates pathname identities, sorts by index storage time (artifact ID breaks ties), then reads at most ten indexes for one page. It neither downloads media nor calls the publication path. A matching immutable receipt under `h3-video-media/v1/approvals/` marks an entry `approved: true`; missing or invalid receipts leave it in History with `approved: false`. The repository visibility check still applies. This UI transport is not a stable public benchmark API.
 
 The projection groups all cells under the original source inside one artifact entry. It reuses `storedBundle`, `servingCells`, `storedFidelityBundle`, and the existing tradeoff calculations. Invalid or unavailable indexes remain explicit error entries. Original execution time comes from `ci.started_at`; index publication time is separate and must never be substituted for execution time. Original run IDs and export run IDs remain distinct.
 
@@ -16,9 +16,9 @@ Each observation also carries the cell's participating and allocated GPU counts,
 
 ## Publication and discovery
 
-The `publish-video-results` repository dispatch starts publication for its `source_run_id`; scheduled and manual catch-up use the same job. The publication job follows every catalog `nextPage`, including empty filtered pages, and deduplicates run/artifact IDs. Each per-run lookup reads all GitHub artifact pages. Standard `run-sweep.yml` runs join legacy H3 workflows in discovery; a sweep with no video artifact remains empty. An explicit `H3_RUN_ID` limits catch-up to one run. Failed artifacts do not prevent later artifacts from being attempted, but the job still fails; timeout or failure is not proof that the catalog was fully processed.
+The `publish-video-results` repository dispatch supplies an explicit `source_run_id` and `merge_run_id`; manual `workflow_dispatch` requires a source `run_id`. There is no scheduled all-runs publisher. The job lists only that run's GitHub artifacts (including later artifact pages), then sends each exact run/artifact ID to bearer-protected `POST /api/video-runs` using the existing invalidation secret. It retries already stored indexes because they may lack an approval receipt. Failed artifacts do not prevent later artifacts from being attempted, but the job still fails. Authorization approves publication of the named source; it is not a benchmark qualification verdict.
 
-Native matrix artifacts use `h3-results-<run>-<attempt>-<recipe-fingerprint>` while legacy names remain readable. The sealed `artifact_name`, run/attempt, and `ci.head_sha` bind a new artifact to GitHub metadata. The actual benchmark checkout remains `git_commit`, which may differ from the Actions head when CI tests a merge commit. Publishing still writes immutable objects before the index; history and Compare only read published indexes. Low-sample and failed sources remain history entries, without changing chart admission.
+Native matrix artifacts use `h3-results-<run>-<attempt>-<recipe-fingerprint>` while legacy names remain readable. The sealed `artifact_name`, run/attempt, and `ci.head_sha` bind a new artifact to GitHub metadata. The actual benchmark checkout remains `git_commit`, which may differ from the Actions head when CI tests a merge commit. The authorized POST writes verified immutable objects before the index, checks index readback, then writes a separate immutable approval receipt bound to artifact identity, source seal and checkout. A repeat with the same identity reuses the receipt; a mismatched receipt does not authorize the source. Every public GET, including `format=media` on a cache miss, is read-only and returns 204 when stored media is absent. Legacy stored indexes and low-sample or failed sources remain in History, while only approval-backed observations enter default chart selectors; sample floors still apply.
 
 ## Evidence boundaries
 
@@ -30,13 +30,13 @@ Native matrix artifacts use `h3-results-<run>-<attempt>-<recipe-fingerprint>` wh
 
 ## Local replay
 
-`E2E_FIXTURES=1` serves `cypress/fixtures/api/video-history.json` through the existing fixture loader and checksum manifest. The fixture is a metadata-only projection of retained H100/H200/B200 observations and two fidelity artifacts; it contains no infrastructure paths or video bytes. Unknown publication timestamps remain null. The response header `X-VideoGenX-Replay: 1` causes a visible replay notice. These are historical retained observations, not newly measured results or a new publication.
+Only in development, `E2E_FIXTURES=1` serves `cypress/fixtures/api/video-history.json` through the existing fixture loader and checksum manifest. The fixture is a metadata-only projection of retained H100/H200/B200 observations and two fidelity artifacts; it contains no infrastructure paths or video bytes. Its synthetic `approved: true` flags exercise the default chart layout and are not real publication receipts. Unknown publication timestamps remain null. The response header `X-VideoGenX-Replay: 1` causes a visible replay notice. These are historical retained observations, not newly measured results or a new publication.
 
 ## 中文说明
 
-`publish-video-results` repository dispatch 为指定 `source_run_id` 启动发布；定时任务和手动补发布复用同一任务。发布任务跟随所有 `nextPage`，包括筛选后为空的页面，并对运行和产物 ID 去重。单次运行会读取 GitHub 产物列表的全部分页；标准 `run-sweep.yml` 也进入发现列表，没有视频产物的 sweep 保持为空。`H3_RUN_ID` 可将补发布限定到一个运行。某个产物失败后仍尝试后续产物，但任务最终报告失败；超时或失败不代表完整处理了目录。
+`publish-video-results` repository dispatch 明确传入 `source_run_id` 与 `merge_run_id`；手动 `workflow_dispatch` 必须指定来源 `run_id`，不再定时扫描全部运行。任务只列举指定运行的 GitHub 产物及其后续分页，对每个产物以现有失效密钥调用受 Bearer 保护的 `POST /api/video-runs`。已存索引仍会重试，以补写可能缺失的批准回执；某个产物失败后继续尝试后续产物，但任务最终报告失败。此授权只批准指定来源的发布，不代表 benchmark 通过质量验收。
 
-原生矩阵采用 `h3-results-<run>-<attempt>-<recipe-fingerprint>`，旧名称仍可读取。封存的 `artifact_name`、run/attempt 和 `ci.head_sha` 对应 GitHub 元数据；实际 benchmark checkout 仍单独记录为 `git_commit`，测试 merge commit 时它可以不同于 Actions head。发布继续先写不可变对象、最后写索引；历史和 Compare 只读已发布索引。失败或低样本来源保留在历史中，不降低图表门槛。
+原生矩阵采用 `h3-results-<run>-<attempt>-<recipe-fingerprint>`，旧名称仍可读取。封存的 `artifact_name`、run/attempt 和 `ci.head_sha` 对应 GitHub 元数据；实际 benchmark checkout 仍单独记录为 `git_commit`，测试 merge commit 时它可以不同于 Actions head。授权 POST 先写已校验的不可变对象与索引，并确认索引可读，再写绑定产物身份、来源哈希和 checkout 的独立不可变批准回执。所有公开 GET（包括 `format=media` 未命中）都不写入；缺少媒体时返回 204。旧索引、失败或低样本来源仍在历史中；只有回执验证通过的观测进入默认图表，原有样本门槛继续适用。
 
 `/video` 与 `/zh/video` 首屏为跨硬件仪表板（见 [VideoGenX 仪表板](./videogenx-dashboard.md)）；本文描述的“性能历史”列表位于其下方可展开的区块，URL 带有 `history-*` 筛选参数（`history-hardware`、`history-concurrency`、`history-query`）时自动展开。每条记录链接到原始 GitHub Actions 运行。原有的按运行查看结果、trade-off 图表与 CI 运行浏览已随仪表板重建移除；视频对比由仪表板的 Compare 面板提供。
 
@@ -46,4 +46,4 @@ serving 矩阵有两种来源，`serving.ts` 按 manifest 的 `evidence_kind` �
 
 当前展示观测值，未选择匹配基线，也不计算 before/after。延迟、吞吐量使用提交到下载完成的窗口；板卡能耗使用记录的生成窗口。保真度、阈值校准、发布验收单独展示。筛选仅作用于已加载的页面，可继续加载较早结果。
 
-`E2E_FIXTURES=1` 使用保留结果的脱敏元数据回放，遵循现有 fixture 校验和清单，并显示回放提示。未知发布时间保持为空；这不是新测量或新发布。
+仅在开发环境中，`E2E_FIXTURES=1` 使用保留结果的脱敏元数据回放，遵循现有 fixture 校验和清单，并显示回放提示。fixture 中合成的 `approved: true` 仅验证图表布局，不是实际批准回执。未知发布时间保持为空；这不是新测量或新发布。

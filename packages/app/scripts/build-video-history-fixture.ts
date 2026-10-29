@@ -51,7 +51,9 @@ const entries: VideoHistoryEntry[] = current.entries.map((entry) => {
   rebuilt += 1;
   const next = videoHistoryEntry(saved, entry.publishedAt);
   // The existing fixture already carries the artifact identity (size, digest); keep it.
-  return { ...next, artifact: { ...next.artifact, ...entry.artifact } };
+  // Preserve fixture-only chart approval when rebuilding a retained observation.
+  // A newly added export remains unapproved: an export is not a publication.
+  return { ...next, approved: entry.approved, artifact: { ...next.artifact, ...entry.artifact } };
 });
 // An export the fixture has not seen becomes a new entry after the existing ones: an export
 // is not a publication, so its publication time stays unknown and it sorts after dated entries.
@@ -72,7 +74,7 @@ manifest.fixtures[FIXTURE_NAME] = {
   capturedAt,
   sha256: fixtureSha256(body),
   source:
-    'Retained public H3 metadata replay from original runs via videoHistoryEntry (canonical workload identity, per-cell GPU counts, board power and server layout); publication time unavailable. No new benchmark or publication.',
+    'Retained public H3 metadata replay; fixture-only synthetic approval flags exercise chart layout and do not record an actual publication. No new benchmark or production publication.',
   topLevel: fixtureTopLevel(page),
 };
 manifest.generatedAt = capturedAt;
