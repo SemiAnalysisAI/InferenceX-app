@@ -137,12 +137,28 @@ function formatMetric(value: number, yAxis: CollectiveXYAxis): string {
 
 // Light enough that overlapping SKUs stay readable; a hovered or pinned point lifts its own band
 // and fades the rest.
-const BAND_FILL = 0.08;
-const BAND_STROKE = 0.45;
+const BAND_FILL = 0.16;
+const BAND_STROKE = 0.6;
 const BAND_FOCUS_FILL = 0.3;
 const BAND_FOCUS_STROKE = 0.95;
 const BAND_FADED_FILL = 0.03;
 const BAND_FADED_STROKE = 0.15;
+
+/**
+ * Every measured point, left to right. The token count is a ladder we set, not an outcome, so no
+ * point is filtered as dominated; the monotone curve smooths between them.
+ */
+function sortedLine<T extends { x: number; y: number }>(points: readonly T[]): T[] {
+  return points.toSorted((a, b) => a.x - b.x);
+}
+
+/** Mean log-height of a band, i.e. how wide it looks on the log y axis. */
+function bandSpread(band: CollectiveXRangeBand): number {
+  if (band.points.length === 0) return 0;
+  let total = 0;
+  for (const item of band.points) total += Math.log(item.hi / item.lo);
+  return total / band.points.length;
+}
 
 /** Lift the band `focusId` and fade the others; null restores every band. */
 function highlightBands(root: Element | null, focusId: string | null): void {
@@ -209,14 +225,14 @@ export function CollectiveXChart({
     () => new Map(series.map((item) => [item.series_id, fitAlphaBeta(item, operation)])),
     [series, operation],
   );
+  // Each line runs through every point of its series with a monotone curve.
   const lines = useMemo(() => {
-    const result: Record<string, { x: number; y: number }[]> = {};
+    const bySeries: Record<string, { x: number; y: number }[]> = {};
     for (const point of points) {
-      (result[point.seriesId] ??= []).push({ x: point.x, y: point.y });
+      (bySeries[point.seriesId] ??= []).push({ x: point.x, y: point.y });
     }
-    for (const line of Object.values(result)) {
-      line.sort((a, b) => a.x - b.x);
-    }
+    const result: Record<string, { x: number; y: number }[]> = {};
+    for (const [id, line] of Object.entries(bySeries)) result[id] = sortedLine(line);
     return result;
   }, [points]);
 
@@ -234,7 +250,9 @@ export function CollectiveXChart({
   // Always mounted, so leaving the range view redraws it empty: D3Chart keeps a removed custom
   // layer's elements on screen.
   const rangeLayer = useMemo(() => {
-    const bands = rangeMode === 'range' ? (ranges ?? []) : [];
+    // Widest first, so it paints at the bottom and narrower bands stay visible on top of it.
+    const bands =
+      rangeMode === 'range' ? (ranges ?? []).toSorted((a, b) => bandSpread(b) - bandSpread(a)) : [];
     const draw = (
       group: d3.Selection<SVGGElement, unknown, null, undefined>,
       xScale: unknown,
@@ -242,12 +260,19 @@ export function CollectiveXChart({
     ) => {
       const x = xScale as d3.ScaleLogarithmic<number, number>;
       const y = yScale as d3.ScaleLogarithmic<number, number>;
-      const area = d3
-        .area<CollectiveXRangeBand['points'][number]>()
+      // Each edge runs through every highest or lowest value with the same monotone curve as the
+      // lines; the lower edge runs back right to left to close the shape.
+      const edge = d3
+        .line<{ x: number; y: number }>()
         .x((item) => x(item.x))
-        .y0((item) => y(item.lo))
-        .y1((item) => y(item.hi))
-        .curve(d3.curveLinear);
+        .y((item) => y(item.y))
+        .curve(d3.curveMonotoneX);
+      const area = (bandPoints: CollectiveXRangeBand['points']) => {
+        const hi = sortedLine(bandPoints.map((item) => ({ x: item.x, y: item.hi })));
+        const lo = sortedLine(bandPoints.map((item) => ({ x: item.x, y: item.lo }))).toReversed();
+        if (hi.length === 0 || lo.length === 0) return null;
+        return `${edge(hi)}L${edge(lo)!.slice(1)}Z`;
+      };
       group
         .selectAll<SVGPathElement, CollectiveXRangeBand>('path.collectivex-range-band')
         .data(bands, (band) => band.id)
@@ -260,7 +285,8 @@ export function CollectiveXChart({
         .attr('stroke-opacity', BAND_STROKE)
         .attr('stroke-width', 1)
         .attr('pointer-events', 'none')
-        .attr('d', (band) => area(band.points));
+        .attr('d', (band) => area(band.points))
+        .order();
     };
     return {
       type: 'custom' as const,
@@ -349,7 +375,7 @@ export function CollectiveXChart({
                 return item ? collectiveXRunDasharray(item.run_index) : 'none';
               },
               strokeWidth: 2.25,
-              curve: d3.curveLinear,
+              curve: d3.curveMonotoneX,
             },
           },
           {
@@ -388,9 +414,11 @@ export function CollectiveXChart({
               const rows = point.range.members
                 .map(
                   (member) =>
-                    `<div class="flex justify-between gap-3 text-muted-foreground"><span>${escapeHtml(member.label)}</span><span>${formatMetric(member.y, yAxis)}</span></div>`,
+                    `<span>${escapeHtml(member.label)}</span><span>${formatMetric(member.y, yAxis)}</span>`,
                 )
                 .join('');
+              // Two-column grid, so every value starts at the same left edge.
+              const table = `<div class="grid text-muted-foreground" style="grid-template-columns: max-content max-content; column-gap: 1.5rem">${rows}</div>`;
               return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 230px; max-width: 380px; user-select: ${isPinned ? 'text' : 'none'}">
             ${pinnedNote}
             <div class="font-semibold mb-1" style="color: ${color}">${escapeHtml(point.seriesLabel)}</div>
@@ -403,7 +431,7 @@ export function CollectiveXChart({
             <div>${t.rangeHeading}: ${formatMetric(point.range.lo, yAxis)} – ${formatMetric(point.range.hi, yAxis)}</div>
             <div class="text-muted-foreground">${t.tokenCounts(locale === 'zh' ? point.point.tokens_per_rank.toLocaleString('zh-CN') : String(point.point.tokens_per_rank), locale === 'zh' ? point.point.global_tokens.toLocaleString('zh-CN') : String(point.point.global_tokens))}</div>
             <div class="mt-1 text-muted-foreground">${t.rangeCount(point.range.libraries)}</div>
-            ${rows}
+            ${table}
           </div>`;
             }
             const measurement = point.point;
