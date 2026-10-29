@@ -48,7 +48,13 @@ const ratio = (v: number) => String(Number(v.toPrecision(2)));
 const share = (v: number, of: number | null, what: string) =>
   of ? ` · ${ratio((v / of) * 100)}% of peak ${what}` : '';
 
-function Roofline({ model }: { model: ComparisonModel }) {
+export function Roofline({
+  model,
+  summaryOnly = false,
+}: {
+  model: ComparisonModel;
+  summaryOnly?: boolean;
+}) {
   const strings = STRINGS[useLocale()];
   const { view } = model;
   const counts = useMemo(() => {
@@ -130,7 +136,7 @@ function Roofline({ model }: { model: ComparisonModel }) {
         />
         <div className="flex items-center gap-2">
           <Switch
-            id="opx-roofline-normalized"
+            id={summaryOnly ? 'opx-summary-normalized' : 'opx-roofline-normalized'}
             checked={normalized}
             onCheckedChange={(enabled) => {
               track('operatorx_roofline_normalized_toggled', { enabled });
@@ -138,7 +144,7 @@ function Roofline({ model }: { model: ComparisonModel }) {
             }}
           />
           <Label
-            htmlFor="opx-roofline-normalized"
+            htmlFor={summaryOnly ? 'opx-summary-normalized' : 'opx-roofline-normalized'}
             className="text-sm font-normal text-muted-foreground"
           >
             Normalized
@@ -148,7 +154,9 @@ function Roofline({ model }: { model: ComparisonModel }) {
       {model.hardware.includes('ascend950pr') && (
         <p className="text-xs text-muted-foreground">{strings.ascendBasis}</p>
       )}
-      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+      {summaryOnly ? (
+        <RooflineBars model={model} summary={summary} />
+      ) : (
         <div className="min-w-0">
           <OpxChart<Point>
             inspect={{ model, caseOf: (p) => p.i }}
@@ -241,8 +249,7 @@ function Roofline({ model }: { model: ComparisonModel }) {
             legendElement={<HardwareLegend model={model} />}
           />
         </div>
-        <RooflineBars model={model} summary={summary} />
-      </div>
+      )}
     </div>
   );
 }

@@ -118,7 +118,7 @@ it('defaults to a measured 950PR shape and normalized BF16, while honoring preci
 });
 
 for (const prefix of ['', '/zh']) {
-  it(`shows matching median and best bars beside the roofline at ${prefix || '/'}`, () => {
+  it(`shows median and best bars in their own full-width panel at ${prefix || '/'}`, () => {
     const datasets = ['ascend950pr-external', 'h200-dgxc'].map((runner, gpu) => {
       const dataset = normalizeBundle(run(`summary-${gpu}`, runner, [64, 128]));
       dataset.results = dataset.results.map((row, i) => ({
@@ -139,6 +139,10 @@ for (const prefix of ['', '/zh']) {
     cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view).as('summary');
     cy.visit(`${prefix}/operatorx`);
     cy.wait('@summary');
+    cy.get('[data-testid^="operatorx-viz-"]')
+      .last()
+      .should('have.attr', 'data-testid', 'operatorx-viz-metric-vs-size');
+    cy.get('[data-testid="operatorx-viz-throughput-summary"]').scrollIntoView();
     cy.get('[data-testid="operatorx-roofline-summary"]')
       .scrollIntoView()
       .within(() => {
@@ -159,10 +163,10 @@ for (const prefix of ['', '/zh']) {
         cy.get('.summary-median').should('have.length', 2);
         cy.get('.summary-best').should('have.length', 2);
       });
-    cy.get('[data-testid="operatorx-viz-roofline"]').screenshot(
+    cy.get('[data-testid="operatorx-viz-throughput-summary"]').screenshot(
       `roofline-summary-${prefix ? 'zh' : 'en'}-normalized`,
     );
-    cy.get('#opx-roofline-normalized').click();
+    cy.get('#opx-summary-normalized').click();
     cy.get('[data-testid="operatorx-roofline-summary"] .summary-row')
       .first()
       .should(($row) => {
@@ -173,7 +177,7 @@ for (const prefix of ['', '/zh']) {
         expect(d.median).to.be.closeTo(644.2450944, 1e-9);
         expect(d.best).to.be.closeTo(858.9934592, 1e-9);
       });
-    cy.get('[data-testid="operatorx-viz-roofline"]').screenshot(
+    cy.get('[data-testid="operatorx-viz-throughput-summary"]').screenshot(
       `roofline-summary-${prefix ? 'zh' : 'en'}-absolute`,
     );
     cy.viewport(390, 844);
@@ -223,30 +227,6 @@ for (const prefix of ['', '/zh']) {
           });
       });
   });
-
-  it(`normalizes distribution throughput by each GPU's peak at ${prefix || '/'}`, () => {
-    cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm).as('gemm');
-    cy.visit(`${prefix}/operatorx`);
-    cy.wait('@gemm');
-    cy.get('[data-testid="operatorx-page"] h1').should(
-      'have.text',
-      prefix ? 'OperatorX（实验性 Beta）' : 'OperatorX (Experimental Beta)',
-    );
-    cy.get('[data-testid="operatorx-viz-distribution"]')
-      .scrollIntoView()
-      .within(() => {
-        cy.get('.y-axis-label').should('have.text', 'Throughput (TFLOPS)');
-        cy.get('.box').should('have.length', 2);
-        cy.get('#opx-dist-normalized').click().should('have.attr', 'aria-checked', 'true');
-        cy.get('.y-axis-label').should(
-          'have.text',
-          prefix ? '计算峰值占比（%）' : 'Share of peak compute (%)',
-        );
-        cy.get('.box').should('have.length', 2);
-        cy.get('#opx-dist-normalized').click().should('have.attr', 'aria-checked', 'false');
-        cy.get('.y-axis-label').should('have.text', 'Throughput (TFLOPS)');
-      });
-  });
 }
 
 for (const prefix of ['', '/zh']) {
@@ -291,11 +271,11 @@ describe('OperatorX progressive rendering', { testIsolation: true }, () => {
       cy.get('[data-testid="operatorx-viz-metric-vs-size"] svg').should('exist');
       cy.get(lower).scrollIntoView();
       cy.get(lower).should('have.attr', 'aria-busy', 'false').find('svg').should('exist');
-      cy.get('[data-testid="operatorx-viz-distribution"]').scrollIntoView();
-      cy.get('#opx-dist-common').click().should('have.attr', 'aria-checked', 'false');
+      cy.get('[data-testid="operatorx-viz-throughput-summary"]').scrollIntoView();
+      cy.get('#opx-summary-normalized').click().should('have.attr', 'aria-checked', 'false');
       cy.scrollTo('top');
-      cy.get('[data-testid="operatorx-viz-distribution"]').scrollIntoView();
-      cy.get('#opx-dist-common').should('have.attr', 'aria-checked', 'false');
+      cy.get('[data-testid="operatorx-viz-throughput-summary"]').scrollIntoView();
+      cy.get('#opx-summary-normalized').should('have.attr', 'aria-checked', 'false');
     });
 
     for (const intent of ['focus', 'hover']) {

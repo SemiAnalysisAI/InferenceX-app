@@ -271,7 +271,7 @@ supported precision (null when none); `rooflineNormalized` is true. Missing/erro
 unsupported rows do not qualify the preferred slice. Explicit UI selections override
 these initial defaults; hardware visibility and measured values are unchanged.
 
-The roofline's median/best bars have a page-owned read projection: add any of
+The full-width Median and best throughput panel replaces Distribution per GPU; Metric vs size is last. The median/best bars have their own precision and Normalized controls and a page-owned read projection: add any of
 `rooflinePrecision=bf16|fp8|fp4`, `rooflineHardware=<comma-separated keys>`, or
 `rooflineNormalized=true|false` to `/api/v1/operatorx/compare?op=gemm`. The optional
 `rooflineSummary` follows those controls (defaults: workload precision, all hardware,
@@ -287,7 +287,7 @@ them with independently selected shapes per GPU. Without the selectors the base
 response is unchanged. Invalid precision, boolean or hardware selectors return 400.
 Hover/click, legend display and responsive placement do not change the data contract.
 
-Distribution per GPU uses the page-owned comparison API's optional
+The former Distribution per GPU panel’s backward-compatible projection uses the page-owned comparison API's optional
 `distributionMetric` (`latency`, `tflops`, `bandwidth`, `computeUtil`, or
 `bandwidthUtil`), `distributionNormalized` (`true`/`false`),
 `distributionMatchedOnly` (`true`/`false`), and `distributionHardware` (comma-separated

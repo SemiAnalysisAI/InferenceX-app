@@ -127,7 +127,7 @@ normalization costs and must not be reported as an end-to-end production speedup
 
 ## Median and best throughput bars
 
-The roofline's companion horizontal bars show median throughput as a fill and the
+The full-width Median and best throughput panel replaces Distribution per GPU. Metric vs size is the last chart. Its horizontal bars show median throughput as a fill and the
 best measured throughput as an outline, sorted by the displayed median. They follow
 the selected workload, hardware, precision and Normalized switch. Normalized bars
 show a fraction of each accelerator's peak; absolute bars show TFLOPS.
@@ -155,7 +155,7 @@ the explicit TFLOPS fields always remain absolute. Case indices refer to the enc
 comparison's cases and source measurement arrays. Invalid selectors return 400.
 Without these parameters the existing comparison response is unchanged.
 
-中文：roofline 图旁的横向柱状图以填充表示吞吐量中位数，以轮廓表示实测最佳值，按当前显示的
+中文：独立全宽面板中的横向柱状图以填充表示吞吐量中位数，以轮廓表示实测最佳值，按当前显示的
 中位数排序。柱状图跟随所选工作负载、硬件、精度和归一化开关：开启时显示峰值算力占比，
 关闭时显示 TFLOPS。所有柱使用同一组用例：在所选精度下，每个所选加速器都有成功且为正的
 有限实测值，且用例的算术强度不低于每个所选加速器的 roofline 拐点（峰值 TFLOPS / 带宽 TB/s）。
