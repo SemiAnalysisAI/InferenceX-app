@@ -2389,6 +2389,20 @@
       ]
     },
     {
+      "spec": "cypress/component/landing-banner-ab.cy.tsx",
+      "duration": 293,
+      "tests": [
+        {
+          "title": [
+            "Landing banner A/B arms",
+            "hands each arm its own definition on click and dismiss"
+          ],
+          "duration": 291,
+          "attempts": 1
+        }
+      ]
+    },
+    {
       "spec": "cypress/component/measured-metric-controls.cy.tsx",
       "duration": 4000
     },
@@ -3822,6 +3836,17 @@
           "attempts": 1
         }
       ]
+    }
+  ],
+  "supplementalProvenance": [
+    {
+      "spec": "cypress/component/landing-banner-ab.cy.tsx",
+      "revision": "435e4c212421d44d07e204b0ff1e2705b44575c6",
+      "browser": "electron",
+      "kind": "component",
+      "sourceHash": "f9462906bf9940269c449ce4cae67512540137dc2d357558e7879c745a83a4a9",
+      "source": "Local Cypress component run; 1 test passed",
+      "durationMs": 293
     }
   ]
 }
