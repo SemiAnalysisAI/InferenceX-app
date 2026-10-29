@@ -285,7 +285,7 @@ export default function ModelArchitectureDiagram({
   const handleToggle = () => {
     const newState = !isExpanded;
     setIsExpanded(newState);
-    track('model_architecture_toggled', { model, expanded: newState });
+    track('model_architecture_toggled', { model, enabled: newState });
   };
 
   return (

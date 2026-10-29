@@ -14,7 +14,11 @@ import {
 
 import { DISPLAY_MODEL_TO_DB, rowToSequence } from '@semianalysisai/inferencex-constants';
 import type { BenchmarkRow } from '@/lib/api/api';
-import { track } from '@/lib/analytics/analytics';
+import { track, trackOncePerPageview } from '@/lib/analytics/analytics';
+import {
+  type SelectionAnalyticsContext,
+  selectionAnalyticsContext,
+} from '@/lib/analytics/selection-context';
 import { EngineComparisonConfirmation } from '@/components/inference/ui/engine-comparison-confirmation';
 import {
   needsEngineComparisonConsent,
@@ -50,7 +54,6 @@ import {
   resolveMetricConfigKey,
   tokenBasisForMetric,
 } from '@/components/inference/metric-registry';
-import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -78,10 +81,15 @@ import {
 } from '@/components/inference/perf-ruler-store';
 import { useParetoHighlightToggle } from './hooks/useParetoHighlightToggle';
 import { useOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
-import { defaultYAxisMetric } from '@/lib/routing/url-state';
+import { DEFAULT_Y_AXIS_METRIC } from '@/lib/routing/url-state';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import { buildAvailabilityHwKey } from '@/lib/charts/chart-utils';
-import { getHardwareConfig, getModelSortIndex, isKnownGpu } from '@/lib/catalog/constants';
+import {
+  getHardwareConfig,
+  getModelSortIndex,
+  hardwareKeyMatchesBase,
+  isKnownGpu,
+} from '@/lib/catalog/constants';
 import { frameworkFamily } from '@/lib/catalog/framework-family';
 import {
   getOpenRouterModelId,
@@ -114,6 +122,7 @@ import {
 } from './hooks/useChartData';
 import { buildActiveComparisonIds, resolveComparisonEntries } from './utils/comparisonEntry';
 import {
+  blockedComparisonToggles,
   comparisonDefaultGroup,
   comparisonExclusionPolicy,
   comparisonExclusion as resolveComparisonExclusion,
@@ -121,7 +130,10 @@ import {
 } from './utils/comparison-exclusion';
 import { resolveLabelState, serializeLabelState } from './utils/label-defaults';
 import { defaultInferenceHardware, defaultInferenceXAxisMode } from './utils/model-defaults';
+import { powerXViewFor } from './powerx/powerx-views';
+import { usePowerXSurface } from './ui/powerx-surface';
 import { bestSeriesPerSku, withUnrankedSkus } from './utils/best-series-per-sku';
+import { resolveBenchmarkSeed } from './utils/benchmark-seed';
 import {
   EMPTY_QUICK_FILTERS,
   parseDeploymentModes,
@@ -238,6 +250,7 @@ export function InferenceProvider({
   benchmarkQueryScope,
   initialBenchmarkModel,
   initialBenchmarkRows,
+  initialBenchmarkSequence,
   initialYAxisMetric,
   autoSelectAllGpus = false,
   lockedFrameworks,
@@ -251,6 +264,8 @@ export function InferenceProvider({
   benchmarkQueryScope?: string;
   initialBenchmarkModel?: string;
   initialBenchmarkRows?: BenchmarkRow[];
+  /** Sequence the seed rows cover; omit when they cover every sequence. */
+  initialBenchmarkSequence?: string;
   initialYAxisMetric?: string;
   autoSelectAllGpus?: boolean;
   lockedFrameworks?: readonly string[];
@@ -410,11 +425,7 @@ export function InferenceProvider({
     }
   }, [selectedGpuResolution]);
   const [selectedYAxisMetric, setSelectedYAxisMetric] = useState<string>(() =>
-    resolveMetricConfigKey(
-      getUrlParam('i_metric'),
-      initialYAxisMetric ??
-        defaultYAxisMetric(parsePowerTiers(splitUrlList(getUrlParam('i_power')))),
-    ),
+    resolveMetricConfigKey(getUrlParam('i_metric'), initialYAxisMetric ?? DEFAULT_Y_AXIS_METRIC),
   );
   const [tokenRevenuePriceSource, setTokenRevenuePriceSource] = useState<TokenRevenuePriceSource>(
     () => (getUrlParam('i_revenue') === 'openrouter' ? 'openrouter' : 'normalized'),
@@ -675,6 +686,14 @@ export function InferenceProvider({
     effectiveSelectedRunId && contestedRunIds.has(String(effectiveSelectedRunId))
       ? String(effectiveSelectedRunId)
       : undefined;
+  const { rows: seedRows, scope: chartQueryScope } = resolveBenchmarkSeed({
+    scope: benchmarkQueryScope,
+    seedRows: initialBenchmarkRows,
+    seedModel: initialBenchmarkModel,
+    seedSequence: initialBenchmarkSequence,
+    selectedModel,
+    selectedSequence: effectiveSequence,
+  });
 
   const {
     graphs,
@@ -708,8 +727,8 @@ export function InferenceProvider({
     asOfRunId,
     dataQuickFilters,
     overviewHistoryPair,
-    benchmarkQueryScope,
-    selectedModel === initialBenchmarkModel ? initialBenchmarkRows : undefined,
+    chartQueryScope,
+    seedRows,
     tcoBasis,
     activeTab === 'inference' &&
       !autoSelectAllGpus &&
@@ -719,6 +738,7 @@ export function InferenceProvider({
     powerCompare,
     fixedSequenceStatistic,
     tokenBasisForMetric(selectedYAxisMetric, tokenBasis),
+    isActive && !sequenceResolved && !effectiveRunDate && !seedRows,
   );
 
   const dbModelKeys = useMemo<string[]>(
@@ -894,19 +914,6 @@ export function InferenceProvider({
       clearPresetOnChange();
     },
     [setSelectedYAxisMetric, clearPresetOnChange],
-  );
-  const setQuickFilterPowerAndMetric = useCallback(
-    (tiers: PowerTier[]) => {
-      setQuickFilterPower(tiers);
-      if (
-        quickFilterPower.length === 0 &&
-        tiers.length > 0 &&
-        !getMeasuredMetricConfig(selectedYAxisMetric)
-      ) {
-        setSelectedYAxisMetricAndClear(defaultYAxisMetric(tiers));
-      }
-    },
-    [quickFilterPower, selectedYAxisMetric, setSelectedYAxisMetricAndClear],
   );
   const setSelectedGPUsAndClear = useCallback(
     (next: string[]) => {
@@ -1151,6 +1158,16 @@ export function InferenceProvider({
     () => new Set(hwFilteredPoints.map(extractHwKey)),
     [hwFilteredPoints, extractHwKey],
   );
+  const blockedHwToggles = useMemo(
+    () =>
+      blockedComparisonToggles(
+        activeHwTypes,
+        selectableHwTypes,
+        comparisonExclusion,
+        consentSupported,
+      ),
+    [activeHwTypes, selectableHwTypes, comparisonExclusion, consentSupported],
+  );
 
   const bestHwTypes = useMemo(() => {
     const wantedType = selectedXAxisMode === 'interactivity' ? 'interactivity' : 'e2e';
@@ -1323,6 +1340,19 @@ export function InferenceProvider({
   }`;
   const lastHwResetKeyRef = useRef('');
   const lastHwResetModelRef = useRef(selectedModel);
+  // PowerX Energy per token opens without H200: its joules per token flatten every other chip.
+  const powerXSurface = usePowerXSurface();
+  const hideH200 = powerXSurface && powerXViewFor(selectedYAxisMetric, powerCompare) === 'energy';
+  const lastHideH200Ref = useRef(hideH200);
+  const automaticHardware = useCallback(
+    (hardware: Set<string>) => {
+      const defaults = defaultInferenceHardware(selectedModel, hardware);
+      if (!hideH200) return defaults;
+      const shown = new Set([...defaults].filter((key) => !hardwareKeyMatchesBase(key, 'h200')));
+      return shown.size > 0 ? shown : defaults;
+    },
+    [selectedModel, hideH200],
+  );
 
   useEffect(() => {
     if (!pendingActiveHwTypes) return;
@@ -1370,7 +1400,10 @@ export function InferenceProvider({
     const scopeChanged = lastHwResetKeyRef.current !== hwResetKey;
     const modelChanged = lastHwResetModelRef.current !== selectedModel;
     const presetFilter = presetHwFilterRef.current;
-    if (!scopeChanged && !bestPerSku && !presetFilter) return;
+    // Re-apply the default when the H200 rule flips, unless the reader picked hardware.
+    const hideH200Changed = !hardwareDefaultsOverridden && lastHideH200Ref.current !== hideH200;
+    if (!scopeChanged && !bestPerSku && !presetFilter && !hideH200Changed) return;
+    lastHideH200Ref.current = hideH200;
     lastHwResetKeyRef.current = hwResetKey;
     lastHwResetModelRef.current = selectedModel;
     const previousSelection = modelChanged ? new Set<string>() : undefined;
@@ -1387,7 +1420,7 @@ export function InferenceProvider({
     const candidates = bestPerSku ? bestHwTypes : selectableHwTypes;
     const automaticSelection =
       activeTab === 'inference' && !hardwareDefaultsOverridden
-        ? defaultInferenceHardware(selectedModel, candidates)
+        ? automaticHardware(candidates)
         : candidates;
     if (exclusion) {
       const { result, droppedGroups } = resolveHwSelection(automaticSelection, previousSelection);
@@ -1414,6 +1447,7 @@ export function InferenceProvider({
     resolveHwSelection,
     activeTab,
     hardwareDefaultsOverridden,
+    automaticHardware,
   ]);
 
   useEffect(() => {
@@ -1470,7 +1504,7 @@ export function InferenceProvider({
         model: selectedModel,
         sequence: effectiveSequence,
         preset_id: activePresetId,
-        yAxisMetric: selectedYAxisMetric,
+        metric: selectedYAxisMetric,
       });
     }, 3000);
     return () => clearTimeout(timer);
@@ -1491,15 +1525,15 @@ export function InferenceProvider({
         gpus: [...new Set(pairs.map((p) => p.split('_').slice(1).join('_')))].toSorted(),
         model: selectedModel,
         sequence: effectiveSequence,
-        yAxisMetric: selectedYAxisMetric,
+        metric: selectedYAxisMetric,
       });
     }, 3000);
     return () => clearTimeout(timer);
   }, [activeDates]);
 
   useEffect(() => {
-    track('inference_chart_view', {
-      yAxisMetric: selectedYAxisMetric,
+    trackOncePerPageview('inference_chart_view', {
+      metric: selectedYAxisMetric,
       source: getUrlParam('i_metric') ? 'url' : 'default',
     });
   }, []);
@@ -1508,7 +1542,7 @@ export function InferenceProvider({
     if (activeHwTypes.size === 0) return '';
     const defaultSelection = (items: Set<string>) =>
       activeTab === 'inference' && !initialActiveHwTypes?.length && !autoSelectAllGpus
-        ? defaultInferenceHardware(selectedModel, items)
+        ? automaticHardware(items)
         : items;
     const defaultBest = defaultSelection(bestHwTypes);
     const defaultAll = defaultSelection(selectableHwTypes);
@@ -1539,21 +1573,31 @@ export function InferenceProvider({
     bestHwTypes,
     bestPerSku,
     activeTab,
-    selectedModel,
+    automaticHardware,
     initialActiveHwTypes,
     autoSelectAllGpus,
   ]);
 
-  const serializedLabelState = serializeLabelState(labelScenarioKind, {
-    showPointLabels,
-    useAdvancedLabels,
-    showLineLabels,
-  });
+  // Label defaults depend on the scenario kind, so until the sequence resolves the URL's label
+  // overrides pass through unchanged. Serializing against the provisional kind would drop an
+  // override that matches its defaults (e.g. `i_label=0` while the kind still reads fixed-seq)
+  // before the effect above applies it to the resolved agentic scenario.
+  const serializedLabelState = sequenceResolved
+    ? serializeLabelState(labelScenarioKind, {
+        showPointLabels,
+        useAdvancedLabels,
+        showLineLabels,
+      })
+    : {
+        i_label: getUrlParam('i_label') ?? '',
+        i_advlabel: getUrlParam('i_advlabel') ?? '',
+        i_linelabel: getUrlParam('i_linelabel') ?? '',
+      };
 
   useUrlStateSync(
     {
       i_metric:
-        selectedYAxisMetric === (initialYAxisMetric ?? defaultYAxisMetric(quickFilterPower))
+        selectedYAxisMetric === (initialYAxisMetric ?? DEFAULT_Y_AXIS_METRIC)
           ? ''
           : selectedYAxisMetric,
       i_revenue: usesTokenSalePricing(selectedYAxisMetric) ? tokenRevenuePriceSource : 'normalized',
@@ -1660,7 +1704,7 @@ export function InferenceProvider({
       const version = ++presetVersionRef.current;
       const { config } = preset;
       presetGuardRef.current = true;
-      setSelectedModel(config.model);
+      setSelectedModel(config.model, { userSelection: false });
       setSelectedSequence(config.sequence);
       setSelectedPrecisions(config.precisions);
       setSelectedYAxisMetric(config.yAxisMetric);
@@ -1774,6 +1818,7 @@ export function InferenceProvider({
     () => ({
       activeHwTypes,
       bestPerSku,
+      blockedHwToggles,
       selectedModel,
       selectedSequence: effectiveSequence,
       selectedPrecisions: effectivePrecisions,
@@ -1795,6 +1840,7 @@ export function InferenceProvider({
     [
       activeHwTypes,
       bestPerSku,
+      blockedHwToggles,
       selectedModel,
       effectiveSequence,
       effectivePrecisions,
@@ -1898,7 +1944,7 @@ export function InferenceProvider({
     setQuickFilterFrameworks,
     setQuickFilterDeployment,
     setQuickFilterSpec,
-    setQuickFilterPower: setQuickFilterPowerAndMetric,
+    setQuickFilterPower,
     setQuickFilterTopologies,
     setIsLegendExpanded,
     setHideNonOptimal,
@@ -2001,4 +2047,19 @@ export function useInferenceDisplay() {
 
 export function useInferenceActions() {
   return useRequiredInferenceContext(useContext(InferenceActionsContext), 'useInferenceActions');
+}
+
+/**
+ * The selected model, sequence and precision, to spread into inference analytics events. Returns an
+ * empty object outside an InferenceProvider, so shared components can call it anywhere.
+ */
+export function useInferenceAnalyticsContext(): SelectionAnalyticsContext {
+  const filters = useContext(InferenceFiltersContext);
+  const model = filters?.selectedModel;
+  const sequence = filters?.selectedSequence;
+  const precisions = filters?.selectedPrecisions;
+  return useMemo(
+    () => selectionAnalyticsContext({ model, sequence, precisions }),
+    [model, sequence, precisions],
+  );
 }

@@ -1,13 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import {
-  AUTHOR_HANDLE,
-  AUTHOR_NAME,
-  SITE_NAME,
-  SITE_URL,
-  SUPPORTERS_LINE,
-} from '@semianalysisai/inferencex-constants';
+import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { fmtCostPerMtok, fmtThroughput } from '@/components/live-seo/format';
 import {
@@ -16,6 +10,8 @@ import {
 } from '@/components/live-seo/rankings-page-sections';
 import { JsonLd } from '@/components/seo/json-ld';
 import { enAlternates } from '@/lib/i18n/i18n';
+import { clampMetaDescription } from '@/lib/seo/meta-text';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 import {
   getRankingPageEntry,
   rankingPageDescription,
@@ -27,7 +23,11 @@ import {
 } from '@/lib/live-seo/rankings';
 import { getRankingPageData, type RankingPageData } from '@/lib/live-seo/run-rankings-data.server';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
+
+export function generateStaticParams(): { slug: string }[] {
+  return [];
+}
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -51,7 +51,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!entry) return {};
   const data = await getRankingPageData(entry.slug);
   const title = rankingPageTitle(entry);
-  const description = `${data ? statLedDescription(entry, data) : rankingPageDescription(entry)} ${SUPPORTERS_LINE}`;
+  const description = clampMetaDescription(
+    data ? statLedDescription(entry, data) : rankingPageDescription(entry),
+    'en',
+  );
   const url = `${SITE_URL}/rankings/${entry.slug}`;
   return {
     title,
@@ -59,13 +62,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     keywords: rankingPageKeywords(entry),
     authors: [{ name: AUTHOR_NAME }],
     alternates: enAlternates(`/rankings/${entry.slug}`),
-    openGraph: { title: `${title} | ${SITE_NAME}`, description, url, type: 'article' },
-    twitter: {
-      card: 'summary_large_image',
+    ...socialMetadata({
       title: `${title} | ${SITE_NAME}`,
       description,
-      creator: AUTHOR_HANDLE,
-    },
+      url,
+      locale: 'en',
+      type: 'article',
+    }),
   };
 }
 

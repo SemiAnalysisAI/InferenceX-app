@@ -177,6 +177,8 @@ export const VIEW_QUERY_PARAMS = {
     'serviceTarget',
     'roleShare',
     'powerFit',
+    'powerBreakdown',
+    'headroom',
   ],
   'model-architectures': ['model'],
   operatorx: ['format', 'hardware', 'model', 'op', 'page', 'parallel', 'status', 'workload'],
@@ -278,6 +280,7 @@ export const DASHBOARD_API_COVERAGE = {
     exclusion:
       'Feature-gated Agentic Workload Explorer reads a frozen, anonymized ProxyTrace snapshot from a separate database through page-owned /api/v1/agentic-workload-explorer/* routes whose shapes follow the pages; no stable public read-only view is published.',
   },
+  powerx: { view: 'inference' },
   operatorx: { view: 'operatorx' },
   collectivex: { view: 'collectivex' },
   'current-inferencex-image': { view: 'current-inferencex-image' },

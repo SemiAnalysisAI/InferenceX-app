@@ -172,6 +172,13 @@ describe('CollectiveX artifact assembly', () => {
     expect(series.points).toHaveLength(10);
   });
 
+  it('carries the recorded backend version, and null where a result has none', () => {
+    expect(
+      makeCollectiveXSeries({ libraryVersion: ' 2.1.0+local@01dc3aaac820 ' }).library_version,
+    ).toBe('2.1.0+local@01dc3aaac820');
+    expect(makeCollectiveXSeries().library_version).toBeNull();
+  });
+
   it('displays only AMD and NVIDIA vendor cases', () => {
     const dataset = buildDataset({
       shards: [
@@ -238,13 +245,36 @@ describe('CollectiveX artifact assembly', () => {
     ).toBeNull();
   });
 
-  it('rejects malformed and cross-version artifacts', () => {
+  it('keeps a withheld tail null through the derived rates', () => {
+    const shard = makeRawShard({ rows: [{}] });
+    const row = (shard.measurement as { rows: Record<string, any>[] }).rows[0];
+    row.components.dispatch.percentiles_us.p99 = null;
+    row.token_rate_at_latency_percentile.p99 = null;
+    const point = buildDatasetFromNeutral(
+      makeRawMatrix([requestedOf(shard)]),
+      [shard],
+      makeRunMeta(),
+    ).series[0].points[0];
+    const dispatch = point.components.dispatch;
+    expect(dispatch?.latency_us.p99).toBeNull();
+    expect(dispatch?.activation_data_rate_gbps_at_latency_percentile?.p99).toBeNull();
+    expect(dispatch?.payload_data_rate_gbps_at_latency_percentile?.p99).toBeNull();
+    expect(dispatch?.payload_data_rate_gbps_at_latency_percentile?.p50).toBeCloseTo(
+      (400000000 / 8 / 417) * 1e-3,
+      3,
+    );
+    expect(point.roundtrip_token_rate_at_latency_percentile.p99).toBeNull();
+  });
+
+  it('rejects malformed and cross-version artifacts, naming the mismatched case', () => {
     expect(() => buildDatasetFromNeutral({}, [], makeRunMeta())).toThrow(/matrix/);
     const shard = makeRawShard();
     shard.version = 2;
     expect(() =>
       buildDatasetFromNeutral(makeRawMatrix([requestedOf(shard)]), [shard], makeRunMeta()),
-    ).toThrow(/version/);
+    ).toThrow(
+      'CollectiveX version mismatch: h200-dgxc-deepep-v2-deepseek-v3-normal-decode-ep8-uniform-bf16 has version 2, cases.json has 1',
+    );
   });
 });
 

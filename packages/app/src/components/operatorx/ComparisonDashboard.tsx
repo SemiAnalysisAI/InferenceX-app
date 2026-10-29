@@ -4,24 +4,30 @@ import { Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from 'next-themes';
 import { isDarkTheme } from '@/lib/themes/themes';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { ComparisonOp } from '@semianalysisai/inferencex-db/operatorx/compare';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
 import { Heading } from '@/components/ui/heading';
 import { Label } from '@/components/ui/label';
-import { MultiSelect } from '@/components/ui/multi-select';
 import { Pending } from '@/components/ui/pending';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { prefetchOperatorXTimelines, useOperatorXComparison } from '@/hooks/api/use-operatorx';
 import { useClientSearch } from '@/hooks/useClientSearch';
+import { track } from '@/lib/analytics/analytics';
+import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
 import { replaceClientSearch } from '@/lib/routing/client-navigation';
 
 import { CaseDetail } from './CaseDetail';
 import { CoverageStrip } from './CoverageStrip';
-import { hardwareLabel, operatorXColors, sortHardware } from './compare/hardware';
+import {
+  hardwareLabel,
+  operatorXColors,
+  sortHardware,
+  toggleHardwareSelection,
+} from './compare/hardware';
 import { METRICS, metricById } from './compare/metrics';
 import { buildModel, caseRefs, type ComparisonModel } from './compare/model';
 import { VISUALIZATIONS } from './viz';
@@ -76,60 +82,62 @@ function ControlGroup({
   );
 }
 
-function VizCard({
-  model,
-  viz,
-  wide,
-  eager,
-}: {
-  model: ComparisonModel;
-  viz: VizDefinition;
-  wide: boolean;
-  eager: boolean;
-}) {
-  const [mounted, setMounted] = useState(eager);
-  const card = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (mounted) return;
-    if (eager || typeof IntersectionObserver === 'undefined') {
-      setMounted(true);
-      return;
-    }
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          setMounted(true);
-        }
-      },
-      { rootMargin: '300px' },
+const VizCard = memo(
+  ({
+    model,
+    viz,
+    wide,
+    eager,
+  }: {
+    model: ComparisonModel;
+    viz: VizDefinition;
+    wide: boolean;
+    eager: boolean;
+  }) => {
+    const [mounted, setMounted] = useState(eager);
+    const card = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+      if (mounted) return;
+      if (eager || typeof IntersectionObserver === 'undefined') {
+        setMounted(true);
+        return;
+      }
+      const observer = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((entry) => entry.isIntersecting)) {
+            setMounted(true);
+          }
+        },
+        { rootMargin: '300px' },
+      );
+      if (card.current) observer.observe(card.current);
+      return () => observer.disconnect();
+    }, [eager, mounted]);
+    return (
+      <Card
+        ref={card}
+        data-testid={`operatorx-viz-${viz.id}`}
+        aria-busy={!mounted}
+        aria-labelledby={`operatorx-title-${viz.id}`}
+        tabIndex={mounted ? undefined : 0}
+        onFocus={() => setMounted(true)}
+        className={`min-w-0 ${wide ? 'lg:col-span-2' : ''}`}
+      >
+        <Heading id={`operatorx-title-${viz.id}`} as="h2" level="card" className="mb-4">
+          {viz.title}
+        </Heading>
+        {mounted ? (
+          <viz.Component model={model} />
+        ) : (
+          <Skeleton
+            aria-hidden="true"
+            className={viz.id === 'roofline' ? 'h-[460px]' : 'h-[420px]'}
+          />
+        )}
+      </Card>
     );
-    if (card.current) observer.observe(card.current);
-    return () => observer.disconnect();
-  }, [eager, mounted]);
-  return (
-    <Card
-      ref={card}
-      data-testid={`operatorx-viz-${viz.id}`}
-      aria-busy={!mounted}
-      aria-labelledby={`operatorx-title-${viz.id}`}
-      tabIndex={mounted ? undefined : 0}
-      onFocus={() => setMounted(true)}
-      className={`min-w-0 ${wide ? 'lg:col-span-2' : ''}`}
-    >
-      <Heading id={`operatorx-title-${viz.id}`} as="h2" level="card" className="mb-4">
-        {viz.title}
-      </Heading>
-      {mounted ? (
-        <viz.Component model={model} />
-      ) : (
-        <Skeleton
-          aria-hidden="true"
-          className={viz.id === 'roofline' ? 'h-[460px]' : 'h-[420px]'}
-        />
-      )}
-    </Card>
-  );
-}
+  },
+);
 
 export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
   const search = new URLSearchParams(useClientSearch());
@@ -146,6 +154,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
   const [pickedBaseline, setBaseline] = useState<string | null>(null);
   const [inspected, setInspected] = useState<number | null>(null);
   const queryClient = useQueryClient();
+  useDialogCloseTracking(inspected !== null, 'operatorx_case_closed', { op });
 
   // GPUs with results at the selected device split
   const available = useMemo(() => sortHardware(view?.hardware.map((h) => h.id) ?? []), [view]);
@@ -158,11 +167,17 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
     [picked, available],
   );
   const baseline = pickedBaseline && hardware.includes(pickedBaseline) ? pickedBaseline : null;
+  // Charts, legend, GPU control and case detail all read this same live state.
   const model = useMemo(() => {
     if (!view) return null;
     const toggle = (hw: string) => {
-      const next = hardware.includes(hw) ? hardware.filter((h) => h !== hw) : [...hardware, hw];
-      if (next.length > 0) setPicked(next);
+      track('operatorx_gpu_toggled', { op, gpu: hw, placement: 'chart' });
+      const next = toggleHardwareSelection(hardware, hw);
+      if (next !== hardware) setPicked(next);
+    };
+    const inspect = (index: number) => {
+      track('operatorx_case_opened', { op, metric: metric.id });
+      setInspected(index);
     };
     const preview = (i: number) =>
       prefetchOperatorXTimelines(
@@ -171,7 +186,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
         caseRefs(view, hardware, i).map((r) => r.ref),
       );
     return buildModel(view, metric, { hardware, available, toggle }, colors, baseline, {
-      inspect: setInspected,
+      inspect,
       preview,
     });
   }, [view, metric, hardware, available, colors, baseline, queryClient, op]);
@@ -187,7 +202,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
     );
   if (isLoading || !view || !model)
     return (
-      <Card data-testid="operatorx-loading" className="min-h-80 items-center justify-center">
+      <Card data-testid="operatorx-loading" className="min-h-svh items-center justify-center">
         <Loader2 className="size-6 animate-spin text-muted-foreground" />
         <p className="mt-3 text-sm text-muted-foreground">Loading results…</p>
       </Card>
@@ -205,12 +220,15 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
   return (
     <div className="flex flex-col gap-4">
       <Card className="relative z-10 py-4 md:py-5" data-testid="operatorx-controls">
-        <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
           <ControlGroup label="Workload" htmlFor="operatorx-workload">
             <SearchableSelect
               triggerId="operatorx-workload"
               value={pending?.id ?? view.workload ?? ''}
-              onValueChange={(v) => setParam('workload', v)}
+              onValueChange={(v) => {
+                track('operatorx_workload_selected', { op, workload: v });
+                setParam('workload', v);
+              }}
               groups={[
                 {
                   label: '',
@@ -226,7 +244,10 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
             <SearchableSelect
               triggerId="operatorx-parallel"
               value={view.parallel || ONE_DEVICE}
-              onValueChange={setParallel}
+              onValueChange={(v) => {
+                track('operatorx_parallel_selected', { op, parallel: v });
+                setParallel(v);
+              }}
               searchable={false}
               groups={[
                 {
@@ -243,7 +264,10 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
             <SearchableSelect
               triggerId="operatorx-metric"
               value={metric.id}
-              onValueChange={(v) => setParam('metric', v)}
+              onValueChange={(v) => {
+                track('operatorx_metric_selected', { op, metric: v });
+                setParam('metric', v);
+              }}
               searchable={false}
               groups={[
                 {
@@ -253,20 +277,15 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
               ]}
             />
           </ControlGroup>
-          <ControlGroup label="GPUs" htmlFor="operatorx-hardware">
-            <MultiSelect
-              triggerId="operatorx-hardware"
-              options={available.map((h) => ({ value: h, label: hardwareLabel(h) }))}
-              value={hardware}
-              onChange={setPicked}
-              minSelections={1}
-            />
-          </ControlGroup>
+
           <ControlGroup label="Baseline" htmlFor="operatorx-baseline">
             <SearchableSelect
               triggerId="operatorx-baseline"
               value={baseline ?? NO_BASELINE}
-              onValueChange={setBaseline}
+              onValueChange={(v) => {
+                track('operatorx_baseline_selected', { op, gpu: v });
+                setBaseline(v);
+              }}
               searchable={false}
               groups={[
                 {

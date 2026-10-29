@@ -131,3 +131,37 @@ describe('Compare Interpolated Table', () => {
     );
   });
 });
+
+describe('Compare table with a shared sequence', () => {
+  // The server renders this page's table for 8k/1k; the shared URL asks for 1k/1k.
+  const SHARED_URL = '/compare/deepseek-r1-b200-vs-h200/8k-1k?i_seq=1k%2F1k';
+  const SHARED_SEQUENCE_ROWS = {
+    method: 'GET',
+    pathname: '/api/v1/benchmarks',
+    query: { view: 'calculator', sequence: '1k/1k' },
+  };
+
+  beforeEach(() => {
+    cy.window().then((win) => {
+      win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+    });
+  });
+
+  it('drops the server cells when the shared sequence fails to load', () => {
+    cy.intercept(SHARED_SEQUENCE_ROWS, { statusCode: 500, body: { error: 'unavailable' } });
+    cy.visit(SHARED_URL);
+    cy.get('[data-testid="compare-table-status"]', { timeout: 15000 })
+      .should('have.attr', 'data-status', 'error')
+      .and('contain.text', 'failed to load');
+    cy.get('[data-testid="compare-interpolated-table"]').should('not.exist');
+  });
+
+  it('shows the empty state for a shared sequence without rows for the pair', () => {
+    cy.intercept(SHARED_SEQUENCE_ROWS, { body: [] });
+    cy.visit(SHARED_URL);
+    cy.get('[data-testid="compare-table-status"]', { timeout: 15000 })
+      .should('have.attr', 'data-status', 'empty')
+      .and('contain.text', 'selected workload');
+    cy.get('[data-testid="compare-interpolated-table"]').should('not.exist');
+  });
+});

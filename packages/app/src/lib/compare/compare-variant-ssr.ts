@@ -21,6 +21,12 @@ import {
   pickRotated,
   type SsrInterpolatedRow,
 } from '@/lib/compare/compare-ssr';
+import {
+  type CompareTableData,
+  compareTableDataFromPoints,
+  emptyCompareTableData,
+} from '@/lib/compare/compare-table-view';
+import { datasetJsonLd } from '@/lib/seo/dataset-jsonld';
 
 export type VariantCompareKind = 'precision' | 'spec-decode';
 
@@ -38,17 +44,6 @@ function buildSidePoints(
 ): GPUDataPoint[] {
   if (side.precision === null || side.precision === undefined) return [];
   return buildGpuDataPoints(rows, hw, isl, osl, side.precision, side.specMethod);
-}
-
-function interactivityRangeOf(pts: GPUDataPoint[]): { min: number; max: number } | null {
-  if (pts.length === 0) return null;
-  let min = Infinity;
-  let max = -Infinity;
-  for (const p of pts) {
-    if (p.interactivity < min) min = p.interactivity;
-    if (p.interactivity > max) max = p.interactivity;
-  }
-  return { min, max };
 }
 
 export function pickVariantPairDefaults(
@@ -134,67 +129,16 @@ export function computeVariantCompareTableData(
   sequence: string | null,
   sideA: VariantCompareSide,
   sideB: VariantCompareSide,
-): {
-  defaultTargets: number[];
-  ssrRows: SsrInterpolatedRow[];
-  interactivityRange: { min: number; max: number };
-} {
-  const empty = { defaultTargets: [], ssrRows: [], interactivityRange: { min: 0, max: 100 } };
-  if (!sequence) return empty;
+): CompareTableData {
+  if (!sequence) return emptyCompareTableData();
 
   const islOsl = sequenceToIslOsl(sequence);
-  if (!islOsl) return empty;
+  if (!islOsl) return emptyCompareTableData();
 
-  const pointsA = buildSidePoints(rows, hw, islOsl.isl, islOsl.osl, sideA);
-  const pointsB = buildSidePoints(rows, hw, islOsl.isl, islOsl.osl, sideB);
-
-  if (pointsA.length === 0 && pointsB.length === 0) return empty;
-
-  const rangeA = interactivityRangeOf(pointsA);
-  const rangeB = interactivityRangeOf(pointsB);
-
-  let globalMin: number, globalMax: number;
-  if (rangeA && rangeB) {
-    globalMin = Math.max(rangeA.min, rangeB.min);
-    globalMax = Math.min(rangeA.max, rangeB.max);
-    if (globalMin >= globalMax) {
-      globalMin = Math.min(rangeA.min, rangeB.min);
-      globalMax = Math.max(rangeA.max, rangeB.max);
-    }
-  } else {
-    const r = rangeA ?? rangeB!;
-    globalMin = r.min;
-    globalMax = r.max;
-  }
-
-  const interactivityRange = {
-    min: Math.ceil(globalMin),
-    max: Math.floor(globalMax),
-  };
-
-  const span = globalMax - globalMin;
-  const defaultTargets =
-    span > 0
-      ? [
-          Math.round(globalMin + span * 0.25),
-          Math.round(globalMin + span * 0.5),
-          Math.round(globalMin + span * 0.75),
-        ]
-      : [Math.round(globalMin)];
-
-  const ssrRows: SsrInterpolatedRow[] = defaultTargets.map((target) => ({
-    target,
-    a:
-      pointsA.length > 0
-        ? interpolateForGPU(pointsA, target, 'interactivity_to_throughput', 'costh')
-        : null,
-    b:
-      pointsB.length > 0
-        ? interpolateForGPU(pointsB, target, 'interactivity_to_throughput', 'costh')
-        : null,
-  }));
-
-  return { defaultTargets, ssrRows, interactivityRange };
+  return compareTableDataFromPoints(
+    buildSidePoints(rows, hw, islOsl.isl, islOsl.osl, sideA),
+    buildSidePoints(rows, hw, islOsl.isl, islOsl.osl, sideB),
+  );
 }
 
 export function computeVariantCompareImageRows(
@@ -538,15 +482,15 @@ export function buildVariantJsonLd(
           { name: `${bLabel} Concurrency`, value: String(Math.round(row.b.concurrency)) },
         );
       }
-      return {
-        '@type': 'Dataset',
+      return datasetJsonLd({
         name: `${model.label} ${kind === 'precision' ? 'precision' : 'spec-decode'} comparison at ${row.target} tok/s/user interactivity`,
+        description: `${aLabel} vs ${bLabel} on ${gpuDisplayLabel}: throughput, cost per million tokens, tok/s/MW and concurrency for ${model.label} at ${row.target} tok/s/user interactivity, measured by InferenceX CI.`,
         variableMeasured: metrics.map((m) => ({
           '@type': 'PropertyValue',
           name: m.name,
           value: m.value,
         })),
-      };
+      });
     });
 
   const keywords = [

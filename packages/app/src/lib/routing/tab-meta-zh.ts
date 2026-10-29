@@ -1,13 +1,14 @@
 import type { Metadata } from 'next';
 
-import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
-import { ZH_OG_LOCALE, zhAlternates, zhPath } from '@/lib/i18n/i18n';
+import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
+import { zhAlternates, zhPath } from '@/lib/i18n/i18n';
 import type { ModelRoute, ModelRouteTab } from '@/lib/routing/model-routes';
 import {
   getDashboardRoute,
   isDashboardRouteKey,
   type DashboardRouteKey,
 } from '@/lib/routing/dashboard-routes';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 export const LANDING_META_ZH = {
   title: 'AI 加速器系统基准测试',
@@ -18,6 +19,11 @@ export const LANDING_META_ZH = {
 export const isZhTab = isDashboardRouteKey;
 
 export const TAB_META_ZH: Record<DashboardRouteKey, { title: string; description: string }> = {
+  powerx: {
+    title: 'PowerX：实测 GPU 功耗与每 Token 能耗',
+    description:
+      '查看每个 InferenceX 基准测试点的实测 GPU 功耗、每 Token 能耗和功耗时间线，以及模型估算的服务器与数据中心开销。',
+  },
   inference: {
     title: '智能体推理基准测试',
     description:
@@ -111,6 +117,8 @@ export const TAB_META_ZH: Record<DashboardRouteKey, { title: string; description
 };
 
 export const TAB_INTRO_ZH: Record<DashboardRouteKey, string> = {
+  powerx:
+    '本页面展示 PowerX 功耗数据：每个基准测试点的实测 GPU 功耗、每 Token 能耗与运行期间的功耗时间线。GPU 功耗为实测值，服务器其他组件与数据中心 PUE 为模型估算。',
   inference:
     '本页面展示 InferenceX 的智能体推理与固定序列 AI 推理基准测试结果：跨芯片、推理框架与模型对比吞吐量（token/s/chip）、交互性（token/s/用户）、首 token 延迟（TTFT）等指标。智能体推理数据来自 AgentX；该场景对公开智能体编码轨迹衍生出的长上下文、多轮、含 subagent 工作负载进行回放。每个数据点都来自公开的 GitHub Actions 工作流，可复现、可审计。',
   evaluation:
@@ -152,6 +160,7 @@ export const TAB_INTRO_ZH: Record<DashboardRouteKey, string> = {
 };
 
 export const TAB_LABELS_ZH: Record<DashboardRouteKey, string> = {
+  powerx: 'PowerX 功耗',
   inference: '推理性能',
   evaluation: '准确率评估',
   historical: '历史趋势',
@@ -183,8 +192,6 @@ export const NAV_LABELS_ZH: Record<HeaderNavHref, string> = {
   '/agentx': 'AgentX',
   '/about': '关于',
 };
-
-const TITLE_SUFFIX = `${SITE_NAME} by ${AUTHOR_NAME}`;
 
 export const MODEL_TAB_META_ZH: Record<
   ModelRouteTab,
@@ -237,16 +244,7 @@ export function modelTabMetadataZh(
     title,
     description,
     alternates: zhAlternates(canonicalEnPath),
-    openGraph: {
-      title: `${title} | ${SITE_NAME}`,
-      description,
-      url,
-      locale: ZH_OG_LOCALE,
-    },
-    twitter: {
-      title: `${title} | ${TITLE_SUFFIX}`,
-      description,
-    },
+    ...socialMetadata({ title: `${title} | ${SITE_NAME}`, description, url, locale: 'zh' }),
   };
 }
 
@@ -258,15 +256,11 @@ export function tabMetadataZh(tab: DashboardRouteKey): Metadata {
     title: meta.title,
     description: meta.description,
     alternates: zhAlternates(enPath),
-    openGraph: {
+    ...socialMetadata({
       title: `${meta.title} | ${SITE_NAME}`,
       description: meta.description,
       url,
-      locale: ZH_OG_LOCALE,
-    },
-    twitter: {
-      title: `${meta.title} | ${TITLE_SUFFIX}`,
-      description: meta.description,
-    },
+      locale: 'zh',
+    }),
   };
 }

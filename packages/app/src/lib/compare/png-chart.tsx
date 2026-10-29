@@ -1,5 +1,6 @@
 import { ImageResponse } from 'next/og';
 
+import { cdnHeaders } from '@/lib/cache/api-cache';
 import type { SsrInterpolatedRow } from '@/lib/compare/compare-ssr';
 import { getCjkFonts } from '@/lib/seo/og-assets';
 
@@ -539,9 +540,7 @@ export async function renderComparePngChart({
     {
       ...SIZE,
       ...(fonts.length > 0 ? { fonts } : {}),
-      headers: {
-        'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
-      },
+      headers: cdnHeaders(),
     },
   );
 }

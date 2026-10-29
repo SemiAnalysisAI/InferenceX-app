@@ -10,6 +10,7 @@ import { Reveal } from '@/components/motion/reveal';
 import { NudgeEngine } from '@/components/nudges/nudge-engine';
 import { FAVORITE_PRESETS } from '@/components/favorites/favorite-presets';
 import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
+import { analyticsPlacement } from '@/lib/analytics/placement';
 import type { Locale } from '@/lib/i18n/i18n';
 
 const STRINGS = {
@@ -62,15 +63,13 @@ export function LandingPage({ locale = 'en' }: { locale?: Locale } = {}) {
       <LandingPageAnalytics />
       <NudgeEngine scope="landing" />
       <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-6 lg:gap-4">
-        <Reveal>
-          <AgentXCompareHero locale={locale} headingLevel="h2" surface="landing" />
-        </Reveal>
+        <div className="contents" {...analyticsPlacement('landing_hero')}>
+          <AgentXCompareHero locale={locale} headingLevel="h1" surface="landing" />
+        </div>
 
-        <Reveal delayMs={90}>
-          <IntroSection locale={locale} />
-        </Reveal>
+        <IntroSection locale={locale} />
 
-        <section className="flex flex-col gap-4 pb-8">
+        <section className="flex flex-col gap-4 pb-8" {...analyticsPlacement('landing_section')}>
           <Reveal>
             <Card>
               <div className="flex items-center gap-2 mb-3">

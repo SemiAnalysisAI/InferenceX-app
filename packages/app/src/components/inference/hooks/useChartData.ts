@@ -135,6 +135,7 @@ export function useChartData(
   powerCompare: PowerCompare = 'none',
   fixedSequenceStatistic: FixedSequenceStatistic = 'median',
   tokenBasis: TokenBasis = 'total',
+  prefetchLatestRows = false,
 ) {
   const queryDate = asOfRunId
     ? (selectedRunDate ?? '')
@@ -143,7 +144,7 @@ export function useChartData(
       : selectedRunDate;
 
   const {
-    data: baseRows,
+    data: queriedBaseRows,
     isLoading: baseLoading,
     isFetching: baseFetching,
     isPlaceholderData: basePlaceholder,
@@ -159,6 +160,24 @@ export function useChartData(
     benchmarkQueryScope,
     true,
   );
+  // Latest rows depend only on the model, so start them while availability resolves the sequence.
+  // The prefetch fills the key the disabled observer above reads, and a disabled observer still
+  // returns cached data. Until the sequence resolves those rows would be filtered by the
+  // provisional default sequence, so the chart keeps loading instead of painting them.
+  useQuery(
+    benchmarkQueryOptions(
+      selectedModel,
+      '',
+      prefetchLatestRows,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      benchmarkQueryScope,
+    ),
+  );
+  const baseRows = prefetchLatestRows ? undefined : queriedBaseRows;
   const {
     data: runRows,
     isLoading: runLoading,

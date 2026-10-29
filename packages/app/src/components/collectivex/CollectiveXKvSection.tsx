@@ -74,7 +74,6 @@ const STRINGS = {
     bulkBaseline: 'Bulk Contiguous Baseline',
     summary: (cases: number, measured: number) => `${cases} cases · ${measured} measured · `,
     headers: {
-      run: 'Run',
       backend: 'Backend',
       fabric: 'Fabric',
       workload: 'Workload',
@@ -132,7 +131,6 @@ const STRINGS = {
     bulkBaseline: 'Bulk 连续传输基线',
     summary: (cases: number, measured: number) => `${cases} 个用例 · 已测 ${measured} 个 · `,
     headers: {
-      run: '运行',
       backend: '后端',
       fabric: '互联方式',
       workload: '工作负载',
@@ -279,7 +277,7 @@ export function CollectiveXKvSection({
           color: colors[collectiveXKvColorKey(kase)] ?? 'var(--muted-foreground)',
           lineDasharray: collectiveXRunDasharray(kase.run_index),
           isActive: activeIds.has(seriesId),
-          title: `#${kase.run_id} · ${kase.workload} · ${kase.topology.topology_class}`,
+          title: `${kase.workload} · ${kase.topology.topology_class}`,
           onClick: () => {
             const next = new Set(activeIds);
             if (next.has(seriesId)) next.delete(seriesId);
@@ -294,12 +292,6 @@ export function CollectiveXKvSection({
 
   const columns = useMemo<DataTableColumn<CollectiveXKvRunCase>[]>(
     () => [
-      {
-        header: strings.headers.run,
-        cell: (row) => <span className="font-mono text-xs">#{row.run_id}</span>,
-        sortValue: (row) => Number(row.run_id),
-        className: 'whitespace-nowrap',
-      },
       { header: 'SKU', cell: (row) => collectiveXSkuLabel(row.sku), sortValue: (row) => row.sku },
       {
         header: strings.headers.backend,
@@ -471,7 +463,10 @@ export function CollectiveXKvSection({
                 <Label className="text-xs text-muted-foreground">{strings.pageControl}</Label>
                 <SegmentedToggle
                   value={String(pageTokens)}
-                  onValueChange={setPageChoice}
+                  onValueChange={(value) => {
+                    track('collectivex_kv_page_tokens_changed', { page_tokens: Number(value) });
+                    setPageChoice(value);
+                  }}
                   ariaLabel={strings.pageAriaLabel}
                   testId="collectivex-kv-page-toggle"
                   options={pageValues.map((value) => ({
@@ -485,7 +480,10 @@ export function CollectiveXKvSection({
               <Label className="text-xs text-muted-foreground">{strings.opControl}</Label>
               <SegmentedToggle
                 value={op}
-                onValueChange={setOp}
+                onValueChange={(value) => {
+                  track('collectivex_kv_op_changed', { op: value });
+                  setOp(value);
+                }}
                 ariaLabel={strings.opAriaLabel}
                 testId="collectivex-kv-op-toggle"
                 options={[
@@ -577,7 +575,7 @@ export function CollectiveXKvSection({
                     isLegendExpanded={legendExpanded}
                     onExpandedChange={(expanded) => {
                       setLegendExpanded(expanded);
-                      track('collectivex_kv_legend_expanded', { expanded });
+                      track('collectivex_kv_legend_expanded', { enabled: expanded });
                     }}
                   />
                 }
@@ -609,7 +607,7 @@ export function CollectiveXKvSection({
                     isLegendExpanded={legendExpanded}
                     onExpandedChange={(expanded) => {
                       setLegendExpanded(expanded);
-                      track('collectivex_kv_legend_expanded', { expanded });
+                      track('collectivex_kv_legend_expanded', { enabled: expanded });
                     }}
                   />
                 }

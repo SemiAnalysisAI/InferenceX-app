@@ -6,14 +6,28 @@ const SEQUENCES = SEQUENCE_OPTIONS.map((s) => sequenceToIslOsl(s)).filter(
   (s): s is { isl: number; osl: number } => s !== null,
 );
 
-const rawUrl = process.argv.filter((a) => a !== '--').slice(2)[0] ?? 'http://localhost:3000';
+// `--dashboard` warms only what dashboards request on first load (after a
+// deploy or an ingest); the default also walks history and recent dates.
+const args = process.argv.slice(2).filter((a) => a !== '--');
+const dashboardOnly = args.includes('--dashboard');
+const rawUrl = args.find((a) => !a.startsWith('--')) ?? 'http://localhost:3000';
 const origin = new URL(rawUrl).origin;
 const bypassSecret = process.env.VERCEL_PROTECTION_BYPASS_SECRET;
-const headers = bypassSecret ? { 'x-vercel-protection-bypass': bypassSecret } : undefined;
+// The CDN caches one variant per Accept-Encoding, so warm the one browsers ask for.
+const headers: Record<string, string> = {
+  'Accept-Encoding': 'gzip, deflate, br, zstd',
+  ...(bypassSecret ? { 'x-vercel-protection-bypass': bypassSecret } : {}),
+};
 
 let total = 0;
 let ok = 0;
 let failed = 0;
+
+/** Build the URL exactly as `lib/api/api.ts` does, so it shares the browser's cache key. */
+function apiPath(path: string, params: Record<string, string> = {}): string {
+  const search = new URLSearchParams(params).toString();
+  return search ? `${path}?${search}` : path;
+}
 
 async function hit(path: string): Promise<void> {
   const url = `${origin}${path}`;
@@ -21,6 +35,8 @@ async function hit(path: string): Promise<void> {
   try {
     const start = performance.now();
     const res = await fetch(url, { headers });
+    // The CDN only stores a streamed response that was read to the end.
+    await res.arrayBuffer();
     const ms = Math.round(performance.now() - start);
     if (res.ok) {
       ok++;
@@ -35,79 +51,77 @@ async function hit(path: string): Promise<void> {
   }
 }
 
+async function hitBatched(paths: string[]): Promise<void> {
+  for (let i = 0; i < paths.length; i += 4) {
+    await Promise.all(paths.slice(i, i + 4).map((p) => hit(p)));
+  }
+}
+
+async function availableDates(): Promise<{ all: string[]; latestPerModel: string[] }> {
+  try {
+    // After an ingest the CDN may still hold the stale payload; ask it to revalidate first.
+    const res = await fetch(`${origin}/api/v1/availability`, {
+      headers: { ...headers, Pragma: 'no-cache', 'Cache-Control': 'no-cache' },
+    });
+    if (!res.ok) return { all: [], latestPerModel: [] };
+    const rows = (await res.json()) as { model: string; date: string }[];
+    const latest = new Map<string, string>();
+    for (const row of rows) {
+      if (row.date > (latest.get(row.model) ?? '')) latest.set(row.model, row.date);
+    }
+    return {
+      all: [...new Set(rows.map((r) => r.date))].toSorted().toReversed(),
+      latestPerModel: [...new Set(latest.values())].toSorted().toReversed(),
+    };
+  } catch {
+    return { all: [], latestPerModel: [] };
+  }
+}
+
 async function warmupCaches() {
   const start = performance.now();
-  console.log(`Warming up: ${origin}\n`);
+  console.log(`Warming up${dashboardOnly ? ' dashboards' : ''}: ${origin}\n`);
 
   console.log('Singleton endpoints:');
   await Promise.all([
     hit('/api/v1/availability'),
     hit('/api/v1/reliability'),
     hit('/api/v1/evaluations'),
+    hit('/api/v1/submissions'),
   ]);
 
   console.log('\nBenchmarks (latest) per model:');
-  for (const model of MODELS) {
-    await hit(`/api/v1/benchmarks?model=${encodeURIComponent(model)}`);
-  }
+  await hitBatched(MODELS.map((model) => apiPath('/api/v1/benchmarks', { model })));
 
-  console.log('\nBenchmark history per model × sequence:');
-  const historyPaths: string[] = [];
-  for (const model of MODELS) {
-    for (const seq of SEQUENCES) {
-      historyPaths.push(
-        `/api/v1/benchmarks/history?model=${encodeURIComponent(model)}&isl=${seq.isl}&osl=${seq.osl}`,
-      );
-    }
-  }
-  for (let i = 0; i < historyPaths.length; i += 4) {
-    await Promise.all(historyPaths.slice(i, i + 4).map((p) => hit(p)));
-  }
+  const dates = await availableDates();
+  // Dashboards ask for the latest run date of the selected model.
+  console.log('\nWorkflow info (latest date of each model):');
+  await hitBatched(dates.latestPerModel.map((date) => apiPath('/api/v1/workflow-info', { date })));
 
-  let availableDates: string[] = [];
-  try {
-    const res = await fetch(`${origin}/api/v1/availability`, { headers });
-    if (res.ok) {
-      const rows = (await res.json()) as { date: string }[];
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - 60);
-      const cutoffStr = cutoff.toISOString().split('T')[0];
-      availableDates = [...new Set(rows.map((r) => r.date))]
-        .filter((d) => d >= cutoffStr)
-        .toSorted()
-        .toReversed();
-    }
-  } catch {}
+  if (!dashboardOnly) {
+    console.log('\nBenchmark history per model × sequence:');
+    await hitBatched(
+      MODELS.flatMap((model) =>
+        SEQUENCES.map(({ isl, osl }) =>
+          apiPath('/api/v1/benchmarks/history', { model, isl: String(isl), osl: String(osl) }),
+        ),
+      ),
+    );
 
-  if (availableDates.length > 0) {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 60);
+    const cutoffStr = cutoff.toISOString().split('T')[0]!;
+    const recentDates = dates.all.filter((d) => d >= cutoffStr);
+
     console.log('\nBenchmarks per model × date (exact):');
-    const datePaths: string[] = [];
-    for (const model of MODELS) {
-      for (const date of availableDates) {
-        datePaths.push(
-          `/api/v1/benchmarks?model=${encodeURIComponent(model)}&date=${date}&exact=true`,
-        );
-      }
-    }
-    for (let i = 0; i < datePaths.length; i += 4) {
-      await Promise.all(datePaths.slice(i, i + 4).map((p) => hit(p)));
-    }
-  }
+    await hitBatched(
+      MODELS.flatMap((model) =>
+        recentDates.map((date) => apiPath('/api/v1/benchmarks', { model, date, exact: 'true' })),
+      ),
+    );
 
-  if (availableDates.length > 0) {
-    console.log(`\nWorkflow info (${availableDates.length} dates from availability):`);
-    for (const date of availableDates) {
-      await hit(`/api/v1/workflow-info?date=${date}`);
-    }
-  } else {
-    console.log('\nWorkflow info (fallback — last 3 dates):');
-    const today = new Date();
-    for (let i = 0; i < 3; i++) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
-      const date = d.toISOString().split('T')[0];
-      await hit(`/api/v1/workflow-info?date=${date}`);
-    }
+    console.log(`\nWorkflow info (${recentDates.length} dates from availability):`);
+    await hitBatched(recentDates.map((date) => apiPath('/api/v1/workflow-info', { date })));
   }
 
   const elapsed = ((performance.now() - start) / 1000).toFixed(1);

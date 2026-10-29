@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
   try {
     const { timelines, known } = await getTimelines(op as ComparisonOp, refs);
     return known
-      ? cachedJson(timelines, { tag: operatorXCacheTag() })
+      ? cachedJson(request, timelines, { tag: operatorXCacheTag() })
       : NextResponse.json(timelines, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     console.error('OperatorX timelines', error);

@@ -5,21 +5,20 @@ import { useEffect, useMemo } from 'react';
 
 import type { GPUDataPoint } from '@/components/calculator/types';
 import { useThroughputData } from '@/components/calculator/useThroughputData';
-import {
-  CompareTableRenderer,
-  type CompareTableData,
-} from '@/components/compare/compare-table-renderer';
+import { CompareTableRenderer } from '@/components/compare/compare-table-renderer';
 import {
   GlobalFilterProvider,
+  useGlobalFilterAvailability,
   useGlobalFilterRun,
   useGlobalFilterSelection,
 } from '@/providers/GlobalFilterContext';
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { Card } from '@/components/ui/card';
-import { track } from '@/lib/analytics/analytics';
+import { track, trackOncePerPageview } from '@/lib/analytics/analytics';
 import { toModel, toSequence } from '@/lib/compare/compare-enum-coerce';
 import type { AgenticScenarioIntro } from '@/lib/compare/compare-ssr';
+import type { CompareTableData } from '@/lib/compare/compare-table-view';
 
 const STRINGS = {
   en: {
@@ -84,13 +83,12 @@ export default function ComparePrecisionPageClient({
   locale = 'en',
 }: ComparePrecisionPageClientProps) {
   useEffect(() => {
-    track('compare_precision_page_view', {
+    trackOncePerPageview(
+      'compare_precision_page_view',
+      { slug, gpu, model: defaultModel, precisions: [precA, precB] },
       slug,
-      gpu,
-      prec_a: precA,
-      prec_b: precB,
-    });
-  }, [slug, gpu, precA, precB]);
+    );
+  }, [slug, gpu, defaultModel, precA, precB]);
 
   const initialModel = toModel(defaultModel);
   const initialSequence = toSequence(defaultSequence);
@@ -223,6 +221,9 @@ export default function ComparePrecisionPageClient({
               aLabel={aLabel}
               bLabel={bLabel}
               ssrTableData={ssrTableData}
+              ssrSequence={defaultSequence}
+              ssrModel={initialModel}
+              ssrPrecisions={initialPrecisions}
               emptyStateText={t.emptyState}
             />
           </Card>
@@ -240,6 +241,9 @@ function CompareTableSection({
   aLabel,
   bLabel,
   ssrTableData,
+  ssrSequence,
+  ssrModel,
+  ssrPrecisions,
   emptyStateText,
 }: {
   gpu: string;
@@ -248,12 +252,23 @@ function CompareTableSection({
   aLabel: string;
   bLabel: string;
   ssrTableData: CompareTableData;
+  ssrSequence: string | null;
+  ssrModel: ReturnType<typeof toModel>;
+  ssrPrecisions: string[];
   emptyStateText: string;
 }) {
-  const { effectiveSequence, effectivePrecisions, selectedModel } = useGlobalFilterSelection();
+  const {
+    selectedSequence,
+    effectiveSequence,
+    effectivePrecisions,
+    selectedModel,
+    selectedPrecisions,
+    sequenceResolved,
+  } = useGlobalFilterSelection();
   const { selectedRunDate } = useGlobalFilterRun();
+  const { availableDates } = useGlobalFilterAvailability();
 
-  const { gpuDataByGroupKey, ranges, hasData } = useThroughputData(
+  const { gpuDataByGroupKey, ranges, hasData, loading, error } = useThroughputData(
     selectedModel,
     effectiveSequence,
     effectivePrecisions,
@@ -274,16 +289,26 @@ function CompareTableSection({
     return { pointsA: pA, pointsB: pB };
   }, [gpuDataByGroupKey, gpu, precA, precB]);
 
-  const clientRange = hasData ? ranges.interactivity : ssrTableData.interactivityRange;
-
   return (
     <CompareTableRenderer
       aLabel={aLabel}
       bLabel={bLabel}
       ssrTableData={ssrTableData}
-      interactivityRange={clientRange}
-      gpuDataPointsA={pointsA}
-      gpuDataPointsB={pointsB}
+      ssrSequence={ssrSequence}
+      ssrModel={ssrModel}
+      ssrPrecisions={ssrPrecisions}
+      selectedSequence={selectedSequence}
+      effectiveSequence={effectiveSequence}
+      sequenceResolved={sequenceResolved}
+      selectedModel={selectedModel}
+      selectedPrecisions={selectedPrecisions}
+      effectivePrecisions={effectivePrecisions}
+      latestRun={!selectedRunDate || selectedRunDate === availableDates.at(-1)}
+      pointsA={pointsA}
+      pointsB={pointsB}
+      clientInteractivityRange={hasData ? ranges.interactivity : null}
+      loading={loading}
+      error={error}
       emptyStateText={emptyStateText}
     />
   );

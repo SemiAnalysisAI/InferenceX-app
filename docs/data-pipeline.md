@@ -191,6 +191,38 @@ point across attempts; the log records the applied backfill ID. Changelog correc
 likewise applied to artifact metadata before `appendOnly`/`evalsOnly` run semantics are
 resolved and before the changelog is upserted.
 
+### Syncing Public Runs Into a Downstream Database
+
+A downstream deployment's database does not receive public CI ingests. `bun run
+admin:db:sync-public` reads `PUBLIC_DATABASE_READONLY_URL` and inserts the public workflow runs
+the target (`DATABASE_WRITE_URL`) lacks, plus the missing child rows of runs it holds only
+partially: benchmark results with their server logs, log files, and trace replays; eval results
+and samples; run stats; changelog entries; run datasets; configs; datasets; and availability.
+
+- Rows match on natural keys because serial ids differ between the databases.
+- The sync is insert-only. It never reads back or modifies target-only runs, and every query
+  against the source is a `SELECT`.
+- Each run commits in its own transaction, so a rerun resumes after an interruption.
+- Source columns from public migrations the target has not applied are skipped and reported.
+- Existing target rows are not refreshed, so later public backfills, purges, and corrections of
+  already-synced rows do not propagate. The sync lists drifted runs (the target holds more
+  benchmark or eval rows than public) for manual reconciliation.
+- Binary payloads are sized with `octet_length` on the raw value and copied in 4 MiB slices, so
+  values near 1 GB never reach Postgres's 1 GB allocation limit.
+
+`--run-id <id>[#<attempt>][,…]` restricts the sync to those runs; without an attempt every
+attempt of the run is copied. An id the public database lacks fails the command, and a run the
+target already holds in full is reported and skipped. In this mode the global `availability`
+table is not copied, because it could advertise dates whose runs were not synced. Instead the
+sync inserts the availability rows implied by the selected runs' benchmark rows, exactly as
+ingest does. `--dry-run` lists the plan, `--limit <n>` caps the number of runs, and
+`--max-value-bytes <n>` skips individual log and blob values above `n` bytes for a target
+compute that cannot hold them; a later uncapped run fills what was skipped.
+
+The `Sync Runs From Public Database` workflow (`sync-run-from-public-db.yml`) runs the sync for
+the dispatched `run-ids`, migrates the target first, then invalidates and warms `APP_URL`. It
+does not run in `SemiAnalysisAI/InferenceX-app`, whose database is the source.
+
 ### Connection drivers and policy
 
 | Connection                      | Library                  | Use case                             |
@@ -653,6 +685,22 @@ For protected previews, follow the bypass handling in
 and API values; ingest success alone does not establish complete coverage. To undo a
 repair, restore the snapshotted rows or original bytes under the same identities.
 Do not delete a shared series to repair one point.
+
+#### Precomputed timeline series (`gpu_power_series`, migration 019)
+
+Ingest also stores the `series=power` output per telemetry artifact: the same
+`packages/db/src/power-series/` transform the route would run on the samples,
+gzipped JSON keyed by `input_key` (series identities plus linked points'
+`power_audit`) and `POWER_SERIES_FORMAT_VERSION`. The route serves these rows when
+every artifact in scope has a current one and otherwise buckets the samples per
+request, so a missing, stale or failed row is slower, never wrong. Incomplete
+artifacts get no row and keep returning `STORED_TELEMETRY_INCOMPLETE`.
+
+Run `bun run admin:db:backfill-power-series --yes` once after migration 019, after
+bumping `POWER_SERIES_FORMAT_VERSION`, and after point overrides or telemetry
+backfills; it rewrites only missing or stale rows (`--run-id ID --force` for one
+run). The format-version test fails when a transform file changes without updating
+the recorded version and fingerprint.
 
 ### Per-run ingest report
 

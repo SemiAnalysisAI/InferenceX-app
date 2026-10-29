@@ -225,6 +225,8 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     p95_e2el: m.p95_e2el ?? 0,
     p99_e2el: m.p99_e2el ?? 0,
     'p99.9_e2el': m['p99.9_e2el'] ?? 0,
+    p75_e2e_norm_intvty: m.p75_e2e_norm_intvty,
+    p90_e2e_norm_intvty: m.p90_e2e_norm_intvty,
     // Measured GPU telemetry (runner's aggregate_power.py). Left undefined for
     // rows predating the field so downstream chart code can distinguish
     // "no measurement" from "0 W" via createChartDataPoint's typeof guard.

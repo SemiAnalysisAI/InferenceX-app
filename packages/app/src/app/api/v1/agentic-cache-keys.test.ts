@@ -7,7 +7,7 @@ vi.mock('@semianalysisai/inferencex-db/connection', () => ({
 
 vi.mock('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: unknown[]) => unknown) => fn,
-  cachedJson: (data: unknown) => Response.json(data),
+  cachedJson: (_request: Request, data: unknown) => Response.json(data),
 }));
 
 import { STATS_VERSION } from '@semianalysisai/inferencex-db/queries/agentic-aggregates';

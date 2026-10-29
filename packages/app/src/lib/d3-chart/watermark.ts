@@ -3,7 +3,7 @@ import type * as d3 from 'd3';
 import type { ChartMargin } from './types';
 import { CHART_TYPE, px } from './typography';
 
-const UNOFFICIAL_WATERMARK_IMAGE_PATH = '/decorative/kanye-west.png';
+const UNOFFICIAL_WATERMARK_IMAGE_PATH = '/decorative/pointing-muse.webp';
 
 function insertWatermarkRect(
   svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,
@@ -115,6 +115,7 @@ export function createUnofficialWatermark(
 
   insertWatermarkRect(svg, innerWidth, innerHeight, margin, patternId);
 
+  // Asset provenance: public/decorative/pointing-muse.md.
   svg
     .insert('image', ':first-child')
     .attr('class', 'unofficial-watermark-image')

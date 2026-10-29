@@ -56,6 +56,7 @@ export async function GET(request: NextRequest) {
   if (FIXTURES_MODE) {
     const fixture = loadFixture<BenchmarkRow[]>('benchmarks');
     return cachedJson(
+      request,
       view === 'calculator'
         ? toCalculatorBenchmarkRows(fixture, sequence)
         : filterByPowerValidity(fixture, powerValidFilter),
@@ -70,6 +71,7 @@ export async function GET(request: NextRequest) {
           ? await getCachedBenchmarksForRun(dbModelKeys, runId)
           : await getCachedBenchmarks(dbModelKeys, date, exact || undefined, runId);
     return cachedJson(
+      request,
       agenticWorkflowMetadataOnly(
         view === 'calculator' ? rows : filterByPowerValidity(rows, powerValidFilter),
       ),

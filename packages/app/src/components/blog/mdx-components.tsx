@@ -1,12 +1,35 @@
 import type { ReactNode } from 'react';
-import Image from 'next/image';
+import Image, { getImageProps } from 'next/image';
 import Link from 'next/link';
 import { slugify } from '@/lib/blog/blog';
+import figureDimensions from '@/lib/blog/figure-dimensions.json';
 import type { Locale } from '@/lib/i18n/i18n';
-import { HardwareChart } from '@/components/blog/blog-hardware-chart';
+import { HardwareChart } from '@/components/blog/blog-hardware-chart-lazy';
 import { HeadingLink } from '@/components/blog/heading-link';
 import { ThemedFigureImage } from '@/components/blog/themed-figure-image';
 import { JsonLd } from '@/components/seo/json-ld';
+
+const FIGURE_DIMENSIONS: Record<string, readonly number[] | undefined> = figureDimensions;
+// Rendered width of the blog article column at each layout breakpoint (see blog-post-content).
+const FIGURE_SIZES =
+  '(min-width: 1536px) 1104px, (min-width: 1280px) 848px, (min-width: 1024px) 624px, calc(100vw - 2rem)';
+const FIGURE_CLASS = 'h-auto w-full rounded-xl';
+
+/** next/image props for a figure source, or null when the manifest has no size for it. */
+function optimizedFigure(src: string | undefined, alt: string, isFirst: boolean) {
+  const size = src ? FIGURE_DIMENSIONS[src] : undefined;
+  if (!src || !size) return null;
+  return getImageProps({
+    src,
+    alt,
+    width: size[0],
+    height: size[1],
+    sizes: FIGURE_SIZES,
+    loading: isFirst ? 'eager' : 'lazy',
+    fetchPriority: isFirst ? 'high' : undefined,
+    className: FIGURE_CLASS,
+  }).props;
+}
 
 function childrenToText(children: ReactNode): string {
   if (typeof children === 'string') return children;
@@ -137,24 +160,39 @@ export function createMdxComponents(
       const isFirst = figureCount === 0;
       figureCount++;
       const loading = isFirst ? 'eager' : 'lazy';
+      const alt = props.alt ?? '';
       const lightSrc = props.srcLight ?? props.src;
       const darkSrc = props.srcDark ?? props.src;
       const hasThemedVariants = Boolean(props.srcLight || props.srcDark) && lightSrc !== darkSrc;
+      const light = optimizedFigure(lightSrc, alt, isFirst);
+      const dark = optimizedFigure(darkSrc, alt, isFirst);
+      const plainSrc = lightSrc ?? darkSrc;
+      const plain = hasThemedVariants ? null : (light ?? dark);
+      // One box for both themes: reserve the light variant's aspect so layout never waits on the theme.
+      const themedBox = light ?? dark;
       return (
         <figure className="my-8 flex flex-col items-start gap-3">
           {hasThemedVariants ? (
             <ThemedFigureImage
-              srcLight={lightSrc}
-              srcDark={darkSrc}
-              alt={props.alt ?? ''}
+              srcLight={light?.src ?? lightSrc}
+              srcDark={dark?.src ?? darkSrc}
+              srcSetLight={light?.srcSet}
+              srcSetDark={dark?.srcSet}
+              sizes={light && dark ? FIGURE_SIZES : undefined}
+              width={themedBox?.width}
+              height={themedBox?.height}
+              alt={alt}
               loading={loading}
-              className="w-full rounded-xl"
+              fetchPriority={isFirst ? 'high' : undefined}
+              className={FIGURE_CLASS}
             />
+          ) : plain ? (
+            <img {...plain} alt={alt} />
           ) : (
-            (lightSrc || darkSrc) && (
+            plainSrc && (
               <img
-                src={lightSrc ?? darkSrc}
-                alt={props.alt ?? ''}
+                src={plainSrc}
+                alt={alt}
                 loading={loading}
                 decoding="async"
                 className="w-full rounded-xl"

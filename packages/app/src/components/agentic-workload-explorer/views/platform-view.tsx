@@ -265,6 +265,7 @@ function PlatformTrendsChart({
         </div>
         <ExportPngButton
           locale={locale}
+          analyticsChart="platform-trends"
           onClick={() => {
             if (svgRef.current)
               exportSvgToPng(svgRef.current, {

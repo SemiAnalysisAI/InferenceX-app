@@ -20,6 +20,12 @@ export function sortHardware(keys: string[]): string[] {
   );
 }
 
+/** Adds or removes `key`; the last selected GPU stays selected, returning `selected` unchanged. */
+export function toggleHardwareSelection(selected: string[], key: string): string[] {
+  if (!selected.includes(key)) return [...selected, key];
+  return selected.length > 1 ? selected.filter((h) => h !== key) : selected;
+}
+
 function spec(key: string): GpuSpec | undefined {
   const label = HW_REGISTRY[key]?.label;
   return label ? GPU_SPECS.find((s) => s.name.startsWith(label)) : undefined;

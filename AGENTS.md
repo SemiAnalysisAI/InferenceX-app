@@ -91,6 +91,8 @@ All interactive elements should have `track()` from `@/lib/analytics/analytics` 
 
 **Convention**: `[section]_[action]` — e.g., `latency_zoom_reset`, `calculator_bar_selected`, `tab_changed`
 
+Event property keys are snake_case and canonical: `gpu`/`gpus`, `gpu_count`, `metric`, `sort_key`/`sort_dir`, `file_name`, `query_length`, `enabled` for boolean toggle state (enforced by `event-property-keys.test.ts`). Mark page regions with `analyticsPlacement()` (`data-analytics-placement`) so clicks get `placement`. Use `useSearchTracking`, `useDialogCloseTracking` and `selectionAnalyticsContext` instead of ad-hoc tracking. See the Analytics section of [docs/architecture.md](./docs/architecture.md).
+
 ## Tab Structure
 
 `packages/app/src/lib/routing/dashboard-routes.ts` is the single dashboard route registry. `TabNav`, `DashboardShell`, metadata, i18n, share URLs, and the sitemap derive from it, so do not add a second route array.
@@ -195,7 +197,7 @@ Total / active parameter counts live in `MODEL_ARCHITECTURES` (`packages/app/src
 
 ### Add a new blog post
 
-Create `packages/app/content/blog/<slug>.mdx` and its required Simplified Chinese translation at `packages/app/content/blog/zh/<slug>.mdx` in the same PR (see [Chinese Website Pages](#chinese-website-pages-zh--mandatory-for-all-indexable-surfaces)). Frontmatter and authoring rules are in [Blog](./docs/blog.md). A post without `publishDate` stays hidden in production. No code changes are needed, since the blog list, sitemap, RSS feed, llms.txt, and OG image pick up the post automatically.
+Create `packages/app/content/blog/<slug>.mdx` and its required Simplified Chinese translation at `packages/app/content/blog/zh/<slug>.mdx` in the same PR (see [Chinese Website Pages](#chinese-website-pages-zh--mandatory-for-all-indexable-surfaces)). Frontmatter and authoring rules are in [Blog](./docs/blog.md). A post without `publishDate` stays hidden in production. No code changes are needed, since the blog list, sitemap, RSS feed, llms.txt, and OG image pick up the post automatically. After adding or replacing `<Figure>` images, run `bun run blog:figure-dimensions` in `packages/app` and commit the updated `src/lib/blog/figure-dimensions.json`.
 
 ### Add a hardware results page
 
@@ -212,8 +214,8 @@ Load `.claude/skills/write-inferencex-whitepaper/` first. It holds the numbers w
 ### Adding a new tab
 
 1. Add the canonical route entry to `packages/app/src/lib/routing/dashboard-routes.ts`, including navigation group, indexability, provider capabilities, locale mirroring, and share scopes.
-2. Add explicit English metadata in `src/lib/routing/tab-meta.ts` and Chinese metadata, intro, and label entries in `src/lib/routing/tab-meta-zh.ts`.
-3. Create the English and Chinese App Router pages. `dashboard-routes.test.ts` enforces structural parity.
+2. Add explicit English metadata and intro entries (`TAB_META`, `TAB_INTRO`) in `src/lib/routing/tab-meta.ts` and Chinese metadata, intro, and label entries in `src/lib/routing/tab-meta-zh.ts`. Keep descriptions within 155 characters.
+3. Create the English and Chinese App Router pages, rendering `<TabIntro tab="<tab>" />` (EN) and `<ZhTabIntro tab="<tab>" />` (zh) above the content unless the content already renders an h1. `dashboard-routes.test.ts` enforces structural parity.
 4. Add the tab content and any section-specific provider only when the route actually needs one; declare dashboard-wide provider needs in the registry.
 5. Use `ChartLegend` with `variant="sidebar"`, sorted by `HW_REGISTRY` sort order, default expanded.
 6. Track interactive actions with the `{tabname}_` analytics prefix.

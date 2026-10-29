@@ -3,7 +3,7 @@
 import { TcoBasisToggle } from '@/components/ui/tco-basis-toggle';
 
 import { ControlPanel } from '@/components/ui/control-panel';
-import { useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 
 import { track } from '@/lib/analytics/analytics';
 import { replaceRouterPathname } from '@/lib/routing/client-navigation';
@@ -13,6 +13,7 @@ import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 
 import {
   useInferenceActions,
+  useInferenceAnalyticsContext,
   useInferenceData,
   useInferenceDisplay,
   useInferenceFilters,
@@ -60,6 +61,9 @@ import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { ModelArchitectureInfoLink } from './ModelArchitectureInfoLink';
 import { MetricExplanation } from './MetricExplanation';
 import { MeasuredMetricControls } from './MeasuredMetricControls';
+import { usePowerXSurface } from './powerx-surface';
+import { powerXChangedCount } from '../powerx/powerx-views';
+import type { PowerXChartConfigSlots } from '../powerx/PowerXLayout';
 import {
   changeMeasuredMetricConfig,
   getMeasuredMetricConfig,
@@ -70,7 +74,7 @@ import { XAxisModeSelector } from './XAxisModeSelector';
 import { TokenBasisToggle } from './TokenBasisToggle';
 import { showsTcoBasisSelector, Sequence, type Model } from '@/lib/catalog/data-mappings';
 import { useLocale } from '@/lib/i18n/use-locale';
-import { defaultYAxisMetric } from '@/lib/routing/url-state';
+import { DEFAULT_Y_AXIS_METRIC } from '@/lib/routing/url-state';
 
 const STRINGS = {
   en: {
@@ -185,6 +189,9 @@ interface ChartControlsProps {
   tcoSource?: 'inference' | 'historical';
   showTcoBasis?: boolean;
   showXAxisMode?: boolean;
+  /** PowerX: the Count / Per / Show as controls that stand in for the Y-axis metric pick. */
+  /** PowerX's Chart Config cells; receives the X-Axis Metric cell so it can place it. */
+  powerXControls?: (slots: PowerXChartConfigSlots) => ReactNode;
 }
 
 export default function ChartControls({
@@ -192,6 +199,7 @@ export default function ChartControls({
   tcoSource = 'inference',
   showTcoBasis = false,
   showXAxisMode = false,
+  powerXControls,
 }: ChartControlsProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -199,14 +207,8 @@ export default function ChartControls({
   useEffect(() => setMounted(true), []);
 
   const { openDropdown, handleDropdownOpenChange } = useOpenDropdown<string>();
-  const {
-    selectedModel,
-    selectedSequence,
-    selectedPrecisions,
-    selectedGPUs,
-    selectedDateRange,
-    quickFilters,
-  } = useInferenceFilters();
+  const { selectedModel, selectedSequence, selectedPrecisions, selectedGPUs, selectedDateRange } =
+    useInferenceFilters();
   const {
     graphs,
     availableGPUs,
@@ -241,6 +243,8 @@ export default function ChartControls({
     setScaleType,
     setPowerCompare,
   } = useInferenceActions();
+  const powerXSurface = usePowerXSurface();
+  const analyticsContext = useInferenceAnalyticsContext();
 
   const featureGateUnlocked = useFeatureGate();
   const visibleGroups = useMemo(
@@ -304,10 +308,25 @@ export default function ChartControls({
       .filter((g) => g.options.length > 0);
   }, [visibleGroups, locale, carriedTier]);
 
+  // Measured power and energy live on PowerX; only Historical Trends keeps them here.
+  const showsMeasuredMetrics = tcoSource === 'historical';
+  const pickerYAxisOptions = useMemo(
+    () =>
+      showsMeasuredMetrics
+        ? searchableYAxisOptions
+        : searchableYAxisOptions
+            .map((group) => ({
+              ...group,
+              options: group.options.filter((option) => !getMeasuredMetricConfig(option.value)),
+            }))
+            .filter((group) => group.options.length > 0),
+    [searchableYAxisOptions, showsMeasuredMetrics],
+  );
+
   const groupedYAxisOptions = useMemo(() => {
     const selectedConfig = getMeasuredMetricConfig(selectedYAxisMetric);
     const seen = new Set<MeasuredMetricFamily>();
-    return searchableYAxisOptions.map((group) => ({
+    return pickerYAxisOptions.map((group) => ({
       ...group,
       groupLabel: group.options.some((option) => getMeasuredMetricConfig(option.value))
         ? t.measuredGroup
@@ -332,7 +351,7 @@ export default function ChartControls({
         ];
       }),
     }));
-  }, [searchableYAxisOptions, selectedYAxisMetric, t]);
+  }, [pickerYAxisOptions, selectedYAxisMetric, t]);
 
   const trackCombinedFilters = () => {
     if (selectedModel && selectedSequence && selectedPrecisions.length > 0 && selectedYAxisMetric) {
@@ -340,9 +359,9 @@ export default function ChartControls({
         model: selectedModel,
         sequence: selectedSequence,
         precision: selectedPrecisions.join(','),
-        yAxisMetric: selectedYAxisMetric,
-        yAxisMetricLabel: METRIC_TITLE_MAP.get(selectedYAxisMetric) ?? selectedYAxisMetric,
-        yAxisMetricGroup: metricGroupMap.get(selectedYAxisMetric) ?? 'Unknown',
+        metric: selectedYAxisMetric,
+        metric_label: METRIC_TITLE_MAP.get(selectedYAxisMetric) ?? selectedYAxisMetric,
+        metric_group: metricGroupMap.get(selectedYAxisMetric) ?? 'Unknown',
       });
     }
   };
@@ -350,8 +369,12 @@ export default function ChartControls({
   const handleModelChange = (value: Model) => {
     setSelectedModel(value);
     const target = inferenceModelRouteForSelection(window.location.pathname, value);
-    if (target !== null) replaceRouterPathname(target, ['g_model']);
+    // Re-picking the shown model only canonicalizes a bare /inference path. That is not a new page.
+    if (target !== null) {
+      replaceRouterPathname(target, ['g_model'], { pageview: value !== selectedModel });
+    }
     track('inference_model_selected', {
+      ...analyticsContext,
       model: value,
     });
     setTimeout(trackCombinedFilters, 0);
@@ -360,6 +383,7 @@ export default function ChartControls({
   const handleSequenceChange = (value: Sequence) => {
     setSelectedSequence(value);
     track('inference_sequence_selected', {
+      ...analyticsContext,
       sequence: value,
     });
     setTimeout(trackCombinedFilters, 0);
@@ -368,6 +392,7 @@ export default function ChartControls({
   const handlePrecisionChange = (value: string[]) => {
     setSelectedPrecisions(value);
     track('inference_precision_selected', {
+      ...analyticsContext,
       precision: value.join(','),
     });
     setTimeout(trackCombinedFilters, 0);
@@ -376,6 +401,7 @@ export default function ChartControls({
   const handleYAxisMetricChange = (value: string) => {
     setSelectedYAxisMetric(value);
     track('inference_y_axis_metric_selected', {
+      ...analyticsContext,
       metric: value,
       metric_label: METRIC_TITLE_MAP.get(value) ?? value,
       metric_group: metricGroupMap.get(value) ?? 'Unknown',
@@ -386,6 +412,7 @@ export default function ChartControls({
   const handleGPUChange = (value: string[]) => {
     setSelectedGPUs(value);
     track('inference_gpu_selected', {
+      ...analyticsContext,
       gpus: value.join(','),
     });
     setTimeout(trackCombinedFilters, 0);
@@ -394,6 +421,7 @@ export default function ChartControls({
   const handleXAxisMetricChange = (value: string) => {
     setSelectedXAxisMetric(value);
     track('inference_x_axis_metric_selected', {
+      ...analyticsContext,
       metric: value,
     });
   };
@@ -401,7 +429,8 @@ export default function ChartControls({
   const handleScaleTypeChange = (value: 'auto' | 'linear' | 'log') => {
     setScaleType(value);
     track('inference_scale_type_selected', {
-      scaleType: value,
+      ...analyticsContext,
+      scale_type: value,
     });
   };
 
@@ -410,13 +439,19 @@ export default function ChartControls({
   const handleDateRangeChange = (range: { startDate: string; endDate: string }) => {
     setSelectedDateRange(range);
     track('inference_date_range_changed', {
-      startDate: range.startDate,
-      endDate: range.endDate,
+      start_date: range.startDate,
+      end_date: range.endDate,
     });
   };
 
   const secondaryCount =
-    (selectedYAxisMetric === defaultYAxisMetric(quickFilters.power) ? 0 : 1) +
+    // PowerX picks the metric through its tabs; its Count, Per, Show as, Scope,
+    // Power statistic and Rated boundaries controls count instead.
+    (powerXSurface
+      ? powerXChangedCount({ metric: selectedYAxisMetric, compare: powerCompare })
+      : selectedYAxisMetric === DEFAULT_Y_AXIS_METRIC
+        ? 0
+        : 1) +
     (showXAxisMode && selectedXAxisMode !== defaultXAxisMode ? 1 : 0) +
     (selectedXAxisMetric === undefined || selectedXAxisMetric === 'p90_ttft' ? 0 : 1) +
     (scaleType === 'auto' ? 0 : 1) +
@@ -433,6 +468,21 @@ export default function ChartControls({
     showTcoBasis &&
     isCostMetric(selectedYAxisMetric) &&
     showsTcoBasisSelector(selectedModel, selectedSequence);
+  // Chart Config columns: the X-Axis Metric column is 11rem, or 18rem on agentic traces
+  // where its options are longer, and the rest of the row shares what is left. PowerX
+  // keeps the same first column and splits the rest in two, so its Count toggle (two
+  // cells) and then Per or Show as, Scope, Power statistic and Rated boundaries (one
+  // cell each) flow left to right in rows of three. Below sm every cell is a row.
+  const xAxisWide = selectedSequence === Sequence.AgenticTraces;
+  const chartConfigGridClass = powerXSurface
+    ? xAxisWide
+      ? 'sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)_minmax(0,1fr)]'
+      : 'sm:grid-cols-[11rem_minmax(0,1fr)_minmax(0,1fr)]'
+    : showXAxisMode
+      ? xAxisWide
+        ? 'sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]'
+        : 'sm:grid-cols-[11rem_minmax(0,1fr)]'
+      : 'sm:grid-cols-2';
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -454,23 +504,27 @@ export default function ChartControls({
                 newModels={AGENTX_NEW_MODEL_DISPLAY_NAMES}
               />
             </div>
-            <ScenarioSelector
-              value={selectedSequence}
-              onChange={handleSequenceChange}
-              open={openDropdown === 'sequence'}
-              onOpenChange={handleDropdownOpenChange('sequence')}
-              availableSequences={availableSequences}
-              model={selectedModel}
-              data-testid="scenario-selector"
-            />
-            <PrecisionSelector
-              value={selectedPrecisions}
-              onChange={handlePrecisionChange}
-              open={openDropdown === 'precision'}
-              onOpenChange={handleDropdownOpenChange('precision')}
-              availablePrecisions={availablePrecisions}
-              data-testid="precision-multiselect"
-            />
+            <div className="min-w-0">
+              <ScenarioSelector
+                value={selectedSequence}
+                onChange={handleSequenceChange}
+                open={openDropdown === 'sequence'}
+                onOpenChange={handleDropdownOpenChange('sequence')}
+                availableSequences={availableSequences}
+                model={selectedModel}
+                data-testid="scenario-selector"
+              />
+            </div>
+            <div className="min-w-0">
+              <PrecisionSelector
+                value={selectedPrecisions}
+                onChange={handlePrecisionChange}
+                open={openDropdown === 'precision'}
+                onOpenChange={handleDropdownOpenChange('precision')}
+                availablePrecisions={availablePrecisions}
+                data-testid="precision-multiselect"
+              />
+            </div>
           </div>
         </ControlPanel>
 
@@ -486,11 +540,20 @@ export default function ChartControls({
             className={showXAxisMode ? 'lg:col-span-2' : undefined}
           >
             <div
-              className={`grid min-w-0 items-start gap-3 ${showXAxisMode ? (selectedSequence === Sequence.AgenticTraces ? 'sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]' : 'sm:grid-cols-[11rem_minmax(0,1fr)]') : 'sm:grid-cols-2'} ${tcoVisible && showXAxisMode ? 'xl:grid-cols-[11rem_minmax(0,1fr)_10rem]' : ''}`}
+              className={`grid min-w-0 items-start gap-3 ${chartConfigGridClass} ${tcoVisible && showXAxisMode && !powerXSurface ? 'xl:grid-cols-[11rem_minmax(0,1fr)_10rem]' : ''}`}
             >
-              {showXAxisMode && <XAxisModeSelector />}
+              {powerXSurface && powerXControls
+                ? powerXControls({
+                    // The More fold is one column: the cell fills it like Count and Per do.
+                    xAxisSelector: showXAxisMode ? (
+                      <XAxisModeSelector className="max-md:max-w-none" />
+                    ) : null,
+                    xAxisChanged: showXAxisMode && selectedXAxisMode !== defaultXAxisMode,
+                  })
+                : showXAxisMode && <XAxisModeSelector />}
               <div
                 className={`flex min-w-0 flex-col space-y-1.5 ${showXAxisMode ? '' : 'sm:col-span-2'}`}
+                hidden={powerXSurface}
               >
                 <div className="flex items-center justify-between gap-2">
                   <LabelWithTooltip
@@ -515,7 +578,7 @@ export default function ChartControls({
                     label: g.groupLabel,
                     options: [
                       ...g.options.filter((option) => getMeasuredMetricConfig(option.value)),
-                      ...searchableYAxisOptions[index].options,
+                      ...pickerYAxisOptions[index].options,
                     ],
                   }))}
                   searchPlaceholder={locale === 'zh' ? '搜索…' : undefined}
@@ -525,7 +588,7 @@ export default function ChartControls({
                 />
               </div>
 
-              {mounted && getMeasuredMetricConfig(selectedYAxisMetric) && (
+              {mounted && showsMeasuredMetrics && getMeasuredMetricConfig(selectedYAxisMetric) && (
                 <MeasuredMetricControls
                   metric={selectedYAxisMetric}
                   onChange={handleYAxisMetricChange}
@@ -552,7 +615,10 @@ export default function ChartControls({
                     value={tokenRevenuePriceSource}
                     onValueChange={(value) => {
                       setTokenRevenuePriceSource(value as 'normalized' | 'openrouter');
-                      track('inference_token_revenue_price_source_selected', { source: value });
+                      track('inference_token_revenue_price_source_selected', {
+                        ...analyticsContext,
+                        source: value,
+                      });
                     }}
                   >
                     <SelectTrigger
@@ -593,7 +659,7 @@ export default function ChartControls({
                           onClick={() => {
                             track('inference_openrouter_pricing_opened', {
                               model: selectedModel,
-                              openRouterModelId,
+                              openrouter_model_id: openRouterModelId,
                             });
                           }}
                         >

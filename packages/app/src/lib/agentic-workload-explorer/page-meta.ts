@@ -3,7 +3,8 @@ import type { Metadata } from 'next';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { EXPLORER_BASE_PATH } from '@/lib/agentic-workload-explorer/paths';
-import { enAlternates, type Locale, ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
+import { enAlternates, type Locale, zhAlternates } from '@/lib/i18n/i18n';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 interface SectionCopy {
   title: string;
@@ -178,13 +179,7 @@ function localizedMetadata(
     title: fullTitle,
     description,
     alternates: locale === 'zh' ? zhAlternates(enPath) : enAlternates(enPath),
-    openGraph: {
-      title: `${fullTitle} | InferenceX`,
-      description,
-      url,
-      ...(locale === 'zh' && { locale: ZH_OG_LOCALE }),
-    },
-    twitter: { title: `${fullTitle} | InferenceX`, description },
+    ...socialMetadata({ title: `${fullTitle} | InferenceX`, description, url, locale }),
     ...(!indexable && { robots: { index: false, follow: true } }),
   };
 }

@@ -4,6 +4,7 @@ import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
 import { CatalogLinkCard } from '@/components/catalog/catalog-link-card';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
+import { analyticsPlacement } from '@/lib/analytics/placement';
 import { getPostBySlug } from '@/lib/blog/blog';
 import {
   CHIP_VS_HIGHLIGHT_LABELS_EN,
@@ -440,7 +441,7 @@ export const ChipDetailContent = ({ entry, locale }: { entry: ChipPageEntry; loc
   const hw = getChipHw(entry);
 
   return (
-    <main className="relative">
+    <main className="relative" {...analyticsPlacement('chips')}>
       <JsonLd data={jsonLd} />
       <div className="container mx-auto px-4 lg:px-8">
         <article className="mx-auto max-w-5xl">
@@ -517,7 +518,7 @@ export const ChipVsContent = ({ page, locale }: { page: ChipVsPage; locale: Loca
   const localizeValue = locale === 'zh' ? localizeVsHighlightValueZh : (value: string) => value;
 
   return (
-    <main className="relative">
+    <main className="relative" {...analyticsPlacement('chips')}>
       <JsonLd data={jsonLd} />
       <div className="container mx-auto px-4 lg:px-8">
         <article className="mx-auto max-w-5xl">
@@ -614,7 +615,7 @@ export const ChipsIndexContent = ({ locale }: { locale: Locale }) => {
     })),
   };
   return (
-    <main className="relative">
+    <main className="relative" {...analyticsPlacement('chips')}>
       <JsonLd data={jsonLd} />
       <div className="container mx-auto px-4 lg:px-8">
         <div className="mx-auto max-w-5xl">

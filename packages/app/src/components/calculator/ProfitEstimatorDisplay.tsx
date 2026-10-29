@@ -65,10 +65,12 @@ import { ALL_IN_MEASURED_NOTE, POWER_BASIS_LABELS } from '@/lib/power/power-basi
 import { AIR_COOLED_SYSTEM_PUE, LIQUID_COOLED_RACK_PUE } from '@/lib/power/system-power-model';
 import { useComparisonChangelogs } from '@/hooks/api/use-comparison-changelogs';
 import { useOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
+import { useHeldHeight } from '@/hooks/useHeldHeight';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
 import { track } from '@/lib/analytics/analytics';
+import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
 import { getGpuSpecs, getHardwareConfig, getModelSortIndex } from '@/lib/catalog/constants';
 import { exportToCsv } from '@/lib/export/csv-export';
 import {
@@ -441,7 +443,7 @@ function InfoFold({
         className="flex w-full items-center gap-1.5 text-left text-foreground cursor-pointer"
         onClick={() => {
           setOpen((prev) => !prev);
-          track('profit_formula_toggled', { open: !open });
+          track('profit_formula_toggled', { enabled: !open });
         }}
       >
         <Info className="size-3.5 text-muted-foreground" aria-hidden />
@@ -551,7 +553,9 @@ function ProfitEstimatorInner({
   }, [availableModels, availabilityRows, basis]);
   const modelAllowed = agenticModels.includes(selectedModel);
   useEffect(() => {
-    if (!modelAllowed && agenticModels[0]) setSelectedModel(agenticModels[0]);
+    if (!modelAllowed && agenticModels[0]) {
+      setSelectedModel(agenticModels[0], { userSelection: false });
+    }
   }, [modelAllowed, agenticModels, setSelectedModel]);
   useEffect(() => {
     if (sequenceResolved && effectiveSequence !== Sequence.AgenticTraces) {
@@ -725,7 +729,10 @@ function ProfitEstimatorInner({
       setSelectedDateRange(range);
       setUrlParam('i_dstart', range.startDate);
       setUrlParam('i_dend', range.endDate);
-      track('profit_history_date_range_changed', range);
+      track('profit_history_date_range_changed', {
+        start_date: range.startDate,
+        end_date: range.endDate,
+      });
     },
     [setUrlParam],
   );
@@ -801,6 +808,8 @@ function ProfitEstimatorInner({
     [historyRunNumbering],
   );
   const loading = throughputLoading || history.loading;
+  const rootRef = useHeldHeight<HTMLDivElement>(loading);
+  const controlsRef = useHeldHeight<HTMLElement>(loading);
 
   const [customCosts, setCustomCosts] = useState<Record<string, string>>({});
   const customCostBases = useMemo(
@@ -1072,7 +1081,7 @@ function ProfitEstimatorInner({
       visible: new Set(legendHwKeys),
       known: new Set(legendHwKeys),
     });
-    track('profit_gpu_reset', { gpuCount: legendHwKeys.length });
+    track('profit_gpu_reset', { gpu_count: legendHwKeys.length });
   }, [legendHwKeys, selectionKey]);
 
   const legendItems = useMemo(
@@ -1431,8 +1440,8 @@ function ProfitEstimatorInner({
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <section data-testid="profit-controls">
+    <div ref={rootRef} className="flex flex-col gap-4">
+      <section ref={controlsRef} data-testid="profit-controls">
         <Card className="relative z-30">
           <div className="flex flex-col gap-4">
             <DashboardSectionHeader title={t.title[basis]} actions={<ChartShareActions />} />
@@ -1796,6 +1805,12 @@ function ProfitEstimatorInner({
               <ChartButtons
                 chartId="profit-estimator-chart"
                 analyticsPrefix="profit_estimator"
+                analyticsContext={selectionAnalyticsContext({
+                  model: selectedModel,
+                  sequence: selectedSequence,
+                  precisions: selectedPrecisions,
+                  gpuCount: selectedGPUs.length,
+                })}
                 className="absolute top-0 right-0 z-10 mb-0"
                 hideZoomReset
                 onExportCsv={handleExportCsv}

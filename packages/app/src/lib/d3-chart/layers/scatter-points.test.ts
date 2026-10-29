@@ -170,6 +170,18 @@ describe('syncPointShape', () => {
   });
 });
 
+const rect = (width: number, height: number, left = 0, top = 0) => ({
+  width,
+  height,
+  left,
+  top,
+  right: left + width,
+  bottom: top + height,
+  x: left,
+  y: top,
+  toJSON: () => ({}),
+});
+
 describe('computeTooltipPosition', () => {
   it('caches same-frame geometry and invalidates it by frame and content lifecycle', () => {
     let nextFrame: FrameRequestCallback | undefined;
@@ -287,6 +299,48 @@ describe('computeTooltipPosition', () => {
       left: 560,
       top: 316,
     });
+  });
+
+  it('keeps the tooltip below the sticky site header instead of underneath it', () => {
+    let frame: FrameRequestCallback | undefined;
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn((callback: FrameRequestCallback) => {
+        frame = callback;
+        return 1;
+      }),
+    );
+    const header = document.createElement('header');
+    header.className = 'vt-site-header';
+    Object.defineProperty(header, 'getBoundingClientRect', { value: () => rect(800, 56) });
+    document.body.append(header);
+    const tooltipNode = document.createElement('div');
+    Object.defineProperty(tooltipNode, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => rect(100, 300),
+    });
+    const container = document.createElement('div');
+    Object.defineProperties(container, {
+      clientWidth: { get: () => 800 },
+      clientHeight: { get: () => 400 },
+      getBoundingClientRect: { value: () => rect(800, 400, 0, -200) },
+    });
+    try {
+      // The chart has scrolled 200px under the header; the tooltip would start at y=4.
+      const below = computeTooltipPosition(20, 20, d3.select(tooltipNode), container);
+      expect(below.top).toBe(60);
+      // A tooltip taller than the space under the header keeps the plain viewport clamp.
+      Object.defineProperty(tooltipNode, 'getBoundingClientRect', {
+        configurable: true,
+        value: () => rect(100, 760),
+      });
+      invalidateTooltipGeometry(tooltipNode);
+      expect(computeTooltipPosition(20, 20, d3.select(tooltipNode), container).top).toBe(4);
+    } finally {
+      header.remove();
+      frame?.(0);
+      vi.unstubAllGlobals();
+    }
   });
 });
 

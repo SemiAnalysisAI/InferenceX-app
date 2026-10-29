@@ -112,7 +112,7 @@ export function SiteSearchDialog({
     const trimmed = query.trim();
     if (!trimmed) return;
     const timer = setTimeout(() => {
-      track('header_search_queried', { query: trimmed.slice(0, 100), results: results.length });
+      track('header_search_queried', { query_length: trimmed.length, results: results.length });
     }, QUERY_TRACK_DELAY_MS);
     return () => clearTimeout(timer);
     // oxlint-disable-next-line react-hooks/exhaustive-deps

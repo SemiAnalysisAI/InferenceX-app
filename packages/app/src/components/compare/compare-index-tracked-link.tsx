@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { operatorXComparisonQuery } from '@/hooks/api/use-operatorx';
 
 import { track } from '@/lib/analytics/analytics';
+import { placementFor } from '@/lib/analytics/placement';
 import { navigateInApp } from '@/lib/routing/client-navigation';
 
 const subscribeToHydration = () => () => {};
@@ -66,11 +67,11 @@ export function CompareIndexTrackedLink({
       onClick={(event) => {
         onClick?.(event);
         if (event.defaultPrevented) return;
-        const payload = {
+        track(analyticsEvent, {
           ...(analyticsTarget ? { target: analyticsTarget } : {}),
           ...(analyticsSurface ? { surface: analyticsSurface } : {}),
-        };
-        track(analyticsEvent, Object.keys(payload).length > 0 ? payload : undefined);
+          placement: placementFor(event.currentTarget),
+        });
         if (appNavigation && typeof props.href === 'string') {
           navigateInApp(event, router, props.href);
         }

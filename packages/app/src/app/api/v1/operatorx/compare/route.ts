@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
     // A comparison missing an unreadable run is served but not cached.
     return isPartialComparison(comparison)
       ? NextResponse.json(body, { headers: { 'Cache-Control': 'no-store' } })
-      : cachedJson(body, { tag: operatorXCacheTag() });
+      : cachedJson(request, body, { tag: operatorXCacheTag() });
   } catch (error) {
     console.error('OperatorX comparison', error);
     return NextResponse.json(

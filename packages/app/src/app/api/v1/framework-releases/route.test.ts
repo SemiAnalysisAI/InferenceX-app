@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { NextRequest } from 'next/server';
+
 import { GET } from './route';
 
 const mocks = vi.hoisted(() => ({ images: vi.fn() }));
@@ -54,7 +56,7 @@ describe('framework releases', () => {
         Response.json(lists[url.includes('vllm-project') ? 'vllm' : 'sglang']),
       ),
     );
-    const response = await GET();
+    const response = await GET(new NextRequest('https://example.test/api/v1/framework-releases'));
     expect(await response.json()).toEqual({
       vllm: { tag: 'v0.32.0', publishedAt: '2026-10-01T00:00:00Z', commits: {} },
       sglang: { tag: 'v0.5.22', publishedAt: '2026-10-10T00:00:00Z', commits: {} },
@@ -93,7 +95,7 @@ describe('framework releases', () => {
           : Response.json({ message: 'Not Found' }, { status: 404 });
       }),
     );
-    const response = await GET();
+    const response = await GET(new NextRequest('https://example.test/api/v1/framework-releases'));
     const body = await response.json();
     expect(body.vllm.commits).toEqual({ aaaa111: 'behind', bbbb222: 'diverged' });
     expect(body.sglang.commits).toEqual({ eeee555: 'ahead' });
@@ -114,7 +116,7 @@ describe('framework releases', () => {
           : Response.json([release('v0.6.0rc1', '2026-10-01T00:00:00Z', { prerelease: true })]),
       ),
     );
-    const response = await GET();
+    const response = await GET(new NextRequest('https://example.test/api/v1/framework-releases'));
     expect(await response.json()).toEqual({ vllm: null, sglang: null });
   });
 });

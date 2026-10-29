@@ -50,7 +50,7 @@ export async function GET(request: NextRequest): Promise<Response> {
   }
   try {
     const chunks = await getStoredRequestTimelineGz(getDb(), id);
-    if (chunks) return cachedGzipJson(chunks);
+    if (chunks) return cachedGzipJson(request, chunks);
     return legacyGET(request);
   } catch (error) {
     console.error('Error fetching request timeline:', error);

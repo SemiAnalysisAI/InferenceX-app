@@ -1,26 +1,27 @@
 import type { Metadata } from 'next';
 
-import { SITE_NAME, SITE_URL, SUPPORTERS_LINE_ZH } from '@semianalysisai/inferencex-constants';
+import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
 import { CatalogLinkCard } from '@/components/catalog/catalog-link-card';
-import { ZH_LANG_TAG, ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
+import { ZH_LANG_TAG, zhAlternates } from '@/lib/i18n/i18n';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 import { INFERENCE_MODEL_SLUGS } from '@/lib/routing/inference-model-slug';
 import type { RunPageEntry } from '@/lib/live-seo/run-pages';
 import { runPageHeadingZh } from '@/lib/live-seo/run-pages-zh';
 import { getAvailableRunEntries } from '@/lib/live-seo/run-rankings-data.server';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
 
 const title = '任意模型在任意 GPU 上的实测结果';
 const description =
-  'InferenceX 集群实测的每一组开源大模型与 GPU 组合的吞吐、延迟与成本数据：DeepSeek、Kimi、GLM、MiniMax、Qwen 运行在 H100、H200、B200、GB200 NVL72、MI300X、MI325X、MI355X 等硬件上。';
+  'InferenceX 实测的每组开源大模型与 GPU 组合的吞吐、延迟与成本：DeepSeek、Kimi、GLM、MiniMax、Qwen 运行在 H100、B200、GB200 NVL72、MI355X 等硬件上。';
 
 export function generateMetadata(): Metadata {
   return {
     title: { absolute: `${title} | ${SITE_NAME}` },
-    description: `${description}${SUPPORTERS_LINE_ZH}`,
+    description,
     keywords: [
       'LLM GPU 基准测试',
       '大模型 GPU 吞吐量',
@@ -32,14 +33,12 @@ export function generateMetadata(): Metadata {
       'MI355X 大模型基准测试',
     ],
     alternates: zhAlternates('/run'),
-    openGraph: {
+    ...socialMetadata({
       title: `${title} | ${SITE_NAME}`,
       description,
       url: `${SITE_URL}/zh/run`,
-      locale: ZH_OG_LOCALE,
-      type: 'website',
-    },
-    twitter: { card: 'summary_large_image', title, description },
+      locale: 'zh',
+    }),
   };
 }
 

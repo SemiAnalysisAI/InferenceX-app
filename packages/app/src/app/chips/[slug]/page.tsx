@@ -9,13 +9,14 @@ import {
   type ChipVsPage,
 } from '@/lib/catalog/chip-pages';
 import { enAlternates } from '@/lib/i18n/i18n';
+import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 import {
-  AUTHOR_HANDLE,
-  AUTHOR_NAME,
-  SITE_NAME,
-  SITE_URL,
-  SUPPORTERS_LINE,
-} from '@semianalysisai/inferencex-constants';
+  chipMetaDescription,
+  chipVsMetaDescription,
+  chipMetaTitle,
+  chipVsMetaTitle,
+} from '@/lib/seo/chip-meta';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -25,10 +26,6 @@ export const dynamicParams = false;
 
 export function generateStaticParams() {
   return getAllChipRouteSlugs().map((slug) => ({ slug }));
-}
-
-function vsDescription(page: ChipVsPage): string {
-  return `${page.a.title} vs ${page.b.title}: memory, bandwidth, FP8/FP4 compute, TDP and cloud pricing side by side, with continuously measured LLM inference benchmarks on identical workloads. ${SUPPORTERS_LINE}`;
 }
 
 function vsKeywords(page: ChipVsPage): string[] {
@@ -51,8 +48,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const chip = getChipPage(slug);
   if (chip) {
-    const title = `${chip.title} Specs, Pricing & AI Inference Benchmarks`;
-    const description = `${chip.summary} ${SUPPORTERS_LINE}`;
+    const title = chipMetaTitle(chip, 'en');
+    const description = chipMetaDescription(chip, 'en');
     const url = `${SITE_URL}/chips/${chip.slug}`;
     return {
       title,
@@ -60,25 +57,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       keywords: [...chip.keywords],
       authors: [{ name: AUTHOR_NAME }],
       alternates: enAlternates(`/chips/${chip.slug}`),
-      openGraph: {
+      ...socialMetadata({
         title: `${title} | ${SITE_NAME}`,
         description,
         url,
+        locale: 'en',
         type: 'article',
-      },
-      twitter: {
-        card: 'summary_large_image',
-        title: `${title} | ${SITE_NAME}`,
-        description,
-        creator: AUTHOR_HANDLE,
-      },
+      }),
     };
   }
 
   const vsPage = getChipVsPage(slug);
   if (!vsPage) return {};
-  const title = `${vsPage.a.label} vs ${vsPage.b.label}: Specs, Power & AI Inference Comparison`;
-  const description = vsDescription(vsPage);
+  const title = chipVsMetaTitle(vsPage, 'en');
+  const description = chipVsMetaDescription(vsPage, 'en');
   const url = `${SITE_URL}/chips/${vsPage.slug}`;
   return {
     title,
@@ -86,18 +78,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     keywords: vsKeywords(vsPage),
     authors: [{ name: AUTHOR_NAME }],
     alternates: enAlternates(`/chips/${vsPage.slug}`),
-    openGraph: {
+    ...socialMetadata({
       title: `${title} | ${SITE_NAME}`,
       description,
       url,
+      locale: 'en',
       type: 'article',
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: `${title} | ${SITE_NAME}`,
-      description,
-      creator: AUTHOR_HANDLE,
-    },
+    }),
   };
 }
 

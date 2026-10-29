@@ -531,7 +531,7 @@ describe('TCO Calculator', () => {
       cy.visit('/calculator?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
         onBeforeLoad(win) {
           win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-          win.localStorage.removeItem('inferencex-feature-gate');
+          win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
         },
       });
       cy.wait('@agenticBenchmarks');

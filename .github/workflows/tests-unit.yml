@@ -14,6 +14,7 @@ on:
       - 'packages/skills/**'
       - 'bunfig.toml'
       - 'bun.lock'
+      - 'patches/**'
       - 'scripts/run-workspace-script.ts'
       - 'tsconfig.json'
       - 'tsconfig.base.json'

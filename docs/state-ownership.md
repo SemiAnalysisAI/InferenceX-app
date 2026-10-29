@@ -140,9 +140,9 @@ Prefixes name share scopes (see [Architecture](./architecture.md#url-state-persi
 
 ### Snapshot, external subscriptions, and writes
 
-`url-state.ts` snapshots known share parameters at module load and removes them from the
-visible address bar after hydration while preserving the pathname and hash. Route-owned
-entry points pass typed seeds where they render URL-controlled state on the server.
+`url-state.ts` snapshots known share parameters at module load and leaves the address bar
+as it loaded, so reloading a share link reopens the same view. Route-owned entry points pass
+typed seeds where they render URL-controlled state on the server.
 
 Live address-bar consumers use the shared `useClientSearch` external store. It subscribes
 once to `popstate`, `CLIENT_SEARCH_CHANGE_EVENT`, and `CLIENT_PATHNAME_CHANGE_EVENT` through `useSyncExternalStore`;
@@ -160,10 +160,11 @@ set from the destination URL.
 ### Carrying state across a full-document navigation
 
 The two effects above combine into a trap: filter changes reach only the
-in-memory `currentState`, and the address bar is stripped clean, so **the URL of
-the `/inference` history entry describes nothing**. Any full-document navigation
-away from the chart therefore destroys the state entirely — the module is torn
-down, and Back returns to a bare `/inference` that rebuilds from defaults.
+in-memory `currentState`, and the address bar keeps only the parameters the page
+loaded with, so **the URL of the `/inference` history entry does not describe the
+current chart**. Any full-document navigation away from the chart therefore loses
+every change made since load. The module is torn down, and Back returns to the
+loaded URL, which rebuilds from those parameters and the defaults.
 
 The agentic point-detail links (`/inference/agentic/<id>`, rendered by
 `tooltipUtils.viewActionsHTML` and `legend-points-table.pointDetailHref`)
@@ -177,7 +178,7 @@ open-in-new-tab. Three helpers in `url-state.ts` bridge the gap:
 | `currentChartSearch()`      | `withChartState()`                                           | resolves the tab through the `/zh` prefix, flushes pending writes, filters    |
 
 The detail page reads the state back through `withChartState` (its own URL was
-snapshotted into `currentState` at load, then stripped as usual), which is what
+snapshotted into `currentState` at load), which is what
 makes its "Inference chart" link land on the chart the reader left rather than
 on defaults.
 
@@ -223,14 +224,24 @@ the chart prunes them against the rendered curves, so a link written from one da
 degrades to fewer rulers, never to an error. Overlay ids depend on the run order in `unofficialruns`, which the share
 link already carries.
 
-`i_pcompare` (inference scope, default `''`) is the power comparison mode, `boundaries` or
-`roles`, owned by `InferenceProvider` as `powerCompare` (display context) with
+`i_pcompare` (inference scope, default `''`) is the power comparison mode, `boundaries`,
+`provisioned`, `all` (share links only) or `roles`, owned by `InferenceProvider` as `powerCompare` (display context) with
 `setPowerCompare` (actions). It is written as `''` for `none`. It is deliberately NOT cleared
 when the metric changes to one without a common axis for the siblings: the chart then draws
 the metric alone and the Measured controls show a hint, so the link's intent survives a
 detour through another setting. Which comparison rows a reader hid from the legend is
 `ScatterGraph` component state (`hiddenPowerVariants`), never shared — see
 [PowerX Permanent View](./powerx-permanent-view.md#comparison-series-i_pcompare).
+
+`i_pbpoint` (inference scope, default `''`) is the set of per-chip compared points on the
+Where the power goes view: `seriesKey:concurrency` pairs joined by commas, one per chip
+pinned by a column click in its drill-down, owned by `PowerAnalysisPanels` component state
+(`comparedPoints`) and written through `useUrlState` whenever it changes (`''` when no chip
+is pinned, so the parameter leaves the link). It is read once on mount; a pair naming a chip
+or a concurrency the current view lacks is carried but applies to nothing. The comparison
+interactivity itself (the slider) is `PowerXSurfaceProvider` context, not a URL parameter,
+and moving it clears every pin. See
+[PowerX Permanent View](./powerx-permanent-view.md#powerx-layout).
 
 ### Staged-result chart links
 

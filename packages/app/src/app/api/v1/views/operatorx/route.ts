@@ -166,6 +166,7 @@ export function GET(request: NextRequest) {
       : { tag: operatorXCacheTag() };
     if (format === 'csv') return csvResponse(rows.map(csvRow), cache);
     return cachedJson(
+      request,
       {
         view: 'operatorx',
         apiVersion: 'v1',

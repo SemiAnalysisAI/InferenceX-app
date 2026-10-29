@@ -36,6 +36,7 @@ import { useGpuMetricsPoint, type GpuMetricSeries } from '@/hooks/api/use-gpu-me
 import { useTraceServerMetrics } from '@/hooks/api/use-trace-server-metrics';
 
 import { availableOverlaySources } from './overlay-sources';
+import { useInferenceAnalyticsContext } from '@/components/inference/InferenceContext';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 
@@ -110,6 +111,14 @@ export function collectorLabel(series: Pick<GpuMetricSeries, 'vendor' | 'sidecar
   return VENDOR_LABEL[series.vendor] ?? series.vendor;
 }
 
+/** Reader-facing collector name; the raw producer id stays in the title attribute. */
+function collectorDisplayName(producer: string): string {
+  if (/dcgm/iu.test(producer)) return 'NVIDIA DCGM';
+  if (/amd-smi|amdsmi|rocm-smi/iu.test(producer)) return 'AMD SMI';
+  if (/nvidia-smi|nvml/iu.test(producer)) return 'nvidia-smi';
+  return producer;
+}
+
 interface Props {
   id: number;
   enabled: boolean;
@@ -123,6 +132,7 @@ function seriesLabel(series: GpuMetricSeries, total: number): string {
 
 export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled = true }: Props) {
   const locale = useLocale();
+  const analyticsContext = useInferenceAnalyticsContext();
   const t = STRINGS[locale];
   const query = useGpuMetricsPoint(id, enabled);
   const seriesList = query.data?.series ?? [];
@@ -165,7 +175,7 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
   );
   const toggleGpu = (gpuIndex: number) => {
     if (!selectedSeries) return;
-    track('inference_agentic_power_gpu_toggled', { id, gpuIndex });
+    track('inference_agentic_power_gpu_toggled', { id, gpu_index: gpuIndex });
     const next = new Set(hiddenGpus);
     if (next.has(gpuIndex)) next.delete(gpuIndex);
     else next.add(gpuIndex);
@@ -250,7 +260,9 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
         <dl className="mb-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:grid-cols-3 lg:grid-cols-5">
           <div className="min-w-0">
             <dt className="text-xs text-muted-foreground">{t.vendor}</dt>
-            <dd className="font-medium">{collectorLabel(selectedSeries)}</dd>
+            <dd className="truncate font-medium" title={collectorLabel(selectedSeries)}>
+              {collectorDisplayName(collectorLabel(selectedSeries))}
+            </dd>
           </div>
           <div className="min-w-0">
             <dt className="text-xs text-muted-foreground">{t.samples}</dt>
@@ -285,7 +297,11 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
               <Select
                 value={String(selectedSeries.id)}
                 onValueChange={(value) => {
-                  track('inference_agentic_power_series_selected', { id, seriesId: Number(value) });
+                  track('inference_agentic_power_series_selected', {
+                    ...analyticsContext,
+                    id,
+                    series_id: Number(value),
+                  });
                   setSeriesSelection({ id, seriesId: Number(value) });
                 }}
               >
@@ -405,7 +421,7 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
               isLegendExpanded={isLegendExpanded}
               onExpandedChange={(expanded) => {
                 setIsLegendExpanded(expanded);
-                track('inference_agentic_power_legend_expanded', { id, expanded });
+                track('inference_agentic_power_legend_expanded', { id, enabled: expanded });
               }}
               switches={
                 metricKey === 'power' && hardware && allInWattsForHardware(hardware) !== null

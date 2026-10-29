@@ -38,6 +38,10 @@ export interface CommonLegendItemProps {
   isRemovable?: boolean;
   onShowPoints?: (name: string) => void;
   showPointsAriaLabel?: string;
+  /** Items sharing a section render after the main list under that heading, in given order. */
+  section?: string;
+  /** Why enabling this inactive item is blocked; shown as its tooltip with a not-allowed cursor. */
+  blockedReason?: string;
 }
 
 const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
@@ -59,13 +63,16 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
   onShowPoints,
   hideAriaLabel,
   showPointsAriaLabel,
+  blockedReason,
 }) => {
   const locale = useLocale();
   const t = STRINGS[locale];
   const id = `checkbox-${hw || name}`;
   const isLongText = (label ?? '').length > 8;
   const canRemove = isActive && Boolean(onRemove);
-  const canRestore = !isActive;
+  const isBlocked = !isActive && Boolean(blockedReason);
+  const canRestore = !isActive && !isBlocked;
+  const blockedReasonId = `${id}-blocked-reason`;
 
   const content = (
     <>
@@ -74,16 +81,25 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
         id={id}
         checked={isActive}
         onChange={() => onClick(hw || name)}
-        className="hidden peer"
+        aria-disabled={isBlocked || undefined}
+        aria-describedby={isBlocked ? blockedReasonId : undefined}
+        className="sr-only peer"
       />
+      {isBlocked && (
+        <span id={blockedReasonId} className="sr-only">
+          {blockedReason}
+        </span>
+      )}
       <label
         htmlFor={id}
         className={cn(
-          'group/item flex items-center cursor-pointer hover:underline peer-focus-visible:outline-none rounded-sm',
+          'group/item flex items-center rounded-sm peer-focus-visible:outline-2 peer-focus-visible:outline-ring',
+          isBlocked ? 'cursor-not-allowed' : 'cursor-pointer hover:underline',
           isLegendExpanded ? 'w-fit whitespace-nowrap' : 'max-w-full',
           sidebarMode && 'min-w-0',
         )}
-        title={!isLegendExpanded && isLongText ? label : title}
+        title={isBlocked ? blockedReason : !isLegendExpanded && isLongText ? label : title}
+        data-blocked={isBlocked || undefined}
         onMouseEnter={onHover && isActive ? () => onHover(hw || name) : undefined}
         onMouseLeave={onHoverEnd && isActive ? onHoverEnd : undefined}
       >

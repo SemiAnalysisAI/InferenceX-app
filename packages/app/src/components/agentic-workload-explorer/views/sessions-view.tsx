@@ -321,7 +321,7 @@ function SessionsPageContent() {
       setSortKey(key);
       setSortDir('desc');
     }
-    track('agentic_workload_sessions_sort_changed', { sortKey: key, sortDir });
+    track('agentic_workload_sessions_sort_changed', { sort_key: key, sort_dir: sortDir });
   }
 
   return (
@@ -353,7 +353,7 @@ function SessionsPageContent() {
               clearTimeout(searchDebounceRef.current);
               searchDebounceRef.current = setTimeout(() => {
                 setActiveSearch(value.trim());
-                track('agentic_workload_sessions_search', { query: value.trim() });
+                track('agentic_workload_sessions_search', { query_length: value.trim().length });
               }, 300);
             }}
             onKeyDown={(e) => {
@@ -533,7 +533,7 @@ function SessionRow({ session }: { session: Session }) {
   const loadHashStats = (): void => {
     if (hashState.status === 'loading' || hashState.status === 'loaded') return;
     setHashState({ status: 'loading' });
-    track('agentic_workload_sessions_hash_stats_load', { sessionId: session.id });
+    track('agentic_workload_sessions_hash_stats_load', { session_id: session.id });
     void runHashStatsRequest(async () => {
       const response = await fetch(
         `/api/v1/agentic-workload-explorer/sessions/${session.id}/hash-stats`,

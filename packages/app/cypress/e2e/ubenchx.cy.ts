@@ -13,7 +13,7 @@ describe('ubenchX hub and test routes', () => {
     cy.visit('/ubenchx', dismissModal);
     cy.url().should('include', '/ubenchx/mem-bw');
     cy.contains('h1', 'ubenchX Microbenchmarks (Beta)').should('be.visible');
-    cy.get('[data-testid="nav-link-ubenchx"]').should('have.attr', 'href', '/ubenchx');
+    cy.get('[data-testid="nav-link-ubenchx"]').should('have.attr', 'href', '/ubenchx/mem-bw');
     cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'HBM Bandwidth');
     cy.contains('h2', 'HBM Bandwidth').should('be.visible');
     cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
@@ -256,7 +256,9 @@ it('filters both devices on one page and preserves their API values and units', 
   cy.get('[data-testid="core-profile-hardware"]').click();
   cy.contains('[role="option"]', 'Huawei 950PR').click();
   cy.get('[data-testid="sm-l2-heatmap"]').should('not.exist');
-  cy.get('[data-testid="profile-scalar_128MiB_cube_isolated"] svg').focus();
+  // Radix returns focus to the trigger after the close animation; focusing the chart earlier blurs it.
+  cy.get('[data-testid="core-profile-hardware"]').should('have.focus');
+  cy.get('[data-testid="profile-scalar_128MiB_cube_isolated"] svg').focus().should('have.focus');
   cy.get('[data-testid="profile-scalar_128MiB_cube_isolated-value"]').should(
     'contain',
     '0 ↔ 1: 19.03 SYS_CNT ticks',
@@ -358,4 +360,62 @@ it('keeps bandwidth hover guides on the rendered point in every metric and after
         });
     });
   assertBandwidthRuler('#ubenchx-latency');
+});
+
+describe('Huawei SKU configurations alongside measured TPC groups', () => {
+  it('preserves source values and matches the read-only API', () => {
+    cy.visit('/ubenchx/tpc-skyline', dismissModal);
+    cy.get('[data-testid="huawei-sku-table"] tbody tr').should('have.length', 9);
+    cy.request('/api/v1/views/ubenchx?test=tpc-skyline').then(({ body }) => {
+      for (const row of body.skuConfigurations) {
+        cy.get(`[data-sku="${row.sku}"] td`).then(($cells) => {
+          expect([...$cells].map((cell) => cell.textContent)).to.deep.equal(
+            [
+              row.cubeCores,
+              row.vectorCores,
+              row.aiCpuCores,
+              row.cubeClockMHz,
+              row.memoryGiB,
+              row.l2MiB,
+              row.ddrRate.base,
+              row.virtualisationOptions.join(', '),
+            ].map(String),
+          );
+        });
+      }
+      cy.request(body.skuConfigurations[0].source.url).its('status').should('eq', 200);
+    });
+    cy.get('[data-sku="PR_9579"]').should('contain', 'Profiled SKU');
+    cy.get('[data-testid="huawei-sku-configurations"]').should(
+      'contain',
+      'not measured TPC or GPC',
+    );
+    cy.screenshot('tpc-huawei-skus-desktop', { capture: 'fullPage' });
+    cy.contains('a', 'View measured PR_9579 core profiles').click();
+    cy.url().should('include', '/ubenchx/core-memory-profiles');
+    cy.get('[data-testid="ascend-core-profiles"]').should('be.visible');
+  });
+
+  it('keeps Chinese mobile configuration columns accessible by scrolling', () => {
+    cy.viewport(390, 844);
+    cy.visit('/zh/ubenchx/tpc-skyline', dismissModal);
+    cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'TPC Skyline 与 SKU 配置');
+    cy.get('[data-testid="huawei-sku-configurations"]').scrollIntoView();
+    cy.contains('h3', 'Huawei 950PR SKU 配置').should('be.visible');
+    cy.get('[data-sku="PR_957c"]').should('contain', '84').and('contain', '112');
+    cy.get('[data-testid="huawei-sku-configurations"] [role="region"]').as('tableRegion');
+    cy.get('@tableRegion').then(($region) => {
+      expect($region[0].scrollWidth).to.be.greaterThan($region[0].clientWidth);
+    });
+    cy.get('@tableRegion').scrollTo('right');
+    cy.contains('[data-testid="huawei-sku-table"] th', '虚拟化选项').should('be.visible');
+    cy.get('@tableRegion').scrollTo('left');
+    cy.screenshot('tpc-huawei-skus-mobile-zh', { capture: 'fullPage' });
+    cy.contains('a', '查看 PR_9579 实测核心访存特征').should(
+      'have.attr',
+      'href',
+      '/zh/ubenchx/core-memory-profiles',
+    );
+    cy.viewport(1280, 720);
+  });
 });

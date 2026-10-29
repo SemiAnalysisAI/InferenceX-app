@@ -23,6 +23,7 @@ export interface ShardOverrides {
   sku?: string;
   backend?: string;
   implName?: string;
+  libraryVersion?: string;
   ep?: number;
   phase?: string;
   mode?: string | null;
@@ -100,6 +101,7 @@ function makeRawCase(options: ShardOverrides, caseId: string): Json {
   const phase = options.phase === 'prefill' ? 'prefill' : 'decode';
   return {
     case_id: caseId,
+    suite: 'ep-core',
     backend: options.backend ?? 'deepep-v2',
     ep: options.ep ?? 8,
     gpus_per_node: options.gpusPerNode ?? 8,
@@ -139,7 +141,10 @@ export function makeRawShard(options: ShardOverrides = {}): Json {
       case_id: caseId,
       case_factors: { sku, case: makeRawCase({ ...options, backend }, caseId) },
     },
-    implementation: { name: options.implName ?? backend },
+    implementation: {
+      name: options.implName ?? backend,
+      ...(options.libraryVersion ? { library_version: options.libraryVersion } : {}),
+    },
     runtime: { vendor: options.vendor ?? 'nvidia' },
     measurement: { rows: rows.map((row, index) => makeRawRow(index, row, worldSize)) },
     outcome: {
@@ -171,10 +176,10 @@ function requestedFromShard(shard: Json): RequestedCaseSpec {
   };
 }
 
+/** The shape of a CollectiveX results directory's `cases.json`. */
 export function makeRawMatrix(requested: RequestedCaseSpec[], version = 1): Json {
   return {
     version,
-    include: [],
     requested_cases: requested.map((entry) => ({
       case: entry.case,
       sku: entry.sku,

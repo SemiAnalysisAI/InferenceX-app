@@ -269,6 +269,18 @@ export function getTooltipContainerGeometry(container: HTMLElement): TooltipCont
   return geometry;
 }
 
+/**
+ * The bottom edge of the sticky site header while it covers the top of the
+ * viewport, so a tall tooltip clamps below it instead of underneath it.
+ */
+function stickyHeaderBottom(): number {
+  if (typeof document === 'undefined') return 0;
+  const header = document.querySelector<HTMLElement>('header.vt-site-header');
+  if (!header) return 0;
+  const rect = header.getBoundingClientRect();
+  return rect.top <= 0 && rect.bottom > 0 ? rect.bottom : 0;
+}
+
 export function computeTooltipPosition(
   mx: number,
   my: number,
@@ -308,6 +320,9 @@ export function computeTooltipPosition(
   top += rect.top;
   left = Math.max(EDGE_PAD, Math.min(viewportWidth - tw - EDGE_PAD, left));
   top = Math.max(EDGE_PAD, Math.min(viewportHeight - th - EDGE_PAD, top));
+  const headerBottom = stickyHeaderBottom();
+  if (headerBottom > 0 && headerBottom + EDGE_PAD + th <= viewportHeight)
+    top = Math.max(headerBottom + EDGE_PAD, top);
 
   return { left, top };
 }

@@ -8,6 +8,7 @@ import { useGlobalFilterSelection } from '@/providers/GlobalFilterContext';
 
 import {
   useInferenceActions,
+  useInferenceAnalyticsContext,
   useInferenceDisplay,
   useInferenceFilters,
 } from '@/components/inference/InferenceContext';
@@ -47,6 +48,7 @@ export function InferenceTcoBadges({
   const { selectedYAxisMetric } = useInferenceDisplay();
   const { userCosts } = useInferenceFilters();
   const { setUserCosts, setSelectedYAxisMetric } = useInferenceActions();
+  const analyticsContext = useInferenceAnalyticsContext();
   const { tcoBasis } = useGlobalFilterSelection();
 
   const metricKey = metricKeyOf(selectedYAxisMetric);
@@ -87,6 +89,7 @@ export function InferenceTcoBadges({
       setUserCosts(next);
       setSelectedYAxisMetric(`y_${customMetric}`);
       track('inference_cost_tier_selected', {
+        ...analyticsContext,
         metric: `y_${customMetric}`,
         cost_tier: 'custom',
         via: 'tco_badge',

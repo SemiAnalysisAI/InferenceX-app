@@ -51,6 +51,8 @@ import {
   slotCases,
   subView,
 } from './layers';
+import { track } from '@/lib/analytics/analytics';
+
 import { barsHeight, binTokens, gpuValues, inBin, OpBars, sizeBin } from './OpBars';
 
 const DEFAULT_MODEL = 'DeepSeek-R1-0528';
@@ -591,12 +593,12 @@ function SlotDetail({
             </DialogHeader>
             <div className="space-y-6">
               <section className="space-y-2">
-                <h3 className="text-sm font-semibold">{metricVsSize.title}</h3>
-                <metricVsSize.Component model={sub.model} />
-              </section>
-              <section className="space-y-2">
                 <h3 className="text-sm font-semibold">{roofline.title}</h3>
                 <roofline.Component model={sub.model} />
+              </section>
+              <section className="space-y-2">
+                <h3 className="text-sm font-semibold">{metricVsSize.title}</h3>
+                <metricVsSize.Component model={sub.model} />
               </section>
             </div>
             <CaseDetail
@@ -703,7 +705,10 @@ export function ModelView() {
   const models = useMemo(() => {
     const toggle = (hw: string) => {
       const next = hardware.includes(hw) ? hardware.filter((h) => h !== hw) : [...hardware, hw];
-      if (next.length > 0) setPicked(next);
+      if (next.length > 0) {
+        track('operatorx_gpu_toggled', { op: 'model', gpu: hw, placement: 'chart' });
+        setPicked(next);
+      }
     };
     const build = (view: ComparisonView | undefined) =>
       view
@@ -801,7 +806,10 @@ export function ModelView() {
               <SearchableSelect
                 triggerId="operatorx-model"
                 value={requested}
-                onValueChange={(v) => setParam('model', v)}
+                onValueChange={(v) => {
+                  track('operatorx_model_selected', { model: v });
+                  setParam('model', v);
+                }}
                 groups={[{ label: '', options: modelOptions.map((m) => ({ value: m, label: m })) }]}
               />
             </ControlGroup>
@@ -809,7 +817,10 @@ export function ModelView() {
               <SearchableSelect
                 triggerId="operatorx-model-parallel"
                 value={split || ONE_DEVICE}
-                onValueChange={setParallel}
+                onValueChange={(v) => {
+                  track('operatorx_parallel_selected', { op: 'model', parallel: v });
+                  setParallel(v);
+                }}
                 searchable={false}
                 groups={[
                   {
@@ -826,7 +837,10 @@ export function ModelView() {
               <SearchableSelect
                 triggerId="operatorx-metric"
                 value={metric.id}
-                onValueChange={(v) => setParam('metric', v)}
+                onValueChange={(v) => {
+                  track('operatorx_metric_selected', { op: 'model', metric: v });
+                  setParam('metric', v);
+                }}
                 searchable={false}
                 groups={[
                   {
@@ -849,7 +863,10 @@ export function ModelView() {
               {precision && (
                 <SegmentedToggle
                   value={precision}
-                  onValueChange={setPrecision}
+                  onValueChange={(v) => {
+                    track('operatorx_model_precision_selected', { precision: v });
+                    setPrecision(v);
+                  }}
                   ariaLabel="Compute precision"
                   options={precisions.map((p) => ({ value: p, label: p }))}
                 />
@@ -892,14 +909,21 @@ export function ModelView() {
                   tokens={tokens}
                   lanes={hardware.length}
                   isDark={isDark}
-                  onOpen={setOpen}
-                  onFold={(key) =>
+                  onOpen={(data) => {
+                    track('operatorx_model_op_opened', { model: requested, op: data.slot.op });
+                    setOpen(data);
+                  }}
+                  onFold={(key) => {
+                    track('operatorx_model_fold_toggled', {
+                      model: requested,
+                      enabled: !openFolds.has(key),
+                    });
                     setOpenFolds((prev) => {
                       const next = new Set(prev);
                       if (!next.delete(key)) next.add(key);
                       return next;
-                    })
-                  }
+                    });
+                  }}
                 />
               </div>
             ))}

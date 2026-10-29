@@ -12,7 +12,7 @@ vi.mock('@semianalysisai/inferencex-db/queries/latest-images', () => ({
 vi.mock('@/app/api/v1/latest-images/route', () => ({ GET: mocks.images }));
 vi.mock('@/app/api/v1/framework-releases/route', () => ({ GET: mocks.releases }));
 vi.mock('@/lib/cache/api-cache', () => ({
-  cachedJson: (data: unknown) => Response.json(data),
+  cachedJson: (_request: Request, data: unknown) => Response.json(data),
   cachedQuery: (fn: unknown) => fn,
 }));
 const image: LatestImageRow = {

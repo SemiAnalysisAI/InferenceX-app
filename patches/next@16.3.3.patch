@@ -1,0 +1,30 @@
+diff --git a/dist/esm/server/image-optimizer.js b/dist/esm/server/image-optimizer.js
+index 710e248ea1e0bc293d239e4fd26b336a3e5f41e4..b05e43df21966dccc00a5fc329c9a63f82c05825 100644
+--- a/dist/esm/server/image-optimizer.js
++++ b/dist/esm/server/image-optimizer.js
+@@ -908,7 +908,9 @@ export async function fetchInternalImage(href, _req, _res, maximumResponseBody,
+         const mocked = createRequestResponseMocks({
+             url: href,
+             method,
+-            socket: _req.socket,
++            // InferenceX patch: no client socket. Once the browser cancels, `send` sees the dead socket
++            // and drops the file stream, so this mock never finishes and every later request for the
++            // same image cache key waits on the stuck optimization.
+             maximumResponseBody
+         });
+         await handleRequest(mocked.req, mocked.res, parseReqUrl(href));
+diff --git a/dist/server/image-optimizer.js b/dist/server/image-optimizer.js
+index e94b5f44054bcd3cff397863add153b8657ee032..0476fac67abf08de65f9f53d2626e2388157365a 100644
+--- a/dist/server/image-optimizer.js
++++ b/dist/server/image-optimizer.js
+@@ -1024,7 +1024,9 @@ async function fetchInternalImage(href, _req, _res, maximumResponseBody, handleR
+         const mocked = (0, _mockrequest.createRequestResponseMocks)({
+             url: href,
+             method,
+-            socket: _req.socket,
++            // InferenceX patch: no client socket. Once the browser cancels, `send` sees the dead socket
++            // and drops the file stream, so this mock never finishes and every later request for the
++            // same image cache key waits on the stuck optimization.
+             maximumResponseBody
+         });
+         await handleRequest(mocked.req, mocked.res, (0, _url.parseReqUrl)(href));

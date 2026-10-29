@@ -8,6 +8,7 @@ import type { ComputePrecision } from '@semianalysisai/inferencex-db/operatorx/c
 import { Label } from '@/components/ui/label';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { Switch } from '@/components/ui/switch';
+import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 import { EmptyChart } from '../charts/empty';
@@ -139,7 +140,10 @@ function Roofline({ model }: { model: ComparisonModel }) {
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
         <SegmentedToggle
           value={precision}
-          onValueChange={setPicked}
+          onValueChange={(value) => {
+            track('operatorx_roofline_precision_selected', { precision: value });
+            setPicked(value);
+          }}
           ariaLabel="Compute precision"
           options={precisions.map((p) => ({ value: p, label: p }))}
         />
@@ -147,7 +151,10 @@ function Roofline({ model }: { model: ComparisonModel }) {
           <Switch
             id="opx-roofline-normalized"
             checked={normalized}
-            onCheckedChange={setNormalized}
+            onCheckedChange={(enabled) => {
+              track('operatorx_roofline_normalized_toggled', { enabled });
+              setNormalized(enabled);
+            }}
           />
           <Label
             htmlFor="opx-roofline-normalized"

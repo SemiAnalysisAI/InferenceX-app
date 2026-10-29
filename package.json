@@ -45,8 +45,10 @@
     "admin:db:apply-overrides": "bun run --cwd packages/db db:apply-overrides",
     "admin:db:backfill-full-response-interactivity": "bun run --cwd packages/db db:backfill-full-response-interactivity",
     "admin:db:backfill-gpu-metrics": "bun run --cwd packages/db db:backfill-gpu-metrics",
+    "admin:db:backfill-power-series": "bun run --cwd packages/db db:backfill-power-series",
     "admin:db:backfill-server-log-files": "bun run --cwd packages/db db:backfill-server-log-files",
     "admin:db:reset": "bun run --cwd packages/db db:reset",
+    "admin:db:sync-public": "bun run --cwd packages/db db:sync-public",
     "admin:db:verify": "bun run --cwd packages/db db:verify",
     "admin:db:migrate:operatorx": "bun run --cwd packages/db db:migrate:operatorx",
     "admin:db:ingest:operatorx": "bun run --cwd packages/db db:ingest:operatorx",
@@ -76,6 +78,9 @@
     "node": ">=24.11.0"
   },
   "packageManager": "bun@1.4.0",
+  "patchedDependencies": {
+    "next@16.3.3": "patches/next@16.3.3.patch"
+  },
   "trustedDependencies": [
     "@posthog/cli",
     "core-js",

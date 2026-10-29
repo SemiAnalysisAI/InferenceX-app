@@ -13,19 +13,25 @@ import {
   type ModelRoute,
   type ModelRouteTab,
 } from '@/lib/routing/model-routes';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 export const LANDING_META = {
   title: 'AI Accelerator System Benchmark',
   brand: 'AcceleratorX by SemiAnalysis',
   description:
-    "Compare AgentX, InferenceX's long-context, multi-turn coding scenario, with fixed-sequence AI inference across chips and frameworks. Public NVIDIA and AMD runs update when configurations change.",
+    'Compare AgentX long-context, multi-turn coding inference with fixed-sequence benchmarks across chips and frameworks, from public NVIDIA and AMD runs.',
 };
 
 export const TAB_META: Record<DashboardRouteKey, { title: string; description: string }> = {
+  powerx: {
+    title: 'PowerX: Measured GPU Power and Energy per Token',
+    description:
+      'Measured GPU power, energy per token and power timelines for every InferenceX benchmark point, with modeled server and facility overhead.',
+  },
   inference: {
     title: 'Agentic Inference Benchmarks',
     description:
-      'Compare latency, throughput, cost, and time-to-first-token for agentic and fixed-sequence AI inference across chips and serving frameworks. AgentX supplies the long-context, multi-turn coding workload.',
+      'Compare AI inference latency, throughput, cost and time to first token across chips and serving frameworks, for agentic and fixed-sequence workloads.',
   },
   evaluation: {
     title: 'LLM Evaluation Results',
@@ -45,27 +51,27 @@ export const TAB_META: Record<DashboardRouteKey, { title: string; description: s
   fleet: {
     title: 'Fleet Lifecycle Economics',
     description:
-      'Project a fixed AI inference fleet across its life: size it against a facility power budget, then track revenue, cost, and margin as measured software configs improve over time.',
+      'Size an AI inference fleet to a facility power budget, then track revenue, cost and margin over its life as measured software configs improve.',
   },
   'first-token': {
     title: 'First-Token Limits',
     description:
-      'Find the cheapest measured AI inference configuration per chip vendor under each time-to-first-token cap, at a minimum interactivity. Measured rows only, no interpolation, for any model and workload.',
+      'Cheapest measured AI inference config per chip vendor under each time-to-first-token cap, at a minimum interactivity. Measured rows only, no interpolation.',
   },
   'cache-reuse': {
     title: 'Prefix Cache Reuse',
     description:
-      'See where an AI inference configuration finds its prompt tokens as concurrency rises: HBM cache hits, host-tier cache hits, or recomputation. Measured runtime cache counters for every model and chip.',
+      'Where AI inference prompt tokens come from as concurrency rises: HBM cache hits, host-tier hits or recompute. Measured cache counters per model and chip.',
   },
   'profit-estimator': {
     title: 'Inference Profit Estimator',
     description:
-      'Estimate what one chip-hour of AI inference earns: revenue at a chosen interactivity and utilization, split into compute expense (TCO $/chip/hr), model license fee, and operator profit.',
+      'Estimate what one chip-hour of AI inference earns, split into compute expense (TCO $/chip/hr), model license fee and operator profit.',
   },
   'profit-estimator-per-gigawatt': {
     title: 'Inference Profit Estimator per GigaWatt',
     description:
-      'Estimate what one gigawatt-year of AI inference earns per chip: revenue at a chosen interactivity and utilization, split into compute expense (TCO), model license fee, and operator profit.',
+      'Estimate what one gigawatt-year of AI inference earns per chip, split into compute expense (TCO), model license fee and operator profit.',
   },
   reliability: {
     title: 'Provider Reliability Metrics',
@@ -90,7 +96,7 @@ export const TAB_META: Record<DashboardRouteKey, { title: string; description: s
   'agentic-workload-explorer': {
     title: 'Agentic Workload Explorer',
     description:
-      'Explore a frozen, anonymized snapshot of real coding-agent traffic captured by ProxyTrace: sessions, token flow, prefix-cache reuse, latency, tool use, and cost.',
+      'A frozen, anonymized snapshot of real coding-agent traffic captured by ProxyTrace: sessions, token flow, prefix-cache reuse, latency, tool use and cost.',
   },
   'ai-chart': {
     title: 'AI-Powered Chart Generation',
@@ -105,7 +111,7 @@ export const TAB_META: Record<DashboardRouteKey, { title: string; description: s
   'current-inferencex-image': {
     title: 'Current InferenceX Image',
     description:
-      'Current InferenceX Docker image tags per model, chip SKU, and configuration. Compares deployed images against latest vLLM and SGLang releases to flag outdated tags.',
+      'Current InferenceX Docker image tags per model, chip SKU and config, compared against the latest vLLM and SGLang releases to flag outdated tags.',
   },
   video: {
     title: 'H3 Video Benchmark',
@@ -115,6 +121,49 @@ export const TAB_META: Record<DashboardRouteKey, { title: string; description: s
     title: 'User Feedback',
     description: 'Internal: decrypt and review user-submitted feedback.',
   },
+};
+
+export const TAB_INTRO: Record<DashboardRouteKey, string> = {
+  powerx:
+    'PowerX shows measured GPU power, energy per output token and power timelines for every InferenceX benchmark point. GPU power is measured; the rest of the server and facility PUE are modeled.',
+  inference:
+    'InferenceX agentic and fixed-sequence AI inference benchmarks compare throughput (tok/s/chip), interactivity (tok/s/user), time to first token (TTFT) and cost across chips, serving frameworks and models. Agentic results come from AgentX, which replays long-context, multi-turn coding-agent traces with subagents. Every data point comes from a public GitHub Actions workflow, so it is reproducible and auditable.',
+  evaluation:
+    'LLM evaluation results compare accuracy across models and deployment configs on standardized eval sets, checking that inference optimizations do not degrade model quality.',
+  historical:
+    'Historical trends track how AI inference performance has changed over time for each chip, framework and model, quantifying the gains from software stack optimizations.',
+  calculator:
+    'The throughput and total cost of ownership (TCO) calculator uses measured benchmark data to estimate cost per million tokens and performance per dollar for LLM serving on each chip config.',
+  fleet:
+    'Fleet lifecycle economics sizes a fixed fleet against a facility power budget and projects revenue, cost, margin and payback from the model release date, using software config improvements measured in historical benchmarks.',
+  'first-token':
+    'First-token limits find, for each chip vendor, the cheapest measured config per million tokens under time-to-first-token (TTFT) caps such as 2 s, 5 s and 10 s at a chosen minimum interactivity. Every bar is a real run with no interpolation, traceable to its GitHub Actions run.',
+  'cache-reuse':
+    'Prefix cache reuse splits prompt tokens at each concurrency level into chip HBM cache hits, host-tier cache hits and recomputed tokens, with an optional trace upper bound. All values are runtime cache counters traceable to their GitHub Actions run.',
+  'profit-estimator':
+    'The inference profit estimator computes revenue per chip-hour for each chip at a chosen interactivity and utilization, stacked into compute expense (TCO $/chip/hr), the model lab license fee and operator profit.',
+  'profit-estimator-per-gigawatt':
+    'The per-gigawatt profit estimator computes yearly revenue for each chip within a gigawatt all-in power budget at a chosen interactivity and utilization, stacked into compute expense (TCO), the model lab license fee and operator profit.',
+  reliability:
+    'Reliability metrics for the benchmark infrastructure show run success rates, error rates and availability for each chip cluster and provider.',
+  'gpu-specs':
+    'Chip specifications compare memory capacity, memory bandwidth, FLOPS, interconnect topology and power for NVIDIA, AMD and other AI accelerators.',
+  operatorx:
+    'OperatorX shows measured GEMM, attention and routed MoE TFLOPS per GPU, latency and full test coverage.',
+  'agentic-workload-explorer':
+    'The agentic workload explorer is a frozen snapshot of anonymized coding-agent traces captured by ProxyTrace. It shows session structure, input and output tokens, prefix cache hits, time to first token (TTFT) and tool call distribution. The snapshot no longer updates, so every time window ends at the snapshot cutoff.',
+  collectivex:
+    'CollectiveX compares expert-parallel (EP) communication dispatch, combine and round-trip latency across DeepEP, MoRI, UCCL and NCCL/RCCL reference implementations under a shared workload, correctness checks and sampling protocol.',
+  submissions:
+    'Every benchmark configuration submitted to InferenceX, with submission history, activity trends and datapoint volume by chip vendor.',
+  'ai-chart':
+    'AI-powered chart generation turns a natural-language description into a chart built from InferenceX benchmark data.',
+  'current-inferencex-image':
+    'The Docker image tags InferenceX currently runs, listed per model, chip SKU and config and compared against the latest upstream vLLM and SGLang releases to spot outdated images.',
+  video:
+    'Reads H3 CI artifacts in the browser to show run status, measurements and comparison verdicts. Comparison thresholds stay uncalibrated until backend labels are calibrated.',
+  feedback:
+    'Internal feedback viewer. Decrypts and shows user-submitted feedback in the browser with a key that never leaves this page.',
 };
 
 const TITLE_SUFFIX = `${SITE_NAME} by ${AUTHOR_NAME}`;
@@ -128,27 +177,39 @@ export function getTabTitle(tab: string): string {
 
 export const MODEL_TAB_META: Record<
   ModelRouteTab,
-  { title: (seoName: string) => string; description: (seoName: string) => string }
+  {
+    title: (seoName: string) => string;
+    description: (seoName: string) => string;
+    intro: (seoName: string) => string;
+  }
 > = {
   historical: {
     title: (seoName) => `${seoName} Historical Inference Trends`,
     description: (seoName) =>
-      `Track ${seoName} inference performance over time. Historical benchmark data showing chip and provider improvements in latency, throughput, and cost for ${seoName}.`,
+      `Track ${seoName} inference performance over time: latency, throughput and cost gains per chip and provider from historical benchmark data.`,
+    intro: (seoName) =>
+      `Historical trends for ${seoName} track how inference performance has changed over time on each chip and framework, quantifying the gains from software stack optimizations.`,
   },
   calculator: {
     title: (seoName) => `${seoName} Throughput & TCO Calculator`,
     description: (seoName) =>
-      `Calculate ${seoName} inference throughput and total cost of ownership. Compare chip cost-efficiency for serving ${seoName} across hardware configurations.`,
+      `Calculate ${seoName} inference throughput and total cost of ownership, and compare chip cost-efficiency across hardware configurations.`,
+    intro: (seoName) =>
+      `The ${seoName} throughput and total cost of ownership (TCO) calculator uses measured benchmark data to estimate cost per million tokens and performance per dollar for serving ${seoName} on each chip config.`,
   },
   'profit-estimator': {
     title: (seoName) => `${seoName} Inference Profit Estimator`,
     description: (seoName) =>
-      `Estimate what one chip-hour of ${seoName} agentic inference earns: revenue at a chosen interactivity and utilization, split into compute expense (TCO $/chip/hr), model license fee, and operator profit.`,
+      `Estimate what one chip-hour of ${seoName} agentic inference earns, split into compute (TCO $/chip/hr), model license fee and operator profit.`,
+    intro: (seoName) =>
+      `Estimate revenue per chip-hour for ${seoName} agentic inference on each chip, split into compute expense (TCO $/chip/hr), model license fee and operator profit, with adjustable interactivity, utilization, license fee and token price.`,
   },
   'profit-estimator-per-gigawatt': {
-    title: (seoName) => `${seoName} Inference Profit Estimator per GigaWatt`,
+    title: (seoName) => `${seoName} Profit Estimator per GigaWatt`,
     description: (seoName) =>
-      `Estimate what one gigawatt-year of ${seoName} agentic inference earns per chip: revenue at a chosen interactivity and utilization, split into compute expense (TCO), model license fee, and operator profit.`,
+      `Estimate what one gigawatt-year of ${seoName} agentic inference earns per chip, split into compute expense (TCO), license fee and operator profit.`,
+    intro: (seoName) =>
+      `Estimate yearly revenue for ${seoName} agentic inference on each chip within a gigawatt all-in power budget, split into compute expense (TCO), model license fee and operator profit, with adjustable interactivity, utilization, license fee and token price.`,
   },
 };
 
@@ -171,15 +232,7 @@ export function modelTabMetadata(tab: ModelRouteTab, route: ModelRoute): Metadat
       canonical: url,
       languages: languageAlternates(enPath),
     },
-    openGraph: {
-      title: `${title} | ${SITE_NAME}`,
-      description,
-      url,
-    },
-    twitter: {
-      title: `${title} | ${SITE_NAME}`,
-      description,
-    },
+    ...socialMetadata({ title: `${title} | ${SITE_NAME}`, description, url, locale: 'en' }),
   };
 }
 
@@ -187,7 +240,7 @@ export function tabMetadata(tab: DashboardRouteKey): Metadata {
   const meta = TAB_META[tab];
   const route = getDashboardRoute(tab);
   const enPath = route.canonicalPath;
-  const url = enPath === '/' ? SITE_URL : `${SITE_URL}${enPath}`;
+  const url = `${SITE_URL}${enPath}`;
   return {
     title: meta.title,
     description: meta.description,
@@ -195,14 +248,11 @@ export function tabMetadata(tab: DashboardRouteKey): Metadata {
       canonical: url,
       ...(route.localeMirrored && { languages: languageAlternates(enPath) }),
     },
-    openGraph: {
-      title: `${meta.title} | InferenceX`,
+    ...socialMetadata({
+      title: `${meta.title} | ${SITE_NAME}`,
       description: meta.description,
       url,
-    },
-    twitter: {
-      title: `${meta.title} | InferenceX`,
-      description: meta.description,
-    },
+      locale: 'en',
+    }),
   };
 }

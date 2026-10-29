@@ -26,6 +26,7 @@ import {
   ZH_OG_LOCALE,
   zhAlternates,
 } from '@/lib/i18n/i18n';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 export interface HardwareFrontmatter {
   title: string;
@@ -206,12 +207,12 @@ export function hardwareIndexMetadata(locale: Locale): Metadata {
     title: t.indexTitle,
     description: t.indexDescription,
     alternates: locale === 'zh' ? zhAlternates(HARDWARE_PATH) : enAlternates(HARDWARE_PATH),
-    openGraph: {
+    ...socialMetadata({
       title: `${t.indexTitle} | ${SITE_NAME}`,
       description: t.indexDescription,
       url: `${SITE_URL}${hardwareIndexPath(locale)}`,
-      ...(locale === 'zh' && { locale: ZH_OG_LOCALE }),
-    },
+      locale,
+    }),
   };
 }
 

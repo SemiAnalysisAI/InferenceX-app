@@ -307,7 +307,7 @@ export function buildInferenceSeries(
   let mapped = options.allPoints ? remapped : partition.data;
   if (xmode === 'e2e-normalized-interactivity')
     mapped = mapped.flatMap((point) => {
-      const derived = point.id === undefined ? undefined : options.derivedMetrics?.[point.id];
+      const derived = point.id === undefined ? point : options.derivedMetrics?.[point.id];
       const x = percentile === 'p75' ? derived?.p75_e2e_norm_intvty : derived?.p90_e2e_norm_intvty;
       return typeof x === 'number' && Number.isFinite(x) && x > 0 ? [{ ...point, x }] : [];
     });
@@ -432,7 +432,7 @@ export function buildInferenceSeries(
     ? allInRows
         .filter((point) => !tableHwKeys || tableHwKeys.has(point.hwKey))
         .map((point): InferenceTableRow => {
-          const derived = point.id === undefined ? undefined : options.derivedMetrics?.[point.id];
+          const derived = point.id === undefined ? point : options.derivedMetrics?.[point.id];
           const x =
             xmode === 'e2e-normalized-interactivity'
               ? percentile === 'p75'

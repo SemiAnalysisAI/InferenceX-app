@@ -102,6 +102,7 @@ export async function GET(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     trackServer('compare_spec_decode_png_render_failed', {
+      route_template: '/compare-spec-decode/[slug]/spec-decode-comparison.png',
       slug,
       model: parsed.model.slug,
       gpu: parsed.gpu,

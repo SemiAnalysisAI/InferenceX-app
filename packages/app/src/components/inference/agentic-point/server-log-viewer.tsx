@@ -285,7 +285,7 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
 
   useEffect(() => {
     if (!searchTerm) return;
-    track(`${analyticsPrefix}_logs_searched`, { id, queryLength: searchTerm.length });
+    track(`${analyticsPrefix}_logs_searched`, { id, query_length: searchTerm.length });
   }, [analyticsPrefix, id, searchTerm]);
 
   useEffect(() => {
@@ -308,8 +308,8 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
     setCopied(true);
     track(`${analyticsPrefix}_logs_copied`, {
       id,
-      fileName: selectedFile,
-      loadedCharacters: log.length,
+      file_name: selectedFile,
+      loaded_characters: log.length,
     });
     window.setTimeout(() => setCopied(false), 1500);
   };
@@ -318,7 +318,7 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
     suppressScrollLoadUntilRef.current = 0;
     setSelection({ pointId: id, fileName, initialOffset: 0, jumpTarget: null });
     setCopied(false);
-    track(`${analyticsPrefix}_log_file_selected`, { id, fileName });
+    track(`${analyticsPrefix}_log_file_selected`, { id, file_name: fileName });
   };
 
   const goToSearchMatch = (result: Omit<LogJumpTarget, 'requestId'>) => {
@@ -333,9 +333,9 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
     setCopied(false);
     track(`${analyticsPrefix}_log_search_match_opened`, {
       id,
-      fileName: result.fileName,
+      file_name: result.fileName,
       offset: result.offset,
-      queryLength: searchTerm.length,
+      query_length: searchTerm.length,
     });
   };
 
@@ -343,9 +343,9 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
     (trigger: 'button' | 'scroll') => {
       track(`${analyticsPrefix}_log_chunk_loaded`, {
         id,
-        fileName: selectedFile,
+        file_name: selectedFile,
         offset: nextOffset,
-        chunkSize: SERVER_LOG_CHUNK_SIZE,
+        chunk_size: SERVER_LOG_CHUNK_SIZE,
         trigger,
       });
       void query.fetchNextPage();
@@ -477,7 +477,7 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
                 href={downloadUrl}
                 download
                 onClick={() =>
-                  track(`${analyticsPrefix}_log_downloaded`, { id, fileName: selectedFile })
+                  track(`${analyticsPrefix}_log_downloaded`, { id, file_name: selectedFile })
                 }
                 data-testid="download-selected-server-log"
               >

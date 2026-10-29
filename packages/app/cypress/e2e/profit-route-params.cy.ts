@@ -98,7 +98,7 @@ describe('Profit estimator route parameters', { testIsolation: true }, () => {
     cy.visit('/profit-estimator?i_pctl=p75&percentile=p50&c_ivtarget=24', {
       onBeforeLoad(win) {
         suppressNudges(win);
-        win.localStorage.setItem('inferencex-feature-gate', '1');
+        win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
       },
     });
     cy.get('[data-testid="profit-estimator-chart"]').should('exist');

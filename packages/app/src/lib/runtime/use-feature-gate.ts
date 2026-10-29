@@ -4,11 +4,23 @@ import { useEffect, useRef, useState } from 'react';
 
 import { track } from '@/lib/analytics/analytics';
 
-export const FEATURE_GATE_KEY = 'inferencex-feature-gate';
+// A new key deliberately invalidates every unlock granted by the old four-arrow code.
+export const FEATURE_GATE_KEY = 'inferencex-feature-gate-konami-v1';
 export const FEATURE_GATE_UNLOCKED_EVENT = 'inferencex:feature-gate:unlocked';
 export const FEATURE_GATE_LOCKED_EVENT = 'inferencex:feature-gate:locked';
 
-const UNLOCK_SEQUENCE = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown'];
+const UNLOCK_SEQUENCE = [
+  'ArrowUp',
+  'ArrowUp',
+  'ArrowDown',
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
+  'ArrowLeft',
+  'ArrowRight',
+  'B',
+  'A',
+];
 
 export function relockFeatureGate(): void {
   if (typeof window === 'undefined') return;
@@ -21,6 +33,7 @@ export function useFeatureGate(): boolean {
   const sequenceRef = useRef<string[]>([]);
 
   useEffect(() => {
+    localStorage.removeItem('inferencex-feature-gate');
     if (typeof window !== 'undefined' && localStorage.getItem(FEATURE_GATE_KEY) === '1') {
       setUnlocked(true);
     }
@@ -29,6 +42,8 @@ export function useFeatureGate(): boolean {
   useEffect(() => {
     if (unlocked) return;
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Let Shift or Caps Lock produce uppercase letters without interrupting the code.
+      if (e.repeat || e.key === 'Shift' || e.key === 'CapsLock') return;
       sequenceRef.current.push(e.key);
       if (sequenceRef.current.length > UNLOCK_SEQUENCE.length) {
         sequenceRef.current = sequenceRef.current.slice(-UNLOCK_SEQUENCE.length);
@@ -48,7 +63,10 @@ export function useFeatureGate(): boolean {
   }, [unlocked]);
 
   useEffect(() => {
-    const handleLock = () => setUnlocked(false);
+    const handleLock = () => {
+      sequenceRef.current = [];
+      setUnlocked(false);
+    };
     const handleUnlock = () => setUnlocked(true);
     window.addEventListener(FEATURE_GATE_LOCKED_EVENT, handleLock);
     window.addEventListener(FEATURE_GATE_UNLOCKED_EVENT, handleUnlock);

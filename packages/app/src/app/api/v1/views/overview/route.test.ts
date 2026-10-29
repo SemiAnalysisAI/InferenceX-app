@@ -5,7 +5,7 @@ import type { OverviewPageData } from '@/lib/overview/overview-data';
 
 const { mockGetOverviewPageData, mockCachedJson, mockCachedText } = vi.hoisted(() => ({
   mockGetOverviewPageData: vi.fn(),
-  mockCachedJson: vi.fn((data: unknown) => Response.json(data)),
+  mockCachedJson: vi.fn((_request: Request, data: unknown) => Response.json(data)),
   mockCachedText: vi.fn(
     (data: string, contentType: string) =>
       new Response(data, { headers: { 'Content-Type': contentType } }),

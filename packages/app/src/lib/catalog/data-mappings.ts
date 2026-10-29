@@ -206,9 +206,27 @@ function modelsByCategory(cat: CategoryTag): ReadonlySet<Model> {
   );
 }
 
-export const MODEL_OPTIONS = (Object.keys(MODEL_CONFIG) as Model[]).filter(
-  (m) => MODEL_CONFIG[m].category !== 'hidden',
-);
+// Selector order is independent of the overview registry order and selected defaults.
+const MODEL_SELECTOR_ORDER: readonly Model[] = [
+  Model.Kimi_K3,
+  Model.DeepSeek_V4_1_Flash,
+  Model.GLM_5_2,
+  Model.MiniMax_M3_1_Flash,
+  Model.Muse_Spark_Open,
+  Model.DeepSeek_V4_Pro,
+  Model.Qwen3_5,
+  Model.Qwen3_8_Flash_Next,
+];
+
+export const MODEL_OPTIONS = (Object.keys(MODEL_CONFIG) as Model[])
+  .filter((m) => MODEL_CONFIG[m].category !== 'hidden')
+  .sort((a, b) => {
+    const rank = (model: Model) => {
+      const index = MODEL_SELECTOR_ORDER.indexOf(model);
+      return index === -1 ? MODEL_SELECTOR_ORDER.length : index;
+    };
+    return rank(a) - rank(b);
+  });
 
 export const DEFAULT_MODELS: ReadonlySet<Model> = modelsByCategory('default');
 export const MAINTENANCE_MODELS: ReadonlySet<Model> = modelsByCategory('maintenance');

@@ -355,7 +355,7 @@ export default function SubmissionsChart({ volume, mode, caption }: SubmissionsC
             isLegendExpanded={isLegendExpanded}
             onExpandedChange={(expanded) => {
               setIsLegendExpanded(expanded);
-              track('submissions_legend_expanded', { expanded });
+              track('submissions_legend_expanded', { enabled: expanded });
             }}
             switches={
               mode === 'weekly'

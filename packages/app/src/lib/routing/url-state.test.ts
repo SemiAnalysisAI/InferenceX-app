@@ -40,13 +40,11 @@ describe('PARAM_DEFAULTS', () => {
     expect(PARAM_DEFAULTS.i_seq).toBe('');
   });
 
-  it('opens on tokens per dollar, or on measured power under any power tier filter', async () => {
-    const { defaultYAxisMetric } = await import('@/lib/routing/url-state');
+  it('opens on tokens per dollar', async () => {
+    const { DEFAULT_Y_AXIS_METRIC } = await import('@/lib/routing/url-state');
     const { DEFAULT_METRIC_CONFIG_KEY } = await import('@/components/inference/metric-registry');
-    expect(defaultYAxisMetric([])).toBe('y_tokensPerDollarH');
-    expect(defaultYAxisMetric([])).toBe(DEFAULT_METRIC_CONFIG_KEY);
-    expect(defaultYAxisMetric(['certified'])).toBe('y_measuredAvgPower');
-    expect(defaultYAxisMetric(['legacy'])).toBe('y_measuredAvgPower');
+    expect(DEFAULT_Y_AXIS_METRIC).toBe('y_tokensPerDollarH');
+    expect(DEFAULT_Y_AXIS_METRIC).toBe(DEFAULT_METRIC_CONFIG_KEY);
   });
 
   it('has expected default for r_range', async () => {
@@ -90,22 +88,6 @@ describe('PARAM_DEFAULTS', () => {
   it('has empty string default for i_advlabel', async () => {
     const { PARAM_DEFAULTS } = await import('@/lib/routing/url-state');
     expect(PARAM_DEFAULTS.i_advlabel).toBe('');
-  });
-
-  it('drops retired comparison controls from old share links while preserving analysis toggles', async () => {
-    setupWindow(
-      '?i_servicecompare=1&i_servicebase=baseline&i_servicepeer=comparator&i_servicetarget=8&i_roleshare=1&i_powerfit=1',
-    );
-    const { readUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
-    const params = readUrlParams();
-    const shared = new URL(buildShareUrl()).searchParams;
-    expect(params).toMatchObject({ i_roleshare: '1', i_powerfit: '1' });
-    expect(shared.get('i_roleshare')).toBe('1');
-    expect(shared.get('i_powerfit')).toBe('1');
-    for (const key of ['i_servicecompare', 'i_servicebase', 'i_servicepeer', 'i_servicetarget']) {
-      expect(params).not.toHaveProperty(key);
-      expect(shared.has(key)).toBe(false);
-    }
   });
 
   it('strips the normalized revenue source but preserves OpenRouter as explicit state', async () => {
@@ -185,37 +167,16 @@ describe('readUrlParams', () => {
     expect(params).not.toHaveProperty('unknown_key');
   });
 
-  it('preserves the locale path, unrelated params, and hash when cleaning initial state', async () => {
+  it('reads share-link params without rewriting the address bar', async () => {
     const { history } = setupWindow('?g_model=test&eval=42', '/zh/evaluation', '#sample-detail');
-    await import('@/lib/routing/url-state');
-    await vi.runAllTimersAsync();
-
-    expect(history.replaceState).toHaveBeenCalledWith(
-      history.state,
-      '',
-      '/zh/evaluation?eval=42#sample-detail',
-    );
-  });
-
-  it('skips the deferred cleanup entirely when the URL has no share-link params', async () => {
-    const { history } = setupWindow('?unrelated=1', '/');
-    await import('@/lib/routing/url-state');
-    await vi.runAllTimersAsync();
-
-    expect(history.replaceState).not.toHaveBeenCalled();
-  });
-
-  it('cleans share-link params via the pristine History prototype, not the patched method', async () => {
-    const { history } = setupWindow('?g_model=test&eval=42', '/inference');
     const pristine = vi.fn();
     vi.stubGlobal('History', { prototype: { replaceState: pristine } });
-    await import('@/lib/routing/url-state');
+    const { readUrlParams } = await import('@/lib/routing/url-state');
     await vi.runAllTimersAsync();
 
+    expect(readUrlParams().g_model).toBe('test');
     expect(history.replaceState).not.toHaveBeenCalled();
-    expect(pristine).toHaveBeenCalledTimes(1);
-    expect(pristine.mock.calls[0]).toEqual([history.state, '', '/inference?eval=42']);
-    expect(pristine.mock.contexts[0]).toBe(history);
+    expect(pristine).not.toHaveBeenCalled();
   });
 });
 

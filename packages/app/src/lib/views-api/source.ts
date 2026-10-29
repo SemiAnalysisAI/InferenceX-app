@@ -28,7 +28,11 @@ import {
 
 export { CALCULATOR_PERCENTILE_VALUES, matchesHardware };
 
-/** Call only fixed, first-party GET handlers. No caller-controlled host or fetch URL. */
+/**
+ * Call only fixed, first-party GET handlers. No caller-controlled host or fetch URL.
+ * The request carries no Accept-Encoding, so cachedJson answers with plain JSON:
+ * direct handler calls never get fetch's transparent content decoding.
+ */
 export function sourceRequest(
   request: NextRequest,
   path: string,
@@ -42,13 +46,6 @@ export function sourceRequest(
 
 export function readResponse<T>(response: Response): Promise<T> {
   if (!response.ok) throw new ViewsUpstreamError(response.status);
-  // Direct route calls do not get fetch's transparent content decoding.
-  // cachedJson emits compressed bytes, even when called without an HTTP hop.
-  if (response.headers.get('Content-Encoding') === 'gzip' && response.body) {
-    return new Response(
-      response.body.pipeThrough(new DecompressionStream('gzip')),
-    ).json() as Promise<T>;
-  }
   return response.json() as Promise<T>;
 }
 

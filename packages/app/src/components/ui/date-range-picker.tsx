@@ -162,6 +162,10 @@ export function DateRangePicker({
   };
 
   const handleCancel = () => {
+    track('date_range_picker_cancelled', {
+      changed:
+        tempRange.startDate !== dateRange.startDate || tempRange.endDate !== dateRange.endDate,
+    });
     setTempRange(dateRange);
     setSelectingStart(true);
     setOpen(false);

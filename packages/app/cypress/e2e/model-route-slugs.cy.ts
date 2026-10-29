@@ -96,6 +96,9 @@ function selectModel(label: string) {
 }
 
 function expectBestPerSku(enabled: boolean) {
+  // Opening the dialog while a select popover or the previous dialog is still exiting can leave
+  // it under Radix's pointer-events lock; a person cannot click that fast, so let them unmount.
+  cy.get('[data-radix-popper-content-wrapper], [role="dialog"]').should('not.exist');
   cy.get('[data-testid="scatter-quick-filters"]').click();
   cy.get('[data-testid="quick-filter-best-per-sku"]').should(
     'have.attr',
@@ -103,6 +106,8 @@ function expectBestPerSku(enabled: boolean) {
     enabled ? 'checked' : 'unchecked',
   );
   cy.get('[data-testid="quick-filters-dialog"]').contains('button', 'Done').click();
+  // Reopening mid exit-animation reuses the old content under a new overlay, which then covers it.
+  cy.get('[data-testid="quick-filters-dialog"]').should('not.exist');
 }
 
 function visitModel(model: string, extra = '', path = '/inference') {
@@ -121,7 +126,7 @@ function visitModel(model: string, extra = '', path = '/inference') {
     {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        win.localStorage.removeItem('inferencex-feature-gate');
+        win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
       },
     },
   );

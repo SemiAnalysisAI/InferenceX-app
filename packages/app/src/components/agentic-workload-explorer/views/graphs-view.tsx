@@ -517,6 +517,7 @@ function Histogram({
         <div className="flex justify-end mb-1">
           <ExportPngButton
             locale={locale}
+            analyticsChart={exportFilename?.replace(/\.png$/u, '') || 'histogram'}
             onClick={() => {
               if (svgRef.current) {
                 exportSvgToPng(svgRef.current, {

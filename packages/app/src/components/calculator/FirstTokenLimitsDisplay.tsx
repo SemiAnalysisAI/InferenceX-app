@@ -51,6 +51,7 @@ import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
 import { track } from '@/lib/analytics/analytics';
+import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
 import { getModelSortIndex } from '@/lib/catalog/constants';
 import { exportToCsv } from '@/lib/export/csv-export';
 import {
@@ -664,7 +665,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
       isLegendExpanded={isLegendExpanded}
       onExpandedChange={(expanded) => {
         setIsLegendExpanded(expanded);
-        track('first_token_legend_expanded', { expanded });
+        track('first_token_legend_expanded', { enabled: expanded });
       }}
       switches={[
         {
@@ -810,7 +811,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
                         const next = values[0];
                         if (!next) return;
                         setCostType(next as CostType);
-                        track('first_token_cost_type_changed', { costType: next });
+                        track('first_token_cost_type_changed', { cost_type: next });
                       }}
                       open={openDropdown === 'costType'}
                       onOpenChange={handleDropdownOpenChange('costType')}
@@ -905,6 +906,12 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
             <ChartButtons
               chartId="first-token-limits"
               analyticsPrefix="first_token"
+              analyticsContext={selectionAnalyticsContext({
+                model: selectedModel,
+                sequence: selectedSequence,
+                precisions: selectedPrecisions,
+                gpuCount: visibleHwKeys.size,
+              })}
               hideZoomReset
               onExportCsv={handleExportCsv}
               exportFileName={`InferenceX_first_token_limits_${selectedModel}`}

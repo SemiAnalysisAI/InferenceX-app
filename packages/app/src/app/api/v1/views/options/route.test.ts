@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/cache/api-cache', () => ({
-  cachedJson: (data: unknown) => Response.json(data),
+  cachedJson: (_request: Request, data: unknown) => Response.json(data),
 }));
 
 import { LIFECYCLE_DEFAULTS } from '@/components/calculator/lifecycle';
@@ -76,6 +76,29 @@ describe('GET /api/v1/views/options', () => {
     const agentic = body.sequences.find((s: { key: string }) => s.key === 'agentic-traces');
     expect(agentic).toBeDefined();
     expect(agentic.isl).toBeNull();
+  });
+
+  it('returns default models in selector order without changing the selected default', async () => {
+    const res = await GET(request('/api/v1/views/options'));
+    const body = await res.json();
+    expect(
+      body.models
+        .filter((model: { category: string }) => model.category === 'default')
+        .map((model: { name: string }) => model.name),
+    ).toEqual([
+      'Kimi-K3',
+      'DeepSeek-V4.1-Flash',
+      'GLM-5.2',
+      'MiniMax-M3.1-Flash',
+      'Muse-Spark-Open',
+      'DeepSeek-V4-Pro',
+      'Qwen-3.5-397B-A17B',
+      'Qwen3.8-Flash-Next',
+    ]);
+    expect(body.defaults.model).toBe('DeepSeek-V4-Pro');
+    expect(body.models.some((model: { category: string }) => model.category === 'hidden')).toBe(
+      false,
+    );
   });
 
   it('describes hardware and metrics from the registries', async () => {

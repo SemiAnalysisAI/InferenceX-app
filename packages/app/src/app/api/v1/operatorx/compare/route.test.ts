@@ -17,7 +17,7 @@ vi.mock('@/lib/operatorx/service', () => ({
   isPartialComparison: vi.fn(() => false),
 }));
 vi.mock('@/lib/cache/api-cache', () => ({
-  cachedJson: vi.fn((body) => NextResponse.json(body)),
+  cachedJson: vi.fn((_request: Request, body: unknown) => NextResponse.json(body)),
   operatorXCacheTag: vi.fn(() => 'opx'),
 }));
 
