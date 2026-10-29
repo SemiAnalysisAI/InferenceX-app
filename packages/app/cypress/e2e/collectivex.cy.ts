@@ -155,7 +155,7 @@ describe('CollectiveX neutral run view', () => {
     cy.contains('[role="option"]', 'EP16').click();
 
     cy.get('[data-testid="collectivex-main-chart"]')
-      .should('contain.text', 'mori')
+      .should('contain.text', 'MoRI')
       .and('contain.text', 'EP16');
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
 

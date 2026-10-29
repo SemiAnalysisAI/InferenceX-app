@@ -47,6 +47,13 @@ export function collectiveXSkuLabel(sku: string): string {
   return normalizeCollectiveXSku(sku).toUpperCase();
 }
 
+/** Display names for backends whose project styles the name differently from the backend id. */
+const COLLECTIVEX_BACKEND_LABELS: Record<string, string> = { mori: 'MoRI' };
+
+export function collectiveXBackendLabel(backend: string): string {
+  return COLLECTIVEX_BACKEND_LABELS[backend] ?? backend;
+}
+
 export function collectiveXCaseLabel(label: string, sku: string): string {
   return label.startsWith(sku) ? `${collectiveXSkuLabel(sku)}${label.slice(sku.length)}` : label;
 }
@@ -84,7 +91,7 @@ export function collectiveXTopologyLabel(
 export function collectiveXLegendLabel(series: CollectiveXSeries, locale: Locale = 'en'): string {
   const mode = locale === 'zh' ? COLLECTIVEX_MODE_LABELS_ZH[series.mode] : series.mode;
   const phase = locale === 'zh' ? COLLECTIVEX_PHASE_LABELS_ZH[series.phase] : series.phase;
-  return `${collectiveXSkuLabel(series.system.sku)} · ${series.backend} · EP${series.system.ep_size} · ${mode} · ${phase} · ${series.precision}`;
+  return `${collectiveXSkuLabel(series.system.sku)} · ${collectiveXBackendLabel(series.backend)} · EP${series.system.ep_size} · ${mode} · ${phase} · ${series.precision}`;
 }
 
 export function collectiveXSeriesLabel(
@@ -270,7 +277,7 @@ export function collectiveXRangeColorKey(series: CollectiveXSeries | CollectiveX
 
 function rangeMemberLabel(series: CollectiveXSeries, locale: Locale): string {
   const mode = locale === 'zh' ? COLLECTIVEX_MODE_LABELS_ZH[series.mode] : series.mode;
-  return `${series.backend} · ${mode}`;
+  return `${collectiveXBackendLabel(series.backend)} · ${mode}`;
 }
 
 /**

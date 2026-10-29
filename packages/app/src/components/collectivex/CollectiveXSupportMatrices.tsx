@@ -6,6 +6,7 @@ import { useMemo } from 'react';
 
 import { useLocale } from '@/lib/i18n/use-locale';
 
+import { collectiveXBackendLabel } from './data';
 import {
   COLLECTIVEX_KNOWN_FOOTNOTES,
   COLLECTIVEX_KNOWN_LIBRARIES,
@@ -150,7 +151,7 @@ export function CollectiveXSupportMatrices({
                           scope="col"
                           className="border-l border-border/60 bg-muted/30 px-3 py-2 text-center text-xs font-medium whitespace-nowrap"
                         >
-                          {library}
+                          {collectiveXBackendLabel(library)}
                         </th>
                       ))}
                     </tr>
@@ -181,7 +182,7 @@ export function CollectiveXSupportMatrices({
                                 <span
                                   data-testid="collectivex-known-na"
                                   title={noteTextOf(kase.ep8.note) ?? undefined}
-                                  aria-label={`${sku.toUpperCase()} × ${library}: ${t.na}${
+                                  aria-label={`${sku.toUpperCase()} × ${collectiveXBackendLabel(library)}: ${t.na}${
                                     noteTextOf(kase.ep8.note)
                                       ? ` — ${noteTextOf(kase.ep8.note)}`
                                       : ''

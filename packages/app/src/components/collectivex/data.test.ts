@@ -9,6 +9,7 @@ import {
   collectiveXSeriesForRun,
   collectiveXSeriesLabel,
   collectiveXSkuLabel,
+  collectiveXBackendLabel,
   collectiveXTopologyLabel,
   fitAlphaBeta,
   formatCollectiveXLatencyPercentiles,
@@ -55,6 +56,8 @@ describe('collectiveXSeriesLabel', () => {
     expect(normalizeCollectiveXSku('B200-nscale')).toBe('b200');
     expect(normalizeCollectiveXSku('H100-DGXC')).toBe('h100');
     expect(collectiveXSkuLabel('B200-nscale')).toBe('B200');
+    expect(collectiveXBackendLabel('mori')).toBe('MoRI');
+    expect(collectiveXBackendLabel('deepep-v2')).toBe('deepep-v2');
     expect(collectiveXCaseLabel('h100-dgxc · deepep-v2', 'h100-dgxc')).toBe('H100 · deepep-v2');
     expect(normalizeCollectiveXSku('future-accelerator')).toBe('future-accelerator');
   });
