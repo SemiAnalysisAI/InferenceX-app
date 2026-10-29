@@ -759,6 +759,9 @@ describe('Profit Estimator per GW', () => {
 
     cy.get('button#profit-price-source').click();
     cy.contains('[role="option"]', 'Custom $/M tok').click();
+    // The closing popover refocuses its trigger after the exit animation; typing before that
+    // loses the keystrokes that clear the field.
+    cy.get('button#profit-price-source').should('have.focus');
     cy.get('[data-testid="profit-custom-prices"]').should('exist');
     cy.get('[data-testid="profit-input-price"]').should('have.value', '0.6');
     cy.get('[data-testid="profit-cached-price"]').should('have.value', '0.1');
@@ -777,6 +780,7 @@ describe('Profit Estimator per GW', () => {
   it('lets a custom $/GPU/hr per chip replace the TCO tier', () => {
     cy.get('button#profit-cost').click();
     cy.get('[data-testid="cost-provider-custom"]').click();
+    cy.get('button#profit-cost').should('have.focus');
     cy.get('[data-testid="result-context-cost-tier"]').should('contain.text', 'Custom');
     cy.get('[data-testid="profit-custom-costs"]').should('not.exist');
     cy.get('[data-testid="profit-tco-badge"] input').should('have.length', 4);
@@ -1658,6 +1662,7 @@ describe('Profit Estimator — responsive control panels', () => {
           '30',
         );
         cy.contains('[role="option"]', 'Custom $/M tok').click();
+        cy.get('#profit-price-source').should('have.focus');
         cy.get('[data-testid="profit-pricing-panel"] [data-testid="profit-custom-prices"]')
           .find('input')
           .should('have.length', 3);

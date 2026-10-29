@@ -15,7 +15,7 @@ import {
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { Card } from '@/components/ui/card';
-import { track } from '@/lib/analytics/analytics';
+import { track, trackOncePerPageview } from '@/lib/analytics/analytics';
 import { toModel, toSequence } from '@/lib/compare/compare-enum-coerce';
 import type { AgenticScenarioIntro } from '@/lib/compare/compare-ssr';
 import type { CompareTableData } from '@/lib/compare/compare-table-view';
@@ -83,13 +83,12 @@ export default function ComparePrecisionPageClient({
   locale = 'en',
 }: ComparePrecisionPageClientProps) {
   useEffect(() => {
-    track('compare_precision_page_view', {
+    trackOncePerPageview(
+      'compare_precision_page_view',
+      { slug, gpu, model: defaultModel, precisions: [precA, precB] },
       slug,
-      gpu,
-      prec_a: precA,
-      prec_b: precB,
-    });
-  }, [slug, gpu, precA, precB]);
+    );
+  }, [slug, gpu, defaultModel, precA, precB]);
 
   const initialModel = toModel(defaultModel);
   const initialSequence = toSequence(defaultSequence);

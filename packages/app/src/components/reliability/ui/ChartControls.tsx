@@ -55,7 +55,7 @@ export default function ReliabilityChartControls() {
           value={dateRange}
           onValueChange={(value) => {
             setDateRange(value);
-            track('reliability_date_range_changed', { dateRange: value });
+            track('reliability_date_range_changed', { date_range: value });
           }}
         >
           <SelectTrigger

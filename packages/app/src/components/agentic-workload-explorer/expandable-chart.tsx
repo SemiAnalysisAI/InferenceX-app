@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
+import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
 
 const STRINGS = {
   en: {
@@ -221,6 +222,7 @@ export function ExpandableChart({
   sharedZoom?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  useDialogCloseTracking(open, 'agentic_workload_chart_closed');
   const [bodyHeight, setBodyHeight] = useState<number>();
   const bodyRef = useRef<HTMLDivElement>(null);
   const isRender = typeof children === 'function';
@@ -278,6 +280,7 @@ export function Expandable({
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  useDialogCloseTracking(open, 'agentic_workload_chart_closed');
   const [generation, setGeneration] = useState(0);
   return (
     <ExpandContext.Provider

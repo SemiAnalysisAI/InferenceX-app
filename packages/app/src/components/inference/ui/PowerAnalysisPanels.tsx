@@ -171,7 +171,7 @@ export default function PowerAnalysisPanels({
       // The clicked chip stays the open one: its point moved, not the slider.
       openDrilldown(series.key);
       track('powerx_breakdown_point_pinned', {
-        hw: series.hwKey,
+        gpu: series.hwKey,
         concurrency: entry.concurrency,
       });
     },
@@ -184,7 +184,7 @@ export default function PowerAnalysisPanels({
       setComparedPoints(
         Object.fromEntries(Object.entries(comparedPoints).filter(([key]) => key !== series.key)),
       );
-      track('powerx_breakdown_point_unpinned', { hw: series.hwKey, concurrency });
+      track('powerx_breakdown_point_unpinned', { gpu: series.hwKey, concurrency });
     },
     [comparedPoints],
   );

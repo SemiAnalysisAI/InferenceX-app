@@ -12,6 +12,7 @@ import {
   type TocHeading,
 } from '@/lib/blog/blog';
 import { type Locale, localePath } from '@/lib/i18n/i18n';
+import { analyticsPlacement } from '@/lib/analytics/placement';
 import { AUTHOR_NAME } from '@semianalysisai/inferencex-constants';
 
 import { BlogBackLink } from './blog-back-link';
@@ -132,7 +133,11 @@ export function BlogPostContent({
                   className="lg:hidden"
                 />
               )}
-              <article data-blog-article className={BLOG_PROSE_CLASS}>
+              <article
+                data-blog-article
+                {...analyticsPlacement('blog_article')}
+                className={BLOG_PROSE_CLASS}
+              >
                 {content}
                 <p className="mt-12 max-w-[72ch] border-t border-border/40 pt-6 text-xs leading-5 text-muted-foreground">
                   {t.copyright}

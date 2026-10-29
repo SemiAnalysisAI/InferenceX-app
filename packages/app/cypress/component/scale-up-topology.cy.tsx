@@ -1,4 +1,5 @@
 import { ScaleUpTopologyDiagram } from '@/components/gpu-specs/scale-up-topology-diagram';
+import { registerAnalyticsClient } from '@/lib/analytics/analytics';
 import type { GpuSpec } from '@/lib/catalog/gpu-specs';
 
 const H100_SXM: GpuSpec = {
@@ -78,6 +79,40 @@ describe('ScaleUpTopologyDiagram', () => {
     cy.get('button[aria-label="Expand H100 SXM scale-up topology diagram"]').click();
     cy.contains('H100 SXM Scale-Up Topology').should('be.visible');
     cy.get('[role="dialog"] svg[role="img"]').should('exist');
+  });
+
+  it('tracks the dialog closing with how long it was open', () => {
+    registerAnalyticsClient({ capture: cy.stub().as('capture') });
+    cy.mount(<ScaleUpTopologyDiagram spec={H100_SXM} allSpecs={ALL_SPECS} />);
+    cy.get('button[aria-label="Expand H100 SXM scale-up topology diagram"]').click();
+    cy.get('[role="dialog"]').should('be.visible');
+    cy.get('body').type('{esc}');
+    cy.get('[role="dialog"]').should('not.exist');
+    cy.get('@capture').should(
+      'have.been.calledWith',
+      'gpu_specs_scaleup_topology_closed',
+      Cypress.sinon.match({ gpu: 'H100 SXM', duration_ms: Cypress.sinon.match.number }),
+    );
+  });
+
+  it('tracks the closing with the GPU shown after Prev/Next, not the card that opened it', () => {
+    registerAnalyticsClient({ capture: cy.stub().as('capture') });
+    cy.mount(<ScaleUpTopologyDiagram spec={H100_SXM} allSpecs={ALL_SPECS} />);
+    cy.get('button[aria-label="Expand H100 SXM scale-up topology diagram"]').click();
+    cy.get('[data-testid="scaleup-topology-nav-next"]').click();
+    cy.contains('GB200 NVL72 Scale-Up Topology').should('be.visible');
+    cy.get('body').type('{esc}');
+    cy.get('[role="dialog"]').should('not.exist');
+    cy.get('@capture').should(
+      'have.been.calledWith',
+      'gpu_specs_scaleup_topology_closed',
+      Cypress.sinon.match({ gpu: 'GB200 NVL72' }),
+    );
+    cy.get('@capture').should(
+      'not.have.been.calledWith',
+      'gpu_specs_scaleup_topology_closed',
+      Cypress.sinon.match({ gpu: 'H100 SXM' }),
+    );
   });
 
   it('dialog shows GPU spec name', () => {

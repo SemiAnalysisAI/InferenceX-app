@@ -14,7 +14,11 @@ import {
 
 import { DISPLAY_MODEL_TO_DB, rowToSequence } from '@semianalysisai/inferencex-constants';
 import type { BenchmarkRow } from '@/lib/api/api';
-import { track } from '@/lib/analytics/analytics';
+import { track, trackOncePerPageview } from '@/lib/analytics/analytics';
+import {
+  type SelectionAnalyticsContext,
+  selectionAnalyticsContext,
+} from '@/lib/analytics/selection-context';
 import { EngineComparisonConfirmation } from '@/components/inference/ui/engine-comparison-confirmation';
 import {
   needsEngineComparisonConsent,
@@ -1500,7 +1504,7 @@ export function InferenceProvider({
         model: selectedModel,
         sequence: effectiveSequence,
         preset_id: activePresetId,
-        yAxisMetric: selectedYAxisMetric,
+        metric: selectedYAxisMetric,
       });
     }, 3000);
     return () => clearTimeout(timer);
@@ -1521,15 +1525,15 @@ export function InferenceProvider({
         gpus: [...new Set(pairs.map((p) => p.split('_').slice(1).join('_')))].toSorted(),
         model: selectedModel,
         sequence: effectiveSequence,
-        yAxisMetric: selectedYAxisMetric,
+        metric: selectedYAxisMetric,
       });
     }, 3000);
     return () => clearTimeout(timer);
   }, [activeDates]);
 
   useEffect(() => {
-    track('inference_chart_view', {
-      yAxisMetric: selectedYAxisMetric,
+    trackOncePerPageview('inference_chart_view', {
+      metric: selectedYAxisMetric,
       source: getUrlParam('i_metric') ? 'url' : 'default',
     });
   }, []);
@@ -2043,4 +2047,19 @@ export function useInferenceDisplay() {
 
 export function useInferenceActions() {
   return useRequiredInferenceContext(useContext(InferenceActionsContext), 'useInferenceActions');
+}
+
+/**
+ * The selected model, sequence and precision, to spread into inference analytics events. Returns an
+ * empty object outside an InferenceProvider, so shared components can call it anywhere.
+ */
+export function useInferenceAnalyticsContext(): SelectionAnalyticsContext {
+  const filters = useContext(InferenceFiltersContext);
+  const model = filters?.selectedModel;
+  const sequence = filters?.selectedSequence;
+  const precisions = filters?.selectedPrecisions;
+  return useMemo(
+    () => selectionAnalyticsContext({ model, sequence, precisions }),
+    [model, sequence, precisions],
+  );
 }

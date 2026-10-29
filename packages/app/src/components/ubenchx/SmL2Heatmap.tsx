@@ -303,8 +303,8 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
       positionTooltip(event);
       drawCrosshair(i, j);
       track('ubenchx_sm_l2_cell_clicked', {
-        smRow: result.smInfo[i].sm,
-        smCol: result.smInfo[j].sm,
+        sm_row: result.smInfo[i].sm,
+        sm_col: result.smInfo[j].sm,
       });
     });
   }, [n, colorScale, result, t, pinnedCell]);

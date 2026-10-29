@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { track } from '@/lib/analytics/analytics';
+import { track, trackOncePerPageview } from '@/lib/analytics/analytics';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChartButtons } from '@/components/ui/chart-buttons';
@@ -91,7 +91,7 @@ export default function SubmissionsDisplay() {
   );
 
   useEffect(() => {
-    track('submissions_page_viewed');
+    trackOncePerPageview('submissions_page_viewed');
   }, []);
 
   const handleModeChange = useCallback((mode: ChartMode) => {

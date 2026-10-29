@@ -38,7 +38,7 @@ const STRINGS = {
 
 export default function ReliabilityChartDisplay() {
   const CHART_ID = 'reliability-chart';
-  const { setIsLegendExpanded, chartData } = useReliabilityContext();
+  const { setIsLegendExpanded, chartData, enabledModels } = useReliabilityContext();
   const t = STRINGS[useLocale()];
 
   const handleExportCsv = useCallback(() => {
@@ -70,6 +70,7 @@ export default function ReliabilityChartDisplay() {
       <ChartSection
         chartId={CHART_ID}
         analyticsPrefix="reliability"
+        analyticsContext={{ gpu_count: enabledModels.size }}
         zoomResetEvent={`d3chart_zoom_reset_${CHART_ID}`}
         setIsLegendExpanded={setIsLegendExpanded}
         onExportCsv={handleExportCsv}

@@ -102,7 +102,7 @@ export function LatencyWaterfall({ rows }: { rows: StatRow[] }) {
       const expanding = !next.has(turn);
       if (expanding) next.add(turn);
       else next.delete(turn);
-      track('agentic_workload_waterfall_group_toggled', { turn, expanded: expanding });
+      track('agentic_workload_waterfall_group_toggled', { turn, enabled: expanding });
       return next;
     });
   }, []);

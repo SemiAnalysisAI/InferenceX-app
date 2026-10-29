@@ -113,7 +113,7 @@ export function BottomToast({
 
   const handleAction = useCallback(() => {
     actionClickedRef.current = true;
-    track('toast_action_clicked', { title, actionLabel: action?.label });
+    track('toast_action_clicked', { title, action_label: action?.label });
     action?.onClick();
     dismiss();
   }, [action, dismiss, title]);

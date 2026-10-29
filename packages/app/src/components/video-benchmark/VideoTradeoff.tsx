@@ -284,7 +284,10 @@ export default function VideoTradeoff({
           <VideoSelect
             label={s.workload}
             value={group ?? ''}
-            onValueChange={setWorkload}
+            onValueChange={(value) => {
+              track('video_tradeoff_workload_selected', { workload: value });
+              setWorkload(value);
+            }}
             options={groups.map(([value, name], index) => ({
               value,
               label: `#${index + 1} · ${name}`,
@@ -294,13 +297,19 @@ export default function VideoTradeoff({
             <VideoSelect
               label={s.x}
               value={xAxis}
-              onValueChange={(value) => setX(value as LatencyAxis)}
+              onValueChange={(value) => {
+                track('video_tradeoff_axis_selected', { axis: 'x', metric: value });
+                setX(value as LatencyAxis);
+              }}
               options={(['p90', 'median'] as const).map((value) => ({ value, label: s[value] }))}
             />
             <VideoSelect
               label={s.y}
               value={yAxis}
-              onValueChange={(value) => setY(value as EfficiencyAxis)}
+              onValueChange={(value) => {
+                track('video_tradeoff_axis_selected', { axis: 'y', metric: value });
+                setY(value as EfficiencyAxis);
+              }}
               options={(
                 [
                   'clipsGpu',
@@ -419,6 +428,7 @@ export default function VideoTradeoff({
               <Button
                 variant="outline"
                 onClick={() => {
+                  track('video_tradeoff_preset_applied', { serving: isServing });
                   setX('median');
                   setY('clipsGpu');
                 }}
@@ -592,6 +602,9 @@ export default function VideoTradeoff({
                       step={key === 'hourly' ? 'any' : undefined}
                       value={cost[key]}
                       onChange={(event) => costInput(key, event.target.value)}
+                      onBlur={(event) => {
+                        if (event.target.value) track('video_tradeoff_cost_set', { field: key });
+                      }}
                     />
                   </label>
                 ))}

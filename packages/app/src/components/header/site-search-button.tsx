@@ -4,6 +4,7 @@ import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 
 import { HEADER_ACTION_STYLE } from '@/components/ui/control-styles';
 import { track } from '@/lib/analytics/analytics';
+import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
 
@@ -27,6 +28,7 @@ export function SiteSearchButton() {
   const strings = STRINGS[locale];
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  useDialogCloseTracking(open, 'header_search_closed');
 
   const openSearch = useCallback((method: 'click' | 'shortcut') => {
     setMounted(true);

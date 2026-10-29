@@ -4,6 +4,7 @@ import { useState } from 'react';
 import VideoSelect from './VideoSelect';
 import { Card } from '@/components/ui/card';
 import { Heading } from '@/components/ui/heading';
+import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { at, entries, number, ROLES, rows, text, type Json } from './bundle';
 
@@ -88,7 +89,10 @@ export default function ResultPower({ result }: { result: Json }) {
           <VideoSelect
             label={s.phase}
             value={phase}
-            onValueChange={(value) => setPhase(value as typeof phase)}
+            onValueChange={(value) => {
+              track('video_power_phase_selected', { phase: value });
+              setPhase(value as typeof phase);
+            }}
             options={(['startup', 'warmup', 'measurement'] as const).map((value) => ({
               value,
               label: s[value],

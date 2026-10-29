@@ -471,7 +471,10 @@ export function CollectiveXKvSection({
                 <Label className="text-xs text-muted-foreground">{strings.pageControl}</Label>
                 <SegmentedToggle
                   value={String(pageTokens)}
-                  onValueChange={setPageChoice}
+                  onValueChange={(value) => {
+                    track('collectivex_kv_page_tokens_changed', { page_tokens: Number(value) });
+                    setPageChoice(value);
+                  }}
                   ariaLabel={strings.pageAriaLabel}
                   testId="collectivex-kv-page-toggle"
                   options={pageValues.map((value) => ({
@@ -485,7 +488,10 @@ export function CollectiveXKvSection({
               <Label className="text-xs text-muted-foreground">{strings.opControl}</Label>
               <SegmentedToggle
                 value={op}
-                onValueChange={setOp}
+                onValueChange={(value) => {
+                  track('collectivex_kv_op_changed', { op: value });
+                  setOp(value);
+                }}
                 ariaLabel={strings.opAriaLabel}
                 testId="collectivex-kv-op-toggle"
                 options={[
@@ -577,7 +583,7 @@ export function CollectiveXKvSection({
                     isLegendExpanded={legendExpanded}
                     onExpandedChange={(expanded) => {
                       setLegendExpanded(expanded);
-                      track('collectivex_kv_legend_expanded', { expanded });
+                      track('collectivex_kv_legend_expanded', { enabled: expanded });
                     }}
                   />
                 }
@@ -609,7 +615,7 @@ export function CollectiveXKvSection({
                     isLegendExpanded={legendExpanded}
                     onExpandedChange={(expanded) => {
                       setLegendExpanded(expanded);
-                      track('collectivex_kv_legend_expanded', { expanded });
+                      track('collectivex_kv_legend_expanded', { enabled: expanded });
                     }}
                   />
                 }

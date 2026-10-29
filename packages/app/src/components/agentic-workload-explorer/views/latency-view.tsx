@@ -920,7 +920,7 @@ function CacheHeatmap({
           type="button"
           onClick={() => {
             setHideSmall((h) => !h);
-            track('agentic_workload_latency_heatmap_hide_small_toggled', { hideSmall: !hideSmall });
+            track('agentic_workload_latency_heatmap_hide_small_toggled', { enabled: !hideSmall });
           }}
           className={`px-2 py-0.5 text-3xs font-mono rounded border transition-colors ${
             hideSmall
@@ -1153,7 +1153,7 @@ function InteractivityHeatmap({
           onClick={() => {
             setHideSmall((h) => !h);
             track('agentic_workload_latency_interactivity_hide_small_toggled', {
-              hideSmall: !hideSmall,
+              enabled: !hideSmall,
             });
           }}
           className={`px-2 py-0.5 text-3xs font-mono rounded border transition-colors ${
@@ -1349,7 +1349,7 @@ function FacetedHeatmap({ data }: { data: HeatmapByOutputCell[] }) {
           type="button"
           onClick={() => {
             setHideSmall((h) => !h);
-            track('agentic_workload_latency_faceted_hide_small_toggled', { hideSmall: !hideSmall });
+            track('agentic_workload_latency_faceted_hide_small_toggled', { enabled: !hideSmall });
           }}
           className={`px-2 py-0.5 text-3xs font-mono rounded border transition-colors ${
             hideSmall

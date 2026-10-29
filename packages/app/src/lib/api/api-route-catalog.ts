@@ -782,7 +782,7 @@ export const apiRouteCatalog = [
       en: 'Unauthenticated feedback submission changes stored state and is intentionally outside the published read API.',
       zh: '无需身份验证的反馈提交会更改存储状态，因此有意不纳入公开只读 API。',
     },
-    sourceSha256: '6e2b697ca9a165e27e889dd71d1b9fb9d489e4ede3077ebb585e2d4c0f159d8a',
+    sourceSha256: '4bb4351da6a074b034baaaf42d7d4c5f9ba1a648ca0622468ce3ddbb575b129d',
   },
   {
     source: 'src/app/api/v1/feedback/list/route.ts',
@@ -1657,7 +1657,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/api/api.ts',
-    sourceSha256: '1d440ffaafa1573e260bcd2282647cdd2ca83e4ebedc44a5f4e7c212e646ab71',
+    sourceSha256: '8fd6eac0b6c3d0df45f9475083eb0c28a07775ca11dac4127ab3abe2f98998e1',
     reviewArea: {
       en: 'Public API client parameter serialization and TypeScript response contracts.',
       zh: '公开 API 客户端的参数序列化和 TypeScript 响应契约。',

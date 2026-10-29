@@ -286,7 +286,7 @@ export default function PowerPartsList({
             aria-controls={restId}
             onClick={() => {
               setExpanded(!expanded);
-              track('powerx_parts_expanded', { expanded: !expanded, hw: series.hwKey });
+              track('powerx_parts_expanded', { enabled: !expanded, gpu: series.hwKey });
             }}
             className="mt-1 flex min-h-11 w-full items-center justify-between gap-3 rounded-md border border-border/70 bg-muted/10 px-3 text-left text-sm font-medium text-foreground"
           >

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Heading } from '@/components/ui/heading';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
+import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import VideoBenchmark from './VideoBenchmark';
 import FidelityResults from './FidelityResults';
@@ -425,7 +426,10 @@ export default function VideoCIRuns() {
               className="min-w-0 flex-1 sm:flex-none"
               variant="outline"
               disabled={loading}
-              onClick={() => void list(1, true)}
+              onClick={() => {
+                track('video_ci_runs_refreshed');
+                void list(1, true);
+              }}
             >
               {s.refresh}
             </Button>
@@ -434,7 +438,10 @@ export default function VideoCIRuns() {
                 className="min-w-0 flex-1 sm:flex-none"
                 variant="outline"
                 disabled={loading}
-                onClick={() => void list(nextPage)}
+                onClick={() => {
+                  track('video_ci_runs_page_loaded', { page: nextPage });
+                  void list(nextPage);
+                }}
               >
                 {nextPage === 1 ? s.browse : s.older}
               </Button>
@@ -446,7 +453,10 @@ export default function VideoCIRuns() {
           <VideoSelect
             label={s.select}
             value={run ? String(run.id) : ''}
-            onValueChange={(value) => void selectRun(value)}
+            onValueChange={(value) => {
+              track('video_ci_run_selected', { latest: value === String(runs[0]?.id) });
+              void selectRun(value);
+            }}
             options={runs.map((r) => ({
               value: String(r.id),
               label: `#${r.id} · ${r.conclusion ?? r.status}`,
@@ -457,6 +467,7 @@ export default function VideoCIRuns() {
               label={s.source}
               value={sourceId}
               onValueChange={(value) => {
+                track('video_ci_source_selected', { source_count: sources.length });
                 setSourceId(value);
                 setCellId('');
                 if (run && artifact) share(run.id, artifact.id, value);
@@ -481,6 +492,7 @@ export default function VideoCIRuns() {
             className="flex flex-wrap gap-2"
             onSubmit={(e) => {
               e.preventDefault();
+              track('video_ci_run_opened_by_id');
               void selectRun(direct);
             }}
           >
@@ -513,6 +525,7 @@ export default function VideoCIRuns() {
               label={s.artifact}
               value={artifact ? String(artifact.id) : ''}
               onValueChange={(value) => {
+                track('video_ci_artifact_selected', { artifact_count: artifacts.length });
                 if (run) void selectRun(String(run.id), value);
               }}
               options={artifacts.map((a) => ({
@@ -560,14 +573,20 @@ export default function VideoCIRuns() {
         <Button
           variant={view === 'results' ? 'default' : 'outline'}
           aria-pressed={view === 'results'}
-          onClick={() => changeView('results')}
+          onClick={() => {
+            track('video_view_selected', { view: 'results' });
+            changeView('results');
+          }}
         >
           {s.results}
         </Button>
         <Button
           variant={view === 'tradeoff' ? 'default' : 'outline'}
           aria-pressed={view === 'tradeoff'}
-          onClick={() => changeView('tradeoff')}
+          onClick={() => {
+            track('video_view_selected', { view: 'tradeoff' });
+            changeView('tradeoff');
+          }}
         >
           {s.tradeoffs}
         </Button>

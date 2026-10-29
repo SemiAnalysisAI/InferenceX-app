@@ -89,10 +89,10 @@ export async function GET(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     trackServer('compare_per_dollar_png_render_failed', {
+      route_template: '/compare-per-dollar/[slug]/performance-per-dollar.png',
       slug,
       model: parsed.model.slug,
-      a: parsed.a,
-      b: parsed.b,
+      gpus: [parsed.a, parsed.b],
       sequence,
       precision,
       error_name: error instanceof Error ? error.name : 'Unknown',

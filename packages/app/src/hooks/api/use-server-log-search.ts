@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { ApiRequestError } from '@/lib/api/api-request-error';
+
 export interface ServerLogSearchMatch {
   fileName: string;
   offset: number;
@@ -21,8 +23,11 @@ async function fetchServerLogSearch(
   signal?: AbortSignal,
 ): Promise<ServerLogSearchResponse> {
   const params = new URLSearchParams({ id: String(id), q: query });
-  const response = await fetch(`/api/v1/server-log-search?${params}`, { signal });
-  if (!response.ok) throw new Error(`server-log-search ${response.status}`);
+  const url = `/api/v1/server-log-search?${params}`;
+  const response = await fetch(url, { signal });
+  if (!response.ok) {
+    throw new ApiRequestError(`server-log-search ${response.status}`, response.status, url);
+  }
   return (await response.json()) as ServerLogSearchResponse;
 }
 

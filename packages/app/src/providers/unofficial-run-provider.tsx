@@ -21,6 +21,7 @@ import { notifyClientSearchChange } from '@/lib/routing/client-navigation';
 import { setProfitRouteUnofficialRuns } from '@/lib/routing/profit-estimator-routes';
 import { useClientRouteSearch } from '@/hooks/useClientSearch';
 import { Model, Sequence } from '@/lib/catalog/data-mappings';
+import { ApiRequestError } from '@/lib/api/api-request-error';
 
 import chartDefinitions from '@/components/inference/metric-registry';
 
@@ -356,12 +357,12 @@ async function fetchUnofficialRuns(
   ids: string[],
   signal: AbortSignal,
 ): Promise<UnofficialRunResponse> {
-  const response = await fetch(`/api/unofficial-run?runId=${encodeURIComponent(ids.join(','))}`, {
-    cache: 'no-store',
-    signal,
-  });
+  const url = `/api/unofficial-run?runId=${encodeURIComponent(ids.join(','))}`;
+  const response = await fetch(url, { cache: 'no-store', signal });
   const data = (await response.json()) as Partial<UnofficialRunResponse> & { error?: string };
-  if (!response.ok) throw new Error(data.error || 'Failed to fetch unofficial run');
+  if (!response.ok) {
+    throw new ApiRequestError(data.error || 'Failed to fetch unofficial run', response.status, url);
+  }
   return selectUnofficialRunResponse(
     {
       runInfos: Array.isArray(data.runInfos) ? data.runInfos : [],

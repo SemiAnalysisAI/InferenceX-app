@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect } from 'react';
 
-import { track } from '@/lib/analytics/analytics';
+import { track, trackOncePerPageview } from '@/lib/analytics/analytics';
 import type { Locale } from '@/lib/i18n/i18n';
 
 const STRINGS = {
@@ -24,7 +24,7 @@ export function NotFoundContent({ locale }: { locale: Locale }) {
   const href = locale === 'zh' ? '/zh' : '/';
 
   useEffect(() => {
-    track('not_found_page_shown', {
+    trackOncePerPageview('not_found_page_shown', {
       locale,
       path: window.location.pathname,
       referrer_host: document.referrer ? new URL(document.referrer).host : null,

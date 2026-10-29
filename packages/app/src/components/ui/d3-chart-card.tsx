@@ -9,6 +9,7 @@ import { ChartButtons } from '@/components/ui/chart-buttons';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { D3Chart, type D3ChartProps } from '@/lib/d3-chart/D3Chart';
 import { track } from '@/lib/analytics/analytics';
+import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 interface D3ChartCardProps<T> {
@@ -30,6 +31,7 @@ export function D3ChartCard<T>({
 }: D3ChartCardProps<T>) {
   const id = useId().replaceAll(/[^a-zA-Z0-9_-]/g, '');
   const [expanded, setExpanded] = useState(false);
+  useDialogCloseTracking(expanded, `${analyticsPrefix}_chart_closed`, { title });
   const locale = useLocale();
   const inlineId = `${analyticsPrefix}-${id}`;
   const expandedId = `${inlineId}-expanded`;
@@ -43,11 +45,13 @@ export function D3ChartCard<T>({
       zoom={{ enabled: false, ...chart.zoom, resetEventName: `d3chart_zoom_reset_${chartId}` }}
     />
   );
+  const exportFileName = filename?.replace(/\.png$/iu, '') ?? title;
   const actions = (chartId: string, canExpand: boolean) => (
     <ChartButtons
       chartId={chartId}
       analyticsPrefix={analyticsPrefix}
-      exportFileName={filename?.replace(/\.png$/iu, '') ?? title}
+      analyticsChart={exportFileName}
+      exportFileName={exportFileName}
       zoomResetEvent={`d3chart_zoom_reset_${chartId}`}
       hideZoomReset={!chart.zoom?.enabled}
       leadingControls={

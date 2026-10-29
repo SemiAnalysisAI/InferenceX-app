@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useGitHubStarCount } from '@/lib/github/github-star-count';
 import { STARRED_EVENT, STARRED_KEY, saveStarred } from '@/lib/github/star-storage';
 import { track } from '@/lib/analytics/analytics';
+import { placementFor } from '@/lib/analytics/placement';
 import { Star } from 'lucide-react';
 
 const GITHUB_REPO_URL = 'https://github.com/SemiAnalysisAI/InferenceX';
@@ -31,10 +32,10 @@ export function StarButton() {
       className={`h-7 gap-1.5 text-xs${hasStarred ? '' : ' star-button-glow'}`}
       title="Star on GitHub"
       data-testid="footer-star-cta"
-      onClick={() => {
+      onClick={(event) => {
         saveStarred();
         setHasStarred(true);
-        track('footer_star_starred');
+        track('footer_star_starred', { placement: placementFor(event.currentTarget) });
         window.open(GITHUB_REPO_URL, '_blank', 'noopener,noreferrer');
       }}
     >

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { type RequestRecord, type RequestTimeline } from '@/hooks/api/use-request-timeline';
@@ -73,6 +73,20 @@ export function shouldHandleTimelineBarClick({
   shiftKey?: boolean;
 }): boolean {
   return button === 0 && !altKey && !ctrlKey && !metaKey && !shiftKey;
+}
+
+/**
+ * Shift+wheel zoom direction. Vertical scroll wins, horizontal scroll (trackpads, Shift remapping)
+ * is the fallback. Both the zoom step and its analytics event read this so they cannot disagree.
+ */
+export function timelineWheelZoomDirection({
+  deltaX,
+  deltaY,
+}: {
+  deltaX: number;
+  deltaY: number;
+}): 'in' | 'out' {
+  return (deltaY || deltaX) > 0 ? 'out' : 'in';
 }
 
 const ROW_MODE_OPTIONS: Record<'en' | 'zh', SegmentedToggleOption<RowMode>[]> = {
@@ -293,18 +307,27 @@ export function RequestTimelineView({
   }, [rows.length]);
 
   const zoomSvgRef = useRef<SVGSVGElement | null>(null);
+  const zoomTrackTimer = useRef<number | undefined>(undefined);
+  // Drop a pending zoom event on unmount so it is never attributed to the next page.
+  useEffect(() => () => window.clearTimeout(zoomTrackTimer.current), []);
   const handleWheel = useCallback(
     (e: WheelEvent) => {
       if (!e.shiftKey) return;
       e.preventDefault();
+      // One event per wheel gesture, not per wheel tick.
+      window.clearTimeout(zoomTrackTimer.current);
+      const direction = timelineWheelZoomDirection(e);
+      zoomTrackTimer.current = window.setTimeout(
+        () => track('inference_agentic_timeline_zoomed', { direction }),
+        500,
+      );
       const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseRatio = Math.max(0, Math.min(1, mouseX / PLOT_WIDTH));
       const curStart = vStart;
       const curEnd = vEnd;
       const curDur = curEnd - curStart;
-      const delta = e.deltaY || e.deltaX;
-      const factor = delta > 0 ? 1.2 : 1 / 1.2;
+      const factor = direction === 'out' ? 1.2 : 1 / 1.2;
       const newDur = Math.min(Math.max(curDur * factor, totalNs * 0.001), totalNs);
       const pivot = curStart + mouseRatio * curDur;
       let newStart = pivot - mouseRatio * newDur;
@@ -461,7 +484,7 @@ export function RequestTimelineView({
                 type="button"
                 onClick={() => {
                   resetZoom();
-                  track('inference_agentic_timeline_zoom_reset', { source: 'summary' });
+                  track('inference_agentic_timeline_zoom_reset', { placement: 'summary' });
                 }}
                 className="text-foreground hover:underline"
               >
@@ -519,7 +542,7 @@ export function RequestTimelineView({
                         onClick={() => {
                           toggleSubagent(row.key);
                           track('inference_agentic_timeline_streams_toggled', {
-                            expanded: !isExpanded,
+                            enabled: !isExpanded,
                           });
                         }}
                         className="size-3.5 flex items-center justify-center text-muted-foreground hover:text-foreground shrink-0"
@@ -577,7 +600,11 @@ export function RequestTimelineView({
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
                 onMouseLeave={handleMouseLeave}
-                onDoubleClick={resetZoom}
+                onDoubleClick={() => {
+                  if (!isZoomed) return;
+                  track('inference_agentic_timeline_zoom_reset', { placement: 'double_click' });
+                  resetZoom();
+                }}
               >
                 <TimelineBars
                   rows={visibleRows}

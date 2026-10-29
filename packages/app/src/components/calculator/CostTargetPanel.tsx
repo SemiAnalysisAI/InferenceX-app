@@ -139,7 +139,7 @@ export default function CostTargetPanel({
   }, []);
 
   const handleCostCapBlur = useCallback(() => {
-    track('calculator_cost_target_set', { costCap: costCapInput });
+    track('calculator_cost_target_set', { cost_cap: costCapInput });
   }, [costCapInput]);
 
   const visibleGroupKeys = useMemo(
@@ -261,7 +261,9 @@ export default function CostTargetPanel({
             title={t.costCapTitle}
             toggleLabel={t.toggleSection}
             testId="calculator-costcap-collapse"
-            onToggle={(open) => track('calculator_section_toggled', { section: 'costcap', open })}
+            onToggle={(open) =>
+              track('calculator_section_toggled', { section: 'costcap', enabled: open })
+            }
           >
             <div className="flex flex-col gap-4">
               <p className="text-muted-foreground text-sm">{t.costCapDescription}</p>

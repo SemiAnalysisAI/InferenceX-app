@@ -161,7 +161,7 @@ describe('PowerX telemetry interactions', () => {
       series: 'mean',
     });
     cy.get('@capture').should('have.been.calledWith', 'power_test_smoothing_window_changed', {
-      windowS: 60,
+      window_s: 60,
     });
     cy.get('@capture').its('callCount').should('eq', 4);
   });

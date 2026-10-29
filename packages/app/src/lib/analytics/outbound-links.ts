@@ -1,4 +1,5 @@
 import { track } from './analytics';
+import { placementFor } from './placement';
 
 export interface OutboundLink {
   host: string;
@@ -35,7 +36,13 @@ function handleClick(event: MouseEvent): void {
   const anchor = event.target.closest('a[href]');
   if (!(anchor instanceof HTMLAnchorElement)) return;
   const link = classifyOutboundLink(anchor.href, window.location.hostname);
-  if (link) track('outbound_link_clicked', { ...link }, { transport: 'sendBeacon' });
+  if (!link) return;
+  const placement = placementFor(anchor);
+  track(
+    'outbound_link_clicked',
+    { ...link, ...(placement ? { placement } : {}) },
+    { transport: 'sendBeacon' },
+  );
 }
 
 /** Installs one delegated listener for every outbound anchor click. Returns the uninstaller. */

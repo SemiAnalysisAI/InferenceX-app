@@ -70,6 +70,7 @@ import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
 import { track } from '@/lib/analytics/analytics';
+import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
 import { getGpuSpecs, getHardwareConfig, getModelSortIndex } from '@/lib/catalog/constants';
 import { exportToCsv } from '@/lib/export/csv-export';
 import {
@@ -442,7 +443,7 @@ function InfoFold({
         className="flex w-full items-center gap-1.5 text-left text-foreground cursor-pointer"
         onClick={() => {
           setOpen((prev) => !prev);
-          track('profit_formula_toggled', { open: !open });
+          track('profit_formula_toggled', { enabled: !open });
         }}
       >
         <Info className="size-3.5 text-muted-foreground" aria-hidden />
@@ -728,7 +729,10 @@ function ProfitEstimatorInner({
       setSelectedDateRange(range);
       setUrlParam('i_dstart', range.startDate);
       setUrlParam('i_dend', range.endDate);
-      track('profit_history_date_range_changed', range);
+      track('profit_history_date_range_changed', {
+        start_date: range.startDate,
+        end_date: range.endDate,
+      });
     },
     [setUrlParam],
   );
@@ -1077,7 +1081,7 @@ function ProfitEstimatorInner({
       visible: new Set(legendHwKeys),
       known: new Set(legendHwKeys),
     });
-    track('profit_gpu_reset', { gpuCount: legendHwKeys.length });
+    track('profit_gpu_reset', { gpu_count: legendHwKeys.length });
   }, [legendHwKeys, selectionKey]);
 
   const legendItems = useMemo(
@@ -1801,6 +1805,12 @@ function ProfitEstimatorInner({
               <ChartButtons
                 chartId="profit-estimator-chart"
                 analyticsPrefix="profit_estimator"
+                analyticsContext={selectionAnalyticsContext({
+                  model: selectedModel,
+                  sequence: selectedSequence,
+                  precisions: selectedPrecisions,
+                  gpuCount: selectedGPUs.length,
+                })}
                 className="absolute top-0 right-0 z-10 mb-0"
                 hideZoomReset
                 onExportCsv={handleExportCsv}

@@ -24,7 +24,8 @@ import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
 import { usePowerXSurface } from '@/components/inference/ui/powerx-surface';
-import { track } from '@/lib/analytics/analytics';
+import { track, trackOncePerPageview } from '@/lib/analytics/analytics';
+import { ApiRequestError } from '@/lib/api/api-request-error';
 import { computeToggle } from '@/lib/shared/toggle-set';
 import { getModelSortIndex } from '@/lib/catalog/constants';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
@@ -462,7 +463,8 @@ async function fetchPowerSeries(
 ): Promise<GpuPowerSeriesResponse> {
   const params = new URLSearchParams({ runId: request.runId, series: 'power' });
   if (request.prefix) params.set('prefix', request.prefix);
-  const response = await fetch(`/api/gpu-metrics?${params.toString()}`, {
+  const url = `/api/gpu-metrics?${params.toString()}`;
+  const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sources: request.sources }),
@@ -471,7 +473,11 @@ async function fetchPowerSeries(
   });
   const body = (await response.json()) as GpuPowerSeriesResponse | { error: string };
   if (!response.ok) {
-    throw new Error('error' in body ? body.error : `HTTP ${response.status}`);
+    throw new ApiRequestError(
+      'error' in body ? body.error : `HTTP ${response.status}`,
+      response.status,
+      url,
+    );
   }
   return body as GpuPowerSeriesResponse;
 }
@@ -1061,7 +1067,7 @@ export default function PowerTimeline({
 
   useEffect(() => {
     if (loadingRuns > 0 || responses.size === 0) return;
-    track('inference_power_timeline_loaded', {
+    trackOncePerPageview('inference_power_timeline_loaded', {
       traces: traces.length,
       missing: missing.length,
       runs: responses.size,
@@ -1553,7 +1559,7 @@ export default function PowerTimeline({
           isActive: activeDates.has(id),
           onClick: () => {
             toggleActiveDate(id);
-            track('interactivity_date_toggled', { date, hw: hwKey, view: 'power_timeline' });
+            track('interactivity_date_toggled', { date, gpu: hwKey, view: 'power_timeline' });
           },
           tooltip: null,
         }));
@@ -1572,7 +1578,7 @@ export default function PowerTimeline({
           isActive: officialHwTypes.has(key),
           onClick: () => {
             handleToggleHwType(key);
-            track('latency_hw_type_toggled', { hw: key });
+            track('latency_hw_type_toggled', { gpu: key });
           },
           tooltip: null,
         };
@@ -1637,7 +1643,7 @@ export default function PowerTimeline({
       checked: windowOnly,
       onCheckedChange: (checked) => {
         setWindowOnly(checked);
-        track('inference_power_timeline_window_changed', { windowOnly: checked });
+        track('inference_power_timeline_window_changed', { window_only: checked });
       },
       infoTooltip: t.windowOnlyHelp,
     },
@@ -1680,7 +1686,7 @@ export default function PowerTimeline({
       isLegendExpanded={isLegendExpanded}
       onExpandedChange={(expanded) => {
         setIsLegendExpanded(expanded);
-        track('latency_legend_expanded', { expanded });
+        track('latency_legend_expanded', { enabled: expanded });
       }}
       onItemHover={(id) => setHighlight(id)}
       onItemHoverEnd={() => setHighlight(null)}

@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { Footer } from '@/components/footer/footer';
+import { registerAnalyticsClient } from '@/lib/analytics/analytics';
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
@@ -19,6 +20,21 @@ describe('Footer', () => {
     const year = new Date().getFullYear().toString();
     cy.get('[data-testid="footer-copyright"]').should('contain', 'semianalysis.com');
     cy.get('[data-testid="footer-copyright"]').should('contain', year);
+  });
+
+  it('marks star and share clicks as coming from the footer', () => {
+    registerAnalyticsClient({ capture: cy.stub().as('capture') });
+    cy.window().then((win) => cy.stub(win, 'open'));
+    cy.get('[data-testid="footer-star-cta"]').click();
+    cy.get('@capture').should('have.been.calledWith', 'footer_star_starred', {
+      placement: 'footer',
+    });
+    cy.get('[data-testid="footer"] [data-testid="share-linkedin"]').click();
+    cy.get('@capture').should(
+      'have.been.calledWith',
+      'social_share_linkedin',
+      Cypress.sinon.match({ placement: 'footer', route_template: Cypress.sinon.match.string }),
+    );
   });
 
   it('has Privacy Policy link', () => {

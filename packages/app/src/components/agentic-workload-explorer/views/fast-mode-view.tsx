@@ -189,6 +189,7 @@ function DailyFastModeChart({ daily, t }: { daily: FastModeDaily[]; t: Strings }
         <div className="flex items-center justify-end mb-2">
           <ExportPngButton
             locale={locale}
+            analyticsChart="daily-fast-mode"
             onClick={() => {
               if (svgRef.current)
                 exportSvgToPng(svgRef.current, {

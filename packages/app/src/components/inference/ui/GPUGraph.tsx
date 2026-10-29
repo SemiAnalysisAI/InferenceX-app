@@ -3,6 +3,7 @@
 import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
 import { track } from '@/lib/analytics/analytics';
+import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
 import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
 import { useEphemeralUrlState } from '@/hooks/useUrlState';
 import { rememberChartStateInUrl } from '@/lib/routing/url-state';
@@ -454,6 +455,9 @@ const GPUGraph = React.memo(
     logAvailabilityRef.current = logAvailability;
     const [fixedLogPointId, setFixedLogPointId] = useState<number | null>(null);
     const [powerTelemetryPoint, setPowerTelemetryPoint] = useState<InferenceData | null>(null);
+    useDialogCloseTracking(quickFiltersOpen, 'inference_quick_filters_dialog_closed');
+    useDialogCloseTracking(fixedLogPointId !== null, 'gpu_timeseries_logs_closed');
+    useDialogCloseTracking(powerTelemetryPoint !== null, 'inference_power_telemetry_closed');
 
     const knownIssueAnnotations = useMemo((): KnownIssueAnnotation[] => {
       const annotations: KnownIssueAnnotation[] = matchKnownConfigIssues(
@@ -519,7 +523,7 @@ const GPUGraph = React.memo(
             onLinkClick: (annotation) =>
               annotation.issue &&
               track('inference_known_issue_clicked', {
-                hwKey: annotation.issue.hwKey,
+                gpu: annotation.issue.hwKey,
                 issue: annotation.issue.issueRef,
               }),
           }),
@@ -1188,17 +1192,17 @@ const GPUGraph = React.memo(
               const ruler = perfRulerRef.current;
               if (ruler.mode) {
                 track('gpu_timeseries_data_point_clicked', {
-                  hw: String(point.hwKey),
+                  gpu: String(point.hwKey),
                   x: point.x,
                   y: point.y,
                   overlay: true,
-                  perfRuler: true,
+                  perf_ruler: true,
                 });
                 ruler.onPointClick(point);
                 return;
               }
               track('gpu_timeseries_data_point_clicked', {
-                hw: String(point.hwKey),
+                gpu: String(point.hwKey),
                 x: point.x,
                 y: point.y,
                 overlay: true,
@@ -1413,17 +1417,17 @@ const GPUGraph = React.memo(
             if (ruler.mode) {
               track('gpu_timeseries_data_point_clicked', {
                 id: d.id,
-                hw: String(d.hwKey),
+                gpu: String(d.hwKey),
                 x: d.x,
                 y: d.y,
-                perfRuler: true,
+                perf_ruler: true,
               });
               ruler.onPointClick(d);
               return;
             }
             track('gpu_timeseries_data_point_clicked', {
               id: d.id,
-              hw: String(d.hwKey),
+              gpu: String(d.hwKey),
               x: d.x,
               y: d.y,
             });
@@ -1436,7 +1440,7 @@ const GPUGraph = React.memo(
                 if (!ephemeralUrlState) rememberChartStateInUrl();
                 track('gpu_timeseries_view_charts_opened', {
                   id: d.id,
-                  hwKey: String(d.hwKey),
+                  gpu: String(d.hwKey),
                   conc: d.conc,
                 });
               });
@@ -1449,7 +1453,7 @@ const GPUGraph = React.memo(
                 chartRef.current?.dismissTooltip();
                 track('inference_power_telemetry_opened', {
                   id: d.id,
-                  hwKey: d.hwKey,
+                  gpu: d.hwKey,
                   conc: d.conc,
                 });
               });
@@ -1465,9 +1469,9 @@ const GPUGraph = React.memo(
                 }
                 track('gpu_timeseries_view_logs_opened', {
                   id: d.id,
-                  hwKey: String(d.hwKey),
+                  gpu: String(d.hwKey),
                   conc: d.conc,
-                  benchmarkType: d.benchmark_type ?? 'single_turn',
+                  benchmark_type: d.benchmark_type ?? 'single_turn',
                 });
               });
             }
@@ -1530,14 +1534,14 @@ const GPUGraph = React.memo(
                   isActive: activeDates.has(id),
                   onClick: () => {
                     toggleActiveDate(id);
-                    track('interactivity_date_toggled', { date, hw: hwKey });
+                    track('interactivity_date_toggled', { date, gpu: hwKey });
                   },
                 })),
             ]}
             isLegendExpanded={isLegendExpanded}
             onExpandedChange={(expanded) => {
               setIsLegendExpanded(expanded);
-              track('interactivity_legend_expanded', { expanded });
+              track('interactivity_legend_expanded', { enabled: expanded });
             }}
             switches={[
               {

@@ -255,7 +255,7 @@ export default function SubmissionsTable({ data }: SubmissionsTableProps) {
         setSortKey(key);
         setSortDir('desc');
       }
-      track('submissions_table_sorted', { column: key });
+      track('submissions_table_sorted', { sort_key: key });
     },
     [sortKey],
   );
@@ -506,7 +506,7 @@ function SubmissionRow({
                           source: 'inline',
                           config: submissionRowKey(row),
                           model: row.model,
-                          hardware: row.hardware,
+                          gpu: row.hardware,
                           framework: row.framework,
                           previous_date: previousRun.date,
                           new_date: row.date,
@@ -631,7 +631,7 @@ function SubmissionRow({
                             source: 'expanded',
                             config: submissionRowKey(row),
                             model: row.model,
-                            hardware: row.hardware,
+                            gpu: row.hardware,
                             framework: row.framework,
                             previous_date: previousRun.date,
                             new_date: row.date,

@@ -13,6 +13,7 @@ import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 
 import {
   useInferenceActions,
+  useInferenceAnalyticsContext,
   useInferenceData,
   useInferenceDisplay,
   useInferenceFilters,
@@ -243,6 +244,7 @@ export default function ChartControls({
     setPowerCompare,
   } = useInferenceActions();
   const powerXSurface = usePowerXSurface();
+  const analyticsContext = useInferenceAnalyticsContext();
 
   const featureGateUnlocked = useFeatureGate();
   const visibleGroups = useMemo(
@@ -357,9 +359,9 @@ export default function ChartControls({
         model: selectedModel,
         sequence: selectedSequence,
         precision: selectedPrecisions.join(','),
-        yAxisMetric: selectedYAxisMetric,
-        yAxisMetricLabel: METRIC_TITLE_MAP.get(selectedYAxisMetric) ?? selectedYAxisMetric,
-        yAxisMetricGroup: metricGroupMap.get(selectedYAxisMetric) ?? 'Unknown',
+        metric: selectedYAxisMetric,
+        metric_label: METRIC_TITLE_MAP.get(selectedYAxisMetric) ?? selectedYAxisMetric,
+        metric_group: metricGroupMap.get(selectedYAxisMetric) ?? 'Unknown',
       });
     }
   };
@@ -372,6 +374,7 @@ export default function ChartControls({
       replaceRouterPathname(target, ['g_model'], { pageview: value !== selectedModel });
     }
     track('inference_model_selected', {
+      ...analyticsContext,
       model: value,
     });
     setTimeout(trackCombinedFilters, 0);
@@ -380,6 +383,7 @@ export default function ChartControls({
   const handleSequenceChange = (value: Sequence) => {
     setSelectedSequence(value);
     track('inference_sequence_selected', {
+      ...analyticsContext,
       sequence: value,
     });
     setTimeout(trackCombinedFilters, 0);
@@ -388,6 +392,7 @@ export default function ChartControls({
   const handlePrecisionChange = (value: string[]) => {
     setSelectedPrecisions(value);
     track('inference_precision_selected', {
+      ...analyticsContext,
       precision: value.join(','),
     });
     setTimeout(trackCombinedFilters, 0);
@@ -396,6 +401,7 @@ export default function ChartControls({
   const handleYAxisMetricChange = (value: string) => {
     setSelectedYAxisMetric(value);
     track('inference_y_axis_metric_selected', {
+      ...analyticsContext,
       metric: value,
       metric_label: METRIC_TITLE_MAP.get(value) ?? value,
       metric_group: metricGroupMap.get(value) ?? 'Unknown',
@@ -406,6 +412,7 @@ export default function ChartControls({
   const handleGPUChange = (value: string[]) => {
     setSelectedGPUs(value);
     track('inference_gpu_selected', {
+      ...analyticsContext,
       gpus: value.join(','),
     });
     setTimeout(trackCombinedFilters, 0);
@@ -414,6 +421,7 @@ export default function ChartControls({
   const handleXAxisMetricChange = (value: string) => {
     setSelectedXAxisMetric(value);
     track('inference_x_axis_metric_selected', {
+      ...analyticsContext,
       metric: value,
     });
   };
@@ -421,7 +429,8 @@ export default function ChartControls({
   const handleScaleTypeChange = (value: 'auto' | 'linear' | 'log') => {
     setScaleType(value);
     track('inference_scale_type_selected', {
-      scaleType: value,
+      ...analyticsContext,
+      scale_type: value,
     });
   };
 
@@ -430,8 +439,8 @@ export default function ChartControls({
   const handleDateRangeChange = (range: { startDate: string; endDate: string }) => {
     setSelectedDateRange(range);
     track('inference_date_range_changed', {
-      startDate: range.startDate,
-      endDate: range.endDate,
+      start_date: range.startDate,
+      end_date: range.endDate,
     });
   };
 
@@ -606,7 +615,10 @@ export default function ChartControls({
                     value={tokenRevenuePriceSource}
                     onValueChange={(value) => {
                       setTokenRevenuePriceSource(value as 'normalized' | 'openrouter');
-                      track('inference_token_revenue_price_source_selected', { source: value });
+                      track('inference_token_revenue_price_source_selected', {
+                        ...analyticsContext,
+                        source: value,
+                      });
                     }}
                   >
                     <SelectTrigger
@@ -647,7 +659,7 @@ export default function ChartControls({
                           onClick={() => {
                             track('inference_openrouter_pricing_opened', {
                               model: selectedModel,
-                              openRouterModelId,
+                              openrouter_model_id: openRouterModelId,
                             });
                           }}
                         >

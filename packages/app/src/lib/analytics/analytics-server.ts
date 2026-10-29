@@ -1,3 +1,7 @@
+/**
+ * Server events never create or update a PostHog person: they all share one aggregate distinct id, so
+ * `$process_person_profile` is always false. Pass `route_template` when the route is known.
+ */
 export function trackServer(eventName: string, properties?: Record<string, unknown>): void {
   void captureServer(eventName, properties);
 }
@@ -18,7 +22,7 @@ export async function captureServer(
       api_key: key,
       event: eventName,
       distinct_id: distinctId,
-      properties: { ...properties, $lib: 'inferencex-server' },
+      properties: { ...properties, $lib: 'inferencex-server', $process_person_profile: false },
       timestamp: new Date().toISOString(),
     });
     const response = await fetch(`${host.replace(/\/$/u, '')}/capture/`, {

@@ -331,7 +331,7 @@ describe('PowerAnalysisPanels per-chip compared point', () => {
     expect(marker()!.getAttribute('x')).not.toBe(markerBefore);
     expect(partsHeading()).toBe('B200 (vLLM) FP8 · c64 · 30 tok/s/user');
     expect(track).toHaveBeenCalledWith('powerx_breakdown_point_pinned', {
-      hw: 'b200_vllm',
+      gpu: 'b200_vllm',
       concurrency: 64,
     });
     // A second column replaces the pin; still one pinned chip.
@@ -392,7 +392,7 @@ describe('PowerAnalysisPanels per-chip compared point', () => {
     expect(partsHeading()).toContain('single-hue');
     expect(partsHeading()).toMatch(/c64 · 22 tok\/s\/user$/u);
     expect(track).toHaveBeenCalledWith('powerx_breakdown_point_pinned', {
-      hw: 'b200_sglang',
+      gpu: 'b200_sglang',
       concurrency: 64,
     });
   });
@@ -599,7 +599,7 @@ describe('PowerAnalysisPanels touch scrub (PowerX on a coarse pointer)', () => {
     act(() => compareButton()!.click());
     expect(sliderValue()).toBe('100 tok/s/user');
     expect(track).toHaveBeenCalledWith('powerx_compare_at_scrub', {
-      hw: 'b200_vllm',
+      gpu: 'b200_vllm',
       concurrency: 4,
       interactivity: 100,
       source: 'scrub',

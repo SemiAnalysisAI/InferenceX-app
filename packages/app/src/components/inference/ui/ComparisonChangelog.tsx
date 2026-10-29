@@ -255,7 +255,7 @@ export default function ComparisonChangelog({
   const handleToggle = () => {
     const newState = !isExpanded;
     setIsExpanded(newState);
-    track(`${analyticsSection}_comparison_changelog_toggled`, { expanded: newState });
+    track(`${analyticsSection}_comparison_changelog_toggled`, { enabled: newState });
   };
 
   const displayModel = DB_MODEL_TO_DISPLAY[modelDbKeys[0]] ?? modelDbKeys[0];

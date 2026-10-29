@@ -4,6 +4,7 @@ import { ArrowRight } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { track } from '@/lib/analytics/analytics';
+import { placementFor } from '@/lib/analytics/placement';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { FavoritePreset } from '@/components/favorites/favorite-presets';
 
@@ -21,6 +22,7 @@ export function CuratedViewCard({ preset }: { preset: FavoritePreset }) {
     track('landing_curated_view_clicked', {
       preset_id: preset.id,
       preset_title: preset.title,
+      placement: placementFor(e.currentTarget),
     });
     window.location.href = href;
   };

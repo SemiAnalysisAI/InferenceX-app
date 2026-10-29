@@ -124,7 +124,7 @@ export function HuaweiSkuConfigurations() {
         <Link
           href={`${locale === 'zh' ? '/zh' : ''}/ubenchx/core-memory-profiles`}
           className="text-sm underline underline-offset-4"
-          onClick={() => track('ubenchx_sku_profiles_opened', { sku: 'PR_9579' })}
+          onClick={() => track('ubenchx_sku_profiles_opened', { gpu: 'PR_9579' })}
         >
           {t.profiles}
         </Link>

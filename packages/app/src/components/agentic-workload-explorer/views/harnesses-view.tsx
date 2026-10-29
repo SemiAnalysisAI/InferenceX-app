@@ -497,7 +497,7 @@ function HarnessHistogram({
       detail={detail}
       locale={locale}
       onExport={() => {
-        track('agentic_workload_harness_histogram_export', { title, filename });
+        track('agentic_workload_harness_histogram_export', { title, file_name: filename });
         if (svgRef.current)
           exportSvgToPng(svgRef.current, {
             title,

@@ -34,6 +34,7 @@ import { Heading } from '@/components/ui/heading';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { track } from '@/lib/analytics/analytics';
+import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
 import { exportToCsv } from '@/lib/export/csv-export';
 import { getGpuSpecs, getHardwareConfig, type TcoBasis } from '@/lib/catalog/constants';
 import {
@@ -1188,6 +1189,12 @@ export default function FleetLifecycle({
             <ChartButtons
               chartId="fleet-lifecycle"
               analyticsPrefix="calculator_lifecycle"
+              analyticsContext={selectionAnalyticsContext({
+                model: selectedModel,
+                sequence: selectedSequence,
+                precisions: selectedPrecisions,
+                gpuCount: visibleHwKeys.size,
+              })}
               zoomResetEvent="d3chart_zoom_reset_fleet-lifecycle"
               onExportCsv={handleExportCsv}
               exportFileName={`InferenceX_fleet_lifecycle_${selectedModel}`}

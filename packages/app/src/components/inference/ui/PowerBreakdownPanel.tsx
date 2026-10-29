@@ -27,6 +27,7 @@ import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { useIsCoarsePointer, useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
+import { useInferenceAnalyticsContext } from '@/components/inference/InferenceContext';
 import { track } from '@/lib/analytics/analytics';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
@@ -1421,6 +1422,7 @@ export default function PowerBreakdownPanel({
   onUnpinComparedPoint?: (series: PowerBreakdownDisplaySeries) => void;
 }) {
   const locale = useLocale();
+  const analyticsContext = useInferenceAnalyticsContext();
   const t = STRINGS[locale];
   const interactivity = useMemo(() => powerBreakdownInteractivity(xField), [xField]);
   const interactivityLabel = interactivity.fromChart && xLabel ? xLabel : t.xAxis;
@@ -1525,7 +1527,7 @@ export default function PowerBreakdownPanel({
     setCompareTarget(readoutEntry.interactivity);
     setScrubIndex(null);
     track('powerx_compare_at_scrub', {
-      hw: series.hwKey,
+      gpu: series.hwKey,
       concurrency: readoutEntry.concurrency,
       interactivity: readoutEntry.interactivity,
       source: readoutSource,
@@ -1604,7 +1606,7 @@ export default function PowerBreakdownPanel({
                 value={series.key}
                 onValueChange={(value) => {
                   onSelectKey(value);
-                  track('inference_power_breakdown_source_selected');
+                  track('inference_power_breakdown_source_selected', { ...analyticsContext });
                 }}
               >
                 <SelectTrigger
@@ -1715,6 +1717,7 @@ export default function PowerBreakdownPanel({
           <ChartButtons
             chartId={sectionId}
             analyticsPrefix="power_breakdown"
+            analyticsContext={analyticsContext}
             hideZoomReset
             onExportCsv={exportCsv}
           />

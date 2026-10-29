@@ -91,6 +91,8 @@ All interactive elements should have `track()` from `@/lib/analytics/analytics` 
 
 **Convention**: `[section]_[action]` — e.g., `latency_zoom_reset`, `calculator_bar_selected`, `tab_changed`
 
+Event property keys are snake_case and canonical: `gpu`/`gpus`, `gpu_count`, `metric`, `sort_key`/`sort_dir`, `file_name`, `query_length`, `enabled` for boolean toggle state (enforced by `event-property-keys.test.ts`). Mark page regions with `analyticsPlacement()` (`data-analytics-placement`) so clicks get `placement`. Use `useSearchTracking`, `useDialogCloseTracking` and `selectionAnalyticsContext` instead of ad-hoc tracking. See the Analytics section of [docs/architecture.md](./docs/architecture.md).
+
 ## Tab Structure
 
 `packages/app/src/lib/routing/dashboard-routes.ts` is the single dashboard route registry. `TabNav`, `DashboardShell`, metadata, i18n, share URLs, and the sitemap derive from it, so do not add a second route array.

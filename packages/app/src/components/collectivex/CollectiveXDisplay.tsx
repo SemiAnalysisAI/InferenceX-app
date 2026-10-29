@@ -818,7 +818,7 @@ export default function CollectiveXDisplay() {
                     options={selectOptions(skuOptions, t.all, true)}
                     onChange={(next) => {
                       setSku(next);
-                      track('collectivex_sku_changed', { sku: next });
+                      track('collectivex_sku_changed', { gpu: next });
                     }}
                   />
                   <SelectControl
@@ -894,18 +894,18 @@ export default function CollectiveXDisplay() {
                       onItemRemove={(id) => {
                         if (rangeView) {
                           setHiddenRangeIds((previous) => new Set([...previous, id]));
-                          track('collectivex_range_toggled', { range: id, visible: false });
+                          track('collectivex_range_toggled', { range: id, enabled: false });
                           return;
                         }
                         setActiveSeriesIds(
                           (previous) => new Set([...previous].filter((item) => item !== id)),
                         );
-                        track('collectivex_series_toggled', { series: id, visible: false });
+                        track('collectivex_series_toggled', { series: id, enabled: false });
                       }}
                       isLegendExpanded={legendExpanded}
                       onExpandedChange={(expanded) => {
                         setLegendExpanded(expanded);
-                        track('collectivex_legend_expanded', { expanded });
+                        track('collectivex_legend_expanded', { enabled: expanded });
                       }}
                       actions={
                         rangeView

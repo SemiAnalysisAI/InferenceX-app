@@ -623,7 +623,7 @@ function TreeNode({
             type="button"
             onClick={() => {
               setOpen(!open);
-              track('agentic_workload_radix_node_toggled', { open: !open, depth });
+              track('agentic_workload_radix_node_toggled', { enabled: !open, depth });
             }}
             className="mt-0.5 w-4 h-4 flex items-center justify-center text-3xs text-subtle hover:text-foreground transition-colors shrink-0"
           >

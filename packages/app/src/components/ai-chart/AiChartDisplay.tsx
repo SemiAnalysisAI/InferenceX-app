@@ -202,7 +202,7 @@ export default function AiChartDisplay() {
                     className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none"
                     onClick={() => {
                       setShowKey((visible) => !visible);
-                      track('ai_chart_api_key_visibility_toggled', { visible: !showKey });
+                      track('ai_chart_api_key_visibility_toggled', { enabled: !showKey });
                     }}
                     aria-label={showKey ? t.hideKey : t.showKey}
                   >

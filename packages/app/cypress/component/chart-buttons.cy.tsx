@@ -2,6 +2,8 @@ import { ChartButtons } from '@/components/ui/chart-buttons';
 import { Card } from '@/components/ui/card';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { ShareButton } from '@/components/ui/share-button';
+import { registerAnalyticsClient } from '@/lib/analytics/analytics';
+import { GlobalFilterSelectionContext } from '@/providers/GlobalFilterContext';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 
 describe('ChartButtons', () => {
@@ -75,6 +77,69 @@ describe('ChartButtons', () => {
       cy.get('[data-testid="export-csv-button"]').should('not.exist');
       cy.get('[data-testid="export-mp4-button"]').click();
       cy.get('@mp4Export').should('have.been.calledOnce');
+    });
+  });
+
+  describe('analytics', () => {
+    it('sends the chart id and dashboard context with export and zoom-reset events', () => {
+      registerAnalyticsClient({ capture: cy.stub().as('capture') });
+      cy.mount(
+        <div style={{ position: 'relative', width: 400, height: 200 }}>
+          <div id="test-chart">Chart content</div>
+          <ChartButtons
+            chartId="test-chart"
+            analyticsPrefix="test"
+            analyticsContext={{
+              model: 'DeepSeek-R1-0528',
+              sequence: '8k/1k',
+              precision: 'fp4,fp8',
+              gpu_count: 3,
+            }}
+            onExportCsv={cy.stub()}
+          />
+        </div>,
+      );
+      const properties = {
+        chart: 'test-chart',
+        model: 'DeepSeek-R1-0528',
+        sequence: '8k/1k',
+        precision: 'fp4,fp8',
+        gpu_count: 3,
+      };
+      cy.get('[data-testid="zoom-reset-button"]').click();
+      cy.get('@capture').should('have.been.calledWith', 'test_zoom_reset_button', properties);
+      cy.get('[data-testid="export-button"]').click();
+      cy.get('@capture').should('have.been.calledWith', 'test_export_menu_opened', properties);
+      cy.get('[data-testid="export-csv-button"]').click();
+      cy.get('@capture').should('have.been.calledWith', 'test_csv_exported', properties);
+    });
+
+    it('sends the shared view, route and selected model with share events', () => {
+      registerAnalyticsClient({ capture: cy.stub().as('capture') });
+      cy.mount(
+        <GlobalFilterSelectionContext.Provider
+          value={
+            { selectedModel: 'DeepSeek-R1-0528' } as React.ContextType<
+              typeof GlobalFilterSelectionContext
+            >
+          }
+        >
+          <ShareButton />
+        </GlobalFilterSelectionContext.Provider>,
+      );
+      const shareProperties = Cypress.sinon.match({
+        model: 'DeepSeek-R1-0528',
+        route_template: Cypress.sinon.match.string,
+      });
+      cy.get('[data-testid="share-button"]').click();
+      cy.get('@capture').should('have.been.calledWith', 'share_popover_opened', shareProperties);
+      cy.window().then((win) => cy.stub(win, 'open'));
+      cy.get('[data-testid="share-twitter"]').click();
+      cy.get('@capture').should(
+        'have.been.calledWith',
+        'social_share_twitter',
+        Cypress.sinon.match({ model: 'DeepSeek-R1-0528', placement: 'share_popover' }),
+      );
     });
   });
 

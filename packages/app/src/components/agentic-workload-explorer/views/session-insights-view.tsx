@@ -209,7 +209,7 @@ function HistogramChart({
               onClick={() => {
                 track('agentic_workload_session_histogram_export', {
                   title,
-                  filename: exportFilename || 'histogram.png',
+                  file_name: exportFilename || 'histogram.png',
                 });
                 if (svgRef.current)
                   exportSvgToPng(svgRef.current, {

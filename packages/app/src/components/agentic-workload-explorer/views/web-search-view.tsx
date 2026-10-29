@@ -224,6 +224,7 @@ function SearchesOverTimeChart({
           {controls}
           <ExportPngButton
             locale={locale}
+            analyticsChart="web-searches-over-time"
             onClick={() => {
               if (svgRef.current)
                 exportSvgToPng(svgRef.current, {
@@ -426,6 +427,7 @@ function SearchCostChart({ daily, locale }: { daily: WebSearchDailyEntry[]; loca
         <div className="flex items-center justify-end mb-2">
           <ExportPngButton
             locale={locale}
+            analyticsChart="web-search-cost"
             onClick={() => {
               if (svgRef.current)
                 exportSvgToPng(svgRef.current, {

@@ -91,11 +91,11 @@ export async function GET(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     trackServer('compare_precision_png_render_failed', {
+      route_template: '/compare-precision/[slug]/precision-comparison.png',
       slug,
       model: parsed.model.slug,
       gpu: parsed.gpu,
-      precA: parsed.precA,
-      precB: parsed.precB,
+      precisions: [parsed.precA, parsed.precB],
       sequence,
       error_name: error instanceof Error ? error.name : 'Unknown',
       error_message: message.slice(0, 500),
