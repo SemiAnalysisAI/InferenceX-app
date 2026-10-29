@@ -110,17 +110,18 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
     trackNudgeEvent(def, 'shown');
   }, []);
 
-  const dismissBanner = useCallback(() => {
-    if (!activeBanner) return;
-    trackNudgeEvent(activeBanner, 'dismissed');
-    markDismissed(activeBanner.storageKey, activeBanner.dismissal);
-    if (activeBanner.renderOnInitialLoad) {
+  // Banner handlers take the clicked banner rather than reading `activeBanner`: until the A/B arm
+  // resolves after hydration, every arm is rendered and `activeBanner` may be the hidden one.
+  const dismissBanner = useCallback((banner: NudgeDefinition) => {
+    trackNudgeEvent(banner, 'dismissed');
+    markDismissed(banner.storageKey, banner.dismissal);
+    if (banner.renderOnInitialLoad) {
       document.documentElement.setAttribute(LANDING_BANNER_DISMISSED_ATTRIBUTE, '');
     }
-    sessionDismissedRef.current.add(activeBanner.id);
+    sessionDismissedRef.current.add(banner.id);
     setActiveBannerId(null);
     bannerShownRef.current = false;
-  }, [activeBanner]);
+  }, []);
 
   const dismissOverlay = useCallback(() => {
     if (!activeOverlay) return;
@@ -151,19 +152,18 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
     coachMarkShownRef.current = false;
   }, [activeCoachMark]);
 
-  const handleBannerAction = useCallback(() => {
-    if (!activeBanner) return;
-    trackNudgeEvent(activeBanner, 'action');
-    activeBanner.content.onLinkClick?.();
-    if (!dismissesOnAction(activeBanner)) return;
-    markDismissed(activeBanner.storageKey, activeBanner.dismissal);
-    if (activeBanner.renderOnInitialLoad) {
+  const handleBannerAction = useCallback((banner: NudgeDefinition) => {
+    trackNudgeEvent(banner, 'action');
+    banner.content.onLinkClick?.();
+    if (!dismissesOnAction(banner)) return;
+    markDismissed(banner.storageKey, banner.dismissal);
+    if (banner.renderOnInitialLoad) {
       document.documentElement.setAttribute(LANDING_BANNER_DISMISSED_ATTRIBUTE, '');
     }
-    sessionDismissedRef.current.add(activeBanner.id);
+    sessionDismissedRef.current.add(banner.id);
     setActiveBannerId(null);
     bannerShownRef.current = false;
-  }, [activeBanner]);
+  }, []);
 
   const handleOverlayAction = useCallback(
     (action?: NudgeAction) => {
@@ -191,7 +191,8 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
     const variant = assignedLandingBannerVariant();
     const assigned = initialBanners.find((nudge) => nudge.variant === variant);
     if (assigned && activeBanner?.variant) {
-      setActiveBannerId(assigned.id);
+      // A banner dismissed before this effect ran has already cleared the active id.
+      setActiveBannerId((id) => (id === null ? null : assigned.id));
       if (isEligible(assigned)) trackNudgeEvent(assigned, 'shown');
     }
     setBannerVariantResolved(true);
@@ -679,14 +680,14 @@ function CoachMarkRenderer({
   );
 }
 
-function BannerRenderer({
+export function BannerRenderer({
   def,
   onDismiss,
   onAction,
 }: {
   def: NudgeDefinition;
-  onDismiss: () => void;
-  onAction: () => void;
+  onDismiss: (def: NudgeDefinition) => void;
+  onAction: (def: NudgeDefinition) => void;
 }) {
   const locale = useLocale();
   const rs = RENDERER_STRINGS[locale];
@@ -699,13 +700,13 @@ function BannerRenderer({
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
     e.preventDefault();
-    onAction();
+    onAction(def);
   };
 
   const handleDismiss = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    onDismiss();
+    onDismiss(def);
   };
 
   return (
