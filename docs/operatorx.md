@@ -48,7 +48,7 @@ OperatorX remains a page-owned API outside the published OpenAPI document.
 | GEMM/MoE tab         | `op`                      | Selects the operation                                  |
 | Workload             | `workload`                | Selects cases before distribution                      |
 | Metric               | `distributionMetric`      | Selects the value and peak basis                       |
-| GPUs                 | `distributionHardware`    | Selects distribution columns and matched cohort        |
+| GPU legend toggles   | `distributionHardware`    | Selects distribution columns and matched cohort        |
 | Matched only         | `distributionMatchedOnly` | Uses cases eligible on every selected GPU              |
 | Normalized           | `distributionNormalized`  | Divides throughput or bandwidth by the applicable peak |
 
