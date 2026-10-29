@@ -72,7 +72,19 @@ function installRun(body: CollectiveXDataset = dataset, alias = 'run') {
 function showView(label: string) {
   cy.get('[data-testid="collectivex-view-select"]').click();
   cy.contains('[role="option"]', label).click();
-  cy.get('[data-testid="collectivex-view-select"]').should('have.text', label);
+  // Radix Select refocuses its trigger after closing; opening the next menu before that lets the
+  // returning focus land outside it and dismiss it.
+  cy.get('[data-testid="collectivex-view-select"]').should('have.text', label).and('have.focus');
+  // A view's legend labels resize the plot, which re-renders a frame later at its new width and
+  // drops any tooltip pinned before that, so wait until the chart matches its container.
+  cy.get('[data-testid="collectivex-explorer-chart"] [data-testid="d3-chart-svg"]').should(
+    ($svg) => {
+      expect(Number($svg.attr('width'))).to.be.closeTo(
+        $svg[0].parentElement!.getBoundingClientRect().width,
+        1,
+      );
+    },
+  );
 }
 
 function suiteTabs() {
