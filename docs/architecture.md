@@ -51,7 +51,7 @@ Other dashboards keep their existing query-state behavior.
 
 **Why debounced writes (150ms)?** Rapid filter changes (e.g., clicking multiple precision checkboxes) are batched into one flush of the in-memory share state and, on profit-estimator routes, one shallow `replaceState` of the pathname instead of one history write per click.
 
-**Why snapshot-and-clear on load?** Initial params are read into the URL-state snapshot, then stripped from the visible address bar with `history.replaceState` while preserving the pathname and hash. Route-owned entry points can also pass typed server seeds. Subsequent debounced writes update the in-memory share state.
+**Why snapshot on load, without clearing the address bar?** Initial params are read once into the URL-state snapshot, and route-owned entry points can also pass typed server seeds. Subsequent debounced writes update the in-memory share state, not the address bar. The loaded params stay visible, so reloading a share link reopens the same view. An earlier load-time cleanup raced Next's hydration history write, which restored the params on some loads and not others.
 
 **Prefix convention**: `g_` (global), `i_` (inference), `e_` (evaluation), `r_` (reliability), and `c_` (calculator). The canonical dashboard route registry declares which scopes belong in each share URL.
 

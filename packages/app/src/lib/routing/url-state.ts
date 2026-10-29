@@ -195,30 +195,6 @@ if (typeof window !== 'undefined') {
       currentState[key] = value;
     }
   }
-  if (Object.keys(_initialParams).length > 0) {
-    setTimeout(() => {
-      const sp = new URLSearchParams(window.location.search);
-      let dirty = false;
-      for (const key of URL_STATE_KEYS) {
-        if (sp.has(key)) {
-          sp.delete(key);
-          dirty = true;
-        }
-      }
-      if (!dirty) return;
-      const s = sp.toString();
-      const replace =
-        typeof History === 'undefined'
-          ? window.history.replaceState
-          : History.prototype.replaceState;
-      replace.call(
-        window.history,
-        window.history.state,
-        '',
-        `${window.location.pathname}${s ? `?${s}` : ''}${window.location.hash}`,
-      );
-    }, 0);
-  }
 }
 
 export function readUrlParams(): UrlStateParams {

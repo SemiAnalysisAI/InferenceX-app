@@ -133,8 +133,7 @@ describe('AgentX All in Measured chart and table', () => {
       };
       cy.intercept('GET', '/api/unofficial-run*', { body: overlayBody }).as('agenticOverlay');
       let csvBlob: Blob | undefined;
-      // Whether the stripped share params come back depends on hydration timing, so
-      // later loads rebuild the URL instead of reading cy.location() or cy.reload().
+      // Later loads rebuild the URL from these params, so each load names the view it expects.
       const chartUrl = (overrides: Record<string, string> = {}) =>
         `${locale === 'zh' ? '/zh' : ''}/powerx?${new URLSearchParams({
           g_model: 'Kimi-K3',

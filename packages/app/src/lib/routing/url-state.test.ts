@@ -167,37 +167,16 @@ describe('readUrlParams', () => {
     expect(params).not.toHaveProperty('unknown_key');
   });
 
-  it('preserves the locale path, unrelated params, and hash when cleaning initial state', async () => {
+  it('reads share-link params without rewriting the address bar', async () => {
     const { history } = setupWindow('?g_model=test&eval=42', '/zh/evaluation', '#sample-detail');
-    await import('@/lib/routing/url-state');
-    await vi.runAllTimersAsync();
-
-    expect(history.replaceState).toHaveBeenCalledWith(
-      history.state,
-      '',
-      '/zh/evaluation?eval=42#sample-detail',
-    );
-  });
-
-  it('skips the deferred cleanup entirely when the URL has no share-link params', async () => {
-    const { history } = setupWindow('?unrelated=1', '/');
-    await import('@/lib/routing/url-state');
-    await vi.runAllTimersAsync();
-
-    expect(history.replaceState).not.toHaveBeenCalled();
-  });
-
-  it('cleans share-link params via the pristine History prototype, not the patched method', async () => {
-    const { history } = setupWindow('?g_model=test&eval=42', '/inference');
     const pristine = vi.fn();
     vi.stubGlobal('History', { prototype: { replaceState: pristine } });
-    await import('@/lib/routing/url-state');
+    const { readUrlParams } = await import('@/lib/routing/url-state');
     await vi.runAllTimersAsync();
 
+    expect(readUrlParams().g_model).toBe('test');
     expect(history.replaceState).not.toHaveBeenCalled();
-    expect(pristine).toHaveBeenCalledTimes(1);
-    expect(pristine.mock.calls[0]).toEqual([history.state, '', '/inference?eval=42']);
-    expect(pristine.mock.contexts[0]).toBe(history);
+    expect(pristine).not.toHaveBeenCalled();
   });
 });
 
