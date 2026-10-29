@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-vi.mock('@vercel/blob', () => ({
+vi.mock('@vercel/blob', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   del: vi.fn(),
   head: vi.fn(),
   list: vi.fn(),
@@ -8,7 +9,19 @@ vi.mock('@vercel/blob', () => ({
 }));
 
 import { blobGet, blobSet, blobPurge } from './blob-cache';
-import { del, head, list, put } from '@vercel/blob';
+import { BlobServiceRateLimited, del, head, list, put, type ListBlobResult } from '@vercel/blob';
+
+// Only the fields blobPurge reads; the full list() result also carries sizes and dates.
+function listPage(count: number): ListBlobResult {
+  return {
+    blobs: Array.from({ length: count }, (_, i) => ({
+      url: `https://blob.example.com/${i}.json`,
+      pathname: `test-cache/${i}.json`,
+    })),
+    hasMore: false,
+    cursor: '',
+  } as unknown as ListBlobResult;
+}
 
 const mockDel = vi.mocked(del);
 const mockHead = vi.mocked(head);
@@ -286,5 +299,57 @@ describe('blobPurge', () => {
 
     expect(deleted).toBe(1);
     expect(mockDel).toHaveBeenCalledTimes(1);
+  });
+
+  describe('large and rate-limited purges', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('deletes a full list page in batches of at most 100 blobs', async () => {
+      mockList.mockResolvedValue(listPage(250));
+      mockDel.mockResolvedValue(undefined);
+
+      expect(await blobPurge()).toBe(250);
+      expect(mockDel.mock.calls.map(([urls]) => (urls as string[]).length)).toEqual([100, 100, 50]);
+    });
+
+    it('waits for the retry-after window and resends the rate-limited batch', async () => {
+      vi.useFakeTimers();
+      mockList.mockResolvedValue(listPage(150));
+      mockDel
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new BlobServiceRateLimited(60))
+        .mockResolvedValue(undefined);
+
+      const purge = blobPurge();
+      await vi.advanceTimersByTimeAsync(59_000);
+      expect(mockDel).toHaveBeenCalledTimes(2);
+
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(await purge).toBe(150);
+      expect(mockDel).toHaveBeenCalledTimes(3);
+      expect(mockDel.mock.calls[2]![0]).toEqual(mockDel.mock.calls[1]![0]);
+    });
+
+    it('fails after three rate-limit waits instead of outliving the function', async () => {
+      vi.useFakeTimers();
+      mockList.mockResolvedValue(listPage(10));
+      mockDel.mockRejectedValue(new BlobServiceRateLimited(60));
+
+      const purge = blobPurge();
+      const outcome = expect(purge).rejects.toBeInstanceOf(BlobServiceRateLimited);
+      await vi.advanceTimersByTimeAsync(180_000);
+      await outcome;
+      expect(mockDel).toHaveBeenCalledTimes(4);
+    });
+
+    it('does not retry errors other than rate limiting', async () => {
+      mockList.mockResolvedValue(listPage(10));
+      mockDel.mockRejectedValue(new Error('store suspended'));
+
+      await expect(blobPurge()).rejects.toThrow('store suspended');
+      expect(mockDel).toHaveBeenCalledTimes(1);
+    });
   });
 });
