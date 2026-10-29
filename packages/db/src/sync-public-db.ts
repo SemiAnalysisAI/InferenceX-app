@@ -551,13 +551,26 @@ async function syncBenchmarks(
     else additions.push([row, configId]);
   }
 
-  // Seed the log map from matched rows so new rows reuse a log the target already holds.
+  // Seed the log and replay maps from matched rows so new rows reuse what the target holds.
   const logIds = new Map<string, string>();
+  const replayIds = new Map<string, string>();
   for (const [row, existing] of matches) {
     if (row.server_log_id !== null && existing.server_log_id !== null) {
       logIds.set(String(row.server_log_id), existing.server_log_id);
     }
+    if (row.trace_replay_id !== null && existing.trace_replay_id !== null) {
+      replayIds.set(String(row.trace_replay_id), existing.trace_replay_id);
+    }
   }
+  // One replay row can back several points; copy and fill each one once.
+  const replayFor = async (sourceReplayId: string): Promise<string> => {
+    const known = replayIds.get(sourceReplayId);
+    if (known) return known;
+    const id = await copyTraceReplay(db, sourceReplayId);
+    replayIds.set(sourceReplayId, id);
+    return id;
+  };
+  const filledReplays = new Set<string>();
 
   for (const [row, existing] of matches) {
     if (row.server_log_id !== null) {
@@ -572,13 +585,15 @@ async function syncBenchmarks(
       }
     }
     if (row.trace_replay_id !== null && existing.trace_replay_id === null) {
-      const replayId = await copyTraceReplay(db, String(row.trace_replay_id));
+      const replayId = await replayFor(String(row.trace_replay_id));
       await db`update benchmark_results set trace_replay_id = ${replayId} where id = ${existing.id}`;
     } else if (
       row.trace_replay_id !== null &&
       existing.trace_replay_id !== null &&
-      plan.shortTables.includes('trace_payloads')
+      plan.shortTables.includes('trace_payloads') &&
+      !filledReplays.has(existing.trace_replay_id)
     ) {
+      filledReplays.add(existing.trace_replay_id);
       await fillTraceReplayPayloads(db, String(row.trace_replay_id), existing.trace_replay_id);
     }
   }
@@ -589,7 +604,7 @@ async function syncBenchmarks(
         ? null
         : await copyServerLog(db, String(row.server_log_id), logIds);
     const traceReplayId =
-      row.trace_replay_id === null ? null : await copyTraceReplay(db, String(row.trace_replay_id));
+      row.trace_replay_id === null ? null : await replayFor(String(row.trace_replay_id));
     await insertReturningId(db, 'benchmark_results', {
       ...row,
       workflow_run_id: targetRunId,
