@@ -154,6 +154,18 @@ const BAND_FOCUS_STROKE = 0.95;
 const BAND_FADED_FILL = 0.03;
 const BAND_FADED_STROKE = 0.15;
 
+/**
+ * Like the inference charts, a line follows the Pareto frontier of its points: more tokens at
+ * lower latency, or a higher rate at fewer tokens, is better. Sorted by x.
+ */
+function paretoLine<T extends { x: number; y: number }>(
+  points: readonly T[],
+  yAxis: CollectiveXYAxis,
+): T[] {
+  const lowerIsBetter = yAxis === 'latency';
+  return globalParetoFrontier(points, lowerIsBetter, !lowerIsBetter);
+}
+
 /** Mean log-height of a band, i.e. how wide it looks on the log y axis. */
 function bandSpread(band: CollectiveXRangeBand): number {
   if (band.points.length === 0) return 0;
@@ -227,18 +239,14 @@ export function CollectiveXChart({
     () => new Map(series.map((item) => [item.series_id, fitAlphaBeta(item, operation)])),
     [series, operation],
   );
-  // Like the inference charts, each line follows its series' Pareto frontier: more tokens and
-  // lower latency (or a higher rate at fewer tokens) is better. Dominated points keep their dot.
+  // Each line follows its series' Pareto frontier; dominated points keep their dot.
   const lines = useMemo(() => {
     const bySeries: Record<string, { x: number; y: number }[]> = {};
     for (const point of points) {
       (bySeries[point.seriesId] ??= []).push({ x: point.x, y: point.y });
     }
-    const lowerIsBetter = yAxis === 'latency';
     const result: Record<string, { x: number; y: number }[]> = {};
-    for (const [id, line] of Object.entries(bySeries)) {
-      result[id] = globalParetoFrontier(line, lowerIsBetter, !lowerIsBetter);
-    }
+    for (const [id, line] of Object.entries(bySeries)) result[id] = paretoLine(line, yAxis);
     return result;
   }, [points, yAxis]);
 
@@ -266,12 +274,25 @@ export function CollectiveXChart({
     ) => {
       const x = xScale as d3.ScaleLogarithmic<number, number>;
       const y = yScale as d3.ScaleLogarithmic<number, number>;
-      const area = d3
-        .area<CollectiveXRangeBand['points'][number]>()
+      // Each edge follows its own Pareto frontier with the same monotone curve as the lines; the
+      // lower edge runs back right to left to close the shape.
+      const edge = d3
+        .line<{ x: number; y: number }>()
         .x((item) => x(item.x))
-        .y0((item) => y(item.lo))
-        .y1((item) => y(item.hi))
-        .curve(d3.curveLinear);
+        .y((item) => y(item.y))
+        .curve(d3.curveMonotoneX);
+      const area = (bandPoints: CollectiveXRangeBand['points']) => {
+        const hi = paretoLine(
+          bandPoints.map((item) => ({ x: item.x, y: item.hi })),
+          yAxis,
+        );
+        const lo = paretoLine(
+          bandPoints.map((item) => ({ x: item.x, y: item.lo })),
+          yAxis,
+        ).toReversed();
+        if (hi.length === 0 || lo.length === 0) return null;
+        return `${edge(hi)}L${edge(lo)!.slice(1)}Z`;
+      };
       group
         .selectAll<SVGPathElement, CollectiveXRangeBand>('path.collectivex-range-band')
         .data(bands, (band) => band.id)
@@ -315,7 +336,7 @@ export function CollectiveXChart({
         draw(group, ctx.newXScale, ctx.newYScale);
       },
     };
-  }, [ranges, rangeMode, colors]);
+  }, [ranges, rangeMode, colors, yAxis]);
   const xTickValues = useMemo(
     () => [...new Set(points.map((point) => point.x))].toSorted((a, b) => a - b),
     [points],
