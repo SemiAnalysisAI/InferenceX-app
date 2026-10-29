@@ -2,6 +2,8 @@
 
 import { Card } from '@/components/ui/card';
 import { Heading } from '@/components/ui/heading';
+import { useMemo } from 'react';
+
 import { useLocale } from '@/lib/i18n/use-locale';
 
 import {
@@ -10,7 +12,10 @@ import {
   COLLECTIVEX_KNOWN_SKUS,
   COLLECTIVEX_KNOWN_SUPPORT,
   collectiveXKnownFootnoteOrder,
+  collectiveXKnownVersions,
+  collectiveXShortLibraryVersion,
   type CollectiveXKnownEp,
+  type CollectiveXVersionedSeries,
 } from './known-support';
 
 const MODES = ['normal', 'low-latency'] as const;
@@ -19,7 +24,7 @@ const STRINGS = {
   en: {
     title: 'Known kernel support',
     description:
-      'The full SKU × library picture, independent of the runs above: green combinations work on the fleet, red combinations are known not to work (the numbered notes say why), and gray combinations are unavailable or awaiting qualification (see notes).',
+      'The full SKU × library picture, independent of the runs above: green combinations work on the fleet, red combinations are known not to work (the numbered notes say why), and gray combinations are unavailable or awaiting qualification (see notes). Under each cell is the backend version the selected runs measured.',
     modes: {
       normal: 'Throughput kernels',
       'low-latency': 'Low-latency kernels',
@@ -30,11 +35,12 @@ const STRINGS = {
     na: 'Not applicable',
     notes: 'Notes',
     note: (number: number) => ` (note ${number})`,
+    version: 'Measured backend version',
   },
   zh: {
     title: '已知 Kernel 支持情况',
     description:
-      '下表展示完整的 SKU × 集合通信库支持情况，不受上方已选运行影响：绿色表示该组合可在集群上运行，红色表示已知不可用（原因见编号注释），灰色表示该组合尚不可用或待验证（详见注释）。',
+      '下表展示完整的 SKU × 集合通信库支持情况，不受上方已选运行影响：绿色表示该组合可在集群上运行，红色表示已知不可用（原因见编号注释），灰色表示该组合尚不可用或待验证（详见注释）。每个单元格下方是所选运行实测的后端版本。',
     modes: {
       normal: '吞吐量 Kernel',
       'low-latency': '低延迟 Kernel',
@@ -45,6 +51,7 @@ const STRINGS = {
     na: '不适用',
     notes: '注释',
     note: (number: number) => `（注 ${number}）`,
+    version: '实测后端版本',
   },
 } as const;
 
@@ -84,9 +91,15 @@ function EpChip({
   );
 }
 
-export function CollectiveXSupportMatrices() {
+export function CollectiveXSupportMatrices({
+  series = [],
+}: {
+  /** The selected runs' series; each cell lists the backend versions they recorded. */
+  series?: readonly CollectiveXVersionedSeries[];
+}) {
   const locale = useLocale();
   const t = STRINGS[locale];
+  const versions = useMemo(() => collectiveXKnownVersions(series), [series]);
 
   return (
     <Card data-testid="collectivex-support-matrices" className="min-w-0">
@@ -154,6 +167,7 @@ export function CollectiveXSupportMatrices() {
                         {COLLECTIVEX_KNOWN_LIBRARIES.map((library) => {
                           const kase = COLLECTIVEX_KNOWN_SUPPORT[mode][sku][library];
                           const pairNa = kase.ep8.status === 'na' && kase.ep16.status === 'na';
+                          const cellVersions = versions.get(`${mode}/${sku}/${library}`) ?? [];
                           return (
                             <td
                               key={library}
@@ -194,6 +208,15 @@ export function CollectiveXSupportMatrices() {
                                   />
                                 </span>
                               )}
+                              {cellVersions.length > 0 ? (
+                                <span
+                                  data-testid="collectivex-known-version"
+                                  title={`${t.version}: ${cellVersions.join(', ')}`}
+                                  className="mt-1 block font-mono text-2xs leading-tight whitespace-nowrap text-muted-foreground"
+                                >
+                                  {cellVersions.map(collectiveXShortLibraryVersion).join(', ')}
+                                </span>
+                              ) : null}
                             </td>
                           );
                         })}

@@ -958,7 +958,7 @@ export default function CollectiveXDisplay() {
           )}
         </>
       )}
-      <CollectiveXSupportMatrices />
+      <CollectiveXSupportMatrices series={combinedSeries} />
     </section>
   );
 }

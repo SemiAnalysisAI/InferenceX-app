@@ -76,7 +76,7 @@ interface RawShard {
     case_id: string;
     case_factors: { sku: string; case: RawCase };
   };
-  implementation: { name: string };
+  implementation: { name: string; library_version?: unknown };
   runtime: { vendor: string };
   measurement: { rows: RawRow[] };
   outcome: { status: string; reasons?: string[] };
@@ -210,6 +210,11 @@ function topologyOf(kase: RawCase) {
   };
 }
 
+function libraryVersionOf(shard: RawShard): string | null {
+  const version = shard.implementation.library_version;
+  return typeof version === 'string' && version.trim() ? version.trim() : null;
+}
+
 function buildSeries({ shard, vendor }: SupportedShard): CollectiveXSeries {
   const kase = shard.identity.case_factors.case;
   return {
@@ -218,6 +223,7 @@ function buildSeries({ shard, vendor }: SupportedShard): CollectiveXSeries {
     mode: toMode(kase.mode),
     precision: toPrecision(kase.precision),
     backend: shard.implementation.name,
+    library_version: libraryVersionOf(shard),
     system: {
       ...topologyOf(kase),
       sku: shard.identity.case_factors.sku,
