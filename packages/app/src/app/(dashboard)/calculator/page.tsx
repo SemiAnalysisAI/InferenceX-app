@@ -16,8 +16,8 @@ export default async function CalculatorPage({ searchParams }: Props) {
   const seed = resolveCalculatorUrlSeed(sp);
   return (
     <>
-      <TabIntro tab="calculator" />
       <ThroughputCalculatorDisplay urlSeed={seed} />
+      <TabIntro tab="calculator" />
     </>
   );
 }

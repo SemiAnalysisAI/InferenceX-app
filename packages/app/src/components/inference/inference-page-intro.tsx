@@ -5,11 +5,11 @@ import { useEffect } from 'react';
 
 import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
-import { TabIntro } from '@/components/dashboard/tab-intro';
-import { ZhTabIntro } from '@/components/zh/zh-tab-intro';
 import { useClientPathname } from '@/hooks/useClientPathname';
 import { languageAlternates, localePath, type Locale } from '@/lib/i18n/i18n';
 import { inferenceModelMeta, inferenceModelMetaZh } from '@/lib/routing/inference-model-meta';
+import { TAB_META } from '@/lib/routing/tab-meta';
+import { TAB_META_ZH } from '@/lib/routing/tab-meta-zh';
 import {
   getInferenceModelBySlug,
   inferenceModelForPathname,
@@ -71,6 +71,11 @@ export function InferencePageIntro({ locale }: { locale: Locale }) {
     return () => observer.disconnect();
   }, [title, description, enPath, locale]);
 
-  const Intro = locale === 'zh' ? ZhTabIntro : TabIntro;
-  return <Intro tab="inference" title={meta?.title} intro={meta?.intro} />;
+  const heading = meta?.title ?? (locale === 'zh' ? TAB_META_ZH : TAB_META).inference.title;
+  // The chart card already explains the page, so the h1 stays for search and screen readers only.
+  return (
+    <h1 data-testid="inference-page-heading" className="sr-only">
+      {heading}
+    </h1>
+  );
 }

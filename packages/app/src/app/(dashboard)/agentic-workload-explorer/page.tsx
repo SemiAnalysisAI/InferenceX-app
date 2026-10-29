@@ -9,8 +9,8 @@ export const metadata: Metadata = tabMetadata('agentic-workload-explorer');
 export default function AgenticWorkloadExplorerPage() {
   return (
     <>
-      <TabIntro tab="agentic-workload-explorer" />
       <OverviewView />
+      <TabIntro tab="agentic-workload-explorer" />
     </>
   );
 }
