@@ -1,7 +1,9 @@
 import { costPerGpuHour, type CostTier } from './hardware';
+import type { ResultsEvidence } from './results-evidence';
 
 /** One stored serving cell (hardware × client concurrency) flattened for the dashboard. */
 export interface VideoPoint {
+  results?: ResultsEvidence | null;
   id: string;
   runId: string;
   artifactId: number;

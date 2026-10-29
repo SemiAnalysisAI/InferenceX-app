@@ -385,7 +385,7 @@ and PNG export are presentation-only controls; they add no API routes or writabl
 snapshot access.
 
 Use positive safe run IDs written as plain digits (`1e3`, `0x10`, and `+5` are
-rejected); run lists such as `unofficialrun` and `runs` take up to eight unique IDs.
+rejected); run lists such as `unofficialrun` / `unofficialruns` and `runs` take up to eight unique IDs.
 Overlay run indices follow the input order after trimming whitespace and removing
 duplicates. Preserve those indices when attributing results to a run.
 `runId` selects an exact logical snapshot, not necessarily
@@ -645,6 +645,55 @@ flags do not make public data sensitive.
 ### Cache-reuse recipe selection
 
 Pass a returned `data.recipes[].key` as `recipe`; `params.recipe` identifies the resolved selection. Missing or stale keys use the dashboard default. Each run uses the selected recipe if available, otherwise its own best-covered recipe. Inspect each bar's source row for its recipe identity. Without official rows, choices come from matching overlay runs.
+
+### VideoGenX results overview
+
+`GET /api/v1/views/video?view=overview` returns the same nine-group projection as
+`/video` and `/zh/video`. It reads at most five stored history pages;
+`coverage.truncated` remains authoritative. It never triggers media publication.
+The earlier dashboard/compare and run/artifact results views remain available.
+
+| UI controls                       | API parameters                                       | Contract                                                                                                                                                                                                |
+| --------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Model and frozen workload         | `r_model`, `r_workload`                              | Compact key from options.workloads resolves to full canonical identity; one 20-scheduled-clip C1 spec, at least 10 valid samples on every hardware; shorter historical runs remain History-only.        |
+| Resolution, duration, mode, steps | `r_resolution`, `r_duration`, `r_mode`, `r_steps`    | Exact recorded metadata; no mode inferred from model names.                                                                                                                                             |
+| GPU count, engine, execution date | `r_gpus`, `r_engine`, `r_date`                       | `deploymentCells` preserves the GPU-count series before the GPU filter.                                                                                                                                 |
+| Hardware legend                   | `r_hidden`                                           | Applies to all groups and media selection.                                                                                                                                                              |
+| Deadline                          | `r_deadline`                                         | Seconds, default 120. Attainment = on-time valid / valid; goodput = on-time valid / wall seconds. Missing per-request timing stays null.                                                                |
+| TCO tier                          | `r_tier`                                             | `h` or `r`; return participating and allocated GPU bases together. Missing allocation stays null.                                                                                                       |
+| Scenario prices                   | `r_price_t2v`, `r_price_i2v`, `r_price_r2v`, `r_api` | Nonnegative USD/video-second inputs, default null. `r_api` is used only when mode is unknown; prices are not borrowed across modes.                                                                     |
+| Utilization                       | `r_utilization`                                      | Fraction 0-1, default 1. Modelled revenue scales; reserved GPU hourly cost does not.                                                                                                                    |
+| Named stored overlay              | `unofficialrun` / `unofficialruns`                   | Exact stored run only, approved or unapproved, in separate `overlayCells`. Actual approval is preserved; the selected run is excluded from official cells, deployments and workload mix. No new ingest. |
+
+`cells` carries the source point, per-clip/frame energy, P95 only with 20 complete
+request samples, deadline metrics, both cost bases and modelled profit per GPU-hour.
+`evidence` includes recorded validity, hashes, completion counts and valid power
+samples. Missing quality, stage timing, memory and startup data remains null.
+PSNR against an H200 full-step reference requires separately sealed paired evidence;
+playable clips alone do not establish it. Never replace nulls with example numbers.
+
+Play/pause, scrub time, clip/difference rendering, theme, and expand controls are
+presentation-only exclusions. Media is read through the existing published-only
+route; source identities, pairing and unavailable states must remain visible.
+
+Example: `/api/v1/views/video?view=overview&r_tier=r&r_deadline=120&r_price_t2v=0.08&r_utilization=0.75`.
+
+`workloadMix` keeps separate eligible resolution/duration/mode cohorts under the model, engine, execution-date, GPU and hardware filters. It never pools their measurements. Profit is null outside the selected canonical workload because scenario prices do not transfer across resolutions or durations. Engine deployments remain distinct. Client-ready P50 uses its recorded field; legacy P50 is reused only when the canonical identity explicitly names the submit-to-downloaded-media boundary.
+
+The plural shared-link alias accepts exactly one positive run ID in this overview. Multiple IDs or both aliases together return HTTP 400; no extra source is ingested.
+
+Default points require a matching publication approval. The named channel never
+admits another run and clearing it cannot promote unapproved evidence. Dismissal
+retains a workload selector only if it remains in the approved choices. Approved
+cohorts retain default preference; a workload found only in the named run requires
+explicit selection or no matching approved cohort. Both channels use the same
+qualification and metric rules. Legacy dashboard/compare views stay approved-only.
+The overview returns JSON only; `format=csv` is unsupported and returns HTTP 400.
+
+中文：默认结果必须有匹配的发布批准记录。指定运行的通道只包含该运行，保留实际批准状态；
+清除叠加运行后不会将未批准数据转为正式结果。移除时，工作负载选择仅在已批准选项中仍然有效时保留。默认优先选择有已批准结果的工作负载；
+仅由指定运行提供的工作负载须明确选择，或在没有匹配的已批准结果时作为回退。两条通道共用准入和计算规则。
+旧 dashboard/compare 视图仍仅接纳已批准结果。overview 只返回 JSON，`format=csv` 返回 400。
 
 ### Landing-page Huawei link
 

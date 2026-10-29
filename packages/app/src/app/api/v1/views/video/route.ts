@@ -5,6 +5,8 @@ import {
   type VideoHistoryPage,
 } from '@/components/video-benchmark/history';
 import { servingCells } from '@/components/video-benchmark/serving';
+import { namedRunPoints, videoPoints } from '@/components/video-benchmark/points';
+import { parseResultsState, resultProjection } from '@/components/video-benchmark/results';
 import { storedBundle, type StoredArtifact } from '@/components/video-benchmark/stored';
 import {
   efficiencyValue,
@@ -30,7 +32,7 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 const headers = { 'Cache-Control': 'private, no-store' };
 
-async function dashboardResponse(request: NextRequest, view: 'dashboard' | 'compare') {
+async function dashboardResponse(request: NextRequest, view: 'dashboard' | 'compare' | 'overview') {
   const pages: VideoHistoryPage[] = [];
   let nextPage: number | null = 1;
   for (let page = 1; page <= VIDEO_HISTORY_MAX_PAGES; page++) {
@@ -44,6 +46,29 @@ async function dashboardResponse(request: NextRequest, view: 'dashboard' | 'comp
     pages.push(payload);
     nextPage = payload.nextPage;
     if (nextPage === null) break;
+  }
+  if (view === 'overview') {
+    const state = parseResultsState(request.nextUrl.search);
+    const projection = resultProjection(
+      videoPoints(pages),
+      state,
+      namedRunPoints(pages, state.unofficialRun),
+    );
+    return NextResponse.json(
+      {
+        view: 'video',
+        apiVersion: 'v1',
+        ...projection,
+        params: { ...projection.state, view },
+        coverage: {
+          pagesRead: pages.length,
+          maxPages: VIDEO_HISTORY_MAX_PAGES,
+          nextPage,
+          truncated: nextPage !== null,
+        },
+      },
+      { headers },
+    );
   }
   const projection = videoDashboardProjection(pages, request.nextUrl.search);
   const { baseline, candidate } = projection.comparison;
@@ -141,9 +166,30 @@ export function GET(request: NextRequest) {
     const mode = parseEnumParam(
       s.get('view'),
       'view',
-      ['dashboard', 'compare', 'discovery', 'results', 'tradeoff'],
+      ['dashboard', 'compare', 'overview', 'discovery', 'results', 'tradeoff'],
       s.has('run') || s.has('artifact') ? 'results' : 'dashboard',
     );
+    if (mode === 'overview') {
+      if (s.has('unofficialrun') && s.has('unofficialruns'))
+        throw new ViewsApiParamError('unofficialruns', 'Use one overlay parameter alias, not both');
+      for (const key of ['unofficialrun', 'unofficialruns'])
+        if (s.has(key)) parseRunIdParam(s.get(key), key);
+      for (const key of s.keys())
+        if (
+          key !== 'view' &&
+          key !== 'unofficialrun' &&
+          key !== 'unofficialruns' &&
+          !key.startsWith('r_')
+        )
+          throw new ViewsApiParamError(
+            key,
+            'Results overview accepts r_ selectors and one unofficialrun/unofficialruns ID',
+          );
+      return dashboardResponse(request, mode);
+    }
+    for (const key of s.keys())
+      if (key.startsWith('r_') || key === 'unofficialrun' || key === 'unofficialruns')
+        throw new ViewsApiParamError(key, 'Results selectors require view=overview');
     if (mode === 'dashboard' || mode === 'compare') {
       for (const key of s.keys())
         if (key !== 'view' && !key.startsWith('v_'))

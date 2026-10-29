@@ -83,7 +83,7 @@ export const DASHBOARD_ROUTES = [
     indexable: false,
     localeMirrored: true,
     providers: STANDALONE_DASHBOARD_PROVIDERS,
-    shareParamScopes: ['v_'],
+    shareParamScopes: ['v_', 'r_'],
   },
   {
     key: 'inference',
