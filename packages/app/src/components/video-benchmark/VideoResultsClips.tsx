@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { InfoHelp } from '@/components/ui/option-info';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { comparablePoints } from './compare';
@@ -20,14 +21,19 @@ import type { StoredArtifact } from './stored';
 const STRINGS = {
   en: {
     label: 'Comparison clips',
-    published: 'Published run',
     unofficial: 'Unofficial published run',
     prompt: 'Prompt',
+    sources: 'Prompt & sources',
+    source: 'Source',
+    run: 'Run',
+    runtime: 'Runtime',
+    artifact: 'Artifact',
+    media: 'Media',
     seed: 'seed',
     take: (n: number) => `take ${n}`,
     noPair: 'No published clips share a verified prompt, seed, take and generation configuration.',
     loading: 'Loading published clips…',
-    missing: 'No matched published clip',
+    missing: 'No matched clip',
     error: 'Published clips could not be loaded.',
     retry: 'Retry clips',
     play: 'Play',
@@ -38,6 +44,7 @@ const STRINGS = {
     view: 'Clip view',
     differenceNote:
       'Absolute RGB difference ×4 against the H200 50-step reference at the same playback time. This browser view is not a sealed quality measurement.',
+    differenceLabel: 'RGB difference ×4 · preview',
     noReference: 'A matched H200 50-step reference is not available.',
     differenceUnavailable:
       'Difference unavailable: frames must have matching geometry and permit cross-origin pixel reads.',
@@ -46,26 +53,32 @@ const STRINGS = {
     wall: 'wall time',
     psnr: 'PSNR',
     energy: 'J / clip',
-    participatingCost: '$ / video-s · participating',
-    allocatedCost: '$ / video-s · allocated',
+    costBasis: 'Modelled TCO · $/video-s',
+    participatingCost: 'Participating',
+    allocatedCost: 'Allocated',
     energyNote:
       'Mean GPU-board joules per valid clip in the selected measurement cell; not a per-clip energy trace.',
     psnrNote: 'Planned: no sealed paired PSNR result is available for this clip.',
-    costNote: 'Modelled TCO per video-second using the selected cost tier and recorded GPU count.',
-    noMeasurement: 'Not measured',
+    metricsHelp:
+      'PSNR is planned until a sealed pair is available. J/clip is the selected cell mean, not a per-clip trace. Both TCO bases use the selected tier and recorded GPU count.',
     gpu: (n: number) => `${n} GPU`,
     seconds: 's',
   },
   zh: {
     label: '视频对比',
-    published: '已发布运行',
     unofficial: '非官方已发布运行',
     prompt: 'Prompt',
+    sources: 'Prompt 与来源',
+    source: '来源',
+    run: '运行',
+    runtime: 'Runtime',
+    artifact: '产物',
+    media: '视频文件',
     seed: 'seed',
     take: (n: number) => `第 ${n} 次`,
     noPair: '没有 prompt、seed、重复次数和生成配置均已核实一致的已发布视频。',
     loading: '正在加载已发布视频…',
-    missing: '没有匹配的已发布视频',
+    missing: '没有匹配的视频',
     error: '无法加载已发布视频。',
     retry: '重试加载视频',
     play: '播放',
@@ -76,6 +89,7 @@ const STRINGS = {
     view: '视频视图',
     differenceNote:
       '与 H200 50-step 参考视频在相同播放时间的 RGB 绝对差异，放大 4 倍。浏览器预览不是已封存的质量测量结果。',
+    differenceLabel: 'RGB 差异 ×4 · 预览',
     noReference: '没有匹配的 H200 50-step 参考视频。',
     differenceUnavailable: '无法显示差异：帧尺寸必须一致，且视频需允许跨域像素读取。',
     mediaError: '此已发布视频无法播放。',
@@ -83,12 +97,13 @@ const STRINGS = {
     wall: '出片时间',
     psnr: 'PSNR',
     energy: 'J / clip',
-    participatingCost: '$ / 视频秒 · 参与 GPU',
-    allocatedCost: '$ / 视频秒 · 分配 GPU',
+    costBasis: 'TCO 估算 · $/视频秒',
+    participatingCost: '参与 GPU',
+    allocatedCost: '分配 GPU',
     energyNote: '所选测量单元每条有效视频的平均 GPU 板卡能耗，不是单条视频的能耗轨迹。',
     psnrNote: '计划中：此视频尚无已封存的配对 PSNR 结果。',
-    costNote: '按所选成本档位和记录的 GPU 数量估算每视频秒 TCO。',
-    noMeasurement: '未测量',
+    metricsHelp:
+      'PSNR 需等待已封存的配对结果。J/clip 是所选测量单元的平均值，不是单条视频的能耗轨迹。两种 TCO 口径均使用所选成本档位和记录的 GPU 数量。',
     gpu: (n: number) => `${n} 张 GPU`,
     seconds: 's',
   },
@@ -351,21 +366,77 @@ function SynchronizedClips({
 
   return (
     <>
-      <div
-        data-testid="video-results-prompt"
-        className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 text-sm"
-      >
-        <p className="min-w-0 flex-1 break-words">
-          <span className="text-muted-foreground">{s.prompt} </span>
-          {group?.prompt ?? s.noPair}
-        </p>
-        {group && (
-          <span className="font-mono text-xs text-muted-foreground">
-            {s.seed} {group.seed} · {s.take(group.take)}
-          </span>
-        )}
+      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+        <span>{s.label}</span>
+        <InfoHelp label={s.label} value="clip-metrics" triggerTestId="video-results-metrics-help">
+          {s.metricsHelp}
+        </InfoHelp>
       </div>
-      <div className="grid min-w-0 grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+      <details
+        data-testid="video-results-sources"
+        className="text-xs"
+        onToggle={(event) =>
+          track('video_results_sources_toggled', { open: event.currentTarget.open })
+        }
+      >
+        <summary className="cursor-pointer" tabIndex={0}>
+          {s.sources}
+        </summary>
+        <div data-testid="video-results-prompt" className="mt-3 space-y-1">
+          <p className="break-words">
+            <span className="text-muted-foreground">{s.prompt} </span>
+            {group?.prompt ?? s.noPair}
+          </p>
+          {group && (
+            <p className="font-mono text-muted-foreground">
+              {s.seed} {group.seed} · {s.take(group.take)}
+            </p>
+          )}
+        </div>
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="text-muted-foreground">
+              <tr>
+                <th className="pr-3 font-medium">{s.source}</th>
+                <th className="pr-3 font-medium">{s.run}</th>
+                <th className="pr-3 font-medium">{s.artifact}</th>
+                <th className="pr-3 font-medium">{s.runtime}</th>
+                <th className="font-medium">{s.media}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map((key) => {
+                const point = points.find((item) => item.hardwareKey === key);
+                const clip = group?.clips.get(key);
+                return (
+                  <tr key={key} className="border-t align-top">
+                    <td className="pr-3 whitespace-nowrap">{hardwareLabel(key)}</td>
+                    <td className="pr-3">{point?.runId ?? '—'}</td>
+                    <td className="pr-3">{point?.artifactId ?? '—'}</td>
+                    <td className="pr-3 break-all">{point?.runtime || '—'}</td>
+                    <td>
+                      {clip ? (
+                        <a
+                          className="underline"
+                          href={clip.url}
+                          onClick={() =>
+                            track('video_results_media_source_opened', { hardware: key })
+                          }
+                        >
+                          {s.media}
+                        </a>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </details>
+      <div className="grid min-w-0 grid-cols-1 gap-3 min-[360px]:grid-cols-2 lg:grid-cols-4 lg:gap-4">
         {visible.map((key) => {
           const point = points.find((item) => item.hardwareKey === key);
           const clip = group?.clips.get(key);
@@ -385,22 +456,17 @@ function SynchronizedClips({
               data-hardware={key}
               className="min-w-0 space-y-2"
             >
-              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold">
-                <span
-                  className="size-2.5 shrink-0 rounded-full"
-                  style={{ background: colorFor(key) }}
-                />
-                <span>{hardwareLabel(key)}</span>
-                <span className="min-w-0 basis-full break-all text-xs font-normal text-muted-foreground">
-                  {point
-                    ? `${point.runtime} · ${point.participating === null ? '—' : s.gpu(point.participating)}`
-                    : s.noMeasurement}
+              <div className="flex h-12 min-w-0 flex-col justify-center text-sm font-semibold">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span
+                    className="size-2.5 shrink-0 rounded-full"
+                    style={{ background: colorFor(key) }}
+                  />
+                  <span className="min-w-0 truncate">{hardwareLabel(key)}</span>
+                </div>
+                <span className="pl-[18px] text-xs font-normal text-muted-foreground">
+                  {typeof point?.participating === 'number' ? s.gpu(point.participating) : '—'}
                 </span>
-                {point && (
-                  <span className="min-w-0 basis-full break-all text-2xs font-normal text-muted-foreground">
-                    #{point.runId} · {point.runId === unofficialRun ? s.unofficial : s.published}
-                  </span>
-                )}
               </div>
               <div className="relative aspect-video overflow-hidden bg-black">
                 {clip && (
@@ -451,8 +517,13 @@ function SynchronizedClips({
                     {unavailable}
                   </div>
                 )}
+                {point && unofficialRun && point.runId === unofficialRun && (
+                  <span className="absolute left-1 top-1 bg-black/70 px-1 text-3xs text-white">
+                    {s.unofficial}
+                  </span>
+                )}
                 {!unavailable && clip?.side.h200FiftyStepReference && (
-                  <span className="absolute right-1 top-1 bg-black/60 px-1 text-3xs text-white">
+                  <span className="absolute bottom-1 right-1 bg-black/60 px-1 text-3xs text-white">
                     {s.reference}
                   </span>
                 )}
@@ -472,16 +543,6 @@ function SynchronizedClips({
                     display(!point || point.energyKj === null ? null : point.energyKj * 1000, 0),
                     s.energyNote,
                   ],
-                  [
-                    s.participatingCost,
-                    display(point ? costs?.[point.id]?.participating : null, 4),
-                    s.costNote,
-                  ],
-                  [
-                    s.allocatedCost,
-                    display(point ? costs?.[point.id]?.allocated : null, 4),
-                    s.costNote,
-                  ],
                 ].map(([label, value, title]) => (
                   <div
                     key={label}
@@ -493,6 +554,26 @@ function SynchronizedClips({
                   </div>
                 ))}
               </dl>
+              <div className="text-xs tabular-nums">
+                <p className="text-2xs text-muted-foreground">{s.costBasis}</p>
+                <dl className="space-y-1">
+                  {[
+                    [
+                      s.participatingCost,
+                      display(point ? costs?.[point.id]?.participating : null, 4),
+                    ],
+                    [s.allocatedCost, display(point ? costs?.[point.id]?.allocated : null, 4)],
+                  ].map(([label, value]) => (
+                    <div
+                      key={label}
+                      className="flex min-w-0 flex-wrap justify-between gap-x-2 border-b border-border/40 py-0.5"
+                    >
+                      <dt className="min-w-0 text-muted-foreground">{label}</dt>
+                      <dd className="m-0 font-medium">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
             </article>
           );
         })}
@@ -553,9 +634,14 @@ function SynchronizedClips({
         </div>
       </div>
       {view === 'difference' && (
-        <p className="text-xs text-muted-foreground">
-          {reference ? s.differenceNote : s.noReference}
-        </p>
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <span>{reference ? s.differenceLabel : s.noReference}</span>
+          {reference && (
+            <InfoHelp label={s.differenceLabel} value="difference-preview">
+              {s.differenceNote}
+            </InfoHelp>
+          )}
+        </div>
       )}
     </>
   );

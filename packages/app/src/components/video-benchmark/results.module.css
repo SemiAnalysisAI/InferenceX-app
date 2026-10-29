@@ -1,19 +1,17 @@
 .page {
   --results-rule: color-mix(in srgb, var(--muted-foreground) 25%, transparent);
 }
+.filters {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.workloadFilter {
+  grid-column: 1 / -1;
+}
 .body {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 172px;
-  gap: 32px;
-  margin-top: 22px;
+  margin-top: 16px;
 }
 .content {
   min-width: 0;
-}
-.rail {
-  position: sticky;
-  top: 16px;
-  align-self: start;
 }
 .group {
   border-top: 1px solid var(--results-rule);
@@ -24,7 +22,7 @@
 .items {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 28px 32px;
+  gap: 20px 28px;
 }
 .item {
   min-width: 0;
@@ -36,12 +34,12 @@
   grid-column: 1/-1;
 }
 .empty {
-  min-height: 112px;
+  min-height: 60px;
   display: grid;
   place-content: center;
   gap: 6px;
   text-align: center;
-  padding: 20px;
+  padding: 10px 14px;
   border: 1px dashed var(--results-rule);
   color: var(--muted-foreground);
   background: repeating-linear-gradient(
@@ -76,14 +74,14 @@
 }
 .legend {
   display: flex;
-  flex-direction: column;
-  gap: 9px;
+  flex-wrap: wrap;
+  gap: 4px 16px;
 }
 .legend label {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 28px;
+  min-height: 36px;
   cursor: pointer;
 }
 .legend input {
@@ -96,22 +94,15 @@
   display: inline-block;
   flex-shrink: 0;
 }
-.note {
-  color: var(--muted-foreground);
-}
-@media (max-width: 1023px) {
-  .body {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 20px;
+@media (min-width: 1024px) {
+  .filters {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1.7fr) minmax(0, 1fr) minmax(
+        0,
+        1fr
+      );
   }
-  .rail {
-    position: static;
-    grid-row: 1;
-  }
-  .legend {
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 4px 16px;
+  .workloadFilter {
+    grid-column: auto;
   }
 }
 @media (max-width: 767px) {

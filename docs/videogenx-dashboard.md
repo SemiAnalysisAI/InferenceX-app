@@ -41,6 +41,13 @@ metadata. Its existing help control shows the full published label and exact sou
 point ID. Matching summaries get distinct source-ID suffixes. This is presentation
 only; query IDs and API projection values remain unchanged.
 
+The header keeps the five selectors in one shared control panel. Its help explains
+the 20-clip cohort and fixture replay; the replay label appears only when active.
+Hardware checkboxes sit above a full-width four-slot clip comparison. Item help
+holds longer metric notes while chart encodings and modeled TCO remain visible.
+Validity keeps the workload identity visible and discloses full hashes on request.
+The uncalibrated rating schema is also disclosed on request.
+
 ## Nine groups and available measurements
 
 | Group                    | Available when retained                                                                                   | Empty until evidence exists                                    |
@@ -76,6 +83,11 @@ unequal frame geometry or blocked cross-origin pixel access. This preview is not
 sealed PSNR result. Distilled and full-step workloads are not silently equated.
 Per-tile wall time is the selected request's duration; energy is the cell's mean
 J/valid clip and is labeled accordingly.
+The default tiles show hardware, recorded GPU count, media, wall time, unknown
+PSNR, mean energy and both modeled TCO bases. Prompt, seed, take, run, artifact,
+runtime and media source remain in the keyboard-accessible Prompt & sources
+disclosure. The Difference label identifies the amplified browser preview; its
+help carries the full qualification.
 
 ## Cost and profit
 
@@ -103,10 +115,11 @@ reduces revenue, not the hours billed. This does not establish sustained capacit
 | Clip/frame energy                                                           | Both normalized values returned; toggle is presentation only                           |
 | Power trace hardware                                                        | All selected cell traces returned; selector is presentation only                       |
 | Clip transport, Difference, case navigation, History expand, theme, Share   | Presentation only; published media metadata uses the existing read-only media contract |
+| Cohort/item help, prompt/source, hashes and rating disclosures, media link  | Presentation only; existing history and published media reads provide their data       |
 
 Admin/publication handlers, private artifacts and credentials are excluded.
-Every control records a `video_results_*` analytics event (media controls use their
-own `video_results_*` events). Tests cover projection/API parity, both GPU bases,
+Video results controls and the new disclosures/media link record `video_results_*`
+events. Shared `InfoHelp` retains its `selector_option_help_opened` event. Tests cover projection/API parity, both GPU bases,
 nulls and invalid power, sample floors, overlay filtering, clip alignment, real
 browser playback and difference failure, bilingual layout and 390px overflow.
 
@@ -117,10 +130,14 @@ browser playback and difference failure, bilingual layout and 390px overflow.
 生成参数、prompt、seed 和测量语义。较短 smoke、未完成及未匹配结果留在性能历史，不混入比较。
 界面按有效性、延迟、吞吐量、资源与能耗、成本、质量、稳定性、启动、并行与部署的顺序展示。
 待采集指标是真正的斜线空态，不使用示意数值。功率无效时不展示功率或能耗结论。
+页首用一个共享控件区域展示五项筛选条件；硬件开关位于四栏视频对比上方。指标说明、
+完整哈希及尚未校准的人工评分维度按需展开，图表图例与 TCO 估算口径仍直接可见。
 
 四个视频窗口只读取已发布产物，核对 prompt、seed、重复次数和生成配置后同步播放。
 Difference 是相对已记录 H200 H3 50-step 视频的浏览器 RGB 差异预览，不是封存的 PSNR 测量。
 参考视频、尺寸或跨域读取条件不满足时显示不可用。蒸馏与完整步数分组保留。
+默认视频卡片保留硬件、GPU 数量、媒体及两种 TCO 口径；完整 prompt、seed、重复次数、
+运行、产物、Runtime 和媒体来源可在“Prompt 与来源”中查看。
 
 成本同时按参与计算和分配的 GPU 数量估算，分配证据缺失时不填补。利润输入默认空白，属于用户
 场景假设；利用率只降低收入，不减少付费时长。模式未知时不套用 T2V/I2V/R2V 价格。

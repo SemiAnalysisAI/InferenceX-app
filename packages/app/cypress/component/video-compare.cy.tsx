@@ -290,6 +290,35 @@ function mountResultsClips() {
 }
 
 describe('Video results synchronized clips', () => {
+  it('keeps exact prompt and source identity behind one focusable disclosure', () => {
+    cy.viewport(1440, 900);
+    mountResultsClips();
+    cy.get('[data-testid="video-results-sources"]').should('not.have.attr', 'open');
+    cy.get('[data-testid="video-results-prompt"]').should(
+      'contain',
+      'A drummer taps a snare drum.',
+    );
+    cy.get('[data-testid="video-results-sources"] summary')
+      .should('contain', 'Prompt & sources')
+      .focus();
+    cy.focused().should('contain', 'Prompt & sources');
+    cy.get('[data-testid="video-results-sources"] summary').click();
+    cy.get('[data-testid="video-results-sources"]').should('have.attr', 'open');
+    cy.get('[data-testid="video-results-prompt"]')
+      .should('be.visible')
+      .and('contain', 'A drummer taps a snare drum.')
+      .and('contain', 'seed 11')
+      .and('contain', 'take 1');
+    cy.get('[data-testid="video-results-sources"]')
+      .should('contain', c1('b200').runId)
+      .and('contain', c1('b200').runtime)
+      .and('contain', c1('h200').runId);
+    cy.get('[data-testid="video-results-clip"] .aspect-video').should(($media) => {
+      expect($media).to.have.length(4);
+      const tops = [...$media].map((element) => element.getBoundingClientRect().top);
+      expect(Math.max(...tops) - Math.min(...tops)).to.be.lessThan(2);
+    });
+  });
   it('decodes retained media, seeks and plays both clips, then displays real pixel differences', () => {
     mountResultsClips();
     cy.get('[data-testid="video-results-clip"] video')
@@ -302,6 +331,7 @@ describe('Video results synchronized clips', () => {
           expect(video.duration).to.equal(2);
         });
       });
+    cy.get('[data-testid="video-results-sources"] summary').click();
     cy.get('[data-testid="video-results-prompt"]')
       .should('contain', 'seed 11')
       .and('contain', 'take 1');
@@ -362,6 +392,14 @@ describe('Video results synchronized clips', () => {
     cy.get('[data-testid="video-results-clip"]').should('have.length', 4);
     cy.get('[data-testid="video-results-clip"][data-hardware="gb200"] video').should('not.exist');
     cy.get('[data-testid="video-results-clip"][data-hardware="mi355x"] video').should('not.exist');
+    cy.get('[data-testid="video-results-clip"][data-hardware="gb200"]').should(
+      'not.contain',
+      'Unofficial published run',
+    );
+    cy.get('[data-testid="video-results-clip"][data-hardware="mi355x"]').should(
+      'not.contain',
+      'Unofficial published run',
+    );
     cy.get('[data-testid="video-results-clip"][data-hardware="h200"] video').then(($video) => {
       const video = $video[0] as HTMLVideoElement;
       video.src = 'data:video/mp4;base64,YmFk';
@@ -371,7 +409,7 @@ describe('Video results synchronized clips', () => {
     cy.get(
       '[data-testid="video-results-clip"][data-hardware="b200"] [data-testid="video-results-media-empty"]',
     ).should('contain', 'reference');
-    cy.get('[data-testid="video-results-clips"] p').should(
+    cy.get('[data-testid="video-results-clips"]').should(
       'contain',
       'A matched H200 50-step reference is not available.',
     );

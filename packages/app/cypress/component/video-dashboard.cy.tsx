@@ -37,9 +37,9 @@ const costRow = (hardware: string, basis = 'participating') =>
   cy.get(`[data-testid="results-cost-table"] [data-hardware="${hardware}"][data-basis="${basis}"]`);
 
 describe('VideoGenX results', () => {
-  it('uses shared panels and concise workload choices with published identity in help', () => {
+  it('uses one shared control panel and concise workload choices with published identity in help', () => {
     mount();
-    cy.get('[data-slot="control-panel"]').should('have.length', 2);
+    cy.get('[data-slot="control-panel"]').should('have.length', 1);
     cy.get('[data-testid="results-automatic-detail"]').should('contain', 'MiniMax');
     cy.location('search').should('not.contain', 'r_workload=');
     cy.get('[data-testid="selected-option-help-automatic"]').click();
@@ -178,7 +178,7 @@ describe('VideoGenX results', () => {
     for (const hardware of ['gb200', 'mi355x', 'h200'])
       cy.get(`[data-testid="results-hardware-${hardware}"]`).uncheck();
     cy.get('[data-testid="results-cost-table"] [data-hardware]').should('not.exist');
-    cy.get('#latency circle').should('not.exist');
+    cy.get('#latency [data-hardware] circle').should('not.exist');
     cy.get('[data-testid="results-hardware-b200"]').check();
     costRow('b200').should('contain', '0.15');
   });
@@ -292,6 +292,16 @@ describe('VideoGenX results', () => {
           expect($control[0].getBoundingClientRect().height).to.equal(controlHeight);
         });
       assertResultsFit();
+      cy.get('[data-testid="video-results-clip"]').should(($tiles) => {
+        expect($tiles).to.have.length(4);
+        const first = $tiles[0].getBoundingClientRect();
+        const second = $tiles[1].getBoundingClientRect();
+        if (width === 320) expect(second.top).to.be.greaterThan(first.top);
+        else if (width === 390) expect(second.top).to.be.closeTo(first.top, 2);
+      });
+      cy.get('[data-testid="video-results-clip"][data-hardware="b200"]')
+        .should('contain', 'TCO')
+        .and('contain', pathname.startsWith('/zh') ? '分配 GPU' : 'Allocated');
       cy.get('[data-testid="results-workload"]').click('left');
       cy.get('[role="grid"]')
         .should('be.visible')

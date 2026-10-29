@@ -15,8 +15,8 @@ import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { ShareButton } from '@/components/ui/share-button';
 import { Card } from '@/components/ui/card';
 import { ControlPanel } from '@/components/ui/control-panel';
+import { InfoHelp } from '@/components/ui/option-info';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
-import { Eyebrow } from '@/components/ui/eyebrow';
 import { Heading } from '@/components/ui/heading';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -52,11 +52,8 @@ import styles from './results.module.css';
 
 const STRINGS = {
   en: {
-    title: 'VideoGenX · results across hardware',
-    subtitle:
-      'The same prompt and seed generated on each hardware. Time to video, fidelity against the full-step clip, metered GPU-board energy and TCO cost per video-second.',
-    config: 'Benchmark config',
-    runConfig: 'Run config',
+    title: 'VideoGenX',
+    config: 'Comparison',
     model: 'Model',
     workload: 'Workload',
     gpus: 'GPU count',
@@ -64,7 +61,6 @@ const STRINGS = {
     date: 'Run date',
     all: 'All',
     automatic: 'Matched workload',
-    automaticDetail: 'Automatically matched to',
     publishedLabel: 'Published label',
     sourceId: 'Source ID',
     stepsUnit: 'steps',
@@ -77,16 +73,17 @@ const STRINGS = {
     retry: 'Retry',
     planned: 'planned',
     tbd: 'tbd',
-    schema: 'schema',
     empty: 'No measured data for this selection',
-    plannedEmpty: 'Awaiting measured evidence',
+    plannedEmpty: '—',
     schemaEmpty: 'Schema only · not calibrated',
-    cohort:
-      'One canonical 20-clip C1 workload; at least 10 valid samples on every hardware. Other runs remain in Performance history.',
-    replay: 'Retained fixture replay · not a new measurement',
+    cohort: '20-clip C1 cohort · ≥10 valid per hardware',
+    cohortHelp:
+      'One canonical 20-clip C1 workload; at least 10 valid samples on every hardware. Other runs remain in Performance history. A fixture replay reads retained evidence and is not a new measurement.',
+    replay: 'Fixture replay',
     hidden: 'Excluded from this comparison',
     validity: 'Validity',
     hash: 'Workload hash',
+    hashDetails: 'Full hashes',
     integrity: 'Technical integrity',
     counts: 'Completion counts',
     fidelity: 'Paired fidelity',
@@ -114,6 +111,7 @@ const STRINGS = {
       'Share of valid clips delivered within the selected deadline. Requires every valid request timestamp.',
     deliveryNote:
       'GPU count is the x-axis. Solid: P50 · dotted: P90 · band: P50–P95. Only observed deployments are drawn.',
+    deliveryLegend: 'Solid P50 · dotted P90 · band P50–P95',
     throughput: 'Throughput',
     clips: 'Valid clips per second',
     seconds: 'Video seconds generated per second',
@@ -134,14 +132,15 @@ const STRINGS = {
     peak: 'observed peak',
     energyBasis: 'Energy basis',
     cost: 'Cost',
-    costMetrics: 'Cost per video and per video-second',
+    costMetrics: 'Modelled TCO per video and video-second',
     tier: 'Cost basis',
     estimator: 'Video profit estimator',
     participating: 'Participating GPUs',
     allocated: 'Allocated GPUs',
     utilization: 'Utilisation',
     price: 'API $ / video-s',
-    priceNote:
+    priceNote: 'Scenario prices · not current API rates',
+    priceDetail:
       'Scenario inputs, not measured revenue or current API prices. Enter a price for each mode; an unknown mode has no price.',
     costNote:
       'Modelled TCO from the hardware registry and measured output rate. Both GPU bases are shown; missing allocation evidence stays unknown. Each price applies only to the selected resolution, duration and mode.',
@@ -197,11 +196,8 @@ const STRINGS = {
     sample: 'Valid samples',
   },
   zh: {
-    title: 'VideoGenX · 跨硬件生成结果',
-    subtitle:
-      '各硬件使用相同 prompt 和 seed 生成视频，比较出片时间、相对完整步数参考视频的保真度、实测 GPU 板卡能耗及每视频秒 TCO 成本。',
-    config: '基准测试配置',
-    runConfig: '运行配置',
+    title: 'VideoGenX',
+    config: '对比条件',
     model: '模型',
     workload: '工作负载',
     gpus: 'GPU 数量',
@@ -209,7 +205,6 @@ const STRINGS = {
     date: '运行日期',
     all: '全部',
     automatic: '匹配的工作负载',
-    automaticDetail: '自动匹配到',
     publishedLabel: '已发布标签',
     sourceId: '来源 ID',
     stepsUnit: '步',
@@ -222,16 +217,17 @@ const STRINGS = {
     retry: '重试',
     planned: '计划中',
     tbd: '待确认',
-    schema: '仅 schema',
     empty: '当前选择没有实测数据',
-    plannedEmpty: '等待实测证据',
+    plannedEmpty: '—',
     schemaEmpty: '仅定义评分维度，尚未校准',
-    cohort:
-      '所有硬件共用一个固定的 20 条视频 C1 工作负载，至少需要 10 个有效样本。其他运行保留在性能历史中。',
-    replay: '保留 fixture 回放 · 不是新测量',
+    cohort: '20 条视频的 C1 工作负载 · 每种硬件至少 10 个有效样本',
+    cohortHelp:
+      '所有硬件共用一个固定的 20 条视频 C1 工作负载，至少需要 10 个有效样本。其他运行保留在性能历史中。Fixture 回放只读取已保留的证据，不是新测量。',
+    replay: 'Fixture 回放',
     hidden: '未纳入本次比较',
     validity: '有效性',
     hash: '工作负载哈希',
+    hashDetails: '完整哈希',
     integrity: '技术完整性',
     counts: '完成数量',
     fidelity: '配对保真度',
@@ -257,6 +253,7 @@ const STRINGS = {
     deadlineInput: '截止时间（s）',
     deadlineNote: '在所选截止时间内交付的有效视频占比，需要所有有效请求的时间记录。',
     deliveryNote: '横轴为 GPU 数量。实线 P50，虚线 P90，色带 P50–P95。只绘制实测部署。',
+    deliveryLegend: '实线 P50 · 虚线 P90 · 色带 P50–P95',
     throughput: '吞吐量',
     clips: '每秒有效视频数',
     seconds: '每秒生成视频秒数',
@@ -275,14 +272,16 @@ const STRINGS = {
     peak: '观测峰值',
     energyBasis: '能耗口径',
     cost: '成本',
-    costMetrics: '每条视频及每视频秒成本',
+    costMetrics: '每条视频及每视频秒的 TCO 估算',
     tier: '成本档位',
     estimator: '视频利润估算器',
     participating: '参与计算的 GPU',
     allocated: '分配的 GPU',
     utilization: '利用率',
     price: 'API $ / video-s',
-    priceNote: '场景假设，不是实测收入或当前 API 价格。分别填写各模式的价格；未知模式不套用价格。',
+    priceNote: '场景价格，非当前 API 报价',
+    priceDetail:
+      '价格输入是场景假设，不是实测收入或当前 API 报价。分别填写各模式的价格；未知模式不套用价格。',
     costNote:
       '使用硬件注册表的 TCO 与实测产出速率建模，同时展示两种 GPU 口径；分配证据缺失时保持未知。价格仅适用于所选分辨率、时长和模式。',
     profitNote:
@@ -345,14 +344,12 @@ function Empty({
   note,
 }: {
   s: Copy;
-  kind?: 'measured' | 'planned' | 'schema';
+  kind?: 'measured' | 'planned';
   note?: string;
 }) {
   return (
     <div className={`${styles.empty} text-xs`} data-testid="results-empty" data-state={kind}>
-      <span>
-        {kind === 'planned' ? s.plannedEmpty : kind === 'schema' ? s.schemaEmpty : s.empty}
-      </span>
+      <span>{kind === 'planned' ? s.plannedEmpty : s.empty}</span>
       {note && <span>{note}</span>}
     </div>
   );
@@ -379,9 +376,13 @@ function Item({
             {state}
           </span>
         )}
+        {note && (
+          <InfoHelp label={title} value={title}>
+            {note}
+          </InfoHelp>
+        )}
       </Heading>
       {children}
-      {note && <p className={`${styles.note} text-xs`}>{note}</p>}
     </div>
   );
 }
@@ -656,92 +657,87 @@ export default function VideoDashboard() {
         <div className="flex flex-col gap-4">
           <DashboardSectionHeader
             title={s.title}
-            description={s.subtitle}
-            actions={<ShareButton />}
+            actions={
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span>{s.cohort}</span>
+                <InfoHelp label={s.cohort} value="cohort" triggerTestId="results-cohort-help">
+                  {s.cohortHelp}
+                </InfoHelp>
+                {replay && <span data-testid="results-replay">{s.replay}</span>}
+                <ShareButton />
+              </div>
+            }
             headingAs="h1"
           />
-          <div className="grid min-w-0 gap-4 lg:grid-cols-[7fr_5fr]">
-            <ControlPanel legend={s.config} className="grid-cols-1 sm:grid-cols-[1fr_2fr]">
-              {selector(
-                'model',
-                s.model,
-                options.models.map((v) => ({ value: v, label: v })),
-                s.all,
+          <ControlPanel legend={s.config} className={styles.filters}>
+            {selector(
+              'model',
+              s.model,
+              options.models.map((v) => ({ value: v, label: v })),
+              s.all,
+            )}
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <Label>{s.gpus}</Label>
+              <SegmentedToggle
+                role="group"
+                value={state.gpuCount === null ? 'all' : String(state.gpuCount)}
+                options={[null, ...options.gpuCounts.toSorted((a, b) => a - b)].map((v) => ({
+                  value: v === null ? 'all' : String(v),
+                  label: v === null ? s.all : String(v),
+                }))}
+                onValueChange={(value) =>
+                  update({ gpuCount: value === 'all' ? null : Number(value) })
+                }
+                ariaLabel={s.gpus}
+                testId="results-gpus"
+              />
+            </div>
+            <div className={`${styles.workloadFilter} flex min-w-0 flex-col gap-1.5`}>
+              <Label htmlFor="results-workload">{s.workload}</Label>
+              <SearchableSelect
+                triggerId="results-workload"
+                triggerTestId="results-workload"
+                value={state.workload ?? 'automatic'}
+                onValueChange={(value) =>
+                  update({ workload: value === 'automatic' ? null : value })
+                }
+                groups={[
+                  {
+                    label: '',
+                    options: [
+                      { value: 'automatic', label: s.automatic, help: resolvedWorkload?.help },
+                      ...workloadOptions,
+                    ],
+                  },
+                ]}
+                placeholder={s.workload}
+                contentClassName="max-w-[calc(100vw-2rem)]"
+                trackPrefix="video_results_workload"
+              />
+              {state.workload === null && resolvedWorkload && (
+                <p className="text-xs text-muted-foreground" data-testid="results-automatic-detail">
+                  {resolvedWorkload.label}
+                </p>
               )}
-              <div className="flex min-w-0 flex-col gap-1.5">
-                <Label htmlFor="results-workload">{s.workload}</Label>
-                <SearchableSelect
-                  triggerId="results-workload"
-                  triggerTestId="results-workload"
-                  value={state.workload ?? 'automatic'}
-                  onValueChange={(value) =>
-                    update({ workload: value === 'automatic' ? null : value })
-                  }
-                  groups={[
-                    {
-                      label: '',
-                      options: [
-                        { value: 'automatic', label: s.automatic, help: resolvedWorkload?.help },
-                        ...workloadOptions,
-                      ],
-                    },
-                  ]}
-                  placeholder={s.workload}
-                  contentClassName="max-w-[calc(100vw-2rem)]"
-                  trackPrefix="video_results_workload"
-                />
-                {state.workload === null && resolvedWorkload && (
-                  <p
-                    className="text-xs text-muted-foreground"
-                    data-testid="results-automatic-detail"
-                  >
-                    {s.automaticDetail}: {resolvedWorkload.label}
-                  </p>
-                )}
-              </div>
-            </ControlPanel>
-            <ControlPanel legend={s.runConfig} className="grid-cols-1 sm:grid-cols-2">
-              <div className="flex min-w-0 flex-col gap-1.5 sm:col-span-2">
-                <Label>{s.gpus}</Label>
-                <SegmentedToggle
-                  role="group"
-                  value={state.gpuCount === null ? 'all' : String(state.gpuCount)}
-                  options={[null, ...options.gpuCounts.toSorted((a, b) => a - b)].map((v) => ({
-                    value: v === null ? 'all' : String(v),
-                    label: v === null ? s.all : String(v),
-                  }))}
-                  onValueChange={(value) =>
-                    update({ gpuCount: value === 'all' ? null : Number(value) })
-                  }
-                  ariaLabel={s.gpus}
-                  testId="results-gpus"
-                />
-              </div>
-              {selector(
-                'engine',
-                s.engine,
-                options.engines.map((v) => ({ value: v, label: v })),
-                s.all,
-              )}
-              {selector(
-                'date',
-                s.date,
-                options.dates
-                  .toSorted()
-                  .toReversed()
-                  .map((v) => ({ value: v, label: v })),
-                s.latest,
-              )}
-            </ControlPanel>
-          </div>
+            </div>
+            {selector(
+              'engine',
+              s.engine,
+              options.engines.map((v) => ({ value: v, label: v })),
+              s.all,
+            )}
+            {selector(
+              'date',
+              s.date,
+              options.dates
+                .toSorted()
+                .toReversed()
+                .map((v) => ({ value: v, label: v })),
+              s.latest,
+            )}
+          </ControlPanel>
         </div>
       </Card>
-      <p className="mt-3 text-xs text-muted-foreground">{s.cohort}</p>
-      {replay && (
-        <p className="mt-2 text-xs text-muted-foreground" data-testid="results-replay">
-          {s.replay}
-        </p>
-      )}
       {loading && (
         <p role="status" className="mt-3 text-sm">
           {s.loading}
@@ -784,6 +780,26 @@ export default function VideoDashboard() {
           </button>
         </div>
       )}
+      <div className={`${styles.legend} mt-5 text-xs`} aria-label={s.hardware}>
+        {RESULTS_HARDWARE.map((key) => (
+          <label key={key}>
+            <input
+              data-testid={`results-hardware-${key}`}
+              type="checkbox"
+              checked={!hidden.has(key)}
+              onChange={() => {
+                const next = new Set(state.hidden);
+                if (next.has(key)) next.delete(key);
+                else next.add(key);
+                update({ hidden: [...next] });
+                track('video_results_hardware_toggled', { hardware: key });
+              }}
+            />
+            <span className={styles.dot} style={{ background: colorFor(key) }} />
+            <span>{hardwareLabel(key)}</span>
+          </label>
+        ))}
+      </div>
       <div className={styles.body}>
         <div className={styles.content}>
           <VideoResultsClips
@@ -810,16 +826,28 @@ export default function VideoDashboard() {
             <Item title={s.hash} note={s.hashNote}>
               <dl className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 text-xs">
                 <dt>{s.workload}</dt>
-                <dd className="break-words">{cells[0]?.point.workload ?? '—'}</dd>
-                {representatives.map((c) => (
-                  <div key={c.point.id} className="contents">
-                    <dt>{cellLabel(c)}</dt>
-                    <dd className="break-all font-mono text-2xs">
-                      {c.evidence?.workloadHash ?? '—'}
-                    </dd>
-                  </div>
-                ))}
+                <dd className="break-words">{resolvedWorkload?.label ?? '—'}</dd>
               </dl>
+              <details
+                className="text-xs"
+                onToggle={(event) =>
+                  track('video_results_hashes_toggled', { open: event.currentTarget.open })
+                }
+              >
+                <summary className="cursor-pointer text-muted-foreground">{s.hashDetails}</summary>
+                <dl className="mt-2 grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2">
+                  <dt>{s.workload}</dt>
+                  <dd className="break-words">{cells[0]?.point.workload ?? '—'}</dd>
+                  {representatives.map((c) => (
+                    <div key={c.point.id} className="contents">
+                      <dt>{cellLabel(c)}</dt>
+                      <dd className="break-all font-mono text-2xs">
+                        {c.evidence?.workloadHash ?? '—'}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </details>
             </Item>
             <Item title={s.integrity}>
               <Table head={[s.hardware, s.sealed, s.powerValid, s.runtime]}>
@@ -886,6 +914,7 @@ export default function VideoDashboard() {
               )}
             </Item>
             <Item title={s.delivery} wide note={s.deliveryNote}>
+              <p className="text-xs text-muted-foreground">{s.deliveryLegend}</p>
               <div data-testid="results-latency-series">
                 {series.some((seriesItem) => seriesItem.points.length > 0) ? (
                   <ResultsLines series={series} label={s.delivery} xLabel={s.gpus} yLabel="s" />
@@ -1082,7 +1111,7 @@ export default function VideoDashboard() {
                   : noRows}
               </Table>
             </Item>
-            <Item title={s.estimator} wide note={s.profitNote}>
+            <Item title={s.estimator} wide note={`${s.priceDetail} ${s.profitNote}`}>
               <p className="text-xs text-muted-foreground">{s.priceNote}</p>
               <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
                 {(['t2v', 'i2v', 'r2v'] as VideoMode[]).map((mode) => (
@@ -1143,9 +1172,16 @@ export default function VideoDashboard() {
             <Item title={s.semantic} state={s.planned}>
               <Empty s={s} kind="planned" />
             </Item>
-            <Item title={s.human} wide state={s.schema}>
-              <Empty s={s} kind="schema" />
-              <ResultsRatingSchema labels={s.dimensions} label={s.schemaEmpty} />
+            <Item title={s.human} wide>
+              <details
+                className="text-xs text-muted-foreground"
+                onToggle={(event) =>
+                  track('video_results_rating_schema_toggled', { open: event.currentTarget.open })
+                }
+              >
+                <summary className="cursor-pointer">{s.schemaEmpty}</summary>
+                <ResultsRatingSchema labels={s.dimensions} label={s.schemaEmpty} />
+              </details>
             </Item>
           </Group>
           <Group id="stability" title={s.stability}>
@@ -1230,8 +1266,7 @@ export default function VideoDashboard() {
             <p className="my-3 text-xs text-muted-foreground">{s.historyNote}</p>
             {historyOpen && <VideoHistory />}
           </details>
-          <footer className="mt-9 flex flex-wrap justify-between gap-3 border-t py-5 text-xs text-muted-foreground">
-            <span>InferenceX · SemiAnalysis</span>
+          <footer className="mt-9 flex flex-wrap justify-end gap-3 border-t py-5 text-xs text-muted-foreground">
             <a
               className="underline"
               href={apiUrl}
@@ -1241,38 +1276,6 @@ export default function VideoDashboard() {
             </a>
           </footer>
         </div>
-        <aside className={styles.rail} aria-label={s.hardware}>
-          <Eyebrow as="div" tone="muted" className="mb-2">
-            {s.hardware}
-          </Eyebrow>
-          <div className={`${styles.legend} text-xs`}>
-            {RESULTS_HARDWARE.map((key) => (
-              <label key={key}>
-                <input
-                  data-testid={`results-hardware-${key}`}
-                  type="checkbox"
-                  checked={!hidden.has(key)}
-                  onChange={() => {
-                    const next = new Set(state.hidden);
-                    if (next.has(key)) next.delete(key);
-                    else next.add(key);
-                    update({ hidden: [...next] });
-                    track('video_results_hardware_toggled', { hardware: key });
-                  }}
-                />
-                <span className={styles.dot} style={{ background: colorFor(key) }} />
-                <span>{hardwareLabel(key)}</span>
-                <span className="ml-auto text-2xs text-muted-foreground">
-                  {n(representatives.find((c) => c.point.hardwareKey === key)?.point.p50, 1)} s
-                </span>
-              </label>
-            ))}
-          </div>
-          <p className="mt-4 text-2xs text-muted-foreground">
-            {s.notMeasured}: —<br />
-            {s.planned} / {s.tbd}
-          </p>
-        </aside>
       </div>
     </div>
   );
