@@ -7,8 +7,8 @@ import type { VizDefinition } from './types';
 
 export const VISUALIZATIONS: VizDefinition[] = [
   speedupVsBaseline,
-  metricVsSize,
   roofline,
+  metricVsSize,
   distribution,
   pairwiseScatter,
 ];
