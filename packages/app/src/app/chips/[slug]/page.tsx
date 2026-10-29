@@ -10,7 +10,12 @@ import {
 } from '@/lib/catalog/chip-pages';
 import { enAlternates } from '@/lib/i18n/i18n';
 import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
-import { chipMetaDescription, chipVsMetaDescription } from '@/lib/seo/chip-meta';
+import {
+  chipMetaDescription,
+  chipVsMetaDescription,
+  chipMetaTitle,
+  chipVsMetaTitle,
+} from '@/lib/seo/chip-meta';
 import { socialMetadata } from '@/lib/seo/social-metadata';
 
 interface Props {
@@ -43,7 +48,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const chip = getChipPage(slug);
   if (chip) {
-    const title = `${chip.title} Specs, Price & Power`;
+    const title = chipMetaTitle(chip, 'en');
     const description = chipMetaDescription(chip, 'en');
     const url = `${SITE_URL}/chips/${chip.slug}`;
     return {
@@ -64,7 +69,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const vsPage = getChipVsPage(slug);
   if (!vsPage) return {};
-  const title = `${vsPage.a.label} vs ${vsPage.b.label}: Specs, Price & Power`;
+  const title = chipVsMetaTitle(vsPage, 'en');
   const description = chipVsMetaDescription(vsPage, 'en');
   const url = `${SITE_URL}/chips/${vsPage.slug}`;
   return {

@@ -4,7 +4,7 @@ import {
   type ChipPageEntry,
   type ChipVsPage,
 } from '@/lib/catalog/chip-pages';
-import { clampMetaDescription } from '@/lib/seo/meta-text';
+import { clampMetaDescription, fitMetaTitle } from '@/lib/seo/meta-text';
 
 function chipFacts(entry: ChipPageEntry) {
   const spec = getChipSpec(entry);
@@ -39,5 +39,28 @@ export function chipVsMetaDescription(page: ChipVsPage, locale: 'en' | 'zh'): st
       ? `${la} 对比 ${lb}：显存 ${a.memory} vs ${b.memory}，带宽 ${a.bandwidth} vs ${b.bandwidth}，TDP ${a.tdp} vs ${b.tdp}，云端价格 ${a.price} vs ${b.price}，附 LLM 推理基准测试。`
       : `${la} vs ${lb}: ${a.memory} vs ${b.memory}, ${a.bandwidth} vs ${b.bandwidth} bandwidth, ${a.tdp} vs ${b.tdp} TDP, ${a.price} vs ${b.price}, plus LLM inference benchmarks.`,
     locale,
+  );
+}
+
+/** Chip page title (before the site suffix), shortened to fit META_TITLE_MAX. */
+export function chipMetaTitle(entry: ChipPageEntry, locale: 'en' | 'zh'): string {
+  return fitMetaTitle(
+    locale === 'zh'
+      ? [`${entry.title} 规格、价格与功耗`, `${entry.title} 规格与价格`, `${entry.title} 规格`]
+      : [
+          `${entry.title} Specs, Price & Power`,
+          `${entry.title} Specs & Price`,
+          `${entry.title} Specs`,
+        ],
+  );
+}
+
+/** Versus page title (before the site suffix), dropping descriptors until it fits META_TITLE_MAX. */
+export function chipVsMetaTitle(page: ChipVsPage, locale: 'en' | 'zh'): string {
+  const vs = `${page.a.label} vs ${page.b.label}`;
+  return fitMetaTitle(
+    locale === 'zh'
+      ? [`${vs}：规格、价格与功耗`, `${vs}：规格与价格`, `${vs} 规格`, vs]
+      : [`${vs}: Specs, Price & Power`, `${vs}: Specs & Price`, `${vs} Specs`, vs],
   );
 }

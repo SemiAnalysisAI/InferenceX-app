@@ -11,7 +11,12 @@ import {
 import { getZhChipTranslation } from '@/lib/catalog/chip-pages-zh';
 import { zhAlternates } from '@/lib/i18n/i18n';
 import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
-import { chipMetaDescription, chipVsMetaDescription } from '@/lib/seo/chip-meta';
+import {
+  chipMetaDescription,
+  chipVsMetaDescription,
+  chipMetaTitle,
+  chipVsMetaTitle,
+} from '@/lib/seo/chip-meta';
 import { socialMetadata } from '@/lib/seo/social-metadata';
 
 interface Props {
@@ -46,7 +51,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (entry) {
     const translation = getZhChipTranslation(entry.slug);
     if (!translation) return {};
-    const title = `${entry.title} 规格、价格与功耗`;
+    const title = chipMetaTitle(entry, 'zh');
     const description = chipMetaDescription(entry, 'zh');
     const url = `${SITE_URL}/zh/chips/${entry.slug}`;
     return {
@@ -67,7 +72,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const vsPage = getChipVsPage(slug);
   if (!vsPage) return {};
-  const title = `${vsPage.a.label} vs ${vsPage.b.label}：规格、价格与功耗`;
+  const title = chipVsMetaTitle(vsPage, 'zh');
   const description = chipVsMetaDescription(vsPage, 'zh');
   const url = `${SITE_URL}/zh/chips/${vsPage.slug}`;
   return {
