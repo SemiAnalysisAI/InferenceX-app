@@ -163,6 +163,7 @@ describe('First-load navigation', () => {
         win.localStorage.removeItem('inferencex-starred');
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         win.localStorage.removeItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed');
+        win.localStorage.setItem('inferencex-landing-banner-variant', 'ubenchx');
       },
     });
 
@@ -245,10 +246,11 @@ describe('Huawei UBenchX launch banner', { testIsolation: true }, () => {
           win.localStorage.setItem('inferencex-rubin-minimax-m3-banner-dismissed', '1');
           win.localStorage.setItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed', '1');
           win.localStorage.removeItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed');
+          win.localStorage.setItem('inferencex-landing-banner-variant', 'ubenchx');
           win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         },
       });
-      cy.get('[data-testid="launch-banner"]')
+      cy.get('[data-testid="launch-banner"]:visible')
         .should('have.attr', 'href', `${locale}/ubenchx/core-memory-profiles`)
         .and(
           'contain.text',
@@ -265,6 +267,75 @@ describe('Huawei UBenchX launch banner', { testIsolation: true }, () => {
       cy.get('[data-testid="ascend-core-profiles"]').should('be.visible');
     });
   }
+});
+
+describe('OperatorX launch banner A/B arm', { testIsolation: true }, () => {
+  for (const locale of ['', '/zh']) {
+    it(`opens OperatorX from ${locale || '/'} landing page`, () => {
+      cy.visit(locale || '/', {
+        onBeforeLoad(win) {
+          win.localStorage.removeItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed');
+          win.localStorage.setItem('inferencex-landing-banner-variant', 'operatorx');
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        },
+      });
+      cy.get('[data-testid="launch-banner"]:visible')
+        .should('have.length', 1)
+        .and('have.attr', 'href', `${locale}/operatorx`)
+        .and(
+          'contain.text',
+          locale ? 'Huawei Ascend 950PR 微基准测试' : 'Huawei Ascend 950PR Microbenchmarks',
+        )
+        .and(
+          'contain.text',
+          locale
+            ? '950PR GEMM FLOPs 与最大 FLOPS 利用率'
+            : '950PR GEMM FLOPs and Max FLOPS utilization',
+        )
+        .click();
+      cy.location('pathname').should('eq', `${locale}/operatorx`);
+      cy.get('[data-testid="operatorx-page"]').should('be.visible');
+    });
+  }
+
+  it('assigns a sticky arm on first visit and shows only that arm', () => {
+    cy.clearAllLocalStorage();
+    cy.visit('/', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+    cy.get('html')
+      .invoke('attr', 'data-landing-banner-variant')
+      .then((variant) => {
+        expect(variant).to.be.oneOf(['ubenchx', 'operatorx']);
+        cy.window()
+          .its('localStorage')
+          .invoke('getItem', 'inferencex-landing-banner-variant')
+          .should('eq', variant);
+        cy.get('[data-testid="launch-banner"]:visible')
+          .should('have.length', 1)
+          .and(
+            'have.attr',
+            'href',
+            variant === 'operatorx' ? '/operatorx' : '/ubenchx/core-memory-profiles',
+          );
+        cy.reload();
+        cy.get('html').should('have.attr', 'data-landing-banner-variant', variant);
+      });
+  });
+
+  it('shares dismissal across arms', () => {
+    cy.visit('/', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed', '1');
+        win.localStorage.setItem('inferencex-landing-banner-variant', 'operatorx');
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+    cy.get('[data-testid="intro-section"]').should('be.visible');
+    cy.get('[data-testid="launch-banner"]').should('not.exist');
+  });
 });
 
 describe('TPUv7 results', { testIsolation: true }, () => {

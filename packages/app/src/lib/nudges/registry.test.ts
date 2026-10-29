@@ -17,8 +17,8 @@ describe('NUDGE_REGISTRY integrity', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('has no duplicate storage keys', () => {
-    const keys = NUDGE_REGISTRY.map((n) => n.storageKey);
+  it('has no duplicate storage keys outside A/B arms of one nudge', () => {
+    const keys = NUDGE_REGISTRY.filter((n) => n.variant !== 'operatorx').map((n) => n.storageKey);
     expect(new Set(keys).size).toBe(keys.length);
   });
 
@@ -77,6 +77,7 @@ describe('NUDGE_REGISTRY integrity', () => {
       'filter-hint',
       'gradient-label',
       'huawei-ascend-950pr-ubenchx-banner',
+      'operatorx-banner',
       'reproducibility',
       'star-nudge',
       'tpuv7-agentx-launch-modal',
@@ -107,6 +108,11 @@ describe('NUDGE_REGISTRY integrity', () => {
     banner.content.onLinkClick?.();
     expect(location.href).toBe('/zh/ubenchx/core-memory-profiles');
 
+    const operatorxBanner = NUDGE_REGISTRY.find((nudge) => nudge.id === 'operatorx-banner');
+    if (operatorxBanner?.type !== 'banner') throw new Error('Missing OperatorX banner');
+    operatorxBanner.content.onLinkClick?.();
+    expect(location.href).toBe('/zh/operatorx');
+
     location.href = '';
     const modal = NUDGE_REGISTRY.find((nudge) => nudge.id === 'tpuv7-agentx-launch-modal');
     if (modal?.type !== 'modal') throw new Error('Missing TPUv7 launch modal');
@@ -114,6 +120,30 @@ describe('NUDGE_REGISTRY integrity', () => {
     expect(location.href).toBe(
       '/zh/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_xmode=interactivity&i_seq=agentic-traces&i_prec=fp8',
     );
+  });
+
+  it('splits the landing banner into comparable A/B arms', () => {
+    const arms = NUDGE_REGISTRY.filter((nudge) => nudge.variant);
+    expect(arms.map((arm) => [arm.variant, arm.content.href])).toEqual([
+      ['ubenchx', '/ubenchx/core-memory-profiles'],
+      ['operatorx', '/operatorx'],
+    ]);
+    for (const arm of arms) {
+      // Same slot, same dismissal, same event names: only the destination differs.
+      expect(arm).toMatchObject({
+        type: 'banner',
+        scope: 'landing',
+        renderOnInitialLoad: true,
+        priority: arms[0].priority,
+        storageKey: arms[0].storageKey,
+        analytics: {
+          shown: 'landing_banner_shown',
+          dismissed: 'landing_banner_dismissed',
+          action: 'landing_banner_clicked',
+          properties: { experiment: 'landing_banner_destination', variant: arm.variant },
+        },
+      });
+    }
   });
 
   it.each(['', '/zh'])('offers both launch models in the %s route tree', (prefix) => {
@@ -210,7 +240,13 @@ describe('NUDGE_REGISTRY integrity', () => {
   it('only server-renders deterministic immediate banners', () => {
     const initialNudges = NUDGE_REGISTRY.filter((nudge) => nudge.renderOnInitialLoad);
 
-    expect(initialNudges).toHaveLength(1);
+    // Several server-rendered banners are allowed only as A/B arms, one per arm.
+    if (initialNudges.length > 1) {
+      const arms = initialNudges.map((nudge) => nudge.variant);
+      expect(arms.every(Boolean)).toBe(true);
+      expect(new Set(arms).size).toBe(arms.length);
+    }
+    expect(initialNudges.length).toBeGreaterThan(0);
     for (const nudge of initialNudges) {
       const triggers = Array.isArray(nudge.trigger) ? nudge.trigger : [nudge.trigger];
       expect(nudge.type).toBe('banner');

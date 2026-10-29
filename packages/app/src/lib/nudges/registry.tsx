@@ -15,7 +15,10 @@ import { MOBILE_VIEWPORT_QUERY } from '@/hooks/useMediaQuery';
 import { isZhPathname, localePath } from '@/lib/i18n/i18n';
 import {
   HUAWEI_UBENCHX_URL,
+  LANDING_BANNER_ANALYTICS_EVENTS,
+  LANDING_BANNER_EXPERIMENT,
   LANDING_BANNER_STORAGE_KEY,
+  OPERATORX_URL,
   TPUV7_QWEN_3_5_AGENTX_URL,
 } from '@/lib/nudges/landing-banner';
 
@@ -309,6 +312,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     priority: 60,
     scope: 'landing',
     renderOnInitialLoad: true,
+    variant: 'ubenchx',
     content: {
       icon: Sparkles,
       iconClassName: 'text-brand',
@@ -327,12 +331,49 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
       },
     },
     analytics: {
-      shown: 'inference_huawei_ascend_950pr_ubenchx_banner_shown',
-      dismissed: 'inference_huawei_ascend_950pr_ubenchx_banner_dismissed',
-      action: 'inference_huawei_ascend_950pr_ubenchx_banner_clicked',
+      ...LANDING_BANNER_ANALYTICS_EVENTS,
       properties: {
         banner_id: 'huawei-ascend-950pr-ubenchx',
         destination: 'ubenchx',
+        experiment: LANDING_BANNER_EXPERIMENT,
+        variant: 'ubenchx',
+      },
+    },
+  },
+  {
+    id: 'operatorx-banner',
+    type: 'banner',
+    trigger: { type: 'immediate' },
+    dismissal: { type: 'permanent' },
+    storageKey: LANDING_BANNER_STORAGE_KEY,
+    priority: 60,
+    scope: 'landing',
+    renderOnInitialLoad: true,
+    variant: 'operatorx',
+    content: {
+      icon: Sparkles,
+      iconClassName: 'text-brand',
+      title: 'Huawei Ascend 950PR Microbenchmarks',
+      titleZh: 'Huawei Ascend 950PR 微基准测试',
+      description: '950PR GEMM FLOPs and Max FLOPS utilization',
+      descriptionZh: '950PR GEMM FLOPs 与最大 FLOPS 利用率',
+      testId: 'launch-banner',
+      badge: 'New',
+      badgeZh: '最新',
+      href: OPERATORX_URL,
+      linkLabel: 'View results',
+      linkLabelZh: '查看结果',
+      onLinkClick: () => {
+        window.location.href = localizedNudgeHref(OPERATORX_URL);
+      },
+    },
+    analytics: {
+      ...LANDING_BANNER_ANALYTICS_EVENTS,
+      properties: {
+        banner_id: 'operatorx',
+        destination: 'operatorx',
+        experiment: LANDING_BANNER_EXPERIMENT,
+        variant: 'operatorx',
       },
     },
   },

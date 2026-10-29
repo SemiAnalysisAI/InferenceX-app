@@ -16,6 +16,8 @@ function clearAllNudgeStorage(win: Cypress.AUTWindow) {
     win.localStorage.removeItem(key);
     win.sessionStorage.removeItem(key);
   }
+  // Pin the landing banner A/B arm so assertions on its copy are deterministic.
+  win.localStorage.setItem('inferencex-landing-banner-variant', 'ubenchx');
 }
 
 beforeEach(() => {
@@ -340,7 +342,7 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
       onBeforeLoad: clearAllNudgeStorage,
     });
     cy.get('[data-testid="launch-banner"]').should('be.visible');
-    cy.get('[data-testid="launch-banner-dismiss"]').click();
+    cy.get('[data-testid="launch-banner-dismiss"]:visible').click();
     cy.get('[data-testid="launch-banner"]').should('not.exist');
 
     cy.reload();
@@ -361,7 +363,7 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
       .and('have.attr', 'href', '/ubenchx/core-memory-profiles');
-    cy.get('[data-testid="launch-banner"]').click();
+    cy.get('[data-testid="launch-banner"]:visible').click();
 
     cy.location('pathname').should('eq', '/ubenchx/core-memory-profiles');
     cy.get('[data-testid="ascend-core-profiles"]').should('be.visible');
