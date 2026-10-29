@@ -22,6 +22,11 @@ import {
   compareModelDisplayLabel,
   compareModelSeoName,
 } from '@/lib/compare/compare-slug';
+import {
+  type CompareTableData,
+  compareTableDataFromPoints,
+  emptyCompareTableData,
+} from '@/lib/compare/compare-table-view';
 import { getHardwareConfig, getGpuSpecs } from '@/lib/catalog/constants';
 import { datasetJsonLd } from '@/lib/seo/dataset-jsonld';
 import { clampMetaDescription, META_DESCRIPTION_MAX } from '@/lib/seo/meta-text';
@@ -200,81 +205,19 @@ function buildGpuDataPointsForSequence(
   return islOsl ? buildGpuDataPoints(rows, hw, islOsl.isl, islOsl.osl, precision) : [];
 }
 
-function interactivityRangeOf(pts: GPUDataPoint[]): { min: number; max: number } | null {
-  if (pts.length === 0) return null;
-  let min = Infinity;
-  let max = -Infinity;
-  for (const p of pts) {
-    if (p.interactivity < min) min = p.interactivity;
-    if (p.interactivity > max) max = p.interactivity;
-  }
-  return { min, max };
-}
-
 export function computeCompareTableData(
   rows: BenchmarkRow[],
   a: string,
   b: string,
   sequence: string | null,
   precision: string | null,
-): {
-  defaultTargets: number[];
-  ssrRows: SsrInterpolatedRow[];
-  interactivityRange: { min: number; max: number };
-} {
-  const empty = { defaultTargets: [], ssrRows: [], interactivityRange: { min: 0, max: 100 } };
-  if (!sequence || !precision) return empty;
+): CompareTableData {
+  if (!sequence || !precision) return emptyCompareTableData();
 
-  const pointsA = buildGpuDataPointsForSequence(rows, a, sequence, precision);
-  const pointsB = buildGpuDataPointsForSequence(rows, b, sequence, precision);
-
-  if (pointsA.length === 0 && pointsB.length === 0) return empty;
-
-  const rangeA = interactivityRangeOf(pointsA);
-  const rangeB = interactivityRangeOf(pointsB);
-
-  let globalMin: number, globalMax: number;
-  if (rangeA && rangeB) {
-    globalMin = Math.max(rangeA.min, rangeB.min);
-    globalMax = Math.min(rangeA.max, rangeB.max);
-    if (globalMin >= globalMax) {
-      globalMin = Math.min(rangeA.min, rangeB.min);
-      globalMax = Math.max(rangeA.max, rangeB.max);
-    }
-  } else {
-    const r = rangeA ?? rangeB!;
-    globalMin = r.min;
-    globalMax = r.max;
-  }
-
-  const interactivityRange = {
-    min: Math.ceil(globalMin),
-    max: Math.floor(globalMax),
-  };
-
-  const span = globalMax - globalMin;
-  const defaultTargets =
-    span > 0
-      ? [
-          Math.round(globalMin + span * 0.25),
-          Math.round(globalMin + span * 0.5),
-          Math.round(globalMin + span * 0.75),
-        ]
-      : [Math.round(globalMin)];
-
-  const ssrRows: SsrInterpolatedRow[] = defaultTargets.map((target) => ({
-    target,
-    a:
-      pointsA.length > 0
-        ? interpolateForGPU(pointsA, target, 'interactivity_to_throughput', 'costh')
-        : null,
-    b:
-      pointsB.length > 0
-        ? interpolateForGPU(pointsB, target, 'interactivity_to_throughput', 'costh')
-        : null,
-  }));
-
-  return { defaultTargets, ssrRows, interactivityRange };
+  return compareTableDataFromPoints(
+    buildGpuDataPointsForSequence(rows, a, sequence, precision),
+    buildGpuDataPointsForSequence(rows, b, sequence, precision),
+  );
 }
 
 export function computeCompareImageRows(

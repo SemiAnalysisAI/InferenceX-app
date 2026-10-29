@@ -5,10 +5,7 @@ import { useEffect, useMemo } from 'react';
 
 import type { GPUDataPoint } from '@/components/calculator/types';
 import { useThroughputData } from '@/components/calculator/useThroughputData';
-import {
-  CompareTableRenderer,
-  type CompareTableData,
-} from '@/components/compare/compare-table-renderer';
+import { CompareTableRenderer } from '@/components/compare/compare-table-renderer';
 import {
   GlobalFilterProvider,
   useGlobalFilterRun,
@@ -21,6 +18,7 @@ import { track } from '@/lib/analytics/analytics';
 import { toModel, toPrecisions, toSequence } from '@/lib/compare/compare-enum-coerce';
 import { SPEC_METHODS_ACTIVE } from '@/lib/compare/compare-variant-slug';
 import type { AgenticScenarioIntro } from '@/lib/compare/compare-ssr';
+import type { CompareTableData } from '@/lib/compare/compare-table-view';
 
 const STRINGS = {
   en: {
@@ -251,6 +249,7 @@ export default function CompareSpecDecodePageClient({
               aLabel={isZh ? `启用 ${aLabel}` : aLabel}
               bLabel={isZh ? '关闭投机解码' : bLabel}
               ssrTableData={ssrTableData}
+              ssrSequence={defaultSequence}
               emptyStateText={t.emptyState}
             />
           </Card>
@@ -268,6 +267,7 @@ function CompareTableSection({
   aLabel,
   bLabel,
   ssrTableData,
+  ssrSequence,
   emptyStateText,
 }: {
   gpu: string;
@@ -276,12 +276,19 @@ function CompareTableSection({
   aLabel: string;
   bLabel: string;
   ssrTableData: CompareTableData;
+  ssrSequence: string | null;
   emptyStateText: string;
 }) {
-  const { effectiveSequence, effectivePrecisions, selectedModel } = useGlobalFilterSelection();
+  const {
+    selectedSequence,
+    effectiveSequence,
+    effectivePrecisions,
+    selectedModel,
+    sequenceResolved,
+  } = useGlobalFilterSelection();
   const { selectedRunDate } = useGlobalFilterRun();
 
-  const { gpuDataByGroupKey, ranges, hasData } = useThroughputData(
+  const { gpuDataByGroupKey, ranges, hasData, loading, error } = useThroughputData(
     selectedModel,
     effectiveSequence,
     effectivePrecisions,
@@ -306,16 +313,20 @@ function CompareTableSection({
     return { pointsA: pA, pointsB: pB };
   }, [gpuDataByGroupKey, gpu, method, precision]);
 
-  const clientRange = hasData ? ranges.interactivity : ssrTableData.interactivityRange;
-
   return (
     <CompareTableRenderer
       aLabel={aLabel}
       bLabel={bLabel}
       ssrTableData={ssrTableData}
-      interactivityRange={clientRange}
-      gpuDataPointsA={pointsA}
-      gpuDataPointsB={pointsB}
+      ssrSequence={ssrSequence}
+      selectedSequence={selectedSequence}
+      effectiveSequence={effectiveSequence}
+      sequenceResolved={sequenceResolved}
+      pointsA={pointsA}
+      pointsB={pointsB}
+      clientInteractivityRange={hasData ? ranges.interactivity : null}
+      loading={loading}
+      error={error}
       emptyStateText={emptyStateText}
     />
   );
