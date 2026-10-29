@@ -3,6 +3,7 @@
 import * as d3 from 'd3';
 import { useMemo, useRef } from 'react';
 
+import { globalParetoFrontier } from '@/lib/charts/pareto-frontier';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { Locale } from '@/lib/i18n/i18n';
@@ -226,16 +227,20 @@ export function CollectiveXChart({
     () => new Map(series.map((item) => [item.series_id, fitAlphaBeta(item, operation)])),
     [series, operation],
   );
+  // Like the inference charts, each line follows its series' Pareto frontier: more tokens and
+  // lower latency (or a higher rate at fewer tokens) is better. Dominated points keep their dot.
   const lines = useMemo(() => {
-    const result: Record<string, { x: number; y: number }[]> = {};
+    const bySeries: Record<string, { x: number; y: number }[]> = {};
     for (const point of points) {
-      (result[point.seriesId] ??= []).push({ x: point.x, y: point.y });
+      (bySeries[point.seriesId] ??= []).push({ x: point.x, y: point.y });
     }
-    for (const line of Object.values(result)) {
-      line.sort((a, b) => a.x - b.x);
+    const lowerIsBetter = yAxis === 'latency';
+    const result: Record<string, { x: number; y: number }[]> = {};
+    for (const [id, line] of Object.entries(bySeries)) {
+      result[id] = globalParetoFrontier(line, lowerIsBetter, !lowerIsBetter);
     }
     return result;
-  }, [points]);
+  }, [points, yAxis]);
 
   const xDomain = useMemo(() => paddedDomain(points.map((point) => point.x)), [points]);
   const yDomain = useMemo(
@@ -369,7 +374,7 @@ export function CollectiveXChart({
                 return item ? collectiveXRunDasharray(item.run_index) : 'none';
               },
               strokeWidth: 2.25,
-              curve: d3.curveLinear,
+              curve: d3.curveMonotoneX,
             },
           },
           {
