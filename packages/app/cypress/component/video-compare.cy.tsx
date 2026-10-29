@@ -3,6 +3,7 @@ import type { VideoHistoryPage } from '@/components/video-benchmark/history';
 import type { MetricOptions, VideoPoint } from '@/components/video-benchmark/metrics';
 import { dashboardCells, videoPoints } from '@/components/video-benchmark/points';
 import VideoCompare from '@/components/video-benchmark/VideoCompare';
+import VideoResultsClips from '@/components/video-benchmark/VideoResultsClips';
 import history from '../fixtures/api/video-history.json';
 import { servingArtifact } from '../support/video-artifacts';
 
@@ -245,5 +246,134 @@ describe('Video compare panel (retained fixture)', () => {
     metricRow('kjPerVideo').should('contain', '每条视频 GPU 板卡能耗');
     cy.get('[data-testid="video-compare-case-of"]').should('contain', '第 1 /');
     clip('baseline').should('contain', '出片时间 120 s');
+  });
+});
+
+// These decoder fixtures are test inputs, never benchmark evidence.
+function mountResultsClips() {
+  for (const key of ['b200', 'h200']) {
+    cy.fixture(`video-results/${key === 'h200' ? 'reference' : 'candidate'}.mp4`, 'base64').then(
+      (encoded: string) => {
+        cy.window().then((win) => {
+          const bytes = Uint8Array.from(win.atob(encoded), (char) => char.codePointAt(0)!);
+          const url = win.URL.createObjectURL(new win.Blob([bytes], { type: 'video/mp4' }));
+          const point = c1(key);
+          const saved = servingArtifact(
+            Number(point.runId),
+            point.artifactId,
+            key === 'h200' ? 'NVIDIA H200' : 'NVIDIA B200',
+          );
+          saved.sources[0].checksums = saved.sources[0].checksums.map(([path, sha]) => [
+            path,
+            path === 'manifest.json' ? point.id.split(':')[0] : sha,
+          ]);
+          saved.sources[0].assets = saved.sources[0].assets.map(([path, asset]) => [
+            path,
+            { ...asset, url },
+          ]);
+          cy.intercept('GET', mediaUrl(point), saved).as(`results-${key}`);
+        });
+      },
+    );
+  }
+  cy.mount(
+    <PathnameContext.Provider value="/video">
+      <VideoResultsClips
+        points={[c1('b200'), c1('h200')]}
+        colorFor={colorFor}
+        hidden={new Set()}
+        costs={{ [c1('b200').id]: { participating: 0.02, allocated: null } }}
+      />
+    </PathnameContext.Provider>,
+  );
+  cy.wait(['@results-b200', '@results-h200']);
+}
+
+describe('Video results synchronized clips', () => {
+  it('decodes retained media, seeks and plays both clips, then displays real pixel differences', () => {
+    mountResultsClips();
+    cy.get('[data-testid="video-results-clip"] video')
+      .should('have.length', 2)
+      .each(($video) => {
+        cy.wrap($video).should(($element) => {
+          const video = $element[0] as HTMLVideoElement;
+          expect(video.readyState).to.be.greaterThan(0.8);
+          expect(video.videoWidth).to.equal(32);
+          expect(video.duration).to.equal(2);
+        });
+      });
+    cy.get('[data-testid="video-results-prompt"]')
+      .should('contain', 'seed 11')
+      .and('contain', 'take 1');
+    cy.window().then((win) => {
+      cy.get('[data-testid="video-results-scrub"]').then(($input) => {
+        const setValue = Object.getOwnPropertyDescriptor(
+          win.HTMLInputElement.prototype,
+          'value',
+        )!.set!;
+        setValue.call($input[0], '0.8');
+        $input[0].dispatchEvent(new win.Event('input', { bubbles: true }));
+      });
+    });
+    cy.get('[data-testid="video-results-scrub"]').should('have.value', '0.8');
+    cy.get('[data-testid="video-results-clip"] video').each(($video) =>
+      cy
+        .wrap($video)
+        .should(($element) =>
+          expect(($element[0] as HTMLVideoElement).currentTime).to.be.closeTo(0.8, 0.08),
+        ),
+    );
+    cy.get('[data-testid="video-results-play"]').click();
+    cy.get('[data-testid="video-results-clip"] video').each(($video) =>
+      cy.wrap($video).should(($element) => {
+        const video = $element[0] as HTMLVideoElement;
+        expect(video.paused).to.equal(false);
+        expect(video.currentTime).to.be.greaterThan(0.8);
+      }),
+    );
+    cy.get('[data-testid="video-results-play"]').click();
+    cy.get('[data-testid="video-results-clip"] video').each(($video) =>
+      cy
+        .wrap($video)
+        .should(($element) => expect(($element[0] as HTMLVideoElement).paused).to.equal(true)),
+    );
+    cy.get('[data-testid="video-results-view"][data-view="difference"]').click();
+    cy.get('[data-testid="video-results-clip"][data-hardware="h200"] canvas').should(($canvas) => {
+      const rgba = ($canvas[0] as HTMLCanvasElement)
+        .getContext('2d')!
+        .getImageData(0, 0, 1, 1).data;
+      expect([...rgba]).to.deep.equal([0, 0, 0, 255]);
+    });
+    cy.get('[data-testid="video-results-clip"][data-hardware="b200"] canvas').should(($canvas) => {
+      const rgba = ($canvas[0] as HTMLCanvasElement)
+        .getContext('2d')!
+        .getImageData(0, 0, 1, 1).data;
+      expect(rgba[0]).to.be.greaterThan(200);
+      expect(rgba[2]).to.be.greaterThan(200);
+      expect(rgba[3]).to.equal(255);
+    });
+    cy.get('[data-testid="video-results-clip"][data-hardware="b200"]')
+      .should('contain', '0.02')
+      .find('dl')
+      .should('contain', '—');
+  });
+  it('keeps unknown hardware empty and cannot draw a difference after the reference decoder fails', () => {
+    mountResultsClips();
+    cy.get('[data-testid="video-results-clip"]').should('have.length', 4);
+    cy.get('[data-testid="video-results-clip"][data-hardware="gb200"] video').should('not.exist');
+    cy.get('[data-testid="video-results-clip"][data-hardware="mi355x"] video').should('not.exist');
+    cy.get('[data-testid="video-results-clip"][data-hardware="h200"] video').then(($video) => {
+      const video = $video[0] as HTMLVideoElement;
+      video.src = 'data:video/mp4;base64,YmFk';
+      video.load();
+    });
+    cy.get('[data-testid="video-results-view"][data-view="difference"]').click();
+    cy.get(
+      '[data-testid="video-results-clip"][data-hardware="b200"] [data-testid="video-results-media-empty"]',
+    ).should('contain', 'reference');
+    cy.get('[data-testid="video-results-clips"] p').should(
+      'contain',
+      'A matched H200 50-step reference is not available.',
+    );
   });
 });

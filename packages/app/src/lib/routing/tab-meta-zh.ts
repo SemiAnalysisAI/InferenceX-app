@@ -101,8 +101,8 @@ export const TAB_META_ZH: Record<DashboardRouteKey, { title: string; description
       '各模型、芯片 SKU 和配置的当前 InferenceX Docker 镜像标签。对比已部署镜像与最新 vLLM 和 SGLang 发布版本，标记过期标签。',
   },
   video: {
-    title: 'H3 视频基准测试',
-    description: '查看 H3 原始视频、音频、测量结果与 CI 来源记录。',
+    title: 'VideoGenX 生成结果',
+    description: '比较匹配的视频、延迟、吞吐量、GPU 板卡能耗和两种 GPU 成本口径，并保留 CI 证据。',
   },
   feedback: {
     title: '用户反馈',
@@ -151,7 +151,7 @@ export const TAB_INTRO_ZH: Record<DashboardRouteKey, string> = {
   'current-inferencex-image':
     '本页面展示 InferenceX 当前使用的 Docker 镜像标签：按模型、芯片 SKU 和配置列出已部署版本，并与上游 vLLM、SGLang 最新发布版本对比，方便排查过期镜像。',
   video:
-    '本页面在浏览器中读取 H3 CI 产物，展示执行状态、测量数据与比较结论；比较阈值在后端标注校准前保持未校准。',
+    '本页面只读展示已发布的视频生成结果，按同一 20 条视频 C1 工作负载比较各硬件；尚无实测证据的指标显示为空态。',
   feedback:
     '本页面为内部反馈查看器：使用解密密钥在浏览器中解密并查阅用户提交的反馈内容，密钥不会离开此页面。',
 };
@@ -175,7 +175,7 @@ export const TAB_LABELS_ZH: Record<DashboardRouteKey, string> = {
   submissions: '提交记录',
   'ai-chart': 'AI 图表',
   'current-inferencex-image': '镜像',
-  video: '视频基准测试',
+  video: 'VideoGenX 视频',
   feedback: '反馈',
 };
 

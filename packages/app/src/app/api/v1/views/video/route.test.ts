@@ -8,6 +8,7 @@ import type {
 import { metricValue } from '@/components/video-benchmark/metrics';
 import { listedVideoCells, plotVideoPoints } from '@/components/video-benchmark/plot';
 import { dashboardCells, videoPoints } from '@/components/video-benchmark/points';
+import { parseResultsState, resultProjection } from '@/components/video-benchmark/results';
 import { servingFixture } from '@/components/video-benchmark/serving.fixture';
 import type { StoredArtifact } from '@/components/video-benchmark/stored';
 import {
@@ -17,6 +18,7 @@ import {
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET } from './route';
+import retainedHistory from '../../../../../../cypress/fixtures/api/video-history.json';
 
 const source = vi.hoisted(() => vi.fn());
 vi.mock('@/app/api/video-runs/route', () => ({ GET: source }));
@@ -141,6 +143,29 @@ beforeEach(() => {
 });
 
 describe('published VideoGenX dashboard projection', () => {
+  it('returns the same nine-group selection and economics as the UI without reading or publishing media', async () => {
+    const history = structuredClone(retainedHistory) as unknown as VideoHistoryPage;
+    history.nextPage = null;
+    source.mockImplementation(() => Response.json(history));
+    const query =
+      'view=overview&r_tier=r&r_deadline=60&r_utilization=0.5&r_hidden=mi355x&unofficialrun=123';
+    const response = await GET(request(query));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    const expected = resultProjection(videoPoints([history]), parseResultsState(query));
+    expect(body).toMatchObject(expected);
+    expect(body.cells.length).toBeGreaterThan(0);
+    expect(body.params.view).toBe('overview');
+    expect(body.coverage.pagesRead).toBe(1);
+    expect(
+      source.mock.calls.every(([req]) => req.nextUrl.searchParams.get('format') === 'history'),
+    ).toBe(true);
+    const mixed = await GET(request('view=overview&v_api=0.08'));
+    const wrongView = await GET(request('view=dashboard&r_tier=h'));
+    expect(mixed.status).toBe(400);
+    expect(wrongView.status).toBe(400);
+  });
+
   it('defaults to the current dashboard, reads history pages and preserves numerical parity', async () => {
     const response = await GET(request());
     expect(response.status).toBe(200);
@@ -174,6 +199,16 @@ describe('published VideoGenX dashboard projection', () => {
     expect(
       source.mock.calls.every(([req]) => req.nextUrl.searchParams.get('format') === 'history'),
     ).toBe(true);
+  });
+  it('accepts the canonical single overlay alias but rejects ambiguous or multiple overlays', async () => {
+    const single = await GET(request('view=overview&unofficialruns=123'));
+    expect(single.status).toBe(200);
+    const body = await single.json();
+    expect(body.params.unofficialRun).toBe('123');
+    const multiple = await GET(request('view=overview&unofficialruns=123,456'));
+    const aliases = await GET(request('view=overview&unofficialrun=123&unofficialruns=456'));
+    expect(multiple.status).toBe(400);
+    expect(aliases.status).toBe(400);
   });
 
   it('shares axis, tier, optimal, API price, compare and hardware-filter semantics with the UI', async () => {

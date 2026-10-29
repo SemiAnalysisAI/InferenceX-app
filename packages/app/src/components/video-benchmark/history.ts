@@ -4,11 +4,13 @@ import { nativeHardware } from './hardware';
 import { storedBundle, storedFidelityBundle, type StoredArtifact } from './stored';
 import { isNativeH3, servingCells } from './serving';
 import { efficiencyValue, latencyValue, tradeoffPoints } from './tradeoff';
+import { resultsEvidence, type ResultsEvidence } from './results-evidence';
 
 /** Shared bound for dashboard history reads in the browser and view API. */
 export const VIDEO_HISTORY_MAX_PAGES = 5;
 
 export interface VideoHistoryObservation {
+  results?: ResultsEvidence | null;
   id: string;
   cell: string | null;
   hardware: string;
@@ -137,6 +139,7 @@ export function videoHistoryEntry(
         }).map((point) => {
           const cell = cells.find((item) => item.id === point.cellId);
           return {
+            results: cell ? resultsEvidence(bundle, cell) : null,
             id: point.id,
             cell: point.cellId ?? null,
             hardware: point.hardware || result.hardware,

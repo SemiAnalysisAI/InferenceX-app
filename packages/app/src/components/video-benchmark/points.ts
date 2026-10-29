@@ -40,6 +40,7 @@ function toPoint(
 ): VideoPoint {
   const server = o.server;
   return {
+    results: o.results ?? null,
     id: o.id,
     runId,
     artifactId,
