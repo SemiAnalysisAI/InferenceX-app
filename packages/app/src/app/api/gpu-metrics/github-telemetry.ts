@@ -4,13 +4,10 @@ import {
   isMultinodePowerSamplesPath,
   parseMultinodePowerSamples,
 } from '@semianalysisai/inferencex-db/etl/multinode-power-samples';
+import { isPowerAuditBundleEntry } from '@semianalysisai/inferencex-db/power-series/power-audit-cut';
 
 import type { GpuMetricRow, GpuPowerRunInfo } from '@/components/gpu-power/types';
-import {
-  cutPowerAuditBundle,
-  isPowerAuditBundleEntry,
-  parsePowerCsvData,
-} from '@/components/gpu-power/power-audit-bundle';
+import { cutPowerAuditBundle, parsePowerCsvData } from '@/components/gpu-power/power-audit-bundle';
 import type { GpuPowerSeries } from '@/components/gpu-power/power-series';
 import {
   downloadGithubArtifact,

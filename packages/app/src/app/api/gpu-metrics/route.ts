@@ -8,7 +8,10 @@
  *
  * DO NOT ADD CACHING (blob, CDN, or unstable_cache) to this route. Live
  * GitHub Actions artifacts change while a run is in progress, and stored
- * telemetry must reflect a successful re-ingest immediately.
+ * telemetry must reflect a successful re-ingest immediately. The precomputed
+ * `series=power` rows below are not a cache in that sense: each row is keyed by
+ * the versions of the series it was computed from and is ignored the moment a
+ * re-ingest or point change makes the key differ.
  *
  * Two telemetry collectors publish GPU power for a run:
  * - single-node runners (nvidia-smi / amd-smi) publish one `gpu_metrics_<RESULT_FILENAME>`
@@ -28,6 +31,9 @@
  *   joins them to chart points by `source` (bundle) or artifact name (CSV).
  *   Persisted samples and validation windows use the same bucketing/cut
  *   transform as artifacts, so historical runs survive artifact expiry.
+ *   Ingest stores that transform's output per artifact (`gpu_power_series`,
+ *   migration 019); the route reads it first and buckets the samples itself
+ *   only when a scoped artifact has no current row.
  * `prefix=<RESULT_FILENAME prefix>` narrows either shape to the artifacts of
  * one model / workload / precision so a full nightly sweep is not downloaded
  * for one chart. A bundle names a whole sweep, so it also matches when the
@@ -44,13 +50,14 @@ import {
   type GpuMetricsRunPayload,
   type GpuMetricsRunSelection,
 } from '@semianalysisai/inferencex-db/queries/gpu-metrics';
-
-import type { GpuPowerRunInfo, GpuPowerApiResponse } from '@/components/gpu-power/types';
-import { bucketPowerFiles, type GpuPowerSeries } from '@/components/gpu-power/power-series';
+import { getPrecomputedPowerSeries } from '@semianalysisai/inferencex-db/queries/gpu-power-series';
 import {
   storedPowerSeries,
   StoredTelemetryIncompleteError,
-} from '@/components/gpu-power/stored-power-series';
+} from '@semianalysisai/inferencex-db/power-series/stored-power-series';
+
+import type { GpuPowerRunInfo, GpuPowerApiResponse } from '@/components/gpu-power/types';
+import { bucketPowerFiles, type GpuPowerSeries } from '@/components/gpu-power/power-series';
 import { ARTIFACT_PREFIX } from './artifact-selection';
 import { fetchGpuMetricsFromGithub } from './github-telemetry';
 
@@ -69,9 +76,22 @@ export interface GpuMetricsRouteResponse extends GpuPowerApiResponse {
   coverage?: GpuMetricsRunPayload['coverage'];
 }
 
+function storedRunInfo(run: GpuMetricsRunPayload['workflowRun']): GpuPowerRunInfo {
+  return {
+    id: run.githubRunId,
+    name: run.name,
+    branch: run.headBranch ?? '',
+    sha: run.headSha ?? '',
+    createdAt: run.createdAt ?? `${run.date}T00:00:00Z`,
+    url:
+      run.htmlUrl ?? `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${run.githubRunId}`,
+    conclusion: run.conclusion ?? '',
+    status: run.status ?? '',
+  };
+}
+
 /** Shape stored series like the GitHub payload so readers are source-agnostic. */
 export function databasePayloadToResponse(payload: GpuMetricsRunPayload): GpuMetricsRouteResponse {
-  const run = payload.workflowRun;
   const filesPerArtifact = new Map<string, number>();
   for (const series of payload.series) {
     filesPerArtifact.set(series.artifactName, (filesPerArtifact.get(series.artifactName) ?? 0) + 1);
@@ -80,18 +100,7 @@ export function databasePayloadToResponse(payload: GpuMetricsRunPayload): GpuMet
     source: 'database',
     coverage: payload.coverage,
     ...(payload.artifactNames ? { artifactNames: payload.artifactNames } : {}),
-    runInfo: {
-      id: run.githubRunId,
-      name: run.name,
-      branch: run.headBranch ?? '',
-      sha: run.headSha ?? '',
-      createdAt: run.createdAt ?? `${run.date}T00:00:00Z`,
-      url:
-        run.htmlUrl ??
-        `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${run.githubRunId}`,
-      conclusion: run.conclusion ?? '',
-      status: run.status ?? '',
-    },
+    runInfo: storedRunInfo(payload.workflowRun),
     artifacts: payload.series.map(({ data, ...series }) => ({
       // Multinode uploads carry one CSV per node; keep them distinguishable.
       name:
@@ -127,9 +136,12 @@ function sourceCoverage(series: GpuPowerSeries[], sources: string[] | null) {
 function powerSeriesResponse(
   source: GpuMetricsSource,
   runInfo: GpuPowerRunInfo,
-  series: GpuPowerSeries[],
+  allSeries: GpuPowerSeries[],
   sources: string[] | null,
 ) {
+  const series = allSeries.filter(
+    (entry) => sources === null || sources.includes(seriesSource(entry) ?? ''),
+  );
   return NextResponse.json(
     { source, runInfo, series, sourceCoverage: sourceCoverage(series, sources) },
     { headers: { 'Cache-Control': 'no-store' } },
@@ -143,6 +155,32 @@ async function fetchGpuMetricsFromDatabase(
   if (!process.env.DATABASE_READONLY_URL) return null;
   const payload = await getGpuMetricsForRun(getDb(), runId, selection);
   return payload ? databasePayloadToResponse(payload) : null;
+}
+
+/**
+ * Precomputed timeline series, or null to use the samples path. A failure here
+ * is logged and falls through: the samples path re-reads the database and
+ * reports its own errors.
+ */
+async function fetchPrecomputedPowerSeries(
+  runId: number,
+  selection: GpuMetricsRunSelection,
+  sources: string[] | null,
+) {
+  if (!process.env.DATABASE_READONLY_URL) return null;
+  try {
+    const stored = await getPrecomputedPowerSeries(getDb(), runId, selection);
+    if (!stored) return null;
+    return powerSeriesResponse(
+      'database',
+      storedRunInfo(stored.workflowRun),
+      stored.series,
+      sources,
+    );
+  } catch (error) {
+    console.error(`gpu-metrics: precomputed power series unavailable for run ${runId}:`, error);
+    return null;
+  }
 }
 
 export function GET(request: NextRequest) {
@@ -232,14 +270,20 @@ async function readGpuMetrics(
     return NextResponse.json({ error: 'series must be "power" when present' }, { status: 400 });
   }
 
+  const selection: GpuMetricsRunSelection = {
+    prefix,
+    sourceResults:
+      sources?.map((source) => source.slice('power_validation_'.length, -'.json'.length)) ?? null,
+    ...(selectedArtifact === undefined ? {} : { artifact: selectedArtifact }),
+  };
+  if (series === 'power') {
+    const precomputed = await fetchPrecomputedPowerSeries(numericRunId, selection, sources);
+    if (precomputed) return precomputed;
+  }
+
   let stored: GpuMetricsRouteResponse | null;
   try {
-    stored = await fetchGpuMetricsFromDatabase(numericRunId, {
-      prefix,
-      sourceResults:
-        sources?.map((source) => source.slice('power_validation_'.length, -'.json'.length)) ?? null,
-      ...(selectedArtifact === undefined ? {} : { artifact: selectedArtifact }),
-    });
+    stored = await fetchGpuMetricsFromDatabase(numericRunId, selection);
   } catch (error) {
     // Missing data may use live artifacts; a failed read cannot establish absence.
     console.error(`gpu-metrics: database lookup failed for run ${runId}:`, error);
@@ -262,7 +306,7 @@ async function readGpuMetrics(
         stored.artifacts.flatMap((artifact) =>
           artifact.series ? [{ ...artifact.series, data: artifact.data }] : [],
         ),
-      ).filter((entry) => sources === null || sources.includes(seriesSource(entry) ?? ''));
+      );
       return powerSeriesResponse('database', stored.runInfo, storedSeries, sources);
     }
     if (series === 'power') {
@@ -279,7 +323,6 @@ async function readGpuMetrics(
       const liveSeries: GpuPowerSeries[] = [];
       for (const entry of [...powerSeries, ...bundleSeries]) {
         const source = seriesSource(entry);
-        if (sources !== null && !sources.includes(source ?? '')) continue;
         if (source !== null && seenSources.has(source)) continue;
         liveSeries.push(entry);
         if (source !== null) seenSources.add(source);

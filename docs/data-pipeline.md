@@ -654,6 +654,22 @@ and API values; ingest success alone does not establish complete coverage. To un
 repair, restore the snapshotted rows or original bytes under the same identities.
 Do not delete a shared series to repair one point.
 
+#### Precomputed timeline series (`gpu_power_series`, migration 019)
+
+Ingest also stores the `series=power` output per telemetry artifact: the same
+`packages/db/src/power-series/` transform the route would run on the samples,
+gzipped JSON keyed by `input_key` (series identities plus linked points'
+`power_audit`) and `POWER_SERIES_FORMAT_VERSION`. The route serves these rows when
+every artifact in scope has a current one and otherwise buckets the samples per
+request, so a missing, stale or failed row is slower, never wrong. Incomplete
+artifacts get no row and keep returning `STORED_TELEMETRY_INCOMPLETE`.
+
+Run `bun run admin:db:backfill-power-series --yes` once after migration 019, after
+bumping `POWER_SERIES_FORMAT_VERSION`, and after point overrides or telemetry
+backfills; it rewrites only missing or stale rows (`--run-id ID --force` for one
+run). The format-version test fails when a transform file changes without updating
+the recorded version and fingerprint.
+
 ### Per-run ingest report
 
 `admin:db:ingest:ci` writes `INGEST_REPORT_OUTPUT` (JSON, `packages/db/src/etl/ingest-run-report.ts`)

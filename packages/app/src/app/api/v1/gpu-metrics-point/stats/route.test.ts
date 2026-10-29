@@ -17,7 +17,7 @@ vi.mock('@semianalysisai/inferencex-db/queries/gpu-metrics-revision', () => ({
 vi.mock('@semianalysisai/inferencex-db/queries/gpu-metrics', () => ({
   getGpuMetricsForPoint: vi.fn(),
 }));
-vi.mock('@/components/gpu-power/stored-power-series', () => ({
+vi.mock('@semianalysisai/inferencex-db/power-series/stored-power-series', () => ({
   storedPowerSeries: stored,
 }));
 vi.mock('@/lib/cache/api-cache', () => ({

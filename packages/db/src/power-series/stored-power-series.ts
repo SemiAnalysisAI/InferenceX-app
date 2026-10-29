@@ -1,12 +1,12 @@
-import type { GpuMetricSeries } from '@semianalysisai/inferencex-db/queries/gpu-metrics';
+import { isRecord } from '../lib/records';
+import type { GpuMetricSeries } from '../queries/gpu-metrics';
 
 import {
   cutPowerAuditSamples,
   cutPowerAuditCsvs,
-  isRecord,
   type PowerAuditDevice,
   type PowerAuditSample,
-} from './power-audit-bundle';
+} from './power-audit-cut';
 import { bucketPowerFiles, type GpuPowerSeries } from './power-series';
 
 export class StoredTelemetryIncompleteError extends Error {

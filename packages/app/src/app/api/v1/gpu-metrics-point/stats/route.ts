@@ -5,9 +5,9 @@ import {
   getGpuMetricsForPoint,
   type GpuMetricsPointPayload,
 } from '@semianalysisai/inferencex-db/queries/gpu-metrics';
+import { storedPowerSeries } from '@semianalysisai/inferencex-db/power-series/stored-power-series';
 
 import type { GpuPowerSeries } from '@/components/gpu-power/power-series';
-import { storedPowerSeries } from '@/components/gpu-power/stored-power-series';
 import { PUBLIC_API_ERRORS, publicApiError } from '@/lib/api/public-api-errors';
 import { cachedJson, cachedQuery } from '@/lib/cache/api-cache';
 import {
