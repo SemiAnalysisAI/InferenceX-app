@@ -15,6 +15,11 @@ vi.mock('adm-zip', () => ({
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
+const mockGetCachedBenchmarks = vi.fn();
+vi.mock('@/lib/benchmarks/benchmark-query-cache.server', () => ({
+  getCachedBenchmarks: (...args: unknown[]) => mockGetCachedBenchmarks(...args),
+}));
+
 function makeRequest(params: string) {
   return new NextRequest(`http://localhost/api/unofficial-run?${params}`);
 }
@@ -126,7 +131,12 @@ describe('normalizeArtifactRows', () => {
 
   it('falls back to model path when prefix is absent', () => {
     const rows = normalizeArtifactRows(
-      [rawRow({ infmax_model_prefix: undefined, model: 'deepseek-ai/DeepSeek-R1-0528' })],
+      [
+        rawRow({
+          infmax_model_prefix: undefined,
+          model: 'deepseek-ai/DeepSeek-R1-0528',
+        }),
+      ],
       '2026-03-01',
     );
     expect(rows[0].model).toBe('dsr1');
@@ -443,6 +453,7 @@ describe('GET /api/unofficial-run', () => {
     vi.resetModules();
     mockFetch.mockReset();
     mockGetEntries.mockReset();
+    mockGetCachedBenchmarks.mockReset();
     process.env.GITHUB_TOKEN = 'test-token';
     const mod = await import('./route');
     GET = mod.GET as any;
@@ -478,7 +489,11 @@ describe('GET /api/unofficial-run', () => {
   });
 
   it('returns GitHub error status when run fetch fails', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 404, statusText: 'Not Found' });
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+    });
     const res = await GET(makeRequest('runId=999'));
     expect(res.status).toBe(404);
   });
@@ -511,7 +526,11 @@ describe('GET /api/unofficial-run', () => {
           artifacts: [{ name: 'results_bmk', id: 10, archive_download_url: 'http://dl' }],
         }),
     });
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 410, statusText: 'Gone' });
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 410,
+      statusText: 'Gone',
+    });
     const res = await GET(makeRequest('runId=123'));
     expect(res.status).toBe(410);
   });
@@ -563,6 +582,96 @@ describe('GET /api/unofficial-run', () => {
     expect(body.evaluations).toEqual([]);
   });
 
+  it.each([
+    [true, 2],
+    [false, 1],
+  ])(
+    'stitches the published curve only when the changelog is append-only (%s)',
+    async (appendOnly, expectedRows) => {
+      const image = 'lmsysorg/sglang:v0.5.0';
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            id: 123,
+            head_branch: 'feature',
+            created_at: '2026-01-02T00:00:00Z',
+            html_url: 'http://github.com/run/123',
+          }),
+      });
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            artifacts: [
+              {
+                name: 'results_bmk',
+                id: 10,
+                archive_download_url: 'http://dl/bmk',
+              },
+              {
+                name: 'changelog-metadata',
+                id: 11,
+                archive_download_url: 'http://dl/cl',
+              },
+            ],
+          }),
+      });
+      mockFetch.mockResolvedValue({
+        ok: true,
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
+      });
+      const changelog = {
+        base_ref: 'origin/main',
+        head_ref: 'abc',
+        entries: [
+          {
+            'config-keys': ['dsr1-fp8-h200-sglang'],
+            'append-only': appendOnly,
+          },
+        ],
+      };
+      mockGetEntries
+        .mockReturnValueOnce([
+          {
+            entryName: 'results.json',
+            getData: () => Buffer.from(JSON.stringify([rawRow({ image })])),
+          },
+        ])
+        .mockReturnValueOnce([
+          {
+            entryName: 'changelog_metadata.json',
+            getData: () => Buffer.from(JSON.stringify(changelog)),
+          },
+        ]);
+      const run = normalizeArtifactRows([rawRow({ image })], '2026-01-01')[0];
+      mockGetCachedBenchmarks.mockResolvedValue([
+        {
+          ...run,
+          id: 55,
+          conc: 64,
+          date: '2026-01-01',
+          run_url: 'http://github.com/run/100',
+        },
+      ]);
+
+      const res = await GET(makeRequest('runId=123'));
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body.benchmarks).toHaveLength(expectedRows);
+      expect(mockGetCachedBenchmarks).toHaveBeenCalledTimes(appendOnly ? 1 : 0);
+      if (appendOnly) {
+        expect(body.benchmarks[1]).toMatchObject({
+          id: 55,
+          date: '2026-01-01',
+          run_url: 'http://github.com/run/123',
+          curve_date: '2026-01-02',
+        });
+      }
+    },
+  );
+
   it('falls back to per-config bmk_* artifacts when results_bmk is missing (agentic-only sweeps)', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
@@ -583,10 +692,26 @@ describe('GET /api/unofficial-run', () => {
       json: () =>
         Promise.resolve({
           artifacts: [
-            { name: 'bmk_agentic_dsv4_conc72', id: 30, archive_download_url: 'http://dl-a' },
-            { name: 'bmk_agentic_dsv4_conc56', id: 31, archive_download_url: 'http://dl-b' },
-            { name: 'agentic_dsv4_conc72', id: 32, archive_download_url: 'http://dl-blob' },
-            { name: 'server_logs_dsv4_conc72', id: 33, archive_download_url: 'http://dl-log' },
+            {
+              name: 'bmk_agentic_dsv4_conc72',
+              id: 30,
+              archive_download_url: 'http://dl-a',
+            },
+            {
+              name: 'bmk_agentic_dsv4_conc56',
+              id: 31,
+              archive_download_url: 'http://dl-b',
+            },
+            {
+              name: 'agentic_dsv4_conc72',
+              id: 32,
+              archive_download_url: 'http://dl-blob',
+            },
+            {
+              name: 'server_logs_dsv4_conc72',
+              id: 33,
+              archive_download_url: 'http://dl-log',
+            },
           ],
         }),
     });
@@ -643,8 +768,16 @@ describe('GET /api/unofficial-run', () => {
       json: () =>
         Promise.resolve({
           artifacts: [
-            { name: 'results_bmk', id: 40, archive_download_url: 'http://dl-merged' },
-            { name: 'bmk_agentic_dsv4_conc72', id: 41, archive_download_url: 'http://dl-a' },
+            {
+              name: 'results_bmk',
+              id: 40,
+              archive_download_url: 'http://dl-merged',
+            },
+            {
+              name: 'bmk_agentic_dsv4_conc72',
+              id: 41,
+              archive_download_url: 'http://dl-a',
+            },
           ],
         }),
     });
@@ -682,8 +815,16 @@ describe('GET /api/unofficial-run', () => {
       json: () =>
         Promise.resolve({
           artifacts: [
-            { name: 'bmk_agentic_dsv4_conc72', id: 50, archive_download_url: 'http://dl-old' },
-            { name: 'bmk_agentic_dsv4_conc72', id: 51, archive_download_url: 'http://dl-new' },
+            {
+              name: 'bmk_agentic_dsv4_conc72',
+              id: 50,
+              archive_download_url: 'http://dl-old',
+            },
+            {
+              name: 'bmk_agentic_dsv4_conc72',
+              id: 51,
+              archive_download_url: 'http://dl-new',
+            },
           ],
         }),
     });
@@ -727,7 +868,13 @@ describe('GET /api/unofficial-run', () => {
       ok: true,
       json: () =>
         Promise.resolve({
-          artifacts: [{ name: 'eval_results_all', id: 20, archive_download_url: 'http://dl-eval' }],
+          artifacts: [
+            {
+              name: 'eval_results_all',
+              id: 20,
+              archive_download_url: 'http://dl-eval',
+            },
+          ],
         }),
     });
     mockFetch.mockResolvedValueOnce({
@@ -810,7 +957,13 @@ describe('GET /api/unofficial-run', () => {
       ok: true,
       json: () =>
         Promise.resolve({
-          artifacts: [{ name: 'results_bmk', id: 10, archive_download_url: 'http://dl-1' }],
+          artifacts: [
+            {
+              name: 'results_bmk',
+              id: 10,
+              archive_download_url: 'http://dl-1',
+            },
+          ],
         }),
     });
     mockFetch.mockResolvedValueOnce({
@@ -818,7 +971,10 @@ describe('GET /api/unofficial-run', () => {
       arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
     });
     mockGetEntries.mockReturnValueOnce([
-      { entryName: 'r1.json', getData: () => Buffer.from(JSON.stringify([rawRow()])) },
+      {
+        entryName: 'r1.json',
+        getData: () => Buffer.from(JSON.stringify([rawRow()])),
+      },
     ]);
 
     mockFetch.mockResolvedValueOnce({
@@ -839,7 +995,13 @@ describe('GET /api/unofficial-run', () => {
       ok: true,
       json: () =>
         Promise.resolve({
-          artifacts: [{ name: 'results_bmk', id: 20, archive_download_url: 'http://dl-2' }],
+          artifacts: [
+            {
+              name: 'results_bmk',
+              id: 20,
+              archive_download_url: 'http://dl-2',
+            },
+          ],
         }),
     });
     mockFetch.mockResolvedValueOnce({
@@ -918,7 +1080,11 @@ describe('GET /api/unofficial-run', () => {
     });
     mockGetEntries.mockReturnValueOnce([]);
 
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 404, statusText: 'Not Found' });
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+    });
 
     const res = await GET(makeRequest('runId=111,999'));
     expect(res.status).toBe(404);
