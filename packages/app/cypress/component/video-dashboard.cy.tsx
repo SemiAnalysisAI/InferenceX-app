@@ -37,6 +37,95 @@ const costRow = (hardware: string, basis = 'participating') =>
   cy.get(`[data-testid="results-cost-table"] [data-hardware="${hardware}"][data-basis="${basis}"]`);
 
 describe('VideoGenX results', () => {
+  it('uses shared panels and concise workload choices with published identity in help', () => {
+    mount();
+    cy.get('[data-slot="control-panel"]').should('have.length', 2);
+    cy.get('[data-testid="results-automatic-detail"]').should('contain', 'MiniMax');
+    cy.location('search').should('not.contain', 'r_workload=');
+    cy.get('[data-testid="selected-option-help-automatic"]').click();
+    cy.get('[data-testid="selected-option-help-content-automatic"]').should('contain', 'Source ID');
+    cy.get('body').click(0, 0);
+    cy.get('[data-testid="results-price-t2v"]').type('0.05');
+    cy.get('[data-testid="results-workload"]').click('left');
+    cy.get('[data-select-option]')
+      .last()
+      .should(($option) => {
+        expect($option.text()).to.contain('MiniMax');
+        expect($option.text()).not.to.contain('prompt');
+        expect($option.text()).not.to.contain('seed');
+      });
+    cy.get('[data-select-option]')
+      .last()
+      .closest('[role="row"]')
+      .find('[data-option-help]')
+      .click();
+    cy.get('[data-testid^="option-help-content-"]').should('contain', 'Source ID');
+    cy.get('[data-testid="results-price-t2v"]').should('have.value', '0.05');
+    cy.location('search').should('not.contain', 'r_workload=');
+  });
+
+  it('retains a published overlay alias until it is dismissed', () => {
+    mount({ search: '?unofficialrun=34342452354&other=1' });
+    cy.get('[data-testid="results-overlay"]').should('contain', '34342452354');
+    cy.get('[data-testid="results-overlay-dismiss"]').click();
+    cy.get('[data-testid="results-overlay"]').should('not.exist');
+    cy.location('search').should('contain', 'other=1').and('not.contain', 'unofficialrun=');
+  });
+
+  it('keeps matching summaries distinct and selects the exact source ID', () => {
+    mount({
+      edit: (observation) => {
+        if (!observation.hardware.includes('H100') || observation.durationSeconds !== 8) return;
+        const workload = JSON.parse(observation.workloadKey!);
+        workload.plan.cases[0].seed += 1;
+        observation.workloadKey = JSON.stringify(workload);
+        observation.hardware = 'NVIDIA GB200';
+      },
+    });
+    cy.get('[data-testid="results-workload"]').click('left');
+    cy.get('[data-select-option]').should('have.length', 3);
+    cy.get('[data-select-option]')
+      .eq(1)
+      .invoke('text')
+      .then((first) => {
+        cy.get('[data-select-option]').eq(2).invoke('text').should('not.equal', first);
+      });
+    cy.get('[data-select-option]')
+      .eq(1)
+      .then(($option) => {
+        const sourceId = $option.attr('data-value')!;
+        cy.wrap($option).closest('[role="row"]').find('[data-option-help]').click();
+        cy.get('[data-testid^="option-help-content-"]').should('contain', sourceId);
+        cy.location('search').should((search) => {
+          expect(new URLSearchParams(search).get('r_workload')).to.equal(null);
+        });
+        cy.get('[data-select-option]').eq(1).click();
+        cy.location('search').should((search) => {
+          expect(new URLSearchParams(search).get('r_workload')).to.equal(sourceId);
+        });
+      });
+  });
+
+  it('uses the shared selector fallbacks and clears scenario prices when the model changes', () => {
+    mount();
+    cy.get('[data-testid="results-price-t2v"]').type('0.05');
+    cy.get('[data-testid="results-model"]').click();
+    cy.get('[role="listbox"] [role="option"]').last().click();
+    cy.get('[data-testid="results-price-t2v"]').should('have.value', '');
+    cy.location('search').should('contain', 'r_model=');
+    cy.get('[data-testid="results-model"]').click();
+    cy.get('[role="listbox"] [role="option"]').first().click();
+    cy.location('search').should('not.contain', 'r_model=');
+    cy.get('[data-testid="results-engine"]').click();
+    cy.get('[role="listbox"] [role="option"]').should('have.length', 1).first().click();
+    cy.location('search').should('not.contain', 'r_engine=');
+    cy.get('[data-testid="results-date"]').click();
+    cy.get('[role="listbox"] [role="option"]').last().click();
+    cy.location('search').should('contain', 'r_date=');
+    cy.get('[data-testid="results-date"]').click();
+    cy.get('[role="listbox"] [role="option"]').first().click();
+    cy.location('search').should('not.contain', 'r_date=');
+  });
   it('keeps the nine groups in order and admits only the common 20-clip C1 workload', () => {
     mount();
     cy.get('[data-testid="video-results"] section[id]').should(($sections) => {
@@ -154,16 +243,19 @@ describe('VideoGenX results', () => {
     });
     cy.get('[data-testid="results-profit"] [data-hardware="b200"]').should('contain', '-1.73');
     cy.location('search').should('contain', 'r_utilization=0');
-    cy.get('[data-testid="results-trace-select"]').select('H200');
+    cy.get('[data-testid="results-trace-select"]').click();
+    cy.contains('[data-select-option]', 'H200').click();
     cy.get('[data-testid="results-power-trace"] [data-hardware="h200"]').should('exist');
     cy.get('[data-testid="results-hardware-h200"]').uncheck();
     cy.get('[data-testid="results-power-trace"] [data-hardware="h200"]').should('not.exist');
     cy.get('[data-testid="results-power-trace"] [data-hardware="b200"]').should('exist');
-    cy.get('[data-testid="results-trace-select"]').should('not.contain', 'H200');
+    cy.get('[data-testid="results-trace-select"]').click();
+    cy.get('[data-select-option]').should('not.contain', 'H200');
+    cy.get('[data-testid="results-trace-select"]').click();
     cy.get('[data-testid="results-price-i2v"]').type('0.09');
     cy.get('[data-testid="results-price-r2v"]').type('0.12');
-    cy.get('[data-testid="results-workload"]').click();
-    cy.contains('[role="option"]', '10 s').click();
+    cy.get('[data-testid="results-workload"]').click('left');
+    cy.contains('[data-select-option]', '10 s').click();
     costRow('gb200').should('exist');
     for (const mode of ['t2v', 'i2v', 'r2v'])
       cy.get(`[data-testid="results-price-${mode}"]`).should('have.value', '');
@@ -174,6 +266,9 @@ describe('VideoGenX results', () => {
   for (const [pathname, width] of [
     ['/video', 1440],
     ['/video', 390],
+    ['/video', 320],
+    ['/zh/video', 1440],
+    ['/zh/video', 390],
     ['/zh/video', 320],
   ] as const) {
     it(`keeps ${pathname} and its workload menu readable at ${width} px`, () => {
@@ -182,9 +277,23 @@ describe('VideoGenX results', () => {
       cy.get('[data-testid="video-results"] h1').should('contain', 'VideoGenX');
       cy.get('#validity h2').should('contain', pathname.startsWith('/zh') ? '有效性' : 'Validity');
       cy.get('#energy [data-testid="results-empty"]').should('exist');
+      const controlHeight = width < 768 ? 44 : 36;
+      for (const key of [
+        'model',
+        'workload',
+        'engine',
+        'date',
+        'deadline',
+        'trace-select',
+        'cost-tier',
+        'price-t2v',
+      ])
+        cy.get(`[data-testid="results-${key}"]`).should(($control) => {
+          expect($control[0].getBoundingClientRect().height).to.equal(controlHeight);
+        });
       assertResultsFit();
-      cy.get('[data-testid="results-workload"]').click();
-      cy.get('[role="listbox"]')
+      cy.get('[data-testid="results-workload"]').click('left');
+      cy.get('[role="grid"]')
         .should('be.visible')
         .should(($menu) => {
           const rect = $menu[0].getBoundingClientRect();
@@ -193,26 +302,43 @@ describe('VideoGenX results', () => {
           expect(rect.height).to.be.greaterThan(0);
           expect($menu[0].scrollWidth).to.be.at.most($menu[0].clientWidth + 1);
         });
-      cy.get('[role="option"]')
+      cy.get('[data-select-option]')
         .last()
         .should(($option) => {
           expect($option[0].scrollWidth).to.be.at.most($option[0].clientWidth + 1);
           expect($option.text()).to.contain('MiniMax');
         });
-      cy.get('[role="option"]').last().click();
+      cy.get('[data-select-option]')
+        .last()
+        .closest('[role="row"]')
+        .find('[data-option-help]')
+        .click();
+      cy.get('[data-testid^="option-help-content-"]').should(($help) => {
+        const rect = $help[0].getBoundingClientRect();
+        expect(rect.left).to.be.at.least(0);
+        expect(rect.right).to.be.at.most(width);
+      });
+      cy.get('[data-select-option]').last().click();
       cy.location('search').should('contain', 'r_workload=');
-      cy.get('[data-testid="results-workload"]').focus().trigger('keydown', { key: 'ArrowDown' });
-      cy.get('[role="listbox"]').should('be.visible');
+      cy.get('[data-testid="results-workload"]').click('left');
+      cy.get('[role="grid"]').should('be.visible');
       cy.focused().trigger('keydown', { key: 'Escape' });
-      cy.get('[role="listbox"]').should('not.exist');
+      cy.get('[role="grid"]').should('not.exist');
       cy.get('[data-testid="results-workload"]').should('have.focus');
-      cy.get('[data-testid="results-workload"]').trigger('keydown', { key: 'ArrowDown' });
-      cy.get('[role="listbox"]').should('be.visible');
-      cy.get('[role="option"]').first().click();
+      cy.get('[data-testid="results-workload"]').click('left');
+      cy.get('[role="grid"]').should('be.visible');
+      cy.focused().trigger('keydown', { key: 'ArrowDown' });
+      cy.focused().trigger('keydown', { key: 'Enter' });
       cy.location('search').should('not.contain', 'r_workload=');
+      cy.document().then((document) => document.documentElement.classList.add('dark'));
       assertResultsFit();
-      cy.get('[data-testid="results-workload"]').click();
-      cy.get('[role="listbox"]').should('be.visible');
+      cy.get('[data-testid="results-workload"]').should(($control) => {
+        expect($control[0].getBoundingClientRect().height).to.equal(controlHeight);
+      });
+      cy.document().then((document) => document.documentElement.classList.remove('dark'));
+      cy.scrollTo('top');
+      cy.get('[data-testid="results-workload"]').click('left');
+      cy.get('[role="grid"]').should('be.visible');
       cy.screenshot(`video-workload-menu-${width}-${pathname.startsWith('/zh') ? 'zh' : 'en'}`, {
         capture: 'viewport',
         overwrite: true,

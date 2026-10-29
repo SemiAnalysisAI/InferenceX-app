@@ -36,9 +36,10 @@ observation in the overlay color, obeys hardware visibility and can be dismissed
 An unknown or unpublished run is explicitly unavailable; this URL cannot trigger
 publication, storage writes or GPU work.
 
-The Workload menu wraps complete labels inside the viewport and supports keyboard
-selection. Its sizing is presentation only; options, source IDs and API values
-remain unchanged.
+The Workload menu shows compact summaries derived from recorded model and generation
+metadata. Its existing help control shows the full published label and exact source
+point ID. Matching summaries get distinct source-ID suffixes. This is presentation
+only; query IDs and API projection values remain unchanged.
 
 ## Nine groups and available measurements
 

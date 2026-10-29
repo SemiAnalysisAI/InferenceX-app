@@ -1,7 +1,6 @@
 'use client';
 
 import { useId } from 'react';
-import { cn } from '@/lib/shared/utils';
 import {
   Select,
   SelectContent,
@@ -16,14 +15,12 @@ export default function VideoSelect({
   onValueChange,
   options,
   testId,
-  contentClassName,
 }: {
   label: string;
   value: string;
   onValueChange: (value: string) => void;
   options: { value: string; label: string }[];
   testId?: string;
-  contentClassName?: string;
 }) {
   const id = useId();
   return (
@@ -40,12 +37,7 @@ export default function VideoSelect({
         >
           <SelectValue placeholder="—" />
         </SelectTrigger>
-        <SelectContent
-          className={cn(
-            'w-(--radix-select-trigger-width) max-w-[calc(100vw-2rem)]',
-            contentClassName,
-          )}
-        >
+        <SelectContent className="w-(--radix-select-trigger-width) max-w-[calc(100vw-2rem)]">
           {options.map((option) => (
             <SelectItem
               key={option.value}
