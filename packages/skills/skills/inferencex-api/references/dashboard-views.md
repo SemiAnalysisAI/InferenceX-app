@@ -255,10 +255,11 @@ OperatorX is available in primary navigation without an unlock and has no publis
 the page and are not part of this skill's read-only view API. The page-owned
 `/api/v1/operatorx/compare?op=gemm&workload=gemm:DeepSeek-V4-Pro` response includes
 optional `hardware[].reference` metadata for Ascend 950PR (28 Cube):
-`peakTflops.bf16=378`, `memoryBandwidthTBs=1.6`, `memoryBandwidthAssumed=true`,
-plus `source` and `qualification`. FP8/FP4 peaks remain null. Normalized X is
-arithmetic intensity divided by 236.25 FLOP/byte; Y is achieved TFLOPS divided
-by 378. The bandwidth is an assumption, not an independently verified memory/ECC
+`peakTflops.bf16=378`, `peakTflops.fp8=756`, `memoryBandwidthTBs=1.6`, `memoryBandwidthAssumed=true`,
+plus `source` and `qualification`. These are dense Cube-only peaks; FP4 remains null.
+Normalized X is arithmetic intensity divided by 236.25 FLOP/byte for BF16 or 472.5
+for FP8; Y is achieved TFLOPS divided by 378 or 756 respectively. FP8 activation
+quantization remains inside the measured latency. The bandwidth is an assumption, not an independently verified memory/ECC
 configuration. Apply these references to the returned measurements; do not substitute
 the older matmul sweep for the ingested F.linear results. Missing measurements stay
 missing. The 950PR crimson color is presentation-only; the stored key remains `ascend950pr`.
