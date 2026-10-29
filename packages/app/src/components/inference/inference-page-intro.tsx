@@ -50,7 +50,9 @@ export function InferencePageIntro({ locale }: { locale: Locale }) {
       ]),
     ];
     const syncMetadata = () => {
-      if (document.title !== title) document.title = title;
+      // Keep React's title text node intact so route cleanup can still remove it.
+      const titleText = document.querySelector('title')?.firstChild;
+      if (titleText && titleText.nodeValue !== title) titleText.nodeValue = title;
       for (const [selector, attribute, value] of attributes) {
         document.querySelectorAll(selector).forEach((node) => {
           if (node.getAttribute(attribute) !== value) node.setAttribute(attribute, value);

@@ -189,7 +189,7 @@ describe('Inference model presentation', () => {
         selectModel('GLM5.2/GLM5.3 744B');
         expectModel('GLM-5.3', 'glm-5-3');
         cy.document().then((document) => {
-          document.title = `Kimi K3 ${suffix} | InferenceX`;
+          document.querySelector('title')!.firstChild!.nodeValue = `Kimi K3 ${suffix} | InferenceX`;
           document.querySelector('meta[name="description"]')!.setAttribute('content', 'Kimi K3');
         });
         expectModel('GLM-5.3', 'glm-5-3');
