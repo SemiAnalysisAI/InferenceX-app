@@ -38,10 +38,17 @@ export function benchmarkQueryOptions(
     ...(initialData ? { initialData } : {}),
     ...(keepPreviousForModel
       ? {
+          // A seed key covers a narrower slice (one sequence) than the shared
+          // key, so its rows would render as an empty chart for another scope.
           placeholderData: (
             previousData: BenchmarkRow[] | undefined,
             previousQuery: { queryKey: readonly unknown[] } | undefined,
-          ) => (previousQuery?.queryKey[1] === model ? previousData : undefined),
+          ) => {
+            const previousKey = previousQuery?.queryKey;
+            if (previousKey?.[1] !== model) return undefined;
+            const previousScope = previousKey.at(-2) === 'scope' ? previousKey.at(-1) : undefined;
+            return previousScope === scope ? previousData : undefined;
+          },
         }
       : {}),
   };
