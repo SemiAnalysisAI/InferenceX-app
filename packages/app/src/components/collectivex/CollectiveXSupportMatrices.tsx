@@ -214,7 +214,9 @@ export function CollectiveXSupportMatrices({
                                   title={`${t.version}: ${cellVersions.join(', ')}`}
                                   className="mt-1 block font-mono text-2xs leading-tight whitespace-nowrap text-muted-foreground"
                                 >
-                                  {cellVersions.map(collectiveXShortLibraryVersion).join(', ')}
+                                  {[
+                                    ...new Set(cellVersions.map(collectiveXShortLibraryVersion)),
+                                  ].join(', ')}
                                 </span>
                               ) : null}
                             </td>
