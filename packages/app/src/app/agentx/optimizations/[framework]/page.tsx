@@ -9,6 +9,7 @@ import {
 } from '@/lib/agentx/agentx-optimizations';
 import { enAlternates } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 interface Props {
   params: Promise<{ framework: string }>;
@@ -29,12 +30,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title,
     description: framework.summary,
     alternates: enAlternates(`/agentx/optimizations/${slug}`),
-    openGraph: {
+    ...socialMetadata({
       title: `${title} | InferenceX`,
       description: framework.summary,
       url: `${SITE_URL}/agentx/optimizations/${slug}`,
-    },
-    twitter: { title: `${title} | InferenceX`, description: framework.summary },
+      locale: 'en',
+    }),
   };
 }
 

@@ -7,10 +7,6 @@ import {
 import { unlockAgenticGate } from '../support/e2e';
 
 describe('TCO Calculator', () => {
-  // ---------------------------------------------------------------------------
-  // Tab navigation (must start from /inference to test tab switching)
-  // ---------------------------------------------------------------------------
-
   describe('tab navigation', () => {
     before(() => {
       cy.window().then((win) => {
@@ -36,10 +32,6 @@ describe('TCO Calculator', () => {
     });
   });
 
-  // ---------------------------------------------------------------------------
-  // All remaining tests share a single /calculator page load
-  // ---------------------------------------------------------------------------
-
   describe('controls, interactions, and features', () => {
     before(() => {
       cy.window().then((win) => {
@@ -49,17 +41,12 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
     });
 
-    // Clear stale Radix scroll lock before each test to prevent pointer-events: none
     beforeEach(() => {
       cy.document().then((doc) => {
         delete doc.body.dataset.scrollLocked;
         doc.body.style.removeProperty('pointer-events');
       });
     });
-
-    // -------------------------------------------------------------------------
-    // Controls and chart rendering
-    // -------------------------------------------------------------------------
 
     it('groups benchmark economics above the comparison target', () => {
       cy.viewport(1280, 900);
@@ -80,8 +67,6 @@ describe('TCO Calculator', () => {
           expect(first.top, 'joined fill reaches the upper border').to.equal(bounds.top + 1);
           expect(first.bottom, 'joined fill reaches the lower border').to.equal(bounds.bottom - 1);
           for (let i = 1; i < buttons.length; i++) {
-            // Firefox can round adjacent fractional coordinates differently;
-            // a subpixel tolerance still rejects any visible inset or gap.
             expect(
               buttons[i].getBoundingClientRect().left,
               'segments have no inset gaps',
@@ -92,7 +77,6 @@ describe('TCO Calculator', () => {
     });
 
     it('shows the precision for a single-precision model', () => {
-      // FP4 remains visible as benchmark context even without alternatives.
       cy.get('[data-testid="calc-cost-selector"]').should('exist');
       cy.get('[data-testid="calculator-controls"]').within(() => {
         cy.contains('Precision').should('be.visible');
@@ -157,10 +141,6 @@ describe('TCO Calculator', () => {
       }
     });
 
-    // -------------------------------------------------------------------------
-    // View toggle and table (reset to throughput + chart view first)
-    // -------------------------------------------------------------------------
-
     it('switching to table view shows the results table', () => {
       cy.get('[data-testid="calculator-metric-throughput"]').click();
       cy.get('[data-testid="calculator-table-view-btn"]').click();
@@ -217,7 +197,6 @@ describe('TCO Calculator', () => {
             Math.min(barCount, 10),
           );
           if (barCount > 10) {
-            // The pagination footer carries the full result count
             cy.get('[data-testid="calculator-chart-section"]').should(
               'contain.text',
               `of ${barCount}`,
@@ -363,10 +342,6 @@ describe('TCO Calculator', () => {
         });
     });
 
-    // -------------------------------------------------------------------------
-    // Click-to-compare bars (fresh visit to ensure clean chart state)
-    // -------------------------------------------------------------------------
-
     it('clicking one bar shows a comparison banner with "selected" text', () => {
       cy.visit('/calculator');
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 1);
@@ -397,10 +372,6 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-comparison-banner"]').should('not.exist');
     });
 
-    // -------------------------------------------------------------------------
-    // Metric-specific disclaimers (fresh visit to reset accumulated state)
-    // -------------------------------------------------------------------------
-
     it('shows disaggregated throughput disclaimer for throughput metric', () => {
       cy.visit('/calculator');
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
@@ -409,24 +380,15 @@ describe('TCO Calculator', () => {
         'Disaggregated inference configurations',
       );
       cy.get('[data-testid="calculator-chart-section"]')
-        // The direction is the point of the warning, not the phrasing: on these
-        // token types a disaggregated config reads high. Asserting the old wording
-        // alone let the note be reworded into something that no longer said which
-        // way it was wrong.
         .should('contain.text', 'per prefill chip and per decode chip')
         .and('contain.text', 'reads faster per chip than it is');
     });
 
-    // A disagg config's input/output cost is attributed to only its prefill or
-    // decode chips, so those token types carry the caveat. The total-token cost
-    // divides by the whole chip count — the same denominator an aggregated
-    // config uses — so it must not.
     it('shows the disaggregated cost disclaimer only for per-token-type cost', () => {
       cy.visit('/calculator');
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
       cy.get('[data-testid="calculator-metric-cost"]').click();
 
-      // Token type defaults to Total Tokens.
       cy.get('[data-testid="calculator-disagg-cost-note"]').should('not.be.visible');
 
       for (const tokenType of ['Output Tokens', 'Input Tokens']) {
@@ -436,8 +398,6 @@ describe('TCO Calculator', () => {
         cy.get('[data-testid="calculator-disagg-cost-note"]')
           .should('be.visible')
           .and('contain.text', 'per prefill chip and per decode chip')
-          // Cheaper, specifically — the flattering direction is what a reader
-          // comparing costs needs told.
           .and('contain.text', 'reads cheaper than it is');
       }
 
@@ -450,22 +410,12 @@ describe('TCO Calculator', () => {
     it('shows disaggregated throughput disclaimer for power metric', () => {
       cy.get('[data-testid="calculator-metric-power"]').click();
       cy.get('[data-testid="calculator-chart-section"]')
-        // The direction is the point of the warning, not the phrasing: on these
-        // token types a disaggregated config reads high. Asserting the old wording
-        // alone let the note be reworded into something that no longer said which
-        // way it was wrong.
         .should('contain.text', 'per prefill chip and per decode chip')
         .and('contain.text', 'reads faster per chip than it is');
     });
   });
 
-  // ---------------------------------------------------------------------------
-  // Direct URL navigation (separate visit to verify fresh load)
-  // ---------------------------------------------------------------------------
-
   describe('direct URL navigation', () => {
-    // Regression: SSR'd HTML must reflect the URL-supplied model so share links
-    // open straight to the right model without a flash of the default. See #430.
     it('?g_model= seeds the model selector before client hydration', () => {
       cy.request('/calculator?g_model=DeepSeek-V4-Pro').then((response) => {
         expect(response.body).to.contain('DeepSeek V4 Pro 0813 1.6T');
@@ -484,10 +434,6 @@ describe('TCO Calculator', () => {
       );
     });
   });
-
-  // ---------------------------------------------------------------------------
-  // DeepSeek V4 agentic trace calculations
-  // ---------------------------------------------------------------------------
 
   describe('availability failure degradation', () => {
     it('keeps usable benchmark results visible when availability metadata fails', () => {
@@ -523,8 +469,6 @@ describe('TCO Calculator', () => {
       cy.visit('/calculator?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
         onBeforeLoad(win) {
           win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-          // The percentile control sits behind the ↑↑↓↓ gate; unlock it so the
-          // specs below can still exercise switching to P75.
           unlockAgenticGate(win);
         },
       });
@@ -583,19 +527,15 @@ describe('TCO Calculator', () => {
         .should('contain.text', 'P75 Interactivity');
     });
 
-    // AgentX publishes on P90, so the percentile control is insider-only. With
-    // the gate locked it must not render at all, and the calculator must still
-    // compute on P90.
     it('hides the percentile selector behind the feature gate and defaults to P90', () => {
       cy.visit('/calculator?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
         onBeforeLoad(win) {
           win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-          win.localStorage.removeItem('inferencex-feature-gate');
+          win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
         },
       });
       cy.wait('@agenticBenchmarks');
 
-      // Scenario and precision stay readable; only percentile is feature-gated.
       cy.get('button[data-testid="calc-sequence-selector"]')
         .should('be.visible')
         .and('have.text', 'Agentic')
@@ -614,12 +554,6 @@ describe('TCO Calculator', () => {
     });
   });
 
-  // ---------------------------------------------------------------------------
-  // Cost target: the inverse of the interactivity slider. The MW-budget input
-  // lives here now that the Fleet Lifecycle section moved to its own /fleet
-  // page — see fleet-lifecycle.cy.ts. Both pages share the `c_mw` URL param.
-  // ---------------------------------------------------------------------------
-
   describe('cost target', () => {
     before(() => {
       cy.window().then((win) => {
@@ -630,9 +564,6 @@ describe('TCO Calculator', () => {
     });
 
     it('sits directly under the interactivity slider, since it inverts it', () => {
-      // Reading order is the point: the slider fixes a speed and the cost falls
-      // out; this fixes the cost and the speed falls out. Anything between them
-      // makes the pair read as unrelated.
       cy.get('[data-testid="calculator-costcap-section"]').should('be.visible');
       cy.get('[data-testid="calculator-costcap-empty"]').should('be.visible');
       cy.get('[data-testid="calculator-controls"]').then(($controls) => {
@@ -656,7 +587,6 @@ describe('TCO Calculator', () => {
         .find('[data-testid="calc-costcap-mw-input"]')
         .should('have.value', '10');
       cy.get('[data-testid="calculator-lifecycle-section"]').should('not.exist');
-      // A pointer to the new page replaces the section.
       cy.get('[data-testid="calculator-fleet-pointer-link"]')
         .should('have.attr', 'href')
         .and('match', /\/fleet$/);
@@ -668,7 +598,6 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-costcap-table"]').within(() => {
         cy.contains('th', 'Max Interactivity (tok/s/user)').should('exist');
         cy.get('tbody tr').should('have.length.greaterThan', 0);
-        // At $100/M tok everything is affordable — values must be numeric
         cy.get('tbody tr')
           .first()
           .find('td')
@@ -689,12 +618,10 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calc-costcap-input"]').type('100');
       cy.get('[data-testid="calculator-costcap-table"] tbody tr').then(($rows) => {
         const fullCount = $rows.length;
-        // Clicking a legend item while all GPUs are visible solos it
         cy.get('.sidebar-legend label').first().click();
         cy.get('[data-testid="calculator-costcap-table"] tbody tr')
           .should('have.length.lessThan', fullCount)
           .and('have.length.greaterThan', 0);
-        // Clicking the solo GPU again restores all
         cy.get('.sidebar-legend label').first().click();
         cy.get('[data-testid="calculator-costcap-table"] tbody tr').should(
           'have.length',
@@ -714,12 +641,8 @@ describe('TCO Calculator', () => {
     });
 
     it('folds the chart away, keeping its title as the handle', () => {
-      // Folded means unmounted, not hidden: these bodies hold D3 charts, and a
-      // reader who folded one should not still be paying to render it.
       cy.get('[data-testid="calculator-chart-collapse"]').click();
       cy.get('[data-testid="calculator-figure"]').should('not.exist');
-      // The title only appears in the header once folded — while open the chart's
-      // own caption carries it, and two copies would be worse than none.
       cy.get('[data-testid="calculator-chart-section"] h2')
         .should('have.length', 1)
         .and('contain.text', 'Total Token Throughput per Chip');
@@ -733,7 +656,6 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calc-costcap-input"]').should('be.visible');
       cy.get('[data-testid="calculator-costcap-collapse"]').click();
       cy.get('[data-testid="calc-costcap-input"]').should('not.exist');
-      // The heading stays put, so the folded section still says what it is.
       cy.get('[data-testid="calculator-costcap-section"]').should(
         'contain.text',
         'Interactivity Within a Cost Target',
@@ -780,7 +702,6 @@ describe('TCO Calculator Chinese route', () => {
       .and('contain.text', '成本：');
     cy.get('[data-testid="calculator-metric-power"]').click();
     cy.get('[data-testid="calculator-cost-badges"]').should('contain.text', '单芯片整机功耗：');
-    // At 390px the desktop toolbar is hidden; use the mobile view toggle.
     cy.contains('[role="tab"]:visible', '表格').click();
     cy.get('[data-testid="calculator-results-table"] thead')
       .should('contain.text', '芯片')
@@ -804,9 +725,7 @@ describe('TCO Calculator Chinese route', () => {
   });
 
   it('keeps dense tables internally scrollable without body overflow at 390px', () => {
-    // At 390px the desktop toolbar is hidden; use the mobile view toggle.
     cy.contains('[role="tab"]:visible', '表格').click();
-    // DataTable renders its horizontal scroller inside the testid wrapper.
     cy.get('[data-testid="calculator-results-table"] .overflow-x-auto')
       .first()
       .then(($scroller) => {

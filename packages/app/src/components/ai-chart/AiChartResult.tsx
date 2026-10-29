@@ -18,6 +18,7 @@ import { computeLeftMargin } from '@/lib/d3-chart/dynamic-margins';
 import { twoRowYAxisLabels } from '@/lib/d3-chart/axis-labels';
 
 import { ChartButtons } from '@/components/ui/chart-buttons';
+import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
 import { getHardwareConfig } from '@/lib/catalog/constants';
 import DOMPurify from 'dompurify';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -25,7 +26,6 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import type { AiChartBarPoint, AiChartSpec } from './types';
 import type { AiSingleChartResult, AiRadarItem } from '@/hooks/api/use-ai-chart';
 
-/** Sanitize tooltip HTML that may contain LLM-generated strings. */
 function sanitize(html: string): string {
   return DOMPurify.sanitize(html, {
     ALLOWED_TAGS: ['div', 'span', 'strong', 'br'],
@@ -67,10 +67,6 @@ const STRINGS = {
     },
   },
 } as const;
-
-// ---------------------------------------------------------------------------
-// Bar Chart (horizontal)
-// ---------------------------------------------------------------------------
 
 function BarChart({ data, spec }: { data: AiChartBarPoint[]; spec: AiChartSpec }) {
   const locale = useLocale();
@@ -154,10 +150,6 @@ function BarChart({ data, spec }: { data: AiChartBarPoint[]; spec: AiChartSpec }
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Scatter Chart
-// ---------------------------------------------------------------------------
 
 function ScatterChart({
   data,
@@ -250,10 +242,6 @@ function ScatterChart({
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Line Chart
-// ---------------------------------------------------------------------------
 
 interface LinePoint {
   hwKey: string;
@@ -382,10 +370,6 @@ function LineChart({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Radar Chart
-// ---------------------------------------------------------------------------
-
 function RadarChart({
   data,
   axes,
@@ -439,7 +423,6 @@ function RadarChart({
     [axes, numberLocale],
   );
 
-  // Radar ignores scales/axes — it draws its own grid. Provide dummy scales.
   const dummyScale = useMemo<ScaleConfig>(() => ({ type: 'linear', domain: [0, 1] }), []);
 
   return (
@@ -457,10 +440,6 @@ function RadarChart({
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Inline Legend
-// ---------------------------------------------------------------------------
 
 function InlineLegend({ items }: { items: { label: string; color: string }[] }) {
   return (
@@ -488,10 +467,6 @@ function buildLegendItems(colorMap: Record<string, string>): { label: string; co
   });
 }
 
-// ---------------------------------------------------------------------------
-// Main Result Component
-// ---------------------------------------------------------------------------
-
 export default function AiChartResult({ charts, summary }: AiChartResultProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -507,7 +482,19 @@ export default function AiChartResult({ charts, summary }: AiChartResultProps) {
           chart.radarData.length > 0;
         return (
           <figure key={i} className="relative rounded-lg">
-            <ChartButtons chartId={chartId} analyticsPrefix="ai_chart" hideZoomReset={!hasZoom} />
+            <ChartButtons
+              chartId={chartId}
+              analyticsPrefix="ai_chart"
+              analyticsContext={selectionAnalyticsContext({
+                model: chart.spec.model,
+                sequence: chart.spec.sequence,
+                precisions: chart.spec.precisions,
+                // No hardware keys means every GPU, so the count is unknown.
+                gpuCount:
+                  chart.spec.hardwareKeys.length > 0 ? chart.spec.hardwareKeys.length : undefined,
+              })}
+              hideZoomReset={!hasZoom}
+            />
             <Card id={`${chartId}-export`}>
               <CardHeader>
                 <CardTitle>{chart.spec.title}</CardTitle>

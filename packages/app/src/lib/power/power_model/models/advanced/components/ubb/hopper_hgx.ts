@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** Hopper HGX: eight GPUs, four NVSwitches, and eight PCIe 5.0 x16 retimers. */
 
 import { type PowerComponentBreakdown, sum_watts, ValidationError } from '../../../../base';
 import { HOPPER_BOARD_BASELINE } from '../../profiles';

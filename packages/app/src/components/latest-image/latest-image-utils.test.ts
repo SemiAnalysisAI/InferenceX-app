@@ -9,7 +9,9 @@ import {
   ageRowStyle,
   baseFramework,
   daysSince,
-  getActualLatestTag,
+  earliestSubmission,
+  firstSubmissionDates,
+  getActualLatestRelease,
   getCurrentImageNodeTypeTooltip,
   imageRowDisplayModel,
   imageRowModel,
@@ -17,6 +19,7 @@ import {
   isActiveImageRow,
   isOutdated,
   isStaleAgentx,
+  nightlyCommit,
   resolveSelectedSequence,
   sequenceOptionsForModel,
 } from './latest-image-utils';
@@ -40,8 +43,6 @@ describe('daysSince', () => {
   });
 
   it('floors to whole days regardless of intraday hour offset', () => {
-    // The submitted-day anchor is 00:00Z; an early-morning "today" still
-    // belongs to the same UTC day, so 23:59 vs 00:01 must round identically.
     const today = new Date('2026-05-28T00:01:00Z');
     expect(daysSince('2026-05-27', today)).toBe(1);
     const lateToday = new Date('2026-05-28T23:59:00Z');
@@ -80,7 +81,6 @@ describe('ageColorStyle', () => {
     const maxDay = ageColorStyle(AGE_MAX_RED_DAYS);
     expect(oneDay?.color).toMatch(/^oklch\(/u);
     expect(maxDay?.color).toMatch(/^oklch\(/u);
-    // Lightness L drops as days grow; AGE_MAX_RED_DAYS sits at L≈0.50, 1d at L≈0.77.
     expect(lightnessOf(maxDay!.color as string)).toBeLessThan(lightnessOf(oneDay!.color as string));
   });
 
@@ -113,29 +113,64 @@ describe('ageRowStyle', () => {
 });
 
 describe('isOutdated', () => {
-  it('is false when image contains the latest tag', () => {
-    expect(isOutdated('sgl-project/sglang:v0.5.12-cu130', 'v0.5.12')).toBe(false);
+  const sglang = { tag: 'v0.5.22', publishedAt: '2026-10-10T08:00:00Z', commits: {} };
+  const vllm = { tag: 'v0.32.0', publishedAt: '2026-10-01T00:00:00Z', commits: {} };
+
+  it('compares versioned tags numerically, not by substring', () => {
+    expect(isOutdated('lmsysorg/sglang:v0.5.22-cu130', sglang, '2026-10-20')).toBe(false);
+    expect(isOutdated('lmsysorg/sglang:v0.5.2-cu130', sglang, '2026-10-20')).toBe(true);
+    expect(isOutdated('lmsysorg/sglang:v0.5.19-cu130', sglang, '2026-10-20')).toBe(true);
+    expect(isOutdated('lmsysorg/sglang:v0.5.23', sglang, '2026-10-20')).toBe(false);
+    expect(isOutdated('lmsysorg/sglang:v0.5.22.post1', sglang, '2026-10-20')).toBe(false);
   });
 
-  it('is true when image does not contain the latest tag', () => {
-    expect(isOutdated('sgl-project/sglang:v0.5.10-cu130', 'v0.5.12')).toBe(true);
+  it('treats current ROCm and sgl-dev builds by their version', () => {
+    expect(
+      isOutdated('lmsysorg/sglang-rocm:v0.5.22-rocm720-mi35x-20261019', sglang, '2026-10-20'),
+    ).toBe(false);
+    expect(
+      isOutdated('lmsysorg/sglang-rocm:v0.5.20-rocm720-mi35x-20260929', sglang, '2026-10-20'),
+    ).toBe(true);
+    expect(
+      isOutdated('rocm/sgl-dev:sglang-0.5.9-rocm720-mi35x-mori-0227-2', sglang, '2026-10-20'),
+    ).toBe(true);
   });
 
-  it('is true for nightly tags regardless of latest', () => {
-    expect(isOutdated('sgl-project/sglang:nightly', 'v0.5.12')).toBe(true);
-    expect(isOutdated('sgl-project/sglang:nightly', null)).toBe(true);
+  it('ignores CUDA versions and digests when reading a version', () => {
+    expect(
+      isOutdated('vllm/vllm-openai:nightly-dev-x86_64-cu13.0.1-5894fdf', vllm, '2026-10-02'),
+    ).toBe(false);
+    expect(isOutdated('vllm/vllm-openai:v0.32.0@sha256:1.2.3', vllm, '2026-10-02')).toBe(false);
   });
 
-  it('is true for rocm/sgl-dev and sglang-rocm patterns (case-insensitive)', () => {
-    expect(isOutdated('rocm/sgl-dev:latest', 'v0.5.12')).toBe(true);
-    expect(isOutdated('ROCM/SGL-DEV:foo', 'v0.5.12')).toBe(true);
-    expect(isOutdated('myreg/sglang-rocm:bar', 'v0.5.12')).toBe(true);
+  it('compares a dated nightly by its build date against the release date', () => {
+    const old = 'lmsysorg/sglang:nightly-dev-cu13-20260914-4358a161';
+    const fresh = 'lmsysorg/sglang:nightly-dev-cu13-20261010-4358a161';
+    expect(isOutdated(old, sglang, '2026-10-20')).toBe(true);
+    expect(isOutdated(fresh, sglang, '2026-10-20')).toBe(false);
   });
 
-  it('is false when actualLatest is null and tag is not in UNSTABLE_PATTERNS', () => {
-    // No release data → can't classify as outdated. Avoid red-flagging a row
-    // we have no ground truth for.
-    expect(isOutdated('vllm/vllm-openai:v0.21.0', null)).toBe(false);
+  it('bounds an unresolved undated nightly by its submission date', () => {
+    const image = 'vllm/vllm-openai:nightly-ac7509e2b1db40fec2f03dde1ed4e9dfdc2338c9@sha256:98ad';
+    expect(isOutdated(image, vllm, '2026-09-30')).toBe(true);
+    expect(isOutdated(image, vllm, '2026-10-01')).toBe(false);
+  });
+
+  it('uses commit ancestry over dates when GitHub resolved the commit', () => {
+    const release = {
+      ...vllm,
+      commits: { af7f9488: 'behind', e68efc68: 'diverged', '83c078d9': 'ahead' } as const,
+    };
+    expect(isOutdated('vllm/vllm-openai:nightly-af7f9488', release, '2026-10-23')).toBe(true);
+    expect(isOutdated('vllm/vllm-openai:nightly-e68efc68', release, '2026-09-01')).toBe(false);
+    expect(isOutdated('lmsysorg/sglang:nightly-dev-20260901-83c078d9', release, '2026-09-02')).toBe(
+      false,
+    );
+  });
+
+  it('does not flag custom tags or frameworks without a release stream', () => {
+    expect(isOutdated('lmsysorg/sglang:qwen38flashnext', sglang, '2026-01-01')).toBe(false);
+    expect(isOutdated('rocm/atom-dev:nightly_202609211553', null, '2026-09-22')).toBe(false);
   });
 });
 
@@ -154,30 +189,73 @@ describe('baseFramework', () => {
   });
 });
 
-describe('getActualLatestTag', () => {
-  it('looks up the base framework from FRAMEWORK_TO_BASE and returns its release', () => {
-    const releases = { vllm: 'v0.21.0', sglang: 'v0.5.12' };
-    expect(getActualLatestTag('vllm', releases)).toBe('v0.21.0');
-    expect(getActualLatestTag('sglang', releases)).toBe('v0.5.12');
-    expect(getActualLatestTag('dynamo-sglang', releases)).toBe('v0.5.12');
-    expect(getActualLatestTag('mori-sglang', releases)).toBe('v0.5.12');
+describe('nightlyCommit', () => {
+  it.each([
+    [
+      'vllm/vllm-openai:nightly-af7f9488c2210d67e1033ecdc845b087ee7fe92b@sha256:8e2f',
+      'af7f9488c2210d67e1033ecdc845b087ee7fe92b',
+    ],
+    ['vllm/vllm-openai:nightly-dev-arm64-cu130-ac9126e58aa7', 'ac9126e58aa7'],
+    ['vllm/vllm-openai:nightly-dev-x86_64-cu13.0.1-20ebb28', '20ebb28'],
+    ['lmsysorg/sglang:nightly-dev-cu13-20260914-4358a161', '4358a161'],
+    [
+      'vllm/vllm-openai-rocm:nightly-rocm100-49cb2bbf71cfd36ee5aa33d1e184b1cddff55294',
+      '49cb2bbf71cfd36ee5aa33d1e184b1cddff55294',
+    ],
+  ])('reads the commit from %s', (image, commit) => {
+    expect(nightlyCommit(image)).toBe(commit);
   });
 
-  it('uses the vLLM release stream for llmd-vllm', () => {
-    const releases = { vllm: 'v0.21.0', sglang: 'v0.5.12' };
-    expect(getActualLatestTag('llmd-vllm', releases)).toBe('v0.21.0');
+  it.each([
+    'rocm/atom-dev:nightly_202609211553',
+    'vllm/vllm-openai:cu134-nightly-x86_64-dev-20261019-mk',
+    'lmsysorg/sglang:v0.5.22-cu130',
+    'lmsysorg/sglang:dev-muse-spark-open',
+  ])('finds no commit in %s', (image) => {
+    expect(nightlyCommit(image)).toBeNull();
+  });
+});
+
+describe('earliestSubmission', () => {
+  const rows = [
+    { image: 'vllm/vllm-openai:nightly-dev-x86_64-cu13.0.1-20ebb28', date: '2026-10-21' },
+    { image: 'vllm/vllm-openai:nightly-dev-arm64-cu13.0.1-20ebb28', date: '2026-09-28' },
+    { image: 'lmsysorg/sglang:nightly', date: '2026-08-01' },
+    { image: 'lmsysorg/sglang:nightly', date: '2026-10-22' },
+  ];
+  const dates = firstSubmissionDates(rows);
+
+  it('bounds a commit build by its first submission on any architecture', () => {
+    expect(earliestSubmission(dates, rows[0])).toBe('2026-09-28');
   });
 
-  it('returns null when releases is undefined (API still loading)', () => {
-    expect(getActualLatestTag('vllm', undefined)).toBeNull();
+  it('keeps each submission date for a floating tag', () => {
+    expect(earliestSubmission(dates, rows[3])).toBe('2026-10-22');
+  });
+});
+
+describe('getActualLatestRelease', () => {
+  const releases = {
+    vllm: { tag: 'v0.21.0', publishedAt: '2026-06-01T00:00:00Z', commits: {} },
+    sglang: { tag: 'v0.5.12', publishedAt: '2026-06-02T00:00:00Z', commits: {} },
+  };
+
+  it.each([
+    ['vllm', 'v0.21.0'],
+    ['dynamo-vllm', 'v0.21.0'],
+    ['llmd-vllm', 'v0.21.0'],
+    ['vllm-disagg', 'v0.21.0'],
+    ['sglang', 'v0.5.12'],
+    ['dynamo-sglang', 'v0.5.12'],
+    ['mori-sglang', 'v0.5.12'],
+  ])('uses the base engine release for %s', (framework, tag) => {
+    expect(getActualLatestRelease(framework, releases)?.tag).toBe(tag);
   });
 
-  it('returns null for an unknown framework (no base mapping)', () => {
-    expect(getActualLatestTag('trt', { vllm: 'v0.21.0', sglang: 'v0.5.12' })).toBeNull();
-  });
-
-  it('returns null when the base release is missing from the releases map', () => {
-    expect(getActualLatestTag('vllm', { sglang: 'v0.5.12' })).toBeNull();
+  it('returns null while loading, for engines without releases, and for missing releases', () => {
+    expect(getActualLatestRelease('vllm', undefined)).toBeNull();
+    expect(getActualLatestRelease('trt', releases)).toBeNull();
+    expect(getActualLatestRelease('vllm', { sglang: releases.sglang })).toBeNull();
   });
 });
 
@@ -192,7 +270,6 @@ describe('getCurrentImageNodeTypeTooltip', () => {
   });
 });
 
-/** Fixed-sequence or agentic row shape the catalog helpers read. */
 function imageRow(
   model: string,
   scenario: 'agentic' | '1k/1k' | '1k/8k' | '8k/1k' | { isl: number; osl: number },
@@ -238,8 +315,7 @@ describe('isActiveImageRow', () => {
     expect(isActiveImageRow(imageRow('dsv4', 'agentic'))).toBe(true);
     expect(isActiveImageRow(imageRow('qwen3.5', '8k/1k'))).toBe(true);
     expect(isActiveImageRow(imageRow('qwen3.5', 'agentic'))).toBe(true);
-    expect(isActiveImageRow(imageRow('minimaxm3', 'agentic'))).toBe(true);
-    // Maintenance is not deprecation: DeepSeek R1 stays listed on 8K/1K.
+    expect(isActiveImageRow(imageRow('minimaxm31flash', 'agentic'))).toBe(true);
     expect(isActiveImageRow(imageRow('dsr1', '8k/1k'))).toBe(true);
   });
 
@@ -256,6 +332,7 @@ describe('isActiveImageRow', () => {
   });
 
   it('drops deprecated models on every scenario, including point-release buckets', () => {
+    expect(isActiveImageRow(imageRow('minimaxm3', 'agentic'))).toBe(false);
     expect(isActiveImageRow(imageRow('kimik2.5', '8k/1k'))).toBe(false);
     expect(isActiveImageRow(imageRow('kimik2.6', '8k/1k'))).toBe(false);
     expect(isActiveImageRow(imageRow('minimaxm2.5', '8k/1k'))).toBe(false);

@@ -1,11 +1,3 @@
-/**
- * Server-side availability enumeration for precision-compare and
- * spec-decode-compare routes.
- *
- * Mirrors the pattern in compare-availability.ts but queries precision
- * and spec_method dimensions rather than hardware pairs.
- */
-
 import { GPU_KEYS, SPEC_METHOD_KEYS } from '@semianalysisai/inferencex-constants';
 
 import { COMPARE_MODEL_SLUGS } from '@/lib/compare/compare-slug';
@@ -16,10 +8,6 @@ import {
   PRECISION_SLUG_TOKENS,
   SPEC_METHODS_ACTIVE,
 } from '@/lib/compare/compare-variant-slug';
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
 
 export interface PrecisionPair {
   gpu: string;
@@ -33,23 +21,10 @@ export interface SpecDecodePair {
   method: string;
 }
 
-// ---------------------------------------------------------------------------
-// Internal: precision allowlist
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// Precision pairs
-// ---------------------------------------------------------------------------
-
-/** For each canonical model slug, return the (gpu, precA, precB) combos where
- *  both precisions have benchmark data on that GPU. Pairs use canonical
- *  PRECISION_SLUG_ORDER ordering. Output sorted by model slug order, GPU
- *  alphabetical, pairs by canonical precision order. */
 export async function getPrecisionPairsByModelSlug(): Promise<Map<string, PrecisionPair[]>> {
   const rows = await getCachedAvailability();
   const dbKeyToSlug = buildDbKeyToSlugMap();
 
-  // Collect distinct precisions per (modelSlug, gpu).
   const precByModelGpu = new Map<string, Set<string>>();
   for (const row of rows) {
     const slug = dbKeyToSlug.get(row.model);
@@ -65,12 +40,10 @@ export async function getPrecisionPairsByModelSlug(): Promise<Map<string, Precis
     s.add(row.precision);
   }
 
-  // Build output map — iterate models in COMPARE_MODEL_SLUGS order.
   const out = new Map<string, PrecisionPair[]>();
   for (const m of COMPARE_MODEL_SLUGS) {
     const pairs: PrecisionPair[] = [];
 
-    // Collect GPUs for this model that have >=2 precisions.
     const gpus: string[] = [];
     for (const [key, precs] of precByModelGpu.entries()) {
       if (!key.startsWith(`${m.slug}\0`)) continue;
@@ -81,13 +54,11 @@ export async function getPrecisionPairsByModelSlug(): Promise<Map<string, Precis
 
     for (const gpu of gpus) {
       const precs = precByModelGpu.get(`${m.slug}\0${gpu}`)!;
-      // Sort precisions by PRECISION_SLUG_ORDER index.
       const sorted = [...precs].toSorted(
         (a, b) =>
           (PRECISION_SLUG_TOKENS.has(a) ? PRECISION_SLUG_ORDER.indexOf(a) : 999) -
           (PRECISION_SLUG_TOKENS.has(b) ? PRECISION_SLUG_ORDER.indexOf(b) : 999),
       );
-      // Generate all C(n,2) pairs in canonical order.
       for (let i = 0; i < sorted.length; i++) {
         for (let j = i + 1; j < sorted.length; j++) {
           const [precA, precB] = orderPrecisionPair(sorted[i], sorted[j]);
@@ -102,14 +73,11 @@ export async function getPrecisionPairsByModelSlug(): Promise<Map<string, Precis
   return out;
 }
 
-/** Flattened list of all comparable precision slugs. Sorted by model slug
- *  order, GPU alphabetical, pairs by canonical precision order. */
 export async function getAllComparablePrecisionSlugs(): Promise<
   { modelSlug: string; gpu: string; precA: string; precB: string }[]
 > {
   const byModel = await getPrecisionPairsByModelSlug();
   const result: { modelSlug: string; gpu: string; precA: string; precB: string }[] = [];
-  // Iterate in COMPARE_MODEL_SLUGS order (Map preserves insertion order).
   for (const [modelSlug, pairs] of byModel.entries()) {
     for (const p of pairs) {
       result.push({ modelSlug, gpu: p.gpu, precA: p.precA, precB: p.precB });
@@ -118,26 +86,16 @@ export async function getAllComparablePrecisionSlugs(): Promise<
   return result;
 }
 
-// ---------------------------------------------------------------------------
-// Spec-decode pairs
-// ---------------------------------------------------------------------------
-
-/** For each canonical model slug, return the (gpu, precision, method) combos
- *  where both the method AND 'none' have benchmark data on that GPU at that
- *  precision. Output sorted by model slug order, GPU alphabetical, then
- *  precision by PRECISION_SLUG_ORDER index, then method alphabetical. */
 export async function getSpecDecodePairsByModelSlug(): Promise<Map<string, SpecDecodePair[]>> {
   const rows = await getCachedAvailability();
   const dbKeyToSlug = buildDbKeyToSlugMap();
 
-  // Collect distinct spec_methods per (modelSlug, gpu, precision).
   const methodsByModelGpuPrec = new Map<string, Set<string>>();
   for (const row of rows) {
     const slug = dbKeyToSlug.get(row.model);
     if (!slug) continue;
     if (!GPU_KEYS.has(row.hardware)) continue;
     if (!PRECISION_SLUG_TOKENS.has(row.precision)) continue;
-    // Accept methods present in data that are in SPEC_METHOD_KEYS.
     if (!SPEC_METHOD_KEYS.has(row.spec_method)) continue;
     const key = `${slug}\0${row.hardware}\0${row.precision}`;
     let s = methodsByModelGpuPrec.get(key);
@@ -152,18 +110,15 @@ export async function getSpecDecodePairsByModelSlug(): Promise<Map<string, SpecD
   for (const m of COMPARE_MODEL_SLUGS) {
     const pairs: SpecDecodePair[] = [];
 
-    // Collect valid (gpu, precision) combos that have both 'none' and an active method.
     const gpuPrecCombos: { gpu: string; precision: string }[] = [];
     for (const [key, methods] of methodsByModelGpuPrec.entries()) {
       if (!key.startsWith(`${m.slug}\0`)) continue;
-      // Need both 'none' and at least one active method.
       if (!methods.has('none')) continue;
       const active = [...methods].filter((meth) => SPEC_METHODS_ACTIVE.has(meth));
       if (active.length === 0) continue;
       const parts = key.split('\0');
       gpuPrecCombos.push({ gpu: parts[1], precision: parts[2] });
     }
-    // Sort: gpu alphabetical, then precision by PRECISION_SLUG_ORDER index.
     gpuPrecCombos.sort((a, b) => {
       if (a.gpu !== b.gpu) return a.gpu < b.gpu ? -1 : 1;
       const ai = PRECISION_SLUG_ORDER.indexOf(a.precision);
@@ -185,9 +140,6 @@ export async function getSpecDecodePairsByModelSlug(): Promise<Map<string, SpecD
   return out;
 }
 
-/** Flattened list of all comparable spec-decode slugs. Sorted by model slug
- *  order, GPU alphabetical, precision by PRECISION_SLUG_ORDER, methods
- *  alphabetical. */
 export async function getAllComparableSpecDecodeSlugs(): Promise<
   { modelSlug: string; gpu: string; precision: string; method: string }[]
 > {

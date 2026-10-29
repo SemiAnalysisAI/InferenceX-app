@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** Shared AMD UBB inventory: eight GPUs and eight PCIe 5.0 x16 retimers. */
 
 import { type PowerComponentBreakdown, sum_watts, ValidationError } from '../../../../base';
 import { AMD_UBB_BASELINE } from '../../profiles';

@@ -3,6 +3,7 @@
 import * as d3 from 'd3';
 import { useMemo } from 'react';
 
+import { useInferenceAnalyticsContext } from '@/components/inference/InferenceContext';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import { Heading } from '@/components/ui/heading';
 import { exportToCsv } from '@/lib/export/csv-export';
@@ -99,7 +100,6 @@ const PANELS: {
   yLog?: boolean;
   reference?: number;
   yDomain?: [number, number];
-  /** Share points stay unconnected: each is one observed configuration. */
   connect: boolean;
 }[] = [
   {
@@ -162,6 +162,7 @@ export default function PowerRoleGroup({
   colorOf: (sourceKey: string) => string;
 }) {
   const locale = useLocale();
+  const analyticsContext = useInferenceAnalyticsContext();
   const t = STRINGS[locale];
   const points = useMemo(() => getRolePoints(data, xField), [data, xField]);
   const label = (key: string) => sources.find((source) => source.key === key)?.label ?? key;
@@ -189,7 +190,6 @@ export default function PowerRoleGroup({
             ];
       }),
     );
-    // Line keys become SVG class names, so they index the source rather than embed its key.
     const lines: PanelLine[] = definition.connect
       ? definition.series.flatMap(({ role, value: read }) =>
           [...new Set(points.map((point) => point.sourceKey))].map((sourceKey, index) => ({
@@ -305,6 +305,7 @@ export default function PowerRoleGroup({
           <ChartButtons
             chartId={sectionId}
             analyticsPrefix="power_roles"
+            analyticsContext={analyticsContext}
             hideZoomReset
             onExportCsv={exportCsv}
           />

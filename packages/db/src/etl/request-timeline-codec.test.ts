@@ -12,7 +12,6 @@ import {
   type ScannedRequest,
 } from './request-timeline-codec';
 
-/** Enough requests that the JSON text crosses several 1 MiB write batches. */
 function largeTimeline(requestCount: number): RequestTimeline {
   return {
     version: REQUEST_TIMELINE_VERSION,
@@ -71,7 +70,6 @@ describe('gzipRequestTimeline', () => {
   });
 });
 
-/** Requests arriving one at a time, like the conversion backfill's range queries. */
 async function* incrementalRequests(requests: readonly object[]): AsyncGenerator<object> {
   for (const request of requests) yield request;
 }
@@ -130,7 +128,6 @@ const CHART_FIELDS: ReadonlySet<string> = new Set([
   'cancelled',
 ]);
 
-/** Scan `gz` with a given in-memory ceiling and keep only `fields` of each request. */
 async function scanned(gz: Buffer, maxInMemoryBytes: number) {
   const requests: ScannedRequest[] = [];
   const header = await scanRequestTimelineGz(
@@ -161,12 +158,10 @@ describe('scanRequestTimelineGz', () => {
     );
 
     const inMemory = await scanned(gz, 64 * 1024 * 1024);
-    // A 1 KiB ceiling forces the gunzip + token stream for this ~1.3 MB document.
     const streamed = await scanned(gz, 1024);
 
     expect(inMemory).toEqual({ header, requests: expected });
     expect(streamed).toEqual({ header, requests: expected });
-    // Exact doubles such as startNs survive the token path unchanged.
     expect(streamed.header.startNs).toBe(timeline.startNs);
   });
 
@@ -183,7 +178,6 @@ describe('scanRequestTimelineGz', () => {
 
 describe('scanRequestTimelineText', () => {
   it('reads PostgreSQL-style JSONB text split at arbitrary points', async () => {
-    // jsonb::text orders keys by length and puts spaces after separators.
     const text =
       '{"endNs": 2000, "startNs": 1000, "version": 6, "requests": [' +
       '{"ad": 0, "cid": "trace-018", "end": 900, "isl": 128, "osl": null, "ttftMs": 42.5, "cancelled": false},' +

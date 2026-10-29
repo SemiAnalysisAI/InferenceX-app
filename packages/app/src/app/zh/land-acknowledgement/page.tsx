@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
 
 import { Card } from '@/components/ui/card';
-import { zhAlternates, ZH_OG_LOCALE } from '@/lib/i18n/i18n';
+import { zhAlternates } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 const REGIONAL_ACKNOWLEDGEMENTS_ZH = [
   {
@@ -33,16 +34,12 @@ export const metadata: Metadata = {
   title: '原住民传统领地声明',
   description: LAND_ACKNOWLEDGEMENT_DESCRIPTION,
   alternates: zhAlternates('/land-acknowledgement'),
-  openGraph: {
+  ...socialMetadata({
     title: '原住民传统领地声明 | InferenceX',
     description: LAND_ACKNOWLEDGEMENT_DESCRIPTION,
     url: `${SITE_URL}/zh/land-acknowledgement`,
-    locale: ZH_OG_LOCALE,
-  },
-  twitter: {
-    title: '原住民传统领地声明 | InferenceX',
-    description: LAND_ACKNOWLEDGEMENT_DESCRIPTION,
-  },
+    locale: 'zh',
+  }),
 };
 
 export default function LandAcknowledgementPageZh() {

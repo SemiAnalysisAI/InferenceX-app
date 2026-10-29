@@ -1,12 +1,15 @@
 'use client';
 
 import { curveLinear } from 'd3';
+import { comparisonDefaults } from '@semianalysisai/inferencex-db/operatorx/visualization';
 import { useMemo, useState } from 'react';
 
 import type { ComputePrecision } from '@semianalysisai/inferencex-db/operatorx/compare';
 import { Label } from '@/components/ui/label';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { Switch } from '@/components/ui/switch';
+import { track } from '@/lib/analytics/analytics';
+import { useLocale } from '@/lib/i18n/use-locale';
 
 import { EmptyChart } from '../charts/empty';
 import { OpxChart, esc, HardwareLegend, tooltipHtml } from '../charts/kit';
@@ -18,24 +21,33 @@ import type { VizDefinition } from './types';
 
 const ORDER: ComputePrecision[] = ['fp4', 'fp8', 'bf16'];
 
+const STRINGS = {
+  en: {
+    ascendBasis:
+      '950PR (28 Cube): dense peaks of 378 BF16 and 756 FP8 TFLOPS; assumed HBM bandwidth 1.6 TB/s. Exact memory/ECC configuration is unresolved.',
+  },
+  zh: {
+    ascendBasis:
+      '950PR（28 个 Cube 核）：BF16 和 FP8 的稠密计算峰值分别为 378 和 756 TFLOPS；HBM 带宽假定为 1.6 TB/s，具体内存及 ECC 配置尚未确认。',
+  },
+};
+
 interface Point {
   hw: string;
   i: number;
   x: number;
   y: number;
-  /** FLOP/byte and TFLOPS, as measured; x/y are these or their normalized forms. */
   ai: number;
   tflops: number;
 }
 
-/** Key of the one roofline every device shares once normalized. */
 const SHARED = 'shared';
 const ratio = (v: number) => String(Number(v.toPrecision(2)));
-/** ` · 42% of peak compute`, or nothing when the device's peak is unknown. */
 const share = (v: number, of: number | null, what: string) =>
   of ? ` · ${ratio((v / of) * 100)}% of peak ${what}` : '';
 
 function Roofline({ model }: { model: ComparisonModel }) {
+  const strings = STRINGS[useLocale()];
   const { view } = model;
   const counts = useMemo(() => {
     const m = new Map<ComputePrecision, number>();
@@ -44,14 +56,10 @@ function Roofline({ model }: { model: ComparisonModel }) {
     return m;
   }, [view]);
   const precisions = ORDER.filter((p) => counts.has(p));
+  const defaults = view.defaults ?? comparisonDefaults(view);
   const [picked, setPicked] = useState<ComputePrecision | null>(null);
-  const [normalized, setNormalized] = useState(true);
-  const precision =
-    picked && precisions.includes(picked)
-      ? picked
-      : precisions.toSorted((a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0))[0];
-  // Normalized, each device's intensity is divided by its ridge point (peak / bandwidth)
-  // and its throughput by its peak, so every roofline becomes min(1, x).
+  const [normalized, setNormalized] = useState(defaults.rooflineNormalized);
+  const precision = picked && precisions.includes(picked) ? picked : defaults.rooflinePrecision;
   const points = useMemo<Point[]>(
     () =>
       model.hardware.flatMap((hw) => {
@@ -107,7 +115,10 @@ function Roofline({ model }: { model: ComparisonModel }) {
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
         <SegmentedToggle
           value={precision}
-          onValueChange={setPicked}
+          onValueChange={(value) => {
+            track('operatorx_roofline_precision_selected', { precision: value });
+            setPicked(value);
+          }}
           ariaLabel="Compute precision"
           options={precisions.map((p) => ({ value: p, label: p }))}
         />
@@ -115,7 +126,10 @@ function Roofline({ model }: { model: ComparisonModel }) {
           <Switch
             id="opx-roofline-normalized"
             checked={normalized}
-            onCheckedChange={setNormalized}
+            onCheckedChange={(enabled) => {
+              track('operatorx_roofline_normalized_toggled', { enabled });
+              setNormalized(enabled);
+            }}
           />
           <Label
             htmlFor="opx-roofline-normalized"
@@ -125,6 +139,9 @@ function Roofline({ model }: { model: ComparisonModel }) {
           </Label>
         </div>
       </div>
+      {model.hardware.includes('ascend950pr') && (
+        <p className="text-xs text-muted-foreground">{strings.ascendBasis}</p>
+      )}
       <OpxChart<Point>
         inspect={{ model, caseOf: (p) => p.i }}
         chartId="operatorx-roofline"

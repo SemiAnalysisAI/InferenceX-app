@@ -39,7 +39,6 @@ import {
 } from './chart-data';
 import type { EvalChangelogEntry, EvaluationChartContextType, EvaluationChartData } from './types';
 
-/** @internal Exported for test provider wrapping only. */
 export const EvaluationContext = createContext<EvaluationChartContextType | undefined>(undefined);
 
 import { resolveEvaluationDate } from './date-resolution';
@@ -125,8 +124,6 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     remove: removeHwRaw,
   } = useChartToggleSet();
 
-  // Pending legend-active selection restored from `e_active` URL param.
-  // Consumed once when hardware availability settles.
   const [pendingActiveHardware, setPendingActiveHardware] = useState<Set<string> | null>(() => {
     const value = getUrlParam('e_active');
     if (!value) return null;
@@ -296,7 +293,6 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     [setSelectedModel],
   );
 
-  // ── Debounced hardware selection tracking ────────────────────────────────
   const evalTrackMounted = useRef(false);
   useEffect(() => {
     if (!evalTrackMounted.current) {
@@ -316,7 +312,6 @@ export function EvaluationProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timer);
   }, [enabledHardware]);
 
-  // Serialize the legend-active set, omitting when it equals all hwTypesWithData.
   const eActiveStr = useMemo(() => {
     if (enabledHardware.size === 0) return '';
     if (enabledHardware.size === hwTypesWithData.size) {

@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
 /* oxlint-disable max-classes-per-file -- mirrors the upstream Python module, class for class */
-/** Grace workload assumptions, excluding LPDDR5X and conversion losses. */
 
 import {
   type Details,

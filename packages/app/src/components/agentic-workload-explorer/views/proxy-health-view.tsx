@@ -12,8 +12,6 @@ import { formatSnapshotTime } from '@/lib/agentic-workload-explorer/snapshot';
 import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
 import { useLocale } from '@/lib/i18n/use-locale';
 
-// ── i18n ────────────────────────────────────────────────────────
-
 const STRINGS = {
   en: {
     failedToLoad: 'Failed to load endpoint data',
@@ -51,7 +49,7 @@ const STRINGS = {
     totalRequests: '总请求数',
     errorRate: '错误率',
     routes: '路由',
-    errorsFinal24h: '错误（最后 24h）',
+    errorsFinal24h: '错误（最后 24 小时）',
     final7days: '最后 7 天',
     errors: (n: string) => `${n} 个错误`,
     uniqueEndpoints: '独立端点',
@@ -78,7 +76,6 @@ const STRINGS = {
     tooltipTotal: '合计',
   },
 } as const;
-// ── Section header ───────────────────────────────────────────────
 
 function SectionHeader({ label, detail }: { label: string; detail?: string }) {
   return (
@@ -91,8 +88,6 @@ function SectionHeader({ label, detail }: { label: string; detail?: string }) {
     </div>
   );
 }
-
-// ── Types ────────────────────────────────────────────────────────
 
 interface RouteStat {
   endpoint: string;
@@ -130,8 +125,6 @@ interface ProxyHealthData {
   statusDistribution: StatusGroup[];
   recentErrors: RecentError[];
 }
-
-// ── Chart constants ──────────────────────────────────────────────
 
 const CHART_W = 600;
 const CHART_H = 180;
@@ -173,14 +166,11 @@ function generateTicks(min: number, max: number, targetCount: number): number[] 
   const spacing = niceNum(range / (targetCount - 1), true);
   const niceMin = Math.floor(min / spacing) * spacing;
   const ticks: number[] = [];
-  // Keep going until a tick reaches max, so the tallest bar is never clipped.
   for (let t = niceMin; t - spacing < max - spacing * 1e-9; t += spacing) {
     ticks.push(Math.round(t * 1e10) / 1e10);
   }
   return ticks;
 }
-
-// ── Status code colors ───────────────────────────────────────────
 
 const STATUS_COLORS: Record<string, string> = {
   '2xx': '#10b981',
@@ -189,8 +179,6 @@ const STATUS_COLORS: Record<string, string> = {
   '5xx': '#ef4444',
   unknown: '#6b7280',
 };
-
-// ── Main page ────────────────────────────────────────────────────
 
 export default function ProxyHealthPage() {
   return (
@@ -240,7 +228,6 @@ function ProxyHealthPageContent() {
 
   return (
     <div className="space-y-6">
-      {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard
           label={t.totalRequests}
@@ -268,7 +255,6 @@ function ProxyHealthPageContent() {
         />
       </div>
 
-      {/* Status code distribution */}
       {data.statusDistribution.length > 0 && (
         <div>
           <SectionHeader label={t.statusCodeDistribution} detail={t.final7days} />
@@ -302,7 +288,6 @@ function ProxyHealthPageContent() {
         </div>
       )}
 
-      {/* Hourly traffic chart */}
       {data.hourlyByEndpoint.length > 0 && (
         <div>
           <SectionHeader label={t.hourlyTraffic} detail={t.final48hours} />
@@ -314,7 +299,6 @@ function ProxyHealthPageContent() {
         </div>
       )}
 
-      {/* Route breakdown table */}
       <div>
         <SectionHeader label={t.routeBreakdown} detail={t.final7days} />
         <div className="mt-3 rounded-md border border-border bg-surface overflow-hidden">
@@ -394,7 +378,6 @@ function ProxyHealthPageContent() {
         </div>
       </div>
 
-      {/* Recent errors */}
       <div>
         <SectionHeader label={t.latestErrors} detail={t.final24hours} />
         <div className="mt-3 rounded-md border border-border bg-surface overflow-hidden">
@@ -466,8 +449,6 @@ function ProxyHealthPageContent() {
   );
 }
 
-// ── Hourly traffic chart ────────────────────────────────────────
-
 function HourlyTrafficChart({
   hourly,
   tooltipTotal,
@@ -475,9 +456,7 @@ function HourlyTrafficChart({
   hourly: HourlyEndpoint[];
   tooltipTotal: string;
 }) {
-  // Aggregate by hour across endpoints, and track per-endpoint series
   const { hours, endpointNames, seriesByEndpoint, maxCount } = useMemo(() => {
-    // Collect unique hours (sorted) and endpoints
     const hourSet = new Set<string>();
     const epSet = new Set<string>();
     for (const h of hourly) {
@@ -487,19 +466,16 @@ function HourlyTrafficChart({
     const sortedHours = [...hourSet].toSorted();
     const epNames = [...epSet].toSorted();
 
-    // Build lookup: hour+endpoint → count
     const lookup = new Map<string, number>();
     for (const h of hourly) {
       lookup.set(`${h.hour}|${h.endpoint}`, h.count);
     }
 
-    // Build stacked series
     const series: Record<string, number[]> = {};
     for (const ep of epNames) {
       series[ep] = sortedHours.map((hr) => lookup.get(`${hr}|${ep}`) || 0);
     }
 
-    // Max stacked total per hour
     let max = 0;
     for (let i = 0; i < sortedHours.length; i++) {
       let sum = 0;
@@ -521,7 +497,6 @@ function HourlyTrafficChart({
   const sx = (i: number) => MARGIN.left + i * (barWidth + barGap);
   const sy = (v: number) => MARGIN.top + PLOT_H - (v / yMax) * PLOT_H;
 
-  // Assign colors
   const colorMap = new Map<string, string>();
   let fallbackIdx = 0;
   for (const ep of endpointNames) {
@@ -531,13 +506,11 @@ function HourlyTrafficChart({
     );
   }
 
-  // Label every ~6 hours
   const labelInterval = Math.max(1, Math.floor(hours.length / 8));
 
   return (
     <div>
       <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full" role="img">
-        {/* Y grid + labels */}
         {yTicks.map((t) => (
           <g key={t}>
             <line
@@ -562,7 +535,6 @@ function HourlyTrafficChart({
           </g>
         ))}
 
-        {/* Stacked bars */}
         {hours.map((hr, i) => {
           let cumY = 0;
           const total = endpointNames.reduce((s, ep) => s + seriesByEndpoint[ep][i], 0);
@@ -601,7 +573,6 @@ function HourlyTrafficChart({
           );
         })}
 
-        {/* X-axis labels */}
         {hours.map((hr, i) =>
           i % labelInterval === 0 ? (
             <text
@@ -623,7 +594,6 @@ function HourlyTrafficChart({
         )}
       </svg>
 
-      {/* Legend */}
       <div className="flex flex-wrap gap-3 mt-2 px-1">
         {endpointNames.map((ep) => (
           <div key={ep} className="flex items-center gap-1.5">
@@ -638,8 +608,6 @@ function HourlyTrafficChart({
     </div>
   );
 }
-
-// ── Stat card ────────────────────────────────────────────────────
 
 function StatCard({
   label,

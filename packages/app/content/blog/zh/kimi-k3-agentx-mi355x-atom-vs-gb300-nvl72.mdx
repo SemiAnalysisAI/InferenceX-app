@@ -1,7 +1,7 @@
 ---
 title: 'Kimi K3 的 AgentX 结果：MI355X ATOM 在部分曲线上胜过 GB300 NVL72'
 subtitle: 'AMD 的厂商引擎在每美元性能前沿上赢下了实打实的一段，而 Hopper 连服务 K3 都很吃力'
-seoDescription: '在 Kimi K3 的 AgentX 运行中，端到端延迟 40 到 60 秒的区间内，MI355X ATOM 在每美元性能上胜过 GB300 NVL72 vLLM；而 Hopper 表现吃力，因为 K3 需要定制的 SM90 kernel 以及调优过的 TP32、EP32 形状。'
+seoDescription: '在 Kimi K3 的 AgentX 运行中，端到端延迟 40 到 60 秒的区间内，MI355X ATOM 在每美元性能上胜过 GB300 NVL72 vLLM；而 Hopper 表现吃力，因为 K3 需要定制的 SM90 kernel 以及调优过的 TP32、EP32 配置。'
 date: '2026-08-25'
 publishDate: '2026-08-25'
 tags:
@@ -25,7 +25,7 @@ tags:
   caption="来源：SemiAnalysis InferenceX"
 />
 
-## 上游这个前提
+## 关于上游的限定条件
 
 AMD 用 [ATOM](/zh/glossary/atom) 快速推进 K3 性能是件好事。与之相伴的建议是：优先把这些改进上游到 vLLM。ATOM 目前是 AMD 性能最好的引擎，但对使用上游开源服务栈的客户来说，vLLM 才是更有参考价值的对比对象；只在厂商运行时下成立的曲线，并不能代表这些客户实际能部署的性能。
 
@@ -63,7 +63,7 @@ _本文结果只是 AgentX 1.0 的一个切面。完整分析、回放方法，�
       "name": "Hopper 在 Kimi K3 上为什么吃力？",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Kimi K3 体量巨大，而 vLLM 维护者和 NVIDIA 都没有把精力放在为它优化 Hopper 上。要在 SM90 上以高交互性服务 K3，需要定制调优的 kernel 以及调优过的 TP32、EP32 形状，而这些工作尚未完成。"
+        "text": "Kimi K3 体量巨大，而 vLLM 维护者和 NVIDIA 都没有把精力放在为它优化 Hopper 上。要在 SM90 上以高交互性服务 K3，需要定制调优的 kernel 以及调优过的 TP32、EP32 配置，而这些工作尚未完成。"
       }
     }
   ]

@@ -188,7 +188,7 @@ export AIPERF_SERVICE_PROFILE_CONFIGURE_TIMEOUT=1800`,
         bullets: [
           '开启 streaming，以便测量首 token 延迟（TTFT）和 token 间延迟（ITL）。',
           'ignore_eos:true 要求服务器生成指定长度的输出，而不是提前停止。',
-          '保留原始轮次间延迟；仅将整个系统的全局空闲时间限制在 10 秒以内。',
+          '保留原始轮次间延迟；仅将全局空闲时间限制在 10 秒以内。',
           'first_turn_prefix cache busting 为每次回放的会话加入唯一首轮标记，避免虚假的跨会话 cache hit，同时保留会话内部的 cache 复用。',
           '有效测试至少运行 900 秒，默认运行 1,800 秒。',
           '正式测量前通过 warmup 建立深层 prefix。',
@@ -228,7 +228,7 @@ export AIPERF_SERVICE_PROFILE_CONFIGURE_TIMEOUT=1800`,
       {
         title: '如何确认负载生成器（load generator）不是瓶颈？',
         paragraphs: [
-          'AIPerf 会将工作分配到多个 worker 进程，并每两秒上报 worker 健康状态。应将高 CPU 警告视为客户端饱和信号；在信任结果前，需要增加客户端 CPU 核心数或负载生成器主机。',
+          'AIPerf 会将工作分配到多个 worker 进程，并每两秒上报 worker 健康状态。应将高 CPU 警告视为客户端饱和信号；在信任结果前，需要增加客户端 CPU 核心数，或再加一台负载生成器主机。',
           '--show-trace-timing 可以区分等待连接池中空闲连接的时间与等待服务器返回首字节的时间。worker 的 CPU 使用率正常且连接池阻塞很少，才有充分依据认为瓶颈位于服务器端。',
         ],
       },

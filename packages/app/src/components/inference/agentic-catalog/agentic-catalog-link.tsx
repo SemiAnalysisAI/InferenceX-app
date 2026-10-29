@@ -5,11 +5,6 @@ import Link from 'next/link';
 
 import { track } from '@/lib/analytics/analytics';
 
-/**
- * Analytics-instrumented links for the `/inference/agentic` catalog. The page
- * and its cards are server components, so every tracked click routes here —
- * the same arrangement `compare-index-tracked-link.tsx` uses for `/compare`.
- */
 interface AgenticCatalogLinkProps extends Omit<React.ComponentProps<typeof Link>, 'href'> {
   href: string;
   analyticsEvent: 'agentic_catalog_tutorial_clicked' | 'agentic_catalog_point_clicked';
@@ -37,7 +32,6 @@ export function AgenticCatalogLink({
 }
 
 export interface AgenticCatalogCardStrings {
-  /** "{n} points · conc {min}–{max}" summary line. */
   points: (count: number) => string;
   concurrency: (min: number, max: number) => string;
 }

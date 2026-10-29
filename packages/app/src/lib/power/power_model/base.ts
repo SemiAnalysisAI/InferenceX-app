@@ -1,14 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 /* oxlint-disable max-classes-per-file -- mirrors the upstream Python module, class for class */
 /* oxlint-disable unicorn/prefer-bigint-literals -- bigint literals need a compile target above ES2018 */
-/** Shared inputs, auditable results, and the per-GPU estimation contract. */
-// Port of power_model/src/power_model/base.py at the revision in manifest.ts.
 
 import type { CoolingMode, CoolingProfile } from './cooling';
 
 export const MODEL_VERSION = '0.1.0';
 
-/** Python's ValueError: a domain or input error raised by a model method. */
 export class ValueError extends Error {
   constructor(message: string) {
     super(message);
@@ -16,11 +13,6 @@ export class ValueError extends Error {
   }
 }
 
-/**
- * pydantic's ValidationError (a ValueError subclass): a field constraint or a
- * model validator rejected a constructed value. `message` is the validator's
- * own text, without pydantic's "Value error, " prefix.
- */
 export class ValidationError extends ValueError {
   constructor(message: string) {
     super(message);
@@ -40,7 +32,6 @@ export type DetailValue = string | number;
 export type Details = readonly (readonly [string, DetailValue])[];
 export type Scope = 'per_gpu_reference' | 'cluster';
 
-/** Watts: a finite, non-negative number (pydantic `Field(strict=True, ge=0, allow_inf_nan=False)`). */
 export function validate_watts(value: number): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     throw new ValidationError('Input should be a finite number');
@@ -49,13 +40,11 @@ export function validate_watts(value: number): number {
   return value;
 }
 
-/** Require a boolean even when evaluating a system directly. */
 export function validate_cpu_offload(value: boolean): boolean {
   if (typeof value !== 'boolean') throw new ValidationError('Input should be a valid boolean');
   return value;
 }
 
-/** A positive integer or a positive finite float (PositiveQuantity). */
 export function validate_quantity(value: number): number {
   if (typeof value !== 'number' || !Number.isFinite(value) || !(value > 0)) {
     throw new ValidationError('Input should be greater than 0');
@@ -63,20 +52,14 @@ export function validate_quantity(value: number): number {
   return value;
 }
 
-/** A positive integer (PositiveCount). */
 export function validate_count(value: number): number {
   if (!Number.isSafeInteger(value)) throw new ValidationError('Input should be a valid integer');
   if (!(value > 0)) throw new ValidationError('Input should be greater than 0');
   return value;
 }
 
-/** A model class the port can check at runtime, like pydantic's `isinstance` on a field. */
 type ModelType<T> = (abstract new (...args: never[]) => T) & { readonly typeName: string };
 
-/**
- * pydantic's `model_type` rejection: a field typed as one model class rejects every
- * other class, including a structurally identical sibling such as another NIC card.
- */
 export function validate_instance<T>(value: unknown, type: ModelType<T>): T {
   if (!(value instanceof type)) {
     throw new ValidationError(`Input should be a valid dictionary or instance of ${type.typeName}`);
@@ -84,7 +67,6 @@ export function validate_instance<T>(value: unknown, type: ModelType<T>): T {
   return value;
 }
 
-/** Run an after-validator: pydantic reports a ValueError raised inside one as a ValidationError. */
 export function model_validator<T>(validate: () => T): T {
   try {
     return validate();
@@ -96,11 +78,6 @@ export function model_validator<T>(validate: () => T): T {
   }
 }
 
-/**
- * CPython's math.fsum: Shewchuk's exactly rounded floating-point sum. Plain
- * left-to-right addition differs from it in the last bits, and parent/child
- * reconciliation and every published total depend on this summation.
- */
 export function fsum(values: readonly number[]): number {
   const partials: number[] = [];
   let specialSum = 0;
@@ -122,7 +99,6 @@ export function fsum(values: readonly number[]): number {
       if (Number.isFinite(x)) {
         partials.push(x);
       } else {
-        // A non-finite intermediate from finite inputs is an overflow.
         if (Number.isFinite(xsave)) throw new RangeError('intermediate overflow in fsum');
         if (!Number.isNaN(xsave)) infSum += xsave;
         specialSum += xsave;
@@ -147,7 +123,6 @@ export function fsum(values: readonly number[]): number {
       lo = y - yr;
       if (lo !== 0) break;
     }
-    // Round half-even exactly when the remaining partials push past a tie.
     if (n > 0 && ((lo < 0 && partials[n - 1] < 0) || (lo > 0 && partials[n - 1] > 0))) {
       const y = lo * 2;
       const x = hi + y;
@@ -171,12 +146,10 @@ export function sum_watts(values: readonly number[]): number {
   return validate_watts(total);
 }
 
-/** Consecutive pairs, like Python's `zip(values, values[1:])`. */
 export function pairs<T>(values: readonly T[]): [T, T][] {
   return values.slice(1).map((right, index) => [values[index], right]);
 }
 
-/** Python's math.isclose. */
 export function isclose(a: number, b: number, rel_tol: number, abs_tol: number): boolean {
   if (a === b) return true;
   if (!Number.isFinite(a) || !Number.isFinite(b)) return false;
@@ -187,7 +160,6 @@ export function isclose(a: number, b: number, rel_tol: number, abs_tol: number):
 const MANTISSA_BITS = BigInt(52);
 const IMPLICIT_BIT = BigInt(1) << MANTISSA_BITS;
 
-/** The exact decimal digits of a finite non-zero |value| and the power of ten of its first digit. */
 function exact_decimal(value: number): { digits: string; exponent: number } {
   const view = new DataView(new ArrayBuffer(8));
   view.setFloat64(0, Math.abs(value));
@@ -196,13 +168,11 @@ function exact_decimal(value: number): { digits: string; exponent: number } {
   const fraction = bits & (IMPLICIT_BIT - BigInt(1));
   const mantissa = biased === 0 ? fraction : fraction | IMPLICIT_BIT;
   const power = (biased === 0 ? 1 : biased) - 1075;
-  // mantissa * 2^power; a negative power is mantissa * 5^-power over 10^-power.
   const scaled = power >= 0 ? mantissa << BigInt(power) : mantissa * BigInt(5) ** BigInt(-power);
   const text = scaled.toString();
   return { digits: text.replace(/0+$/u, ''), exponent: text.length - 1 + Math.min(power, 0) };
 }
 
-/** Keep `precision` significant digits, rounding an exact tie to even like CPython's `%g`. */
 function round_digits(digits: string, exponent: number, precision: number) {
   if (digits.length <= precision) return { digits, exponent };
   const kept = digits.slice(0, precision);
@@ -217,7 +187,6 @@ function round_digits(digits: string, exponent: number, precision: number) {
   };
 }
 
-/** Python's `format(value, 'g')`: six significant digits, ties to even, trailing zeros removed. */
 export function formatG(value: number): string {
   if (Number.isNaN(value)) return 'nan';
   if (!Number.isFinite(value)) return value > 0 ? 'inf' : '-inf';
@@ -236,7 +205,6 @@ export function formatG(value: number): string {
   return `${sign}${integer}${fractional ? `.${fractional}` : ''}`;
 }
 
-/** Python's `repr()` of a str, as an enum's "is not a valid" message quotes the input. */
 export function py_repr(text: string): string {
   const quote = text.includes("'") && !text.includes('"') ? '"' : "'";
   let out = quote;
@@ -253,7 +221,6 @@ export function py_repr(text: string): string {
   return out + quote;
 }
 
-/** Convert a model value into the JSON pydantic's `model_dump(mode="json")` produces. */
 export function dump(value: unknown): JsonValue {
   if (value === null || value === undefined) return null;
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
@@ -267,16 +234,13 @@ export function dump(value: unknown): JsonValue {
   throw new TypeError(`Cannot serialize ${typeof value}`);
 }
 
-/** pydantic's frozen, strict BaseModel: every model serializes its own fields. */
 export abstract class FrozenModel {
-  /** The Python class name, which also names result nodes; minification-safe. */
   static readonly typeName: string = 'FrozenModel';
 
   get typeName(): string {
     return (this.constructor as typeof FrozenModel).typeName;
   }
 
-  /** The model's fields in pydantic declaration order. */
   protected abstract fields(): Record<string, unknown>;
 
   model_dump(): JsonObject {
@@ -311,7 +275,6 @@ export interface OperatingStateFields {
   using_scale_out?: boolean;
 }
 
-/** One workload and scale-out policy shared by the whole modeled cluster. */
 export class OperatingState extends FrozenModel {
   static override readonly typeName: string = 'OperatingState';
   readonly workload_state: WorkloadState;
@@ -356,7 +319,6 @@ export interface ProvenanceFields {
   assumptions?: readonly string[];
 }
 
-/** Source and measurement boundary attached to an input or modeling assumption. */
 export class Provenance extends FrozenModel {
   static override readonly typeName: string = 'Provenance';
   readonly profile_id: string;
@@ -412,7 +374,6 @@ interface GroupOptions {
   configuration?: JsonObject | null;
 }
 
-/** Totals across this scope; quantities may be fractional shares of external equipment. */
 export class PowerComponentBreakdown extends FrozenModel {
   static override readonly typeName: string = 'PowerComponentBreakdown';
   readonly name: string;
@@ -471,7 +432,6 @@ export class PowerComponentBreakdown extends FrozenModel {
     });
   }
 
-  /** Scale a whole tree so every parent still sums its children exactly once. */
   scaled(quantity: number): PowerComponentBreakdown {
     const count = validate_quantity(quantity);
     return new PowerComponentBreakdown({
@@ -485,7 +445,6 @@ export class PowerComponentBreakdown extends FrozenModel {
     });
   }
 
-  /** The `details` pairs as a lookup, like Python's `dict(component.details)`. */
   detail(key: string): DetailValue | undefined {
     return this.details.findLast(([name]) => name === key)?.[1];
   }
@@ -619,9 +578,7 @@ export class PowerEstimate extends FrozenModel {
 }
 
 export interface EstimateOptions {
-  /** Watts per Grace socket; replaces the socket's modeled loads. */
   cpu_and_dram_measured_power_per_socket?: number | null;
-  /** Watts per x86 CPU package; replaces the modeled x86 CPU only. */
   cpu_measured_power_per_socket?: number | null;
 }
 
@@ -635,7 +592,6 @@ export abstract class PowerModel extends OperatingState {
 
   constructor({ cooling, ...state }: PowerModelFields) {
     super(state);
-    // cooling.ts imports this module; a type-only import keeps the graph acyclic.
     if (!(cooling instanceof FrozenModel) || cooling.typeName !== 'CoolingProfile') {
       throw new ValidationError('Input should be an instance of CoolingProfile');
     }
@@ -649,15 +605,10 @@ export abstract class PowerModel extends OperatingState {
     });
   }
 
-  /** Return AllInPower_per_gpu in watts per GPU. */
   estimate(gpu_level_power_per_gpu: number, options: EstimateOptions = {}): number {
     return this.estimate_breakdown(gpu_level_power_per_gpu, options).AllInPower_per_gpu;
   }
 
-  /**
-   * Per-socket measured inputs replace modeled CPU and DRAM or CPU alone.
-   * The available measurement source currently depends on the system.
-   */
   estimate_breakdown(
     gpu_level_power_per_gpu: number,
     {
@@ -696,7 +647,6 @@ export abstract class PowerModel extends OperatingState {
     });
   }
 
-  /** Return scoped IT watts and the matching GPU count before PUE. */
   protected abstract _estimate_it_power(
     gpu_level_power_per_gpu: number,
     cpu_and_dram_measured_power_per_socket: number | null,

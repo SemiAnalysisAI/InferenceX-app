@@ -1,23 +1,7 @@
-/**
- * AgentX industry impact — the upstream optimization work that AgentX traces
- * drove across inference engines, routers, KV-cache layers, and kernels.
- *
- * English content lives here; the Simplified Chinese port is a 1:1 mirror in
- * `agentx-optimizations-zh.ts`, keyed by the same slugs and section ids.
- * `agentx-optimizations.test.ts` enforces that the two stay structurally
- * identical, so a section added here without a translation fails CI.
- *
- * Every claim links to the upstream pull request it came from. Sections list
- * PRs as `{ repo, number }` rather than prose links so the reference survives
- * translation unchanged — a PR number is an identifier, not copy.
- */
-
-/** Where a project sits in the serving stack; drives the index-page grouping. */
 export const OPTIMIZATION_LAYERS = ['engine', 'router', 'kv-cache', 'kernels', 'transfer'] as const;
 
 export type OptimizationLayer = (typeof OPTIMIZATION_LAYERS)[number];
 
-/** Upstream repositories referenced by this page, with their display names. */
 export const PR_REPOS = {
   'vllm-project/vllm': 'vLLM',
   'sgl-project/sglang': 'SGLang',
@@ -44,7 +28,6 @@ export function prLabel(pr: UpstreamPr): string {
   return `${PR_REPOS[pr.repo]} #${pr.number}`;
 }
 
-/** Figures exported from the source deck, served from /public. */
 export const OPTIMIZATION_FIGURES = {
   servingStack: {
     src: '/images/agentx-optimizations/serving-stack.png',
@@ -116,13 +99,11 @@ export interface ReferenceLink {
 }
 
 export interface OptimizationSection {
-  /** Stable anchor id, used for in-page navigation and as the translation key. */
   id: string;
   heading: string;
   paragraphs: readonly string[];
   figure?: {
     key: OptimizationFigureKey;
-    /** Omit the "View full-resolution image" call to action under the caption. */
     hideFullResolutionCta?: boolean;
   } & OptimizationFigureCopy;
   prs?: readonly UpstreamPr[];
@@ -135,14 +116,10 @@ export interface OptimizationHighlight {
 }
 
 export interface OptimizationFramework {
-  /** URL segment: /agentx/optimizations/<slug>. */
   slug: string;
-  /** Product name — never translated. */
   name: string;
   layer: OptimizationLayer;
-  /** One-line description used on the index card and in page metadata. */
   summary: string;
-  /** Intro rendered above the first section on the detail page. */
   lead: string;
   highlights: readonly OptimizationHighlight[];
   sections: readonly OptimizationSection[];
@@ -158,7 +135,6 @@ export interface OptimizationsOverview {
   frameworksIntro: string;
   sections: readonly OptimizationSection[];
   layerLabels: Readonly<Record<OptimizationLayer, string>>;
-  /** Shared UI strings for both the index and the detail pages. */
   ui: {
     backToAgentX: string;
     backToOverview: string;
@@ -1058,7 +1034,6 @@ export function getOptimizationFramework(slug: string): OptimizationFramework | 
   return FRAMEWORKS.find((framework) => framework.slug === slug);
 }
 
-/** Total distinct upstream PRs referenced, used in the index-page copy. */
 export function countReferencedPrs(): number {
   const seen = new Set<string>();
   for (const section of OPTIMIZATIONS_OVERVIEW.sections) {

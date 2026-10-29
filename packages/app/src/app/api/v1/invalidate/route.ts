@@ -23,25 +23,38 @@ export async function POST(request: Request) {
     process.env.VERCEL_GIT_COMMIT_REF === 'staging' &&
     Boolean(request.headers.get('x-vercel-protection-bypass'));
 
-  if (!isProtectedStagingRequest && (!secret || !bearerMatches(authHeader, secret))) {
-    return new NextResponse('Unauthorized', { status: 401 });
+  if (!isProtectedStagingRequest) {
+    if (!secret) {
+      return new NextResponse('INVALIDATE_SECRET is not set', { status: 500 });
+    }
+    if (!bearerMatches(authHeader, secret)) {
+      return new NextResponse('Unauthorized', { status: 401 });
+    }
   }
 
-  // ?scope=collectivex or ?scope=operatorx purges only that cache scope; the
-  // default remains a full purge (which covers both).
-  const scope = new URL(request.url).searchParams.get('scope');
+  // ?scope=collectivex or ?scope=operatorx purges only that cache scope. The
+  // default full purge covers CollectiveX but not OperatorX, which only its own
+  // ingest invalidates. ?immediate=true drops cached responses outright instead
+  // of serving them once more while they refresh, for corrections and retractions.
+  const params = new URL(request.url).searchParams;
+  const scope = params.get('scope');
   if (scope && scope !== COLLECTIVEX_CACHE_SCOPE && scope !== OPERATORX_CACHE_SCOPE) {
     return NextResponse.json({ error: 'unknown scope' }, { status: 400 });
   }
+  const immediateParam = params.get('immediate');
+  if (immediateParam !== null && immediateParam !== 'true' && immediateParam !== 'false') {
+    return NextResponse.json({ error: 'immediate must be true or false' }, { status: 400 });
+  }
+  const immediate = immediateParam === 'true';
   if (scope === COLLECTIVEX_CACHE_SCOPE) {
-    purgeCollectiveX();
-    return NextResponse.json({ invalidated: true, scope });
+    purgeCollectiveX({ immediate });
+    return NextResponse.json({ invalidated: true, scope, immediate });
   }
   if (scope === OPERATORX_CACHE_SCOPE) {
-    purgeOperatorX();
-    return NextResponse.json({ invalidated: true, scope });
+    await purgeOperatorX({ immediate });
+    return NextResponse.json({ invalidated: true, scope, immediate });
   }
 
-  const blobsDeleted = await purgeAll();
-  return NextResponse.json({ invalidated: true, blobsDeleted });
+  const blobsDeleted = await purgeAll({ immediate });
+  return NextResponse.json({ invalidated: true, blobsDeleted, immediate });
 }

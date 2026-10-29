@@ -4,10 +4,6 @@ import Link from 'next/link';
 
 import { track } from '@/lib/analytics/analytics';
 
-/**
- * Analytics-instrumented link for the AgentX telemetry tutorial. The tutorial
- * pages are server components, so every tracked click goes through here.
- */
 interface AgentXTelemetryLinkProps extends Omit<React.ComponentProps<typeof Link>, 'href'> {
   href: string;
   analyticsEvent:

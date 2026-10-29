@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
+import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
+import { InferencePageIntro } from '@/components/inference/inference-page-intro';
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { enAlternates } from '@/lib/i18n/i18n';
@@ -12,17 +13,7 @@ import {
   INFERENCE_MODEL_SLUGS,
   inferenceModelPath,
 } from '@/lib/routing/inference-model-slug';
-
-/**
- * `/inference/<model>` — an indexable path form of `/inference?g_model=<model>`.
- *
- * The query form stays supported for share links, but this page gives every
- * model its own crawlable URL with model-specific metadata, a self-canonical,
- * and a `/zh` hreflang sibling. The chart body is identical to `/inference`;
- * the model is pinned from the pathname by the dashboard shell
- * (`GlobalFilterProvider` seeding via `inferenceModelForPathname`), and an
- * explicit `?g_model=` param still wins over the path pin.
- */
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 interface Props {
   params: Promise<{ model: string }>;
@@ -40,20 +31,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const enPath = inferenceModelPath(entry.slug);
   const url = `${SITE_URL}${enPath}`;
   return {
-    title: { absolute: `${title} | ${SITE_NAME} by ${AUTHOR_NAME}` },
+    title: { absolute: `${title} | ${SITE_NAME}` },
     description,
     alternates: enAlternates(enPath),
-    openGraph: {
-      title: `${title} | ${SITE_NAME}`,
-      description,
-      url,
-      type: 'website',
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: `${title} | ${SITE_NAME}`,
-      description,
-    },
+    ...socialMetadata({ title: `${title} | ${SITE_NAME}`, description, url, locale: 'en' }),
   };
 }
 
@@ -61,12 +42,12 @@ export default async function InferenceModelPage({ params }: Props) {
   const { model } = await params;
   const entry = getInferenceModelBySlug(model);
   if (!entry) notFound();
-  // Known aliases are canonicalized in next.config.ts before this SSG route
-  // renders. Keeping redirects out of the page avoids a production-only
-  // DYNAMIC_SERVER_USAGE failure when an on-demand alias reads searchParams.
   return (
-    <InferenceProvider activeTab="inference">
-      <InferenceChartDisplay />
-    </InferenceProvider>
+    <>
+      <InferencePageIntro locale="en" />
+      <InferenceProvider activeTab="inference">
+        <InferenceChartDisplay />
+      </InferenceProvider>
+    </>
   );
 }

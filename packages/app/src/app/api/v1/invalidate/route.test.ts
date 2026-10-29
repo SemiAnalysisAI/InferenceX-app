@@ -1,8 +1,9 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
-const { mockPurgeAll, mockPurgeCollectiveX } = vi.hoisted(() => ({
+const { mockPurgeAll, mockPurgeCollectiveX, mockPurgeOperatorX } = vi.hoisted(() => ({
   mockPurgeAll: vi.fn(),
   mockPurgeCollectiveX: vi.fn(),
+  mockPurgeOperatorX: vi.fn(),
 }));
 
 vi.mock('@/lib/cache/api-cache', () => ({
@@ -10,7 +11,7 @@ vi.mock('@/lib/cache/api-cache', () => ({
   OPERATORX_CACHE_SCOPE: 'operatorx',
   purgeAll: mockPurgeAll,
   purgeCollectiveX: mockPurgeCollectiveX,
-  purgeOperatorX: vi.fn(),
+  purgeOperatorX: mockPurgeOperatorX,
 }));
 
 import { POST } from './route';
@@ -67,11 +68,24 @@ describe('POST /api/v1/invalidate', () => {
     expect(res.status).toBe(401);
   });
 
-  it('returns 401 when INVALIDATE_SECRET is not set', async () => {
+  it('returns 500 when INVALIDATE_SECRET is not set', async () => {
     delete process.env.INVALIDATE_SECRET;
 
     const res = await POST(postReq({ Authorization: 'Bearer anything' }));
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(500);
+    expect(await res.text()).toBe('INVALIDATE_SECRET is not set');
+    expect(mockPurgeAll).not.toHaveBeenCalled();
+  });
+
+  it('allows the protected staging request when INVALIDATE_SECRET is not set', async () => {
+    delete process.env.INVALIDATE_SECRET;
+    process.env.VERCEL_ENV = 'preview';
+    process.env.VERCEL_GIT_COMMIT_REF = 'staging';
+    mockPurgeAll.mockResolvedValueOnce(1);
+
+    const res = await POST(postReq({ 'x-vercel-protection-bypass': 'opaque-bypass' }));
+    expect(res.status).toBe(200);
+    expect(mockPurgeAll).toHaveBeenCalledOnce();
   });
 
   it('returns 401 for length mismatch (timing-safe)', async () => {
@@ -87,7 +101,7 @@ describe('POST /api/v1/invalidate', () => {
     const res = await POST(postReq({ 'x-vercel-protection-bypass': 'opaque-bypass' }));
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ invalidated: true, blobsDeleted: 4 });
+    expect(await res.json()).toEqual({ invalidated: true, blobsDeleted: 4, immediate: false });
     expect(mockPurgeAll).toHaveBeenCalledOnce();
   });
 
@@ -117,8 +131,23 @@ describe('POST /api/v1/invalidate', () => {
     const res = await POST(postReq({ Authorization: 'Bearer test-secret-123' }));
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toEqual({ invalidated: true, blobsDeleted: 15 });
-    expect(mockPurgeAll).toHaveBeenCalledOnce();
+    expect(body).toEqual({ invalidated: true, blobsDeleted: 15, immediate: false });
+    expect(mockPurgeAll).toHaveBeenCalledExactlyOnceWith({ immediate: false });
+  });
+
+  it('hard-purges every layer when immediate=true', async () => {
+    mockPurgeAll.mockResolvedValueOnce(3);
+
+    const res = await POST(postReq({ Authorization: 'Bearer test-secret-123' }, '?immediate=true'));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ invalidated: true, blobsDeleted: 3, immediate: true });
+    expect(mockPurgeAll).toHaveBeenCalledExactlyOnceWith({ immediate: true });
+  });
+
+  it('rejects a malformed immediate flag without purging anything', async () => {
+    const res = await POST(postReq({ Authorization: 'Bearer test-secret-123' }, '?immediate=1'));
+    expect(res.status).toBe(400);
+    expect(mockPurgeAll).not.toHaveBeenCalled();
   });
 
   it('returns zero blobs deleted when cache is empty', async () => {
@@ -127,7 +156,7 @@ describe('POST /api/v1/invalidate', () => {
     const res = await POST(postReq({ Authorization: 'Bearer test-secret-123' }));
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toEqual({ invalidated: true, blobsDeleted: 0 });
+    expect(body).toEqual({ invalidated: true, blobsDeleted: 0, immediate: false });
   });
 
   it('purges only the CollectiveX scope when requested', async () => {
@@ -136,8 +165,40 @@ describe('POST /api/v1/invalidate', () => {
     );
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toEqual({ invalidated: true, scope: 'collectivex' });
-    expect(mockPurgeCollectiveX).toHaveBeenCalledOnce();
+    expect(body).toEqual({ invalidated: true, scope: 'collectivex', immediate: false });
+    expect(mockPurgeCollectiveX).toHaveBeenCalledExactlyOnceWith({ immediate: false });
+    expect(mockPurgeAll).not.toHaveBeenCalled();
+  });
+
+  it('waits for the OperatorX shared cache purge before reporting success', async () => {
+    const purge = Promise.withResolvers<void>();
+    mockPurgeOperatorX.mockReturnValueOnce(purge.promise);
+    let completed = false;
+    const pending = POST(
+      postReq({ Authorization: 'Bearer test-secret-123' }, '?scope=operatorx'),
+    ).then((response) => {
+      completed = true;
+      return response;
+    });
+    await Promise.resolve();
+    expect(mockPurgeOperatorX).toHaveBeenCalledExactlyOnceWith({ immediate: false });
+    expect(completed).toBe(false);
+    purge.resolve();
+    const response = await pending;
+    expect(await response.json()).toEqual({
+      invalidated: true,
+      scope: 'operatorx',
+      immediate: false,
+    });
+    expect(mockPurgeAll).not.toHaveBeenCalled();
+  });
+
+  it('hard-purges only the OperatorX scope when immediate=true', async () => {
+    const res = await POST(
+      postReq({ Authorization: 'Bearer test-secret-123' }, '?scope=operatorx&immediate=true'),
+    );
+    expect(await res.json()).toEqual({ invalidated: true, scope: 'operatorx', immediate: true });
+    expect(mockPurgeOperatorX).toHaveBeenCalledExactlyOnceWith({ immediate: true });
     expect(mockPurgeAll).not.toHaveBeenCalled();
   });
 

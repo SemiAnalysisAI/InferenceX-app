@@ -14,11 +14,6 @@ interface DashboardSectionHeaderProps {
   descriptionClassName?: string;
 }
 
-/**
- * Shared title row for dashboard sections. Keeping the action in a shrinkable
- * sibling makes chart controls and share actions align consistently without
- * changing the section's heading semantics or copy.
- */
 export function DashboardSectionHeader({
   title,
   description,

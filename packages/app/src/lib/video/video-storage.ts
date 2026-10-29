@@ -23,7 +23,6 @@ import {
   type VideoHistoryPage,
 } from '@/components/video-benchmark/history';
 
-// Media must survive the dashboard cache's prefix-wide purge.
 const PREFIX = 'h3-video-media/v1';
 export const videoStorageEnabled = () => Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 const runPrefix = (runId: string) => `${PREFIX}/runs/${runId}/`;
@@ -135,8 +134,6 @@ export async function readStoredArtifact(
     const result: StoredArtifact = await response.json();
     if (result.storageVersion !== 1 || result.runId !== runId || result.artifact.id !== artifact.id)
       throw new Error('Stored artifact identity mismatch');
-    // Serving cells already carry verified power and memory summaries. Older
-    // indexes embedded their full logs; keep those in downloadable assets only.
     for (const source of result.sources)
       source.texts = source.texts.filter(
         ([path]) => path === 'report/index.html' || legacyTelemetry(path) || sourceSeal(path),
@@ -238,7 +235,6 @@ export async function storeVideoArtifact(
     artifact: { ...artifact, stored: true },
     sources,
   };
-  // Publish the index last so readers cannot observe partially uploaded bundles.
   await immutable(
     `${runPrefix(runId)}${artifact.name}_${artifact.id}.json`,
     JSON.stringify(result),

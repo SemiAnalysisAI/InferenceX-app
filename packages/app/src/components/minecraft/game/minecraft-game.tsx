@@ -91,7 +91,6 @@ interface Session {
   stop: () => void;
 }
 
-/** Key codes the game handles itself; their browser defaults are suppressed while playing. */
 const GAME_KEYS = new Set([
   'Space',
   'F1',
@@ -187,9 +186,7 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
       settingsRef.current = next;
       try {
         localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
-      } catch {
-        /* storage unavailable */
-      }
+      } catch {}
       const session = sessionRef.current;
       if (session) session.game.renderDistance = next.renderDistance;
       audioRef.current?.setVolume(next.volume);
@@ -197,7 +194,6 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
     });
   }, []);
 
-  // Track the container size for GUI scaling and the renderer.
   useEffect(() => {
     const el = rootRef.current;
     if (!el) return;
@@ -226,9 +222,6 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
     setChat((c) => [...c.slice(-99), { id: chatId.current++, text, time: performance.now() }]);
   }, []);
 
-  // -------------------------------------------------------------------------
-  // Saving
-  // -------------------------------------------------------------------------
   const save = useCallback(() => {
     const s = sessionRef.current;
     if (!s) return false;
@@ -260,14 +253,10 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
     [save],
   );
 
-  // Save on unmount (dialog closed).
   const endSessionRef = useRef(endSession);
   endSessionRef.current = endSession;
   useEffect(() => () => endSessionRef.current(true), []);
 
-  // -------------------------------------------------------------------------
-  // Pointer lock
-  // -------------------------------------------------------------------------
   const lock = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas || touch) return;
@@ -275,9 +264,7 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
     try {
       const r = canvas.requestPointerLock() as unknown as Promise<void> | undefined;
       if (r && typeof r.catch === 'function') r.catch(() => undefined);
-    } catch {
-      /* not supported */
-    }
+    } catch {}
   }, [touch]);
 
   useEffect(() => {
@@ -303,12 +290,8 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
     return () => document.removeEventListener('pointerlockchange', onChange);
   }, [phase, setOverlay]);
 
-  // -------------------------------------------------------------------------
-  // Session lifecycle
-  // -------------------------------------------------------------------------
   const startWorld = useCallback(
     (meta: WorldMeta, data: ReturnType<typeof loadWorld>) => {
-      // Renderer disposal loses its WebGL context; a new world needs a new canvas.
       setCanvasGeneration((generation) => generation + 1);
       pendingRef.current = { meta, data };
       setProgress(0);
@@ -318,8 +301,6 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
     },
     [setOverlay],
   );
-  // A listed world whose save is missing or unreadable is never started (starting would
-  // save a fresh world over it); the list shows an error instead.
   const playWorld = useCallback(
     (meta: WorldMeta) => {
       const data = loadWorld(meta.id);
@@ -450,7 +431,6 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
           setProgress(pct);
           if (game.spawnReady() && renderer.meshedChunks >= target) {
             loadingDone = true;
-            // Never start inside terrain.
             const p = game.player;
             for (let i = 0; i < 128; i++) {
               const bx = Math.floor(p.x);
@@ -480,7 +460,6 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
           overlayRef.current === 'ending';
         let alpha = 1;
         if (!paused) alpha = game.update(dt, buildInput());
-        // Events.
         const p = game.player;
         for (const ev of game.events.splice(0)) {
           switch (ev.type) {
@@ -524,12 +503,10 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
             }
           }
         }
-        // Mining crumbs.
         if (game.breakProgress > 0 && game.target && ++hitParticle % 3 === 0) {
           const tg = game.target;
           renderer.addHitParticle(tg.x, tg.y, tg.z, tg.face, tg.id);
         }
-        // Held item name pop-up.
         const held = game.held;
         const heldKey = held?.id ?? '';
         if (game.selected !== lastSelected.current || heldKey !== lastHeld.current) {
@@ -559,15 +536,11 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
       raf = requestAnimationFrame(frame);
     })();
     return () => {
-      // Once the session exists its loop is owned by session.stop(), not this effect.
       cancelled = true;
       if (!sessionStarted) cancelAnimationFrame(raf);
     };
   }, [phase, locale, pushChat, save, setOverlay, t]);
 
-  // -------------------------------------------------------------------------
-  // Keyboard
-  // -------------------------------------------------------------------------
   const closeScreen = useCallback(() => {
     const s = sessionRef.current;
     if (!s) return;
@@ -662,7 +635,6 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
     };
   }, [phase, closeScreen, openChat]);
 
-  // Warn before closing the tab mid-game (Ctrl+W is close to the movement keys).
   useEffect(() => {
     if (phase !== 'playing') return;
     const before = (e: BeforeUnloadEvent) => {
@@ -673,9 +645,6 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
     return () => window.removeEventListener('beforeunload', before);
   }, [phase, save]);
 
-  // -------------------------------------------------------------------------
-  // Mouse
-  // -------------------------------------------------------------------------
   useEffect(() => {
     if (phase !== 'playing') return;
     const move = (e: MouseEvent) => {
@@ -718,9 +687,6 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
     else if (e.button === 2) mouse.current.use = false;
   };
 
-  // -------------------------------------------------------------------------
-  // Chat
-  // -------------------------------------------------------------------------
   const submitChat = () => {
     const s = sessionRef.current;
     const text = chatText.trim();
@@ -736,15 +702,11 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
     lock();
   };
 
-  // -------------------------------------------------------------------------
-  // Escape (wired to the dialog)
-  // -------------------------------------------------------------------------
   const handleEscape = useCallback((): boolean => {
     if (phase === 'worlds' || phase === 'create' || phase === 'options') {
       setPhase(phase === 'create' ? 'worlds' : 'title');
       return true;
     }
-    // Never close mid-load; the session is being created.
     if (phase === 'loading') return true;
     if (phase !== 'playing') return false;
     const s = sessionRef.current;
@@ -774,17 +736,12 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
     return true;
   }, [phase, closeScreen, lock, setOverlay]);
 
-  // Layout effect: the handler must match the phase before the browser can paint it,
-  // otherwise an Escape right after `playing` renders would close the dialog.
   useLayoutEffect(() => {
     const el = rootRef.current;
     if (!el) return;
     (el as HTMLDivElement & { mcEscape?: () => boolean }).mcEscape = handleEscape;
   }, [handleEscape]);
 
-  // -------------------------------------------------------------------------
-  // Dev/test hooks
-  // -------------------------------------------------------------------------
   useEffect(() => {
     if (process.env.NODE_ENV === 'production') return;
     const w = window as unknown as Record<string, unknown>;
@@ -828,9 +785,6 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
     };
   }, [phase]);
 
-  // -------------------------------------------------------------------------
-  // Touch controls
-  // -------------------------------------------------------------------------
   const lookTouch = useRef<{
     id: number;
     x: number;
@@ -876,7 +830,6 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
     lookTouch.current = null;
     touchInput.current.attack = false;
     if (quick) {
-      // Tap: use or place, like Bedrock touch controls.
       touchInput.current.use = true;
       window.setTimeout(() => {
         touchInput.current.use = false;
@@ -929,9 +882,6 @@ export function MinecraftGame({ locale, onExit }: { locale: Locale; onExit: () =
     },
   });
 
-  // -------------------------------------------------------------------------
-  // Render
-  // -------------------------------------------------------------------------
   const session = sessionRef.current;
   const game = session?.game ?? null;
   const s = guiScale;
@@ -1730,9 +1680,7 @@ function OptionsPanel({
             setSoundOn(next);
             try {
               localStorage.setItem('minecraft-sound', String(next));
-            } catch {
-              /* storage unavailable */
-            }
+            } catch {}
             window.dispatchEvent(new CustomEvent('minecraft-sound-toggle'));
           }}
         >
@@ -1817,7 +1765,6 @@ function completeCommand(text: string) {
   return COMMANDS.find((c) => c.startsWith(text)) ?? text;
 }
 
-/** Mouse look with vanilla's sensitivity curve. */
 function look(game: Game, dx: number, dy: number, sensitivity: number) {
   const f = sensitivity * 0.6 + 0.2;
   const k = f * f * f * 8 * 0.15 * (Math.PI / 180);

@@ -1,9 +1,11 @@
 'use client';
 
 import * as d3 from 'd3';
+import { comparisonDefaults } from '@semianalysisai/inferencex-db/operatorx/visualization';
 import { useMemo, useState } from 'react';
 
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { track } from '@/lib/analytics/analytics';
 
 import { EmptyChart } from '../charts/empty';
 import { OpxChart, esc, HardwareLegend, tooltipHtml } from '../charts/kit';
@@ -27,7 +29,11 @@ function MetricVsSize({ model }: { model: ComparisonModel }) {
     [view],
   );
   const [slice, setSlice] = useState<string | null>(null);
-  const current = groups.find(([k]) => k === slice) ?? groups[0];
+  const defaults = view.defaults ?? comparisonDefaults(view);
+  const current =
+    groups.find(([k]) => k === slice) ??
+    groups.find(([k]) => k === defaults.metricVsSizeSlice) ??
+    groups[0];
   const points = useMemo<Point[]>(
     () =>
       current
@@ -55,7 +61,10 @@ function MetricVsSize({ model }: { model: ComparisonModel }) {
         size="sm"
         searchable
         value={current[0]}
-        onValueChange={setSlice}
+        onValueChange={(value) => {
+          track('operatorx_metric_vs_size_slice_selected', { slice: value, metric: metric.id });
+          setSlice(value);
+        }}
         triggerAriaLabel="Shape"
         groups={[
           {

@@ -45,7 +45,6 @@ const GUIDE_COLORS: Record<string, string> = {
   p95: '#ef4444',
 };
 
-/** Keep the existing p95 + 10% cutoff; the omitted tail is reported below the chart. */
 export function buildHistogram(entries: HistogramEntry[], bucketCount: number): HistogramBucket[] {
   if (entries.length === 0) return [];
   const sorted = [...entries].toSorted((a, b) => a.value - b.value);

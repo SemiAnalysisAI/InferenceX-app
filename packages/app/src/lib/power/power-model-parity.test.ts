@@ -1,10 +1,3 @@
-/**
- * The TypeScript power model (./power_model) is a file-for-file port of the
- * InferenceX Python package. These tests hold it to the pinned upstream revision:
- * every module has a counterpart, and the port reproduces upstream's own output
- * (scripts/generate-power-model-parity.py) for every catalog system and state and
- * for seeded random inputs.
- */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
@@ -54,7 +47,6 @@ interface ParityReport {
   text: string;
 }
 
-// Read rather than import: a typed import of the 1.4 MB fixture slows type-checking.
 const parity = JSON.parse(readFileSync(join(__dirname, 'power-model.parity.json'), 'utf8')) as {
   modelRevision: string;
   provenances: JsonValue[];
@@ -65,7 +57,6 @@ const parity = JSON.parse(readFileSync(join(__dirname, 'power-model.parity.json'
 };
 const { cases } = parity;
 
-/** Upstream modules by port path: `a/b.py` → `a/b.ts`, `a/__init__.py` → `a/index.ts`. */
 function portPath(pythonFile: string): string {
   return pythonFile.replace(/(?<dir>^|\/)__init__\.py$/, '$<dir>index.ts').replace(/\.py$/, '.ts');
 }
@@ -89,7 +80,6 @@ function expand(node: CompactNode): JsonValue {
   };
 }
 
-/** Structural equality, with numbers equal to a relative 1e-12. */
 function expectClose(actual: unknown, expected: unknown, path = '$'): void {
   if (typeof expected === 'number' && typeof actual === 'number') {
     const tolerance = Math.max(Math.abs(expected), Math.abs(actual)) * REL_TOL;

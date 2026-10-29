@@ -29,8 +29,6 @@ import {
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 
-// ── i18n ────────────────────────────────────────────────────────────────
-
 const STRINGS = {
   en: {
     summary: 'Summary',
@@ -129,7 +127,6 @@ const STRINGS = {
   },
 };
 
-// Mirror HARNESS_BUCKETS_PER_DECADE and SESSION_METRIC_PER_DECADE in packages/db/src/harnesses.ts.
 const PER_DECADE = 10;
 const SESSION_METRIC_PER_DECADE: Record<SessionMetric, number> = {
   prompt: PER_DECADE,
@@ -164,8 +161,6 @@ function byHarness<T extends { harness: Harness }>(rows: T[]): Map<Harness, T[]>
   return map;
 }
 
-// ── Layout pieces ────────────────────────────────────────────────
-
 function SectionHeader({ label, detail }: { label: string; detail?: string }) {
   return (
     <div className="flex items-center gap-2 mb-2">
@@ -178,7 +173,6 @@ function SectionHeader({ label, detail }: { label: string; detail?: string }) {
   );
 }
 
-/** Chart card in the house style: controls row, then the chart. */
 function ChartFrame({
   title,
   detail,
@@ -261,8 +255,6 @@ function HarnessHead({ harness }: { harness: Harness }) {
     </th>
   );
 }
-
-// ── Summary ──────────────────────────────────────────────────────
 
 interface SummaryRow {
   label: string;
@@ -350,7 +342,6 @@ function SummaryTable({
         { label: strings.outputTokensP50, value: (h) => q(output.get(h), 0.5) },
         { label: strings.outputTokensP95, value: (h) => q(output.get(h), 0.95) },
         {
-          // Bucket 13 starts at 10^1.3 ≈ 20 tokens; zero-token responses sit in bucket -1.
           label: strings.responsesLt20OutputTokens,
           value: (h) => {
             const out = output.get(h) ?? [];
@@ -397,8 +388,6 @@ function SummaryTable({
     </div>
   );
 }
-
-// ── Tool calls per response ──────────────────────────────────────
 
 const CALL_ORDER = ['0', '1', '2', '3', '4+'];
 
@@ -447,9 +436,6 @@ function ToolCallsTable({ shares, callsLabel }: { shares: HarnessShare[]; callsL
   );
 }
 
-// ── Histograms ───────────────────────────────────────────────────
-
-/** Decade ticks, plus 3× ticks when the axis spans few decades. */
 function logTicks(lo: number, hi: number): number[] {
   const ticks: number[] = [];
   for (let d = Math.ceil(lo); d <= Math.floor(hi); d++) {
@@ -459,11 +445,6 @@ function logTicks(lo: number, hi: number): number[] {
   return ticks;
 }
 
-/**
- * One histogram row per harness on a shared log axis. Bar height is the share
- * of that harness's items in the bucket, on one scale across rows; the tick
- * marks the median.
- */
 function HarnessHistogram({
   buckets,
   perDecade,
@@ -486,8 +467,6 @@ function HarnessHistogram({
   const svgRef = useRef<SVGSVGElement>(null);
   const positive = buckets.filter((b) => b.bucket >= 0);
   const harnesses = presentHarnesses(positive);
-  // Axis spans every harness's p1–p99, rounded out to whole decades; the tails
-  // fold into the edge bars so each row still sums to 100%.
   const raw = byHarness(positive);
   const edge = (q: number) =>
     harnesses.map((h) => Math.log10(bucketQuantile(raw.get(h) ?? [], perDecade, q) ?? 1));
@@ -518,7 +497,7 @@ function HarnessHistogram({
       detail={detail}
       locale={locale}
       onExport={() => {
-        track('agentic_workload_harness_histogram_export', { title, filename });
+        track('agentic_workload_harness_histogram_export', { title, file_name: filename });
         if (svgRef.current)
           exportSvgToPng(svgRef.current, {
             title,
@@ -610,8 +589,6 @@ function HarnessHistogram({
     </ChartFrame>
   );
 }
-
-// ── Page ─────────────────────────────────────────────────────────
 
 export default function HarnessesPage() {
   return (

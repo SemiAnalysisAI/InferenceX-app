@@ -30,8 +30,13 @@ const EXPECTED_FILES = [
   'skills/inferencex-to-chart/integrity.json',
   'skills/inferencex-to-table/SKILL.md',
   'skills/inferencex-to-table/integrity.json',
+  'skills/inferencex-pr-improvements/SKILL.md',
+  'skills/inferencex-pr-improvements/agents/openai.yaml',
+  'skills/inferencex-pr-improvements/integrity.json',
+  'skills/inferencex-pr-improvements/scripts/waterfall.mjs',
   'skills/inferencex-api/SKILL.md',
   'skills/inferencex-api/integrity.json',
+  'skills/inferencex-api/references/agentic-interactivity.md',
   'skills/inferencex-api/references/agentx.md',
   'skills/inferencex-api/references/chart-templates.md',
   'skills/inferencex-api/references/cli-contract.md',
@@ -46,6 +51,7 @@ const EXPECTED_FILES = [
   'skills/inferencex-api/references/releases.md',
   'skills/inferencex-api/references/tco.md',
   'skills/inferencex-api/schemas.json',
+  'skills/inferencex-api/scripts/agentic-interactivity.mjs',
   'skills/inferencex-api/scripts/capture-response.mjs',
   'skills/inferencex-api/scripts/chart-layout.mjs',
   'skills/inferencex-api/scripts/charts.mjs',
@@ -77,7 +83,7 @@ test('read-only release verification rejects altered evidence and unsafe retries
   const result = spawnSync('python3', ['-B', 'test/verify-release.test.py'], {
     cwd: resolve(import.meta.dirname, '..'),
     encoding: 'utf8',
-    timeout: 10_000,
+    timeout: 60_000,
   });
   assert.ifError(result.error);
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);

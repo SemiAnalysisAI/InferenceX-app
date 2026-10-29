@@ -15,7 +15,7 @@ import {
 
 import { useFeedbackList } from '@/hooks/api/use-feedback-list';
 import type { FeedbackListRow } from '@/lib/api/api';
-import { track } from '@/lib/analytics/analytics';
+import { track, trackOncePerPageview } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { relockFeatureGate } from '@/lib/runtime/use-feature-gate';
 import { Button } from '@/components/ui/button';
@@ -139,7 +139,7 @@ export default function FeedbackViewer() {
   const [keyError, setKeyError] = useState<string | null>(null);
 
   useEffect(() => {
-    track('feedback_viewer_page_viewed');
+    trackOncePerPageview('feedback_viewer_page_viewed');
   }, []);
 
   const cipher = useMemo(() => (cipherKey ? createCipher(cipherKey) : null), [cipherKey]);
@@ -249,7 +249,7 @@ export default function FeedbackViewer() {
                 type="button"
                 onClick={() => {
                   setShowKey((v) => !v);
-                  track('feedback_viewer_key_visibility_toggled', { visible: !showKey });
+                  track('feedback_viewer_key_visibility_toggled', { enabled: !showKey });
                 }}
                 aria-label={showKey ? t.hideKey : t.showKey}
                 className="absolute right-0 top-0 flex size-11 items-center justify-center text-muted-foreground hover:text-foreground sm:size-9"

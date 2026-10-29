@@ -12,13 +12,11 @@ import { encodeRequestChartData, getRequestChartData } from './request-chart-dat
 import { getRequestTimeline, getStoredRequestTimelineGz } from './request-timeline';
 import { getTraceHistograms } from './trace-histograms';
 
-// Expose the self-heal promise so the test can await the real write-back.
 vi.mock('./agentic-shared', async (importOriginal) => {
   const actual = await importOriginal<typeof agenticShared>();
   return { ...actual, writeBackRequestTimeline: vi.fn(actual.writeBackRequestTimeline) };
 });
 
-/** A small timeline whose request fields differ by `seed`. */
 function timelineFor(seed: number): RequestTimeline {
   return {
     version: REQUEST_TIMELINE_VERSION,
@@ -46,7 +44,6 @@ function timelineFor(seed: number): RequestTimeline {
   };
 }
 
-/** Expected histogram arrays: the numeric ISL/OSL values in request order. */
 function sequenceLengths(timeline: RequestTimeline): { isl: number[]; osl: number[] } {
   return {
     isl: timeline.requests.flatMap((request) => (request.isl === null ? [] : [request.isl])),
@@ -57,8 +54,6 @@ function sequenceLengths(timeline: RequestTimeline): { isl: number[]; osl: numbe
 const legacyOnly = timelineFor(1);
 const gzipOnly = timelineFor(2);
 const gzipCopy = timelineFor(3);
-// Same version, different content: only a reader that consults the legacy
-// copy despite a gzip copy could return it.
 const supersededLegacy = timelineFor(4);
 
 let db: PGlite;
@@ -91,7 +86,6 @@ beforeAll(async () => {
       ${REQUEST_TIMELINE_VERSION}, 4
     )
   `;
-  // A stale legacy timeline next to the raw profile it was computed from.
   const profile = gzipSync(
     JSON.stringify({
       metadata: {
@@ -136,7 +130,6 @@ describe('request timeline storage on PostgreSQL', () => {
   });
 
   it('encodes identical chart tuples from the SQL projection and the gzip decode', async () => {
-    // Point 101 is a small legacy row, so it takes the SQL projection.
     await expect(getRequestChartData(sql, 101)).resolves.toEqual(
       encodeRequestChartData(legacyOnly, legacyOnly.requests),
     );
@@ -149,8 +142,6 @@ describe('request timeline storage on PostgreSQL', () => {
   });
 
   it('scans PostgreSQL JSONB text above the projection limit into the same tuples', async () => {
-    // A one-request limit sends point 101's four-request legacy timeline
-    // through the bounded text scan of `request_timeline::text`.
     await expect(getRequestChartData(sql, 101, 1)).resolves.toEqual(
       encodeRequestChartData(legacyOnly, legacyOnly.requests),
     );
@@ -187,7 +178,6 @@ describe('request timeline storage on PostgreSQL', () => {
     expect(row!.request_timeline_version).toBe(REQUEST_TIMELINE_VERSION);
     expect(row!.request_count).toBe(1);
     expect(row!.legacy_version).toBe(REQUEST_TIMELINE_VERSION - 1);
-    // The next read takes the gzip fast path instead of recomputing.
     await expect(getRequestTimeline(sql, 104)).resolves.toEqual(result);
     expect(writeBack).toHaveBeenCalledTimes(1);
   });

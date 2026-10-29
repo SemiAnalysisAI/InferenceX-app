@@ -3,14 +3,28 @@
 import { useSyncExternalStore } from 'react';
 import { isEmbedPathname } from '../embed/embed-route';
 
-export type EasterEggTheme = 'minecraft' | 'csgo' | 'gta' | 'doom' | 'halo';
-const themes: EasterEggTheme[] = ['minecraft', 'csgo', 'gta', 'doom', 'halo'];
+export type EasterEggTheme =
+  | 'minecraft'
+  | 'csgo'
+  | 'gta'
+  | 'doom'
+  | 'halo'
+  | 'orange-chicken'
+  | 'excalidraw';
+const themes: EasterEggTheme[] = [
+  'minecraft',
+  'csgo',
+  'gta',
+  'doom',
+  'halo',
+  'orange-chicken',
+  'excalidraw',
+];
 const listeners = new Set<() => void>();
 let observer: MutationObserver | undefined;
 
 function snapshot(): EasterEggTheme | null {
   const root = document.documentElement;
-  // The saved theme can be applied before a streamed embed stamps its boot attribute.
   if (isEmbedPathname(window.location.pathname) || Object.hasOwn(root.dataset, 'inferencexEmbed'))
     return null;
   return themes.find((theme) => root.classList.contains(theme)) ?? null;
@@ -36,7 +50,6 @@ function subscribe(listener: () => void) {
 
 const serverSnapshot = () => null;
 
-/** One shared observer; no theme content or side effects during SSR. */
 export function useEasterEggTheme() {
   return useSyncExternalStore(subscribe, snapshot, serverSnapshot);
 }

@@ -16,33 +16,33 @@ import { useLocale } from '@/lib/i18n/use-locale';
 const STRINGS = {
   en: {
     title: 'ubenchX Microbenchmarks (Beta)',
-    subtitle: 'Low-level GPU microbenchmarks measuring fundamental hardware characteristics.',
+    subtitle:
+      'Low-level accelerator microbenchmarks measuring fundamental hardware characteristics.',
     test: 'Microbenchmark',
     testTooltip: 'The ubenchX microbenchmark to display.',
     memBwTitle: 'HBM Bandwidth',
-    smL2Title: 'SM-SM L2 Latency Difference',
-    tpcSkylineTitle: 'TPC Skyline',
+    tpcSkylineTitle: 'TPC Skyline & SKU configurations',
+    coreProfilesTitle: 'Core memory-access profiles',
   },
   zh: {
     title: 'ubenchX 微基准测试（Beta）',
-    subtitle: '底层 GPU 微基准测试，测量基础硬件特性。',
+    subtitle: '底层加速器微基准测试，测量基础硬件特性。',
     test: '微基准测试',
     testTooltip: '要显示的 ubenchX 微基准测试。',
     memBwTitle: 'HBM 带宽',
-    smL2Title: 'SM 间 L2 延迟差异',
-    tpcSkylineTitle: 'TPC Skyline',
+    tpcSkylineTitle: 'TPC Skyline 与 SKU 配置',
+    coreProfilesTitle: '核心访存特征',
   },
 } as const;
 
 export const UBENCHX_TESTS = [
   { slug: 'mem-bw', titleKey: 'memBwTitle' },
-  { slug: 'sm-l2-distance', titleKey: 'smL2Title' },
   { slug: 'tpc-skyline', titleKey: 'tpcSkylineTitle' },
+  { slug: 'core-memory-profiles', titleKey: 'coreProfilesTitle' },
 ] as const;
 
 export type UbenchxTestSlug = (typeof UBENCHX_TESTS)[number]['slug'];
 
-/** Shared ubenchX page header: title plus a selector that switches between test views. */
 export function UbenchxHub({ current }: { current: UbenchxTestSlug }) {
   const locale = useLocale();
   const router = useRouter();
@@ -66,7 +66,9 @@ export function UbenchxHub({ current }: { current: UbenchxTestSlug }) {
           }}
         >
           <SelectTrigger id="ubenchx-test-select" data-testid="ubenchx-test-select">
-            <SelectValue />
+            <SelectValue>
+              {t[UBENCHX_TESTS.find((test) => test.slug === current)!.titleKey]}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {UBENCHX_TESTS.map((test) => (

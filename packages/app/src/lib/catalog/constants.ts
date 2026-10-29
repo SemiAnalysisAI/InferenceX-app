@@ -1,6 +1,5 @@
 import { HW_REGISTRY, resolveFrameworkPartLabel } from '@semianalysisai/inferencex-constants';
 
-/** d3.schemeTableau10 — 10-color categorical palette for tracked configs. */
 export const TABLEAU_10 = [
   '#4e79a7',
   '#f28e2c',
@@ -23,22 +22,14 @@ export interface GpuSpecs {
 
 export type TcoBasis = 'external' | 'internal';
 
-/** App-wide TCO basis when no explicit selection or share-link param is present. */
 export const DEFAULT_TCO_BASIS: TcoBasis = 'internal';
 
 const DEFAULT_SPECS: GpuSpecs = { tdp: 0, power: 0, costh: 0, costr: 0 };
 
-/**
- * Look up power/cost specs for a hardware key by extracting the base GPU name.
- * Splits on '_' or '-' to get the base (e.g. "h100_vllm" -> "h100").
- */
 export function getGpuSpecs(hwKey: string, basis: TcoBasis = DEFAULT_TCO_BASIS): GpuSpecs {
   const base = hwKey.split(/[-_]/u)[0];
   const entry = HW_REGISTRY[base];
   if (!entry) return DEFAULT_SPECS;
-  // The TCO basis only reprices the owning tier: Google's internal owner cost vs
-  // what an external buyer pays. The rental tier is a customer renting from GCP
-  // at the 3-year commit rate, which does not change with the basis.
   const internalCost = base === 'tpuv7' ? 1.03 : undefined;
   return {
     tdp: entry.tdp,
@@ -48,7 +39,6 @@ export function getGpuSpecs(hwKey: string, basis: TcoBasis = DEFAULT_TCO_BASIS):
   };
 }
 
-/** Build the vendor prefix string for the `gpu` tooltip field. */
 function getVendorPrefix(base: string): string {
   const entry = HW_REGISTRY[base];
   if (!entry) return 'Unknown';
@@ -61,7 +51,6 @@ export interface HardwareEntry {
   suffix: string;
   gpu: string;
   framework?: string;
-  /** Keep precision in curve labels even when the filter selects one precision. */
   alwaysShowPrecision?: boolean;
 }
 
@@ -72,13 +61,6 @@ const UNKNOWN_HARDWARE: HardwareEntry = {
   gpu: 'Unknown Hardware',
 };
 
-/**
- * Build a hardware config entry from a key like "h100_dynamo-trt_mtp".
- * Derives all display fields from GPU_KEYS/GPU_VENDORS + FRAMEWORK_LABELS.
- *
- * `model` (frontend display name) enables per-model suffix overrides — e.g. M3's
- * `mtp` token renders as "EAGLE" rather than the generic "MTP".
- */
 function buildHardwareEntry(hwKey: string, model?: string): HardwareEntry | null {
   const base = hwKey.split('_')[0];
   const reg = HW_REGISTRY[base];
@@ -86,7 +68,7 @@ function buildHardwareEntry(hwKey: string, model?: string): HardwareEntry | null
 
   const parts = hwKey.split('_').slice(1);
   const label = reg.label;
-  const gpuName = base.toUpperCase(); // always raw uppercase for gpu string
+  const gpuName = base.toUpperCase();
   const isJulyRubinSnapshot = base === 'vr200' && parts[0] === 'rubin-july';
   const partLabels =
     base === 'vr200' && parts[0] === 'coreweave-vera-rubin'
@@ -102,14 +84,6 @@ function buildHardwareEntry(hwKey: string, model?: string): HardwareEntry | null
   };
 }
 
-/**
- * Maps a canonical GPU key to one or more legacy/alias keys whose data should be
- * merged in transparently. When a user selects the canonical key, availability and
- * chart data from alias keys is included and the alias hwKey is remapped to canonical.
- *
- * Use case: the GB200 NVL72 TRT backend was renamed from `trtllm` → `trt` around
- * Dec 7 2025, splitting the date history across two keys in availability.json.
- */
 export const GPU_KEY_ALIASES: Record<string, string[]> = {
   'gb200_dynamo-trt': ['gb200_dynamo-trtllm'],
   'gb200_dynamo-trt_mtp': ['gb200_dynamo-trtllm_mtp'],
@@ -117,10 +91,6 @@ export const GPU_KEY_ALIASES: Record<string, string[]> = {
   'gb300_dynamo-trt_mtp': ['gb300_dynamo-trtllm_mtp'],
 };
 
-/**
- * Inverse map: alias key → canonical key. Derived from GPU_KEY_ALIASES.
- * Used for O(1) hwKey remapping when filtering chart data.
- */
 export const GPU_ALIAS_TO_CANONICAL: Record<string, string> = Object.fromEntries(
   Object.entries(GPU_KEY_ALIASES).flatMap(([canonical, aliases]) =>
     aliases.map((alias) => [alias, canonical]),
@@ -132,34 +102,20 @@ export function getModelSortIndex(hwKey: string): number {
   return entry?.sort ?? Object.keys(HW_REGISTRY).length;
 }
 
-/** Returns true if the base GPU in a hardware key is recognized. */
 export function isKnownGpu(hwKey: string): boolean {
   return hwKey.split('_')[0] in HW_REGISTRY;
 }
 
-/**
- * True when `hwKey` is exactly this registry GPU key or a framework / disagg /
- * spec variant (`{base}_…`), matching the legend prefix rules used elsewhere.
- */
 export function hardwareKeyMatchesBase(hwKey: string, baseGpuKey: string): boolean {
   return hwKey === baseGpuKey || hwKey.startsWith(`${baseGpuKey}_`);
 }
 
-/** True when `hwKey` matches any of the given base registry keys (e.g. compare pages). */
 export function hardwareKeyMatchesAnyBase(hwKey: string, baseGpuKeys: readonly string[]): boolean {
   return baseGpuKeys.some((b) => hardwareKeyMatchesBase(hwKey, b));
 }
 
-/** Cache for buildHardwareEntry results. */
 const hwCache = new Map<string, HardwareEntry>();
 
-/**
- * Get hardware config for a GPU key, building it dynamically from shared GPU constants + FRAMEWORK_LABELS.
- * Returns UNKNOWN_HARDWARE for unrecognized base GPUs.
- *
- * Pass `model` (frontend display name) to apply per-model suffix overrides
- * (e.g. M3 `mtp` → "EAGLE"). Omitting it preserves the generic labels.
- */
 export function getHardwareConfig(hwKey: string, model?: string): HardwareEntry {
   const cacheKey = model ? `${model}|${hwKey}` : hwKey;
   const cached = hwCache.get(cacheKey);

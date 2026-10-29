@@ -1,43 +1,39 @@
 # InferenceX Docs
 
-Design rationale and non-obvious conventions. See [CLAUDE.md](../CLAUDE.md) for the quick-start project guide.
+Design rationale and non-obvious conventions. Repo-wide rules are in [AGENTS.md](../AGENTS.md).
 
 ## Docs
 
-- [App Source Organization](./source-organization.md) — Component/provider ownership, library domains, and import/refactor conventions
+- [App Source Organization](./source-organization.md) covers import and refactor conventions for app source.
 
-- [Presentation Themes](./themes.md): Minecraft activation and assets, CS:GO, GTA and Halo styling, Halo theme music, single-button theme toggle, dark-chart/export integration, and presentation-only API exclusion.
-- [Playable Minecraft](./minecraft-game.md): the opt-in game launched from the Minecraft theme, controls, saves, lifecycle and verification.
+- [API Skill Examples](./inferencex-api-examples.md) shows how to install the public API skill, query benchmarks, and export measured PowerX data.
+- [PowerX System Power](./powerx-system-power.md) covers the modeled chassis and rack power, its assumptions, and the offline comparison export.
+- [PowerX Permanent View](./powerx-permanent-view.md) covers the measured-energy power metrics, their share links, and the power timeline.
+- [PowerX Tutorial](./powerx-tutorial.md) covers the `.mdx` source behind `/powerx/tutorial`, its syntax, and its widgets.
+- [API Skill Releases](./inferencex-skills-release.md) is the runbook for preparing, verifying, publishing, and recovering `inferencex-skills` releases.
+- [API Skill Discovery](./inferencex-skills-discovery.md) is the acceptance protocol for implicit skill discovery in fresh Codex and Claude Code projects.
+- [CLI Compatibility](./inferencex-cli-compatibility.md) covers the CLI contract, exit semantics, platform scope, and legacy migration.
 
-- [Dashboard Read-only Views](./dashboard-readonly-views.md): API/filter inventory, source audit and verification scope
-- [Pareto Boundary API](./pareto-api.md): Query frontier and hinterland observations, preserve provenance, and distinguish API scope from chart highlights.
+- [Architecture](./architecture.md) explains the client-first data flow, deliberate API exceptions, URL state, and caching choices.
+- [D3 Charts](./d3-charts.md) covers render phases, zoom and tooltip behavior, animation, and Pareto highlights.
+- [Video History](./video-history.md) covers the read-only published H3 catalog, source identity, metric boundaries, and retained-data replay.
+- [VideoGenX dashboard](./videogenx-dashboard.md) covers shared workload selection, deployment metrics, Compare, and missing-data rules.
+- [Data Pipeline](./data-pipeline.md) covers DB schema and migration rules, ETL design, audited purges and backfills, and agentic and PowerX storage.
+- [Ingesting Runs](./ingesting-runs.md) is the runbook for manually ingesting a GitHub Actions benchmark run.
+- [Deployment Configuration](./deployment-configuration.md) lists the environment variables, GitHub variables, and GitHub secrets the app and workflows read, and which of them are required.
+- [GPU Specs](./gpu-specs.md) covers unit conventions, topology invariants, and hardware gotchas.
+- [TCO Calculator](./tco-calculator.md) covers the calculator's interpolation, cost metrics, unofficial-run overlays, and estimator design.
+- [Adding Entities](./adding-entities.md) has the checklists for adding models, GPUs, precisions, sequences, and frameworks.
+- [Testing](./testing.md) covers test requirements, quality standards, and the pre-commit checklist.
+- [Site Search](./site-search.md) covers how header search indexes and ranks pages, plus its performance and SEO guarantees.
+- [Typography](./typography.md) covers type tokens, heading components, chart font sizes, and the `check:typography` gate.
+- [Data Transforms](./data-transforms.md) covers power boundaries, prefix-cache tier shares, and hardware-key gotchas in the chart data pipeline.
+- [State Ownership](./state-ownership.md) explains where shared chart state lives and how URL state is restored across navigation.
+- [Blog](./blog.md) covers MDX content, frontmatter and scheduled publishing, captions, heading IDs, and math.
+- [CollectiveX](./collectivex.md) covers the separate Neon database filled by uploading results directories, run identity and merging, the ingest CLI and maintenance workflow, the operator runbook, and the shared reader.
+- [Chinese Pages (/zh)](./i18n.md) explains why /zh pages are hand-authored and how hreflang and blog translation pairing work.
+- [Chinese Copy Editorial Guide](./chinese-copy.md) covers audience, register, terminology, the review workflow, and the PR checklist for Chinese copy.
 
-- [API Skill Examples](./inferencex-api-examples.md) — Install the public skill, query benchmarks, export measured PowerX data, and explain empty results
-- [PowerX System Power](./powerx-system-power.md) — Pinned chassis and NVL72 rack models, NVL72 Grace-socket gate, measured-input guards, assumptions, and reproducible article exports
-- [PowerX Permanent View](./powerx-permanent-view.md) — Power boundaries as gated Measured Energy metrics, `i_metric`/`i_rulers` share links, missing-value states
-- [API Skill Releases](./inferencex-skills-release.md) — Prepare an immutable package, verify clean installations and agent exports, and publish through the package-specific workflow
-- [API Skill Discovery](./inferencex-skills-discovery.md) — Accept or reject implicit skill discovery in fresh Codex and Claude Code projects
-- [CLI Compatibility](./inferencex-cli-compatibility.md) — Contract 1 schemas, bundle and exit semantics, platform scope, and legacy migration
-- [CLI Release Checklist](./inferencex-cli-release-checklist.md) — Candidate evidence and ordered publication gates
-
-- [Architecture](./architecture.md) — Why client-first, route navigation, URL state, provider nesting, server-side caching (unstable_cache + blob), in-memory client cache, color system, analytics enforcement
-- [D3 Charts](./d3-charts.md) — Why 4 effects, in-place mutation, refs for zoom, rAF throttling, HTML tooltips, Pareto directions, gradient labels
-- [Video History](./video-history.md) — Read-only published H3 catalog, metric boundaries, sharing, and local retained-data replay
-- [Data Pipeline](./data-pipeline.md) — DB schema reasoning, ETL design, transform pipeline, spline method choice, normalizer resolution order (model/GPU/framework)
-- [Pitfalls](./pitfalls.md) — Failure modes: token type consistency, schema evolution, empty objects, zoom loss, stale closures, disaggregated metrics, negative splines, date stamping, ref stability, cost inheritance
-- [GPU Specs](./gpu-specs.md) — Unit conventions, topology invariants, SVG layout rationale, hardware gotchas
-- [TCO Calculator](./tco-calculator.md) — Why interpolation, composite keys, cost matrix, token type bugs, badge logic, state design, Fleet Lifecycle, Profit Estimator, First-Token Limits
-- [Adding Entities](./adding-entities.md) — Step-by-step checklists for adding new models, GPUs, precisions, sequences, frameworks (ingest + constants + frontend), plus featuring a day-0 model (launch banner, modal, Quick Comparisons preset)
-- [Testing](./testing.md) — Requirements, quality standards, pre-commit checklist
-- [Site Search](./site-search.md) — Header search: live-page indexing, llms.txt seeds, progressive crawl, BM25 with concept expansion, lazy chunk, SEO and API-coverage exclusion
-- [Typography](./typography.md) — Type tokens (text-2xs/3xs, named tracking), Heading/Eyebrow components, TS-based chart font sizes, and the check:typography ratchet gate + allowlist burndown
-- [Data Transforms](./data-transforms.md) — Full pipeline from BenchmarkRow to RenderableGraph: type hierarchy, hardware key construction, derived metrics, memoization strategy, prefix-cache tier shares (`/cache-reuse`)
-- [State Ownership](./state-ownership.md) — Which context owns which state, availability filtering cascade, comparison date mechanics, URL param sync
-- [Blog](./blog.md) — MDX content system, SEO features (OG images, RSS, llms.txt, JSON-LD), TOC sidebar, reading progress, heading links, analytics events
-- [CollectiveX](./collectivex.md) — lazy ingest-on-read pipeline (separate Neon DB as a durable GitHub-artifact cache), tombstoned deletes, raw-docs storage + shared reader
-- [VideoGenX dashboard](./videogenx-dashboard.md) — `/video` cross-hardware chart: published-history projection → points → metrics, TCO tiers per participating GPU vs. the API list price, deployment cells (queued cells never plotted), arena Compare, performance evidence, unavailable-hardware roster, null rules
-- [Chinese Pages (/zh)](./i18n.md) — Why hand-authored /zh pages instead of an i18n framework, hreflang pairing, blog translation pairing, html lang workaround, CJK reading time/slugs
-- [Chinese Copy Editorial Guide](./chinese-copy.md) — Audience, surface-specific register, context-aware terminology, rewrite workflow, manual-review process, and PR checklist
-
-- [Agentic Workload Explorer](./agentic-workload-explorer.md) — feature-gated, read-only explorer over a frozen anonymized ProxyTrace snapshot: separate read replica, Kysely query layer, page-bff routes, bilingual views
-- [OperatorX](./operatorx.md) — hidden GEMM, attention, and routed MoE explorer, per-GPU TFLOPS, raw artifact persistence, and local verification
+- [Agentic Workload Explorer](./agentic-workload-explorer.md) covers the feature-gated explorer over a frozen, anonymized ProxyTrace snapshot and its separate read replica.
+- [Huawei SKU configurations](./ubenchx-huawei-skus.md) documents the 950PR table on TPC Skyline, source limitations and API coverage.
+- [OperatorX](./operatorx.md) covers the GEMM and routed MoE explorer, compact comparison reads, artifact persistence, deployment, and local verification.

@@ -3,7 +3,6 @@ import { ArrowRight } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { MinecraftSplash } from '@/components/minecraft/minecraft-splash';
 import { NewBadge } from '@/components/ui/new-badge';
-import { TPUV7_QWEN_3_5_AGENTX_URL } from '@/lib/nudges/landing-banner';
 import {
   agentxDashboardHref,
   FEATURED_AGENTX_MODELS,
@@ -12,51 +11,18 @@ import {
 
 import { CompareIndexTrackedLink } from './compare-index-tracked-link';
 
-/**
- * Full-color brand marks for the ledger rows, sharing the `*-color.svg`
- * assets used by `/model` pages and inference chart captions. Keyed by
- * compare slug so a featured model without a registered mark simply renders
- * without one instead of breaking the row.
- */
 const MODEL_LOGOS: Record<string, string> = {
   'muse-spark-open': '/logos/muse-mascot.webp',
   'kimi-k3': '/logos/kimi-color.svg',
   'deepseek-v41-flash': '/logos/deepseek-color.svg',
   'deepseek-v4': '/logos/deepseek-color.svg',
-  // GLM ships under the Z.ai product brand, so the ledger shows the Z.ai
-  // mark rather than the Zhipu corporate dot cluster.
   'glm-5-3': '/logos/zai-color.svg',
   'minimax-m3': '/logos/minimax-color.svg',
+  'minimax-m31-flash': '/logos/minimax-color.svg',
   'qwen-3-8-flash-next': '/logos/qwen-color.svg',
   'qwen-3-5': '/logos/qwen-color.svg',
 };
 
-/**
- * Full-color brand marks for the hero strip: the silicon platforms named
- * in the description (Google, OpenAI, AMD, NVIDIA), then SambaNova, followed
- * by Meta, Microsoft, and Oracle. The path data is copied from the shared brand assets under
- * `public/logos/` but inlined as SVG elements: the strip must add zero
- * `/logos/` image requests, because the mobile landing performance spec
- * budgets those fetches to the ledger's lazy `*-color.svg` model marks.
- * viewBoxes are cropped to the path content, so rendered sizes need no
- * canvas-padding compensation and the marks read optically equal.
- *
- * Google is the four-color "G" in the official brand palette (blue
- * #4285F4, red #EA4335, yellow #FBBC05, green #34A853), used as-is in both
- * themes. NVIDIA uses its official brand green (#76B900) as-is in both themes;
- * the OpenAI and AMD marks are black by brand design (neither has a
- * color variant), so they render in `currentColor` via `text-foreground`,
- * which reproduces the official reversed-white treatment in dark mode.
- * SambaNova is its purple ribbon mark (the current sambanova.ai header and
- * favicon; the shared `sambanova.webp` asset is raster only), traced into
- * three stacked flat fills sampled from the official gradient: deep plum
- * #2A1246, violet #7340B8, and lilac #CC8FF3 highlights. Used as-is in both themes.
- * Meta keeps the official blue-gradient fills from `meta-color.svg`
- * (gradient ids re-namespaced `agentx-meta-*` since inline defs land in
- * the page DOM), Microsoft its four-color window, and Oracle renders in
- * Oracle Red #C74634 (PMS 180 C per Oracle's brand guidelines — the
- * shared `oracle.svg` asset carries no fill of its own).
- */
 interface VendorMarkGradient {
   id: string;
   x1: string;
@@ -71,11 +37,22 @@ const VENDOR_MARKS: readonly {
   viewBox: string;
   width: number;
   height: number;
-  /** Linear gradients referenced by path fills; ids are namespaced to avoid DOM collisions. */
   gradients?: readonly VendorMarkGradient[];
-  /** Brand-color fills, or `currentColor` for marks that are monochrome by design. */
   paths: readonly { d: string; fill: string }[];
 }[] = [
+  {
+    name: 'Huawei',
+    viewBox: '0 0 24 24',
+    width: 24,
+    height: 24,
+    // Huawei brand mark from https://cdn.simpleicons.org/huawei (Simple Icons).
+    paths: [
+      {
+        d: 'M3.67 6.14S1.82 7.91 1.72 9.78v.35c.08 1.51 1.22 2.4 1.22 2.4 1.83 1.79 6.26 4.04 7.3 4.55 0 0 .06.03.1-.01l.02-.04v-.04C7.52 10.8 3.67 6.14 3.67 6.14zM9.65 18.6c-.02-.08-.1-.08-.1-.08l-7.38.26c.8 1.43 2.15 2.53 3.56 2.2.96-.25 3.16-1.78 3.88-2.3.06-.05.04-.09.04-.09zm.08-.78C6.49 15.63.21 12.28.21 12.28c-.15.46-.2.9-.21 1.3v.07c0 1.07.4 1.82.4 1.82.8 1.69 2.34 2.2 2.34 2.2.7.3 1.4.31 1.4.31.12.02 4.4 0 5.54 0 .05 0 .08-.05.08-.05v-.06c0-.03-.03-.05-.03-.05zM9.06 3.19a3.42 3.42 0 00-2.57 3.15v.41c.03.6.16 1.05.16 1.05.66 2.9 3.86 7.65 4.55 8.65.05.05.1.03.1.03a.1.1 0 00.06-.1c1.06-10.6-1.11-13.42-1.11-13.42-.32.02-1.19.23-1.19.23zm8.299 2.27s-.49-1.8-2.44-2.28c0 0-.57-.14-1.17-.22 0 0-2.18 2.81-1.12 13.43.01.07.06.08.06.08.07.03.1-.03.1-.03.72-1.03 3.9-5.76 4.55-8.64 0 0 .36-1.4.02-2.34zm-2.92 13.07s-.07 0-.09.05c0 0-.01.07.03.1.7.51 2.85 2 3.88 2.3 0 0 .16.05.43.06h.14c.69-.02 1.9-.37 3-2.26l-7.4-.25zm7.83-8.41c.14-2.06-1.94-3.97-1.94-3.98 0 0-3.85 4.66-6.67 10.8 0 0-.03.08.02.13l.04.01h.06c1.06-.53 5.46-2.77 7.28-4.54 0 0 1.15-.93 1.21-2.42zm1.52 2.14s-6.28 3.37-9.52 5.55c0 0-.05.04-.03.11 0 0 .03.06.07.06 1.16 0 5.56 0 5.67-.02 0 0 .57-.02 1.27-.29 0 0 1.56-.5 2.37-2.27 0 0 .73-1.45.17-3.14z',
+        fill: '#FF0000',
+      },
+    ],
+  },
   {
     name: 'Google',
     viewBox: '0 0 48 48',
@@ -396,33 +373,48 @@ const VENDOR_MARKS: readonly {
   },
 ] as const;
 
-// Models kept off the landing ledger. Qwen 3.5 stays reachable through the TPU card.
 const LANDING_HIDDEN_LEDGER_MODELS: ReadonlySet<string> = new Set([
   'deepseek-v4',
   'qwen-3-8-flash-next',
   'qwen-3-5',
+  'minimax-m3',
+  'kimi-k3',
+  'glm-5-3',
 ]);
 
 const LANDING_HARDWARE_RESULTS = [
   {
-    id: 'tpu',
+    id: 'huawei',
+    vendor: 'Huawei',
+    title: 'Huawei Ascend 950PR',
+    titleZh: '华为 Ascend 950PR',
+    subtitle: 'UbenchX',
+    href: '/ubenchx/core-memory-profiles',
+    model: 'ascend950pr',
+    analyticsEvent: 'landing_huawei_results_clicked',
+    isNew: true,
+  },
+  {
+    id: 'tpu-kimi-k3',
     vendor: 'Google',
-    title: 'TPU Results',
-    titleZh: 'TPU 结果',
-    subtitle: 'Qwen3.5 · AgentX',
-    href: TPUV7_QWEN_3_5_AGENTX_URL,
-    model: 'qwen-3-5',
+    title: 'TPU Kimi K3 Submission',
+    titleZh: 'TPU Kimi K3 提交结果',
+    subtitle: '2.8 Trillion parameters AgentX',
+    subtitleZh: '2.8 万亿参数 AgentX',
+    href: '/inference/kimi-k3',
+    model: 'kimi-k3',
     analyticsEvent: 'landing_tpu_results_clicked',
     isNew: true,
   },
   {
-    id: 'rubin',
+    id: 'rubin-glm-5-3',
     vendor: 'NVIDIA',
-    title: 'Rubin Results',
-    titleZh: 'Rubin 结果',
-    subtitle: 'MiniMax M3 · AgentX',
-    href: '/inference/minimax-m3',
-    model: 'minimax-m3',
+    title: 'Vera Rubin NVL72 GLM 5.3 Submission',
+    titleZh: 'Vera Rubin NVL72 GLM 5.3 提交结果',
+    subtitle: '744 Billion parameters AgentX',
+    subtitleZh: '7440 亿参数 AgentX',
+    href: '/inference/glm-5-3',
+    model: 'glm-5-3',
     analyticsEvent: 'landing_rubin_results_clicked',
   },
   {
@@ -434,6 +426,16 @@ const LANDING_HARDWARE_RESULTS = [
     href: '/inference/deepseek-r1?i_seq=8k%2F1k&i_prec=fp4&i_xmode=e2e',
     model: 'deepseek-r1',
     analyticsEvent: 'landing_jalapeno_results_clicked',
+  },
+  {
+    id: 'minimax-m31-flash',
+    vendor: 'MiniMax',
+    title: 'MiniMax M3.1 Flash',
+    titleZh: 'MiniMax M3.1 Flash',
+    subtitle: 'AgentX',
+    href: '/inference/minimax-m31-flash',
+    model: 'minimax-m31-flash',
+    analyticsEvent: 'landing_minimax_m31_flash_results_clicked',
   },
 ] as const;
 
@@ -462,11 +464,6 @@ const STRINGS = {
   },
 } as const;
 
-/**
- * The hero leads `/compare` and the landing page. `/compare` owns the page
- * `h1`; the landing page renders the hero under its own section flow, so the
- * caller picks the heading level rather than shipping a second `h1`.
- */
 export function AgentXCompareHero({
   locale,
   headingLevel = 'h1',
@@ -479,7 +476,6 @@ export function AgentXCompareHero({
   const t = STRINGS[locale];
   const prefix = locale === 'zh' ? '/zh' : '';
   const Heading = headingLevel;
-  // Landing curation must not change compare coverage or dashboard defaults.
   const ledgerModels =
     surface === 'landing'
       ? FEATURED_AGENTX_MODELS.filter((model) => !LANDING_HIDDEN_LEDGER_MODELS.has(model.slug))
@@ -493,9 +489,6 @@ export function AgentXCompareHero({
             <p className="font-mono text-xs font-semibold tracking-eyebrow text-brand uppercase">
               {t.eyebrow}
             </p>
-            {/* `relative` anchors the splash, which positions itself absolutely
-                at the top right. Landing only: /compare is not the launch
-                surface, and the announcement belongs on the front page. */}
             <div className="relative">
               <Heading className="mt-3 max-w-2xl text-2xl/[1.8rem] font-semibold tracking-tight text-foreground lg:text-[2.4rem]/[2.4rem]">
                 {t.title}
@@ -505,45 +498,45 @@ export function AgentXCompareHero({
             <p className="mt-3 max-w-3xl text-base leading-7 text-muted-foreground lg:text-lg">
               {t.description}
             </p>
-            {/* Decorative: the description right above already names every
-                vendor, so the strip is hidden from assistive technology. */}
             <div
               aria-hidden="true"
               data-testid="compare-agentx-vendor-marks"
               className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-foreground"
             >
-              {VENDOR_MARKS.map((mark) => (
-                <svg
-                  key={mark.name}
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox={mark.viewBox}
-                  width={mark.width}
-                  height={mark.height}
-                  className="shrink-0"
-                >
-                  {mark.gradients ? (
-                    <defs>
-                      {mark.gradients.map((gradient) => (
-                        <linearGradient
-                          key={gradient.id}
-                          id={gradient.id}
-                          x1={gradient.x1}
-                          y1={gradient.y1}
-                          x2={gradient.x2}
-                          y2={gradient.y2}
-                        >
-                          {gradient.stops.map((stop) => (
-                            <stop key={stop.offset} offset={stop.offset} stopColor={stop.color} />
-                          ))}
-                        </linearGradient>
-                      ))}
-                    </defs>
-                  ) : null}
-                  {mark.paths.map((path) => (
-                    <path key={path.d} d={path.d} fill={path.fill} />
-                  ))}
-                </svg>
-              ))}
+              {VENDOR_MARKS.filter((mark) => surface === 'landing' || mark.name !== 'Huawei').map(
+                (mark) => (
+                  <svg
+                    key={mark.name}
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox={mark.viewBox}
+                    width={mark.width}
+                    height={mark.height}
+                    className="shrink-0"
+                  >
+                    {mark.gradients ? (
+                      <defs>
+                        {mark.gradients.map((gradient) => (
+                          <linearGradient
+                            key={gradient.id}
+                            id={gradient.id}
+                            x1={gradient.x1}
+                            y1={gradient.y1}
+                            x2={gradient.x2}
+                            y2={gradient.y2}
+                          >
+                            {gradient.stops.map((stop) => (
+                              <stop key={stop.offset} offset={stop.offset} stopColor={stop.color} />
+                            ))}
+                          </linearGradient>
+                        ))}
+                      </defs>
+                    ) : null}
+                    {mark.paths.map((path) => (
+                      <path key={path.d} d={path.d} fill={path.fill} />
+                    ))}
+                  </svg>
+                ),
+              )}
             </div>
             <div className="mt-5 flex flex-wrap gap-3">
               <CompareIndexTrackedLink
@@ -579,11 +572,10 @@ export function AgentXCompareHero({
           </div>
 
           <div className="border-t border-border/70 bg-muted/15 lg:border-t-0 lg:border-l">
-            {/* Landing shows the hardware results first, above the model ledger. */}
             {surface === 'landing' && (
               <div className="divide-y divide-border/70 border-b border-border/70">
                 {LANDING_HARDWARE_RESULTS.map((result) => {
-                  const mark = VENDOR_MARKS.find((vendor) => vendor.name === result.vendor)!;
+                  const mark = VENDOR_MARKS.find((vendor) => vendor.name === result.vendor);
                   return (
                     <CompareIndexTrackedLink
                       key={result.id}
@@ -596,19 +588,32 @@ export function AgentXCompareHero({
                       className="group flex min-h-14 items-center justify-between gap-4 px-5 py-2.5 transition-colors hover:bg-brand/5 focus-visible:outline-none"
                     >
                       <span className="flex min-w-0 items-center gap-3">
-                        <svg
-                          data-testid={`landing-${result.id}-${result.vendor.toLowerCase()}-logo`}
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox={mark.viewBox}
-                          width={32}
-                          height={32}
-                          aria-hidden="true"
-                          className="size-8 shrink-0 text-foreground"
-                        >
-                          {mark.paths.map((path) => (
-                            <path key={path.d} d={path.d} fill={path.fill} />
-                          ))}
-                        </svg>
+                        {result.vendor === 'MiniMax' ? (
+                          <img
+                            data-testid={`landing-${result.id}-${result.vendor.toLowerCase()}-logo`}
+                            src={MODEL_LOGOS[result.model]}
+                            alt=""
+                            aria-hidden="true"
+                            width={32}
+                            height={32}
+                            loading="lazy"
+                            className="size-8 shrink-0 object-contain"
+                          />
+                        ) : (
+                          <svg
+                            data-testid={`landing-${result.id}-${result.vendor.toLowerCase()}-logo`}
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox={mark!.viewBox}
+                            width={32}
+                            height={32}
+                            aria-hidden="true"
+                            className="size-8 shrink-0 text-foreground"
+                          >
+                            {mark!.paths.map((path) => (
+                              <path key={path.d} d={path.d} fill={path.fill} />
+                            ))}
+                          </svg>
+                        )}
                         <span className="min-w-0">
                           <span className="flex items-center gap-1.5 text-sm font-semibold leading-tight text-foreground group-hover:text-brand">
                             <span className="min-w-0">
@@ -621,7 +626,9 @@ export function AgentXCompareHero({
                             )}
                           </span>
                           <span className="mt-1 block font-mono text-3xs tracking-eyebrow text-brand uppercase">
-                            {result.subtitle}
+                            {locale === 'zh' && 'subtitleZh' in result
+                              ? result.subtitleZh
+                              : result.subtitle}
                           </span>
                         </span>
                       </span>
@@ -637,8 +644,6 @@ export function AgentXCompareHero({
                 })}
               </div>
             )}
-            {/* The visible ledger header is dropped; `ledgerTitle` stays as the
-                nav's accessible name so screen readers still get the label. */}
             <nav aria-label={t.ledgerTitle} className="divide-y divide-border/70">
               {ledgerModels.map((model) => (
                 <CompareIndexTrackedLink

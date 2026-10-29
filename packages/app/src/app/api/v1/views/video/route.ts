@@ -187,16 +187,16 @@ export function GET(request: NextRequest) {
     )
       throw new ViewsApiParamError('compare', 'Expected up to eight run:artifact pairs');
     const saved = [payload];
+    const unpublishedCompare: string[] = [];
     for (const ref of new Set(refs)) {
       const [r, a] = ref.split(':');
       if (r === run && a === artifact) continue;
-      saved.push(
-        await readResponse<StoredArtifact>(
-          await videoRuns(
-            sourceRequest(request, '/api/video-runs', { run: r, artifact: a, format: 'published' }),
-          ),
-        ),
+      const compared = await videoRuns(
+        sourceRequest(request, '/api/video-runs', { run: r, artifact: a, format: 'published' }),
       );
+      // An unstored ref is missing evidence, not a failed read of the primary artifact.
+      if (compared.status === 204) unpublishedCompare.push(ref);
+      else saved.push(await readResponse<StoredArtifact>(compared));
     }
     const runs = saved.flatMap((item) =>
       item.sources
@@ -318,6 +318,7 @@ export function GET(request: NextRequest) {
           phase,
           gpuBasis,
         },
+        unpublishedCompare,
         sources: payload.sources,
         workloads,
         evidence,

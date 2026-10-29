@@ -131,6 +131,35 @@ const pages = [
 ];
 const request = (query = '') => new NextRequest(`https://example.test/api/v1/views/video?${query}`);
 
+function storedServingArtifact(): StoredArtifact {
+  const fixture = servingFixture();
+  fixture.documents.set('manifest.json', fixture.manifest);
+  fixture.documents.set('ci.json', fixture.ci);
+  fixture.checksums.set('manifest.json', 'a'.repeat(64));
+  return {
+    storageVersion: 1,
+    runId: '123',
+    artifact: { id: 456, name: 'published', expired: false, size_in_bytes: 1 },
+    sources: [
+      {
+        id: '123',
+        documents: [...fixture.documents],
+        checksums: [...fixture.checksums],
+        texts: [],
+        assets: [
+          [
+            'gpu/c1/baseline/artifacts/measurement-r001-c001.mp4',
+            {
+              url: 'https://private.test/secret-token',
+              downloadUrl: 'https://private.test/download',
+            },
+          ],
+        ],
+      },
+    ],
+  };
+}
+
 beforeEach(() => {
   source.mockReset();
   source.mockImplementation((req: NextRequest) => {
@@ -240,32 +269,7 @@ describe('published VideoGenX dashboard projection', () => {
   });
 
   it('pairs published cases, clamps the requested index and excludes asset URLs and raw documents', async () => {
-    const fixture = servingFixture();
-    fixture.documents.set('manifest.json', fixture.manifest);
-    fixture.documents.set('ci.json', fixture.ci);
-    fixture.checksums.set('manifest.json', 'a'.repeat(64));
-    const saved: StoredArtifact = {
-      storageVersion: 1,
-      runId: '123',
-      artifact: { id: 456, name: 'published', expired: false, size_in_bytes: 1 },
-      sources: [
-        {
-          id: '123',
-          documents: [...fixture.documents],
-          checksums: [...fixture.checksums],
-          texts: [],
-          assets: [
-            [
-              'gpu/c1/baseline/artifacts/measurement-r001-c001.mp4',
-              {
-                url: 'https://private.test/secret-token',
-                downloadUrl: 'https://private.test/download',
-              },
-            ],
-          ],
-        },
-      ],
-    };
+    const saved = storedServingArtifact();
     source.mockImplementation((req: NextRequest) =>
       Response.json(
         req.nextUrl.searchParams.get('format') === 'published'
@@ -290,6 +294,22 @@ describe('published VideoGenX dashboard projection', () => {
     expect(body.comparison.cases.selected.baseline.mediaPath).toBe(
       'gpu/c1/baseline/artifacts/measurement-r004-c001.mp4',
     );
+  });
+
+  it('keeps the primary legacy artifact and lists an unpublished compare ref', async () => {
+    const saved = storedServingArtifact();
+    source.mockImplementation((req: NextRequest) =>
+      req.nextUrl.searchParams.get('run') === '123'
+        ? Response.json(saved)
+        : new Response(null, { status: 204 }),
+    );
+    const response = await GET(request('run=123&artifact=456&view=tradeoff&compare=789:1011'));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.params.compare).toEqual(['789:1011']);
+    expect(body.unpublishedCompare).toEqual(['789:1011']);
+    expect(body.serving.map((item: { run: string }) => item.run)).toEqual(['123']);
+    expect(body.points.length).toBeGreaterThan(0);
   });
 
   it('retains explicit discovery and treats media read failure as unavailable, not zero pairs', async () => {

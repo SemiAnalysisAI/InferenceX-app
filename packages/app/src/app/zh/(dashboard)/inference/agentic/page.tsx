@@ -4,8 +4,9 @@ import { AgenticCatalogHero } from '@/components/inference/agentic-catalog/agent
 import { AgenticCatalogList } from '@/components/inference/agentic-catalog/agentic-catalog-list';
 import { JsonLd } from '@/components/seo/json-ld';
 import { getAgenticCatalogGroups } from '@/lib/agentx/agentic-catalog';
-import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
+import { zhAlternates } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 const TITLE = 'AgentX 遥测数据';
 const DESCRIPTION =
@@ -15,13 +16,12 @@ export const metadata: Metadata = {
   title: TITLE,
   description: DESCRIPTION,
   alternates: zhAlternates('/inference/agentic'),
-  openGraph: {
+  ...socialMetadata({
     title: `${TITLE} | InferenceX`,
     description: DESCRIPTION,
     url: `${SITE_URL}/zh/inference/agentic`,
-    locale: ZH_OG_LOCALE,
-  },
-  twitter: { title: `${TITLE} | InferenceX`, description: DESCRIPTION },
+    locale: 'zh',
+  }),
 };
 
 export const dynamic = 'force-dynamic';

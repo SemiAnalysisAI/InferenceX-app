@@ -4,14 +4,15 @@ import {
   chartPoints,
   collectiveXCaseLabel,
   collectiveXColorKey,
-  collectiveXConclusionLabel,
   collectiveXLegendLabel,
   collectiveXRunDasharray,
   collectiveXSeriesForRun,
   collectiveXSeriesLabel,
   collectiveXSkuLabel,
+  collectiveXBackendLabel,
   collectiveXTopologyLabel,
   fitAlphaBeta,
+  formatCollectiveXLatencyPercentiles,
   metricValue,
   normalizeCollectiveXSku,
   seriesMatchesSelection,
@@ -24,41 +25,14 @@ import {
   type CollectiveXKvRunCase,
   collectiveXKvCell,
   collectiveXKvPageValues,
+  collectiveXRangeBands,
+  collectiveXRangeColorKey,
 } from './data';
 import type { CollectiveXKvRow, CollectiveXPercentiles, CollectiveXSeries } from './types';
 import { makeCollectiveXDataset, makeCollectiveXSeries } from './test-fixture';
 
 const dataset = makeCollectiveXDataset();
-// series[0]: deepep-v2 EP8 scale-up (nvlink, single node).
-// series[1]: MoRI EP16 scale-out (xGMI scale-up + RDMA scale-out, two nodes).
 const [scaleUp, scaleOut] = dataset.series;
-
-describe('collectiveXConclusionLabel', () => {
-  it.each([
-    ['success', '成功'],
-    ['failure', '失败'],
-    ['cancelled', '已取消'],
-    ['skipped', '已跳过'],
-    ['timed_out', '超时'],
-    ['startup_failure', '启动失败'],
-    ['action_required', '需要处理'],
-    ['neutral', '中立'],
-    ['stale', '已过期'],
-  ])('localizes the %s workflow conclusion in Chinese', (conclusion, expected) => {
-    expect(collectiveXConclusionLabel(conclusion, 'zh')).toBe(expected);
-  });
-
-  it('derives pending only from a null workflow conclusion', () => {
-    expect(collectiveXConclusionLabel(null, 'zh')).toBe('待处理');
-    expect(collectiveXConclusionLabel(null, 'en')).toBe('pending');
-  });
-
-  it('preserves known English values and hides unknown values on Chinese pages', () => {
-    expect(collectiveXConclusionLabel('startup_failure', 'en')).toBe('startup_failure');
-    expect(collectiveXConclusionLabel('future_status', 'en')).toBe('future_status');
-    expect(collectiveXConclusionLabel('future_status', 'zh')).toBe('未知状态');
-  });
-});
 
 describe('collectiveXTopologyLabel', () => {
   it('shows only the scale-up transport when there is no scale-out fabric', () => {
@@ -82,6 +56,8 @@ describe('collectiveXSeriesLabel', () => {
     expect(normalizeCollectiveXSku('B200-nscale')).toBe('b200');
     expect(normalizeCollectiveXSku('H100-DGXC')).toBe('h100');
     expect(collectiveXSkuLabel('B200-nscale')).toBe('B200');
+    expect(collectiveXBackendLabel('mori')).toBe('MoRI');
+    expect(collectiveXBackendLabel('deepep-v2')).toBe('deepep-v2');
     expect(collectiveXCaseLabel('h100-dgxc · deepep-v2', 'h100-dgxc')).toBe('H100 · deepep-v2');
     expect(normalizeCollectiveXSku('future-accelerator')).toBe('future-accelerator');
   });
@@ -100,10 +76,10 @@ describe('collectiveXSeriesLabel', () => {
     expect(collectiveXSeriesLabel(scaleOut)).toContain('EP16 · normal · decode');
   });
 
-  it('includes the run id for namespaced multi-run series', () => {
+  it('keeps the stored snapshot id out of the label', () => {
     const [runSeries] = collectiveXSeriesForRun([scaleUp], '30165164821');
     expect(collectiveXSeriesLabel(runSeries)).toBe(
-      '#30165164821 · H200 · deepep-v2 · EP8 · normal · decode · bf16',
+      'H200 · deepep-v2 · EP8 · normal · decode · bf16',
     );
   });
 
@@ -128,7 +104,6 @@ describe('collectiveXColorKey', () => {
   it('assigns the same key to two series with identical configuration', () => {
     const a = makeCollectiveXSeries({ variant: 'a' });
     const b = makeCollectiveXSeries({ variant: 'b' });
-    // The color key is configuration-derived and excludes the series id.
     expect(collectiveXColorKey(a)).toBe(collectiveXColorKey(b));
   });
 
@@ -151,8 +126,6 @@ describe('collectiveXColorKey', () => {
   });
 
   it('leads with the system vendor so getVendor places series in vendor hue zones', () => {
-    // The chart color system reads the first "_"-separated token to classify the
-    // vendor (NVIDIA greens, AMD reds), matching the InferenceX charts.
     expect(collectiveXColorKey(scaleUp).split('_')[0]).toBe('nvidia');
     const amd = makeCollectiveXSeries({ sku: 'mi355x', vendor: 'amd' });
     expect(collectiveXColorKey(amd).split('_')[0]).toBe('amd');
@@ -257,7 +230,6 @@ describe('metricValue', () => {
     const payload = metricValue(point, 'dispatch', 'p50', 'payload-rate');
     const activation = metricValue(point, 'dispatch', 'p50', 'activation-rate');
     expect(payload).toBeGreaterThan(0);
-    // Payload uses total_logical_bytes ÷ ep; activation uses aggregate activation bytes.
     expect(payload).not.toBeCloseTo(activation as number, 1);
   });
 
@@ -272,14 +244,11 @@ function pct(value: number): CollectiveXPercentiles {
 }
 
 describe('fitAlphaBeta', () => {
-  // Build a series whose dispatch latency is exactly α + bytesPerGpu/β with
-  // α = 10 µs and β = 250 GB/s (per GPU), so the OLS must recover both. ep = 8,
-  // so aggregate payload_bytes = bytesPerGpu × 8 and fitAlphaBeta divides it back.
   const EP = 8;
   function fitSeries(): CollectiveXSeries {
     const point = (bytesPerGpu: number) => {
-      const latency = 10 + bytesPerGpu / (250 * 1e3); // µs
-      const rate = (bytesPerGpu / latency) * 1e-3; // GB/s per GPU
+      const latency = 10 + bytesPerGpu / (250 * 1e3);
+      const rate = (bytesPerGpu / latency) * 1e-3;
       const component = {
         latency_us: pct(latency),
         activation_data_rate_gbps_at_latency_percentile: pct(rate),
@@ -323,9 +292,34 @@ describe('fitAlphaBeta', () => {
   });
 
   it('returns null when the byte axis has no variance across the ladder', () => {
-    // The default fixture holds bytes constant across the ladder, so bytes/GPU
-    // reconstructs to a single value and there is no slope to fit.
     expect(fitAlphaBeta(makeCollectiveXSeries(), 'dispatch')).toBeNull();
+  });
+});
+
+describe('formatCollectiveXLatencyPercentiles', () => {
+  const component = scaleUp.points[0].components.dispatch!;
+
+  it('formats all four latency percentiles', () => {
+    const latency = { p50: 12.34, p90: 15, p95: 18.06, p99: 120.4 };
+    expect(
+      formatCollectiveXLatencyPercentiles({ ...component, latency_us: latency }, 'unavailable'),
+    ).toBe('12.3 / 15.0 / 18.1 / 120.4 µs');
+  });
+
+  it('renders a placeholder for percentiles the artifact left null', () => {
+    const latency = {
+      p50: 9.5,
+      p90: null,
+      p95: null,
+      p99: null,
+    } as unknown as CollectiveXPercentiles;
+    expect(
+      formatCollectiveXLatencyPercentiles({ ...component, latency_us: latency }, 'unavailable'),
+    ).toBe('9.5 / - / - / - µs');
+  });
+
+  it('uses the unavailable label when the component was not measured', () => {
+    expect(formatCollectiveXLatencyPercentiles(null, '不可用')).toBe('不可用');
   });
 });
 
@@ -345,13 +339,111 @@ describe('chartPoints', () => {
   });
 
   it('drops points whose metric is unavailable', () => {
-    // Dispatch has no per-operation token rate, so tokens-per-second is null everywhere.
     expect(chartPoints([scaleUp], 'dispatch', 'p50', 'tokens-per-second')).toHaveLength(0);
   });
 
   it('keeps roundtrip token-rate points', () => {
     const points = chartPoints([scaleUp], 'roundtrip', 'p50', 'tokens-per-second');
     expect(points).toHaveLength(scaleUp.points.length);
+  });
+});
+
+describe('collectiveXRangeBands', () => {
+  // Same SKU and EP size, three libraries at scaled latencies, plus another EP size.
+  const scaled = (backend: string, factor: number, tokens?: number[]) => {
+    const base = collectiveXSeriesForRun([scaleUp], '7')[0];
+    return {
+      ...base,
+      series_id: `7:${backend}`,
+      backend,
+      points: base.points
+        .filter((point) => !tokens || tokens.includes(point.tokens_per_rank))
+        .map((point) => ({
+          ...point,
+          components: {
+            ...point.components,
+            dispatch: point.components.dispatch && {
+              ...point.components.dispatch,
+              latency_us: {
+                ...point.components.dispatch.latency_us,
+                p50: (point.components.dispatch.latency_us.p50 ?? 0) * factor,
+              },
+            },
+          },
+        })),
+    };
+  };
+  const first = scaleUp.points[0].tokens_per_rank;
+  const base = scaleUp.points[0].components.dispatch!.latency_us.p50!;
+
+  it('spans the lowest to the highest library with the median as its line', () => {
+    const bands = collectiveXRangeBands(
+      [scaled('a', 1), scaled('b', 2), scaled('c', 4)],
+      'dispatch',
+      'p50',
+      'latency',
+    );
+    expect(bands).toHaveLength(1);
+    expect(bands[0].colorKey).toBe(collectiveXRangeColorKey(scaleUp));
+    expect(bands[0].label).toBe('H200 · EP8');
+    const point = bands[0].points[0];
+    expect(point.x).toBe(first);
+    expect([point.lo, point.mid, point.hi]).toEqual([base, base * 2, base * 4]);
+    expect(point.members.map((member) => member.label)).toEqual([
+      'a · normal',
+      'b · normal',
+      'c · normal',
+    ]);
+  });
+
+  it('averages the middle two for an even count and orders rates best-first', () => {
+    const [band] = collectiveXRangeBands(
+      [scaled('a', 1), scaled('b', 3)],
+      'dispatch',
+      'p50',
+      'latency',
+    );
+    expect(band.points[0].mid).toBe(base * 2);
+    const [rate] = collectiveXRangeBands(
+      [scaled('a', 1), scaled('b', 3)],
+      'roundtrip',
+      'p50',
+      'tokens-per-second',
+    );
+    const ys = rate.points[0].members.map((member) => member.y);
+    expect(ys).toEqual(ys.toSorted((a, b) => b - a));
+  });
+
+  it('covers every token count any library measured', () => {
+    const [band] = collectiveXRangeBands(
+      [scaled('a', 1, [first]), scaled('b', 2)],
+      'dispatch',
+      'p50',
+      'latency',
+    );
+    expect(band.points).toHaveLength(scaleUp.points.length);
+    expect(band.points[0].members).toHaveLength(2);
+    expect(band.points.at(-1)!.members).toHaveLength(1);
+    const last = band.points.at(-1)!;
+    expect(last.lo).toBe(last.hi);
+  });
+
+  it('counts libraries, not library-and-mode series', () => {
+    const lowLatency = { ...scaled('a', 2), series_id: '7:a-ll', mode: 'low-latency' as const };
+    const [band] = collectiveXRangeBands(
+      [scaled('a', 1), lowLatency, scaled('b', 3)],
+      'dispatch',
+      'p50',
+      'latency',
+    );
+    expect(band.points[0].members).toHaveLength(3);
+    expect(band.points[0].libraries).toBe(2);
+  });
+
+  it('keeps SKUs and EP sizes apart', () => {
+    const other = collectiveXSeriesForRun([scaleOut], '7')[0];
+    const bands = collectiveXRangeBands([scaled('a', 1), other], 'dispatch', 'p50', 'latency');
+    expect(bands.map((band) => band.label)).toEqual(['H200 · EP8', 'MI355X · EP16']);
   });
 });
 
@@ -480,7 +572,7 @@ describe('collectiveXKvChartPoints', () => {
       [16, 15.12],
     ]);
     expect(points[0].seriesId).toBe('318:gb200-nixl-kv-dsv4-rdma-xfer-ep2-paged-fp8');
-    expect(points[0].seriesLabel).toContain('#318');
+    expect(points[0].seriesLabel).not.toContain('#318');
   });
 
   it('plots ISL scaling at batch 1 with latency as the metric', () => {
@@ -537,7 +629,6 @@ describe('collectiveXKvChartPoints', () => {
       const points = collectiveXKvFrontierPoints(
         [
           kase([
-            // batch 1 is alone at 4096; batch 16 wins the 32768 rung.
             { isl: 4096, batch: 1, gbps_p50: 5 },
             { isl: 32768, batch: 1, gbps_p50: 7.5 },
             { isl: 32768, batch: 4, gbps_p50: 20 },
@@ -595,7 +686,6 @@ describe('collectiveXKvChartPoints', () => {
       const points = collectiveXKvOverlapPoints(
         [
           kase([
-            // The smaller-ISL ladder never enters the normalization.
             { isl: 4096, batch: 1, gbps_p50: 99 },
             { isl: 32768, batch: 1, gbps_p50: 8 },
             { isl: 32768, batch: 4, gbps_p50: 24 },
@@ -630,7 +720,6 @@ describe('collectiveXKvChartPoints', () => {
           kase([
             { isl: 4096, batch: 1, gbps_p50: 6 },
             { isl: 4096, batch: 4, gbps_p50: 18 },
-            // The larger-ISL ladder is ignored once 4096 is pinned.
             { isl: 32768, batch: 1, gbps_p50: 8 },
             { isl: 32768, batch: 4, gbps_p50: 24 },
           ]),
@@ -684,7 +773,6 @@ describe('collectiveXKvChartPoints', () => {
             bulk({ isl: 32768, gbps_p50: 89.41 }),
             bulk({ isl: 4096, gbps_p50: 52.3 }),
             bulk({ isl: 32768, op: 'push', gbps_p50: 70 }),
-            // Paged rows never enter the ceiling.
             { isl: 32768, batch: 1, gbps_p50: 7.39 },
           ]),
         ],

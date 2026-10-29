@@ -1,14 +1,9 @@
-/* InferenceX motion system. Transform/opacity only; entrances decelerate;
- * micro-feedback stays under 200ms. Everything is gated so no-JS visitors,
- * crawlers, and reduced-motion users get static content. */
-
 :root {
   --motion-ease-enter: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-reveal-duration: 550ms;
   --motion-reveal-distance: 12px;
 }
 
-/* Reveal-on-view primitive (<Reveal> flips data-inview; delayMs staggers). */
 @media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
   [data-reveal] {
     opacity: 0;
@@ -25,7 +20,6 @@
   }
 }
 
-/* Press feedback for buttons and button-shaped links. */
 @media (prefers-reduced-motion: no-preference) {
   .motion-press {
     transition-property: color, background-color, border-color, opacity, transform;
@@ -38,7 +32,6 @@
   }
 }
 
-/* Motion tokens: fast = direct feedback, base = contextual movement. */
 :root {
   --motion-dur-fast: 150ms;
   --motion-dur-base: 220ms;
@@ -46,9 +39,6 @@
   --motion-ease-exit: cubic-bezier(0.3, 0, 1, 1);
 }
 
-/* Route transitions (progressive enhancement; no-VT browsers get an
- * instant swap). Cross-document transitions cover full-document navs
- * such as the compare catalog cards. */
 @view-transition {
   navigation: auto;
 }
@@ -64,7 +54,6 @@
     animation: motion-vt-in var(--motion-dur-base) var(--motion-ease-enter) both;
   }
 
-  /* Naming the cross-page chrome removes it from the root cross-fade. */
   .vt-site-header {
     view-transition-name: site-header;
   }
@@ -73,8 +62,6 @@
     view-transition-name: dashboard-tabs;
   }
 
-  /* Shared element: compare card title → detail page <h1>. Applied to at
-   * most one element per page. */
   .vt-compare-title {
     view-transition-name: compare-title;
   }
@@ -97,8 +84,6 @@
   }
 }
 
-/* Reduced motion: near-instant cut (`animation: none` would freeze the
- * old snapshot). */
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-group(*),
   ::view-transition-image-pair(*),
@@ -108,8 +93,6 @@
   }
 }
 
-/* Stale-while-refetching dim for charts. Non-moving opacity fade, so not
- * gated on reduced motion. */
 .motion-stale {
   transition: opacity var(--motion-dur-fast) ease;
 }
@@ -118,13 +101,10 @@
   opacity: 0.55;
 }
 
-/* Pending cue for full-document navigations (compare catalog cards). */
 .motion-nav-pending[data-pending='true'] {
   opacity: 0.6;
 }
 
-/* Dashboard tab rail: sliding active indicator. Falls back to the per-link
- * static border until JS has measured. */
 .tab-indicator {
   position: absolute;
   bottom: 0;
@@ -142,7 +122,6 @@
   }
 }
 
-/* Small popover-style entrances (header mobile menu). */
 @media (prefers-reduced-motion: no-preference) {
   .motion-pop-in {
     animation: motion-pop-in var(--motion-dur-fast) var(--motion-ease-enter) both;
@@ -153,6 +132,26 @@
   from {
     opacity: 0;
     transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* A page-load entrance that needs no script: fade and rise from the first paint, staggered
+   through --motion-delay. */
+@media (prefers-reduced-motion: no-preference) {
+  .motion-enter {
+    animation: motion-enter 500ms var(--motion-ease-enter) both;
+    animation-delay: var(--motion-delay, 0ms);
+  }
+}
+
+@keyframes motion-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
   }
   to {
     opacity: 1;

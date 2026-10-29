@@ -18,7 +18,7 @@ on:
         type: boolean
         default: false
       neon-branch:
-        description: Optional existing Neon child branch; omit for production on master
+        description: Optional existing Neon child branch; omit to use DATABASE_WRITE_URL from the default branch
         required: false
         type: string
 
@@ -31,7 +31,7 @@ concurrency:
 jobs:
   backfill:
     name: Backfill server-log bundles
-    if: github.ref == 'refs/heads/master' || inputs.neon-branch != ''
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || inputs.neon-branch != ''
     runs-on: blacksmith-16vcpu-ubuntu-2404
     timeout-minutes: 360
     permissions:
@@ -52,6 +52,7 @@ jobs:
         timeout-minutes: 8
         env:
           PRODUCTION_DATABASE_URL: ${{ secrets.DATABASE_WRITE_URL }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
           NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
           NEON_BRANCH_NAME: ${{ inputs.neon-branch }}
@@ -75,19 +76,24 @@ jobs:
             database_url=$(curl "${curl_args[@]}" \
               "$api/connection_uri?branch_id=$branch_id&database_name=neondb&role_name=neondb_owner&pooled=false" | jq -er '.uri')
             echo "Child database: $NEON_BRANCH_NAME ($branch_id)" | tee -a "$GITHUB_STEP_SUMMARY"
-          elif [ "$GITHUB_REF" != 'refs/heads/master' ]; then
-            echo '::error::Production backfill requires master'
+          elif [ "$GITHUB_REF" != "refs/heads/$DEFAULT_BRANCH" ]; then
+            echo "::error::Backfilling DATABASE_WRITE_URL requires the default branch ($DEFAULT_BRANCH)"
             exit 1
+          else
+            : "${PRODUCTION_DATABASE_URL:?DATABASE_WRITE_URL secret is not set}"
           fi
           echo "::add-mask::$database_url"
           echo "DATABASE_WRITE_URL=$database_url" >> "$GITHUB_ENV"
       - name: Backfill server-log files
         env:
+          INGEST_REPO: ${{ vars.BENCHMARK_REPO }}
           GH_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
           RUN_ID: ${{ inputs.run-id }}
           FROM_RUN: ${{ inputs.from-run }}
           FORCE: ${{ inputs.force }}
         run: |
+          : "${INGEST_REPO:?BENCHMARK_REPO repository variable is not set}"
+          : "${GH_TOKEN:?INFX_MAIN_PAT secret is not set}"
           args=(--yes)
           if [ -n "$RUN_ID" ] && [ -n "$FROM_RUN" ]; then
             echo '::error::Set run-id or from-run, not both'
@@ -117,5 +123,9 @@ jobs:
           CYPRESS_INSTALL_BINARY: '0'
       - name: Invalidate production cache
         env:
+          APP_URL: ${{ vars.APP_URL }}
           INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
-        run: bun run admin:cache:invalidate https://inferencex.semianalysis.com
+          VERCEL_PROTECTION_BYPASS_SECRET: ${{ secrets.VERCEL_PROTECTION_BYPASS_SECRET }}
+        run: |
+          : "${APP_URL:?APP_URL repository variable is not set}"
+          bun run admin:cache:invalidate "$APP_URL"

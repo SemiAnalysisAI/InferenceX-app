@@ -25,30 +25,13 @@ import { outputTokPerChip } from './lifecycle';
 import { getCostProviderLabel, getThroughputForType } from './ThroughputBarChart';
 import type { CostProvider, CostType, GPUDataPoint } from './types';
 
-/**
- * The inverse of the target-interactivity slider: the slider fixes a speed and
- * reads off the cost, this fixes a cost ceiling and reads off the highest speed
- * that stays under it. That is why it sits directly beneath the slider rather
- * than among the fleet-economics sections — it answers a question about the
- * operating point, not about a deployment's lifetime.
- *
- * Deliberately independent of the slider's own value: `gpuDataByGroupKey` is the
- * unfiltered frontier, so a chip that interpolates to nothing at the current
- * target still gets an answer here.
- */
 interface CostTargetPanelProps {
   gpuDataByGroupKey: Record<string, GPUDataPoint[]>;
   hardwareConfig: HardwareConfig;
   costProvider: CostProvider;
   costType: CostType;
-  /** Legend visibility by base hwKey. */
   visibleHwKeys: Set<string>;
-  /**
-   * Facility power budget, owned by the page. Only used to turn the answer into
-   * concurrent users; the interactivity result itself does not need it.
-   */
   mw: number | null;
-  /** Raw MW input value (page-owned so the `c_mw` URL param has one writer). */
   mwInput: string;
   onMwInputChange: (raw: string) => void;
 }
@@ -103,9 +86,9 @@ const STRINGS = {
     costCapNoGpus: '当前无可见芯片可评估。请在图表图例中启用硬件。',
     note: '注：',
     disaggFleet:
-      ' 解耦推理配置（如 MoRI SGLang、Dynamo TRTLLM）的输入与输出吞吐量分别按预填充芯片与解码芯片报告，而非按芯片总数，因此在「输入」与「输出」token 类型下，成本上限所允许的交互性沿用了上述按池计的口径。在「总计」口径下，两种部署方式均按芯片总数计。',
+      ' 分离式推理配置（如 MoRI SGLang、Dynamo TRTLLM）的输入与输出吞吐量分别按预填充芯片与解码芯片报告，而非按芯片总数，因此在「输入」与「输出」token 类型下，成本上限所允许的交互性沿用了上述按池计的口径。在「总计」口径下，两种部署方式均按芯片总数计。',
     assumptions: (tier: string) =>
-      `假设结果操作点下 100% 利用率，并采用 ${tier} 层级的自有数据中心经济模型。如显示并发用户数，则已改按芯片总数计。`,
+      `假设在给出结果的运行点上利用率为 100%，并采用 ${tier} 层级的自有数据中心经济模型。如显示并发用户数，则已改按芯片总数计。`,
     source: '来源：',
   },
 } as const;
@@ -128,7 +111,6 @@ interface CostCapRow {
   resultKey: string;
   hwKey: string;
   precision?: string;
-  /** null = cost target not reachable anywhere on this chip's frontier */
   maxInteractivity: number | null;
   tputAtIv: number | null;
   users: number | null;
@@ -157,11 +139,9 @@ export default function CostTargetPanel({
   }, []);
 
   const handleCostCapBlur = useCallback(() => {
-    track('calculator_cost_target_set', { costCap: costCapInput });
+    track('calculator_cost_target_set', { cost_cap: costCapInput });
   }, [costCapInput]);
 
-  // Gated ONLY by the legend's hw visibility — never by results interpolated at
-  // the current slider target, which would hide a chip whose frontier is fine.
   const visibleGroupKeys = useMemo(
     () =>
       new Set(
@@ -228,7 +208,6 @@ export default function CostTargetPanel({
         users: stats ? stats.concurrentUsers : null,
       });
     }
-    // Highest achievable interactivity first; unreachable rows last.
     return rows.toSorted(
       (a, b) => (b.maxInteractivity ?? -Infinity) - (a.maxInteractivity ?? -Infinity),
     );
@@ -282,7 +261,9 @@ export default function CostTargetPanel({
             title={t.costCapTitle}
             toggleLabel={t.toggleSection}
             testId="calculator-costcap-collapse"
-            onToggle={(open) => track('calculator_section_toggled', { section: 'costcap', open })}
+            onToggle={(open) =>
+              track('calculator_section_toggled', { section: 'costcap', enabled: open })
+            }
           >
             <div className="flex flex-col gap-4">
               <p className="text-muted-foreground text-sm">{t.costCapDescription}</p>
@@ -368,8 +349,6 @@ export default function CostTargetPanel({
                 </>
               ) : (
                 <p className="text-sm text-muted-foreground" data-testid="calculator-costcap-empty">
-                  {/* With a valid target set, empty means nothing is legend-visible
-                      (unreachable chips still produce rows). */}
                   {costCap ? t.costCapNoGpus : t.costCapEmpty}
                 </p>
               )}

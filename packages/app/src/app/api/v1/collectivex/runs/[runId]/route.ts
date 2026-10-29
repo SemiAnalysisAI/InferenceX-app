@@ -8,21 +8,10 @@ import {
 import { FIXTURES_MODE, getCollectiveXWriteDb } from '@semianalysisai/inferencex-db/connection';
 import {
   collectiveXDatasetFromRow,
-  deleteCollectiveXRun,
   getCollectiveXRun,
 } from '@semianalysisai/inferencex-db/queries/collectivex';
 
-import {
-  COLLECTIVEX_CACHE_CONTROL,
-  collectiveXCacheTag,
-  cachedJson,
-  purgeCollectiveX,
-} from '@/lib/cache/api-cache';
-import { bearerMatches } from '@/lib/api/bearer-auth';
-import {
-  collectiveXSweepErrorStatus,
-  ensureCollectiveXRun,
-} from '@/lib/collectivex/collectivex-lazy-ingest';
+import { collectiveXCacheTag, cachedJson } from '@/lib/cache/api-cache';
 import { loadFixture } from '@/lib/testing/test-fixtures';
 
 export const dynamic = 'force-dynamic';
@@ -44,80 +33,16 @@ export async function GET(request: NextRequest, context: { params: Promise<{ run
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
     const latest = loadFixture<CollectiveXDataset>('collectivex-latest');
-    if (latest.run.run_id === runId) return cachedJson(latest);
-    return cachedJson(loadFixture<CollectiveXDataset>(`collectivex-run-${runId}`));
-  }
-
-  let ensureError: unknown = null;
-  try {
-    await ensureCollectiveXRun(version, runId);
-  } catch (error) {
-    ensureError = error;
+    if (latest.run.run_id === runId) return cachedJson(request, latest);
+    return cachedJson(request, loadFixture<CollectiveXDataset>(`collectivex-run-${runId}`));
   }
 
   try {
-    // Ensure may have inserted or refreshed this run, so read from the same primary.
     const row = await getCollectiveXRun(getCollectiveXWriteDb(), version, runId);
-    if (row === null) {
-      if (ensureError) {
-        const status = collectiveXSweepErrorStatus(ensureError);
-        if (status !== null) {
-          return NextResponse.json(
-            { error: status === 404 ? 'Not found' : 'Unavailable' },
-            { status },
-          );
-        }
-        throw ensureError;
-      }
-      return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    }
-    if (ensureError) {
-      console.error('CollectiveX run refresh failed; serving stored run:', ensureError);
-    }
-    // Short window like the sibling routes: a GitHub re-run of failed shards
-    // refreshes this run's stored contents, and deletion must not linger.
-    return cachedJson(collectiveXDatasetFromRow(row), {
-      tag: collectiveXCacheTag(),
-      cacheControl: COLLECTIVEX_CACHE_CONTROL,
-    });
+    if (row === null) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    return cachedJson(request, collectiveXDatasetFromRow(row), { tag: collectiveXCacheTag() });
   } catch (error) {
     console.error('Error fetching CollectiveX run:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
-
-/**
- * Admin deletion of an ingested run. Authenticated with a dedicated Bearer
- * secret — the token is remembered in browser localStorage, so it must not
- * be the CI-held INVALIDATE_SECRET (scoped blast radius, independently
- * rotatable). Deletion tombstones the run (lazy discovery must never
- * re-ingest it) and purges the CollectiveX cache scope so the run table and
- * latest views drop it immediately.
- */
-export async function DELETE(
-  request: NextRequest,
-  context: { params: Promise<{ runId: string }> },
-) {
-  const secret = process.env.COLLECTIVEX_ADMIN_SECRET;
-  const authHeader = request.headers.get('Authorization') ?? '';
-  if (!secret || !bearerMatches(authHeader, secret)) {
-    return new NextResponse('Unauthorized', { status: 401 });
-  }
-
-  const { runId } = await context.params;
-  if (!RUN_ID.test(runId)) {
-    return NextResponse.json({ error: 'Unknown run id' }, { status: 400 });
-  }
-
-  try {
-    const deleted = await deleteCollectiveXRun(getCollectiveXWriteDb(), runId);
-    if (!deleted) {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    }
-    purgeCollectiveX();
-    return NextResponse.json({ deleted: true, runId });
-  } catch (error) {
-    console.error('Error deleting CollectiveX run:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

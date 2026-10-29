@@ -1,10 +1,3 @@
-/**
- * Simplified Chinese ports of the English-prose-generating functions in
- * compare-ssr.ts. Provides zh narrative templates, JSON-LD builders, and
- * breadcrumb helpers for /zh/compare and /zh/compare-per-dollar slug pages.
- *
- * MUST be updated whenever compare-ssr.ts narrative templates change.
- */
 import {
   AUTHOR_NAME,
   AUTHOR_URL,
@@ -22,32 +15,24 @@ import {
   fmtCost,
   fmtPctDelta,
   type FullBoth,
-  META_DESCRIPTION_MAX,
   type PairSummary,
   type PerDollarBoth,
   pickRotated,
   type SsrInterpolatedRow,
 } from '@/lib/compare/compare-ssr';
+import { datasetJsonLd } from '@/lib/seo/dataset-jsonld';
+import { clampMetaDescription, fitMetaTitle, META_DESCRIPTION_MAX } from '@/lib/seo/meta-text';
 
-/** Format model names for Chinese prose without leaking English conjunctions. */
 export function formatModelListZh(models: CompareModelSlug[]): string {
   const labels = models.map((model) => model.label);
   return labels.length === 0 ? '暂无模型' : labels.join('、');
 }
-
-// ---------------------------------------------------------------------------
-// Band phrase — Chinese
-// ---------------------------------------------------------------------------
 
 function bandPositionZh(target: number, range: string, band: 'low' | 'middle' | 'high'): string {
   if (band === 'low') return `${target} tok/s/user 接近 ${range} 交互性区间的下限`;
   if (band === 'high') return `${target} tok/s/user 接近 ${range} 交互性区间的上限`;
   return `${target} tok/s/user 位于 ${range} 交互性区间的中段`;
 }
-
-// ---------------------------------------------------------------------------
-// /compare-per-dollar variant — both GPUs, no tie, non-zero costs
-// ---------------------------------------------------------------------------
 
 const PER_DOLLAR_BOTH_TEMPLATES_ZH: ((i: PerDollarBoth) => string)[] = [
   (i) =>
@@ -102,10 +87,6 @@ const PER_DOLLAR_SINGLE_TEMPLATES_ZH: ((args: {
     `当 ${i.modelLabel} 的目标交互性为 ${i.target} tok/s/user 时，仅 ${i.presentLabel} 有成本数据，每百万 token 成本为 ${fmtCost(i.presentCost)}；${i.missingLabel} 在该运行点尚未测试。`,
 ];
 
-// ---------------------------------------------------------------------------
-// /compare 'full' variant — both GPUs, mentions cost AND throughput
-// ---------------------------------------------------------------------------
-
 function fullSummaryZh(i: FullBoth): string {
   const costPart = i.costTied
     ? '每 token 成本基本持平'
@@ -152,11 +133,6 @@ const FULL_SINGLE_TEMPLATES_ZH: ((args: {
     `当 ${i.modelLabel} 的目标交互性为 ${i.target} tok/s/user 时，${i.presentLabel} 的吞吐量为 ${i.presentValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.presentCost)}；${i.missingLabel} 在该运行点尚未测试。`,
 ];
 
-// ---------------------------------------------------------------------------
-// compareTableNarrativeZh
-// ---------------------------------------------------------------------------
-
-/** 1:1 port of `AGENTIC_SCENARIO_INTRO` — see the English original for why. */
 export const AGENTIC_SCENARIO_INTRO_ZH: AgenticScenarioIntro = {
   paragraph:
     'AgentX 回放真实的 coding agent 会话，而非定长 prompt。随着会话轮次增加，上下文不断增长；每个请求的大部分内容都可直接从 cache 读取，无需重新计算。因此，这项对比不仅取决于芯片本身的吞吐量，还会受到跨节点 KV 传输、prefix-aware routing 和 cache 容量等系统因素影响。定长序列工作负载仍是衡量 kernel 与芯片性能的清晰基线；两种场景从不同角度回答同一硬件的性能问题。',
@@ -242,7 +218,6 @@ export function compareTableNarrativeZh(
       continue;
     }
 
-    // 'full' variant
     if (a && b) {
       const costOk = a.cost > 0 && b.cost > 0;
       const tputOk = a.value > 0 && b.value > 0;
@@ -291,21 +266,18 @@ export function compareTableNarrativeZh(
   return paragraphs;
 }
 
-// ---------------------------------------------------------------------------
-// SEO meta description — Chinese port of compareMetaDescription
-// ---------------------------------------------------------------------------
+export function compareSeoTitleZh(gpuLabel: string, modelSeoName: string): string {
+  return fitMetaTitle([
+    `${gpuLabel}：${modelSeoName} 推理基准测试`,
+    `${gpuLabel}：${modelSeoName} 基准测试`,
+    `${gpuLabel}：${modelSeoName}`,
+  ]);
+}
 
-/** First candidate ≤ max, or undefined. Local mirror of the private helper in
- *  compare-ssr.ts so the ladder logic stays identical between the two files. */
 function firstUnderZh(candidates: string[], max: number): string | undefined {
   return candidates.find((c) => c.length <= max);
 }
 
-/** Simplified Chinese, stat-led, ≤155-char meta description for a
- *  `/zh/compare/<slug>` page. 1:1 port of `compareMetaDescription`: same
- *  representative-row stat (`computeCompareStat`), same fallback-to-boilerplate
- *  and brand-clause-drop ladders. Model name, GPU SKUs and units stay English
- *  per the translation rules; the connective prose is Chinese. */
 export function compareMetaDescriptionZh(
   model: CompareModelSlug,
   a: string,
@@ -325,8 +297,8 @@ export function compareMetaDescriptionZh(
         `${gpuLabel} 在 ${modelName} 上的推理基准测试，来自 ${SITE_NAME}。`,
         `${gpuLabel} 在 ${modelName} 上的推理基准测试。`,
       ],
-      META_DESCRIPTION_MAX,
-    ) ?? `${gpuLabel} 推理基准测试`.slice(0, META_DESCRIPTION_MAX);
+      META_DESCRIPTION_MAX.zh,
+    ) ?? clampMetaDescription(`${gpuLabel} 在 ${modelName} 上的推理基准测试。`, 'zh');
 
   const stat = computeCompareStat(a, b, ssrRows);
   if (!stat) return fallback;
@@ -349,14 +321,10 @@ export function compareMetaDescriptionZh(
         `${core}数据来自 ${SITE_NAME} 开源基准测试，结果经过验证。`,
         core,
       ],
-      META_DESCRIPTION_MAX,
+      META_DESCRIPTION_MAX.zh,
     ) ?? fallback
   );
 }
-
-// ---------------------------------------------------------------------------
-// JSON-LD — Chinese
-// ---------------------------------------------------------------------------
 
 export function buildBreadcrumbJsonLdZh(
   variant: CompareJsonLdVariant,
@@ -478,15 +446,16 @@ export function buildJsonLdZh(
           { name: `${bLabel} 并发数`, value: String(Math.round(row.b.concurrency)) },
         );
       }
-      return {
-        '@type': 'Dataset',
+      return datasetJsonLd({
         name: `${model.label}：目标交互性 ${row.target} tok/s/user 下的对比`,
+        description: `${model.label} 在 ${row.target} tok/s/user 交互性下 ${aLabel} 与 ${bLabel} 的吞吐量、每百万 token 成本、tok/s/MW 与并发数，由 InferenceX CI 实测。`,
+        inLanguage: 'zh-CN',
         variableMeasured: metrics.map((m) => ({
           '@type': 'PropertyValue',
           name: m.name,
           value: m.value,
         })),
-      };
+      });
     });
 
   return {

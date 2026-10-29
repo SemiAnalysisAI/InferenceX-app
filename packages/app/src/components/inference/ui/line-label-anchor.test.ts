@@ -4,7 +4,6 @@ import type { InferenceData } from '@/components/inference/types';
 
 import { pointNearestX } from './line-label-anchor';
 
-// Minimal InferenceData stand-ins — pointNearestX only reads `x`.
 const pt = (x: number, y: number): InferenceData => ({ x, y }) as InferenceData;
 
 describe('pointNearestX', () => {
@@ -16,8 +15,6 @@ describe('pointNearestX', () => {
   });
 
   it('keeps a stable anchor as the line shifts between frames', () => {
-    // An anchor stored at x=5 should resolve to whichever current point sits
-    // nearest x=5 — this is what keeps a replay label glued to its line.
     const anchorX = 5;
     const frameA = [pt(0, 10), pt(5, 22), pt(10, 30)];
     const frameB = [pt(0, 12), pt(5, 18), pt(10, 26)];

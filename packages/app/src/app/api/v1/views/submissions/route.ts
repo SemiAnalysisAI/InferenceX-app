@@ -20,7 +20,7 @@ import {
   validateParams as validateViewParams,
 } from '@/lib/views-api/params';
 import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
-import { readResponse } from '@/lib/views-api/source';
+import { readResponse, sourceRequest } from '@/lib/views-api/source';
 import { DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants';
 import type { NextRequest } from 'next/server';
 export const dynamic = 'force-dynamic';
@@ -47,7 +47,9 @@ export function GET(request: NextRequest) {
     const lines = s.has('lines')
       ? parseListParam(s.get('lines'), 'lines', ['nvidia', 'amd', 'total'])
       : ['nvidia', 'amd', 'total'];
-    const { summary, volume } = await readResponse<SubmissionsResponse>(await submissions());
+    const { summary, volume } = await readResponse<SubmissionsResponse>(
+      await submissions(sourceRequest(request, '/api/v1/submissions')),
+    );
     const previousRuns = computePreviousRuns(summary);
     const previousImages = computePreviousImages(summary);
     const rows = summary
@@ -75,7 +77,7 @@ export function GET(request: NextRequest) {
       mode === 'weekly'
         ? groupVolumeByWeek(selectedVolume).map((row) => ({ date: row.week, ...row }))
         : computeCumulative(selectedVolume);
-    return cachedJson({
+    return cachedJson(request, {
       apiVersion: 'v1',
       view: 'submissions',
       params: { search, sort, direction, offset, limit, mode, onChangeOnly, lines },

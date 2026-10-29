@@ -1,7 +1,3 @@
-// Inline JSON-LD <script>. Emits raw JSON via dangerouslySetInnerHTML (React
-// children would HTML-escape the payload). Escapes `<`, `>`, and `&` per the
-// HTML5 spec for `<script>` element contents — blocks `</script>` breakout and
-// keeps the payload valid if any string field ever contains one of those.
 export function JsonLd({ data }: { data: object }) {
   const json = JSON.stringify(data);
   if (!json) return null;

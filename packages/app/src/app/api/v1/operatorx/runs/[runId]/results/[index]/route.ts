@@ -8,14 +8,16 @@ export const runtime = 'nodejs';
 export const maxDuration = 300;
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ runId: string; index: string }> },
 ) {
   try {
     const { runId, index } = await context.params;
     if (!/^[0-9]+$/u.test(index))
       return NextResponse.json({ error: 'Invalid result index' }, { status: 400 });
-    return cachedJson(await getResultDetail(runId, Number(index)), { tag: operatorXCacheTag() });
+    return cachedJson(request, await getResultDetail(runId, Number(index)), {
+      tag: operatorXCacheTag(),
+    });
   } catch (error) {
     console.error('OperatorX result read', error);
     return NextResponse.json(

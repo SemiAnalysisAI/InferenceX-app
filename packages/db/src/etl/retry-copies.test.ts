@@ -31,7 +31,6 @@ function tempRoot(): string {
 
 const SIBLINGS = ['bmk_agentic_', 'agentic_', 'power_audit_', 'multinode_server_logs_'];
 
-/** One job copy: its benchmark row plus every sibling artifact the job uploads. */
 function writeCopy(dir: string, suffix: string, row: Record<string, unknown>): void {
   for (const prefix of SIBLINGS) fs.mkdirSync(path.join(dir, `${prefix}${suffix}`));
   fs.writeFileSync(path.join(dir, `bmk_agentic_${suffix}`, 'result.json'), JSON.stringify(row));
@@ -47,7 +46,6 @@ function metas(entries: [string, string, number][]): RetryArtifactMeta[] {
 describe('dropSupersededJobCopies', () => {
   it('keeps the latest attempt of a point and every sibling of that copy', () => {
     const dir = tempRoot();
-    // Retries on other runners get unrelated hashed names; name order is not attempt order.
     writeCopy(dir, 'conc48-aaaa', { ...goldenRow, median_e2el: 1 });
     writeCopy(dir, 'conc48-zzzz', { ...goldenRow, median_e2el: 2 });
     writeCopy(dir, 'conc48-mmmm', { ...goldenRow, median_e2el: 3 });

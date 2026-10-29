@@ -85,9 +85,6 @@ interface SessionDetail {
 const PAGE_SIZE = 100;
 const MIN_PAGE_SIZE = 1;
 
-// Tabs that only show hash block counts. They load requests without hash_ids
-// (~90% of the payload); the conversation view fetches a request's list when
-// it's expanded. Opening any other tab reloads the session with hash_ids.
 const TABS_WITHOUT_HASH_IDS = new Set(['conversation', 'flow', 'timeline']);
 
 export default function SessionLayout({ children }: { children: React.ReactNode }) {
@@ -106,13 +103,11 @@ export default function SessionLayout({ children }: { children: React.ReactNode 
   const hasMore = data ? data.requests.length < data.total : false;
   const relativePath = explorerRelativePath(pathname) ?? '';
   const tab = relativePath.slice(`/sessions/${id}/`.length).split('/')[0] ?? '';
-  // Sticky: once a tab needed hash_ids, keep them so switching back doesn't refetch.
   const [withHashIds, setWithHashIds] = useState(() => !TABS_WITHOUT_HASH_IDS.has(tab));
   useEffect(() => {
     if (!TABS_WITHOUT_HASH_IDS.has(tab)) setWithHashIds(true);
   }, [tab]);
 
-  // Fetch a page, retrying with halved chunk size on failure
   const fetchPage = useCallback(
     async (offset: number, limit: number): Promise<SessionDetail> => {
       const res = await fetch(
@@ -145,7 +140,6 @@ export default function SessionLayout({ children }: { children: React.ReactNode 
     );
   }, []);
 
-  // Auto-load when sentinel becomes visible
   const loadMoreCb = useCallback(() => {
     if (!data || loadingMore) return;
     const nextOffset = data.requests.length;
@@ -163,7 +157,6 @@ export default function SessionLayout({ children }: { children: React.ReactNode 
     onLoadMore: loadMoreCb,
   });
 
-  // Initial fetch + refetch when load direction changes
   useEffect(() => {
     let stale = false;
     setLoading(true);
@@ -251,7 +244,6 @@ export default function SessionLayout({ children }: { children: React.ReactNode 
   const navLinks = tabKeys.map((key) => ({
     href: explorerHref(`${sessionPath}/${key}`),
     label: EXPLORER_SESSION_TAB_META[key][locale],
-    // Match on the explorer-relative path; `href` may carry `?version=`.
     active:
       relativePath === `${sessionPath}/${key}` ||
       (key === 'conversation' && relativePath === sessionPath),
@@ -386,7 +378,6 @@ export default function SessionLayout({ children }: { children: React.ReactNode 
               {t.newest}
             </button>
           </div>
-          {/* Scrolls on its own on narrow screens instead of widening the page. */}
           <nav className="flex min-w-0 items-center gap-0.5 overflow-x-auto border border-border rounded-md p-0.5">
             {navLinks.map((link) => {
               const isActive = link.active;

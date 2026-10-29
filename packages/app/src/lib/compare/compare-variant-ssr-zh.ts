@@ -1,11 +1,3 @@
-/**
- * Simplified Chinese ports of the English-prose-generating functions in
- * compare-variant-ssr.ts. Provides zh narrative templates, JSON-LD builders,
- * and breadcrumb helpers for /zh/compare-precision and /zh/compare-spec-decode
- * slug pages.
- *
- * MUST be updated whenever compare-variant-ssr.ts narrative templates change.
- */
 import {
   AUTHOR_NAME,
   AUTHOR_URL,
@@ -22,22 +14,14 @@ import {
   pickRotated,
   type SsrInterpolatedRow,
 } from '@/lib/compare/compare-ssr';
+import { datasetJsonLd } from '@/lib/seo/dataset-jsonld';
 import { type VariantBoth, type VariantCompareKind } from '@/lib/compare/compare-variant-ssr';
-
-// ---------------------------------------------------------------------------
-// Band phrase -- Chinese
-// ---------------------------------------------------------------------------
 
 function bandPositionZh(target: number, range: string, band: 'low' | 'middle' | 'high'): string {
   if (band === 'low') return `${target} tok/s/user 接近 ${range} 交互性区间的下限`;
   if (band === 'high') return `${target} tok/s/user 接近 ${range} 交互性区间的上限`;
   return `${target} tok/s/user 位于 ${range} 交互性区间的中段`;
 }
-
-// ---------------------------------------------------------------------------
-// Shared template-input type — imported from the EN module so the two files
-// cannot drift structurally.
-// ---------------------------------------------------------------------------
 
 function variantFullSummaryZh(i: VariantBoth): string {
   const cheaper = i.cheaper === '关闭' || i.cheaper === 'Off' ? '关闭投机解码' : i.cheaper;
@@ -65,10 +49,6 @@ function variantStateAtZh(kind: VariantCompareKind, label: string): string {
   return label === '关闭' || label === 'Off' ? '关闭投机解码时' : `启用 ${label} 时`;
 }
 
-// ---------------------------------------------------------------------------
-// Precision comparison templates -- Chinese
-// ---------------------------------------------------------------------------
-
 const PRECISION_BOTH_TEMPLATES_ZH: ((i: VariantBoth) => string)[] = [
   (i) =>
     `在 ${i.gpuLabel} 上运行 ${i.modelLabel}，目标交互性为 ${i.target} tok/s/user 时，${i.aLabel} 的吞吐量为 ${i.aValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${i.bLabel} 的吞吐量为 ${i.bValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${variantFullSummaryZh(i)}。较低的量化精度以模型准确率为代价换取更高吞吐量；如需了解对模型质量的影响，请查看评估页。`,
@@ -79,10 +59,6 @@ const PRECISION_BOTH_TEMPLATES_ZH: ((i: VariantBoth) => string)[] = [
   (i) =>
     `${bandPositionZh(i.target, i.range, i.band)}。在这一运行点，${i.aLabel} 在 ${i.gpuLabel} 上运行 ${i.modelLabel} 的吞吐量为 ${i.aValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${i.bLabel} 的吞吐量为 ${i.bValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${variantFullSummaryZh(i)}。调整量化精度会同时影响推理速度和模型质量；模型准确率基准测试请参阅评估页。`,
 ];
-
-// ---------------------------------------------------------------------------
-// Spec-decode comparison templates -- Chinese
-// ---------------------------------------------------------------------------
 
 const SPEC_DECODE_BOTH_TEMPLATES_ZH: ((i: VariantBoth) => string)[] = [
   (i) =>
@@ -95,7 +71,6 @@ const SPEC_DECODE_BOTH_TEMPLATES_ZH: ((i: VariantBoth) => string)[] = [
     `${bandPositionZh(i.target, i.range, i.band)}。在这一运行点，${variantStateAtZh('spec-decode', i.aLabel)}，吞吐量为 ${i.aValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${variantStateAtZh('spec-decode', i.bLabel)}，吞吐量为 ${i.bValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${variantFullSummaryZh(i)}。投机解码的收益因工作负载而异；输出较短的 prompt 通常收益较小。`,
 ];
 
-// Single-side templates -- Chinese (shared by both kinds)
 const VARIANT_SINGLE_TEMPLATES_ZH: ((args: {
   kind: VariantCompareKind;
   modelLabel: string;
@@ -113,10 +88,6 @@ const VARIANT_SINGLE_TEMPLATES_ZH: ((args: {
   (i) =>
     `在 ${i.gpuLabel} 上运行 ${i.modelLabel}，目标交互性设为 ${i.target} tok/s/user：${variantStateAtZh(i.kind, i.presentLabel)}，吞吐量为 ${i.presentValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.presentCost)}；${variantStateAtZh(i.kind, i.missingLabel)}，该运行点尚未测试。`,
 ];
-
-// ---------------------------------------------------------------------------
-// variantCompareNarrativeZh
-// ---------------------------------------------------------------------------
 
 export function variantCompareNarrativeZh(
   kind: VariantCompareKind,
@@ -191,10 +162,6 @@ export function variantCompareNarrativeZh(
 
   return paragraphs;
 }
-
-// ---------------------------------------------------------------------------
-// JSON-LD -- Chinese
-// ---------------------------------------------------------------------------
 
 function variantJsonLdEntryForZh(label: string, summary: PairSummary, position: number) {
   const props: { name: string; value: string | number }[] = [{ name: '类别', value: '配置方案' }];
@@ -289,16 +256,16 @@ export function buildVariantJsonLdZh(
           { name: `${bDisplayLabel}：并发数`, value: String(Math.round(row.b.concurrency)) },
         );
       }
-      return {
-        '@type': 'Dataset',
+      return datasetJsonLd({
         name: `${model.label}：目标交互性 ${row.target} tok/s/user 下的${kindLabel}`,
+        description: `${model.label} 在 ${gpuDisplayLabel} 上、${row.target} tok/s/user 交互性下 ${aDisplayLabel} 与 ${bDisplayLabel} 的吞吐量、每百万 token 成本、tok/s/MW 与并发数，由 InferenceX CI 实测。`,
         inLanguage: 'zh-CN',
         variableMeasured: metrics.map((m) => ({
           '@type': 'PropertyValue',
           name: m.name,
           value: m.value,
         })),
-      };
+      });
     });
 
   const keywords = [

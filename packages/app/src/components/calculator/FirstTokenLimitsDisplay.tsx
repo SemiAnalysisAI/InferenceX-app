@@ -51,6 +51,7 @@ import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
 import { track } from '@/lib/analytics/analytics';
+import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
 import { getModelSortIndex } from '@/lib/catalog/constants';
 import { exportToCsv } from '@/lib/export/csv-export';
 import {
@@ -90,7 +91,7 @@ const COST_PROVIDER_OPTIONS: {
   {
     value: 'costh',
     label: 'Owning at Large Hyperscaler Volume',
-    labelZh: '自有 - 超大规模云大批量',
+    labelZh: '自有 · 超大规模云厂商批量采购',
   },
   { value: 'costr', label: 'Rent - 3 Year Commit', labelZh: '租赁 - 3 年承诺' },
 ];
@@ -160,10 +161,10 @@ const STRINGS = {
       '哪款芯片最优，取决于用户能接受多长的首 token 等待。本页面按每一档首 token 延迟（TTFT）上限，从同时满足交互性下限的实测配置中，逐厂商选出成本最低的一个。仅使用实测数据，不做插值，每个柱形都可追溯到对应的运行记录。',
     benchmarkGroup: '基准测试配置',
     chartGroup: '图表配置',
-    costProviderLabel: '成本供应商',
+    costProviderLabel: '计价方式',
     costProviderTooltip:
-      '柱形成本采用的定价层级。按超大规模云厂商大批量采购价自有（如 AWS/GCP）或 3 年承诺租赁。带锁的租赁期限（按需至 2 年承诺）收录于 SemiAnalysis AI Cloud TCO 模型。',
-    costProviderPlaceholder: '成本供应商',
+      '柱形成本采用的定价层级。按超大规模云厂商的大批量采购价格自购（如 AWS/GCP）或 3 年承诺租赁。带锁的租赁期限（按需至 2 年承诺）收录于 SemiAnalysis AI Cloud TCO 模型。',
+    costProviderPlaceholder: '计价方式',
     tokenTypeLabel: 'Token 类型',
     tokenTypeTooltip:
       '成本按每百万总 token、输入 token 还是输出 token 计。分离式配置的输入、输出吞吐量分别按 prefill 芯片和 decode 芯片统计，因此其输入、输出口径的成本并非按全部芯片计。',
@@ -183,7 +184,7 @@ const STRINGS = {
     noTtft: (stat: string) =>
       `${zhStatPhrase('首 token 延迟', stat, '当前选择的实测数据行未报告')}，无法施加上限。请尝试其他工作负载或运行日期。`,
     noneUnderCaps: (cap: string, stat: string) =>
-      `${zhStatPhrase('首 token 延迟', stat, '实测配置达到了交互性下限，但没有任何配置的')}落在本梯度最大上限（≤${cap}s）之内。请提高或新增上限后再比较首 token 延迟约束。`,
+      `${zhStatPhrase('首 token 延迟', stat, '实测配置达到了交互性下限，但没有任何配置的')}落在本阶梯的最大上限（≤${cap}s）之内。请提高或新增上限后再比较首 token 延迟约束。`,
     captionFloor: (min: number, stat: string) =>
       `${zhStatPhrase('交互性', stat)} ≥${min} tok/s/user`,
     captionRows: (qualifying: number, measured: number) =>
@@ -268,16 +269,11 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
   const [visibilityIntent, setVisibilityIntent] = useState<CalculatorVisibilityIntent | null>(null);
   const [highContrast, setHighContrast] = useState(false);
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
-  // Both inputs are URL-seeded so an article can link the exact figure. Empty
-  // means "use the sequence-aware default", which is why the defaults are not
-  // written into the URL.
   const [minInteractivityInput, setMinInteractivityInput] = useState<string>(
     () => readUrlParams().c_ivmin ?? '',
   );
   const [capsInput, setCapsInput] = useState<string>(() => readUrlParams().c_ttft ?? '');
 
-  // Unofficial-run overlay (`?unofficialrun=…`): each loaded run gets its own
-  // bar per cap, chosen from its own rows only, in the run's palette color.
   const { isUnofficialRun, unofficialBenchmarkRows, unofficialRunInfos, runIndexByUrl } =
     useUnofficialRun();
   const overlayInput = useMemo(
@@ -312,8 +308,6 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
 
   const isAgenticSequence = selectedSequence === Sequence.AgenticTraces;
   const featureGateUnlocked = useFeatureGate();
-  // Agentic rows are read at the selected percentile; fixed sequences at the
-  // median, the same split as the inference chart's interactivity and TTFT axes.
   const statLabel = isAgenticSequence
     ? selectedPercentile.toUpperCase()
     : STAT_LABELS[locale].median;
@@ -330,8 +324,6 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
     [capsInput],
   );
 
-  // One legend governs a chip's official and overlay bars together; overlay-only
-  // hardware is merged in so its bar can be hidden. See docs/tco-calculator.md.
   const legendHwKeys = useMemo(() => {
     if (!isUnofficialRun || overlayAvailableHwKeys.length === 0) return availableHwKeys;
     return [...new Set([...availableHwKeys, ...overlayAvailableHwKeys])];
@@ -439,8 +431,6 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
     writeUrlParams({ c_ttft: parsed ? formatFirstTokenCaps(parsed) : '' });
   }, []);
   const handleCapsBlur = useCallback(() => {
-    // Normalize what was typed to the ladder actually in use, so the field and
-    // the chart agree; an unusable entry falls back to the default ladder.
     const parsed = parseFirstTokenCaps(capsInput);
     setCapsInput(parsed ? formatFirstTokenCaps(parsed) : '');
     track('first_token_caps_set', { caps: formatFirstTokenCaps(caps) });
@@ -489,8 +479,6 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
           title: `${t.unofficialRun}: ${series.label}`,
           hw: `overlay-run-${info?.id ?? series.runIndex}`,
           isActive: true,
-          // A label for the run, not a series the legend can hide: per-run
-          // removal lives in the unofficial-run banner.
           isRemovable: false,
           onClick: () => {},
         };
@@ -677,7 +665,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
       isLegendExpanded={isLegendExpanded}
       onExpandedChange={(expanded) => {
         setIsLegendExpanded(expanded);
-        track('first_token_legend_expanded', { expanded });
+        track('first_token_legend_expanded', { enabled: expanded });
       }}
       switches={[
         {
@@ -823,7 +811,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
                         const next = values[0];
                         if (!next) return;
                         setCostType(next as CostType);
-                        track('first_token_cost_type_changed', { costType: next });
+                        track('first_token_cost_type_changed', { cost_type: next });
                       }}
                       open={openDropdown === 'costType'}
                       onOpenChange={handleDropdownOpenChange('costType')}
@@ -918,6 +906,12 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
             <ChartButtons
               chartId="first-token-limits"
               analyticsPrefix="first_token"
+              analyticsContext={selectionAnalyticsContext({
+                model: selectedModel,
+                sequence: selectedSequence,
+                precisions: selectedPrecisions,
+                gpuCount: visibleHwKeys.size,
+              })}
               hideZoomReset
               onExportCsv={handleExportCsv}
               exportFileName={`InferenceX_first_token_limits_${selectedModel}`}

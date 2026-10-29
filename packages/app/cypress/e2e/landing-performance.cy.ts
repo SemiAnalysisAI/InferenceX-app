@@ -65,24 +65,38 @@ describe('Landing page performance', () => {
       .and('contain', 'href="/quotes#quote-minimax"')
       .and('contain', 'data-testid="launch-banner"');
 
+    // The previous page can still be loading a chunk when this intercept starts, and the visit
+    // below aborts it. Cypress fails the test when a response callback loses its browser
+    // connection, so delay only the scripts requested by the document this test opens.
+    const pageUnderTest = `/?hydration-check=${Date.now()}`;
     cy.intercept('GET', '**/_next/static/**/*.js', (request) => {
+      if (!String(request.headers.referer ?? '').endsWith(pageUnderTest)) return;
       request.continue((response) => {
         response.setDelay(1500);
       });
     });
 
-    cy.visit('/', {
+    cy.visit(pageUnderTest, {
       onBeforeLoad(win) {
-        win.localStorage.removeItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed');
+        win.localStorage.removeItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed');
+        win.localStorage.setItem('inferencex-landing-banner-variant', 'operatorx');
         observeLayoutShifts(win);
       },
     });
 
-    cy.get('[data-testid="launch-banner"]').should('be.visible');
+    // Both A/B arms are server-rendered; the pre-paint style shows only the assigned one.
+    cy.get('[data-banner-variant="ubenchx"]').should('exist').and('not.be.visible');
+    cy.get('[data-testid="launch-banner"]:visible')
+      .should('have.length', 1)
+      .and('have.attr', 'href', '/operatorx');
     cy.get('[data-testid="intro-section"]').should(
       'contain.text',
       'See full quotes & more supporters',
     );
+    cy.get('[data-testid="compare-agentx-primary"]')
+      .should('be.visible')
+      .closest('[data-reveal]')
+      .should('not.exist');
     cy.get('[data-testid="supporters-more-row"]')
       .should('have.class', 'justify-end')
       .find('a')
@@ -94,7 +108,7 @@ describe('Landing page performance', () => {
     cy.viewport(412, 823);
     cy.visit('/', {
       onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed', '1');
+        win.localStorage.setItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed', '1');
         observeLayoutShifts(win);
       },
     });
@@ -118,9 +132,6 @@ describe('Landing page performance', () => {
       expect(resourceNames.some((name) => name.includes('/brand/left-pattern-full.svg'))).to.eq(
         false,
       );
-      // The landing AgentX ledger has five lazy model marks. A mobile viewport may
-      // fetch any visible subset, but the text-only supporter strip must not pull
-      // in its former logo set.
       const landingLogos = new Set(resourceNames.filter((name) => name.includes('/logos/')));
       expect(landingLogos.size).to.be.lessThan(6);
       expect(
@@ -139,12 +150,6 @@ describe('Landing page performance', () => {
 
   it('preloads only the default font and no supporter logos', () => {
     cy.request('/').then((response) => {
-      // Next emits resource preloads as a `Link` response header (when `/` renders
-      // dynamically) and/or as inlined <link rel="preload"> tags in the document
-      // <head> (when `/` is statically prerendered) — and a production build can
-      // surface the same resource in BOTH places at once. Collect a deduplicated
-      // set of preloaded URLs per `as` type, keyed by URL, so the assertion holds
-      // in every render mode and never double-counts a resource listed twice.
       const linkHeader = String(response.headers.link ?? '');
       const body = String(response.body ?? '');
 
@@ -156,7 +161,6 @@ describe('Landing page performance', () => {
         else if (as === 'image' && url.startsWith('/logos/')) logos.add(url);
       };
 
-      // `Link` header entries: <url>; rel=preload; as="font"|"image"; ...
       for (const entry of linkHeader.split(',')) {
         if (!/\brel=preload\b/u.test(entry)) continue;
         add(
@@ -165,7 +169,6 @@ describe('Landing page performance', () => {
         );
       }
 
-      // Inlined <link rel="preload"> tags.
       for (const tag of body.match(/<link\b[^>]*\brel="preload"[^>]*>/gu) ?? []) {
         add(
           tag.match(/\bas="(?<as>[^"]+)"/u)?.groups?.as,
@@ -174,9 +177,8 @@ describe('Landing page performance', () => {
       }
 
       expect([...fonts]).to.have.length(1);
-      // The supporters band no longer renders a quote block, so no supporter
-      // logo is visible on the landing page and none should be preloaded.
       expect([...logos]).to.have.length(0);
+      expect(body.match(/<link\b[^>]*left-pattern-full\.svg[^>]*>/gu) ?? []).to.have.length(0);
     });
   });
 });

@@ -7,16 +7,8 @@ import {
   type ProfitRouteProps,
 } from '@/components/calculator/profit-route-input';
 import { modelRouteAvailableForTab, resolveModelRouteSlug } from '@/lib/routing/model-routes';
-import { modelTabMetadata } from '@/lib/routing/tab-meta';
-
-/**
- * `/profit-estimator/<model>` — the GW-year profit estimator seeded to a
- * specific model, so every model has an indexable URL. Switching models in
- * the UI rewrites the pathname in place via `history.replaceState` (no reload,
- * no remount), the same mechanism `/calculator/<model>` uses. No
- * `generateStaticParams`: the page reads searchParams, so it renders
- * dynamically anyway.
- */
+import { MODEL_TAB_META, modelTabMetadata } from '@/lib/routing/tab-meta';
+import { TabIntro } from '@/components/dashboard/tab-intro';
 
 type Props = ProfitRouteProps;
 
@@ -33,15 +25,21 @@ export default async function ProfitEstimatorModelPage({ params, searchParams }:
     searchParams,
   });
   const seed = resolveCalculatorUrlSeed(sp);
-  // A legacy explicit ?g_model= wins over the path, as on /calculator/<model>.
   return (
-    <ProfitEstimatorDisplay
-      basis="chip-hour"
-      urlSeed={{
-        ...seed,
-        model: seed.model ?? resolved.route.model,
-        profitRouteKey: JSON.stringify(sp),
-      }}
-    />
+    <>
+      <TabIntro
+        tab="profit-estimator"
+        title={MODEL_TAB_META['profit-estimator'].title(resolved.route.seoName)}
+        intro={MODEL_TAB_META['profit-estimator'].intro(resolved.route.seoName)}
+      />
+      <ProfitEstimatorDisplay
+        basis="chip-hour"
+        urlSeed={{
+          ...seed,
+          model: seed.model ?? resolved.route.model,
+          profitRouteKey: JSON.stringify(sp),
+        }}
+      />
+    </>
   );
 }

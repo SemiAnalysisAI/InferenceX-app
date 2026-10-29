@@ -1,3 +1,4 @@
+import type { ComponentType } from 'react';
 import { compileMDX } from 'next-mdx-remote/rsc';
 import rehypeShikiFromHighlighter from '@shikijs/rehype/core';
 import remarkGfm from 'remark-gfm';
@@ -37,18 +38,20 @@ function getHighlighter() {
   return highlighterPromise;
 }
 
-export async function compileBlogMdx(source: string, locale: BlogLocale = 'en') {
+export async function compileBlogMdx(
+  source: string,
+  locale: BlogLocale = 'en',
+  components: Record<string, ComponentType<any>> = createMdxComponents(locale),
+) {
   const highlighter = await getHighlighter();
 
   return compileMDX({
     source,
-    components: createMdxComponents(locale),
+    components,
     options: {
       mdxOptions: {
-        // Keep prices like $1.95/GPU/hr as prose; math must use `$$` delimiters.
         remarkPlugins: [remarkGfm, [remarkMath, { singleDollarTextMath: false }]],
         rehypePlugins: [
-          // A malformed expression renders inline in red instead of failing the whole build.
           [rehypeKatex, { strict: false }],
           [
             rehypeShikiFromHighlighter,

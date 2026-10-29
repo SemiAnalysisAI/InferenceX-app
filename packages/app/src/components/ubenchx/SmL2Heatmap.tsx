@@ -12,11 +12,8 @@ import { transformSmL2Run, type SmL2ViewResult } from './sm-l2-transform';
 
 const STRINGS = {
   en: {
-    pageTitle: 'SM-SM L2 Latency Difference',
-    pageSubtitle:
-      'Pointer-chase L2 cache benchmark revealing SM-to-SM latency differences and GPC/die topology.',
     heatmapTitle: 'SM-SM L2 Latency Difference',
-    colorBarLabel: 'mean |diff| per address (cycles)',
+    colorBarLabel: 'mean |diff| per address (clock64 cycles)',
     tooltipSm: 'SM',
     tooltipGpc: 'GPC',
     tooltipDie: 'Die',
@@ -26,7 +23,7 @@ const STRINGS = {
     tooltipCol: 'column',
     methodology: 'Methodology',
     methodologyText:
-      'L2 pointer-chase benchmark: each SM walks a linked-list through L2 cache lines, recording per-hop latency via clock64(). The matrix shows mean |diff| between per-address latency vectors of each SM pair, revealing shared L2 partition proximity.',
+      'Each SM walks a linked list through L2 cache lines, recording per-hop latency with clock64(). Each cell is the mean absolute difference between two SMs’ matched-address latency profiles, not direct SM-to-SM communication latency or a physical distance.',
     statsIntraGpc: 'Intra-GPC mean',
     statsInterGpc: 'Inter-GPC (same die) mean',
     statsCrossDie: 'Cross-die mean',
@@ -35,10 +32,8 @@ const STRINGS = {
     noData: 'No SM-L2 distance data available.',
   },
   zh: {
-    pageTitle: 'SM 间 L2 延迟差异',
-    pageSubtitle: '基于指针追踪的 L2 缓存基准测试，揭示 SM 间延迟差异和 GPC/die 拓扑结构。',
     heatmapTitle: 'SM 间 L2 延迟差异',
-    colorBarLabel: '每地址平均 |差值|（周期）',
+    colorBarLabel: '每地址平均 |差值|（clock64 周期）',
     tooltipSm: 'SM',
     tooltipGpc: 'GPC',
     tooltipDie: 'Die',
@@ -48,7 +43,7 @@ const STRINGS = {
     tooltipCol: '列',
     methodology: '测试方法',
     methodologyText:
-      'L2 指针追踪基准测试：每个 SM 沿链表遍历 L2 缓存行，通过 clock64() 记录每跳延迟。矩阵展示每对 SM 的逐地址延迟向量的平均绝对差，揭示 L2 分区的共享亲和度。',
+      '每个 SM 沿链表遍历 L2 缓存行，并用 clock64() 记录每跳延迟。每个单元格表示两个 SM 在相同地址上测得的延迟特征之间的平均绝对差，既不是 SM 间直接通信延迟，也不是物理距离。',
     statsIntraGpc: 'GPC 内平均',
     statsInterGpc: '跨 GPC（同 die）平均',
     statsCrossDie: '跨 die 平均',
@@ -58,7 +53,6 @@ const STRINGS = {
   },
 } as const;
 
-/** Minimum cell size in pixels for readability. */
 const MIN_CELL = 3;
 const MAX_CELL = 6;
 
@@ -96,7 +90,6 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
 
     const g = svg.append('g').attr('transform', `translate(${marginLeft},${marginTop})`);
 
-    // Draw heatmap cells
     const matrix = result.matrix;
     for (let i = 0; i < n; i++) {
       for (let j = 0; j < n; j++) {
@@ -112,7 +105,6 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
       }
     }
 
-    // Die separator
     const dieASms = result.dieACount;
     if (dieASms > 0 && dieASms < n) {
       const sep = dieASms * cellSize;
@@ -131,7 +123,6 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
         .attr('stroke', 'white')
         .attr('stroke-width', 2.5);
 
-      // Die labels
       g.append('text')
         .attr('x', (dieASms * cellSize) / 2)
         .attr('y', -6)
@@ -150,7 +141,6 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
         .text('Die B');
     }
 
-    // GPC boxes and labels
     for (const bound of result.gpcBounds) {
       const x = bound.start * cellSize;
       const y = bound.start * cellSize;
@@ -176,7 +166,6 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
         .text(`GPC${bound.gpc}${isPartial ? '*' : ''}`);
     }
 
-    // Color bar
     const barWidth = 14;
     const barHeight = chartSize;
     const barX = chartSize + 16;
@@ -192,7 +181,6 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
         .attr('height', barHeight / barSteps + 1)
         .attr('fill', colorScale(val));
     }
-    // Color bar ticks
     const tickVals = [0, result.stats.max / 2, result.stats.max];
     for (const tv of tickVals) {
       const ty = ((result.stats.max - tv) / result.stats.max) * barHeight;
@@ -214,10 +202,8 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
       .attr('font-size', '8px')
       .text(t.colorBarLabel);
 
-    // Crosshair group
     const crosshairG = g.append('g').attr('class', 'crosshair').style('pointer-events', 'none');
 
-    // Interaction overlay
     const overlay = g
       .append('rect')
       .attr('width', chartSize)
@@ -265,7 +251,6 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
 
     const drawCrosshair = (i: number, j: number) => {
       crosshairG.selectAll('*').remove();
-      // Row highlight
       crosshairG
         .append('rect')
         .attr('x', 0)
@@ -276,7 +261,6 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
         .attr('stroke', 'var(--foreground)')
         .attr('stroke-width', 0.5)
         .attr('opacity', 0.6);
-      // Col highlight
       crosshairG
         .append('rect')
         .attr('x', j * cellSize)
@@ -289,11 +273,9 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
         .attr('opacity', 0.6);
     };
 
-    // Redraws (e.g. after pinning) clear the SVG; restore the pinned crosshair.
     if (pinnedCell) drawCrosshair(pinnedCell.i, pinnedCell.j);
 
     overlay.on('mousemove', (event: MouseEvent) => {
-      // A pinned tooltip stays on its cell until dismissed.
       if (pinnedCell) return;
       const [mx, my] = d3.pointer(event);
       const i = Math.floor(my / cellSize);
@@ -321,8 +303,8 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
       positionTooltip(event);
       drawCrosshair(i, j);
       track('ubenchx_sm_l2_cell_clicked', {
-        smRow: result.smInfo[i].sm,
-        smCol: result.smInfo[j].sm,
+        sm_row: result.smInfo[i].sm,
+        sm_col: result.smInfo[j].sm,
       });
     });
   }, [n, colorScale, result, t, pinnedCell]);
@@ -334,7 +316,6 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
     return () => window.removeEventListener('resize', handleResize);
   }, [drawChart]);
 
-  // Dismiss pinned tooltip on outside click
   useEffect(() => {
     if (!pinnedCell) return;
     const handler = (e: MouseEvent) => {
@@ -362,17 +343,19 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
   );
 }
 
-export function SmL2Content() {
+export function SmL2Content({ gpu = 'all' }: { gpu?: string }) {
   const locale = useLocale();
   const t = STRINGS[locale];
 
   const results = useMemo(
     () =>
-      Object.entries(SM_L2_RUNS).map(([key, run]) => ({
-        key,
-        view: transformSmL2Run(key, run),
-      })),
-    [],
+      Object.entries(SM_L2_RUNS)
+        .filter(([key]) => gpu === 'all' || gpu === key)
+        .map(([key, run]) => ({
+          key,
+          view: transformSmL2Run(key, run),
+        })),
+    [gpu],
   );
 
   if (results.length === 0) {
@@ -381,11 +364,6 @@ export function SmL2Content() {
 
   return (
     <div className="space-y-8" role="group" aria-label={t.aria}>
-      <div>
-        <h2 className="text-xl font-semibold tracking-tight">{t.pageTitle}</h2>
-        <p className="text-sm text-muted-foreground mt-1">{t.pageSubtitle}</p>
-      </div>
-
       {results.map(({ key, view }) => (
         <section key={key}>
           <h2 className="text-lg font-semibold mb-2">
@@ -393,7 +371,6 @@ export function SmL2Content() {
           </h2>
           <SmL2HeatmapChart result={view} locale={locale} />
 
-          {/* Stats */}
           <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-muted-foreground">
             <div className="rounded-md border p-3">
               <div className="font-medium">{t.statsIntraGpc}</div>
@@ -415,7 +392,6 @@ export function SmL2Content() {
             </div>
           </div>
 
-          {/* Methodology */}
           <div className="mt-4 text-xs text-muted-foreground space-y-1">
             <h3 className="text-sm font-semibold">{t.methodology}</h3>
             <p>{t.methodologyText}</p>

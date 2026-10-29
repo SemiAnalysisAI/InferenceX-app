@@ -1,19 +1,3 @@
-/**
- * Keep one job copy per benchmark point when a source run was re-run.
- *
- * GitHub keeps artifacts from every run attempt. A point that passed on more
- * than one attempt therefore arrives as several job copies, and the hashed
- * artifact names differ whenever the retry landed on another runner. Without
- * a choice, every copy writes the same benchmark row and links its own GPU
- * telemetry, so the stored point mixes attempts.
- *
- * The latest attempt wins: the producer's `run_attempt` when both copies carry
- * one, otherwise the newest benchmark artifact. Attempts run one after another,
- * so for older runs the newest copy is the latest attempt that produced it. Every sibling
- * artifact of an older copy (power audit, GPU telemetry, traces, server logs)
- * is removed before ingest reads the directory, so all consumers see the same
- * copy.
- */
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -22,7 +6,6 @@ import type { BenchmarkParams } from './benchmark-mapper.js';
 import { configCacheKey } from './config-cache.js';
 import { createSkipTracker } from './skip-tracker.js';
 
-/** Artifact name prefixes produced by one benchmark job, longest first. */
 const JOB_ARTIFACT_PREFIXES = [
   'multinode_server_logs_',
   'bmk_agentic_',
@@ -42,21 +25,16 @@ export interface RetryArtifactMeta {
 }
 
 export interface SupersededCopy {
-  /** Shared artifact-name suffix of the dropped job copy. */
   suffix: string;
-  /** Suffix of the newer copy that replaced it. */
   keptSuffix: string;
-  /** Artifact directories removed for the dropped copy. */
   removed: string[];
 }
 
 export interface RetryCopySelection {
   superseded: SupersededCopy[];
-  /** Points with several copies that could not be ordered by artifact metadata. */
   unordered: string[];
 }
 
-/** Persisted point identity, using the config tuple instead of its DB id. */
 export function benchmarkPointKey(row: BenchmarkParams): string {
   return JSON.stringify([
     configCacheKey(row.config),
@@ -69,11 +47,6 @@ export function benchmarkPointKey(row: BenchmarkParams): string {
   ]);
 }
 
-/**
- * Points held by per-job `bmk_*` files. The `results_*` aggregate is a plain
- * concatenation of those files across every attempt, so its rows for these
- * points are skipped in favor of the selected per-job copy.
- */
 export function perJobPointKeys(files: readonly BenchmarkArtifactFile[]): Set<string> {
   const keys = new Set<string>();
   for (const file of files) {
@@ -94,7 +67,6 @@ function jobSuffix(dir: string): string | null {
 }
 
 interface CopyOrder extends RetryArtifactMeta {
-  /** `run_attempt` stamped by the producer, when every row carries one. */
   runAttempt?: number;
 }
 
@@ -106,11 +78,6 @@ function newer(a: CopyOrder, b: CopyOrder): boolean {
   return at === bt ? (a.id ?? 0) > (b.id ?? 0) : at > bt;
 }
 
-/**
- * Drop older job copies of every benchmark point found under `root`.
- * `artifacts` describes the downloaded directories (one per artifact name).
- * Copies without metadata are left in place and reported as unordered.
- */
 export function dropSupersededJobCopies(
   root: string,
   artifacts: Iterable<RetryArtifactMeta>,
@@ -119,7 +86,6 @@ export function dropSupersededJobCopies(
   const metaByName = new Map<string, RetryArtifactMeta>();
   for (const artifact of artifacts) metaByName.set(artifact.name, artifact);
 
-  // suffix -> point keys produced by that job copy
   const pointsBySuffix = new Map<string, Set<string>>();
   const metaBySuffix = new Map<string, CopyOrder>();
   for (const file of readBenchmarkArtifacts(root, { runId, tracker: createSkipTracker() })) {
@@ -138,7 +104,6 @@ export function dropSupersededJobCopies(
     pointsBySuffix.set(suffix, points);
   }
 
-  // point key -> suffixes that produced it
   const suffixesByPoint = new Map<string, string[]>();
   for (const [suffix, points] of pointsBySuffix) {
     for (const point of points) {
@@ -166,9 +131,6 @@ export function dropSupersededJobCopies(
     winnerByPoint.set(point, winner);
   }
 
-  // Retries of one job produce the same points, so a copy either wins all of
-  // its ordered points or none. A partial loss cannot be ingested without
-  // mixing attempts, so it fails instead.
   const dropped = new Map<string, string>();
   for (const [suffix, points] of pointsBySuffix) {
     const winners = [...points]
@@ -206,7 +168,6 @@ export function dropSupersededJobCopies(
   return { superseded, unordered };
 }
 
-/** Log lines describing a selection, for CI output. */
 export function describeRetryCopySelection(selection: RetryCopySelection): string[] {
   const lines = selection.superseded.map(
     (copy) =>

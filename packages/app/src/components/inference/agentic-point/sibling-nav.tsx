@@ -62,7 +62,6 @@ function frameworkLabel(fw: string) {
   return fw;
 }
 
-/** Short label for a sibling chip: parallelism + concurrency. */
 export function chipLabel(s: BenchmarkSibling): string {
   const usePrefill =
     !s.disagg &&
@@ -81,7 +80,6 @@ export function chipLabel(s: BenchmarkSibling): string {
   const aggregatePcp = s.disagg
     ? undefined
     : meaningfulParallelismSize(s.prefill_pcp_size, s.decode_pcp_size);
-  // Same parallelism labeler the chart points use (TP/EP/TEP/DEP/DPA…).
   const parallel = parallelismLabel({
     tp: usePrefill ? s.prefill_tp : s.decode_tp,
     ep: usePrefill ? s.prefill_ep : s.decode_ep,
@@ -164,9 +162,6 @@ const SIBLING_STRINGS = {
 
 const SORT_VALUES: SortMode[] = ['default', 'conc', 'parallelism', 'tput', 'requests'];
 
-// Group key for the "parallelism" sort: ep first (so TP/EP1 sorts ahead of
-// EP/TEP/DEP groups), then tp, then dp-attention, then disagg — every config
-// of one parallelism lands together, ordered by concurrency within.
 const parallelRank = (
   s: BenchmarkSibling,
 ): [number, number, number, number, number, number, number, number] => {
@@ -189,10 +184,8 @@ function sortSiblings(siblings: BenchmarkSibling[], mode: SortMode): BenchmarkSi
   if (mode === 'conc') {
     out.sort((a, b) => a.conc - b.conc);
   } else if (mode === 'tput') {
-    // Highest throughput/GPU first; rows missing the metric sink to the end.
     out.sort((a, b) => (b.tput_per_gpu ?? -Infinity) - (a.tput_per_gpu ?? -Infinity));
   } else if (mode === 'requests') {
-    // Most total requests first; rows missing the metric sink to the end.
     out.sort((a, b) => (b.total_requests ?? -Infinity) - (a.total_requests ?? -Infinity));
   } else {
     out.sort((a, b) => {
@@ -201,7 +194,6 @@ function sortSiblings(siblings: BenchmarkSibling[], mode: SortMode): BenchmarkSi
       for (let i = 0; i < ra.length; i++) {
         if (ra[i] !== rb[i]) return ra[i] - rb[i];
       }
-      // Within a parallelism group: offload off before on, then concurrency.
       const oa = a.offload_mode === 'on' ? 1 : 0;
       const ob = b.offload_mode === 'on' ? 1 : 0;
       return oa - ob || a.conc - b.conc;
@@ -222,11 +214,6 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
   const agenticBase = isZhPathname(pathname)
     ? `${ZH_PREFIX}/inference/agentic`
     : '/inference/agentic';
-  // Persist the sort in the URL so clicking a point (which remounts this
-  // component on the new route) keeps the chosen order instead of resetting.
-  // Read it once from the URL on mount — this component only renders after the
-  // client-side siblings query resolves, so `window` is always available here
-  // (no SSR/hydration mismatch). Matches the app's window-based url-state read.
   const [sortMode, setSortMode] = useState<SortMode>(() => {
     if (typeof window === 'undefined') return 'default';
     const v = new URLSearchParams(window.location.search).get('sort');
@@ -235,12 +222,10 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
 
   const sorted = useMemo(() => sortSiblings(siblings, sortMode), [siblings, sortMode]);
 
-  // prev/next follow the displayed (sorted) order so navigation matches the row.
   const currentIdx = sorted.findIndex((s) => s.is_current);
   const prev = currentIdx > 0 ? sorted[currentIdx - 1] : null;
   const next = currentIdx !== -1 && currentIdx < sorted.length - 1 ? sorted[currentIdx + 1] : null;
 
-  // Carry the active sort through every point-to-point link.
   const hrefFor = (id: number) =>
     sortMode === 'default' ? `${agenticBase}/${id}` : `${agenticBase}/${id}?sort=${sortMode}`;
 
@@ -270,8 +255,6 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
               const mode = v as SortMode;
               setSortMode(mode);
               track('agentic_siblings_sorted', { mode });
-              // Mirror into the URL (replace, no history spam) so a refresh —
-              // and the next point's mount — keep the chosen order.
               if (currentId !== undefined) {
                 const href =
                   mode === 'default'
@@ -302,7 +285,7 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
           disabled={!prev}
           onClick={() => {
             if (prev) {
-              track('agentic_siblings_navigated', { direction: 'prev', targetId: prev.id });
+              track('agentic_siblings_navigated', { direction: 'prev', target_id: prev.id });
               router.push(hrefFor(prev.id));
             }
           }}
@@ -320,7 +303,7 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
                 type="button"
                 onClick={() => {
                   if (!active) {
-                    track('agentic_siblings_navigated', { direction: 'chip', targetId: s.id });
+                    track('agentic_siblings_navigated', { direction: 'chip', target_id: s.id });
                     router.push(hrefFor(s.id));
                   }
                 }}
@@ -341,7 +324,7 @@ export function SiblingNav({ sku, siblings }: { sku: BenchmarkSku; siblings: Ben
           disabled={!next}
           onClick={() => {
             if (next) {
-              track('agentic_siblings_navigated', { direction: 'next', targetId: next.id });
+              track('agentic_siblings_navigated', { direction: 'next', target_id: next.id });
               router.push(hrefFor(next.id));
             }
           }}

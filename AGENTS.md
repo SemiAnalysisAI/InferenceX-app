@@ -1,21 +1,25 @@
 # AGENTS.md
 
-For detailed subsystem docs, see [docs/index.md](./docs/index.md).
+InferenceX App is a Next.js dashboard for ML inference benchmark data (Neon PostgreSQL → `/api/v1/*` routes → React Query hooks → D3 charts). Setup, scripts, and package layout are in [README.md](./README.md). The `@/*` import alias maps to `packages/app/src/`.
+
+For detailed subsystem docs, see [docs/index.md](./docs/index.md). **MUST ALWAYS READ IN CASE OF RELEVANT INFORMATION.**
 
 - Pareto logic changes must update both InferenceX and InferenceX-app with matching regression tests and cross-linked PRs.
 - Changes under `packages/app/src/lib/power/power_model/` need a companion InferenceX `power_model/` PR, cross-linked both ways. See [Power Model — TS Port and Upstream Python MUST Stay in Sync](#power-model--ts-port-and-upstream-python-must-stay-in-sync).
-- **Easter egg themes and games are just for fun.** Optional themes (Minecraft, CS:GO, GTA, DOOM, Halo, and any future ones) and the games launched from them do not need stable infrastructure, carry no compatibility or uptime guarantees, and may be deleted at any time without notice or migration. Do not add unit, component, E2E, or CI checks for them; delete existing feature tests rather than fixing or extending them. The only exceptions are `packages/app/src/lib/optional-theme-imports.test.ts` and `packages/app/cypress/e2e/optional-theme-isolation.cy.ts`: retain and maintain these checks to protect normal light/dark pages, embeds, resource loading, and SEO. Do not expand them into gameplay or visual-fidelity coverage. See [Easter egg policy](./docs/testing.md#easter-egg-themes-and-games).
-- Any added, changed, or removed filter, frontend view, or page MUST include the corresponding API and `inferencex-skills` changes in the same PR. Missing updates are BLOCKING on PR review. See [Read-only coverage for public views](#read-only-coverage-for-public-views) for coverage requirements and documented exclusions.
+- **Easter egg themes and games are just for fun.** They get no feature tests or compatibility guarantees and may be deleted at any time. See the [easter egg policy](./docs/testing.md#easter-egg-themes-and-games) for the two main-site isolation checks that stay.
+- Any added, changed, or removed filter, frontend view, or page MUST include the corresponding API and `inferencex-skills` changes in the same PR. See [Read-only coverage for public views](#read-only-coverage-for-public-views).
 
-## AI model disclosure
+## PR descriptions
 
-Every PR description must include an **AI model disclosure** section naming the exact model/version used to prepare the PR. List each contributing model and its role, including delegated agents. Tool names such as Claude Code, Cursor, or Perplexity Computer are not model identities. Copy the model identifier exposed by the runtime; do not guess an unavailable identifier. If the runtime does not expose the exact model, explicitly state that it could not be verified. Human-only PRs must state `No AI used`. Keep the disclosure current when later edits use another model.
+- **Keep PR descriptions high signal and low noise.** Lead with a short explanation of the problem, what changes, and why it matters to a human reviewer, so the PR is understandable without expanding any section. Keep material risks, breaking changes, and unresolved failures visible. Put AI disclosure, change-type lists, author checklists, and other administrative boilerplate after the summary in clearly named `<details><summary>…</summary>` blocks, without the `open` attribute, with blank lines around the Markdown inside each block. Collapsing required checklist items changes presentation, not review or merge requirements.
+- **Report validation only from actual integration or end-to-end runs**, with a concise outcome and a run link when available. Put supporting evidence, verbose check output, and logs in a collapsed `<details><summary>Validation details</summary>` block, and keep material failures and regressions visible. Omit routine local-check inventories (unit-test counts, lint/format, typecheck) and empty or pending validation sections. Keep running the appropriate checks; this rule only governs what goes in the description.
+- Every PR description must include an **AI model disclosure** section inside a collapsed-by-default `<details><summary>AI model disclosure</summary>` block, naming the exact model/version used to prepare the PR. List each contributing model and its role, including delegated agents. Tool names such as Claude Code, Cursor, or Perplexity Computer are not model identities. Copy the model identifier exposed by the runtime; do not guess an unavailable identifier. If the runtime does not expose the exact model, explicitly state that it could not be verified. Human-only PRs must state `No AI used`. Keep the disclosure current when later edits use another model.
 
 ## Contribution requirements
 
-> **PR and GitHub-issue titles & descriptions must be bilingual — include a Simplified Chinese version in addition to English.** Title format: `<English title> / <中文标题>` (keep bracket prefixes at the front untranslated). In the PR/issue body, follow the English content with a `## 中文说明` section mirroring the summary; don't translate code blocks, logs, or stack traces — summarize around them. **Commit messages must include a Chinese translation too**: keep the subject line in English (conventional-commit style) and include the Chinese translation of the subject and key points in the commit body (e.g. a trailing `中文：<translation>` paragraph); squash-merge commits inherit the bilingual PR title, which satisfies the subject requirement automatically.
+> **PR and GitHub-issue titles & descriptions must be bilingual — include a Simplified Chinese version in addition to English.** Title format: `<English title> / <中文标题>` (keep bracket prefixes at the front untranslated). In PR and issue bodies and human-authored PR comments, keep English visible and put the Chinese in one collapsed `<details><summary>中文</summary>` section at the end; don't translate code blocks, logs, or stack traces — summarize around them. **Commit messages must include a Chinese translation too**: keep the subject line in English (conventional-commit style) and include the Chinese translation of the subject and key points in the commit body (e.g. a trailing `中文：<translation>` paragraph); squash-merge commits inherit the bilingual PR title, which satisfies the subject requirement automatically.
 
-> **Translation quality bar:** write natural technical Chinese, not word-for-word machine translation (style reference: [`vllm-project/vllm-ascend` `README.zh.md`](https://github.com/vllm-project/vllm-ascend/blob/main/README.zh.md)). Preserve product names, hardware SKUs, framework/library names (Next.js, React Query, D3.js, Tailwind ...), flags, and code identifiers in English. Use parenthetical English clarification for acronyms on first use. Preferred terms: benchmark 基准测试, dashboard 仪表板, chart 图表, config 配置, throughput 吞吐量, latency 延迟, single-node/multi-node 单节点/多节点, evaluation 评估, artifact 产物. In first-party ML infrastructure UI and technical prose, keep established English technical terms and phrases that Chinese engineers normally use in English; decide from real industry usage and the surface, not from a closed list. `warmup`, `seed`, and `offload` are examples, not the whole category. Follow `docs/chinese-copy.md` for explanatory and quotation exceptions.
+> **Translation quality bar:** write natural technical Chinese, not word-for-word machine translation (style reference: [`vllm-project/vllm-ascend` `README.zh.md`](https://github.com/vllm-project/vllm-ascend/blob/main/README.zh.md)). Preserve product names, hardware SKUs, framework/library names (Next.js, React Query, D3.js, Tailwind ...), flags, and code identifiers in English. Use parenthetical English clarification for acronyms on first use. Use the preferred renderings in the `docs/chinese-copy.md` terminology table, and 单节点/多节点 for single-node/multi-node. In first-party ML infrastructure UI and technical prose, keep established English technical terms and phrases that Chinese engineers normally use in English; decide from real industry usage and the surface, not from a closed list. `warmup`, `seed`, and `offload` are examples, not the whole category. Follow `docs/chinese-copy.md` for explanatory and quotation exceptions.
 
 > **Chinese editorial decisions are context-aware.** Follow [docs/chinese-copy.md](./docs/chinese-copy.md) for audience, surface-specific register, terminology exceptions, the two independent fidelity/naturalness gates, the Claude-plus-manual-review workflow, and the PR checklist. Do not turn a preferred wording or pronoun choice into a global mechanical rule unless it is correct in every supported context.
 
@@ -23,99 +27,9 @@ Every PR description must include an **AI model disclosure** section naming the 
 
 > **Cursor Bugbot re-reviews on EVERY push** — each new commit to a PR can surface new inline comments, including on code an earlier review passed. Before merging, loop until convergence: wait for checks (the Bugbot review is one of the PR checks) → fetch unresolved review comments → fix or answer each with a reply → push → repeat until a push produces no new findings. Branch rules require all review threads resolved before merge, so resolve addressed threads as you go.
 
-## Project Overview
-
-InferenceX App — Next.js 16 dashboard for ML inference benchmark data. DB-backed with Neon PostgreSQL, React Query for data fetching, D3.js for charts.
-
-- **Framework**: Next.js 16 (App Router, Turbopack)
-- **Language**: TypeScript (strict mode)
-- **Styling**: Tailwind CSS 4 + shadcn/ui (Radix UI primitives)
-- **Charts**: D3.js — shared library at `src/lib/d3-chart/`, scatter/GPU/bar charts
-- **Data**: Neon DB → API routes (`/api/v1/*`) → React Query hooks → Context providers
-- **Deployment**: Vercel with daily cron-triggered rebuilds
-- **Analytics**: PostHog (`posthog-js`) via `@/lib/analytics/analytics` — recommended on all interactive elements (autocapture provides baseline coverage)
-
-## Quick Start
-
-```bash
-bun install               # Install dependencies
-bun run dev                # Dev server with Turbopack (http://localhost:3000)
-bun run mcp                # MCP server exposing read-only benchmark tools
-bun run build              # Production build
-bun run typecheck          # TypeScript type checking (all packages)
-bun run lint               # Lint with oxlint
-bun run lint:fix           # Auto-fix lint issues
-bun run fmt                # Format check with oxfmt
-bun run fmt:fix            # Auto-fix formatting
-bun run test:unit          # Vitest unit tests
-bun run test:e2e           # Cypress smoke suite, the default local check
-bun run test:e2e:full      # Full Cypress suite, normally covered by CI
-```
-
-## Monorepo Structure
-
-```
-packages/
-├── app/                  # Next.js frontend (@semianalysisai/inferencex-app)
-│   ├── content/blog/     # MDX blog posts (frontmatter + content)
-│   └── src/
-│       ├── app/          # Pages, layouts, API routes (/api/v1/*)
-│       │   └── blog/     # Blog list + [slug] post pages, OG image generation
-│       ├── components/   # Tab sections: inference/, evaluation/, historical-trends/,
-│       │                 #   throughput-calculator/, reliability/, gpu-specs/, blog/, ui/
-│       ├── hooks/api/    # React Query hooks (use-benchmarks, use-availability, etc.)
-│       └── lib/          # Utilities, constants, d3-chart/, chart-utils, blog, data-mappings
-├── constants/            # Shared constants (GPU keys, model mappings, SEO)
-├── db/                   # DB layer, ETL, migrations, queries, ingest scripts
-└── mcp/                  # MCP server exposing read-only benchmark tools
-```
-
-**Path alias**: `@/*` → `packages/app/src/`
-
 ## Data Architecture
 
-```
-Frontend → React Query hooks (src/hooks/api/) → /api/v1/* routes → Neon DB
-```
-
-API routes (`packages/app/src/app/api/v1/`):
-
-- `benchmarks?model=X&date=YYYY-MM-DD` — latest benchmark per (config, concurrency)
-- `benchmarks/history?model=X&gpu=Y` — historical benchmark data for trend charts
-- `workflow-info?date=YYYY-MM-DD` — runs, changelogs, configs for a date
-- `availability` — `Record<model, dates[]>`
-- `reliability` — raw `ReliabilityRow[]`
-- `evaluations` — raw `EvalRow[]`
-- `server-log` — retrieve benchmark runtime logs
-- `gpu-metrics-point?id=N` — PowerX chip telemetry (samples + per-GPU statistics cached per revision) linked to one benchmark point
-- `invalidate` — invalidate API cache (admin; `?scope=collectivex` purges only that scope)
-- `collectivex/latest`, `collectivex/runs`, `collectivex/runs/[runId]` — CollectiveX sweep data
-  from a **separate** Neon DB, populated lazily on read from GitHub Actions artifacts and served
-  assembled through the shared reader (the one deliberate exception to the raw-rows rule below);
-  `runs/[runId]` also handles admin DELETE. See [CollectiveX](./docs/collectivex.md).
-- `agentic-workload-explorer/*` — page-owned (`page-bff`) reads of a frozen, anonymized ProxyTrace
-  snapshot from a **separate** read replica (`DATABASE_PROXYTRACE_READONLY_URL`) backing the
-  feature-gated `/agentic-workload-explorer` pages. See [Agentic Workload Explorer](./docs/agentic-workload-explorer.md).
-- `tco-feed?model=dsv4&workloads=1024x1024,8192x1024&tiers=30,50,75,100&format=csv` — per-hardware Pareto-frontier output-throughput reads at fixed interactivity tiers, for external spreadsheet TCO models (Excel Power Query); `view=scores` (optional `weights`, `workload_weights`, `alpha`) folds them into one tier-weighted, workload-blended, output-equivalent score per hardware
-- `overview?tier=50&engine=community&compare=30d&ref=b200` — a compact, cached page-data response used only by `/overview` selector navigation
-- `pareto` — beta derived frontier/hinterland observations with explicit raw model, workload, metrics and axis preferences; see [Pareto API](./docs/pareto-api.md). This is a documented exception to the raw-row rule, reusing the benchmark source and chart dominance algorithm without UI filtering.
-
-**Raw-data API routes return raw DB data**. Dashboard projections under
-`/api/v1/views/*` use shared pure UI transformations server-side and publish their
-selectors and assumptions. Keep raw-data contracts separate from these projections.
-Exceptions: the CollectiveX routes assemble raw stored documents through the shared reader in
-`packages/db/src/collectivex/` (see [docs/collectivex.md](./docs/collectivex.md) for why); and
-`tco-feed`, which runs the calculator's frontier interpolation server-side because its consumers
-(spreadsheets) cannot execute the TS transforms — its assumptions (tier weights, workload mix, α)
-enter only as explicit query params with documented defaults, so a published sheet's URL fully
-records its methodology; and `overview`, which assembles the same `OverviewPageData` used for the
-initial server render so selector changes can update the matrix without transferring every model's
-raw benchmark history or triggering a React Server Component (RSC) round trip. It is a page-owned
-backend-for-frontend (BFF), not a reusable public data API; and `pareto`, which returns
-frontier/hinterland coordinates over stored benchmark rows with explicit axis preferences (see
-[Pareto API](./docs/pareto-api.md)), reusing the chart dominance algorithm without UI filters;
-and `gpu-metrics-point`, a point-detail BFF that computes per-GPU statistics from stored samples
-on a cache miss and caches the payload by telemetry revision.
+**Raw-data API routes return raw DB data.** Keep their contracts separate from the `/api/v1/views/*` dashboard projections. [Deliberate API Exceptions](./docs/architecture.md#deliberate-api-exceptions) lists the routes that differ and why.
 
 ### Read-only coverage for public views
 
@@ -159,23 +73,9 @@ Run the synchronization guard from `packages/app`:
 bun --env-file=../../.env vitest run src/lib/api/api-route-catalog.test.ts
 ```
 
-Static content routes (no DB):
-
-- `/blog` — blog listing (statically generated from MDX files in `content/blog/`)
-- `/blog/[slug]` — blog post page with MDX rendering and OG image generation
-- `/whitepaper` — whitepaper index; `/whitepaper/[slug]` — research-paper landing page (registry in `src/lib/content/whitepapers.ts`; PDF, cover, hardware render, and light/dark figure PNGs under `public/whitepaper/<slug>/`). Load `.claude/skills/write-inferencex-whitepaper/` to write or update a paper: it holds the numbers workflow, copy rules, the PDF/chart pipeline, and the registry checklist.
-- `/feed.xml` — RSS 2.0 feed
-- `/llms.txt` — LLM-readable site index
-- `/llms-full.txt` — full article content for LLM ingestion
-- `/sitemap.xml` — dynamic sitemap (includes blog posts)
-
 ## Code Style & Tooling
 
-- **Linter**: oxlint — `bun run lint` / `bun run lint:fix`
-- **Formatter**: oxfmt — `bun run fmt` / `bun run fmt:fix`
-- **Type checking**: `bun run typecheck` (tsc --noEmit, strict mode)
-- **Typography gate**: `bun run check:typography` (CI + pre-commit) — no new arbitrary font sizes (`text-[11px]`) or letter-spacing (`tracking-[0.16em]`) in class strings, and no quoted font-size literals in `src/lib/d3-chart/`. Use `text-2xs`/`text-3xs`, `tracking-eyebrow`/`tracking-eyebrow-wide`/`tracking-heading`, the `<Heading>`/`<Eyebrow>` components, or `CHART_TYPE` from `@/lib/d3-chart/typography` (chart font sizes must stay in TS — CSS variables don't survive PNG export). Existing offenders live in `packages/app/scripts/typography-allowlist.json` and migrate on touch. See [Typography](./docs/typography.md).
-- **Node**: 24.x
+`bun run check:typography` runs in CI and pre-commit and blocks new arbitrary font sizes and letter-spacing. See [Typography](./docs/typography.md).
 
 ## Environment Variables
 
@@ -183,14 +83,7 @@ See `.env.example`. Key vars: `GITHUB_TOKEN`, `DATABASE_READONLY_URL`, `DATABASE
 
 ## Testing
 
-See [Testing](./docs/testing.md) for full requirements, quality standards, and pre-commit checklist. Tests are **mandatory** — missing/low-quality tests are 🔴 BLOCKING on PR review. **Exception:** easter egg themes and games have no feature tests; retain only the two main-site isolation checks named in the policy at the top of this file.
-
-### E2E Runtime and PR Workflow
-
-- Prefer `bun run test:e2e` while iterating. It runs the local smoke suite and avoids blocking development on the full browser matrix.
-- Use `bun run test:e2e:full` only when a local full-suite run is useful. The merge gate runs the full suite in GitHub Actions.
-- A warm local full E2E run typically takes about **4–6 minutes** because the component and integration suites run sequentially on one machine; cold dependency/browser setup can take longer.
-- GitHub Actions runs integration specs across **four shards per browser** for Chrome and Firefox (eight parallel E2E jobs), while component tests run in a separate job. Recent successful workflows complete in roughly **3–5 minutes**.
+See [Testing](./docs/testing.md) for full requirements, quality standards, and pre-commit checklist. Tests are **mandatory**, and missing or low-quality tests are 🔴 BLOCKING on PR review. Easter egg features are the exception (see the top of this file).
 
 ## Analytics Requirement
 
@@ -198,11 +91,11 @@ All interactive elements should have `track()` from `@/lib/analytics/analytics` 
 
 **Convention**: `[section]_[action]` — e.g., `latency_zoom_reset`, `calculator_bar_selected`, `tab_changed`
 
-**Prefixes**: `agentic_workload_`, `latency_`, `interactivity_`, `gpu_timeseries_`, `inference_`, `calculator_`, `evaluation_`, `reliability_`, `tab_`, `selector_`, `blog_`, `whitepaper_`, `social_`
+Event property keys are snake_case and canonical: `gpu`/`gpus`, `gpu_count`, `metric`, `sort_key`/`sort_dir`, `file_name`, `query_length`, `enabled` for boolean toggle state (enforced by `event-property-keys.test.ts`). Mark page regions with `analyticsPlacement()` (`data-analytics-placement`) so clicks get `placement`. Use `useSearchTracking`, `useDialogCloseTracking` and `selectionAnalyticsContext` instead of ad-hoc tracking. See the Analytics section of [docs/architecture.md](./docs/architecture.md).
 
 ## Tab Structure
 
-Dashboard route keys, paths, primary/feature-gated/footer-only navigation, indexability, provider capabilities, `/zh` mirroring, and share-parameter scopes are defined once in `packages/app/src/lib/routing/dashboard-routes.ts`. `TabNav`, `DashboardShell`, metadata, i18n, share URLs, and the sitemap derive from that registry; do not add a second route array.
+`packages/app/src/lib/routing/dashboard-routes.ts` is the single dashboard route registry. `TabNav`, `DashboardShell`, metadata, i18n, share URLs, and the sitemap derive from it, so do not add a second route array.
 
 ## Unofficial Run Support — Mandatory for Inference / Evaluation Features
 
@@ -216,7 +109,7 @@ When adding a chart feature (toggle, label, overlay, filter, export, share-link 
 4. Add at least one E2E or unit test that exercises the overlay path. The mock helper `createMockUnofficialRunContext` (cypress/support/mock-data.ts) and the `cypress/e2e/inference-chart.cy.ts` overlay setup are good starting points.
 5. Note overlay support explicitly in the PR description so reviewers can verify it ("works for both official runs and `?unofficialrun=` overlays — verified at <preview-url>").
 
-If the feature genuinely cannot apply to overlays (e.g., it depends on data only ingested for official runs), say so explicitly in code comments and the PR description. Default to "must support overlays."
+If the feature genuinely cannot apply to overlays (e.g., it depends on data only ingested for official runs), say so explicitly in the PR description. Default to "must support overlays."
 
 ## Chinese Website Pages (/zh) — Mandatory for All Indexable Surfaces
 
@@ -228,14 +121,12 @@ The site ships a hand-authored Simplified Chinese sibling for every indexable pa
 2. **New dashboard tab** → add one entry to `src/lib/routing/dashboard-routes.ts`, then add exact entries to `TAB_META_ZH`, `TAB_INTRO_ZH`, and `TAB_LABELS_ZH` in `src/lib/routing/tab-meta-zh.ts`. Create `src/app/zh/(dashboard)/<tab>/page.tsx` mirroring the English page with `tabMetadataZh('<tab>')` and a `<ZhTabIntro tab="<tab>" />` block above the chart; the registry automatically supplies `/zh` route matching and indexable sitemap entries. The chart's own UI strings must follow rule 5. Registry and metadata tests enforce route parity and dictionary completeness.
 3. **New blog post** → the translation `packages/app/content/blog/zh/<same-filename>.mdx` is REQUIRED in the same PR. Translate frontmatter `title`/`subtitle` and the body; keep `date`, `publishDate`, `modifiedDate`, `tags`, and the filename/slug identical (English and Chinese posts pair by filename; visibility gating always follows the English post's `publishDate`). Rewrite internal `/blog/<slug>` links to `/zh/blog/<slug>`; never alter numbers, code blocks, or `<Figure>`/`<JsonLd>` structure. The `/zh/blog` listing, hreflang, and sitemap pick the file up automatically.
 4. **Editing an existing English page or post** → update its Chinese sibling in the same PR. Omitting the required Chinese sibling update is a 🔴 BLOCKING review issue. Fidelity or wording issues inside an updated Chinese sibling follow the advisory workflow below; serious findings require Chinese maintainer confirmation.
-5. **ALL user-visible UI strings MUST have a Chinese equivalent** — no carve-outs for "chart internals" or "option labels". This includes: headers/footers, card titles/descriptions, control and filter labels, buttons, toggles (Log Scale, Optimal Only, …), nudges, dropdown OPTION display names (Y-axis metric names, token types, scale modes), searchable-select placeholders ("Search…"), table column headers and action buttons ("Prompts"), modal/drawer chrome, legend footnotes, and empty/loading/error messages. Mechanism: client components call `useLocale()` (`src/lib/i18n/use-locale.ts`) and read from a component-local `STRINGS = { en, zh }` dict; server components take an optional `locale` prop passed from the /zh page; registry-defined display names (e.g. `Y_AXIS_METRICS`, legend toggle configs) carry a `labelZh` field resolved through a locale-aware label helper at render time. The `en` values must keep the exact original strings so English pages stay byte-identical.
+5. **ALL user-visible UI strings MUST have a Chinese equivalent**, with no carve-outs for "chart internals" or "option labels". This includes: headers/footers, card titles/descriptions, control and filter labels, buttons, toggles (Log Scale, Optimal Only, …), nudges, dropdown OPTION display names (Y-axis metric names, token types, scale modes), searchable-select placeholders ("Search…"), table column headers and action buttons ("Prompts"), modal/drawer chrome, legend footnotes, and empty/loading/error messages. Mechanism: client components call `useLocale()` (`src/lib/i18n/use-locale.ts`) and read from a component-local `STRINGS = { en, zh }` dict; server components take an optional `locale` prop passed from the /zh page; registry-defined display names (e.g. `METRIC_REGISTRY` entries) carry a `labelZh` field resolved through a locale-aware label helper at render time. The `en` values must keep the exact original strings so English pages stay byte-identical.
 6. **What stays English**: brand/product names, hardware SKUs, model/framework/precision names, units (tok/s/user, GB/s, $/M tok), code identifiers and flags — per the translation quality bar — plus established English technical terms and phrases that Chinese ML infrastructure engineers normally use in English, as documented contextually in `docs/chinese-copy.md` (`warmup`, `seed`, and `offload` are non-exhaustive examples), and DB-stored _content_ (benchmark rows, dataset conversation text, run logs), which is data, not UI.
 7. **Compare slug narrative sync**: the per-slug compare pages are mirrored at `/zh/compare/[slug]` and `/zh/compare-per-dollar/[slug]`; their Chinese prose templates live in `src/lib/compare/compare-ssr-zh.ts`, a 1:1 port of the English templates in `compare-ssr.ts`. The variant compare pages (`/zh/compare-precision/[slug]` and `/zh/compare-spec-decode/[slug]`) have their Chinese templates in `src/lib/compare/compare-variant-ssr-zh.ts`, porting `compare-variant-ssr.ts`. Any PR that changes the English narrative templates MUST update the zh port in the same commit.
 8. **Every route gets a /zh sibling, including hidden or feature-gated ones** (`/agentx`, `/ai-chart`, `/current-inferencex-image`, `/feedback`, agentic detail pages). Noindex routes keep their noindex on both sides. The only exceptions are `feed.xml` and `llms.txt` (single-language machine feeds) plus per-post OG images. Chinese posts reuse the English post's OG image because the renderer font has no CJK glyphs.
 
-> **Claude reviews every changed user-visible Chinese string, but the Chinese maintainer makes the final decision.** Load `review-zh-copy` before opening or reviewing any PR that touches user-visible Chinese text, including refactors whose filenames do not contain `zh`. The skill evaluates semantic fidelity and natural Chinese as separate gates and follows [docs/chinese-copy.md](./docs/chinese-copy.md). Its findings never block another contributor's merge. Do not mention `@edwingao28` for a clean review, routine coverage, or an ordinary wording or naturalness suggestion. Mention `@edwingao28` only for a high-confidence semantic or factual error, changed attribution or speaker voice, or unresolved high-impact ambiguity, and ask for confirmation. The Chinese maintainer makes the final editorial decision.
-
-> **Chinese copy has a narrow objective CI guard.** `packages/app/src/lib/i18n/zh-objective-guard.test.ts` checks direction-aware App Router page parity (the documented Chinese-only `/zh/[...notFound]` catch-all is the sole current exception), explicit `en`/`zh` object-literal key shape, Blog filename and non-translatable MDX structure, and English-byte preservation for PRs labeled `chinese-copy-only`. `packages/app/src/lib/i18n/zh-copy.test.ts` retains its separately hand-checked mechanical cases. New objective rules must use the same parsing logic in the real source scan and their mutation tests. These guards do **not** judge fluency, clause order, sentence structure, register, contextual pronouns, marketing tone, quotation voice, English-token ratios, or contextual terminology; those require page context and human review. See `docs/chinese-copy.md` for the complete boundary.
+> **Claude reviews every changed user-visible Chinese string, but the Chinese maintainer makes the final decision.** Load `review-zh-copy` before opening or reviewing any PR that touches user-visible Chinese text, including refactors whose filenames do not contain `zh`. Its findings are advisory and never block another contributor's merge. [docs/chinese-copy.md](./docs/chinese-copy.md) defines the review gates, when to mention `@edwingao28`, and what the objective CI guard (`packages/app/src/lib/i18n/zh-objective-guard.test.ts`) does and does not check.
 
 ## Chart Interpolation — TS and Python Helpers MUST Stay in Sync
 
@@ -247,7 +138,7 @@ The Python helper is a 1:1 port of these three TypeScript functions:
 - `monotoneSlopes` (Steffen 1990, matches `d3.curveMonotoneX`) — same file
 - `hermiteInterpolate` — same file
 
-Plus the wrapper `interpolateMetricAtInteractivity` in `packages/app/src/components/inference/hooks/useInterpolatedTrendData.ts` which composes them with the "no extrapolation → return null" rule.
+Plus the wrapper `interpolateMetricAtInteractivity` in `packages/app/src/components/inference/hooks/interpolated-trend-core.ts` which composes them with the "no extrapolation → return null" rule.
 
 Plus `recoverReciprocalNumerator` in `interpolation.ts`, which decides whether a metric is splined directly or derived from the interpolated throughput. $/M tok and J/token are a per-chip constant over a throughput, so independently splining the metric breaks that identity between knots; both TS and Python spline the throughput and re-derive instead. See `docs/tco-calculator.md` for the reproducible measurement.
 
@@ -272,27 +163,9 @@ The Python file has a header comment explaining the pipeline and a `_cli()` entr
 - **Port-only change** is allowed only when it brings the port closer to the pinned upstream behaviour and needs no upstream edit, for example matching a pydantic rejection or Python's `%g` rounding. Cite the upstream lines it mirrors, cover the case in `power-model-validation.test.ts` or the parity generator, and keep the regenerated fixture byte-stable apart from the cases you added.
 - Never hand-edit `power-model.parity.json` or `power-model.manifest.json`; regenerate them.
 
-## Model Parameter Counts (verified)
+## Model Parameter Counts
 
-Authoritative total / active parameter counts for every model in the dashboard. Use these when updating `MODEL_CONFIG` labels in `packages/app/src/lib/catalog/data-mappings.ts` or any blog/docs prose. Verify against the HF model card before adding a new model — point releases (e.g. K2 → K2.5, GLM-4.5 → GLM-5) often keep or change sizes in non-obvious ways.
-
-| Model                  | Total | Active      | HF ID                               | Source                             |
-| ---------------------- | ----- | ----------- | ----------------------------------- | ---------------------------------- |
-| DeepSeek-R1-0528       | 671B  | 37B         | `deepseek-ai/DeepSeek-R1-0528`      | HF model card                      |
-| DeepSeek-V4-Pro        | 1.6T  | 49B         | `deepseek-ai/DeepSeek-V4-Pro`       | HF model card                      |
-| DeepSeek-V4.1-Flash    | 552B  | 8B / 16B    | `deepseek-ai/DeepSeek-V4.1-Flash`   | HF model card                      |
-| Kimi-K2.5              | 1T    | 32B         | `moonshotai/Kimi-K2.5`              | HF model card                      |
-| Kimi-K2.6              | 1T    | 32B         | `moonshotai/Kimi-K2.6`              | HF model card                      |
-| Kimi-K2.7-Code         | 1T    | 32B         | `moonshotai/Kimi-K2.7-Code`         | HF model card                      |
-| Qwen3.5-397B-A17B      | 397B  | 17B         | `Qwen/Qwen3.5-397B-A17B`            | HF model card                      |
-| Qwen3.8-Flash-Next     | 176B  | 6B          | `Qwen/Qwen3.8-Flash-Next-FP8`       | HF model card                      |
-| Qwen3.8-27B            | 27B   | 27B (dense) | `Qwen/Qwen3.8-27B`                  | HF model card                      |
-| GLM-5                  | 744B  | 40B         | `zai-org/GLM-5`                     | HF model card                      |
-| GLM-5.1                | 744B  | 40B         | `zai-org/GLM-5.1-FP8`               | HF model card (same base as GLM-5) |
-| MiniMax-M2.5           | 230B  | 10B         | `MiniMaxAI/MiniMax-M2.5`            | HF model card                      |
-| MiniMax-M2.7           | 230B  | 10B         | `MiniMaxAI/MiniMax-M2.7`            | NVIDIA M2.7 blog                   |
-| gpt-oss-120b           | 120B  | 5.1B        | `openai/gpt-oss-120b`               | HF model card                      |
-| Llama-3.3-70B-Instruct | 70B   | 70B (dense) | `meta-llama/Llama-3.3-70B-Instruct` | HF model card                      |
+Total / active parameter counts live in `MODEL_ARCHITECTURES` (`packages/app/src/lib/catalog/model-architectures.ts`). Verify against the HF model card before adding a model or changing `MODEL_CONFIG` labels in `packages/app/src/lib/catalog/data-mappings.ts` or blog/docs prose. Point releases (e.g. K2 → K2.5, GLM-4.5 → GLM-5) often keep or change sizes in non-obvious ways.
 
 **Common mislabel traps** (have all bitten this repo at least once — do not repeat):
 
@@ -313,19 +186,6 @@ Authoritative total / active parameter counts for every model in the dashboard. 
 
 ## Common Development Tasks
 
-### Modify chart appearance/behavior
-
-- D3 scatter plot: `src/components/inference/ui/ScatterGraph.tsx`
-- D3 GPU graph: `src/components/inference/ui/GPUGraph.tsx`
-- Chart layout/errors: `src/components/inference/ui/ChartDisplay.tsx`
-- Shared D3 library: `src/lib/d3-chart/` (setup, axes, grid, watermark, layers)
-
-### Change chart filters/state
-
-- State: `src/components/inference/InferenceContext.tsx`
-- Controls: `src/components/inference/ui/ChartControls.tsx`
-- Filter logic: `src/components/inference/hooks/useChartData.ts`
-
 ### Add/modify a metric
 
 1. Register the field, bilingual labels/titles, polarity, and custom-source metadata in `src/components/inference/metric-registry.ts` (`METRIC_REGISTRY`).
@@ -337,23 +197,15 @@ Authoritative total / active parameter counts for every model in the dashboard. 
 
 ### Add a new blog post
 
-1. Create `packages/app/content/blog/<slug>.mdx` with frontmatter: `title`, `subtitle`, `date` (required), `tags`, `modifiedDate` (optional)
-2. Write content using Markdown + custom MDX components (`Figure`, `Blur`)
-3. Create the Simplified Chinese translation at `packages/app/content/blog/zh/<slug>.mdx` (**required** — see [Chinese Website Pages](#chinese-website-pages-zh--mandatory-for-all-indexable-surfaces))
-4. No code changes needed — the post automatically appears in the blog list, sitemap, RSS feed, llms.txt, and gets a generated OG image; the zh file appears on `/zh/blog` with hreflang pairing
+Create `packages/app/content/blog/<slug>.mdx` and its required Simplified Chinese translation at `packages/app/content/blog/zh/<slug>.mdx` in the same PR (see [Chinese Website Pages](#chinese-website-pages-zh--mandatory-for-all-indexable-surfaces)). Frontmatter and authoring rules are in [Blog](./docs/blog.md). A post without `publishDate` stays hidden in production. No code changes are needed, since the blog list, sitemap, RSS feed, llms.txt, and OG image pick up the post automatically. After adding or replacing `<Figure>` images, run `bun run blog:figure-dimensions` in `packages/app` and commit the updated `src/lib/blog/figure-dimensions.json`.
 
-See [Blog](./docs/blog.md) for content format, available MDX components, and design details.
+### Add a hardware results page
 
-### Modify blog components
+Create `packages/app/content/hardware/<slug>.mdx` and its Chinese sibling `packages/app/content/hardware/zh/<slug>.mdx` in the same PR. The frontmatter schema is in [Blog](./docs/blog.md#hardware-results-pages). The `/hardware` index, sitemap, llms.txt, llms-full.txt, and OG image pick the page up automatically; the RSS feed stays blog-only.
 
-- Blog library (posts, headings, reading time): `src/lib/blog/blog.ts`
-- Blog list page: `src/app/blog/page.tsx`
-- Blog post page: `src/app/blog/[slug]/page.tsx`
-- MDX components: `src/components/blog/mdx-components.tsx`
-- TOC sidebar: `src/components/blog/blog-toc.tsx`
-- OG image generation: `src/app/blog/[slug]/og-image-render.tsx`
-- RSS feed: `src/app/feed.xml/route.ts`
-- SEO constants: `packages/constants/src/seo.ts`
+### Write or update a whitepaper
+
+Load `.claude/skills/write-inferencex-whitepaper/` first. It holds the numbers workflow, copy rules, the PDF/chart pipeline, and the registry checklist for `src/lib/content/whitepapers.ts`.
 
 ### Add a new model or GPU
 
@@ -362,8 +214,8 @@ See [Blog](./docs/blog.md) for content format, available MDX components, and des
 ### Adding a new tab
 
 1. Add the canonical route entry to `packages/app/src/lib/routing/dashboard-routes.ts`, including navigation group, indexability, provider capabilities, locale mirroring, and share scopes.
-2. Add explicit English metadata in `src/lib/routing/tab-meta.ts` and Chinese metadata, intro, and label entries in `src/lib/routing/tab-meta-zh.ts`.
-3. Create the English and Chinese App Router pages. `dashboard-routes.test.ts` enforces structural parity.
+2. Add explicit English metadata and intro entries (`TAB_META`, `TAB_INTRO`) in `src/lib/routing/tab-meta.ts` and Chinese metadata, intro, and label entries in `src/lib/routing/tab-meta-zh.ts`. Keep descriptions within 155 characters.
+3. Create the English and Chinese App Router pages, rendering `<TabIntro tab="<tab>" />` (EN) and `<ZhTabIntro tab="<tab>" />` (zh) above the content unless the content already renders an h1. `dashboard-routes.test.ts` enforces structural parity.
 4. Add the tab content and any section-specific provider only when the route actually needs one; declare dashboard-wide provider needs in the registry.
 5. Use `ChartLegend` with `variant="sidebar"`, sorted by `HW_REGISTRY` sort order, default expanded.
 6. Track interactive actions with the `{tabname}_` analytics prefix.
@@ -375,36 +227,5 @@ Workflow for a periodic dep bump. Branch: `chore/bump-deps-YYYY-MM-DD`. Commit e
 1. **Bump versions**: `bun update --interactive --recursive`. Review every proposed update across workspaces. Press `l` to select the latest version when an update must cross the declared semver range.
 2. **Resolve install errors**: follow Bun's reported remediation and keep package-manager settings in `bunfig.toml` only when the documented configuration requires them.
 3. **Audit security**: `bun audit` checks the installed packages recorded in `bun.lock`. For each finding, update the affected dependency with `bun update` or `bun update --latest`, then rerun the audit. Do not suppress an advisory without a documented reason.
-4. **Fix lint/format**: `bun run lint:fix && bun run fmt:fix`. New rules from oxlint version bumps may not have autofixers (e.g. `require-unicode-regexp`, `unicorn/no-negated-condition`) — fix manually. For mechanical bulk changes, delegate to a subagent and verify with `bun run typecheck`.
-5. **Final check**: `bun run lint && bun run fmt && bun run typecheck && bun run security` all pass. Pre-commit hook reruns these.
-
-## Subsystem Docs
-
-Detailed design rationale (the "why" and "how", not the "what") lives in [docs/](./docs/index.md):
-
-- **[Index](./docs/index.md)** — index of all docs **MUST ALWAYS READ IN CASE OF RELEVANT INFORMATION**
-- **[Architecture](./docs/architecture.md)** — Client-first design, route navigation, URL state, caching, color system
-- **[D3 Charts](./docs/d3-charts.md)** — 4-effect architecture, zoom refs, tooltip lifecycle
-- **[Data Pipeline](./docs/data-pipeline.md)** — DB schema reasoning, ETL design, spline interpolation
-- **[Pitfalls](./docs/pitfalls.md)** — Token type bugs, schema evolution, stale closures, zoom loss
-- **[GPU Specs](./docs/gpu-specs.md)** — Topology invariants, unit conventions, hardware gotchas
-- **[TCO Calculator](./docs/tco-calculator.md)** — Interpolation, composite keys, cost matrix
-- **[Adding Entities](./docs/adding-entities.md)** — Checklists for adding models, GPUs, precisions, sequences, frameworks
-- **[Testing](./docs/testing.md)** — Requirements, quality standards, pre-commit checklist
-- **[Data Transforms](./docs/data-transforms.md)** — BenchmarkRow → AggDataEntry → InferenceData pipeline, hardware key construction, derived metrics
-- **[State Ownership](./docs/state-ownership.md)** — Context provider state map, availability filtering cascade, comparison dates, URL params
-- **[Blog](./docs/blog.md)** — MDX content system, SEO features, TOC sidebar, reading progress, analytics events
-
-## Claude AI Agents
-
-### `@claude` (`.github/workflows/claude.yml`)
-
-Three jobs: a lightweight Haiku **`route`** classifier runs on any `@claude` mention in an issue/comment and emits a `profile`; its output gates **`implement`** or **`review`**. (The `review` job also triggers directly on PR open/sync, with no comment to route.)
-
-- `@claude <anything>` — `route` picks a **profile** (`ui` / `code` / `docs` / `question` / `review`) and, for implement profiles, a browser (`playwright` / `chrome` / `none`).
-  - **implement** job (`ui` / `code` / `docs` / `question`): provisions only what's needed — dev server, Playwright browser, and Cypress binary install **on demand** only for browser/UI work, so docs/DB/backend/question tasks stay fast. `ui` gets focused browser verification plus the `?unofficialrun=` overlay, then passes `bun run test:e2e`; the full suite remains covered by the merge checks. Creates `claude/issue-{N}-*` branches and can push.
-  - **review** job (`review` profile, or any PR open/sync): a **read-only**, **verifying** review. It checks out the PR head, starts a local dev server backed by the real read-only DB, and uses the **Playwright MCP** on `http://localhost:3000` to confirm the changed UI actually works (renders real data, interactions behave, no console errors). It does **not** re-run the test suite — `typecheck`/`lint`/`test:unit` and the fixtures-based e2e are already covered by the dedicated `tests-*`/`lint` workflows; the review reads their status and folds failures into the review as 🔴 BLOCKING — plus the static diff review (bugs, security, missing tests). Never edits or pushes. A review-phrased ask in **any** wording (e.g. "@claude take a look at this PR") routes here, not just the exact `@claude review`. Prompt: `.github/claude/review-prompt.md`.
-- **Explicit overrides** (skip the classifier): `@claude review` → review; `@claude chrome` → Chrome DevTools MCP; `@claude frontend` → full Playwright + dev server; `@claude general` (or `lite`) → lean no-browser. If the router guesses wrong, re-run with the override.
-- `implement` and `review` share a `claude-<PR/issue number>` concurrency group, so reviews and implementation on the same PR serialize instead of clobbering each other.
-
-The model is set once via the workflow-level `CLAUDE_MODEL` env (`claude-opus-4-8`); the router uses `CLAUDE_ROUTER_MODEL` (`claude-haiku-4-5`).
+4. **Fix lint/format**: `bun run lint:fix && bun run fmt:fix`. New rules from oxlint version bumps may not have autofixers (e.g. `unicorn/no-negated-condition`), so fix those manually. For mechanical bulk changes, delegate to a subagent and verify with `bun run typecheck`.
+5. **Final check**: `bun run lint && bun run fmt && bun run typecheck && bun run security` all pass.

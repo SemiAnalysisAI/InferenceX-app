@@ -267,6 +267,18 @@ describe('dashboardCells', () => {
     expect(result.workload).toBe(FORMAL.split(' · ').slice(0, 5).join(' · '));
   });
 
+  it('breaks a full hardware and cell tie by the newer publication, not roster order', () => {
+    // Newer publication of an older artifact (backfill) on the later roster SKU.
+    const newer = pageOf('1', 'NVIDIA H200', [cell({ id: 'new:c1', workloadKey: 'new-plan' })]);
+    newer.entries[0].publishedAt = '2026-09-12T00:00:00Z';
+    const older = pageOf('2', 'NVIDIA B200', [
+      cell({ id: 'old:c1', hardware: 'NVIDIA B200', workloadKey: 'old-plan' }),
+    ]);
+    const result = dashboardCells(videoPoints([newer, older]));
+    expect(result.cells.map((p) => p.id)).toEqual(['new:c1']);
+    expect(result.otherWorkloads).toBe(1);
+  });
+
   it('keeps legacy cells together only inside their sealed source, never by label', () => {
     const result = dashboardCells(
       videoPoints([

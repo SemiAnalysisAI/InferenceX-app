@@ -28,14 +28,9 @@ import { computeToggle } from '@/hooks/useTogglableSet';
 import { Model, Sequence, Precision } from '@/lib/catalog/data-mappings';
 import React from 'react';
 
-/** cy.stub() with .as() alias — cast to any to work around Cypress type limitation. */
 function namedStub(alias: string) {
   return (cy.stub() as any).as(alias);
 }
-
-// ---------------------------------------------------------------------------
-// Hardware config
-// ---------------------------------------------------------------------------
 
 export function createMockHardwareConfig(): HardwareConfig {
   return {
@@ -86,10 +81,6 @@ export function createMockHardwareConfig(): HardwareConfig {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Chart definition
-// ---------------------------------------------------------------------------
-
 export function createMockChartDefinition(overrides?: Partial<ChartDefinition>): ChartDefinition {
   const chartType = overrides?.chartType ?? 'e2e';
   const x = overrides?.x ?? (chartType === 'interactivity' ? 'median_intvty' : 'median_e2el');
@@ -110,10 +101,6 @@ export function createMockChartDefinition(overrides?: Partial<ChartDefinition>):
       overrides?.x_labelZh ?? (chartType === 'interactivity' ? '交互性' : '端到端延迟（s）'),
   };
 }
-
-// ---------------------------------------------------------------------------
-// Inference data
-// ---------------------------------------------------------------------------
 
 export function createMockInferenceData(overrides?: Partial<InferenceData>): InferenceData {
   return {
@@ -163,10 +150,6 @@ export function createMockInferenceData(overrides?: Partial<InferenceData>): Inf
     ...overrides,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Inference domain contexts
-// ---------------------------------------------------------------------------
 
 export type MockInferenceContextValues = InferenceDataContextType &
   InferenceFiltersContextType &
@@ -229,6 +212,8 @@ export function createMockInferenceContextValues(
     selectedPercentile: 'p90',
     fixedSequenceStatistic: 'median',
     setFixedSequenceStatistic: namedStub('setFixedSequenceStatistic'),
+    tokenBasis: 'total',
+    setTokenBasis: namedStub('setTokenBasis'),
     selectedXAxisMetric: null,
     setSelectedXAxisMetric: namedStub('setSelectedXAxisMetric'),
     selectedE2eXAxisMetric: null,
@@ -303,13 +288,10 @@ export function createMockInferenceContextValues(
     compareGpuPair: null,
     lockedFrameworks: null,
     minimalChrome: false,
+    blockedHwToggles: new Map(),
     ...overrides,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Evaluation chart data
-// ---------------------------------------------------------------------------
 
 export function createMockEvaluationChartData(
   overrides?: Partial<EvaluationChartData>,
@@ -349,10 +331,6 @@ export function createMockEvaluationChartData(
     ...overrides,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Evaluation context
-// ---------------------------------------------------------------------------
 
 export function createMockEvaluationContext(
   overrides?: Partial<EvaluationChartContextType>,
@@ -398,10 +376,6 @@ export function createMockEvaluationContext(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Reliability data
-// ---------------------------------------------------------------------------
-
 export function createMockReliabilityData(
   overrides?: Partial<ModelSuccessRateData & { modelLabel: string }>,
 ): ModelSuccessRateData & { modelLabel: string } {
@@ -414,10 +388,6 @@ export function createMockReliabilityData(
     ...overrides,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Reliability context
-// ---------------------------------------------------------------------------
 
 export function createMockReliabilityContext(
   overrides?: Partial<ReliabilityChartContextType>,
@@ -455,9 +425,6 @@ export function createMockReliabilityContext(
     ...overrides,
   };
 }
-
-// Global filter contexts
-// ---------------------------------------------------------------------------
 
 export type GlobalFilterContextOverrides = Partial<
   GlobalFilterSelectionContextType &
@@ -553,10 +520,6 @@ export function createMockGlobalFilterContexts(
     },
   };
 }
-
-// ---------------------------------------------------------------------------
-// Unofficial run context
-// ---------------------------------------------------------------------------
 
 export function createMockUnofficialRunContext(
   overrides?: Partial<UnofficialRunContextType>,

@@ -40,6 +40,8 @@ export interface VideoPoint {
   server: { tp: number | null; ulysses: number | null; attention: string | null } | null;
   status: string;
   observedAt: string | null;
+  /** When the artifact entered published history; orders publications with `artifactId`. */
+  publishedAt?: string | null;
 }
 
 export type XMetricId = 'p90Latency' | 'p50Latency';

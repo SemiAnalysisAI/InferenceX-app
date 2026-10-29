@@ -34,18 +34,12 @@ const IDENTITY_FIELDS = [
   'image',
   'run_url',
 ] as const;
-// The CPU-side keys are withheld on cpu_power_valid, so the manifest carries that verdict too.
 const POWER_FIELDS = [
   ...MEASURED_POWER_METRIC_KEYS,
   'power_valid',
   'power_metric_schema_version',
   'cpu_power_valid',
 ];
-/**
- * The workloads PowerX publishes. The receipt predicate, the required-power
- * matrix scenarios and the ingest's unmapped-row diagnostic derive from this
- * one table.
- */
 export const POWER_WORKLOADS = [
   { scenario: 'agentic', benchmarkType: 'agentic_traces', isl: null, osl: null },
   { scenario: '1k1k', benchmarkType: 'single_turn', isl: 1024, osl: 1024 },
@@ -53,7 +47,6 @@ export const POWER_WORKLOADS = [
 ] as const;
 export type PowerWorkload = (typeof POWER_WORKLOADS)[number];
 
-/** Mapped agentic rows carry null sequence lengths, so equality is the whole rule. */
 export function powerWorkloadOf(row: {
   benchmarkType: string;
   isl: number | null;
@@ -69,7 +62,6 @@ export function powerWorkloadOf(row: {
   );
 }
 
-/** The workload of a raw artifact row the mapper rejected, by the mapper's own type rule. */
 export function rawPowerWorkloadOf(raw: Record<string, unknown>): PowerWorkload | null {
   return powerWorkloadOf(
     isAgenticRow(raw)
@@ -94,20 +86,12 @@ export interface PowerPublicationManifest {
   runId: number;
   runAttempt: number;
   points: PowerPublicationPoint[];
-  /** Fatal: verify-power-publication exits non-zero when this is non-empty. */
   ingestErrors?: string[];
-  /**
-   * PowerX-workload results the benchmark itself marked failed. Excluded from
-   * the curve on purpose, so copied into the verification receipt, never fatal.
-   */
   publicationWarnings?: string[];
-  /** Copied into the verification receipt, never fatal; see `Skips.telemetryError`. */
   telemetryWarnings?: string[];
-  /** Attachment completeness, separate from benchmark/power publication validity. */
   telemetry?: TelemetryReceipt;
 }
 
-/** Receipt written next to the manifest by `verify-power-publication.ts`. */
 export function powerVerificationReceipt(
   manifest: PowerPublicationManifest,
   errors: readonly string[],
@@ -135,11 +119,6 @@ export function powerVerificationReceipt(
   };
 }
 
-/**
- * How a PowerX-workload result that did not map is reported. A result the
- * benchmark marked failed is a known exclusion (warning); any other unmapped
- * result is a hole in the published curve (fatal error).
- */
 export function unmappedPowerResultIssue(
   raw: Record<string, unknown>,
   failed: boolean,
@@ -213,7 +192,6 @@ export function powerPublicationPoint(
   };
 }
 
-/** Matching numbers alone would miss leaked invalid telemetry or lost audit evidence. */
 export function verifyPowerPublication(
   expected: readonly PowerPublicationPoint[],
   actual: readonly PublishedPowerRow[],

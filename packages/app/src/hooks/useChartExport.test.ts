@@ -67,7 +67,6 @@ describe('useChartExport failure messages', () => {
     ['/inference', 'Failed to export image. Please try again.'],
     ['/zh/inference', '图片导出失败，请重试。'],
   ])('reports a PNG capture failure in the current locale on %s', async (pathname, message) => {
-    // Keep the hook mounted across locale navigation to catch a stale callback.
     exportMocks.pathname = pathname;
     act(() => root.render(createElement(HookProbe)));
     const error = new Error('PNG capture failed');
@@ -161,6 +160,28 @@ describe('useChartExport failure messages', () => {
       if (liveScroller) expect(liveScroller.scrollLeft).toBe(250);
     },
   );
+
+  it('exports the option each dropdown shows, not its first option', async () => {
+    chart.innerHTML = `
+      <select data-testid="power-timeline-concurrency">
+        <option value="">All</option>
+        <option value="4">c4</option>
+        <option value="8">c8</option>
+      </select>`;
+    const live = chart.querySelector('select')!;
+    live.value = '4';
+    let exportedValue: string | undefined;
+    exportMocks.toPng.mockImplementationOnce((element: HTMLElement) => {
+      exportedValue = element.querySelector('select')?.value;
+      throw new Error('stop after capture');
+    });
+    vi.spyOn(window, 'alert').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    await act(() => current.exportToImage());
+    expect(exportMocks.toPng).toHaveBeenCalledOnce();
+    expect(exportedValue).toBe('4');
+    expect(live.value).toBe('4');
+  });
 
   it('includes the legend again after line labels are toggled off', async () => {
     chart.innerHTML =

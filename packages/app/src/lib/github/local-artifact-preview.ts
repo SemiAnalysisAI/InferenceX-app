@@ -8,7 +8,6 @@ export interface LocalArtifactPreview {
   evaluations: Record<string, unknown>[];
 }
 
-/** An explicit local fixture directory, never a private-repository API fallback. */
 export function localArtifactPreviewEnabled(hostname: string): boolean {
   return (
     process.env.NODE_ENV === 'development' &&

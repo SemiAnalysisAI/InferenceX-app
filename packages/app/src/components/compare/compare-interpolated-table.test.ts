@@ -58,7 +58,6 @@ describe('compare interpolated table — SSR data generation', () => {
 
     expect(resultA).not.toBeNull();
     expect(resultB).not.toBeNull();
-    // Same as spline evaluated at the lowest frontier point (interactivity 10)
     expect(resultA!.value).toBe(800);
     expect(resultB!.value).toBe(700);
   });
@@ -75,7 +74,6 @@ describe('compare interpolated table — SSR data generation', () => {
       expect(r.b).not.toBeNull();
     }
 
-    // Higher interactivity = lower throughput (on the Pareto front)
     expect(results[0].a!.value).toBeGreaterThan(results[1].a!.value);
     expect(results[1].a!.value).toBeGreaterThan(results[2].a!.value);
   });
@@ -118,7 +116,6 @@ describe('compare interpolated table — interactivity range computation', () =>
     const overlapMin = Math.max(rangeA.min, rangeB.min);
     const overlapMax = Math.min(rangeA.max, rangeB.max);
 
-    // No overlap
     expect(overlapMin).toBeGreaterThanOrEqual(overlapMax);
 
     const unionMin = Math.min(rangeA.min, rangeB.min);
@@ -141,7 +138,6 @@ describe('compare interpolated table — interactivity range computation', () =>
   });
 
   it('returns a single target when range is zero', () => {
-    // span === 0 falls through to the single-target branch.
     const min = 30;
     const targets = [Math.round(min)];
 

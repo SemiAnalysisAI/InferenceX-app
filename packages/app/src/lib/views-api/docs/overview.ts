@@ -17,14 +17,6 @@ import {
   nullableNumberSchema as nullableNumber,
 } from '@/lib/api/api-documentation-helpers';
 
-/**
- * Docs fragment for GET /api/v1/views/overview.
- *
- * Assembled into the registry by the coordinator — this module only exports
- * `operations`. The `views` group id is added to `ApiGroupId` during that
- * integration, hence the local cast below.
- */
-
 const VIEWS_GROUP: ApiOperation['group'] = 'views';
 
 const parameters: readonly ApiParameter[] = [

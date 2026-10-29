@@ -9,15 +9,8 @@ import {
   pathWithSearchParams,
   resolveModelRouteSlug,
 } from '@/lib/routing/model-routes';
-import { modelTabMetadata } from '@/lib/routing/tab-meta';
-
-/**
- * `/historical/<model>` — the Historical Trends tab seeded to a specific
- * model, giving every model an indexable URL. `GlobalFilterProvider` (mounted
- * by the dashboard shell) reads the model straight from the pathname, so the
- * page body is identical to the bare tab; switching models in the UI rewrites
- * the pathname in place via `history.replaceState` (no reload, no remount).
- */
+import { MODEL_TAB_META, modelTabMetadata } from '@/lib/routing/tab-meta';
+import { TabIntro } from '@/components/dashboard/tab-intro';
 
 interface Props {
   params: Promise<{ model: string }>;
@@ -39,17 +32,21 @@ export default async function HistoricalModelPage({ params, searchParams }: Prop
   const { model } = await params;
   const resolved = resolveModelRouteSlug(model);
   if (!resolved) notFound();
-  // Aliases and non-canonical casing 308 to the canonical slug, keeping any
-  // share-link params, mirroring /compare/[slug]. `searchParams` is awaited
-  // only on this branch so the canonical slugs stay statically generated.
   if (resolved.isAlias) {
     permanentRedirect(
       pathWithSearchParams(modelRoutePath('historical', resolved.route.slug), await searchParams),
     );
   }
   return (
-    <InferenceProvider activeTab="historical">
-      <HistoricalTrendsDisplay />
-    </InferenceProvider>
+    <>
+      <TabIntro
+        tab="historical"
+        title={MODEL_TAB_META.historical.title(resolved.route.seoName)}
+        intro={MODEL_TAB_META.historical.intro(resolved.route.seoName)}
+      />
+      <InferenceProvider activeTab="historical">
+        <HistoricalTrendsDisplay />
+      </InferenceProvider>
+    </>
   );
 }

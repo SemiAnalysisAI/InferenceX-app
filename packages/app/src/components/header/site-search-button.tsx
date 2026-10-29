@@ -4,11 +4,10 @@ import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 
 import { HEADER_ACTION_STYLE } from '@/components/ui/control-styles';
 import { track } from '@/lib/analytics/analytics';
+import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
 
-// The dialog, index and extraction code ship in their own chunk. Nothing but
-// this button and its shortcut listener is part of the initial page bundle.
 const loadDialog = () => import('./site-search-dialog');
 const SiteSearchDialog = lazy(() =>
   loadDialog().then((module) => ({ default: module.SiteSearchDialog })),
@@ -19,20 +18,17 @@ const STRINGS = {
   zh: { label: '搜索 InferenceX' },
 } as const;
 
-/** True when a keystroke is going into a text field the user is typing in. */
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   return target.isContentEditable || /^(?:INPUT|TEXTAREA|SELECT)$/u.test(target.tagName);
 }
 
-/** Header magnifying-glass button; opens site search on click, Cmd/Ctrl+K or "/". */
 export function SiteSearchButton() {
   const locale = useLocale();
   const strings = STRINGS[locale];
   const [open, setOpen] = useState(false);
-  // Mount the lazy dialog only after first use, then keep it mounted so the
-  // close animation plays and the in-memory index survives reopening.
   const [mounted, setMounted] = useState(false);
+  useDialogCloseTracking(open, 'header_search_closed');
 
   const openSearch = useCallback((method: 'click' | 'shortcut') => {
     setMounted(true);
@@ -68,7 +64,6 @@ export function SiteSearchButton() {
         title={strings.label}
         className={cn(HEADER_ACTION_STYLE, 'size-11')}
         onClick={() => openSearch('click')}
-        // Warm the chunk on intent so the first open feels instant.
         onPointerEnter={() => void loadDialog()}
         onFocus={() => void loadDialog()}
       >

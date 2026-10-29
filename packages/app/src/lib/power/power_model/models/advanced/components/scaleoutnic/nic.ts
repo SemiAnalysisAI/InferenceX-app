@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** NIC capacity metadata and fixed active/idle electrical power. */
 
 import { type Details, type OperatingState, py_repr, ValidationError } from '../../../../base';
 import { GenericComponent, type GenericComponentFields } from '../base';
@@ -12,16 +11,12 @@ export interface ScaleOutNICCardFields extends GenericComponentFields {
   state: NICState | string;
 }
 
-/** A concrete NIC class, constructible from a state with its own baseline provenance. */
 export type ScaleOutNICCardType = new (fields: ScaleOutNICCardFields) => ScaleOutNICCard;
 
 export abstract class ScaleOutNICCard extends GenericComponent {
   static override readonly typeName: string = 'ScaleOutNICCard';
-  /** Configured nominal bandwidth, independent of the card's state. */
   static readonly bandwidth_gbps: number;
-  /** Per-card power when scale-out networking is unused. */
   static readonly idle_power_w: number;
-  /** Per-card power when using scale-out networking. */
   static readonly active_power_w: number;
   readonly state: NICState;
 

@@ -28,8 +28,6 @@ describe('computeAutoSwitchDecision', () => {
     const run = [entry(Model.DeepSeek_V4_Pro, Sequence.OneK_OneK)];
     const decision = computeAutoSwitchDecision(run, Model.DeepSeek_R1, Model.DeepSeek_R1, '');
     expect(decision.modelToSet).toBeNull();
-    // Ref must not be advanced — if the URL is later cleared we still want
-    // a fresh load of the same run to be able to fire the switch.
     expect(decision.nextKey).toBe('');
   });
 
@@ -40,13 +38,10 @@ describe('computeAutoSwitchDecision', () => {
     ];
     const decision = computeAutoSwitchDecision(run, undefined, Model.DeepSeek_R1, '');
     expect(decision.modelToSet).toBeNull();
-    // Key still advances so we don't keep re-evaluating on every render.
     expect(decision.nextKey).toBe([Model.DeepSeek_R1, Model.DeepSeek_V4_Pro].toSorted().join(','));
   });
 
   it('does not re-fire after a manual model change against the same run set', () => {
-    // Simulate the post-auto-switch state: ref already holds the run's key,
-    // user manually switched back to a model the run does not cover.
     const run = [entry(Model.DeepSeek_V4_Pro, Sequence.OneK_OneK)];
     const lastKey = Model.DeepSeek_V4_Pro;
     const decision = computeAutoSwitchDecision(run, undefined, Model.DeepSeek_R1, lastKey);
@@ -55,17 +50,13 @@ describe('computeAutoSwitchDecision', () => {
   });
 
   it('re-arms after the overlay set is cleared so a subsequent load can switch again', () => {
-    // Step 1: a run is loaded, switch fires.
     const run = [entry(Model.DeepSeek_V4_Pro, Sequence.OneK_OneK)];
     const first = computeAutoSwitchDecision(run, undefined, Model.DeepSeek_R1, '');
     expect(first.modelToSet).toBe(Model.DeepSeek_V4_Pro);
 
-    // Step 2: user dismisses the run, overlay set goes empty — ref resets.
     const cleared = computeAutoSwitchDecision([], undefined, Model.DeepSeek_V4_Pro, first.nextKey);
     expect(cleared).toEqual({ nextKey: '', modelToSet: null });
 
-    // Step 3: a *different* run is loaded with a different model. The cleared
-    // ref allows the switch to fire again.
     const run2 = [entry(Model.Kimi_K2_5, Sequence.OneK_OneK)];
     const second = computeAutoSwitchDecision(
       run2,
@@ -77,10 +68,6 @@ describe('computeAutoSwitchDecision', () => {
   });
 
   it('ignores sequence-only changes in the dedupe key', () => {
-    // Same model, two sequences appearing across renders. The decision logic
-    // only branches on model, so the key should not change when a new
-    // sequence arrives for an already-covered model — otherwise the effect
-    // would re-evaluate (and bail) on every sequence delta.
     const oneK = [entry(Model.DeepSeek_V4_Pro, Sequence.OneK_OneK)];
     const both = [
       entry(Model.DeepSeek_V4_Pro, Sequence.OneK_OneK),
@@ -93,9 +80,6 @@ describe('computeAutoSwitchDecision', () => {
   });
 
   it('picks the first model deterministically across insertion orders', () => {
-    // Same set of models in two different orders should produce the same
-    // auto-picked target — protecting against `Object.keys`-driven nondeterminism
-    // in `parseAvailableModelsAndSequences`.
     const orderA = [
       entry(Model.MiniMax_M2_5, Sequence.OneK_OneK),
       entry(Model.DeepSeek_V4_Pro, Sequence.OneK_OneK),

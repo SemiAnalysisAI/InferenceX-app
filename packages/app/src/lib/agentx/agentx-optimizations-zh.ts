@@ -1,13 +1,3 @@
-/**
- * Simplified Chinese port of `agentx-optimizations.ts`.
- *
- * Translations are keyed by framework slug and section id, and carry only the
- * prose: PR references, figure assets, and link targets come from the English
- * registry, so a PR list can never drift between the two languages.
- * `agentx-optimizations.test.ts` fails if a section, highlight, paragraph, or
- * link here does not line up with its English counterpart.
- */
-
 import {
   AGENTX_OPTIMIZATION_FRAMEWORKS,
   OPTIMIZATIONS_OVERVIEW,
@@ -23,14 +13,12 @@ interface SectionTranslation {
   heading: string;
   paragraphs: readonly string[];
   figure?: OptimizationFigureCopy;
-  /** Link labels, in the same order as the English section's `links`. */
   links?: readonly string[];
 }
 
 interface FrameworkTranslation {
   summary: string;
   lead: string;
-  /** Highlight labels, in order. The values stay in English (units, numbers). */
   highlights: readonly string[];
   sections: Readonly<Record<string, SectionTranslation>>;
 }
@@ -40,7 +28,7 @@ const OVERVIEW_ZH = {
   title: '面向智能体负载的优化',
   lead: 'AgentX 推出后的最初几个月，最有价值的成果并非开源数据集，而是 AgentX 合作伙伴提交的 50 多个上游 PR。这些改动以 AgentX 为核心衡量标准，面向真实智能体负载进行优化。',
   intro: [
-    'AgentX 回放的是真实智能体流量，因此它衡量的远不止 prefill 与 decode 内核本身，而是端到端的完整链路：KV cache 生命周期、混合注意力（hybrid attention）cache 正确性、CPU KV offload、传输进度、路由亲和性、增量 tokenization、请求序列化以及调度器记账。这些开销每一项都是生产环境智能体部署已经在付的成本，而单轮 8k/1k 场景一项也测不出来。',
+    'AgentX 回放的是真实智能体流量，因此它衡量的远不止 prefill 与 decode kernel 本身，而是端到端的完整链路：KV cache 生命周期、混合注意力（hybrid attention）cache 正确性、CPU KV offload、传输进度、路由亲和性、增量 tokenization、请求序列化以及调度器记账。这些开销每一项都是生产环境智能体部署已经在付的成本，而单轮 8k/1k 场景一项也测不出来。',
     'SemiAnalysis 与 AMD 软件团队多年协作、推动其软件开发方式现代化，下面的许多工作正是这一协作的成果，它们让 AMD 开源栈在智能体负载上更接近一流水平。',
   ],
   highlights: ['上游 PR', '上游项目', '涉及的栈层级', '作为优化基准的 trace'],
@@ -51,7 +39,7 @@ const OVERVIEW_ZH = {
     ecosystem: {
       heading: '分布式推理生态简介',
       paragraphs: [
-        '智能体推理是系统级问题，而不是单纯的芯片或内核问题。当分布式系统需要处理数十万个智能体请求时，请求调度与 KV cache 管理就不再只是记账工作，而会实实在在地影响性能。例如 subagent 会产生突发式的 KV cache 访问模式，若不加优化，就会把主 agent 的 cache 挤掉。',
+        '智能体推理是系统级问题，而不是单纯的芯片或 kernel 问题。当分布式系统需要处理数十万个智能体请求时，请求调度与 KV cache 管理就不再只是记账工作，而会实实在在地影响性能。例如 subagent 会产生突发式的 KV cache 访问模式，若不加优化，就会把主 agent 的 cache 挤掉。',
         '在栈的最上层，router（有时也称 frontend）把请求分发给各个 worker。当服务端启用数据并行注意力（data-parallel attention）时，每个 DP rank 都有独立的 KV cache，因此请求会按 consistent hashing 等策略路由：同一会话或同一 subagent 的请求按其唯一 ID 落到同一个 rank，而不是把所有 cache 都搅乱。',
         '大多数路由策略在不同实现之间差别不大。有些 router 是独立组件，例如 vLLM router 和 llm-d router；有些则集成在引擎内部，例如 SGLang model gateway 和 ATOM Mesh。',
         '完成路由后，请求进入 vLLM、SGLang 等推理引擎的调度器。引擎负责执行推理并通过 API 返回结果，同时提供接口把引擎内部的 KV cache 接到外部 KV cache 管理器上——这正是该生态可插拔的原因：一个 cache 管理器可以对接多种引擎。',
@@ -76,10 +64,10 @@ const OVERVIEW_ZH = {
     other: {
       heading: '其他优化：day-zero 支持与正确性',
       paragraphs: [
-        '各项目页面汇总的工作主要针对长上下文开销：prefix 必须活下来、hybrid cache 必须保持正确、传输必须跟得上。这一节的改动性质不同，它们属于 day-zero 支持与正确性缺陷——它们让一个请求彻底失败的程度，和百万 token 会话遇到的问题一样严重。',
-        'MiniMax-M3 检验了这些 ROCm 工作能否累积成 day-zero 就绪能力，Advancing AI 一文直接给出了对比：AMD 首个公开的 disaggregated 配方 MI355X FP4 在 1 月才登陆 InferenceX，比 NVIDIA 晚了数月；而 M3 FP4 disaggregation 在 day zero 就已就位。相比 DeepSeek-R1 时期需要数月才追平，这是明显进步。day-zero 路径上有三个 vLLM 修复，且都属于正确性问题而非性能问题。',
+        '各项目页面汇总的工作主要针对长上下文开销：prefix 必须活下来、hybrid cache 必须保持正确、传输必须跟得上。这一节的改动性质不同，它们属于 day-zero 支持与正确性缺陷——它们同样会让一个请求彻底失败，与百万 token 会话遇到的问题一样严重。',
+        'MiniMax-M3 检验了这些 ROCm 工作能否累积成 day-zero 就绪能力，Advancing AI 一文直接给出了对比：AMD 首个公开的 disaggregated 测试配置 MI355X FP4 在 1 月才登陆 InferenceX，比 NVIDIA 晚了数月；而 M3 FP4 disaggregation 在 day zero 就已就位。相比 DeepSeek-R1 时期需要数月才追平，这是明显进步。day-zero 路径上有三个 vLLM 修复，且都属于正确性问题而非性能问题。',
         '首先被卡住的是 disaggregation。NixlConnector 的握手逻辑假设 SPLIT 区域的 block_len 会随 prefill 与 decode 的 TP 比例缩放，但 block_len 实际取决于每个 rank 的 KV head 数量。M3 只有 4 个 KV head，因此 TP4 prefill 搭配 TP8 decode 时，两侧都被 GQA 限制为每 rank 一个 head，两个长度相等，而断言却要求相差两倍。握手因此被拒绝，KV 完全没有传输，decode 只能从零重新生成，gsm8k 得分为 0。改为按真实 head 比例校验后问题解决。',
-        '另外两个问题源于平台差异。M3 的稀疏注意力后端在所有 E4M3 配置下都把按字节存储的 FP8 cache 读作 float8_e4m3fn，但 gfx942 的平台 dtype 是 e4m3fnuz；两种编码并不相同，因此 K 和 V 在进入内核前就已被改变，而且 prefill 与 decode 的 wrapper 也漏掉了 FP8 检查中的 FNUZ 类型。改为按平台 dtype 解释 cache 视图后，两处一并修复。此外，M3 的 NVIDIA 与 AMD 模型实现位于不同文件，只有 NVIDIA 版实现了 EAGLE3 接口，导致 ROCm 上的 speculative decoding 在引擎初始化时就以 model-does-not-support 报错退出。把 AMD 版补齐到同等能力后恢复正常，MI355X 的 gsm8k 与未启用 EAGLE3 的 MI355X 运行以及 B200 结果一致。',
+        '另外两个问题源于平台差异。M3 的稀疏注意力后端在所有 E4M3 配置下都把按字节存储的 FP8 cache 读作 float8_e4m3fn，但 gfx942 的平台 dtype 是 e4m3fnuz；两种编码并不相同，因此 K 和 V 在进入 kernel 前就已被改变，而且 prefill 与 decode 的 wrapper 也漏掉了 FP8 检查中的 FNUZ 类型。改为按平台 dtype 解释 cache 视图后，两处一并修复。此外，M3 的 NVIDIA 与 AMD 模型实现位于不同文件，只有 NVIDIA 版实现了 EAGLE3 接口，导致 ROCm 上的 speculative decoding 在引擎初始化时就以 model-does-not-support 报错退出。把 AMD 版补齐到同等能力后恢复正常，MI355X 的 gsm8k 与未启用 EAGLE3 的 MI355X 运行以及 B200 结果一致。',
         'TensorRT-LLM 页面覆盖了 M3 中与长上下文直接相关的工作：disaggregated KV 传输中的 descriptor 爆炸、context graph 捕获、稀疏 block stride、autotuner 候选集，以及必须从候选池中移除的错误 split-K MoE tactic。',
       ],
       links: ['Can AMD break the CUDA moat? — Advancing AI'],
@@ -90,7 +78,7 @@ const OVERVIEW_ZH = {
         '本地 AgentX 矩阵同时包含会话感知或 KV 感知路由、长度多变的长对话历史、MTP、hybrid attention、聚合式与 disaggregated 部署，以及跨越 HBM 容量临界点的并发扫描；既有全部驻留 GPU 的对比，也有通过 vLLM SimpleCPU、Mooncake、LMCache 和 SGLang HiCache 进行的 CPU DRAM offload。正是这种组合推动了上面这些上游工作。',
         '旧的固定序列矩阵通常只创建一个 prompt、执行一次 prefill、解码固定长度的续写，然后丢弃请求。因此它无法衡量 cache 跨轮次的存活、重复 tokenization、会话亲和性、cache 事件流量、offload 频繁换入换出、调度器停顿期间的传输进度，以及长生命周期的归属记账。',
         '允许的优化策略把 CPU KV offload 视为可选项。厂商可以使用 vLLM connector、LMCache、SGLang HiCache、Mooncake、Dynamo KVBM 或其他 CPU DRAM connector；如果关闭 offload 能得到更好的延迟与吞吐量组合，也可以关闭。NVMe offload 暂缓。CPU DRAM 必须按所用 GPU 比例缩放，其中非标准化 DRAM 系统上限为 3 TB；标准化 DRAM 系统没有硬性上限，但同样遵守比例规则。本地生成器目前对所有 runner 一律套用 3 TB 上限，因此尚未实现标准化 DRAM 的例外条款。',
-        '新增的优化范围并不只是"更长的注意力"，而是不断增长的会话状态在保存、搬运、路由、重建和反复处理过程中的全部开销。AgentX 把这些成本放大到足以推动 vLLM、SGLang、TensorRT-LLM、ATOM、AITER、Dynamo 和 LMCache 做出通用的上游改动。对 NIXL 与 Mooncake 的直接检索没有发现此处之外带 AgentX 标记的运行时 PR，因此它们的影响仍通过上述引擎 connector 改动体现。',
+        '新增的优化范围并不只是“更长的注意力”，而是不断增长的会话状态在保存、搬运、路由、重建和反复处理过程中的全部开销。AgentX 把这些成本放大到足以推动 vLLM、SGLang、TensorRT-LLM、ATOM、AITER、Dynamo 和 LMCache 做出通用的上游改动。对 NIXL 与 Mooncake 的直接检索没有发现此处之外带 AgentX 标记的运行时 PR，因此它们的影响仍通过上述引擎 connector 改动体现。',
       ],
       links: ['所有提及 AgentX 的上游 PR'],
     },
@@ -99,7 +87,7 @@ const OVERVIEW_ZH = {
     engine: '推理引擎',
     router: 'Router 与编排',
     'kv-cache': 'KV cache 层',
-    kernels: '内核',
+    kernels: 'Kernel 层',
     transfer: '传输引擎',
   } as Readonly<Record<OptimizationLayer, string>>,
   ui: {
@@ -129,7 +117,7 @@ const FRAMEWORKS_ZH: Readonly<Record<string, FrameworkTranslation>> = {
       'hybrid-prefix-caching': {
         heading: '混合注意力 prefix caching',
         paragraphs: [
-          'vLLM 改进了 hybrid attention 的 prefix caching，使短生命周期的 sliding-window 分配不再挤掉有价值的长上下文 checkpoint。选择性保留（selective retention）会保住稀疏的回放边界，在 14 个并发请求、上下文最长 100 万 token 的条件下，报告 prefix cache 命中率超过 95%。',
+          'vLLM 改进了混合注意力的 prefix caching，使短生命周期的 sliding-window 分配不再挤掉有价值的长上下文 checkpoint。选择性保留（selective retention）会保住稀疏的回放边界，在 14 个并发请求、上下文最长 100 万 token 的条件下，报告 prefix cache 命中率超过 95%。',
           '同样的可达性策略也应用到了 Mooncake，并移除了不可达的 sliding-window 查找。此前的后续改动还停止 offload 那些永远不会被复用的 sliding-window block，并把 speculative lookahead block 保留在留下的 prefix 内。',
         ],
         figure: {
@@ -174,9 +162,9 @@ const FRAMEWORKS_ZH: Readonly<Record<string, FrameworkTranslation>> = {
       'rocm-decode': {
         heading: 'ROCm：cache 层之下',
         paragraphs: [
-          '在 ROCm 侧，近期工作继续深入到 cache 层以下，那里的开销是按层而非按请求计的。当 prefix 能够存活并及时到达之后，剩下的就是 decode 步骤本身；而一次会话中要执行数千次的 decode，会为每一次可以避免的拷贝、每一个不匹配的内核付出代价。三个仍为 open 的改动针对的正是这一层。',
-          '一个 Kimi-K3 改动把 KDA decode 结果直接写入该层的输出 buffer，为每个 KDA 层省去一次设备内拷贝；单看收益很小，但它会在每个解码 token 的每一层上重复发生。第二个改动用 AITER 的 sparse-MLA decode 内核替代通用路径，报告 AgentX 输出吞吐量提升 5.22%，token 间延迟大幅下降。',
-          '第三个改动很好地说明了"测量形状"有多重要：配套改动把 full-graph 注意力投影切换到调优过的 AITER GEMM，在低并发固定序列上取得 2.3% 的提升。内核级改动可以在统一形状上给出干净的收益，却在智能体 trace 上被 cache 与调度波动淹没。',
+          '在 ROCm 侧，近期工作继续深入到 cache 层以下，那里的开销是按层而非按请求计的。当 prefix 能够存活并及时到达之后，剩下的就是 decode 步骤本身；而一次会话中要执行数千次的 decode，会为每一次可以避免的拷贝、每一个不匹配的 kernel 付出代价。三个仍为 open 的改动针对的正是这一层。',
+          '一个 Kimi-K3 改动把 KDA decode 结果直接写入该层的输出 buffer，为每个 KDA 层省去一次设备内拷贝；单看收益很小，但它会在每个解码 token 的每一层上重复发生。第二个改动用 AITER 的 sparse-MLA decode kernel 替代通用路径，报告 AgentX 输出吞吐量提升 5.22%，token 间延迟大幅下降。',
+          '第三个改动很好地说明了“测量形状”有多重要：配套改动把 full-graph 注意力投影切换到调优过的 AITER GEMM，在低并发固定序列上取得 2.3% 的提升。kernel 级改动可以在统一形状上给出干净的收益，却在智能体 trace 上被 cache 与调度波动淹没。',
         ],
       },
     },
@@ -196,7 +184,7 @@ const FRAMEWORKS_ZH: Readonly<Record<string, FrameworkTranslation>> = {
         paragraphs: [
           'SGLang 的 sliding-window 工作处理的冲突与 vLLM 的保留策略相同，只是从分配器一侧入手。window 页与 prefix 页取自同一个池，而 window 是更贪婪的消费者：它不断周转，prefix 却长期不动，于是在压力下这种临时分配会挤掉本应长期保留的部分。',
           '三种设计从不同角度解决该问题。其一，在页面离开 window 时就主动释放，而不是等淘汰压力来找它们，让失效的 window 状态不再争抢它已经用不上的页面。其二，把 compute lock 限制在单个 window 内，从而限定一个在途请求最多能钉住多少池空间。其三，清除已失去价值的陈旧 full-KV 条目。',
-          '与之并列的 ROCm ring-cache 修复属于正确性而非容量问题：ring buffer 的设计本身就会复用槽位，而复用一个旧内容仍被引用的槽位，得到的是错误输出而不是变慢的输出。这些问题在单个 8k prompt 上完全看不出来——window 永远不会绕过 prefix，池也不会有竞争；但在多轮 hybrid 会话中，它们决定了昂贵的 full-attention 历史在下一轮是否还在。',
+          '与之并列的 ROCm ring-cache 修复属于正确性而非容量问题：ring buffer 的设计本身就会复用槽位，而复用一个旧内容仍被引用的槽位，得到的是错误输出而不是变慢的输出。这些问题在单个 8k prompt 上完全看不出来——window 不会绕回到仍被引用的 prefix 槽位，池也不会有竞争；但在多轮 hybrid 会话中，它们决定了昂贵的 full-attention 历史在下一轮是否还在。',
         ],
       },
       hicache: {
@@ -212,16 +200,16 @@ const FRAMEWORKS_ZH: Readonly<Record<string, FrameworkTranslation>> = {
         },
       },
       'variable-length': {
-        heading: '长度多变的流量对内核流水线意味着什么',
+        heading: '长度多变的流量对 kernel 流水线意味着什么',
         paragraphs: [
-          '与生产流量一样，AgentX 会话的上下文长度连续变化。如果运行时直接按长度做特化，几乎每来一个请求就要编译一个新内核。SGLang maintainer 的解决办法是把上下文长度作为 runtime scalar 传入，从而收敛为一次编译：AgentX 并发 384 下输出吞吐量提升 26.75%，平均 TTFT 降低 36.25%——收益来自消除编译，而不是把计算做得更快。',
+          '与生产流量一样，AgentX 会话的上下文长度连续变化。如果运行时直接按长度做特化，几乎每来一个请求就要编译一个新 kernel。SGLang maintainer 的解决办法是把上下文长度作为 runtime scalar 传入，从而收敛为一次编译：AgentX 并发 384 下输出吞吐量提升 26.75%，平均 TTFT 降低 36.25%——收益来自消除编译，而不是把计算做得更快。',
           '同理，移除每步一次的 device-to-host 序列长度同步，也消除了一个 decode 气泡；这个气泡的唯一成因，就是 host 想知道一个设备端早已掌握的长度。',
         ],
       },
       routing: {
         heading: 'Cache 感知的数据并行路由',
         paragraphs: [
-          '当请求不带任何可复用历史（例如某个 subagent 刚启动）时，发给哪个 worker 都行，唯一值得考虑的就是负载均衡；但当它带着上兆字节的已缓存 prefix 时，把它发给一个并不持有该 prefix 的空闲 worker 就是昂贵选择，router 必须知道状态究竟在哪里。',
+          '当请求不带任何可复用历史（例如某个 subagent 刚启动）时，发给哪个 worker 都行，唯一值得考虑的就是负载均衡；但当它带着一兆字节的已缓存 prefix 时，把它发给一个并不持有该 prefix 的空闲 worker 就是昂贵选择，router 必须知道状态究竟在哪里。',
           'SGLang 加入了 DP cache affinity，让会话粘在持有其 cache 的 rank 上。同一批工作还实现了 DP 感知的 prefill 与 decode 路由，使 disaggregated 部署的两侧做出一致决策，并把 cache 均衡作为路由信号，避免亲和性退化成单个热点 worker。router 只能依据它被告知的信息行动，因此 hybrid cache 事件也变得 radix cache 感知与 sliding-window 感知。',
         ],
       },
@@ -250,7 +238,7 @@ const FRAMEWORKS_ZH: Readonly<Record<string, FrameworkTranslation>> = {
   'tensorrt-llm': {
     summary:
       '边界感知的增量 tokenization、disaggregated KV 的 descriptor 合并，以及调度器生命周期修复。',
-    lead: 'TensorRT-LLM 的 AgentX 工作从前端开始——那里有一项只因负载是多轮才存在的开销——随后沿着请求路径深入到传输粒度、内核选择与调度器生命周期。',
+    lead: 'TensorRT-LLM 的 AgentX 工作从前端开始——那里有一项只因负载是多轮才存在的开销——随后沿着请求路径深入到传输粒度、kernel 选择与调度器生命周期。',
     highlights: [
       '每轮 tokenization 平均耗时',
       '并发 5 时请求关键路径 KV 的 p99',
@@ -271,7 +259,7 @@ const FRAMEWORKS_ZH: Readonly<Record<string, FrameworkTranslation>> = {
         paragraphs: [
           'MiniMax-M3 的工作聚焦于 disaggregated KV 搬运，那里的问题出在粒度上。当 prefill 与 decode 使用不同的 head 布局时，一个逻辑请求的 KV 就不再是少数几块大的连续区域，而变成数千个带 stride 的小片段，每一片都会生成自己的传输 descriptor。搬运的字节数没变，爆炸的是每个 descriptor 的开销，而且恰恰在最需要关注的长 prompt 上最严重。',
           '修正后的多池映射与分块 NIXL bounce 路径把这些碎片通过一块有界可复用的 arena 合并起来，以一次额外的 staging 拷贝换取数量级更少的 descriptor。AgentX 诊断显示：并发 5 时请求关键路径 KV 的 p99 从 26.74 秒降到 125 ms，并发 40 时从 10.15 秒降到 288 ms。',
-          '非阻塞的 context 传输轮询保护同一条路径：即使调度停顿，也能及时回收已完成的传输，打破"已完成的 KV block 仍被钉住、导致无法接纳新请求"的反馈回路。另有一个 draft cache 传输提案已关闭且未合入，不应算作 TensorRT-LLM 已交付的行为。',
+          '非阻塞的 context 传输轮询保护同一条路径：即使调度停顿，也能及时回收已完成的传输，打破“已完成的 KV block 仍被钉住、导致无法接纳新请求”的反馈回路。另有一个 draft cache 传输提案已关闭且未合入，不应算作 TensorRT-LLM 已交付的行为。',
         ],
       },
       'execution-paths': {
@@ -281,17 +269,17 @@ const FRAMEWORKS_ZH: Readonly<Record<string, FrameworkTranslation>> = {
         ],
       },
       'kernel-selection': {
-        heading: '内核选择与调度器生命周期',
+        heading: 'kernel 选择与调度器生命周期',
         paragraphs: [
-          'AgentX 还暴露出只有在规模扩大、运行时间拉长后才会出现的内核选择与调度器生命周期问题。其中两个关乎"选中了哪个内核"。MiniMax-M3 为 MXFP8 autotuning 增加了 CuTeDSL 候选，扩大候选集后，在低并发聚合点上每 GPU 输出吞吐量提升约 7% 到 10%。反方向的例子是：TensorRT-LLM 在错误的 split-K MoE tactic 导致七次 AgentX 运行中有五次崩溃后禁用了它们，之后七次对照运行无一崩溃。一个又快又错的 tactic 比单纯慢的更糟，而 autotuner 只要不把它从候选池中剔除，就仍会将它选中。',
-          '另外两个属于生命周期缺陷，这类问题是长时间运行（而非大规模运行）的典型失败模式。序列槽位余量与一致的按槽位索引的 buffer 尺寸，处理的是"一个请求即将完成、另一个刚被接纳、两者同时需要槽位"的短暂重叠——持续的到达与离开会不断撞上这个窗口，而固定批次永远撞不到。后续的 attention 数据并行 dummy request 修复，让九个 Qwen3.5 disaggregated 单元保持存活，而此前多数单元几分钟内就会失败：这正是"能跑完基准测试的配置"与"能撑过一次会话的配置"之间的差别。',
+          'AgentX 还暴露出只有在规模扩大、运行时间拉长后才会出现的 kernel 选择与调度器生命周期问题。其中两个关乎“选中了哪个 kernel”。MiniMax-M3 为 MXFP8 autotuning 增加了 CuTeDSL 候选，扩大候选集后，在低并发聚合点上每 GPU 输出吞吐量提升约 7% 到 10%。反方向的例子是：TensorRT-LLM 在错误的 split-K MoE tactic 导致七次 AgentX 运行中有五次崩溃后禁用了它们，之后七次对照运行无一崩溃。一个又快又错的 tactic 比单纯慢的更糟，而 autotuner 只要不把它从候选池中剔除，就仍会将它选中。',
+          '另外两个属于生命周期缺陷，这类问题是长时间运行（而非大规模运行）的典型失败模式。序列槽位余量与一致的按槽位索引的 buffer 尺寸，处理的是“一个请求即将完成、另一个刚被接纳、两者同时需要槽位”的短暂重叠——持续的到达与离开会不断撞上这个窗口，而固定批次永远撞不到。后续的 attention 数据并行 dummy request 修复，让九个 Qwen3.5 disaggregated 单元保持存活，而此前多数单元几分钟内就会失败：这正是“能跑完基准测试的配置”与“能撑过一次会话的配置”之间的差别。',
         ],
       },
       'pipelined-transfer': {
         heading: '面向超长 prompt 的流水线 KV 传输',
         paragraphs: [
           '两个仍为 open 的传输改动针对超长的 disaggregated prompt，它们放在一起还说明了一个修复如何制造出下一个瓶颈。在默认安排下，decode worker 必须等整段 prompt 完成 prefill 并传输完毕才能开始，于是两个昂贵阶段前后串行，尽管第一个阶段本可以增量产出。流水线 KV 传输会在每个 prefill 分块完成时就开始发送，让传输与 prefill 计算重叠，只有最后一个分块留在关键路径上。',
-          '该改动使分块处理变得频繁，从而暴露出原本只做一次的工作。其后续改动改为只取当前分块所属的 block ID，而不是每次都取整段 prompt 的 block 列表。对于切成 1,024 token 分块的 128,000 token prompt，这就是"构建一次 4,096 条目的列表"与"为每个层组重建 128 次"的差别——一项随 prompt 总长增长的按分块开销，正好会吃掉流水线刚刚换来的收益。',
+          '该改动使分块处理变得频繁，从而暴露出原本只做一次的工作。其后续改动改为只取当前分块所属的 block ID，而不是每次都取整段 prompt 的 block 列表。对于切成 1,024 token 分块的 128,000 token prompt，这就是“构建一次 4,096 条目的列表”与“为每个层组重建 128 次”的差别——一项随 prompt 总长增长的按分块开销，正好会吃掉流水线刚刚换来的收益。',
         ],
         figure: {
           alt: '时间线示意图：改动前四个 prefill 分块全部完成后才整体传输 prompt，decode 随后才开始；改动后每个完成的分块边传输边计算下一块，decode 更早开始。',
@@ -304,7 +292,7 @@ const FRAMEWORKS_ZH: Readonly<Record<string, FrameworkTranslation>> = {
   atom: {
     summary:
       '稀疏 checkpoint 保留、recurrent 状态 checkpoint、CPU offload 归属管理，以及长 prefill 并行。',
-    lead: 'AMD 的 ATOM 引擎当初是为单轮负载设计的，而不是面向真实世界的多轮智能体生产流量，因此支持长上下文多轮负载需要对核心引擎及其内核做大量改动。相比 vLLM 与 SGLang，ATOM 在智能体负载上仍有很长的路要走，而 AgentX 正是其重构所面向的真实目标负载。',
+    lead: 'AMD 的 ATOM 引擎当初是为单轮负载设计的，而不是面向真实世界的多轮智能体生产流量，因此支持长上下文多轮负载需要对核心引擎及其 kernel 做大量改动。相比 vLLM 与 SGLang，ATOM 在智能体负载上仍有很长的路要走，而 AgentX 正是其重构所面向的真实目标负载。',
     highlights: [
       '并发 48 下的 prefix 命中率',
       'sliding-window 关卡处的丢弃率',
@@ -321,8 +309,8 @@ const FRAMEWORKS_ZH: Readonly<Record<string, FrameworkTranslation>> = {
       'cache-manager': {
         heading: '必须先落地的 cache 管理器修复',
         paragraphs: [
-          '在上述效果能够被测量之前，还有两个更早的 cache 管理器修复必须先合入；它们都是"cache 自报健康却什么也没做"的典型例子。其一，避免 free pool 命中破坏共享的 cache 条目；其二是一处 deferred-output 修复，它在默认调度模式下恢复了 prefix hash，使重复的长 prompt 从零缓存 token 变为可复用每一个完整的 prefix block。',
-          '另有一个改动让命中 prefix 的 prefill 继续走优化过的 sink attention 内核，而不是回退到通用路径，使得一次 cache 命中不会悄悄抵消掉它节省的一部分开销。',
+          '在上述效果能够被测量之前，还有两个更早的 cache 管理器修复必须先合入；它们都是“cache 自报健康却什么也没做”的典型例子。其一，避免 free pool 命中破坏共享的 cache 条目；其二是一处 deferred-output 修复，它在默认调度模式下恢复了 prefix hash，使重复的长 prompt 从零缓存 token 变为可复用每一个完整的 prefix block。',
+          '另有一个改动让命中 prefix 的 prefill 继续走优化过的 sink attention kernel，而不是回退到通用路径，使得一次 cache 命中不会悄悄抵消掉它节省的一部分开销。',
         ],
       },
       'recurrent-state': {
@@ -356,8 +344,8 @@ const FRAMEWORKS_ZH: Readonly<Record<string, FrameworkTranslation>> = {
       disaggregation: {
         heading: 'Disaggregation 必须搬运模型真正保留的东西',
         paragraphs: [
-          'Disaggregation 必须搬运模型真正保留的状态，而它并不总是一份统一的 cache。DeepSeek-V4 会传输其 FP8 与 BF16 混合布局的两个 buffer；EAGLE disaggregation 则在目标 cache 之外一并搬运 draft 模型独立的 KV cache——这正是 TensorRT-LLM 与 SGLang 各自也必须解决的"第二份 cache"问题。',
-          '远端 KV 的准入与背压机制补上了最后一环：阻止 decode 侧接受超出其安全恢复能力的挂起传输，这相当于 disaggregated 形态下的"接下自己完不成的活"。',
+          'Disaggregation 必须搬运模型真正保留的状态，而它并不总是一份统一的 cache。DeepSeek-V4 会传输其 FP8 与 BF16 混合布局的两个 buffer；EAGLE disaggregation 则在目标 cache 之外一并搬运 draft 模型独立的 KV cache——这正是 TensorRT-LLM 与 SGLang 各自也必须解决的“第二份 cache”问题。',
+          '远端 KV 的准入与背压机制补上了最后一环：阻止 decode 侧接受超出其安全恢复能力的挂起传输，这相当于 disaggregated 形态下的“接下自己完不成的活”。',
         ],
       },
       'long-prefill': {
@@ -371,8 +359,8 @@ const FRAMEWORKS_ZH: Readonly<Record<string, FrameworkTranslation>> = {
     },
   },
   aiter: {
-    summary: 'Context-parallel 进程组、面向大 cache 池的 64 位寻址，以及常驻式 MLA decode 内核。',
-    lead: 'ATOM、AMD vLLM 与 AMD SGLang 的长上下文执行都依赖与之匹配的底层 AITER 内核，因为引擎层的并行策略只有在内核能够表达时才是真实可用的。',
+    summary: 'Context-parallel 进程组、面向大 cache 池的 64 位寻址，以及常驻式 MLA decode kernel。',
+    lead: 'ATOM、AMD vLLM 与 AMD SGLang 的长上下文执行都依赖与之匹配的底层 AITER kernel，因为引擎层的并行策略只有在 kernel 能够表达时才是真实可用的。',
     highlights: [
       '加宽行索引后可覆盖的 token 数',
       '超过 4 GB 的池所需的寻址位宽',
@@ -382,25 +370,25 @@ const FRAMEWORKS_ZH: Readonly<Record<string, FrameworkTranslation>> = {
       'context-parallel': {
         heading: 'Context-parallel 进程组',
         paragraphs: [
-          'Prefill 的 context-parallel 进程组提供了 prefill context parallelism 所需的额外 query 分片维度，同时把融合内核的行索引加宽到可支持 131,000 token 以上的 prompt。Decode context parallelism（DCP）则把 KV 切分到已有的张量并行 GPU 上，使更长的序列或更大的 batch 无需在每个 rank 上复制整份 cache 就能容纳。',
+          'Prefill 的 context-parallel 进程组提供了 prefill context parallelism 所需的额外 query 分片维度，同时把融合 kernel 的行索引加宽到可支持 131,000 token 以上的 prompt。Decode context parallelism（DCP）则把 KV 切分到已有的张量并行 GPU 上，使更长的序列或更大的 batch 无需在每个 rank 上复制整份 cache 就能容纳。',
         ],
       },
       'address-width': {
         heading: '地址位宽：短请求几乎永远碰不到的失败',
         paragraphs: [
-          '大 cache 暴露出一类短固定请求基本碰不到的失败：地址位宽。在单个 cache 池跨过边界之前，32 位偏移完全够用；一旦越界，运算就会回绕，内核会访问到错误的行，而且不会抛出任何错误。',
+          '大 cache 暴露出一类短固定请求基本碰不到的失败：地址位宽。在单个 cache 池跨过边界之前，32 位偏移完全够用；一旦越界，运算就会回绕，kernel 会访问到错误的行，而且不会抛出任何错误。',
           'AITER 为超过 4 GB 的 batch prefill 增加了运行时 64 位分发，为超过 2 GB 的场景提供 64 位 MLA 偏移，并在 DeepSeek-V4 的统一 cache 路径中全面采用 64 位寻址——最后一项避免了在约 1.5 亿行的池中静默读写到错误的行。',
         ],
         figure: {
           alt: '约 1.5 亿行的统一 KV 池的两幅对比图：使用 32 位偏移时，超过 4 GB 的访问会回绕到另一行；使用 64 位偏移时，访问到的正是目标行。',
           caption:
-            '在单个 cache 池跨过 4 GB 之前，32 位偏移都够用；一旦越界，运算回绕，内核就会读写到另一行，并且不会报错。',
+            '在单个 cache 池跨过 4 GB 之前，32 位偏移都够用；一旦越界，运算回绕，kernel 就会读写到另一行，并且不会报错。',
         },
       },
       'persistent-mla': {
         heading: '面向常见 head 打包方式的常驻 MLA decode',
         paragraphs: [
-          'DeepSeek-V4 的 decode 还获得了面向 64 head 与 128 head MTP 打包方式的常驻 MLA 内核。这两种 head 数量正是普通解码与 speculative 验证实际产生的形态，因此引擎在常见形状上获得了专门的长上下文路径，而不是把它们当作某个为短上下文编写的内核的附带变体。这与前面 vLLM 选择 AITER sparse-MLA 内核的论点相同：在长上下文下，通用路径不是一种小幅妥协，而根本就是错误的内核。',
+          'DeepSeek-V4 的 decode 还获得了面向 64 head 与 128 head MTP 打包方式的常驻 MLA kernel。这两种 head 数量正是普通解码与 speculative 验证实际产生的形态，因此引擎在常见形状上获得了专门的长上下文路径，而不是把它们当作某个为短上下文编写的 kernel 的附带变体。这与前面 vLLM 选择 AITER sparse-MLA kernel 的论点相同：在长上下文下，通用路径不是一种小幅妥协，而根本就是错误的 kernel。',
         ],
       },
     },
@@ -408,7 +396,7 @@ const FRAMEWORKS_ZH: Readonly<Record<string, FrameworkTranslation>> = {
   dynamo: {
     summary:
       '批量化 KV 匹配、以 request lease 表示归属、更廉价的 router 状态，以及更精简的请求平面。',
-    lead: 'NVIDIA 提交的相当一部分结果使用 Dynamo 推理编排与 router 系统。它的 AgentX 系列工作说明：当引擎内核变快之后，分布式服务层本身可能成为瓶颈。router 的工作量正比于活跃 prefix 的数量与长度，而不是生成的 token 数，因此大量长期存在、彼此重叠的长会话对它造成的压力，是固定形状流量永远制造不出来的。',
+    lead: 'NVIDIA 提交的相当一部分结果使用 Dynamo 推理编排与 router 系统。它的 AgentX 系列工作说明：当引擎 kernel 变快之后，分布式服务层本身可能成为瓶颈。router 的工作量正比于活跃 prefix 的数量与长度，而不是生成的 token 数，因此大量长期存在、彼此重叠的长会话对它造成的压力，是固定形状流量永远制造不出来的。',
     highlights: [
       '并发 512 下输出吞吐量中位数提升',
       '采用 request lease 后 AgentX 回放耗时下降（vLLM 后端）',
@@ -424,7 +412,7 @@ const FRAMEWORKS_ZH: Readonly<Record<string, FrameworkTranslation>> = {
       ownership: {
         heading: '归属关系如何表示',
         paragraphs: [
-          '第二批 PR 改变了归属关系的表示方式，这才是底层更难的问题。每个缓存 block 都需要归属到依赖它的请求上，才能做到"仍在使用时不释放、所有人用完后不再钉住"。当成千上万个并发会话共享彼此重叠的 prefix 时，这套记账本身的开销就变得可观。',
+          '第二批 PR 改变了归属关系的表示方式，这才是底层更难的问题。每个 cache block 都需要归属到依赖它的请求上，才能做到“仍在使用时不释放、所有人用完后不再钉住”。当成千上万个并发会话共享彼此重叠的 prefix 时，这套记账本身的开销就变得可观。',
           'Dynamo 从共享 block 链，转向 arena 级别的归属计数，最终采用按后端划分的 request lease，每一步都把被跟踪的单位变粗。lease 设计让 vLLM 后端的 AgentX 回放耗时降低 23.71%、SGLang 降低 22.02%，同时降低了峰值内存——这说明问题出在此前的表示方式上，而不是流量本身。',
         ],
         figure: {
@@ -437,14 +425,14 @@ const FRAMEWORKS_ZH: Readonly<Record<string, FrameworkTranslation>> = {
         heading: '曾经很小的 router 状态',
         paragraphs: [
           '后续的 router profiling 又消除了一批形态相同的开销：某个周期性扫描或全量重算之所以此前可以接受，只是因为活跃状态一直很小。分桶式过期清理取代了正比于全部被跟踪对象的扫描，让高 churn 的 AgentX 吞吐量提升 13.7%。仅处理增量的后缀清理只处理发生变化的部分，在同一时间窗口内可处理约 28 倍的写入与删除事件。压缩 prompt 路径把前端 CPU 占用降低 35.3%，并显著改善尾部首 token 时间——这很重要，因为该负载的 prompt 既长又高度重复。过载状态现在也改为增量跟踪而非重新计算。',
-          '有一项路由改动是有意的取舍，而非纯粹的收益：Dynamo 现在可以把进行中的 decode 请求计入路由评分，于是一个已经承担长时间 decode 的 worker，会显得比其队列深度所暗示的更"贵"。在其报告的调参点上，这改善了 AgentX 延迟中位数，代价是少量吞吐量——只有当请求会长时间占用 worker 时，这种权衡才会显现出来。',
+          '有一项路由改动是有意的取舍，而非纯粹的收益：Dynamo 现在可以把进行中的 decode 请求计入路由评分，于是一个已经承担长时间 decode 的 worker，会显得比其队列深度所暗示的更“贵”。在其报告的调参点上，这改善了 AgentX 延迟中位数，代价是少量吞吐量——只有当请求会长时间占用 worker 时，这种权衡才会显现出来。',
         ],
       },
       'request-plane': {
         heading: '请求平面',
         paragraphs: [
-          '接下来优化的是请求平面，因为智能体 trace 并不是"一个请求、一个响应"。它会发出大量内容高度雷同的相关请求，并把每个 token 作为独立帧流式返回，因此序列化与拷贝是按轮次、按 token 付出的，而不是只付一次。改用 MessagePack 请求负载在其 AgentX 测试中把吞吐量提高 8.1%、平均首 token 时间降低 9.7%；直接的 Python 转码则彻底去掉了该路径上的中间值树。',
-          '随后是一系列"去掉一次拷贝"而非"把某步做快"的改动：不再拷贝 MessagePack 事件负载、不再拷贝收到的 ZeroMQ 帧、不再为每个 token 承担完整的 token 间延迟指标开销；chat 流式热路径也因同样理由被缩短。单看这些都平淡无奇，但乘上每个并发会话的每个流式 token，它们决定了前端每秒能承载多少请求。',
+          '接下来优化的是请求平面，因为智能体 trace 并不是“一个请求、一个响应”。它会发出大量内容高度雷同的相关请求，并把每个 token 作为独立帧流式返回，因此序列化与拷贝是按轮次、按 token 付出的，而不是只付一次。改用 MessagePack 请求负载在其 AgentX 测试中把吞吐量提高 8.1%、平均首 token 时间降低 9.7%；直接的 Python 转码则彻底去掉了该路径上的中间值树。',
+          '随后是一系列“去掉一次拷贝”而非“把某步做快”的改动：不再拷贝 MessagePack 事件负载、不再拷贝收到的 ZeroMQ 帧、不再为每个 token 承担完整的 token 间延迟指标开销；chat 流式热路径也因同样理由被缩短。单看这些都平淡无奇，但乘上每个并发会话的每个流式 token，它们决定了前端每秒能承载多少请求。',
         ],
       },
       profiling: {
@@ -459,17 +447,17 @@ const FRAMEWORKS_ZH: Readonly<Record<string, FrameworkTranslation>> = {
   lmcache: {
     summary:
       '分块的外部 cache 加载、hybrid group 存储优化、AMD Instinct 支持，以及 DCP 感知的 offload。',
-    lead: 'LMCache 是一个开源 KV cache 层，位于 vLLM 等推理引擎之下，按 prefix hash 为 key，把可复用的 KV chunk 存放在 CPU DRAM、本地 NVMe 以及 Mooncake、Redis、S3 等远端后端上。它可以作为 vLLM 原生 offload connector 的替代方案。',
+    lead: 'LMCache 是一个开源 KV cache 层，位于 vLLM 等推理引擎之下，以 prefix hash 为 key，把可复用的 KV chunk 存放在 CPU DRAM、本地 NVMe 以及 Mooncake、Redis、S3 等远端后端上。它可以作为 vLLM 原生 offload connector 的替代方案。',
     highlights: [
       '旧路径死锁前后完成的请求数对比',
       'hybrid group 每 token 存储量的下降幅度',
-      'MI350X 上通过的 KV 传输内核测试',
+      'MI350X 上通过的 KV 传输 kernel 测试',
     ],
     sections: {
       'chunked-loading': {
         heading: '分块的外部 cache 加载',
         paragraphs: [
-          'LMCache 的多进程路径针对智能体场景下 cache 搬运的规模与形态做了修改，起点是一种不是"变慢"而是"卡死"的失败：当大量上下文超过 100,000 token 的请求各自在开始前就为整次加载预留 block 时，池会被一群全都在等待、没有一个在推进的请求耗尽。',
+          'LMCache 的多进程路径针对智能体场景下 cache 搬运的规模与形态做了修改，起点是一种不是“变慢”而是“卡死”的失败：当大量上下文超过 100,000 token 的请求各自在开始前就为整次加载预留 block 时，池会被一群全都在等待、没有一个在推进的请求耗尽。',
           '分块的外部 cache 加载改为按分块预留，于是各次加载可以交错进行并逐步排空。在并发 32 的验证中，旧路径在第 28 个请求处死锁，新路径完成了 120 个请求；并发 48 时即使 KV 池已占用 98.5%，运行依然继续。',
         ],
         figure: {
@@ -482,7 +470,7 @@ const FRAMEWORKS_ZH: Readonly<Record<string, FrameworkTranslation>> = {
         heading: '搬得更少，也更少挡路',
         paragraphs: [
           '其余改动的目标是减少搬运量以及运行时的干扰。只存储 DeepSeek-V4 hybrid group 中真正有用的部分，把每 token 的存储量降低了近二十倍；sliding-window 预取现在只加载仍然有效的 window，而不是那些永远不会被读取的 window 状态——这与 vLLM 在 offload 上采用的可达性论证相同，只是从存储一侧切入。',
-          '随后，按对象组只做一次原生传输调用，消除了 staging 拷贝与内核启动之间反复的 Python 锁交接；这类开销正比于片段数量，而不是其中的字节数。',
+          '随后，按对象组只做一次原生传输调用，消除了 staging 拷贝与 kernel 启动之间反复的 Python 锁交接；这类开销正比于片段数量，而不是其中的字节数。',
         ],
       },
       'lock-accounting': {
@@ -495,8 +483,8 @@ const FRAMEWORKS_ZH: Readonly<Record<string, FrameworkTranslation>> = {
       'amd-enablement': {
         heading: 'AMD Instinct 支持',
         paragraphs: [
-          '另一条并行的工作线让上述能力在 AMD Instinct 硬件上真正可用。CacheBlend 的非 prefix 复用依赖仅支持 CUDA 的 FlashInfer，因此一个 Triton block-sparse 注意力后端重新实现了它需要的三个内核：带 CSR 索引并输出 log-sum-exp 的 block-sparse attention、causal prefill，以及基于 log-sum-exp 的输出融合；在检测到 ROCm 或缺少 FlashInfer 时会自动切换到这些实现。ROCm Dockerfile 则对齐了 CUDA 的构建与轻量镜像。一个 AMD hipFile 后端扩展了此前只能通过 NVIDIA cuFile 访问存储的 GDS L1 slab 文件层：它通过 ctypes 绑定 ROCm 的 hipFile，并按 torch.version.hip 分发，cuFile 路径保持不变。',
-          '最后的缺口是分发方式。CUDA 用户安装预编译 wheel，AMD 用户却要从源码构建。我们与 AMD 一起发布了预编译的 gfx942 与 gfx950 wheel 来补上这一环：它可以装入上游镜像，并在 MI350X 上通过全部 56 项 KV 传输内核测试；它发布到 GitHub release 而非 PyPI，因此直接执行 pip install lmcache 仍会安装 CUDA 版本。一个单行的后续修复把 bind mount 进来的仓库标记为 git safe directory——这个问题只在 CI 中出现，因为容器以 root 身份运行在 runner 所拥有的 checkout 上，setup.py 中的版本探测会拒绝读取它。',
+          '另一条并行的工作线让上述能力在 AMD Instinct 硬件上真正可用。CacheBlend 的非 prefix 复用依赖仅支持 CUDA 的 FlashInfer，因此一个 Triton block-sparse 注意力后端重新实现了它需要的三个 kernel：带 CSR 索引并输出 log-sum-exp 的 block-sparse attention、causal prefill，以及基于 log-sum-exp 的输出融合；在检测到 ROCm 或缺少 FlashInfer 时会自动切换到这些实现。ROCm Dockerfile 则对齐了 CUDA 的构建与轻量镜像。一个 AMD hipFile 后端扩展了此前只能通过 NVIDIA cuFile 访问存储的 GDS L1 slab 文件层：它通过 ctypes 绑定 ROCm 的 hipFile，并按 torch.version.hip 分发，cuFile 路径保持不变。',
+          '最后的缺口是分发方式。CUDA 用户安装预编译 wheel，AMD 用户却要从源码构建。我们与 AMD 一起发布了预编译的 gfx942 与 gfx950 wheel 来补上这一环：它可以装入上游镜像，并在 MI350X 上通过全部 56 项 KV 传输 kernel 测试；它发布到 GitHub release 而非 PyPI，因此直接执行 pip install lmcache 仍会安装 CUDA 版本。一个单行的后续修复把 bind mount 进来的仓库标记为 git safe directory——这个问题只在 CI 中出现，因为容器以 root 身份运行在 runner 所拥有的 checkout 上，setup.py 中的版本探测会拒绝读取它。',
         ],
       },
       'dcp-offload': {
@@ -528,7 +516,7 @@ const FRAMEWORKS_ZH: Readonly<Record<string, FrameworkTranslation>> = {
         heading: '装不上的支持不算支持',
         paragraphs: [
           'Mooncake 发布了 CUDA 与 MUSA 的 wheel，却没有 ROCm 包，因此 AMD 用户只能在每个镜像里从源码构建引擎。ROCm wheel、CI 与发版流程把 mooncake-transfer-engine-rocm 一并发布到 PyPI。这条工作线来自 AMD 工程师 Andy Luo，他在用 AgentX 自测（dogfooding）智能体负载时注意到：在 ROCm 上从源码构建 Mooncake 并不是一流的使用体验。',
-          '该传输引擎没有设备端内核，也不依赖 torch，因此一个架构无关的 wheel 即可覆盖 gfx942 与 gfx950；ROCm 运行时在加载时绑定而非随包分发，这意味着同一个 wheel 在上游 vLLM ROCm 镜像与 SGLang ROCm 镜像中都可直接使用。验证覆盖了完整的交叉组合：MI300X 与 MI355X，各自在 vllm/vllm-openai-rocm 与 lmsysorg/sglang 下运行 master 二进制及带数据校验的 HIP buffer 传输测试。该 PR 还增加了按 tag 触发、覆盖 Python 3.10 到 3.13 的发布流程。',
+          '该传输引擎没有设备端 kernel，也不依赖 torch，因此一个架构无关的 wheel 即可覆盖 gfx942 与 gfx950；ROCm 运行时在加载时绑定而非随包分发，这意味着同一个 wheel 在上游 vLLM ROCm 镜像与 SGLang ROCm 镜像中都可直接使用。验证覆盖了完整的交叉组合：MI300X 与 MI355X，各自在 vllm/vllm-openai-rocm 与 lmsysorg/sglang 下运行 master 二进制及带数据校验的 HIP buffer 传输测试。该 PR 还增加了按 tag 触发、覆盖 Python 3.10 到 3.13 的发布流程。',
           '一个仍为 open 的后续改动增加了自托管的双节点 MI350X 外部 prefill 与 decode 环境，让 ROCm 的 disaggregated 路径在真实硬件上被实际执行，而不只是通过编译。综合这些工作，AMD 上的 AgentX 运行现在可以直接从已发布产物把传输引擎与 KV cache 层装进标准上游镜像，并在 GPU 显存与网络之间直接搬运 KV。',
         ],
         links: ['PyPI 上的 mooncake-transfer-engine'],
@@ -574,12 +562,12 @@ const FRAMEWORKS_ZH: Readonly<Record<string, FrameworkTranslation>> = {
         heading: '它在 AgentX 上带来的变化',
         paragraphs: [
           '即使 DRAM 层几乎没被用到，收益也会出现。并发 128–256 时 HBM 已经承担了约 95.6% 的 prompt token，DRAM 不到 1%。开启 UMBP 后，并发 256 下单 GPU 吞吐量仍提升 **8.3%**、P90 TTFT 降低 **35%**，并发 128 下分别为 2.7% 与 34%。关闭 UMBP 时，主机 KV 池占用率达到 72% 和 100%，却最多只承担了 0.1% 的 prompt token——因此收益来自直连路径，而不是 offload 本身。',
-          '足够大的 cache 进而改变了部署拓扑。一旦去重后的 DRAM 承载了 KV，prefill 就不再仅为容量而需要 TP8：在并发 16–48 时，配方改用 TP4 prefill 加 TP8 decode，共 **12 张 GPU，而不是 16 张**。在并发 16、32、48 下，UMBP 分别承担了 34%、71% 和 75% 的 prompt token，重算比例不到 3%；单 GPU 吞吐量在 GPU 数量减少 25% 的情况下提升 **26–34%**。',
+          '足够大的 cache 进而改变了部署拓扑。一旦去重后的 DRAM 承载了 KV，prefill 就不再仅为容量而需要 TP8：在并发 16–48 时，测试配置改用 TP4 prefill 加 TP8 decode，共 **12 张 GPU，而不是 16 张**。在并发 16、32、48 下，UMBP 分别承担了 34%、71% 和 75% 的 prompt token，重算比例不到 3%；单 GPU 吞吐量在 GPU 数量减少 25% 的情况下提升 **26–34%**。',
           'SGLang 针对 MI355X 上 DeepSeek-V4-Pro 的其他优化在 UMBP 之上进一步叠加，把并发 256 下的单 GPU 吞吐量从 **55.8k 提升到 62.0k**，并把曲线延伸到并发 384 和 512。完整配置见下方 10 月 4 日的 sweep 链接。',
         ],
         links: [
           'InferenceX CI 上 10 月 4 日的 AgentX sweep（完整配置）',
-          'InferenceX #3664：MI355X 上的 DeepSeek-V4 disaggregated UMBP 配方',
+          'InferenceX #3664：MI355X 上的 DeepSeek-V4 disaggregated UMBP 测试配置',
           'MoRI UMBP 登上公开 AgentX 排行榜 — AMD',
         ],
       },
@@ -603,7 +591,6 @@ function localizeSection(
   };
 }
 
-/** The overview content for a locale, with English structure and localized prose. */
 export function getOptimizationsOverview(locale: Locale): OptimizationsOverview {
   if (locale === 'en') return OPTIMIZATIONS_OVERVIEW;
   return {
@@ -627,7 +614,6 @@ export function getOptimizationsOverview(locale: Locale): OptimizationsOverview 
   };
 }
 
-/** One framework's content for a locale. */
 export function getLocalizedFramework(
   framework: OptimizationFramework,
   locale: Locale,
@@ -650,12 +636,10 @@ export function getLocalizedFramework(
   };
 }
 
-/** Every framework for a locale, in registry order. */
 export function getLocalizedFrameworks(locale: Locale): readonly OptimizationFramework[] {
   return AGENTX_OPTIMIZATION_FRAMEWORKS.map((framework) =>
     getLocalizedFramework(framework, locale),
   );
 }
 
-/** Exported for the parity test, which walks the same keys the resolvers read. */
 export const OPTIMIZATIONS_ZH_INTERNALS = { OVERVIEW_ZH, FRAMEWORKS_ZH };

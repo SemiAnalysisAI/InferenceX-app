@@ -38,7 +38,6 @@ describe('AgentX telemetry guide', () => {
       expect(existsSync(path.join(publicDir, asset.src)), asset.src).toBe(true);
       expect(asset.width).toBeGreaterThan(0);
       expect(asset.height).toBeGreaterThan(0);
-      // Screen-reader copy has to describe the screenshot, not just name it.
       expect(section.figure.alt.length, section.figure.key).toBeGreaterThan(40);
       expect(section.figure.caption.length, section.figure.key).toBeGreaterThan(20);
     }
@@ -61,9 +60,6 @@ describe('AgentX telemetry guide', () => {
     }
   });
 
-  // The prose cites these counts. AGENTIC_DETAIL_SURFACE mirrors what
-  // agentic-point-detail.tsx renders, so adding a chart there without
-  // updating the copy fails here rather than shipping a stale number.
   it('keeps its numeric claims aligned with the detail-page surface', () => {
     const byLabel = new Map(
       AGENTX_TELEMETRY_GUIDE.highlights.map((highlight) => [highlight.label, highlight.value]),
@@ -74,9 +70,6 @@ describe('AgentX telemetry guide', () => {
     expect(byLabel.get('views per point')).toBe(String(AGENTIC_DETAIL_SURFACE.views));
     expect(byLabel.get('replay stages')).toBe(String(AGENTIC_DETAIL_SURFACE.stages.length));
 
-    // The bullet list enumerates the same eleven charts, collapsed into nine
-    // lines because three pairs share a card. Guard the two that are easy to
-    // desynchronise instead of asserting a brittle line count.
     const detail = AGENTX_TELEMETRY_GUIDE.sections.find(
       (section) => section.id === 'point-detail-page',
     );
@@ -124,7 +117,6 @@ describe('AgentX telemetry Chinese port', () => {
 
     expect(zh.highlights).toHaveLength(en.highlights.length);
     for (const [index, highlight] of zh.highlights.entries()) {
-      // Values are numerals — they stay language-neutral; only labels translate.
       expect(highlight.value).toBe(en.highlights[index].value);
       expect(CJK.test(highlight.label), `highlight ${index}`).toBe(true);
     }

@@ -1,6 +1,5 @@
 import { at, entries, number, rows, text, type Json } from './bundle';
 
-/** Compare measured board watts only with the same devices' recorded enforced limits. */
 export function powerLimitComparison(
   phase: Json,
   before: Json,
@@ -56,7 +55,6 @@ export function powerLimitComparison(
     watts += number(at(first, 'enforced_limit_w'))!;
     boardMean += measured;
   }
-  // Reject a partial or mismatched aggregate instead of silently normalizing it.
   if (!Number.isFinite(watts) || Math.abs(boardMean - mean) > Math.max(1, mean) * 1e-6) return null;
   const percent = (mean / watts) * 100;
   return Number.isFinite(percent) ? { watts, percent } : null;

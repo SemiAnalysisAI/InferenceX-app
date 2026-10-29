@@ -3,14 +3,14 @@ import type { Metadata } from 'next';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { EXPLORER_BASE_PATH } from '@/lib/agentic-workload-explorer/paths';
-import { enAlternates, type Locale, ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
+import { enAlternates, type Locale, zhAlternates } from '@/lib/i18n/i18n';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 interface SectionCopy {
   title: string;
   description: string;
 }
 
-/** Explorer sections with their own route, keyed by explorer-relative path. */
 export const EXPLORER_SECTION_META = {
   '/sessions': {
     en: {
@@ -74,7 +74,7 @@ export const EXPLORER_SECTION_META = {
       title: 'Costs',
       description: 'List-price cost of the snapshot traffic by model and token type.',
     },
-    zh: { title: '成本', description: '按模型与 token 类型统计的快照流量标价成本。' },
+    zh: { title: '成本', description: '按模型与 token 类型统计的快照流量成本，按标价计算。' },
   },
   '/fast-mode': {
     en: {
@@ -150,14 +150,13 @@ export const EXPLORER_SECTION_META = {
 
 export type ExplorerSectionPath = keyof typeof EXPLORER_SECTION_META;
 
-/** Session-detail tabs, keyed by the tab segment after `/sessions/[id]/`. */
 export const EXPLORER_SESSION_TAB_META = {
   conversation: { en: 'Conversation', zh: '对话' },
   raw: { en: 'Raw Trace', zh: '原始 Trace' },
   statistics: { en: 'Statistics', zh: '统计' },
   'prefill-vs-decode': { en: 'Prefill vs Decode', zh: 'Prefill 与 Decode' },
   flamegraph: { en: 'Flamegraph', zh: '火焰图' },
-  'tokens-over-time': { en: 'Tokens Over Time', zh: 'Token 时间分布' },
+  'tokens-over-time': { en: 'Tokens Over Time', zh: 'Token 随时间变化' },
   timeline: { en: 'Timeline', zh: '时间线' },
   flow: { en: 'Flow', zh: '流程图' },
   'radix-tree': { en: 'Radix Tree', zh: 'Radix Tree' },
@@ -180,18 +179,11 @@ function localizedMetadata(
     title: fullTitle,
     description,
     alternates: locale === 'zh' ? zhAlternates(enPath) : enAlternates(enPath),
-    openGraph: {
-      title: `${fullTitle} | InferenceX`,
-      description,
-      url,
-      ...(locale === 'zh' && { locale: ZH_OG_LOCALE }),
-    },
-    twitter: { title: `${fullTitle} | InferenceX`, description },
+    ...socialMetadata({ title: `${fullTitle} | InferenceX`, description, url, locale }),
     ...(!indexable && { robots: { index: false, follow: true } }),
   };
 }
 
-/** Metadata for an explorer section page in either locale. */
 export function explorerSectionMetadata(section: ExplorerSectionPath, locale: Locale): Metadata {
   const copy = EXPLORER_SECTION_META[section][locale];
   return localizedMetadata(
@@ -203,7 +195,6 @@ export function explorerSectionMetadata(section: ExplorerSectionPath, locale: Lo
   );
 }
 
-/** Metadata for one session-detail tab; session pages are never indexed. */
 export function explorerSessionMetadata(
   id: string,
   tab: ExplorerSessionTab,

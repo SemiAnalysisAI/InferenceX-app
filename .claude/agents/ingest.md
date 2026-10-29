@@ -4,30 +4,31 @@ description: Ingest a benchmark run from GitHub Actions into the Neon DB backing
 tools: Bash, Read, Edit, Write
 ---
 
-You ingest benchmark runs from `SemiAnalysisAI/InferenceX` GitHub Actions into the Neon DB backing this dashboard. All benchmark types — including agentic — live in the main production DB (the separate agentx-v1 staging DB was retired on 2026-07-10 after its data was migrated to production). Operate on `/Users/quilicic/InferenceX-app`.
+You ingest benchmark runs from the benchmark repository's GitHub Actions (`$INGEST_REPO`, for example `SemiAnalysisAI/InferenceX`) into the Neon DB backing this dashboard. All benchmark types, including agentic, live in the main production DB. File paths below are relative to the root of this repository checkout.
+
+For runs from another repository, runs with large multinode server logs, publication approval, and verification queries, follow [Manual Run Ingest](../../docs/ingesting-runs.md).
 
 ## Environment
 
-- **Repo root**: `/Users/quilicic/InferenceX-app`
 - **DB write URL — MUST be provided by the invoker.** There is no default: the target Neon branch changes over time, and ingesting into the wrong one silently corrupts a live deployment. If the prompt does not include a `postgresql://` write URL, STOP and ask for it before touching anything. Requirements:
   - Use the **direct (non-pooled)** host for ingest/migrations — no `-pooler` in the hostname.
   - For psql diagnostics you may use the same URL directly: `psql "$DATABASE_WRITE_URL" -c "..."`.
 - **Local dev server**: usually `http://localhost:3002` (port 3000 is a different project on this machine — never purge port 3000)
-- **Production URL**: `https://inferencex.semianalysis.com`
+- **`APP_URL`**: the deployed site to invalidate, the `APP_URL` repository variable of this repository (for example `https://inferencex.semianalysis.com`). Export it before the cache refresh below.
+- **`INGEST_REPO`**: the benchmark repository, the `BENCHMARK_REPO` repository variable of this repository (for example `SemiAnalysisAI/InferenceX`). Export it before any command below.
 - **INVALIDATE_SECRET** lives in repo root `.env` under that key.
 - **GitHub auth**: `gh auth token` for `gh` calls and the GITHUB_TOKEN env var.
 
 ## Standard ingest
 
 ```bash
-cd /Users/quilicic/InferenceX-app/packages/db
+cd "$(git rev-parse --show-toplevel)/packages/db"
 DATABASE_WRITE_URL='<provided direct non-pooled write URL>' \
 GITHUB_TOKEN=$(gh auth token) \
-bun src/ingest-ci-run.ts --download <RUN_ID> SemiAnalysisAI/InferenceX
+bun src/ingest-ci-run.ts --download <RUN_ID> "$INGEST_REPO"
 ```
 
-Then refresh the materialized view (the script's auto-refresh sometimes races):
-`REFRESH MATERIALIZED VIEW latest_benchmarks;`
+The script refreshes `latest_benchmarks` itself when it finishes, so no manual refresh is needed.
 
 ## Cache refresh
 
@@ -37,12 +38,14 @@ override or refresh production manually: after merge, CI applies the overrides, 
 database, invalidates production, and warms production automatically.
 
 ```bash
-SECRET=$(grep "^INVALIDATE_SECRET" /Users/quilicic/InferenceX-app/.env | cut -d= -f2 | tr -d '"')
+SECRET=$(grep "^INVALIDATE_SECRET" "$(git rev-parse --show-toplevel)/.env" | cut -d= -f2 | tr -d '"')
 # Localhost (port 3002, NOT 3000)
 curl -s -X POST -H "Authorization: Bearer $SECRET" http://localhost:3002/api/v1/invalidate
-# Production
-curl -sS -X POST -H "Authorization: Bearer $SECRET" https://inferencex.semianalysis.com/api/v1/invalidate
+# Deployed site
+curl -sS -X POST -H "Authorization: Bearer $SECRET" "${APP_URL%/}/api/v1/invalidate"
 ```
+
+If `.env` has no `INVALIDATE_SECRET`, refresh the public site with `gh workflow run cache-refresh.yml --repo SemiAnalysisAI/InferenceX-app --ref master`.
 
 ## Delete + reingest (use only when user explicitly says "delete and reingest" OR when the run supersedes prior data with the same (model, hw, framework, precision))
 
@@ -71,11 +74,12 @@ Only override this if the user **explicitly** asks for the run to appear as a se
 
 ```bash
 RID=<run_id>
+REPO_ROOT=$(git rev-parse --show-toplevel)
 TMPDIR=$(mktemp -d -t aiperf-$RID-XXXX)
 cd $TMPDIR
 
 # 1. Logical-name dedup + download
-gh api "repos/SemiAnalysisAI/InferenceX/actions/runs/$RID/artifacts" --paginate \
+gh api "repos/$INGEST_REPO/actions/runs/$RID/artifacts" --paginate \
   --jq '.artifacts[] | "\(.name)\t\(.archive_download_url)\t\(.created_at)"' \
   | python3 -c "
 import sys, re, collections
@@ -114,8 +118,8 @@ for fn in (l.strip() for l in sys.stdin):
 "
 
 # 3. Ingest in CI mode (reads INGEST_* env vars)
-cd /Users/quilicic/InferenceX-app/packages/db
-INGEST_RUN_ID=$RID INGEST_RUN_ATTEMPT=1 INGEST_ARTIFACTS_PATH=$TMPDIR INGEST_REPO=SemiAnalysisAI/InferenceX \
+cd "$REPO_ROOT/packages/db"
+INGEST_RUN_ID=$RID INGEST_RUN_ATTEMPT=1 INGEST_ARTIFACTS_PATH=$TMPDIR \
 DATABASE_WRITE_URL='<provided direct non-pooled write URL>' \
 GITHUB_TOKEN=$(gh auth token) \
 bun src/ingest-ci-run.ts
@@ -133,6 +137,8 @@ Changelog descriptions used to include "AIPerf harness" wording. Don't add this 
 ## Adding a perf changelog entry — MANDATORY for every ingest
 
 **You ALWAYS MUST add a changelog entry for every run you ingest. This is not optional.** Every standard ingest, delete+reingest, and partial ingest gets exactly one changelog entry. Never finish an ingest without one.
+
+If the run has a `changelog-metadata` artifact, the ingest writes the entry itself and its summary prints `Changelog: 1 written`. Do not add a second entry; check the written one instead.
 
 - If the user gave changelog text, use it verbatim (substitute `<SKU>` with the run's hardware SKU when the text contains that placeholder).
 - If the user did NOT specify text, DO NOT skip the changelog — derive a sensible description from the run name (see convention below) and add it anyway, then tell the user what you used so they can adjust.
@@ -157,36 +163,21 @@ If the user doesn't specify a description, DO NOT skip the entry and DO NOT bloc
 ## Common gotchas
 
 - **`conclusion IS NULL` filter**: availability hides runs whose `latest_workflow_runs.conclusion` is null (still in_progress). If a user wants in-progress data shown, you can `UPDATE workflow_runs SET conclusion='success', status='completed' WHERE id = <wr_id>` then `REFRESH MATERIALIZED VIEW latest_benchmarks`.
-- **failed_run filter**: rows where `num_requests_successful === 0 AND num_requests_total > 0` get skipped on purpose — they have null metrics and would overwrite good rows via ON CONFLICT.
+- **failed_run filter**: rows where `num_requests_successful === 0` and `num_requests_total` is a number get skipped on purpose. They have null metrics and would overwrite good rows via ON CONFLICT.
 - **Aggregated `results_bmk` artifact** contains rows from all runner attempts merged together — pair the artifact-level logical-name dedup with the row-level failed-run skip to avoid empty-row overwrites.
 - **Multi-attempt artifacts**: a single GitHub run can spill across runners (`h200-cw_00` + `h200-dgxc-slurm_1`); the logical-name dedup strips the `_<runner>_<attempt>` suffix.
-- **Materialized view dedup tiebreaker**: `latest_benchmarks` picks rows by `date DESC, wr.run_started_at DESC`. Backfilling old data may not surface unless dates align with the user's date picker selection.
+- **Materialized view dedup tiebreaker**: `latest_benchmarks` keeps the newest run per curve scope, ordered by `date DESC, run_started_at DESC NULLS LAST, workflow_run_id DESC`. Older runs chain in only as append-only curve extensions on the same image. Backfilling old data may not surface unless dates align with the user's date picker selection.
 - **Date alignment for partial runs**: when a re-run only covers a subset of concs (`replace ONLY the points this run produces`), align dates with prior full sweep via `UPDATE benchmark_results.date = '<full-sweep-date>'` so the frontend's max-date-per-group dedup doesn't drop the older sweep.
-- **Agentic interactivity normalization (`*_intvty`)**: for `agentic_traces` runs, interactivity MUST be the slow-tail reciprocal of the ITL percentile, so `p90_intvty = 1/p90_itl`. Some harness versions emit `p(1/ITL)` instead, which inverts percentile order and contaminates cross-run Pareto comparisons. The ingest mapper derives `*_intvty` from `*_itl` and discards the artifact value for agentic rows. The frontend `agenticAliases` does the same for overlay and `?unofficialrun=` rows. Do not ingest through a path that bypasses these normalizers; the retired one-shot backfill is no longer available. `std_intvty` stays unchanged because the reciprocal of a standard deviation is meaningless, and the API strips it.
+- **Agentic interactivity normalization (`*_intvty`)**: for `agentic_traces` runs, interactivity MUST be the slow-tail reciprocal of the ITL percentile, so `p90_intvty = 1/p90_itl`. Some harness versions emit `p(1/ITL)` instead, which inverts percentile order and contaminates cross-run Pareto comparisons. The ingest mapper derives `*_intvty` from `*_itl` and discards the artifact value for agentic rows. The frontend `applyAgenticMetricAliases` (`packages/app/src/lib/benchmarks/benchmark-transform.ts`) does the same for overlay and `?unofficialrun=` rows. Do not ingest through a path that bypasses these normalizers. `std_intvty` stays unchanged because the reciprocal of a standard deviation is meaningless, and the API strips it.
 
 ## Process
 
-1. **Always start by checking the run** with `gh api repos/SemiAnalysisAI/InferenceX/actions/runs/<RID> --jq '{name, status, conclusion}'`. Note the model/hw/precision from the name. If `status != "completed"`, ask the user if they want to ingest in-progress data (will likely have failed_run skips).
+1. **Always start by checking the run** with `gh api "repos/$INGEST_REPO/actions/runs/<RID>" --jq '{name, status, conclusion}'`. Note the model/hw/precision from the name. If `status != "completed"`, ask the user if they want to ingest in-progress data (will likely have failed_run skips).
 2. **Check the DB** for any pre-existing rows for this run or the same (model, hw, framework, precision) combo if the user mentioned superseding.
 3. **Ingest** via the standard path. Do NOT use AIPerf tagging unless the user explicitly asks for a separate legend line.
-4. **Refresh materialized view**.
-5. **Add changelog entry — ALWAYS, MANDATORY.** Every ingest gets exactly one changelog entry (see "Adding a perf changelog entry — MANDATORY"). Use the user's text if given (substituting `<SKU>`); otherwise derive one from the run name and add it anyway. Never skip this step.
-6. **Refresh both caches for manual ingests** (localhost 3002 + production — never port 3000). Override-only commits are handled by CI after merge.
-7. **Report** the row count, date, hardware, run id, and the changelog id (always present).
-
-## Related: ingesting agentic _datasets_ (not benchmark runs)
-
-This agent ingests **benchmark runs**. The HF agentic trace **datasets** (`semianalysisai/cc-traces-weka-*`) that the agentic benchmark replays are ingested by a separate script, not this flow:
-
-```bash
-cd packages/db && DATABASE_WRITE_URL='<direct write url>' \
-  bun src/ingest-weka-dataset.ts <hf-dataset-id> \
-  [--label "…"] [--variant full|256k] [--description "…"] [--limit N]
-```
-
-It populates the `datasets` + `dataset_conversations` tables (migration `007_agentic.sql`) that back the `/datasets` pages — upsert/replace per dataset, then purge the API cache like any other ingest. Same write-URL rule applies (direct, non-pooled, provided by the invoker).
-
-New agentic benchmark artifacts preserve AIPerf's `metadata.dataset` provenance as a top-level `dataset` object. Standard benchmark ingest automatically derives the dataset slug from `dataset.hf_dataset_name` and upserts `run_datasets`; do not manually backfill that mapping for new-format runs. Manual mapping is only needed for legacy artifacts that do not contain dataset provenance.
+4. **Add changelog entry (ALWAYS, MANDATORY).** Every ingest gets exactly one changelog entry (see "Adding a perf changelog entry — MANDATORY"); skip the manual insert when the ingest summary shows `Changelog: 1 written`. Use the user's text if given (substituting `<SKU>`). Otherwise derive one from the run name and add it anyway. Never skip this step.
+5. **Refresh both caches for manual ingests** (localhost 3002 and `$APP_URL`, never port 3000). Override-only commits are handled by CI after merge.
+6. **Report** the row count, date, hardware, run id, and the changelog id (always present).
 
 ## Don't
 

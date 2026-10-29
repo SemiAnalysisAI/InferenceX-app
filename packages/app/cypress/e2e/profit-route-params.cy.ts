@@ -69,13 +69,12 @@ describe('Profit estimator route parameters', { testIsolation: true }, () => {
         cy.reload();
         cy.get('[data-testid="profit-target-input"]').should('have.value', '28');
         cy.get('[data-testid="profit-estimator-chart"]').should('exist');
-        cy.get('[data-testid="profit-target-input"]').clear().type('35').blur();
+        cy.get('[data-testid="profit-target-input"]').clear().type('170').blur();
         cy.location('pathname').should('eq', `${base}/cache-hit-mode/theoretical`);
-        // A model switch must also clear a non-default target, not only a default.
         cy.get('[data-testid="profit-target-input"]').clear().type('24').blur();
         cy.get('[data-testid="profit-model-selector"]').click();
         cy.contains('[role="option"]', 'Kimi K3').click();
-        cy.get('[data-testid="profit-target-input"]').should('have.value', '45');
+        cy.get('[data-testid="profit-target-input"]').should('have.value', '60');
         cy.location('pathname').should('eq', `${prefix}/${tab}/kimi-k3/cache-hit-mode/theoretical`);
       });
     }
@@ -91,7 +90,7 @@ describe('Profit estimator route parameters', { testIsolation: true }, () => {
     cy.get('label[for="profit-target"]').should('contain.text', 'P90');
     cy.location('search').should('eq', '');
     cy.get('a[href="/profit-estimator-per-gigawatt"]').filter(':visible').first().click();
-    cy.get('[data-testid="profit-target-input"]').should('have.value', '45');
+    cy.get('[data-testid="profit-target-input"]').should('have.value', '60');
     cy.location('pathname').should('not.include', '/target/24');
   });
 
@@ -99,7 +98,7 @@ describe('Profit estimator route parameters', { testIsolation: true }, () => {
     cy.visit('/profit-estimator?i_pctl=p75&percentile=p50&c_ivtarget=24', {
       onBeforeLoad(win) {
         suppressNudges(win);
-        win.localStorage.setItem('inferencex-feature-gate', '1');
+        win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
       },
     });
     cy.get('[data-testid="profit-estimator-chart"]').should('exist');

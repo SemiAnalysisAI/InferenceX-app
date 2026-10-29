@@ -1,16 +1,5 @@
 import { DASHBOARD_ROUTES } from '@/lib/routing/dashboard-routes';
 
-/**
- * Result ordering by page type. Lower tiers are listed first among relevant
- * results:
- *
- * 0. Main pages: the landing page, AgentX, every dashboard tab and the other
- *    primary destinations.
- * 1. Reference pages: chips, comparisons, rankings, models, glossary and
- *    everything else not listed here.
- * 2. Overview.
- * 3. Articles: blog posts, the blog index and whitepapers.
- */
 export const PAGE_TIER = { main: 0, reference: 1, overview: 2, article: 3 } as const;
 export type PageTier = (typeof PAGE_TIER)[keyof typeof PAGE_TIER];
 
@@ -21,13 +10,12 @@ const MAIN_PATHS = new Set<string>([
   ...DASHBOARD_ROUTES.map((route) => route.path),
 ]);
 const MAIN_PREFIXES = ['/inference/', '/agentx/', '/ubenchx'];
-const ARTICLE_PREFIXES = ['/blog', '/whitepaper'];
+const ARTICLE_PREFIXES = ['/blog', '/whitepaper', '/hardware'];
 
 function matchesPrefix(path: string, prefix: string): boolean {
   return path === prefix || path.startsWith(prefix.endsWith('/') ? prefix : `${prefix}/`);
 }
 
-/** Tier for a page path (anchor and `/zh` prefix ignored). */
 export function pageTier(url: string): PageTier {
   const hash = url.indexOf('#');
   let path = hash === -1 ? url : url.slice(0, hash);

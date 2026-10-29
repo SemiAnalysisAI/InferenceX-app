@@ -19,7 +19,6 @@ describe('Standalone unofficial-run banner', () => {
       const context = createMockUnofficialRunContext({ unofficialRunInfos: [run] });
       cy.mount(
         <UnofficialRunContext.Provider value={context}>
-          {/* Standalone providers precede the page's centered content container. */}
           <UnofficialRunBanner />
           <main>
             <div className="container mx-auto px-4 lg:px-8">

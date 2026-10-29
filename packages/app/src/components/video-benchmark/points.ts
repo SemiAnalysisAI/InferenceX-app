@@ -21,7 +21,10 @@ export function videoPoints(pages: VideoHistoryPage[]): VideoPoint[] {
         for (const observation of source.observations) {
           if (seen.has(observation.id)) continue;
           seen.add(observation.id);
-          points.push(toPoint(observation, entry.runId, entry.artifact.id, source.observedAt));
+          points.push({
+            ...toPoint(observation, entry.runId, entry.artifact.id, source.observedAt),
+            publishedAt: entry.publishedAt,
+          });
         }
       }
   return points.toSorted(
@@ -102,6 +105,11 @@ export function latestVideoCells(points: VideoPoint[]): VideoPoint[] {
 /** Valid clips a cell needs before the dashboard counts it: the same floor as the P90 display. */
 export const DASHBOARD_SAMPLE_FLOOR = 10;
 
+/** Positive when `a` was published after `b`: the published history order (time, then artifact id). */
+function publicationOrder(a: VideoPoint, b: VideoPoint): number {
+  return (a.publishedAt ?? '').localeCompare(b.publishedAt ?? '') || a.artifactId - b.artifactId;
+}
+
 /** Unknown legacy workloads stay inside their sealed source, never merge by display label. */
 export function workloadGroup(point: Pick<VideoPoint, 'workloadKey' | 'id'>): string {
   return point.workloadKey || `unknown:${point.id.split(':')[0]}`;
@@ -123,6 +131,7 @@ export function dashboardCells(points: VideoPoint[]): {
   const qualified = points.filter((p) => p.samples >= DASHBOARD_SAMPLE_FLOOR);
   const hardware = new Map<string, Set<string>>();
   const cellKeys = new Map<string, Set<string>>();
+  const newest = new Map<string, VideoPoint>();
   for (const p of qualified) {
     const group = workloadGroup(p);
     const hardwareId = p.hardwareKey ?? p.hardwareName;
@@ -133,6 +142,8 @@ export function dashboardCells(points: VideoPoint[]): {
         `${hardwareId}:${deploymentKey(p)}:${p.concurrency ?? 'na'}`,
       ),
     );
+    const latest = newest.get(group);
+    if (!latest || publicationOrder(p, latest) > 0) newest.set(group, p);
   }
   let workloadKey: string | null = null;
   for (const group of hardware.keys()) {
@@ -140,12 +151,11 @@ export function dashboardCells(points: VideoPoint[]): {
       workloadKey = group;
       continue;
     }
-    const byHardware = hardware.get(group)!.size - hardware.get(workloadKey)!.size;
-    if (
-      byHardware > 0 ||
-      (byHardware === 0 && cellKeys.get(group)!.size > cellKeys.get(workloadKey)!.size)
-    )
-      workloadKey = group;
+    const order =
+      hardware.get(group)!.size - hardware.get(workloadKey)!.size ||
+      cellKeys.get(group)!.size - cellKeys.get(workloadKey)!.size ||
+      publicationOrder(newest.get(group)!, newest.get(workloadKey)!);
+    if (order > 0) workloadKey = group;
   }
   const others = new Set(points.map(workloadGroup));
   if (workloadKey !== null) others.delete(workloadKey);

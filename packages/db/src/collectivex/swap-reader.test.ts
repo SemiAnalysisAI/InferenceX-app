@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { buildDatasetFromNeutral, buildRunSummary, isMatrixDoc, matrixVersion } from './reader';
-import { makeSwapDoc, swapMatrix, swapMeta } from './swap-test-fixture';
+import { buildDatasetFromNeutral, buildRunSummary } from './reader';
+import {
+  makeSwapDoc,
+  makeSwapRequestedCase,
+  swapCaseId,
+  swapMatrix,
+  swapMeta,
+} from './swap-test-fixture';
+import { makeRawMatrix, makeRawShard } from './test-fixture';
 
-describe('standalone swap_blocks artifacts', () => {
+describe('swap_blocks results', () => {
   it('assembles verified copies through GiB and exposes the run without EP cases', () => {
-    expect(isMatrixDoc(swapMatrix)).toBe(true);
-    expect(matrixVersion(swapMatrix)).toBe(1);
     const dataset = buildDatasetFromNeutral(
       swapMatrix,
       [makeSwapDoc(), { log: 'unrelated' }],
@@ -32,6 +37,7 @@ describe('standalone swap_blocks artifacts', () => {
       covered_skus: ['h200-dgxc'],
     });
   });
+
   it.each(['correctness', 'payload', 'latency', 'samples', 'provenance', 'duplicate'])(
     'rejects %s corruption instead of plotting success',
     (corruption) => {
@@ -40,45 +46,105 @@ describe('standalone swap_blocks artifacts', () => {
       if (corruption === 'payload') doc.cases[0].payload_bytes = 2048;
       if (corruption === 'latency') doc.cases[0].latency.percentiles_us.p50 = NaN;
       if (corruption === 'samples') doc.cases[0].latency.sample_count = 0;
-      if (corruption === 'provenance') doc.runtime.source_sha = 'other';
+      if (corruption === 'provenance') (doc.runtime as Record<string, unknown>).source_sha = null;
       if (corruption === 'duplicate') doc.cases.push(doc.cases[0]);
       expect(() => buildDatasetFromNeutral(swapMatrix, [doc], swapMeta)).toThrow(/invalid/);
     },
   );
-  it('does not misclassify arbitrary execution matrices', () => {
-    const matrix = { include: [{ backend: 'other', sku: 'h200-dgxc' }] };
-    expect(isMatrixDoc(matrix)).toBe(false);
-    expect(matrixVersion(matrix)).toBeNull();
-    expect(() => buildDatasetFromNeutral(matrix, [], swapMeta)).toThrow(
+
+  it('keeps the measuring revision instead of requiring the snapshot revision', () => {
+    const doc = makeSwapDoc();
+    doc.runtime.source_sha = 'f'.repeat(40);
+    const dataset = buildDatasetFromNeutral(swapMatrix, [doc], swapMeta);
+    expect(dataset.run.source_sha).toBe('abc123');
+    expect(dataset.swap_blocks?.[0].runtime.source_sha).toBe('f'.repeat(40));
+  });
+
+  it('rejects the retired execution-only swap matrix', () => {
+    const matrix = { include: [{ backend: 'swap-blocks', sku: 'h200-dgxc' }] };
+    expect(() => buildDatasetFromNeutral(matrix, [makeSwapDoc()], swapMeta)).toThrow(
       'invalid CollectiveX matrix',
     );
   });
 });
 
+describe('swap_blocks cases in a unified cases.json', () => {
+  it('skips ladder-free swap cases in EP coverage and keeps unanswered ones pending', () => {
+    const shard = makeRawShard();
+    const identity = shard.identity as {
+      case_id: string;
+      case_factors: { sku: string; case: Record<string, unknown> };
+    };
+    const ep = makeRawMatrix([
+      {
+        caseId: identity.case_id,
+        sku: identity.case_factors.sku,
+        case: identity.case_factors.case,
+      },
+    ]);
+    const matrix = {
+      ...ep,
+      requested_cases: [
+        ...(ep.requested_cases as unknown[]),
+        makeSwapRequestedCase('h200-dgxc', 'contiguous'),
+        makeSwapRequestedCase('h200-dgxc', 'random'),
+        makeSwapRequestedCase('mi300x', 'contiguous'),
+      ],
+    };
+
+    const dataset = buildDatasetFromNeutral(matrix, [shard, makeSwapDoc()], swapMeta);
+
+    expect(dataset.coverage.map((row) => row.case_id)).toEqual([identity.case_id]);
+    expect(dataset.series).toHaveLength(1);
+    expect(dataset.swap_blocks?.map((result) => result.sku)).toEqual(['h200-dgxc']);
+    expect(dataset.run).toMatchObject({
+      requested_cases: 4,
+      measured_cases: 2,
+      terminal_cases: 2,
+      swap_requested_cases: 3,
+      swap_measured_cases: 1,
+      // mi300x is requested but has no result, so it is not a covered pool.
+      covered_skus: ['h200-dgxc'],
+    });
+  });
+
+  it('assembles a snapshot with requested cases and no results', () => {
+    const dataset = buildDatasetFromNeutral(
+      { version: 1, requested_cases: [makeSwapRequestedCase()] },
+      [],
+      swapMeta,
+    );
+    expect(dataset.swap_blocks).toEqual([]);
+    expect(buildRunSummary(dataset)).toMatchObject({
+      requested_cases: 1,
+      measured_cases: 0,
+      swap_cases: { requested: 1, measured: 0 },
+    });
+  });
+});
+
 it('keeps identical measurements from separate GPU pools and rejects ambiguous provenance', () => {
   const matrix = {
-    include: [
-      { backend: 'swap-blocks', sku: 'h200-dgxc' },
-      { backend: 'swap-blocks', sku: 'mi355x' },
-    ],
+    version: 1,
+    requested_cases: [makeSwapRequestedCase('h200-dgxc'), makeSwapRequestedCase('mi355x')],
   };
-  const first = makeSwapDoc();
-  const docs = ['h200-dgxc', 'mi355x'].map((sku) => ({
-    ...first,
-    runtime: { ...first.runtime, sku },
-  }));
+  const docs = ['h200-dgxc', 'mi355x'].map((sku) => makeSwapDoc(sku));
   const dataset = buildDatasetFromNeutral(matrix, docs, swapMeta);
   expect(dataset.swap_blocks?.map((r) => [r.sku, r.points[0].latency_us.p50])).toEqual([
     ['h200-dgxc', 2],
     ['mi355x', 2],
   ]);
   expect(new Set(dataset.swap_blocks?.map((r) => r.result_id)).size).toBe(2);
-  expect(() => buildDatasetFromNeutral(matrix, [first], swapMeta)).toThrow('GPU pool');
-  expect(() =>
-    buildDatasetFromNeutral(
-      matrix,
-      [{ ...first, runtime: { ...first.runtime, sku: 'unknown' } }],
-      swapMeta,
-    ),
-  ).toThrow('GPU pool');
+
+  const unlabeled = makeSwapDoc();
+  delete (unlabeled.runtime as { sku?: string }).sku;
+  expect(() => buildDatasetFromNeutral(matrix, [unlabeled], swapMeta)).toThrow('GPU pool');
+  expect(() => buildDatasetFromNeutral(matrix, [makeSwapDoc('unknown')], swapMeta)).toThrow(
+    'GPU pool',
+  );
+  const unrequested = { ...makeSwapDoc(), case_id: swapCaseId('h200-dgxc', 'random') };
+  expect(() => buildDatasetFromNeutral(matrix, [unrequested], swapMeta)).toThrow('requested case');
+  expect(() => buildDatasetFromNeutral(matrix, [makeSwapDoc(), makeSwapDoc()], swapMeta)).toThrow(
+    'requested case',
+  );
 });

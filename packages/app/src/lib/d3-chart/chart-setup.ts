@@ -8,11 +8,6 @@ import {
   positionUnofficialWatermarkImage,
 } from './watermark';
 
-/**
- * Creates or updates the structural SVG skeleton for a chart.
- * Idempotent: first call creates elements, subsequent calls update
- * dimensions/theme without destroying data layers in zoomGroup.
- */
 export function setupChartStructure(
   svgElement: SVGSVGElement,
   config: ChartSetupConfig,
@@ -32,17 +27,14 @@ export function setupChartStructure(
   const svg = d3.select(svgElement);
   svg.attr('width', containerWidth).attr('height', containerHeight);
 
-  // Detect existing structure
   const existingG = svg.select<SVGGElement>('.chart-root');
   const isNew = existingG.empty();
 
   if (isNew) {
-    // ── First render: create full skeleton ──
     svg.selectAll('*').remove();
 
     const defs = svg.append('defs');
 
-    // Watermark
     if (watermark === 'logo') {
       createLogoWatermark(
         svg,
@@ -63,7 +55,6 @@ export function setupChartStructure(
       .attr('class', 'chart-root')
       .attr('transform', `translate(${margin.left},${margin.top})`);
 
-    // Grid group (rendered behind data)
     const gridGroup = g.append('g').attr('class', 'grid');
     if (!hideAxes) {
       gridGroup
@@ -90,9 +81,6 @@ export function setupChartStructure(
 
     let zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>;
     if (clipContent) {
-      // `plot-bounds.ts` reconstructs this rect in viewport coordinates (from
-      // the .chart-root translate plus these dimensions) so callers can tell
-      // whether a point is actually visible. Keep the two in step.
       defs
         .append('clipPath')
         .attr('id', `clip-${config.chartId}`)
@@ -134,31 +122,26 @@ export function setupChartStructure(
     return { svg, g, zoomGroup, xAxisGroup, yAxisGroup, gridGroup, defs, width, height, margin };
   }
 
-  // ── Subsequent renders: update existing structure ──
   const g = existingG;
   g.attr('transform', `translate(${margin.left},${margin.top})`);
 
   const defs = svg.select<SVGDefsElement>('defs');
 
-  // Update grid border positions
   const gridGroup = g.select<SVGGElement>('.grid');
   if (!config.hideAxes) {
     gridGroup.select('.border-right').attr('x1', width).attr('x2', width).attr('y2', height);
     gridGroup.select('.border-top').attr('x2', width);
   }
 
-  // Update axis group positions
   const xAxisGroup = g.select<SVGGElement>('.x-axis').attr('transform', `translate(0,${height})`);
   const yAxisGroup = g.select<SVGGElement>('.y-axis');
 
-  // Update clip rect
   if (clipContent) {
     defs.select(`#clip-${config.chartId} rect`).attr('width', width).attr('height', height);
   }
 
   const zoomGroup = g.select<SVGGElement>('.zoom-group');
 
-  // Update watermark — detect type change and recreate if needed
   const logoPatternId = `logo-pattern-${chartId}`;
   const unofficialPatternId = `unofficial-pattern-${chartId}`;
   const hasLogo = !defs.select(`#${logoPatternId}`).empty();
@@ -212,13 +195,11 @@ export function setupChartStructure(
     }
   }
 
-  // Update Y-axis label position
   const yLabel = svg.select('.y-axis-label');
   if (!yLabel.empty()) {
     yLabel.attr('x', -(margin.top + height / 2)).text(config.yLabel ?? '');
   }
 
-  // Update X-axis label position
   const xLabelEl = svg.select('.x-axis-label');
   if (!xLabelEl.empty()) {
     xLabelEl

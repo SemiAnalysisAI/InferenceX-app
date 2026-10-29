@@ -1,5 +1,0 @@
-rules:
-  dependabot-cooldown:
-    config:
-      # Match bunfig.toml's minimumReleaseAge of one day.
-      days: 1

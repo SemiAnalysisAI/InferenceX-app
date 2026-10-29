@@ -1,5 +1,3 @@
-// Equivalent tools share colors across providers; user-connected MCP tools keep fallback gray.
-
 const SHELL = '#8b5cf6';
 const READ = '#0ea5e9';
 const EDIT = '#10b981';
@@ -12,7 +10,6 @@ const ASK = '#f43f5e';
 const LSP = '#06b6d4';
 
 export const TOOL_COLORS: Record<string, string> = {
-  // Claude Code
   Bash: SHELL,
   bash: SHELL,
   PowerShell: SHELL,
@@ -45,7 +42,6 @@ export const TOOL_COLORS: Record<string, string> = {
   AskUserQuestion: ASK,
   LSP,
 
-  // Codex CLI / cloud (OpenAI Responses)
   exec_command: SHELL,
   shell_command: SHELL,
   shell: SHELL,

@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** Internal NVLink fabric tray with management CPU, fans, and DC/DC conversion. */
 
 import { FrozenModel, PowerComponentBreakdown, Provenance, sum_watts } from '../../../../base';
 import { BlackwellNVSwitch } from '../../components/blackwell_nvswitch';

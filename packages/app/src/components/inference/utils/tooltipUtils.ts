@@ -5,6 +5,7 @@ import { agenticDetailHref } from '@/lib/agentx/agentic-detail-link';
 import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
 import { frameworkFamily } from '@/lib/catalog/framework-family';
 import type { Locale } from '@/lib/i18n/i18n';
+import type { PowerBasisLabelStyle } from '@/lib/power/power-basis';
 import { isKvOffloadEnabled } from '@/lib/benchmarks/kv-offload';
 import { chartStateHref } from '@/lib/routing/url-state';
 import type {
@@ -17,6 +18,7 @@ import {
 } from '@/lib/power/system-power-model';
 
 import type { HardwareConfig, InferenceData, OverlayData } from '@/components/inference/types';
+import { powerBasisPillHtml } from '@/components/inference/powerx/PowerBasisPill';
 import {
   isAllInMeasuredConfigKey,
   isMeasuredEnergyConfigKey,
@@ -39,63 +41,34 @@ import {
 } from '@/components/inference/utils/runtime-metadata-labels';
 
 export interface TooltipConfig {
-  /** The data point to display */
   data: InferenceData;
-  /** Whether the tooltip is pinned (enables text selection) */
   isPinned: boolean;
-  /** X-axis label for the chart */
   xLabel: string;
-  /** Y-axis label for the chart */
   yLabel: string;
-  /** Currently selected Y-axis metric */
   selectedYAxisMetric: string;
-  /** Hardware configuration for looking up labels */
   hardwareConfig: HardwareConfig;
-  /** URL to the GitHub Actions workflow run */
   runUrl?: string;
-  /**
-   * Whether this agentic point has a stored trace_replay blob. Controls
-   * visibility of the "View charts" button — the actual distributions are
-   * rendered on the detail page, not inline, so all the tooltip needs is a
-   * presence boolean (sourced from the bulk `/api/v1/trace-availability`
-   * call so we don't ship megabytes of profile JSONL just for this check).
-   */
   hasTrace?: boolean;
-  /** Whether this official DB-backed point has a linked `server_logs` row. */
   hasLog?: boolean;
-  /** Opt in only when the host handles the dialog action. */
   showPowerTelemetry?: boolean;
-  /** Page locale for tooltip metadata labels. Defaults to English. */
   locale?: Locale;
+  /** PowerX names boundaries the way its Count control does (GPU only, Whole system). */
+  powerLabelStyle?: PowerBasisLabelStyle;
+  /** The viewer is on a touch-primary device: the pinned hint says Tap, not Click. */
+  touch?: boolean;
 }
 
 export interface OverlayTooltipConfig extends TooltipConfig {
-  /** Overlay data containing label and run URL */
   overlayData: OverlayData;
 }
 
-// `dp_attention` is `boolean | string` on InferenceData (DB sends raw, the
-// transform narrows "true"/"false" → boolean). Coerce to a plain boolean for
-// the shared labeler, treating the legacy string form correctly.
 const asBool = (v: boolean | string | undefined): boolean | undefined =>
   typeof v === 'string' ? v === 'true' : v;
 
-/**
- * Returns the short label for a data point on the chart.
- * - Non-multinode: e.g. "TP8", "EP8", "TEP8", "DEP8", "DPAEP8"
- * - Multinode disagg: e.g. "2xEP4+1xDPAEP32"
- * - Old data (no ep field): falls back to tp value
- *
- * Delegates to the shared {@link parallelismLabel} so the chart points and the
- * agentic sibling navigator describe a config identically.
- */
 export const getPointLabel = (d: InferenceData): string => {
   const aggregateDcp = meaningfulParallelismSize(d.prefill_dcp_size, d.decode_dcp_size);
   const aggregatePcp = meaningfulParallelismSize(d.prefill_pcp_size, d.decode_pcp_size);
   const label = parallelismLabel({
-    // InferenceData.tp is the TOTAL GPU count (createChartDataPoint folds pp
-    // into it for aggregated rows) — the label wants the actual TP width, so
-    // prefer the raw decode_tp and keep d.tp only as a legacy fallback.
     tp: d.decode_tp ?? d.tp,
     dp: d.dp,
     ep: d.ep,
@@ -124,8 +97,8 @@ export const getPointLabel = (d: InferenceData): string => {
   return label;
 };
 
-const runLinkHTML = (runUrl: string | undefined, locale: Locale) =>
-  runUrl
+const runLinkHTML = (runUrl: string | undefined, locale: Locale, hardware: string) =>
+  runUrl && !hardware.startsWith('tpu')
     ? `<div style="font-size: 11px; margin-top: 4px;">
         <a href="${runUrl}" target="_blank" rel="noopener noreferrer" style="color: var(--muted-foreground); text-decoration: underline; cursor: pointer;">${locale === 'zh' ? 'GitHub Actions 运行记录' : 'GitHub Actions Run'}</a>
       </div>`
@@ -146,8 +119,6 @@ const formatTooltipDate = (value: string, locale: Locale): string => {
   return `${Number(match.groups.year)}年${Number(match.groups.month)}月${Number(match.groups.day)}日`;
 };
 
-/** Tooltip numeric values are capped at 3 decimal places (trailing zeros stripped).
- *  Exported so the legend points table shows exactly the numbers the tooltip shows. */
 export const fmt = (v: number): string => {
   if (!Number.isFinite(v)) return String(v);
   const rounded = parseFloat(v.toFixed(3));
@@ -158,6 +129,7 @@ export const fmt = (v: number): string => {
 const TOOLTIP_STRINGS = {
   en: {
     dismiss: 'Click elsewhere to dismiss',
+    dismissTouch: 'Tap elsewhere to dismiss',
     unofficialRun: '✕ UNOFFICIAL RUN',
     date: 'Date',
     dataFrom: (d: string) => `(data from ${d})`,
@@ -178,6 +150,7 @@ const TOOLTIP_STRINGS = {
   },
   zh: {
     dismiss: '点击其他区域关闭',
+    dismissTouch: '点按其他区域关闭',
     unofficialRun: '✕ 非官方运行',
     date: '日期',
     dataFrom: (d: string) => `（数据来自 ${d}）`,
@@ -198,20 +171,16 @@ const TOOLTIP_STRINGS = {
   },
 } as const;
 
-/**
- * Which comparison series (`i_pcompare`) a point belongs to, for the clones a
- * boundary / role comparison appends. On the energy axis a role clone also
- * reports its share of the reconstructed request energy (utils/role-energy.ts).
- */
 const powerVariantHTML = (
   d: InferenceData,
   selectedYAxisMetric: string,
   locale: Locale,
+  labelStyle?: PowerBasisLabelStyle,
 ): string => {
   const variant = d.powerVariant;
   if (!variant) return '';
   const t = TOOLTIP_STRINGS[locale];
-  let html = tooltipLine(t.series, powerVariantLabel(variant, locale));
+  let html = tooltipLine(t.series, powerVariantLabel(variant, locale, labelStyle));
   if (
     variant.kind === 'role' &&
     variant.id !== 'all' &&
@@ -226,19 +195,12 @@ const powerVariantHTML = (
   return html;
 };
 
-/**
- * Measured-power certification tier line. Rendered only while a Measured
- * Energy y-axis is selected and the point carries a tier — non-measured axes
- * and telemetry-free points stay unchanged.
- */
 const powerTierHTML = (d: InferenceData, selectedYAxisMetric: string, locale: Locale): string => {
   if (!isMeasuredEnergyConfigKey(selectedYAxisMetric) || !d.power_tier) return '';
   const t = TOOLTIP_STRINGS[locale];
   return tooltipLine(t.powerData, d.power_tier === 'certified' ? t.powerCertified : t.powerLegacy);
 };
 
-/** Escape strings that arrive from artifact JSONB (worker role / hosts)
- *  before interpolating them into tooltip HTML. */
 const escapeHtml = (s: string): string =>
   s
     .replaceAll('&', '&amp;')
@@ -250,10 +212,12 @@ const escapeHtml = (s: string): string =>
 const SYSTEM_POWER_STRINGS = {
   en: {
     heading: 'InferenceX Power Model (beta)',
+    details: 'Deployment & model details',
     measuredGpu: 'Measured GPU power',
-    itPerGpu: 'Modeled IT power per GPU',
-    deploymentIt: 'Modeled deployment IT power',
-    facility: 'Modeled facility power',
+    itPerGpu: 'Measured IT power per GPU (no PUE)',
+    facilityPerGpu: 'Measured facility power per GPU',
+    deploymentIt: 'Measured deployment IT power',
+    facility: 'Measured facility power',
     state: 'Operating state',
     workloads: {
       'fixed-seq-len': 'fixed sequence length',
@@ -317,10 +281,12 @@ const SYSTEM_POWER_STRINGS = {
   },
   zh: {
     heading: 'InferenceX 功耗模型（Beta）',
+    details: '部署与模型详情',
     measuredGpu: 'GPU 实测功耗',
-    itPerGpu: '每 GPU 分摊的 IT 功耗估算',
-    deploymentIt: '整个部署的 IT 功耗估算',
-    facility: '数据中心功耗估算',
+    itPerGpu: '每 GPU 实测 IT 功耗（不含 PUE）',
+    facilityPerGpu: '每 GPU 实测数据中心功耗',
+    deploymentIt: '整个部署的实测 IT 功耗',
+    facility: '实测数据中心功耗',
     state: '运行状态',
     workloads: {
       'fixed-seq-len': '固定序列长度',
@@ -376,6 +342,24 @@ const SYSTEM_POWER_STRINGS = {
   },
 } as const;
 
+/** Power readings: whole watts with grouping — sub-watt digits are model noise. */
+const fmtWatts = (value: number): string => Math.round(value).toLocaleString('en-US');
+
+/** Y-axis metrics whose values are watts, shown rounded to whole watts. */
+const WATT_METRICS = new Set([
+  'y_measuredAvgPower',
+  'y_measuredPrefillAvgPower',
+  'y_measuredDecodeAvgPower',
+  'y_itModeledWatts',
+  'y_utilityModeledWatts',
+]);
+
+const fmtY = (value: number, metric: string): string =>
+  WATT_METRICS.has(metric) && Number.isFinite(value) ? fmtWatts(value) : fmt(value);
+
+/** A point's y value as the tooltip prints it for the metric (watts get their own format). */
+export const formatMetricValue = fmtY;
+
 const modeledSystemPowerHTML = (
   d: InferenceData,
   selectedYAxisMetric: string,
@@ -398,16 +382,20 @@ const modeledSystemPowerHTML = (
   const u = t.units[estimate.unit];
   return `<div data-testid="tooltip-modeled-system-power" style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px; font-size: 11px;">
     <strong>${t.heading}</strong>
-    ${tooltipLine(t.measuredGpu, `${fmt(estimate.measuredGpuWattsPerGpu)} W/GPU`)}
-    ${estimate.unit === 'nvl72-tray' && estimate.measuredGraceSocketWatts !== null ? tooltipLine(t.graceSocket, `${fmt(estimate.measuredGraceSocketWatts)} W/socket`) : ''}
-    ${tooltipLine(t.itPerGpu, `${fmt(estimate.itWattsPerGpu)} W/GPU`)}
+    ${tooltipLine(t.measuredGpu, `${fmtWatts(estimate.measuredGpuWattsPerGpu)} W/GPU${powerBasisPillHtml('gpu', locale)}`)}
+    ${estimate.unit === 'nvl72-tray' && estimate.measuredGraceSocketWatts !== null ? tooltipLine(t.graceSocket, `${fmtWatts(estimate.measuredGraceSocketWatts)} W/socket`) : ''}
+    ${tooltipLine(t.itPerGpu, `${fmtWatts(estimate.itWattsPerGpu)} W/GPU${powerBasisPillHtml('it', locale)}`)}
+    ${tooltipLine(t.facilityPerGpu, `${fmtWatts(estimate.deploymentFacilityWatts / estimate.gpuCount)} W/GPU${powerBasisPillHtml('facility', locale)}`)}
     ${
       isPinned
         ? `
+      <details data-testid="tooltip-power-model-details" style="margin-top: 2px;">
+      <summary style="cursor: pointer; color: var(--muted-foreground);">${t.details}</summary>
       ${tooltipLine(t.state, `${t.workloads[estimate.operatingState.workload]} · ${t.scaleOut(estimate.operatingState.scaleOut)}`)}
-      ${tooltipLine(t.deploymentIt, `${fmt(estimate.deploymentItWatts)} W`)}
-      ${tooltipLine(`${t.facility} (PUE ${fmt(estimate.pue)})`, `${fmt(estimate.deploymentFacilityWatts)} W`)}
+      ${tooltipLine(t.deploymentIt, `${fmtWatts(estimate.deploymentItWatts)} W`)}
+      ${tooltipLine(`${t.facility} (PUE ${fmt(estimate.pue)})`, `${fmtWatts(estimate.deploymentFacilityWatts)} W`)}
       <div style="color: var(--muted-foreground); margin-bottom: 4px;">${u.topology(estimate.chassisCount, estimate.gpuCount, estimate.modeledGpuCount)}${estimate.chassisBasis === 'extrapolated' ? `<br/>${u.extrapolation}` : ''}${estimate.topologyBasis === 'uniform-hosts' ? `<br/>${u.uniformHosts}` : ''}<br/>${estimate.unit === 'nvl72-tray' && estimate.cpuBasis === 'modeled' ? t.units['nvl72-tray'].modeledCpuAssumptions : u.assumptions}<br/>${u.network}<br/>${u.normalization}<br/>${u.boundary}</div>
+      </details>
       ${tooltipLine(t.model, `<a href="${escapeHtml(SYSTEM_POWER_MODEL_SOURCE_URL)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${escapeHtml(estimate.hardware)} · ${escapeHtml(estimate.modelRevision.slice(0, 12))}</a>`)}
     `
         : ''
@@ -430,10 +418,6 @@ const WORKER_POWER_STRINGS = {
 
 const WORKER_ROWS_LIMIT = 8;
 
-/**
- * Render worker telemetry only in pinned tooltips so hover tooltips stay lean.
- * Missing or empty worker payloads produce no section.
- */
 const generateWorkerPowerHTML = (d: InferenceData, isPinned: boolean, locale: Locale): string => {
   if (!isPinned || !Array.isArray(d.workers) || d.workers.length === 0) return '';
   const t = WORKER_POWER_STRINGS[locale];
@@ -451,8 +435,6 @@ const generateWorkerPowerHTML = (d: InferenceData, isPinned: boolean, locale: Lo
       );
     }
     if (typeof w.avg_util_pct === 'number') parts.push(`${fmt(w.avg_util_pct)}%`);
-    // avg_mem_used_mb follows the nvidia-smi/telemetry convention (MiB despite
-    // the _mb suffix), so divide by 1024 when displaying GiB.
     if (typeof w.avg_mem_used_mb === 'number') parts.push(`${fmt(w.avg_mem_used_mb / 1024)} GiB`);
     if (Array.isArray(w.hosts) && w.hosts.length > 0) parts.push(escapeHtml(w.hosts.join(',')));
     return `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px; overflow-wrap: anywhere;">${parts.join(' · ')}</div>`;
@@ -492,10 +474,6 @@ const CACHE_STRINGS = {
   },
 } as const;
 
-/**
- * Cache configuration and hit-rate rows shared by fixed-sequence, agentic,
- * official, comparison, and unofficial-run tooltips.
- */
 const generateCacheMetadataHTML = (d: InferenceData, locale: Locale): string => {
   const t = CACHE_STRINGS[locale];
   const parts: string[] = [];
@@ -532,10 +510,6 @@ const generateCacheMetadataHTML = (d: InferenceData, locale: Locale): string => 
   return parts.join('');
 };
 
-/**
- * Agentic-only request success and token totals. Cache metadata is rendered
- * separately because fixed-sequence rows can carry it too.
- */
 const AGENTIC_STRINGS = {
   en: {
     speculativeDecoding: 'Speculative Decoding',
@@ -588,10 +562,6 @@ const generateAgenticHTML = (d: InferenceData, locale: Locale): string => {
     parts.push(tooltipLine(t.generatedTokens, formatNumber(d.total_generation_tokens)));
   }
 
-  // Histograms + time-series live on the dedicated detail page now; the
-  // "View charts" button (rendered by the wrapper when pinned + has trace
-  // data) takes the user there.
-
   return parts.join('');
 };
 
@@ -619,17 +589,7 @@ const pointDetailActionLink = (action: TooltipAction, href: string, label: strin
     background: var(--accent); color: var(--accent-foreground); text-align: center; text-decoration: none;
   ">${label} &rarr;</a>`;
 
-/**
- * Outer shell for pinned/hover chart tooltips. Caps width and height to the
- * viewport so stacked action buttons (logs / PowerX / power trace) stay
- * reachable on narrow mobile viewports — `computeTooltipPosition` can only
- * clamp top/left, so a taller-than-viewport shell would still overflow.
- */
-export const tooltipShellStyle = (opts: {
-  isPinned: boolean;
-  /** Hex/CSS color; omit for the default border token. */
-  border?: string;
-}): string => {
+export const tooltipShellStyle = (opts: { isPinned: boolean; border?: string }): string => {
   const border = opts.border ?? '1px solid var(--border)';
   return [
     'background: var(--popover)',
@@ -647,11 +607,6 @@ export const tooltipShellStyle = (opts: {
   ].join('; ');
 };
 
-/**
- * Whether a point on the measured-power / energy scatter can jump to its
- * per-second telemetry on the Timeline display. Overlay points qualify too:
- * the trace is keyed by run id and audit name, not by a persisted row id.
- */
 export const showsPowerTraceAction = (
   point: Pick<InferenceData, 'power_audit' | 'run_url'>,
   selectedYAxisMetric: string,
@@ -660,12 +615,6 @@ export const showsPowerTraceAction = (
   getMeasuredMetricConfig(selectedYAxisMetric) !== undefined &&
   traceKeyForPoint(point) !== null;
 
-/**
- * Same-tab click is intercepted by the chart (in-page metric switch); the href
- * keeps open-in-new-tab landing on the Timeline display of THIS chart. The
- * address bar is stripped of chart state after load, so the share-link store
- * is layered over the live location first (`chartStateHref`).
- */
 const powerTraceHref = (): string =>
   typeof window === 'undefined' ? '#' : chartStateHref({ i_metric: POWER_TIMELINE_METRIC_KEY });
 
@@ -674,21 +623,11 @@ interface ViewActionsInput {
   hasTraceData: boolean;
   hasLogData: boolean;
   point: InferenceData;
-  /**
-   * Metric the chart currently plots, when that chart can switch to the
-   * Timeline display in place (the scatter). Omitted by charts that cannot,
-   * so they never render a "View power trace" link nothing would handle.
-   */
   powerTraceMetric?: string;
   showPowerTelemetry?: boolean;
   locale: Locale;
 }
 
-/**
- * Point-detail links rendered only on pinned tooltips. "View charts" and
- * "View logs" need a persisted row id (overlay points have none); "View power
- * trace" needs only the run and audit source, so it works for overlays too.
- */
 const viewActionsHTML = ({
   isPinned,
   hasTraceData,
@@ -790,12 +729,6 @@ const contextParallelismParts = (dcp?: number, pcp?: number, dwdp?: number): str
   return parts.length > 0 ? `${parts.join(', ')}, ` : '';
 };
 
-/**
- * Generates HTML for the parallelism configuration section of a tooltip.
- * Falls back to GPU count for old data without parallelism fields.
- * Pipeline parallelism is only rendered when > 1 (pp of 0/1 means "no PP",
- * matching the point-label rule in {@link parallelismLabel}).
- */
 const generateParallelismHTML = (d: InferenceData, locale: Locale = 'en'): string => {
   const t = PARALLELISM_STRINGS[locale];
   const deployment = d.disagg ? t.disaggregated : d.is_multinode ? t.multiNode : t.singleNode;
@@ -855,7 +788,6 @@ const generateParallelismHTML = (d: InferenceData, locale: Locale = 'en'): strin
 
 const POWER_REASON_CODE_RE = /^[a-z][a-z0-9_]*$/u;
 
-/** Raw tooltip HTML must not trust producer-supplied reason codes. */
 const powerWithheldHTML = (d: InferenceData, locale: Locale): string => {
   if (!Array.isArray(d.power_invalid_reasons) || d.power_invalid_reasons.length === 0) return '';
   const codes = d.power_invalid_reasons
@@ -867,12 +799,6 @@ const powerWithheldHTML = (d: InferenceData, locale: Locale): string => {
   return tooltipLine(TOOLTIP_STRINGS[locale].powerWithheld, codes.join(', '));
 };
 
-/**
- * Generates HTML content for official data point tooltips.
- *
- * @param config - Configuration for the tooltip
- * @returns HTML string for the tooltip content
- */
 export const generateTooltipContent = (config: TooltipConfig): string => {
   const {
     data: d,
@@ -889,7 +815,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
 
   return `
     <div style="${tooltipShellStyle({ isPinned })}">
-      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
+      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${config.touch ? t.dismissTouch : t.dismiss}</div>` : ''}
       <div style="color: var(--foreground); font-size: 12px; font-weight: 600; margin-bottom: 8px;">
         ${hardwareConfig[d.hwKey] ? getDisplayLabel(getPointHardwareConfig(d, hardwareConfig[d.hwKey])) : d.hwKey}
       </div>
@@ -901,7 +827,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
           : ''
       }
       ${tooltipLine(xLabel, fmt(d.x))}
-      ${tooltipLine(yLabel, fmt(d.y))}
+      ${tooltipLine(yLabel, fmtY(d.y, selectedYAxisMetric))}
       ${
         selectedYAxisMetric === 'y_tpPerGpu' && d['inputTputPerGpu']
           ? `
@@ -915,7 +841,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
           : ''
       }
       ${powerTierHTML(d, selectedYAxisMetric, locale)}
-      ${powerVariantHTML(d, selectedYAxisMetric, locale)}
+      ${powerVariantHTML(d, selectedYAxisMetric, locale, config.powerLabelStyle)}
       ${modeledSystemPowerHTML(d, selectedYAxisMetric, isPinned, locale)}
       ${tooltipLine(t.totalChips, d.physicalChips ?? d.tp)}
       ${generateParallelismHTML(d, locale)}
@@ -925,7 +851,7 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
       ${powerWithheldHTML(d, locale)}
       ${generateAgenticHTML(d, locale)}
       ${generateWorkerPowerHTML(d, isPinned, locale)}
-      ${runLinkHTML(runUrl, locale)}
+      ${runLinkHTML(runUrl, locale, d.hwKey)}
       ${viewActionsHTML({
         isPinned,
         hasTraceData: Boolean(hasTrace),
@@ -939,13 +865,6 @@ export const generateTooltipContent = (config: TooltipConfig): string => {
   `;
 };
 
-/**
- * Generates HTML content for overlay (unofficial run) data point tooltips.
- * These tooltips have a distinct red border and "UNOFFICIAL" label.
- *
- * @param config - Configuration for the overlay tooltip
- * @returns HTML string for the tooltip content
- */
 export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): string => {
   const { data: d, isPinned, xLabel, yLabel, selectedYAxisMetric, overlayData } = config;
   const locale = config.locale ?? 'en';
@@ -956,7 +875,7 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
 
   return `
     <div style="${tooltipShellStyle({ isPinned, border: '2px solid #dc2626' })}">
-      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
+      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${config.touch ? t.dismissTouch : t.dismiss}</div>` : ''}
       <div style="color: #dc2626; font-size: 10px; font-weight: 700; margin-bottom: 4px; text-transform: uppercase;">
         ${t.unofficialRun}
       </div>
@@ -966,9 +885,9 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
       ${tooltipLine(t.branch, `${branch}`)}
       ${tooltipLine(t.date, formatTooltipDate(d.actualDate ?? d.date, locale))}
       ${tooltipLine(xLabel, fmt(d.x))}
-      ${tooltipLine(yLabel, fmt(d.y))}
+      ${tooltipLine(yLabel, fmtY(d.y, selectedYAxisMetric))}
       ${powerTierHTML(d, selectedYAxisMetric, locale)}
-      ${powerVariantHTML(d, selectedYAxisMetric, locale)}
+      ${powerVariantHTML(d, selectedYAxisMetric, locale, config.powerLabelStyle)}
       ${modeledSystemPowerHTML(d, selectedYAxisMetric, isPinned, locale)}
       ${tooltipLine(t.totalChips, d.physicalChips ?? d.tp)}
       ${generateParallelismHTML(d, locale)}
@@ -990,13 +909,6 @@ export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): str
   `;
 };
 
-/**
- * Generates HTML content for GPU graph tooltips (date comparison view).
- * Similar to regular tooltips but shows "GPU Config" instead of hardware label at top.
- *
- * @param config - Configuration for the tooltip
- * @returns HTML string for the tooltip content
- */
 export const generateGPUGraphTooltipContent = (config: TooltipConfig): string => {
   const {
     data: d,
@@ -1014,7 +926,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
 
   return `
     <div style="${tooltipShellStyle({ isPinned })}">
-      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
+      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${config.touch ? t.dismissTouch : t.dismiss}</div>` : ''}
       ${tooltipLine(t.date, `${formatTooltipDate(d.date, locale)}${d.actualDate && d.actualDate !== d.date ? ` <span style="opacity: 0.7">${t.dataFrom(formatTooltipDate(d.actualDate, locale))}</span>` : ''}`)}
       ${tooltipLine(t.chipConfig, `${hardwareConfig[d.hwKey] ? getDisplayLabel(getPointHardwareConfig(d, hardwareConfig[d.hwKey])) : d.hwKey}`)}
       ${
@@ -1024,7 +936,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
           : ''
       }
       ${tooltipLine(xLabel, fmt(d.x))}
-      ${tooltipLine(yLabel, fmt(d.y))}
+      ${tooltipLine(yLabel, fmtY(d.y, selectedYAxisMetric))}
       ${
         selectedYAxisMetric === 'y_tpPerGpu' && d['inputTputPerGpu']
           ? `
@@ -1038,7 +950,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
           : ''
       }
       ${powerTierHTML(d, selectedYAxisMetric, locale)}
-      ${powerVariantHTML(d, selectedYAxisMetric, locale)}
+      ${powerVariantHTML(d, selectedYAxisMetric, locale, config.powerLabelStyle)}
       ${modeledSystemPowerHTML(d, selectedYAxisMetric, isPinned, locale)}
       ${tooltipLine(t.totalChips, d.physicalChips ?? d.tp)}
       ${generateParallelismHTML(d, locale)}
@@ -1048,7 +960,7 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
       ${powerWithheldHTML(d, locale)}
       ${generateAgenticHTML(d, locale)}
       ${generateWorkerPowerHTML(d, isPinned, locale)}
-      ${runLinkHTML(runUrl, locale)}
+      ${runLinkHTML(runUrl, locale, d.hwKey)}
       ${viewActionsHTML({
         isPinned,
         hasTraceData: Boolean(hasTrace),

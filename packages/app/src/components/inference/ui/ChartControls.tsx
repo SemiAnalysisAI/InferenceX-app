@@ -3,7 +3,7 @@
 import { TcoBasisToggle } from '@/components/ui/tco-basis-toggle';
 
 import { ControlPanel } from '@/components/ui/control-panel';
-import { useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 
 import { track } from '@/lib/analytics/analytics';
 import { replaceRouterPathname } from '@/lib/routing/client-navigation';
@@ -13,6 +13,7 @@ import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 
 import {
   useInferenceActions,
+  useInferenceAnalyticsContext,
   useInferenceData,
   useInferenceDisplay,
   useInferenceFilters,
@@ -48,6 +49,8 @@ import {
   type CostMetricFamilyId,
   type CostTier,
   type MetricKey,
+  countsInputTokens,
+  isInputMetric,
 } from '@/components/inference/metric-registry';
 import {
   cachedInputPricePerMillion,
@@ -58,6 +61,9 @@ import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 import { ModelArchitectureInfoLink } from './ModelArchitectureInfoLink';
 import { MetricExplanation } from './MetricExplanation';
 import { MeasuredMetricControls } from './MeasuredMetricControls';
+import { usePowerXSurface } from './powerx-surface';
+import { powerXChangedCount } from '../powerx/powerx-views';
+import type { PowerXChartConfigSlots } from '../powerx/PowerXLayout';
 import {
   changeMeasuredMetricConfig,
   getMeasuredMetricConfig,
@@ -65,9 +71,10 @@ import {
   type MeasuredMetricFamily,
 } from '../measured-metric-config';
 import { XAxisModeSelector } from './XAxisModeSelector';
+import { TokenBasisToggle } from './TokenBasisToggle';
 import { showsTcoBasisSelector, Sequence, type Model } from '@/lib/catalog/data-mappings';
 import { useLocale } from '@/lib/i18n/use-locale';
-import { defaultYAxisMetric } from '@/lib/routing/url-state';
+import { DEFAULT_Y_AXIS_METRIC } from '@/lib/routing/url-state';
 
 const STRINGS = {
   en: {
@@ -163,11 +170,6 @@ const STRINGS = {
 
 const METRIC_GROUPS = METRIC_CONTROL_GROUPS;
 
-// Full option titles carry the cost tier ("… (Owning at Large Hyperscaler
-// Volume)"). The y-axis selector collapses the published tiers of a metric
-// into one option and hands the tier to the Cost Tier selector in the chart
-// caption, so these maps serve analytics labels and the Custom User Values
-// entries.
 const METRIC_TITLE_MAP = new Map(
   (Object.keys(METRIC_REGISTRY) as MetricKey[]).map((key) => [
     `y_${key}`,
@@ -183,12 +185,13 @@ const METRIC_TITLE_ZH_MAP = new Map(
 );
 
 interface ChartControlsProps {
-  /** Hide GPU Config selector and related date pickers (used by Historical Trends tab) */
   hideGpuComparison?: boolean;
   tcoSource?: 'inference' | 'historical';
   showTcoBasis?: boolean;
-  /** Inference-only: historical trends use dates on the horizontal axis. */
   showXAxisMode?: boolean;
+  /** PowerX: the Count / Per / Show as controls that stand in for the Y-axis metric pick. */
+  /** PowerX's Chart Config cells; receives the X-Axis Metric cell so it can place it. */
+  powerXControls?: (slots: PowerXChartConfigSlots) => ReactNode;
 }
 
 export default function ChartControls({
@@ -196,25 +199,16 @@ export default function ChartControls({
   tcoSource = 'inference',
   showTcoBasis = false,
   showXAxisMode = false,
+  powerXControls,
 }: ChartControlsProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
-  // The percentile selector is rendered conditionally on `selectedSequence`,
-  // which on the client is hydrated from URL params. SSR doesn't see the URL,
-  // so deferring the conditional until after mount keeps the initial DOM
-  // identical between server and client (avoids hydration warnings).
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
   const { openDropdown, handleDropdownOpenChange } = useOpenDropdown<string>();
-  const {
-    selectedModel,
-    selectedSequence,
-    selectedPrecisions,
-    selectedGPUs,
-    selectedDateRange,
-    quickFilters,
-  } = useInferenceFilters();
+  const { selectedModel, selectedSequence, selectedPrecisions, selectedGPUs, selectedDateRange } =
+    useInferenceFilters();
   const {
     graphs,
     availableGPUs,
@@ -249,12 +243,9 @@ export default function ChartControls({
     setScaleType,
     setPowerCompare,
   } = useInferenceActions();
+  const powerXSurface = usePowerXSurface();
+  const analyticsContext = useInferenceAnalyticsContext();
 
-  // Y-axis options come from the canonical registry and need no API data.
-  // Gated groups appear only after the feature gate unlocks. A gated metric
-  // that arrived through a shared URL keeps its own group visible while the
-  // gate is locked so the selector never shows an option it cannot name;
-  // this mirrors how tab-nav keeps a gated route's tab for the current page.
   const featureGateUnlocked = useFeatureGate();
   const visibleGroups = useMemo(
     () =>
@@ -277,13 +268,9 @@ export default function ChartControls({
   const selectedTier: CostTier | undefined = isMetricKey(selectedMetricKey)
     ? metricCostTier(selectedMetricKey)
     : undefined;
-  // Switching metric keeps the tier the reader is on, including Custom User
-  // Values: the tier is picked in the chart caption, not here.
   const carriedTier: CostTier = selectedTier ?? 'hyperscaler';
 
   const searchableYAxisOptions = useMemo(() => {
-    // Shared across groups so a family listed under Custom User Values does
-    // not reappear after its published entry.
     const seenFamilies = new Set<CostMetricFamilyId>();
     return visibleGroups
       .map((group) => {
@@ -292,11 +279,6 @@ export default function ChartControls({
           const key = m.replace(/^y_/u, '') as MetricKey;
           const family = costMetricFamily(key);
           if (family) {
-            // Every pricing basis of a metric, published or custom,
-            // collapses into one option per metric family. The option
-            // tracks the tier in force so the selection highlight follows
-            // the metric; the Cost Tier selector in the chart caption
-            // changes the pricing basis.
             if (seenFamilies.has(family)) return [];
             seenFamilies.add(family);
             const tieredKey = metricForCostTier(family, carriedTier) ?? key;
@@ -326,12 +308,25 @@ export default function ChartControls({
       .filter((g) => g.options.length > 0);
   }, [visibleGroups, locale, carriedTier]);
 
-  // Keep the existing metric key in state and shared URLs. Only the menu's
-  // default presentation collapses; full metric names remain searchable.
+  // Measured power and energy live on PowerX; only Historical Trends keeps them here.
+  const showsMeasuredMetrics = tcoSource === 'historical';
+  const pickerYAxisOptions = useMemo(
+    () =>
+      showsMeasuredMetrics
+        ? searchableYAxisOptions
+        : searchableYAxisOptions
+            .map((group) => ({
+              ...group,
+              options: group.options.filter((option) => !getMeasuredMetricConfig(option.value)),
+            }))
+            .filter((group) => group.options.length > 0),
+    [searchableYAxisOptions, showsMeasuredMetrics],
+  );
+
   const groupedYAxisOptions = useMemo(() => {
     const selectedConfig = getMeasuredMetricConfig(selectedYAxisMetric);
     const seen = new Set<MeasuredMetricFamily>();
-    return searchableYAxisOptions.map((group) => ({
+    return pickerYAxisOptions.map((group) => ({
       ...group,
       groupLabel: group.options.some((option) => getMeasuredMetricConfig(option.value))
         ? t.measuredGroup
@@ -341,8 +336,6 @@ export default function ChartControls({
         if (!config) return [option];
         if (seen.has(config.family)) return [];
         seen.add(config.family);
-        // Keep the selected boundary (and other dimensions) when hopping between
-        // the power and energy families; fall back to the family default otherwise.
         const value =
           selectedConfig?.family === config.family
             ? selectedYAxisMetric
@@ -358,7 +351,7 @@ export default function ChartControls({
         ];
       }),
     }));
-  }, [searchableYAxisOptions, selectedYAxisMetric, t]);
+  }, [pickerYAxisOptions, selectedYAxisMetric, t]);
 
   const trackCombinedFilters = () => {
     if (selectedModel && selectedSequence && selectedPrecisions.length > 0 && selectedYAxisMetric) {
@@ -366,34 +359,31 @@ export default function ChartControls({
         model: selectedModel,
         sequence: selectedSequence,
         precision: selectedPrecisions.join(','),
-        yAxisMetric: selectedYAxisMetric,
-        yAxisMetricLabel: METRIC_TITLE_MAP.get(selectedYAxisMetric) ?? selectedYAxisMetric,
-        yAxisMetricGroup: metricGroupMap.get(selectedYAxisMetric) ?? 'Unknown',
+        metric: selectedYAxisMetric,
+        metric_label: METRIC_TITLE_MAP.get(selectedYAxisMetric) ?? selectedYAxisMetric,
+        metric_group: metricGroupMap.get(selectedYAxisMetric) ?? 'Unknown',
       });
     }
   };
 
   const handleModelChange = (value: Model) => {
     setSelectedModel(value);
-    // A deliberate pick moves the URL onto the model's indexable subroute in
-    // place — no reload, RSC refetch, or scroll reset. Kept out of the model
-    // state effects on purpose: programmatic changes (back-nav restore,
-    // config load, auto-switch) must not rewrite the URL, and event handlers
-    // are immune to Strict Mode's double-invoked effects. `g_model` is
-    // dropped because the path now carries the model — a lingering share
-    // param would override it on the next snapshot read.
     const target = inferenceModelRouteForSelection(window.location.pathname, value);
-    if (target !== null) replaceRouterPathname(target, ['g_model']);
+    // Re-picking the shown model only canonicalizes a bare /inference path. That is not a new page.
+    if (target !== null) {
+      replaceRouterPathname(target, ['g_model'], { pageview: value !== selectedModel });
+    }
     track('inference_model_selected', {
+      ...analyticsContext,
       model: value,
     });
-    // Track combined after state update
     setTimeout(trackCombinedFilters, 0);
   };
 
   const handleSequenceChange = (value: Sequence) => {
     setSelectedSequence(value);
     track('inference_sequence_selected', {
+      ...analyticsContext,
       sequence: value,
     });
     setTimeout(trackCombinedFilters, 0);
@@ -402,6 +392,7 @@ export default function ChartControls({
   const handlePrecisionChange = (value: string[]) => {
     setSelectedPrecisions(value);
     track('inference_precision_selected', {
+      ...analyticsContext,
       precision: value.join(','),
     });
     setTimeout(trackCombinedFilters, 0);
@@ -410,6 +401,7 @@ export default function ChartControls({
   const handleYAxisMetricChange = (value: string) => {
     setSelectedYAxisMetric(value);
     track('inference_y_axis_metric_selected', {
+      ...analyticsContext,
       metric: value,
       metric_label: METRIC_TITLE_MAP.get(value) ?? value,
       metric_group: metricGroupMap.get(value) ?? 'Unknown',
@@ -420,6 +412,7 @@ export default function ChartControls({
   const handleGPUChange = (value: string[]) => {
     setSelectedGPUs(value);
     track('inference_gpu_selected', {
+      ...analyticsContext,
       gpus: value.join(','),
     });
     setTimeout(trackCombinedFilters, 0);
@@ -428,6 +421,7 @@ export default function ChartControls({
   const handleXAxisMetricChange = (value: string) => {
     setSelectedXAxisMetric(value);
     track('inference_x_axis_metric_selected', {
+      ...analyticsContext,
       metric: value,
     });
   };
@@ -435,38 +429,60 @@ export default function ChartControls({
   const handleScaleTypeChange = (value: 'auto' | 'linear' | 'log') => {
     setScaleType(value);
     track('inference_scale_type_selected', {
-      scaleType: value,
+      ...analyticsContext,
+      scale_type: value,
     });
   };
 
-  const isInputMetric = (() => {
-    const chartDef = graphs[0]?.chartDefinition;
-    if (!chartDef) return false;
-    const titleKey = `${selectedYAxisMetric}_title` as keyof typeof chartDef;
-    const title = (chartDef[titleKey] as string) || '';
-    return title.toLowerCase().includes('input');
-  })();
+  const selectedIsInputMetric = isInputMetric(selectedYAxisMetric);
 
   const handleDateRangeChange = (range: { startDate: string; endDate: string }) => {
     setSelectedDateRange(range);
     track('inference_date_range_changed', {
-      startDate: range.startDate,
-      endDate: range.endDate,
+      start_date: range.startDate,
+      end_date: range.endDate,
     });
   };
 
   const secondaryCount =
-    (selectedYAxisMetric === defaultYAxisMetric(quickFilters.power) ? 0 : 1) +
+    // PowerX picks the metric through its tabs; its Count, Per, Show as, Scope,
+    // Power statistic and Rated boundaries controls count instead.
+    (powerXSurface
+      ? powerXChangedCount({ metric: selectedYAxisMetric, compare: powerCompare })
+      : selectedYAxisMetric === DEFAULT_Y_AXIS_METRIC
+        ? 0
+        : 1) +
     (showXAxisMode && selectedXAxisMode !== defaultXAxisMode ? 1 : 0) +
     (selectedXAxisMetric === undefined || selectedXAxisMetric === 'p90_ttft' ? 0 : 1) +
     (scaleType === 'auto' ? 0 : 1) +
     (selectedGPUs.length > 0 ? 1 : 0) +
     (selectedDateRange.startDate && selectedDateRange.endDate ? 1 : 0);
+  const tokenBasisVisible =
+    mounted &&
+    featureGateUnlocked &&
+    tcoSource === 'inference' &&
+    selectedSequence === Sequence.AgenticTraces &&
+    countsInputTokens(selectedYAxisMetric);
   const tcoVisible =
     mounted &&
     showTcoBasis &&
     isCostMetric(selectedYAxisMetric) &&
     showsTcoBasisSelector(selectedModel, selectedSequence);
+  // Chart Config columns: the X-Axis Metric column is 11rem, or 18rem on agentic traces
+  // where its options are longer, and the rest of the row shares what is left. PowerX
+  // keeps the same first column and splits the rest in two, so its Count toggle (two
+  // cells) and then Per or Show as, Scope, Power statistic and Rated boundaries (one
+  // cell each) flow left to right in rows of three. Below sm every cell is a row.
+  const xAxisWide = selectedSequence === Sequence.AgenticTraces;
+  const chartConfigGridClass = powerXSurface
+    ? xAxisWide
+      ? 'sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)_minmax(0,1fr)]'
+      : 'sm:grid-cols-[11rem_minmax(0,1fr)_minmax(0,1fr)]'
+    : showXAxisMode
+      ? xAxisWide
+        ? 'sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]'
+        : 'sm:grid-cols-[11rem_minmax(0,1fr)]'
+      : 'sm:grid-cols-2';
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -488,23 +504,27 @@ export default function ChartControls({
                 newModels={AGENTX_NEW_MODEL_DISPLAY_NAMES}
               />
             </div>
-            <ScenarioSelector
-              value={selectedSequence}
-              onChange={handleSequenceChange}
-              open={openDropdown === 'sequence'}
-              onOpenChange={handleDropdownOpenChange('sequence')}
-              availableSequences={availableSequences}
-              model={selectedModel}
-              data-testid="scenario-selector"
-            />
-            <PrecisionSelector
-              value={selectedPrecisions}
-              onChange={handlePrecisionChange}
-              open={openDropdown === 'precision'}
-              onOpenChange={handleDropdownOpenChange('precision')}
-              availablePrecisions={availablePrecisions}
-              data-testid="precision-multiselect"
-            />
+            <div className="min-w-0">
+              <ScenarioSelector
+                value={selectedSequence}
+                onChange={handleSequenceChange}
+                open={openDropdown === 'sequence'}
+                onOpenChange={handleDropdownOpenChange('sequence')}
+                availableSequences={availableSequences}
+                model={selectedModel}
+                data-testid="scenario-selector"
+              />
+            </div>
+            <div className="min-w-0">
+              <PrecisionSelector
+                value={selectedPrecisions}
+                onChange={handlePrecisionChange}
+                open={openDropdown === 'precision'}
+                onOpenChange={handleDropdownOpenChange('precision')}
+                availablePrecisions={availablePrecisions}
+                data-testid="precision-multiselect"
+              />
+            </div>
           </div>
         </ControlPanel>
 
@@ -520,17 +540,29 @@ export default function ChartControls({
             className={showXAxisMode ? 'lg:col-span-2' : undefined}
           >
             <div
-              className={`grid min-w-0 items-start gap-3 ${showXAxisMode ? (selectedSequence === Sequence.AgenticTraces ? 'sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]' : 'sm:grid-cols-[11rem_minmax(0,1fr)]') : 'sm:grid-cols-2'} ${tcoVisible && showXAxisMode ? 'xl:grid-cols-[11rem_minmax(0,1fr)_10rem]' : ''}`}
+              className={`grid min-w-0 items-start gap-3 ${chartConfigGridClass} ${tcoVisible && showXAxisMode && !powerXSurface ? 'xl:grid-cols-[11rem_minmax(0,1fr)_10rem]' : ''}`}
             >
-              {showXAxisMode && <XAxisModeSelector />}
+              {powerXSurface && powerXControls
+                ? powerXControls({
+                    // The More fold is one column: the cell fills it like Count and Per do.
+                    xAxisSelector: showXAxisMode ? (
+                      <XAxisModeSelector className="max-md:max-w-none" />
+                    ) : null,
+                    xAxisChanged: showXAxisMode && selectedXAxisMode !== defaultXAxisMode,
+                  })
+                : showXAxisMode && <XAxisModeSelector />}
               <div
                 className={`flex min-w-0 flex-col space-y-1.5 ${showXAxisMode ? '' : 'sm:col-span-2'}`}
+                hidden={powerXSurface}
               >
-                <LabelWithTooltip
-                  htmlFor="y-axis-select"
-                  label={t.yAxisMetric}
-                  tooltip={t.yAxisMetricTooltip}
-                />
+                <div className="flex items-center justify-between gap-2">
+                  <LabelWithTooltip
+                    htmlFor="y-axis-select"
+                    label={t.yAxisMetric}
+                    tooltip={t.yAxisMetricTooltip}
+                  />
+                  {tokenBasisVisible && <TokenBasisToggle />}
+                </div>
                 <SearchableSelect
                   triggerId="y-axis-select"
                   triggerTestId="yaxis-metric-selector"
@@ -546,7 +578,7 @@ export default function ChartControls({
                     label: g.groupLabel,
                     options: [
                       ...g.options.filter((option) => getMeasuredMetricConfig(option.value)),
-                      ...searchableYAxisOptions[index].options,
+                      ...pickerYAxisOptions[index].options,
                     ],
                   }))}
                   searchPlaceholder={locale === 'zh' ? '搜索…' : undefined}
@@ -556,7 +588,7 @@ export default function ChartControls({
                 />
               </div>
 
-              {mounted && getMeasuredMetricConfig(selectedYAxisMetric) && (
+              {mounted && showsMeasuredMetrics && getMeasuredMetricConfig(selectedYAxisMetric) && (
                 <MeasuredMetricControls
                   metric={selectedYAxisMetric}
                   onChange={handleYAxisMetricChange}
@@ -583,7 +615,10 @@ export default function ChartControls({
                     value={tokenRevenuePriceSource}
                     onValueChange={(value) => {
                       setTokenRevenuePriceSource(value as 'normalized' | 'openrouter');
-                      track('inference_token_revenue_price_source_selected', { source: value });
+                      track('inference_token_revenue_price_source_selected', {
+                        ...analyticsContext,
+                        source: value,
+                      });
                     }}
                   >
                     <SelectTrigger
@@ -624,7 +659,7 @@ export default function ChartControls({
                           onClick={() => {
                             track('inference_openrouter_pricing_opened', {
                               model: selectedModel,
-                              openRouterModelId,
+                              openrouter_model_id: openRouterModelId,
                             });
                           }}
                         >
@@ -638,7 +673,7 @@ export default function ChartControls({
 
               {!showXAxisMode &&
                 graphs.some((g) => g.chartDefinition?.chartType === 'interactivity') &&
-                isInputMetric &&
+                selectedIsInputMetric &&
                 selectedSequence !== Sequence.AgenticTraces && (
                   <div className="flex flex-col space-y-1.5 lg:col-span-1">
                     <LabelWithTooltip
@@ -665,7 +700,7 @@ export default function ChartControls({
                 )}
 
               {graphs.some((g) => g.chartDefinition?.chartType === 'interactivity') &&
-                isInputMetric && (
+                selectedIsInputMetric && (
                   <div className="flex flex-col space-y-1.5 lg:col-span-1">
                     <LabelWithTooltip
                       htmlFor="scale-type-select"

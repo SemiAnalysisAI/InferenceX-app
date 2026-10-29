@@ -1,7 +1,4 @@
-/**
- * Pure utility functions for legend filtering and sorting.
- * Used by ChartLegend component for sidebar mode processing.
- */
+import { matchesSearch } from '@/lib/shared/search-match';
 
 interface LegendItem {
   label: string;
@@ -9,10 +6,6 @@ interface LegendItem {
   isActive: boolean;
 }
 
-/**
- * Filters legend items by search query (case-insensitive, matches label and title),
- * then optionally sorts active items to the top while preserving relative order.
- */
 export function filterAndSortLegendItems<T extends LegendItem>(
   items: T[],
   searchQuery: string,
@@ -20,12 +13,11 @@ export function filterAndSortLegendItems<T extends LegendItem>(
 ): T[] {
   let result = items;
 
-  const query = searchQuery.trim().toLowerCase();
+  const query = searchQuery.trim();
   if (query) {
     result = result.filter(
       (item) =>
-        item.label.toLowerCase().includes(query) ||
-        (item.title && item.title.toLowerCase().includes(query)),
+        matchesSearch(item.label, query) || (item.title && matchesSearch(item.title, query)),
     );
   }
 

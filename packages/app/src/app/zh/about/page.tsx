@@ -7,7 +7,8 @@ import { AgentXFaq } from '@/components/about/agentx-faq';
 import { buildFaqJsonLd, FaqList } from '@/components/about/faq';
 import { PromoVideo } from '@/components/about/promo-video';
 import { JsonLd } from '@/components/seo/json-ld';
-import { zhAlternates, ZH_OG_LOCALE, ZH_LANG_TAG } from '@/lib/i18n/i18n';
+import { zhAlternates, ZH_LANG_TAG } from '@/lib/i18n/i18n';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 import { GITHUB_OWNER, GITHUB_REPO, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const faqJsonLd = buildFaqJsonLd(FAQ_ITEMS_ZH, ZH_LANG_TAG);
@@ -19,16 +20,12 @@ export const metadata: Metadata = {
   title: '关于',
   description: ABOUT_DESCRIPTION,
   alternates: zhAlternates('/about'),
-  openGraph: {
+  ...socialMetadata({
     title: '关于 | InferenceX',
     description: ABOUT_DESCRIPTION,
     url: `${SITE_URL}/zh/about`,
-    locale: ZH_OG_LOCALE,
-  },
-  twitter: {
-    title: '关于 | InferenceX',
-    description: ABOUT_DESCRIPTION,
-  },
+    locale: 'zh',
+  }),
 };
 
 export default function AboutPageZh() {
@@ -42,9 +39,9 @@ export default function AboutPageZh() {
 
         <section>
           <Card>
-            <h2 className="text-lg font-semibold mb-2">
+            <h1 className="text-lg font-semibold mb-2">
               持续运行的开源智能体推理基准测试，受到万亿美元级、吉瓦规模 Token 工厂运营方的信赖
-            </h2>
+            </h1>
             <p className="text-muted-foreground mb-2">
               全球迈向 AGI
               的进程呈指数级加速，软件开发和模型发布也日新月异。静态基准测试很快就会过时；参与者提交的软件镜像往往是为基准测试专门构建的，无法反映真实应用场景中的性能。

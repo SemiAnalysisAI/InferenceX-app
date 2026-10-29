@@ -47,6 +47,10 @@ operation.
 
 ## Read published benchmark results
 
+For interactivity comparisons and performance-over-time charts, first read
+[AgentX P90 interactivity](agentic-interactivity.md). The dashboard operating point
+uses reciprocal P90 full-response ITL, not the median or P90 of token rates.
+
 Muse Spark Open uses display model `Muse-Spark-Open`, raw DB key
 `musespark`, and dashboard route `/inference/muse-spark-open` (also under `/zh`).
 Use `model=Muse-Spark-Open` for benchmark reads and the inference view API,
@@ -55,6 +59,13 @@ links open the canonical dashboard without an `unofficialRun` parameter.
 Unofficial runs remain available through explicitly supplied overlay links; they
 do not populate the published benchmark API. Preserve empty API responses as no
 published data; do not substitute another model.
+
+MiniMax M3.1 Flash uses display model `MiniMax-M3.1-Flash`, raw DB key
+`minimaxm31flash`, and dashboard route `/inference/minimax-m31-flash` (also under
+`/zh`). It is benchmarked on AgentX only, with the checkpoint's built-in DSpark
+drafter, which the API reports as spec method `mtp`. Use
+`model=MiniMax-M3.1-Flash` for benchmark reads and the inference view API, with
+`sequence=agentic-traces` for the latter. Its rows never fall back to `MiniMax-M3`.
 
 Installed raw recipes use `scripts/capture-response.mjs`, which applies the shared
 request-header helper for version attribution. Set `INFERENCEX_TELEMETRY=0` or

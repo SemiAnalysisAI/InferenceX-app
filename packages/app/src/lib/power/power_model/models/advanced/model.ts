@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** The advanced implementation delegates IT accounting to its configured cluster. */
 
 import {
   type ITPowerBreakdown,

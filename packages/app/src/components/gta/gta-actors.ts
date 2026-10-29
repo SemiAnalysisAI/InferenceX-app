@@ -1,9 +1,5 @@
 import * as T from 'three';
 
-// Vehicle preparation. GTADevs car exports ship without wheels, so the axle
-// positions are measured from the wheel-arch cut-outs in the body and
-// procedural tyres and alloy rims are fitted.
-
 export interface WheelSpot {
   x: number;
   y: number;
@@ -35,14 +31,12 @@ function materialsOf(m: T.Mesh) {
   return Array.isArray(m.material) ? m.material : [m.material];
 }
 
-/** Wraps a loaded car so it faces -z, sits on y = 0 and has measured wheels. */
 export function prepareCar(scene: T.Object3D, match?: CarTemplate): CarTemplate {
   const inner = scene;
   if (match) return matchCar(inner, match);
   const box = new T.Box3().setFromObject(inner);
   const size = box.getSize(new T.Vector3());
   const center = box.getCenter(new T.Vector3());
-  // Some exports face along x; rotate so the long axis is z.
   if (size.x > size.z * 1.15) {
     inner.rotation.y += Math.PI / 2;
     inner.updateMatrixWorld(true);
@@ -55,7 +49,6 @@ export function prepareCar(scene: T.Object3D, match?: CarTemplate): CarTemplate 
   const list = meshes(inner);
   const halfW = size.x / 2,
     halfL = size.z / 2;
-  // Profile of the lowest outer-side vertex along the car's length.
   const bins = 120;
   const low = new Float32Array(bins).fill(Infinity);
   for (const m of list) {
@@ -112,7 +105,6 @@ export function prepareCar(scene: T.Object3D, match?: CarTemplate): CarTemplate 
     front = undefined;
     rear = undefined;
   }
-  // Raise the body so the tyres touch the ground under the arches.
   const archTop = front && rear ? Math.min(front.top, rear.top) : sill + r * 1.2;
   const lift = Math.max(0, r * 2 + 0.03 - archTop);
   inner.position.y += lift;
@@ -124,7 +116,6 @@ export function prepareCar(scene: T.Object3D, match?: CarTemplate): CarTemplate 
     { x: wx, y: r, z: rz, r, w },
     { x: -wx, y: r, z: rz, r, w },
   ];
-  // Body paint: the opaque material with the most vertices on the outer skin.
   const tris = new Map<T.Material, number>();
   for (const m of list) {
     m.castShadow = true;
@@ -169,7 +160,6 @@ export function prepareCar(scene: T.Object3D, match?: CarTemplate): CarTemplate 
   };
 }
 
-/** Apply a full-detail template's placement to its low-poly LOD. */
 function matchCar(inner: T.Object3D, match: CarTemplate): CarTemplate {
   inner.position.copy(match.inner.position);
   inner.rotation.y = match.inner.rotation;
@@ -193,7 +183,6 @@ function matchCar(inner: T.Object3D, match: CarTemplate): CarTemplate {
   return { ...match, root, paint };
 }
 
-/** Unit wheel (radius 1, width 1) lying on the x axis: tyre and rim geometries. */
 export function wheelGeometries() {
   const profile: T.Vector2[] = [];
   const rr = 0.68;
@@ -258,7 +247,6 @@ export const RIM_MAT = new T.MeshStandardMaterial({
 
 const WHEELS = wheelGeometries();
 
-/** A drivable or traffic car instance with its own paint and spinning wheels. */
 export function instantiateCar(t: CarTemplate, paint?: T.Color) {
   const root = t.root.clone(true);
   if (paint) {
@@ -312,7 +300,6 @@ interface Part {
   paint: boolean;
 }
 
-/** Instanced copies of a template (parked cars, props, trees) with an optional paint colour. */
 export class InstancedSet {
   readonly meshes: T.InstancedMesh[] = [];
   private readonly parts: Part[] = [];

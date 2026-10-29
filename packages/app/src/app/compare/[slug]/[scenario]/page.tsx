@@ -8,20 +8,16 @@ import {
 
 import { buildCompareMetadata, renderComparePage } from '../page';
 
-/**
- * `/compare/<slug>/<scenario>` — the same comparison with its workload pinned
- * by the path instead of `?i_seq=`. Both routes render through the parent's
- * exported body, so the two URLs cannot drift.
- */
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
+
+export function generateStaticParams(): { scenario: string }[] {
+  return [];
+}
 
 interface Props {
   params: Promise<{ slug: string; scenario: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-/** Reject unknown segments here rather than silently falling back to the
- *  pair's default, which would serve 200s for arbitrary junk paths. */
 function assertScenario(scenario: string): ScenarioSegment {
   if (!sequenceForScenarioSegment(scenario)) notFound();
   return scenario.toLowerCase() as ScenarioSegment;
@@ -32,9 +28,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return buildCompareMetadata(slug, { scenarioSegment: assertScenario(scenario) });
 }
 
-export default async function CompareScenarioPage({ params, searchParams }: Props) {
+export default async function CompareScenarioPage({ params }: Props) {
   const { slug, scenario } = await params;
-  return renderComparePage(slug, await searchParams, {
-    scenarioSegment: assertScenario(scenario),
-  });
+  return renderComparePage(slug, { scenarioSegment: assertScenario(scenario) });
 }

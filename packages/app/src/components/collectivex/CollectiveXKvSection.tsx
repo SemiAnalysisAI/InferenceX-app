@@ -74,7 +74,6 @@ const STRINGS = {
     bulkBaseline: 'Bulk Contiguous Baseline',
     summary: (cases: number, measured: number) => `${cases} cases · ${measured} measured · `,
     headers: {
-      run: 'Run',
       backend: 'Backend',
       fabric: 'Fabric',
       workload: 'Workload',
@@ -132,7 +131,6 @@ const STRINGS = {
     bulkBaseline: 'Bulk 连续传输基线',
     summary: (cases: number, measured: number) => `${cases} 个用例 · 已测 ${measured} 个 · `,
     headers: {
-      run: '运行',
       backend: '后端',
       fabric: '互联方式',
       workload: '工作负载',
@@ -187,8 +185,6 @@ export function CollectiveXKvSection({
   runIndexById,
 }: {
   datasets: CollectiveXDataset[];
-  /** Selection-order style index per run id, shared with the EP explorer so
-   * the same run keeps the same dash pattern on both charts. */
   runIndexById: ReadonlyMap<string, number>;
 }) {
   const locale = useLocale();
@@ -197,26 +193,16 @@ export function CollectiveXKvSection({
   const [xAxis, setXAxis] = useState<CollectiveXKvChartSelection['x'] | 'frontier' | 'overlap'>(
     'batch',
   );
-  // The page ladder lives in the data (the sweep moved from 64/16 to the
-  // production block 256); a stored choice the current rows no longer carry
-  // falls back to the largest measured page rather than an empty chart.
   const [pageChoice, setPageChoice] = useState<string | null>(null);
   const [op, setOp] = useState<CollectiveXKvChartSelection['op']>('pull');
-  // Overlap view only: 'max' normalizes each series at its own largest
-  // measured ISL; a numeric string pins every series to that ISL.
   const [overlapIsl, setOverlapIsl] = useState<string>('max');
   const [xLogScale, setXLogScale] = useState(true);
   const [yLogScale, setYLogScale] = useState(true);
   const [showWireCeilings, setShowWireCeilings] = useState(true);
-  // Legend toggles are keyed to the current series set: when checked runs
-  // change, the stored selection is stale and every series starts active
-  // again (the EP explorer resets the same way).
   const [seriesSelection, setSeriesSelection] = useState<{
     ids: Set<string>;
     signature: string;
   } | null>(null);
-  // Default open: with the closable sidebar panel, `false` now means fully
-  // hidden (reopen button only), so the legend must start expanded.
   const [legendExpanded, setLegendExpanded] = useState(true);
 
   const rows = useMemo<CollectiveXKvRunCase[]>(
@@ -236,8 +222,6 @@ export function CollectiveXKvSection({
     pageChoice !== null && pageValues.includes(Number(pageChoice))
       ? Number(pageChoice)
       : (pageValues[0] ?? 64);
-  // Table cells always read the ladder's top page (and the runner-up when one
-  // exists) so the columns stay stable while the chart toggle moves.
   const primaryPage = pageValues[0] ?? 64;
   const secondaryPage = pageValues[1];
   const seriesSignature = useMemo(
@@ -259,10 +243,6 @@ export function CollectiveXKvSection({
     () => measuredCases.filter((kase) => activeIds.has(`${kase.run_id}:${kase.case_id}`)),
     [activeIds, measuredCases],
   );
-  // ISL options come from all measured cases (not the legend-active subset)
-  // so the selector is stable while series are toggled. A stored value that
-  // no longer exists for the current direction and page size falls back to
-  // 'max' rather than an empty chart.
   const overlapIslValues = useMemo(
     () => collectiveXKvIslValues(measuredCases, { op, pageTokens }),
     [measuredCases, op, pageTokens],
@@ -297,7 +277,7 @@ export function CollectiveXKvSection({
           color: colors[collectiveXKvColorKey(kase)] ?? 'var(--muted-foreground)',
           lineDasharray: collectiveXRunDasharray(kase.run_index),
           isActive: activeIds.has(seriesId),
-          title: `#${kase.run_id} · ${kase.workload} · ${kase.topology.topology_class}`,
+          title: `${kase.workload} · ${kase.topology.topology_class}`,
           onClick: () => {
             const next = new Set(activeIds);
             if (next.has(seriesId)) next.delete(seriesId);
@@ -312,12 +292,6 @@ export function CollectiveXKvSection({
 
   const columns = useMemo<DataTableColumn<CollectiveXKvRunCase>[]>(
     () => [
-      {
-        header: strings.headers.run,
-        cell: (row) => <span className="font-mono text-xs">#{row.run_id}</span>,
-        sortValue: (row) => Number(row.run_id),
-        className: 'whitespace-nowrap',
-      },
       { header: 'SKU', cell: (row) => collectiveXSkuLabel(row.sku), sortValue: (row) => row.sku },
       {
         header: strings.headers.backend,
@@ -489,7 +463,10 @@ export function CollectiveXKvSection({
                 <Label className="text-xs text-muted-foreground">{strings.pageControl}</Label>
                 <SegmentedToggle
                   value={String(pageTokens)}
-                  onValueChange={setPageChoice}
+                  onValueChange={(value) => {
+                    track('collectivex_kv_page_tokens_changed', { page_tokens: Number(value) });
+                    setPageChoice(value);
+                  }}
                   ariaLabel={strings.pageAriaLabel}
                   testId="collectivex-kv-page-toggle"
                   options={pageValues.map((value) => ({
@@ -503,7 +480,10 @@ export function CollectiveXKvSection({
               <Label className="text-xs text-muted-foreground">{strings.opControl}</Label>
               <SegmentedToggle
                 value={op}
-                onValueChange={setOp}
+                onValueChange={(value) => {
+                  track('collectivex_kv_op_changed', { op: value });
+                  setOp(value);
+                }}
                 ariaLabel={strings.opAriaLabel}
                 testId="collectivex-kv-op-toggle"
                 options={[
@@ -595,7 +575,7 @@ export function CollectiveXKvSection({
                     isLegendExpanded={legendExpanded}
                     onExpandedChange={(expanded) => {
                       setLegendExpanded(expanded);
-                      track('collectivex_kv_legend_expanded', { expanded });
+                      track('collectivex_kv_legend_expanded', { enabled: expanded });
                     }}
                   />
                 }
@@ -627,7 +607,7 @@ export function CollectiveXKvSection({
                     isLegendExpanded={legendExpanded}
                     onExpandedChange={(expanded) => {
                       setLegendExpanded(expanded);
-                      track('collectivex_kv_legend_expanded', { expanded });
+                      track('collectivex_kv_legend_expanded', { enabled: expanded });
                     }}
                   />
                 }

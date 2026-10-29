@@ -1,6 +1,3 @@
-// Merged from basic.cy.ts, navigation.cy.ts, theme-toggle.cy.ts, and land-acknowledgement.cy.ts
-// to reduce per-file Cypress startup overhead (~500ms per file)
-
 describe('Page Load & Navigation', () => {
   it('page renders without JavaScript errors', () => {
     const errors: string[] = [];
@@ -11,10 +8,9 @@ describe('Page Load & Navigation', () => {
       if (!isKnown) {
         errors.push(err.message);
       }
-      return false; // prevent Cypress from failing the test
+      return false;
     });
 
-    // Re-visit to capture errors from a fresh load
     cy.visit('/');
     cy.get('[data-testid="header"]').should('exist');
     cy.get('[data-testid="footer"]').should('exist');
@@ -93,9 +89,6 @@ describe('Page Load & Navigation', () => {
   });
 });
 
-// Toggle visibility, click behavior, and aria-label are covered by
-// cypress/component/mode-toggle.cy.tsx. Only the reload-persistence test
-// requires a full page load (true e2e concern).
 describe('Splash text', () => {
   it('announces AgentX on the landing page in both light and dark mode', () => {
     cy.visit('/', {
