@@ -1256,7 +1256,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/operatorx/hardware.ts',
-    sourceSha256: 'acc8180f8e64c04c7a62072379e8262434764d5438796f2590704734d691aa1e',
+    sourceSha256: 'aefd67d99d91f23ef812ea09501603a7e6cc8b228d21d8cf2aa006f405f8c4ff',
     reviewArea: {
       en: 'OperatorX Ascend reference values, provenance and assumed bandwidth shared with UI normalization.',
       zh: 'OperatorX Ascend 参考值、来源及假定带宽，与 UI 归一化共用。',
