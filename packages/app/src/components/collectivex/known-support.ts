@@ -84,8 +84,8 @@ export const COLLECTIVEX_KNOWN_FOOTNOTES: Record<string, CollectiveXKnownFootnot
     zh: 'vLLM 仅在跨节点时运行 MoRI 低延迟模式（InterNodeV1LL），没有单节点低延迟 Kernel，因此不测量此配置。',
   },
   'uccl-amd-ll-fp8': {
-    en: 'Low-latency EP16 works in BF16. FP8 failed the correctness check on MI300X and has not yet run on MI325X.',
-    zh: '低延迟 EP16 的 BF16 可用。FP8 在 MI300X 上未通过正确性检查，在 MI325X 上尚未运行。',
+    en: 'Low-latency EP16 works in BF16 and FP8. FP8 sometimes hangs in its first two-node dispatch on these GPUs (every MI325X attempt so far, one of three on MI300X), so MI325X FP8 has no result yet.',
+    zh: '低延迟 EP16 在 BF16 与 FP8 下均可用。FP8 在这些 GPU 上偶尔会在首次双节点 dispatch 时卡住（目前 MI325X 每次尝试均卡住，MI300X 三次中一次），因此 MI325X 的 FP8 尚无结果。',
   },
   'uccl-not-brought-up': {
     en: 'Not brought up on this pool (untested compute capability or no scale-out NIC path for the CPU proxy).',
