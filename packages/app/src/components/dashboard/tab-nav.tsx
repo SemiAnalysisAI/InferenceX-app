@@ -31,6 +31,7 @@ import { useClientRouteSearch } from '@/hooks/useClientSearch';
 import { profitRoutePathname } from '@/lib/routing/profit-estimator-routes';
 import { readUrlParams } from '@/lib/routing/url-state';
 import { routeModelForPathname } from '@/lib/routing/model-routes';
+import { inferenceModelForPathname } from '@/lib/routing/inference-model-slug';
 import { cn } from '@/lib/shared/utils';
 
 const TAB_LABELS_EN: Record<DashboardRouteKey, string> = {
@@ -147,11 +148,14 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
   useEffect(() => {
     // The bare entry now redirects, so tab returns must name the retained selection.
     const pathModel = dashboardShellCapabilitiesForPathname(pathname).providers.globalFilters
-      ? routeModelForPathname(pathname)
+      ? (inferenceModelForPathname(pathname) ?? routeModelForPathname(pathname))
       : undefined;
-    const model = readUrlParams().g_model ?? pathModel;
+    const model =
+      current === 'profit-estimator' || current === 'profit-estimator-per-gigawatt'
+        ? undefined
+        : (readUrlParams().g_model ?? pathModel);
     setRetainedModel((previous) => model ?? previous);
-  }, [pathname, search]);
+  }, [current, pathname, search]);
   const unofficialIds = useMemo(() => {
     for (const [key, value] of new URLSearchParams(search)) {
       if (/^unofficialruns?$/iu.test(key) && value) return value;

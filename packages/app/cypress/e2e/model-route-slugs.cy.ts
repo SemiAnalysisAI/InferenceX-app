@@ -26,7 +26,9 @@ describe('Per-model dashboard routes', () => {
       cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek V4 Pro');
       cy.get('[data-testid="tab-trigger-evaluation"]').click();
       cy.location('pathname').should('eq', `${locale}/evaluation`);
-      cy.get('[data-testid="tab-trigger-inference"]').click();
+      cy.get('[data-testid="tab-trigger-inference"]')
+        .should('have.attr', 'href', `${locale}/inference?g_model=DeepSeek-V4-Pro`)
+        .click();
       cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek V4 Pro');
     });
 
