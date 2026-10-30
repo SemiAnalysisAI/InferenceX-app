@@ -1,7 +1,7 @@
--- Append-only inheritance compares images per topology line instead of per
--- curve. An AgentX curve spans AGG/disagg, speculative-decoding and offload
--- lines that may run different images, so the per-curve rule never let a
--- mixed-image append-only run extend its predecessor. Fixed-sequence scopes
+-- Append-only inheritance compares images per line instead of per curve. An
+-- AgentX curve spans AGG/disagg and offload lines that may run different images,
+-- so the per-curve rule never let a mixed-image append-only run extend its
+-- predecessor. Lines match InferenceX's append-only check. Fixed-sequence scopes
 -- hold one line and keep their previous rule. packages/db/src/queries/benchmarks.ts
 -- runs the same run_line_images query inline.
 drop materialized view latest_benchmarks;
@@ -18,8 +18,7 @@ with recursive run_line_images as (
     select br.workflow_run_id, br.date, br.image,
       benchmark_curve_scope(c.model, c.hardware, c.framework, c.precision,
         br.benchmark_type, br.isl, br.osl, c.spec_method, c.disagg, br.offload_mode) as curve_scope,
-      benchmark_curve_scope(c.model, c.hardware, c.framework, c.precision,
-        'single_turn', br.isl, br.osl, c.spec_method, c.disagg, br.offload_mode)::text as line
+      jsonb_build_array(c.disagg, coalesce(br.offload_mode, 'off'))::text as line
     from benchmark_results br
     join configs c on c.id = br.config_id
     where br.error is null

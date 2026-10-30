@@ -134,10 +134,10 @@ interface RecursiveBenchmarkPlan {
   resultOrder: SqlPiece;
 }
 
-// An AgentX curve spans topology lines that may run different images, so append-only
-// runs inherit only while every shared line keeps its image. `line_images` is NULL
-// when a line has a missing or second image; a line is benchmark_curve_scope without
-// the AgentX fold. Computed inline so reads do not depend on migration 020.
+// An AgentX curve spans AGG/disagg and offload lines that may run different images, so
+// append-only runs inherit only while every shared line keeps its image, as InferenceX's
+// append-only check requires. `line_images` is NULL when a line has a missing or second
+// image. Computed inline so reads do not depend on migration 020.
 function curveRunBase(modelKeys: string[], runLineFilter: SqlPiece): SqlPiece {
   return sqlPiece`
     run_line_images AS (
@@ -151,8 +151,7 @@ function curveRunBase(modelKeys: string[], runLineFilter: SqlPiece): SqlPiece {
         SELECT br.workflow_run_id, br.date, br.image,
           benchmark_curve_scope(c.model, c.hardware, c.framework, c.precision,
             br.benchmark_type, br.isl, br.osl, c.spec_method, c.disagg, br.offload_mode) AS curve_scope,
-          benchmark_curve_scope(c.model, c.hardware, c.framework, c.precision,
-            'single_turn', br.isl, br.osl, c.spec_method, c.disagg, br.offload_mode)::text AS line
+          jsonb_build_array(c.disagg, coalesce(br.offload_mode, 'off'))::text AS line
         FROM benchmark_results br
         JOIN configs c ON c.id = br.config_id
         WHERE br.error IS NULL AND c.model = ANY(${modelKeys})
@@ -383,9 +382,9 @@ function queryRecursiveBenchmarks(
  *
  * Selection unit is the LINE, not the point. Normally each line comes entirely from
  * its newest workflow run. Runs explicitly marked append-only are the sole exception:
- * their new points extend the immediately preceding curve when every topology line
- * both runs contain keeps its image, including a consecutive chain of append-only
- * runs back to the nearest full snapshot.
+ * their new points extend the immediately preceding curve while every shared line keeps
+ * its image, including a consecutive chain of append-only runs back to the nearest full
+ * snapshot.
  *
  * The frontend filters by sequence client-side. This eliminates API round-trips when
  * switching sequences — the data is already cached by React Query.
@@ -472,8 +471,8 @@ export async function getLatestBenchmarks(
 /**
  * Fetch the curve snapshot represented by one workflow run. Ordinary runs return
  * exactly their own points; append-only runs also include the immediately preceding
- * curve chain whose shared topology lines keep their images. Used by GPU comparison
- * for same-day run snapshots.
+ * curve chain whose shared lines keep their images. Used by GPU comparison for
+ * same-day run snapshots.
  */
 export async function getBenchmarksForRun(
   sql: DbClient,

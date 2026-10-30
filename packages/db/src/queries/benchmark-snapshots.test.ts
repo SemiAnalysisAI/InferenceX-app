@@ -70,7 +70,8 @@ async function seed() {
     VALUES (1, 'glm5.2', 'gb300', 'dynamo-trt', 'fp4', 'mtp', false, 8, 8, 8, 8),
       (2, 'glm5.2', 'gb300', 'dynamo-trt', 'fp4', 'mtp', true, 4, 8, 4, 8),
       (3, 'glm5.2', 'gb300', 'sglang', 'fp4', 'none', false, 8, 8, 8, 8),
-      (4, 'glm5.2', 'gb300', 'dynamo-trt', 'fp8', 'none', false, 8, 8, 8, 8);`);
+      (4, 'glm5.2', 'gb300', 'dynamo-trt', 'fp8', 'none', false, 8, 8, 8, 8),
+      (5, 'glm5.2', 'gb300', 'dynamo-trt', 'fp4', 'none', false, 8, 8, 8, 8);`);
   await addRun(1, { githubId: 33219706372 });
   await addPoint(1, 1, 1, 1, { offload: 'off', image: 'trt:rc22' });
   await addRun(11, { githubId: 34413290524 });
@@ -412,6 +413,14 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
     await addPoint(11, 14, 1, 16, { image: 'agg:x' });
     expect(ids(await getBenchmarksForRun(sql, 'glm5.2', 14))).toEqual([10, 11]);
     await expectSameCurve('an AGG image change two runs back stops the chain');
+  });
+  it('treats AgentX speculative-decoding variants as one image line', async () => {
+    await addRun(12);
+    await addPoint(8, 12, 1, 1, { image: 'agg:a' });
+    await addRun(13, { append: true });
+    await addPoint(9, 13, 5, 4, { image: 'agg:b' });
+    expect(ids(await getBenchmarksForRun(sql, 'glm5.2', 13))).toEqual([9]);
+    await expectSameCurve('a non-MTP image change stops the chain');
   });
   it('preserves accepted rows regardless of overall workflow conclusion', async () => {
     await addRun(12, { conclusion: 'failure' });

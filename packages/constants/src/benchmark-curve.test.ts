@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  benchmarkCurveLine,
-  benchmarkCurveScope,
-  type BenchmarkCurveInput,
-} from './benchmark-curve';
+import { benchmarkCurveScope, curveLineImages, type BenchmarkCurveInput } from './benchmark-curve';
 
 const agg: BenchmarkCurveInput = {
   model: 'glm5.2',
@@ -47,12 +43,26 @@ describe('benchmarkCurveScope', () => {
   );
 });
 
-describe('benchmarkCurveLine', () => {
-  it('holds one line per fixed-sequence scope and one per AgentX topology', () => {
-    const fixed = { ...agg, benchmark_type: 'single_turn', isl: 1024, osl: 1024 };
-    expect(benchmarkCurveLine({ ...fixed, offload_mode: null })).toBe(
-      benchmarkCurveLine({ ...fixed, offload_mode: 'off' }),
-    );
-    expect(benchmarkCurveLine(agg)).not.toBe(benchmarkCurveLine({ ...agg, disagg: true }));
+describe('curveLineImages', () => {
+  it('splits AgentX lines by AGG/disagg and offload, as InferenceX does', () => {
+    expect(
+      curveLineImages([
+        { ...agg, image: 'a' },
+        { ...agg, disagg: true, image: 'b' },
+        { ...agg, offload_mode: 'on', image: 'c' },
+      ]),
+    ).not.toBeNull();
+    expect(
+      curveLineImages([
+        { ...agg, image: 'a' },
+        { ...agg, spec_method: 'none', image: 'b' },
+      ]),
+    ).toBeNull();
+    expect(
+      curveLineImages([
+        { ...agg, offload_mode: null, image: 'a' },
+        { ...agg, image: 'b' },
+      ]),
+    ).toBeNull();
   });
 });
