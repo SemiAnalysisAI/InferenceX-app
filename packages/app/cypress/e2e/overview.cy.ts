@@ -349,7 +349,7 @@ describe('Overview page', () => {
     cy.go('back');
     cy.location('search').should('eq', '');
     cy.go('back');
-    cy.location('pathname').should('eq', '/inference');
+    cy.location('pathname').should('eq', '/inference/kimi-k3');
   });
 
   it('warms a hovered option and derives the reference without a request', () => {
