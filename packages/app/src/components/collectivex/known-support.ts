@@ -63,13 +63,21 @@ export const COLLECTIVEX_KNOWN_FOOTNOTES: Record<string, CollectiveXKnownFootnot
     en: "UCCL's CPU-proxy RDMA is functional on the Pollara fabric but ~13x under its upstream-documented bandwidth (~6 GB/s vs 82 GB/s), invariant to GPU-memory registration mode and traffic class — an ionic-driver-level suspect. Numbers at that deficit would misrepresent the SKU.",
     zh: 'UCCL 的 CPU 代理 RDMA 在 Pollara 网络上可运行，但带宽仅为上游文档值的约 1/13（约 6 GB/s 对 82 GB/s），与 GPU 内存注册方式和流量类别无关，疑似 ionic 驱动层问题。该水平的数据无法公正代表此 SKU。',
   },
-  'uccl-h100-init-crash': {
-    en: 'Crashes at NCCL communicator setup on this pool (unhandled CUDA error, 4/4 attempts on 2026-08-28) while deepep-v2 EP16 ran green concurrently — uccl-specific here, under investigation; the earlier wall-clock rationale is superseded.',
-    zh: '在该集群上于 NCCL 通信器建立阶段崩溃（unhandled CUDA error，2026-08-28 四次尝试全部失败），而同期 deepep-v2 EP16 正常通过——为该集群上 uccl 特有问题，调查中；早先的超时说法已被取代。',
-  },
   'uccl-h200-rdma-recv-ring': {
     en: 'Runs with a deeper RDMA receive ring (1040 tokens, labelled -rdmarecv1040): at the default depth the two-node BF16 prefill dispatch deadlocks (uccl-project/uccl#1110). Decode is unchanged by the deeper ring (within 1%); both phases move about 25 GB/s per rank through the CPU proxy, roughly 4x behind DeepEP V2 at the top of the ladder.',
     zh: '使用更深的 RDMA 接收环（1040 token，标记为 -rdmarecv1040）运行：默认深度下双节点 BF16 prefill 的 dispatch 会死锁（uccl-project/uccl#1110）。更深的接收环对 decode 无影响（差异在 1% 以内）；两个阶段经 CPU 代理每 rank 约 25 GB/s，在梯级顶端约比 DeepEP V2 慢 4 倍。',
+  },
+  'h100-efa-deepep-decode-only': {
+    en: 'Runs over EFA through the NCCL GIN proxy: about 2.2 ms at T=1 and 25 ms at T=512, roughly 9x nccl-ep on the same nodes. Decode only: the prefill ladder at this rate does not finish inside the 90-minute case budget.',
+    zh: '经 NCCL GIN 代理在 EFA 上运行：T=1 约 2.2 ms，T=512 约 25 ms，约为同节点 nccl-ep 的 9 倍。仅有 decode：按此速率，prefill 梯级无法在 90 分钟的单用例时限内完成。',
+  },
+  'h100-efa-nccl-ll-decode-only': {
+    en: 'Low-latency EP16 runs over EFA with a ~1.2 ms floor at T=1 (vs ~28 µs on EP8 NVLink) and passes correctness at every rung. Decode only: the prefill ladder does not finish inside the 90-minute case budget.',
+    zh: '低延迟 EP16 可在 EFA 上运行，T=1 下限约 1.2 ms（EP8 NVLink 约 28 µs），所有梯级正确性通过。仅有 decode：prefill 梯级无法在 90 分钟的单用例时限内完成。',
+  },
+  'efa-no-ibgda': {
+    en: "DeepEP V2's low-latency path uses the bundled V1 buffer, which needs NVSHMEM IBGDA on Mellanox NICs; EFA has no IBGDA, and every rank segfaults at setup. DeepEP V2.5 drops V1 and could run low-latency over NCCL GIN.",
+    zh: 'DeepEP V2 的低延迟路径使用内置的 V1 缓冲，需要 Mellanox 网卡上的 NVSHMEM IBGDA；EFA 不支持 IBGDA，所有 rank 在初始化时段错误。DeepEP V2.5 移除了 V1，可经 NCCL GIN 运行低延迟模式。',
   },
   'uccl-not-brought-up': {
     en: 'Not brought up on this pool (untested compute capability or no scale-out NIC path for the CPU proxy).',
@@ -140,9 +148,9 @@ type KnownMatrix = Record<
 
 const NORMAL: KnownMatrix = {
   h100: {
-    'deepep-v2': bothWork,
+    'deepep-v2': cell(works, worksWith('h100-efa-deepep-decode-only')),
     mori: off('amd-only'),
-    'uccl-ep': cell(works, broken('uccl-h100-init-crash')),
+    'uccl-ep': bothWork,
     'nccl-ep': cell(works, worksWith('nccl-v02-gin')),
     'flashinfer-ep': off('gb-only'),
   },
@@ -206,10 +214,10 @@ const NORMAL: KnownMatrix = {
 
 const LOW_LATENCY: KnownMatrix = {
   h100: {
-    'deepep-v2': cell(works, broken('hseries-ll-gdr')),
+    'deepep-v2': cell(works, broken('efa-no-ibgda')),
     mori: off('amd-only'),
-    'uccl-ep': cell(works, na('ll-ep16-not-enabled')),
-    'nccl-ep': cell(worksWith('nccl-v02-ll'), na('nccl-ll-ep16-not-enabled')),
+    'uccl-ep': bothWork,
+    'nccl-ep': cell(worksWith('nccl-v02-ll'), worksWith('h100-efa-nccl-ll-decode-only')),
     'flashinfer-ep': off('no-ll-kernels'),
   },
   h200: {
