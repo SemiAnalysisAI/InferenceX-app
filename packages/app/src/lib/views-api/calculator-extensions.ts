@@ -1,5 +1,9 @@
 import { buildCacheReuse, defaultCacheReuseGroup } from '@/components/calculator/cache-reuse';
 import {
+  estimateRevenueCapacity,
+  REVENUE_PERIOD_HOURS,
+} from '@/components/calculator/revenue-capacity';
+import {
   DEFAULT_FIRST_TOKEN_CAPS,
   parseFirstTokenCaps,
   selectFirstTokenWinners,
@@ -20,7 +24,12 @@ import type { TokenRevenuePricing } from '@/components/inference/types';
 import { fetchOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
 import { cachedJson } from '@/lib/cache/api-cache';
 import { getGpuSpecs } from '@/lib/catalog/constants';
-import { getOpenRouterModelId, Sequence, type Model } from '@/lib/catalog/data-mappings';
+import {
+  getOpenRouterModelId,
+  PRECISION_OPTIONS,
+  Sequence,
+  type Model,
+} from '@/lib/catalog/data-mappings';
 import { POWER_BASIS_LABELS } from '@/lib/power/power-basis';
 import type { NextRequest } from 'next/server';
 import { runViewsRoute, ViewsApiParamError } from './errors';
@@ -38,6 +47,7 @@ import { calculatorGroups, comparisonSelections, selection } from './source';
 export type CalculatorExtension =
   | 'first-token'
   | 'cache-reuse'
+  | 'revenue-capacity'
   | 'profit-estimator'
   | 'profit-estimator-per-gigawatt';
 
@@ -46,6 +56,10 @@ export function calculatorExtension(view: CalculatorExtension, request: NextRequ
     const search = request.nextUrl.searchParams;
     validateParams(search, VIEW_QUERY_PARAMS[view]);
     const params = selection(search);
+    if (view === 'revenue-capacity' && !search.has('precisions'))
+      params.precisions = [...PRECISION_OPTIONS];
+    if (view === 'revenue-capacity' && params.percentile !== 'p90')
+      throw new ViewsApiParamError('percentile', 'Revenue capacity uses P90', ['p90']);
     if (view !== 'first-token' && params.sequence !== Sequence.AgenticTraces)
       throw new ViewsApiParamError('sequence', 'This view requires agentic-traces', [
         'agentic-traces',
@@ -119,7 +133,7 @@ export function calculatorExtension(view: CalculatorExtension, request: NextRequ
       });
     }
     const defaults = profitModelDefaults(params.model as Model);
-    const basis = view === 'profit-estimator' ? 'chip-hour' : 'gw-year';
+    const basis = view === 'profit-estimator-per-gigawatt' ? 'gw-year' : 'chip-hour';
     const target = parseNumberParam(search.get('target'), 'target', defaults.interactivity, {
       min: 0.001,
     });
@@ -187,6 +201,76 @@ export function calculatorExtension(view: CalculatorExtension, request: NextRequ
         ),
         outputPerMillion: parseNumberParam(search.get('outputPrice'), 'outputPrice', 1, { min: 0 }),
       };
+    }
+    if (view === 'revenue-capacity') {
+      const revenueTarget = parseNumberParam(
+        search.get('revenueTarget'),
+        'revenueTarget',
+        1_000_000,
+        { min: 0 },
+      );
+      const period = parseEnumParam(
+        search.get('period'),
+        'period',
+        ['month', 'quarter', 'year'],
+        'month',
+      );
+      const capacity = (group: typeof groups.official, isOverlay = false) => {
+        const missing: ReturnType<typeof estimateRevenueCapacity>['skipped'] = [];
+        const raw = Object.entries(group.grouped).flatMap(([key, points]) => {
+          const result = interpolateProfitForGPU(
+            points,
+            target,
+            'interactivity_to_throughput',
+            'costh',
+            'provisioned',
+          );
+          if (!result) {
+            missing.push({
+              hwKey: group.groupMeta[key]?.hwKey ?? key,
+              resultKey: key,
+              reason: 'outside-measured-range',
+            });
+            return [];
+          }
+          return [
+            {
+              ...result,
+              ...group.groupMeta[key],
+              precision: points[0]?.precision,
+              resultKey: key,
+              isOverlay,
+              runUrl: isOverlay
+                ? (result.nearestPoints[0]?.sourceRow?.run_url ?? undefined)
+                : undefined,
+            },
+          ];
+        });
+        const data = estimateRevenueCapacity(
+          applyCacheHitMode(raw, cacheHitMode),
+          pricing,
+          revenueTarget,
+          period,
+          utilization,
+        );
+        return { ...data, skipped: [...data.skipped, ...missing] };
+      };
+      return cachedJson(request, {
+        ...envelope,
+        params: {
+          ...groups.params,
+          target,
+          revenueTarget,
+          period,
+          hours: REVENUE_PERIOD_HOURS[period],
+          utilization,
+          priceSource,
+          cacheHitMode,
+        },
+        pricing,
+        data: capacity(groups.official),
+        overlays: capacity(groups.overlay, true),
+      });
     }
     const assumptions = {
       utilizationPct: utilization,

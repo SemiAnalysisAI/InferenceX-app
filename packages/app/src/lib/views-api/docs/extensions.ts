@@ -23,6 +23,14 @@ const imageAgePoint: ApiSchema = {
 };
 
 const PARAMETER_NOTES: Record<string, [string, string]> = {
+  revenueTarget: [
+    'Nonnegative finite gross revenue target in USD; default 1000000. Before compute expense and model-license fees.',
+    '有限非负数，表示 USD 总收入目标；默认 1000000。未扣除算力支出和模型许可费。',
+  ],
+  period: [
+    'month (default), quarter or year: 730, 2190 or 8760 hours. Annualized planning periods, not calendar dates.',
+    'month（默认）、quarter 或 year，分别按 730、2190、8760 小时计算，为年度均摊规划周期，不对应具体日历日期。',
+  ],
   model: [
     'Model display name or comparison slug, case-insensitive. Required for benchmark-based views. The image view also accepts current image-catalog names, trims whitespace and defaults to all; unknown models return 400.',
     '模型显示名称或比较页 slug，不区分大小写。基于基准测试的视图需要此参数。镜像视图还接受当前镜像列表中的模型名，去除首尾空白后匹配，默认 all；未知模型返回 400。',
@@ -374,7 +382,9 @@ export function viewParameter(view: ReadonlyView, name: string): ApiParameter {
           'Image scenario. Defaults to agentic-traces (Agentic), falling back to the first available active scenario for the selected model.',
           '镜像场景。默认为 agentic-traces（Agentic）；所选模型无此场景时，回退到其首个有效场景。',
         ] as const)
-      : (view === 'profit-estimator' || view === 'profit-estimator-per-gigawatt') &&
+      : (view === 'profit-estimator' ||
+            view === 'profit-estimator-per-gigawatt' ||
+            view === 'revenue-capacity') &&
           name === 'model'
         ? ([
             'Model display name or comparison slug. The dashboards offer agentic-trace models with usable benchmark curves and token pricing; this API also accepts other known models, which may return no estimated rows. Check /api/v1/availability for agentic_traces data.',
@@ -391,14 +401,100 @@ export function viewParameter(view: ReadonlyView, name: string): ApiParameter {
       (name === 'model' &&
         !['current-inferencex-image', 'overview', 'rankings', 'compare'].includes(view)) ||
       (view === 'gpu-metrics' && name === 'runId'),
-    type: 'string',
-    schema: { type: 'string' },
+    type: name === 'revenueTarget' ? 'number' : 'string',
+    schema:
+      name === 'revenueTarget'
+        ? { type: 'number', minimum: 0, default: 1000000 }
+        : name === 'period'
+          ? { type: 'string', enum: ['month', 'quarter', 'year'], default: 'month' }
+          : { type: 'string' },
     description: text(...note),
-    example: name === 'model' ? 'DeepSeek-V4-Pro' : name === 'runId' ? '123' : '',
+    example:
+      name === 'revenueTarget'
+        ? 1000000
+        : name === 'period'
+          ? 'month'
+          : name === 'model'
+            ? 'DeepSeek-V4-Pro'
+            : name === 'runId'
+              ? '123'
+              : '',
   };
 }
 
 const NEW_VIEWS = {
+  'revenue-capacity': [
+    'GPU capacity for a revenue target',
+    '收入目标对应的 GPU 需求',
+    {
+      pricing: object,
+      data: {
+        type: 'object',
+        properties: {
+          rows: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                hwKey: { type: 'string' },
+                resultKey: { type: 'string' },
+                precision: { type: 'string' },
+                isOverlay: { type: 'boolean' },
+                runIndex: { type: 'integer' },
+                runLabel: { type: 'string' },
+                runUrl: { type: 'string' },
+                sourceUrls: strings,
+                sourceDates: strings,
+                revenuePerGpuHour: { type: 'number' },
+                realizedRevenuePerGpuHour: { type: 'number' },
+                gpuEquivalents: { type: 'number' },
+                requiredGpus: { type: 'integer' },
+                deploymentGpus: { type: ['integer', 'null'] },
+                deployments: { type: ['integer', 'null'] },
+                projectedRevenue: { type: 'number' },
+              },
+              required: [
+                'hwKey',
+                'resultKey',
+                'sourceUrls',
+                'sourceDates',
+                'revenuePerGpuHour',
+                'realizedRevenuePerGpuHour',
+                'gpuEquivalents',
+                'requiredGpus',
+                'deploymentGpus',
+                'deployments',
+                'projectedRevenue',
+              ],
+            },
+          },
+          skipped: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                hwKey: { type: 'string' },
+                resultKey: { type: 'string' },
+                precision: { type: 'string' },
+                reason: {
+                  type: 'string',
+                  enum: [
+                    'outside-measured-range',
+                    'no-token-mix',
+                    'zero-revenue',
+                    'unsafe-fleet-size',
+                  ],
+                },
+              },
+              required: ['hwKey', 'resultKey', 'reason'],
+            },
+          },
+        },
+        required: ['rows', 'skipped'],
+      },
+      overlays: object,
+    },
+  ],
   'first-token': ['First-token winners', '首 token 达标配置', { data: object }],
   'cache-reuse': [
     'Cache-reuse curves',

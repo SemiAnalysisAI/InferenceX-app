@@ -91,6 +91,34 @@ https://inferencex.semianalysis.com/api/v1/views/first-token?model=DeepSeek-V4-P
 https://inferencex.semianalysis.com/api/v1/views/profit-estimator?model=DeepSeek-V4-Pro&priceSource=custom&inputPrice=1&cachedInputPrice=0.1&outputPrice=1
 ```
 
+## Revenue target capacity
+
+Use `/api/v1/views/revenue-capacity?model=Kimi-K3&revenueTarget=1000000&period=month`
+for the `/revenue-capacity` and `/zh/revenue-capacity` pages. Request gross revenue,
+not profit.
+
+The view supports `revenueTarget` (USD, default 1000000), `period` (`month`,
+`quarter`, `year`), `target` (P90 tok/s/user), `utilization` (percent),
+`priceSource` (`list`, `openrouter`, `custom`), `inputPrice`, `cachedInputPrice`,
+`outputPrice`, `cacheHitMode` (`theoretical`, `actual`), `precisions`, `gpus`,
+`date`, `runId`, and `unofficialrun`. It requires AgentX and P90; omitted
+precision compares all precisions. Model target and price defaults match the
+profit estimator. Month/quarter/year use 730/2190/8760 hours.
+
+Read `data.rows` for official configurations and `overlays.rows` for unofficial
+runs. Each row returns `gpuEquivalents`, rounded `requiredGpus`,
+`revenuePerGpuHour`, utilization-adjusted `realizedRevenuePerGpuHour`,
+`projectedRevenue`, nullable `deploymentGpus`/`deployments`, and source run URLs
+and dates. A null deployment size means whole-chip capacity only, not a
+deployment plan. Configurations are alternative fleets; never sum their counts.
+Missing or out-of-range data stays in `skipped` with a reason.
+
+Coverage: every calculation control maps to the parameters above. Share and CSV
+serialize the same applied values; chart ordering, expand/collapse, copy status,
+and locale are presentation-only. TCO, license fees, power, cost tiers and profit
+history are not inputs to gross revenue capacity. Do not promise demand,
+fleet-scale efficiency or redundancy from this estimate.
+
 ## Profit estimator defaults
 
 Both views default `cacheHitMode` to `theoretical`, displayed as

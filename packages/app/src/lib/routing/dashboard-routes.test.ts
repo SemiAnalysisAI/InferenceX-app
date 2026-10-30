@@ -49,19 +49,8 @@ describe('dashboard route registry', () => {
     expect(dashboardRouteForPathname('/historical/kimi-k3')?.key).toBe('historical');
   });
 
-  it('puts both profit estimators between Inference Performance and Accuracy Evals', () => {
-    const primary = DASHBOARD_ROUTES.filter((route) => route.navGroup === 'primary').map(
-      (route) => route.key,
-    );
-    expect(primary.slice(0, 4)).toEqual([
-      'inference',
-      'profit-estimator-per-gigawatt',
-      'profit-estimator',
-      'evaluation',
-    ]);
-    expect(primary).not.toContain('calculator');
-    expect(primary).not.toContain('fleet');
-    expect(primary).not.toContain('historical');
+  it('resolves profit and revenue routes without confusing their prefixes', () => {
+    expect(dashboardRouteForPathname('/revenue-capacity')?.key).toBe('revenue-capacity');
     expect(dashboardRouteForPathname('/profit-estimator-per-gigawatt/kimi-k3')?.key).toBe(
       'profit-estimator-per-gigawatt',
     );

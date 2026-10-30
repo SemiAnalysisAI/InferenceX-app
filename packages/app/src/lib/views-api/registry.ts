@@ -3,6 +3,25 @@
  * Update the matching view docs and skills reference with every selector change.
  */
 export const VIEW_QUERY_PARAMS = {
+  'revenue-capacity': [
+    'model',
+    'sequence',
+    'target',
+    'percentile',
+    'revenueTarget',
+    'period',
+    'utilization',
+    'priceSource',
+    'inputPrice',
+    'cachedInputPrice',
+    'outputPrice',
+    'cacheHitMode',
+    'precisions',
+    'gpus',
+    'date',
+    'runId',
+    'unofficialrun',
+  ],
   'cache-reuse': [
     'config',
     'date',
@@ -259,6 +278,7 @@ export type ReadonlyView = keyof typeof VIEW_QUERY_PARAMS;
 
 /** Every dashboard route, including hidden/public routes, has an explicit disposition. */
 export const DASHBOARD_API_COVERAGE = {
+  'revenue-capacity': { view: 'revenue-capacity' },
   inference: {
     view: 'inference',
     exclusion:
