@@ -72,6 +72,13 @@ const nextConfig: NextConfig = {
         permanent: true,
       },
       ...SEO_REDIRECTS,
+      // The featured model can change; do not permanently cache this default.
+      ...LOCALE_PREFIXES.map((prefix) => ({
+        source: `${prefix}/inference`,
+        destination: `${prefix}/inference/kimi-k3`,
+        permanent: false,
+        missing: [{ type: 'query' as const, key: 'g_model' }],
+      })),
       ...INFERENCE_MODEL_ALIAS_REDIRECTS,
       ...VIDEO_ALIAS_REDIRECTS,
       {

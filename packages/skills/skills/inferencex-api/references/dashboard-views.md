@@ -5,6 +5,17 @@ Use `/api/v1/views/*` for dashboard-calculated values. Read the deployed
 these routes become available only after the corresponding app change deploys.
 Do not assume an installed skill proves server availability.
 
+The bare `/inference` and `/zh/inference` entry routes temporarily redirect to
+their `/kimi-k3` pages unless `g_model` explicitly selects a model. Other query
+parameters are preserved. This is a navigation default, not an API default:
+`/api/v1/views/inference` still requires `model`; pass `model=Kimi-K3&sequence=agentic-traces` to match
+the landing page. Existing model-specific links and historical results remain available.
+
+`/inference` 和 `/zh/inference` 在未通过 `g_model` 指定模型时，会临时重定向到
+各自的 `/kimi-k3` 页面，并保留其他查询参数。这只改变页面入口；
+`/api/v1/views/inference` 仍要求显式传入 `model`，使用 `model=Kimi-K3&sequence=agentic-traces`
+可查询入口页面对应的模型。已有模型链接和历史结果不受影响。
+
 On mobile inference and PowerX charts, Scenario, Precision, and Run context (date,
 run selection and changelog) are inside More chart controls; Model stays visible.
 Desktop keeps Scenario and Precision beside Model and Run context below chart

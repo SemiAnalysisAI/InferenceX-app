@@ -4,6 +4,19 @@ Reference for agents modifying filter behavior. Explains which context to touch 
 
 ## Provider State Map
 
+The bare `/inference` and `/zh/inference` routes use a temporary redirect to
+Kimi K3 in `next.config.ts`. Explicit `g_model` share links bypass that redirect,
+and all other query parameters are carried forward. Model-specific paths and
+other dashboard defaults are unchanged. The read-only inference API still
+requires an explicit `model`; its example and the skills guide use `Kimi-K3`
+for parity with this navigation default.
+Tab navigation includes the retained model when returning to inference, so the
+entry redirect does not reset a user's selection.
+`GlobalFilterProvider` publishes the selected model to the client-only
+`inference-navigation-state.ts` store. Tab navigation subscribes to that value,
+including selections omitted from share URLs because they match an older default.
+The store survives provider remounts but resets on a full page load.
+
 ### GlobalFilterProvider
 
 File: `packages/app/src/providers/GlobalFilterContext.tsx`

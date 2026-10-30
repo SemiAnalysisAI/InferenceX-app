@@ -20,6 +20,63 @@ const unlockPointerEvents = () => {
 };
 
 describe('Per-model dashboard routes', () => {
+  for (const locale of ['', '/zh']) {
+    it(`retains an explicit legacy model across ${locale}/evaluation`, () => {
+      cy.visit(`${locale}/inference/deepseek-v4`, visitOptions);
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek V4 Pro');
+      cy.get('[data-testid="tab-trigger-evaluation"]').click();
+      cy.location('pathname').should('eq', `${locale}/evaluation`);
+      cy.get('[data-testid="tab-trigger-inference"]')
+        .should('have.attr', 'href', `${locale}/inference?g_model=DeepSeek-V4-Pro`)
+        .click();
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek V4 Pro');
+    });
+
+    it(`renders Kimi K3 chart data from bare ${locale}/inference`, () => {
+      cy.intercept('GET', '/api/v1/availability', {
+        body: modelSelectionAvailability
+          .filter((row) => row.model === 'dsv4')
+          .map((row) => ({ ...row, model: 'kimik3' })),
+      });
+      cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
+        expect(new URL(request.url).searchParams.get('model')).to.eq('Kimi-K3');
+        request.reply({
+          body: modelSelectionBenchmarks
+            .filter((row) => row.model === 'dsv4')
+            .map((row) => ({ ...row, model: 'kimik3' })),
+        });
+      });
+      cy.visit(`${locale}/inference`, visitOptions);
+      cy.location('pathname').should('eq', `${locale}/inference/kimi-k3`);
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'Kimi K3');
+      cy.get('[data-testid="scatter-graph"] svg .dot-group').should('have.length.greaterThan', 0);
+    });
+
+    it(`opens bare ${locale}/inference on Kimi K3 without dropping shared filters`, () => {
+      const query = '?i_seq=agentic-traces&i_prec=fp4&utm_source=default-model-test';
+      cy.request({ url: `${locale}/inference${query}`, followRedirect: false }).then((response) => {
+        expect(response.status).to.eq(307);
+        const destination = new URL(
+          String(response.headers.location),
+          String(Cypress.config('baseUrl')),
+        );
+        expect(destination.pathname).to.eq(`${locale}/inference/kimi-k3`);
+        expect(destination.search).to.eq(query);
+      });
+      cy.visit(`${locale}/inference${query}`, visitOptions);
+      cy.location('pathname').should('eq', `${locale}/inference/kimi-k3`);
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'Kimi K3');
+      cy.get('[data-testid="inference-page-heading"]').should('contain.text', 'Kimi K3');
+    });
+
+    it(`retains the current model when navigating from ${locale}/evaluation`, () => {
+      cy.visit(`${locale}/evaluation`, visitOptions);
+      cy.get('[data-testid="tab-trigger-inference"]').click();
+      cy.location('pathname').should('eq', `${locale}/inference`);
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek V4 Pro');
+    });
+  }
+
   it('seeds /historical/<slug> to the routed model and rewrites the URL on switch without a reload', () => {
     cy.visit('/historical/minimax-m3', visitOptions);
     cy.get('[data-testid="historical-trends-display"]').should('be.visible');
