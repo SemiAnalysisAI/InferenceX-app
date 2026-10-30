@@ -498,6 +498,7 @@ const MODEL_DEFAULT_PRECISIONS: Partial<
 > = {
   [Model.GLM_5_2]: { [Sequence.AgenticTraces]: [Precision.FP4, Precision.FP8] },
   [Model.Qwen3_5]: { [Sequence.AgenticTraces]: [Precision.FP4, Precision.FP8] },
+  [Model.Qwen3_8_Flash_Next]: { [Sequence.AgenticTraces]: [Precision.FP4] },
 };
 
 export function getModelDefaultPrecisions(

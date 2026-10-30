@@ -63,8 +63,8 @@ const parameters: readonly ApiParameter[] = [
     required: false,
     type: 'string',
     description: text(
-      'Comma-separated precisions. When omitted, the densest available precision is auto-selected, matching the dashboard default.',
-      '逗号分隔的精度列表。省略时按数据最密的精度自动选择，与仪表盘默认行为一致。',
+      'Comma-separated precisions. When omitted, the per-model default precisions configured for the sequence are used (for example FP4 for Qwen3.8 Flash Next agentic traces); otherwise the densest available precision is auto-selected, matching the dashboard default.',
+      '逗号分隔的精度列表。省略时优先使用该模型在此序列下配置的默认精度（例如 Qwen3.8 Flash Next 的 agentic traces 默认为 FP4），否则按数据最密的精度自动选择，与仪表板默认行为一致。',
     ),
     schema: { type: 'string', description: 'Comma-separated list of fp4|fp4fp8|fp8|bf16|int4' },
     example: 'fp8,bf16',

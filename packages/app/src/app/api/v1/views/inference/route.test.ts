@@ -88,6 +88,18 @@ function makeRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
   } as BenchmarkRow;
 }
 
+function agenticRow(hardware: string, precision: string): BenchmarkRow {
+  return makeRow({
+    model: 'qwen3.8next',
+    hardware,
+    framework: 'sglang',
+    precision,
+    benchmark_type: 'agentic_traces',
+    isl: null,
+    osl: null,
+  });
+}
+
 const ROWS = [
   makeRow({ conc: 16, metrics: { ...makeRow().metrics, median_intvty: 40, tput_per_gpu: 200 } }),
   makeRow(),
@@ -438,6 +450,26 @@ describe('GET /api/v1/views/inference', () => {
     expect(body.series).toEqual([]);
     expect(body.count).toBe(0);
     expect(mockGetLatestBenchmarks.mock.calls[0][1]).toEqual(['musespark']);
+  });
+
+  it('applies the per-model default precision when precisions are omitted', async () => {
+    // FP8 has too few curves to stand alone, so the auto default would be FP4+FP8.
+    mockGetLatestBenchmarks.mockResolvedValue([
+      agenticRow('b200', 'fp4'),
+      agenticRow('b300', 'fp4'),
+      agenticRow('gb300', 'fp4'),
+      agenticRow('h100', 'fp8'),
+      agenticRow('h200', 'fp8'),
+    ]);
+    const base = '/api/v1/views/inference?model=Qwen3.8-Flash-Next&sequence=agentic-traces';
+
+    const defaulted = await GET(request(base));
+    const defaultedBody = await defaulted.json();
+    expect(defaultedBody.params.precisions).toEqual(['fp4']);
+
+    const explicit = await GET(request(`${base}&precisions=fp8`));
+    const explicitBody = await explicit.json();
+    expect(explicitBody.params.precisions).toEqual(['fp8']);
   });
 
   it('rejects unknown models and bad enums with a 400 and allowed values', async () => {

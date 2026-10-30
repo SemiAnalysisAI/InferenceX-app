@@ -1,6 +1,11 @@
 import { NORMALIZED_TOKEN_REVENUE_PRICING } from '@/components/inference/token-revenue';
 import { fetchOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
-import { getOpenRouterModelId, type Model, Sequence } from '@/lib/catalog/data-mappings';
+import {
+  getModelDefaultPrecisions,
+  getOpenRouterModelId,
+  type Model,
+  Sequence,
+} from '@/lib/catalog/data-mappings';
 import {
   validateParams as validateViewParams,
   matchesHardware,
@@ -138,13 +143,14 @@ export function GET(request: NextRequest) {
         ? await getCachedAgenticBenchmarkHistory([...dbModelKeys])
         : await getCachedBenchmarkHistory([...dbModelKeys], islOsl?.isl ?? 0, islOsl?.osl ?? 0);
 
-    // Precision auto-resolution mirrors the dashboard's densest-precision default.
+    // Precision auto-resolution mirrors the dashboard: per-model default, else densest.
     const availablePrecisions = [...new Set(allRows.map((row) => row.precision))].toSorted();
     const resolvedPrecisions = resolveEffectivePrecisions({
       selectedPrecisions: [...precisions],
       availablePrecisions,
       curveCounts: countCurvesByPrecision(allRows),
       explicit: precisions.length > 0,
+      modelDefaultPrecisions: getModelDefaultPrecisions(displayName as Model, sequence),
     });
 
     const trendMetricKey = resolveMetricConfigKey(metricConfigKey).slice(2) as YAxisMetricKey;

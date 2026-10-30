@@ -36,6 +36,7 @@ import type { DerivedAgenticMetricMap } from '@/hooks/api/use-derived-agentic-me
 import { fetchOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
 import type { TcoBasis } from '@/lib/catalog/constants';
 import {
+  getModelDefaultPrecisions,
   getOpenRouterModelId,
   isBestPerSkuDefaultOff,
   Model,
@@ -171,7 +172,7 @@ function buildView(
   derivedMetrics?: DerivedAgenticMetricMap,
 ): InferenceViewData {
   // Precision auto-resolution runs against the sequence-scoped rows, exactly
-  // like the dashboard's densest-precision default.
+  // like the dashboard's per-model or densest-precision default.
   const seqRows = rows.filter((row) => rowToSequence(row) === params.sequence);
   const availablePrecisions = [...new Set(seqRows.map((row) => row.precision))].toSorted();
   const resolvedPrecisions = resolveEffectivePrecisions({
@@ -179,6 +180,7 @@ function buildView(
     availablePrecisions,
     curveCounts: countCurvesByPrecision(seqRows),
     explicit: params.precisionsExplicit,
+    modelDefaultPrecisions: getModelDefaultPrecisions(params.model as Model, params.sequence),
   });
 
   const result = buildInferenceSeries(rows, {

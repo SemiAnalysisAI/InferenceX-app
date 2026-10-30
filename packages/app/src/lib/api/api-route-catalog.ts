@@ -139,7 +139,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-historical-view',
-    sourceSha256: 'd2f7768ffee4a60618ac4f9add87bbe571cc668424eb8d9f257d78fe82a546fb',
+    sourceSha256: 'b59d8b8014f09d2a2a832f5db96c8b5e5685eead7a5f0341b18865af2fe83494',
   },
   {
     source: 'src/app/api/v1/views/inference/route.ts',
@@ -147,7 +147,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-inference-view',
-    sourceSha256: '18d6658379e045492907836358cf5c29a1d901af6189498b519266c249244674',
+    sourceSha256: '2c7888507d4b2ee2e34377d5fa7dfb710589e44fa04e9ea128c2a8a84e7f7c53',
   },
   {
     source: 'src/app/api/v1/views/options/route.ts',
