@@ -13,7 +13,7 @@ const release = (tag_name: string, published_at: string, extra = {}) => ({
   draft: false,
   ...extra,
 });
-const image = (framework: string, tag: string, model = 'dsv4') => ({
+const image = (framework: string, tag: string, model = 'dsv41flash') => ({
   model,
   hardware: 'b200',
   framework,
