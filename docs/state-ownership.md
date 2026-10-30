@@ -12,6 +12,10 @@ requires an explicit `model`; its example and the skills guide use `Kimi-K3`
 for parity with this navigation default.
 Tab navigation includes the retained model when returning to inference, so the
 entry redirect does not reset a user's selection.
+`GlobalFilterProvider` publishes the selected model to the client-only
+`inference-navigation-state.ts` store. Tab navigation subscribes to that value,
+including selections omitted from share URLs because they match an older default.
+The store survives provider remounts but resets on a full page load.
 
 ### GlobalFilterProvider
 

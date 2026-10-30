@@ -69,11 +69,11 @@ describe('Per-model dashboard routes', () => {
       cy.get('[data-testid="inference-page-heading"]').should('contain.text', 'Kimi K3');
     });
 
-    it(`uses Kimi K3 when navigating from ${locale}/evaluation without a model selection`, () => {
+    it(`retains the current model when navigating from ${locale}/evaluation`, () => {
       cy.visit(`${locale}/evaluation`, visitOptions);
       cy.get('[data-testid="tab-trigger-inference"]').click();
-      cy.location('pathname').should('eq', `${locale}/inference/kimi-k3`);
-      cy.get('[data-testid="model-selector"]').should('contain.text', 'Kimi K3');
+      cy.location('pathname').should('eq', `${locale}/inference`);
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek V4 Pro');
     });
   }
 

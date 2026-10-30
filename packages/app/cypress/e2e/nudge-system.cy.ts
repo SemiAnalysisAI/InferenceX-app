@@ -419,14 +419,14 @@ describe('Dashboard nudges — filter-hint toast', () => {
     cy.get('[data-testid="filter-hint-nudge"]').should('not.exist');
 
     cy.get('[data-testid="tab-trigger-inference"]').click();
-    cy.location('pathname').should('eq', '/inference/kimi-k3');
+    cy.location('pathname').should('eq', '/inference');
     cy.get('[data-testid="filter-hint-nudge"]', { timeout: 3000 }).should('be.visible');
   });
 
   it('re-evaluates the localized filter hint after a Chinese tab transition', () => {
     cy.visit('/zh/evaluation', { onBeforeLoad: suppressCompetingDashboardToasts });
     cy.get('[data-testid="tab-trigger-inference"]').click();
-    cy.location('pathname').should('eq', '/zh/inference/kimi-k3');
+    cy.location('pathname').should('eq', '/zh/inference');
     cy.get('[data-testid="filter-hint-nudge"]', { timeout: 3000 })
       .should('be.visible')
       .and('contain.text', '图表太拥挤？');

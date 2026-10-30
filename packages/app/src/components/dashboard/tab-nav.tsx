@@ -10,13 +10,13 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from 'react';
 
 import { track } from '@/lib/analytics/analytics';
 import {
   DASHBOARD_ROUTES,
   dashboardRouteForPathname,
-  dashboardShellCapabilitiesForPathname,
   getDashboardRoute,
   type DashboardRoute,
   type DashboardRouteKey,
@@ -29,9 +29,10 @@ import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useClientRouteSearch } from '@/hooks/useClientSearch';
 import { profitRoutePathname } from '@/lib/routing/profit-estimator-routes';
-import { readUrlParams } from '@/lib/routing/url-state';
-import { routeModelForPathname } from '@/lib/routing/model-routes';
-import { inferenceModelForPathname } from '@/lib/routing/inference-model-slug';
+import {
+  getInferenceNavigationModel,
+  subscribeInferenceNavigationModel,
+} from '@/lib/routing/inference-navigation-state';
 import { cn } from '@/lib/shared/utils';
 
 const TAB_LABELS_EN: Record<DashboardRouteKey, string> = {
@@ -144,18 +145,11 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
 
   const { navRef, indicator, animate } = useTabIndicator(current, featureGateUnlocked);
   const search = useClientRouteSearch();
-  const [retainedModel, setRetainedModel] = useState<string>();
-  useEffect(() => {
-    // The bare entry now redirects, so tab returns must name the retained selection.
-    const pathModel = dashboardShellCapabilitiesForPathname(pathname).providers.globalFilters
-      ? (inferenceModelForPathname(pathname) ?? routeModelForPathname(pathname))
-      : undefined;
-    const model =
-      current === 'profit-estimator' || current === 'profit-estimator-per-gigawatt'
-        ? undefined
-        : (readUrlParams().g_model ?? pathModel);
-    setRetainedModel((previous) => model ?? previous);
-  }, [current, pathname, search]);
+  const retainedModel = useSyncExternalStore(
+    subscribeInferenceNavigationModel,
+    getInferenceNavigationModel,
+    () => undefined,
+  );
   const unofficialIds = useMemo(() => {
     for (const [key, value] of new URLSearchParams(search)) {
       if (/^unofficialruns?$/iu.test(key) && value) return value;
