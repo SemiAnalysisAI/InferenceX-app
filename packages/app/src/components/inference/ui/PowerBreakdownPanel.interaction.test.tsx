@@ -416,18 +416,20 @@ describe('PowerChipCompare legend highlight', () => {
         '[data-testid="power-chip-compare-legend-item"]',
       ),
     ];
-    // PowerX counts IT only by default: no facility layer.
+    // PowerX counts the facility overhead by default: the PUE layer tops the stack.
     expect(legend.map((item) => item.dataset.band)).toEqual([
       'gpu',
       'server',
       'fansPsu',
       'network',
+      'facility',
     ]);
     expect(legend.map((item) => item.textContent)).toEqual([
       'GPU· Measured',
       'Server parts· Modeled (hatched)',
       'Fans + PSU loss· Modeled (hatched)',
       'Network share· Modeled (hatched)',
+      'Facility (PUE)· Modeled (hatched)',
     ]);
     const item = legend[1];
     expect(item.querySelector('span[title]')?.getAttribute('title')).toBe('Modeled (hatched)');
@@ -445,7 +447,7 @@ describe('PowerChipCompare legend highlight', () => {
       ),
     ];
     expect(segments('server')).toHaveLength(2);
-    expect(segments('facility')).toHaveLength(0);
+    expect(segments('facility')).toHaveLength(2);
     // Each chip's segments repeat the plot in that chip's colour; a layer made of several
     // parts lists them in its title.
     const gpuSegment = segments('gpu')[0];

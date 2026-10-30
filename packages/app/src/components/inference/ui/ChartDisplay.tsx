@@ -1497,11 +1497,11 @@ export default function ChartDisplay({
                                 />
                                 {powerCompare !== 'roles' && (
                                   <PowerXFacilitySwitch
-                                    pue={
-                                      [...officialRows, ...overlayRows]
-                                        .map((point) => point.modeledSystemPower)
-                                        .find((model) => model?.status === 'supported')?.pue ?? null
-                                    }
+                                    pues={[...officialRows, ...overlayRows].flatMap((point) =>
+                                      point.modeledSystemPower?.status === 'supported'
+                                        ? [point.modeledSystemPower.pue]
+                                        : [],
+                                    )}
                                   />
                                 )}
                               </div>

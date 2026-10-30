@@ -2562,6 +2562,10 @@
       "duration": 4000
     },
     {
+      "spec": "cypress/component/powerx-facility-switch.cy.tsx",
+      "duration": 4000
+    },
+    {
       "spec": "cypress/component/powerx-tutorial-layout.cy.tsx",
       "duration": 6900,
       "tests": [
