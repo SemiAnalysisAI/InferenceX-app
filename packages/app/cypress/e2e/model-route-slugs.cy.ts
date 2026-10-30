@@ -21,6 +21,26 @@ const unlockPointerEvents = () => {
 
 describe('Per-model dashboard routes', () => {
   for (const locale of ['', '/zh']) {
+    it(`renders Kimi K3 chart data from bare ${locale}/inference`, () => {
+      cy.intercept('GET', '/api/v1/availability', {
+        body: modelSelectionAvailability
+          .filter((row) => row.model === 'dsv4')
+          .map((row) => ({ ...row, model: 'kimik3' })),
+      });
+      cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
+        expect(new URL(request.url).searchParams.get('model')).to.eq('Kimi-K3');
+        request.reply({
+          body: modelSelectionBenchmarks
+            .filter((row) => row.model === 'dsv4')
+            .map((row) => ({ ...row, model: 'kimik3' })),
+        });
+      });
+      cy.visit(`${locale}/inference`, visitOptions);
+      cy.location('pathname').should('eq', `${locale}/inference/kimi-k3`);
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'Kimi K3');
+      cy.get('[data-testid="scatter-graph"] svg .dot-group').should('have.length.greaterThan', 0);
+    });
+
     it(`opens bare ${locale}/inference on Kimi K3 without dropping shared filters`, () => {
       const query = '?i_seq=agentic-traces&i_prec=fp4&utm_source=default-model-test';
       cy.request({ url: `${locale}/inference${query}`, followRedirect: false }).then((response) => {

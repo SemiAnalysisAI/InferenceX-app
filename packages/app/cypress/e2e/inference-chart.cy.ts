@@ -117,7 +117,7 @@ describe('Inference Chart', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/inference');
+    cy.visit('/inference?g_model=DeepSeek-V4-Pro');
     cy.wait(['@chartAvailability', '@chartBenchmarks']);
   });
 

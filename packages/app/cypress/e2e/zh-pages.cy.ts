@@ -68,7 +68,8 @@ describe('Chinese (/zh) pages', () => {
     });
 
     it('renders the Chinese h1 without an intro box', () => {
-      cy.get('[data-testid="inference-page-heading"]').should('have.text', '智能体推理基准测试');
+      cy.location('pathname').should('eq', '/zh/inference/kimi-k3');
+      cy.get('[data-testid="inference-page-heading"]').should('have.text', 'Kimi K3 推理基准测试');
       cy.get('[data-testid="zh-tab-intro"]').should('not.exist');
 
       cy.get('[data-testid="tab-trigger-evaluation"]')
