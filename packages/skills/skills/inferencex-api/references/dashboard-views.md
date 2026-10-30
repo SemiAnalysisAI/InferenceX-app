@@ -281,7 +281,7 @@ supported precision (null when none); `rooflineNormalized` is true. Missing/erro
 unsupported rows do not qualify the preferred slice. Explicit UI selections override
 these initial defaults; hardware visibility and measured values are unchanged.
 
-The full-width Median and best throughput panel replaces Distribution per GPU; Metric vs size is last. The median/best bars have their own precision and Normalized controls and a page-owned read projection: add any of
+The Median and best throughput panel replaces Distribution per GPU and sits beside Head to head; Metric vs size is last. The median/best bars have their own precision and Normalized controls and a page-owned read projection: add any of
 `rooflinePrecision=bf16|fp8|fp4`, `rooflineHardware=<comma-separated keys>`, or
 `rooflineNormalized=true|false` to `/api/v1/operatorx/compare?op=gemm`. The optional
 `rooflineSummary` follows those controls (defaults: workload precision, all hardware,

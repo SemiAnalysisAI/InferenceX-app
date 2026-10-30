@@ -118,7 +118,7 @@ it('defaults to a measured 950PR shape and normalized BF16, while honoring preci
 });
 
 for (const prefix of ['', '/zh']) {
-  it(`shows median and best bars in their own full-width panel at ${prefix || '/'}`, () => {
+  it(`shows median and best bars beside head to head at ${prefix || '/'}`, () => {
     const datasets = ['ascend950pr-external', 'h200-dgxc'].map((runner, gpu) => {
       const dataset = normalizeBundle(run(`summary-${gpu}`, runner, [64, 128]));
       dataset.results = dataset.results.map((row, i) => ({
@@ -142,7 +142,19 @@ for (const prefix of ['', '/zh']) {
     cy.get('[data-testid^="operatorx-viz-"]')
       .last()
       .should('have.attr', 'data-testid', 'operatorx-viz-metric-vs-size');
-    cy.get('[data-testid="operatorx-viz-throughput-summary"]').scrollIntoView();
+    cy.get('[data-testid="operatorx-viz-throughput-summary"]')
+      .scrollIntoView()
+      .should(($summary) => {
+        const next = $summary.next()[0];
+        expect(next?.dataset.testid).to.equal('operatorx-viz-pairwise-scatter');
+        expect($summary[0].getBoundingClientRect().top).to.be.closeTo(
+          next.getBoundingClientRect().top,
+          1,
+        );
+        expect($summary[0].getBoundingClientRect().right).to.be.lessThan(
+          next.getBoundingClientRect().left,
+        );
+      });
     cy.get('[data-testid="operatorx-roofline-summary"]')
       .scrollIntoView()
       .within(() => {

@@ -127,7 +127,7 @@ normalization costs and must not be reported as an end-to-end production speedup
 
 ## Median and best throughput bars
 
-The full-width Median and best throughput panel replaces Distribution per GPU. Metric vs size is the last chart. Its horizontal bars show median throughput as a fill and the
+The Median and best throughput panel replaces Distribution per GPU and sits beside Head to head on desktop. Metric vs size is the last chart. Its horizontal bars show median throughput as a fill and the
 best measured throughput as an outline, sorted by the displayed median. They follow
 the selected workload, hardware, precision and Normalized switch. Normalized bars
 show a fraction of each accelerator's peak; absolute bars show TFLOPS.
@@ -140,8 +140,8 @@ middle values. Changing hardware can change the cohort. Missing references or an
 empty intersection produce an explanation, never a fallback to unrelated per-GPU
 shapes. "Best" means the maximum case throughput in this cohort, not the fastest
 individual timing sample. Hover shows both statistics; clicking opens that hardware's
-best-case timeline. The bars share the existing hardware colors and stack below the
-scatter plot on smaller screens.
+best-case timeline. The bars share the existing hardware colors and stack above Head to
+head on smaller screens.
 
 The page-owned comparison API accepts `rooflinePrecision=bf16|fp8|fp4`,
 `rooflineHardware=<comma-separated hardware keys>` and `rooflineNormalized=true|false`.
@@ -155,14 +155,14 @@ the explicit TFLOPS fields always remain absolute. Case indices refer to the enc
 comparison's cases and source measurement arrays. Invalid selectors return 400.
 Without these parameters the existing comparison response is unchanged.
 
-中文：独立全宽面板中的横向柱状图以填充表示吞吐量中位数，以轮廓表示实测最佳值，按当前显示的
+中文：桌面端与 Head to head 并排显示的横向柱状图以填充表示吞吐量中位数，以轮廓表示实测最佳值，按当前显示的
 中位数排序。柱状图跟随所选工作负载、硬件、精度和归一化开关：开启时显示峰值算力占比，
 关闭时显示 TFLOPS。所有柱使用同一组用例：在所选精度下，每个所选加速器都有成功且为正的
 有限实测值，且用例的算术强度不低于每个所选加速器的 roofline 拐点（峰值 TFLOPS / 带宽 TB/s）。
 图中显示共同用例数量；用例数为偶数时，中位数取中间两项的平均值。更改所选硬件可能改变这组
 用例。缺少参考值或没有共同用例时显示说明，不改用各硬件独有的用例。最佳值是这组用例中的
 最高实测吞吐量，不是单次计时样本中的最快值。悬停同时显示中位数和最佳值，点击可查看对应
-硬件最佳用例的时间线。柱状图沿用现有硬件配色，小屏幕上排列在散点图下方。
+硬件最佳用例的时间线。柱状图沿用现有硬件配色，小屏幕上排列在 Head to head 上方。
 
 页面专属 API 支持 `rooflinePrecision=bf16|fp8|fp4`、`rooflineHardware=<逗号分隔的硬件 key>`
 和 `rooflineNormalized=true|false`。传入其中任一参数时，响应增加 `rooflineSummary`，与 UI
