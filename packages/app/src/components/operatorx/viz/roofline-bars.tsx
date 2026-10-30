@@ -13,8 +13,7 @@ import type { ComparisonModel } from '../compare/model';
 const STRINGS = {
   en: {
     title: 'Median (fill) and best (outline)',
-    individual:
-      'Each accelerator uses its own compute-bound cases; case sets and quantization formats may differ. Counts are shown per bar.',
+    individual: 'Each accelerator uses its own compute-bound cases.',
     noData: 'No compute-bound measurements for this precision.',
     cohort: 'Shared cases at or above every selected accelerator’s ridge point',
     empty: 'No shared compute-bound cases. Try selecting fewer accelerators or another precision.',
@@ -28,7 +27,7 @@ const STRINGS = {
   },
   zh: {
     title: '中位数（填充）与最佳值（轮廓）',
-    individual: '各加速器使用各自的计算受限用例，用例集合和量化格式可能不同。每条柱显示用例数量。',
+    individual: '各加速器使用各自的计算受限用例。',
     noData: '此精度没有计算受限的实测用例。',
     cohort: '算术强度不低于每个所选加速器 roofline 拐点的共同实测用例',
     empty: '没有共同的计算受限用例。请减少所选加速器，或切换精度。',
