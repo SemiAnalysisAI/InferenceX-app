@@ -303,6 +303,31 @@ describe('writeUrlParams + buildShareUrl', () => {
     vi.unstubAllGlobals();
   });
 
+  it.each(['/inference', '/zh/inference'])(
+    'keeps the selected legacy model in share links from %s',
+    async (pathname) => {
+      setupWindow('', pathname);
+      const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
+      const { setInferenceNavigationModel } =
+        await import('@/lib/routing/inference-navigation-state');
+      setInferenceNavigationModel('DeepSeek-V4-Pro');
+      writeUrlParams({ g_model: 'DeepSeek-V4-Pro' });
+      await vi.advanceTimersByTimeAsync(200);
+      const url = new URL(buildShareUrl());
+      expect(url.pathname).toBe(pathname);
+      expect(url.searchParams.get('g_model')).toBe('DeepSeek-V4-Pro');
+    },
+  );
+
+  it('does not add the inference navigation default to other tabs', async () => {
+    setupWindow('', '/historical');
+    const { buildShareUrl } = await import('@/lib/routing/url-state');
+    const { setInferenceNavigationModel } =
+      await import('@/lib/routing/inference-navigation-state');
+    setInferenceNavigationModel('DeepSeek-V4-Pro');
+    expect(new URL(buildShareUrl()).searchParams.has('g_model')).toBe(false);
+  });
+
   it('stores params and includes them in share URL after flush', async () => {
     setupWindow('', '/inference');
     const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
