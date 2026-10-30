@@ -51,14 +51,6 @@ export const COLLECTIVEX_KNOWN_FOOTNOTES: Record<string, CollectiveXKnownFootnot
     en: 'Requires an MNNVL one-sided NVLink domain; only the GB rack-scale SKUs have one.',
     zh: '需要 MNNVL 单边 NVLink 域，仅 GB 机柜级 SKU 具备。',
   },
-  'mori-inter-node-corruption': {
-    en: 'MoRI InterNodeV1 combine returns stochastically wrong aggregates above ~128 tokens/rank on the Pollara/ionic fabric (ROCm/mori#610; the earlier caller-side routing bug from #475 is fixed via #546, but this residual survives; the ionic driver 25.11-vs-26.03 delta is the open lead).',
-    zh: 'MoRI InterNodeV1 的 combine 在 Pollara/ionic 网络上、每 rank 约 128 token 以上时随机返回错误聚合结果（ROCm/mori#610；#475 的调用方路由 bug 已由 #546 修复，但残留问题仍在；ionic 驱动 25.11 与 26.03 的差异是当前线索）。',
-  },
-  'tw-no-fabric': {
-    en: 'This pool has no inter-node GPU RDMA fabric (the shared subnet is management-only); cross-node EP is structurally impossible until the fabric exists.',
-    zh: '该集群没有跨节点 GPU RDMA 网络（共享子网仅用于管理），在网络就位前跨节点 EP 在结构上不可行。',
-  },
   'uccl-pollara-degraded': {
     en: "UCCL's CPU-proxy RDMA is functional on the Pollara fabric but ~13x under its upstream-documented bandwidth (~6 GB/s vs 82 GB/s), invariant to GPU-memory registration mode and traffic class — an ionic-driver-level suspect. Numbers at that deficit would misrepresent the SKU.",
     zh: 'UCCL 的 CPU 代理 RDMA 在 Pollara 网络上可运行，但带宽仅为上游文档值的约 1/13（约 6 GB/s 对 82 GB/s），与 GPU 内存注册方式和流量类别无关，疑似 ionic 驱动层问题。该水平的数据无法公正代表此 SKU。',
@@ -82,6 +74,18 @@ export const COLLECTIVEX_KNOWN_FOOTNOTES: Record<string, CollectiveXKnownFootnot
   'h100-efa-uccl-ll': {
     en: 'Low-latency EP16 runs over EFA and passes correctness at every rung, with a ~3.4 ms floor at T=1 and ~5.1 ms at the T=256 top rung (BF16), versus ~0.15 ms at T=1 on H200 InfiniBand.',
     zh: '低延迟 EP16 可在 EFA 上运行，所有梯级正确性通过；T=1 下限约 3.4 ms，梯级顶端 T=256 约 5.1 ms（BF16），而 H200 InfiniBand 上 T=1 约 0.15 ms。',
+  },
+  'mi355x-ainic-a77': {
+    en: 'Blocked on the host network stack: the vLLM v0.32.0 ROCm image builds MoRI v1.2.3.post1 for AINIC 1.117.5-a-77, while these nodes run a-45, so two-node MoRI cannot open its RDMA queue pairs. Single-node runs are unaffected; a host AINIC upgrade is requested.',
+    zh: '受主机网络栈限制：vLLM v0.32.0 ROCm 镜像中的 MoRI v1.2.3.post1 针对 AINIC 1.117.5-a-77 构建，而这些节点运行 a-45，因此双节点 MoRI 无法建立 RDMA 队列对。单节点不受影响；已申请升级主机 AINIC。',
+  },
+  'vllm-mori-ll-inter-node-only': {
+    en: 'vLLM runs MoRI low-latency only across nodes (InterNodeV1LL); it has no single-node low-latency kernel, so this configuration is not measured.',
+    zh: 'vLLM 仅在跨节点时运行 MoRI 低延迟模式（InterNodeV1LL），没有单节点低延迟 Kernel，因此不测量此配置。',
+  },
+  'uccl-amd-ll-fp8': {
+    en: 'Low-latency EP16 works in BF16 and FP8. FP8 sometimes hangs in its first two-node dispatch on these GPUs (every MI325X attempt so far, one of three on MI300X), so MI325X FP8 has no result yet.',
+    zh: '低延迟 EP16 在 BF16 与 FP8 下均可用。FP8 在这些 GPU 上偶尔会在首次双节点 dispatch 时卡住（目前 MI325X 每次尝试均卡住，MI300X 三次中一次），因此 MI325X 的 FP8 尚无结果。',
   },
   'uccl-not-brought-up': {
     en: 'Not brought up on this pool (untested compute capability or no scale-out NIC path for the CPU proxy).',
@@ -110,14 +114,6 @@ export const COLLECTIVEX_KNOWN_FOOTNOTES: Record<string, CollectiveXKnownFootnot
   'b300-ll-create-ah': {
     en: 'Cross-node IBGDA fails during NVSHMEM setup — re-confirmed on a fresh node pair 2026-08-28: ibv_reg_dmabuf_mr returns a null MR before the downstream ibv_create_ah failure, with nvidia_peermem loaded; the live suspect is the stale libmlx5 in the container image (an image bump, not a host fix).',
     zh: '跨节点 IBGDA 在 NVSHMEM 建立阶段失败——2026-08-28 在新节点对上复验：ibv_reg_dmabuf_mr 返回空 MR，随后才是 ibv_create_ah 失败，且 nvidia_peermem 已加载；当前疑点是容器镜像中过旧的 libmlx5（需镜像升级而非主机修复）。',
-  },
-  'mori-ll-scale-up-only': {
-    en: 'MoRI low-latency measures AsyncLL split-phase (the kernel SGLang deploys); the benchmark keeps it scale-up EP8 only.',
-    zh: 'MoRI 低延迟测量 AsyncLL 分阶段路径（即 SGLang 实际部署的 Kernel）；基准仅覆盖节点内 EP8。',
-  },
-  'mori-asyncll-topk6': {
-    en: "AsyncLL (the deployed low-latency kernel) hits a device-side assert whenever top-k does not divide the 64-lane warp — the DeepSeek-V4-Pro workload's top-k 6 crashes where top-k 8 passes (bisected on-metal, pure mori API). Fixed upstream in ROCm/mori#505 (2026-07-31); red until the mi35x images ship a mori containing it (newest tag is mori-0706).",
-    zh: 'AsyncLL（实际部署的低延迟 Kernel）在 top-k 无法整除 64 lane warp 时触发设备端断言——DeepSeek-V4-Pro 工作负载的 top-k 6 崩溃而 top-k 8 通过（裸金属上用纯 mori API 二分定位）。上游已在 ROCm/mori#505（2026-07-31）修复；在 mi35x 镜像包含该修复前（最新标签为 mori-0706）保持红色。',
   },
   'no-ll-kernels': {
     en: 'The library has no low-latency kernels.',
@@ -191,21 +187,21 @@ const NORMAL: KnownMatrix = {
   },
   mi300x: {
     'deepep-v2': off('nvidia-only'),
-    mori: cell(works, broken('tw-no-fabric')),
-    'uccl-ep': cell(works, broken('tw-no-fabric')),
+    mori: bothWork,
+    'uccl-ep': bothWork,
     'nccl-ep': off('nvidia-only'),
     'flashinfer-ep': off('gb-only'),
   },
   mi325x: {
     'deepep-v2': off('nvidia-only'),
-    mori: cell(works, broken('tw-no-fabric')),
-    'uccl-ep': cell(works, broken('tw-no-fabric')),
+    mori: bothWork,
+    'uccl-ep': bothWork,
     'nccl-ep': off('nvidia-only'),
     'flashinfer-ep': off('gb-only'),
   },
   mi355x: {
     'deepep-v2': off('nvidia-only'),
-    mori: cell(works, broken('mori-inter-node-corruption')),
+    mori: cell(works, broken('mi355x-ainic-a77')),
     'uccl-ep': cell(works, broken('uccl-pollara-degraded')),
     'nccl-ep': off('nvidia-only'),
     'flashinfer-ep': off('gb-only'),
@@ -257,21 +253,21 @@ const LOW_LATENCY: KnownMatrix = {
   },
   mi300x: {
     'deepep-v2': off('nvidia-only'),
-    mori: cell(broken('mori-asyncll-topk6'), na('mori-ll-scale-up-only')),
-    'uccl-ep': cell(broken('uccl-amd-ll-kernel'), broken('uccl-amd-ll-kernel')),
+    mori: cell(na('vllm-mori-ll-inter-node-only'), works),
+    'uccl-ep': cell(na('ll-ep16-not-enabled'), worksWith('uccl-amd-ll-fp8')),
     'nccl-ep': off('nvidia-only'),
     'flashinfer-ep': off('no-ll-kernels'),
   },
   mi325x: {
     'deepep-v2': off('nvidia-only'),
-    mori: cell(broken('mori-asyncll-topk6'), na('mori-ll-scale-up-only')),
-    'uccl-ep': cell(broken('uccl-amd-ll-kernel'), broken('uccl-amd-ll-kernel')),
+    mori: cell(na('vllm-mori-ll-inter-node-only'), works),
+    'uccl-ep': cell(na('ll-ep16-not-enabled'), worksWith('uccl-amd-ll-fp8')),
     'nccl-ep': off('nvidia-only'),
     'flashinfer-ep': off('no-ll-kernels'),
   },
   mi355x: {
     'deepep-v2': off('nvidia-only'),
-    mori: cell(broken('mori-asyncll-topk6'), na('mori-ll-scale-up-only')),
+    mori: cell(na('vllm-mori-ll-inter-node-only'), broken('mi355x-ainic-a77')),
     'uccl-ep': cell(broken('uccl-amd-ll-kernel'), broken('uccl-amd-ll-kernel')),
     'nccl-ep': off('nvidia-only'),
     'flashinfer-ep': off('no-ll-kernels'),
