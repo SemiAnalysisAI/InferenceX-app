@@ -262,7 +262,16 @@ for (const prefix of ['', '/zh']) {
         cy.contains('No case was measured on both.').should('not.exist');
         cy.contains('of 2').should('be.visible');
         cy.get('svg').should('exist');
+        cy.get('[data-testid="chart-legend"]').should('not.exist');
+        cy.get('span[aria-hidden="true"].rounded-full').should('have.length', 2);
       });
+    // At the default desktop width the plot area is square so the parity line sits at 45 degrees.
+    cy.get('[data-testid="operatorx-viz-pairwise-scatter"] svg').should(($svgs) => {
+      const { width, height } = [...$svgs]
+        .map((svg) => svg.getBoundingClientRect())
+        .toSorted((a, b) => b.width - a.width)[0];
+      expect(height - 56 - 16).to.be.closeTo(width - 72 - 16, 2);
+    });
   });
 }
 

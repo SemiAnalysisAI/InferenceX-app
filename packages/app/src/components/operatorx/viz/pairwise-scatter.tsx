@@ -4,15 +4,22 @@ import * as d3 from 'd3';
 import { useMemo, useState } from 'react';
 
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { useResponsiveChartDimensions } from '@/hooks/useResponsiveChartDimensions';
 import { track } from '@/lib/analytics/analytics';
 
 import { EmptyChart } from '../charts/empty';
-import { OpxChart, esc, HardwareLegend, tooltipHtml } from '../charts/kit';
+import { OpxChart, esc, tooltipHtml } from '../charts/kit';
 import { valueScale } from '../charts/scales';
 import { hardwareLabel } from '../compare/hardware';
 import type { ComparisonModel } from '../compare/model';
 import { originRows } from '../compare/slices';
 import type { VizDefinition } from './types';
+
+const MARGIN = { top: 16, right: 16, bottom: 56, left: 72 };
+
+// A square plot keeps the parity line at 45 degrees and fills the card beside the summary bars.
+const squareHeight = (width: number) =>
+  Math.min(560, Math.max(380, width - MARGIN.left - MARGIN.right + MARGIN.top + MARGIN.bottom));
 
 interface Pair {
   i: number;
@@ -35,6 +42,7 @@ function PairwiseScatter({ model }: { model: ComparisonModel }) {
   const { view, metric, hardware } = model;
   const [pickA, setA] = useState<string | null>(null);
   const [pickB, setB] = useState<string | null>(null);
+  const { dimensions, setContainerRef } = useResponsiveChartDimensions();
   const a =
     pickA && hardware.includes(pickA)
       ? pickA
@@ -67,9 +75,17 @@ function PairwiseScatter({ model }: { model: ComparisonModel }) {
     pairs.flatMap((p) => [p.x, p.y]),
   );
   const [d0, d1] = scale.domain as [number, number];
+  const swatch = (hw: string) => (
+    <span
+      aria-hidden="true"
+      className="size-2.5 shrink-0 rounded-full"
+      style={{ backgroundColor: model.colors[hw] }}
+    />
+  );
   return (
-    <div className="space-y-3">
+    <div ref={setContainerRef} className="space-y-3">
       <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+        {swatch(a)}
         <SearchableSelect
           size="sm"
           value={a}
@@ -81,6 +97,7 @@ function PairwiseScatter({ model }: { model: ComparisonModel }) {
           triggerAriaLabel="X axis GPU"
         />
         <span>vs</span>
+        {swatch(b)}
         <SearchableSelect
           size="sm"
           value={b}
@@ -102,8 +119,8 @@ function PairwiseScatter({ model }: { model: ComparisonModel }) {
           inspect={{ model, caseOf: (p) => p.i }}
           chartId="operatorx-pairwise"
           data={pairs}
-          height={380}
-          margin={{ top: 16, right: 16, bottom: 56, left: 72 }}
+          height={squareHeight(dimensions.width)}
+          margin={MARGIN}
           xScale={scale}
           yScale={scale}
           xAxis={{
@@ -164,7 +181,6 @@ function PairwiseScatter({ model }: { model: ComparisonModel }) {
                 footer: 'Click for kernel timeline',
               }),
           }}
-          legendElement={<HardwareLegend model={model} hardware={[a, b]} />}
         />
       )}
     </div>
