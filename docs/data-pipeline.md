@@ -120,6 +120,14 @@ while newly added concurrency points or complete recipe variants may run as delt
 All appended points must retain the target curve's image, and benchmark-affecting code
 changes must be isolated to the new points.
 
+`/api/unofficial-run` previews an append-only run the same way. For each curve the run
+touches, it adds the current published points from `latest_benchmarks` when the run and
+that curve share one image. A point the run re-measures replaces the published one.
+Inherited rows keep their producer date, workflow-run ID and result ID. They take the
+unofficial run's URL because overlays group series by run URL. Every row in the stitched
+curve gets the run's date as `curve_date` and the negated GitHub run ID as
+`curve_workflow_run_id`, since the run has no `workflow_runs` row yet.
+
 ### Audited Point Purges
 
 `packages/db/src/etl/run-overrides.ts` is the durable audit record for exceptional

@@ -13,10 +13,10 @@ import {
 } from './hardware';
 import { metricById } from './metrics';
 
-function comparison() {
+function comparison(dtype = 'bf16') {
   const op = {
     type: 'gemm',
-    args: { m: 1024, n: 1024, k: 1024, a: { dtype: 'bf16' }, b: { dtype: 'bf16' }, out: 'bf16' },
+    args: { m: 1024, n: 1024, k: 1024, a: { dtype }, b: { dtype }, out: 'bf16' },
     sources: ['deepseek-ai/DeepSeek-V4-Pro/mlp'],
     backend: 'torch_npu_linear',
   };
@@ -61,7 +61,7 @@ describe('Ascend OperatorX reference', () => {
     const reference = view.hardware[0].reference!;
     expect(view.workload).toBe('gemm:DeepSeek-V4-Pro');
     expect(reference).toMatchObject({
-      peakTflops: { bf16: 378, fp8: null, fp4: null },
+      peakTflops: { bf16: 378, fp8: 756, fp4: null },
       memoryBandwidthTBs: 1.6,
       memoryBandwidthAssumed: true,
     });
@@ -90,8 +90,20 @@ describe('Ascend OperatorX reference', () => {
     );
   });
 
-  it('does not invent other precision peaks or change existing hardware references', () => {
-    expect(peakTflops('ascend950pr', 'fp8')).toBeNull();
+  it('normalizes FP8 measurements with the same Cube peak in the API and UI', () => {
+    const view = comparisonView(comparison('e4m3'), 'gemm:DeepSeek-V4-Pro');
+    expect(view.hardware[0].reference!.peakTflops.fp8).toBe(756);
+    expect(view.defaults.rooflinePrecision).toBe('fp8');
+    expect(view.cases[0].computePrecision).toBe('fp8');
+    expect(view.measurements.ascend950pr.latencyUs[0]).toBe(10);
+    expect(metricById('computeUtil').value(view.cases[0], 10, 'ascend950pr')).toBeCloseTo(
+      214.7483648 / 756,
+      12,
+    );
+    expect(peakTflops('ascend950pr', 'fp8')! / peakBandwidthTBs('ascend950pr')!).toBe(472.5);
+  });
+
+  it('leaves unregistered precisions and existing hardware references unchanged', () => {
     expect(peakTflops('ascend950pr', 'fp4')).toBeNull();
     expect(peakTflops('ascend950pr', 'other')).toBeNull();
     expect(peakTflops('unknown', 'bf16')).toBeNull();

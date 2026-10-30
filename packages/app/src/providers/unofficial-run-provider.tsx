@@ -15,6 +15,7 @@ import type { ChartDefinition, HardwareConfig, InferenceData } from '@/component
 import { UnofficialBanner } from '@/components/ui/unofficial-banner';
 import { DB_MODEL_TO_DISPLAY, rowToSequence } from '@semianalysisai/inferencex-constants';
 import type { BenchmarkRow, EvalRow } from '@/lib/api/api';
+import { benchmarkCurveDate } from '@/lib/benchmarks/benchmark-run-selection';
 import { transformBenchmarkRows, type TokenBasis } from '@/lib/benchmarks/benchmark-transform';
 import { normalizeEvalHardwareKey } from '@/lib/charts/chart-utils';
 import { notifyClientSearchChange } from '@/lib/routing/client-navigation';
@@ -135,7 +136,13 @@ export function buildChartData(
     if (!sequence) continue;
     const key = `${displayModel}_${sequence}`;
     if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(row);
+    // Same date semantics as the official chart: snapshot date, with the measured date kept.
+    const chartRow = {
+      ...row,
+      date: benchmarkCurveDate(row),
+      actualDate: row.date,
+    };
+    groups.get(key)!.push(chartRow);
   }
 
   const result: UnofficialChartData = {};
@@ -152,7 +159,10 @@ export function buildChartData(
     );
     result[key] = {
       e2e: { data: chartData[e2eIdx] ?? [], gpus: hardwareConfig },
-      interactivity: { data: chartData[interactivityIdx] ?? [], gpus: hardwareConfig },
+      interactivity: {
+        data: chartData[interactivityIdx] ?? [],
+        gpus: hardwareConfig,
+      },
     };
   }
   return result;
@@ -359,7 +369,9 @@ async function fetchUnofficialRuns(
 ): Promise<UnofficialRunResponse> {
   const url = `/api/unofficial-run?runId=${encodeURIComponent(ids.join(','))}`;
   const response = await fetch(url, { cache: 'no-store', signal });
-  const data = (await response.json()) as Partial<UnofficialRunResponse> & { error?: string };
+  const data = (await response.json()) as Partial<UnofficialRunResponse> & {
+    error?: string;
+  };
   if (!response.ok) {
     throw new ApiRequestError(data.error || 'Failed to fetch unofficial run', response.status, url);
   }

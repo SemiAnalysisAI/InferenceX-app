@@ -28,8 +28,8 @@ import {
 import { QueryProvider } from '@/providers/query-provider';
 import { PostHogProvider, PostHogPageView } from '@/providers/posthog-provider';
 import {
-  LANDING_BANNER_DISMISSED_ATTRIBUTE,
-  LANDING_BANNER_STORAGE_KEY,
+  landingBannerPrepaintScript as buildLandingBannerPrepaintScript,
+  landingBannerPrepaintStyle as buildLandingBannerPrepaintStyle,
 } from '@/lib/nudges/landing-banner';
 
 const dm_sans = DM_Sans({
@@ -166,12 +166,8 @@ const jsonLd = {
   ],
 };
 
-const landingBannerPrepaintScript = `try{if(localStorage.getItem(${JSON.stringify(
-  LANDING_BANNER_STORAGE_KEY,
-)})){document.documentElement.setAttribute(${JSON.stringify(
-  LANDING_BANNER_DISMISSED_ATTRIBUTE,
-)},'')}}catch{}`;
-const landingBannerPrepaintStyle = `html[${LANDING_BANNER_DISMISSED_ATTRIBUTE}] [data-initial-banner]{display:none}`;
+const landingBannerPrepaintScript = buildLandingBannerPrepaintScript();
+const landingBannerPrepaintStyle = buildLandingBannerPrepaintStyle();
 
 export default function RootLayout({
   children,

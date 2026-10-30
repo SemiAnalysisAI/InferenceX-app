@@ -12,8 +12,8 @@ export const metadata: Metadata = {
 export default function ZhFeedbackPage() {
   return (
     <>
-      <ZhTabIntro tab="feedback" />
       <FeedbackViewer />
+      <ZhTabIntro tab="feedback" />
     </>
   );
 }

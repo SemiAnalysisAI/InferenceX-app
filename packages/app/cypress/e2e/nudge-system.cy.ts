@@ -4,7 +4,7 @@ function clearAllNudgeStorage(win: Cypress.AUTWindow) {
   const keys = [
     'inferencex-starred',
     'inferencex-star-modal-dismissed',
-    'inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed',
+    'inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed',
     'inferencex-reproducibility-nudge-shown',
     'inferencex-star-nudge-shown',
     'inferencex-export-nudge-shown',
@@ -16,6 +16,8 @@ function clearAllNudgeStorage(win: Cypress.AUTWindow) {
     win.localStorage.removeItem(key);
     win.sessionStorage.removeItem(key);
   }
+  // Pin the landing banner A/B arm so assertions on its copy are deterministic.
+  win.localStorage.setItem('inferencex-landing-banner-variant', 'ubenchx');
 }
 
 beforeEach(() => {
@@ -30,8 +32,8 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
     });
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
-      .and('contain.text', 'Google TPUv7 joins AgentX')
-      .and('contain.text', 'TPUv7 Kimi K3 2.8T prelimary Submisison: Competitive Results')
+      .and('contain.text', 'Huawei Ascend 950PR Microbenchmarks')
+      .and('contain.text', 'Cycle Level Core memory-access MicroBenchmarks (Beta)')
       .and('contain.text', 'View results');
     cy.get('[data-new-badge="launch-banner"]').should('have.class', 'new-badge-flash');
     cy.get('[data-new-badge]')
@@ -83,15 +85,13 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
     });
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
-      .and('contain.text', 'Google TPUv7 加入 AgentX')
-      .and('contain.text', 'TPUv7 Kimi K3 2.8T 初步提交：成绩具有竞争力')
+      .and('contain.text', 'Huawei Ascend 950PR 微基准测试')
+      .and('contain.text', '周期级核心访存微基准测试（Beta）')
       .and('contain.text', '查看结果');
   });
 });
 
 const LAUNCH_MODAL_KEY = 'inferencex-tpuv7-agentx-multiple-model-modal-dismissed';
-const TPU_RESULTS_HREF =
-  '/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_xmode=interactivity&i_seq=agentic-traces&i_prec=fp8';
 
 function assertTpuResultsFilters() {
   assertTpuGb300Selected();
@@ -322,16 +322,18 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
 });
 
 describe('Landing nudges — banner', { testIsolation: true }, () => {
-  it('wraps the full launch banner title on mobile without clipping', () => {
+  it('wraps the launch banner title and subtitle on mobile without clipping', () => {
     cy.viewport(375, 812);
     cy.visit('/', { onBeforeLoad: clearAllNudgeStorage });
     cy.get('[data-testid="launch-banner"] p')
-      .first()
-      .should('contain.text', 'Google TPUv7 joins AgentX')
+      .should('contain.text', 'Huawei Ascend 950PR Microbenchmarks')
+      .and('contain.text', 'Cycle Level Core memory-access MicroBenchmarks (Beta)')
       .and('have.css', 'white-space', 'normal')
-      .should(($title) => {
-        expect($title[0].scrollWidth).to.be.at.most($title[0].clientWidth);
-        expect($title[0].scrollHeight).to.be.at.most($title[0].clientHeight);
+      .should(($paragraphs) => {
+        for (const text of $paragraphs) {
+          expect(text.scrollWidth).to.be.at.most(text.clientWidth);
+          expect(text.scrollHeight).to.be.at.most(text.clientHeight);
+        }
       });
   });
 
@@ -340,7 +342,7 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
       onBeforeLoad: clearAllNudgeStorage,
     });
     cy.get('[data-testid="launch-banner"]').should('be.visible');
-    cy.get('[data-testid="launch-banner-dismiss"]').click();
+    cy.get('[data-testid="launch-banner-dismiss"]:visible').click();
     cy.get('[data-testid="launch-banner"]').should('not.exist');
 
     cy.reload();
@@ -348,32 +350,31 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
   });
 
   it('clicking the banner body navigates without persisting dismissal', () => {
-    interceptTpuLaunchData();
     cy.visit('/', {
       onBeforeLoad: clearAllNudgeStorage,
     });
     cy.get('[data-testid="launch-banner"]').should('be.visible');
     cy.window().then((win) => {
-      expect(win.localStorage.getItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed')).to.eq(
-        null,
-      );
+      expect(
+        win.localStorage.getItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed'),
+      ).to.eq(null);
     });
 
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
-      .and('have.attr', 'href', TPU_RESULTS_HREF);
-    cy.get('[data-testid="launch-banner"]').click();
+      .and('have.attr', 'href', '/ubenchx/core-memory-profiles');
+    cy.get('[data-testid="launch-banner"]:visible').click();
 
-    cy.location('pathname').should('eq', '/inference/qwen-3-5');
-    assertTpuResultsFilters();
+    cy.location('pathname').should('eq', '/ubenchx/core-memory-profiles');
+    cy.get('[data-testid="ascend-core-profiles"]').should('be.visible');
 
     cy.get('[data-testid="nav-link-home"]').click();
     cy.location('pathname').should('eq', '/');
     cy.reload();
     cy.window().then((win) => {
-      expect(win.localStorage.getItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed')).to.eq(
-        null,
-      );
+      expect(
+        win.localStorage.getItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed'),
+      ).to.eq(null);
     });
     cy.get('[data-testid="launch-banner"]').should('be.visible');
   });
@@ -492,7 +493,7 @@ describe('Nudge scope isolation', () => {
     cy.visit('/', {
       onBeforeLoad(win) {
         clearAllNudgeStorage(win);
-        win.localStorage.setItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed', '1');
+        win.localStorage.setItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed', '1');
         win.localStorage.setItem('inferencex-starred', '1');
       },
     });

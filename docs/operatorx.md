@@ -129,12 +129,13 @@ normalization costs and must not be reported as an end-to-end production speedup
 
 The OperatorX-only hardware reference for `ascend950pr` uses the 28-Cube
 Ascend950PR_9579 basis in `Ascend-ubench.md` (hardware configuration and section 5):
-378 dense BF16 TFLOPS and **assumed** HBM bandwidth of 1.6 TB/s. The compute value
-is Cube-only (Huawei Ascend 950 white paper, table 3-1), excluding the Vector
-contribution in the 425 TFLOPS combined figure. Exact memory/ECC configuration
-remains unresolved; the chart states this qualification. Other precision ceilings
-remain null. The normalized roofline divides arithmetic intensity by 236.25
-FLOP/byte and throughput by 378 TFLOPS; raw measurements are unchanged.
+378 dense BF16 TFLOPS, 756 dense FP8 TFLOPS and **assumed** HBM bandwidth of 1.6 TB/s.
+The compute values are Cube-only ([Huawei Ascend 950 white paper, table 3-1](https://public-download.obs.cn-east-2.myhuaweicloud.com/ascend/%E6%98%87%E8%85%BE950%20NPU%E6%9E%B6%E6%9E%84%E7%99%BD%E7%9A%AE%E4%B9%A6.pdf)),
+excluding Vector compute in the combined figures. Exact memory/ECC configuration
+remains unresolved; the chart states this qualification. FP4 remains null.
+The normalized roofline divides arithmetic intensity by 236.25 FLOP/byte for BF16
+or 472.5 for FP8, and throughput by 378 or 756 TFLOPS respectively. Raw measurements
+and the inclusion of activation quantization in measured FP8 latency are unchanged.
 
 `GET /api/v1/operatorx/compare?op=gemm` includes an optional `hardware[].reference`
 object with `label`, nullable `peakTflops.{bf16,fp8,fp4}`, `memoryBandwidthTBs`,
@@ -160,11 +161,13 @@ still win; no data, hardware selection, or measurement is changed.
 ### 中文说明
 
 `ascend950pr` 的参考值仅用于 OperatorX，依据 `Ascend-ubench.md` 的硬件配置说明和第 5 节，
-以 28 个 Cube 核的 Ascend950PR_9579 为基准：BF16 稠密计算峰值为 378 TFLOPS，
-HBM 带宽**假定为** 1.6 TB/s。计算峰值取自华为 Ascend 950 白皮书表 3-1 中的 Cube 项，
-不包含 425 TFLOPS 合计值中的 Vector 算力。具体内存及 ECC 配置仍未确认，图表会显示此说明。
-其他精度的峰值保留为 null。归一化时，算术强度除以 236.25 FLOP/byte，吞吐量除以
-378 TFLOPS；实测数据不变。
+以 28 个 Cube 核的 Ascend950PR_9579 为基准：BF16 和 FP8 的稠密计算峰值分别为 378 和
+756 TFLOPS，HBM 带宽**假定为** 1.6 TB/s。计算峰值仅计入 Cube 算力，来源为
+[华为 Ascend 950 白皮书表 3-1](https://public-download.obs.cn-east-2.myhuaweicloud.com/ascend/%E6%98%87%E8%85%BE950%20NPU%E6%9E%B6%E6%9E%84%E7%99%BD%E7%9A%AE%E4%B9%A6.pdf)，
+不包含白皮书合计值中的 Vector 算力。具体内存及 ECC 配置仍未确认，图表会显示此说明。
+FP4 的峰值保留为 null。归一化时，BF16 的算术强度除以 236.25 FLOP/byte，吞吐量除以
+378 TFLOPS；FP8 则分别除以 472.5 FLOP/byte 和 756 TFLOPS。实测数据不变，FP8 延迟仍包含
+激活量化耗时。
 
 `GET /api/v1/operatorx/compare?op=gemm` 的响应在 `hardware[].reference` 中提供可选的参考值对象：
 `label`、允许为 null 的 `peakTflops.{bf16,fp8,fp4}`、`memoryBandwidthTBs`、

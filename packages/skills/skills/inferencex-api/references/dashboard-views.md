@@ -33,12 +33,14 @@ results or treat its interpolated values as separately measured operating points
    for static model, hardware, sequence and metric registries; use each specialized
    view's `options`, `configurations`, `workloads`, or raw run-list operation for
    data-dependent choices.
-   MiniMax M3 has `category=deprecated` in `options.models`; it remains selectable
-   through explicit model parameters and overview `modelScope=all`. MiniMax M3.1
-   Flash remains in the default model group.
+   MiniMax M3 and DeepSeek V4 Pro have `category=deprecated` in `options.models`.
+   They remain selectable through explicit model parameters and overview
+   `modelScope=all`. MiniMax M3.1 Flash and DeepSeek V4.1 Flash remain in the default
+   model group. Historical data and unofficial-run overlays remain available;
+   current-image views exclude both retired models.
    Preserve `options.models` order within each category when rendering model
    selectors. The default group is Kimi K3, DeepSeek V4.1 Flash, GLM5.2/GLM5.3,
-   MiniMax M3.1 Flash, Muse Spark Open, DeepSeek V4 Pro 0813, Qwen3.5, then
+   MiniMax M3.1 Flash, Muse Spark Open, Qwen3.5, then
    Qwen3.8 Flash Next. This presentation order does not change `defaults.model`
    or the overview's model order.
    For models with `category=deprecated`, inference charts append `(Deprecated)`
@@ -258,10 +260,11 @@ Its other `/api/v1/operatorx/*` routes belong to the page and are not part of th
 skill's read-only view API. The page-owned
 `/api/v1/operatorx/compare?op=gemm&workload=gemm:DeepSeek-V4-Pro` response includes
 optional `hardware[].reference` metadata for Ascend 950PR (28 Cube):
-`peakTflops.bf16=378`, `memoryBandwidthTBs=1.6`, `memoryBandwidthAssumed=true`,
-plus `source` and `qualification`. FP8/FP4 peaks remain null. Normalized X is
-arithmetic intensity divided by 236.25 FLOP/byte; Y is achieved TFLOPS divided
-by 378. The bandwidth is an assumption, not an independently verified memory/ECC
+`peakTflops.bf16=378`, `peakTflops.fp8=756`, `memoryBandwidthTBs=1.6`, `memoryBandwidthAssumed=true`,
+plus `source` and `qualification`. These are dense Cube-only peaks; FP4 remains null.
+Normalized X is arithmetic intensity divided by 236.25 FLOP/byte for BF16 or 472.5
+for FP8; Y is achieved TFLOPS divided by 378 or 756 respectively. FP8 activation
+quantization remains inside the measured latency. The bandwidth is an assumption, not an independently verified memory/ECC
 configuration. Apply these references to the returned measurements; do not substitute
 the older matmul sweep for the ingested F.linear results. Missing measurements stay
 missing. The 950PR crimson color is presentation-only; the stored key remains `ascend950pr`.

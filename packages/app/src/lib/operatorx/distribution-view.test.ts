@@ -84,14 +84,14 @@ describe('OperatorX distribution projection', () => {
       matchedOnly: true,
       normalized: true,
     });
-    expect(normalized).toMatchObject({ metric: 'computeUtil', normalized: true, matchedCases: 1 });
+    expect(normalized).toMatchObject({ metric: 'computeUtil', normalized: true, matchedCases: 2 });
     expect(normalized.boxes[0]).toMatchObject({
       hardware: 'ascend950pr',
-      n: 1,
+      n: 2,
       p50: 1,
-      caseIndices: [0],
+      caseIndices: [0, 1],
     });
-    expect(normalized.boxes[1].p50).toBeCloseTo(189 / 989);
+    expect(normalized.boxes[1].p50).toBeCloseTo((189 / 989 + 378 / 1979) / 2);
   });
 
   it('uses bandwidth peak for bandwidth and leaves latency in microseconds', () => {
@@ -118,6 +118,8 @@ describe('OperatorX distribution projection', () => {
     const input = view();
     input.measurements.h200.status[0] = null;
     input.measurements.h200.latencyUs[0] = null;
+    input.measurements.ascend950pr.status[1] = null;
+    input.measurements.ascend950pr.latencyUs[1] = null;
     const projection = distributionView(input, {
       metric: 'tflops',
       hardware: ['ascend950pr', 'h200'],

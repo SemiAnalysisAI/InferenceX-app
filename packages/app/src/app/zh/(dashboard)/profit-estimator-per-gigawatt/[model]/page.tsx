@@ -38,11 +38,6 @@ export default async function ZhProfitEstimatorModelPage({ params, searchParams 
   const meta = MODEL_TAB_META_ZH['profit-estimator-per-gigawatt'];
   return (
     <>
-      <ZhTabIntro
-        tab="profit-estimator-per-gigawatt"
-        title={meta.title(resolved.route.seoName)}
-        intro={meta.intro(resolved.route.seoName)}
-      />
       <ProfitEstimatorDisplay
         basis="gw-year"
         urlSeed={{
@@ -50,6 +45,11 @@ export default async function ZhProfitEstimatorModelPage({ params, searchParams 
           model: seed.model ?? resolved.route.model,
           profitRouteKey: JSON.stringify(sp),
         }}
+      />
+      <ZhTabIntro
+        tab="profit-estimator-per-gigawatt"
+        title={meta.title(resolved.route.seoName)}
+        intro={meta.intro(resolved.route.seoName)}
       />
     </>
   );

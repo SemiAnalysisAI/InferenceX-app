@@ -12,12 +12,12 @@ export const metadata: Metadata = tabMetadata('powerx');
 export default function PowerXPage() {
   return (
     <PowerXFeatureGate locale="en">
-      <TabIntro tab="powerx" />
       <PowerXSurfaceProvider>
         <InferenceProvider activeTab="inference">
           <InferenceChartDisplay />
         </InferenceProvider>
       </PowerXSurfaceProvider>
+      <TabIntro tab="powerx" />
     </PowerXFeatureGate>
   );
 }

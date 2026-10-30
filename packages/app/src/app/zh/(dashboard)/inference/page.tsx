@@ -12,7 +12,7 @@ export default function ZhInferencePage() {
     <>
       <InferencePageIntro locale="zh" />
       <InferenceProvider activeTab="inference">
-        <InferenceChartDisplay />
+        <InferenceChartDisplay centerOnEnter />
       </InferenceProvider>
     </>
   );

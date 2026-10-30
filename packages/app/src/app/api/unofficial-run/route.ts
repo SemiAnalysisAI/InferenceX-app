@@ -8,12 +8,18 @@ import { artifactRunId } from '@semianalysisai/inferencex-db/etl/tpu-normalizati
 import { mapBenchmarkRow } from '@semianalysisai/inferencex-db/etl/benchmark-mapper';
 import { mapAggEvalRow, type EvalParams } from '@semianalysisai/inferencex-db/etl/eval-mapper';
 import { createSkipTracker } from '@semianalysisai/inferencex-db/etl/skip-tracker';
+import {
+  hasAppendOnlyFlag,
+  parseChangelogEntries,
+} from '@semianalysisai/inferencex-db/etl/changelog-ingest';
 
 import {
   localArtifactPreviewEnabled,
   readLocalArtifactPreview,
 } from '@/lib/github/local-artifact-preview';
 import type { BenchmarkRow, EvalRow } from '@/lib/api/api';
+import { stitchAppendOnlyPreview } from '@/lib/benchmarks/append-only-preview';
+import { getCachedBenchmarks } from '@/lib/benchmarks/benchmark-query-cache.server';
 import {
   downloadGithubArtifact,
   extractZipEntries,
@@ -205,7 +211,10 @@ async function downloadArtifactRows(archiveUrl: string, githubToken: string) {
 }
 
 /** Parse the runId query param into a list of unique numeric ids. */
-function parseRunIds(raw: string | null): { ids: string[]; error: string | null } {
+function parseRunIds(raw: string | null): {
+  ids: string[];
+  error: string | null;
+} {
   if (!raw) return { ids: [], error: 'runId must be provided' };
   const ids = [
     ...new Set(
@@ -216,7 +225,10 @@ function parseRunIds(raw: string | null): { ids: string[]; error: string | null 
     ),
   ];
   if (ids.length === 0 || !ids.every((id) => /^\d+$/u.test(id))) {
-    return { ids: [], error: 'runId must be a comma-separated list of numeric values' };
+    return {
+      ids: [],
+      error: 'runId must be a comma-separated list of numeric values',
+    };
   }
   return { ids, error: null };
 }
@@ -231,7 +243,9 @@ async function processSingleRun(
   | { errorResponse: NextResponse }
   | {
       errorResponse: null;
-      runInfo: ReturnType<typeof normalizeGithubRunInfo> & { isNonMainBranch: boolean };
+      runInfo: ReturnType<typeof normalizeGithubRunInfo> & {
+        isNonMainBranch: boolean;
+      };
       benchmarks: BenchmarkRow[];
       evaluations: EvalRow[];
       nextEvalConfigIdOffset: number;
@@ -277,6 +291,9 @@ async function processSingleRun(
     .toSorted((a, b) => b.id - a.id)[0];
   const evalArtifact = artifacts
     .filter((a) => a.name === 'eval_results_all')
+    .toSorted((a, b) => b.id - a.id)[0];
+  const changelogArtifact = artifacts
+    .filter((a) => a.name === 'changelog-metadata')
     .toSorted((a, b) => b.id - a.id)[0];
 
   // Agentic-only sweeps never run the collect-results merge job (run-sweep.yml
@@ -338,6 +355,23 @@ async function processSingleRun(
       }
     }
     benchmarks = normalizeArtifactRows(rawRows, date, runUrl || null);
+  }
+
+  if (benchmarks.length > 0 && changelogArtifact) {
+    const { rows, errorResponse } = await downloadArtifactRows(
+      changelogArtifact.archive_download_url,
+      githubToken,
+    );
+    if (errorResponse) return { errorResponse };
+    if (hasAppendOnlyFlag(rows.map((row) => ({ entries: parseChangelogEntries(row.entries) })))) {
+      const latest = await getCachedBenchmarks([...new Set(benchmarks.map((row) => row.model))]);
+      benchmarks = stitchAppendOnlyPreview(benchmarks, latest, {
+        runId,
+        date,
+        startedAt: timestamp,
+        runUrl: runUrl || null,
+      });
+    }
   }
 
   if (evalArtifact) {

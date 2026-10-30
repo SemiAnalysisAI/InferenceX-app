@@ -33,13 +33,13 @@ export default async function CalculatorModelPage({ params, searchParams }: Prop
   const seed = resolveCalculatorUrlSeed(sp);
   return (
     <>
+      <ThroughputCalculatorDisplay
+        urlSeed={{ ...seed, model: seed.model ?? resolved.route.model }}
+      />
       <TabIntro
         tab="calculator"
         title={MODEL_TAB_META.calculator.title(resolved.route.seoName)}
         intro={MODEL_TAB_META.calculator.intro(resolved.route.seoName)}
-      />
-      <ThroughputCalculatorDisplay
-        urlSeed={{ ...seed, model: seed.model ?? resolved.route.model }}
       />
     </>
   );

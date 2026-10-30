@@ -78,12 +78,17 @@ describe('Landing page performance', () => {
 
     cy.visit(pageUnderTest, {
       onBeforeLoad(win) {
-        win.localStorage.removeItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed');
+        win.localStorage.removeItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed');
+        win.localStorage.setItem('inferencex-landing-banner-variant', 'operatorx');
         observeLayoutShifts(win);
       },
     });
 
-    cy.get('[data-testid="launch-banner"]').should('be.visible');
+    // Both A/B arms are server-rendered; the pre-paint style shows only the assigned one.
+    cy.get('[data-banner-variant="ubenchx"]').should('exist').and('not.be.visible');
+    cy.get('[data-testid="launch-banner"]:visible')
+      .should('have.length', 1)
+      .and('have.attr', 'href', '/operatorx');
     cy.get('[data-testid="intro-section"]').should(
       'contain.text',
       'See full quotes & more supporters',
@@ -103,7 +108,7 @@ describe('Landing page performance', () => {
     cy.viewport(412, 823);
     cy.visit('/', {
       onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed', '1');
+        win.localStorage.setItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed', '1');
         observeLayoutShifts(win);
       },
     });

@@ -9,8 +9,8 @@ export const metadata: Metadata = tabMetadata('ai-chart');
 export default function AiChartPage() {
   return (
     <>
-      <TabIntro tab="ai-chart" />
       <AiChartDisplay />
+      <TabIntro tab="ai-chart" />
     </>
   );
 }

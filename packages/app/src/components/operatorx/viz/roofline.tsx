@@ -25,11 +25,11 @@ const ORDER: ComputePrecision[] = ['fp4', 'fp8', 'bf16'];
 const STRINGS = {
   en: {
     ascendBasis:
-      '950PR (28 Cube): 378 TFLOPS dense BF16; assumed HBM bandwidth 1.6 TB/s. Exact memory/ECC configuration is unresolved.',
+      '950PR (28 Cube): dense peaks of 378 BF16 and 756 FP8 TFLOPS; assumed HBM bandwidth 1.6 TB/s. Exact memory/ECC configuration is unresolved.',
   },
   zh: {
     ascendBasis:
-      '950PR（28 个 Cube 核）：BF16 稠密计算峰值为 378 TFLOPS；HBM 带宽假定为 1.6 TB/s，具体内存及 ECC 配置尚未确认。',
+      '950PR（28 个 Cube 核）：BF16 和 FP8 的稠密计算峰值分别为 378 和 756 TFLOPS；HBM 带宽假定为 1.6 TB/s，具体内存及 ECC 配置尚未确认。',
   },
 };
 

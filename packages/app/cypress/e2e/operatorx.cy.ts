@@ -118,6 +118,47 @@ it('defaults to a measured 950PR shape and normalized BF16, while honoring preci
 });
 
 for (const prefix of ['', '/zh']) {
+  it(`keeps 950PR FP8 points visible when normalized at ${prefix || '/'}`, () => {
+    const dataset = normalizeBundle(run('950pr-fp8', 'ascend950pr-external', [64, 128]));
+    dataset.results = dataset.results.map((row, i) => ({
+      ...row,
+      args: {
+        m: 1024 * (i + 1),
+        n: 1024,
+        k: 1024,
+        a: { dtype: 'e4m3' },
+        b: { dtype: 'e4m3' },
+        out: 'bf16',
+      },
+    }));
+    const view = comparisonView(
+      buildComparison('gemm', [{ runner: 'ascend950pr-external', dataset }]),
+      null,
+    );
+    cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view).as('fp8');
+    cy.visit(`${prefix}/operatorx`);
+    cy.wait('@fp8');
+    cy.get('[data-testid="operatorx-viz-roofline"]')
+      .scrollIntoView()
+      .within(() => {
+        cy.contains('[role="tab"]', 'fp8').should('have.attr', 'aria-selected', 'true');
+        cy.get('#opx-roofline-normalized').should('have.attr', 'aria-checked', 'true');
+        cy.get<SVGCircleElement & { __data__: { y: number } }>('circle.point')
+          .should('have.length', 2)
+          .each(($point) => {
+            const point = $point[0] as unknown as { __data__: { y: number } };
+            expect(point.__data__.y).to.be.closeTo(268.435456 / 756, 1e-12);
+          });
+        cy.get('#opx-roofline-normalized').click();
+        cy.get<SVGCircleElement & { __data__: { y: number } }>('circle.point')
+          .should('have.length', 2)
+          .each(($point) => {
+            const point = $point[0] as unknown as { __data__: { y: number } };
+            expect(point.__data__.y).to.be.closeTo(268.435456, 1e-9);
+          });
+      });
+  });
+
   it(`normalizes distribution throughput by each GPU's peak at ${prefix || '/'}`, () => {
     cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm).as('gemm');
     cy.visit(`${prefix}/operatorx`);
@@ -174,6 +215,11 @@ describe('OperatorX progressive rendering', { testIsolation: true }, () => {
       cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm).as('comparison');
       cy.visit(`${prefix}/operatorx`);
       cy.wait('@comparison');
+      cy.get('[data-testid^="operatorx-viz-"]')
+        .first()
+        .should('have.attr', 'aria-busy', 'false')
+        .find('svg')
+        .should('exist');
       const lower = '[data-testid="operatorx-viz-pairwise-scatter"]';
       cy.get(lower).should('have.attr', 'aria-busy', 'true').find('svg').should('not.exist');
       cy.get('[data-testid="operatorx-viz-metric-vs-size"]').scrollIntoView();
