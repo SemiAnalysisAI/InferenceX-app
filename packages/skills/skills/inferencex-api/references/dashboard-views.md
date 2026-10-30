@@ -33,12 +33,14 @@ results or treat its interpolated values as separately measured operating points
    for static model, hardware, sequence and metric registries; use each specialized
    view's `options`, `configurations`, `workloads`, or raw run-list operation for
    data-dependent choices.
-   MiniMax M3 has `category=deprecated` in `options.models`; it remains selectable
-   through explicit model parameters and overview `modelScope=all`. MiniMax M3.1
-   Flash remains in the default model group.
+   MiniMax M3 and DeepSeek V4 Pro have `category=deprecated` in `options.models`.
+   They remain selectable through explicit model parameters and overview
+   `modelScope=all`. MiniMax M3.1 Flash and DeepSeek V4.1 Flash remain in the default
+   model group. Historical data and unofficial-run overlays remain available;
+   current-image views exclude both retired models.
    Preserve `options.models` order within each category when rendering model
    selectors. The default group is Kimi K3, DeepSeek V4.1 Flash, GLM5.2/GLM5.3,
-   MiniMax M3.1 Flash, Muse Spark Open, DeepSeek V4 Pro 0813, Qwen3.5, then
+   MiniMax M3.1 Flash, Muse Spark Open, Qwen3.5, then
    Qwen3.8 Flash Next. This presentation order does not change `defaults.model`
    or the overview's model order.
    For models with `category=deprecated`, inference charts append `(Deprecated)`

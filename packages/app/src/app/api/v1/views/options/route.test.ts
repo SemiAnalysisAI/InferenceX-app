@@ -55,7 +55,7 @@ describe('GET /api/v1/views/options', () => {
     const dsv4 = body.models.find((m: { name: string }) => m.name === 'DeepSeek-V4-Pro');
     expect(dsv4).toBeDefined();
     expect(dsv4.dbKeys).toContain('dsv4');
-    expect(typeof dsv4.category).toBe('string');
+    expect(dsv4.category).toBe('deprecated');
     expect(body.models.every((m: { dbKeys: string[] }) => m.dbKeys.length > 0)).toBe(true);
     expect(body.models.find((m: { name: string }) => m.name === 'MiniMax-M3')).toMatchObject({
       dbKeys: ['minimaxm3'],
@@ -91,7 +91,6 @@ describe('GET /api/v1/views/options', () => {
       'GLM-5.2',
       'MiniMax-M3.1-Flash',
       'Muse-Spark-Open',
-      'DeepSeek-V4-Pro',
       'Qwen-3.5-397B-A17B',
       'Qwen3.8-Flash-Next',
     ]);
