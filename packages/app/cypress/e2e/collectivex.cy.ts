@@ -467,10 +467,10 @@ describe('CollectiveX neutral run view', () => {
     )
       .should('have.attr', 'data-status', 'broken')
       .and('have.attr', 'title')
-      .and('include', 'ROCm/mori#610');
+      .and('include', 'AINIC 1.117.5-a-77');
     cy.get('[data-testid="collectivex-known-notes-normal"]').should(
       'contain.text',
-      'ROCm/mori#610',
+      'AINIC 1.117.5-a-77',
     );
     cy.get(
       '[data-testid="collectivex-known-cell"][data-mode="normal"][data-sku="h100"][data-library="mori"] [data-testid="collectivex-known-na"]',
