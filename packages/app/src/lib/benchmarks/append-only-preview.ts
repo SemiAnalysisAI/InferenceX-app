@@ -41,11 +41,21 @@ const pointKey = (row: BenchmarkRow): string =>
     row.conc,
   ]);
 
+// Producer runs of a published curve, newest first, in latest_benchmarks' run order.
+// Every run but the oldest is append-only, or the older runs would not be published.
+const producerRuns = (rows: BenchmarkRow[]): BenchmarkRow[][] =>
+  [...Map.groupBy(rows, (row) => row.workflow_run_id).values()].toSorted(
+    ([a], [b]) =>
+      b.date.localeCompare(a.date) ||
+      (b.run_started_at ?? '').localeCompare(a.run_started_at ?? '') ||
+      (b.workflow_run_id ?? 0) - (a.workflow_run_id ?? 0),
+  );
+
 /**
  * Preview an append-only run the way ingestion will publish it: each curve it
- * touches extends the current published curve when every topology line on both
- * sides keeps its image. Inherited rows keep their producer date and ids but take
- * the run's URL, which is the overlay's series identity.
+ * touches inherits the published producer runs, newest first, while every topology
+ * line in the chain keeps its image. Inherited rows keep their producer date and
+ * ids but take the run's URL, which is the overlay's series identity.
  */
 export function stitchAppendOnlyPreview(
   runRows: BenchmarkRow[],
@@ -62,17 +72,18 @@ export function stitchAppendOnlyPreview(
   };
 
   return [...runByScope].flatMap(([scope, rows]) => {
-    const predecessors = latestByScope.get(scope) ?? [];
-    if (
-      predecessors.length === 0 ||
-      !extendCurveLineImages(curveLineImages(rows), curveLineImages(predecessors))
-    ) {
-      return rows;
+    const inherited: BenchmarkRow[] = [];
+    let chain = curveLineImages(rows);
+    for (const producer of producerRuns(latestByScope.get(scope) ?? [])) {
+      chain = extendCurveLineImages(chain, curveLineImages(producer));
+      if (!chain) break;
+      inherited.push(...producer);
     }
+    if (inherited.length === 0) return rows;
     const claimed = new Set(rows.map(pointKey));
     return [
       ...rows.map((row) => ({ ...row, ...curve })),
-      ...predecessors
+      ...inherited
         .filter((row) => !claimed.has(pointKey(row)))
         .map((row) => ({ ...row, ...curve, run_url: snapshot.runUrl })),
     ];
