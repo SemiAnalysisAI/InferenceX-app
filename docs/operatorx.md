@@ -125,6 +125,25 @@ normalization costs and must not be reported as an end-to-end production speedup
 写入流程在清除缓存后预热默认 GEMM 和 MoE 对比。基准测试会先校验响应完全一致；
 仅使用已归一化输入的本地结果不代表完整生产请求的性能。
 
+## Median and best throughput bars
+
+The Median and best throughput panel replaces Distribution per GPU and sits beside Head to head on desktop. Metric vs size is the last chart. Its horizontal bars show median throughput as a fill and the
+best measured throughput as an outline, sorted by the displayed median. They follow
+the selected workload, hardware, precision and Normalized switch. Normalized bars
+show a fraction of each accelerator's peak; absolute bars show TFLOPS.
+
+**Shared cases only** is on by default: every bar uses the exact same cases, measured on every selected accelerator in the selected precision, with arithmetic intensity at or above every selected accelerator's ridge point (peak TFLOPS / bandwidth TB/s). An empty intersection stays empty; for example, FP8 cases measured only with fp32 block scales and only with ue8m0 block scales never overlap.
+
+Turning the switch off gives each accelerator its own successful positive finite measurements at or above its own ridge point. Each bar shows its case count. Case sets and quantization formats may differ; these medians are descriptive, not matched-shape speedup comparisons. Hardware lacking measurements or references is omitted without hiding other hardware. Even-sized cohorts average the middle two values. Best is maximum case throughput, not the fastest timing sample. Clicking opens the best case's timeline.
+
+The page-owned comparison API accepts `rooflinePrecision=bf16|fp8|fp4`, `rooflineHardware=<comma-separated hardware keys>`, `rooflineNormalized=true|false`, and `rooflineSharedOnly=true|false`. Supplying any adds `rooflineSummary`, using the UI's pure helper. Defaults are workload precision, all hardware, normalized=true, sharedOnly=true. `cohort` is `per-hardware-compute-bound` or `shared-compute-bound`. `matchedCases` always counts shared cases before ridge filtering. `caseIndices` is the union of displayed bar indices; each bar also returns its own exact `caseIndices` and `n`. Other fields include `missingReferences`, `hardware`, `median`, `best`, `medianTflops`, `bestTflops`, and `bestCaseIndex`. Normalized values are fractions (1 = 100%); explicit TFLOPS fields remain absolute. Invalid selectors return 400. Without selectors the existing comparison response is unchanged.
+
+中文：“仅共同用例”默认开启：所有柱使用完全相同的用例，即在所选精度下每个所选加速器都有实测值，且算术强度不低于每个所选加速器的 roofline 拐点（峰值 TFLOPS / 带宽 TB/s）。没有交集时仍显示空状态；例如，只用 fp32 block scale 测量的 FP8 用例与只用 ue8m0 block scale 测量的用例不会重叠。
+
+关闭该开关后，各加速器使用所选精度下各自成功、为正且有限的实测值，并按自身的 roofline 拐点筛选计算受限用例。每条柱显示用例数量。用例集合和量化格式可能不同，中位数用于描述各自结果，不代表相同形状下的性能对比。缺少实测值或参考值的硬件不显示，但不会阻止其他硬件显示。用例数为偶数时，中位数取中间两项的平均值；最佳值是用例吞吐量的最大值，不是单次最快计时。点击可查看最佳用例的时间线。
+
+页面专属的对比 API 支持 `rooflinePrecision=bf16|fp8|fp4`、`rooflineHardware=<逗号分隔的硬件 key>`、`rooflineNormalized=true|false` 和 `rooflineSharedOnly=true|false`。传入任一参数时，响应会增加 `rooflineSummary`，与 UI 共用同一个纯函数计算。默认值为工作负载的 roofline 精度、返回的全部硬件、`normalized=true` 和 `sharedOnly=true`。`cohort` 为 `per-hardware-compute-bound` 或 `shared-compute-bound`。`matchedCases` 始终表示拐点过滤前的共同用例数；顶层 `caseIndices` 是所显示各柱用例的并集，每条柱另外返回自身的 `caseIndices` 和 `n`。其他字段包括 `missingReferences`、`hardware`、`median`、`best`、`medianTflops`、`bestTflops` 和 `bestCaseIndex`。归一化数值为比例（1 表示 100%），显式的 TFLOPS 字段始终为绝对值。无效参数返回 400；不传这些参数时，原有响应保持不变。
+
 ## Ascend 950PR normalization
 
 The OperatorX-only hardware reference for `ascend950pr` uses the 28-Cube
@@ -132,7 +151,8 @@ Ascend950PR_9579 basis in `Ascend-ubench.md` (hardware configuration and section
 378 dense BF16 TFLOPS, 756 dense FP8 TFLOPS and **assumed** HBM bandwidth of 1.6 TB/s.
 The compute values are Cube-only ([Huawei Ascend 950 white paper, table 3-1](https://public-download.obs.cn-east-2.myhuaweicloud.com/ascend/%E6%98%87%E8%85%BE950%20NPU%E6%9E%B6%E6%9E%84%E7%99%BD%E7%9A%AE%E4%B9%A6.pdf)),
 excluding Vector compute in the combined figures. Exact memory/ECC configuration
-remains unresolved; the chart states this qualification. FP4 remains null.
+remains unresolved; the API reference's `qualification` field records this caveat,
+which the charts do not repeat. FP4 remains null.
 The normalized roofline divides arithmetic intensity by 236.25 FLOP/byte for BF16
 or 472.5 for FP8, and throughput by 378 or 756 TFLOPS respectively. Raw measurements
 and the inclusion of activation quantization in measured FP8 latency are unchanged.
@@ -164,7 +184,7 @@ still win; no data, hardware selection, or measurement is changed.
 以 28 个 Cube 核的 Ascend950PR_9579 为基准：BF16 和 FP8 的稠密计算峰值分别为 378 和
 756 TFLOPS，HBM 带宽**假定为** 1.6 TB/s。计算峰值仅计入 Cube 算力，来源为
 [华为 Ascend 950 白皮书表 3-1](https://public-download.obs.cn-east-2.myhuaweicloud.com/ascend/%E6%98%87%E8%85%BE950%20NPU%E6%9E%B6%E6%9E%84%E7%99%BD%E7%9A%AE%E4%B9%A6.pdf)，
-不包含白皮书合计值中的 Vector 算力。具体内存及 ECC 配置仍未确认，图表会显示此说明。
+不包含白皮书合计值中的 Vector 算力。具体内存及 ECC 配置仍未确认，API 参考值的 `qualification` 字段记录了这一说明，图表中不再重复显示。
 FP4 的峰值保留为 null。归一化时，BF16 的算术强度除以 236.25 FLOP/byte，吞吐量除以
 378 TFLOPS；FP8 则分别除以 472.5 FLOP/byte 和 756 TFLOPS。实测数据不变，FP8 延迟仍包含
 激活量化耗时。

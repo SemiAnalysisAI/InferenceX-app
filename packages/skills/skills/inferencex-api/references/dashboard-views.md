@@ -281,7 +281,11 @@ supported precision (null when none); `rooflineNormalized` is true. Missing/erro
 unsupported rows do not qualify the preferred slice. Explicit UI selections override
 these initial defaults; hardware visibility and measured values are unchanged.
 
-Distribution per GPU uses the page-owned comparison API's optional
+The Median and best throughput panel sits beside Head to head and replaces Distribution per GPU; Metric vs size is last. Precision, Normalized, and Shared cases only controls map to `rooflinePrecision=bf16|fp8|fp4`, `rooflineHardware=<comma-separated keys>`, `rooflineNormalized=true|false`, and `rooflineSharedOnly=true|false` on `/api/v1/operatorx/compare?op=gemm`. Supplying any adds `rooflineSummary`. Defaults: workload precision, all hardware, normalized=true, sharedOnly=true.
+
+By default (shared-only) every bar uses the same cases measured on every selected accelerator and above every ridge point; an empty intersection remains empty (for example, FP8 fp32-scale and ue8m0-scale cases never overlap). With `rooflineSharedOnly=false` each bar uses that hardware's successful positive finite measurements at or above its own ridge point; case sets and quantization formats can differ, so these are descriptive medians, not matched-shape speedups. Missing references omit only the affected hardware. `cohort` identifies `per-hardware-compute-bound` or `shared-compute-bound`. `matchedCases` counts shared cases before ridge filtering; top-level `caseIndices` is the union of displayed bar indices, and each bar's `caseIndices` and `n` identify its own cohort. Bars also contain median, best, medianTflops, bestTflops, bestCaseIndex and hardware. Normalized values are fractions. Invalid selectors return 400; no selectors leave the original response unchanged. Hover and click are presentation-only.
+
+The former Distribution per GPU panel’s backward-compatible projection uses the page-owned comparison API's optional
 `distributionMetric` (`latency`, `tflops`, `bandwidth`, `computeUtil`, or
 `bandwidthUtil`), `distributionNormalized` (`true`/`false`),
 `distributionMatchedOnly` (`true`/`false`), and `distributionHardware` (comma-separated
