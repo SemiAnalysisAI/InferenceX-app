@@ -117,6 +117,35 @@ it('defaults to a measured 950PR shape and normalized BF16, while honoring preci
     });
 });
 
+it('shows disjoint FP8 measurements and keeps strict shared-only mode explicit', () => {
+  const datasets = ['ascend950pr-external', 'h200-dgxc'].map((runner, gpu) => {
+    const dataset = normalizeBundle(run(`fp8-disjoint-${gpu}`, runner, [64]));
+    dataset.results = dataset.results.map((row) => ({
+      ...row,
+      args: {
+        m: 4096 * (gpu + 1),
+        n: 4096,
+        k: 4096,
+        a: { dtype: 'e4m3' },
+        b: { dtype: 'e4m3' },
+        out: 'bf16',
+      },
+      latencyUs: 100,
+    }));
+    return { runner, dataset };
+  });
+  const view = comparisonView(buildComparison('gemm', datasets), null);
+  cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view);
+  cy.visit('/operatorx');
+  cy.get('[data-testid="operatorx-viz-throughput-summary"]').scrollIntoView();
+  cy.get('[data-testid="operatorx-roofline-summary"] .summary-row').should('have.length', 2);
+  cy.get('[data-testid="operatorx-viz-throughput-summary"]').screenshot('fp8-summary-independent');
+  cy.get('#opx-summary-shared').click();
+  cy.contains('No shared compute-bound cases').should('be.visible');
+  cy.get('#opx-summary-shared').click();
+  cy.get('[data-testid="operatorx-roofline-summary"] .summary-row').should('have.length', 2);
+});
+
 for (const prefix of ['', '/zh']) {
   it(`shows median and best bars in their own full-width panel at ${prefix || '/'}`, () => {
     const datasets = ['ascend950pr-external', 'h200-dgxc'].map((runner, gpu) => {

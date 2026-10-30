@@ -799,8 +799,8 @@ export const apiDocumentationGroups: readonly ApiDocumentationGroup[] = [
 // published OpenAPI. Its hardware[].reference normalization basis, bandwidth
 // assumptions, cross-backend argument alignment (fastest successful backend per
 // hardware/case, with measurements[].backend provenance), and workload-resolved
-// chart defaults, optional distribution quantiles and shared-cohort roofline
-// median/best summaries with precision/hardware/normalization selectors are
+// chart defaults, optional distribution quantiles and per-hardware/shared-cohort roofline
+// median/best summaries with precision/hardware/normalization/cohort selectors are
 // documented in docs/operatorx.md. Ingest-time compact run
 // projections are fetched in one revision-aware bulk query, preserving response
 // and source identities; legacy fallback and

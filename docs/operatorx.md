@@ -132,46 +132,17 @@ best measured throughput as an outline, sorted by the displayed median. They fol
 the selected workload, hardware, precision and Normalized switch. Normalized bars
 show a fraction of each accelerator's peak; absolute bars show TFLOPS.
 
-Every bar uses exactly the same case indices: successful positive finite measurements
-on every selected accelerator, in the chosen precision, with arithmetic intensity
-at or above **every selected accelerator's ridge point** (peak TFLOPS / bandwidth TB/s).
-The count is shown above the chart. Even-sized cohorts use the average of the two
-middle values. Changing hardware can change the cohort. Missing references or an
-empty intersection produce an explanation, never a fallback to unrelated per-GPU
-shapes. "Best" means the maximum case throughput in this cohort, not the fastest
-individual timing sample. Hover shows both statistics; clicking opens that hardware's
-best-case timeline. The bars share the existing hardware colors and stack below the
-scatter plot on smaller screens.
+By default each accelerator uses its own successful positive finite measurements in the selected precision, at or above its own ridge point (peak TFLOPS / bandwidth TB/s). Each bar shows its case count. Case sets and quantization formats may differ; these medians are descriptive, not matched-shape speedup comparisons. Hardware lacking measurements or references is omitted without hiding other hardware.
 
-The page-owned comparison API accepts `rooflinePrecision=bf16|fp8|fp4`,
-`rooflineHardware=<comma-separated hardware keys>` and `rooflineNormalized=true|false`.
-Supplying any of these adds `rooflineSummary`, computed by the same pure helper as
-the UI. Defaults are the workload's roofline precision, all returned hardware and
-normalized values. It returns resolved controls, `cohort=shared-compute-bound`,
-`matchedCases` before ridge filtering, the final `caseIndices`, `missingReferences`,
-and sorted `bars` containing `hardware`, `n`, `median`, `best`, `medianTflops`,
-`bestTflops`, and `bestCaseIndex`. Normalized `median`/`best` are fractions (1 = 100%);
-the explicit TFLOPS fields always remain absolute. Case indices refer to the enclosing
-comparison's cases and source measurement arrays. Invalid selectors return 400.
-Without these parameters the existing comparison response is unchanged.
+The **Shared cases only** switch instead requires the exact same cases on every selected accelerator and arithmetic intensity above every selected ridge point. An empty intersection stays empty in this mode. Even-sized cohorts average the middle two values. Best is maximum case throughput, not the fastest timing sample. Clicking opens the best case's timeline.
 
-中文：独立全宽面板中的横向柱状图以填充表示吞吐量中位数，以轮廓表示实测最佳值，按当前显示的
-中位数排序。柱状图跟随所选工作负载、硬件、精度和归一化开关：开启时显示峰值算力占比，
-关闭时显示 TFLOPS。所有柱使用同一组用例：在所选精度下，每个所选加速器都有成功且为正的
-有限实测值，且用例的算术强度不低于每个所选加速器的 roofline 拐点（峰值 TFLOPS / 带宽 TB/s）。
-图中显示共同用例数量；用例数为偶数时，中位数取中间两项的平均值。更改所选硬件可能改变这组
-用例。缺少参考值或没有共同用例时显示说明，不改用各硬件独有的用例。最佳值是这组用例中的
-最高实测吞吐量，不是单次计时样本中的最快值。悬停同时显示中位数和最佳值，点击可查看对应
-硬件最佳用例的时间线。柱状图沿用现有硬件配色，小屏幕上排列在散点图下方。
+The page-owned comparison API accepts `rooflinePrecision=bf16|fp8|fp4`, `rooflineHardware=<comma-separated hardware keys>`, `rooflineNormalized=true|false`, and `rooflineSharedOnly=true|false`. Supplying any adds `rooflineSummary`, using the UI's pure helper. Defaults are workload precision, all hardware, normalized=true, sharedOnly=false. `cohort` is `per-hardware-compute-bound` or `shared-compute-bound`. `matchedCases` always counts shared cases before ridge filtering. `caseIndices` is the union of displayed bar indices; each bar also returns its own exact `caseIndices` and `n`. Other fields include `missingReferences`, `hardware`, `median`, `best`, `medianTflops`, `bestTflops`, and `bestCaseIndex`. Normalized values are fractions (1 = 100%); explicit TFLOPS fields remain absolute. Invalid selectors return 400. Without selectors the existing comparison response is unchanged.
 
-页面专属 API 支持 `rooflinePrecision=bf16|fp8|fp4`、`rooflineHardware=<逗号分隔的硬件 key>`
-和 `rooflineNormalized=true|false`。传入其中任一参数时，响应增加 `rooflineSummary`，与 UI
-共用计算函数。默认采用工作负载的 roofline 精度、返回的全部硬件以及归一化数值。响应包含
-实际生效的参数、`cohort=shared-compute-bound`、拐点过滤前的 `matchedCases`、最终的
-`caseIndices`、`missingReferences`，以及已排序的 `bars`，其中包含 `hardware`、`n`、
-`median`、`best`、`medianTflops`、`bestTflops` 和 `bestCaseIndex`。归一化时 `median` 和
-`best` 使用比例值（1 表示 100%），`medianTflops` 和 `bestTflops` 始终为绝对吞吐量。
-用例索引对应同一响应中的用例及实测来源数组；无效参数返回 400。不传这些参数时，原有响应不变。
+中文：默认情况下，各加速器使用所选精度下各自成功、为正且有限的实测值，并按自身的 roofline 拐点筛选计算受限用例。每条柱显示用例数量。用例集合和量化格式可能不同，中位数用于描述各自结果，不代表相同形状下的性能对比。缺少实测值或参考值的硬件不显示，但不会阻止其他硬件显示。
+
+开启“仅共同用例”后，所有所选硬件必须有完全一致的用例，且算术强度不低于每个硬件的拐点。没有交集时仍显示空状态。用例数为偶数时，中位数取中间两项的平均值；最佳值是用例吞吐量的最大值，不是单次最快计时。点击可查看最佳用例的时间线。
+
+页面专属的对比 API 支持 `rooflinePrecision=bf16|fp8|fp4`、`rooflineHardware=<逗号分隔的硬件 key>`、`rooflineNormalized=true|false` 和 `rooflineSharedOnly=true|false`。传入任一参数时，响应会增加 `rooflineSummary`，与 UI 共用同一个纯函数计算。默认值为工作负载的 roofline 精度、返回的全部硬件、`normalized=true` 和 `sharedOnly=false`。`cohort` 为 `per-hardware-compute-bound` 或 `shared-compute-bound`。`matchedCases` 始终表示拐点过滤前的共同用例数；顶层 `caseIndices` 是所显示各柱用例的并集，每条柱另外返回自身的 `caseIndices` 和 `n`。其他字段包括 `missingReferences`、`hardware`、`median`、`best`、`medianTflops`、`bestTflops` 和 `bestCaseIndex`。归一化数值为比例（1 表示 100%），显式的 TFLOPS 字段始终为绝对值。无效参数返回 400；不传这些参数时，原有响应保持不变。
 
 ## Ascend 950PR normalization
 

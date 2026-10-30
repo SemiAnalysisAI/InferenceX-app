@@ -48,6 +48,7 @@ describe('roofline median and best summary', () => {
       precision: 'bf16' as const,
       hardware: ['ascend950pr', 'h200'],
       normalized: false,
+      sharedOnly: true,
     };
     const absolute = rooflineSummary(view, params);
     expect(absolute.matchedCases).toBe(4);
@@ -74,6 +75,7 @@ describe('roofline median and best summary', () => {
       precision: 'fp8' as const,
       hardware: ['ascend950pr', 'h200'],
       normalized: true,
+      sharedOnly: true,
     };
     expect(rooflineSummary(view, params).bars).toEqual([]);
     view.cases.forEach((c) => {
@@ -89,4 +91,26 @@ describe('roofline median and best summary', () => {
     view.measurements.h200.status[3] = 'error';
     expect(rooflineSummary(view, params).bars).toEqual([]);
   });
+});
+
+it('keeps disjoint FP8 formats visible by default and reports exact per-bar case sets', () => {
+  const view = fixture();
+  view.cases.forEach((c) => {
+    c.computePrecision = 'fp8';
+  });
+  view.measurements.ascend950pr = column([null, null, null, 1, null]);
+  view.measurements.h200 = column([null, null, null, null, 2]);
+  const params = {
+    precision: 'fp8' as const,
+    hardware: ['ascend950pr', 'h200', 'unknown'],
+    normalized: true,
+  };
+  const result = rooflineSummary(view, params);
+  expect(result.cohort).toBe('per-hardware-compute-bound');
+  expect(result.bars).toMatchObject([
+    { hardware: 'ascend950pr', n: 1, caseIndices: [3], median: 600 / 756 },
+    { hardware: 'h200', n: 1, caseIndices: [4], median: 300 / 1979 },
+  ]);
+  expect(result.missingReferences).toEqual(['unknown']);
+  expect(rooflineSummary(view, { ...params, sharedOnly: true }).bars).toEqual([]);
 });

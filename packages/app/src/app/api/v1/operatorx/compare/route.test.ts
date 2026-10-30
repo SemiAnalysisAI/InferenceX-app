@@ -104,32 +104,37 @@ it('rejects invalid distribution selectors without changing the default comparis
   expect(await defaultResponse.json()).not.toHaveProperty('distribution');
 });
 
-it('returns the same shared-cohort median and best values as the roofline chart', async () => {
-  const source = comparison();
-  vi.mocked(getComparison).mockResolvedValue(source);
-  const response = await GET(
-    new NextRequest(
-      'http://localhost/api/v1/operatorx/compare?op=gemm&rooflinePrecision=bf16&rooflineHardware=ascend950pr,h200&rooflineNormalized=false',
-    ),
-  );
-  const body = await response.json();
-  expect(response.status).toBe(200);
-  expect(body.rooflineSummary).toEqual(
-    rooflineSummary(comparisonView(source, null), {
-      precision: 'bf16',
-      hardware: ['ascend950pr', 'h200'],
-      normalized: false,
-    }),
-  );
-  expect(body.rooflineSummary.bars).toMatchObject([
-    { hardware: 'ascend950pr', n: 1, median: 378, best: 378 },
-    { hardware: 'h200', n: 1, median: 189, best: 189 },
-  ]);
-});
+it.each([false, true])(
+  'returns matching summary controls and values with sharedOnly=%s',
+  async (sharedOnly) => {
+    const source = comparison();
+    vi.mocked(getComparison).mockResolvedValue(source);
+    const response = await GET(
+      new NextRequest(
+        `http://localhost/api/v1/operatorx/compare?op=gemm&rooflinePrecision=bf16&rooflineHardware=ascend950pr,h200&rooflineNormalized=false&rooflineSharedOnly=${sharedOnly}`,
+      ),
+    );
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body.rooflineSummary).toEqual(
+      rooflineSummary(comparisonView(source, null), {
+        precision: 'bf16',
+        hardware: ['ascend950pr', 'h200'],
+        normalized: false,
+        sharedOnly,
+      }),
+    );
+    expect(body.rooflineSummary.bars).toMatchObject([
+      { hardware: 'ascend950pr', n: 1, median: 378, best: 378 },
+      { hardware: 'h200', n: 1, median: 189, best: 189 },
+    ]);
+  },
+);
 
 it.each([
   'rooflinePrecision=other',
   'rooflineNormalized=yes',
+  'rooflineSharedOnly=yes',
   'rooflineHardware=unknown',
   'rooflineHardware=',
 ])('rejects an invalid roofline selector: %s', async (query) => {

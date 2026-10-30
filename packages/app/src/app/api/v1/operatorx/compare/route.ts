@@ -35,15 +35,20 @@ export async function GET(request: NextRequest) {
   const metric = params.get('distributionMetric') ?? 'tflops';
   const matched = params.get('distributionMatchedOnly') ?? 'true';
   const normalized = params.get('distributionNormalized') ?? 'false';
-  const summaryRequested = ['rooflinePrecision', 'rooflineHardware', 'rooflineNormalized'].some(
-    (key) => params.has(key),
-  );
+  const summaryRequested = [
+    'rooflinePrecision',
+    'rooflineHardware',
+    'rooflineNormalized',
+    'rooflineSharedOnly',
+  ].some((key) => params.has(key));
   const summaryPrecision = params.get('rooflinePrecision');
+  const summarySharedOnly = params.get('rooflineSharedOnly') ?? 'false';
   const summaryNormalized = params.get('rooflineNormalized') ?? 'true';
   if (
     summaryRequested &&
     ((summaryPrecision !== null && !['bf16', 'fp8', 'fp4'].includes(summaryPrecision)) ||
-      !['true', 'false'].includes(summaryNormalized))
+      !['true', 'false'].includes(summaryNormalized) ||
+      !['true', 'false'].includes(summarySharedOnly))
   )
     return NextResponse.json({ error: 'Invalid roofline summary parameters' }, { status: 400 });
   if (
@@ -97,6 +102,7 @@ export async function GET(request: NextRequest) {
                 (summaryPrecision as ComputePrecision | null) ?? view.defaults.rooflinePrecision,
               hardware: summaryHardware,
               normalized: summaryNormalized === 'true',
+              sharedOnly: summarySharedOnly === 'true',
             }),
           }
         : {}),

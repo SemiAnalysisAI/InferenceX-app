@@ -13,6 +13,9 @@ import type { ComparisonModel } from '../compare/model';
 const STRINGS = {
   en: {
     title: 'Median (fill) and best (outline)',
+    individual:
+      'Each accelerator uses its own compute-bound cases; case sets and quantization formats may differ. Counts are shown per bar.',
+    noData: 'No compute-bound measurements for this precision.',
     cohort: 'Shared cases at or above every selected accelerator’s ridge point',
     empty: 'No shared compute-bound cases. Try selecting fewer accelerators or another precision.',
     missing: 'A compute or bandwidth reference is unavailable for',
@@ -25,6 +28,8 @@ const STRINGS = {
   },
   zh: {
     title: '中位数（填充）与最佳值（轮廓）',
+    individual: '各加速器使用各自的计算受限用例，用例集合和量化格式可能不同。每条柱显示用例数量。',
+    noData: '此精度没有计算受限的实测用例。',
     cohort: '算术强度不低于每个所选加速器 roofline 拐点的共同实测用例',
     empty: '没有共同的计算受限用例。请减少所选加速器，或切换精度。',
     missing: '以下硬件缺少计算峰值或带宽参考值',
@@ -152,13 +157,17 @@ export function RooflineBars({
     <section className="min-w-0 space-y-2" data-testid="operatorx-roofline-summary">
       <h3 className="text-sm font-medium">{strings.title}</h3>
       <p className="text-xs text-muted-foreground">
-        {strings.cohort}: {summary.caseIndices.length}.
+        {summary.sharedOnly
+          ? `${strings.cohort}: ${summary.caseIndices.length}.`
+          : strings.individual}
       </p>
       {summary.bars.length === 0 ? (
         <EmptyChart>
           {summary.missingReferences.length > 0
             ? `${strings.missing}: ${summary.missingReferences.map(hardwareLabel).join(', ')}.`
-            : strings.empty}
+            : summary.sharedOnly
+              ? strings.empty
+              : strings.noData}
         </EmptyChart>
       ) : (
         <OpxChart<RooflineSummaryBar>
@@ -167,7 +176,7 @@ export function RooflineBars({
           inspect={{ model, caseOf: (d) => d.bestCaseIndex }}
           height={Math.max(160, summary.bars.length * 44 + 64)}
           clipContent={false}
-          margin={{ top: 12, right: 64, bottom: 48, left: 84 }}
+          margin={{ top: 12, right: 64, bottom: 48, left: 160 }}
           xScale={{
             type: 'linear',
             domain: [0, Math.max(...summary.bars.map((b) => b.best)) * 1.04],
@@ -186,7 +195,11 @@ export function RooflineBars({
                 ? `${Math.round(Number(v) * 100)}%`
                 : Number(v).toLocaleString('en-US', { maximumFractionDigits: 1 }),
           }}
-          yAxis={{ tickFormat: (v) => hardwareLabel(String(v)), grid: false }}
+          yAxis={{
+            tickFormat: (v) =>
+              `${hardwareLabel(String(v))} (n=${summary.bars.find((b) => b.hardware === v)?.n ?? 0})`,
+            grid: false,
+          }}
           layers={[layer]}
           tooltip={{
             attachToLayer: 0,

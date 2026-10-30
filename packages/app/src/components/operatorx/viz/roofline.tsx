@@ -25,10 +25,12 @@ const ORDER: ComputePrecision[] = ['fp4', 'fp8', 'bf16'];
 
 const STRINGS = {
   en: {
+    sharedOnly: 'Shared cases only',
     ascendBasis:
       '950PR (28 Cube): dense peaks of 378 BF16 and 756 FP8 TFLOPS; assumed HBM bandwidth 1.6 TB/s. Exact memory/ECC configuration is unresolved.',
   },
   zh: {
+    sharedOnly: '仅共同用例',
     ascendBasis:
       '950PR（28 个 Cube 核）：BF16 和 FP8 的稠密计算峰值分别为 378 和 756 TFLOPS；HBM 带宽假定为 1.6 TB/s，具体内存及 ECC 配置尚未确认。',
   },
@@ -66,6 +68,7 @@ export function Roofline({
   const precisions = ORDER.filter((p) => counts.has(p));
   const defaults = view.defaults ?? comparisonDefaults(view);
   const [picked, setPicked] = useState<ComputePrecision | null>(null);
+  const [sharedOnly, setSharedOnly] = useState(false);
   const [normalized, setNormalized] = useState(defaults.rooflineNormalized);
   const precision = picked && precisions.includes(picked) ? picked : defaults.rooflinePrecision;
   const points = useMemo<Point[]>(
@@ -89,8 +92,8 @@ export function Roofline({
     [model, view, precision, normalized],
   );
   const summary = useMemo(
-    () => rooflineSummary(view, { precision, hardware: model.hardware, normalized }),
-    [view, precision, model.hardware, normalized],
+    () => rooflineSummary(view, { precision, hardware: model.hardware, sharedOnly, normalized }),
+    [view, precision, model.hardware, normalized, sharedOnly],
   );
   if (!precision) return <EmptyChart>No case has FLOP and byte counts.</EmptyChart>;
   const xs = normalized
@@ -150,6 +153,24 @@ export function Roofline({
             Normalized
           </Label>
         </div>
+        {summaryOnly && (
+          <div className="flex items-center gap-2">
+            <Switch
+              id="opx-summary-shared"
+              checked={sharedOnly}
+              onCheckedChange={(enabled) => {
+                track('operatorx_summary_shared_toggled', { enabled });
+                setSharedOnly(enabled);
+              }}
+            />
+            <Label
+              htmlFor="opx-summary-shared"
+              className="text-sm font-normal text-muted-foreground"
+            >
+              {strings.sharedOnly}
+            </Label>
+          </div>
+        )}
       </div>
       {model.hardware.includes('ascend950pr') && (
         <p className="text-xs text-muted-foreground">{strings.ascendBasis}</p>

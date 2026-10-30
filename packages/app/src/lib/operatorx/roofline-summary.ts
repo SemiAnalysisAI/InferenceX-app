@@ -10,11 +10,13 @@ export interface RooflineSummaryParams {
   precision: ComputePrecision | null;
   hardware: string[];
   normalized: boolean;
+  sharedOnly?: boolean;
 }
 
 export interface RooflineSummaryBar {
   hardware: string;
   n: number;
+  caseIndices: number[];
   median: number;
   best: number;
   medianTflops: number;
@@ -70,41 +72,60 @@ export function rooflineSummary(view: ComparisonView, params: RooflineSummaryPar
             return c.flops! / c.bytes! >= peak! / bandwidth!;
           });
         });
-  const bars: RooflineSummaryBar[] =
-    caseIndices.length > 0
-      ? hardware
-          .map((hw) => {
-            const values = caseIndices
-              .map((i) => ({ i, value: throughput(hw, i)! }))
-              .sort((a, b) => a.value - b.value || a.i - b.i);
-            const medianTflops = quantileSorted(
-              values.map((p) => p.value),
-              0.5,
-            )!;
-            const best = values.at(-1)!;
-            const divisor = params.normalized ? reference.get(hw)!.peak! : 1;
-            return {
-              hardware: hw,
-              n: values.length,
-              median: medianTflops / divisor,
-              best: best.value / divisor,
-              medianTflops,
-              bestTflops: best.value,
-              bestCaseIndex: best.i,
-            };
-          })
-          .sort(
-            (a, b) =>
-              b.median - a.median || b.best - a.best || a.hardware.localeCompare(b.hardware),
-          )
-      : [];
+  const sharedOnly = params.sharedOnly ?? false;
+  const bars: RooflineSummaryBar[] = hardware
+    .flatMap((hw) => {
+      if (missingReferences.includes(hw)) return [];
+      const { peak, bandwidth } = reference.get(hw)!;
+      const indices = sharedOnly
+        ? caseIndices
+        : view.cases.flatMap((c, i) =>
+            c.computePrecision === params.precision &&
+            throughput(hw, i) !== null &&
+            c.bytes &&
+            c.bytes > 0 &&
+            Number.isFinite(c.bytes) &&
+            c.flops! / c.bytes >= peak! / bandwidth!
+              ? [i]
+              : [],
+          );
+      if (indices.length === 0) return [];
+      const values = indices
+        .map((i) => ({ i, value: throughput(hw, i)! }))
+        .sort((a, b) => a.value - b.value || a.i - b.i);
+      const medianTflops = quantileSorted(
+        values.map((p) => p.value),
+        0.5,
+      )!;
+      const best = values.at(-1)!;
+      const divisor = params.normalized ? peak! : 1;
+      return [
+        {
+          hardware: hw,
+          n: values.length,
+          caseIndices: indices,
+          median: medianTflops / divisor,
+          best: best.value / divisor,
+          medianTflops,
+          bestTflops: best.value,
+          bestCaseIndex: best.i,
+        },
+      ];
+    })
+    .sort((a, b) => b.median - a.median || b.best - a.best || a.hardware.localeCompare(b.hardware));
+
   return {
     precision: params.precision,
     hardware,
     normalized: params.normalized,
-    cohort: 'shared-compute-bound' as const,
+    sharedOnly,
+    cohort: sharedOnly
+      ? ('shared-compute-bound' as const)
+      : ('per-hardware-compute-bound' as const),
     matchedCases: shared.length,
-    caseIndices,
+    caseIndices: sharedOnly
+      ? caseIndices
+      : [...new Set(bars.flatMap((bar) => bar.caseIndices))].sort((a, b) => a - b),
     missingReferences,
     bars,
   };

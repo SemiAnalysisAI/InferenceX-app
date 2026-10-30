@@ -271,21 +271,9 @@ supported precision (null when none); `rooflineNormalized` is true. Missing/erro
 unsupported rows do not qualify the preferred slice. Explicit UI selections override
 these initial defaults; hardware visibility and measured values are unchanged.
 
-The full-width Median and best throughput panel replaces Distribution per GPU; Metric vs size is last. The median/best bars have their own precision and Normalized controls and a page-owned read projection: add any of
-`rooflinePrecision=bf16|fp8|fp4`, `rooflineHardware=<comma-separated keys>`, or
-`rooflineNormalized=true|false` to `/api/v1/operatorx/compare?op=gemm`. The optional
-`rooflineSummary` follows those controls (defaults: workload precision, all hardware,
-normalized). Its shared-compute-bound cohort includes only successful positive finite
-measurements present on **every selected accelerator** and above each selected
-accelerator's ridge point. The UI draws median fill and maximum outline using these
-same statistics. `matchedCases` counts shared cases before the ridge filter;
-`caseIndices` identifies the final cohort. `bars` are sorted by displayed median and
-contain `hardware`, `n`, `median`, `best`, absolute `medianTflops`/`bestTflops`, and
-`bestCaseIndex` for source/timeline lookup. Normalized values are fractions, not
-percent numbers. Empty cohorts or `missingReferences` yield no bars; never replace
-them with independently selected shapes per GPU. Without the selectors the base
-response is unchanged. Invalid precision, boolean or hardware selectors return 400.
-Hover/click, legend display and responsive placement do not change the data contract.
+The full-width Median and best throughput panel replaces Distribution per GPU; Metric vs size is last. Precision, Normalized, and Shared cases only controls map to `rooflinePrecision=bf16|fp8|fp4`, `rooflineHardware=<comma-separated keys>`, `rooflineNormalized=true|false`, and `rooflineSharedOnly=true|false` on `/api/v1/operatorx/compare?op=gemm`. Supplying any adds `rooflineSummary`. Defaults: workload precision, all hardware, normalized=true, sharedOnly=false.
+
+By default each bar uses that hardware's successful positive finite measurements at or above its own ridge point. Case sets and quantization formats can differ, so these are descriptive medians, not matched-shape speedups. Missing references omit only the affected hardware. Shared-only mode requires the same cases measured on every selected accelerator and above every ridge point; an empty intersection remains empty. `cohort` identifies `per-hardware-compute-bound` or `shared-compute-bound`. `matchedCases` counts shared cases before ridge filtering; top-level `caseIndices` is the union of displayed bar indices, and each bar's `caseIndices` and `n` identify its own cohort. Bars also contain median, best, medianTflops, bestTflops, bestCaseIndex and hardware. Normalized values are fractions. Invalid selectors return 400; no selectors leave the original response unchanged. Hover and click are presentation-only.
 
 The former Distribution per GPU panel’s backward-compatible projection uses the page-owned comparison API's optional
 `distributionMetric` (`latency`, `tflops`, `bandwidth`, `computeUtil`, or
