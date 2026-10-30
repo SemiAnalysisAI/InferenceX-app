@@ -1,3 +1,4 @@
+import originalHuawei from '@/components/ubenchx/data/huawei-bandwidth.json';
 import { SM_L2_RUNS } from '@/components/ubenchx/sm-l2-data';
 import { transformSmL2Run } from '@/components/ubenchx/sm-l2-transform';
 import { TPC_SKYLINE_RUNS } from '@/components/ubenchx/tpc-skyline-data';
@@ -223,6 +224,24 @@ it('exposes Huawei rotating-copy evidence without inventing missing tests or siz
     dtype: 'float16',
     missingSizesBytes: [],
   });
+  expect(run.rows).toHaveLength(51);
+  expect(run.rows.slice(0, 9).map((row: { bytes: number }) => row.bytes)).toEqual([
+    8, 16, 32, 64, 128, 256, 512, 1024, 2048,
+  ]);
+  expect(run.metadata.smallMessageExtension).toMatchObject({
+    cann: '9.2.1',
+    date: '2026-10-30',
+    slotStrideBytes: 4096,
+    sizeRangeBytes: [8, 2048],
+  });
+  expect(run.metadata.cann).toBe('9.1.0');
+  expect(run.rows[0].timeMs).toBeCloseTo(0.000465661971247755, 10);
+  for (const original of originalHuawei.curves['Huawei 950PR']) {
+    const actual = run.rows.find((row: { bytes: number }) => row.bytes === original.size_bytes);
+    expect(actual.timeMs).toBe(original.amortized_copy_ms);
+    expect(actual.bandwidthGbps).toBe(original.effective_GBps);
+    expect(actual.processBandwidthGbps).toEqual(original.process_GBps);
+  }
   expect(run.rows.some((row: { bytes: number }) => row.bytes === 17179869184)).toBe(true);
   const endpoint = run.rows.find((row: { bytes: number }) => row.bytes === 17179869184);
   expect(endpoint.bandwidthGbps).toBeCloseTo(1447.2735584561165, 6);
