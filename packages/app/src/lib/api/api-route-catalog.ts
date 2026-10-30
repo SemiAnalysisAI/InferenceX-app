@@ -1240,7 +1240,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/operatorx/service.ts',
-    sourceSha256: '7eec06104311e2673d9a898d6acdc5a49b56132d57c0d688d27fcd4479ef8d24',
+    sourceSha256: '8be8dbf750d00e5cf9ffc92bc6c58c80fc8e94c43744162f450a9d7cfb780840',
     reviewArea: {
       en: 'OperatorX bulk compact reads, revision-keyed shared Blob comparisons, raw fallback, partial/revision cache exclusion and bounded timeline reads.',
       zh: 'OperatorX 批量精简读取、按 revision 共享 Blob 对比缓存、原始数据回退、部分失败或 revision 变更时不缓存，以及时间线限流并行读取规则。',

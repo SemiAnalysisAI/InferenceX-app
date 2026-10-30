@@ -11,6 +11,7 @@ import {
   KERNEL_CATEGORIES,
   type KernelCategory,
   type OperatorXTimeline,
+  type TimelineKernel,
   type TimelineRanks,
 } from '@semianalysisai/inferencex-db/operatorx/timeline';
 import {
@@ -160,6 +161,18 @@ function RankSummary({ ranks }: { ranks: TimelineRanks }) {
   );
 }
 
+/**
+ * Each kernel's time per call. A split case reads it off rank 0's replay drawn above,
+ * since the profile's per-call average spans every replay, and a collective's slow ones
+ * (waiting on another rank) would make the table disagree with the timeline and latency.
+ */
+function kernelTimes(timeline: OperatorXTimeline | null): (k: TimelineKernel) => number {
+  if (!timeline?.ranks || timeline.truncated) return (k) => k.usPerCall;
+  const byName = new Map<number, number>();
+  for (const e of timeline.events) byName.set(e[0], (byName.get(e[0]) ?? 0) + e[3]);
+  return (k) => byName.get(k.name) ?? 0;
+}
+
 function GpuTimeline({
   hardware,
   color,
@@ -178,7 +191,8 @@ function GpuTimeline({
   const [hovered, setHovered] = useState<number | null>(null);
   const colorOf = (name: number) => (timeline ? palette[timeline.categories[name]] : OTHER);
   const event = timeline && hovered !== null ? timeline.events[hovered] : null;
-  const total = timeline?.kernels.reduce((sum, k) => sum + k.usPerCall, 0) ?? 0;
+  const timeOf = kernelTimes(timeline);
+  const total = timeline?.kernels.reduce((sum, k) => sum + timeOf(k), 0) ?? 0;
   return (
     <section className="space-y-2 border-t border-border/60 pt-3" data-testid="operatorx-timeline">
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
@@ -244,6 +258,8 @@ function GpuTimeline({
               </>
             ) : timeline.truncated ? (
               `First ${timeline.events.length} kernels of the replay`
+            ) : timeline.ranks ? (
+              'Kernel times are from this replay; collectives include waiting for the other ranks.'
             ) : null}
           </p>
           <table className="w-full table-fixed text-xs">
@@ -273,9 +289,9 @@ function GpuTimeline({
                         <span className="truncate font-mono">{shortName(name)}</span>
                       </span>
                     </td>
-                    <td className="py-1 text-right">{formatUs(k.usPerCall)}</td>
+                    <td className="py-1 text-right">{formatUs(timeOf(k))}</td>
                     <td className="py-1 text-right">
-                      {total > 0 ? `${Math.round((k.usPerCall / total) * 100)}%` : '—'}
+                      {total > 0 ? `${Math.round((timeOf(k) / total) * 100)}%` : '—'}
                     </td>
                     <td className="py-1 text-right">{k.countPerCall}</td>
                     <td className="hidden py-1 text-right md:table-cell">

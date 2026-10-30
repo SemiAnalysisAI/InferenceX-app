@@ -3,7 +3,14 @@
 import { ArrowDown, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from 'next-themes';
-import { type CSSProperties, useEffect, useMemo, useState } from 'react';
+import {
+  type CSSProperties,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
 import type {
   ComparisonOp,
@@ -21,7 +28,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { MultiSelect } from '@/components/ui/multi-select';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
@@ -36,7 +42,12 @@ import { useClientSearch } from '@/hooks/useClientSearch';
 import { replaceClientSearch } from '@/lib/routing/client-navigation';
 
 import { CaseDetail } from '../CaseDetail';
-import { hardwareLabel, operatorXColors, sortHardware } from '../compare/hardware';
+import {
+  hardwareLabel,
+  measuredHardware,
+  operatorXColors,
+  toggleHardwareSelection,
+} from '../compare/hardware';
 import { METRICS, metricById } from '../compare/metrics';
 import { buildModel, caseRefs, type ComparisonModel } from '../compare/model';
 import { metricVsSize } from '../viz/metric-vs-size';
@@ -64,6 +75,13 @@ function setParam(key: string, value: string) {
   const params = new URLSearchParams(window.location.search);
   params.set(key, value);
   replaceClientSearch(params);
+}
+
+/** A module name with line breaks allowed after `_`, `.` and `+`, never mid-word. */
+function breakable(label: string): ReactNode[] {
+  return label
+    .split(/(?<=[_.+])/u)
+    .flatMap((part, i) => (i > 0 ? [<wbr key={i} />, part] : [part]));
 }
 
 /** The one-device option's select value (its split key is empty). */
@@ -469,7 +487,7 @@ function BlockRows({
               }}
               data-testid={`operatorx-model-node-${n.id}`}
             >
-              <span className="line-clamp-2 break-all">{n.label}</span>
+              <span className="line-clamp-2 break-words">{breakable(n.label)}</span>
             </div>
           );
         })}
@@ -557,13 +575,19 @@ function SlotDetail({
     if (!data?.model) return null;
     const { model, indices, slot } = data;
     const view = subView(model.view, indices);
+    const measured = measuredHardware([view]).filter((hw) => model.available.includes(hw));
     const op = slot.op as ComparisonOp;
     return {
       op,
       model: buildModel(
         view,
         model.metric,
-        { hardware: model.hardware, available: model.available, toggle: model.toggle },
+        {
+          // only the GPUs that measured this op's shapes
+          hardware: model.hardware.filter((hw) => measured.includes(hw)),
+          available: measured,
+          toggle: model.toggle,
+        },
         model.colors,
         null,
         {
@@ -654,16 +678,14 @@ export function ModelView() {
   // GPUs with results at the selected device split
   const atSplitViews = useMemo(() => views.filter((v) => v.parallel === split), [views, split]);
   const modelOptions = useMemo(() => [...new Set(views.flatMap((v) => v.modelOptions))], [views]);
-  // a link to a model without results (such as a deprecated one) opens on one with results
+  // a link to a model without results opens on one with results
   const loaded = !gemm.isLoading && !moe.isLoading && !attention.isLoading;
   useEffect(() => {
     if (loaded && modelOptions.length > 0 && !modelOptions.includes(requested))
       setParam('model', modelOptions.includes(DEFAULT_MODEL) ? DEFAULT_MODEL : modelOptions[0]);
   }, [loaded, modelOptions, requested]);
-  const available = useMemo(
-    () => sortHardware([...new Set(atSplitViews.flatMap((v) => Object.keys(v.measurements)))]),
-    [atSplitViews],
-  );
+  // GPUs with measured results at the selected device split
+  const available = useMemo(() => measuredHardware(atSplitViews), [atSplitViews]);
   const colors = useMemo(
     () =>
       operatorXColors(
@@ -703,23 +725,31 @@ export function ModelView() {
     [arch, gemmView, attentionView, moe.data, requested, openFolds],
   );
 
+  // The legends are the one GPU control, as on the op tabs
+  const toggle = useCallback(
+    (hw: string, placement: 'diagram' | 'chart') => {
+      track('operatorx_gpu_toggled', { op: 'model', gpu: hw, placement });
+      setPicked(toggleHardwareSelection(hardware, hw));
+    },
+    [hardware],
+  );
   const models = useMemo(() => {
-    const toggle = (hw: string) => {
-      const next = hardware.includes(hw) ? hardware.filter((h) => h !== hw) : [...hardware, hw];
-      if (next.length > 0) {
-        track('operatorx_gpu_toggled', { op: 'model', gpu: hw, placement: 'chart' });
-        setPicked(next);
-      }
-    };
     const build = (view: ComparisonView | undefined) =>
       view
-        ? buildModel(view, metric, { hardware, available, toggle }, colors, null, {
-            inspect: () => {},
-            preview: () => {},
-          })
+        ? buildModel(
+            view,
+            metric,
+            { hardware, available, toggle: (hw) => toggle(hw, 'chart') },
+            colors,
+            null,
+            {
+              inspect: () => {},
+              preview: () => {},
+            },
+          )
         : null;
     return { gemm: build(gemmView), moe: build(moeView), attention: build(attentionView) };
-  }, [gemmView, moeView, attentionView, metric, hardware, available, colors]);
+  }, [gemmView, moeView, attentionView, metric, hardware, available, colors, toggle]);
   const resolved = useMemo(
     () =>
       blocks.map((block) => ({
@@ -802,7 +832,7 @@ export function ModelView() {
     <TooltipProvider>
       <div className="flex flex-col gap-4" data-testid="operatorx-model-view">
         <Card className="relative z-10 py-4 md:py-5">
-          <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
             <ControlGroup label="Model" htmlFor="operatorx-model">
               <SearchableSelect
                 triggerId="operatorx-model"
@@ -851,15 +881,6 @@ export function ModelView() {
                 ]}
               />
             </ControlGroup>
-            <ControlGroup label="GPUs" htmlFor="operatorx-hardware">
-              <MultiSelect
-                triggerId="operatorx-hardware"
-                options={available.map((h) => ({ value: h, label: hardwareLabel(h) }))}
-                value={hardware}
-                onChange={setPicked}
-                minSelections={1}
-              />
-            </ControlGroup>
             <ControlGroup label="Precision" htmlFor="operatorx-model-precision">
               {precision && (
                 <SegmentedToggle
@@ -875,59 +896,69 @@ export function ModelView() {
             </ControlGroup>
           </div>
         </Card>
-        <Card className="gap-3">
-          <div
-            className={`sticky top-14 z-20 -mx-2 grid ${ROW_GRID} items-end gap-x-4 rounded-md bg-card px-2 py-2`}
-          >
-            <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
-              {hardware.map((hw) => (
-                <span key={hw} className="flex items-center gap-1.5">
-                  <span
-                    className="inline-block size-2 rounded-full"
-                    style={{ background: colors[hw] }}
+        {/* Too narrow for the diagram beside its bars: the card scrolls sideways, not the page */}
+        <Card className="gap-3 max-md:overflow-x-auto" data-testid="operatorx-model-diagram">
+          <div className="flex flex-col gap-3 max-md:min-w-[36rem]">
+            <div
+              className={`max-md:static sticky top-14 z-20 -mx-2 grid ${ROW_GRID} items-end gap-x-4 rounded-md bg-card px-2 py-2`}
+            >
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                {available.map((hw) => (
+                  <button
+                    type="button"
+                    key={hw}
+                    aria-pressed={hardware.includes(hw)}
+                    onClick={() => toggle(hw, 'diagram')}
+                    className={`flex items-center gap-1.5 ${hardware.includes(hw) ? '' : 'opacity-40'}`}
+                    data-testid={`operatorx-model-gpu-${hw}`}
+                  >
+                    <span
+                      className="inline-block size-2 rounded-full"
+                      style={{ background: colors[hw] }}
+                    />
+                    {hardwareLabel(hw)}
+                  </button>
+                ))}
+              </div>
+              {bin === null ? <div /> : <TokenSlider bins={bins} bin={bin} onChange={setBin} />}
+            </div>
+            <div className="flex flex-col">
+              {blocks.map((block, b) => (
+                <div key={block.id}>
+                  {b > 0 && (
+                    <div className={`grid ${ROW_GRID} gap-x-4`}>
+                      {block.alternative ? (
+                        <span className="my-0.5 text-center text-xs text-muted-foreground">or</span>
+                      ) : (
+                        <ArrowDown className="mx-auto my-1 size-3.5 text-muted-foreground" />
+                      )}
+                    </div>
+                  )}
+                  <BlockRows
+                    block={block}
+                    slots={slots.get(block.id) ?? []}
+                    tokens={tokens}
+                    lanes={hardware.length}
+                    isDark={isDark}
+                    onOpen={(data) => {
+                      track('operatorx_model_op_opened', { model: requested, op: data.slot.op });
+                      setOpen(data);
+                    }}
+                    onFold={(key) => {
+                      track('operatorx_model_fold_toggled', {
+                        model: requested,
+                        enabled: !openFolds.has(key),
+                      });
+                      setOpenFolds((prev) => {
+                        const next = new Set(prev);
+                        if (!next.delete(key)) next.add(key);
+                        return next;
+                      });
+                    }}
                   />
-                  {hardwareLabel(hw)}
-                </span>
+                </div>
               ))}
             </div>
-            {bin === null ? <div /> : <TokenSlider bins={bins} bin={bin} onChange={setBin} />}
-          </div>
-          <div className="flex flex-col">
-            {blocks.map((block, b) => (
-              <div key={block.id}>
-                {b > 0 && (
-                  <div className={`grid ${ROW_GRID} gap-x-4`}>
-                    {block.alternative ? (
-                      <span className="my-0.5 text-center text-xs text-muted-foreground">or</span>
-                    ) : (
-                      <ArrowDown className="mx-auto my-1 size-3.5 text-muted-foreground" />
-                    )}
-                  </div>
-                )}
-                <BlockRows
-                  block={block}
-                  slots={slots.get(block.id) ?? []}
-                  tokens={tokens}
-                  lanes={hardware.length}
-                  isDark={isDark}
-                  onOpen={(data) => {
-                    track('operatorx_model_op_opened', { model: requested, op: data.slot.op });
-                    setOpen(data);
-                  }}
-                  onFold={(key) => {
-                    track('operatorx_model_fold_toggled', {
-                      model: requested,
-                      enabled: !openFolds.has(key),
-                    });
-                    setOpenFolds((prev) => {
-                      const next = new Set(prev);
-                      if (!next.delete(key)) next.add(key);
-                      return next;
-                    });
-                  }}
-                />
-              </div>
-            ))}
           </div>
         </Card>
         <SlotDetail data={open} modelName={requested} onClose={() => setOpen(null)} />

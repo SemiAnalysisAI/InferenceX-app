@@ -25,7 +25,7 @@ import { CoverageStrip } from './CoverageStrip';
 import {
   hardwareLabel,
   operatorXColors,
-  sortHardware,
+  measuredHardware,
   toggleHardwareSelection,
 } from './compare/hardware';
 import { METRICS, metricById } from './compare/metrics';
@@ -156,8 +156,8 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
   const queryClient = useQueryClient();
   useDialogCloseTracking(inspected !== null, 'operatorx_case_closed', { op });
 
-  // GPUs with results at the selected device split
-  const available = useMemo(() => sortHardware(view?.hardware.map((h) => h.id) ?? []), [view]);
+  // GPUs with measured results at the selected device split
+  const available = useMemo(() => (view ? measuredHardware([view]) : []), [view]);
   const colors = useMemo(
     () => operatorXColors(view?.hardware.map((h) => h.id) ?? [], theme),
     [view, theme],
