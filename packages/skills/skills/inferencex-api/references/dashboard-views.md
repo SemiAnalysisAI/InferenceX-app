@@ -5,6 +5,14 @@ Use `/api/v1/views/*` for dashboard-calculated values. Read the deployed
 these routes become available only after the corresponding app change deploys.
 Do not assume an installed skill proves server availability.
 
+On mobile inference and PowerX charts, Scenario, Precision, and Run context (date,
+run selection and changelog) are inside More chart controls; Model stays visible.
+Desktop keeps Scenario and Precision beside Model and Run context below chart
+settings. Embedded charts keep their standalone run controls. This is
+presentation-only: scenario/precision/run/date parameters, defaults, returned
+measurements and unofficial overlays are unchanged; no API parameter represents
+the collapsed state.
+
 ## TCO basis
 
 Use `tcoBasis=internal` (the default) or `tcoBasis=external` in cost-aware

@@ -1578,6 +1578,7 @@ export default function ChartDisplay({
                   )}
                   <ChartControls
                     showXAxisMode
+                    runContext={selectedGPUs.length === 0 ? <WorkflowInfoDisplay /> : undefined}
                     showTcoBasis={[...captionHwKeys].some((key) => key.split('_')[0] === 'tpuv7')}
                     powerXControls={
                       powerXLayout && powerXMounted
@@ -1598,7 +1599,7 @@ export default function ChartDisplay({
                   <XAxisModeSelector />
                 </div>
               )}
-              {selectedGPUs.length === 0 && <WorkflowInfoDisplay />}
+              {embedded && selectedGPUs.length === 0 && <WorkflowInfoDisplay />}
               {selectedGPUs.length > 0 && (
                 <ComparisonChangelog
                   changelogs={changelogs}
