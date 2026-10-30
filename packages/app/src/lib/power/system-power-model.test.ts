@@ -6,6 +6,7 @@ import {
   estimateChassisPower,
   estimateRackPower,
   FACILITY_PUE_NOTE,
+  formatPueRange,
   isRackPowerHardware,
   isSystemPowerHardware,
   LIQUID_COOLED_RACK_PUE,
@@ -183,5 +184,14 @@ describe('system power model adapter', () => {
     expect(isSystemPowerHardware('gb200')).toBe(false);
     expect(isRackPowerHardware('h100')).toBe(false);
     expect(isSystemPowerHardware('constructor')).toBe(false);
+  });
+});
+
+describe('formatPueRange', () => {
+  it('shows one PUE, a low–high range across cooling types, or a dash when none', () => {
+    expect(formatPueRange([1.3, 1.3])).toBe('1.3');
+    expect(formatPueRange([1.3, 1.1, 1.3])).toBe('1.1–1.3');
+    expect(formatPueRange([1.1, Number.NaN])).toBe('1.1');
+    expect(formatPueRange([])).toBe('—');
   });
 });
