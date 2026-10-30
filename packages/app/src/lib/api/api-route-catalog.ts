@@ -166,6 +166,14 @@ export const apiRouteCatalog = [
     sourceSha256: 'b75d73e47c0d61319a67b19556d64c861c423af91e381cc0356606316b5809c6',
   },
   {
+    source: 'src/app/api/v1/views/revenue-capacity/route.ts',
+    path: '/api/v1/views/revenue-capacity',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-revenue-capacity-view',
+    sourceSha256: '6d2071996ca5cb500010b45ed5acef00171cb94e8bdc249c32855783c1bcffe1',
+  },
+  {
     source: 'src/app/api/v1/views/profit-estimator/route.ts',
     path: '/api/v1/views/profit-estimator',
     method: 'GET',
@@ -1515,7 +1523,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/calculator-extensions.ts',
-    sourceSha256: 'e2e3ecf4e5f5e0561d81c3eceee1b5d497011e3cd9a1182328cce6ec721ca7f9',
+    sourceSha256: '24187b250879be7846127d3913f4d114526229a79a034eb8a90d7e1372669529',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1551,7 +1559,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: '7b5e23a835687af4bc7d35edeaadcb267f6ecf7bc42baa8d17ea4482cf81f6bd',
+    sourceSha256: 'cf1b314445d3839faec7fa51b9b3cae662faf715f563dfa9d83055613695b2b5',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

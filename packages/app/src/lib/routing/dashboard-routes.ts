@@ -126,6 +126,16 @@ export const DASHBOARD_ROUTES = [
     shareParamScopes: ['g_', 'i_', 'c_'],
   },
   {
+    key: 'revenue-capacity',
+    path: '/revenue-capacity',
+    canonicalPath: '/revenue-capacity',
+    navGroup: 'primary',
+    indexable: true,
+    localeMirrored: true,
+    providers: STANDALONE_DASHBOARD_PROVIDERS,
+    shareParamScopes: [],
+  },
+  {
     key: 'evaluation',
     path: '/evaluation',
     canonicalPath: '/evaluation',

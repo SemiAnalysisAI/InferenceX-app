@@ -19,6 +19,11 @@ export const LANDING_META_ZH = {
 export const isZhTab = isDashboardRouteKey;
 
 export const TAB_META_ZH: Record<DashboardRouteKey, { title: string; description: string }> = {
+  'revenue-capacity': {
+    title: '收入目标 GPU 需求计算器',
+    description:
+      '基于 AgentX 吞吐量与 token 定价，计算实现月度、季度或年度推理收入目标所需的 GPU 或加速器数量。',
+  },
   powerx: {
     title: 'PowerX：实测 GPU 功耗与每 Token 能耗',
     description:
@@ -133,6 +138,8 @@ export const TAB_INTRO_ZH: Record<DashboardRouteKey, string> = {
     '本页面展示首 token 延迟约束下的成本对比：在选定的最低交互性下，按 2 s、5 s、10 s 等各档首 token 延迟（TTFT）上限，逐档找出各芯片厂商每百万 token 成本最低的实测配置，并标注最优配置与厂商间的成本差距。所有柱形均来自实际运行过的配置，不做插值，可直接追溯到对应的 GitHub Actions 运行记录。',
   'cache-reuse':
     '本页面展示前缀缓存复用情况：选定模型与配置后，按并发数逐档以堆叠柱形拆分 prompt token 的来源，分为芯片 HBM 缓存命中、主机层缓存命中与未复用（重新计算）三部分，并可叠加 trace 的理论上限。所有数值均来自运行时实测的缓存计数，可追溯到对应的 GitHub Actions 运行记录。',
+  'revenue-capacity':
+    '结合 AgentX 实测吞吐量、token 定价和可计费利用率，估算总收入目标所需的 GPU 容量。缺少实测数据时不作估算。',
   'profit-estimator':
     '本页面提供推理利润估算器：在选定的交互性与利用率下，按每芯片每小时计算各芯片的收入，并以堆叠柱形拆分为算力支出（TCO $/chip/hr）、模型实验室从收入中抽取的许可费，以及运营方所剩利润。',
   'profit-estimator-per-gigawatt':
@@ -169,6 +176,7 @@ export const TAB_LABELS_ZH: Record<DashboardRouteKey, string> = {
   'first-token': '首 token 延迟约束',
   'cache-reuse': '前缀缓存复用',
   'profit-estimator': '利润估算',
+  'revenue-capacity': '收入目标',
   'profit-estimator-per-gigawatt': '每吉瓦利润估算',
   reliability: '可靠性',
   'gpu-specs': '芯片规格',

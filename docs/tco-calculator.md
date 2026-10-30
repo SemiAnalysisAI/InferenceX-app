@@ -449,6 +449,31 @@ the notes now carry the correction instead: which figures are affected (Input an
 never Total), in which direction (flattering), by how much, and that the Fleet Lifecycle
 page is deliberately on a different basis.
 
+## Revenue Target Capacity (`/revenue-capacity`)
+
+The page and its `/zh` sibling consume `/api/v1/views/revenue-capacity` directly.
+`revenue-capacity.ts` inverts the profit estimator's P90 throughput and token
+pricing calculation. Gross revenue per chip-hour is multiplied once by billable
+utilization and 730/2190/8760 hours for month/quarter/year. Dividing the target
+by this result gives the unrounded GPU-equivalent count.
+
+Counts round up to complete deployments only when the interpolation endpoints
+agree on topology. Disaggregated deployments add prefill and decode chips;
+aggregated deployments do not double-count them. Mixed or missing topology
+returns whole-chip capacity and a null deployment size, not a deployment plan.
+
+All precisions are selected by default. Rows retain framework, precision and
+official/unofficial run identity; configurations are alternatives, not additive
+fleet components. Missing token mixes, out-of-range curves and zero billable
+revenue have unavailable reasons. Cost and power metadata do not gate gross
+revenue. The profit and per-GW calculations are unchanged.
+
+Control coverage: revenue target, period, model, P90 target, token price source
+and three custom prices, utilization, cache mode, precision, hardware keys,
+snapshot date, exact run ID, and unofficial run IDs map to API parameters.
+Copy link and CSV preserve applied assumptions. Ordering, locale and disclosure
+expansion are presentation-only. Source dates and run links accompany each row.
+
 ## Profit Estimator (`/profit-estimator`, `/profit-estimator-per-gigawatt`)
 
 Fleet Lifecycle answers "what did a fixed fleet earn over its life". These two tabs

@@ -49,8 +49,10 @@ The complete suite is `bun run test:e2e:full`. It runs all Cypress component and
 
 `packages/app/timings.json` and `timings-firefox.json` are the committed Chrome
 and Firefox `cypress-split` baselines. `component-timings.json` is the Chrome
-component baseline. Their unit guard requires one positive duration for every
-current spec and rejects removed entries.
+component baseline. The observation merger validates one positive duration for
+every measured spec and rejects missing or stale entries. Its unit tests use
+concrete observations to exercise validation and shard assignment rather than
+pinning the repository's current spec inventory.
 
 CI uploads raw per-shard, per-test observations and validates the complete
 20-shard matrix before publishing `cypress-timing-baselines`. Refresh all

@@ -19,6 +19,7 @@ export type AnalyticsPlacement =
   | 'blog_article'
   | 'glossary'
   | 'compare'
+  | 'revenue-capacity'
   | 'chips';
 
 /** Spread onto an element: `<nav {...analyticsPlacement('footer')}>`. */

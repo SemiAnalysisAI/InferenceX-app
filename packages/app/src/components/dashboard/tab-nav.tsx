@@ -40,6 +40,7 @@ const TAB_LABELS_EN: Record<DashboardRouteKey, string> = {
   'first-token': 'First-Token Limits',
   'cache-reuse': 'Prefix Cache Reuse',
   'profit-estimator': 'Profit Estimator',
+  'revenue-capacity': 'Revenue Target',
   'profit-estimator-per-gigawatt': 'Profit Estimator per GW',
   reliability: 'Reliability',
   'gpu-specs': 'Chip Specs',

@@ -23,6 +23,11 @@ export const LANDING_META = {
 };
 
 export const TAB_META: Record<DashboardRouteKey, { title: string; description: string }> = {
+  'revenue-capacity': {
+    title: 'Revenue Target GPU Calculator',
+    description:
+      'Calculate GPUs or accelerators needed for monthly, quarterly or yearly inference revenue targets using AgentX throughput and token prices.',
+  },
   powerx: {
     title: 'PowerX: Measured GPU Power and Energy per Token',
     description:
@@ -140,6 +145,8 @@ export const TAB_INTRO: Record<DashboardRouteKey, string> = {
     'First-token limits find, for each chip vendor, the cheapest measured config per million tokens under time-to-first-token (TTFT) caps such as 2 s, 5 s and 10 s at a chosen minimum interactivity. Every bar is a real run with no interpolation, traceable to its GitHub Actions run.',
   'cache-reuse':
     'Prefix cache reuse splits prompt tokens at each concurrency level into chip HBM cache hits, host-tier cache hits and recomputed tokens, with an optional trace upper bound. All values are runtime cache counters traceable to their GitHub Actions run.',
+  'revenue-capacity':
+    'Estimate GPU capacity for gross revenue targets using benchmarked AgentX throughput, token prices and billable utilization. Missing measurements stay unavailable.',
   'profit-estimator':
     'The inference profit estimator computes revenue per chip-hour for each chip at a chosen interactivity and utilization, stacked into compute expense (TCO $/chip/hr), the model lab license fee and operator profit.',
   'profit-estimator-per-gigawatt':
