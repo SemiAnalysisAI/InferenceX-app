@@ -16,6 +16,7 @@ import { track } from '@/lib/analytics/analytics';
 import {
   DASHBOARD_ROUTES,
   dashboardRouteForPathname,
+  dashboardShellCapabilitiesForPathname,
   getDashboardRoute,
   type DashboardRoute,
   type DashboardRouteKey,
@@ -28,6 +29,8 @@ import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useClientRouteSearch } from '@/hooks/useClientSearch';
 import { profitRoutePathname } from '@/lib/routing/profit-estimator-routes';
+import { readUrlParams } from '@/lib/routing/url-state';
+import { routeModelForPathname } from '@/lib/routing/model-routes';
 import { cn } from '@/lib/shared/utils';
 
 const TAB_LABELS_EN: Record<DashboardRouteKey, string> = {
@@ -140,6 +143,15 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
 
   const { navRef, indicator, animate } = useTabIndicator(current, featureGateUnlocked);
   const search = useClientRouteSearch();
+  const [retainedModel, setRetainedModel] = useState<string>();
+  useEffect(() => {
+    // The bare entry now redirects, so tab returns must name the retained selection.
+    const pathModel = dashboardShellCapabilitiesForPathname(pathname).providers.globalFilters
+      ? routeModelForPathname(pathname)
+      : undefined;
+    const model = readUrlParams().g_model ?? pathModel;
+    setRetainedModel((previous) => model ?? previous);
+  }, [pathname, search]);
   const unofficialIds = useMemo(() => {
     for (const [key, value] of new URLSearchParams(search)) {
       if (/^unofficialruns?$/iu.test(key) && value) return value;
@@ -147,11 +159,14 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
     return '';
   }, [search]);
   const tabHref = (path: string) => {
-    if (!unofficialIds) return path;
-    return (
-      profitRoutePathname(path, new URLSearchParams({ unofficialruns: unofficialIds })) ??
-      `${path}?unofficialruns=${unofficialIds}`
-    );
+    const href = unofficialIds
+      ? (profitRoutePathname(path, new URLSearchParams({ unofficialruns: unofficialIds })) ??
+        `${path}?unofficialruns=${unofficialIds}`)
+      : path;
+    if (retainedModel && (path === '/inference' || path === '/zh/inference')) {
+      return `${href}${unofficialIds ? '&' : '?'}g_model=${encodeURIComponent(retainedModel)}`;
+    }
+    return href;
   };
 
   return (

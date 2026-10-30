@@ -10,6 +10,8 @@ and all other query parameters are carried forward. Model-specific paths and
 other dashboard defaults are unchanged. The read-only inference API still
 requires an explicit `model`; its example and the skills guide use `Kimi-K3`
 for parity with this navigation default.
+Tab navigation includes the retained model when returning to inference, so the
+entry redirect does not reset a user's selection.
 
 ### GlobalFilterProvider
 

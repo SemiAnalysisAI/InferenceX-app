@@ -21,6 +21,15 @@ const unlockPointerEvents = () => {
 
 describe('Per-model dashboard routes', () => {
   for (const locale of ['', '/zh']) {
+    it(`retains an explicit legacy model across ${locale}/evaluation`, () => {
+      cy.visit(`${locale}/inference/deepseek-v4`, visitOptions);
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek V4 Pro');
+      cy.get('[data-testid="tab-trigger-evaluation"]').click();
+      cy.location('pathname').should('eq', `${locale}/evaluation`);
+      cy.get('[data-testid="tab-trigger-inference"]').click();
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek V4 Pro');
+    });
+
     it(`renders Kimi K3 chart data from bare ${locale}/inference`, () => {
       cy.intercept('GET', '/api/v1/availability', {
         body: modelSelectionAvailability

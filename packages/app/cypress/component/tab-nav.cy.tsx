@@ -3,6 +3,7 @@ import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.share
 
 import { TabNav } from '@/components/dashboard/tab-nav';
 import { CLIENT_PATHNAME_CHANGE_EVENT } from '@/lib/routing/client-navigation';
+import { writeUrlParams } from '@/lib/routing/url-state';
 import {
   UnofficialRunBanner,
   UnofficialRunContext,
@@ -47,6 +48,29 @@ const bannerRun = {
   status: 'completed',
   isNonMainBranch: true,
 };
+
+describe('TabNav retained inference model', () => {
+  afterEach(() => {
+    writeUrlParams({ g_model: 'DeepSeek-V4-Pro' });
+  });
+
+  for (const locale of ['', '/zh']) {
+    for (const width of [375, 1280]) {
+      it(`preserves the selected model and unofficial run from ${locale}/evaluation at ${width}px`, () => {
+        cy.viewport(width, 900);
+        writeUrlParams({ g_model: 'Qwen-3.5-397B-A17B' });
+        mountTabNav({ pathname: `${locale}/evaluation`, search: '?unofficialruns=12345' });
+        cy.get(`[data-testid="${width < 768 ? 'mobile-tab' : 'tab-trigger'}-inference"]`)
+          .filter(':visible')
+          .should(
+            'have.attr',
+            'href',
+            `${locale}/inference?unofficialruns=12345&g_model=Qwen-3.5-397B-A17B`,
+          );
+      });
+    }
+  }
+});
 
 describe('TabNav — attached unofficial-run banner', () => {
   for (const width of [320, 390, 768, 1440]) {
