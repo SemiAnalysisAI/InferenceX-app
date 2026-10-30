@@ -10,10 +10,10 @@ export const metadata: Metadata = tabMetadata('historical');
 export default function HistoricalPage() {
   return (
     <>
-      <TabIntro tab="historical" />
       <InferenceProvider activeTab="historical">
         <HistoricalTrendsDisplay />
       </InferenceProvider>
+      <TabIntro tab="historical" />
     </>
   );
 }

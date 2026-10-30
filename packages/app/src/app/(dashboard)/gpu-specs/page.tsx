@@ -9,8 +9,8 @@ export const metadata: Metadata = tabMetadata('gpu-specs');
 export default function GpuSpecsPage() {
   return (
     <>
-      <TabIntro tab="gpu-specs" />
       <GpuSpecsContent />
+      <TabIntro tab="gpu-specs" />
     </>
   );
 }

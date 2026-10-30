@@ -17,11 +17,11 @@ export default async function ZhProfitEstimatorPage({ searchParams }: Props) {
   const seed = resolveCalculatorUrlSeed(sp);
   return (
     <>
-      <ZhTabIntro tab="profit-estimator" />
       <ProfitEstimatorDisplay
         basis="chip-hour"
         urlSeed={{ ...seed, model: seed.model ?? defaultRouteModel('profit-estimator') }}
       />
+      <ZhTabIntro tab="profit-estimator" />
     </>
   );
 }

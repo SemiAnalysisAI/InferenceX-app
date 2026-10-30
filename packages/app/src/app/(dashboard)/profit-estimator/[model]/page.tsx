@@ -27,11 +27,6 @@ export default async function ProfitEstimatorModelPage({ params, searchParams }:
   const seed = resolveCalculatorUrlSeed(sp);
   return (
     <>
-      <TabIntro
-        tab="profit-estimator"
-        title={MODEL_TAB_META['profit-estimator'].title(resolved.route.seoName)}
-        intro={MODEL_TAB_META['profit-estimator'].intro(resolved.route.seoName)}
-      />
       <ProfitEstimatorDisplay
         basis="chip-hour"
         urlSeed={{
@@ -39,6 +34,11 @@ export default async function ProfitEstimatorModelPage({ params, searchParams }:
           model: seed.model ?? resolved.route.model,
           profitRouteKey: JSON.stringify(sp),
         }}
+      />
+      <TabIntro
+        tab="profit-estimator"
+        title={MODEL_TAB_META['profit-estimator'].title(resolved.route.seoName)}
+        intro={MODEL_TAB_META['profit-estimator'].intro(resolved.route.seoName)}
       />
     </>
   );

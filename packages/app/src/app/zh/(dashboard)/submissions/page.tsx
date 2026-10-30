@@ -9,8 +9,8 @@ export const metadata: Metadata = tabMetadataZh('submissions');
 export default function ZhSubmissionsPage() {
   return (
     <>
-      <ZhTabIntro tab="submissions" />
       <SubmissionsDisplay />
+      <ZhTabIntro tab="submissions" />
     </>
   );
 }

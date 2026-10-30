@@ -58,6 +58,7 @@ import {
   usesTokenSalePricing,
 } from '@/components/inference/token-revenue';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
+import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { ModelArchitectureInfoLink } from './ModelArchitectureInfoLink';
 import { MetricExplanation } from './MetricExplanation';
 import { MeasuredMetricControls } from './MeasuredMetricControls';
@@ -189,6 +190,7 @@ interface ChartControlsProps {
   tcoSource?: 'inference' | 'historical';
   showTcoBasis?: boolean;
   showXAxisMode?: boolean;
+  runContext?: ReactNode;
   /** PowerX: the Count / Per / Show as controls that stand in for the Y-axis metric pick. */
   /** PowerX's Chart Config cells; receives the X-Axis Metric cell so it can place it. */
   powerXControls?: (slots: PowerXChartConfigSlots) => ReactNode;
@@ -199,10 +201,12 @@ export default function ChartControls({
   tcoSource = 'inference',
   showTcoBasis = false,
   showXAxisMode = false,
+  runContext,
   powerXControls,
 }: ChartControlsProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
+  const isMobile = useIsMobileViewport();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -484,6 +488,32 @@ export default function ChartControls({
         : 'sm:grid-cols-[11rem_minmax(0,1fr)]'
       : 'sm:grid-cols-2';
 
+  const benchmarkSelectors = (
+    <>
+      <div className="min-w-0">
+        <ScenarioSelector
+          value={selectedSequence}
+          onChange={handleSequenceChange}
+          open={openDropdown === 'sequence'}
+          onOpenChange={handleDropdownOpenChange('sequence')}
+          availableSequences={availableSequences}
+          model={selectedModel}
+          data-testid="scenario-selector"
+        />
+      </div>
+      <div className="min-w-0">
+        <PrecisionSelector
+          value={selectedPrecisions}
+          onChange={handlePrecisionChange}
+          open={openDropdown === 'precision'}
+          onOpenChange={handleDropdownOpenChange('precision')}
+          availablePrecisions={availablePrecisions}
+          data-testid="precision-multiselect"
+        />
+      </div>
+    </>
+  );
+
   return (
     <TooltipProvider delayDuration={0}>
       <div className="grid min-w-0 items-start gap-3 lg:grid-cols-3">
@@ -504,27 +534,7 @@ export default function ChartControls({
                 newModels={AGENTX_NEW_MODEL_DISPLAY_NAMES}
               />
             </div>
-            <div className="min-w-0">
-              <ScenarioSelector
-                value={selectedSequence}
-                onChange={handleSequenceChange}
-                open={openDropdown === 'sequence'}
-                onOpenChange={handleDropdownOpenChange('sequence')}
-                availableSequences={availableSequences}
-                model={selectedModel}
-                data-testid="scenario-selector"
-              />
-            </div>
-            <div className="min-w-0">
-              <PrecisionSelector
-                value={selectedPrecisions}
-                onChange={handlePrecisionChange}
-                open={openDropdown === 'precision'}
-                onOpenChange={handleDropdownOpenChange('precision')}
-                availablePrecisions={availablePrecisions}
-                data-testid="precision-multiselect"
-              />
-            </div>
+            {!isMobile && <div className="hidden md:contents">{benchmarkSelectors}</div>}
           </div>
         </ControlPanel>
 
@@ -534,6 +544,11 @@ export default function ChartControls({
           countLabel={t.changed}
           testId="inference-secondary-controls"
         >
+          {isMobile && (
+            <div className="grid min-w-0 grid-cols-2 items-start gap-3 md:hidden">
+              {benchmarkSelectors}
+            </div>
+          )}
           <ControlPanel
             legend={t.chartControls}
             data-testid="inference-chart-configuration"
@@ -771,6 +786,7 @@ export default function ChartControls({
               </div>
             </ControlPanel>
           )}
+          {runContext && <div className="min-w-0 md:mt-1 lg:col-span-3">{runContext}</div>}
         </MobileControlSection>
       </div>
     </TooltipProvider>

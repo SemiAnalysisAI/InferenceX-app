@@ -293,22 +293,26 @@ describe('Default scenario', () => {
       interceptAgenticData();
       interceptDerivedAgenticMetrics();
       cy.visit('/inference');
-      cy.get('fieldset [data-testid="scenario-selector"]')
+      if (width < 768) {
+        cy.get('[data-testid="scenario-selector"]').should('not.be.visible');
+        cy.get('[data-testid="inference-secondary-controls"] > button').click();
+      }
+      cy.get('[data-testid="scenario-selector"]')
         .should('be.visible')
         .and('contain.text', 'Agentic');
       cy.get('label[for="scenario-select"]').should('be.visible').and('contain.text', 'Scenario');
       cy.get('h2 [data-testid="scenario-selector"]').should('not.exist');
-      cy.get('fieldset [data-testid="scenario-selector"]').click('right', {
+      cy.get('[data-testid="scenario-selector"]').click('right', {
         scrollBehavior: 'center',
       });
       cy.contains('[data-select-option]', '8K / 1K').click();
       cy.contains('No measurements to plot for this selection.').should('be.visible');
-      cy.get('fieldset [data-testid="scenario-selector"]')
+      cy.get('[data-testid="scenario-selector"]')
         .should('contain.text', '8K / 1K')
         .click('right', { scrollBehavior: 'center' });
       cy.contains('[data-select-option]', 'Agentic').click();
       cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'Agentic');
-      cy.get('fieldset [data-testid="scenario-selector"]').should('contain.text', 'Agentic');
+      cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
     });
   }
 

@@ -33,6 +33,7 @@ import {
 describe('model selector ordering', () => {
   it('keeps non-default models in their existing order and excludes hidden models', () => {
     expect(MODEL_OPTIONS.filter((model) => !isModelDefault(model))).toEqual([
+      Model.DeepSeek_V4_Pro,
       Model.Kimi_K2_5,
       Model.MiniMax_M3,
       Model.DeepSeek_R1,
@@ -197,6 +198,11 @@ describe('isModelDeprecated', () => {
   it('moves MiniMax M3 to deprecated while keeping M3.1 Flash active', () => {
     expect(isModelDeprecated(Model.MiniMax_M3)).toBe(true);
     expect(isModelDeprecated(Model.MiniMax_M3_1_Flash)).toBe(false);
+  });
+
+  it('retires DeepSeek V4 Pro while keeping V4.1 Flash active', () => {
+    expect(isModelDeprecated(Model.DeepSeek_V4_Pro)).toBe(true);
+    expect(isModelDeprecated(Model.DeepSeek_V4_1_Flash)).toBe(false);
   });
 
   it('returns true for deprecated model GptOss', () => {

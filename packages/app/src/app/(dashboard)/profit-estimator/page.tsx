@@ -17,11 +17,11 @@ export default async function ProfitEstimatorPage({ searchParams }: Props) {
   const seed = resolveCalculatorUrlSeed(sp);
   return (
     <>
-      <TabIntro tab="profit-estimator" />
       <ProfitEstimatorDisplay
         basis="chip-hour"
         urlSeed={{ ...seed, model: seed.model ?? defaultRouteModel('profit-estimator') }}
       />
+      <TabIntro tab="profit-estimator" />
     </>
   );
 }

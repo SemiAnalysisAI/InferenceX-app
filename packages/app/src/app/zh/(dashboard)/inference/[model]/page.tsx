@@ -46,7 +46,7 @@ export default async function ZhInferenceModelPage({ params }: Props) {
     <>
       <InferencePageIntro locale="zh" />
       <InferenceProvider activeTab="inference">
-        <InferenceChartDisplay />
+        <InferenceChartDisplay centerOnEnter />
       </InferenceProvider>
     </>
   );
