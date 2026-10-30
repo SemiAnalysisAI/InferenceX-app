@@ -20,6 +20,32 @@ const unlockPointerEvents = () => {
 };
 
 describe('Per-model dashboard routes', () => {
+  for (const locale of ['', '/zh']) {
+    it(`opens bare ${locale}/inference on Kimi K3 without dropping shared filters`, () => {
+      const query = '?i_seq=agentic-traces&i_prec=fp4&utm_source=default-model-test';
+      cy.request({ url: `${locale}/inference${query}`, followRedirect: false }).then((response) => {
+        expect(response.status).to.eq(307);
+        const destination = new URL(
+          String(response.headers.location),
+          String(Cypress.config('baseUrl')),
+        );
+        expect(destination.pathname).to.eq(`${locale}/inference/kimi-k3`);
+        expect(destination.search).to.eq(query);
+      });
+      cy.visit(`${locale}/inference${query}`, visitOptions);
+      cy.location('pathname').should('eq', `${locale}/inference/kimi-k3`);
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'Kimi K3');
+      cy.get('[data-testid="inference-page-heading"]').should('contain.text', 'Kimi K3');
+    });
+
+    it(`uses Kimi K3 when navigating from ${locale}/evaluation without a model selection`, () => {
+      cy.visit(`${locale}/evaluation`, visitOptions);
+      cy.get('[data-testid="tab-trigger-inference"]').click();
+      cy.location('pathname').should('eq', `${locale}/inference/kimi-k3`);
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'Kimi K3');
+    });
+  }
+
   it('seeds /historical/<slug> to the routed model and rewrites the URL on switch without a reload', () => {
     cy.visit('/historical/minimax-m3', visitOptions);
     cy.get('[data-testid="historical-trends-display"]').should('be.visible');
