@@ -79,6 +79,10 @@ export const COLLECTIVEX_KNOWN_FOOTNOTES: Record<string, CollectiveXKnownFootnot
     en: "DeepEP V2's low-latency path uses the bundled V1 buffer, which needs NVSHMEM IBGDA on Mellanox NICs; EFA has no IBGDA, and every rank segfaults at setup. DeepEP V2.5 drops V1 and could run low-latency over NCCL GIN.",
     zh: 'DeepEP V2 的低延迟路径使用内置的 V1 缓冲，需要 Mellanox 网卡上的 NVSHMEM IBGDA；EFA 不支持 IBGDA，所有 rank 在初始化时段错误。DeepEP V2.5 移除了 V1，可经 NCCL GIN 运行低延迟模式。',
   },
+  'h100-efa-uccl-ll': {
+    en: 'Low-latency EP16 runs over EFA and passes correctness at every rung, with a ~3.4 ms floor at T=1 and ~5.1 ms at the T=256 top rung (BF16), versus ~0.15 ms at T=1 on H200 InfiniBand.',
+    zh: '低延迟 EP16 可在 EFA 上运行，所有梯级正确性通过；T=1 下限约 3.4 ms，梯级顶端 T=256 约 5.1 ms（BF16），而 H200 InfiniBand 上 T=1 约 0.15 ms。',
+  },
   'uccl-not-brought-up': {
     en: 'Not brought up on this pool (untested compute capability or no scale-out NIC path for the CPU proxy).',
     zh: '未在该集群上启用（计算架构未经测试，或 CPU 代理没有可用的横向扩展网卡路径）。',
@@ -92,16 +96,12 @@ export const COLLECTIVEX_KNOWN_FOOTNOTES: Record<string, CollectiveXKnownFootnot
     zh: 'NCCL EP v0.2 已修复 v0.1 的跨节点 GIN 故障。吞吐量 EP16 已在 B200、B300、H100 和 H200 上复验通过；GB200/GB300 使用 MNNVL。当前仅验证 BF16。',
   },
   'nccl-v02-ll': {
-    en: 'NCCL EP v0.2 ships the combine-recv shared-memory fence, resolving the v0.1 race. Low-latency EP8 is enabled on all NVIDIA pools, with EP16 enabled on B200/GB200/GB300. The full decode ladder is restored; qualification is BF16 only.',
-    zh: 'NCCL EP v0.2 已加入 combine-recv 共享内存栅栏，修复 v0.1 的竞争问题。所有 NVIDIA 集群均已启用低延迟 EP8，B200/GB200/GB300 另已启用 EP16。完整 decode 测试阶梯已恢复；当前仅验证 BF16。',
+    en: 'NCCL EP v0.2 ships the combine-recv shared-memory fence, resolving the v0.1 race. Low-latency EP8 is enabled on all NVIDIA pools, with EP16 on B200, H100, H200, GB200 and GB300. The full decode ladder is restored, in BF16 and FP8.',
+    zh: 'NCCL EP v0.2 已加入 combine-recv 共享内存栅栏，修复 v0.1 的竞争问题。所有 NVIDIA 集群均已启用低延迟 EP8，B200、H100、H200、GB200 和 GB300 另已启用 EP16。完整 decode 测试阶梯已恢复，覆盖 BF16 与 FP8。',
   },
   'nccl-ll-ep16-not-enabled': {
-    en: 'NCCL EP low-latency EP16 is not enabled on this pool; it is enabled on B200/GB200/GB300 with v0.2.',
-    zh: '该集群尚未启用 NCCL EP 低延迟 EP16；v0.2 已在 B200/GB200/GB300 上启用此配置。',
-  },
-  'hseries-ll-gdr': {
-    en: 'Functional and numerically correct, but the IBGDA send path runs 2.3–26x slower than bare-metal references in these virtualized pods (gdrcopy present but insufficient); held until the platform GDR question is resolved.',
-    zh: '功能与数值均正确，但在这些虚拟化节点上 IBGDA 发送路径比裸金属参考慢 2.3–26 倍（已装 gdrcopy 仍不足）；在平台 GDR 问题解决前暂不发布。',
+    en: 'NCCL EP low-latency EP16 is not enabled on this pool; v0.2 enables it on B200, H100, H200, GB200 and GB300.',
+    zh: '该集群尚未启用 NCCL EP 低延迟 EP16；v0.2 已在 B200、H100、H200、GB200 和 GB300 上启用此配置。',
   },
   'b300-ll-single-node-pin': {
     en: 'Works via a pinned single-node HCA list: the low-latency buffer self-enables IBGDA even single-node, and only the storage-IB rails accept AH/DCT creation (InferenceX#2525); steady-state traffic stays on NVLink.',
@@ -124,8 +124,8 @@ export const COLLECTIVEX_KNOWN_FOOTNOTES: Record<string, CollectiveXKnownFootnot
     zh: '该库没有低延迟 Kernel。',
   },
   'll-ep16-not-enabled': {
-    en: 'Low-latency EP16 is not enabled for this library on any pool.',
-    zh: '该库的低延迟 EP16 未在任何集群上启用。',
+    en: 'Low-latency EP16 is not enabled for this library on this pool.',
+    zh: '该库的低延迟 EP16 未在该集群上启用。',
   },
 };
 
@@ -216,15 +216,15 @@ const LOW_LATENCY: KnownMatrix = {
   h100: {
     'deepep-v2': cell(works, broken('efa-no-ibgda')),
     mori: off('amd-only'),
-    'uccl-ep': bothWork,
+    'uccl-ep': cell(works, worksWith('h100-efa-uccl-ll')),
     'nccl-ep': cell(worksWith('nccl-v02-ll'), worksWith('h100-efa-nccl-ll-decode-only')),
     'flashinfer-ep': off('no-ll-kernels'),
   },
   h200: {
-    'deepep-v2': cell(works, broken('hseries-ll-gdr')),
+    'deepep-v2': bothWork,
     mori: off('amd-only'),
-    'uccl-ep': cell(works, na('ll-ep16-not-enabled')),
-    'nccl-ep': cell(worksWith('nccl-v02-ll'), na('nccl-ll-ep16-not-enabled')),
+    'uccl-ep': bothWork,
+    'nccl-ep': cell(worksWith('nccl-v02-ll'), worksWith('nccl-v02-ll')),
     'flashinfer-ep': off('no-ll-kernels'),
   },
   b200: {
