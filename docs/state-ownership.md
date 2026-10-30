@@ -16,6 +16,8 @@ entry redirect does not reset a user's selection.
 `inference-navigation-state.ts` store. Tab navigation subscribes to that value,
 including selections omitted from share URLs because they match an older default.
 The store survives provider remounts but resets on a full page load.
+Share links from the bare inference route explicitly include this model, even
+when it matches the legacy URL-state default.
 
 ### GlobalFilterProvider
 
