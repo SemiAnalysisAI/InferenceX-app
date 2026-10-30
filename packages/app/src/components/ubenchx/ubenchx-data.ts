@@ -1,4 +1,5 @@
 import huawei from './data/huawei-bandwidth.json';
+import smallMessages from './data/huawei-bandwidth-small.json';
 
 export interface UbenchxRow {
   readonly bytes: number;
@@ -25,6 +26,7 @@ export interface UbenchxRunMetadata {
   readonly cann?: string;
   readonly torchNpu?: string;
   readonly missingSizesBytes?: readonly number[];
+  readonly smallMessageExtension?: typeof smallMessages.metadata;
 }
 
 export interface UbenchxRun {
@@ -424,6 +426,7 @@ for (const [gpu, points] of Object.entries(huawei.curves)) {
       dtype: 'float16',
       protocol: 'rotating-pool-npu-graph',
       missingSizesBytes: [],
+      smallMessageExtension: smallMessages.metadata,
       sourceUrl:
         'https://github.com/SemiAnalysisAI/InferenceX-app/blob/0e7525c9b62124a43856d26e1ce2ac5b2ae31b93/packages/app/src/components/ubenchx/data/huawei-bandwidth.json',
     },
@@ -432,7 +435,7 @@ for (const [gpu, points] of Object.entries(huawei.curves)) {
       source:
         '950PR 128 GiB nominal reference assumed at 1600 GB/s; not independently verified by memory-controller counters',
     },
-    rows: points.map((point) => ({
+    rows: [...smallMessages.points, ...points].map((point) => ({
       bytes: point.size_bytes,
       timeMs: point.amortized_copy_ms,
       bandwidthGbps: point.effective_GBps,

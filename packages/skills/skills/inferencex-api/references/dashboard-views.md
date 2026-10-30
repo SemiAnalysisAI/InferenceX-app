@@ -746,3 +746,7 @@ Chinese ownership-tier wording denotes owning hardware at hyperscaler purchase
 volume, not a rental quote; the wording does not change the underlying TCO rates.
 
 Vendor-series colors are presentation-only. Huawei/Ascend series use a shared, theme-aware amber identity across the chart generators; historical dates and high-contrast configurations may use related shades. Colors do not change API measurements, hardware identities, filters or normalization references. Sequential heatmap scales encode values rather than vendor identity.
+
+### Huawei small-message bandwidth extension
+
+`test=mem-bw&gpu=Huawei%20950PR` covers 51 sizes, 8 B through 16 GiB. The nine 8 B–2 KiB points have 360 observations each from a separate CANN 9.2.1 run. `metadata.smallMessageExtension` preserves its date, versions, board, size range, 4096-byte slot stride, archive digest and cache qualification. The original metadata and all 42 measurements from 4 KiB upward are unchanged. These graph-amortized rates include possible cache residency and are not isolated-copy latency or cold-HBM bandwidth.
