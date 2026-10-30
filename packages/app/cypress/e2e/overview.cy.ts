@@ -1656,9 +1656,7 @@ describe('Overview page', () => {
     desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
       platform('b200').should('contain.text', 'SGLang · FP4').and('not.contain.text', 'STP');
     });
-    cy.get('[data-testid="overview-model-scope-toggle"]')
-      .find('[data-overview-model-scope="all"]')
-      .click();
+    desktopModel('DeepSeek-V4-Pro', AGENTX).should('contain.text', '已弃用');
     desktopModel('MiniMax-M3', AGENTX).within(() => {
       platform('gb300')
         .find('[data-testid="overview-cost-delta"]')
