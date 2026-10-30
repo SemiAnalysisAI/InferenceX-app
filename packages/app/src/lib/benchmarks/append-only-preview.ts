@@ -1,4 +1,8 @@
-import { benchmarkCurveScope } from '@semianalysisai/inferencex-constants';
+import {
+  benchmarkCurveScope,
+  curveLineImages,
+  extendCurveLineImages,
+} from '@semianalysisai/inferencex-constants';
 
 import type { BenchmarkRow } from '@/lib/api/api';
 
@@ -39,9 +43,9 @@ const pointKey = (row: BenchmarkRow): string =>
 
 /**
  * Preview an append-only run the way ingestion will publish it: each curve it
- * touches extends the current published curve when every point on both sides
- * shares one image. Inherited rows keep their producer date and ids but take the
- * run's URL, which is the overlay's series identity.
+ * touches extends the current published curve when every topology line on both
+ * sides keeps its image. Inherited rows keep their producer date and ids but take
+ * the run's URL, which is the overlay's series identity.
  */
 export function stitchAppendOnlyPreview(
   runRows: BenchmarkRow[],
@@ -58,14 +62,10 @@ export function stitchAppendOnlyPreview(
   };
 
   return [...runByScope].flatMap(([scope, rows]) => {
-    const images = new Set(rows.map((row) => row.image));
-    const [image] = images;
     const predecessors = latestByScope.get(scope) ?? [];
     if (
-      images.size !== 1 ||
-      !image ||
       predecessors.length === 0 ||
-      predecessors.some((row) => row.image !== image)
+      !extendCurveLineImages(curveLineImages(rows), curveLineImages(predecessors))
     ) {
       return rows;
     }

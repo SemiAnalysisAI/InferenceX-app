@@ -155,7 +155,10 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
     await sql`UPDATE benchmark_results SET power_invalid_reasons = '["sampling_gap_exceeded"]'::jsonb,
       power_audit = '{"expected_gpu_count":16}'::jsonb WHERE id IN (1, 2)`;
     await db.exec(
-      readFileSync(new URL('../../migrations/015_power_provenance.sql', import.meta.url), 'utf8'),
+      readFileSync(
+        new URL('../../migrations/020_append_only_line_images.sql', import.meta.url),
+        'utf8',
+      ),
     );
     for (const rows of [
       await getLatestBenchmarks(sql, 'glm5.2'),
@@ -366,7 +369,7 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
   });
   it('stops append-only inheritance at an image change or new full snapshot', async () => {
     await addRun(12, { append: true });
-    await addPoint(8, 12, 1, 300, { offload: 'off', image: 'trt:rc27' });
+    await addPoint(8, 12, 2, 300, { image: 'trt:rc27' });
     expect(ids(await getBenchmarksForRun(sql, 'glm5.2', 12))).toEqual([8]);
     await addRun(13);
     await addPoint(9, 13, 2, 400, { image: 'trt:rc27' });
@@ -399,6 +402,17 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
     expect(ids(await getBenchmarksForRun(sql, 'glm5.2', 14))).toEqual([16, 17]);
     await expectSameCurve('an AGG image change stops the mixed-image chain');
   });
+  it('checks each older run against every topology image already in the chain', async () => {
+    await addRun(12);
+    await addPoint(8, 12, 1, 1, { image: 'agg:y' });
+    await addPoint(9, 12, 2, 2884, { image: 'disagg:z' });
+    await addRun(13, { append: true });
+    await addPoint(10, 13, 2, 4096, { image: 'disagg:z' });
+    await addRun(14, { append: true });
+    await addPoint(11, 14, 1, 16, { image: 'agg:x' });
+    expect(ids(await getBenchmarksForRun(sql, 'glm5.2', 14))).toEqual([10, 11]);
+    await expectSameCurve('an AGG image change two runs back stops the chain');
+  });
   it('preserves accepted rows regardless of overall workflow conclusion', async () => {
     await addRun(12, { conclusion: 'failure' });
     await addPoint(8, 12, 1, 1, { offload: 'off' });
@@ -426,10 +440,10 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
     expect(ids(await getBenchmarksForRun(sql, 'glm5.2', 34413290524))).toEqual([8]);
   });
   it.each([null, 'mixed'])(
-    'does not inherit across an incomplete or mixed image: %s',
+    'does not inherit across an incomplete or mixed image within a topology: %s',
     async (image) => {
       await addRun(12, { append: true });
-      await addPoint(8, 12, 1, 300, { image });
+      await addPoint(8, 12, 2, 300, { image });
       if (image === 'mixed') await addPoint(9, 12, 2, 400);
       expect(ids(await getBenchmarksForRun(sql, 'glm5.2', 12))).toEqual(
         image === null ? [8] : [8, 9],

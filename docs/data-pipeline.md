@@ -31,10 +31,13 @@ there are no duplicated metric-specific columns on `benchmark_results` or
 
 Computing the newest logical curve from the full result table is expensive. The
 materialized view pre-computes the newest logical curve snapshot, including
-same-image append-only history when applicable. Point identity within that snapshot
-remains config, scenario, sequence, offload mode, recipe fingerprint, and concurrency.
-API routes use the view when no date filter is specified; date-filtered requests
-use the same `benchmark_curve_runs` view and `benchmark_curve_scope` function.
+append-only history when applicable. An append-only run extends the run before it
+when every topology line both contain keeps its image; an AgentX curve spans AGG,
+disagg, speculative-decoding and offload lines that may run different images. Point
+identity within that snapshot remains config, scenario, sequence, offload mode,
+recipe fingerprint, and concurrency. API routes use the view when no date filter is
+specified; date-filtered requests use the same `benchmark_curve_runs` view and
+`benchmark_curve_scope` function and compute the line images inline.
 
 `REFRESH CONCURRENTLY` allows reads during refresh (no downtime). The trade-off is a brief window where the view is stale after ingest, which is acceptable because ingests are infrequent.
 
