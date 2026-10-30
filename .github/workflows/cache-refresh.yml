@@ -2,6 +2,14 @@ name: Cache Refresh
 
 on:
   workflow_dispatch:
+    inputs:
+      scope:
+        description: Cache scope (OperatorX is separate from dashboards)
+        type: choice
+        default: dashboards
+        options:
+          - dashboards
+          - operatorx
 
 permissions: {}
 
@@ -17,6 +25,14 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Validate cache scope
+        env:
+          CACHE_SCOPE: ${{ inputs.scope || 'dashboards' }}
+        run: |
+          case "$CACHE_SCOPE" in
+            dashboards|operatorx) ;;
+            *) echo 'Unsupported cache scope' >&2; exit 2 ;;
+          esac
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -42,6 +58,7 @@ jobs:
           CYPRESS_INSTALL_BINARY: '0'
 
       - name: Invalidate cache
+        if: inputs.scope != 'operatorx'
         env:
           APP_URL: ${{ vars.APP_URL }}
           INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
@@ -51,9 +68,42 @@ jobs:
           bun run admin:cache:invalidate "$APP_URL" --immediate
 
       - name: Warm up cache
+        if: inputs.scope != 'operatorx'
         env:
           APP_URL: ${{ vars.APP_URL }}
           VERCEL_PROTECTION_BYPASS_SECRET: ${{ secrets.VERCEL_PROTECTION_BYPASS_SECRET }}
         run: |
           : "${APP_URL:?APP_URL repository variable is not set}"
           bun run admin:cache:warmup "$APP_URL"
+
+      - name: Invalidate OperatorX cache
+        if: inputs.scope == 'operatorx'
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
+          VERCEL_PROTECTION_BYPASS_SECRET: ${{ secrets.VERCEL_PROTECTION_BYPASS_SECRET }}
+        run: |
+          : "${APP_URL:?APP_URL repository variable is not set}"
+          : "${INVALIDATE_SECRET:?VERCEL_INVALIDATE_SECRET secret is not set}"
+          headers=(-H "Authorization: Bearer $INVALIDATE_SECRET")
+          if [ -n "$VERCEL_PROTECTION_BYPASS_SECRET" ]; then
+            headers+=(-H "x-vercel-protection-bypass: $VERCEL_PROTECTION_BYPASS_SECRET")
+          fi
+          curl -sSf -X POST "${APP_URL%/}/api/v1/invalidate?scope=operatorx&immediate=true" "${headers[@]}" \
+            | jq -e '.invalidated == true and .scope == "operatorx" and .immediate == true'
+
+      - name: Warm OperatorX comparisons
+        if: inputs.scope == 'operatorx'
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          VERCEL_PROTECTION_BYPASS_SECRET: ${{ secrets.VERCEL_PROTECTION_BYPASS_SECRET }}
+        run: |
+          : "${APP_URL:?APP_URL repository variable is not set}"
+          headers=(-H 'Accept-Encoding: gzip, deflate, br, zstd')
+          if [ -n "$VERCEL_PROTECTION_BYPASS_SECRET" ]; then
+            headers+=(-H "x-vercel-protection-bypass: $VERCEL_PROTECTION_BYPASS_SECRET")
+          fi
+          for op in gemm moe; do
+            curl -sSf --retry 2 --retry-delay 2 --max-time 120 --compressed \
+              "${APP_URL%/}/api/v1/operatorx/compare?op=$op" "${headers[@]}" -o /dev/null
+          done

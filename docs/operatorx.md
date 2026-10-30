@@ -101,6 +101,10 @@ suppresses a SQL error. Responses and timeline identities are preserved.
 5. Deploy the reader and purge `/api/v1/invalidate?scope=operatorx`; warm
    `/api/v1/operatorx/compare?op=gemm` and `?op=moe` by consuming their full responses.
 
+After a manual publication, dispatch **Cache Refresh** with `scope=operatorx`. The default `dashboards` scope deliberately does not purge OperatorX. The targeted option expires only OperatorX caches and warms the default GEMM/MoE comparisons.
+
+中文：手动发布后，触发 **Cache Refresh** 工作流并将 `scope` 设为 `operatorx`。默认的 `dashboards` scope 有意不清除 OperatorX 缓存；`operatorx` 只会使 OperatorX 缓存失效，并预热默认的 GEMM/MoE 对比。
+
 The backfill requires `DATABASE_OPERATORX_WRITE_URL`; it loads one run at a time,
 preserves run revisions and source indices, and locks the captured revision before
 writing. A concurrent re-ingest causes stale work to be skipped. It is idempotent
