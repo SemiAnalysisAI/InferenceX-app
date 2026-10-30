@@ -24,16 +24,8 @@ import { RooflineBars } from './roofline-bars';
 const ORDER: ComputePrecision[] = ['fp4', 'fp8', 'bf16'];
 
 const STRINGS = {
-  en: {
-    sharedOnly: 'Shared cases only',
-    ascendBasis:
-      '950PR (28 Cube): dense peaks of 378 BF16 and 756 FP8 TFLOPS; assumed HBM bandwidth 1.6 TB/s. Exact memory/ECC configuration is unresolved.',
-  },
-  zh: {
-    sharedOnly: '仅共同用例',
-    ascendBasis:
-      '950PR（28 个 Cube 核）：BF16 和 FP8 的稠密计算峰值分别为 378 和 756 TFLOPS；HBM 带宽假定为 1.6 TB/s，具体内存及 ECC 配置尚未确认。',
-  },
+  en: { sharedOnly: 'Shared cases only' },
+  zh: { sharedOnly: '仅共同用例' },
 };
 
 interface Point {
@@ -172,9 +164,6 @@ export function Roofline({
           </div>
         )}
       </div>
-      {!summaryOnly && model.hardware.includes('ascend950pr') && (
-        <p className="text-xs text-muted-foreground">{strings.ascendBasis}</p>
-      )}
       {summaryOnly ? (
         <RooflineBars model={model} summary={summary} />
       ) : (
