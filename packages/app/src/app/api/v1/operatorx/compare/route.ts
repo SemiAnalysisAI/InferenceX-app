@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     'rooflineSharedOnly',
   ].some((key) => params.has(key));
   const summaryPrecision = params.get('rooflinePrecision');
-  const summarySharedOnly = params.get('rooflineSharedOnly') ?? 'false';
+  const summarySharedOnly = params.get('rooflineSharedOnly') ?? 'true';
   const summaryNormalized = params.get('rooflineNormalized') ?? 'true';
   if (
     summaryRequested &&

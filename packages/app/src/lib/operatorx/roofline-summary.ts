@@ -72,7 +72,7 @@ export function rooflineSummary(view: ComparisonView, params: RooflineSummaryPar
             return c.flops! / c.bytes! >= peak! / bandwidth!;
           });
         });
-  const sharedOnly = params.sharedOnly ?? false;
+  const sharedOnly = params.sharedOnly ?? true;
   const bars: RooflineSummaryBar[] = hardware
     .flatMap((hw) => {
       if (missingReferences.includes(hw)) return [];

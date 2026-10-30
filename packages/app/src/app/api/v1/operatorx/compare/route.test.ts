@@ -131,6 +131,15 @@ it.each([false, true])(
   },
 );
 
+it('defaults the roofline summary to the shared cohort', async () => {
+  vi.mocked(getComparison).mockResolvedValue(comparison());
+  const response = await GET(
+    new NextRequest('http://localhost/api/v1/operatorx/compare?op=gemm&rooflinePrecision=bf16'),
+  );
+  const body = await response.json();
+  expect(body.rooflineSummary).toMatchObject({ sharedOnly: true, cohort: 'shared-compute-bound' });
+});
+
 it.each([
   'rooflinePrecision=other',
   'rooflineNormalized=yes',

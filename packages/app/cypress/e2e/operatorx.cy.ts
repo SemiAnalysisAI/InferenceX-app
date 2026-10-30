@@ -117,7 +117,7 @@ it('defaults to a measured 950PR shape and normalized BF16, while honoring preci
     });
 });
 
-it('shows disjoint FP8 measurements and keeps strict shared-only mode explicit', () => {
+it('defaults to shared cases and shows disjoint FP8 measurements per accelerator on request', () => {
   const datasets = ['ascend950pr-external', 'h200-dgxc'].map((runner, gpu) => {
     const dataset = normalizeBundle(run(`fp8-disjoint-${gpu}`, runner, [64]));
     dataset.results = dataset.results.map((row) => ({
@@ -138,12 +138,14 @@ it('shows disjoint FP8 measurements and keeps strict shared-only mode explicit',
   cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view);
   cy.visit('/operatorx');
   cy.get('[data-testid="operatorx-viz-throughput-summary"]').scrollIntoView();
+  // Shared cases only is on by default, and disjoint FP8 formats share no case.
+  cy.get('#opx-summary-shared').should('have.attr', 'aria-checked', 'true');
+  cy.contains('No shared compute-bound cases').should('be.visible');
+  cy.get('#opx-summary-shared').click().should('have.attr', 'aria-checked', 'false');
   cy.get('[data-testid="operatorx-roofline-summary"] .summary-row').should('have.length', 2);
   cy.get('[data-testid="operatorx-viz-throughput-summary"]').screenshot('fp8-summary-independent');
   cy.get('#opx-summary-shared').click();
   cy.contains('No shared compute-bound cases').should('be.visible');
-  cy.get('#opx-summary-shared').click();
-  cy.get('[data-testid="operatorx-roofline-summary"] .summary-row').should('have.length', 2);
 });
 
 // Every median and best label stays vertically inside its own bar row, and the best label

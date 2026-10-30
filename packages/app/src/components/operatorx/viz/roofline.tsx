@@ -60,7 +60,7 @@ export function Roofline({
   const precisions = ORDER.filter((p) => counts.has(p));
   const defaults = view.defaults ?? comparisonDefaults(view);
   const [picked, setPicked] = useState<ComputePrecision | null>(null);
-  const [sharedOnly, setSharedOnly] = useState(false);
+  const [sharedOnly, setSharedOnly] = useState(true);
   const [normalized, setNormalized] = useState(defaults.rooflineNormalized);
   const precision = picked && precisions.includes(picked) ? picked : defaults.rooflinePrecision;
   const points = useMemo<Point[]>(

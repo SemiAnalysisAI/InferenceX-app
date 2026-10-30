@@ -93,7 +93,7 @@ describe('roofline median and best summary', () => {
   });
 });
 
-it('keeps disjoint FP8 formats visible by default and reports exact per-bar case sets', () => {
+it('defaults to the shared cohort and keeps disjoint FP8 formats visible per accelerator', () => {
   const view = fixture();
   view.cases.forEach((c) => {
     c.computePrecision = 'fp8';
@@ -105,12 +105,15 @@ it('keeps disjoint FP8 formats visible by default and reports exact per-bar case
     hardware: ['ascend950pr', 'h200', 'unknown'],
     normalized: true,
   };
-  const result = rooflineSummary(view, params);
+  // Disjoint FP8 scale formats share no case, so the default shared cohort is empty.
+  const shared = rooflineSummary(view, params);
+  expect(shared.cohort).toBe('shared-compute-bound');
+  expect(shared.bars).toEqual([]);
+  const result = rooflineSummary(view, { ...params, sharedOnly: false });
   expect(result.cohort).toBe('per-hardware-compute-bound');
   expect(result.bars).toMatchObject([
     { hardware: 'ascend950pr', n: 1, caseIndices: [3], median: 600 / 756 },
     { hardware: 'h200', n: 1, caseIndices: [4], median: 300 / 1979 },
   ]);
   expect(result.missingReferences).toEqual(['unknown']);
-  expect(rooflineSummary(view, { ...params, sharedOnly: true }).bars).toEqual([]);
 });
