@@ -23,6 +23,10 @@ describe('Chart Section Tabs — E2E', () => {
     cy.url().should('include', '/profit-estimator');
     cy.url().should('not.include', '/profit-estimator-per-gigawatt');
 
+    cy.get('[data-testid="tab-trigger-revenue-capacity"]').click();
+    cy.location('pathname').should('eq', '/revenue-capacity');
+    cy.contains('h1', 'Revenue → GPU capacity').should('be.visible');
+
     cy.get('[data-testid="tab-trigger-submissions"]').click();
     cy.url().should('include', '/submissions');
 
