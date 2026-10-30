@@ -151,7 +151,7 @@ export function Roofline({
           </Label>
         </div>
       </div>
-      {model.hardware.includes('ascend950pr') && (
+      {!summaryOnly && model.hardware.includes('ascend950pr') && (
         <p className="text-xs text-muted-foreground">{strings.ascendBasis}</p>
       )}
       {summaryOnly ? (

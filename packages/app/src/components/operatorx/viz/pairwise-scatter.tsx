@@ -1,10 +1,9 @@
 'use client';
 
 import * as d3 from 'd3';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { SearchableSelect } from '@/components/ui/searchable-select';
-import { useResponsiveChartDimensions } from '@/hooks/useResponsiveChartDimensions';
 import { track } from '@/lib/analytics/analytics';
 
 import { EmptyChart } from '../charts/empty';
@@ -14,12 +13,6 @@ import { hardwareLabel } from '../compare/hardware';
 import type { ComparisonModel } from '../compare/model';
 import { originRows } from '../compare/slices';
 import type { VizDefinition } from './types';
-
-const MARGIN = { top: 16, right: 16, bottom: 56, left: 72 };
-
-// A square plot keeps the parity line at 45 degrees and fills the card beside the summary bars.
-const squareHeight = (width: number) =>
-  Math.min(560, Math.max(380, width - MARGIN.left - MARGIN.right + MARGIN.top + MARGIN.bottom));
 
 interface Pair {
   i: number;
@@ -42,7 +35,17 @@ function PairwiseScatter({ model }: { model: ComparisonModel }) {
   const { view, metric, hardware } = model;
   const [pickA, setA] = useState<string | null>(null);
   const [pickB, setB] = useState<string | null>(null);
-  const { dimensions, setContainerRef } = useResponsiveChartDimensions();
+  // The plot fills whatever height the row leaves, so it never pads the card beside it.
+  const [plotBox, setPlotBox] = useState<HTMLDivElement | null>(null);
+  const [plotHeight, setPlotHeight] = useState(0);
+  useEffect(() => {
+    if (!plotBox) return;
+    const observer = new ResizeObserver(([entry]) =>
+      setPlotHeight(Math.round(entry.contentRect.height)),
+    );
+    observer.observe(plotBox);
+    return () => observer.disconnect();
+  }, [plotBox]);
   const a =
     pickA && hardware.includes(pickA)
       ? pickA
@@ -83,7 +86,7 @@ function PairwiseScatter({ model }: { model: ComparisonModel }) {
     />
   );
   return (
-    <div ref={setContainerRef} className="space-y-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
         {swatch(a)}
         <SearchableSelect
@@ -115,73 +118,77 @@ function PairwiseScatter({ model }: { model: ComparisonModel }) {
       {pairs.length === 0 ? (
         <EmptyChart>No case was measured on both.</EmptyChart>
       ) : (
-        <OpxChart<Pair>
-          inspect={{ model, caseOf: (p) => p.i }}
-          chartId="operatorx-pairwise"
-          data={pairs}
-          height={squareHeight(dimensions.width)}
-          margin={MARGIN}
-          xScale={scale}
-          yScale={scale}
-          xAxis={{
-            label: `${hardwareLabel(a)} ${metric.label.toLowerCase()} (${metric.unit})`,
-            tickCount: 5,
-            tickFormat: (v) => metric.tick(Number(v)),
-          }}
-          yAxis={{
-            label: `${hardwareLabel(b)} (${metric.unit})`,
-            tickCount: 5,
-            tickFormat: (v) => metric.tick(Number(v)),
-          }}
-          layers={[
-            {
-              type: 'line',
-              key: 'parity',
-              lines: {
-                parity: [
-                  { x: d0, y: d0 },
-                  { x: d1, y: d1 },
-                ],
-              },
-              config: {
-                getColor: () => 'var(--muted-foreground)',
-                getStrokeDasharray: () => '4 4',
-                strokeWidth: 1.5,
-                curve: d3.curveLinear,
-              },
-            },
-            {
-              type: 'point',
-              key: 'points',
-              data: pairs,
-              config: {
-                getCx: () => 0,
-                getCy: () => 0,
-                getX: (p) => p.x,
-                getY: (p) => p.y,
-                getColor: (p) => model.colors[winner(p)],
-                getRadius: () => 3,
-                keyFn: (p) => String(p.i),
-                maxPoints: Infinity,
-              },
-            },
-          ]}
-          tooltip={{
-            rulerType: 'none',
-            attachToLayer: 1,
-            content: (p) =>
-              tooltipHtml({
-                title: view.cases[p.i].shape,
-                rows: [
-                  esc(view.cases[p.i].precision),
-                  ...originRows(view, p.i),
-                  `${hardwareLabel(a)} ${esc(view.measurements[a].backend?.[p.i] ?? '')} <strong>${metric.format(p.x)}</strong>`,
-                  `${hardwareLabel(b)} ${esc(view.measurements[b].backend?.[p.i] ?? '')} <strong>${metric.format(p.y)}</strong>`,
-                ],
-                footer: 'Click for kernel timeline',
-              }),
-          }}
-        />
+        <div ref={setPlotBox} className="relative min-h-72 flex-1">
+          <div className="absolute inset-0">
+            <OpxChart<Pair>
+              inspect={{ model, caseOf: (p) => p.i }}
+              chartId="operatorx-pairwise"
+              data={pairs}
+              height={Math.max(plotHeight, 288)}
+              margin={{ top: 16, right: 16, bottom: 56, left: 72 }}
+              xScale={scale}
+              yScale={scale}
+              xAxis={{
+                label: `${hardwareLabel(a)} ${metric.label.toLowerCase()} (${metric.unit})`,
+                tickCount: 5,
+                tickFormat: (v) => metric.tick(Number(v)),
+              }}
+              yAxis={{
+                label: `${hardwareLabel(b)} (${metric.unit})`,
+                tickCount: 5,
+                tickFormat: (v) => metric.tick(Number(v)),
+              }}
+              layers={[
+                {
+                  type: 'line',
+                  key: 'parity',
+                  lines: {
+                    parity: [
+                      { x: d0, y: d0 },
+                      { x: d1, y: d1 },
+                    ],
+                  },
+                  config: {
+                    getColor: () => 'var(--muted-foreground)',
+                    getStrokeDasharray: () => '4 4',
+                    strokeWidth: 1.5,
+                    curve: d3.curveLinear,
+                  },
+                },
+                {
+                  type: 'point',
+                  key: 'points',
+                  data: pairs,
+                  config: {
+                    getCx: () => 0,
+                    getCy: () => 0,
+                    getX: (p) => p.x,
+                    getY: (p) => p.y,
+                    getColor: (p) => model.colors[winner(p)],
+                    getRadius: () => 3,
+                    keyFn: (p) => String(p.i),
+                    maxPoints: Infinity,
+                  },
+                },
+              ]}
+              tooltip={{
+                rulerType: 'none',
+                attachToLayer: 1,
+                content: (p) =>
+                  tooltipHtml({
+                    title: view.cases[p.i].shape,
+                    rows: [
+                      esc(view.cases[p.i].precision),
+                      ...originRows(view, p.i),
+                      `${hardwareLabel(a)} ${esc(view.measurements[a].backend?.[p.i] ?? '')} <strong>${metric.format(p.x)}</strong>`,
+                      `${hardwareLabel(b)} ${esc(view.measurements[b].backend?.[p.i] ?? '')} <strong>${metric.format(p.y)}</strong>`,
+                    ],
+                    footer: 'Click for kernel timeline',
+                  }),
+              }}
+            />
+          </div>
+        </div>
       )}
     </div>
   );
