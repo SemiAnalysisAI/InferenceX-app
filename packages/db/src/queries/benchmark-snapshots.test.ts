@@ -126,8 +126,8 @@ beforeAll(async () => {
   await seed();
   const legacyRows = await getLatestBenchmarks(sql, 'glm5.2');
   legacyCount = legacyRows.length;
-  await db.exec(readFileSync(new URL('014_agentic_curve_snapshots.sql', dir), 'utf8'));
-  await db.exec(readFileSync(new URL('015_power_provenance.sql', dir), 'utf8'));
+  for (const name of migrations.filter((filename) => filename >= '014_'))
+    await db.exec(readFileSync(new URL(name, dir), 'utf8'));
   const retained = await db.query<{ count: number }>(
     'SELECT count(*)::int AS count FROM benchmark_results',
   );
@@ -373,6 +373,31 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
     await addRun(14, { append: true });
     await addPoint(10, 14, 2, 500, { image: 'trt:rc27' });
     expect(ids(await getBenchmarksForRun(sql, 'glm5.2', 14))).toEqual([9, 10]);
+  });
+  it('extends a mixed AGG/disagg curve when each shared topology keeps its image', async () => {
+    await addRun(12);
+    for (const [id, config, conc, image] of [
+      [8, 1, 1, 'agg:a'],
+      [9, 1, 4, 'agg:a'],
+      [10, 1, 16, 'agg:a'],
+      [11, 2, 2884, 'disagg:d'],
+      [12, 2, 4096, 'disagg:d'],
+      [13, 2, 7480, 'disagg:d'],
+    ] as const)
+      await addPoint(id, 12, config, conc, { image });
+    await addRun(13, { append: true });
+    await addPoint(14, 13, 1, 32, { image: 'agg:a' });
+    await addPoint(15, 13, 2, 1228, { image: 'disagg:d' });
+    const curve = [8, 9, 10, 11, 12, 13, 14, 15];
+    expect(ids(await getBenchmarksForRun(sql, 'glm5.2', 13))).toEqual(curve);
+    await expectSameCurve('append-only run extends a mixed-image AGG/disagg curve');
+    expect(ids(await getLatestBenchmarks(sql, 'glm5.2'))).toEqual(curve);
+
+    await addRun(14, { append: true });
+    await addPoint(16, 14, 1, 64, { image: 'agg:b' });
+    await addPoint(17, 14, 2, 8192, { image: 'disagg:d' });
+    expect(ids(await getBenchmarksForRun(sql, 'glm5.2', 14))).toEqual([16, 17]);
+    await expectSameCurve('an AGG image change stops the mixed-image chain');
   });
   it('preserves accepted rows regardless of overall workflow conclusion', async () => {
     await addRun(12, { conclusion: 'failure' });
