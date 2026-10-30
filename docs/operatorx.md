@@ -183,6 +183,59 @@ Ascend 在浅色和深色图表中使用偏冷的深红色，与 AMD 的暖红�
 Roofline 在 BF16 有 FLOP/byte 计数时默认选择 BF16，否则选择数据点最多的受支持精度；
 Normalized 默认开启。用户主动选择的形状、精度和 Normalized 开关仍优先生效，不修改数据、硬件选择或测量值。
 
+## Roofline
+
+MoE and attention ops run several stages (projections, the attention core or
+recurrence, router, experts, shared experts), each at its own precision and
+intensity, and split cases add collectives. A case's roofline time on a GPU is
+the sum over its stages of the slower of compute (FLOPs at that GPU's peak for
+the stage's precision) and memory (bytes at peak bandwidth), plus each
+collective's bytes at the GPU's scale-up bandwidth: a tensor-parallel GEMM's
+all-reduce, an MoE's all-reduce, all-gather/reduce-scatter or expert-parallel
+dispatch/combine, and attention's dcp merge. Attention's own tensor-parallel
+all-reduce runs outside the op. Share of roofline is that time over measured
+latency. The roofline chart plots each case at its effective intensity: where
+the GPU's roofline reaches the case's bound, so the gap under the roof is the
+case's share of roofline. For a single-stage op this is plain FLOP/byte.
+
+中文：MoE 与注意力算子包含多个阶段（投影、注意力核心或线性递归、路由、专家、共享专家），
+各阶段精度与算术强度不同，多卡切分还会引入集合通信。某用例在某 GPU 上的 roofline
+时间为各阶段中算力时间（按该阶段精度的峰值算力计算 FLOPs）与访存时间（按峰值带宽
+计算字节数）取较慢者之和，再加上各集合通信按 scale-up 带宽计算的时间：张量并行
+GEMM 的 all-reduce，MoE 的 all-reduce、all-gather/reduce-scatter 或专家并行的
+dispatch/combine，以及注意力的 dcp 合并。注意力自身的张量并行 all-reduce 不在算子
+内。Roofline 占比为该时间与实测延迟之比。Roofline 图按等效算术强度放置每个用例，
+即 GPU roofline 达到该用例上界的位置，因此点与屋顶之间的差距即为 roofline 占比；
+单阶段算子的等效强度就是普通的 FLOP/byte。
+
+## Data API
+
+`GET /api/v1/views/operatorx` is the public, read-only OperatorX feed, listed in
+the API reference and OpenAPI document. It returns one row per case and GPU,
+from that GPU's newest stored result. Each row has the case key, op type,
+device split, testlist, the models and layers the case comes from, shape and
+precision labels, dimensions, per-GPU useful FLOPs and bytes, status, latency,
+TFLOPS, TB/s, roofline time and share (see Roofline), kernel, and the stored run ID
+and result index.
+
+- `op`: `gemm` (default), `moe` or `attention`.
+- `workload` (from `options.workloads`) or `model` (from `options.models`).
+- `parallel`: `1` for one device (tp=dp=ep=dcp=1), or a split such as `tp8`.
+- `hardware`, `status` (`ok` by default, or `all`), `page` (100 rows), `format=csv`.
+
+Unknown or repeated parameters and values outside the listed options return 400.
+Responses are cached until new results are ingested. A response built without an
+unreadable run is not cached. The other `/api/v1/operatorx/*` routes serve the
+page and may change with it.
+
+中文：`GET /api/v1/views/operatorx` 是公开的只读 OperatorX 数据接口，列于 API 参考与
+OpenAPI 文档中。每个用例与 GPU 返回一行，取该 GPU 最新存储的结果，包含用例键、算子类型、
+设备切分、testlist、所属模型与层、形状与精度标签、维度、每 GPU 有效 FLOPs 与字节数、
+状态、延迟、TFLOPS、TB/s、roofline 时间与占比、kernel，以及运行 ID 与结果索引。参数：
+`op`、`workload` 或 `model`、`parallel`（`1` 表示单卡）、`hardware`、`status`、`page`、
+`format=csv`。未知或重复的参数及不在可选项中的取值返回 400。在新结果入库前保持缓存；
+缺少无法读取的运行时不缓存。其余 `/api/v1/operatorx/*` 接口服务于页面，可能随页面变化。
+
 ## Persistence and deployment
 
 ### Queued Ascend 950PR replacement
@@ -287,8 +340,8 @@ measurement. The newest-per-hardware/case/backend raw selection is unchanged.
 original run, revision, result index, kernel, and CUDA Graph flag. Head-to-head
 points and timeline inspection use these same selected measurements. Thus identical
 BF16 cases measured by `torch_npu_linear` and `vllm` can be compared, while different
-precision or quantization arguments remain separate. No public OpenAPI operation
-is added: OperatorX remains a documented page-owned API.
+precision or quantization arguments remain separate. This adds no OpenAPI
+operation; the compare route stays page-owned.
 
 中文：对比 API 与所有图表按完整算子参数匹配测试用例，保留精度、量化、布局和形状差异，
 不再要求不同设备使用相同 backend。同一设备、同一用例有多个 backend 时，选择成功且延迟为

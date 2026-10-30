@@ -213,6 +213,14 @@ export const apiRouteCatalog = [
     operationId: 'get-video-view',
     sourceSha256: '566405f7db1eb5ea141b54384238e1b531bfe616c7fcd65b8653aed30d7ba007',
   },
+  {
+    source: 'src/app/api/v1/views/operatorx/route.ts',
+    path: '/api/v1/views/operatorx',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-operatorx-view',
+    sourceSha256: 'f4218a9564b96efd3e212cd50ec5a85cbf233db9145c91b3debcbcf7cd423ad8',
+  },
   // Agentic Workload Explorer page backend (frozen ProxyTrace snapshot).
   {
     source: 'src/app/api/v1/agentic-workload-explorer/cache/route.ts',
@@ -562,7 +570,7 @@ export const apiRouteCatalog = [
       en: 'OperatorX page backend; cross-hardware comparisons include hardware references, workload-resolved defaults, and optional distribution quantiles with resolved normalization controls.',
       zh: 'OperatorX 页面后端；跨硬件对比包含硬件参考值、按工作负载确定的默认值，以及可选的分布分位数和归一化参数。',
     },
-    sourceSha256: '26f0b3c9a6f82b6e96aed9f5d19c0c0b8e14b072bc917978e7ba02dc530e0aea',
+    sourceSha256: 'e91ab390d842efd8b1681980a51fb7b8efc9916bf85335bebce67e6833256eb3',
   },
   {
     source: 'src/app/api/v1/operatorx/timelines/route.ts',
@@ -573,7 +581,7 @@ export const apiRouteCatalog = [
       en: 'OperatorX page backend; serves the case drill-down kernel timelines in the page’s own compact shape.',
       zh: 'OperatorX 页面后端；以页面自身的紧凑结构提供用例详情的 kernel 时间线。',
     },
-    sourceSha256: 'c41b25c899b181bd5d687c795d12b74b8b279bbf55ee7e7b4c77f6d46abeff26',
+    sourceSha256: 'eaaf5647360300c025a65f5e4896ca3799aea85905a32f7e6258cea517620342',
   },
 
   {
@@ -1208,7 +1216,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/operatorx/visualization.ts',
-    sourceSha256: '2b05d3af345fe795b4262e4408f587f2d3f125de0461b3c6c4ce6f3124409635',
+    sourceSha256: '49d265692f796cd00de1a24f2d8316bd0d12edf280e53faf02765765118a0ad2',
     reviewArea: {
       en: 'OperatorX workload-resolved chart defaults and shared shape grouping used by UI and comparison API.',
       zh: 'OperatorX 按工作负载确定的图表默认值及形状分组，由 UI 与对比 API 共用。',
@@ -1216,7 +1224,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/operatorx/compare.ts',
-    sourceSha256: '1ff99424e53323aa40abe76a8fd4de066ad0b026068c73c9149f6cc6937676f8',
+    sourceSha256: 'c41b35d4fe0ba0da4b16290e5350b4fc70d69a0c092be317fe10335dba23dd83',
     reviewArea: {
       en: 'OperatorX page-owned comparison: workload filtering and optional hardware normalization references; excluded from published OpenAPI.',
       zh: 'OperatorX 页面专属对比：workload 筛选及可选的硬件归一化参考值；不纳入公开 OpenAPI。',
@@ -1232,7 +1240,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/operatorx/service.ts',
-    sourceSha256: 'f14a3caf1bb3bd3f23d8fe4b9f71ae58a1842c26da3fd545ec67572e33d9808f',
+    sourceSha256: '8be8dbf750d00e5cf9ffc92bc6c58c80fc8e94c43744162f450a9d7cfb780840',
     reviewArea: {
       en: 'OperatorX bulk compact reads, revision-keyed shared Blob comparisons, raw fallback, partial/revision cache exclusion and bounded timeline reads.',
       zh: 'OperatorX 批量精简读取、按 revision 共享 Blob 对比缓存、原始数据回退、部分失败或 revision 变更时不缓存，以及时间线限流并行读取规则。',
@@ -1240,7 +1248,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/operatorx/comparison-cache.ts',
-    sourceSha256: '44a287013f711bf90e1d8db39493aebc7042d5aa6f28e5f13cad37840dcfd345',
+    sourceSha256: 'a43bf0cb027f8b32a8cdda4a9c84fc3d2e1ada7f49c59bf7039c22f45a07e6c3',
     reviewArea: {
       en: 'Versioned ingest-time OperatorX projections and newest-first merge preserving statuses, source ordering and timeline provenance.',
       zh: 'OperatorX 写入时生成的版本化对比数据及最新优先合并规则，保留状态、来源顺序和时间线归属。',
@@ -1248,7 +1256,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/operatorx.ts',
-    sourceSha256: '134980fa91bf9ffb21659527f3834f10971afd2cc3b7d738673bb93dcb0b6c0e',
+    sourceSha256: '10fa17540b17e49996417e2b2339efa085daff66d42ddb2f8d9af40fb8427977',
     reviewArea: {
       en: 'OperatorX raw and compact reads, atomic projection writes and revision-guarded backfill.',
       zh: 'OperatorX 原始及精简数据读取、事务内写入和按 revision 校验的 backfill。',
@@ -1551,7 +1559,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: '7b5e23a835687af4bc7d35edeaadcb267f6ecf7bc42baa8d17ea4482cf81f6bd',
+    sourceSha256: '40d6249f2c44aec624e057f5356e26101caeb5b0ff5fb5b681f8f0ab76b5597c',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1585,7 +1593,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/cache/api-cache.ts',
-    sourceSha256: 'f70cdf1994432842d0249c3d601b95c6c292b86bf7f811253f77c5b09a404e28',
+    sourceSha256: 'fa17881973118e5ab8b026b20df43b92a05d03ec9069d8aea77b5765a959c4dc',
     reviewArea: {
       en: 'Public CDN tags, cache lifetimes, Blob key dimensions, and purge behavior.',
       zh: '公开 CDN 标签、缓存时长、Blob 键维度和清除行为。',

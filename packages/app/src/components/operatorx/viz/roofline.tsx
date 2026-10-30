@@ -15,6 +15,7 @@ import { EmptyChart } from '../charts/empty';
 import { OpxChart, esc, HardwareLegend, tooltipHtml } from '../charts/kit';
 import { formatCompact } from '../charts/scales';
 import { hardwareLabel, peakBandwidthTBs, peakTflops } from '../compare/hardware';
+import { type RooflineBound, rooflineBound } from '../compare/roofline-bound';
 import type { ComparisonModel } from '../compare/model';
 import { originRows } from '../compare/slices';
 import type { VizDefinition } from './types';
@@ -39,12 +40,30 @@ interface Point {
   y: number;
   ai: number;
   tflops: number;
+  us: number;
+  bound: RooflineBound | null;
 }
 
 const SHARED = 'shared';
 const ratio = (v: number) => String(Number(v.toPrecision(2)));
 const share = (v: number, of: number | null, what: string) =>
   of ? ` · ${ratio((v / of) * 100)}% of peak ${what}` : '';
+
+/** `37% of roofline (88 µs · compute 41%, memory 59%)`. */
+function boundRow(b: RooflineBound, us: number): string {
+  const parts = (
+    [
+      ['compute', b.compute],
+      ['memory', b.memory],
+      ['link', b.link],
+    ] as const
+  ).filter(([, t]) => t > 0);
+  const split =
+    parts.length > 1
+      ? ` · ${parts.map(([name, t]) => `${name} ${ratio((t / b.us) * 100)}%`).join(', ')}`
+      : ` · ${parts[0]?.[0] ?? 'compute'}-bound`;
+  return `<strong>${ratio((b.us / us) * 100)}% of roofline</strong> (${ratio(b.us)} µs${split})`;
+}
 
 function Roofline({ model }: { model: ComparisonModel }) {
   const strings = STRINGS[useLocale()];
@@ -60,6 +79,8 @@ function Roofline({ model }: { model: ComparisonModel }) {
   const [picked, setPicked] = useState<ComputePrecision | null>(null);
   const [normalized, setNormalized] = useState(defaults.rooflineNormalized);
   const precision = picked && precisions.includes(picked) ? picked : defaults.rooflinePrecision;
+  // Each stage hits its own roof, so a case sits at its effective intensity: where the
+  // device's roofline reaches the case's bound, F / t_roof (plain FLOP/byte for one stage).
   const points = useMemo<Point[]>(
     () =>
       model.hardware.flatMap((hw) => {
@@ -69,23 +90,29 @@ function Roofline({ model }: { model: ComparisonModel }) {
         return view.cases.flatMap((c, i) => {
           const us = model.latency(hw, i);
           if (c.computePrecision !== precision || !us || !c.flops || !c.bytes) return [];
-          const ai = c.flops / c.bytes;
+          const bound = rooflineBound(c, hw);
           const tflops = c.flops / (us * 1e6);
+          // ridge-normalized: the share of peak the bound allows on the slope, else past the ridge
+          // without a bound (a stage's peak or the link bandwidth unknown), plain FLOP/byte
+          const plain = c.flops / c.bytes;
+          const reach = peak && bw && bound ? c.flops / (peak * 1e6) / bound.us : null;
+          const ridged =
+            peak && bw ? (reach !== null && reach < 0.999 ? reach : (plain * bw) / peak) : null;
+          const ai = ridged === null ? plain : (ridged * peak!) / bw!;
           return [
             normalized
-              ? { hw, i, ai, tflops, x: (ai * bw!) / peak!, y: tflops / peak! }
-              : { hw, i, ai, tflops, x: ai, y: tflops },
+              ? { hw, i, ai, tflops, us, bound, x: ridged!, y: tflops / peak! }
+              : { hw, i, ai, tflops, us, bound, x: ai, y: tflops },
           ];
         });
       }),
     [model, view, precision, normalized],
   );
   if (!precision) return <EmptyChart>No case has FLOP and byte counts.</EmptyChart>;
-  const xs = normalized
-    ? points.map((p) => p.x)
-    : view.cases.flatMap((c) =>
-        c.computePrecision === precision && c.flops && c.bytes ? [c.flops / c.bytes] : [],
-      );
+  const composite = view.cases.some(
+    (c) => (c.work?.parts.length ?? 0) > 1 || (c.work?.links.length ?? 0) > 0,
+  );
+  const xs = points.map((p) => p.x);
   const [a0, a1] =
     xs.length > 0
       ? [
@@ -156,9 +183,12 @@ function Roofline({ model }: { model: ComparisonModel }) {
         }}
         xAxis={
           normalized
-            ? { label: 'Arithmetic intensity / ridge point', tickFormat: (v) => ratio(Number(v)) }
+            ? {
+                label: `${composite ? 'Effective intensity' : 'Arithmetic intensity'} / ridge point`,
+                tickFormat: (v) => ratio(Number(v)),
+              }
             : {
-                label: 'Arithmetic intensity (FLOP/byte)',
+                label: `${composite ? 'Effective intensity' : 'Arithmetic intensity'} (FLOP/byte)`,
                 tickFormat: (v) => formatCompact(Number(v)),
               }
         }
@@ -212,7 +242,8 @@ function Roofline({ model }: { model: ComparisonModel }) {
           content: (p) => {
             const peak = peakTflops(p.hw, precision);
             const bw = peakBandwidthTBs(p.hw);
-            const tbs = p.tflops / p.ai;
+            const c = view.cases[p.i];
+            const tbs = c.bytes! / (p.us * 1e6);
             return tooltipHtml({
               title: hardwareLabel(p.hw),
               color: model.colors[p.hw],
@@ -221,7 +252,8 @@ function Roofline({ model }: { model: ComparisonModel }) {
                 ...originRows(view, p.i),
                 `<strong>${p.tflops.toFixed(1)} TFLOPS</strong>${share(p.tflops, peak, 'compute')}`,
                 `<strong>${tbs.toFixed(2)} TB/s</strong>${share(tbs, bw, 'bandwidth')}`,
-                `${p.ai.toFixed(0)} FLOP/byte`,
+                `${(c.flops! / c.bytes!).toFixed(0)} FLOP/byte${composite ? ` · ${p.ai.toFixed(0)} effective` : ''}`,
+                ...(p.bound ? [boundRow(p.bound, p.us)] : []),
               ],
               footer: 'Click for kernel timeline',
             });
@@ -236,7 +268,7 @@ function Roofline({ model }: { model: ComparisonModel }) {
 export const roofline: VizDefinition = {
   id: 'roofline',
   title: 'Roofline',
-  ops: ['gemm', 'moe'],
+  ops: ['gemm', 'moe', 'attention'],
   wide: true,
   Component: Roofline,
 };

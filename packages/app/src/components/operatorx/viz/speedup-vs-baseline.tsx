@@ -127,6 +127,6 @@ export const speedupVsBaseline: VizDefinition = {
   id: 'speedup-vs-baseline',
   title: 'Advantage over baseline',
   needsBaseline: true,
-  ops: ['gemm', 'moe'],
+  ops: ['gemm', 'moe', 'attention'],
   Component: SpeedupVsBaseline,
 };

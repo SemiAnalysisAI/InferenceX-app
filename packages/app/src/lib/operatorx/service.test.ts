@@ -29,7 +29,7 @@ vi.mock('next/cache', () => ({
 }));
 
 const args = { m: 1, n: 64, k: 128, a: { dtype: 'bf16' }, b: { dtype: 'bf16' } };
-const shape = { type: 'gemm', args, sources: ['openai/gpt-oss-120b/k_proj'] };
+const shape = { type: 'gemm', args, sources: ['deepseek-ai/DeepSeek-R1-0528/q_a_proj'] };
 function bundle(
   id: string,
   backends: string[],

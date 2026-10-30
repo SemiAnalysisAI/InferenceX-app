@@ -7,6 +7,7 @@ import type { OperatorXRunRef } from '@semianalysisai/inferencex-db/operatorx/bu
 import {
   type Comparison,
   type ComparisonOp,
+  opFamily,
 } from '@semianalysisai/inferencex-db/operatorx/compare';
 import {
   normalizeBundle,
@@ -87,7 +88,11 @@ export async function getResultDetail(
   return { result, metrics: metrics[index] ?? {} };
 }
 
-const OP_TESTLIST_PREFIX: Record<ComparisonOp, string> = { gemm: 'gemm', moe: 'moe' };
+const OP_TESTLIST_PREFIX: Record<ComparisonOp, string> = {
+  gemm: 'gemm',
+  moe: 'moe',
+  attention: 'attn',
+};
 
 const compared = new Map<ComparisonOp, { revisions: string; value: Promise<Comparison> }>();
 const partial = new WeakSet<Comparison>();
@@ -207,7 +212,7 @@ export async function getTimelines(
         const [, rawIndex, revision] = ref.split(':');
         const index = Number(rawIndex);
         const result = results[index];
-        if (!revision || revision !== run.revision || !result || result.opType !== op) {
+        if (!revision || revision !== run.revision || !result || opFamily(result.opType) !== op) {
           known = false;
         } else {
           timelines[ref] = compactTimeline(metrics[index]);

@@ -155,6 +155,6 @@ function Distribution({ model }: { model: ComparisonModel }) {
 export const distribution: VizDefinition = {
   id: 'distribution',
   title: 'Distribution per GPU',
-  ops: ['gemm', 'moe'],
+  ops: ['gemm', 'moe', 'attention'],
   Component: Distribution,
 };

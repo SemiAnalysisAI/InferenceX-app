@@ -4,7 +4,10 @@ import { OPERATORX_HARDWARE_REFERENCES } from '@semianalysisai/inferencex-db/ope
 import { GPU_SPECS, type GpuSpec } from '@/lib/catalog/gpu-specs';
 import { getModelSortIndex } from '@/lib/catalog/constants';
 import { generateVendorColors } from '@/lib/charts/dynamic-colors';
-import type { ComputePrecision } from '@semianalysisai/inferencex-db/operatorx/compare';
+import type {
+  ComparisonView,
+  ComputePrecision,
+} from '@semianalysisai/inferencex-db/operatorx/compare';
 
 export function hardwareLabel(key: string): string {
   return OPERATORX_HARDWARE_REFERENCES[key]?.label ?? HW_REGISTRY[key]?.label ?? key.toUpperCase();
@@ -21,6 +24,15 @@ export function sortHardware(keys: string[]): string[] {
 }
 
 /** Adds or removes `key`; the last selected GPU stays selected, returning `selected` unchanged. */
+/** GPUs with at least one measured case in these views, the ones charts can draw. */
+export function measuredHardware(views: Pick<ComparisonView, 'measurements'>[]): string[] {
+  const out = new Set<string>();
+  for (const v of views)
+    for (const [hw, col] of Object.entries(v.measurements))
+      if (col.status.includes('ok')) out.add(hw);
+  return sortHardware([...out]);
+}
+
 export function toggleHardwareSelection(selected: string[], key: string): string[] {
   if (!selected.includes(key)) return [...selected, key];
   return selected.length > 1 ? selected.filter((h) => h !== key) : selected;
@@ -46,4 +58,11 @@ export function peakBandwidthTBs(key: string): number | null {
   if (reference) return reference.memoryBandwidthTBs;
   const m = spec(key)?.memoryBandwidth.match(/(?<tbs>[\d.]+)\s*TB\/s/u);
   return m ? Number(m.groups?.tbs) : null;
+}
+
+/** Per-GPU unidirectional scale-up (NVLink / Infinity Fabric) bandwidth in TB/s. */
+export function scaleUpTBs(key: string): number | null {
+  const m = spec(key)?.scaleUpBandwidth.match(/(?<v>[\d.]+)\s*(?<unit>[GT])B\/s/u);
+  if (!m?.groups) return null;
+  return Number(m.groups.v) / (m.groups.unit === 'G' ? 1000 : 1);
 }
