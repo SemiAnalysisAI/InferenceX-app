@@ -154,6 +154,10 @@ for (const prefix of ['', '/zh']) {
         expect($summary[0].getBoundingClientRect().right).to.be.lessThan(
           next.getBoundingClientRect().left,
         );
+        // Head to head takes 5 of 12 desktop columns; the bars take the other 7.
+        expect(
+          next.getBoundingClientRect().width / $summary[0].getBoundingClientRect().width,
+        ).to.be.closeTo(5 / 7, 0.03);
       });
     cy.get('[data-testid="operatorx-roofline-summary"]')
       .scrollIntoView()
@@ -174,6 +178,18 @@ for (const prefix of ['', '/zh']) {
           });
         cy.get('.summary-median').should('have.length', 2);
         cy.get('.summary-best').should('have.length', 2);
+        // Axis ticks use the page font, and hardware names match the bar value labels.
+        cy.get('.y-axis .tick text').should(($ticks) => {
+          const tick = getComputedStyle($ticks[0]);
+          const label = getComputedStyle(
+            $ticks[0].ownerDocument.querySelector('.summary-median-label')!,
+          );
+          expect(tick.fontFamily).to.contain('DM Sans').and.equal(label.fontFamily);
+          expect(tick.fontSize).to.equal(label.fontSize);
+        });
+        cy.get('.x-axis .tick text')
+          .first()
+          .should(($tick) => expect(getComputedStyle($tick[0]).fontFamily).to.contain('DM Sans'));
       });
     cy.get('[data-testid="operatorx-viz-throughput-summary"]').screenshot(
       `roofline-summary-${prefix ? 'zh' : 'en'}-normalized`,

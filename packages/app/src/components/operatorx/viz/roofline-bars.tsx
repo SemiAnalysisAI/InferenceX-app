@@ -149,7 +149,11 @@ export function RooflineBars({
     },
   };
   return (
-    <section className="min-w-0 space-y-2" data-testid="operatorx-roofline-summary">
+    <section
+      // Hardware names share a row with the 12px median and best labels.
+      className="min-w-0 space-y-2 [&_.y-axis_.tick_text]:text-xs!"
+      data-testid="operatorx-roofline-summary"
+    >
       <h3 className="text-sm font-medium">{strings.title}</h3>
       <p className="text-xs text-muted-foreground">
         {strings.cohort}: {summary.caseIndices.length}.

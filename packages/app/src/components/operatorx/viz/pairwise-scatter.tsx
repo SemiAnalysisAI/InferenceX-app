@@ -191,5 +191,6 @@ export const pairwiseScatter: VizDefinition = {
   id: 'pairwise-scatter',
   title: 'Head to head',
   ops: ['gemm', 'moe'],
+  span: 5,
   Component: PairwiseScatter,
 };
