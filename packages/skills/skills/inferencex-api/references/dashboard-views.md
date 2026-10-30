@@ -5,6 +5,14 @@ Use `/api/v1/views/*` for dashboard-calculated values. Read the deployed
 these routes become available only after the corresponding app change deploys.
 Do not assume an installed skill proves server availability.
 
+On mobile inference and PowerX charts, Scenario, Precision, and Run context (date,
+run selection and changelog) are inside More chart controls; Model stays visible.
+Desktop keeps Scenario and Precision beside Model and Run context below chart
+settings. Embedded charts keep their standalone run controls. This is
+presentation-only: scenario/precision/run/date parameters, defaults, returned
+measurements and unofficial overlays are unchanged; no API parameter represents
+the collapsed state.
+
 ## TCO basis
 
 Use `tcoBasis=internal` (the default) or `tcoBasis=external` in cost-aware
@@ -33,12 +41,14 @@ results or treat its interpolated values as separately measured operating points
    for static model, hardware, sequence and metric registries; use each specialized
    view's `options`, `configurations`, `workloads`, or raw run-list operation for
    data-dependent choices.
-   MiniMax M3 has `category=deprecated` in `options.models`; it remains selectable
-   through explicit model parameters and overview `modelScope=all`. MiniMax M3.1
-   Flash remains in the default model group.
+   MiniMax M3 and DeepSeek V4 Pro have `category=deprecated` in `options.models`.
+   They remain selectable through explicit model parameters and overview
+   `modelScope=all`. MiniMax M3.1 Flash and DeepSeek V4.1 Flash remain in the default
+   model group. Historical data and unofficial-run overlays remain available;
+   current-image views exclude both retired models.
    Preserve `options.models` order within each category when rendering model
    selectors. The default group is Kimi K3, DeepSeek V4.1 Flash, GLM5.2/GLM5.3,
-   MiniMax M3.1 Flash, Muse Spark Open, DeepSeek V4 Pro 0813, Qwen3.5, then
+   MiniMax M3.1 Flash, Muse Spark Open, Qwen3.5, then
    Qwen3.8 Flash Next. This presentation order does not change `defaults.model`
    or the overview's model order.
    For models with `category=deprecated`, inference charts append `(Deprecated)`
@@ -271,7 +281,7 @@ supported precision (null when none); `rooflineNormalized` is true. Missing/erro
 unsupported rows do not qualify the preferred slice. Explicit UI selections override
 these initial defaults; hardware visibility and measured values are unchanged.
 
-The full-width Median and best throughput panel replaces Distribution per GPU; Metric vs size is last. Precision, Normalized, and Shared cases only controls map to `rooflinePrecision=bf16|fp8|fp4`, `rooflineHardware=<comma-separated keys>`, `rooflineNormalized=true|false`, and `rooflineSharedOnly=true|false` on `/api/v1/operatorx/compare?op=gemm`. Supplying any adds `rooflineSummary`. Defaults: workload precision, all hardware, normalized=true, sharedOnly=false.
+The Median and best throughput panel sits beside Head to head and replaces Distribution per GPU; Metric vs size is last. Precision, Normalized, and Shared cases only controls map to `rooflinePrecision=bf16|fp8|fp4`, `rooflineHardware=<comma-separated keys>`, `rooflineNormalized=true|false`, and `rooflineSharedOnly=true|false` on `/api/v1/operatorx/compare?op=gemm`. Supplying any adds `rooflineSummary`. Defaults: workload precision, all hardware, normalized=true, sharedOnly=false.
 
 By default each bar uses that hardware's successful positive finite measurements at or above its own ridge point. Case sets and quantization formats can differ, so these are descriptive medians, not matched-shape speedups. Missing references omit only the affected hardware. Shared-only mode requires the same cases measured on every selected accelerator and above every ridge point; an empty intersection remains empty. `cohort` identifies `per-hardware-compute-bound` or `shared-compute-bound`. `matchedCases` counts shared cases before ridge filtering; top-level `caseIndices` is the union of displayed bar indices, and each bar's `caseIndices` and `n` identify its own cohort. Bars also contain median, best, medianTflops, bestTflops, bestCaseIndex and hardware. Normalized values are fractions. Invalid selectors return 400; no selectors leave the original response unchanged. Hover and click are presentation-only.
 

@@ -76,6 +76,14 @@ describe('Per-model dashboard routes', () => {
     cy.visit('/zh/historical/minimax-m3', visitOptions);
     cy.get('[data-testid="zh-tab-intro"]').should('be.visible').and('contain.text', 'MiniMax M3');
     cy.get('[data-testid="historical-trends-display"]').should('be.visible');
+    cy.get('[data-testid="historical-trends-display"]').then(([display]) => {
+      cy.get('[data-testid="zh-tab-intro"]').then(([intro]) => {
+        // The intro sits below the dashboard so the chart and selectors load first.
+        expect(
+          display.compareDocumentPosition(intro) & Node.DOCUMENT_POSITION_FOLLOWING,
+        ).to.be.above(0);
+      });
+    });
   });
 });
 
@@ -150,12 +158,11 @@ describe('Inference model presentation', () => {
         cy.window().then((win) => {
           (win as MarkerWindow).__modelRouteNoReloadMarker = true;
         });
-        const intro = `[data-testid="${locale ? 'zh-' : ''}tab-intro"]`;
+        const heading = '[data-testid="inference-page-heading"]';
         const suffix = locale ? '推理基准测试' : 'Inference Benchmarks';
         const expectModel = (name: string, slug: string) => {
           const title = `${name} ${suffix}`;
-          cy.get(`${intro} h1`).should('have.text', title);
-          cy.get(`${intro} p`).first().should('contain.text', name);
+          cy.get(heading).should('have.text', title);
           cy.title().should('eq', `${title} | InferenceX`);
           cy.get('meta[name="description"]').should('have.attr', 'content').and('contain', name);
           cy.get('meta[property="og:title"]').should(
@@ -215,17 +222,14 @@ describe('Inference model presentation', () => {
     it(`updates a bare ${locale}/inference intro when the selector creates a model route`, () => {
       visitModel('DeepSeek-V4.1-Flash', '', `${locale}/inference`);
       selectModel(PRO);
-      cy.get(`[data-testid="${locale ? 'zh-' : ''}tab-intro"] h1`).should(
-        'contain.text',
-        'DeepSeek V4 Pro',
-      );
+      cy.get('[data-testid="inference-page-heading"]').should('contain.text', 'DeepSeek V4 Pro');
       cy.title().should('contain', 'DeepSeek V4 Pro');
     });
 
     it(`follows an explicit query-model override on ${locale}/inference/kimi-k3`, () => {
       visitModel('DeepSeek-V4.1-Flash', '', `${locale}/inference/kimi-k3`);
       cy.get('[data-testid="model-selector"]').should('contain.text', FLASH);
-      cy.get(`[data-testid="${locale ? 'zh-' : ''}tab-intro"] h1`).should(
+      cy.get('[data-testid="inference-page-heading"]').should(
         'contain.text',
         'DeepSeek V4.1 Flash',
       );
@@ -238,7 +242,6 @@ describe('Inference model presentation', () => {
         expect(document.querySelector('h1')?.textContent).to.eq(
           locale ? 'Kimi K3 推理基准测试' : 'Kimi K3 Inference Benchmarks',
         );
-        expect(document.querySelector('h1 + p')?.textContent).to.contain('Kimi K3 2.8T');
         expect(document.title).to.contain('Kimi K3');
       });
     });

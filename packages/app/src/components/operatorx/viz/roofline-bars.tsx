@@ -127,11 +127,16 @@ export function RooflineBars({
         .attr('width', (d) => Math.max(0, x(d.median) - x(0)))
         .attr('height', y.bandwidth())
         .attr('fill', (d) => model.colors[d.hardware]);
-      const fits = (d: RooflineSummaryBar) => x(d.median) - x(0) > format(d.median).length * 7 + 12;
+      const labelWidth = (value: number) => format(value).length * 7;
+      const fits = (d: RooflineSummaryBar) => x(d.median) - x(0) > labelWidth(d.median) + 12;
+      // A median label that does not fit inside its bar sits just after it on the same row,
+      // so tight rows never stack it onto the next bar; the best label moves past it.
+      const medianEnd = (d: RooflineSummaryBar) =>
+        fits(d) ? x(d.median) : x(d.median) + 4 + labelWidth(d.median);
       rows
         .select<SVGTextElement>('.summary-median-label')
-        .attr('x', (d) => (fits(d) ? x(d.median) - 6 : x(0) + 4))
-        .attr('y', (d) => (fits(d) ? y.bandwidth() / 2 : y.bandwidth() + 7))
+        .attr('x', (d) => (fits(d) ? x(d.median) - 6 : x(d.median) + 4))
+        .attr('y', y.bandwidth() / 2)
         .attr('text-anchor', (d) => (fits(d) ? 'end' : 'start'))
         .style('fill', function (d) {
           const bar = this.parentElement?.querySelector('.summary-median');
@@ -142,7 +147,7 @@ export function RooflineBars({
         .text((d) => format(d.median));
       rows
         .select('.summary-best-label')
-        .attr('x', (d) => x(d.best) + 7)
+        .attr('x', (d) => Math.max(x(d.best), medianEnd(d)) + 7)
         .attr('y', y.bandwidth() / 2)
         .text((d) => format(d.best));
       return rows
@@ -154,9 +159,13 @@ export function RooflineBars({
     },
   };
   return (
-    <section className="min-w-0 space-y-2" data-testid="operatorx-roofline-summary">
-      <h3 className="text-sm font-medium">{strings.title}</h3>
+    <section
+      // Hardware names share a row with the 12px median and best labels.
+      className="min-w-0 space-y-2 [&_.y-axis_.tick_text]:text-xs!"
+      data-testid="operatorx-roofline-summary"
+    >
       <p className="text-xs text-muted-foreground">
+        <span className="font-medium text-foreground">{strings.title}</span> ·{' '}
         {summary.sharedOnly
           ? `${strings.cohort}: ${summary.caseIndices.length}.`
           : strings.individual}
@@ -174,9 +183,9 @@ export function RooflineBars({
           chartId="operatorx-roofline-summary"
           data={summary.bars}
           inspect={{ model, caseOf: (d) => d.bestCaseIndex }}
-          height={Math.max(160, summary.bars.length * 44 + 64)}
+          height={Math.max(120, summary.bars.length * 30 + 52)}
           clipContent={false}
-          margin={{ top: 12, right: 64, bottom: 48, left: 160 }}
+          margin={{ top: 4, right: 64, bottom: 48, left: 140 }}
           xScale={{
             type: 'linear',
             domain: [0, Math.max(...summary.bars.map((b) => b.best)) * 1.04],

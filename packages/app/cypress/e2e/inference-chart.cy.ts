@@ -521,7 +521,18 @@ describe('Inference Chart — Simplified Chinese mobile path', () => {
 
   it('keeps chart controls reachable and localizes the complete table click path', () => {
     cy.contains('h2', '推理性能').should('be.visible');
+    cy.get('[data-testid="inference-run-context"]').should('have.length', 1).and('not.be.visible');
+    cy.get('#scenario-select').should('have.length', 1).and('not.be.visible');
+    cy.get('#precision-select').should('have.length', 1).and('not.be.visible');
     cy.get('[data-testid="inference-secondary-controls"] > button').click();
+    cy.get('[data-testid="inference-secondary-controls"]').within(() => {
+      cy.get('#scenario-select').should('be.visible');
+      cy.get('#precision-select').should('be.visible');
+    });
+    cy.get('[data-testid="inference-secondary-controls"]')
+      .find('[data-testid="inference-run-context"]')
+      .should('be.visible')
+      .and('contain.text', '运行信息');
     cy.get('label[for="x-axis-mode-select"]').should('have.text', 'X 轴指标');
     cy.get('[data-testid="x-axis-mode-selector"]').click();
     cy.get('[data-testid="x-axis-mode-e2e"]').should('have.text', '端到端延迟').click();

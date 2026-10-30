@@ -146,8 +146,23 @@ it('shows disjoint FP8 measurements and keeps strict shared-only mode explicit',
   cy.get('[data-testid="operatorx-roofline-summary"] .summary-row').should('have.length', 2);
 });
 
+// Every median and best label stays vertically inside its own bar row, and the best label
+// never overlaps the median label.
+function expectSummaryLabelsOnRows() {
+  cy.get('[data-testid="operatorx-roofline-summary"] .summary-row').each(($row) => {
+    const band = $row.find('.summary-best')[0].getBoundingClientRect();
+    const median = $row.find('.summary-median-label')[0].getBoundingClientRect();
+    const best = $row.find('.summary-best-label')[0].getBoundingClientRect();
+    for (const label of [median, best]) {
+      const middle = (label.top + label.bottom) / 2;
+      expect(middle).to.be.within(band.top, band.bottom);
+    }
+    expect(best.left).to.be.at.least(median.right);
+  });
+}
+
 for (const prefix of ['', '/zh']) {
-  it(`shows median and best bars in their own full-width panel at ${prefix || '/'}`, () => {
+  it(`shows median and best bars beside head to head at ${prefix || '/'}`, () => {
     const datasets = ['ascend950pr-external', 'h200-dgxc'].map((runner, gpu) => {
       const dataset = normalizeBundle(run(`summary-${gpu}`, runner, [64, 128]));
       dataset.results = dataset.results.map((row, i) => ({
@@ -171,7 +186,23 @@ for (const prefix of ['', '/zh']) {
     cy.get('[data-testid^="operatorx-viz-"]')
       .last()
       .should('have.attr', 'data-testid', 'operatorx-viz-metric-vs-size');
-    cy.get('[data-testid="operatorx-viz-throughput-summary"]').scrollIntoView();
+    cy.get('[data-testid="operatorx-viz-throughput-summary"]')
+      .scrollIntoView()
+      .should(($summary) => {
+        const next = $summary.next()[0];
+        expect(next?.dataset.testid).to.equal('operatorx-viz-pairwise-scatter');
+        expect($summary[0].getBoundingClientRect().top).to.be.closeTo(
+          next.getBoundingClientRect().top,
+          1,
+        );
+        expect($summary[0].getBoundingClientRect().right).to.be.lessThan(
+          next.getBoundingClientRect().left,
+        );
+        // Head to head takes 5 of 12 desktop columns; the bars take the other 7.
+        expect(
+          next.getBoundingClientRect().width / $summary[0].getBoundingClientRect().width,
+        ).to.be.closeTo(5 / 7, 0.03);
+      });
     cy.get('[data-testid="operatorx-roofline-summary"]')
       .scrollIntoView()
       .within(() => {
@@ -191,6 +222,18 @@ for (const prefix of ['', '/zh']) {
           });
         cy.get('.summary-median').should('have.length', 2);
         cy.get('.summary-best').should('have.length', 2);
+        // Axis ticks use the page font, and hardware names match the bar value labels.
+        cy.get('.y-axis .tick text').should(($ticks) => {
+          const tick = getComputedStyle($ticks[0]);
+          const label = getComputedStyle(
+            $ticks[0].ownerDocument.querySelector('.summary-median-label')!,
+          );
+          expect(tick.fontFamily).to.contain('DM Sans').and.equal(label.fontFamily);
+          expect(tick.fontSize).to.equal(label.fontSize);
+        });
+        cy.get('.x-axis .tick text')
+          .first()
+          .should(($tick) => expect(getComputedStyle($tick[0]).fontFamily).to.contain('DM Sans'));
       });
     cy.get('[data-testid="operatorx-viz-throughput-summary"]').screenshot(
       `roofline-summary-${prefix ? 'zh' : 'en'}-normalized`,
@@ -214,6 +257,42 @@ for (const prefix of ['', '/zh']) {
       .scrollIntoView()
       .should('be.visible')
       .screenshot(`roofline-summary-${prefix ? 'zh' : 'en'}-mobile`);
+    expectSummaryLabelsOnRows();
+  });
+
+  it(`keeps a median label that does not fit its bar on the same row at ${prefix || '/'}`, () => {
+    const datasets = ['ascend950pr-external', 'h200-dgxc'].map((runner, gpu) => {
+      const dataset = normalizeBundle(run(`short-${gpu}`, runner, [64, 128]));
+      dataset.results = dataset.results.map((row, i) => ({
+        ...row,
+        args: {
+          m: 1024 * (i + 1),
+          n: 1024,
+          k: 1024,
+          a: { dtype: 'bf16' },
+          b: { dtype: 'bf16' },
+          out: 'bf16',
+        },
+        // 950PR is 20x slower, so its median bar is too short to hold its label.
+        latencyUs: gpu === 0 ? 100 : 5,
+      }));
+      return { runner, dataset };
+    });
+    const view = comparisonView(buildComparison('gemm', datasets), null);
+    cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view).as('short');
+    cy.visit(`${prefix}/operatorx`);
+    cy.wait('@short');
+    cy.get('[data-testid="operatorx-viz-throughput-summary"]').scrollIntoView();
+    cy.get('#opx-summary-normalized').click().should('have.attr', 'aria-checked', 'false');
+    cy.get('[data-testid="operatorx-roofline-summary"] .summary-row').should('have.length', 2);
+    cy.get('[data-testid="operatorx-roofline-summary"] .summary-row')
+      .last()
+      .should(($row) => {
+        const bar = $row.find('.summary-median')[0].getBoundingClientRect();
+        const label = $row.find('.summary-median-label')[0].getBoundingClientRect();
+        expect(label.left, 'label starts after the short bar').to.be.at.least(bar.right);
+      });
+    expectSummaryLabelsOnRows();
   });
 
   it(`keeps 950PR FP8 points visible when normalized at ${prefix || '/'}`, () => {
@@ -279,7 +358,17 @@ for (const prefix of ['', '/zh']) {
         cy.contains('No case was measured on both.').should('not.exist');
         cy.contains('of 2').should('be.visible');
         cy.get('svg').should('exist');
+        cy.get('[data-testid="chart-legend"]').should('not.exist');
+        cy.get('span[aria-hidden="true"].rounded-full').should('have.length', 2);
       });
+    // The plot fills the height the row leaves, so only the card padding sits below it.
+    cy.get('[data-testid="operatorx-viz-pairwise-scatter"]').should(($card) => {
+      const plot = [...$card.find('svg')]
+        .map((svg) => svg.getBoundingClientRect())
+        .toSorted((a, b) => b.width - a.width)[0];
+      const padding = Number.parseFloat(getComputedStyle($card[0]).paddingBottom);
+      expect($card[0].getBoundingClientRect().bottom - plot.bottom).to.be.closeTo(padding, 2);
+    });
   });
 }
 

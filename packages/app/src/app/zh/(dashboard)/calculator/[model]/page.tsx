@@ -41,13 +41,13 @@ export default async function ZhCalculatorModelPage({ params, searchParams }: Pr
   const meta = MODEL_TAB_META_ZH.calculator;
   return (
     <>
+      <ThroughputCalculatorDisplay
+        urlSeed={{ ...seed, model: seed.model ?? resolved.route.model }}
+      />
       <ZhTabIntro
         tab="calculator"
         title={meta.title(resolved.route.seoName)}
         intro={meta.intro(resolved.route.seoName)}
-      />
-      <ThroughputCalculatorDisplay
-        urlSeed={{ ...seed, model: seed.model ?? resolved.route.model }}
       />
     </>
   );

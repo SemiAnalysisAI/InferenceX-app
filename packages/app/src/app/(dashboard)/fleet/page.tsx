@@ -16,8 +16,8 @@ export default async function FleetPage({ searchParams }: Props) {
   const seed = resolveCalculatorUrlSeed(sp);
   return (
     <>
-      <TabIntro tab="fleet" />
       <FleetLifecycleDisplay urlSeed={seed} />
+      <TabIntro tab="fleet" />
     </>
   );
 }

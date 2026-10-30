@@ -16,8 +16,8 @@ export default async function ZhFleetPage({ searchParams }: Props) {
   const seed = resolveCalculatorUrlSeed(sp);
   return (
     <>
-      <ZhTabIntro tab="fleet" />
       <FleetLifecycleDisplay urlSeed={seed} />
+      <ZhTabIntro tab="fleet" />
     </>
   );
 }

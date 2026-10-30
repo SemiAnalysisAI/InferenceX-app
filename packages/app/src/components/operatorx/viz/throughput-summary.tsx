@@ -10,6 +10,5 @@ export const throughputSummary: VizDefinition = {
   id: 'throughput-summary',
   title: 'Median and best throughput',
   ops: ['gemm', 'moe'],
-  wide: true,
   Component: ThroughputSummary,
 };

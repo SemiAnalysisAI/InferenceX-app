@@ -16,8 +16,8 @@ export default async function ZhCalculatorPage({ searchParams }: Props) {
   const seed = resolveCalculatorUrlSeed(sp);
   return (
     <>
-      <ZhTabIntro tab="calculator" />
       <ThroughputCalculatorDisplay urlSeed={seed} />
+      <ZhTabIntro tab="calculator" />
     </>
   );
 }

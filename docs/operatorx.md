@@ -127,7 +127,7 @@ normalization costs and must not be reported as an end-to-end production speedup
 
 ## Median and best throughput bars
 
-The full-width Median and best throughput panel replaces Distribution per GPU. Metric vs size is the last chart. Its horizontal bars show median throughput as a fill and the
+The Median and best throughput panel replaces Distribution per GPU and sits beside Head to head on desktop. Metric vs size is the last chart. Its horizontal bars show median throughput as a fill and the
 best measured throughput as an outline, sorted by the displayed median. They follow
 the selected workload, hardware, precision and Normalized switch. Normalized bars
 show a fraction of each accelerator's peak; absolute bars show TFLOPS.

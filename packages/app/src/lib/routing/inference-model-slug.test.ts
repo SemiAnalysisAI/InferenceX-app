@@ -52,6 +52,16 @@ describe('INFERENCE_MODEL_SLUGS registry', () => {
       ACTIVE_INFERENCE_MODEL_SLUGS.some((entry) => entry.model === Model.MiniMax_M3_1_Flash),
     ).toBe(true);
   });
+
+  it('keeps retired DeepSeek V4 Pro links addressable without promoting them as active', () => {
+    expect(getInferenceModelBySlug('deepseek-v4-pro')?.model).toBe(Model.DeepSeek_V4_Pro);
+    expect(
+      ACTIVE_INFERENCE_MODEL_SLUGS.some((entry) => entry.model === Model.DeepSeek_V4_Pro),
+    ).toBe(false);
+    expect(
+      ACTIVE_INFERENCE_MODEL_SLUGS.some((entry) => entry.model === Model.DeepSeek_V4_1_Flash),
+    ).toBe(true);
+  });
 });
 
 describe('getInferenceModelBySlug', () => {

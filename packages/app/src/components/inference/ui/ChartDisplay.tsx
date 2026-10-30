@@ -146,6 +146,7 @@ import ReplayLauncher, { type ReplayLauncherHandle } from '../replay/ReplayLaunc
 import WorkflowInfoDisplay from './WorkflowInfoDisplay';
 import { hasRoleTelemetry } from '../utils/power-chip-coverage';
 import { useFirstChartRenderTiming } from './use-first-chart-render-timing';
+import { useCenterOnEnter } from '@/hooks/useCenterOnEnter';
 
 // Off by default (table view, GPU-over-time, power timeline and PowerX Where panels), so they
 // load on first use instead of shipping with every dashboard, compare page and blog chart.
@@ -306,7 +307,10 @@ function renderInferenceTcoBadges(props: {
   );
 }
 
-export default function ChartDisplay({ embedded = false }: { embedded?: boolean } = {}) {
+export default function ChartDisplay({
+  embedded = false,
+  centerOnEnter = false,
+}: { embedded?: boolean; centerOnEnter?: boolean } = {}) {
   const locale = useLocale();
   const t = STRINGS[locale];
   const chartRootRef = useRef<HTMLDivElement>(null);
@@ -1533,6 +1537,11 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
             );
           });
 
+  useCenterOnEnter(chartRootRef, '[data-testid="chart-figure"]', {
+    enabled: centerOnEnter && !embedded && !minimalChrome && !powerXSurface,
+    ready: !isFirstLoad && !isDerivedXAxisLoading && renderableGraphs.length > 0,
+  });
+
   return (
     <div
       ref={chartRootRef}
@@ -1569,6 +1578,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                   )}
                   <ChartControls
                     showXAxisMode
+                    runContext={selectedGPUs.length === 0 ? <WorkflowInfoDisplay /> : undefined}
                     showTcoBasis={[...captionHwKeys].some((key) => key.split('_')[0] === 'tpuv7')}
                     powerXControls={
                       powerXLayout && powerXMounted
@@ -1589,7 +1599,7 @@ export default function ChartDisplay({ embedded = false }: { embedded?: boolean 
                   <XAxisModeSelector />
                 </div>
               )}
-              {selectedGPUs.length === 0 && <WorkflowInfoDisplay />}
+              {embedded && selectedGPUs.length === 0 && <WorkflowInfoDisplay />}
               {selectedGPUs.length > 0 && (
                 <ComparisonChangelog
                   changelogs={changelogs}

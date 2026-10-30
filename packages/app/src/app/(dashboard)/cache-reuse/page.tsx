@@ -16,8 +16,8 @@ export default async function CacheReusePage({ searchParams }: Props) {
   const seed = resolveCalculatorUrlSeed(sp);
   return (
     <>
-      <TabIntro tab="cache-reuse" />
       <CacheReuseDisplay urlSeed={seed} />
+      <TabIntro tab="cache-reuse" />
     </>
   );
 }
