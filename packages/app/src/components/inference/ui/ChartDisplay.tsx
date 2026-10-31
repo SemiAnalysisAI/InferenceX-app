@@ -125,8 +125,6 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import { PowerXTutorialCta } from '@/components/powerx/powerx-tutorial-cta';
 
 import { ATOM_FOOTNOTE_MARKER, AtomEngineFootnote } from '@/components/ui/atom-engine-footnote';
-import { AgenticOptimizationNote } from '@/components/inference/ui/AgenticOptimizationNote';
-import { CacheReuseLink } from '@/components/inference/ui/CacheReuseLink';
 import { OffloadHaloLegendKey } from '@/components/inference/ui/OffloadHaloLegendKey';
 import { ActiveQuickFilters } from '@/components/inference/ui/ActiveQuickFilters';
 import { ResultContext } from '@/components/ui/result-context';
@@ -1137,24 +1135,38 @@ export default function ChartDisplay({
             ];
             const hasOffloadHalo =
               showOffloadingLabel && footerPoints.some((point) => point.offload_mode === 'on');
-            const hasAtomSeries = footerPoints.some(
+            const footerOfficialRows = [
+              ...graph.data,
+              ...(graph.clippedData ?? []).map((entry) => entry.point),
+            ];
+            const footerOverlayRows = footerOverlay
+              ? {
+                  ...footerOverlay,
+                  data: [
+                    ...footerOverlay.data,
+                    ...(footerOverlay.clippedData ?? []).map((entry) => entry.point),
+                  ],
+                }
+              : footerOverlay;
+            const selectedFooterRows = isGpuComparison
+              ? visibleDateComparisonRows(footerOfficialRows, footerOverlayRows)
+              : visibleComparisonRows(footerOfficialRows, footerOverlayRows);
+            const hasAtomSeries = [
+              ...selectedFooterRows.officialRows,
+              ...selectedFooterRows.overlayRows,
+            ].some(
               (point) =>
                 point.framework !== undefined &&
                 getFrameworkLabel(point.framework).includes(ATOM_FOOTNOTE_MARKER),
             );
             const footerNotices =
-              hasOffloadHalo || isAgenticSequence || hasAtomSeries ? (
+              hasOffloadHalo || residentSequenceLengths ? (
                 <>
                   <div
                     data-testid="chart-status-notes"
                     className="flex flex-wrap items-center gap-x-5 gap-y-2"
                   >
                     {hasOffloadHalo && <OffloadHaloLegendKey />}
-                    {isAgenticSequence && <AgenticOptimizationNote />}
-                    {isAgenticSequence && !minimalChrome && <CacheReuseLink />}
-                    {hasAtomSeries && (
-                      <AtomEngineFootnote className="min-w-0 flex-[1_1_24rem] text-xs leading-5" />
-                    )}
                   </div>
                   {residentSequenceLengths && !minimalChrome && !powerXSurface && (
                     <p
@@ -1380,8 +1392,13 @@ export default function ChartDisplay({
                           {powerXSurface && chartContext}
                         </>
                       );
-                      const chartFooter = !powerXSurface && (
-                        <div className="mt-3">{chartContext}</div>
+                      const chartFooter = (!powerXSurface || hasAtomSeries) && (
+                        <div className="mt-3">
+                          {!powerXSurface && chartContext}
+                          {hasAtomSeries && (
+                            <AtomEngineFootnote className="mt-2 text-xs leading-5" />
+                          )}
+                        </div>
                       );
 
                       if (getViewMode(graphIndex) === 'table') {
