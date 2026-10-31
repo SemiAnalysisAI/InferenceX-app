@@ -9,6 +9,15 @@ import {
 
 const OVERLAY_CONFIGS = [...REAL_CONFIGS, DOMINATED_CONFIG];
 
+function chartSnapshot(svg: Element) {
+  const clone = svg.cloneNode(true) as Element;
+  // Trace metadata can finish loading during export without changing chart geometry.
+  for (const mark of clone.querySelectorAll('[data-trace-availability]')) {
+    mark.removeAttribute('data-trace-availability');
+  }
+  return clone.outerHTML;
+}
+
 describe('Overlay points follow Optimal Only on the selected axes', () => {
   before(() => {
     interceptOverlayRun({ overlayConfigs: OVERLAY_CONFIGS });
@@ -48,13 +57,16 @@ describe('Overlay points follow Optimal Only on the selected axes', () => {
   it('exports exact PNG ratios with official and overlay points without resizing the live chart', () => {
     let originalWidth: number;
     let originalHeight: number;
+    let originalSvg: string;
     let png = '';
+    const layouts: { width: number; height: number; axis: string | null; font: string }[] = [];
     cy.get('[data-testid="d3-chart-svg"]')
       .first()
       .then(($svg) => {
         const bounds = $svg[0].getBoundingClientRect();
         originalWidth = bounds.width;
         originalHeight = bounds.height;
+        originalSvg = chartSnapshot($svg[0]);
       });
     cy.window().then((win) => {
       cy.stub(win.HTMLAnchorElement.prototype, 'click').callsFake(
@@ -64,6 +76,21 @@ describe('Overlay points follow Optimal Only on the selected axes', () => {
             const exported = win.document.querySelector('#chart-0-export')!;
             expect(exported.querySelectorAll('.dot-group').length).to.be.greaterThan(0);
             expect(exported.querySelectorAll('.unofficial-overlay-pt').length).to.be.greaterThan(0);
+            const svg = exported.querySelector<SVGSVGElement>('[data-testid="d3-chart-svg"]')!;
+            const bounds = svg.getBoundingClientRect();
+            const frame = exported.getBoundingClientRect();
+            expect(bounds.bottom, 'entire plot fits above the footer').to.be.at.most(frame.bottom);
+            expect(bounds.width / frame.width, 'plot uses the image width').to.be.greaterThan(0.85);
+            expect(bounds.height / frame.height, 'plot uses the image height').to.be.greaterThan(
+              0.5,
+            );
+            expect(svg.getAttribute('height'), 'SVG was re-rendered, not padded').not.to.eq('600');
+            layouts.push({
+              width: bounds.width,
+              height: bounds.height,
+              axis: svg.querySelector('.x-axis')!.getAttribute('transform'),
+              font: win.getComputedStyle(svg.querySelector('.x-axis text')!).fontSize,
+            });
           }
         },
       );
@@ -106,7 +133,15 @@ describe('Overlay points follow Optimal Only on the selected axes', () => {
           const bounds = $svg[0].getBoundingClientRect();
           expect(bounds.width).to.eq(originalWidth);
           expect(bounds.height).to.eq(originalHeight);
+          expect(chartSnapshot($svg[0]), 'export does not mutate live marks or defs').to.eq(originalSvg);
         });
+    });
+    cy.then(() => {
+      expect(layouts).to.have.length(2);
+      expect(layouts[0].width).to.be.greaterThan(layouts[1].width);
+      expect(layouts[0].height).to.be.lessThan(layouts[1].height);
+      expect(layouts[0].axis).not.to.eq(layouts[1].axis);
+      expect(layouts[0].font, 'text is re-laid out, not scaled').to.eq(layouts[1].font);
     });
   });
 

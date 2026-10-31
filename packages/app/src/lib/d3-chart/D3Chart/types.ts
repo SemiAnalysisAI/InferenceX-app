@@ -220,5 +220,7 @@ export interface D3ChartProps<T = any> {
   scrollablePlot?: { minWidth: number; label: string; enabled: boolean };
 
   onRender?: (ctx: RenderContext) => void;
+  /** Pure decorations for a resized export clone, without updating live refs. */
+  onExportRender?: (ctx: RenderContext) => void;
   onDisplayUpdate?: (ctx: RenderContext) => void;
 }

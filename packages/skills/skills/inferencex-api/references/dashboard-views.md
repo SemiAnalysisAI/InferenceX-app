@@ -27,13 +27,14 @@ the collapsed state.
 ## PNG export aspect ratio
 
 PNG aspect ratio (Auto / 16:9 / 1:1) is an export-only setting in the download
-menu. Fixed ratios add padding to fit the complete chart and source footer
-without cropping or stretching. The live chart, official and unofficial data,
+menu. Fixed ratios re-layout the graph in an offscreen clone, reserving room
+for captions and the source footer. They do not stretch the captured image or
+add letterbox bars. The live chart, official and unofficial data,
 CSV/MP4 exports, share links, and read-only API responses do not change.
 API clients choose their own image dimensions.
 
 PNG 宽高比（自动 / 16:9 / 1:1）是下载菜单中仅用于图片导出的设置。固定宽高比
-通过增加留白保留完整图表和来源页脚，不裁剪或拉伸内容。页面图表、官方及非官方
+会在离屏副本中重新布局图表，并为标题和来源页脚预留空间，不拉伸截图或添加边条。页面图表、官方及非官方
 数据、CSV/MP4 导出、分享链接和只读 API 响应均不变。API 客户端自行设置图片尺寸。
 
 ## TCO basis

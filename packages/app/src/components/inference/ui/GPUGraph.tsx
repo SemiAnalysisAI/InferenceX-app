@@ -1262,6 +1262,24 @@ const GPUGraph = React.memo(
       root.selectAll('.roofline-path').style('opacity', null);
     }, []);
 
+    const decorateRender = (ctx: RenderContext) => {
+      if (logScale) {
+        const yScale = (ctx.renderedYScale ?? ctx.yScale) as d3.ScaleLogarithmic<number, number>;
+        ctx.layout.yAxisGroup.call(
+          d3.axisLeft(yScale).ticks(10).tickFormat(logTickFormat(yScale)) as any,
+        );
+      }
+      const group = ctx.layout.zoomGroup;
+      group.selectAll('.point-label').style('fill', 'var(--foreground)');
+      if (showPointLabels) keepPointLabelsInPlot(group);
+      group
+        .selectAll('.dot-group, .unofficial-overlay-pt, .roofline-path')
+        .style('transition', 'opacity 150ms ease');
+      group.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (point) {
+        renderOffloadHalo(d3.select(this), point, 'var(--foreground)');
+      });
+    };
+
     if (data.length === 0 && overlayPoints.length === 0) {
       return (
         <div className="relative w-full p-3">
@@ -1491,28 +1509,9 @@ const GPUGraph = React.memo(
         }}
         onRender={(ctx: RenderContext) => {
           lastRenderCtxRef.current = ctx;
-          if (logScale) {
-            const yScale = (ctx.renderedYScale ?? ctx.yScale) as d3.ScaleLogarithmic<
-              number,
-              number
-            >;
-            ctx.layout.yAxisGroup.call(
-              d3.axisLeft(yScale).ticks(10).tickFormat(logTickFormat(yScale)) as any,
-            );
-          }
-          ctx.layout.zoomGroup.selectAll('.point-label').style('fill', 'var(--foreground)');
-          if (showPointLabels) keepPointLabelsInPlot(ctx.layout.zoomGroup);
-
-          ctx.layout.zoomGroup
-            .selectAll('.dot-group, .unofficial-overlay-pt, .roofline-path')
-            .style('transition', 'opacity 150ms ease');
-
-          ctx.layout.zoomGroup
-            .selectAll<SVGGElement, InferenceData>('.dot-group')
-            .each(function (point) {
-              renderOffloadHalo(d3.select(this), point, 'var(--foreground)');
-            });
+          decorateRender(ctx);
         }}
+        onExportRender={decorateRender}
         legendElement={
           <ChartLegend
             variant="sidebar"

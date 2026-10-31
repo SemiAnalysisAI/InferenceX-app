@@ -3,11 +3,18 @@
 ## PNG export aspect ratio
 
 The download popover offers Auto, 16:9, and 1:1 for PNG export only. Auto retains
-the existing image dimensions. Fixed ratios expand the final canvas with
-theme-matched padding, center the captured content above the source footer,
-and keep the captured chart and its unofficial overlays without cropping
-or stretching. Integer-multiple dimensions make the complete PNG, including
-the footer, exactly 16:9 or 1:1.
+the existing image dimensions. Fixed ratios lay out an offscreen clone at a
+1280×720 or 1000×1000 CSS-pixel frame (captured at 2× resolution). The exporter
+measures caption and source-footer space, then gives the remaining height and
+width to the plot. Long captions can grow the complete frame proportionally.
+The chart rebuilds axes, grids, points and curves using copied visible scales,
+without stretching a bitmap or adding letterbox bars. Text and mark sizes stay
+constant; official points and unofficial overlays use the new coordinates.
+
+Each D3 SVG registers a clone renderer. Export copies D3 bindings before keyed
+joins and namespaces SVG IDs to keep clipping/gradients independent of the live
+chart. Export decorations use `onExportRender`, never a callback that updates
+live-chart refs. Auto keeps the previous capture path.
 
 The choice stays local to each download menu. It does not resize the live chart,
 change benchmark data or share links, or affect CSV and MP4 export. The
