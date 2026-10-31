@@ -68,6 +68,8 @@ describe('Ascend OperatorX reference', () => {
     expect(reference.source).toContain('Ascend-ubench.md');
     expect(reference.qualification).toContain('memory/ECC');
     expect(reference.qualification).toContain('3200 MHz HBM clock');
+    expect(reference.qualification).toContain('eight HBM stacks');
+    expect(reference.qualification).toContain('204.8 GB/s');
     expect(reference.source).toContain('HBM Clock Speed 3200 MHz');
     expect(hardwareLabel('ascend950pr')).toBe(reference.label);
     expect(reference.label).toBe('950PR');

@@ -60,7 +60,7 @@ const STRINGS = {
     huaweiMethodology:
       'Huawei: FP16 rotating source/destination pools of at least 512 MiB each, timed as full rotating-buffer NPU graph replays. Three processes, 360 observations per size; full copied-bit checks before/after each block. Graph time is amortized per copy, not isolated-copy latency. Protocols differ from the GPU curves. No physical HBM-traffic counters were collected. The 8 B–2 KiB points were added on 30 October with CANN 9.2.1 and 4 KiB slot spacing; touched payload may fit in cache. Points from 4 KiB upward retain the original CANN 9.1.0 run.',
     huaweiReference:
-      'Huawei MBU uses a 1,638.4 GB/s reference, derived from the card’s 3200 MHz HBM clock (npu-smi) and the 4096-bit bus implied by Huawei’s rounded 1.6 TB/s figure; the exact board bandwidth ceiling was not independently measured.',
+      'Huawei MBU uses a 1,638.4 GB/s reference: eight HBM stacks at 204.8 GB/s each, derived from the card’s 3200 MHz HBM clock (npu-smi) and Huawei’s rounded 1.6 TB/s figure. The exact board bandwidth ceiling was not independently measured.',
     amortized: 'Amortized graph copy time',
     source: 'Source',
     instructions:
@@ -93,7 +93,7 @@ const STRINGS = {
     huaweiMethodology:
       'Huawei：源和目标分别使用至少 512 MiB 的 FP16 轮转缓冲池，每次计时覆盖完整缓冲池轮转的一次 NPU 图重放。每个大小在三个进程中共测量 360 次，每个测量块前后逐位校验全部拷贝结果。图执行时间按拷贝次数摊销，不代表单次独立拷贝延迟；与 GPU 曲线的测试协议不同，且未采集物理 HBM 流量计数器。8 B–2 KiB 的数据点于 10 月 30 日使用 CANN 9.2.1 补测，缓冲槽间距为 4 KiB，实际访问的数据可能驻留在缓存中。4 KiB 及以上的数据点仍沿用原 CANN 9.1.0 的测量结果。',
     huaweiReference:
-      'Huawei 的 MBU 使用 1,638.4 GB/s 参考值。该值依据 npu-smi 报告的 3200 MHz HBM 时钟推算：要与 Huawei 公布的 1.6 TB/s（取整值）相符，总线位宽应为 4096 位。该板卡的确切带宽上限未经独立实测。',
+      'Huawei 的 MBU 使用 1,638.4 GB/s 参考值，即 8 个 HBM stack、每个 204.8 GB/s。该值依据 npu-smi 报告的 3200 MHz HBM 时钟和 Huawei 公布的取整值 1.6 TB/s 推算；该板卡的确切带宽上限未经独立实测。',
     amortized: '摊销后的图拷贝时间',
     source: '数据来源',
     instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',

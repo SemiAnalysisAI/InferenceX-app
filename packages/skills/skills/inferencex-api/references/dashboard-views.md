@@ -302,8 +302,7 @@ optional `hardware[].reference` metadata for Ascend 950PR (28 Cube):
 plus `source` and `qualification`. These are dense Cube-only peaks; FP4 remains null.
 Normalized X is arithmetic intensity divided by 230.712890625 FLOP/byte for BF16 or 461.42578125
 for FP8; Y is achieved TFLOPS divided by 378 or 756 respectively. FP8 activation
-quantization remains inside the measured latency. The bandwidth is derived from the card's 3200 MHz HBM clock (`npu-smi`) and the 4096-bit bus implied by Huawei's rounded 1.6 TB/s, not a published or counter-verified memory/ECC
-configuration. Apply these references to the returned measurements; do not substitute
+quantization remains inside the measured latency. The bandwidth is derived as eight HBM stacks × 204.8 GB/s (the card's 3200 MHz npu-smi HBM clock against Huawei's rounded 1.6 TB/s; likely 128 bits × 12.8 Gbps per stack with a 1:2 CK:WCK ratio), not a published or counter-verified memory/ECC configuration. Apply these references to the returned measurements; do not substitute
 the older matmul sweep for the ingested F.linear results. Missing measurements stay
 missing. The 950PR crimson color is presentation-only; the stored key remains `ascend950pr`.
 The response also returns workload-resolved `defaults`: `metricVsSizeSlice` prefers

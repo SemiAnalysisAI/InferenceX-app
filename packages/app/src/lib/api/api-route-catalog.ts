@@ -1165,7 +1165,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/ubenchx/ubenchx-data.ts',
-    sourceSha256: '6dc7f6749bd6929b355709fe00ce88ad4cd506e7b710d5c3114edc35add46f62',
+    sourceSha256: 'f380f87ad4cdb8313338046cccbfdc814fc9c1f23386361025303606c7b1c9d4',
     reviewArea: {
       en: 'ubenchX Huawei measurement units, protocol metadata and shared UI/API calculations.',
       zh: 'ubenchX Huawei 测量单位、协议元数据及界面与 API 共用的计算。',
@@ -1264,7 +1264,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/operatorx/hardware.ts',
-    sourceSha256: '08d0461108aab59053f6d675923ce37810f7a5597c0783e827fcd23ce08655fc',
+    sourceSha256: 'f7af61c494582acaa391370f793709c94d133a1c5ec0c6c198275d6db8c048a2',
     reviewArea: {
       en: 'OperatorX Ascend reference values, provenance and assumed bandwidth shared with UI normalization.',
       zh: 'OperatorX Ascend 参考值、来源及假定带宽，与 UI 归一化共用。',
