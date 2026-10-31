@@ -17,6 +17,20 @@ interface UseChartExportOptions {
   exportFileName?: string;
 }
 
+export type PngAspectRatio = 'auto' | '16:9' | '1:1';
+
+/** Expand the canvas without cropping or stretching any captured content. */
+export function getPngExportDimensions(
+  width: number,
+  height: number,
+  aspectRatio: PngAspectRatio,
+): { width: number; height: number } {
+  if (aspectRatio === 'auto') return { width, height };
+  const [w, h] = aspectRatio === '16:9' ? [16, 9] : [1, 1];
+  const unit = Math.ceil(Math.max(width / w, height / h));
+  return { width: unit * w, height: unit * h };
+}
+
 function applyStyles(el: HTMLElement | null, styles: Partial<CSSStyleDeclaration>) {
   if (!el) return;
   for (const [key, value] of Object.entries(styles)) {
@@ -185,26 +199,32 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
   });
 }
 
-async function addWatermark(chartDataUrl: string, bgColor: string): Promise<string> {
+export async function addWatermark(
+  chartDataUrl: string,
+  bgColor: string,
+  aspectRatio: PngAspectRatio = 'auto',
+): Promise<string> {
   const img = await loadImage(chartDataUrl);
-  if (!img) return chartDataUrl;
+  if (!img) throw new Error('Could not decode the chart PNG');
 
   const isDark = hasDarkTheme(document.documentElement) || bgColor.includes('0 0%');
 
   const WATERMARK_HEIGHT = 120;
   const canvas = document.createElement('canvas');
-  canvas.width = img.width;
-  canvas.height = img.height + WATERMARK_HEIGHT;
+  const dimensions = getPngExportDimensions(img.width, img.height + WATERMARK_HEIGHT, aspectRatio);
+  canvas.width = dimensions.width;
+  canvas.height = dimensions.height;
   const ctx = canvas.getContext('2d');
-  if (!ctx) return chartDataUrl;
+  if (!ctx) throw new Error('PNG canvas is unavailable');
 
   ctx.fillStyle = bgColor || (isDark ? '#131416' : '#eaebec');
-  ctx.fillRect(0, 0, canvas.width, img.height);
+  const contentHeight = canvas.height - WATERMARK_HEIGHT;
+  ctx.fillRect(0, 0, canvas.width, contentHeight);
 
-  ctx.drawImage(img, 0, 0);
+  ctx.drawImage(img, (canvas.width - img.width) / 2, (contentHeight - img.height) / 2);
 
   ctx.fillStyle = isDark ? '#1a1a2e' : '#f5f5f5';
-  ctx.fillRect(0, img.height, canvas.width, WATERMARK_HEIGHT);
+  ctx.fillRect(0, contentHeight, canvas.width, WATERMARK_HEIGHT);
 
   const footerText = getExportFooterText();
   let fontSize = 40;
@@ -218,7 +238,7 @@ async function addWatermark(chartDataUrl: string, bgColor: string): Promise<stri
   ctx.fillStyle = isDark ? '#aaa' : '#555';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(footerText, canvas.width / 2, img.height + WATERMARK_HEIGHT / 2);
+  ctx.fillText(footerText, canvas.width / 2, contentHeight + WATERMARK_HEIGHT / 2);
 
   return canvas.toDataURL('image/png');
 }
@@ -233,245 +253,258 @@ export function useChartExport({
   const t = STRINGS[locale];
   const [isExporting, setIsExporting] = useState(false);
 
-  const exportToImage = useCallback(async () => {
-    setIsExporting(true);
+  const exportToImage = useCallback(
+    async (ratio: PngAspectRatio = 'auto') => {
+      setIsExporting(true);
 
-    let wasClosed = false;
-    if (setIsLegendExpanded && !hideLegend) {
-      const el = document.querySelector(`#${chartId}`);
-      wasClosed = Boolean(el?.querySelector('[data-testid="legend-open-button"]'));
-      if (wasClosed) {
-        setIsLegendExpanded(true);
-        await waitForRender();
-      }
-    }
-
-    try {
-      const htmlToImagePromise = import('@jpinsonneau/html-to-image');
-
-      const element = document.querySelector(`#${chartId}`);
-      if (!element) throw new Error('Chart element not found');
-
-      const exportElement = document.querySelector<HTMLElement>(`#${chartId}-export`);
-      if (!exportElement) throw new Error('Export container not found');
-
-      const clone = element.cloneNode(true) as HTMLElement;
-      const liveSelects = element.querySelectorAll('select');
-      clone.querySelectorAll('select').forEach((select, i) => {
-        select.value = liveSelects[i].value;
-      });
-      clone.removeAttribute('id');
-      const nestedExport = clone.querySelector(`[id="${chartId}-export"]`);
-      if (nestedExport) nestedExport.remove();
-      if (hideLegend) {
-        for (const legend of clone.querySelectorAll(
-          '[data-slot="chart-legend-wrapper"], .legend-container',
-        )) {
-          legend.remove();
+      let wasClosed = false;
+      if (setIsLegendExpanded && !hideLegend) {
+        const el = document.querySelector(`#${chartId}`);
+        wasClosed = Boolean(el?.querySelector('[data-testid="legend-open-button"]'));
+        if (wasClosed) {
+          setIsLegendExpanded(true);
+          await waitForRender();
         }
       }
-
-      const figcaption = clone.querySelector('figcaption');
-      if (figcaption) {
-        const heading = figcaption.querySelector('h2');
-        if (heading) (heading as HTMLElement).style.whiteSpace = 'nowrap';
-
-        const origCaption = element.querySelector('figcaption');
-        if (origCaption) {
-          const origEls = [origCaption, ...origCaption.querySelectorAll('*')] as HTMLElement[];
-          const cloneEls = [figcaption, ...figcaption.querySelectorAll('*')] as HTMLElement[];
-          for (let i = 0; i < origEls.length; i++) {
-            if (!cloneEls[i]) continue;
-            (cloneEls[i] as HTMLElement).style.color = getComputedStyle(origEls[i]!).color;
-          }
-        }
-      }
-
-      exportElement.append(clone);
-
-      if (wasClosed && setIsLegendExpanded) {
-        setIsLegendExpanded(false);
-      }
-
-      const bgColor = getComputedStyle(document.documentElement)
-        .getPropertyValue('--background')
-        .trim();
-      const legendContainer = clone.querySelectorAll('.legend-container')[0] as
-        | HTMLElement
-        | undefined;
-
-      applyStyles(exportElement, { width: 'fit-content', overflow: 'visible', padding: '16px' });
-
-      for (const scroller of clone.querySelectorAll<HTMLElement>('[data-chart-scroll]')) {
-        applyStyles(scroller, { width: 'fit-content', overflow: 'visible' });
-        scroller.scrollLeft = 0;
-      }
-      const flexContainer = clone.querySelector(
-        ':scope > .flex, [data-chart-scroll] > .flex',
-      ) as HTMLElement | null;
-      applyStyles(flexContainer, {
-        flexDirection: 'row',
-        width: 'fit-content',
-        gap: '16px',
-        overflow: 'visible',
-      });
-
-      const svgWrapper = clone.querySelector('.relative > .relative') as HTMLElement | null;
-      if (svgWrapper) {
-        const originalWidth =
-          (element.querySelector('.relative > .relative') as HTMLElement)?.offsetWidth ||
-          (element as HTMLElement).offsetWidth;
-        applyStyles(svgWrapper, { width: `${originalWidth}px`, flexShrink: '0' });
-        const svgParent = svgWrapper.parentElement as HTMLElement | null;
-        applyStyles(svgParent, { width: `${originalWidth}px`, flexShrink: '0', minWidth: 'auto' });
-      }
-
-      if (legendContainer) {
-        legendContainer.style.cssText +=
-          '; position: relative !important; right: auto !important; top: auto !important; left: auto !important; bottom: auto !important; width: auto !important; min-width: fit-content !important; height: auto !important; min-height: 0 !important; max-height: none !important; z-index: auto !important; overflow: visible !important; padding: 8px !important;';
-
-        const scrollContainer = legendContainer.querySelector(
-          'ul, [class*="overflow"]',
-        ) as HTMLElement | null;
-        applyStyles(scrollContainer, {
-          overflow: 'visible',
-          scrollbarGutter: 'auto',
-          paddingRight: '8px',
-        });
-
-        legendContainer.querySelectorAll('label').forEach((label) => {
-          applyStyles(label, { width: '100%', whiteSpace: 'nowrap' });
-        });
-        legendContainer.querySelectorAll('label > span:last-child').forEach((span) => {
-          applyStyles(span as HTMLElement, {
-            overflow: 'visible',
-            textOverflow: 'unset',
-            whiteSpace: 'nowrap',
-          });
-        });
-
-        const contentWrapper = legendContainer.parentElement as HTMLElement | null;
-        applyStyles(contentWrapper, { width: 'fit-content', height: 'auto', overflow: 'visible' });
-
-        const chartWrapper = contentWrapper?.parentElement as HTMLElement | null;
-        applyStyles(chartWrapper, {
-          width: 'fit-content',
-          flexShrink: '0',
-          height: 'auto',
-          overflow: 'visible',
-          position: 'relative',
-        });
-      }
-
-      for (const el of clone.querySelectorAll('.no-export')) {
-        (el as HTMLElement).style.display = 'none';
-      }
-      for (const el of clone.querySelectorAll('.export-only')) {
-        (el as HTMLElement).style.display = 'inline';
-      }
-      for (const el of clone.querySelectorAll('[id$="-export"]')) {
-        (el as HTMLElement).parentElement!.style.display = 'none';
-      }
-
-      if (legendContainer) {
-        for (const el of legendContainer.querySelectorAll('.text-red-900')) {
-          (el as HTMLElement).style.color = 'inherit';
-          (el as HTMLElement).style.fontWeight = 'normal';
-        }
-      }
-
-      if (legendContainer) {
-        const scrollContainer = legendContainer.querySelector(
-          'ul, [class*="overflow"]',
-        ) as HTMLElement | null;
-        if (scrollContainer) {
-          const sibling = scrollContainer.nextElementSibling as HTMLElement | null;
-          const hasVisibleControls =
-            sibling &&
-            sibling.style.display !== 'none' &&
-            [...sibling.children].some((child) => (child as HTMLElement).style.display !== 'none');
-          if (!hasVisibleControls) {
-            scrollContainer.style.borderBottom = 'none';
-            scrollContainer.style.paddingBottom = '0';
-          }
-        }
-      }
-
-      if (legendContainer) {
-        const legendList = legendContainer.querySelector('ul');
-        if (legendList) {
-          const firstVisible = [...legendList.children].find(
-            (child) => (child as HTMLElement).style.display !== 'none',
-          ) as HTMLElement | undefined;
-          if (firstVisible && firstVisible !== legendList.firstElementChild) {
-            firstVisible.style.paddingTop = '4px';
-          }
-        }
-      }
-
-      const resolvedExportFontFamily = getResolvedExportFontFamily();
-
-      resolveCssVarsForExport(exportElement);
-      inlineComputedFontFamilyForExport(exportElement, resolvedExportFontFamily);
-
-      for (const label of clone.querySelectorAll('label')) {
-        label.style.fontSize = '12px';
-      }
-      for (const span of clone.querySelectorAll('span')) {
-        span.style.fontSize = '14px';
-      }
-      normalizeChartSvgWidthsForExport(clone);
 
       try {
-        await document.fonts.ready;
-      } catch {
-        await new Promise((resolve) => {
-          setTimeout(resolve, 300);
+        const htmlToImagePromise = import('@jpinsonneau/html-to-image');
+
+        const element = document.querySelector(`#${chartId}`);
+        if (!element) throw new Error('Chart element not found');
+
+        const exportElement = document.querySelector<HTMLElement>(`#${chartId}-export`);
+        if (!exportElement) throw new Error('Export container not found');
+
+        const clone = element.cloneNode(true) as HTMLElement;
+        const liveSelects = element.querySelectorAll('select');
+        clone.querySelectorAll('select').forEach((select, i) => {
+          select.value = liveSelects[i].value;
         });
-      }
+        clone.removeAttribute('id');
+        const nestedExport = clone.querySelector(`[id="${chartId}-export"]`);
+        if (nestedExport) nestedExport.remove();
+        if (hideLegend) {
+          for (const legend of clone.querySelectorAll(
+            '[data-slot="chart-legend-wrapper"], .legend-container',
+          )) {
+            legend.remove();
+          }
+        }
 
-      const htmlToImage = await htmlToImagePromise;
-      const { toPng } = htmlToImage;
-      let fontEmbedCSS = getFontEmbedCSS();
-      if (typeof htmlToImage.getFontEmbedCSS === 'function') {
+        const figcaption = clone.querySelector('figcaption');
+        if (figcaption) {
+          const heading = figcaption.querySelector('h2');
+          if (heading) (heading as HTMLElement).style.whiteSpace = 'nowrap';
+
+          const origCaption = element.querySelector('figcaption');
+          if (origCaption) {
+            const origEls = [origCaption, ...origCaption.querySelectorAll('*')] as HTMLElement[];
+            const cloneEls = [figcaption, ...figcaption.querySelectorAll('*')] as HTMLElement[];
+            for (let i = 0; i < origEls.length; i++) {
+              if (!cloneEls[i]) continue;
+              (cloneEls[i] as HTMLElement).style.color = getComputedStyle(origEls[i]!).color;
+            }
+          }
+        }
+
+        exportElement.append(clone);
+
+        if (wasClosed && setIsLegendExpanded) {
+          setIsLegendExpanded(false);
+        }
+
+        const bgColor = getComputedStyle(document.documentElement)
+          .getPropertyValue('--background')
+          .trim();
+        const legendContainer = clone.querySelectorAll('.legend-container')[0] as
+          | HTMLElement
+          | undefined;
+
+        applyStyles(exportElement, { width: 'fit-content', overflow: 'visible', padding: '16px' });
+
+        for (const scroller of clone.querySelectorAll<HTMLElement>('[data-chart-scroll]')) {
+          applyStyles(scroller, { width: 'fit-content', overflow: 'visible' });
+          scroller.scrollLeft = 0;
+        }
+        const flexContainer = clone.querySelector(
+          ':scope > .flex, [data-chart-scroll] > .flex',
+        ) as HTMLElement | null;
+        applyStyles(flexContainer, {
+          flexDirection: 'row',
+          width: 'fit-content',
+          gap: '16px',
+          overflow: 'visible',
+        });
+
+        const svgWrapper = clone.querySelector('.relative > .relative') as HTMLElement | null;
+        if (svgWrapper) {
+          const originalWidth =
+            (element.querySelector('.relative > .relative') as HTMLElement)?.offsetWidth ||
+            (element as HTMLElement).offsetWidth;
+          applyStyles(svgWrapper, { width: `${originalWidth}px`, flexShrink: '0' });
+          const svgParent = svgWrapper.parentElement as HTMLElement | null;
+          applyStyles(svgParent, {
+            width: `${originalWidth}px`,
+            flexShrink: '0',
+            minWidth: 'auto',
+          });
+        }
+
+        if (legendContainer) {
+          legendContainer.style.cssText +=
+            '; position: relative !important; right: auto !important; top: auto !important; left: auto !important; bottom: auto !important; width: auto !important; min-width: fit-content !important; height: auto !important; min-height: 0 !important; max-height: none !important; z-index: auto !important; overflow: visible !important; padding: 8px !important;';
+
+          const scrollContainer = legendContainer.querySelector(
+            'ul, [class*="overflow"]',
+          ) as HTMLElement | null;
+          applyStyles(scrollContainer, {
+            overflow: 'visible',
+            scrollbarGutter: 'auto',
+            paddingRight: '8px',
+          });
+
+          legendContainer.querySelectorAll('label').forEach((label) => {
+            applyStyles(label, { width: '100%', whiteSpace: 'nowrap' });
+          });
+          legendContainer.querySelectorAll('label > span:last-child').forEach((span) => {
+            applyStyles(span as HTMLElement, {
+              overflow: 'visible',
+              textOverflow: 'unset',
+              whiteSpace: 'nowrap',
+            });
+          });
+
+          const contentWrapper = legendContainer.parentElement as HTMLElement | null;
+          applyStyles(contentWrapper, {
+            width: 'fit-content',
+            height: 'auto',
+            overflow: 'visible',
+          });
+
+          const chartWrapper = contentWrapper?.parentElement as HTMLElement | null;
+          applyStyles(chartWrapper, {
+            width: 'fit-content',
+            flexShrink: '0',
+            height: 'auto',
+            overflow: 'visible',
+            position: 'relative',
+          });
+        }
+
+        for (const el of clone.querySelectorAll('.no-export')) {
+          (el as HTMLElement).style.display = 'none';
+        }
+        for (const el of clone.querySelectorAll('.export-only')) {
+          (el as HTMLElement).style.display = 'inline';
+        }
+        for (const el of clone.querySelectorAll('[id$="-export"]')) {
+          (el as HTMLElement).parentElement!.style.display = 'none';
+        }
+
+        if (legendContainer) {
+          for (const el of legendContainer.querySelectorAll('.text-red-900')) {
+            (el as HTMLElement).style.color = 'inherit';
+            (el as HTMLElement).style.fontWeight = 'normal';
+          }
+        }
+
+        if (legendContainer) {
+          const scrollContainer = legendContainer.querySelector(
+            'ul, [class*="overflow"]',
+          ) as HTMLElement | null;
+          if (scrollContainer) {
+            const sibling = scrollContainer.nextElementSibling as HTMLElement | null;
+            const hasVisibleControls =
+              sibling &&
+              sibling.style.display !== 'none' &&
+              [...sibling.children].some(
+                (child) => (child as HTMLElement).style.display !== 'none',
+              );
+            if (!hasVisibleControls) {
+              scrollContainer.style.borderBottom = 'none';
+              scrollContainer.style.paddingBottom = '0';
+            }
+          }
+        }
+
+        if (legendContainer) {
+          const legendList = legendContainer.querySelector('ul');
+          if (legendList) {
+            const firstVisible = [...legendList.children].find(
+              (child) => (child as HTMLElement).style.display !== 'none',
+            ) as HTMLElement | undefined;
+            if (firstVisible && firstVisible !== legendList.firstElementChild) {
+              firstVisible.style.paddingTop = '4px';
+            }
+          }
+        }
+
+        const resolvedExportFontFamily = getResolvedExportFontFamily();
+
+        resolveCssVarsForExport(exportElement);
+        inlineComputedFontFamilyForExport(exportElement, resolvedExportFontFamily);
+
+        for (const label of clone.querySelectorAll('label')) {
+          label.style.fontSize = '12px';
+        }
+        for (const span of clone.querySelectorAll('span')) {
+          span.style.fontSize = '14px';
+        }
+        normalizeChartSvgWidthsForExport(clone);
+
         try {
-          fontEmbedCSS = await htmlToImage.getFontEmbedCSS(exportElement);
-        } catch {}
+          await document.fonts.ready;
+        } catch {
+          await new Promise((resolve) => {
+            setTimeout(resolve, 300);
+          });
+        }
+
+        const htmlToImage = await htmlToImagePromise;
+        const { toPng } = htmlToImage;
+        let fontEmbedCSS = getFontEmbedCSS();
+        if (typeof htmlToImage.getFontEmbedCSS === 'function') {
+          try {
+            fontEmbedCSS = await htmlToImage.getFontEmbedCSS(exportElement);
+          } catch {}
+        }
+        const captureDimensions = getExportCaptureDimensions(exportElement);
+        const chartDataUrl = await toPng(exportElement, {
+          ...captureDimensions,
+          quality: 1,
+          pixelRatio: 2,
+          cacheBust: true,
+          skipFonts: false,
+          fontEmbedCSS,
+          preferredFontFormat: 'woff2',
+          filter: (node) => !node.classList?.contains('no-export'),
+          style: {
+            transform: 'scale(1)',
+            fontFamily: resolvedExportFontFamily,
+          },
+        });
+
+        const dataUrl = await addWatermark(chartDataUrl, bgColor, ratio);
+
+        const link = document.createElement('a');
+        link.download = `${exportFileName || chartId}-${Date.now()}.png`;
+        link.href = dataUrl;
+        link.click();
+
+        window.dispatchEvent(new CustomEvent('inferencex:action'));
+      } catch (error) {
+        console.error('Error exporting image:', error);
+        alert(t.exportFailed);
+        if (wasClosed && setIsLegendExpanded) setIsLegendExpanded(false);
+      } finally {
+        setIsExporting(false);
+        const exportElement = document.querySelector<HTMLElement>(`#${chartId}-export`);
+        if (exportElement) exportElement.innerHTML = '';
       }
-      const captureDimensions = getExportCaptureDimensions(exportElement);
-      const chartDataUrl = await toPng(exportElement, {
-        ...captureDimensions,
-        quality: 1,
-        pixelRatio: 2,
-        cacheBust: true,
-        skipFonts: false,
-        fontEmbedCSS,
-        preferredFontFormat: 'woff2',
-        filter: (node) => !node.classList?.contains('no-export'),
-        style: {
-          transform: 'scale(1)',
-          fontFamily: resolvedExportFontFamily,
-        },
-      });
-
-      const dataUrl = await addWatermark(chartDataUrl, bgColor);
-
-      const link = document.createElement('a');
-      link.download = `${exportFileName || chartId}-${Date.now()}.png`;
-      link.href = dataUrl;
-      link.click();
-
-      window.dispatchEvent(new CustomEvent('inferencex:action'));
-    } catch (error) {
-      console.error('Error exporting image:', error);
-      alert(t.exportFailed);
-      if (wasClosed && setIsLegendExpanded) setIsLegendExpanded(false);
-    } finally {
-      setIsExporting(false);
-      const exportElement = document.querySelector<HTMLElement>(`#${chartId}-export`);
-      if (exportElement) exportElement.innerHTML = '';
-    }
-  }, [chartId, setIsLegendExpanded, hideLegend, exportFileName, t]);
+    },
+    [chartId, setIsLegendExpanded, hideLegend, exportFileName, t],
+  );
 
   return { isExporting, exportToImage };
 }

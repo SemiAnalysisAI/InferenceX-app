@@ -1,5 +1,18 @@
 # D3 Chart Design Rationale
 
+## PNG export aspect ratio
+
+The download popover offers Auto, 16:9, and 1:1 for PNG export only. Auto retains
+the existing image dimensions. Fixed ratios expand the final canvas with
+theme-matched padding, center the captured content above the source footer,
+and keep the captured chart and its unofficial overlays without cropping
+or stretching. Integer-multiple dimensions make the complete PNG, including
+the footer, exactly 16:9 or 1:1.
+
+The choice stays local to each download menu. It does not resize the live chart,
+change benchmark data or share links, or affect CSV and MP4 export. The
+presentation-only choice has no read-only API parameter.
+
 ## Four Invalidation Phases
 
 One effect for every D3 operation takes roughly 500ms (React reconciliation ~200ms plus a full SVG update ~300ms). `D3Chart` separates structure, stable-identity data joins, metric coordinates, and display decoration. The most common interaction, switching the Y-axis metric, then takes roughly 100ms:
