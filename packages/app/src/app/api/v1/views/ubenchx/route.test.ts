@@ -218,7 +218,7 @@ it('exposes Huawei rotating-copy evidence without inventing missing tests or siz
   const run = body.memBw.gpus[0];
   expect(run.gpu).toBe('Huawei 950PR');
   expect(run.peakBandwidthGbps).toBe(1638.4);
-  expect(run.peakBandwidthSource).toContain('not independently verified');
+  expect(run.peakBandwidthSource).toContain('256 bits × 6.4 Gbps');
   expect(run.metadata).toMatchObject({
     protocol: 'rotating-pool-npu-graph',
     dtype: 'float16',

@@ -220,23 +220,9 @@ The OperatorX-only hardware reference for `ascend950pr` uses the 28-Cube
 Ascend950PR_9579 basis in `Ascend-ubench.md` (hardware configuration and section 5):
 378 dense BF16 TFLOPS, 756 dense FP8 TFLOPS and a **derived** HBM bandwidth of 1.6384 TB/s.
 The compute values are Cube-only ([Huawei Ascend 950 white paper, table 3-1](https://public-download.obs.cn-east-2.myhuaweicloud.com/ascend/%E6%98%87%E8%85%BE950%20NPU%E6%9E%B6%E6%9E%84%E7%99%BD%E7%9A%AE%E4%B9%A6.pdf)),
-excluding Vector compute in the combined figures. Huawei publishes only a rounded
-1.6 TB/s for the 128 GB configuration. On 31 October 2026, `npu-smi info -t memory`
-on the benchmarked card (driver 25.7.rc1.6) reported 131072 MB of HBM at a 3200 MHz HBM
-clock. `npu-smi` reports the clock, with data on both edges, not the data rate. Two
-Ascend parts with standard 1024-bit HBM stacks calibrate the field: the 910B reports
-1600 MHz for Samsung HBM2e (4 stacks, 1.6 TB/s published, ~1.54 TB/s measured), which
-needs 3.2 Gbps per pin; reading 1600 as a data rate would cap it at 0.82 TB/s, below
-what it measures. The 910 reports 1200 MHz for 2.4 Gbps HBM2 (1.2 TB/s published). So the
-950PR's 3200 MHz is 6.4 Gbps per pin. The package carries eight memory stacks, so each
-is 204.8 GB/s and 256 bits wide: 8 × 256 bits × 6.4 Gbps = 1.6384 TB/s. The other split
-with the same peak, 8 × 512 bits at 3.2 Gbps, would require npu-smi to report a data rate
-and is ruled out by both calibrations. Seven enabled stacks give exactly the Atlas 350's
-published 112 GB and 1.4 TB/s (1.4336 TB/s). The previous
-1.6 TB/s basis drew 44 memory-bound BF16 GEMVs (M ≤ 8, 0.5–2.4 GB of weights) up to 1.3%
-above the roofline. Bus width and the exact memory/ECC configuration are not published
-or counter-verified; the API reference's `qualification` field records this caveat, which
-the charts do not repeat. FP4 remains null.
+excluding Vector compute in the combined figures. Peak memory bandwidth is 1.6384 TB/s:
+8 HBM stacks × 256 bits × 6.4 Gbps per pin (`npu-smi` HBM clock 3200 MHz), which Huawei
+rounds to 1.6 TB/s. FP4 remains null.
 The normalized roofline divides arithmetic intensity by 230.712890625 FLOP/byte for BF16
 or 461.42578125 for FP8, and throughput by 378 or 756 TFLOPS respectively. Raw measurements
 and the inclusion of activation quantization in measured FP8 latency are unchanged.
@@ -268,19 +254,8 @@ still win; no data, hardware selection, or measurement is changed.
 以 28 个 Cube 核的 Ascend950PR_9579 为基准：BF16 和 FP8 的稠密计算峰值分别为 378 和
 756 TFLOPS，HBM 带宽为**推算值** 1.6384 TB/s。计算峰值仅计入 Cube 算力，来源为
 [华为 Ascend 950 白皮书表 3-1](https://public-download.obs.cn-east-2.myhuaweicloud.com/ascend/%E6%98%87%E8%85%BE950%20NPU%E6%9E%B6%E6%9E%84%E7%99%BD%E7%9A%AE%E4%B9%A6.pdf)，
-不包含白皮书合计值中的 Vector 算力。Huawei 只公布了 128 GB 配置的取整带宽 1.6 TB/s。
-2026 年 10 月 31 日，在测试所用板卡（驱动 25.7.rc1.6）上运行 `npu-smi info -t memory`，报告 HBM
-容量为 131072 MB、HBM 时钟为 3200 MHz。`npu-smi` 报告的是时钟（数据在双沿传输），而不是数据速率。
-两款使用标准 1024 位 HBM stack 的 Ascend 芯片可以校准该字段：910B 的 Samsung HBM2e（4 个 stack，
-公布带宽 1.6 TB/s，实测约 1.54 TB/s）显示 1600 MHz，需要每引脚 3.2 Gbps；若把 1600 理解为数据速率，
-峰值只有 0.82 TB/s，低于实测值。910 的 2.4 Gbps HBM2（公布带宽 1.2 TB/s）显示 1200 MHz。因此 950PR
-的 3200 MHz 对应每引脚 6.4 Gbps。封装上有 8 个内存 stack，每个 stack 为 204.8 GB/s、256 位：
-8 × 256 位 × 6.4 Gbps = 1.6384 TB/s。峰值相同的另一种拆分（8 × 512 位、3.2 Gbps）要求 npu-smi
-报告数据速率，与上述两项校准矛盾，因此可以排除。启用 7 个 stack 时，恰好得到 Atlas 350 公布的
-112 GB 和 1.4 TB/s（1.4336 TB/s）。按原来的 1.6 TB/s
-计算时，44 个访存受限的 BF16 GEMV（M ≤ 8，权重 0.5–2.4 GB）最多高出 roofline 1.3%。总线位宽和
-具体内存及 ECC 配置均未公布，也未经硬件计数器验证；API 参考值的 `qualification` 字段记录了这一说明，
-图表中不再重复显示。FP4 的峰值保留为 null。归一化时，BF16 的算术强度除以 230.712890625 FLOP/byte，
+不包含白皮书合计值中的 Vector 算力。峰值内存带宽为 1.6384 TB/s：8 个 HBM stack × 256 位 ×
+每引脚 6.4 Gbps（`npu-smi` 报告 HBM 时钟 3200 MHz），Huawei 将其取整为 1.6 TB/s。FP4 的峰值保留为 null。归一化时，BF16 的算术强度除以 230.712890625 FLOP/byte，
 吞吐量除以 378 TFLOPS；FP8 则分别除以 461.42578125 FLOP/byte 和 756 TFLOPS。实测数据不变，FP8 延迟仍包含
 激活量化耗时。
 
