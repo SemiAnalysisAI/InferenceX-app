@@ -61,10 +61,11 @@ interface RawKvRow {
   op: string;
   descs: number;
   req_bytes: number;
+  posted_bytes?: number;
   prep_ms?: number;
-  latency_ms: CollectiveXKvLatency;
-  request_ms?: CollectiveXKvLatency;
-  gbps_p50: number;
+  latency_ms: CollectiveXKvLatency | null;
+  request_ms?: CollectiveXKvLatency | null;
+  gbps_p50: number | null;
   gbps_p50_incl_prep?: number;
   verify?: { passed: boolean; detail?: string };
 }
@@ -76,7 +77,13 @@ interface RawShard {
     case_id: string;
     case_factors: { sku: string; case: RawCase };
   };
-  implementation: { name: string; library_version?: unknown };
+  implementation: {
+    name: string;
+    library_version?: unknown;
+    maturity?: unknown;
+    transport?: unknown;
+  };
+  topology?: { network?: unknown };
   runtime: { vendor: string };
   measurement: { rows: RawRow[] };
   outcome: { status: string; reasons?: string[] };
@@ -296,24 +303,36 @@ function isSwapCase(kase: RawCase): boolean {
   return kase.suite === 'swap-blocks';
 }
 
-function mapKvRow(row: RawKvRow): CollectiveXKvRow {
-  return {
-    kind: row.kind === 'bulk' ? 'bulk' : 'paged',
-    isl: row.isl,
-    page_tokens: row.page_tokens ?? null,
-    batch: row.batch ?? 1,
-    op: row.op === 'push' ? 'push' : 'pull',
-    descs: row.descs,
-    req_bytes: row.req_bytes,
-    prep_ms: row.prep_ms ?? 0,
-    latency_ms: row.latency_ms,
-    ...(row.request_ms ? { request_ms: row.request_ms } : {}),
-    gbps_p50: row.gbps_p50,
-    ...(typeof row.gbps_p50_incl_prep === 'number'
-      ? { gbps_p50_incl_prep: row.gbps_p50_incl_prep }
-      : {}),
-    verify_passed: row.verify?.passed ?? true,
-  };
+/** A row whose first burst failed carries no samples; its case outcome says why. */
+function mapKvRow(row: RawKvRow): CollectiveXKvRow[] {
+  if (!row.latency_ms || typeof row.gbps_p50 !== 'number') return [];
+  return [
+    {
+      kind: row.kind === 'bulk' ? 'bulk' : 'paged',
+      isl: row.isl,
+      page_tokens: row.page_tokens ?? null,
+      batch: row.batch ?? 1,
+      op: row.op === 'push' ? 'push' : 'pull',
+      descs: row.descs,
+      req_bytes: row.req_bytes,
+      ...(typeof row.posted_bytes === 'number' ? { posted_bytes: row.posted_bytes } : {}),
+      prep_ms: row.prep_ms ?? 0,
+      latency_ms: row.latency_ms,
+      ...(row.request_ms ? { request_ms: row.request_ms } : {}),
+      gbps_p50: row.gbps_p50,
+      ...(typeof row.gbps_p50_incl_prep === 'number'
+        ? { gbps_p50_incl_prep: row.gbps_p50_incl_prep }
+        : {}),
+      verify_passed: row.verify?.passed ?? true,
+      ...(row.verify?.passed === false && row.verify.detail
+        ? { verify_detail: row.verify.detail }
+        : {}),
+    },
+  ];
+}
+
+function textOf(value: unknown): string | null {
+  return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
 function buildKvCases(
@@ -347,6 +366,7 @@ function buildKvCases(
     const workload = kase.workload ?? 'kv';
     const precision = toPrecision(kase.precision);
     const shard = measured ?? failed;
+    const maturity = shard?.shard.implementation.maturity;
     return [
       {
         case_id: caseId,
@@ -362,8 +382,12 @@ function buildKvCases(
         outcome,
         reason,
         detail: requested.detail ?? null,
+        library_version: shard ? libraryVersionOf(shard.shard) : null,
+        maturity: maturity === 'production' || maturity === 'candidate' ? maturity : null,
+        network: textOf(shard?.shard.topology?.network),
+        transport: textOf(shard?.shard.implementation.transport),
         rows: measured
-          ? (measured.shard.measurement.rows as unknown as RawKvRow[]).map(mapKvRow)
+          ? (measured.shard.measurement.rows as unknown as RawKvRow[]).flatMap(mapKvRow)
           : [],
       },
     ];

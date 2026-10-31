@@ -204,6 +204,9 @@ export interface KvOverrides {
   version?: number | string;
   rows?: Partial<KvRowSpec>[];
   omitShard?: boolean;
+  /** Extra `implementation` fields (library_version, maturity, transport, library_config). */
+  implementation?: Json;
+  network?: string;
 }
 
 interface KvRowSpec {
@@ -215,6 +218,9 @@ interface KvRowSpec {
   gbps_p50: number;
   latency_p50: number;
   verify_passed: boolean;
+  posted_bytes: number;
+  /** The row's first burst failed: no samples. */
+  failed: boolean;
 }
 
 function makeRawKvRow(spec: Partial<KvRowSpec>): Json {
@@ -223,23 +229,28 @@ function makeRawKvRow(spec: Partial<KvRowSpec>): Json {
     kind: spec.kind ?? 'paged',
     preset: 'dsv4',
     isl: spec.isl ?? 32768,
-    page_tokens: spec.page_tokens === undefined ? 64 : spec.page_tokens,
+    page_tokens: spec.page_tokens === undefined ? 256 : spec.page_tokens,
     layers: 61,
     page_bytes: spec.kind === 'bulk' ? null : 9216,
     descs: spec.kind === 'bulk' ? 1 : 20302,
     req_bytes: 183000000,
     batch: spec.batch ?? 1,
     op: spec.op ?? 'pull',
+    ...(spec.posted_bytes === undefined ? {} : { posted_bytes: spec.posted_bytes }),
     prep_ms: 1.2,
-    latency_ms: {
-      p50: latency,
-      p95: latency * 1.05,
-      min: latency * 0.98,
-      max: latency * 1.1,
-      n: 24,
-    },
-    gbps_p50: spec.gbps_p50 ?? 7.39,
-    verify: { passed: spec.verify_passed ?? true, detail: '' },
+    latency_ms: spec.failed
+      ? null
+      : {
+          p50: latency,
+          p95: latency * 1.05,
+          min: latency * 0.98,
+          max: latency * 1.1,
+          n: 24,
+        },
+    gbps_p50: spec.failed ? null : (spec.gbps_p50 ?? 7.39),
+    verify: spec.failed
+      ? { passed: false, detail: "transfer raised RuntimeError('boom')" }
+      : { passed: spec.verify_passed ?? true, detail: '' },
   };
 }
 
@@ -264,10 +275,11 @@ export function makeKvFixture(options: KvOverrides = {}): {
     suite: 'kv-transfer',
   };
   const rows = options.rows ?? [
-    { kind: 'paged', page_tokens: 64, batch: 1 },
-    { kind: 'paged', page_tokens: 64, batch: 16, gbps_p50: 15.12, latency_p50: 193.7 },
-    { kind: 'paged', page_tokens: 16, batch: 1, gbps_p50: 2.72, latency_p50: 67.3 },
+    { kind: 'paged', batch: 1 },
+    { kind: 'paged', batch: 4, gbps_p50: 15.12, latency_p50: 193.7 },
+    { kind: 'paged', batch: 1, op: 'push', gbps_p50: 8.02, latency_p50: 22.82 },
     { kind: 'bulk', page_tokens: null, batch: 1, gbps_p50: 89.41, latency_p50: 2.05 },
+    { kind: 'bulk', page_tokens: null, batch: 1, op: 'push', gbps_p50: 92.1, latency_p50: 1.99 },
   ];
   const shard: Json | null = options.omitShard
     ? null
@@ -275,7 +287,8 @@ export function makeKvFixture(options: KvOverrides = {}): {
         version: options.version ?? '1',
         record_type: 'case-attempt',
         identity: { case_id: caseId, case_factors: { sku, case: identityCase } },
-        implementation: { name: options.backend ?? 'nixl' },
+        implementation: { name: options.backend ?? 'nixl', ...options.implementation },
+        ...(options.network ? { topology: { network: options.network } } : {}),
         runtime: { vendor: options.vendor ?? 'nvidia' },
         measurement: { rows: rows.map(makeRawKvRow) },
         outcome: {
