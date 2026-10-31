@@ -3760,9 +3760,8 @@ const ScatterGraph = React.memo(
     const layersRef = useRef(layers);
     layersRef.current = layers;
 
-    const onRender = useCallback(
+    const onExportRender = useCallback(
       (ctx: RenderContext) => {
-        lastRenderCtxRef.current = ctx;
         const { zoomGroup } = ctx.layout;
 
         zoomGroup.selectAll('.dot-group').style('transition', 'opacity 150ms ease');
@@ -3794,6 +3793,14 @@ const ScatterGraph = React.memo(
         getCssColor,
         resolveColor,
       ],
+    );
+
+    const onRender = useCallback(
+      (ctx: RenderContext) => {
+        lastRenderCtxRef.current = ctx;
+        onExportRender(ctx);
+      },
+      [onExportRender],
     );
 
     useLayoutEffect(() => {
@@ -4142,6 +4149,7 @@ const ScatterGraph = React.memo(
           tooltip={tooltipConfig}
           transitionDuration={transitionDuration}
           onRender={onRender}
+          onExportRender={onExportRender}
           noDataOverlay={
             filteredData.length === 0 && processedOverlayData.length === 0 ? (
               <div

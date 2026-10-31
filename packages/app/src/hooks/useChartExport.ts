@@ -4,6 +4,13 @@ import { CHART_FONT_MINECRAFT, CHART_FONT_SANS } from '@/lib/d3-chart/typography
 import { getExportFooterText } from '@/lib/export/export-footer';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { hasDarkTheme } from '@/lib/themes/themes';
+import {
+  layoutPngExport,
+  PNG_PIXEL_RATIO,
+  PNG_FOOTER_HEIGHT,
+  type PngAspectRatio,
+} from '@/lib/export/png-layout';
+export type { PngAspectRatio } from '@/lib/export/png-layout';
 
 const STRINGS = {
   en: { exportFailed: 'Failed to export image. Please try again.' },
@@ -15,20 +22,6 @@ interface UseChartExportOptions {
   setIsLegendExpanded?: (expanded: boolean) => void;
   hideLegend?: boolean;
   exportFileName?: string;
-}
-
-export type PngAspectRatio = 'auto' | '16:9' | '1:1';
-
-/** Expand the canvas without cropping or stretching any captured content. */
-export function getPngExportDimensions(
-  width: number,
-  height: number,
-  aspectRatio: PngAspectRatio,
-): { width: number; height: number } {
-  if (aspectRatio === 'auto') return { width, height };
-  const [w, h] = aspectRatio === '16:9' ? [16, 9] : [1, 1];
-  const unit = Math.ceil(Math.max(width / w, height / h));
-  return { width: unit * w, height: unit * h };
 }
 
 function applyStyles(el: HTMLElement | null, styles: Partial<CSSStyleDeclaration>) {
@@ -199,21 +192,16 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
   });
 }
 
-export async function addWatermark(
-  chartDataUrl: string,
-  bgColor: string,
-  aspectRatio: PngAspectRatio = 'auto',
-): Promise<string> {
+export async function addWatermark(chartDataUrl: string, bgColor: string): Promise<string> {
   const img = await loadImage(chartDataUrl);
   if (!img) throw new Error('Could not decode the chart PNG');
 
   const isDark = hasDarkTheme(document.documentElement) || bgColor.includes('0 0%');
 
-  const WATERMARK_HEIGHT = 120;
+  const WATERMARK_HEIGHT = PNG_FOOTER_HEIGHT * PNG_PIXEL_RATIO;
   const canvas = document.createElement('canvas');
-  const dimensions = getPngExportDimensions(img.width, img.height + WATERMARK_HEIGHT, aspectRatio);
-  canvas.width = dimensions.width;
-  canvas.height = dimensions.height;
+  canvas.width = img.width;
+  canvas.height = img.height + WATERMARK_HEIGHT;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('PNG canvas is unavailable');
 
@@ -221,7 +209,7 @@ export async function addWatermark(
   const contentHeight = canvas.height - WATERMARK_HEIGHT;
   ctx.fillRect(0, 0, canvas.width, contentHeight);
 
-  ctx.drawImage(img, (canvas.width - img.width) / 2, (contentHeight - img.height) / 2);
+  ctx.drawImage(img, 0, 0);
 
   ctx.fillStyle = isDark ? '#1a1a2e' : '#f5f5f5';
   ctx.fillRect(0, contentHeight, canvas.width, WATERMARK_HEIGHT);
@@ -469,11 +457,25 @@ export function useChartExport({
             fontEmbedCSS = await htmlToImage.getFontEmbedCSS(exportElement);
           } catch {}
         }
-        const captureDimensions = getExportCaptureDimensions(exportElement);
+        const captureDimensions =
+          ratio === 'auto'
+            ? getExportCaptureDimensions(exportElement)
+            : await layoutPngExport(element, clone, exportElement, ratio);
+        if (ratio !== 'auto') {
+          // New D3 nodes need the same export styling as the original clone.
+          for (const el of clone.querySelectorAll<HTMLElement>('.export-only')) {
+            el.style.display = 'inline';
+          }
+          for (const el of clone.querySelectorAll<HTMLElement>('.no-export')) {
+            el.style.display = 'none';
+          }
+          resolveCssVarsForExport(exportElement);
+          inlineComputedFontFamilyForExport(exportElement, resolvedExportFontFamily);
+        }
         const chartDataUrl = await toPng(exportElement, {
           ...captureDimensions,
           quality: 1,
-          pixelRatio: 2,
+          pixelRatio: PNG_PIXEL_RATIO,
           cacheBust: true,
           skipFonts: false,
           fontEmbedCSS,
@@ -485,7 +487,7 @@ export function useChartExport({
           },
         });
 
-        const dataUrl = await addWatermark(chartDataUrl, bgColor, ratio);
+        const dataUrl = await addWatermark(chartDataUrl, bgColor);
 
         const link = document.createElement('a');
         link.download = `${exportFileName || chartId}-${Date.now()}.png`;
@@ -500,7 +502,10 @@ export function useChartExport({
       } finally {
         setIsExporting(false);
         const exportElement = document.querySelector<HTMLElement>(`#${chartId}-export`);
-        if (exportElement) exportElement.innerHTML = '';
+        if (exportElement) {
+          exportElement.innerHTML = '';
+          exportElement.style.removeProperty('height');
+        }
       }
     },
     [chartId, setIsLegendExpanded, hideLegend, exportFileName, t],

@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef } from 'react';
 import * as d3 from 'd3';
 import { getDomainAwareChartWatermark } from '@/lib/runtime/unofficial-domain';
+import { registerChartExportRenderer, renderExportChart } from '../export-renderer';
 
 import {
   computeTooltipPosition,
@@ -299,6 +300,33 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
   const dataPhaseYScale = dataIdentity ? null : yScaleConfig;
   const dataPhaseLayers = dataIdentity ? null : layers;
   const dataPhaseTooltip = dataIdentity ? null : tooltipConfig;
+
+  useLayoutEffect(() => {
+    const source = svgRef.current;
+    if (!source) return;
+    return registerChartExportRenderer(source, (target, width, height) => {
+      const scales = scalesRef.current ?? {
+        xScale: d3.scaleLinear(),
+        yScale: d3.scaleLinear(),
+      };
+      const transform = d3.zoomTransform(source);
+      const axes = zoomConfig?.axes ?? 'both';
+      let { xScale, yScale } = scales;
+      if (zoomConfig?.enabled) {
+        if (axes !== 'y' && !isBandScale(xScale)) {
+          xScale = zoomConfig.rescaleX
+            ? zoomConfig.rescaleX(xScale as ContinuousScale, transform)
+            : transform.rescaleX(xScale);
+        }
+        if (axes !== 'x' && !isBandScale(yScale)) {
+          yScale = zoomConfig.rescaleY
+            ? zoomConfig.rescaleY(yScale as ContinuousScale, transform)
+            : transform.rescaleY(yScale);
+        }
+      }
+      renderExportChart(target, width, height, props, { xScale, yScale });
+    });
+  });
 
   useLayoutEffect(() => {
     if (!svgRef.current || dimensions.width === 0) return;

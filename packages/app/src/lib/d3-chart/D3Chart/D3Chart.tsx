@@ -41,6 +41,7 @@ function D3ChartInner<T>(
     caption,
     scrollablePlot,
     onRender,
+    onExportRender,
     onDisplayUpdate,
   }: D3ChartProps<T>,
   ref: React.ForwardedRef<D3ChartHandle>,
@@ -125,6 +126,7 @@ function D3ChartInner<T>(
       legendElement,
       noDataOverlay,
       onRender,
+      onExportRender,
       onDisplayUpdate,
     },
     {
