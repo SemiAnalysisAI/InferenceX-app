@@ -522,6 +522,7 @@ const ScatterGraph = React.memo(
     yLabel,
     chartDefinition,
     caption,
+    footer,
     onShowTable,
     showAllHardwareTypes = false,
     hardwareConfigOverride,
@@ -4140,6 +4141,7 @@ const ScatterGraph = React.memo(
           testId="scatter-graph"
           grabCursor={true}
           caption={caption}
+          footer={footer}
           xScale={xScaleConfig}
           yScale={yScaleConfig}
           xAxis={xAxisConfig}

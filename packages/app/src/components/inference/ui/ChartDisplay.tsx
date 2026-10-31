@@ -1186,7 +1186,7 @@ export default function ChartDisplay({
                   {!minimalChrome && renderChartButtons(graph, graphIndex)}
                   <Card data-coach-mark-root="">
                     {(() => {
-                      const chartCaption = (
+                      const chartHeading = (
                         <>
                           <div className="flex items-start gap-1">
                             <Heading as="h2" level="card">
@@ -1243,6 +1243,10 @@ export default function ChartDisplay({
                               </OptionInfo>
                             )}
                           </div>
+                        </>
+                      );
+                      const chartContext = (
+                        <div>
                           <ResultContext
                             locale={locale}
                             deprecated={isModelDeprecated(selectedModel)}
@@ -1368,7 +1372,16 @@ export default function ChartDisplay({
                               </p>
                             )}
                           <UnofficialDomainNotice />
+                        </div>
+                      );
+                      const chartCaption = (
+                        <>
+                          {chartHeading}
+                          {powerXSurface && chartContext}
                         </>
+                      );
+                      const chartFooter = !powerXSurface && (
+                        <div className="mt-3">{chartContext}</div>
                       );
 
                       if (getViewMode(graphIndex) === 'table') {
@@ -1397,6 +1410,7 @@ export default function ChartDisplay({
                               chartDefinition={graph.chartDefinition}
                               selectedYAxisMetric={selectedYAxisMetric}
                             />
+                            {chartFooter}
                           </>
                         );
                       }
@@ -1414,6 +1428,7 @@ export default function ChartDisplay({
                                 overlayDataByChartType[graph.chartDefinition.chartType] ?? undefined
                               }
                               caption={chartCaption}
+                              footer={chartFooter}
                               comparison={Boolean(isGpuComparison)}
                               runNumbering={runNumbering}
                             />
@@ -1431,6 +1446,7 @@ export default function ChartDisplay({
                             yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
                             chartDefinition={graph.chartDefinition}
                             caption={chartCaption}
+                            footer={chartFooter}
                             overlayData={footerOverlay ?? undefined}
                             runNumbering={runNumbering}
                           />
@@ -1447,6 +1463,7 @@ export default function ChartDisplay({
                             yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
                             chartDefinition={graph.chartDefinition}
                             caption={caption}
+                            footer={chartFooter}
                             overlayData={
                               overlayDataByChartType[graph.chartDefinition.chartType] ?? undefined
                             }

@@ -2,6 +2,11 @@
 
 ## PNG export aspect ratio
 
+Inference charts keep the title above the plot and place cost controls, pricing
+assumptions, attribution, and the deployment notice below the plot and legend.
+The shared `D3Chart` / `D3ChartWrapper` `footer` slot keeps this context inside
+the chart's export root. PowerX retains its existing header layout.
+
 The download popover offers Auto, 16:9, and 1:1 for PNG export only. Auto retains
 the existing image dimensions. Fixed ratios lay out an offscreen clone at a
 1280×720 or 1000×1000 CSS-pixel frame (captured at 2× resolution). The exporter
