@@ -5,6 +5,7 @@ import { overlaySelectionReducer, UnofficialRunContext } from '@/providers/unoff
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import { useParetoHighlightToggle } from '@/components/inference/hooks/useParetoHighlightToggle';
 import ChartDisplay from '@/components/inference/ui/ChartDisplay';
+import { PowerXSurfaceProvider } from '@/components/inference/ui/powerx-surface';
 import chartDefinitions from '@/components/inference/metric-registry';
 import { mountWithProviders } from '../support/test-utils';
 import { expandLegendAdvanced } from '../support/legend-advanced';
@@ -2044,6 +2045,42 @@ describe('ChartDisplay responsive status notes', () => {
     });
     cy.get('#chart-0 .dot-group').should('have.length.greaterThan', 0);
     cy.get('[data-testid="atom-engine-footnote"]').should('not.exist');
+  });
+
+  it('retains the selected ATOM disclaimer below the PowerX Where panels', () => {
+    mountWithProviders(
+      <PowerXSurfaceProvider>
+        <ChartDisplay />
+      </PowerXSurfaceProvider>,
+      {
+        inference: {
+          selectedYAxisMetric: 'y_measuredAvgPower',
+          powerCompare: 'breakdown',
+          graphs: [
+            {
+              model: Model.DeepSeek_R1,
+              sequence: Sequence.AgenticTraces,
+              chartDefinition: defaultChartDef,
+              data: [createMockInferenceData({ framework: 'atom' })],
+            },
+          ],
+        },
+        globalFilters: {},
+        unofficial: {},
+      },
+    );
+    cy.get('[data-testid="powerx-where-controls"]').should('be.visible');
+    cy.get('[data-testid="atom-engine-footnote"]')
+      .should('have.length', 1)
+      .and('have.text', atomDisclaimer)
+      .and('be.visible');
+    cy.get('[data-testid="chart-figure"]').should(($figure) => {
+      const panels = $figure[0].querySelector('[data-testid="power-analysis-panels"]')!;
+      const note = $figure[0].querySelector('[data-testid="atom-engine-footnote"]')!;
+      expect(note.getBoundingClientRect().top).to.be.at.least(
+        panels.getBoundingClientRect().bottom,
+      );
+    });
   });
 });
 

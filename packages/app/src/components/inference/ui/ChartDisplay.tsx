@@ -1560,6 +1560,9 @@ export default function ChartDisplay({
                               showRoles={powerCompare === 'roles'}
                               placement={powerCompare === 'roles' ? 'after' : 'before'}
                             />
+                            {powerXLayout && powerCompare !== 'roles' && hasAtomSeries && (
+                              <AtomEngineFootnote className="mt-2 text-xs leading-5" />
+                            )}
                           </>
                         );
                       })()}
