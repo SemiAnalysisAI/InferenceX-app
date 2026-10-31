@@ -144,6 +144,57 @@ The page-owned comparison API accepts `rooflinePrecision=bf16|fp8|fp4`, `rooflin
 
 页面专属的对比 API 支持 `rooflinePrecision=bf16|fp8|fp4`、`rooflineHardware=<逗号分隔的硬件 key>`、`rooflineNormalized=true|false` 和 `rooflineSharedOnly=true|false`。传入任一参数时，响应会增加 `rooflineSummary`，与 UI 共用同一个纯函数计算。默认值为工作负载的 roofline 精度、返回的全部硬件、`normalized=true` 和 `sharedOnly=true`。`cohort` 为 `per-hardware-compute-bound` 或 `shared-compute-bound`。`matchedCases` 始终表示拐点过滤前的共同用例数；顶层 `caseIndices` 是所显示各柱用例的并集，每条柱另外返回自身的 `caseIndices` 和 `n`。其他字段包括 `missingReferences`、`hardware`、`median`、`best`、`medianTflops`、`bestTflops` 和 `bestCaseIndex`。归一化数值为比例（1 表示 100%），显式的 TFLOPS 字段始终为绝对值。无效参数返回 400；不传这些参数时，原有响应保持不变。
 
+## Per-device FLOPs and bytes for sharded cases
+
+A case with `parallel` runs on `tp × dp` devices of one node. Following InferenceX
+`operatorx/core/parallel.py`, its args keep the full unsplit shape and each dp group's
+batch, so MoE experts see `tokens × dp` tokens in total. Each case's `flops` and `bytes`
+(the useful-FLOP and ideal-DRAM-byte counts behind TFLOPS, bandwidth, utilization,
+roofline points and the median/best bars) are the node totals divided by `tp × dp`, which
+pairs one device's share with the measured latency. Arithmetic intensity does not depend
+on the device count. Cases without `parallel` are unchanged. A malformed `parallel` value
+gives null counts, so the case shows its latency but no derived throughput. Before
+comparison format 2, sharded cases were credited with the whole node's work, which put
+them above the roofline (up to 3.4× the B300 bandwidth roof for DeepSeek-V4.1-Flash EP8/TP8).
+
+MoE weight bytes count the experts the tokens actually reach, following the forced
+`routing.distribution` in InferenceX `operatorx/runners/common/vllm/moe.py`: `balanced` touches
+`min(E, T × k)` experts; `single_hot` touches expert 0 plus `k − 1` uniform picks from the rest; a
+zipf distribution (`p ∝ 1/rank^s`, k drawn without replacement) uses Rosén's inclusion-probability
+approximation, which stays within 2% of simulation and errs high. `natural` routing is the router's
+own choice and keeps the uniform-random estimate, so a few low-token sharded `natural` cases can
+still sit slightly (≤7%) above the roof when the router concentrates tokens. Before format 2,
+skewed routing used the uniform estimate too (Qwen3.5 zipf s=1.2 on H100 reached 1.09× the roof).
+
+中文：MoE 权重字节数按 token 实际路由到的 expert 计算，与 InferenceX
+`operatorx/runners/common/vllm/moe.py` 中强制指定的 `routing.distribution` 一致：`balanced`
+覆盖 `min(E, T × k)` 个 expert；`single_hot` 覆盖 expert 0，以及从其余 expert 中均匀选出的
+`k − 1` 个；zipf 分布（`p ∝ 1/rank^s`，每个 token 无放回地选取 k 个）采用 Rosén 近似计算入选概率，
+与模拟结果的偏差不超过 2%，且只会偏高。`natural` 路由由 router 自行选择，仍沿用均匀随机估计，
+因此少量低 token 数的切分 `natural` 用例在 router 集中路由时仍可能略高于 roofline（不超过 7%）。
+对比格式 2 之前，偏斜路由同样使用均匀估计（Qwen3.5 zipf s=1.2 在 H100 上达到 roofline 的 1.09 倍）。
+
+## Default MoE workload
+
+When `workload` is absent or names no available workload (for example `workload=moe`), the MoE
+view opens on `moe:DeepSeek-V4.1-Flash` (`DEFAULT_WORKLOADS` in
+`packages/db/src/operatorx/compare.ts`). If that workload has no data, it falls back to the first
+listed workload (most hardware, then label). GEMM keeps the first listed workload. An explicit
+valid `workload` always wins.
+
+中文：未传 `workload` 或其值不对应任何可用工作负载（例如 `workload=moe`）时，MoE 视图默认打开
+`moe:DeepSeek-V4.1-Flash`（见 `packages/db/src/operatorx/compare.ts` 中的 `DEFAULT_WORKLOADS`）。
+该工作负载没有数据时，回退到列表中的第一项（按硬件数量、再按名称排序）。GEMM 仍使用列表第一项。
+显式传入的有效 `workload` 始终优先。
+
+中文：带 `parallel` 的用例在单节点的 `tp × dp` 个设备上运行。按照 InferenceX
+`operatorx/core/parallel.py` 的约定，参数保留未切分的完整形状和每个 dp 组的 batch，因此 MoE
+expert 共处理 `tokens × dp` 个 token。每个用例的 `flops`（有效 FLOP 数）和 `bytes`（理想 DRAM
+字节数）取节点总量除以 `tp × dp`，即单个设备承担的份额，与实测延迟相对应。TFLOPS、带宽、利用率、
+roofline 数据点以及中位数/最佳值柱状图都由这两个计数推导。算术强度不受设备数影响；不带 `parallel` 的用例保持不变。
+`parallel` 取值无效时计数为 null，只显示延迟，不计算派生吞吐量。对比格式 2 之前，切分用例按整个节点的
+工作量计算，导致数据点高于 roofline（DeepSeek-V4.1-Flash EP8/TP8 在 B300 上最高达到带宽上限的 3.4 倍）。
+
 ## Ascend 950PR normalization
 
 The OperatorX-only hardware reference for `ascend950pr` uses the 28-Cube
