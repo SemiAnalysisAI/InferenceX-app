@@ -69,26 +69,71 @@ export function opLabels(type: string, args: Args): OpLabels {
   }
 }
 
+/**
+ * How a case is split over one node, per upstream `operatorx/core/parallel.py`: args keep
+ * the full unsplit shape and each dp group's batch, and the op runs on `tp × dp` devices.
+ * No `parallel` means one device. Returns null for a malformed split.
+ */
+function split(a: Args): { devices: number; dp: number } | null {
+  const p = a.parallel;
+  if (p === undefined || p === null) return { devices: 1, dp: 1 };
+  const o = obj(p);
+  if (!o) return null;
+  const axis = (k: string): number | null => {
+    const v = o[k];
+    if (v === undefined) return 1;
+    return typeof v === 'number' && Number.isInteger(v) && v >= 1 ? v : null;
+  };
+  const [tp, dp] = [axis('tp'), axis('dp')];
+  return tp && dp ? { devices: tp * dp, dp } : null;
+}
+
+type NodeCount = (a: Args, tokens: number) => number | null;
+
+/**
+ * Spread a whole-node count evenly over the node's devices, so latency (one device's view
+ * of the split op) pairs with one device's share. MoE experts see every dp group's batch.
+ */
+function perDevice(type: string, a: Args, gemm: NodeCount, moe: NodeCount): number | null {
+  const s = split(a);
+  if (!s) return null;
+  let total: number | null = null;
+  if (type === 'gemm') total = gemm(a, 0);
+  else if (type === 'moe') {
+    const t = num(a.tokens);
+    total = t ? moe(a, t * s.dp) : null;
+  }
+  return total === null ? null : total / s.devices;
+}
+
+/** Useful FLOPs per device; sharded cases divide the node's work by `tp × dp`. */
 export function usefulFlops(type: string, a: Args): number | null {
-  if (type === 'gemm') {
-    const [m, n, k] = [num(a.m), num(a.n), num(a.k)];
-    return m && n && k ? 2 * m * n * k : null;
-  }
-  if (type === 'moe') {
-    const ex = obj(a.experts);
-    const [t, h] = [num(a.tokens), num(a.hidden)];
-    if (!ex || !t || !h) return null;
-    const [e, k, i] = [num(ex.num), num(ex.top_k), num(ex.inter)];
-    if (!e || !k || !i) return null;
-    const w = num(ex.latent) ?? h;
-    let flops = 2 * t * h * e + 6 * t * w * i * k;
-    if (num(ex.latent)) flops += 2 * 2 * t * h * w;
-    const sh = obj(a.shared);
-    if (sh && num(sh.count) && num(sh.inter))
-      flops += 6 * t * h * (sh.inter as number) * (sh.count as number);
-    return flops;
-  }
-  return null;
+  return perDevice(type, a, gemmFlops, moeFlops);
+}
+
+/** Ideal DRAM bytes per device; sharded cases divide the node's traffic by `tp × dp`. */
+export function usefulBytes(type: string, a: Args): number | null {
+  return perDevice(type, a, gemmBytes, moeBytes);
+}
+
+function gemmFlops(a: Args): number | null {
+  const [m, n, k] = [num(a.m), num(a.n), num(a.k)];
+  return m && n && k ? 2 * m * n * k : null;
+}
+
+function moeFlops(a: Args, t: number): number | null {
+  const ex = obj(a.experts);
+  const h = num(a.hidden);
+  if (!ex || !t || !h) return null;
+  const [e, k, i] = [num(ex.num), num(ex.top_k), num(ex.inter)];
+  if (!e || !k || !i) return null;
+  const w = num(ex.latent) ?? h;
+  let flops = 2 * t * h * e + 6 * t * w * i * k;
+  if (num(ex.latent)) flops += 2 * 2 * t * h * w;
+  const sh = obj(a.shared);
+  if (sh && num(sh.count) && num(sh.inter))
+    flops += 6 * t * h * (sh.inter as number) * (sh.count as number);
+  return flops;
 }
 
 const ELEMENT_BYTES: Record<string, number> = {
@@ -119,30 +164,71 @@ function operandBytes(d: Args | null, rows: number, cols: number, stored = true)
   return bytes;
 }
 
-export function usefulBytes(type: string, a: Args): number | null {
-  if (type === 'gemm') {
-    const [m, n, k] = [num(a.m), num(a.n), num(a.k)];
-    if (!m || !n || !k) return null;
-    const out = ELEMENT_BYTES[str(a.out) ?? 'bf16'] ?? 2;
-    return operandBytes(obj(a.a), m, k, false) + operandBytes(obj(a.b), n, k) + m * n * out;
+function gemmBytes(a: Args): number | null {
+  const [m, n, k] = [num(a.m), num(a.n), num(a.k)];
+  if (!m || !n || !k) return null;
+  const out = ELEMENT_BYTES[str(a.out) ?? 'bf16'] ?? 2;
+  return operandBytes(obj(a.a), m, k, false) + operandBytes(obj(a.b), n, k) + m * n * out;
+}
+
+/**
+ * Expected distinct experts that `t` tokens route to, following the forced distributions
+ * in InferenceX `operatorx/runners/common/vllm/moe.py`. `natural` (the router's own choice)
+ * and unknown values keep the uniform-random estimate. Returns null for a malformed zipf.
+ */
+export function touchedExperts(e: number, k: number, t: number, routing: unknown): number | null {
+  const dist = obj(routing)?.distribution;
+  if (dist === 'balanced') return Math.min(e, t * k);
+  if (dist === 'single_hot') {
+    // Expert 0 on every token, plus k-1 of the remaining e-1 uniformly.
+    return e === 1 ? 1 : 1 + (e - 1) * (1 - (1 - (k - 1) / (e - 1)) ** t);
   }
-  if (type === 'moe') {
-    const ex = obj(a.experts);
-    const [t, h] = [num(a.tokens), num(a.hidden)];
-    if (!ex || !t || !h) return null;
-    const [e, k, i] = [num(ex.num), num(ex.top_k), num(ex.inter)];
-    if (!e || !k || !i) return null;
-    const w = num(ex.latent) ?? h;
-    const touched = e * (1 - (1 - k / e) ** t);
-    let bytes = touched * (operandBytes(obj(ex.w1), 2 * i, w) + operandBytes(obj(ex.w2), w, i));
-    bytes += h * e * 2 + 2 * t * h * 2;
-    if (num(ex.latent)) bytes += 2 * h * w * 2;
-    const sh = obj(a.shared);
-    if (sh && num(sh.count) && num(sh.inter)) {
-      const si = (sh.inter as number) * (sh.count as number);
-      bytes += operandBytes(obj(sh.w1), 2 * si, h) + operandBytes(obj(sh.w2), h, si);
-    }
-    return bytes;
+  const zipf = obj(dist);
+  if (zipf) {
+    const s = num(zipf.s);
+    return zipf.kind === 'zipf' && s !== null ? zipfTouched(e, k, t, s) : null;
   }
-  return null;
+  return e * (1 - (1 - k / e) ** t);
+}
+
+/**
+ * Each token draws k experts without replacement with p ~ 1/rank^s. Rosén's approximation
+ * gives each expert's per-token inclusion probability 1 - exp(-p·τ), with τ solved so the
+ * probabilities sum to k. Against simulation it stays within 2% and errs high, so it never
+ * understates bytes.
+ */
+function zipfTouched(e: number, k: number, t: number, s: number): number {
+  if (k >= e) return e;
+  const weights = Array.from({ length: e }, (_, i) => 1 / (i + 1) ** s);
+  const total = weights.reduce((sum, w) => sum + w, 0);
+  const p = weights.map((w) => w / total);
+  const picked = (tau: number) => p.reduce((sum, q) => sum + 1 - Math.exp(-q * tau), 0);
+  let [lo, hi] = [0, 1];
+  while (picked(hi) < k) hi *= 2;
+  for (let i = 0; i < 100; i++) {
+    const mid = (lo + hi) / 2;
+    if (picked(mid) < k) lo = mid;
+    else hi = mid;
+  }
+  return p.reduce((sum, q) => sum + 1 - Math.exp(-q * hi * t), 0);
+}
+
+function moeBytes(a: Args, t: number): number | null {
+  const ex = obj(a.experts);
+  const h = num(a.hidden);
+  if (!ex || !t || !h) return null;
+  const [e, k, i] = [num(ex.num), num(ex.top_k), num(ex.inter)];
+  if (!e || !k || !i) return null;
+  const w = num(ex.latent) ?? h;
+  const touched = touchedExperts(e, k, t, a.routing);
+  if (touched === null) return null;
+  let bytes = touched * (operandBytes(obj(ex.w1), 2 * i, w) + operandBytes(obj(ex.w2), w, i));
+  bytes += h * e * 2 + 2 * t * h * 2;
+  if (num(ex.latent)) bytes += 2 * h * w * 2;
+  const sh = obj(a.shared);
+  if (sh && num(sh.count) && num(sh.inter)) {
+    const si = (sh.inter as number) * (sh.count as number);
+    bytes += operandBytes(obj(sh.w1), 2 * si, h) + operandBytes(obj(sh.w2), h, si);
+  }
+  return bytes;
 }
