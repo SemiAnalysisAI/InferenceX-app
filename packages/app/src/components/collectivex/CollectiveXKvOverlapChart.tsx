@@ -28,14 +28,14 @@ const IDEAL_KEY = '__collectivex-kv-overlap-ideal__';
 
 const STRINGS = {
   en: {
-    noData: 'No measured KV rows match the selected page size and direction.',
+    noData: 'No measured KV rows match the selected direction.',
     instructions:
       'Shift+Scroll to zoom · Drag to pan · Double-click to reset · Click a point to pin tooltip',
     xAxis: 'Requests per burst (log)',
     yAxis: 'Aggregate bandwidth relative to batch 1 (log)',
     dismiss: 'Click elsewhere to dismiss',
     pointContext: (row: CollectiveXKvChartPoint['row']) =>
-      `${row.op} · page ${row.page_tokens} · batch ${row.batch} · ISL ${row.isl.toLocaleString('en-US')}`,
+      `${row.op} · batch ${row.batch} · ISL ${row.isl.toLocaleString('en-US')}`,
     pointMetrics: (point: CollectiveXKvChartPoint) =>
       `${point.y.toFixed(2)}x batch 1 (ideal ${point.row.batch}x) · ${point.row.gbps_p50.toFixed(point.row.gbps_p50 >= 100 ? 0 : 2)} GB/s`,
     latency: (row: CollectiveXKvChartPoint['row']) =>
@@ -43,13 +43,13 @@ const STRINGS = {
     verify: (passed: boolean) => `verify: ${passed ? 'passed' : 'FAILED'}`,
   },
   zh: {
-    noData: '没有与所选页大小和传输方向匹配的 KV 实测数据。',
+    noData: '没有与所选传输方向匹配的 KV 实测数据。',
     instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
     xAxis: '每次突发请求数（对数）',
     yAxis: '相对批大小 1 的聚合带宽（对数）',
     dismiss: '点击其他位置关闭',
     pointContext: (row: CollectiveXKvChartPoint['row']) =>
-      `${row.op} · 页大小 ${row.page_tokens} · batch ${row.batch} · ISL ${row.isl.toLocaleString('en-US')}`,
+      `${row.op} · batch ${row.batch} · ISL ${row.isl.toLocaleString('en-US')}`,
     pointMetrics: (point: CollectiveXKvChartPoint) =>
       `批大小 1 的 ${point.y.toFixed(2)} 倍（理想 ${point.row.batch} 倍）· ${point.row.gbps_p50.toFixed(point.row.gbps_p50 >= 100 ? 0 : 2)} GB/s`,
     latency: (row: CollectiveXKvChartPoint['row']) =>

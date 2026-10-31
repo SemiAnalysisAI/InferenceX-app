@@ -62,6 +62,12 @@ interface SelectOption<T extends string | number> {
 
 type CollectiveXSuite = 'ep' | 'kv' | 'swap';
 
+const METHODOLOGY_DOC: Record<CollectiveXSuite, string> = {
+  ep: 'methodology',
+  kv: 'kv-transfer',
+  swap: 'swap-blocks',
+};
+
 const PERCENTILE_OPTIONS: SegmentedToggleOption<CollectiveXPercentile>[] = [
   { value: 'p50', label: 'p50' },
   { value: 'p90', label: 'p90' },
@@ -649,7 +655,7 @@ export default function CollectiveXDisplay() {
                 </a>
                 <a
                   data-testid="collectivex-methodology-link"
-                  href={`https://github.com/${sourceRepository}/blob/${singleDataset.run.source_sha}/collectivex/docs/${shownSuite === 'swap' ? 'swap-blocks' : 'methodology'}.md`}
+                  href={`https://github.com/${sourceRepository}/blob/${singleDataset.run.source_sha}/collectivex/docs/${METHODOLOGY_DOC[shownSuite]}.md`}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() =>

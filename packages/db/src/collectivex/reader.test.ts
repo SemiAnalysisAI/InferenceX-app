@@ -294,11 +294,11 @@ describe('CollectiveX kv-transfer assembly', () => {
       outcome: 'success',
       vendor: 'nvidia',
     });
-    expect(kase.rows).toHaveLength(4);
+    expect(kase.rows).toHaveLength(5);
     expect(kase.rows[0]).toMatchObject({
       kind: 'paged',
       isl: 32768,
-      page_tokens: 64,
+      page_tokens: 256,
       batch: 1,
       op: 'pull',
       gbps_p50: 7.39,
@@ -312,6 +312,45 @@ describe('CollectiveX kv-transfer assembly', () => {
     });
     expect(dataset.run.covered_skus).toContain('gb200');
     expect(dataset.run.requested_points).toBe(10);
+  });
+
+  it('carries the library build, maturity, network and posted bytes of a measured case', () => {
+    const dataset = buildDataset({
+      kv: [
+        {
+          backend: 'mooncake',
+          implementation: {
+            library_version: '0.3.13.post1',
+            maturity: 'candidate',
+            transport: 'verbs',
+          },
+          network: 'infiniband',
+          rows: [
+            { op: 'push', posted_bytes: 43153792 },
+            { op: 'push', batch: 32, failed: true },
+          ],
+        },
+      ],
+    });
+    const kase = dataset.kv![0];
+    expect(kase).toMatchObject({
+      library_version: '0.3.13.post1',
+      maturity: 'candidate',
+      network: 'infiniband',
+      transport: 'verbs',
+    });
+    // A row whose first burst failed has no samples to plot; the case outcome reports it.
+    expect(kase.rows).toHaveLength(1);
+    expect(kase.rows[0]).toMatchObject({ op: 'push', posted_bytes: 43153792 });
+  });
+
+  it('leaves the build and network null when nothing measured the case', () => {
+    expect(buildDataset({ kv: [{ omitShard: true }] }).kv![0]).toMatchObject({
+      library_version: null,
+      maturity: null,
+      network: null,
+      transport: null,
+    });
   });
 
   it('coerces the kv entrypoint string version against the numeric matrix version', () => {
