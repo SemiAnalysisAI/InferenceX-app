@@ -74,6 +74,38 @@ describe('First-Token Limits', () => {
       firstRowCell('Concurrency').should('have.text', '8');
     });
 
+    it('repositions calculator titles and summaries in fixed-ratio PNG exports', () => {
+      let downloads = 0;
+      cy.window().then((win) => {
+        cy.stub(win.HTMLAnchorElement.prototype, 'click').callsFake(
+          function (this: HTMLAnchorElement) {
+            if (!this.download.endsWith('.png')) return;
+            const root = win.document.querySelector('#first-token-limits-export')!;
+            const svg = root.querySelector('svg[data-testid="d3-chart-svg"]')!;
+            const plot = svg.querySelector('clipPath rect')!;
+            const width = Number(plot.getAttribute('width'));
+            const height = Number(plot.getAttribute('height'));
+            expect(Number(svg.querySelector('.ft-x-title')!.getAttribute('x'))).to.eq(width / 2);
+            expect(Number(svg.querySelector('.ft-x-title')!.getAttribute('y'))).to.eq(height + 82);
+            for (const summary of svg.querySelectorAll('.ft-summary-who')) {
+              expect(Number(summary.getAttribute('y'))).to.eq(height + 40);
+            }
+            const bounds = svg.getBoundingClientRect();
+            expect(bounds.bottom).to.be.at.most(root.getBoundingClientRect().bottom);
+            downloads++;
+          },
+        );
+      });
+      (['16:9', '1:1'] as const).forEach((ratio, index) => {
+        cy.get('[data-testid="first-token-figure"] [data-testid="export-button"]').click();
+        cy.get('[data-testid="png-aspect-ratio"]').select(ratio);
+        cy.get('[data-testid="export-png-button"]').click();
+        cy.wrap(null, { timeout: 30000 }).should(() => {
+          expect(downloads).to.eq(index + 1);
+        });
+      });
+    });
+
     it('re-picks the winner when the legend isolates another chip', () => {
       cy.get('.sidebar-legend label').contains('B200').click();
       cy.get(BARS).should('have.attr', 'data-hw', 'b200_sglang');

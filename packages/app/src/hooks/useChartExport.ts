@@ -464,7 +464,7 @@ export function useChartExport({
         if (ratio !== 'auto') {
           // New D3 nodes need the same export styling as the original clone.
           for (const el of clone.querySelectorAll<HTMLElement>('.export-only')) {
-            el.style.display = 'block';
+            el.style.display = 'inline';
           }
           for (const el of clone.querySelectorAll<HTMLElement>('.no-export')) {
             el.style.display = 'none';

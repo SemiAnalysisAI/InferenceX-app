@@ -1011,6 +1011,7 @@ export default function ProfitEstimatorChart({
         layers={layers}
         tooltip={tooltip}
         onRender={onRender}
+        onExportRender={onRender}
         instructions=""
         legendElement={legendElement}
         caption={caption}

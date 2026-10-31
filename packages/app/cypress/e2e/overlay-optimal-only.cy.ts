@@ -79,6 +79,11 @@ describe('Overlay points follow Optimal Only on the selected axes', () => {
             const svg = exported.querySelector<SVGSVGElement>('[data-testid="d3-chart-svg"]')!;
             const bounds = svg.getBoundingClientRect();
             const frame = exported.getBoundingClientRect();
+            for (const span of exported.querySelectorAll('span.export-only')) {
+              expect(win.getComputedStyle(span).display, 'caption values stay inline').to.eq(
+                'inline',
+              );
+            }
             expect(bounds.bottom, 'entire plot fits above the footer').to.be.at.most(frame.bottom);
             expect(bounds.width / frame.width, 'plot uses the image width').to.be.greaterThan(0.85);
             expect(bounds.height / frame.height, 'plot uses the image height').to.be.greaterThan(
