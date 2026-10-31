@@ -1,7 +1,5 @@
 'use client';
 
-import { TcoBasisToggle } from '@/components/ui/tco-basis-toggle';
-
 import { ControlPanel } from '@/components/ui/control-panel';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 
@@ -25,7 +23,6 @@ import {
 } from '@/components/ui/chart-selectors';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
-import { isCostMetric } from '@/components/ui/chart-display-helpers';
 import { MultiSelect } from '@/components/ui/multi-select';
 import {
   Select,
@@ -73,7 +70,7 @@ import {
 } from '../measured-metric-config';
 import { XAxisModeSelector } from './XAxisModeSelector';
 import { TokenBasisToggle } from './TokenBasisToggle';
-import { showsTcoBasisSelector, Sequence, type Model } from '@/lib/catalog/data-mappings';
+import { Sequence, type Model } from '@/lib/catalog/data-mappings';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { DEFAULT_Y_AXIS_METRIC } from '@/lib/routing/url-state';
 
@@ -82,9 +79,6 @@ const STRINGS = {
     measuredPower: 'Measured Power',
     measuredEnergy: 'Measured Energy',
     measuredGroup: 'Measured',
-    tcoBasis: 'TCO Basis',
-    tcoBasisTooltip:
-      'Choose External customer pricing or Internal owner cost. Internal changes only hardware with a separate owner cost, currently TPUv7.',
     benchmarkControls: 'Benchmark Config',
     chartControls: 'Chart Config',
     compareHistory: 'Compare history',
@@ -127,9 +121,6 @@ const STRINGS = {
     measuredPower: '实测功率',
     measuredEnergy: '实测能耗',
     measuredGroup: '实测',
-    tcoBasis: 'TCO 口径',
-    tcoBasisTooltip:
-      '选择按外部客户价格还是内部持有成本计算 TCO。只有另有内部持有成本的硬件才会受影响，目前仅 TPUv7。',
     benchmarkControls: '基准测试配置',
     chartControls: '图表配置',
     compareHistory: '对比历史趋势',
@@ -188,7 +179,6 @@ const METRIC_TITLE_ZH_MAP = new Map(
 interface ChartControlsProps {
   hideGpuComparison?: boolean;
   tcoSource?: 'inference' | 'historical';
-  showTcoBasis?: boolean;
   showXAxisMode?: boolean;
   runContext?: ReactNode;
   /** PowerX: the Count / Per / Show as controls that stand in for the Y-axis metric pick. */
@@ -199,7 +189,6 @@ interface ChartControlsProps {
 export default function ChartControls({
   hideGpuComparison = false,
   tcoSource = 'inference',
-  showTcoBasis = false,
   showXAxisMode = false,
   runContext,
   powerXControls,
@@ -467,11 +456,6 @@ export default function ChartControls({
     tcoSource === 'inference' &&
     selectedSequence === Sequence.AgenticTraces &&
     countsInputTokens(selectedYAxisMetric);
-  const tcoVisible =
-    mounted &&
-    showTcoBasis &&
-    isCostMetric(selectedYAxisMetric) &&
-    showsTcoBasisSelector(selectedModel, selectedSequence);
   // Chart Config columns: the X-Axis Metric column is 11rem, or 18rem on agentic traces
   // where its options are longer, and the rest of the row shares what is left. PowerX
   // keeps the same first column and splits the rest in two, so its Count toggle (two
@@ -554,9 +538,7 @@ export default function ChartControls({
             data-testid="inference-chart-configuration"
             className={showXAxisMode ? 'lg:col-span-2' : undefined}
           >
-            <div
-              className={`grid min-w-0 items-start gap-3 ${chartConfigGridClass} ${tcoVisible && showXAxisMode && !powerXSurface ? 'xl:grid-cols-[11rem_minmax(0,1fr)_10rem]' : ''}`}
-            >
+            <div className={`grid min-w-0 items-start gap-3 ${chartConfigGridClass}`}>
               {powerXSurface && powerXControls
                 ? powerXControls({
                     // The More fold is one column: the cell fills it like Count and Per do.
@@ -610,13 +592,6 @@ export default function ChartControls({
                   compare={powerCompare}
                   onCompareChange={setPowerCompare}
                 />
-              )}
-
-              {tcoVisible && (
-                <div className="flex min-w-0 w-full max-w-48 flex-col gap-1.5 sm:col-span-2 xl:col-span-1">
-                  <LabelWithTooltip label={t.tcoBasis} tooltip={t.tcoBasisTooltip} />
-                  <TcoBasisToggle source={tcoSource} className="md:h-9" />
-                </div>
               )}
 
               {mounted && usesTokenSalePricing(selectedYAxisMetric) && (

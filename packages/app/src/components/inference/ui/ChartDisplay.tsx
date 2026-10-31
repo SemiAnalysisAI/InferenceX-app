@@ -135,6 +135,7 @@ import { MetricExplanation } from './MetricExplanation';
 import { OptionInfo } from '@/components/ui/option-info';
 import ChartControls from './ChartControls';
 import { CostTierSelector } from './CostTierSelector';
+import { TcoBasisCaption } from './TcoBasisCaption';
 import { InferenceTcoBadges } from './InferenceTcoBadges';
 import { XAxisModeSelector } from './XAxisModeSelector';
 import ComparisonChangelog from './ComparisonChangelog';
@@ -1281,6 +1282,13 @@ export default function ChartDisplay({
                             costTierControl={
                               embedded || minimalChrome ? undefined : <CostTierSelector />
                             }
+                            tcoBasis={
+                              <TcoBasisCaption
+                                hardwareKeys={captionHwKeys}
+                                source="inference"
+                                interactive={!embedded && !minimalChrome}
+                              />
+                            }
                             date={selectedRunDate}
                             dates={selectedDates}
                             dateRange={
@@ -1615,7 +1623,6 @@ export default function ChartDisplay({
                   <ChartControls
                     showXAxisMode
                     runContext={selectedGPUs.length === 0 ? <WorkflowInfoDisplay /> : undefined}
-                    showTcoBasis={[...captionHwKeys].some((key) => key.split('_')[0] === 'tpuv7')}
                     powerXControls={
                       powerXLayout && powerXMounted
                         ? (slots) => (

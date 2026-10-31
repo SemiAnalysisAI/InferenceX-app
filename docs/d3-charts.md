@@ -45,6 +45,15 @@ The footer retains the originating hostname and route and fits long links to
 the output width. This is presentation-only; API responses, skills, and benchmark
 data are unchanged.
 
+## Cost controls in the caption
+
+Inference and historical charts place TCO Basis immediately after Cost Tier
+below the graph. The model/scenario, cost-metric and visible-TPUv7 gates apply
+to official data and unofficial overlays. The shared caption field exports the
+selected basis as text; embedded charts do not expose interactive controls.
+This placement is presentation-only: `tcoBasis`, API responses, defaults and
+calculations are unchanged.
+
 ## Four Invalidation Phases
 
 One effect for every D3 operation takes roughly 500ms (React reconciliation ~200ms plus a full SVG update ~300ms). `D3Chart` separates structure, stable-identity data joins, metric coordinates, and display decoration. The most common interaction, switching the Y-axis metric, then takes roughly 100ms:
