@@ -74,6 +74,7 @@ The public operations require `version=1`:
 | [`/collectivex/latest`](https://inferencex.semianalysis.com/api/v1/collectivex/latest?version=1) | Newest stored run by run ID; only runs with a measured result are stored.        |
 | [`/collectivex/runs`](https://inferencex.semianalysis.com/api/v1/collectivex/runs?version=1)     | Retained summaries and `discovery_complete`; the helper uses this for selection. |
 | `/collectivex/runs/{runId}`                                                                      | One run dataset; a re-ingest of the same commit can replace its contents.        |
+| [`/collectivex/changelog`](https://inferencex.semianalysis.com/api/v1/collectivex/changelog?version=1) | The perf-changelog.yaml PR entries linked to stored runs, with each changed case's before/after p50. |
 
 All paths above are under `/api/v1`. Consult the [public API reference](https://inferencex.semianalysis.com/api)
 and [OpenAPI document](https://inferencex.semianalysis.com/api/openapi.json) for the

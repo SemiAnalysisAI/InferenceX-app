@@ -4,13 +4,10 @@ import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils';
 import type { DbClient } from './connection';
 import { createAdminSql } from './etl/db-utils';
 import {
-  changelogLinkRows,
   checkProvenance,
-  entriesForPrs,
-  fetchChangelog,
+  fetchEntries,
   type ChangelogLinkRow,
-  gitHubGet,
-  type GitHubGet,
+  linkRows,
   uncoveredCases,
 } from './collectivex/changelog';
 import {
@@ -131,84 +128,20 @@ export function describeUpload({ run, docs, plan }: UploadedRun): string {
   return `${lines.join('\n')}\n`;
 }
 
-/** The YAML parser of the Bun runtime the CLI runs under (the app ships no YAML dependency). */
-function bunYamlParse(text: string): unknown {
+/** The CLI runs under Bun, whose built-in YAML parser reads the changelog (the app has no YAML dependency). */
+function parseYaml(text: string): unknown {
   const bun = (globalThis as { Bun?: { YAML?: { parse: (source: string) => unknown } } }).Bun;
-  if (!bun?.YAML) throw new Error('reading the changelog needs the Bun runtime (Bun.YAML)');
+  if (!bun?.YAML) throw new Error('reading perf-changelog.yaml needs the Bun runtime');
   return bun.YAML.parse(text);
 }
 
-async function fetchText(url: string): Promise<string> {
-  const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
-  if (!response.ok) throw new Error(`${url} returned HTTP ${response.status}`);
-  return response.text();
-}
-
-export interface ChangelogSources {
-  github: GitHubGet;
-  fetchText: (url: string) => Promise<string>;
-  parseYaml: (text: string) => unknown;
-}
-
-const DEFAULT_SOURCES: ChangelogSources = {
-  github: gitHubGet(),
-  fetchText,
-  parseYaml: bunYamlParse,
-};
-
-/**
- * The changelog entries an upload publishes: every named PR is merged with an entry on main, the
- * entries together select every uploaded case, and the results were measured from each PR's code.
- */
-export async function planUploadLinks(
-  planned: Awaited<ReturnType<typeof planUpload>>,
-  prs: number[],
-  sources: ChangelogSources = DEFAULT_SOURCES,
-): Promise<ChangelogLinkRow[]> {
-  const changelog = await fetchChangelog(sources.github, sources.fetchText, sources.parseYaml);
-  const entries = entriesForPrs(changelog.entries, prs);
-  const uncovered = uncoveredCases(entries, planned.upload.matrix, planned.upload.results);
-  if (uncovered.length > 0) {
-    throw new Error(
-      `the changelog entries of ${prs.map((pr) => `#${pr}`).join(', ')} do not select ` +
-        `${uncovered.length} uploaded case(s): ${uncovered.slice(0, 5).join(', ')}` +
-        `${uncovered.length > 5 ? ', ...' : ''}`,
-    );
-  }
-  for (const pr of prs) await checkProvenance(sources.github, pr, planned.run.source_sha);
-  return changelogLinkRows(
-    entries,
-    changelog.sha,
-    planned.run.matrix,
-    { runId: planned.run.run_id, docs: planned.docs },
-    planned.latest ? { runId: planned.latest.run_id, docs: planned.latest.docs } : null,
-  );
-}
-
-function firstPoint(points: [number, number][] | undefined) {
-  return points?.[0];
-}
-
-function lastPoint(points: [number, number][] | undefined) {
-  return points?.at(-1);
-}
-
 export function describeLinks(rows: ChangelogLinkRow[]): string {
-  const lines = ['Changelog entries to link:'];
-  for (const row of rows) {
-    lines.push(`  #${row.pr_number} (${row.date}): ${row.changes.length} selected case(s) changed`);
-    for (const change of row.changes.slice(0, 5)) {
-      const describe = (pick: typeof firstPoint) => {
-        const before = pick(change.before?.pair_period_p50_us);
-        const after = pick(change.after.pair_period_p50_us);
-        return after ? `T=${after[0]} ${before ? `${before[1]} -> ` : ''}${after[1]} us` : '';
-      };
-      const detail = [describe(firstPoint), describe(lastPoint)].filter(Boolean).join(', ');
-      lines.push(`    ${change.sku}/${change.case_id}${detail ? `: ${detail}` : ''}`);
-    }
-    if (row.changes.length > 5) lines.push(`    ... and ${row.changes.length - 5} more`);
-  }
-  return `${lines.join('\n')}\n`;
+  return rows
+    .map(
+      (row) =>
+        `  #${row.pr_number} (${row.date}): ${row.changes.length} selected case(s) changed\n`,
+    )
+    .join('');
 }
 
 /**
@@ -284,32 +217,38 @@ async function main(): Promise<void> {
       const previous = run.previous_run_id
         ? await getStoredCollectiveXRun(sql as unknown as DbClient, run.previous_run_id)
         : null;
-      const sources = DEFAULT_SOURCES;
-      const changelog = await fetchChangelog(sources.github, sources.fetchText, sources.parseYaml);
-      const entries = entriesForPrs(changelog.entries, args.prs);
+      const entries = await fetchEntries(args.prs, parseYaml);
+      // Runs uploaded before the rule predate it, so a provenance gap is reported, not refused.
       for (const pr of args.prs) {
-        // Back-filled runs predate the rule, so a provenance gap is reported, not refused.
-        await checkProvenance(sources.github, pr, run.source_sha).catch((error: unknown) =>
-          console.warn(`  warning: ${error instanceof Error ? error.message : String(error)}`),
+        await checkProvenance(pr, run.source_sha).catch((error: unknown) =>
+          console.warn(`  warning: ${String(error)}`),
         );
       }
-      const rows = changelogLinkRows(
+      const rows = linkRows(
         entries,
-        changelog.sha,
         run.matrix,
         { runId: run.run_id, docs: run.docs },
-        previous ? { runId: previous.run_id, docs: previous.docs } : null,
+        previous && {
+          runId: previous.run_id,
+          docs: previous.docs,
+        },
       );
       console.log(`This will link run ${run.run_id} to:\n${describeLinks(rows)}`);
-      if (!hasYesFlag() && !(await confirm('Continue? (y/N) '))) {
-        console.log('Aborted.');
-        return;
-      }
-      console.log(`  linked ${await upsertCollectiveXChangelogLinks(sql, rows)} entries`);
+      if (!hasYesFlag() && !(await confirm('Continue? (y/N) '))) return;
+      await upsertCollectiveXChangelogLinks(sql, rows);
       wrote = true;
     } else {
       const planned = await planUpload(sql as unknown as DbClient, args.dir);
-      const links = await planUploadLinks(planned, args.prs);
+      const entries = await fetchEntries(args.prs, parseYaml);
+      const uncovered = uncoveredCases(entries, planned.upload.matrix, planned.upload.results);
+      if (uncovered.length > 0) throw new Error(`no --pr entry selects ${uncovered.join(', ')}`);
+      for (const pr of args.prs) await checkProvenance(pr, planned.run.source_sha);
+      const links = linkRows(
+        entries,
+        planned.run.matrix,
+        { runId: planned.run.run_id, docs: planned.docs },
+        planned.latest && { runId: planned.latest.run_id, docs: planned.latest.docs },
+      );
       console.log(describeUpload(planned));
       console.log(describeLinks(links));
       if (planned.run.summary.measured_cases === 0) {

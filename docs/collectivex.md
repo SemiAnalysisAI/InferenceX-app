@@ -90,24 +90,17 @@ rebuild a deleted run.
 
 ## Changelog
 
-Every PR that changes what CollectiveX measures appends an entry to
-`collectivex/perf-changelog.yaml` in InferenceX: the PR link, the date, the pools it affects and
-optional suite, backend, mode, phase, EP-size and precision selectors, with English and Chinese
-descriptions (InferenceX's `collectivex/changelog.py` and CI validate it). An upload must name the
-merged PRs it publishes with `--pr`. The CLI reads the file from InferenceX `main` (Bun's built-in
-YAML parser; the app has no YAML dependency) and refuses the upload unless:
-
-- every named PR is merged and has an entry on `main`;
-- the entries together select every uploaded case;
-- the results' `source_sha` is one of each PR's commits or contains its merge commit (checked
-  through the GitHub API, with `GITHUB_TOKEN` when set).
-
-It then stores each entry in `cx_changelog_entries` against the new run, with `changes`: for every
-case the entry selects whose document this run changed, the previous and new status, kernel
-generation, library version and pair-period p50 per token count. A PR published pool by pool
-links to several runs. `--link-run <run_id> --pr <n>` links entries to a run already stored,
-comparing it with the run before it; it reports a provenance gap instead of refusing, for runs
-uploaded before this rule. The dashboard does not read the table yet.
+Every PR that changes what CollectiveX measures appends an entry to InferenceX
+`collectivex/perf-changelog.yaml`: the PR link, the date, the pools it affects, optional suite,
+backend, mode, phase, EP-size and precision selectors, and a description. An upload must name the
+merged PRs it publishes with `--pr`. The CLI reads the file from InferenceX `main` (with Bun's YAML
+parser) and refuses the upload unless every PR has an entry, the entries select every uploaded case,
+and the results' `source_sha` is one of each PR's commits or contains its merge commit (GitHub API,
+`GITHUB_TOKEN` when set). Each entry is stored in `cx_changelog_entries` against the run, with
+`changes`: the previous and new status, kernel generation, library version and pair-period p50 of
+every selected case the run changed. `--link-run <run_id> --pr <n>` links a stored run, comparing
+it with the run before it, and only warns on a provenance gap. `GET /api/v1/collectivex/changelog`
+serves the entries, and the CollectiveX page lists them under the support matrix.
 
 ## Operator runbook
 

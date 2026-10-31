@@ -2090,6 +2090,83 @@ export const apiOperations: readonly ApiOperation[] = [
     curlUrl: `${API_BASE_URL}/api/v1/collectivex/runs?version=1`,
   },
   {
+    id: 'list-collectivex-changelog',
+    group: 'collectivex',
+    method: 'GET',
+    path: '/api/v1/collectivex/changelog',
+    summary: text('List CollectiveX changelog entries', '列出 CollectiveX 变更记录'),
+    description: text(
+      'Returns the InferenceX collectivex/perf-changelog.yaml entries linked to stored runs, newest first: one row per run and entry, with the pair-period p50 before and after for every selected case that run changed.',
+      '按从新到旧返回已关联到已存储运行的 InferenceX collectivex/perf-changelog.yaml 记录：每个运行与记录一行，并附上该运行改变的每个被选中用例在之前和之后的 pair-period p50。',
+    ),
+    audience: 'public',
+    stability: 'beta',
+    parameters: [
+      parameter(
+        'version',
+        'query',
+        true,
+        'enum',
+        'CollectiveX contract version.',
+        'CollectiveX 契约版本。',
+        { type: 'integer', enum: [...COLLECTIVEX_VERSIONS] },
+        COLLECTIVEX_VERSIONS.at(-1) ?? 1,
+      ),
+    ],
+    responses: [
+      success(
+        'Version and linked changelog entries.',
+        '版本与已关联的变更记录。',
+        objectSchema({
+          version: integerSchema,
+          entries: arraySchema(
+            objectSchema({
+              run_id: stringSchema,
+              entry_index: integerSchema,
+              pr_number: integerSchema,
+              pr_link: stringSchema,
+              date: stringSchema,
+              pools: arraySchema(stringSchema),
+              selectors: anyObjectSchema,
+              description: stringSchema,
+              changes: arraySchema(anyObjectSchema),
+            }),
+          ),
+        }),
+        {
+          version: 1,
+          entries: [
+            {
+              run_id: '1793344844',
+              entry_index: 14,
+              pr_number: 4674,
+              pr_link: 'https://github.com/SemiAnalysisAI/InferenceX/pull/4674',
+              date: '2026-10-30',
+              pools: ['mi300x'],
+              selectors: { backends: ['uccl-ep'], modes: ['low-latency'], precisions: ['fp8'] },
+              description: "Model uccl-ep's in-kernel FP8 cast exactly in low-latency mode.",
+              changes: [],
+            },
+          ],
+        },
+      ),
+      errorResponse(
+        '400',
+        'version is missing or unsupported.',
+        'version 缺失或不受支持。',
+        'Unknown version',
+      ),
+      errorResponse(
+        '500',
+        'The changelog query failed.',
+        '变更记录查询失败。',
+        'Internal server error',
+      ),
+    ],
+    responseShapeName: 'CollectiveXChangelog',
+    curlUrl: `${API_BASE_URL}/api/v1/collectivex/changelog?version=1`,
+  },
+  {
     id: 'get-collectivex-run',
     group: 'collectivex',
     method: 'GET',

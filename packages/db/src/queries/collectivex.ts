@@ -234,33 +234,36 @@ export async function getStoredCollectiveXRun(
 export async function upsertCollectiveXChangelogLinks(
   sql: Sql,
   rows: ChangelogLinkRow[],
-): Promise<number> {
-  let written = 0;
+): Promise<void> {
   for (const row of rows) {
-    const result = await sql`
+    await sql`
       INSERT INTO cx_changelog_entries
-        (run_id, entry_index, pr_number, pr_link, date, pools, selectors, description,
-         description_zh, changelog_sha, changes)
+        (run_id, entry_index, pr_number, pr_link, date, pools, selectors, description, changes)
       VALUES
         (${row.run_id}, ${row.entry_index}, ${row.pr_number}, ${row.pr_link}, ${row.date},
-         ${sql.array(row.pools)}, ${row.selectors as never}::jsonb, ${row.description}, ${row.description_zh},
-         ${row.changelog_sha}, ${{ changes: row.changes } as never}::jsonb->'changes')
+         ${sql.array(row.pools)}, ${row.selectors as never}::jsonb, ${row.description},
+         ${{ changes: row.changes } as never}::jsonb->'changes')
       ON CONFLICT (run_id, entry_index) DO UPDATE SET
-        pr_number = EXCLUDED.pr_number,
-        pr_link = EXCLUDED.pr_link,
-        date = EXCLUDED.date,
-        pools = EXCLUDED.pools,
-        selectors = EXCLUDED.selectors,
-        description = EXCLUDED.description,
-        description_zh = EXCLUDED.description_zh,
-        changelog_sha = EXCLUDED.changelog_sha,
-        changes = EXCLUDED.changes,
-        linked_at = now()
-      RETURNING id
+        pr_number = EXCLUDED.pr_number, pr_link = EXCLUDED.pr_link, date = EXCLUDED.date,
+        pools = EXCLUDED.pools, selectors = EXCLUDED.selectors,
+        description = EXCLUDED.description, changes = EXCLUDED.changes, linked_at = now()
     `;
-    written += result.length;
   }
-  return written;
+}
+
+/** Every linked changelog entry of a version's runs, newest entry first. */
+export async function listCollectiveXChangelog(
+  sql: DbClient,
+  version: number,
+): Promise<ChangelogLinkRow[]> {
+  const rows = await sql`
+    SELECT e.run_id::text, e.entry_index, e.pr_number, e.pr_link,
+      to_char(e.date, 'YYYY-MM-DD') AS date, e.pools, e.selectors, e.description, e.changes
+    FROM cx_changelog_entries e JOIN cx_runs r ON r.run_id = e.run_id
+    WHERE r.version = ${version}
+    ORDER BY e.date DESC, e.entry_index DESC, e.run_id DESC
+  `;
+  return rows as unknown as ChangelogLinkRow[];
 }
 
 /** A stored run removed by a deletion. */

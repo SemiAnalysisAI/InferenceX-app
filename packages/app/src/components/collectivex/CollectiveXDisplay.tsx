@@ -27,6 +27,7 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import { CollectiveXChart } from './CollectiveXChart';
 import { CollectiveXSwapSection } from './CollectiveXSwapSection';
 import { CollectiveXKvSection } from './CollectiveXKvSection';
+import { CollectiveXChangelog } from './CollectiveXChangelog';
 import { CollectiveXSupportMatrices } from './CollectiveXSupportMatrices';
 import {
   collectiveXBackendLabel,
@@ -960,6 +961,7 @@ export default function CollectiveXDisplay() {
         </>
       )}
       <CollectiveXSupportMatrices series={combinedSeries} />
+      <CollectiveXChangelog version={version} />
     </section>
   );
 }
