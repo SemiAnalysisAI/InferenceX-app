@@ -46,6 +46,11 @@ TPUv7 data is visible. The API accepts the pricing basis independently of
 control visibility. It changes configured ownership costs, not measured
 throughput; explicit custom costs remain user-controlled.
 
+Inference and historical charts place TCO Basis beside Cost Tier in the caption
+below the graph, including eligible unofficial overlays. PNG captions retain the
+selected basis as text. This placement is presentation-only; it adds no API
+parameter and changes no defaults, returned values or visibility rules.
+
 ## Historical editorial articles
 
 The GLM-5.3 article at
