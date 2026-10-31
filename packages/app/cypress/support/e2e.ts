@@ -33,6 +33,9 @@ Cypress.on('window:before:load', (win) => {
   win.addEventListener('pageswap', skipCrossDocumentTransition);
   win.addEventListener('pagereveal', skipCrossDocumentTransition);
   try {
+    if (win.localStorage.getItem('theme') === null) {
+      win.localStorage.setItem('theme', 'dark');
+    }
     if (suppressLaunchModal) {
       win.localStorage.setItem(
         'inferencex-tpuv7-agentx-multiple-model-modal-dismissed',

@@ -48,7 +48,7 @@ const seo = (doc: Document) => [
   ...[...doc.querySelectorAll('h1, h2')].map((node) => node.textContent),
 ];
 
-describe('optional themes stay off the default page', () => {
+describe('optional themes stay off standard light/dark pages and embeds', () => {
   for (const route of ['/', '/zh']) {
     it(`${route} migrates a retired kart preference and keeps the toggle usable`, () => {
       const requests: string[] = [];
@@ -82,7 +82,6 @@ describe('optional themes stay off the default page', () => {
     ['dark', '/', 390],
     ['light', '/zh', 390],
     ['dark', '/zh', 1440],
-    ['default', '/', 390],
     ['system', '/zh', 1440],
   ] as const) {
     it(`${theme} ${route} at ${width}px does not load theme code, assets or fonts`, () => {
@@ -93,8 +92,7 @@ describe('optional themes stay off the default page', () => {
       cy.viewport(width, 900);
       cy.visit(route, {
         onBeforeLoad(win) {
-          if (theme === 'default') win.localStorage.removeItem('theme');
-          else win.localStorage.setItem('theme', theme);
+          win.localStorage.setItem('theme', theme);
           saveMediaOptIns(win, true);
         },
       });
@@ -174,7 +172,7 @@ describe('optional themes stay off the default page', () => {
     }
   });
 
-  it('reaches optional themes with ordinary clicks and preserves default-page cleanup and metadata', () => {
+  it('reaches optional themes with ordinary clicks and preserves standard-page cleanup and metadata', () => {
     cy.visit('/about', {
       onBeforeLoad(win) {
         win.localStorage.setItem('theme', 'light');
@@ -199,7 +197,7 @@ describe('optional themes stay off the default page', () => {
   });
 
   for (const route of ['/about', '/zh/about']) {
-    it(`${route} keeps the page and default toggle working when optional chunks fail`, () => {
+    it(`${route} keeps the page and theme toggle working when optional chunks fail`, () => {
       cy.viewport(1440, 900);
       cy.visit(route, {
         onBeforeLoad(win) {
