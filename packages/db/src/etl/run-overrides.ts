@@ -305,6 +305,18 @@ export const CHANGELOG_BACKFILLS: readonly ChangelogBackfill[] = [
       prLink: 'https://github.com/SemiAnalysisAI/InferenceX/pull/4511',
     },
   },
+  {
+    id: 'run-41085412898-restore-append-only',
+    reason:
+      'PR #4675 produced an append-only delta sweep, but conflict resolution with #4676 removed the marker before its artifacts were reused for merge ingestion.',
+    githubRunId: 41085412898,
+    runAttempt: 3,
+    baseRef: 'fcb4a75b563c5c14e4922f47c3d53ed14500acf2',
+    headRef: 'bd626adbc0fc2a61f0165a455a1242e87008c74b',
+    set: {
+      appendOnly: true,
+    },
+  },
 ];
 
 export type JsonValue =
