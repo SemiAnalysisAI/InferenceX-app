@@ -3,10 +3,62 @@ import { Card } from '@/components/ui/card';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { ShareButton } from '@/components/ui/share-button';
 import { registerAnalyticsClient } from '@/lib/analytics/analytics';
+import { addWatermark } from '@/hooks/useChartExport';
+import { getExportFooterStyle } from '@/lib/export/export-footer';
 import { GlobalFilterSelectionContext } from '@/providers/GlobalFilterContext';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
+import type { CSSProperties } from 'react';
 
 describe('ChartButtons', () => {
+  for (const theme of [
+    { name: 'light', background: '#ffffff', foreground: '#1e1e1e', pixel: [255, 255, 255, 255] },
+    { name: 'dark', background: '#131416', foreground: '#eaebec', pixel: [19, 20, 22, 255] },
+  ]) {
+    it(`exports the ${theme.name} footer with scoped colors and inherited typography`, () => {
+      cy.mount(
+        <div
+          id="footer-theme"
+          style={
+            {
+              '--background': theme.background,
+              '--foreground': theme.foreground,
+              fontFamily: 'serif',
+            } as CSSProperties
+          }
+        />,
+      );
+      cy.get('#footer-theme').then(async ($root) => {
+        const root = $root[0];
+        const style = getExportFooterStyle(root);
+        expect(style.fontFamily).to.eq('serif');
+        expect(style.color).to.eq(
+          theme.name === 'light' ? 'rgb(30, 30, 30)' : 'rgb(234, 235, 236)',
+        );
+        expect(root.childElementCount).to.eq(0);
+        const source = root.ownerDocument.createElement('canvas');
+        source.width = 1200;
+        source.height = 400;
+        const result = await addWatermark(source.toDataURL(), style.backgroundColor, style);
+        const image = new Image();
+        image.src = result;
+        await image.decode();
+        expect(image.width).to.eq(1200);
+        expect(image.height).to.eq(520);
+        const output = root.ownerDocument.createElement('canvas');
+        output.width = image.width;
+        output.height = image.height;
+        const ctx = output.getContext('2d')!;
+        ctx.drawImage(image, 0, 0);
+        expect([...ctx.getImageData(5, 450, 1, 1).data]).to.deep.eq(theme.pixel);
+        const textPixels = ctx.getImageData(100, 420, 1000, 60).data;
+        const hasText = textPixels.some(
+          (value, index) => index % 4 !== 3 && value !== theme.pixel[index % 4],
+        );
+        expect(hasText).to.eq(true);
+      });
+    });
+  }
+
   it('offers PNG sizing only inside the download menu, including PNG-only charts', () => {
     cy.mount(
       <div>
