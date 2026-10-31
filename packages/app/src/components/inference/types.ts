@@ -319,6 +319,7 @@ export interface ScatterGraphProps {
   yLabel: string;
   chartDefinition: ChartDefinition;
   caption?: React.ReactNode;
+  footer?: React.ReactNode;
   onShowTable?: () => void;
   showAllHardwareTypes?: boolean;
   hardwareConfigOverride?: HardwareConfig;

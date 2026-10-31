@@ -39,6 +39,7 @@ function D3ChartInner<T>(
     legendElement,
     noDataOverlay,
     caption,
+    footer,
     scrollablePlot,
     onRender,
     onExportRender,
@@ -163,6 +164,7 @@ function D3ChartInner<T>(
       legendElement={legendElement}
       noDataOverlay={noDataOverlay}
       caption={caption}
+      footer={footer}
       scrollablePlot={scrollablePlot}
     />
   );

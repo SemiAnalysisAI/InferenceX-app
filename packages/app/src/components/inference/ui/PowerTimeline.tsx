@@ -317,6 +317,7 @@ export interface PowerTimelineProps {
   data: InferenceData[];
   overlayData?: OverlayData;
   caption?: React.ReactNode;
+  footer?: React.ReactNode;
   comparison?: boolean;
   runNumbering?: Map<string, number>;
 }
@@ -888,6 +889,7 @@ export default function PowerTimeline({
   data,
   overlayData,
   caption,
+  footer,
   comparison = false,
   runNumbering: providedRunNumbering,
 }: PowerTimelineProps) {
@@ -1868,6 +1870,7 @@ export default function PowerTimeline({
           attachToLayer: 2,
         }}
         legendElement={legendElement}
+        footer={footer}
         caption={
           <>
             {caption}

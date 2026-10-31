@@ -143,6 +143,7 @@ export interface D3ChartWrapperProps {
   legendElement: React.ReactNode;
   noDataOverlay?: React.ReactNode;
   caption?: React.ReactNode;
+  footer?: React.ReactNode;
   instructions?: string;
   zoomEnabled?: boolean;
   testId?: string;
@@ -163,6 +164,7 @@ export function D3ChartWrapper({
   legendElement,
   noDataOverlay,
   caption,
+  footer,
   instructions,
   zoomEnabled = false,
   testId,
@@ -276,6 +278,7 @@ export function D3ChartWrapper({
       ) : (
         plot
       )}
+      {footer && <div data-slot="chart-footer">{footer}</div>}
     </div>
   );
 }

@@ -217,6 +217,7 @@ export interface D3ChartProps<T = any> {
   legendElement?: React.ReactNode;
   noDataOverlay?: React.ReactNode;
   caption?: React.ReactNode;
+  footer?: React.ReactNode;
   scrollablePlot?: { minWidth: number; label: string; enabled: boolean };
 
   onRender?: (ctx: RenderContext) => void;

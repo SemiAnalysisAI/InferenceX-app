@@ -225,6 +225,7 @@ const GPUGraph = React.memo(
     yLabel,
     chartDefinition,
     caption,
+    footer,
     overlayData,
     runNumbering: providedRunNumbering,
   }: ScatterGraphProps) => {
@@ -1346,6 +1347,7 @@ const GPUGraph = React.memo(
         testId="gpu-graph"
         grabCursor={true}
         caption={caption}
+        footer={footer}
         xScale={{ type: 'linear', domain: xExtent, nice: true }}
         yScale={{ type: logScale ? 'log' : 'linear', domain: yDomain, nice: true }}
         xAxis={{
