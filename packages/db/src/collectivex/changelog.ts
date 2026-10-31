@@ -95,6 +95,7 @@ export function parseChangelog(raw: unknown): ChangelogEntry[] {
 /** One cases.json requested case. */
 export interface RequestedCase {
   sku: string;
+  disposition?: unknown;
   case: Record<string, unknown> & { case_id?: unknown };
 }
 
@@ -103,8 +104,14 @@ export function requestedCases(matrix: unknown): RequestedCase[] {
   return Array.isArray(cases) ? (cases as RequestedCase[]) : [];
 }
 
+/** Whether the entry covers one runnable cases.json case (unsupported cases never run). */
 export function entrySelects(entry: ChangelogEntry, requested: RequestedCase): boolean {
-  if (!entry.pools.includes(requested.sku)) return false;
+  if (
+    (requested.disposition ?? 'runnable') !== 'runnable' ||
+    !entry.pools.includes(requested.sku)
+  ) {
+    return false;
+  }
   return (Object.keys(entry.selectors) as SelectorKey[]).every((key) =>
     entry.selectors[key]!.includes(requested.case[SELECTORS[key]] as string | number),
   );

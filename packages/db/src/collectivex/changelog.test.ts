@@ -93,6 +93,12 @@ describe('selection', () => {
     ]);
   });
 
+  it('never selects an unsupported case', () => {
+    expect(
+      entrySelects(entry, { ...requested('b300', 'deepep-v2', 16), disposition: 'unsupported' }),
+    ).toBe(false);
+  });
+
   it('names uploaded cases no entry selects, and PRs with no entry', () => {
     expect(
       uncoveredCases([entry], MATRIX, [
