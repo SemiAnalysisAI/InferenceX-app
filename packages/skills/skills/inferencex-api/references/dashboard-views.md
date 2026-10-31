@@ -33,6 +33,12 @@ add letterbox bars. The live chart, official and unofficial data,
 CSV/MP4 exports, share links, and read-only API responses do not change.
 API clients choose their own image dimensions.
 
+The chart footer omits the inference-optimization note and prefix-cache link.
+Selected ATOM series retain their complete disclaimer below the plot in every
+PNG layout, including unofficial overlays and history comparisons. These are
+presentation-only changes: benchmark data, cache-reuse views, and API parameters
+are unchanged.
+
 PNG 宽高比（自动 / 16:9 / 1:1）是下载菜单中仅用于图片导出的设置。固定宽高比
 会在离屏副本中重新布局图表，并为标题和来源页脚预留空间，不拉伸截图或添加边条。页面图表、官方及非官方
 数据、CSV/MP4 导出、分享链接和只读 API 响应均不变。API 客户端自行设置图片尺寸。

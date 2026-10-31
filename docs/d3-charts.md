@@ -15,6 +15,12 @@ assumptions, attribution, and the deployment notice below the plot and legend.
 The shared `D3Chart` / `D3ChartWrapper` `footer` slot keeps this context inside
 the chart's export root. PowerX retains its existing header layout.
 
+The inference footer omits the optimization note and prefix-cache navigation
+link. The complete ATOM disclaimer lives in the exportable chart footer whenever
+a selected official or unofficial series uses ATOM, including history comparisons.
+It appears below the plot in Auto, 16:9, and 1:1 PNG exports. Hidden ATOM series
+do not add the disclaimer.
+
 The download popover offers Auto, 16:9, and 1:1 for PNG export only. Auto retains
 the existing image dimensions. Fixed ratios lay out an offscreen clone at a
 1280×720 or 1000×1000 CSS-pixel frame (captured at 2× resolution). The exporter

@@ -125,8 +125,6 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import { PowerXTutorialCta } from '@/components/powerx/powerx-tutorial-cta';
 
 import { ATOM_FOOTNOTE_MARKER, AtomEngineFootnote } from '@/components/ui/atom-engine-footnote';
-import { AgenticOptimizationNote } from '@/components/inference/ui/AgenticOptimizationNote';
-import { CacheReuseLink } from '@/components/inference/ui/CacheReuseLink';
 import { OffloadHaloLegendKey } from '@/components/inference/ui/OffloadHaloLegendKey';
 import { ActiveQuickFilters } from '@/components/inference/ui/ActiveQuickFilters';
 import { ResultContext } from '@/components/ui/result-context';
@@ -1130,6 +1128,8 @@ export default function ChartDisplay({
               selectedGPUs.length > 0 &&
               ((selectedDateRange.startDate && selectedDateRange.endDate) ||
                 selectedDates.length > 0);
+            const powerXWherePanelsOnly =
+              powerXLayout && powerXTab === 'where' && powerCompare !== 'roles' && !isGpuComparison;
             const footerOverlay = overlayDataByChartType[graph.chartDefinition.chartType];
             const footerPoints = [
               ...graph.data,
@@ -1138,24 +1138,38 @@ export default function ChartDisplay({
             ];
             const hasOffloadHalo =
               showOffloadingLabel && footerPoints.some((point) => point.offload_mode === 'on');
-            const hasAtomSeries = footerPoints.some(
+            const footerOfficialRows = [
+              ...graph.data,
+              ...(graph.clippedData ?? []).map((entry) => entry.point),
+            ];
+            const footerOverlayRows = footerOverlay
+              ? {
+                  ...footerOverlay,
+                  data: [
+                    ...footerOverlay.data,
+                    ...(footerOverlay.clippedData ?? []).map((entry) => entry.point),
+                  ],
+                }
+              : footerOverlay;
+            const selectedFooterRows = isGpuComparison
+              ? visibleDateComparisonRows(footerOfficialRows, footerOverlayRows)
+              : visibleComparisonRows(footerOfficialRows, footerOverlayRows);
+            const hasAtomSeries = [
+              ...selectedFooterRows.officialRows,
+              ...selectedFooterRows.overlayRows,
+            ].some(
               (point) =>
                 point.framework !== undefined &&
                 getFrameworkLabel(point.framework).includes(ATOM_FOOTNOTE_MARKER),
             );
             const footerNotices =
-              hasOffloadHalo || isAgenticSequence || hasAtomSeries ? (
+              hasOffloadHalo || residentSequenceLengths ? (
                 <>
                   <div
                     data-testid="chart-status-notes"
                     className="flex flex-wrap items-center gap-x-5 gap-y-2"
                   >
                     {hasOffloadHalo && <OffloadHaloLegendKey />}
-                    {isAgenticSequence && <AgenticOptimizationNote />}
-                    {isAgenticSequence && !minimalChrome && <CacheReuseLink />}
-                    {hasAtomSeries && (
-                      <AtomEngineFootnote className="min-w-0 flex-[1_1_24rem] text-xs leading-5" />
-                    )}
                   </div>
                   {residentSequenceLengths && !minimalChrome && !powerXSurface && (
                     <p
@@ -1388,8 +1402,13 @@ export default function ChartDisplay({
                           {powerXSurface && chartContext}
                         </>
                       );
-                      const chartFooter = !powerXSurface && (
-                        <div className="mt-3">{chartContext}</div>
+                      const chartFooter = (!powerXSurface || hasAtomSeries) && (
+                        <div className="mt-3">
+                          {!powerXSurface && chartContext}
+                          {hasAtomSeries && (
+                            <AtomEngineFootnote className="mt-2 text-xs leading-5" />
+                          )}
+                        </div>
                       );
 
                       if (getViewMode(graphIndex) === 'table') {
@@ -1483,7 +1502,7 @@ export default function ChartDisplay({
                       // Where view: the caption stays at the top of the card and the chip
                       // comparison is the visual; the boundary curves live on Power draw
                       // under Count: All.
-                      if (powerXLayout && powerXTab === 'where' && powerCompare !== 'roles')
+                      if (powerXWherePanelsOnly)
                         return <div className="order-first">{chartCaption}</div>;
                       if (powerXLayout && powerXHeadroom) {
                         const { officialRows, overlayRows } = isGpuComparison
@@ -1543,6 +1562,9 @@ export default function ChartDisplay({
                               showRoles={powerCompare === 'roles'}
                               placement={powerCompare === 'roles' ? 'after' : 'before'}
                             />
+                            {powerXWherePanelsOnly && hasAtomSeries && (
+                              <AtomEngineFootnote className="mt-2 text-xs leading-5" />
+                            )}
                           </>
                         );
                       })()}
