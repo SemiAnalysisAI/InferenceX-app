@@ -5,6 +5,7 @@ import path from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { changelogLinkRows, parseChangelog } from '../collectivex/changelog';
 import { buildUploadedRun, validateResults } from '../collectivex/results-upload';
 import { makeRawMatrix, makeRawShard } from '../collectivex/test-fixture';
 import { planUpload } from '../ingest-collectivex';
@@ -15,7 +16,9 @@ import {
   getCollectiveXRun,
   getLatestCollectiveXRun,
   getMaxCollectiveXRunId,
+  getStoredCollectiveXRun,
   listCollectiveXRuns,
+  upsertCollectiveXChangelogLinks,
   upsertCollectiveXRun,
 } from './collectivex';
 
@@ -279,5 +282,50 @@ describe('migration 005', () => {
         first.docs,
       ),
     ).rejects.toThrow(/cx_runs_committed_run_id/u);
+  });
+});
+
+describe('CollectiveX changelog links', () => {
+  it('stores the entries a run publishes against it, and reads a run with its predecessor', async () => {
+    await upload([mi300x, mi325x], FIRST_AT);
+    const second = await upload([h200], SECOND_AT);
+    const stored = await getStoredCollectiveXRun(sql, second.run.run_id);
+    expect(stored?.previous_run_id).toBe(String(FIRST_AT.getTime() / 1000));
+
+    const entries = parseChangelog([
+      {
+        date: '2026-10-29',
+        'pr-link': 'https://github.com/SemiAnalysisAI/InferenceX/pull/4700',
+        pools: ['h200-dgxc'],
+        description: ['H200 change.'],
+        'description-zh': ['H200 改动。'],
+      },
+    ]);
+    const rows = changelogLinkRows(
+      entries,
+      'c'.repeat(40),
+      stored!.matrix,
+      { runId: stored!.run_id, docs: stored!.docs },
+      { runId: second.latest!.run_id, docs: second.latest!.docs },
+    );
+    expect(rows[0].changes.map((change) => [change.sku, change.before])).toEqual([
+      ['h200-dgxc', null],
+    ]);
+    expect(await upsertCollectiveXChangelogLinks(sql, rows)).toBe(1);
+    // Linking again refreshes the row instead of duplicating it.
+    expect(await upsertCollectiveXChangelogLinks(sql, rows)).toBe(1);
+    const linked =
+      await sql`SELECT run_id::text, pr_number, pools, changes FROM cx_changelog_entries`;
+    expect(linked).toHaveLength(1);
+    expect(linked[0]).toMatchObject({
+      run_id: second.run.run_id,
+      pr_number: 4700,
+      pools: ['h200-dgxc'],
+    });
+    expect((linked[0].changes as unknown[]).length).toBe(1);
+
+    // Deleting the run removes its links.
+    await deleteCollectiveXRun(sql, second.run.run_id);
+    expect(await sql`SELECT id FROM cx_changelog_entries`).toHaveLength(0);
   });
 });

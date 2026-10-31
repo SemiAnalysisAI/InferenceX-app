@@ -34,12 +34,27 @@ afterEach(() => {
 });
 
 describe('parseIngestArgs', () => {
-  it('uploads a results directory', () => {
-    expect(parseIngestArgs(['--dir', '/tmp/results', '--yes', '--no-ssl'])).toEqual({
+  it('uploads a results directory naming the PRs it publishes', () => {
+    expect(parseIngestArgs(['--dir', '/tmp/results', '--pr', '4692', '--yes', '--no-ssl'])).toEqual(
+      {
+        mode: 'upload',
+        dir: '/tmp/results',
+        prs: [4692],
+      },
+    );
+    expect(parseIngestArgs(['--dir=results', '--pr=1', '--pr', '2', '--pr', '1', '-y'])).toEqual({
       mode: 'upload',
-      dir: '/tmp/results',
+      dir: 'results',
+      prs: [1, 2],
     });
-    expect(parseIngestArgs(['--dir=results', '-y'])).toEqual({ mode: 'upload', dir: 'results' });
+  });
+
+  it('links changelog entries to a stored run', () => {
+    expect(parseIngestArgs(['--link-run', '1793344844', '--pr', '4674'])).toEqual({
+      mode: 'link',
+      runId: '1793344844',
+      prs: [4674],
+    });
   });
 
   it('deletes one named run', () => {
@@ -47,14 +62,18 @@ describe('parseIngestArgs', () => {
       mode: 'delete',
       runId: '1792039236',
     });
+    expect(() => parseIngestArgs(['--delete-run', '5', '--pr', '1'])).toThrow(/takes no --pr/u);
   });
 
-  it('needs exactly one of --dir and --delete-run', () => {
-    expect(() => parseIngestArgs([])).toThrow(/exactly one of --dir or --delete-run/u);
+  it('needs exactly one mode, and a PR for uploads and links', () => {
+    expect(() => parseIngestArgs([])).toThrow(/exactly one of --dir, --link-run or --delete-run/u);
     expect(() => parseIngestArgs(['--dir', 'r', '--delete-run', '5'])).toThrow(
-      /exactly one of --dir or --delete-run/u,
+      /exactly one of --dir, --link-run or --delete-run/u,
     );
-    expect(() => parseIngestArgs(['--dir', ''])).toThrow(/--dir needs a path/u);
+    expect(() => parseIngestArgs(['--dir', '', '--pr', '1'])).toThrow(/--dir needs a path/u);
+    expect(() => parseIngestArgs(['--dir', 'r'])).toThrow(/--pr <n>/u);
+    expect(() => parseIngestArgs(['--link-run', '5'])).toThrow(/--pr <n>/u);
+    expect(() => parseIngestArgs(['--dir', 'r', '--pr', 'x'])).toThrow(/Invalid PR number/u);
   });
 
   it('rejects malformed run ids', () => {

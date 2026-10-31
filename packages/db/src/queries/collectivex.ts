@@ -1,5 +1,6 @@
 import type { DbClient } from '../connection.js';
 import type { Sql } from '../etl/db-utils';
+import type { ChangelogLinkRow } from '../collectivex/changelog';
 import { buildDatasetFromNeutral } from '../collectivex/reader';
 import type { CollectiveXDataset, CollectiveXRunSummary } from '../collectivex/types';
 
@@ -200,6 +201,66 @@ export async function upsertCollectiveXRun(
   if (rows === null) return 'stale';
   if (rows.length === 0) return 'conflict';
   return rows[0].inserted ? 'inserted' : 'replaced';
+}
+
+/** A stored run (any version) with its documents, for linking changelog entries to it later. */
+export async function getStoredCollectiveXRun(
+  sql: DbClient,
+  runId: string,
+): Promise<(CollectiveXRunRow & { previous_run_id: string | null }) | null> {
+  const rows = await sql`
+    SELECT r.run_id::text, r.run_attempt, r.version,
+      to_char(r.generated_at at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as generated_at,
+      r.source_sha, r.source_branch, r.summary->>'source_repository' AS source_repository,
+      r.conclusion, r.matrix,
+      COALESCE(d.docs, '[]'::jsonb) AS docs,
+      (SELECT p.run_id::text FROM cx_runs p
+       WHERE p.version = r.version AND p.run_id < r.run_id
+       ORDER BY p.run_id DESC LIMIT 1) AS previous_run_id
+    FROM cx_runs r
+    LEFT JOIN LATERAL (
+      SELECT jsonb_agg(doc ORDER BY id) AS docs
+      FROM cx_run_docs
+      WHERE run_id = r.run_id AND run_attempt = r.run_attempt
+    ) d ON true
+    WHERE r.run_id = ${runId}
+  `;
+  if (rows.length === 0) return null;
+  const { previous_run_id, ...row } = rows[0] as Record<string, unknown>;
+  return { ...toRunRow(row), previous_run_id: (previous_run_id as string | null) ?? null };
+}
+
+/** Store (or refresh) the changelog entries a run publishes. */
+export async function upsertCollectiveXChangelogLinks(
+  sql: Sql,
+  rows: ChangelogLinkRow[],
+): Promise<number> {
+  let written = 0;
+  for (const row of rows) {
+    const result = await sql`
+      INSERT INTO cx_changelog_entries
+        (run_id, entry_index, pr_number, pr_link, date, pools, selectors, description,
+         description_zh, changelog_sha, changes)
+      VALUES
+        (${row.run_id}, ${row.entry_index}, ${row.pr_number}, ${row.pr_link}, ${row.date},
+         ${sql.array(row.pools)}, ${row.selectors as never}::jsonb, ${row.description}, ${row.description_zh},
+         ${row.changelog_sha}, ${{ changes: row.changes } as never}::jsonb->'changes')
+      ON CONFLICT (run_id, entry_index) DO UPDATE SET
+        pr_number = EXCLUDED.pr_number,
+        pr_link = EXCLUDED.pr_link,
+        date = EXCLUDED.date,
+        pools = EXCLUDED.pools,
+        selectors = EXCLUDED.selectors,
+        description = EXCLUDED.description,
+        description_zh = EXCLUDED.description_zh,
+        changelog_sha = EXCLUDED.changelog_sha,
+        changes = EXCLUDED.changes,
+        linked_at = now()
+      RETURNING id
+    `;
+    written += result.length;
+  }
+  return written;
 }
 
 /** A stored run removed by a deletion. */

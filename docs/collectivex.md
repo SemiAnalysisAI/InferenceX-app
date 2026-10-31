@@ -65,10 +65,12 @@ exactly the `cases.json` version, and no string holds an IPv4 address and no key
 machine (`host`, `hosts`, `hostname`, `nodelist`, `slurm_nodelist`, `master_addr`,
 case-insensitive). Each document is then assembled alone, so every failure names its file.
 
-- **CLI**: `bun run admin:db:ingest:collectivex (--dir <results-dir> | --delete-run <run_id>)
-[--yes] [--no-ssl]`. `--dir` reads and validates the directory, merges it over the latest
-  stored run, prints the plan (run_id, source sha, how many uploaded, replaced, kept and
-  dropped, each dropped case) and asks for confirmation unless `--yes` is given. It writes
+- **CLI**: `bun run admin:db:ingest:collectivex (--dir <results-dir> --pr <n>... |
+--link-run <run_id> --pr <n>... | --delete-run <run_id>) [--yes] [--no-ssl]`. `--dir` reads and
+  validates the directory, merges it over the latest stored run, links the run to the changelog
+  entries of the named PRs (see [Changelog](#changelog)), prints the plan (run_id, source sha,
+  how many uploaded, replaced, kept and dropped, each dropped case, and each entry with the cases
+  it changes) and asks for confirmation unless `--yes` is given. It writes
   through `DATABASE_COLLECTIVEX_WRITE_URL` and never prints that URL. `--delete-run` deletes
   one stored run and its documents. After a write, when `APP_URL` and
   `VERCEL_INVALIDATE_SECRET` are set, it purges the cache with
@@ -86,14 +88,36 @@ case-insensitive). Each document is then assembled alone, so every failure names
 There is no backfill and no prune: the results exist only in the database, so nothing can
 rebuild a deleted run.
 
+## Changelog
+
+Every PR that changes what CollectiveX measures appends an entry to
+`collectivex/perf-changelog.yaml` in InferenceX: the PR link, the date, the pools it affects and
+optional suite, backend, mode, phase, EP-size and precision selectors, with English and Chinese
+descriptions (InferenceX's `collectivex/changelog.py` and CI validate it). An upload must name the
+merged PRs it publishes with `--pr`. The CLI reads the file from InferenceX `main` (Bun's built-in
+YAML parser; the app has no YAML dependency) and refuses the upload unless:
+
+- every named PR is merged and has an entry on `main`;
+- the entries together select every uploaded case;
+- the results' `source_sha` is one of each PR's commits or contains its merge commit (checked
+  through the GitHub API, with `GITHUB_TOKEN` when set).
+
+It then stores each entry in `cx_changelog_entries` against the new run, with `changes`: for every
+case the entry selects whose document this run changed, the previous and new status, kernel
+generation, library version and pair-period p50 per token count. A PR published pool by pool
+links to several runs. `--link-run <run_id> --pr <n>` links entries to a run already stored,
+comparing it with the run before it; it reports a provenance gap instead of refusing, for runs
+uploaded before this rule. The dashboard does not read the table yet.
+
 ## Operator runbook
 
 **Upload results** from a cluster checkout after `collectivex/run.sh` finishes:
 
 1. Apply migrations once per schema change: `bun run admin:db:migrate:collectivex` (or run
    the workflow with no input).
-2. `bun run admin:db:ingest:collectivex --dir <path/to/collectivex/results>`, read the plan,
-   and confirm. Upload one `source_sha` at a time.
+2. `bun run admin:db:ingest:collectivex --dir <path/to/collectivex/results> --pr <n>`, naming
+   every merged PR the results publish, read the plan, and confirm. Upload one `source_sha` at a
+   time.
 3. If the CLI could not purge the cache, run the `Ingest CollectiveX Results` workflow with no
    input.
 
