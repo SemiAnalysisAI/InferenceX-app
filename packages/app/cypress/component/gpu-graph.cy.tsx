@@ -809,6 +809,7 @@ describe('GPU comparison with unofficial runs', () => {
   }) {
     const [activeDates, setActiveDates] = useState(new Set(ALL_SERIES));
     const [overlayHw, setOverlayHw] = useState(new Set(['b200']));
+    const [showOffloadingLabel, setShowOffloadingLabel] = useState(true);
     const value = createMockInferenceContextValues({
       hardwareConfig: hwConfig,
       selectedGPUs: ['h100'],
@@ -820,6 +821,8 @@ describe('GPU comparison with unofficial runs', () => {
       selectedPrecisions: [Precision.FP4],
       showLineLabels: true,
       ...context,
+      showOffloadingLabel,
+      setShowOffloadingLabel,
     });
     return (
       <UnofficialRunContext.Provider value={{ ...unofficial, activeOverlayHwTypes: overlayHw }}>
@@ -879,6 +882,31 @@ describe('GPU comparison with unofficial runs', () => {
       />,
     );
   };
+
+  it('toggles official and unofficial offload halos without removing history points', () => {
+    mountComparison(
+      createMockChartDefinition({ chartType: 'interactivity', y_tpPerGpu_roofline: 'upper_left' }),
+      [8, 16, 32].map((x) => ({ ...official(DATES[0], x, 300 - x), offload_mode: 'on' })),
+      [8, 16, 32].map((x) => ({ ...overlay(x, 400 - x), offload_mode: 'on' })),
+    );
+    cy.get('#gpu-overlay .offload-halo').should('have.length', 6);
+    cy.get('#gpu-overlay .unofficial-overlay-pt .offload-halo')
+      .first()
+      .should('have.attr', 'stroke', overlayRunColor(0));
+    cy.get('[data-testid="legend-advanced-toggle"]').click();
+    cy.get('#gpu-offloading-label').should('have.attr', 'data-state', 'checked').click();
+    cy.get('#gpu-overlay .offload-halo').should('not.exist');
+    cy.get('#gpu-overlay .dot-group').should('have.length', 3);
+    cy.get('#gpu-overlay .unofficial-overlay-pt').should('have.length', 3);
+    cy.get('#gpu-overlay .roofline-path').should('have.length.at.least', 2);
+    cy.get('#gpu-parallelism-labels').click();
+    cy.get('#gpu-overlay .offload-halo').should('not.exist');
+    cy.get('#gpu-offloading-label').click();
+    cy.get('#gpu-overlay .offload-halo').should('have.length', 6);
+    cy.get('#gpu-overlay .unofficial-overlay-pt .offload-halo')
+      .first()
+      .should('have.attr', 'stroke', overlayRunColor(0));
+  });
 
   it('keeps unofficial runs on the date comparison in the run color and dash', () => {
     mountComparison(

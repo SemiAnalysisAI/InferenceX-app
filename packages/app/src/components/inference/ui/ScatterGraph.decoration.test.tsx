@@ -113,7 +113,7 @@ describe('ScatterGraph toggle decoration', () => {
       ...baseInferenceState(),
       selectedSequence: 'agentic-traces',
     };
-    const { container, unmount } = mountChart({
+    const { container, rerender, unmount } = mountChart({
       data: [standard, mtp, mtpWithOffload, fixedMtp],
     });
     const groups = dotGroups(container);
@@ -124,6 +124,18 @@ describe('ScatterGraph toggle decoration', () => {
     expect(container.querySelector('[data-testid="spec-decode-marker-key"]')).toBeNull();
     expect(container.querySelector('[data-testid="offload-halo-key"]')).toBeNull();
     expect(container.querySelector('[data-testid="agentic-optimization-note"]')).toBeNull();
+    const positions = groups.map((group) => group.getAttribute('transform'));
+    const builds = rebuildCount();
+    inferenceState.current = { ...inferenceState.current, showOffloadingLabel: false };
+    rerender();
+    expect(container.querySelector('.offload-halo')).toBeNull();
+    expect(dotGroups(container)).toEqual(groups);
+    expect(groups.map((group) => group.getAttribute('transform'))).toEqual(positions);
+    expect(rebuildCount()).toBe(builds);
+    inferenceState.current = { ...inferenceState.current, showOffloadingLabel: true };
+    rerender();
+    expect(groups[2].querySelector('.offload-halo')).not.toBeNull();
+    expect(container.querySelectorAll('.offload-halo')).toHaveLength(1);
     unmount();
   });
 

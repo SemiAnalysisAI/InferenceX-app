@@ -384,7 +384,7 @@ describe('ScatterGraph unofficial overlays', () => {
       unofficialRunInfos: [{ id: '123', branch: 'test-branch', url: runUrl }],
     };
 
-    const { container, unmount } = mountChart({
+    const { container, rerender, unmount } = mountChart({
       overlayData: {
         data: overlayPoints,
         hardwareConfig: HARDWARE_CONFIG,
@@ -396,6 +396,16 @@ describe('ScatterGraph unofficial overlays', () => {
     expect(groups[0].querySelector('.offload-halo')).not.toBeNull();
     expect(groups[1].querySelector('.spec-decode-marker')).toBeNull();
     expect(groups[1].querySelector('.offload-halo')).toBeNull();
+    const haloColor = groups[0].querySelector('.offload-halo')!.getAttribute('stroke');
+    const positions = groups.map((group) => group.getAttribute('transform'));
+    inferenceState.current = { ...inferenceState.current, showOffloadingLabel: false };
+    rerender();
+    expect(container.querySelector('.offload-halo')).toBeNull();
+    expect([...container.querySelectorAll('.unofficial-overlay-pt')]).toEqual(groups);
+    expect(groups.map((group) => group.getAttribute('transform'))).toEqual(positions);
+    inferenceState.current = { ...inferenceState.current, showOffloadingLabel: true };
+    rerender();
+    expect(groups[0].querySelector('.offload-halo')!.getAttribute('stroke')).toBe(haloColor);
     unmount();
   });
 
