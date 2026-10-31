@@ -9,6 +9,7 @@ import { useChartZoom } from '@/hooks/useChartZoom';
 import { useResponsiveChartDimensions } from '@/hooks/useResponsiveChartDimensions';
 
 import type { ContinuousScale } from '../types';
+import { DEFAULT_CHART_MARGIN } from '../chart-setup';
 
 import { isBandScale, type BuiltScale } from './scale-builders';
 import type { D3ChartHandle, D3ChartProps } from './types';
@@ -19,7 +20,7 @@ function D3ChartInner<T>(
     chartId,
     data,
     height = 600,
-    margin,
+    margin = DEFAULT_CHART_MARGIN,
     watermark,
     testId,
     grabCursor = true,
@@ -153,6 +154,7 @@ function D3ChartInner<T>(
       tooltipRef={tooltipRef}
       setContainerRef={setContainerRef}
       dimensions={dimensions}
+      plotTop={margin.top}
       pinnedPoint={pinnedPoint}
       isPinned={isPinned}
       dismissTooltip={dismissTooltip}
