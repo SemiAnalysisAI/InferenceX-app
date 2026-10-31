@@ -52,15 +52,14 @@ const STRINGS = {
     bwY: 'Bandwidth (TB/s)',
     xAxis: 'Message Size',
     yMetric: 'Y-axis',
-    peakNote:
-      'MBU uses each device’s bandwidth reference. Huawei’s 1.6 TB/s references are qualified below.',
+    peakNote: 'MBU uses each device’s peak bandwidth.',
     methodology: 'Methodology',
     methodologyText:
       'NVIDIA/AMD: times b.copy_(a) on float32 tensors using triton.testing.do_bench; bandwidth = 2 * bytes / time (read + write). Power-of-two sizes from 8 B to 16 GiB.',
     huaweiMethodology:
       'Huawei: FP16 rotating source/destination pools of at least 512 MiB each, timed as full rotating-buffer NPU graph replays. Three processes, 360 observations per size; full copied-bit checks before/after each block. Graph time is amortized per copy, not isolated-copy latency. Protocols differ from the GPU curves. No physical HBM-traffic counters were collected. The 8 B–2 KiB points were added on 30 October with CANN 9.2.1 and 4 KiB slot spacing; touched payload may fit in cache. Points from 4 KiB upward retain the original CANN 9.1.0 run.',
     huaweiReference:
-      'Huawei MBU uses a 1,600 GB/s reference; the exact board bandwidth ceiling was not independently measured.',
+      'Huawei MBU uses the 1,638.4 GB/s peak (8 HBM stacks × 256 bits × 6.4 Gbps), which Huawei rounds to 1.6 TB/s.',
     amortized: 'Amortized graph copy time',
     source: 'Source',
     instructions:
@@ -86,13 +85,14 @@ const STRINGS = {
     bwY: '带宽（TB/s）',
     xAxis: '消息大小',
     yMetric: 'Y 轴',
-    peakNote: 'MBU 按各设备的带宽参考值计算。Huawei 的 1.6 TB/s 参考值及其限制见下文。',
+    peakNote: 'MBU 按各设备的峰值带宽计算。',
     methodology: '测试方法',
     methodologyText:
       'NVIDIA/AMD：使用 triton.testing.do_bench 计时 b.copy_(a)（float32 张量）；带宽 = 2 * bytes / time（读 + 写）。消息大小为 2 的幂次，从 8 B 到 16 GiB。',
     huaweiMethodology:
       'Huawei：源和目标分别使用至少 512 MiB 的 FP16 轮转缓冲池，每次计时覆盖完整缓冲池轮转的一次 NPU 图重放。每个大小在三个进程中共测量 360 次，每个测量块前后逐位校验全部拷贝结果。图执行时间按拷贝次数摊销，不代表单次独立拷贝延迟；与 GPU 曲线的测试协议不同，且未采集物理 HBM 流量计数器。8 B–2 KiB 的数据点于 10 月 30 日使用 CANN 9.2.1 补测，缓冲槽间距为 4 KiB，实际访问的数据可能驻留在缓存中。4 KiB 及以上的数据点仍沿用原 CANN 9.1.0 的测量结果。',
-    huaweiReference: 'Huawei 的 MBU 使用 1,600 GB/s 参考值，该板卡的确切带宽上限未经独立实测。',
+    huaweiReference:
+      'Huawei 的 MBU 按峰值带宽 1,638.4 GB/s 计算（8 个 HBM stack × 256 位 × 6.4 Gbps），Huawei 将其取整为 1.6 TB/s。',
     amortized: '摊销后的图拷贝时间',
     source: '数据来源',
     instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',

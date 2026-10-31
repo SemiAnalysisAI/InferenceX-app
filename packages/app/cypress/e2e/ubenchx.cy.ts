@@ -306,7 +306,7 @@ describe('Huawei copy-bandwidth evidence', () => {
       expect(body.memBw.gpus[0].rows[0].bytes).to.equal(8);
       expect(body.memBw.gpus[0].metadata.smallMessageExtension.cann).to.equal('9.2.1');
       expect(body.memBw.gpus[0].rows.at(-1).bytes).to.equal(17179869184);
-      expect(body.memBw.gpus[0].rows.at(-1).mbuPercent).to.be.closeTo(90.4545974, 0.0001);
+      expect(body.memBw.gpus[0].rows.at(-1).mbuPercent).to.be.closeTo(88.3345678, 0.0001);
       expect(body.smL2Distance.gpus).to.deep.equal([]);
       expect(body.tpcSkyline.gpus).to.deep.equal([]);
     });
