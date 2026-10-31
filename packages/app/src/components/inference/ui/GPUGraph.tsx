@@ -1158,7 +1158,12 @@ const GPUGraph = React.memo(
           marks.attr('transform', (d) => `translate(${xScale(d.x)},${yScale(d.y)})`);
           marks.select('.overlay-x').attr('stroke', (d) => overlayRunColor(overlayRunOf(d)));
           marks.each(function (d) {
-            renderOffloadHalo(d3.select(this), d, overlayRunColor(overlayRunOf(d)));
+            renderOffloadHalo(
+              d3.select(this),
+              d,
+              overlayRunColor(overlayRunOf(d)),
+              showOffloadingLabel,
+            );
           });
           updateLabels(zoomGroup);
 
@@ -1233,6 +1238,7 @@ const GPUGraph = React.memo(
       };
     }, [
       visibleOverlayPoints,
+      showOffloadingLabel,
       overlayRunOf,
       overlayData,
       showPointLabels,
@@ -1274,6 +1280,20 @@ const GPUGraph = React.memo(
       root.selectAll('.roofline-path').style('opacity', null);
     }, []);
 
+    const syncOffloadHalos = (group: RenderContext['layout']['zoomGroup']) => {
+      group.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (point) {
+        renderOffloadHalo(d3.select(this), point, 'var(--foreground)', showOffloadingLabel);
+      });
+      group.selectAll<SVGGElement, InferenceData>('.unofficial-overlay-pt').each(function (point) {
+        renderOffloadHalo(
+          d3.select(this),
+          point,
+          overlayRunColor(overlayRunOf(point)),
+          showOffloadingLabel,
+        );
+      });
+    };
+
     const decorateRender = (ctx: RenderContext) => {
       if (logScale) {
         const yScale = (ctx.renderedYScale ?? ctx.yScale) as d3.ScaleLogarithmic<number, number>;
@@ -1287,9 +1307,7 @@ const GPUGraph = React.memo(
       group
         .selectAll('.dot-group, .unofficial-overlay-pt, .roofline-path')
         .style('transition', 'opacity 150ms ease');
-      group.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (point) {
-        renderOffloadHalo(d3.select(this), point, 'var(--foreground)');
-      });
+      syncOffloadHalos(group);
     };
 
     if (data.length === 0 && overlayPoints.length === 0) {
@@ -1340,7 +1358,7 @@ const GPUGraph = React.memo(
         chartId={chartId}
         dataIdentity={dataIdentity}
         metricIdentity={metricIdentity}
-        displayIdentity={`${showPointLabels}:${useAdvancedLabels}:${showConcurrencyLabels}:${paletteIdentity}:${selectedPrecisions.join(',')}`}
+        displayIdentity={`${showPointLabels}:${useAdvancedLabels}:${showConcurrencyLabels}:${showOffloadingLabel}:${paletteIdentity}:${selectedPrecisions.join(',')}`}
         data={officialPoints}
         margin={CHART_MARGIN}
         watermark={getChartWatermark()}
@@ -1524,6 +1542,7 @@ const GPUGraph = React.memo(
           attachToLayer: 1,
         }}
         onDisplayUpdate={(ctx: RenderContext) => {
+          syncOffloadHalos(ctx.layout.zoomGroup);
           ctx.layout.zoomGroup
             .selectAll<SVGGElement, InferenceData>('.dot-group')
             .each(function (point) {

@@ -1567,7 +1567,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: 'd6cf9fe4b5ade6706ea4e32331b3148c17734a945dc95a8e6e6e738f7885ab7f',
+    sourceSha256: '6c864fc5f745a67104cdbbfac126da5908b5d54b66378ee1d1a47fc280efdb6e',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

@@ -66,8 +66,9 @@ GPU-count (`i_label`), parallelism (`i_advlabel`), and concurrency (`i_conclabel
 annotations are independent. Agentic and fixed-sequence charts default to curve
 labels on and point annotations off. Parallelism is available outside Advanced.
 The default-on Offloading Label control in Advanced uses `i_offloadlabel=0` to hide
-the dotted-circle “KV offload ON” footer key without hiding point halos or filtering
-results. It applies to official and unofficial data and GPU-history comparisons.
+both the dotted-circle “KV offload ON” footer key and the dotted halos around
+offloaded points, without hiding the points or filtering results. It applies to
+official and unofficial data, GPU-history comparisons, and chart exports.
 These are presentation-only controls: the read-only API and skills data contracts
 keep every benchmark row and offload field unchanged.
 

@@ -270,7 +270,8 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('label[for="scatter-offloading-label"]').should('have.text', 'Offloading Label');
     cy.get('#scatter-offloading-label').should('have.attr', 'data-state', 'checked').click();
     cy.get('[data-testid="offload-halo-key"]').should('not.exist');
-    cy.get('#chart-0 .offload-halo').should('have.length.at.least', 1);
+    cy.get('#chart-0 .offload-halo').should('not.exist');
+    cy.get('#chart-0 .dot-group').should('have.length.at.least', 1);
     cy.get('[data-testid="share-button"]').click();
     cy.get('[data-testid="share-url-input"]')
       .invoke('val')
@@ -281,7 +282,9 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
         cy.visit(String(url));
       });
     expandLegendAdvanced();
+    cy.get('#chart-0 .offload-halo').should('not.exist');
     cy.get('#scatter-offloading-label').should('have.attr', 'data-state', 'unchecked').click();
+    cy.get('#chart-0 .offload-halo').should('have.length.at.least', 1);
     cy.get('[data-testid="chart-notices-chart-0"] [data-testid="offload-halo-key"]').should(
       'be.visible',
     );
@@ -729,9 +732,11 @@ describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', ()
     expandLegendAdvanced();
     cy.get('#scatter-offloading-label').click();
     cy.get('[data-testid="offload-halo-key"]').should('not.exist');
+    cy.get('#chart-0 .offload-halo').should('not.exist');
     cy.get('#chart-0 .unofficial-overlay-pt').should('have.length.greaterThan', 0);
     cy.get('#scatter-offloading-label').click();
     cy.get('[data-testid="offload-halo-key"]').should('contain.text', 'KV offload ON');
+    cy.get('#chart-0 .unofficial-overlay-pt .offload-halo').should('have.length.at.least', 1);
   });
 
   it('e2e-normalized-interactivity mode shows suppression banner for unofficial-run overlays', () => {

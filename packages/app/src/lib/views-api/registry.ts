@@ -262,7 +262,7 @@ export const DASHBOARD_API_COVERAGE = {
   inference: {
     view: 'inference',
     exclusion:
-      'The same-SKU vLLM/SGLang confirmation dialog is a local presentation acknowledgement, not an API access restriction. best=true ranks across frameworks; best=false returns both without interactive consent state. GPU-count, parallelism, concurrency, line, gradient, and offloading labels are independent presentation settings with no API parameters. Offloading Label hides only the footer key; offload fields and benchmark rows remain unchanged.',
+      'The same-SKU vLLM/SGLang confirmation dialog is a local presentation acknowledgement, not an API access restriction. best=true ranks across frameworks; best=false returns both without interactive consent state. GPU-count, parallelism, concurrency, line, gradient, and offloading labels are independent presentation settings with no API parameters. Offloading Label hides the footer key and dotted point halos in charts and exports; plotted measurements, offload fields, and benchmark rows remain unchanged.',
   },
   'profit-estimator-per-gigawatt': { view: 'profit-estimator-per-gigawatt' },
   'profit-estimator': { view: 'profit-estimator' },

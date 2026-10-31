@@ -3147,6 +3147,7 @@ const ScatterGraph = React.memo(
                   d3.select(this),
                   d,
                   overlayRunColor(overlayRunIndex(d.run_url ?? null, runIndexByUrl)),
+                  showOffloadingLabel,
                 );
               });
 
@@ -3726,6 +3727,7 @@ const ScatterGraph = React.memo(
       pointLabelsVisible,
       useAdvancedLabels,
       showConcurrencyLabels,
+      showOffloadingLabel,
       buildPointId,
       overlayData,
       processedOverlayData,
@@ -3761,15 +3763,37 @@ const ScatterGraph = React.memo(
     const layersRef = useRef(layers);
     layersRef.current = layers;
 
+    const syncOffloadHalos = useCallback(
+      (zoomGroup: RenderContext['layout']['zoomGroup']) => {
+        zoomGroup.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (point) {
+          renderOffloadHalo(d3.select(this), point, 'var(--foreground)', showOffloadingLabel);
+        });
+        zoomGroup
+          .selectAll<SVGGElement, InferenceData>('.unofficial-overlay-pt')
+          .each(function (point) {
+            renderOffloadHalo(
+              d3.select(this),
+              point,
+              overlayRunColor(overlayRunIndex(point.run_url ?? null, runIndexByUrl)),
+              showOffloadingLabel,
+            );
+          });
+      },
+      [showOffloadingLabel, runIndexByUrl],
+    );
+
+    useLayoutEffect(() => {
+      const display = getDisplaySelection();
+      if (display) syncOffloadHalos(display.zoomGroup);
+    }, [getDisplaySelection, syncOffloadHalos]);
+
     const onExportRender = useCallback(
       (ctx: RenderContext) => {
         const { zoomGroup } = ctx.layout;
 
         zoomGroup.selectAll('.dot-group').style('transition', 'opacity 150ms ease');
 
-        zoomGroup.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (d) {
-          renderOffloadHalo(d3.select(this), d, 'var(--foreground)');
-        });
+        syncOffloadHalos(zoomGroup);
 
         avoidPointLabelCollisions(zoomGroup);
 
@@ -3787,6 +3811,7 @@ const ScatterGraph = React.memo(
         }
       },
       [
+        syncOffloadHalos,
         hardwareConfig,
         xScaleConfig._isLog,
         yScaleConfig.type,
