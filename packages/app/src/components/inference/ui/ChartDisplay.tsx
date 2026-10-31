@@ -1128,6 +1128,8 @@ export default function ChartDisplay({
               selectedGPUs.length > 0 &&
               ((selectedDateRange.startDate && selectedDateRange.endDate) ||
                 selectedDates.length > 0);
+            const powerXWherePanelsOnly =
+              powerXLayout && powerXTab === 'where' && powerCompare !== 'roles' && !isGpuComparison;
             const footerOverlay = overlayDataByChartType[graph.chartDefinition.chartType];
             const footerPoints = [
               ...graph.data,
@@ -1500,7 +1502,7 @@ export default function ChartDisplay({
                       // Where view: the caption stays at the top of the card and the chip
                       // comparison is the visual; the boundary curves live on Power draw
                       // under Count: All.
-                      if (powerXLayout && powerXTab === 'where' && powerCompare !== 'roles')
+                      if (powerXWherePanelsOnly)
                         return <div className="order-first">{chartCaption}</div>;
                       if (powerXLayout && powerXHeadroom) {
                         const { officialRows, overlayRows } = isGpuComparison
@@ -1560,7 +1562,7 @@ export default function ChartDisplay({
                               showRoles={powerCompare === 'roles'}
                               placement={powerCompare === 'roles' ? 'after' : 'before'}
                             />
-                            {powerXLayout && powerCompare !== 'roles' && hasAtomSeries && (
+                            {powerXWherePanelsOnly && hasAtomSeries && (
                               <AtomEngineFootnote className="mt-2 text-xs leading-5" />
                             )}
                           </>

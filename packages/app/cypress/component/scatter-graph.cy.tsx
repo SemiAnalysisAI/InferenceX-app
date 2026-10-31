@@ -2047,41 +2047,54 @@ describe('ChartDisplay responsive status notes', () => {
     cy.get('[data-testid="atom-engine-footnote"]').should('not.exist');
   });
 
-  it('retains the selected ATOM disclaimer below the PowerX Where panels', () => {
-    mountWithProviders(
-      <PowerXSurfaceProvider>
-        <ChartDisplay />
-      </PowerXSurfaceProvider>,
-      {
-        inference: {
-          selectedYAxisMetric: 'y_measuredAvgPower',
-          powerCompare: 'breakdown',
-          graphs: [
-            {
-              model: Model.DeepSeek_R1,
-              sequence: Sequence.AgenticTraces,
-              chartDefinition: defaultChartDef,
-              data: [createMockInferenceData({ framework: 'atom' })],
-            },
-          ],
+  for (const history of [false, true]) {
+    it(`shows one ATOM disclaimer in PowerX Where ${history ? 'history' : 'chip'} comparison`, () => {
+      mountWithProviders(
+        <PowerXSurfaceProvider>
+          <ChartDisplay />
+        </PowerXSurfaceProvider>,
+        {
+          inference: {
+            selectedYAxisMetric: 'y_measuredAvgPower',
+            powerCompare: 'breakdown',
+            selectedGPUs: history ? ['b200_trt'] : [],
+            selectedDates: history ? ['2025-03-01'] : [],
+            activeDates: new Set(['2025-03-01']),
+            graphs: [
+              {
+                model: Model.DeepSeek_R1,
+                sequence: Sequence.AgenticTraces,
+                chartDefinition: defaultChartDef,
+                data: [createMockInferenceData({ framework: 'atom' })],
+              },
+            ],
+          },
+          globalFilters: {},
+          unofficial: {},
         },
-        globalFilters: {},
-        unofficial: {},
-      },
-    );
-    cy.get('[data-testid="powerx-where-controls"]').should('be.visible');
-    cy.get('[data-testid="atom-engine-footnote"]')
-      .should('have.length', 1)
-      .and('have.text', atomDisclaimer)
-      .and('be.visible');
-    cy.get('[data-testid="chart-figure"]').should(($figure) => {
-      const panels = $figure[0].querySelector('[data-testid="power-analysis-panels"]')!;
-      const note = $figure[0].querySelector('[data-testid="atom-engine-footnote"]')!;
-      expect(note.getBoundingClientRect().top).to.be.at.least(
-        panels.getBoundingClientRect().bottom,
       );
+      cy.get('[data-testid="powerx-where-controls"]').should('be.visible');
+      cy.get('[data-testid="atom-engine-footnote"]')
+        .should('have.length', 1)
+        .and('have.text', atomDisclaimer)
+        .and('be.visible');
+      if (history) {
+        cy.get('#chart-0 [data-slot="chart-footer"] [data-testid="atom-engine-footnote"]').should(
+          'have.length',
+          1,
+        );
+        assertAtomPngExport('16:9');
+      } else {
+        cy.get('[data-testid="chart-figure"]').should(($figure) => {
+          const panels = $figure[0].querySelector('[data-testid="power-analysis-panels"]')!;
+          const note = $figure[0].querySelector('[data-testid="atom-engine-footnote"]')!;
+          expect(note.getBoundingClientRect().top).to.be.at.least(
+            panels.getBoundingClientRect().bottom,
+          );
+        });
+      }
     });
-  });
+  }
 });
 
 describe('ChartDisplay engine comparison guard', () => {
