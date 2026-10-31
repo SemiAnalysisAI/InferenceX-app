@@ -7,6 +7,47 @@ import { GlobalFilterSelectionContext } from '@/providers/GlobalFilterContext';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 
 describe('ChartButtons', () => {
+  it('offers PNG sizing only inside the download menu, including PNG-only charts', () => {
+    cy.mount(
+      <div>
+        <div id="png-only-chart" style={{ width: 300, height: 200 }}>
+          Chart content
+        </div>
+        <ChartButtons chartId="png-only-chart" analyticsPrefix="test" />
+      </div>,
+    );
+    cy.get('[data-testid="png-aspect-ratio"]').should('not.exist');
+    cy.get('[data-testid="export-button"]').click();
+    cy.get('[data-testid="png-aspect-ratio"]').should('have.value', 'auto');
+    for (const ratio of ['16:9', '1:1']) {
+      cy.get('[data-testid="png-aspect-ratio"]').select(ratio).should('have.value', ratio);
+      cy.get('#png-only-chart').should(($chart) => {
+        const bounds = $chart[0].getBoundingClientRect();
+        expect(bounds.width).to.eq(300);
+        expect(bounds.height).to.eq(200);
+      });
+    }
+    cy.get('[data-testid="export-button"]').click().click();
+    cy.get('[data-testid="png-aspect-ratio"]').should('have.value', '1:1');
+    cy.get('[data-testid="export-png-button"]').should('be.visible');
+    cy.get('[data-testid="export-csv-button"]').should('not.exist');
+  });
+
+  it('does not offer PNG sizing when image export is unavailable', () => {
+    cy.mount(
+      <ChartButtons
+        chartId="table-chart"
+        analyticsPrefix="test"
+        hideImageExport
+        onExportCsv={cy.stub()}
+      />,
+    );
+    cy.get('[data-testid="export-button"]').click();
+    cy.get('[data-testid="png-aspect-ratio"]').should('not.exist');
+    cy.get('[data-testid="export-png-button"]').should('have.attr', 'aria-disabled', 'true');
+    cy.get('[data-testid="export-csv-button"]').should('be.visible');
+  });
+
   describe('without CSV export', () => {
     beforeEach(() => {
       cy.mount(
@@ -171,6 +212,10 @@ describe('ChartButtons', () => {
       .and('have.attr', 'aria-label', '下载图表')
       .click();
     cy.get('[data-testid="export-png-button"]').should('contain.text', '下载 PNG');
+    cy.get('[data-testid="png-aspect-ratio"]')
+      .should('be.visible')
+      .and('have.attr', 'aria-label', 'PNG 宽高比')
+      .select('16:9');
     cy.get('[data-testid="export-csv-button"]').should('contain.text', '下载 CSV');
     cy.get('[data-testid="zoom-reset-button"]').should('have.attr', 'aria-label', '重置缩放');
   });
