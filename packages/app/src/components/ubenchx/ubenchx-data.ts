@@ -433,7 +433,7 @@ for (const [gpu, points] of Object.entries(huawei.curves)) {
     bandwidthReference: {
       gbps: 1638.4,
       source:
-        '950PR 128 GiB reference derived at 1638.4 GB/s: eight HBM stacks × 204.8 GB/s, from the card’s 3200 MHz HBM clock (npu-smi) and Huawei’s rounded 1.6 TB/s figure; not independently verified by memory-controller counters',
+        '950PR 128 GiB reference derived at 1638.4 GB/s: eight HBM stacks × 256 bits × 6.4 Gbps per pin, from the card’s 3200 MHz HBM clock (npu-smi) and Huawei’s rounded 1.6 TB/s figure; not independently verified by memory-controller counters',
     },
     rows: [...smallMessages.points, ...points].map((point) => ({
       bytes: point.size_bytes,
