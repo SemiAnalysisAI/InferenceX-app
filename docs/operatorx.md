@@ -174,6 +174,25 @@ skewed routing used the uniform estimate too (Qwen3.5 zipf s=1.2 on H100 reached
 因此少量低 token 数的切分 `natural` 用例在 router 集中路由时仍可能略高于 roofline（不超过 7%）。
 对比格式 2 之前，偏斜路由同样使用均匀估计（Qwen3.5 zipf s=1.2 在 H100 上达到 roofline 的 1.09 倍）。
 
+## Case labels and Metric vs size slices
+
+Case `shape` labels name everything that separates otherwise equal shapes: a split case
+appends its `parallel` axes (` · tp=8 ep=8`, in tp, dp, ep, dcp order) and a MoE case whose
+router does not pick top-k experts appends its selection kind (` · hash routing`). Metric vs size
+slices are the shape without the token count (MoE) or `N`/`K` plus any split (GEMM), followed by
+the precision label, so every point on a line is the same operation at a different size. Before
+comparison format 3, sharded and hash-routed DeepSeek-V4 and V4.1-Flash, MiniMax-M3 and Kimi-K3
+MoE cases shared a line with single-device top-k cases of the same shape (up to 10 cases at one
+token count). Router gate weights are counted at their stored `router.gate.dtype` width.
+
+中文：用例的 `shape` 标签会标出区分同形状用例的全部差异：切分用例追加其 `parallel` 维度
+（如 ` · tp=8 ep=8`，按 tp、dp、ep、dcp 顺序），router 不按 top-k 选择 expert 的 MoE 用例追加
+其选择方式（如 ` · hash routing`）。Metric vs size 的分组键为去掉 token 数的形状（MoE），或 `N`、`K`
+加上切分方式（GEMM），再加精度标签，因此同一条曲线上的点是同一个操作在不同规模下的结果。
+对比格式 3 之前，DeepSeek-V4、V4.1-Flash、MiniMax-M3 和 Kimi-K3 中切分或 hash 路由的 MoE 用例，
+会与同形状的单设备 top-k 用例画在同一条曲线上（同一 token 数下最多 10 个用例）。router gate
+权重按 `router.gate.dtype` 的实际存储宽度计算字节数。
+
 ## Default MoE workload
 
 When `workload` is absent or names no available workload (for example `workload=moe`), the MoE

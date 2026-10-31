@@ -1208,7 +1208,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/operatorx/visualization.ts',
-    sourceSha256: '2b05d3af345fe795b4262e4408f587f2d3f125de0461b3c6c4ce6f3124409635',
+    sourceSha256: '254d065ad3363fe986310bedd5b7db2802df08f2f769e2a6a850da38b6025c41',
     reviewArea: {
       en: 'OperatorX workload-resolved chart defaults and shared shape grouping used by UI and comparison API.',
       zh: 'OperatorX 按工作负载确定的图表默认值及形状分组，由 UI 与对比 API 共用。',
@@ -1248,7 +1248,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/operatorx/comparison-cache.ts',
-    sourceSha256: 'c90c5deed0213f7bd81bf4183815137eb02f91fca9e940a7fca7e0c55e8d8a6e',
+    sourceSha256: '82db8cd90b176c6f86328f64504f9417cd748788319dec43532d84d33a9b81f5',
     reviewArea: {
       en: 'Versioned ingest-time OperatorX projections and newest-first merge preserving statuses, source ordering and timeline provenance.',
       zh: 'OperatorX 写入时生成的版本化对比数据及最新优先合并规则，保留状态、来源顺序和时间线归属。',

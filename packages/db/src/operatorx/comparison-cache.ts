@@ -13,7 +13,7 @@ import {
  * Bump when persisted shape/derivation changes, then backfill existing runs.
  * Includes normalize, compare, describe, workloads, and model display mappings.
  */
-export const OPERATORX_COMPARISON_VERSION = 2;
+export const OPERATORX_COMPARISON_VERSION = 3;
 
 interface SelectedRow {
   row: ComparisonRow;

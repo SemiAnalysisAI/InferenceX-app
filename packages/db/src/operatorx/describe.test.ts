@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { touchedExperts, usefulBytes, usefulFlops } from './describe';
+import { opLabels, touchedExperts, usefulBytes, usefulFlops } from './describe';
 
 const operand = (dtype: string, group: number[], isStatic: boolean) => ({
   dtype,
@@ -153,5 +153,39 @@ describe('OperatorX touched experts by routing distribution', () => {
     const uniform = touchedExperts(512, 10, 256, { distribution: 'natural' })!;
     const skewed = touchedExperts(512, 10, 256, zipf(1.2))!;
     expect(skewed / uniform).toBeLessThan(0.72);
+  });
+});
+
+describe('OperatorX case labels', () => {
+  it('keeps the single-device top-k MoE label unchanged', () => {
+    expect(opLabels('moe', v41Flash(256)).shape).toBe('T=256 H=5120 E=384/top6 I=2304');
+  });
+
+  it('names the split so sharded variants of one shape stay distinguishable', () => {
+    expect(opLabels('moe', v41Flash(256, { ep: 8, tp: 8 })).shape).toBe(
+      'T=256 H=5120 E=384/top6 I=2304 · tp=8 ep=8',
+    );
+    expect(opLabels('moe', v41Flash(256, { dp: 8, ep: 8 })).shape).toBe(
+      'T=256 H=5120 E=384/top6 I=2304 · dp=8 ep=8',
+    );
+    expect(opLabels('gemm', gemm({ tp: 4 })).shape).toBe('128×4096×7168 · tp=4');
+    expect(opLabels('gemm', gemm()).shape).toBe('128×4096×7168');
+  });
+
+  it('names non-top-k expert selection', () => {
+    const hash = {
+      ...v41Flash(8),
+      router: { select: { kind: 'hash', vocab: 129280 }, gate: { dtype: 'bf16' } },
+    };
+    expect(opLabels('moe', hash).shape).toBe('T=8 H=5120 E=384/top6 I=2304 · hash routing');
+  });
+});
+
+describe('OperatorX router gate bytes', () => {
+  it('reads the router gate at its stored width', () => {
+    const withGate = (dtype: string) => ({ ...v41Flash(8), router: { gate: { dtype } } });
+    const extra = usefulBytes('moe', withGate('fp32'))! - usefulBytes('moe', withGate('bf16'))!;
+    // hidden x experts gate weights, 2 extra bytes each.
+    expect(extra).toBeCloseTo(5120 * 384 * 2, 3);
   });
 });

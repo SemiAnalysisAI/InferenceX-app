@@ -313,6 +313,10 @@ more distinct positive sizes, falling back to the existing largest slice.
 supported precision (null when none); `rooflineNormalized` is true. Missing/error/
 unsupported rows do not qualify the preferred slice. Explicit UI selections override
 these initial defaults; hardware visibility and measured values are unchanged.
+Case `shape` labels append the `parallel` split (` · tp=8 ep=8`) and non-top-k MoE expert
+selection (` · hash routing`). Slices drop only the token count (MoE) or M (GEMM), so a
+slice never mixes split layouts or router kinds; treat each slice as one operation swept
+over size. Router gate bytes use `router.gate.dtype`.
 
 The Median and best throughput panel sits beside Head to head and replaces Distribution per GPU; Metric vs size is last. Precision, Normalized, and Shared cases only controls map to `rooflinePrecision=bf16|fp8|fp4`, `rooflineHardware=<comma-separated keys>`, `rooflineNormalized=true|false`, and `rooflineSharedOnly=true|false` on `/api/v1/operatorx/compare?op=gemm`. Supplying any adds `rooflineSummary`. Defaults: workload precision, all hardware, normalized=true, sharedOnly=true.
 

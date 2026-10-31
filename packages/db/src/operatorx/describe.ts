@@ -32,9 +32,19 @@ export interface OpLabels {
   precision: string;
 }
 
+const PARALLEL_AXES = ['tp', 'dp', 'ep', 'dcp'];
+
+/** ` · tp=8 ep=8` for a split case, empty for one device; distinguishes otherwise equal shapes. */
+export function parallelLabel(a: Args): string {
+  const p = obj(a.parallel);
+  if (!p) return '';
+  const parts = PARALLEL_AXES.flatMap((k) => (p[k] === undefined ? [] : [`${k}=${String(p[k])}`]));
+  return parts.length > 0 ? ` · ${parts.join(' ')}` : '';
+}
+
 function gemmLabels(a: Args): OpLabels {
   return {
-    shape: `${a.m}×${a.n}×${a.k}`,
+    shape: `${a.m}×${a.n}×${a.k}${parallelLabel(a)}`,
     precision: `${describeOperand(a.a)} × ${describeOperand(a.b)} → ${a.out ?? 'bf16'}`,
   };
 }
@@ -48,7 +58,9 @@ function moeLabels(a: Args): OpLabels {
     dist && dist !== 'natural'
       ? ` · ${typeof dist === 'string' ? dist : `zipf s=${(obj(dist) ?? {}).s}`}`
       : '';
-  const shape = `T=${a.tokens} H=${a.hidden} E=${ex.num}/top${ex.top_k} I=${ex.inter}${latent}${distLabel}`;
+  const select = str(obj(obj(a.router)?.select)?.kind);
+  const selectLabel = select && select !== 'topk' ? ` · ${select} routing` : '';
+  const shape = `T=${a.tokens} H=${a.hidden} E=${ex.num}/top${ex.top_k} I=${ex.inter}${latent}${distLabel}${selectLabel}${parallelLabel(a)}`;
   const shared = obj(a.shared);
   const sharedW = shared?.w1;
   const precision = `a1 ${describeOperand(ex.a1)} · w ${describeOperand(ex.w1)}${sharedW ? ` · shared w ${describeOperand(sharedW)}` : ''}`;
@@ -223,7 +235,8 @@ function moeBytes(a: Args, t: number): number | null {
   const touched = touchedExperts(e, k, t, a.routing);
   if (touched === null) return null;
   let bytes = touched * (operandBytes(obj(ex.w1), 2 * i, w) + operandBytes(obj(ex.w2), w, i));
-  bytes += h * e * 2 + 2 * t * h * 2;
+  const gate = str(obj(obj(a.router)?.gate)?.dtype) ?? 'bf16';
+  bytes += h * e * (ELEMENT_BYTES[gate] ?? 2) + 2 * t * h * 2;
   if (num(ex.latent)) bytes += 2 * h * w * 2;
   const sh = obj(a.shared);
   if (sh && num(sh.count) && num(sh.inter)) {
