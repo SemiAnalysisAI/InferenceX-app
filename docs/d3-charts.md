@@ -25,6 +25,12 @@ The choice stays local to each download menu. It does not resize the live chart,
 change benchmark data or share links, or affect CSV and MP4 export. The
 presentation-only choice has no read-only API parameter.
 
+PNG and replay MP4 link footers resolve background, foreground, and font from
+the active export context rather than choosing a separate light/dark palette.
+The footer retains the originating hostname and route and fits long links to
+the output width. This is presentation-only; API responses, skills, and benchmark
+data are unchanged.
+
 ## Four Invalidation Phases
 
 One effect for every D3 operation takes roughly 500ms (React reconciliation ~200ms plus a full SVG update ~300ms). `D3Chart` separates structure, stable-identity data joins, metric coordinates, and display decoration. The most common interaction, switching the Y-axis metric, then takes roughly 100ms:

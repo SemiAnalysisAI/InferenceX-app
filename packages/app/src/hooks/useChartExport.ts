@@ -1,7 +1,11 @@
 import { useCallback, useState } from 'react';
 
 import { CHART_FONT_MINECRAFT, CHART_FONT_SANS } from '@/lib/d3-chart/typography';
-import { getExportFooterText } from '@/lib/export/export-footer';
+import {
+  drawExportFooter,
+  getExportFooterStyle,
+  type ExportFooterStyle,
+} from '@/lib/export/export-footer';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { hasDarkTheme } from '@/lib/themes/themes';
 import {
@@ -179,10 +183,6 @@ export function normalizeChartSvgWidthsForExport(root: HTMLElement): void {
   }
 }
 
-function watermarkFont(size: number): string {
-  return `bold ${size}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
-}
-
 function loadImage(src: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
     const img = new Image();
@@ -192,7 +192,11 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
   });
 }
 
-export async function addWatermark(chartDataUrl: string, bgColor: string): Promise<string> {
+export async function addWatermark(
+  chartDataUrl: string,
+  bgColor: string,
+  footerStyle: ExportFooterStyle = getExportFooterStyle(document.body),
+): Promise<string> {
   const img = await loadImage(chartDataUrl);
   if (!img) throw new Error('Could not decode the chart PNG');
 
@@ -211,22 +215,7 @@ export async function addWatermark(chartDataUrl: string, bgColor: string): Promi
 
   ctx.drawImage(img, 0, 0);
 
-  ctx.fillStyle = isDark ? '#1a1a2e' : '#f5f5f5';
-  ctx.fillRect(0, contentHeight, canvas.width, WATERMARK_HEIGHT);
-
-  const footerText = getExportFooterText();
-  let fontSize = 40;
-  ctx.font = watermarkFont(fontSize);
-  const maxTextWidth = canvas.width - 48;
-  const textWidth = ctx.measureText(footerText).width;
-  if (textWidth > maxTextWidth) {
-    fontSize = Math.max(16, Math.floor((fontSize * maxTextWidth) / textWidth));
-    ctx.font = watermarkFont(fontSize);
-  }
-  ctx.fillStyle = isDark ? '#aaa' : '#555';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(footerText, canvas.width / 2, contentHeight + WATERMARK_HEIGHT / 2);
+  drawExportFooter(ctx, footerStyle, canvas.width, contentHeight, WATERMARK_HEIGHT, 40);
 
   return canvas.toDataURL('image/png');
 }
@@ -429,6 +418,10 @@ export function useChartExport({
         }
 
         const resolvedExportFontFamily = getResolvedExportFontFamily();
+        const footerStyle = {
+          ...getExportFooterStyle(exportElement),
+          fontFamily: resolvedExportFontFamily,
+        };
 
         resolveCssVarsForExport(exportElement);
         inlineComputedFontFamilyForExport(exportElement, resolvedExportFontFamily);
@@ -487,7 +480,7 @@ export function useChartExport({
           },
         });
 
-        const dataUrl = await addWatermark(chartDataUrl, bgColor);
+        const dataUrl = await addWatermark(chartDataUrl, bgColor, footerStyle);
 
         const link = document.createElement('a');
         link.download = `${exportFileName || chartId}-${Date.now()}.png`;
