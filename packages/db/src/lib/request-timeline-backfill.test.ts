@@ -78,7 +78,6 @@ describe('convertLegacyRequestTimeline (PostgreSQL)', () => {
       values (3811, ${JSON.stringify(legacy)}::jsonb)
     `;
 
-    // Two requests per range: three range queries for five requests.
     const stored = await convertLegacyRequestTimeline(sql, 3811, 2);
     expect(stored.version).toBe(REQUEST_TIMELINE_VERSION);
     expect(stored.requestCount).toBe(5);
@@ -89,7 +88,6 @@ describe('convertLegacyRequestTimeline (PostgreSQL)', () => {
     expect(row.request_timeline_version).toBe(REQUEST_TIMELINE_VERSION);
     expect(row.request_count).toBe(5);
     expect(gunzipRequestTimeline(row.request_timeline_gz!)).toEqual(legacy);
-    // Conversion alone keeps the legacy copy; clearing it is opt-in.
     expect(row.request_timeline).toEqual(legacy);
   });
 
@@ -114,7 +112,6 @@ describe('convertLegacyRequestTimeline (PostgreSQL)', () => {
   });
 });
 
-/** Answer the header query, then each range query, from fixed responses. */
 function scriptedSql(headerCounts: number[], ranges: unknown[][]): Sql {
   const counts = [...headerCounts];
   const slices = [...ranges];
@@ -220,7 +217,6 @@ describe('dropVerifiedLegacyRequestTimeline', () => {
       insert into agentic_trace_replay (id, request_timeline)
       values (34, ${JSON.stringify(legacy)}::jsonb)
     `;
-    // One request's input length differs; version and request count match.
     const edited = timelineWith(5);
     edited.requests[3]!.isl = 1;
     await writeRequestTimelineGz(sql, 34, {
@@ -258,7 +254,6 @@ describe('dropVerifiedLegacyRequestTimeline', () => {
   it('keeps the legacy JSONB when the stored gzip is corrupt', async () => {
     const legacy = timelineWith(5);
     await convertedRow(36, legacy);
-    // Flip one byte in the middle of the deflate stream; the length is unchanged.
     await sql`
       update agentic_trace_replay
       set request_timeline_gz = set_byte(

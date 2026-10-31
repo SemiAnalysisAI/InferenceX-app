@@ -2,8 +2,6 @@ import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants'
 
 import { GENERATED_FAQ_DATA, type FaqItem } from '@/components/about/faq';
 
-/* ---------- FAQ content (Simplified Chinese) ---------- */
-
 export const FAQ_ITEMS_ZH: readonly FaqItem[] = [
   {
     id: 'faq-what-is-inferencex',
@@ -53,7 +51,7 @@ export const FAQ_ITEMS_ZH: readonly FaqItem[] = [
       '每兆瓦 token 吞吐量（tok/s/MW）',
       'P99 首 token 延迟（TTFT）',
       'AgentX 场景的端到端延迟、token 间延迟（ITL）、输出吞吐量、prefix cache 行为以及会话与子智能体执行情况',
-      '每百万 token 成本（总计、输入、输出）——涵盖超大规模云大批量自有和租赁定价',
+      '每百万 token 成本（总计、输入、输出）——涵盖超大规模云厂商批量采购的自有成本和租赁价格',
       '每 token 能耗（焦耳，总计、输入、输出）',
       '用户自定义成本和功耗计算',
     ],

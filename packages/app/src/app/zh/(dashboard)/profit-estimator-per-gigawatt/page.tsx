@@ -12,13 +12,11 @@ interface Props {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-/** Chinese sibling of `/profit-estimator`; opens on the tab's default model. */
 export default async function ZhProfitEstimatorPage({ searchParams }: Props) {
   const sp = await searchParams;
   const seed = resolveCalculatorUrlSeed(sp);
   return (
     <>
-      <ZhTabIntro tab="profit-estimator-per-gigawatt" />
       <ProfitEstimatorDisplay
         basis="gw-year"
         urlSeed={{
@@ -26,6 +24,7 @@ export default async function ZhProfitEstimatorPage({ searchParams }: Props) {
           model: seed.model ?? defaultRouteModel('profit-estimator-per-gigawatt'),
         }}
       />
+      <ZhTabIntro tab="profit-estimator-per-gigawatt" />
     </>
   );
 }

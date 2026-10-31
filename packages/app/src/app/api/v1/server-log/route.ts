@@ -158,7 +158,7 @@ export async function GET(request: NextRequest) {
       if (chunk === null) {
         return publicApiError(PUBLIC_API_ERRORS.notFound, 404);
       }
-      return cachedJson({ id, ...chunk });
+      return cachedJson(request, { id, ...chunk });
     }
 
     const serverLog =
@@ -170,7 +170,7 @@ export async function GET(request: NextRequest) {
       return publicApiError(PUBLIC_API_ERRORS.notFound, 404);
     }
 
-    return cachedJson(fileName === null ? { id, serverLog } : { id, fileName, serverLog });
+    return cachedJson(request, fileName === null ? { id, serverLog } : { id, fileName, serverLog });
   } catch (error) {
     console.error('Error fetching server log:', error);
     return publicApiError(PUBLIC_API_ERRORS.internal, 500);

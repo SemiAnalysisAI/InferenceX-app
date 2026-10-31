@@ -57,13 +57,9 @@ async function buildOverviewPageData(
   rowScope: OverviewRowScope = OVERVIEW_DEFAULT_ROW_SCOPE,
   hardwareRowScope: OverviewHardwareRowScope = OVERVIEW_DEFAULT_HARDWARE_ROW_SCOPE,
 ): Promise<OverviewPageData> {
-  // Each filter is a no-op outside its own comparison mode, so both run on
-  // every path and the active one is whichever the matrix is actually in.
   const scopeRows = (data: OverviewPageData): OverviewPageData =>
     applyOverviewHardwareRowScope(applyOverviewRowScope(data, rowScope), hardwareRowScope);
   const models = overviewModelsForScope(modelScope);
-  // Synthetic rows go through the same assemblers as the live path, so a
-  // contract drift breaks fixture tests instead of stranding the page.
   const currentRowsByModel = FIXTURES_MODE
     ? loadFixture<Record<string, BenchmarkRow[]>>('overview-rows')
     : await loadRowsByModel(models, getCachedBenchmarks);
@@ -79,10 +75,6 @@ async function buildOverviewPageData(
     );
   }
 
-  // Note (wenyao): the 30-day window must not move when inactive models are
-  // revealed — a maintenance model can still post occasional runs, and a newer
-  // one would silently shift the cost deltas already shown on default rows.
-  // Anchor the snapshot to the default models in every scope.
   const snapshotRows =
     modelScope === 'all'
       ? Object.fromEntries(
@@ -137,9 +129,6 @@ async function buildOverviewPageData(
   );
 }
 
-// v2: AgentX rows group above 8K/1K rows (#918). The assembled models array is
-// stored in the derived cache, so the display-order change needs a new key —
-// v1 entries keep serving the old order until they expire otherwise.
 const getCachedOverviewPageData = cachedDerivedData(buildOverviewPageData, 'overview-page-v2');
 
 export function getOverviewPageData(

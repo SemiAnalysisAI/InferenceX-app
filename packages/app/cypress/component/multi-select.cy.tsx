@@ -150,7 +150,6 @@ describe('MultiSelect', () => {
     cy.mount(<MultiSelectWrapper />);
     cy.get('[data-slot="select-trigger"]').click();
     cy.get('[data-slot="select-item"]').contains('NVIDIA H100 SXM').click();
-    // Badge should appear in the trigger area
     cy.get('[data-slot="select-trigger"]').within(() => {
       cy.contains('NVIDIA H100 SXM').should('be.visible');
     });
@@ -158,14 +157,11 @@ describe('MultiSelect', () => {
 
   it('deselecting removes badge', () => {
     cy.mount(<MultiSelectWrapper initial={['h100-sxm']} />);
-    // Badge should be visible initially
     cy.get('[data-slot="select-trigger"]').within(() => {
       cy.contains('NVIDIA H100 SXM').should('be.visible');
     });
-    // Open dropdown and click the selected item to deselect
     cy.get('[data-slot="select-trigger"]').click();
     cy.get('[data-slot="select-item"]').contains('NVIDIA H100 SXM').click();
-    // Badge should be gone, placeholder should return
     cy.contains('Select Chips...').should('be.visible');
   });
 
@@ -200,7 +196,6 @@ describe('MultiSelect', () => {
     cy.mount(<MultiSelectWrapper searchable={true} />);
     cy.get('[data-slot="select-trigger"]').click();
     cy.get('input[placeholder="Search..."]').type('MI300');
-    // Only AMD MI300X should be visible
     cy.get('[data-slot="select-item"]').should('have.length', 1);
     cy.get('[data-slot="select-item"]').contains('AMD MI300X').should('be.visible');
   });
@@ -208,9 +203,7 @@ describe('MultiSelect', () => {
   it('maxSelections prevents selecting more items', () => {
     cy.mount(<MultiSelectWrapper initial={['h100-sxm', 'h200-sxm']} maxSelections={2} />);
     cy.get('[data-slot="select-trigger"]').click();
-    // The counter should show 2 / 2 selected
     cy.contains('2 / 2 selected').should('be.visible');
-    // Unselected options should have opacity-50 (disabled appearance)
     cy.get('[data-slot="select-item"]')
       .contains('AMD MI300X')
       .parent()
@@ -219,10 +212,8 @@ describe('MultiSelect', () => {
 
   it('minSelections prevents deselecting below minimum', () => {
     cy.mount(<MultiSelectWrapper initial={['h100-sxm']} minSelections={1} />);
-    // Try to deselect via dropdown
     cy.get('[data-slot="select-trigger"]').click();
     cy.contains('[data-slot="select-item"]', 'NVIDIA H100 SXM').should('be.disabled');
-    // Should still be selected since we can't go below 1
     cy.get('[data-slot="select-trigger"]').within(() => {
       cy.contains('NVIDIA H100 SXM').should('be.visible');
     });
@@ -230,14 +221,11 @@ describe('MultiSelect', () => {
 
   it('clear all removes all selections', () => {
     cy.mount(<MultiSelectWrapper initial={['h100-sxm', 'h200-sxm']} />);
-    // Badges should be visible
     cy.get('[data-slot="select-trigger"]').within(() => {
       cy.contains('NVIDIA H100 SXM').should('be.visible');
       cy.contains('NVIDIA H200 SXM').should('be.visible');
     });
-    // Click clear all button
     cy.get('[aria-label="Clear all selections"]').click();
-    // Placeholder should return
     cy.contains('Select Chips...').should('be.visible');
   });
 
@@ -269,7 +257,6 @@ describe('MultiSelect', () => {
     );
     cy.get('[data-slot="select-trigger"]').click();
     cy.get('[data-slot="select-content"]').should('be.visible');
-    // Click outside the component
     cy.get('[data-testid="outside-area"]').click({ force: true });
     cy.get('[data-slot="select-content"]').should('not.exist');
   });

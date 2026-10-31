@@ -34,8 +34,6 @@ import { SUBAGENT_STATS_WINDOW_DAYS } from '@semianalysisai/inferencex-db/proxyt
 import { IDLE_GAP_CUTOFF_MS } from '@semianalysisai/inferencex-db/proxytrace/shared/wall-clock';
 import { snapshotNow } from '@/lib/agentic-workload-explorer/snapshot';
 
-// ── i18n ─────────────────────────────────────────────────────────
-
 const STRINGS = {
   en: {
     loading: 'Loading…',
@@ -46,7 +44,6 @@ const STRINGS = {
     sessions: 'Sessions',
     usd: 'USD',
     total: 'Total',
-    // Hourly token chart
     tokenVolumePerHour: 'Token Volume per Hour',
     final48h: '(final 48h)',
     hourlyTokenVolume: 'Hourly Token Volume',
@@ -54,25 +51,20 @@ const STRINGS = {
     cacheRead: 'Cache Read',
     cacheWrite: 'Cache Write',
     output: 'Output',
-    // Weekly sessions
     weeklySessionsByHarness: 'Weekly Sessions by Harness',
     noSessionsInSnapshot: (v: number) =>
       `No sessions with > 20 requests at trace v${v} in this snapshot`,
     weekOf: (label: string) => `Week of ${label}`,
-    // Hourly cost
     estimatedCostPerHour: 'Estimated Cost per Hour',
     hourlyCost: 'Hourly Cost',
     estCost: 'Est. Cost',
-    // CPU vs GPU pie
     p50CpuGpuTime: 'P50 CPU vs GPU Time',
     cpuTimeBetweenTurns: 'CPU (time between turns)',
     gpuE2eLatency: 'GPU (E2E latency)',
     p50Cpu: 'P50 CPU',
     p50Gpu: 'P50 GPU',
-    // Max concurrent subagents
     maxConcurrentSubagentsPerSession: 'Max Concurrent Subagents per Session',
     noEligibleSessions: 'No eligible sessions in this snapshot',
-    // RPS
     requestsPerSecond: 'Requests per Second',
     finalOfSnapshot: (label: string) => `(final ${label} of snapshot)`,
     requestsPerSecondYAxis: 'Requests / second',
@@ -84,7 +76,6 @@ const STRINGS = {
     totalRequests: 'Total Requests',
     bucketMinutes: (min: number) => `${min}m buckets`,
     bucketHours: (h: number) => `${h}h buckets`,
-    // Wall clock
     wallClockTitle: 'Wall Clock: Tool/CPU vs LLM/GPU vs Idle',
     wallClockFinal: (days: number) => `(final ${days}d, UTC)`,
     wallClockComposition: 'Wall Clock Composition',
@@ -96,12 +87,10 @@ const STRINGS = {
     agentBoth: 'Both',
     modeHours: 'Hours',
     modeShare: 'Share',
-    // Section headers
     traffic: 'Traffic',
     hourlyActivity: 'Hourly Activity',
     weeklySessions: 'Weekly Sessions',
     wallClock: 'Wall Clock',
-    // Histogram titles and axis labels
     islTotalDist: 'ISL Total Distribution',
     islTotalAxis: 'ISL Total Tokens (Cache Read + Cache Write + Input)',
     cacheReadDist: 'Cache Read Distribution',
@@ -143,13 +132,11 @@ const STRINGS = {
       `Max Concurrent Subagents per Session — Final ${days}d (> 20 reqs, trace v${v})`,
     maxConcurrentAxis: 'Peak Concurrent Subagents',
     bins: (n: number) => `${n} bins`,
-    // CpuGpuPie variant labels
     p50PrefillDecodeTime: 'P50 Prefill vs Decode Time',
     prefillTtft: 'Prefill (TTFT)',
     decodeE2eMinusTtft: 'Decode (E2E − TTFT)',
     p50Prefill: 'P50 Prefill',
     p50Decode: 'P50 Decode',
-    // Model-specific titles
     cpuGpuOpus47Fast: 'P50 CPU vs GPU Time — Opus 4.7 (fast mode)',
     cpuGpuOpus47NonFast: 'P50 CPU vs GPU Time — Opus 4.7 (non-fast)',
     cpuGpuOpus48Fast: 'P50 CPU vs GPU Time — Opus 4.8 (fast mode)',
@@ -179,7 +166,7 @@ const STRINGS = {
     cacheWrite: '缓存写入',
     output: '输出',
     weeklySessionsByHarness: '每周会话数（按 Harness）',
-    noSessionsInSnapshot: (v: number) => `当前快照中无超过 20 次请求且 trace v${v} 的会话`,
+    noSessionsInSnapshot: (v: number) => `当前快照中没有请求数超过 20 次且 trace 为 v${v} 的会话`,
     weekOf: (label: string) => `${label} 当周`,
     estimatedCostPerHour: '每小时预估成本',
     hourlyCost: '每小时成本',
@@ -202,11 +189,11 @@ const STRINGS = {
     totalRequests: '总请求数',
     bucketMinutes: (min: number) => `${min} 分钟分桶`,
     bucketHours: (h: number) => `${h} 小时分桶`,
-    wallClockTitle: '时钟时间：Tool/CPU vs LLM/GPU vs 空闲',
+    wallClockTitle: '墙钟时间：Tool/CPU vs LLM/GPU vs 空闲',
     wallClockFinal: (days: number) => `（最后 ${days} 天，UTC）`,
-    wallClockComposition: '时钟时间构成',
-    shareOfWallClock: '时钟时间占比',
-    wallClockHoursYAxis: '时钟时间（小时）',
+    wallClockComposition: '墙钟时间构成',
+    shareOfWallClock: '墙钟时间占比',
+    wallClockHoursYAxis: '墙钟时间（小时）',
     llmGpuLegend: 'LLM / GPU（E2E 延迟）',
     toolCpuLegend: 'Tool / CPU（客户端）',
     userIdleLegend: '用户空闲（对话间隔）',
@@ -216,7 +203,7 @@ const STRINGS = {
     traffic: '流量',
     hourlyActivity: '每小时活跃度',
     weeklySessions: '每周会话',
-    wallClock: '时钟时间',
+    wallClock: '墙钟时间',
     islTotalDist: 'ISL Total 分布',
     islTotalAxis: 'ISL 总 Token（Cache Read + Cache Write + Input）',
     cacheReadDist: 'Cache Read 分布',
@@ -247,7 +234,7 @@ const STRINGS = {
     tokensPerChunkAxis: '输出 Token / SSE Event（tok/chunk）',
     prefillShareTitle: 'Prefill 占 E2E 延迟比例（TTFT / E2E）',
     prefillShareAxis: 'TTFT / E2E（prefill 占延迟比例）',
-    interactivityDist: 'Interactivity 分布',
+    interactivityDist: '交互性分布',
     interactivityAxis: 'Interactivity（output tok/s/user）',
     sessionDurationTitle: (v: number) => `会话时长（> 20 次请求，trace v${v}）`,
     sessionDurationAxis: '会话时长（小时）',
@@ -276,16 +263,6 @@ const STRINGS = {
     gt20ReqsTrace: (v: number) => `（> 20 次请求，trace v${v}）`,
   },
 };
-
-// ── Lazy chart card scaffolding ───────────────────────────────────
-//
-// Each chart on the page is wrapped in a card that lazily fetches its own
-// dataset via `useGraphDataset`. The hook's ref is attached to the card's
-// outer div, so the dataset fetch only fires when the card scrolls within
-// ~300px of the viewport. Multiple cards requesting the same dataset
-// (e.g. all the `requestStats`-derived histograms) dedupe through the
-// hook's module-level cache, so the first visible card triggers and the
-// rest piggyback.
 
 function ChartSkeletonCard({ title }: { title?: string }) {
   const t = STRINGS[useLocale()];
@@ -342,11 +319,6 @@ function EmptyDataCard({ title }: { title: string }) {
   );
 }
 
-/**
- * Generic wrapper that takes a dataset key + a render function. The render
- * function only runs once the dataset has resolved. While loading or before
- * the card has scrolled into view, a skeleton is rendered.
- */
 function LazyDatasetCard<T>({
   datasetKey,
   ctx,
@@ -392,8 +364,6 @@ interface WeeklySessionRow {
 
 type WeeklySessionPoint = { week: string; total: number } & Record<Harness, number>;
 
-// One UTC day of wall-clock time split three ways (camelCased by jsonCamel
-// from getWallClockBreakdown's snake_case row).
 interface WallClockDay {
   day: string;
   agent: 'claude' | 'codex' | 'openai';
@@ -432,34 +402,27 @@ interface Bucket {
   count: number;
 }
 
-/** A percentile card value, precomputed server-side. */
 interface Percentile {
   label: string;
   value: number;
 }
 
-/** Pre-binned histogram payload from /api/graphs (see packages/db/src/stats.ts).
- *  `n` is values.length on the server — the count the title displays. */
 interface GraphHistogram {
   buckets: Bucket[];
   percentiles: Percentile[];
   n: number;
 }
 
-/** Pre-computed p50 pie payload (p50 of each series, in seconds) + n. */
 interface GraphPie {
   p50a: number;
   p50b: number;
   n: number;
 }
 
-/** One labeled concurrency bucket count (color re-attached client-side). */
 interface ConcurrencyBucket {
   label: string;
   value: number;
 }
-
-// ── Nice tick generation ──────────────────────────────────────────
 
 function niceNum(range: number, round: boolean): number {
   const exponent = Math.floor(Math.log10(range));
@@ -488,7 +451,6 @@ function generateTicks(min: number, max: number, targetCount: number): number[] 
   const spacing = niceNum(range / (targetCount - 1), true);
   const niceMin = Math.floor(min / spacing) * spacing;
   const ticks: number[] = [];
-  // Keep going until a tick reaches max, so the tallest bar is never clipped.
   for (let t = niceMin; t - spacing < max - spacing * 1e-9; t += spacing) {
     ticks.push(Math.round(t * 1e10) / 1e10);
   }
@@ -503,8 +465,6 @@ function formatAxisValue(v: number): string {
   if (v < 1) return v.toFixed(2);
   return v.toFixed(1);
 }
-
-// ── SVG Histogram Component ───────────────────────────────────────
 
 const CHART_WIDTH = 520;
 const CHART_HEIGHT = 200;
@@ -525,21 +485,10 @@ function Histogram({
 }: {
   buckets: Bucket[];
   color: string;
-  /** Percentile cards, precomputed server-side (label + value, already transformed). */
   percentiles: Percentile[];
   axisLabel: string;
-  /** Display format for percentile cards (with unit, e.g. "5.13 tok/chunk"). */
   format?: (v: number) => string;
-  /** Display format for x-axis tick labels (plain number; unit lives in axisLabel). */
   tickFormat?: (v: number) => string;
-  /**
-   * Which tail of the distribution is "the bad one". For latency-style
-   * metrics (lower = better) the slow tail lives at the high percentiles, so
-   * p99 is the bad tail — the default. For throughput-style metrics
-   * (higher = better, e.g. prefill speed, interactivity) the slow tail lives
-   * at the *low* percentiles (p1), so the coloring flips. Only affects the
-   * percentile-line coloring here; the percentile SET is chosen server-side.
-   */
   tailDirection?: 'high' | 'low';
   title?: string;
   exportFilename?: string;
@@ -552,16 +501,13 @@ function Histogram({
   const xMin = buckets[0].min;
   const xMax = buckets.at(-1)!.max;
 
-  // Y-axis ticks
   const yTicks = generateTicks(0, maxCount, 5);
   const yMax = yTicks.at(-1) || maxCount;
 
-  // X-axis ticks (sparse, nice round numbers)
   const xTicks = generateTicks(xMin, xMax, 10);
   const fmt = format || formatAxisValue;
   const tickFmt = tickFormat || formatAxisValue;
 
-  // Scale functions
   const sx = (v: number) => MARGIN.left + ((v - xMin) / (xMax - xMin || 1)) * PLOT_W;
   const sy = (v: number) => MARGIN.top + PLOT_H - (v / yMax) * PLOT_H;
 
@@ -571,6 +517,7 @@ function Histogram({
         <div className="flex justify-end mb-1">
           <ExportPngButton
             locale={locale}
+            analyticsChart={exportFilename?.replace(/\.png$/u, '') || 'histogram'}
             onClick={() => {
               if (svgRef.current) {
                 exportSvgToPng(svgRef.current, {
@@ -590,7 +537,6 @@ function Histogram({
         className="w-full"
         style={{ maxHeight: 220 }}
       >
-        {/* Y-axis grid lines and labels */}
         {yTicks.map((tv) => (
           <g key={`y-${tv}`}>
             {tv > 0 && (
@@ -620,7 +566,6 @@ function Histogram({
           </g>
         ))}
 
-        {/* Y-axis label */}
         <text
           x={12}
           y={MARGIN.top + PLOT_H / 2}
@@ -635,7 +580,6 @@ function Histogram({
           {t.requests}
         </text>
 
-        {/* Axes */}
         <line
           x1={MARGIN.left}
           y1={MARGIN.top}
@@ -655,7 +599,6 @@ function Histogram({
           strokeWidth={1}
         />
 
-        {/* Bars */}
         {buckets.map((bucket, i) => {
           const x = sx(bucket.min);
           const w = sx(bucket.max) - sx(bucket.min);
@@ -676,12 +619,9 @@ function Histogram({
           );
         })}
 
-        {/* Percentile lines */}
         {percentiles.map(({ label, value: val }) => {
           const px = sx(val);
           if (px < MARGIN.left || px > MARGIN.left + PLOT_W) return null;
-          // Color the "bad tail" red regardless of which direction it lives
-          // in — p99 for high-tail (latency), p1 for low-tail (throughput).
           const isBadTail = tailDirection === 'low' ? label === 'p1' : label === 'p99';
           const isWarnTail =
             tailDirection === 'low'
@@ -718,7 +658,6 @@ function Histogram({
           );
         })}
 
-        {/* X-axis ticks and labels */}
         {xTicks.map((tv) => {
           const x = sx(tv);
           if (x < MARGIN.left - 1 || x > MARGIN.left + PLOT_W + 1) return null;
@@ -749,7 +688,6 @@ function Histogram({
           );
         })}
 
-        {/* X-axis label */}
         <text
           x={MARGIN.left + PLOT_W / 2}
           y={CHART_HEIGHT - 2}
@@ -764,7 +702,6 @@ function Histogram({
         </text>
       </svg>
 
-      {/* Percentile stats */}
       <div className="grid grid-cols-5 gap-1.5 mt-3 pt-3 border-t border-border">
         {percentiles.map((p) => (
           <div
@@ -781,8 +718,6 @@ function Histogram({
     </div>
   );
 }
-
-// ── Hourly token volume chart ──────────────────────────────────────
 
 const HOURLY_COLORS = {
   input: '#6b7280',
@@ -867,7 +802,6 @@ function HourlyTokenChart({ data }: { data: HourlyToken[] }) {
         />
       </div>
       <svg ref={svgRef} viewBox={`0 0 ${CW} ${CH}`} className="w-full" style={{ maxHeight: 240 }}>
-        {/* Y-axis grid */}
         {yTicks.map((tv) => (
           <g key={`y-${tv}`}>
             {tv > 0 && (
@@ -897,7 +831,6 @@ function HourlyTokenChart({ data }: { data: HourlyToken[] }) {
           </g>
         ))}
 
-        {/* Y-axis label */}
         <text
           x={12}
           y={M.top + PH / 2}
@@ -912,7 +845,6 @@ function HourlyTokenChart({ data }: { data: HourlyToken[] }) {
           {t.tokens}
         </text>
 
-        {/* Axes */}
         <line
           x1={M.left}
           y1={M.top}
@@ -932,7 +864,6 @@ function HourlyTokenChart({ data }: { data: HourlyToken[] }) {
           strokeWidth={1}
         />
 
-        {/* Stacked bars */}
         {data.map((d, i) => {
           const x = M.left + (i / data.length) * PW;
           const input = Number(d.input);
@@ -940,7 +871,6 @@ function HourlyTokenChart({ data }: { data: HourlyToken[] }) {
           const cacheWrite = Number(d.cacheWrite);
           const output = Number(d.output);
 
-          // Stack from bottom: output, cacheWrite, cacheRead, input
           const segments = [
             { value: output, color: HOURLY_COLORS.output },
             { value: cacheWrite, color: HOURLY_COLORS.cacheWrite },
@@ -976,7 +906,6 @@ function HourlyTokenChart({ data }: { data: HourlyToken[] }) {
           );
         })}
 
-        {/* X-axis tick labels (every 6 hours) */}
         {data.map((d, i) => {
           const date = new Date(d.hour);
           const hour = date.getUTCHours();
@@ -1027,7 +956,6 @@ function HourlyTokenChart({ data }: { data: HourlyToken[] }) {
         })}
       </svg>
 
-      {/* Tooltip */}
       {tooltip && (
         <div
           className="fixed z-50 pointer-events-none rounded-md border border-border bg-surface p-2.5 shadow-lg"
@@ -1082,10 +1010,6 @@ function HourlyTokenChart({ data }: { data: HourlyToken[] }) {
   );
 }
 
-// ── Weekly sessions by harness chart ─────────────────────────────
-
-// Mirror the badge colors used on /sessions so the stacks read as
-// "the chip's color, but bigger".
 const HARNESS_COLORS: Record<Harness, string> = {
   'claude-code': '#f97316',
   codex: '#8b5cf6',
@@ -1111,8 +1035,6 @@ function pivotWeeklySessions(rows: WeeklySessionRow[]): WeeklySessionPoint[] {
 }
 
 function formatWeekLabel(week: string): string {
-  // Postgres ::date arrives as 'YYYY-MM-DD'. Parse as UTC midnight to avoid
-  // local-timezone shift bumping us into the wrong week.
   const d = new Date(`${week}T00:00:00Z`);
   return d.toLocaleDateString('en-US', {
     month: 'short',
@@ -1142,7 +1064,6 @@ function WeeklySessionsByHarnessChart({ data }: { data: WeeklySessionPoint[] }) 
   const yMax = yTicks.at(-1) || maxTotal;
   const sy = (v: number) => M.top + PH - (v / yMax) * PH;
 
-  // Center each bar inside its slot — 70% slot width, 15% gutter each side.
   const slotWidth = PW / Math.max(data.length, 1);
   const barWidth = Math.max(slotWidth * 0.7, 4);
   const slotX = (i: number) => M.left + i * slotWidth + (slotWidth - barWidth) / 2;
@@ -1161,8 +1082,6 @@ function WeeklySessionsByHarnessChart({ data }: { data: WeeklySessionPoint[] }) 
     </div>
   );
 
-  // Label every week when there are <= 12 bars; otherwise stride to keep
-  // labels readable. Always label the first and last bar.
   const labelStride = data.length > 12 ? Math.ceil(data.length / 12) : 1;
 
   return (
@@ -1199,7 +1118,6 @@ function WeeklySessionsByHarnessChart({ data }: { data: WeeklySessionPoint[] }) 
         </div>
       ) : (
         <svg ref={svgRef} viewBox={`0 0 ${CW} ${CH}`} className="w-full" style={{ maxHeight: 280 }}>
-          {/* Y-axis grid */}
           {yTicks.map((tv) => (
             <g key={`y-${tv}`}>
               {tv > 0 && (
@@ -1229,7 +1147,6 @@ function WeeklySessionsByHarnessChart({ data }: { data: WeeklySessionPoint[] }) 
             </g>
           ))}
 
-          {/* Y-axis label */}
           <text
             x={12}
             y={M.top + PH / 2}
@@ -1244,7 +1161,6 @@ function WeeklySessionsByHarnessChart({ data }: { data: WeeklySessionPoint[] }) 
             {t.sessions}
           </text>
 
-          {/* Axes */}
           <line
             x1={M.left}
             y1={M.top}
@@ -1264,7 +1180,6 @@ function WeeklySessionsByHarnessChart({ data }: { data: WeeklySessionPoint[] }) 
             strokeWidth={1}
           />
 
-          {/* Stacked bars in legend order, Claude Code on the bottom */}
           {data.map((d, i) => {
             const x = slotX(i);
             const segments = HARNESSES.map((key) => ({ key, value: d[key] }));
@@ -1275,8 +1190,6 @@ function WeeklySessionsByHarnessChart({ data }: { data: WeeklySessionPoint[] }) 
                 onMouseMove={(e) => setTooltip({ x: e.clientX, y: e.clientY, item: d })}
                 onMouseLeave={() => setTooltip(null)}
               >
-                {/* Invisible full-height hit target so tooltip works even on
-                  thin segments / empty stacks. */}
                 <rect x={x} y={M.top} width={barWidth} height={PH} fill="transparent" />
                 {segments.map((seg) => {
                   if (seg.value === 0) return null;
@@ -1299,7 +1212,6 @@ function WeeklySessionsByHarnessChart({ data }: { data: WeeklySessionPoint[] }) 
             );
           })}
 
-          {/* X-axis tick labels — week-starting date */}
           {data.map((d, i) => {
             const isEdge = i === 0 || i === data.length - 1;
             if (!isEdge && i % labelStride !== 0) return null;
@@ -1333,7 +1245,6 @@ function WeeklySessionsByHarnessChart({ data }: { data: WeeklySessionPoint[] }) 
         </svg>
       )}
 
-      {/* Tooltip */}
       {tooltip && (
         <div
           className="fixed z-50 pointer-events-none rounded-md border border-border bg-surface p-2.5 shadow-lg"
@@ -1360,8 +1271,6 @@ function WeeklySessionsByHarnessChart({ data }: { data: WeeklySessionPoint[] }) 
     </ExpandableChart>
   );
 }
-
-// ── Hourly cost chart ──────────────────────────────────────────────
 
 function HourlyCostChart({ data }: { data: HourlyToken[] }) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -1413,7 +1322,6 @@ function HourlyCostChart({ data }: { data: HourlyToken[] }) {
         />
       </div>
       <svg ref={svgRef} viewBox={`0 0 ${CW} ${CH}`} className="w-full" style={{ maxHeight: 200 }}>
-        {/* Y-axis grid */}
         {yTicks.map((tv) => (
           <g key={`y-${tv}`}>
             {tv > 0 && (
@@ -1443,7 +1351,6 @@ function HourlyCostChart({ data }: { data: HourlyToken[] }) {
           </g>
         ))}
 
-        {/* Y-axis label */}
         <text
           x={12}
           y={M.top + PH / 2}
@@ -1458,7 +1365,6 @@ function HourlyCostChart({ data }: { data: HourlyToken[] }) {
           {t.usd}
         </text>
 
-        {/* Axes */}
         <line
           x1={M.left}
           y1={M.top}
@@ -1478,7 +1384,6 @@ function HourlyCostChart({ data }: { data: HourlyToken[] }) {
           strokeWidth={1}
         />
 
-        {/* Bars */}
         {data.map((d, i) => {
           const cost = Number(d.cost);
           if (cost === 0) return null;
@@ -1501,7 +1406,6 @@ function HourlyCostChart({ data }: { data: HourlyToken[] }) {
           );
         })}
 
-        {/* X-axis tick labels (every 6 hours) */}
         {data.map((d, i) => {
           const date = new Date(d.hour);
           const hour = date.getUTCHours();
@@ -1552,7 +1456,6 @@ function HourlyCostChart({ data }: { data: HourlyToken[] }) {
         })}
       </svg>
 
-      {/* Tooltip */}
       {tooltip && (
         <div
           className="fixed z-50 pointer-events-none rounded-md border border-border bg-surface p-2.5 shadow-lg"
@@ -1584,8 +1487,6 @@ function HourlyCostChart({ data }: { data: HourlyToken[] }) {
   );
 }
 
-// ── P50 CPU vs GPU time pie chart ─────────────────────────────────
-
 function CpuGpuPieChart({
   p50a,
   p50b,
@@ -1599,9 +1500,7 @@ function CpuGpuPieChart({
   aColor = '#a855f7',
   bColor = '#10b981',
 }: {
-  /** P50 of series A (seconds), precomputed server-side. */
   p50a: number;
-  /** P50 of series B (seconds), precomputed server-side. */
   p50b: number;
   n: number;
   title?: string;
@@ -1794,28 +1693,22 @@ function CpuGpuPieChart({
   );
 }
 
-// ── Max concurrent subagents pie chart ───────────────────────────
-
 interface PieSlice {
   label: string;
   value: number;
   color: string;
 }
 
-/** Sequential palette from "0 = quiet" → "many = busy". Ordered so the
- *  pie reads as "how often is the session quiet vs hot?". Index-aligned with
- *  the 7 buckets `graphConcurrencyBuckets` (server-side) emits. */
 const CONCURRENCY_BUCKET_COLORS = [
-  '#475569', // 0     — slate (idle)
-  '#0ea5e9', // 1     — sky
-  '#06b6d4', // 2     — cyan
-  '#10b981', // 3     — emerald
-  '#f59e0b', // 4–5   — amber
-  '#f97316', // 6–10  — orange
-  '#f43f5e', // 11+   — rose
+  '#475569',
+  '#0ea5e9',
+  '#06b6d4',
+  '#10b981',
+  '#f59e0b',
+  '#f97316',
+  '#f43f5e',
 ];
 
-/** Re-attach the client-side palette to the server's labeled counts. */
 function concurrencySlices(buckets: ConcurrencyBucket[]): PieSlice[] {
   return buckets.map((b, i) => ({
     label: b.label,
@@ -1836,8 +1729,6 @@ function MaxConcurrentSubagentsPieChart({ slices }: { slices: PieSlice[] }) {
   const cy = CH / 2;
   const r = 90;
 
-  // Build sequential arcs. Special-case "only one bucket non-zero" to draw a
-  // full circle, since SVG's arc command can't span 360°.
   const nonZeroSlices = slices.filter((s) => s.value > 0);
   const arcs: { slice: PieSlice; path: string; midAngle: number; frac: number }[] = [];
   if (total > 0) {
@@ -1978,10 +1869,6 @@ function MaxConcurrentSubagentsPieChart({ slices }: { slices: PieSlice[] }) {
   );
 }
 
-// ── RPS timeseries chart ──────────────────────────────────────────
-
-/** Window size (in buckets) for the rolling average. Scales with bucket count
- *  so the line stays usefully smooth at every range. */
 function rollingWindow(pointCount: number): number {
   if (pointCount >= 144) return 9;
   if (pointCount >= 72) return 7;
@@ -2068,7 +1955,6 @@ function RpsTimeseriesChart({
   const bucketMin = data?.bucketMinutes ?? 0;
   const bucketLabel = bucketMin >= 60 ? t.bucketHours(bucketMin / 60) : t.bucketMinutes(bucketMin);
 
-  // Sparse x-axis ticks: aim for ~6 labels regardless of point count
   const tickInterval = Math.max(1, Math.floor(points.length / 6));
 
   const subtitle = (
@@ -2158,7 +2044,6 @@ function RpsTimeseriesChart({
             className="w-full"
             style={{ maxHeight: 260 }}
           >
-            {/* Y-axis grid lines */}
             {yTicks.map((tv) => (
               <g key={`y-${tv}`}>
                 {tv > 0 && (
@@ -2188,7 +2073,6 @@ function RpsTimeseriesChart({
               </g>
             ))}
 
-            {/* Y-axis label */}
             <text
               x={12}
               y={M.top + PH / 2}
@@ -2203,7 +2087,6 @@ function RpsTimeseriesChart({
               {t.requestsPerSecondYAxis}
             </text>
 
-            {/* Axes */}
             <line
               x1={M.left}
               y1={M.top}
@@ -2223,7 +2106,6 @@ function RpsTimeseriesChart({
               strokeWidth={1}
             />
 
-            {/* Bars (raw RPS per bucket) */}
             {points.map((p, i) => {
               if (p.rps === 0) return null;
               const x = bucketX(i);
@@ -2241,7 +2123,6 @@ function RpsTimeseriesChart({
               );
             })}
 
-            {/* Rolling average line */}
             {linePath && (
               <path
                 d={linePath}
@@ -2253,7 +2134,6 @@ function RpsTimeseriesChart({
               />
             )}
 
-            {/* Hover overlay (one slim invisible rect per bucket for tooltips) */}
             {points.map((p, i) => {
               const x = bucketX(i);
               return (
@@ -2272,7 +2152,6 @@ function RpsTimeseriesChart({
               );
             })}
 
-            {/* X-axis tick labels */}
             {points.map((p, i) => {
               if (i % tickInterval !== 0) return null;
               const x = bucketX(i) + barWidth / 2;
@@ -2329,7 +2208,6 @@ function RpsTimeseriesChart({
             })}
           </svg>
 
-          {/* Summary stats */}
           <div className="grid grid-cols-3 gap-1.5 mt-3 pt-3 border-t border-border">
             <div className="rounded-md border border-border bg-surface-hover px-2 py-1.5 text-center">
               <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
@@ -2359,7 +2237,6 @@ function RpsTimeseriesChart({
         </>
       )}
 
-      {/* Tooltip */}
       {tooltip && (
         <div
           className="fixed z-50 pointer-events-none rounded-md border border-border bg-surface p-2.5 shadow-lg"
@@ -2394,14 +2271,6 @@ function RpsTimeseriesChart({
     </ExpandableChart>
   );
 }
-
-// ── Wall-clock composition chart (idle vs tool/CPU vs LLM/GPU) ────
-//
-// Every recorded lane-second falls in one of three buckets: the model
-// generating (E2E latency), the client running tools, and the human
-// reading/typing between turns. Stacked per UTC day so the mix — not just
-// the totals — is visible. See getWallClockBreakdown in packages/db for how
-// the tool and idle gaps are separated.
 
 const WALL_CLOCK_COLORS = {
   llm: '#10b981',
@@ -2474,7 +2343,6 @@ function WallClockStackedBarChart({ data }: { data: WallClockDay[] }) {
   const PW = CW - M.left - M.right;
   const PH = CH - M.top - M.bottom;
 
-  // Hours in absolute mode, fraction of the day's total in share mode.
   const scaleOf = (d: WallClockDay) => {
     if (!share) return 1 / 3_600_000;
     const total = totalOf(d);
@@ -2671,7 +2539,6 @@ function WallClockStackedBarChart({ data }: { data: WallClockDay[] }) {
         {visibleData.map((d) => {
           const x = M.left + dayIndex(d.day) * dayWidth + 1;
           const k = scaleOf(d);
-          // Stack from the bottom: LLM, then tool, then idle on top.
           const segments = [
             { value: d.llmMs * k, color: WALL_CLOCK_COLORS.llm },
             { value: d.toolMs * k, color: WALL_CLOCK_COLORS.tool },
@@ -2770,11 +2637,6 @@ function WallClockStackedBarChart({ data }: { data: WallClockDay[] }) {
   );
 }
 
-// ── Main page ─────────────────────────────────────────────────────
-
-// Pre-binned dataset payloads from /api/graphs (see packages/db/src/stats.ts).
-// A dataset key that feeds multiple charts ships a dict of the per-chart
-// payloads; single-chart keys ship the payload directly.
 interface RequestStatsPayload {
   islTotal: GraphHistogram;
   cacheRead: GraphHistogram;
@@ -2788,7 +2650,6 @@ interface RequestStatsPayload {
 }
 interface WallClockPayload {
   userIdle: GraphHistogram;
-  /** Idle gaps >= the cutoff, excluded from userIdle and the daily sums. */
   walkedAway: number;
   daily: WallClockDay[];
 }
@@ -2819,9 +2680,7 @@ interface HistogramSpec {
   tickFormat?: (v: number) => string;
   tailDirection?: 'high' | 'low';
   exportFilename?: string;
-  /** Which API include key feeds this chart. */
   datasetKey: string;
-  /** Pick the pre-binned histogram this chart renders out of the payload. */
   select: (payload: unknown) => GraphHistogram;
 }
 
@@ -2891,10 +2750,6 @@ function GraphsPageContent() {
   const { apiParam: traceVersionParam } = useTraceVersion();
   const [rpsRange, setRpsRange] = useState<RpsRangeKey>('24h');
 
-  // Per-dataset lazy fetches replace the old monolithic /api/graphs call.
-  // Each card on the page asks for only the dataset it needs; charts that
-  // share a dataset (the ~8 requestStats-derived histograms) dedupe through
-  // the hook's module-level cache.
   const ctx = useMemo<GraphDatasetContext>(
     () => ({
       baseUrl: buildUrl('/api/v1/agentic-workload-explorer/graphs'),
@@ -2916,11 +2771,6 @@ function GraphsPageContent() {
     key: `${selectedModel ?? ''}-${traceVersionParam}-${rpsRange}`,
   });
 
-  // ── Histogram specs: dataset key + a selector picking the pre-binned
-  // per-chart payload. The binning + percentile math runs server-side (exact
-  // port of the old client extract()/buildHistogram); `select` just reaches
-  // into the dataset payload for this chart's slice. Cards lazy-load their
-  // `datasetKey` via useGraphDataset and dedupe shared keys.
   const charts: HistogramSpec[] = [
     {
       key: 'islTotal',
@@ -3186,7 +3036,6 @@ function GraphsPageContent() {
         />
       </div>
 
-      {/* Weekly harness mix */}
       <div className="flex items-center gap-2">
         <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
           {t.weeklySessions}
@@ -3202,7 +3051,6 @@ function GraphsPageContent() {
         />
       </div>
 
-      {/* Wall-clock composition: LLM vs tool/CPU vs user idle */}
       <div className="flex items-center gap-2">
         <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
           {t.wallClock}
@@ -3245,7 +3093,6 @@ function GraphsPageContent() {
         />
       </div>
 
-      {/* Prefill vs Decode share of E2E latency (streaming rows only) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <LazyDatasetCard<PrefillDecodePayload>
           datasetKey="prefillDecodeValues"
@@ -3273,7 +3120,6 @@ function GraphsPageContent() {
         />
       </div>
 
-      {/* Opus 4.7 CPU vs GPU split — fast-mode vs regular */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <LazyDatasetCard<GraphPie>
           datasetKey="cpuGpuOpus47Fast"
@@ -3313,7 +3159,6 @@ function GraphsPageContent() {
         />
       </div>
 
-      {/* Opus 4.7 Prefill vs Decode split — fast-mode vs regular */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <LazyDatasetCard<GraphPie>
           datasetKey="prefillDecodeOpus47Fast"
@@ -3365,7 +3210,6 @@ function GraphsPageContent() {
         />
       </div>
 
-      {/* Opus 4.8 CPU vs GPU split — fast-mode vs regular */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <LazyDatasetCard<GraphPie>
           datasetKey="cpuGpuOpus48Fast"
@@ -3405,7 +3249,6 @@ function GraphsPageContent() {
         />
       </div>
 
-      {/* Opus 4.8 Prefill vs Decode split — fast-mode vs regular */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <LazyDatasetCard<GraphPie>
           datasetKey="prefillDecodeOpus48Fast"

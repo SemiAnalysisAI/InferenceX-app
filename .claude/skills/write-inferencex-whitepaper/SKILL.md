@@ -74,7 +74,7 @@ NODE_PATH=$(npm root -g) node $SKILL/pipeline/render_pdf.js $OUT         # paper
 pdftoppm -r 60 -png $OUT/paper.pdf $OUT/pg                                # look at every page
 ```
 
-Dependencies: Python 3 with matplotlib, numpy, Pillow, scipy; Playwright (Chromium) on the global npm path; poppler for `pdftoppm`. DM Sans TTFs and the OFL notice are in `pipeline/fonts/`.
+Dependencies: Python 3 with matplotlib, numpy, Pillow, scipy; Playwright (Chromium) on the global npm path; poppler for `pdftoppm`. DM Sans TTFs are in `pipeline/fonts/`.
 
 Spec fields (`examples/mi355x-kimi-k3.json`):
 
@@ -116,7 +116,7 @@ Delete any asset a previous revision no longer references; `whitepapers.test.ts`
 
 ## Step 5: Register the paper
 
-Add one object to `WHITEPAPERS` in `packages/app/src/lib/content/whitepapers.ts`. The type doc comments describe every field; the important ones:
+Add one object to `WHITEPAPERS` in `packages/app/src/lib/content/whitepapers.ts`. The `Whitepaper` interface defines every field; the important ones:
 
 - `slug` (URL-safe, unique), `publishedDate`, `dataDate` (benchmark snapshot), `pageCount` (content pages, cover excluded), `tags`.
 - `pdfPath`, `coverImagePath` (also `heroImagePath`; used by the sitemap and JSON-LD image), `chipImagePath` with `chipImageWidth`/`chipImageHeight` from `cutout.py`.

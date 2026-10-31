@@ -10,11 +10,6 @@ export function offloadHaloLabel(locale: Locale): string {
   return locale === 'zh' ? 'KV offload 已开启' : 'KV offload ON';
 }
 
-/**
- * Key for the dashed ring drawn around agentic points that use KV-cache
- * offload. Rendered in the axis-metric info footer below the chart (the
- * footer is `no-export`, so downloaded PNGs carry only the halo itself).
- */
 export function OffloadHaloLegendKey() {
   const locale = useLocale();
   return (

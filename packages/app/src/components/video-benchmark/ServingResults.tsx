@@ -334,9 +334,7 @@ export default function ServingResults({
       mediaPath = safePath(
         `${current.runPath.slice(0, current.runPath.lastIndexOf('/') + 1)}${safePath(path)}`,
       );
-  } catch {
-    // Invalid manifest paths never become media URLs.
-  }
+  } catch {}
   const mediaUrl = urls.get(mediaPath);
   const chooseCell = (id: string) => {
     setSelected(id);
@@ -465,7 +463,10 @@ export default function ServingResults({
               <VideoSelect
                 label={s.slot}
                 value={text(at(record, 'slot_id'))}
-                onValueChange={setSlot}
+                onValueChange={(value) => {
+                  track('video_serving_slot_selected', { slot: value });
+                  setSlot(value);
+                }}
                 options={records.map((item) => ({
                   value: text(at(item, 'slot_id')),
                   label: `${at(item, 'phase') === 'warmup' ? s.warmup : s.measured} · ${text(at(item, 'slot_id'))}`,
@@ -608,7 +609,10 @@ export default function ServingResults({
           <VideoSelect
             label={s.gpuBasis}
             value={gpuBasis}
-            onValueChange={(value) => setGpuBasis(value as typeof gpuBasis)}
+            onValueChange={(value) => {
+              track('video_serving_gpu_basis_selected', { basis: value });
+              setGpuBasis(value as typeof gpuBasis);
+            }}
             options={[
               { value: 'participating', label: s.participatingBasis },
               { value: 'allocated', label: s.allocatedBasis },
@@ -715,7 +719,10 @@ export default function ServingResults({
             <VideoSelect
               label={s.phase}
               value={phase}
-              onValueChange={(value) => setPhase(value as typeof phase)}
+              onValueChange={(value) => {
+                track('video_serving_phase_selected', { phase: value });
+                setPhase(value as typeof phase);
+              }}
               options={[
                 { value: 'measurement', label: s.measurement },
                 { value: 'startup', label: s.startup },

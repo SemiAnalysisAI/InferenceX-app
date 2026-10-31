@@ -12,17 +12,16 @@ interface Props {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-/** Chinese sibling of `/profit-estimator`; opens on the tab's default model. */
 export default async function ZhProfitEstimatorPage({ searchParams }: Props) {
   const sp = await searchParams;
   const seed = resolveCalculatorUrlSeed(sp);
   return (
     <>
-      <ZhTabIntro tab="profit-estimator" />
       <ProfitEstimatorDisplay
         basis="chip-hour"
         urlSeed={{ ...seed, model: seed.model ?? defaultRouteModel('profit-estimator') }}
       />
+      <ZhTabIntro tab="profit-estimator" />
     </>
   );
 }

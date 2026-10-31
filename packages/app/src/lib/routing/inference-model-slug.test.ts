@@ -42,6 +42,26 @@ describe('INFERENCE_MODEL_SLUGS registry', () => {
       expect(INFERENCE_MODEL_SLUGS).toContain(entry);
     }
   });
+
+  it('keeps the MiniMax M3 page addressable without promoting it as active', () => {
+    expect(getInferenceModelBySlug('minimax-m3')?.model).toBe(Model.MiniMax_M3);
+    expect(ACTIVE_INFERENCE_MODEL_SLUGS.some((entry) => entry.model === Model.MiniMax_M3)).toBe(
+      false,
+    );
+    expect(
+      ACTIVE_INFERENCE_MODEL_SLUGS.some((entry) => entry.model === Model.MiniMax_M3_1_Flash),
+    ).toBe(true);
+  });
+
+  it('keeps retired DeepSeek V4 Pro links addressable without promoting them as active', () => {
+    expect(getInferenceModelBySlug('deepseek-v4-pro')?.model).toBe(Model.DeepSeek_V4_Pro);
+    expect(
+      ACTIVE_INFERENCE_MODEL_SLUGS.some((entry) => entry.model === Model.DeepSeek_V4_Pro),
+    ).toBe(false);
+    expect(
+      ACTIVE_INFERENCE_MODEL_SLUGS.some((entry) => entry.model === Model.DeepSeek_V4_1_Flash),
+    ).toBe(true);
+  });
 });
 
 describe('getInferenceModelBySlug', () => {

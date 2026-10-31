@@ -30,7 +30,6 @@ if (
 ) {
   throw new Error('All browser and component observations must come from one workflow attempt');
 }
-// Validate every group before writing any baseline.
 const baselines = groups.map((group) => {
   const specs = globSync(`cypress/${group.kind}/**/*.cy.${group.kind === 'e2e' ? 'ts' : 'tsx'}`, {
     cwd: app,

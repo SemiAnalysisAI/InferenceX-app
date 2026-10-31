@@ -1,122 +1,25 @@
 # Data Transformation Pipeline
 
-Explains the full chain from raw API response to chart-ready scatter points. Goal: let an agent understand type roles and where each transform lives without reading 5+ source files.
+## Power boundaries
 
-## Type Hierarchy
+`lib/power/power-basis.ts` derives the three boundaries beyond GPU-measured telemetry as J per successful output token and J per total (input + output) token, plus W per allocated GPU for B4; `POWER_BASIS_FIELDS` maps every basis × quantity, B1 included, to its `InferenceData` field. B2 and B3 watts are one rating per hardware, so they are not chart fields; the power timelines (`PowerTimeline`, the per-run `GpuPowerChart`) draw them as reference lines. `buildDerivedChartFields` calls `buildPowerBasisChartFields(entry, specs)` right after the measured fields, so the official chart, the `?unofficialrun=` overlay (`transformBenchmarkRows`), and Historical Trends (`rowToLightweightPoint` with `requestedMetrics`) share one formula set; each key is gated by `wants(key)` so selective output stays exact.
 
-### DWDP topology
+| Basis                                    | W / GPU                                                                    | J / output token                   | J / total token                 | Fields                                                                                       |
+| ---------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------- | ------------------------------- | -------------------------------------------------------------------------------------------- |
+| B1 GPU measured                          | `avg_power_w`                                                              | `joules_per_output_token`          | `joules_per_total_token`        | existing `measuredAvgPower`, `measuredJPerOutputToken`, `measuredJPerTotalToken` (unchanged) |
+| B2 GPU provisioned                       | `HW_REGISTRY.tdp`                                                          | `W × N_alloc ÷ total output tok/s` | `W ÷ tput_per_gpu`              | `gpuProvisionedJPerOutputToken`, `gpuProvisionedJPerTotalToken`                              |
+| B3 utility provisioned (all-in)          | `HW_REGISTRY.power × 1000`                                                 | `W × N_alloc ÷ total output tok/s` | `W ÷ tput_per_gpu`              | `utilityProvisionedJPerOutputToken`, `utilityProvisionedJPerTotalToken`                      |
+| B4-IT IT modeled (measured → IT, no PUE) | `modeledSystemPower.deploymentItWatts ÷ modeledSystemPower.gpuCount`       | `B1 J/out × (B4-IT W ÷ B1 W)`      | `B1 J/total × (B4-IT W ÷ B1 W)` | `itModeledWatts`, `itModeledJPerOutputToken`, `itModeledJPerTotalToken`                      |
+| B4 utility modeled (measured → IT → PUE) | `modeledSystemPower.deploymentFacilityWatts ÷ modeledSystemPower.gpuCount` | `B1 J/out × (B4 W ÷ B1 W)`         | `B1 J/total × (B4 W ÷ B1 W)`    | `utilityModeledWatts`, `utilityModeledJPerOutputToken`, `utilityModeledJPerTotalToken`       |
 
-`metrics.prefill_dwdp_size` records the ranks in one distributed weight-data
-parallel prefill group. The producer keeps `prefill_tp=1` and counts groups in
-`prefill_num_workers`. Two groups of size 8 use 16 prefill GPUs; the fallback ETL
-count includes the group width without treating DWDP as TP or EP. Explicit
-physical GPU counts remain authoritative.
-
-The field is retained in the metrics map (no database migration), copied to chart
-points, and exposed as nullable `prefill_dwdp_size` on sibling rows. Labels render
-`2xDWDP8+1xDEP8`, and tooltips show the prefill DWDP width. Missing or default
-widths preserve legacy labels. This metadata does not enable runtime DWDP.
-
-The producer contract follows NVIDIA's [DWDP implementation notes](https://raw.githubusercontent.com/NVIDIA/TensorRT-LLM/main/docs/source/blogs/tech_blog/blog19_DWDP_Distributed_Weight_Data_Parallelism_for_High_Performance_LLM_Inference_on_NVL72.md).
-
-```
-BenchmarkRow   (lib/api/api.ts)
-    |
-    v  rowToAggDataEntry()
-AggDataEntry   (components/inference/types.ts)
-    |
-    v  createChartDataPoint()
-InferenceData  (components/inference/types.ts)
-    |
-    v  useChartData.ts (filtering + memoization)
-RenderableGraph[]  (consumed by ScatterGraph)
-```
-
-**`BenchmarkRow`** (`lib/api/api.ts`) — raw DB row. The `metrics` field is a loose `Record<string, number>` containing every measured stat. Config fields (hardware, framework, concurrency, topology) are top-level.
-
-**`AggDataEntry`** (`components/inference/types.ts`) — flattened, fully-typed working representation. All metric keys are promoted to top-level fields with `?? 0` defaults. The display model name is resolved here. `hwKey` starts as an empty string and is filled in by `transformBenchmarkRows` after calling `getHardwareKey`. The `actualDate` field holds the real DB date when the `date` field has been overridden to a user-selected comparison date.
-
-**`InferenceData`** (`components/inference/types.ts`) is a chart-ready scatter point. It extends `Partial<AggDataEntry>` with chart coordinates (`x`, `y`), derived metric objects shaped as `{ y: number; roof: boolean }`, and narrowed boolean types for the `dp_attention`/`disagg` family. Derived metric objects start with `roof: false`; current frontier membership is computed separately from the selected metric and chart direction.
-
-**`RenderableGraph`** — final output of `useChartData`. Bundles `model`, `sequence`, `chartDefinition`, and `InferenceData[]` for a single scatter chart panel.
-
----
-
-## Transformation Steps
-
-### Step 1: API row to AggDataEntry (`lib/benchmarks/benchmark-transform.ts`)
-
-**`rowToAggDataEntry(row)`** — does three things:
-
-1. Flattens `row.metrics` into typed fields (e.g. `m.median_ttft ?? 0`).
-2. Resolves the DB model slug to a human display name via `DB_MODEL_TO_DISPLAY`.
-3. Copies all config fields (topology, disagg flags, image, dates) verbatim.
-
-`hwKey` is left as `''` at this point — it is not known until `getHardwareKey` runs in the next phase.
-
-**`transformBenchmarkRows(rows)`** — orchestrates the full BenchmarkRow[] → InferenceData[][] transform:
-
-1. Converts every row to `AggDataEntry` once (via `rowToAggDataEntry`).
-2. Calls `getHardwareKey(entry)` and writes the result back into `entry.hwKey`.
-3. Calls `getHardwareConfig(hwKey)` with a per-call cache to build the `HardwareConfig` map (hardware display metadata — label, color, GPU title).
-4. Builds canonical derived fields once per prepared entry, then calls `createChartDataPoint` for each chart definition with that definition's `x`/`y` keys and the shared fields. The same `AggDataEntry` and derived objects are reused across both charts.
-
-Returns `{ chartData: InferenceData[][], hardwareConfig: HardwareConfig }`.
-
-### Step 2: AggDataEntry to InferenceData (`lib/charts/chart-utils.ts`)
-
-**`createChartDataPoint(date, entry, xKey, yKey, hwKey, derivedFields?)`** spreads `entry` first, then overrides chart coordinates and metadata. The full transform passes precomputed derived fields; direct callers may omit them.
-
-- `x` / `y`: read directly from `entry[xKey]` and `entry[yKey]` (set per chart definition).
-- `tp` is the total chip count: disaggregated configs sum `num_prefill_gpu + num_decode_gpu`; aggregate configs prefer a positive `num_decode_gpu`, then `num_prefill_gpu`, with TP × PP as a minimum even when a positive count is present. Legacy ingest defaults can populate counts as TP × EP without PP; this floor preserves pipeline parallelism for existing rows and unofficial overlays. Aggregate role counts describe the same deployment and are not summed. The actual tensor-parallel width remains in `decode_tp`.
-- Boolean narrowing: `dp_attention`, `prefill_dp_attention`, `decode_dp_attention`, and `is_multinode` are coerced from `boolean | string` to `boolean | undefined`.
-- Disagg fields: `num_prefill_gpu` / `num_decode_gpu` are only set when `entry.disagg` is true; otherwise they are dropped.
-
-**`buildDerivedChartFields(entry, hwKey, requestedMetrics?)`** is the sole owner of inference and historical trend formulas. The full transform requests every benchmark-backed field. History requests only the selected metric and its interpolation dependencies, so it stays lightweight. Each emitted value uses `{ y: number; roof: boolean }`.
-
-- `tpPerGpu`, `outputTputPerGpu`, `inputTputPerGpu` — raw throughput from the entry (tok/s/gpu).
-- `tokenRevenuePerGpuHour` uses cache-aware token sale pricing. `buildDerivedChartFields` emits a normalized placeholder; `applyTokenRevenuePricing` applies the selected normalized or OpenRouter prices to uncached input, cached input, and output. Revenue is the priced streams per GPU-second scaled to one hour. Normalized pricing uses $1/M for uncached input and output and $0.10/M for cached input. OpenRouter uses its published cache-read price when available, otherwise 10% of the prompt price. Agentic cache share uses the same measured GPU-plus-external-or-CPU rule as Fleet Lifecycle. Aggregate rows use their measured input/output split; disaggregated rows derive a like-for-like split from fixed ISL:OSL or measured agentic prompt:generation totals because their raw input/output rates use different prefill/decode GPU denominators. Historical Trends splines total throughput, token share, and cache hit independently before applying these prices; a partly measured cache frontier receives no cache discount.
-- `tpPerMw` — `(tputPerGpu * 1000) / hardwarePower` (GPU power in kW, result in tok/s/MW).
-- Cost-per-million fields — GPU hourly cost divided by tokens-per-hour (in millions): `costh` / `costr` for owning-at-large-hyperscaler-volume / 3-year-rental pricing respectively. Three token variants exist: combined (`costh`/`costr`), output-only (`costhOutput`/`costrOutput`), and input-only (`costhi`/`costri`). The former Neocloud tier (`costn`/`costni`/`costnOutput`) was removed; its share-link keys alias to the hyperscaler-volume metric.
-- Infrastructure purchasing-power fields divide tokens per hour by the same hourly costs. Total (`tokensPerDollarH`/`R`), output-only (`outputTokensPerDollarH`/`R`), and input-only (`inputTokensPerDollarH`/`R`) are separate USD Y-axis metrics. The former ¥-priced `tokensPerRmb*` axes and the Neocloud `*PerDollarN` axes were removed; their share-link keys alias to the matching hyperscaler-volume $ metric. The dashboard defaults to the hyperscaler-volume total-tokens-per-dollar axis (`y_tokensPerDollarH`); with a measured-power tier filter (`i_power`) it defaults to the measured power scatter (`y_measuredAvgPower`) instead. Links created for the removed API-price `i_metric=y_tokensPerDollar` axis resolve to the same hyperscaler-volume variant.
-- Energy fields — `jTotal` / `jOutput` / `jInput`: `(hardwarePower * 1000) / tputPerGpu` (Joules per token, where power in kW is converted to W). These divide one GPU's all-in power by that GPU's reported throughput; for disaggregated rows `output_tput_per_gpu` is per decode GPU, so `jOutput` ignores the prefill pool. Its semantics are frozen; the whole-deployment view lives in the power boundaries below.
-- Power-boundary fields — see [Power boundaries](#power-boundaries).
-
-#### Power boundaries
-
-`lib/power-basis.ts` derives the three boundaries beyond GPU-measured telemetry as W per allocated GPU plus J per successful output token. `buildDerivedChartFields` calls `buildPowerBasisChartFields(entry, specs)` right after the measured fields, so the official chart, the `?unofficialrun=` overlay (`transformBenchmarkRows`), and Historical Trends (`rowToLightweightPoint` with `requestedMetrics`) share one formula set; each key is gated by `wants(key)` so selective output stays exact.
-
-| Basis                                    | W / GPU                                                                    | J / output token                   | Fields                                                             |
-| ---------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------ |
-| B1 GPU measured                          | `avg_power_w`                                                              | `joules_per_output_token`          | existing `measuredAvgPower`, `measuredJPerOutputToken` (unchanged) |
-| B2 GPU provisioned                       | `HW_REGISTRY.tdp`                                                          | `W × N_alloc ÷ total output tok/s` | `gpuProvisionedWatts`, `gpuProvisionedJPerOutputToken`             |
-| B3 utility provisioned (all-in)          | `HW_REGISTRY.power × 1000`                                                 | `W × N_alloc ÷ total output tok/s` | `utilityProvisionedWatts`, `utilityProvisionedJPerOutputToken`     |
-| B4 utility modeled (measured → IT → PUE) | `modeledSystemPower.deploymentFacilityWatts ÷ modeledSystemPower.gpuCount` | `B1 J/out × (B4 W ÷ B1 W)`         | `utilityModeledWatts`, `utilityModeledJPerOutputToken`             |
-
-- **N_alloc and total throughput** (`powerBasisNormalization`). Aggregate rows report output per allocated GPU, so `N_alloc` cancels and the builder uses `W ÷ output_tput_per_gpu` without trusting display counts (legacy ingest can encode TP × EP twice). Fixed-sequence disaggregated rows (`disagg && benchmark_type === 'single_turn'`) report output per decode GPU while the deployment also powers the prefill pool, so `total output tok/s = output_tput_per_gpu × num_decode_gpu` and `N_alloc = num_prefill_gpu + num_decode_gpu`; the article's 4P+4D counts eight GPUs, and B3 energy is `(P + D) / D` times `jOutput` on such rows. Other disaggregated benchmark types emit no provisioned energy because it is not verifiable in-app whether AgentX throughput already divides by all GPUs.
-- **B4 source.** Reuses the `SystemPowerEstimate` that `rowToAggDataEntry` attached as `entry.modeledSystemPower`; nothing re-runs `modelSystemPower`. `deploymentFacilityWatts` is modeled IT power (chassis or rack AC plus its scale-out network share) × PUE with PUE applied exactly once inside `estimateChassisPower` or `estimateRackPower`, divided by the physical measured GPU count (not `modeledGpuCount`, which over-counts partially allocated chassis: a 4P+4D deployment on two worker hosts models 16 GPUs while measuring 8, and the unit test pins that divisor). Modeled energy scales the producer's same-window `joules_per_output_token` by `B4 W ÷ avg_power_w`, so it inherits B1's token denominator and survives rows whose `output_tput_per_gpu` is missing (the provisioned energies do not; a per-basis point count cannot assume one shared denominator).
-- **Null rules.** A value is emitted only when finite and positive; otherwise the key is omitted (never `{ y: 0 }`), because the metric filters drop points by `metricKey in point` and `remapInferencePoint` falls back to raw throughput when a key exists with an unusable value. B2/B3 W are absent for hardware without registry specs (`getGpuSpecs` returns zeros); their energies are also absent without output throughput or disaggregated counts. B4 requires `modeledSystemPower.status === 'supported'` and B1 watts (`avg_power_w` after `rowToAggDataEntry`'s `power_valid !== 0` admission); B4 energy additionally needs `joules_per_output_token`. Telemetry admission belongs to `modelSystemPower`, which accepts `power_valid === 1` with schema v2 or the validated unversioned single-node producer (`telemetryBasis: 'validated-unversioned-single-node'`), so B4 shares B1's telemetry admission; benchmark types without an upstream workload state (`reason: 'workload'`), unsupported hardware (`reason: 'hardware'`), and telemetry/topology failures withhold it. GB200/GB300 NVL72 rows take an equal compute-tray share of `estimateRackPower`, the pinned `power_model` rack evaluated at the measured W/GPU and, when the row carries complete, matching Grace-socket telemetry from the same window, the measured W per Grace socket; otherwise the rack's modeled Grace profile (`unit: 'nvl72-tray'`, `cpuBasis: 'measured' | 'modeled'`). The public API's `strictV2` row filter is not re-applied in the chart for B1, so it is not re-applied for B4 either (plan §3.1 describes B1 with that filter; the app's chart path is the authority here).
+- **N_alloc and total throughput** (`powerBasisNormalization`). Aggregate rows report output per allocated GPU, so `N_alloc` cancels and the builder uses `W ÷ output_tput_per_gpu` without trusting display counts (legacy ingest can encode TP × EP twice). Fixed-sequence disaggregated rows (`disagg && benchmark_type === 'single_turn'`) report output per decode GPU while the deployment also powers the prefill pool, so `total output tok/s = output_tput_per_gpu × num_decode_gpu` and `N_alloc = num_prefill_gpu + num_decode_gpu`; the article's 4P+4D counts eight GPUs, and B3 energy is `(P + D) / D` times `jOutput` on such rows. Other disaggregated benchmark types emit no provisioned energy because it is not verifiable in-app whether AgentX throughput already divides by all GPUs. The producer divides total (input + output) throughput by every allocated GPU for aggregate and disaggregated rows alike, so J per total token is `W ÷ tput_per_gpu` with `N_alloc` cancelled; it keeps the output normalization's availability gate, so a boundary publishes J per total token exactly where it publishes J per output token. B3 J per total token therefore equals the ungated `jTotal` wherever both exist.
+- **B3 meter.** `HW_REGISTRY.power` is all-in utility power per GPU (host, networking and cooling, PUE included), so B3 applies no further PUE and sits at the same meter as B4.
+- **B4 source.** Reuses the `SystemPowerEstimate` that `rowToAggDataEntry` attached as `entry.modeledSystemPower`; nothing re-runs `modelSystemPower`. `deploymentFacilityWatts` is modeled IT power (chassis or rack AC plus its scale-out network share) × PUE with PUE applied exactly once inside `estimateChassisPower` or `estimateRackPower`, divided by the physical measured GPU count (not `modeledGpuCount`, which over-counts partially allocated chassis: a 4P+4D deployment on two worker hosts models 16 GPUs while measuring 8, and the unit test pins that divisor). Modeled energy scales the producer's same-window `joules_per_output_token` and `joules_per_total_token` by `B4 W ÷ avg_power_w`, so it inherits B1's token denominators and survives rows whose `output_tput_per_gpu` is missing (the provisioned energies do not; a per-basis point count cannot assume one shared denominator).
+- **Null rules.** A value is emitted only when finite and positive; otherwise the key is omitted (never `{ y: 0 }`), because the metric filters drop points by `metricKey in point` and `remapInferencePoint` falls back to raw throughput when a key exists with an unusable value. B2/B3 energies are absent for hardware without registry specs (`getGpuSpecs` returns zeros), without output throughput, or without disaggregated counts. B4 requires `modeledSystemPower.status === 'supported'` and B1 watts (`avg_power_w` after `rowToAggDataEntry`'s `power_valid !== 0` admission); B4 energy additionally needs `joules_per_output_token` (J/out) or `joules_per_total_token` (J/total). Telemetry admission belongs to `modelSystemPower`, which accepts `power_valid === 1` with schema v2 or the validated unversioned single-node producer (`telemetryBasis: 'validated-unversioned-single-node'`), so B4 shares B1's telemetry admission; benchmark types without an upstream workload state (`reason: 'workload'`), unsupported hardware (`reason: 'hardware'`), and telemetry/topology failures withhold it. GB200/GB300 NVL72 rows take an equal compute-tray share of `estimateRackPower`, the pinned `power_model` rack evaluated at the measured W/GPU and, when the row carries complete, matching Grace-socket telemetry from the same window, the measured W per Grace socket; otherwise the rack's modeled Grace profile (`unit: 'nvl72-tray'`, `cpuBasis: 'measured' | 'modeled'`). The public API's `strictV2` row filter is not re-applied in the chart for B1, so it is not re-applied for B4 either.
 - **Ordering invariant** (unit-tested on real B200 telemetry): B3 ≥ B4 ≥ B1 and B2 ≥ B1 for both W/GPU and J/out on the same point.
+- **Token-mix invariant** (`power-basis.test.ts`, aggregate and 8P + 8D disaggregated rows): every boundary's J/out ÷ J/total equals B1's, the served total-to-output token ratio.
 - **Reconstructed prefill energy** (`reconstructedPrefillJPerOutputToken`, `utils/role-energy.ts`). For validated (`power_valid === 1`, schema 2) disaggregated rows, `prefill_joules_per_input_token × (joules_per_output_token ÷ joules_per_input_token)` carries the prefill pool's energy onto the output-token axis: the ratio is the served input:output token count because schema-2 aggregate energy has one numerator. With `decode_joules_per_output_token` it sums back to the deployment's J/out. It feeds only the `i_pcompare=roles` comparison on the energy axis (PowerX Figure 7) and is never a y-axis of its own; aggregate rows and rows missing any of the four inputs omit it.
 - Historical Trends substitutes `output_tput_per_gpu := tput_per_gpu` for legacy rows lacking output throughput; provisioned energies in trends inherit that fallback.
-
-**GPU specs lookup** happens inside `buildDerivedChartFields`. `getGpuSpecs(hwKey)` (`lib/catalog/constants.ts`) splits on `[-_]` to extract the base GPU token (for example, `"b200_trt_mtp"` becomes `"b200"`) and looks it up in `HW_REGISTRY`. Missing keys return zeroed specs, producing `0` cost/energy values rather than crashing.
-
-### Step 3: Filtering, memoization, and rendering (`hooks/useChartData.ts`)
-
-The hook runs a 5-step memoized pipeline:
-
-1. **Fetch** — `useBenchmarks(model, date)` via React Query. When the selected date equals the latest available date, the query key is normalized to `''` to reuse the eagerly-cached materialized-view response and avoid a duplicate fetch.
-
-2. **Comparison date merging** — for GPU-vs-GPU date comparisons, `useQueries` fires one additional fetch per comparison date. Each row is stamped with the _user-selected_ comparison date (overriding the actual DB date) so that `GPUGraph`'s `activeDates` filter, which is keyed by user-selected date, matches the points. The original DB date is preserved in `actualDate`.
-
-3. **Sequence filter + transform** — rows are filtered to `isl`/`osl` for the selected sequence, then passed to `transformBenchmarkRows`. This is the only place `transformBenchmarkRows` is called in normal rendering.
-
-4. **Sort `hardwareConfig`** — the `HardwareConfig` object is sorted by `getModelSortIndex` and stabilized with a ref: if the sorted key string matches the previous render, the same object reference is returned. This prevents D3 Effect 2 (data bind) from firing when a sequence change returns the same GPU set.
-
-5. **Build renderable graphs** — `stableChartDefinitions` is computed in a separate `useMemo` that depends only on metric/axis selections (not on data). This decouples Y-axis changes from data changes so D3 Effect 3 (metric repositioning) does not fire alongside Effect 2 (data bind). Within this memo, the x-axis field is resolved per chart type, roofline directions are flipped when the x-axis polarity reverses (e.g. interactivity → TTFT), and Y-axis labels are looked up. The final `graphs` memo applies GPU filtering, cost-limit clipping, optional user-cost/user-power overrides, and remaps each point's `x`/`y` from the selected metric's `{ y, roof }` object.
-
----
 
 ## Prefix-Cache Tier Shares (`/cache-reuse`)
 
@@ -130,52 +33,16 @@ Why the shares are built the way they are:
 - **Rows without any tier are drawn as gaps, not zeros.** A GB300 sweep scraped only at the Dynamo frontend has a theoretical ceiling but no server counters; those concurrencies get a marker and remain in the API’s `unmeasured` list.
 - **Fixed sequences record no cache tier at all**, so the tab keeps the scenario selector and shows an explanatory empty state rather than an empty chart.
 
-The configuration selector defaults to the group with the most tiered rows, preferring SGLang on a tie because SGLang separates the two tiers; `c_cfg` seeds it from a share link. Within that group, `c_recipe` selects a serving recipe by TP/EP/DP attention, workers, physical GPU counts, disaggregation, speculation, offload and fingerprint. Missing or stale keys use the recipe with the most tiered rows, then most rows, then label. The selector uses overlay recipes only when official rows are absent. Table and CSV rows identify their recipe. Overlay runs on the same hardware become their own outlined series so a branch can be read against the published curve concurrency by concurrency. Each run uses the selected recipe when available, otherwise its own best-covered recipe; no series mixes recipes. Cypress fixtures: `interceptOverlayRun` (agentic rows with gpu 0.8 / external 0.1 / cpu 0.05, which must render as 80 / 5 / 15).
+The configuration selector defaults to the group with the most tiered rows, preferring SGLang on a tie because SGLang separates the two tiers. Overlay runs on the same hardware become their own outlined series so a branch can be read against the published curve concurrency by concurrency; no series mixes recipes.
 
-The tab is footer-only, so the agentic chart links into it: `CacheReuseLink` sits in the chart's status-notes footer (chart state rides along via `withChartState`) and in the point summary of an agentic detail page, where `cacheReuseHref` (`lib/calculator/cache-reuse-link.ts`) writes the point's own `g_model`, `g_rundate`, `i_seq`, `i_prec`, `c_cfg`, and `c_recipe` (clearing an inherited `g_runid`) because a reader who landed cold has no in-memory chart state to inherit; pinning one precision matters because with several selected the groups are keyed `hwKey__precision` and a bare hardware key would miss.
+The tab is footer-only, so the agentic chart links into it. `cacheReuseHref` (`lib/calculator/cache-reuse-link.ts`) writes the point's own `g_model`, `g_rundate`, `i_seq`, `i_prec`, `c_cfg`, and `c_recipe` (clearing an inherited `g_runid`) because a reader who landed cold has no in-memory chart state to inherit; pinning one precision matters because with several selected the groups are keyed `hwKey__precision` and a bare hardware key would miss.
 
 ## Hardware Key Construction
 
 This is the most complex and bug-prone part of the pipeline. A bad hardware key produces either a missing legend entry, zeroed cost/energy metrics (because `getGpuSpecs` returns zeros), or a chart point that never matches the active hardware filter.
 
-**`getHardwareKey(entry)`** (`lib/charts/chart-utils.ts`) — builds the canonical key:
+**GPU specs lookup** happens inside `buildDerivedChartFields`. `getGpuSpecs(hwKey)` (`lib/catalog/constants.ts`) splits on `[-_]` to extract the base GPU token (for example, `"b200_trt_mtp"` becomes `"b200"`) and looks it up in `HW_REGISTRY`. Missing keys return zeroed specs, producing `0` cost/energy values rather than crashing.
 
-1. Base GPU: `entry.hw.split('-')[0]` strips any `-DP` / `-MN` variant suffix from the hardware field (e.g. `"h100-8"` → `"h100"`).
-2. Framework suffix: appends `_${entry.framework}`. The direct key (`h100_trt`) is tested via `isKnownGpu()` (checks whether the base GPU exists in `HW_REGISTRY`). If the direct key's base is unknown and `entry.disagg` is true, a `-disagg` variant is tried.
-3. Spec decoding suffix: for fixed-sequence rows, if `entry.mtp === 'on'` or `entry.spec_decoding === 'mtp'`, appends `_mtp`. Otherwise, any non-`'none'` `spec_decoding` value is appended as-is (e.g. `_eagle`). Agentic rows deliberately omit this suffix because one production curve may combine speculative and standard-decoding points; `spec_decoding` remains on each point for filtering, tooltip metadata, and point-level identity.
+**User-entered GPU costs** (`calculateCostsForGpus`, `lib/shared/utils.ts`) are keyed by `hwKey.split('_')[0]`, so every framework and spec-decoding variant of a GPU (`b200_trt`, `b200_trt_mtp`) inherits its base GPU's cost.
 
-The resulting key's base GPU must exist in `HW_REGISTRY`. Display fields (label, suffix, gpu tooltip) are derived dynamically by `getHardwareConfig()`. Unrecognised base GPUs fall back to the `unknown` hardware config.
-
-**Three variants exist for different data sources:**
-
-- `getHardwareKey(entry: AggDataEntry)` — for benchmark data (the normal path described above).
-- `normalizeEvalHardwareKey(hw, framework?, specDecoding?)` (`lib/charts/chart-utils.ts`) — for evaluation/reliability rows which use looser naming (e.g. `"B200 NB"`, `"H200 CW"`). Strips known qualifiers (`nb`, `cw`, `nv`, etc.) before building the key. Returns `'unknown'` if the base GPU is not in `HW_REGISTRY`.
-- `buildAvailabilityHwKey(hardware, framework?, specMethod?, disagg?)` (`lib/charts/chart-utils.ts`) — for availability rows. Follows the same disagg-variant logic as `getHardwareKey` but uses `resolveFrameworkAlias` to normalize framework aliases before lookup.
-
-**Alias remapping** (`lib/catalog/constants.ts`) — `GPU_KEY_ALIASES` maps a canonical key to one or more legacy keys (e.g. `gb200_dynamo-trtllm` was renamed to `gb200_dynamo-trt`). The inverse map `GPU_ALIAS_TO_CANONICAL` is used in `filterByGPU` to treat alias keys as their canonical equivalent when the user selects a GPU from the filter panel.
-
----
-
-## Chart Configuration
-
-`metric-registry.ts` owns metric fields, English and Chinese labels, titles, polarity, and control ordering. It derives exactly two `ChartDefinition` objects:
-
-| `chartType`     | Default x-axis  | x meaning                                                      |
-| --------------- | --------------- | -------------------------------------------------------------- |
-| `interactivity` | `median_intvty` | Interactivity (tok/s/user) — higher = more responsive per user |
-| `e2e`           | `median_e2el`   | End-to-end latency (s) — lower = faster                        |
-
-Both charts share the same Y-axis options. The `y` field is the default `AggDataEntry` key used for raw Y values; each `y_{metric}` field overrides this with a dotted path into the `InferenceData` derived fields (e.g. `"tpPerGpu.y"`).
-
-**Per-metric Y-axis schema** is owned once in `METRIC_REGISTRY`:
-
-- `field`: dotted path for the value (for example, `"costh.y"`).
-- `label` / `labelZh`: bilingual Y-axis labels.
-- `title` / `titleZh`: bilingual dropdown and chart titles.
-- `polarity`: whether higher or lower values are preferable. The derived chart definitions combine this with x-axis polarity to produce the concrete Pareto corner.
-
-**X-axis selection** takes precedence over the Y metric: selecting an input-energy metric keeps the chosen Interactivity, TTFT, or E2E axis. Fixed-sequence service axes use `i_mstat=median|mean` (default `median`); Agentic axes keep the selected percentile. Mean interactivity resolves the separate `mean_tpot_intvty` field, derived as `1 / mean_tpot` with TPOT in seconds, not the arithmetic mean of per-request speeds (`mean_intvty`, retained unchanged). Mean TTFT and E2E use the explicit `mean_ttft` and `mean_e2el` measurements. Missing, non-finite or nonpositive mean measurements are omitted, never replaced by median or raw interactivity. Axes and headings identify Mean/Median; changing the effective field clears Perf Rulers. Official data, unofficial overlays, Replay, tables and CSV share the resolved axis. Missing or zero-filled TTFT values are omitted instead of becoming plotted latency measurements. The legacy input-metric override (`inputTputPerGpu` declares `p90_ttft`) applies only to callers without a global x-axis mode.
-
-`pointTopologyKey` supplies exact topology filter keys without concurrency, hardware, precision, date, run or recipe identity. The API includes `topologyKey` on each point so a caller can reuse it as a selector. A topology filter does not imply that two platforms' measured concurrency sets, software or other experimental conditions match.
-
-**Limits** — both charts include `y_cost_limit: 5` (clip cost-per-million metrics above $5/M tokens) and `y_latency_limit: 60` (clip x-axis outliers beyond 60s when TTFT is on x). Tokens-per-dollar metrics are not cost-clipped; clipped cost points remain available to the dashed continuation layer.
+Agentic keys deliberately omit the spec-decoding suffix because one production curve may combine speculative and standard-decoding points; `spec_decoding` remains on each point for filtering, tooltip metadata, and point-level identity.

@@ -1,5 +1,7 @@
 import {
   benchmarkCurveScope,
+  curveLineImages,
+  extendCurveLineImages,
   type BenchmarkCurveInput,
 } from '@semianalysisai/inferencex-constants';
 import type { DbClient } from '../connection';
@@ -28,11 +30,16 @@ export interface CurvePoint {
   appendOnly: boolean;
 }
 
+const curveInput = (point: CurvePoint) => point.identity as unknown as BenchmarkCurveInput;
+
 function scope(point: CurvePoint): string {
-  return benchmarkCurveScope(point.identity as unknown as BenchmarkCurveInput);
+  return benchmarkCurveScope(curveInput(point));
 }
 
-/** Mirrors migration 014: latest attempt, scope-level snapshots and same-image append chains. */
+function runLineImages(points: readonly CurvePoint[]) {
+  return curveLineImages(points.map((point) => ({ ...curveInput(point), image: point.image })));
+}
+
 export function publishedCurve(points: readonly CurvePoint[]): Map<string, CurvePoint[]> {
   const latestAttempts = new Map<number, number>();
   for (const point of points)
@@ -62,24 +69,18 @@ export function publishedCurve(points: readonly CurvePoint[]): Map<string, Curve
           (a[0].runStartedAt ? Date.parse(a[0].runStartedAt) : -Infinity) ||
         b[0].workflowRunId - a[0].workflowRunId,
     );
-    const rootImage = ranked[0][0].image;
-    const uniformImage = (rows: CurvePoint[]) =>
-      rootImage !== null && rows.every((row) => row.image === rootImage);
     const selected = new Map<string, CurvePoint>();
+    let chain = runLineImages(ranked[0]);
     for (let index = 0; index < ranked.length; index++) {
       const current = ranked[index];
-      // SQL groups run/date for ranking, then joins every point in that run/scope.
       for (const point of byRun.get(current[0].workflowRunId) ?? []) {
         const id = stablePowerPointIdentity(point.identity);
         if (!selected.has(id)) selected.set(id, point);
       }
-      if (
-        !current[0].appendOnly ||
-        !uniformImage(current) ||
-        !ranked[index + 1] ||
-        !uniformImage(ranked[index + 1])
-      )
-        break;
+      const older = ranked[index + 1];
+      chain =
+        current[0].appendOnly && older ? extendCurveLineImages(chain, runLineImages(older)) : null;
+      if (!chain) break;
     }
     result.set(key, [...selected.values()]);
   }
@@ -97,7 +98,6 @@ function canonical(entries: readonly CurveReplacement[]): string {
   );
 }
 
-/** Exact lost identities bind any destructive authorization to one observed snapshot. */
 export function assertCurvePreserved(
   existing: readonly CurvePoint[],
   proposed: readonly CurvePoint[],
@@ -130,11 +130,6 @@ export function assertCurvePreserved(
     );
 }
 
-/**
- * Every error-free point of these models' latest run attempts, plus this run's
- * own points, read from base tables so a stale materialized view cannot hide a
- * loss. These rows are the TypeScript projection's only input.
- */
 export async function loadStoredCurvePoints(
   sql: DbClient | Sql,
   models: readonly string[],
@@ -161,11 +156,6 @@ export async function loadStoredCurvePoints(
   }));
 }
 
-/**
- * Read-only preflight; no config/workflow upsert, migration, or materialized-view
- * refresh. `files` is the ingest's one benchmark-artifact read, the same rows the
- * verifier bound to `required`.
- */
 export async function preflightRequiredPowerCurves(
   sql: DbClient | Sql,
   required: RequiredPowerScope,
@@ -179,8 +169,6 @@ export async function preflightRequiredPowerCurves(
   for (const file of files) {
     for (const { mapped } of file.rows) {
       if (!mapped) continue;
-      // A config not present yet cannot match an id-keyed purge; backfills
-      // match by config dimensions and still apply.
       const point = { ...mapped, configId: configIds.get(configCacheKey(mapped.config)) ?? -1 };
       const plan = planBenchmarkPoint(
         { githubRunId: source.runId, runAttempt: source.runAttempt },
@@ -214,11 +202,8 @@ export async function preflightRequiredPowerCurves(
 }
 
 export interface CurveProjectionInput {
-  /** Base-table points of the touched models and of this run (`loadStoredCurvePoints`). */
   stored: readonly CurvePoint[];
-  /** Every stored workflow row of this GitHub run, any attempt. */
   attempts: readonly { id: number; runAttempt: number }[];
-  /** The run's planned points as publication identities. */
   incoming: readonly { identity: Record<string, unknown>; image: string | null }[];
   source: { runId: number; runAttempt: number };
   date: string;
@@ -226,21 +211,13 @@ export interface CurveProjectionInput {
   appendOnly: boolean;
 }
 
-/**
- * The curves this ingest would publish, as the SQL owner would see them after
- * the write: this attempt's points replace its own earlier rows; a newer
- * attempt supersedes every stored point of the run; an attempt older than a
- * stored one publishes nothing. `existing` is the same scopes before the write.
- */
 export function projectProposedCurve(input: CurveProjectionInput): {
   existing: CurvePoint[];
   proposed: CurvePoint[];
 } {
   const { stored, attempts, source } = input;
   const sameAttempt = attempts.find((row) => row.runAttempt === source.runAttempt);
-  // New serial IDs sort after stored IDs. A concurrent ingest is outside this pure preflight boundary.
   const workflowRunId = sameAttempt ? sameAttempt.id : Number.MAX_SAFE_INTEGER;
-  // The upsert never changes `date`, so a re-ingested point keeps its stored date.
   const storedDates = new Map(
     stored
       .filter((point) => point.workflowRunId === workflowRunId)

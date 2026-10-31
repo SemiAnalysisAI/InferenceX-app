@@ -12,7 +12,6 @@ const STRINGS = {
   zh: { chart: '前缀缓存复用 →', point: '查看此配置的前缀缓存复用 →' },
 } as const;
 
-/** Agentic-only link into the Prefix Cache Reuse tab, from the chart footer or a point. */
 export function CacheReuseLink({ point, className }: { point?: PointMeta; className?: string }) {
   const locale = useLocale();
   const t = STRINGS[locale];

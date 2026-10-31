@@ -103,7 +103,6 @@ export function mergeTimingObservations(
   };
 }
 
-// Use the installed scheduler, not a second implementation that can drift from CI.
 const { splitByDuration } = createRequire(import.meta.url)('cypress-split/src/timings') as {
   splitByDuration: (
     shards: number,

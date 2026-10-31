@@ -19,7 +19,6 @@ import {
   type TcoFeedSourceRow,
 } from './tco-feed';
 
-/** Build a single_turn source row: interactivity = 1/itl, output tput = otput. */
 function makeRow(overrides: Partial<TcoFeedSourceRow> & { itl?: number; otput?: number } = {}) {
   const { itl = 0.02, otput = 500, ...rest } = overrides;
   return {
@@ -35,7 +34,6 @@ function makeRow(overrides: Partial<TcoFeedSourceRow> & { itl?: number; otput?: 
 
 const WORKLOAD_8K1K = [{ isl: 8192, osl: 1024 }];
 
-/** Three-knot frontier: (iv 20 → 1000), (iv 50 → 400), (iv 100 → 100). */
 function threeKnotRows(): TcoFeedSourceRow[] {
   return [
     makeRow({ itl: 1 / 20, otput: 1000 }),
@@ -53,7 +51,6 @@ describe('computeTcoFeed — frontier reads', () => {
     const rows = computeTcoFeed(threeKnotRows(), WORKLOAD_8K1K, [20, 35, 50, 100]);
     expect(rows).toHaveLength(4);
 
-    // Exact knots read exactly.
     expect(findRow(rows, 'gb200', '8192x1024', 20)).toMatchObject({
       output_tput_per_gpu: 1000,
       is_interpolated: false,
@@ -67,7 +64,6 @@ describe('computeTcoFeed — frontier reads', () => {
       is_interpolated: false,
     });
 
-    // Between knots: strictly inside the neighboring knots' range.
     const mid = findRow(rows, 'gb200', '8192x1024', 35)!;
     expect(mid.boundary).toBe('interpolated');
     expect(mid.is_interpolated).toBe(true);
@@ -93,28 +89,19 @@ describe('computeTcoFeed — frontier reads', () => {
 
   it('excludes Pareto-dominated points from the frontier and from provenance dates', () => {
     const rows = computeTcoFeed(
-      [
-        ...threeKnotRows(),
-        // Dominated: iv 40 / 300 sits below the 20→1000 / 50→400 frontier —
-        // and carries a NEWER date that must not leak into provenance.
-        makeRow({ itl: 1 / 40, otput: 300, date: '2026-09-09' }),
-      ],
+      [...threeKnotRows(), makeRow({ itl: 1 / 40, otput: 300, date: '2026-09-09' })],
       WORKLOAD_8K1K,
       [40],
     );
     const read = findRow(rows, 'gb200', '8192x1024', 40)!;
     expect(read.frontier_points).toBe(3);
-    // Interpolates the 20→1000 / 50→400 segment, unaffected by the 300 point.
     expect(read.output_tput_per_gpu).toBeGreaterThan(400);
     expect(read.latest_date).toBe('2026-07-10');
   });
 
   it('builds the frontier as the envelope across configs of the same hardware', () => {
     const rows = computeTcoFeed(
-      [
-        makeRow({ itl: 1 / 50, otput: 400 }), // config A
-        makeRow({ itl: 1 / 50, otput: 900 }), // config B dominates at the same iv
-      ],
+      [makeRow({ itl: 1 / 50, otput: 400 }), makeRow({ itl: 1 / 50, otput: 900 })],
       WORKLOAD_8K1K,
       [50],
     );
@@ -122,14 +109,13 @@ describe('computeTcoFeed — frontier reads', () => {
   });
 
   it('clamps below the sweep floor and zeroes above the capability ceiling', () => {
-    // Frontier spans iv 40 → 80.
     const source = [makeRow({ itl: 1 / 40, otput: 800 }), makeRow({ itl: 1 / 80, otput: 200 })];
     const rows = computeTcoFeed(source, WORKLOAD_8K1K, [30, 60, 100]);
 
     const low = findRow(rows, 'gb200', '8192x1024', 30)!;
     expect(low.boundary).toBe('clamped_low');
     expect(low.is_interpolated).toBe(false);
-    expect(low.output_tput_per_gpu).toBe(800); // min-iv knot = highest measured tput
+    expect(low.output_tput_per_gpu).toBe(800);
 
     const mid = findRow(rows, 'gb200', '8192x1024', 60)!;
     expect(mid.boundary).toBe('interpolated');
@@ -147,15 +133,10 @@ describe('computeTcoFeed — frontier reads', () => {
   it('uses stored median_intvty (chart parity), falling back to 1/median_itl', () => {
     const rows = computeTcoFeed(
       [
-        // Stored intvty wins — it is what the chart plots for single_turn
-        // rows — even when 1/median_itl disagrees (here itl implies iv 40).
         makeRow({
           metrics: { median_intvty: 50, median_itl: 1 / 40, output_tput_per_gpu: 600 },
         }),
-        // Legacy row without intvty → derived from itl (iv 20, higher tput,
-        // so it lands on the frontier as the low-iv knot).
         makeRow({ metrics: { median_itl: 1 / 20, output_tput_per_gpu: 900 } }),
-        // Neither metric valid → row dropped.
         makeRow({ metrics: { output_tput_per_gpu: 5000 } }),
       ],
       WORKLOAD_8K1K,
@@ -186,9 +167,9 @@ describe('computeTcoFeed — frontier reads', () => {
           itl: 1 / 50,
           otput: 9000,
         }),
-        makeRow({ isl: 1024, osl: 1024, itl: 1 / 50, otput: 9000 }), // different workload
-        makeRow({ itl: 0, otput: 9000 }), // invalid itl
-        makeRow({ itl: 1 / 50, otput: 0 }), // invalid tput
+        makeRow({ isl: 1024, osl: 1024, itl: 1 / 50, otput: 9000 }),
+        makeRow({ itl: 0, otput: 9000 }),
+        makeRow({ itl: 1 / 50, otput: 0 }),
       ],
       WORKLOAD_8K1K,
       [50],
@@ -304,7 +285,7 @@ describe('parseTiers', () => {
 
   it('rejects duplicate tiers (would double-count in the scores view)', () => {
     expect(parseTiers('50,50')).toBeNull();
-    expect(parseTiers('50,50.0')).toBeNull(); // same numeric value
+    expect(parseTiers('50,50.0')).toBeNull();
   });
 });
 
@@ -323,7 +304,7 @@ describe('parseWorkloads', () => {
   });
 
   it('rejects malformed pairs, zero lengths, and oversized lists', () => {
-    expect(parseWorkloads('8192X1024')).toBeNull(); // uppercase separator
+    expect(parseWorkloads('8192X1024')).toBeNull();
     expect(parseWorkloads('axb')).toBeNull();
     expect(parseWorkloads('0x1024')).toBeNull();
     expect(parseWorkloads('8192x')).toBeNull();
@@ -402,7 +383,7 @@ describe('tcoFeedToCsv', () => {
       'hardware,workload,tier,output_tput_per_gpu,boundary,frontier_points,' +
         'frontier_min_interactivity,frontier_max_interactivity,latest_date,oldest_frontier_date',
     );
-    expect(lines).toHaveLength(4); // header + 2 rows + trailing newline
+    expect(lines).toHaveLength(4);
     expect(lines[1]).toBe('gb200,8192x1024,50,400,interpolated,3,20,100,2026-07-10,2026-07-10');
     expect(lines[2]).toBe('gb200,8192x1024,200,0,unreachable,3,20,100,2026-07-10,2026-07-10');
     expect(csv.endsWith('\n')).toBe(true);
@@ -414,10 +395,6 @@ const BOTH_WORKLOADS = [
   { isl: 8192, osl: 1024 },
 ];
 
-/**
- * b200 covers both workloads (single-knot frontiers read exactly at tier
- * 50); gb300 covers only 8k1k.
- */
 function twoWorkloadRows(): TcoFeedSourceRow[] {
   return [
     makeRow({
@@ -435,27 +412,21 @@ function twoWorkloadRows(): TcoFeedSourceRow[] {
 
 describe('computeTcoScores', () => {
   it('is exactly the weighted sum over the points view, times the output-equivalent factor', () => {
-    // Knots at iv 20/50/100 read exactly at those tiers: 1000/400/100.
     const tiers = [20, 50, 100];
     const feed = computeTcoFeed(threeKnotRows(), WORKLOAD_8K1K, tiers);
     const scores = computeTcoScores(feed, WORKLOAD_8K1K, tiers, [0.5, 0.3, 0.2], [1], 0.25);
     expect(scores).toHaveLength(1);
-    // 0.5·1000 + 0.3·400 + 0.2·100 = 640, ×(1 + 0.25·8192/1024) = ×3.
     expect(scores[0].workload_scores['8192x1024']).toBe(640);
     expect(scores[0].score).toBe(1920);
-    // alpha=0 scores plain output throughput.
     const plain = computeTcoScores(feed, WORKLOAD_8K1K, tiers, [0.5, 0.3, 0.2], [1], 0);
     expect(plain[0].score).toBe(640);
   });
 
   it('unreachable tiers contribute 0 at full weight; clamped tiers contribute the clamp', () => {
-    // Frontier spans iv 40 → 80.
     const source = [makeRow({ itl: 1 / 40, otput: 800 }), makeRow({ itl: 1 / 80, otput: 200 })];
     const tiers = [30, 40, 100];
     const feed = computeTcoFeed(source, WORKLOAD_8K1K, tiers);
     const scores = computeTcoScores(feed, WORKLOAD_8K1K, tiers, [0.25, 0.5, 0.25], [1], 0);
-    // 0.25·800 (clamped) + 0.5·800 + 0.25·0 (unreachable) = 600 — the
-    // unreachable tier's weight is NOT redistributed to reachable tiers.
     expect(scores[0].score).toBe(600);
     expect(scores[0].unreachable_tiers).toBe(1);
     expect(scores[0].clamped_tiers).toBe(1);
@@ -468,10 +439,9 @@ describe('computeTcoScores', () => {
 
     const b200 = scores[0];
     expect(b200.workload_scores).toEqual({ '1024x1024': 1000, '8192x1024': 400 });
-    expect(b200.score).toBe(700); // 0.5·1000 + 0.5·400
+    expect(b200.score).toBe(700);
     expect(b200.workloads_covered).toBe(2);
 
-    // gb300 lacks 1k1k → its weight renormalizes onto 8k1k alone.
     const gb300 = scores[1];
     expect(gb300.workload_scores).toEqual({ '1024x1024': null, '8192x1024': 5000 });
     expect(gb300.score).toBe(5000);
@@ -481,7 +451,6 @@ describe('computeTcoScores', () => {
   it('applies per-workload output-equivalent factors before blending', () => {
     const feed = computeTcoFeed(twoWorkloadRows(), BOTH_WORKLOADS, [50]);
     const scores = computeTcoScores(feed, BOTH_WORKLOADS, [50], [1], [0.5, 0.5], 0.25);
-    // 0.5·1000·(1 + 0.25·1) + 0.5·400·(1 + 0.25·8) = 625 + 600.
     expect(scores[0].score).toBe(1225);
   });
 

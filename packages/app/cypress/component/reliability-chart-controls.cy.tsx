@@ -7,7 +7,6 @@ describe('Reliability ChartControls', () => {
   });
 
   it('shows the current date range value from context', () => {
-    // Default mock context has dateRange = 'last-7-days'
     cy.get('[data-testid="reliability-date-range"]').should('contain.text', 'Last 7 days');
   });
 

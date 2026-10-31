@@ -13,7 +13,6 @@ import {
   readRequestTimelineGz,
 } from './request-timeline';
 
-// Observe the self-heal hand-off while still running the real write-back.
 vi.mock('./agentic-shared', async (importOriginal) => {
   const actual = await importOriginal<typeof agenticShared>();
   return { ...actual, writeBackRequestTimeline: vi.fn(actual.writeBackRequestTimeline) };
@@ -39,11 +38,6 @@ function mockSql(queue: unknown[][]): { sql: DbClient; log: SqlCall[] } {
   return { sql, log };
 }
 
-/**
- * Serve `substring(request_timeline_gz from $1 for $2)` from `stored` with
- * PostgreSQL's 1-based semantics, recording every requested range. Any other
- * query returns `meta`.
- */
 function sliceServingSql(
   stored: Buffer,
   meta?: Record<string, unknown>,
@@ -103,7 +97,6 @@ const gzipMeta = (gzBytes: number) => ({
   timeline_version: REQUEST_TIMELINE_VERSION,
 });
 
-/** The stored bytes with one byte in the middle of the deflate stream flipped. */
 function corruptedCopy(stored: Buffer): Buffer {
   const corrupted = Buffer.from(stored);
   const middle = Math.floor(corrupted.length / 2);
@@ -172,7 +165,6 @@ describe('getRequestTimeline', () => {
     const corrupted = corruptedCopy(stored);
     const { sql } = sliceServingSql(corrupted, gzipMeta(corrupted.length));
 
-    // Every byte arrives, so the length checks pass and only decoding can tell.
     await expect(readRequestTimelineGz(sql, 870, corrupted.length, 64)).resolves.toHaveLength(
       stored.length,
     );
@@ -252,8 +244,6 @@ describe('getRequestTimeline', () => {
 
     expect(result?.version).toBe(REQUEST_TIMELINE_VERSION);
     expect(result?.requests).toHaveLength(1);
-    // A stale gzip copy is never sliced; the blob is read instead. The
-    // PostgreSQL test in request-timeline-db.test.ts checks what is stored.
     expect(log[1]!.text).toContain('profile_export_chunk_count as parts');
     expect(agenticShared.writeBackRequestTimeline).toHaveBeenCalledWith(sql, 870, result);
   });
@@ -268,7 +258,6 @@ describe('getRequestTimeline', () => {
 
     await expect(getRequestTimeline(sql, 422991)).resolves.toBeNull();
     expect(agenticShared.writeBackRequestTimeline).not.toHaveBeenCalled();
-    // Meta read and blob read only.
     expect(log).toHaveLength(2);
   });
 });

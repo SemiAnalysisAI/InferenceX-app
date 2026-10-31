@@ -14,7 +14,6 @@ const cases: {
   readFileSync(new URL('../fixtures/power-percentile-recovery.json', import.meta.url), 'utf8'),
 );
 
-// Replayed telemetry hashes/windows live in docs/data/power-p90-backfill.json.
 describe('audited Qwen3.5 power percentile recovery', () => {
   it.each(cases)(
     'restores P75/P90 through ingest and chart conversion for row $api.id',

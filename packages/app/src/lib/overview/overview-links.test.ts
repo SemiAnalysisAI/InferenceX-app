@@ -20,7 +20,6 @@ import {
 
 const RUN_URL = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/26714221123';
 
-/** Query the default fixture produces: one source run, so the run is pinned. */
 const PINNED_QUERY =
   'g_model=Qwen-3.5-397B-A17B&g_rundate=2026-07-18&g_runid=26714221123&i_seq=8k%2F1k' +
   '&i_prec=fp4&i_metric=y_costh&i_gpus=b200_sglang_mtp&i_spec=mtp&i_disagg=single-node' +
@@ -409,9 +408,6 @@ describe('overview row scope links', () => {
   });
 
   it('keeps the row scope on the URL in hardware mode, where it is dormant', () => {
-    // The 30-day tab is off screen, so the key changes nothing on the rendered
-    // matrix. It is still the only record of that tab's answer, and dropping it
-    // here is what used to lose the filter on refresh or a shared link.
     expect(overviewHref('en', 50, 'community', 'hardware', 'b200', 'default', 'changed')).toBe(
       '/overview?rows=changed',
     );
@@ -468,10 +464,6 @@ describe('overview hardware row scope links', () => {
   });
 
   it('writes both row scopes at once, so a URL rebuilt from page data keeps them', () => {
-    // Every href the page builds comes from the current page data, including
-    // the one the client router starts from on first load. Emitting only the
-    // active mode's key there erased the other tab's filter on refresh and on
-    // any shared link carrying both.
     expect(overviewHref('en', 50, 'community', '30d', 'b200', 'default', 'changed', 'priced')).toBe(
       '/overview?compare=30d&rows=changed&hwrows=priced',
     );
@@ -490,8 +482,6 @@ describe('overview hardware row scope links', () => {
   });
 
   it('lets each mode keep its own filter across a tab switch', () => {
-    // The comparison switcher owns only `compare`, so the scope belonging to the
-    // mode being left stays in the URL and is waiting when the reader returns.
     const hardware = mergeOverviewControlHref('/overview', '/overview?hwrows=priced', ['hwrows']);
     expect(hardware).toBe('/overview?hwrows=priced');
 
@@ -509,9 +499,6 @@ describe('overview hardware row scope links', () => {
   });
 
   it('lets the models control reset both scopes without clearing the dormant one', () => {
-    // The models toggle owns `models` plus both row keys, because revealing
-    // inactive models resets them. A merged key the target href does not carry
-    // is deleted, so hiding — which resets nothing — has to restate both.
     const current = '/overview?compare=30d&models=all&rows=changed&hwrows=priced';
     const keys = ['models', 'rows', 'hwrows'] as const;
 

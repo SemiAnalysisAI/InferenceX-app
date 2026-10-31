@@ -16,8 +16,8 @@ export default async function ZhCacheReusePage({ searchParams }: Props) {
   const seed = resolveCalculatorUrlSeed(sp);
   return (
     <>
-      <ZhTabIntro tab="cache-reuse" />
       <CacheReuseDisplay urlSeed={seed} />
+      <ZhTabIntro tab="cache-reuse" />
     </>
   );
 }

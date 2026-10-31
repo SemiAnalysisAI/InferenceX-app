@@ -7,6 +7,8 @@ import {
   type TokenLengthPercentiles,
 } from '@semianalysisai/inferencex-constants';
 
+import { ApiRequestError } from '@/lib/api/api-request-error';
+
 interface ResidentSequenceLengthSketches {
   isl: TokenLengthSketch | null;
   osl: TokenLengthSketch | null;
@@ -38,10 +40,15 @@ async function fetchResidentSequenceLengths(
 ): Promise<ResidentSequenceLengthPercentiles | null> {
   const chunks = await Promise.all(
     chunkResidentPointIds(ids).map(async (chunk) => {
-      const response = await fetch(`/api/v1/resident-sequence-lengths?ids=${chunk.join(',')}`, {
-        signal,
-      });
-      if (!response.ok) throw new Error(`resident-sequence-lengths ${response.status}`);
+      const url = `/api/v1/resident-sequence-lengths?ids=${chunk.join(',')}`;
+      const response = await fetch(url, { signal });
+      if (!response.ok) {
+        throw new ApiRequestError(
+          `resident-sequence-lengths ${response.status}`,
+          response.status,
+          url,
+        );
+      }
       return (await response.json()) as ResidentSequenceLengthSketches;
     }),
   );

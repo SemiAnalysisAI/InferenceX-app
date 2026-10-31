@@ -16,14 +16,6 @@ import {
   nullableNumberSchema as nullableNumber,
 } from '@/lib/api/api-documentation-helpers';
 
-/**
- * Docs fragment for GET /api/v1/views/rankings.
- *
- * Assembled into the registry by the coordinator — this module only exports
- * `operations`. The `views` group id is added to `ApiGroupId` during that
- * integration, hence the local cast below.
- */
-
 const VIEWS_GROUP: ApiOperation['group'] = 'views';
 
 const nullableBoolean: ApiSchema = { type: ['boolean', 'null'] };
@@ -48,7 +40,7 @@ const parameters: readonly ApiParameter[] = [
     type: 'string',
     description: text(
       'Display model name (case-insensitive) or compare-page slug. Default: every ranked model; models without measurable rows are dropped there but kept when requested explicitly.',
-      '展示模型名称（不区分大小写）或对比页 slug。默认为全部有排名的模型；无可测数据的模型在全量结果中会被省略，显式指定时则保留。',
+      '模型显示名称（不区分大小写）或对比页 slug。默认为全部有排名的模型；无可测数据的模型在全量结果中会被省略，显式指定时则保留。',
     ),
     schema: { type: 'string', enum: SUPPORTED_BENCHMARK_MODELS },
     example: 'DeepSeek-V4-Pro',

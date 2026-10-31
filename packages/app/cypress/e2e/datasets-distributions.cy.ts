@@ -155,11 +155,9 @@ describe('Dataset distribution percentiles', () => {
   it('localizes the distribution cards and conversation controls', () => {
     cy.visit('/zh/agentx/test-dataset', { onBeforeLoad: unlockAgenticGate });
 
-    // Representative labels only; exhaustive copy lives with the translations.
     cy.get('input[aria-label="搜索对话"]').should('exist');
     cy.contains('[data-slot="card"]', '每对话轮次数').within(() => {
       cy.get('[data-testid="distribution-unit"]').should('have.text', '轮次');
-      // Keyboard access keeps working on the localized route.
       cy.get('rect[role="slider"]')
         .focus()
         .should('have.attr', 'aria-valuetext')

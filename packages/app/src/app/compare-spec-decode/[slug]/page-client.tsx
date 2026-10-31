@@ -5,22 +5,25 @@ import { useEffect, useMemo } from 'react';
 
 import type { GPUDataPoint } from '@/components/calculator/types';
 import { useThroughputData } from '@/components/calculator/useThroughputData';
-import {
-  CompareTableRenderer,
-  type CompareTableData,
-} from '@/components/compare/compare-table-renderer';
+import { CompareTableRenderer } from '@/components/compare/compare-table-renderer';
 import {
   GlobalFilterProvider,
+  useGlobalFilterAvailability,
   useGlobalFilterRun,
   useGlobalFilterSelection,
 } from '@/providers/GlobalFilterContext';
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { Card } from '@/components/ui/card';
-import { track } from '@/lib/analytics/analytics';
+import { track, trackOncePerPageview } from '@/lib/analytics/analytics';
 import { toModel, toPrecisions, toSequence } from '@/lib/compare/compare-enum-coerce';
 import { SPEC_METHODS_ACTIVE } from '@/lib/compare/compare-variant-slug';
 import type { AgenticScenarioIntro } from '@/lib/compare/compare-ssr';
+import {
+  type CompareTableData,
+  compareTableDataFromPoints,
+  pinTablePrecisions,
+} from '@/lib/compare/compare-table-view';
 
 const STRINGS = {
   en: {
@@ -53,7 +56,6 @@ const STRINGS = {
   },
 } as const;
 
-/** y_costh = Cost per Million Total Tokens (Owning at Large Hyperscaler Volume). */
 const DEFAULT_Y_AXIS = 'y_costh';
 
 interface CompareSpecDecodePageClientProps {
@@ -66,8 +68,6 @@ interface CompareSpecDecodePageClientProps {
   defaultPrecision: string | null;
   ssrTableData: CompareTableData;
   narrative: string[];
-  /** Set only when the page is rendering the agentic workload. Explains
-   *  what AgentX measures before the head-to-head numbers. */
   agenticIntro?: AgenticScenarioIntro | null;
   gpuLabel: string;
   precisionLabel: string;
@@ -103,7 +103,7 @@ export default function CompareSpecDecodePageClient({
   const t = STRINGS[locale];
 
   useEffect(() => {
-    track('compare_spec_decode_page_view', { slug, gpu, method });
+    trackOncePerPageview('compare_spec_decode_page_view', { slug, gpu, method }, slug);
   }, [slug, gpu, method]);
 
   const initialModel = toModel(modelDisplayName);
@@ -157,7 +157,6 @@ export default function CompareSpecDecodePageClient({
                   .
                 </p>
               )}
-              {/* MTP engine caveat disclaimer */}
               <div
                 className="mt-3 flex items-start gap-2 rounded-md border-l-2 border-amber-500 bg-amber-500/5 px-3 py-2"
                 data-testid="compare-spec-decode-mtp-caveat"
@@ -255,6 +254,9 @@ export default function CompareSpecDecodePageClient({
               aLabel={isZh ? `启用 ${aLabel}` : aLabel}
               bLabel={isZh ? '关闭投机解码' : bLabel}
               ssrTableData={ssrTableData}
+              ssrSequence={defaultSequence}
+              ssrModel={initialModel}
+              ssrPrecisions={defaultPrecision ? [defaultPrecision] : (initialPrecisions ?? [])}
               emptyStateText={t.emptyState}
             />
           </Card>
@@ -272,6 +274,9 @@ function CompareTableSection({
   aLabel,
   bLabel,
   ssrTableData,
+  ssrSequence,
+  ssrModel,
+  ssrPrecisions,
   emptyStateText,
 }: {
   gpu: string;
@@ -280,37 +285,40 @@ function CompareTableSection({
   aLabel: string;
   bLabel: string;
   ssrTableData: CompareTableData;
+  ssrSequence: string | null;
+  ssrModel: ReturnType<typeof toModel>;
+  ssrPrecisions: string[];
   emptyStateText: string;
 }) {
-  const { effectiveSequence, effectivePrecisions, selectedModel } = useGlobalFilterSelection();
+  const {
+    selectedSequence,
+    effectiveSequence,
+    effectivePrecisions,
+    selectedModel,
+    selectedPrecisions,
+    sequenceResolved,
+  } = useGlobalFilterSelection();
   const { selectedRunDate } = useGlobalFilterRun();
+  const { availableDates } = useGlobalFilterAvailability();
 
-  const { gpuDataByGroupKey, ranges, hasData } = useThroughputData(
+  const { gpuDataByGroupKey, loading, error } = useThroughputData(
     selectedModel,
     effectiveSequence,
     effectivePrecisions,
     selectedRunDate,
   );
 
-  // Partition client-side data points by speculative decoding:
-  // Side A = hw keys carrying the method suffix (e.g. _mtp)
-  // Side B = hw keys for the base GPU without any spec-decode suffix
   const { pointsA, pointsB } = useMemo(() => {
     const pA: GPUDataPoint[] = [];
     const pB: GPUDataPoint[] = [];
     const methodSuffix = `_${method}`;
     for (const [groupKey, points] of Object.entries(gpuDataByGroupKey)) {
       const hwKey = groupKey.split('__')[0];
-      // Must belong to this GPU. Keys are framework-qualified (h200_sglang).
       if (hwKey !== gpu && !hwKey.startsWith(`${gpu}_`)) continue;
-      // getHardwareKey appends the spec-decode suffix LAST (h200_sglang_mtp),
-      // so side membership is decided by the key's ending.
       const isSideA = hwKey.endsWith(methodSuffix);
       const isSideB = !isSideA && ![...SPEC_METHODS_ACTIVE].some((m) => hwKey.endsWith(`_${m}`));
       if (!isSideA && !isSideB) continue;
       for (const point of points) {
-        // The slug pins one precision — ignore points from other precisions
-        // the user may enable in the chart controls.
         if (precision !== null && point.precision !== precision) continue;
         (isSideA ? pA : pB).push(point);
       }
@@ -318,16 +326,34 @@ function CompareTableSection({
     return { pointsA: pA, pointsB: pB };
   }, [gpuDataByGroupKey, gpu, method, precision]);
 
-  const clientRange = hasData ? ranges.interactivity : ssrTableData.interactivityRange;
+  const pinnedRange = useMemo(
+    () =>
+      pointsA.length > 0 || pointsB.length > 0
+        ? compareTableDataFromPoints(pointsA, pointsB).interactivityRange
+        : null,
+    [pointsA, pointsB],
+  );
 
   return (
     <CompareTableRenderer
       aLabel={aLabel}
       bLabel={bLabel}
       ssrTableData={ssrTableData}
-      interactivityRange={clientRange}
-      gpuDataPointsA={pointsA}
-      gpuDataPointsB={pointsB}
+      ssrSequence={ssrSequence}
+      ssrModel={ssrModel}
+      ssrPrecisions={ssrPrecisions}
+      selectedSequence={selectedSequence}
+      effectiveSequence={effectiveSequence}
+      sequenceResolved={sequenceResolved}
+      selectedModel={selectedModel}
+      selectedPrecisions={pinTablePrecisions(selectedPrecisions, precision)}
+      effectivePrecisions={pinTablePrecisions(effectivePrecisions, precision)}
+      latestRun={!selectedRunDate || selectedRunDate === availableDates.at(-1)}
+      pointsA={pointsA}
+      pointsB={pointsB}
+      clientInteractivityRange={pinnedRange}
+      loading={loading}
+      error={error}
       emptyStateText={emptyStateText}
     />
   );

@@ -5,6 +5,7 @@ import { Suspense } from 'react';
 import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { enAlternates } from '@/lib/i18n/i18n';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 import { AgentXCompareHero } from '@/components/compare/agentx-compare-hero';
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
@@ -22,7 +23,7 @@ import {
 import { bucketComparePairsByVendor, formatModelList } from '@/lib/compare/compare-ssr';
 import { type Model } from '@/lib/catalog/data-mappings';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
 
 const DESCRIPTION =
   'Compare AgentX agentic inference results for Kimi K3, DeepSeek V4 Pro, MiniMax M3, Qwen 3.5, and GLM 5.3, plus fixed-sequence chip comparisons.';
@@ -31,17 +32,12 @@ export const metadata: Metadata = {
   title: 'AgentX Inference Comparisons',
   description: DESCRIPTION,
   alternates: enAlternates('/compare'),
-  openGraph: {
+  ...socialMetadata({
     title: `AgentX Inference Comparisons | ${SITE_NAME}`,
     description: DESCRIPTION,
     url: `${SITE_URL}/compare`,
-    type: 'website',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: `AgentX Inference Comparisons | ${SITE_NAME}`,
-    description: DESCRIPTION,
-  },
+    locale: 'en',
+  }),
 };
 
 interface VendorGroup {
@@ -93,10 +89,6 @@ export default function CompareIndexPage() {
     <>
       <JsonLd data={jsonLd} />
       <AgentXCompareHero locale="en" />
-      {/* In-page Suspense (not loading.tsx — a route-level boundary would
-          also wrap /compare/[slug] and degrade its 404/308 statuses): the
-          static hero paints immediately while the catalog's availability
-          query streams behind the skeleton. */}
       <Suspense fallback={<CompareRouteSkeleton />}>
         <CompareCatalog />
       </Suspense>
@@ -105,11 +97,6 @@ export default function CompareIndexPage() {
 }
 
 async function CompareCatalog() {
-  // Server-side filter: only show (model, pair) combinations where both GPUs
-  // have benchmark data for that model. Avoids cards that would link to an
-  // empty-state page. The page-level handler at /compare/[slug] still renders
-  // the empty-state for direct URL hits, so this is purely a navigation
-  // hygiene concern.
   const comparablePairsByModel = await getComparablePairsByModelSlug();
   const totalUrls = [...comparablePairsByModel.values()].reduce((s, p) => s + p.length, 0);
   const modelsWithPairs = COMPARE_MODEL_SLUGS.filter(
@@ -175,11 +162,6 @@ async function CompareCatalog() {
           <section key={model.slug} id={model.slug}>
             <Card className="flex flex-col gap-4">
               <div>
-                {/* `displayName` is the Model enum value by contract (see
-                    CompareModelSlug in compare-slug.ts), so the shared
-                    ModelLogo resolves each section's brand mark (DeepSeek,
-                    MiniMax, Kimi, ...) from MODEL_CONFIG and renders nothing
-                    for models without one. */}
                 <h2 className="flex items-center gap-2.5 text-xl lg:text-2xl font-bold tracking-tight">
                   <ModelLogo model={model.displayName as Model} className="size-6 lg:size-7" />
                   {model.label}
@@ -203,7 +185,7 @@ async function CompareCatalog() {
                       return (
                         <ComparePairCardLink
                           key={slug}
-                          href={comparisonPairHref('en', slug, model)}
+                          href={comparisonPairHref('en', slug)}
                           slug={slug}
                           label={label}
                           archLine={archLine}

@@ -1,8 +1,3 @@
-/**
- * The workload is addressable as a path segment — `/compare/<slug>/agentic`,
- * `/compare/<slug>/8k-1k` — not only as `?i_seq=`. The bare slug keeps
- * rendering the pair's default workload.
- */
 const AGENTX_SLUG = 'deepseek-v4-b200-vs-h200';
 
 describe('Compare scenario routes', () => {
@@ -23,10 +18,6 @@ describe('Compare scenario routes', () => {
   });
 
   it('lets the path segment override the pair default', () => {
-    // Which workload a bare slug defaults to is `pickPairDefaults`, unit-tested
-    // in compare-pair-defaults.test.ts against rows this fixture set does not
-    // carry. What belongs here is the routing contract: whatever the default
-    // is, a scenario segment replaces it.
     cy.visit(`/compare/${AGENTX_SLUG}`);
     cy.get('[data-testid="compare-narrative"]')
       .invoke('text')
@@ -42,8 +33,6 @@ describe('Compare scenario routes', () => {
   });
 
   it('canonicalizes every scenario view onto the bare slug URL', () => {
-    // The segments are views of one comparison; without a shared canonical the
-    // default view would appear twice in the index.
     cy.visit(`/compare/${AGENTX_SLUG}/8k-1k`);
     cy.get('link[rel="canonical"]')
       .should('have.attr', 'href')
@@ -75,17 +64,17 @@ describe('Compare scenario routes', () => {
     }
   });
 
-  it('links catalog cards to scenario paths rather than query strings', () => {
+  it('links catalog cards to the canonical pair URL without a scenario segment', () => {
     for (const base of ['/compare', '/compare-per-dollar']) {
       cy.visit(base);
       cy.get('#deepseek-v4 a[data-scenario="AgentX"]')
         .first()
         .should('have.attr', 'href')
-        .and('match', new RegExp(`^${base}/.+/agentic$`, 'u'));
+        .and('match', new RegExp(`^${base}/deepseek-v4-[^/?]+$`, 'u'));
       cy.get('#deepseek-r1 a[data-scenario="8K/1K"]')
         .first()
         .should('have.attr', 'href')
-        .and('match', new RegExp(`^${base}/.+/8k-1k$`, 'u'));
+        .and('match', new RegExp(`^${base}/deepseek-r1-[^/?]+$`, 'u'));
     }
   });
 

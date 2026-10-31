@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { track } from '@/lib/analytics/analytics';
+import { trackOncePerSession } from '@/lib/analytics/analytics';
 
 export function ReadingProgressBar({ slug }: { slug: string }) {
   const [progress, setProgress] = useState(0);
@@ -17,7 +17,6 @@ export function ReadingProgressBar({ slug }: { slug: string }) {
 
         const rect = article.getBoundingClientRect();
         const viewportHeight = window.innerHeight;
-        // 0 when article top is at viewport top, 1 when article bottom reaches viewport bottom
         const totalDistance = rect.height - viewportHeight;
         const p = totalDistance <= 0 ? 1 : Math.min(1, Math.max(0, -rect.top / totalDistance));
 
@@ -26,7 +25,7 @@ export function ReadingProgressBar({ slug }: { slug: string }) {
         for (const milestone of [25, 50, 75, 100]) {
           if (p * 100 >= milestone && !firedRef.current.has(milestone)) {
             firedRef.current.add(milestone);
-            track('blog_read_milestone', { milestone, slug });
+            trackOncePerSession('blog_read_milestone', { milestone, slug }, `${slug}:${milestone}`);
           }
         }
       });

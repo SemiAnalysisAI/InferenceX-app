@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { notFound, redirect } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 
 import 'katex/dist/katex.min.css';
 
@@ -26,7 +26,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ModelPage({ params }: Props) {
   const { slug } = await params;
   const canonical = COMPARE_MODEL_ALIASES[slug];
-  if (canonical) redirect(modelAliasDestination(canonical, 'en'));
+  if (canonical) permanentRedirect(modelAliasDestination(canonical, 'en'));
 
   const page = getLocalizedModelPage(slug, 'en');
   if (!page) notFound();

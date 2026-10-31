@@ -9,14 +9,12 @@ const routes = apiRouteCatalog
   )
   .map(({ path }) => ({
     path,
-    // Catalog templates keep private path IDs out of analytics.
     segments: path.split('/'),
   }));
 
 const marker =
-  /^inferencex-(?<source>cli|skill)\/(?<version>(?:0|[1-9]\d{0,3})\.(?:0|[1-9]\d{0,3})\.(?:0|[1-9]\d{0,3}))$/u;
+  /^inferencex-(?<client>cli|skill)\/(?<version>(?:0|[1-9]\d{0,3})\.(?:0|[1-9]\d{0,3})\.(?:0|[1-9]\d{0,3}))$/u;
 
-/** Attribution is self-reported, never authentication or a user identifier. */
 export function captureClientRequest(request: Request): Promise<void> | undefined {
   const environment = process.env.VERCEL_ENV;
   if (
@@ -46,12 +44,11 @@ export function captureClientRequest(request: Request): Promise<void> | undefine
   return captureServer(
     'cli_api_request_received',
     {
-      source: match.groups.source,
+      client: match.groups.client,
       version: match.groups.version,
-      route: route.path,
+      route_template: route.path,
       environment,
       traffic,
-      $process_person_profile: false,
       $geoip_disable: true,
     },
     'inferencex-client-request-volume',

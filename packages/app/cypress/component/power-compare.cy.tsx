@@ -17,15 +17,9 @@ import {
 } from '../support/mock-data';
 import { mountWithProviders } from '../support/test-utils';
 
-// Power comparison series (`i_pcompare`) on `?unofficialrun=` overlays: role
-// clones draw in the overlay run colour with the role dash, and their legend
-// rows toggle them.
-
 const OVERLAY_RUN_ID = 31415926535;
 const OVERLAY_RUN_URL = `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${OVERLAY_RUN_ID}`;
 const hwConfig = createMockHardwareConfig();
-// `lower_right` is what the registry resolves for a lower-is-better metric on
-// the interactivity chart; the power envelope walks from that corner.
 const chartDefinition = createMockChartDefinition({
   chartType: 'interactivity',
   y_measuredAvgPower: 'measuredAvgPower.y',
@@ -34,10 +28,6 @@ const chartDefinition = createMockChartDefinition({
 
 const metric = (y: number) => ({ y, roof: false });
 
-/**
- * Three measured points with both roles available. Power falls as x rises so
- * every point sits on the upper power envelope the chart draws for watt axes.
- */
 function measuredCurve(hwKey: string, run_url?: string): InferenceData[] {
   return [
     [8, 700, 840, 500],
@@ -172,11 +162,7 @@ describe('ScatterGraph power comparison series', () => {
     mountCompare(official, overlay);
 
     cy.get(`${svg} .roofline-path[data-power-variant="prefill"]`).should('exist');
-    // Base points and rooflines carry no variant id (only role siblings are
-    // cloned), so the base row has to map back onto them.
     cy.get(legend).contains('label', 'All GPUs').trigger('mouseover');
-    // Wait for the siblings to settle first: opacity transitions over 150 ms,
-    // so a base check taken at once would still read the pre-hover value.
     cy.get(`${svg} .roofline-path[data-power-variant="prefill"]`).should(
       'have.css',
       'opacity',
@@ -218,6 +204,20 @@ describe('Modeled power source links', () => {
                 facilityWatts: 8320,
                 deploymentItWatts: 6400,
                 deploymentFacilityWatts: 8320,
+                deploymentBreakdownWatts: {
+                  gpu: 4800,
+                  measuredCpu: 0,
+                  cpu: 375,
+                  memory: 150,
+                  nic: 250,
+                  nvswitch: 125,
+                  storage: 60,
+                  other: 40,
+                  fans: 200,
+                  psuLoss: 200,
+                  network: 200,
+                  facility: 1920,
+                },
                 pue: 1.3,
                 topologyBasis: 'single-node',
                 chassisBasis: 'full',

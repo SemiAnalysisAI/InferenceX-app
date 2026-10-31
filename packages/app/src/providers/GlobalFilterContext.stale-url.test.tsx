@@ -6,22 +6,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Model, Sequence } from '@/lib/catalog/data-mappings';
 import type * as UrlStateModule from '@/lib/routing/url-state';
 
-/**
- * Regression coverage for the stale-`i_seq` snapshot bug behind the paramless
- * AgentX hero links (see `agentxDashboardHref`).
- *
- * The module-level URL snapshot retains self-written params across soft
- * navigations: every dashboard visit pins its resolved sequence via the
- * URL-sync effect, and `refreshUrlParams` does not evict keys absent from the
- * live URL. `getUrlParam('i_seq')` can therefore return the PREVIOUS page's
- * sequence on a navigation whose URL carries no `i_seq` at all. Applying that
- * value flips `sequenceExplicit`, which blocks the availability-driven AgentX
- * default — a bare `/inference/kimi-k3` hero link would open on 8K/1K.
- *
- * The provider must consult `hasExplicitUrlParam('i_seq')` (which IS refreshed
- * per navigation) before honoring the snapshot value.
- */
-
 const mocks = vi.hoisted(() => ({
   availability: {
     data: [] as unknown[],
@@ -62,13 +46,11 @@ import {
   useGlobalFilterSelection,
 } from './GlobalFilterContext';
 
-/** Kimi-K3 availability: both the Agentic and the 8K/1K scenario exist. */
 const KIMI_K3_ROWS = [
   { model: 'kimik3', isl: null, osl: null, benchmark_type: 'agentic_traces' },
   { model: 'kimik3', isl: 8192, osl: 1024, benchmark_type: 'single_turn' },
 ];
 
-/** Two Agentic run dates; a retained `g_rundate` snapshot points at the older one. */
 const STALE_RUN_DATE = '2026-08-20';
 const LATEST_RUN_DATE = '2026-09-01';
 const KIMI_K3_DATED_ROWS = [
@@ -168,14 +150,6 @@ describe('GlobalFilterProvider stale i_prec snapshot', () => {
   });
 });
 
-/**
- * The same snapshot-vs-live-URL split applies to the run pins. Every manual
- * date pick (and every blog "live chart" link) writes `g_rundate` into the
- * snapshot; `refreshUrlParams` never evicts it. If the provider honored that
- * retained value on a navigation whose URL carries no `g_rundate`, it would flip
- * the explicit-date flag and open a fresh dashboard on the OLD date instead of
- * the latest run — the "run date is not at the latest on a fresh load" bug.
- */
 describe('GlobalFilterProvider stale g_rundate snapshot', () => {
   beforeEach(() => {
     mocks.availability.data = KIMI_K3_DATED_ROWS;

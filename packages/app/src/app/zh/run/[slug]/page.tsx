@@ -1,12 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import {
-  AUTHOR_NAME,
-  SITE_NAME,
-  SITE_URL,
-  SUPPORTERS_LINE_ZH,
-} from '@semianalysisai/inferencex-constants';
+import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { fmtCostPerMtok, fmtThroughput } from '@/components/live-seo/format';
 import {
@@ -15,7 +10,9 @@ import {
   type RunStrings,
 } from '@/components/live-seo/run-page-sections';
 import { JsonLd } from '@/components/seo/json-ld';
-import { ZH_LANG_TAG, ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
+import { ZH_LANG_TAG, zhAlternates } from '@/lib/i18n/i18n';
+import { clampMetaDescription } from '@/lib/seo/meta-text';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 import { scenarioLabel } from '@/lib/live-seo/rankings';
 import { getRunPageEntry, type RunPageEntry } from '@/lib/live-seo/run-pages';
 import {
@@ -27,7 +24,11 @@ import {
 } from '@/lib/live-seo/run-pages-zh';
 import { getRunPageData, type RunPageData } from '@/lib/live-seo/run-rankings-data.server';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
+
+export function generateStaticParams(): { slug: string }[] {
+  return [];
+}
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -54,25 +55,25 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!entry) return {};
   const data = await getRunPageData(entry.slug);
   const title = runPageTitleZh(entry);
-  const description = `${data ? statLedDescriptionZh(entry, data) : runPageDescriptionZh(entry)}${SUPPORTERS_LINE_ZH}`;
+  const description = clampMetaDescription(
+    data ? statLedDescriptionZh(entry, data) : runPageDescriptionZh(entry),
+    'zh',
+  );
   const url = `${SITE_URL}/zh/run/${entry.slug}`;
   return {
     title: { absolute: `${title} | ${SITE_NAME}` },
     description,
     keywords: runPageKeywordsZh(entry),
     authors: [{ name: AUTHOR_NAME }],
-    // Valid slugs without benchmark data render an empty state; keep those
-    // out of the index (the sitemap already excludes them).
     ...(data?.hasData ? {} : { robots: { index: false, follow: true } }),
     alternates: zhAlternates(`/run/${entry.slug}`),
-    openGraph: {
+    ...socialMetadata({
       title: `${title} | ${SITE_NAME}`,
       description,
       url,
-      locale: ZH_OG_LOCALE,
+      locale: 'zh',
       type: 'article',
-    },
-    twitter: { card: 'summary_large_image', title: `${title} | ${SITE_NAME}`, description },
+    }),
   };
 }
 
@@ -95,7 +96,7 @@ function buildFaqZh(
 
   const costAnswer =
     typeof read?.costPerMtok === 'number'
-      ? `按超大规模云大批量自有 $/GPU/小时 价格、每用户每秒 ${data.primaryTier} token 档位计算，每百万 token（输入加输出）成本为 ${fmtCostPerMtok(read.costPerMtok)}。零售租用价格见上方表格；更慢的交互档位成本更低。`
+      ? `以每用户每秒 ${data.primaryTier} token 为交互档位，按超大规模云厂商批量采购并自有设备的 $/GPU/小时 成本计算，每百万 token（输入加输出）成本为 ${fmtCostPerMtok(read.costPerMtok)}。零售租用价格见上方表格；更慢的交互档位成本更低。`
       : `每百万 token 成本由实测吞吐和 SemiAnalysis AI Cloud TCO 模型的 $/GPU/小时 价格换算得出，待该组合达到主交互档位后即会显示。`;
 
   const servingAnswer = `本页数据来自 ${data.frameworks.join('、')}，精度覆盖 ${data.precisions.map((p) => p.toUpperCase()).join('、')}${data.hasDisagg ? '，包含 prefill 分离部署' : ''}${data.hasMultinode ? '，并包含多节点部署' : ''}。推理引擎持续重新构建并重跑基准，最优配置可能随时变化。`;
@@ -195,7 +196,7 @@ export default async function ZhRunPage({ params }: Props) {
     colGpuHour: '$/GPU/小时',
     colCostPerMtok: '每百万 token 成本',
     priceTierLabels: {
-      hyperscaler: '自有 - 超大规模云大批量',
+      hyperscaler: '自有 · 超大规模云厂商批量采购',
       retail: '零售租用',
     },
     emptyState: `InferenceX 集群尚未发布 ${model} 在 ${chipLabel} 上的基准测试结果。基准测试持续运行，新结果落地后本页会自动填充。`,

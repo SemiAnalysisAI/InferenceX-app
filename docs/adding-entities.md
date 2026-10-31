@@ -50,7 +50,7 @@ Present what you inferred and get confirmation + category in a single step. Incl
 > - DB key: `glm5`, Display: `GLM-5`, Label: `GLM 5`
 > - HF path: `zai-org/GLM-5-FP8`
 >
-> Does this look right? What category: default, experimental, or deprecated?
+> Does this look right? What category: default, experimental, maintenance, deprecated, or hidden?
 > Any extra HF/mount paths?
 
 ### Then apply
@@ -73,16 +73,16 @@ Everything else (`MODEL_OPTIONS`, `DEFAULT_MODELS`, `EXPERIMENTAL_MODELS`, `DEPR
 
 **`packages/app/src/lib/compare/compare-slug.ts`** (easy to miss — the /compare and /compare-per-dollar pages do NOT derive from `MODEL_CONFIG`):
 
-- `COMPARE_MODEL_SLUGS` — add an entry with `{ slug, displayName, dbKeys, label }`. `displayName` must match the `Model` enum value; `dbKeys` lists the DB buckets to query. Place it per the ordering comment (Chinese-lab flagships first, newer family member leads). Without this entry the model is absent from /compare, /compare-per-dollar, the sitemap, and their OG images.
+- Add a `COMPARE_MODEL_SLUGS` entry with `{ slug, displayName, dbKeys, label, seoName }`. `displayName` must match the `Model` enum value, and `dbKeys` lists the DB buckets to query. Without this entry the model is absent from /compare, /compare-per-dollar, the sitemap, and their OG images.
 - `COMPARE_MODEL_ALIASES` — only if a family-level or older-version slug should 308 to the new entry.
 
 **`packages/app/src/lib/compare/compare-ssr.ts`**:
 
 - `KNOWN_MODELS` — add the display name so `?g_model=` URL overrides validate on compare pages.
 
-**`packages/app/src/app/compare/page.tsx`** and **`packages/app/src/app/compare-per-dollar/page.tsx`**:
+**`packages/app/src/app/compare/page.tsx`** and **`packages/app/src/app/compare-per-dollar/page.tsx`**, plus their `packages/app/src/app/zh/` copies:
 
-- `DESCRIPTION` — these SEO meta strings hardcode a sample model list ("…, Qwen 3.5 397B-A17B, and more"). Add the new model if it should appear in the catalog blurb.
+- Each `DESCRIPTION` SEO meta string hardcodes a sample model list. Add the new model if it should appear in the catalog blurb.
 
 **`packages/app/src/lib/catalog/model-architectures.ts`** (optional — powers the per-model architecture diagram on the inference tab):
 
@@ -94,81 +94,9 @@ Everything else (`MODEL_OPTIONS`, `DEFAULT_MODELS`, `EXPERIMENTAL_MODELS`, `DEPR
 
 ## Featuring a Day-0 Model
 
-When a new model launches and we want to give it the headline treatment, swap the **promotion surfaces** to it. This is separate from [Adding a New Model](#adding-a-new-model) above — the model must **already exist** (`Model.*` enum, `MODEL_CONFIG`, DB mapping) before it can be featured. The promotion surfaces are:
+Only a model that already exists can be featured (see [Adding a New Model](#adding-a-new-model)). The promotion surfaces are the landing banner and modal in `packages/app/src/lib/nudges/registry.tsx` and the visible `*-launch` preset at the top of `FAVORITE_PRESETS` in `packages/app/src/components/favorites/favorite-presets.ts`.
 
-- **Launch banner** — the dismissible bar at the top of the landing page
-- **Launch modal** — the "X is live" popup on the landing page
-- **Quick Comparisons preset** — the "X — First Look" card (first entry in `FAVORITE_PRESETS`)
-- **Default model** (optional) — the model the dashboard opens on (`g_model`)
-
-### The "retire old, new IDs" pattern
-
-Each launch **replaces** the previous day-0 model's surfaces rather than editing them in place. This is deliberate:
-
-- **New storage keys** (`inferencex-<slug>-{banner,modal}-dismissed`) so users who dismissed the _previous_ launch banner/modal still see the new one.
-- **Keep the old preset, hide it** (`hidden: true`) instead of deleting it — existing `?preset=<old-slug>-launch` links (old banners, modals, external shares, blog `DashboardCTA`s) must keep resolving.
-- **Generic testIds** (`launch-banner`, `launch-modal`) — launch-agnostic so Cypress selectors don't change every launch.
-
-> The current day-0 model is **whatever the single visible (`hidden` unset) `*-launch` preset points to** — detect it, don't assume. As of MiniMax M3 it was DeepSeek V4 Pro.
-
-### Derive the identifiers
-
-From the model name, derive (MiniMax M3 shown as the worked example):
-
-| Token     | Example            | Used in                                        |
-| --------- | ------------------ | ---------------------------------------------- |
-| `SLUG`    | `minimax-m3`       | preset id, nudge ids, storage keys, `?preset=` |
-| `SLUG_`   | `minimax_m3`       | analytics event names                          |
-| `ENUM`    | `Model.MiniMax_M3` | preset `config.model`                          |
-| `DISPLAY` | `MiniMax M3`       | all user-facing copy                           |
-| `G_MODEL` | `MiniMax-M3`       | `g_model` default (the `Model.*` string value) |
-
-### Then apply
-
-**`packages/app/src/components/favorites/favorite-presets.ts`**:
-
-1. On the outgoing visible `*-launch` preset, add `hidden: true` and update its comment (retired, kept for link compat — same pattern as the existing `dsv4-launch-nvidia` entry).
-2. Prepend a new visible preset as the **first** element of `FAVORITE_PRESETS`:
-   ```ts
-   {
-     id: 'SLUG-launch',
-     title: 'DISPLAY — First Look',
-     description:
-       'First benchmarks of DISPLAY across every available GPU. New configurations appear here as they come online.',
-     tags: ['<Vendor>', '<Version>', 'New'], // e.g. ['MiniMax', 'M3', 'New']
-     category: 'comparison',
-     wide: true,
-     config: {
-       model: ENUM,
-       sequence: Sequence.EightK_OneK,
-       precisions: ['fp4', 'fp4fp8', 'fp8'],
-       yAxisMetric: 'y_tpPerGpu',
-       hwFilter: ['h100', 'h200', 'b200', 'b300', 'gb200', 'gb300', 'mi300x', 'mi325x', 'mi355x'],
-     },
-   }
-   ```
-   Narrow `hwFilter` only for a restricted launch (e.g. NVIDIA-only). The broad filter + "as they come online" copy is the intended self-filling behavior even when data is still partial at launch.
-
-**`packages/app/src/lib/nudges/registry.tsx`** — rewrite the two launch nudges (only one banner + one modal exist at a time):
-
-- **Modal** (under "Landing modals"): `id: 'SLUG-launch-modal'`, `storageKey: 'inferencex-SLUG-modal-dismissed'`, `title: 'DISPLAY is live'`, day-zero `description`, `testId: 'launch-modal'`, `primaryAction.onClick` → `/inference?preset=SLUG-launch`, analytics `SLUG_modal_shown`/`_dismissed`/`_explored`.
-- **Banner** (under "Landing banner"): `id: 'SLUG-launch-banner'`, `storageKey: 'inferencex-SLUG-banner-dismissed'`, `title: 'DISPLAY benchmarks are live'`, `testId: 'launch-banner'`, `href`/`onLinkClick` → `/inference?preset=SLUG-launch`, keep the generic `launch_banner_*` analytics events but set `properties: { banner_id: 'SLUG-launch', preset_id: 'SLUG-launch' }`.
-
-**`packages/app/src/lib/routing/url-state.ts`** _(only if making it the site default)_:
-
-- Set `PARAM_DEFAULTS.g_model` to `'G_MODEL'`. Most launches **leave this unchanged** — only change it for a true flagship (DeepSeek V4 Pro got it; MiniMax M3 did not).
-
-### Sync tests
-
-- **`packages/app/src/lib/nudges/registry.test.ts`** — update the **sorted** expected-ids array ("contains the expected set of migrated nudges") to the new `SLUG-launch-banner`/`SLUG-launch-modal` ids.
-- **`packages/app/cypress/e2e/nudge-system.cy.ts`** and **`navigation.cy.ts`** — replace the old `inferencex-<old-slug>-{modal,banner}-dismissed` storage keys with the new ones. TestId selectors stay generic (`launch-modal`, `launch-banner`); update any `it(...)` titles that name the old model.
-- **`packages/app/src/lib/routing/url-state.test.ts`** _(only if the default changed)_ — two specs hardcode the default `g_model`; update both.
-
-> **Don't touch:** blog MDX `?g_model=…` / `?preset=<old-slug>-launch` links (historical, correct), `packages/constants/src/models.ts` DB-key maps, or the outgoing model's data-mapping / architecture entries — it still exists, it's just no longer the headline.
-
-### Verify
-
-`bun run typecheck && bun run lint && bun run fmt && bun run test:unit`, then `rg` for the old slug to confirm only the intentional hidden preset + blog links remain. Final gate: `bun run test:e2e:full` and a manual `bun run dev` check that the banner/modal/preset read `DISPLAY` and `/inference?preset=SLUG-launch` renders data.
+Each launch **replaces** the previous launch's surfaces rather than editing them in place. Use new storage keys, so users who dismissed the previous banner or modal still see the new one. Keep the old preset but set `hidden: true` instead of deleting it, because existing `?preset=<old-slug>-launch` links in old banners, external shares and blog `DashboardCTA`s must keep resolving. Keep the generic testIds (`launch-banner`, `launch-modal`) so Cypress selectors don't change every launch.
 
 ---
 
@@ -176,7 +104,7 @@ From the model name, derive (MiniMax M3 shown as the worked example):
 
 ### Infer from artifacts
 
-Ask for the run URL first (see [Workflow](#workflow)). The user may not have one if adding preemptively, but having a run massively raises chances of getting it right first try. From artifacts, infer the base GPU key and any suffixes.
+Ask for the run URL first (see [Workflow](#workflow)). From artifacts, infer the base GPU key.
 
 ### Ask the user to confirm
 
@@ -189,19 +117,18 @@ Present what you inferred and ask about anything not visible in artifacts:
 5. What are the **cost rates** in $/GPU/hr? (owning at large hyperscaler volume, rent on a 3-year commit)
 6. What is the **TDP** in watts?
 7. Where should it **sort** relative to existing GPUs in legends? (lower = first)
-8. Are there any **new artifact suffixes** for this GPU beyond the existing ones (`-trt`, `-nv`, `-amds`, `-amd`, `-nvd`, `-nvs`, `-disagg`, `-multinode-slurm`, `-dgxc-slurm`, `-dgxc`, `-nb`)?
-9. Do you have the **full hardware specs** for the GPU Specs tab? (memory GB, memory bandwidth TB/s, FP4/FP8/BF16 TFLOPS, interconnect tech, scale-up bandwidth, NIC model, scale-out topology)
+8. Do you have the **full hardware specs** for the GPU Specs tab? (memory GB, memory bandwidth TB/s, FP4/FP8/BF16 TFLOPS, interconnect tech, scale-up bandwidth, NIC model, scale-out topology)
 
 ### Then apply
 
 **`packages/constants/src/gpu-keys.ts`** (single source of truth):
 
 - Add one entry to `HW_REGISTRY` with all fields: `vendor`, `arch`, `label`, `sort`, `tdp`, `power`, `costh`, `costr`. **If power/cost are unknown, use `9.99` as an obvious placeholder** — the test suite requires `power > 0`.
-- If this is a **new vendor** (not NVIDIA or AMD), also add color zones to `VENDOR_OKLCH_ZONES` and `VENDOR_HSL_ZONES` in the same file, and extend the `Vendor` type in `src/lib/charts/dynamic-colors.ts`.
+- If this is a **new vendor** (one without zones in `VENDOR_OKLCH_ZONES` yet), also add color zones to `VENDOR_OKLCH_ZONES` and `VENDOR_HSL_ZONES` in the same file, and extend the `Vendor` type and `getVendor()` in `src/lib/charts/dynamic-colors.ts`.
 
-**`packages/db/src/etl/normalizers.ts`**:
+**`packages/db/src/etl/normalizers.ts`** (usually no change):
 
-- `hwToGpuKey()` — add `.replace()` for any new artifact suffixes
+- `hwToGpuKey()` lowercases the hardware name and keeps only the text before the first `-`, so artifact suffixes need no mapping and GPU keys cannot contain `-`. Add a `HW_ALIASES` entry only when that text differs from the GPU key (e.g. `vrnvl72` → `vr200`).
 
 **`packages/app/src/lib/catalog/gpu-specs.ts`** (if specs provided):
 
@@ -216,7 +143,7 @@ Present what you inferred and ask about anything not visible in artifacts:
 
 ### Infer from artifacts
 
-Ask for the run URL first (see [Workflow](#workflow)). The user may not have one if adding preemptively, but having a run massively raises chances of getting it right first try. From artifacts, infer the precision key from the segment after the model prefix (e.g. `fp8` from `bmk_dsr1_1k1k_fp8_sglang_...`).
+Ask for the run URL first (see [Workflow](#workflow)). From artifacts, infer the precision key from the segment after the model prefix (e.g. `fp8` from `bmk_dsr1_1k1k_fp8_sglang_...`).
 
 ### Ask the user to confirm
 
@@ -224,8 +151,7 @@ Present what you inferred and ask about anything not visible in artifacts:
 
 1. What is the **key**? (lowercase, e.g. `fp4`, `fp8`)
 2. What is the **display label**? (e.g. `FP4`, `FP8`)
-3. What **chart shape** should it use? Existing: FP4 = circle (default), FP8 = square, BF16 = triangle, INT4 = diamond. Pick one or describe a new shape.
-4. Does this precision appear as a **suffix on model prefix names** in artifacts? (e.g. `dsr1-mxfp4`)
+3. Does this precision appear as a **suffix on model prefix names** in artifacts? (e.g. `dsr1-mxfp4`)
 
 ### Then apply
 
@@ -240,10 +166,7 @@ Present what you inferred and ask about anything not visible in artifacts:
 
 Everything else (`PRECISION_OPTIONS`, `getPrecisionLabel()`) is derived automatically.
 
-**`packages/app/src/lib/charts/chart-rendering.ts`** (if new shape):
-
-- `SHAPE_CONFIG` — add shape definition with normal/hover states
-- `getShapeConfig()` — add condition
+Chart shapes need no change. `getShapeKeyForPrecision()` in `packages/app/src/lib/charts/chart-rendering.ts` assigns shapes by the precision's position among the selected precisions.
 
 ---
 
@@ -251,7 +174,7 @@ Everything else (`PRECISION_OPTIONS`, `getPrecisionLabel()`) is derived automati
 
 ### Infer from artifacts
 
-Ask for the run URL first (see [Workflow](#workflow)). The user may not have one if adding preemptively, but having a run massively raises chances of getting it right first try. From artifacts, infer the sequence from the `{n}k{m}k` segment (e.g. `16k8k` from `bmk_dsr1_16k8k_fp8_sglang_...`).
+Ask for the run URL first (see [Workflow](#workflow)). From artifacts, infer the sequence from the `{n}k{m}k` segment (e.g. `16k8k` from `bmk_dsr1_16k8k_fp8_sglang_...`).
 
 ### Ask the user to confirm
 
@@ -270,7 +193,7 @@ Present what you inferred and ask about anything not visible in artifacts:
 **`packages/app/src/lib/catalog/data-mappings.ts`**:
 
 1. `Sequence` enum — add member
-2. `SEQUENCE_CONFIG` — add one entry with `{ label, compact }`
+2. Add a `SEQUENCE_CONFIG` entry with `{ label, labelZh, compact, category, kind }`
 
 Everything else (`SEQUENCE_OPTIONS`, `SEQUENCE_PREFIX_MAPPING`, `getSequenceLabel()`) is derived automatically.
 
@@ -282,7 +205,7 @@ No ingest changes needed — `parseIslOsl()` regex handles any `{n}k{m}k` patter
 
 ### Infer from artifacts
 
-Ask for the run URL first (see [Workflow](#workflow)). The user may not have one if adding preemptively, but having a run massively raises chances of getting it right first try. From artifacts, infer the framework from the segment after the precision (e.g. `sglang` from `bmk_dsr1_1k1k_fp8_sglang_tp8-...`).
+Ask for the run URL first (see [Workflow](#workflow)). From artifacts, infer the framework from the segment after the precision (e.g. `sglang` from `bmk_dsr1_1k1k_fp8_sglang_tp8-...`).
 
 ### Ask the user to confirm
 
@@ -300,39 +223,19 @@ Present what you inferred and ask about anything not visible in artifacts:
 - Add one entry to `FW_REGISTRY` with `{ label }` (the display name)
 - If the framework is a **rename/alias** of an existing one, add to `FRAMEWORK_ALIASES` instead
 
-**`packages/db/src/etl/normalizers.ts`**:
-
-- `normalizeFramework()` — add special case only if name needs transformation
-
-**No other files need changes.** Display labels, `FRAMEWORK_KEYS`, and `FRAMEWORK_LABELS` are all derived automatically from `FW_REGISTRY` and `FRAMEWORK_ALIASES`.
+**No other files need changes.** `normalizeFramework()` resolves raw names through `FRAMEWORK_ALIASES`, and display labels, `FRAMEWORK_KEYS`, and `FRAMEWORK_LABELS` are derived from `FW_REGISTRY` and `FRAMEWORK_ALIASES`.
 
 ---
 
-## What doesn't need changing
-
-- **DB schema** — all columns are open-ended text/integer, no migrations needed
-- **Ingest pipeline** — `config-cache.ts`, `benchmark-ingest.ts`, `eval-ingest.ts` are fully parameterized
-- **New metrics** — auto-captured as JSONB; only add to `KNOWN_METRIC_RAW_KEYS` in `benchmark-mapper.ts` to suppress warnings
-- **Prefix resolution** — if `infmax_model_prefix` matches the DB key (after stripping precision suffixes like `-fp8`), no `PREFIX_ALIASES` entry is needed
-
 ## After applying (all entity types)
 
-**Always offer to ingest and invalidate** after adding any entity. Ask only which invalidation URL to use (`http://localhost:3000` or `https://inferencex.semianalysis.com`).
+**Always offer to ingest and refresh the cache** after adding any entity. Ask only whether to refresh a local server or the public dashboard, then follow [Manual Run Ingest](./ingesting-runs.md).
 
 ```bash
-bun run admin:db:ingest:run <run-url-or-id>
-bun run admin:cache:invalidate <url>
+bun run admin:db:ingest:run <run-url-or-id>  # needs DATABASE_WRITE_URL and GITHUB_TOKEN
+bun run admin:cache:invalidate <url>         # needs INVALIDATE_SECRET, defaults to http://localhost:3000
 ```
 
-Both require `DATABASE_WRITE_URL` and `GITHUB_TOKEN` env vars.
+For the public dashboard, dispatch `cache-refresh.yml` instead of running the invalidate script.
 
 > **Note:** If the run was already ingested (e.g. mappings were added in `packages/db` before the frontend), you'll see `0 new, N duplicate` — this is expected. The rows already exist; the ingest confirms they resolve correctly with the new mappings.
-
-## Verify
-
-After all changes:
-
-```bash
-bun run typecheck
-bun run test:unit
-```

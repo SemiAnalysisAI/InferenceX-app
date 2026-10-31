@@ -57,7 +57,7 @@ export default function RawTracePage() {
               <button
                 onClick={() => {
                   const next = isExpanded ? null : req.id;
-                  track('agentic_workload_raw_request_toggled', { expanded: next !== null });
+                  track('agentic_workload_raw_request_toggled', { enabled: next !== null });
                   setExpandedRequest(next);
                 }}
                 className={`w-full flex items-center justify-between py-2.5 px-3 text-sm transition-colors text-left ${

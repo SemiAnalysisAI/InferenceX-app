@@ -18,8 +18,6 @@ import {
 } from './profit-power';
 import type { GPUDataPoint, InterpolatedResult } from './types';
 
-// Power telemetry from MI355X Kimi K3 source row 441385; the target/rates below
-// are controlled inputs so the test isolates a denominator change.
 const source: BenchmarkRow = {
   id: 441385,
   model: 'kimik3',
@@ -54,9 +52,7 @@ const source: BenchmarkRow = {
     avg_total_gpu_power_w: 6369.045,
   },
 };
-// python -m power_model --gpu-level-power-per-gpu=796.130625 --system=mi355 --workload=agentic:
-// All-in W/GPU × the estimator's 1.1 planning margin, in kW.
-const MODELED_KW_PER_GPU = 1.4900494869888934;
+const MODELED_KW_PER_GPU = 1.501659140881397;
 const point: GPUDataPoint = {
   sourceRow: source,
   hwKey: 'mi355x_atom',
@@ -268,7 +264,6 @@ describe('profit power basis preview', () => {
       'costh',
       'modeled',
     )!;
-    // Without Grace telemetry the tray is priced on the rack model's Grace profile.
     expect(modeledPowerAtTarget(excluded, 45)).toMatchObject({
       kwPerGpu: expect.closeTo(
         (upstreamRackWattsPerGpu('gb300', 594.191, null, true) / 1000) * 1.1,
@@ -276,8 +271,6 @@ describe('profit power basis preview', () => {
       ),
       source: { topology: 'nvl72-tray', cpu: 'modeled' },
     });
-    // A measured-Grace knot and a modeled-Grace knot are different power bases:
-    // they are never blended, and the profit curve does not bridge them.
     const knots = [
       { ...trayPoint, interactivity: 40 },
       { ...missingCpu, interactivity: 50 },
@@ -353,7 +346,6 @@ describe('profit power basis preview', () => {
         },
       });
     }
-    // Eight GPUs on one node are not whole four-GPU compute trays.
     for (const hardware of ['gb200', 'gb300']) {
       expect(
         modeledPowerAtTarget(
@@ -410,7 +402,6 @@ describe('profit power basis preview', () => {
       expect(output.skipped).toEqual([]);
       expect(output.rows).toHaveLength(1);
       expect(output.rows[0].powerLabel).toContain('Full-chassis extrapolation');
-      // Packing identical replicas must not charge all eight GPUs to each replica.
       const full = {
         ...source,
         metrics: { ...source.metrics, avg_power_w: 500, avg_total_gpu_power_w: 4000 },

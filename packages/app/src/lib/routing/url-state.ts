@@ -1,22 +1,8 @@
-/**
- * @file url-state.ts
- * @description Utility for reading chart control state from URL query parameters on first load,
- * then keeping state in memory. Share links are built on-demand via buildShareUrl().
- *
- * URL params are prefixed by scope:
- *   g_ = global state (model, run date/id)
- *   i_ = inference chart
- *   e_ = evaluation chart
- *   r_ = reliability chart
- *   c_ = TCO calculator
- *
- * Only non-default values are written to keep URLs short.
- */
 import { LIFECYCLE_DEFAULTS } from '@/components/calculator/lifecycle';
-import { MEASURED_METRIC_DEFAULTS } from '@/components/inference/measured-metric-config';
 import { dashboardRouteForPathname, getDashboardRoute } from '@/lib/routing/dashboard-routes';
 import { routeModelForPathname } from '@/lib/routing/model-routes';
 import { replaceClientPathname } from '@/lib/routing/client-navigation';
+import { getInferenceNavigationModel } from '@/lib/routing/inference-navigation-state';
 import {
   PROFIT_ROUTE_PARAMS,
   profitRouteParams,
@@ -24,23 +10,20 @@ import {
   profitRouteSearch,
 } from '@/lib/routing/profit-estimator-routes';
 
-// All known share-link parameter keys
 const URL_STATE_KEYS = [
-  // Global
   'g_model',
   'g_rundate',
   'g_runid',
   'g_tco',
-  // Inference
   'i_seq',
   'i_prec',
   'i_metric',
-  // Token-revenue sale-price source: normalized $1/M or live OpenRouter catalog.
   'i_revenue',
   'i_pctl',
   'i_mstat',
-  'i_roleshare',
-  'i_powerfit',
+  'i_tokens',
+  'i_pbview',
+  'i_pbpoint',
   'i_xmetric',
   'i_e2e_xmetric',
   'i_xmode',
@@ -52,26 +35,21 @@ const URL_STATE_KEYS = [
   'i_optimal',
   'i_best',
   'i_label',
-  // Legacy alias of `i_label` with inverted semantics — read-only on load so
-  // pre-rename share links (?i_nolabel=1) keep hiding point labels even if the
-  // default flips again later. New code only writes `i_label`.
   'i_nolabel',
   'i_hc',
   'i_log',
   'i_legend',
   'i_advlabel',
   'i_conclabel',
+  'i_offloadlabel',
   'i_gradlabel',
   'i_frontier',
   'i_linelabel',
   'i_active',
-  // Quick filters (vendor / framework / deployment / mtp-stp / power tier).
-  // `i_disagg` keeps its historical name for shared-link compatibility.
   'i_vendor',
   'i_fw',
   'i_disagg',
   'i_spec',
-  // Measured-power certification tiers ('certified' / 'legacy', comma-joined).
   'i_power',
   'i_topology',
   'i_ptlines',
@@ -79,92 +57,47 @@ const URL_STATE_KEYS = [
   'i_ptwindow',
   'i_ptfocus',
   'i_ptutility',
-  // Power Timeline concurrency filter: one positive integer, empty = every load.
+  'i_ptraw',
   'i_ptconc',
-  // Completed Perf Rulers on the primary inference chart: `isoX|curveA|curveB`
-  // entries joined by `;` (see serializePerfRulers in d3-chart/layers/perf-ruler).
   'i_rulers',
-  // Comparison series overlaid on a gated power metric: `boundaries` (every
-  // power boundary) or `roles` (prefill / decode pools). Empty = the metric alone.
   'i_pcompare',
-  // Exact serving-envelope pair behind an Overview 30-day comparison cell.
   'i_overview_current',
   'i_overview_baseline',
-  // Evaluation
   'e_rundate',
   'e_bench',
   'e_hc',
   'e_labels',
   'e_legend',
   'e_active',
-  // Reliability
   'r_range',
   'r_pct',
   'r_hc',
   'r_legend',
   'r_active',
-  // Calculator (fleet planner)
   'c_mw',
   'c_costcap',
-  // Calculator (fleet lifecycle) — token price and the ramp/interrupt/horizon
-  // assumptions (the throughput steps are measured; those four are not), plus
-  // which metric the chart plots.
   'c_price',
-  // Output-token price. Input keeps `c_price`, so a link written before the
-  // split still seeds the field it always seeded.
   'c_oprice',
   'c_ramp',
-  // What a cached input token sells for, as a % of the price. Agentic only —
-  // fixed sequences record no cache hits for it to apply to.
   'c_cache',
   'c_ly',
   'c_mtbi',
   'c_rec',
   'c_life',
   'c_power',
-  // First-token limits: interactivity floor (tok/s/user) and the comma-joined
-  // TTFT cap ladder in seconds. Empty means the page's sequence-aware defaults.
   'c_ivmin',
   'c_ttft',
-  // Cache reuse: the configuration group plotted. Empty means the group with
-  // the most rows reporting cache tiers.
   'c_cfg',
-  // Cache reuse: the serving recipe within that group. Empty means the recipe
-  // with the most rows reporting cache tiers.
   'c_recipe',
-  // Profit estimator: the interactivity target (tok/s/user) at the selected
-  // percentile. Empty means the selected model's default operating point, so
-  // default views keep their short links. Distinct from the retired
-  // `c_profit_target`, which carried a fixed-8k/1k operating point.
   'c_ivtarget',
-  // Profit estimator: which cache hit rate to use — actual (server-measured,
-  // default) or theoretical (infinite-cache rate from the trace).
   'c_chmode',
 ] as const;
 
 export type UrlStateKey = (typeof URL_STATE_KEYS)[number];
 export type UrlStateParams = Partial<Record<UrlStateKey, string>>;
 
-/** Default values for each parameter. Params matching their default are omitted from share URLs. */
-/**
- * Dashboard default y-axis: total tokens purchased per $1 of Hyperscaler
- * ownership TCO. It depends only on measured throughput and hardware cost, so
- * the opening view does not assume a token sale price.
- */
 export const DEFAULT_Y_AXIS_METRIC = 'y_tokensPerDollarH';
 
-/**
- * The y-axis a link without `i_metric` opens on. A measured-power tier filter
- * (`i_power`) is only meaningful on a power chart, so any tier opens the
- * measured power scatter. `InferenceContext` resolves links and strips
- * `i_metric` from share links with this one function; if those two defaults
- * differed, a link would reopen on a metric other than the one it captured.
- */
-export function defaultYAxisMetric(powerTiers: readonly string[]): string {
-  return powerTiers.length > 0 ? MEASURED_METRIC_DEFAULTS.power : DEFAULT_Y_AXIS_METRIC;
-}
-
-/** Shared defaults for the fleet lifecycle and calculator MW controls. */
 export const DEFAULT_FLEET_MW = '10';
 export const DEFAULT_LIFECYCLE_RAMP_MONTHS = String(LIFECYCLE_DEFAULTS.rampMonths);
 
@@ -173,27 +106,15 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   g_rundate: '',
   g_runid: '',
   g_tco: 'internal',
-  // No strippable default: per-route `initialSequence` seeds (e.g. the /compare
-  // pages) make the no-param resolution route-dependent, so stripping '8k/1k'
-  // (the global default) would revert an explicit 8K/1K pick back to the route's
-  // seeded scenario on reload. Empty means the resolved scenario is ALWAYS
-  // written explicitly (effectiveSequence is never ''), so a shared/reloaded
-  // link keeps whatever the user picked. The no-param case still resolves via
-  // availability.
   i_seq: '',
-  // No strippable default: precision is only written to the URL once chosen
-  // explicitly, so an explicit FP4 selection must survive (not be stripped as a
-  // "default") or it would silently revert to the per-model auto default on reload.
   i_prec: '',
-  // No strippable default: the no-param metric depends on `i_power` and on a
-  // route's seeded metric, so `InferenceContext` writes '' when the metric
-  // equals that resolved default and the explicit key otherwise.
   i_metric: '',
   i_revenue: 'normalized',
   i_pctl: 'p90',
   i_mstat: 'median',
-  i_roleshare: '0',
-  i_powerfit: '0',
+  i_tokens: 'total',
+  i_pbview: 'area',
+  i_pbpoint: '',
   i_xmetric: 'p90_ttft',
   i_e2e_xmetric: 'p90_ttft',
   i_xmode: '',
@@ -211,6 +132,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   i_legend: '',
   i_advlabel: '',
   i_conclabel: '',
+  i_offloadlabel: '1',
   i_gradlabel: '',
   i_frontier: '',
   i_linelabel: '',
@@ -226,6 +148,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   i_ptwindow: '',
   i_ptfocus: '',
   i_ptutility: '',
+  i_ptraw: '',
   i_ptconc: '',
   i_rulers: '',
   i_pcompare: '',
@@ -244,10 +167,6 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   r_active: '',
   c_mw: DEFAULT_FLEET_MW,
   c_costcap: '',
-  // Empty means "use the component's default", which for these two is derived
-  // rather than constant: the price from the cheapest visible chip's break-even,
-  // the horizon from the measured run window. A non-empty default here would be
-  // stripped from share links and silently re-derived on load.
   c_price: '',
   c_oprice: '',
   c_life: '',
@@ -256,11 +175,8 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   c_ttft: '',
   c_cfg: '',
   c_recipe: '',
-  // Model-dependent default (`profitModelDefaults(model).interactivity`), so the
-  // estimator writes '' itself when the target equals the model's default.
   c_ivtarget: '',
   c_chmode: '',
-  // Empty means the default y metric (margin).
   c_ly: '',
   c_ramp: DEFAULT_LIFECYCLE_RAMP_MONTHS,
   c_cache: '10',
@@ -268,11 +184,8 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   c_rec: '12',
 };
 
-/** In-memory store of current param values (kept in sync via writeUrlParams). */
 const currentState: Record<string, string> = {};
 
-// On module load: snapshot share-link params from the URL.
-// Cleanup is deferred so it runs after Next.js hydration finishes.
 const _initialParams: UrlStateParams = {};
 const explicitUrlParams: UrlStateParams = {};
 if (typeof window !== 'undefined') {
@@ -285,64 +198,13 @@ if (typeof window !== 'undefined') {
       currentState[key] = value;
     }
   }
-  // Strip share-link params from the address bar. Deferred so the Next.js
-  // router doesn't overwrite it during hydration, and skipped entirely when
-  // the URL carries none: this module is pulled in by dashboard chunks, so on
-  // a landing → dashboard client navigation it initializes *mid-transition*.
-  // Going through the Next-patched `window.history.replaceState` here would
-  // dispatch a router restore built from the pre-commit URL, reverting the
-  // just-committed navigation (the "first dashboard click replays the landing
-  // page" regression). The pristine prototype method rewrites the address bar
-  // without involving the App Router — same trick as `replaceClientSearch` in
-  // client-navigation.ts. Router state is carried over so Back/Forward keep
-  // working.
-  if (Object.keys(_initialParams).length > 0) {
-    setTimeout(() => {
-      const sp = new URLSearchParams(window.location.search);
-      let dirty = false;
-      for (const key of URL_STATE_KEYS) {
-        if (sp.has(key)) {
-          sp.delete(key);
-          dirty = true;
-        }
-      }
-      if (!dirty) return;
-      const s = sp.toString();
-      const replace =
-        typeof History === 'undefined'
-          ? window.history.replaceState
-          : History.prototype.replaceState;
-      replace.call(
-        window.history,
-        window.history.state,
-        '',
-        `${window.location.pathname}${s ? `?${s}` : ''}${window.location.hash}`,
-      );
-    }, 0);
-  }
 }
 
-/** Returns the current share-link state, flushing pending writes for provider remounts. */
 export function readUrlParams(): UrlStateParams {
   flushPendingParams();
   return _initialParams;
 }
 
-/**
- * Re-read share-link params from the live URL, replacing the load-time
- * snapshot.
- *
- * The snapshot above is captured once per page load, which is correct for a
- * hard navigation but wrong for a client-side one: a soft transition to
- * `/inference?g_model=…` does not remount the provider, so every reader kept
- * seeing the params of the page the user came FROM (usually none). Callers
- * must only invoke this on a real router navigation — self-writes go through
- * `history.replaceState`, which deliberately does not, so re-reading after one
- * of those would fight the user's own filter changes.
- *
- * Also mirrors into `currentState` so the next share-link write starts from
- * what the URL actually asked for.
- */
 export function refreshUrlParams(): UrlStateParams {
   if (typeof window === 'undefined') return _initialParams;
   flushPendingParams();
@@ -365,27 +227,8 @@ export function refreshUrlParams(): UrlStateParams {
   return _initialParams;
 }
 
-/**
- * Pathname of the last navigation whose params were pulled into the snapshot.
- * Module-level (not a hook ref) so only the FIRST `useUrlState` consumer to
- * render after a navigation does the work: a component that mounts later on
- * the same path must not re-import the URL over filter changes the user has
- * made since.
- */
 let lastRefreshedPathname: string | null = null;
 
-/**
- * Refresh the snapshot once per client-side navigation.
- *
- * Providers read their initial state through `getUrlParam` during render, so
- * the snapshot has to be current BEFORE they initialise. `useUrlState` calls
- * this while rendering, which puts it ahead of every provider below the
- * component that called it first (React renders top-down), and ahead of the
- * mount effects that read `i_gpus` and friends.
- *
- * Returns whether a refresh actually happened, which is what the unit tests
- * assert on.
- */
 export function refreshUrlParamsOnNavigation(pathname: string): boolean {
   if (lastRefreshedPathname === pathname) return false;
   lastRefreshedPathname = pathname;
@@ -393,28 +236,20 @@ export function refreshUrlParamsOnNavigation(pathname: string): boolean {
   return true;
 }
 
-/** Whether the current navigation explicitly supplied a share-link parameter. */
 export function hasExplicitUrlParam(key: UrlStateKey): boolean {
   return explicitUrlParams[key] !== undefined;
 }
 
-/** Check whether the current URL has any share-link params. */
 export function hasAnyUrlParams(): boolean {
   if (typeof window === 'undefined') return false;
   const searchParams = new URLSearchParams(window.location.search);
   return URL_STATE_KEYS.some((key) => searchParams.has(key));
 }
 
-// Debounce timer for batching rapid state changes
 let writeTimer: ReturnType<typeof setTimeout> | null = null;
 let pendingParams: UrlStateParams = {};
 
-/**
- * Write share-link params to the in-memory store (debounced).
- * Params matching their default value are removed.
- */
 export function writeUrlParams(params: UrlStateParams): void {
-  // merge into pending batch
   Object.assign(pendingParams, params);
 
   if (writeTimer !== null) {
@@ -427,7 +262,6 @@ export function writeUrlParams(params: UrlStateParams): void {
   }, 150);
 }
 
-/** Client-owned filter writes must not trigger Next's navigation rehydration effects. */
 function syncProfitRoute(): void {
   if (typeof window === 'undefined') return;
   const params = collectTabParams();
@@ -442,7 +276,6 @@ function syncProfitRoute(): void {
   ]);
 }
 
-/** Immediately flush any pending param writes into the in-memory store. */
 function flushPendingParams(): void {
   if (Object.keys(pendingParams).length === 0) return;
 
@@ -463,29 +296,12 @@ function flushPendingParams(): void {
   writeTimer = null;
 }
 
-/**
- * Build a share URL containing only the params relevant to the current tab.
- * Flushes pending writes first so state is up-to-date.
- *
- * `unofficialrun` / `unofficialruns` is not part of the in-memory `currentState`
- * (it's owned by UnofficialRunProvider and written to the address bar via
- * history.pushState on dismiss/load). We read it straight from the live URL so
- * a shared link reflects the currently-loaded set of unofficial runs, including
- * after per-run dismissals.
- */
 const UNOFFICIAL_RUN_PARAM_RE = /^unofficialruns?$/iu;
 
-/**
- * Current in-memory state for the active route, plus any unofficial-run IDs
- * in the address bar, as a `URLSearchParams`. Flushes pending writes first so
- * the caller sees the newest filter change rather than the one before it.
- */
 function collectTabParams(): URLSearchParams {
   flushPendingParams();
 
   const route = dashboardRouteForPathname(window.location.pathname);
-  // Compare and other chart routes share inference controls but deliberately
-  // stay outside the dashboard registry.
   const prefixes = route?.shareParamScopes ?? getDashboardRoute('inference').shareParamScopes;
   const filtered = new URLSearchParams();
   const onProfitRoute = profitRouteParams(window.location.pathname) !== null;
@@ -499,18 +315,16 @@ function collectTabParams(): URLSearchParams {
     }
   }
 
-  // On per-model routes (/calculator/<slug>, /historical/<slug>) the pathname
-  // already encodes the model, so a matching g_model would be redundant in the
-  // share link. A mismatch (possible mid-transition) is kept — explicit
-  // g_model wins over the path on load, so the link still opens correctly.
+  // Bare inference now has a different entry default than the retained legacy model.
+  if (/^(?:\/zh)?\/inference\/?$/u.test(window.location.pathname)) {
+    const model = getInferenceNavigationModel();
+    if (model) filtered.set('g_model', model);
+  }
+
   if (routeModelForPathname(window.location.pathname) === filtered.get('g_model')) {
     filtered.delete('g_model');
   }
 
-  // Carry over any unofficial-run IDs currently reflected in the address bar.
-  // Only the first match is forwarded and it's always emitted under the plural
-  // `unofficialruns` key — the canonical form the app writes on dismiss/load
-  // and the one we want shared links to use going forward.
   const liveParams = profitRouteSearch(window.location.pathname, window.location.search);
   for (const [key, value] of liveParams) {
     if (UNOFFICIAL_RUN_PARAM_RE.test(key) && value) {
@@ -532,28 +346,11 @@ export function buildShareUrl(): string {
   return `${window.location.origin}${window.location.pathname}${search ? `?${search}` : ''}${window.location.hash}`;
 }
 
-/**
- * The chart state this page would share, as a query string (no leading `?`).
- * Empty when every value is at its default.
- */
 export function currentChartSearch(): string {
   if (typeof window === 'undefined') return '';
   return collectTabParams().toString();
 }
 
-/**
- * Write the chart state into the CURRENT history entry, so Back restores it.
- *
- * Filter changes only ever reach the in-memory `currentState` — the address bar
- * is deliberately stripped clean after load — so the entry the browser returns
- * to is a bare `/inference` that rebuilds from defaults. Detail-page links are
- * plain `<a href>` (they must support open-in-new-tab), i.e. full-document
- * navigations that also destroy this module, so the URL is the only channel
- * that survives. Call this immediately before navigating away from a chart.
- *
- * `history.state` is passed straight through so the Next router's own entry
- * bookkeeping is not clobbered.
- */
 export function rememberChartStateInUrl(): string {
   if (typeof window === 'undefined') return '';
   if (profitRouteParams(window.location.pathname) !== null) {
@@ -563,17 +360,12 @@ export function rememberChartStateInUrl(): string {
   const { pathname, hash, search: liveSearch } = window.location;
   const chartParams = collectTabParams();
 
-  // Start from whatever is already in the address bar so params this module
-  // does not own (campaign tags and the like) survive the rewrite, then layer
-  // the chart state on top. Both unofficial-run spellings are cleared first —
-  // `collectTabParams` re-emits the canonical plural form.
   const merged = new URLSearchParams(liveSearch);
   for (const key of URL_STATE_KEYS) merged.delete(key);
   const unofficialKeys: string[] = [];
   for (const key of merged.keys()) {
     if (UNOFFICIAL_RUN_PARAM_RE.test(key)) unofficialKeys.push(key);
   }
-  // Deleting inside the iteration above would skip entries.
   for (const key of unofficialKeys) merged.delete(key);
   for (const [key, value] of chartParams) merged.set(key, value);
 
@@ -586,18 +378,10 @@ export function rememberChartStateInUrl(): string {
   return chartParams.toString();
 }
 
-/**
- * The current page's URL carrying its chart state plus `overrides`,
- * canonicalised like `rememberChartStateInUrl`: chart params and both
- * unofficial-run spellings are dropped from the live address bar before the
- * store's state (and the overrides) are layered on. For anchors that must
- * work with open-in-new-tab, where the in-memory state would otherwise be lost.
- */
 export function chartStateHref(overrides: Record<string, string>): string {
   const { origin, pathname, hash, search } = window.location;
   const merged = new URLSearchParams(search);
   for (const key of URL_STATE_KEYS) merged.delete(key);
-  // Collected first: deleting while iterating the params would skip entries.
   const staleRunKeys = [...merged.keys()].filter((key) => UNOFFICIAL_RUN_PARAM_RE.test(key));
   for (const key of staleRunKeys) merged.delete(key);
   for (const [key, value] of collectTabParams()) merged.set(key, value);
@@ -606,11 +390,6 @@ export function chartStateHref(overrides: Record<string, string>): string {
   return `${origin}${pathname}${query ? `?${query}` : ''}${hash}`;
 }
 
-/**
- * Append the current chart state to an outbound in-app href, so the page it
- * opens can link back to the chart the user left. Used for the agentic
- * point-detail links, which are full-document navigations.
- */
 export function withChartState(href: string): string {
   const search = currentChartSearch();
   if (!search) return href;

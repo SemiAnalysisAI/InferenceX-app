@@ -20,8 +20,6 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
 
-// ── Types ────────────────────────────────────────────────────────
-
 interface ToolAnalyticsData {
   toolCounts: { toolName: string; count: number }[];
   transitions: { fromTool: string; toTool: string; count: number }[];
@@ -63,8 +61,6 @@ interface ToolAnalyticsData {
     failureRate: number | null;
   }[];
   sessionOutcomeCounts: {
-    // Raw SessionOutcome values from packages/db tool-analysis — the API's
-    // camelKeys() converts object keys, not string values, so these stay snake_case.
     outcome:
       | 'no_edit'
       | 'edited_unverified'
@@ -76,7 +72,6 @@ interface ToolAnalyticsData {
   }[];
   toolTimings: ToolTimings;
   cachedAt?: string;
-  /** Present for single-harness views, which run live over a session sample. */
   sample?: { sessions: number; totalSessions: number; requests: number; totalRequests: number };
 }
 
@@ -120,21 +115,15 @@ interface ToolTimings {
   };
 }
 
-// The API returns this while the cache is being computed post-response. The
-// page exposes an explicit cache-read retry instead of polling.
 interface WarmingResponse {
   warming: true;
 }
 
-// The tool_analytics_cache table doesn't exist — migration 028 hasn't been
-// applied to the database this deployment points at.
 interface SetupRequiredResponse {
   setupRequired: true;
 }
 
 type ToolAnalyticsResponse = ToolAnalyticsData | WarmingResponse | SetupRequiredResponse;
-
-// ── Histogram helpers (same as graphs page) ──────────────────────
 
 interface Bucket {
   min: number;
@@ -150,10 +139,6 @@ function buildHistogram(values: number[], bucketCount: number): Bucket[] {
   }
   const min = sorted[0];
   const isInteger = sorted.every((v) => Number.isInteger(v));
-  // Integer data with a compact range bins on whole-number edges over the
-  // full range: a fractional step over integers leaves empty comb bins, and
-  // the p95 clip below would silently drop a tail the percentile tiles
-  // still report.
   if (isInteger) {
     const fullRange = sorted.at(-1)! - min + 1;
     const step = Math.ceil(fullRange / bucketCount);
@@ -175,7 +160,6 @@ function buildHistogram(values: number[], bucketCount: number): Bucket[] {
   let max = p95Val + (p95Val - min) * 0.1 || sorted.at(-1)!;
   let step = (max - min) / bucketCount;
   if (isInteger) {
-    // Whole-number step keeps bin edges aligned to integer values.
     step = Math.max(1, Math.ceil(step));
     max = min + step * bucketCount;
   }
@@ -221,7 +205,6 @@ function generateTicks(min: number, max: number, targetCount: number): number[] 
   const spacing = niceNum(range / (targetCount - 1), true);
   const niceMin = Math.floor(min / spacing) * spacing;
   const ticks: number[] = [];
-  // Keep going until a tick reaches max, so the tallest bar is never clipped.
   for (let t = niceMin; t - spacing < max - spacing * 1e-9; t += spacing) {
     ticks.push(Math.round(t * 1e10) / 1e10);
   }
@@ -284,10 +267,6 @@ const OUTCOME_COLORS: Record<ToolAnalyticsData['sessionOutcomeCounts'][number]['
 
 type OutcomeKey = ToolAnalyticsData['sessionOutcomeCounts'][number]['outcome'];
 
-// Tool names partition almost perfectly by harness (Claude Code tools never
-// occur in Codex sessions and vice versa), so the agent selector filters the
-// tool list instead of re-aggregating samples. Generic OpenAI Responses
-// clients share Codex's tool names and land under 'codex'.
 const AGENT_FILTERS = ['all', 'claude', 'codex'] as const;
 type AgentFilter = (typeof AGENT_FILTERS)[number];
 
@@ -295,12 +274,9 @@ type HarnessFilter = 'all' | Harness;
 
 const STRINGS = {
   en: {
-    // Y-axis label for histograms
     sessions: 'Sessions',
-    // Transition heatmap
     hideSmall: 'Hide n<5',
     noTransitionData: 'No transition data',
-    // Workflow Patterns section
     workflowPatterns: 'Workflow Patterns',
     workflowCacheMissing:
       "Workflow patterns are not yet built for this snapshot — they will appear once the snapshot's tool_analytics_cache is rebuilt.",
@@ -333,7 +309,6 @@ const STRINGS = {
     pingPongDescription:
       'Alternating A→B→A→B segments of 2+ full cycles — the edit/verify and read/tweak feedback loops. Cycles = A→B round trips per segment.',
     noRecurringLoops: 'No recurring loops found',
-    // Tool Wall-Time section
     toolWallTime: 'Tool Wall-Time',
     turnaroundByTool: 'Turnaround by Tool',
     clientSideWallTime: '(client-side wall time)',
@@ -342,7 +317,6 @@ const STRINGS = {
     turnaroundDistribution: 'Turnaround Distribution',
     colSamples: 'Samples',
     colMean: 'Mean',
-    // OS turnaround cards
     turnaroundShapeByOs: 'Turnaround Shape by OS',
     splitByArch: 'Split by arch',
     turnaroundShapeDescription:
@@ -354,7 +328,6 @@ const STRINGS = {
       `Median Turnaround by ${splitArch ? 'Platform' : 'OS'}`,
     medianTurnaroundDescription: (splitArch: boolean) =>
       `p50 with p90 below, per tool and ${splitArch ? 'OS/arch' : 'OS'}. Same client-side wall-time samples as the chart — differences are OS + machine + harness overhead, not model latency.`,
-    // Bash breakdown
     bashBreakdown: 'Bash Breakdown',
     bashBreakdownDescription:
       "Split by the verification-kind classification already stored at ingest (raw commands never leave the proxy): test / typecheck / lint / build, everything else is 'other'. Timing columns come from the single-tool-turn samples above.",
@@ -367,12 +340,9 @@ const STRINGS = {
     bashTopBinariesAriaLabel: 'Bash top binaries',
     colBinary: 'Binary',
     colInvocations: 'Invocations',
-    // Pie Chart
     usageBreakdown: 'Usage Breakdown',
-    // Shared labels
     batchLabel: '(parallel batch)',
     callsUnit: 'calls',
-    // Loading / error states
     loadingToolAnalytics: 'Loading tool analytics...',
     cacheTableMissing: 'Tool analytics are not yet built for this snapshot',
     cacheTableMissingDetail:
@@ -382,7 +352,6 @@ const STRINGS = {
     reloadToolAnalyticsAriaLabel: 'Reload tool analytics',
     failedToLoad: 'Failed to load tool analytics',
     retry: 'Retry',
-    // Summary stats
     stats: 'Stats',
     totalToolCalls: 'Total Tool Calls',
     explicitToolErrorRate: 'Explicit Tool Error Rate',
@@ -399,11 +368,9 @@ const STRINGS = {
     recoveredFailures: 'Recovered Failures',
     recoveredFailuresDetail: (recovered: string, total: string) =>
       `${recovered} recovered / ${total} sessions with final failure signal`,
-    // Distribution section
     distribution: 'Distribution',
     toolUsageDistribution: 'Tool Usage Distribution',
     topTransitions: 'Top Transitions',
-    // Transition Matrix section
     transitionMatrix: 'Transition Matrix',
     rowNormalizedProbability: 'row-normalized probability',
     rawCounts: 'raw counts',
@@ -411,7 +378,6 @@ const STRINGS = {
     showProbability: 'Show Probability',
     transitionMatrixDescription: (count: number) =>
       `Cell (i, j) = after tool i, tool j was called next. Top ${count} tools by usage.`,
-    // Explicit Tool Error Rates section
     explicitToolErrorRates: 'Explicit Tool Error Rates',
     anthropicToolResults: 'Anthropic Tool Results',
     matchedResults: (n: string) => `(${n} matched results)`,
@@ -424,7 +390,6 @@ const STRINGS = {
     colErrors: 'Errors',
     colUnknown: 'Unknown',
     colErrorRate: 'Error Rate',
-    // Verification Loop
     verificationLoopAnalysis: 'Verification Loop Analysis',
     sessionOutcomeProxies: 'Session Outcome Proxies',
     sessionOutcomeDescription:
@@ -436,7 +401,6 @@ const STRINGS = {
     colPass: 'Pass',
     colFail: 'Fail',
     colFailRate: 'Fail Rate',
-    // Agentic Loop Depth
     agenticLoopDepth: 'Agentic Loop Depth',
     toolCallsPerSession: 'Tool Calls per Session',
     uniqueToolsPerSession: 'Unique Tools per Session',
@@ -491,7 +455,7 @@ const STRINGS = {
     repeatShareDetail: '连续重复调用同一工具的比例',
     longestStreak: '最长连续调用',
     longestStreakDetail: '单会话中同一工具的最大连续调用次数',
-    sessionsMined: '已分析会话数',
+    sessionsMined: '已挖掘会话数',
     sessionsMinedDetail: (calls: string, steps: string) =>
       `${calls} 次工具调用 → ${steps} 步（合并后）`,
     recurringMotifs: '常见模式',
@@ -511,22 +475,22 @@ const STRINGS = {
       '交替 A→B→A→B 的 2+ 完整周期片段——编辑/验证和读取/调整反馈循环。Cycles = 每段 A→B 往返次数。',
     noRecurringLoops: '未发现循环模式',
     toolWallTime: '工具耗时',
-    turnaroundByTool: '按工具分组的响应时间',
+    turnaroundByTool: '按工具分组的周转时间',
     clientSideWallTime: '（客户端耗时）',
     turnaroundByToolDescription: (single: string, total: string, pct: string, batchLabel: string) =>
       `从 tool_use 响应结束到同一会话 lane 的下一条 tool_result 请求之间的时间——包含工具执行和 harness 开销。仅统计单工具 turn（${single} / ${total} 个 tool turns，${pct}%）；并行 tool call 的 turn 归入${batchLabel}；超过 30 分钟的间隔视为空闲已排除。`,
-    turnaroundDistribution: '响应时间分布',
+    turnaroundDistribution: '周转时间分布',
     colSamples: '样本数',
     colMean: '均值',
-    turnaroundShapeByOs: '按操作系统的响应时间分布',
+    turnaroundShapeByOs: '按操作系统的周转时间分布',
     splitByArch: '按架构拆分',
     turnaroundShapeDescription:
-      '按对数间隔 bin 统计的样本占比，各系列独立归一化。会话的 OS/arch 来自客户端元数据（SDK headers，或 Codex user-agent）。虚线为中位数；样本不足 200 的平台已隐藏。',
+      '按对数间隔 bin 统计的样本占比，各系列独立归一化。会话的 OS/arch 来自客户端元数据（SDK headers；无 headers 时使用 Codex user-agent）。虚线为中位数；样本不足 200 的平台已隐藏。',
     agent: 'Agent',
     tool: '工具',
-    turnaroundAxisLabel: '响应时间（对数坐标）',
+    turnaroundAxisLabel: '周转时间（对数坐标）',
     medianTurnaroundByOs: (splitArch: boolean) =>
-      `按${splitArch ? '平台' : '操作系统'}的中位响应时间`,
+      `按${splitArch ? '平台' : '操作系统'}的中位周转时间`,
     medianTurnaroundDescription: (splitArch: boolean) =>
       `p50 及下方 p90，按工具和${splitArch ? 'OS/arch' : 'OS'}分组。与图表使用相同的客户端耗时样本——差异来自 OS + 机器 + harness 开销，而非模型延迟。`,
     bashBreakdown: 'Bash 分类统计',
@@ -558,7 +522,7 @@ const STRINGS = {
     explicitToolErrorRate: '显式工具错误率',
     errorRateDetail: (errors: string, matched: string) =>
       `${errors} 个错误 / ${matched} 个 Anthropic 匹配结果`,
-    verifiedEdited: '已验证已编辑',
+    verifiedEdited: '编辑后已验证',
     verifiedEditedDetail: (verified: string, edited: string) =>
       `${verified} / ${edited} 个已编辑会话`,
     finalVerifiedPass: '最终验证通过',
@@ -566,7 +530,7 @@ const STRINGS = {
     uniqueToolTypes: '工具类型数',
     sessionsAnalyzed: '已分析会话数',
     avgToolsPerSession: '平均每会话工具数',
-    recoveredFailures: '已恢复失败',
+    recoveredFailures: '失败后恢复',
     recoveredFailuresDetail: (recovered: string, total: string) =>
       `${recovered} 个已恢复 / ${total} 个含最终失败信号的会话`,
     distribution: '分布',
@@ -641,8 +605,6 @@ const STRINGS = {
   },
 };
 
-// ── SVG Histogram ────────────────────────────────────────────────
-
 const CHART_WIDTH = 520;
 const CHART_HEIGHT = 200;
 const MARGIN = { top: 8, right: 12, bottom: 36, left: 48 };
@@ -711,6 +673,7 @@ function Histogram({
           <div className="flex items-center justify-end mb-2">
             <ExportPngButton
               locale={locale}
+              analyticsChart={exportFilename?.replace(/\.png$/u, '') || 'tool-histogram'}
               onClick={() => {
                 if (svgRef.current)
                   exportSvgToPng(svgRef.current, {
@@ -801,7 +764,6 @@ function Histogram({
               />
             );
           })}
-          {/* Percentile lines */}
           {sorted.length > 0 &&
             percentiles.map(({ label, value: val }) => {
               const px = sx(val);
@@ -892,8 +854,6 @@ function Histogram({
   );
 }
 
-// ── Transition Heatmap ───────────────────────────────────────────
-
 const CELL = 36;
 const ROW_LABEL_W = 110;
 const COL_LABEL_H = 100;
@@ -918,7 +878,6 @@ function TransitionHeatmap({
   const locale = useLocale();
   const svgRef = useRef<SVGSVGElement>(null);
   const [hideSmall, setHideSmall] = useState(true);
-  // Rank tools by total involvement
   const tools = useMemo(() => {
     const totals = new Map<string, number>();
     for (const t of transitions) {
@@ -931,7 +890,6 @@ function TransitionHeatmap({
       .map(([name]) => name);
   }, [transitions]);
 
-  // Build matrix
   const { matrix, rowSums, maxVal } = useMemo(() => {
     const m: number[][] = Array.from({ length: tools.length }, () =>
       Array.from<number>({ length: tools.length }).fill(0),
@@ -984,7 +942,7 @@ function TransitionHeatmap({
           <button
             type="button"
             onClick={() => {
-              track('agentic_workload_transition_hide_small_toggled', { hideSmall: !hideSmall });
+              track('agentic_workload_transition_hide_small_toggled', { enabled: !hideSmall });
               setHideSmall((h) => !h);
             }}
             className={`px-2 py-0.5 text-3xs font-mono rounded border transition-colors ${
@@ -997,6 +955,7 @@ function TransitionHeatmap({
           </button>
           <ExportPngButton
             locale={locale}
+            analyticsChart="tool-transition-matrix"
             onClick={() => {
               if (svgRef.current)
                 exportSvgToPng(svgRef.current, {
@@ -1009,7 +968,6 @@ function TransitionHeatmap({
           />
         </div>
         <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: H }}>
-          {/* Column labels (to tools) — vertical */}
           {tools.map((tool, j) => {
             const label = tool.length > 14 ? `${tool.slice(0, 13)}…` : tool;
             const cx = ROW_LABEL_W + j * CELL + CELL / 2;
@@ -1031,7 +989,6 @@ function TransitionHeatmap({
             );
           })}
 
-          {/* Row labels (from tools) */}
           {tools.map((tool, i) => {
             const label = tool.length > 14 ? `${tool.slice(0, 13)}…` : tool;
             return (
@@ -1051,7 +1008,6 @@ function TransitionHeatmap({
             );
           })}
 
-          {/* Grid cells */}
           {tools.map((_fromTool, i) =>
             tools.map((_toTool, j) => {
               const raw = matrix[i][j];
@@ -1096,8 +1052,6 @@ function TransitionHeatmap({
   );
 }
 
-// ── Workflow Patterns (collapsed-run motifs, streaks, loops) ─────
-
 interface SequenceMotif {
   pattern: string[];
   support: number;
@@ -1139,7 +1093,6 @@ interface SequenceInsightsPayload {
 
 function ToolChip({ tool, avgRun }: { tool: string; avgRun?: number }) {
   const color = getToolColor(tool);
-  // ×N only when the step meaningfully repeats — every step trivially has ≥1.
   const showRun = avgRun !== undefined && avgRun >= 1.15;
   return (
     <span
@@ -1242,7 +1195,6 @@ function WorkflowPatterns({ harness }: { harness: HarnessFilter }) {
     <section>
       <SectionHeader label={t.workflowPatterns} count={motifs.length} />
 
-      {/* Repetition summary tiles */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
         {[
           {
@@ -1407,8 +1359,6 @@ function WorkflowPatterns({ harness }: { harness: HarnessFilter }) {
   );
 }
 
-// ── Section Header (matches overview page) ──────────────────────
-
 function SectionHeader({ label, count }: { label: string; count: number }) {
   return (
     <div className="flex items-center gap-2 mb-2">
@@ -1421,11 +1371,6 @@ function SectionHeader({ label, count }: { label: string; count: number }) {
   );
 }
 
-// ── Tool wall-time distributions ─────────────────────────────────
-
-// Must stay in sync with TIMING_BIN_EDGES_MS in packages/db (width_bucket
-// output: bin 0 = below the first edge, bin 9 = 5–30min; >30min is dropped
-// server-side as idle).
 const TIMING_BIN_LABELS = [
   '<0.5s',
   '0.5–1s',
@@ -1450,8 +1395,6 @@ function formatMs(v: number | null | undefined): string {
 }
 
 const BATCH_LABEL = '(parallel batch)';
-
-// ── Turnaround by OS ─────────────────────────────────────────────
 
 const OS_ORDER = ['MacOS', 'Windows', 'Linux'];
 const ARCH_ORDER = ['x64', 'arm64'];
@@ -1494,18 +1437,10 @@ const TOOL_AGENT: Record<string, Exclude<AgentFilter, 'all'>> = {
   web_search_call: 'codex',
 };
 
-// Aggregate turnaround curve across the common Claude Code tools, exposed as an
-// "All" pseudo-tool in the tool row. Its median is interpolated from the
-// combined histogram (per-tool rows carry exact SQL percentiles; the aggregate
-// can't), so it appears only when at least one of these tools is present.
 const ALL_TOOL = 'All';
 const ALL_AGG_TOOLS = ['Bash', 'Read', 'Edit', 'Write', 'TaskUpdate', 'Grep'];
 
-// Must stay in sync with os_fine_histogram in packages/db operations:
-// bin b covers gaps around 10^(b/8) ms.
 const FINE_BINS_PER_DECADE = 8;
-// Display window: ~30ms to ~3min. Mass outside (well under 1% of samples)
-// is clipped from the curve, not from the medians.
 const FINE_BIN_MIN = 12;
 const FINE_BIN_MAX = 42;
 
@@ -1513,9 +1448,6 @@ function fineBinMs(bin: number): number {
   return 10 ** (bin / FINE_BINS_PER_DECADE);
 }
 
-// Approximate p50 from the log-spaced histogram, interpolating in log-space
-// within the crossing bin. Used for the "All" aggregate, which has no exact
-// percentile from SQL.
 function p50FromBins(bins: Map<number, number>): number | null {
   let total = 0;
   for (const c of bins.values()) total += c;
@@ -1535,7 +1467,6 @@ function OsTurnaroundCards({ byOs }: { byOs: ToolTimings['byOs'] }) {
   const t = STRINGS[locale];
   const svgRef = useRef<SVGSVGElement>(null);
 
-  // Tools ordered by total sample volume across OSes.
   const tools = useMemo(() => {
     const totals = new Map<string, number>();
     for (const row of byOs.perTool) {
@@ -1559,8 +1490,6 @@ function OsTurnaroundCards({ byOs }: { byOs: ToolTimings['byOs'] }) {
     [tools, agentFilter],
   );
 
-  // The named common tools present under the current agent filter; when any
-  // exist an "All" pseudo-tool aggregating them heads the tool row.
   const aggTools = useMemo(
     () => ALL_AGG_TOOLS.filter((name) => filteredTools.includes(name)),
     [filteredTools],
@@ -1575,8 +1504,6 @@ function OsTurnaroundCards({ byOs }: { byOs: ToolTimings['byOs'] }) {
         : filteredTools[0];
   const isAll = activeTool === ALL_TOOL;
 
-  // One displayed series per platform: OS level by default, (os, arch) when
-  // split. Only combos that passed the server-side sample floor appear.
   const platforms = useMemo(() => {
     if (!splitArch) {
       return byOs.perTool
@@ -1600,9 +1527,6 @@ function OsTurnaroundCards({ byOs }: { byOs: ToolTimings['byOs'] }) {
   }, [byOs, activeTool, splitArch]);
 
   const series = useMemo(() => {
-    // "All" sums the named common tools per platform straight from the fine
-    // histogram; its median is interpolated from those combined bins and it
-    // has no single session count.
     if (isAll) {
       const groups = new Map<
         string,
@@ -1676,7 +1600,6 @@ function OsTurnaroundCards({ byOs }: { byOs: ToolTimings['byOs'] }) {
 
   if (tools.length === 0) return null;
 
-  // Shared x-domain across the displayed series, clipped to the window.
   let lo = FINE_BIN_MAX;
   let hi = FINE_BIN_MIN;
   for (const s of series) {
@@ -1717,7 +1640,7 @@ function OsTurnaroundCards({ byOs }: { byOs: ToolTimings['byOs'] }) {
                   type="button"
                   onClick={() => {
                     track('agentic_workload_turnaround_split_arch_toggled', {
-                      splitArch: !splitArch,
+                      enabled: !splitArch,
                     });
                     setSplitArch((v) => !v);
                   }}
@@ -1731,6 +1654,7 @@ function OsTurnaroundCards({ byOs }: { byOs: ToolTimings['byOs'] }) {
                 </button>
                 <ExportPngButton
                   locale={locale}
+                  analyticsChart="tool-turnaround-by-os"
                   onClick={() => {
                     if (svgRef.current)
                       exportSvgToPng(svgRef.current, {
@@ -2289,8 +2213,6 @@ function ToolTimingSection({ timings }: { timings: ToolTimings }) {
   );
 }
 
-// ── Pie Chart with "Other" grouping ──────────────────────────────
-
 interface PieSlice {
   label: string;
   count: number;
@@ -2350,11 +2272,9 @@ function PieChartSection({
       <Expandable title={t.usageBreakdown} corner>
         <div ref={containerRef} className="rounded-md border border-border bg-surface p-4 relative">
           <div className="flex flex-col lg:flex-row items-center gap-6">
-            {/* SVG Pie */}
             <div className="shrink-0">
               <svg viewBox="-1.1 -1.1 2.2 2.2" width={220} height={220}>
                 {(() => {
-                  // Pre-compute paths for all slices
                   const paths: { slice: PieSlice; d: string }[] = [];
                   let cumAngle = -Math.PI / 2;
                   for (const slice of slices) {
@@ -2370,7 +2290,6 @@ function PieChartSection({
                       d: `M 0 0 L ${x1} ${y1} A 1 1 0 ${largeArc} 1 ${x2} ${y2} Z`,
                     });
                   }
-                  // Render hovered slice last so it paints on top
                   const sorted = hoveredSlice
                     ? [
                         ...paths.filter((p) => p.slice.label !== hoveredSlice.label),
@@ -2420,7 +2339,6 @@ function PieChartSection({
               </svg>
             </div>
 
-            {/* Legend */}
             <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-1.5">
               {slices.map((slice) => (
                 <div
@@ -2442,7 +2360,6 @@ function PieChartSection({
             </div>
           </div>
 
-          {/* Hover tooltip */}
           {hoveredSlice && (
             <div
               className="absolute z-50 pointer-events-none rounded-md border border-border bg-background shadow-lg px-3 py-2 text-2xs font-mono max-w-[240px]"
@@ -2478,8 +2395,6 @@ function PieChartSection({
     </section>
   );
 }
-
-// ── Main Page ────────────────────────────────────────────────────
 
 const HARNESS_FILTERS: { value: HarnessFilter }[] = [
   { value: 'all' },
@@ -2709,7 +2624,6 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
         </div>
       )}
 
-      {/* ── Summary Stats ──────────────────────────────────────── */}
       <section>
         <SectionHeader label={t.stats} count={8} />
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -2766,10 +2680,8 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
         </div>
       </section>
 
-      {/* ── Pie Chart ─────────────────────────────────────────── */}
       <PieChartSection toolCounts={toolCounts} totalToolCalls={totalToolCalls} />
 
-      {/* ── Tool Usage + Top Transitions ───────────────────────── */}
       <section>
         <SectionHeader label={t.distribution} count={Math.min(toolCounts.length, 15)} />
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -2851,10 +2763,8 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
         </div>
       </section>
 
-      {/* ── Tool Wall-Time ─────────────────────────────────────── */}
       <ToolTimingSection timings={data.toolTimings} />
 
-      {/* ── Transition Matrix ──────────────────────────────────── */}
       <section>
         <SectionHeader label={t.transitionMatrix} count={transitions.length} />
         <Card>
@@ -2870,7 +2780,7 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
                 type="button"
                 onClick={() => {
                   track('agentic_workload_transition_mode_toggled', {
-                    showProbability: !showProbability,
+                    show_probability: !showProbability,
                   });
                   setShowProbability((v) => !v);
                 }}
@@ -2896,10 +2806,8 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
         </Card>
       </section>
 
-      {/* ── Workflow Patterns ─────────────────────────────────── */}
       <WorkflowPatterns harness={harness} />
 
-      {/* ── Tool Error Rates ───────────────────────────────────── */}
       <section>
         <SectionHeader label={t.explicitToolErrorRates} count={toolErrorRates.length} />
         <div className="space-y-4">
@@ -2974,7 +2882,6 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
         </div>
       </section>
 
-      {/* ── Verification Loop Analysis ─────────────────────────── */}
       <section>
         <SectionHeader
           label={t.verificationLoopAnalysis}
@@ -3083,7 +2990,6 @@ function ToolAnalyticsView({ harness }: { harness: HarnessFilter }) {
         </div>
       </section>
 
-      {/* ── Agentic Loop Depth ─────────────────────────────────── */}
       <section>
         <SectionHeader label={t.agenticLoopDepth} count={sessionToolStats.length} />
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

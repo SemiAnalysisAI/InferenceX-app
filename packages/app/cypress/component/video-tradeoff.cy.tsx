@@ -70,6 +70,11 @@ describe('Video tradeoff chart (synthetic fixtures)', () => {
     cy.contains('dd', '8 / 4').should('be.visible');
     cy.get('[role="combobox"][aria-label="Efficiency axis · higher is better"]').click();
     cy.contains('[role="option"]', 'Valid clips / USD').click();
+    // Radix Select refocuses its trigger after the close animation; typing before that sends
+    // the keystrokes to the trigger instead of the cost fields.
+    cy.get('[role="combobox"][aria-label="Efficiency axis · higher is better"]').should(
+      'have.focus',
+    );
     cy.contains('No points qualify for these axes yet.').should('be.visible');
     cy.get('input[aria-label="Whole deployment cost (USD/hour)"]').type('2');
     cy.get('circle.point').should('not.exist');

@@ -3,11 +3,6 @@ import { join } from 'node:path';
 
 import type { BenchmarkRow } from '@/lib/api/api';
 
-/**
- * GB300 NVL72 1P1D disaggregated row as the #3296 producer emits it: Qwen3.5
- * FP8 8k/1k conc 32 replay, one four-GPU prefill tray and one decode tray, two
- * Grace sockets each. Values are the replay's published aggregate.
- */
 export function gb300DisaggRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
   return {
     id: 990_032,
@@ -89,11 +84,6 @@ export function gb300DisaggRow(overrides: Partial<BenchmarkRow> = {}): Benchmark
   };
 }
 
-/**
- * GB300 NVL72 aggregate TP16 row without per-worker telemetry (K3 style): four
- * compute trays modeled at the deployment mean, eight Grace sockets. Watts reuse
- * the replay's means.
- */
 export function gb300AggregateRow(trays = 4): BenchmarkRow {
   const gpus = trays * 4;
   const sockets = trays * 2;
@@ -139,11 +129,6 @@ interface ParityCase {
   summary?: { AllInPower_per_gpu: number };
 }
 
-/**
- * Upstream facility W per GPU of one fixed-sequence-length rack, read from the
- * pinned Python model's own output (power-model.parity.json); null socket
- * watts models the Grace sockets.
- */
 export function upstreamRackWattsPerGpu(
   hardware: 'gb200' | 'gb300',
   gpuWattsPerGpu: number,

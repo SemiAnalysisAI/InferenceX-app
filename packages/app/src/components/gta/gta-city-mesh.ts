@@ -2,10 +2,6 @@ import * as T from 'three';
 
 import { GROUND, ROAD, type Road, type World } from './gta-world';
 
-// Static city geometry built once from OpenStreetMap data: terrain chunks,
-// road ribbons with junction-aware markings, raised sidewalks and extruded
-// buildings with per-segment facade attributes.
-
 export const CHUNK = 400;
 
 class Buf {
@@ -46,7 +42,6 @@ function chunked<V>(map: Map<string, V>, x: number, z: number, make: () => V) {
   return v;
 }
 
-/** Terrain as 800 m chunks with a coarse LOD for distant hills. */
 export function buildTerrain(world: World, material: T.Material) {
   const group = new T.Group();
   group.name = 'terrain';
@@ -86,7 +81,6 @@ export function buildTerrain(world: World, material: T.Material) {
   };
   for (let cj = 0; cj < H - 1; cj += span)
     for (let ci = 0; ci < W - 1; ci += span) {
-      // Skip chunks that are entirely deep water.
       let dry = false;
       for (let j = cj; j < Math.min(H, cj + span) && !dry; j += 4)
         for (let i = ci; i < Math.min(W, ci + span); i += 4)
@@ -170,7 +164,6 @@ function normals(samples: Sample[]) {
     const l = Math.hypot(dx, dz) || 1;
     dx /= l;
     dz /= l;
-    // Left-hand normal in the x/z plane, with a mitre stretch at corners.
     let scale = 1;
     if (i > 0 && i < samples.length - 1) {
       const p = samples[i - 1],
@@ -231,7 +224,6 @@ export function buildRoads(
     const samples = resample(road, 6);
     if (samples.length < 2) continue;
     const ns = normals(samples);
-    // Junction arc positions along this road for markings and curb cuts.
     const marks: { s: number; r: number }[] = [];
     let s = 0;
     for (let k = 0; k < road.pts.length; k += 2) {
@@ -247,7 +239,6 @@ export function buildRoads(
           best = at - m.s;
           r = m.r;
         }
-      // Positive when the junction lies ahead.
       return { d: -best, r };
     };
     const mid = samples[samples.length >> 1];
@@ -276,7 +267,6 @@ export function buildRoads(
         buf.idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
       }
     }
-    // Elevated decks: underside, barriers and columns.
     if (samples.some((p) => p.dy > 0.5)) {
       for (let i = 1; i < samples.length; i++) {
         const a = samples[i - 1],
@@ -295,7 +285,6 @@ export function buildRoads(
           deck.pos.push(ax, ya - 1.6, az, bx, yb - 1.6, bz, bx, yb + 0.9, bz, ax, ya + 0.9, az);
           deck.idx.push(o, o + 1, o + 2, o, o + 2, o + 3, o, o + 2, o + 1, o, o + 3, o + 2);
         }
-        // Underside.
         const o = deck.count;
         deck.pos.push(
           a.x + (na.nx * W) / 2,
@@ -325,7 +314,6 @@ export function buildRoads(
         }
       }
     }
-    // Raised sidewalks and curbs along city streets.
     if (
       road.cls >= ROAD.trunk &&
       road.cls <= ROAD.service &&
@@ -361,14 +349,12 @@ export function buildRoads(
               y1 = world.surface(x1, z1);
             const top0 = Math.max(y0 + 0.14, world.surface(x0, z0) + 0.22);
             const top1 = Math.max(y1 + 0.22, top0 - 0.4);
-            // curb bottom, curb top, outer top
             wb.pos.push(x0, y0, z0, x0, top0, z0, x1, top1, z1);
             const ox = n.nx * side,
               oz = n.nz * side;
             const l = Math.hypot(ox, oz) || 1;
             wb.nor.push(-ox / l, 0, -oz / l, 0, 1, 0, 0, 1, 0);
             if (prev >= 0) {
-              // Wind each triangle so it faces up (or toward the road for the curb face).
               const P = wb.pos;
               const tri = (
                 a: number,
@@ -464,7 +450,6 @@ function hash(i: number) {
   return x - Math.floor(x);
 }
 
-/** Extruded buildings merged per 400 m chunk. */
 export function buildBuildings(world: World, material: T.Material, skip: Set<number>) {
   const chunks = new Map<string, Buf>();
   const color = new T.Color();
@@ -487,7 +472,6 @@ export function buildBuildings(world: World, material: T.Material, skip: Set<num
           : palette[Math.floor(seed * palette.length)],
         T.SRGBColorSpace,
       );
-    // Use linear colour in the vertex attribute.
     const cr = color.r,
       cg = color.g,
       cb = color.b;
@@ -525,16 +509,13 @@ export function buildBuildings(world: World, material: T.Material, skip: Set<num
       const vb = y0 - b.base,
         vt = h - b.base;
       buf.uv.push(0, vb, len, vb, len, vt, 0, vt);
-      // Wind so the face points along the outward normal.
       const ex = bx - ax,
         ez = bz - az;
-      // cross((e,0),(0,1,0)) = (-ez, 0, ex)... choose winding by comparing with normal.
       const cx2 = -ez,
         cz2 = ex;
       if (cx2 * nx + cz2 * nz > 0) buf.idx.push(o, o + 1, o + 2, o, o + 2, o + 3);
       else buf.idx.push(o, o + 2, o + 1, o, o + 3, o + 2);
     }
-    // Roof.
     const contour: T.Vector2[] = [];
     for (let i = 0; i < n; i++) contour.push(new T.Vector2(b.pts[i * 2], b.pts[i * 2 + 1]));
     let tris: number[][];
@@ -552,7 +533,6 @@ export function buildBuildings(world: World, material: T.Material, skip: Set<num
       buf.attr('color', 3).push(cr, cg, cb);
     };
     if (b.roof === 3 || b.roof === 1 || b.roof === 2) {
-      // Hipped / pyramid / dome: inset ring up to a ridge or apex.
       const rise =
         b.roof === 3
           ? Math.min(3.5, Math.sqrt(Math.abs(area) / 2) * 0.35)
@@ -600,7 +580,6 @@ export function buildBuildings(world: World, material: T.Material, skip: Set<num
         if (cr2 < 0) buf.idx.push(o, o + 1, o + 2);
         else buf.idx.push(o, o + 2, o + 1);
       }
-      // Rooftop mechanical units on larger flat roofs.
       const footprint = Math.abs(area) / 2;
       if (footprint > 300 && b.height > 9 && style !== 0) {
         const count = 1 + Math.floor(seed * Math.min(5, footprint / 400));

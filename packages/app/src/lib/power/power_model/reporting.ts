@@ -1,15 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** Readable power bills of materials from the model's computed component tree. */
 
 import { formatG, type PowerComponentBreakdown, type PowerEstimate, ValueError } from './base';
 
 type Row = [string, string, string, string];
 
-/** Python's `format(value, ',.2f')`, which rounds exact ties to even. */
 function formatWatts(value: number): string {
   const magnitude = Math.abs(value);
-  // An exact binary tie at two decimals is an odd multiple of 1/8 (x.125, x.375, ...);
-  // toFixed rounds those up, Python to the even cent.
   const tie = Number.isInteger(magnitude * 8) && !Number.isInteger(magnitude * 4);
   const cents = Math.floor(magnitude * 100);
   const text = tie
@@ -78,7 +74,6 @@ const unitOf = (system: PowerComponentBreakdown) =>
 
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
 
-/** Normalize each system group's tree to one chassis or rack; keep cluster totals separate. */
 export function format_power_breakdown_per_chassis(estimate: PowerEstimate): string {
   if (estimate.scope !== 'cluster') {
     throw new ValueError('--power-breakdown-per-chassis requires the oss model');

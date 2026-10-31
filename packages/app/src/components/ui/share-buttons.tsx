@@ -2,7 +2,10 @@
 
 import { Button } from '@/components/ui/button';
 import { track } from '@/lib/analytics/analytics';
+import { placementFor } from '@/lib/analytics/placement';
+import { routeTemplateForPathname } from '@/lib/analytics/route-template';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { dashboardRouteForPathname } from '@/lib/routing/dashboard-routes';
 
 const SITE_URL = 'https://inferencex.semianalysis.com';
 
@@ -15,7 +18,7 @@ const STRINGS = {
   },
   zh: {
     shareText:
-      '探索 InferenceX：开源测试智能体推理与固定序列 AI 推理，并提供来自公开芯片运行的 AgentX 结果。',
+      '探索 InferenceX：开源智能体推理与固定序列 AI 推理基准测试，并提供来自公开芯片运行的 AgentX 结果。',
     twitter: '分享到 X（推特）',
     linkedin: '分享到 LinkedIn',
   },
@@ -26,7 +29,28 @@ function getShareUrl(): string {
   return window.location.href;
 }
 
-export function ShareTwitterButton({ text }: { text?: string }) {
+/**
+ * The page being shared, for share events. `view` is the dashboard tab (absent off the dashboards)
+ * and `route_template` the page's route. Read at event time so it follows client-side navigation.
+ */
+export function shareAnalyticsProperties(): Record<string, unknown> {
+  if (typeof window === 'undefined') return {};
+  const { pathname } = window.location;
+  return {
+    view: dashboardRouteForPathname(pathname)?.key,
+    route_template: routeTemplateForPathname(pathname),
+  };
+}
+
+interface SocialShareButtonProps {
+  /** Extra event properties, such as the selected `model` or a `placement` the DOM can't supply. */
+  analyticsProperties?: Record<string, unknown>;
+}
+
+export function ShareTwitterButton({
+  text,
+  analyticsProperties,
+}: SocialShareButtonProps & { text?: string }) {
   const t = STRINGS[useLocale()];
   return (
     <Button
@@ -35,14 +59,18 @@ export function ShareTwitterButton({ text }: { text?: string }) {
       className="size-7"
       title={t.twitter}
       data-testid="share-twitter"
-      onClick={() => {
+      onClick={(event) => {
         const url = getShareUrl();
         window.open(
           `https://twitter.com/intent/tweet?text=${encodeURIComponent(text ?? t.shareText)}&url=${encodeURIComponent(url)}`,
           '_blank',
           'noopener,noreferrer,width=600,height=400',
         );
-        track('social_share_twitter');
+        track('social_share_twitter', {
+          ...shareAnalyticsProperties(),
+          placement: placementFor(event.currentTarget),
+          ...analyticsProperties,
+        });
       }}
     >
       <svg viewBox="0 0 24 24" fill="currentColor" className="size-3.5">
@@ -52,7 +80,7 @@ export function ShareTwitterButton({ text }: { text?: string }) {
   );
 }
 
-export function ShareLinkedInButton() {
+export function ShareLinkedInButton({ analyticsProperties }: SocialShareButtonProps = {}) {
   const t = STRINGS[useLocale()];
   return (
     <Button
@@ -61,14 +89,18 @@ export function ShareLinkedInButton() {
       className="size-7"
       title={t.linkedin}
       data-testid="share-linkedin"
-      onClick={() => {
+      onClick={(event) => {
         const url = getShareUrl();
         window.open(
           `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
           '_blank',
           'noopener,noreferrer,width=600,height=600',
         );
-        track('social_share_linkedin');
+        track('social_share_linkedin', {
+          ...shareAnalyticsProperties(),
+          placement: placementFor(event.currentTarget),
+          ...analyticsProperties,
+        });
       }}
     >
       <svg viewBox="0 0 24 24" fill="currentColor" className="size-3.5">

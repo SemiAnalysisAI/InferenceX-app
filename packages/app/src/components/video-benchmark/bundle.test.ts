@@ -12,7 +12,6 @@ import {
   type Json,
 } from './bundle';
 
-// Synthetic contract tests only. These values are never presented as benchmark evidence.
 async function fixture(extra: Record<string, string> = {}) {
   const files = new Map(
     Object.entries({
@@ -170,7 +169,6 @@ describe('explicit economics assumptions', () => {
   });
 });
 
-// Opt-in verification of original downloaded backend bytes; no model/GPU execution.
 it.skipIf(!process.env.H3_ARTIFACT_DIR)(
   'opens the real CI artifact with both roles and native audio',
   async () => {

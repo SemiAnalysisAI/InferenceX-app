@@ -18,7 +18,6 @@ import {
 interface GpuStatsTableProps {
   data: GpuMetricRow[];
   metricKey: GpuMetricKey;
-  /** Full-record digest; omit only for live artifacts without stored statistics. */
   storedStats?: readonly GpuMetricStatRow[];
 }
 
@@ -52,7 +51,7 @@ const GpuStatsTable = React.memo(({ data, metricKey, storedStats }: GpuStatsTabl
 
   const handleSort = (col: SortCol) => {
     const newAsc = sortCol === col ? !sortAsc : true;
-    track('gpu_power_table_sorted', { column: col, ascending: newAsc });
+    track('gpu_power_table_sorted', { sort_key: col, sort_dir: newAsc ? 'asc' : 'desc' });
     if (sortCol === col) {
       setSortAsc((prev) => !prev);
     } else {

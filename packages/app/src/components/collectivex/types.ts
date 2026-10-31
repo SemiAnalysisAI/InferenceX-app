@@ -1,19 +1,9 @@
-/**
- * UI-side CollectiveX types. The neutral contract (dataset/series/coverage
- * shapes, version constants, reader) lives in the db package so the ingest
- * script and this frontend share one source of truth — see
- * `packages/db/src/collectivex/`.
- */
-
 import type {
   CollectiveXPoint,
   CollectiveXSeries,
   CollectiveXVersion,
 } from '@semianalysisai/inferencex-db/collectivex/types';
 
-// Re-exported explicitly rather than with `export *`: Next's SWC loader rejects a
-// star re-export anywhere in a page's module graph ("Using `export * from '...'` in
-// a page is disallowed"), and this module is reached from the /collectivex page.
 export type {
   CollectiveXComponent,
   CollectiveXCoverage,
@@ -54,9 +44,15 @@ export interface CollectiveXChartPoint {
   x: number;
   y: number;
   point: CollectiveXPoint;
+  /** Set on a SKU-range median point: the band's extent and every contributing series. */
+  range?: {
+    lo: number;
+    hi: number;
+    libraries: number;
+    members: { label: string; y: number }[];
+  };
 }
 
-/** A stored run's series with namespaced identity and selection-order visual-style index. */
 export type CollectiveXRunSeries = CollectiveXSeries & {
   run_id: string;
   run_index: number;

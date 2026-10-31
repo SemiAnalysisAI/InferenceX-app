@@ -5,9 +5,9 @@ import { UbenchxHub } from '@/components/ubenchx/UbenchxHub';
 import { enAlternates } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 
-const TITLE = 'ubenchX: TPC Skyline';
+const TITLE = 'ubenchX: TPC Skyline & SKU configurations';
 const DESCRIPTION =
-  'Measured TPC per GPC groupings on NVIDIA GPUs, found from thread-block cluster co-scheduling.';
+  'Measured NVIDIA TPC per GPC groupings alongside Huawei 950PR SKU configuration counts, clocks, memory and cache capacities.';
 
 export const metadata: Metadata = {
   title: TITLE,

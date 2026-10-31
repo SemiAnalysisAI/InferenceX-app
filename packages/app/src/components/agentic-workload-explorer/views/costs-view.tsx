@@ -32,8 +32,6 @@ import { Expandable } from '@/components/agentic-workload-explorer/expandable-ch
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 
-// ── i18n ────────────────────────────────────────────────────────
-
 const STRINGS = {
   en: {
     summary: 'Summary',
@@ -107,8 +105,6 @@ const STRINGS = {
 
 type Strings = (typeof STRINGS)[keyof typeof STRINGS];
 
-// ── Chart constants ──────────────────────────────────────────────
-
 const CHART_W = 600;
 const CHART_H = 200;
 const MARGIN = { top: 8, right: 12, bottom: 36, left: 56 };
@@ -117,8 +113,6 @@ const PLOT_H = CHART_H - MARGIN.top - MARGIN.bottom;
 
 const SVG_FONT = 'var(--font-mono, ui-monospace, monospace)';
 const SVG_FONT_SIZE = '9px';
-
-// ── Helpers ──────────────────────────────────────────────────────
 
 function formatDollarsAxis(v: number): string {
   if (v >= 1000) return `$${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}K`;
@@ -153,7 +147,6 @@ function generateTicks(min: number, max: number, targetCount: number): number[] 
   const spacing = niceNum(range / (targetCount - 1), true);
   const niceMin = Math.floor(min / spacing) * spacing;
   const ticks: number[] = [];
-  // Keep going until a tick reaches max, so the tallest bar is never clipped.
   for (let t = niceMin; t - spacing < max - spacing * 1e-9; t += spacing) {
     ticks.push(Math.round(t * 1e10) / 1e10);
   }
@@ -164,8 +157,6 @@ function truncateModel(model: string, maxLen = 32): string {
   if (model.length <= maxLen) return model;
   return `${model.slice(0, maxLen - 1)}...`;
 }
-
-// ── Section header ───────────────────────────────────────────────
 
 function SectionHeader({ label, detail }: { label: string; detail?: string }) {
   return (
@@ -179,8 +170,6 @@ function SectionHeader({ label, detail }: { label: string; detail?: string }) {
   );
 }
 
-// ── Stat card ────────────────────────────────────────────────────
-
 function StatCard({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
     <div className="rounded-md border border-border bg-surface p-3">
@@ -192,8 +181,6 @@ function StatCard({ label, value, detail }: { label: string; value: string; deta
     </div>
   );
 }
-
-// ── Daily cost bar chart ─────────────────────────────────────────
 
 function DailyCostChart({
   data,
@@ -231,6 +218,7 @@ function DailyCostChart({
           {controls}
           <ExportPngButton
             locale={locale}
+            analyticsChart="daily-cost"
             onClick={() => {
               if (svgRef.current)
                 exportSvgToPng(svgRef.current, {
@@ -248,7 +236,6 @@ function DailyCostChart({
           className="w-full"
           style={{ maxHeight: 240 }}
         >
-          {/* Y-axis grid lines and labels */}
           {yTicks.map((tv) => (
             <g key={`y-${tv}`}>
               {tv > 0 && (
@@ -275,7 +262,6 @@ function DailyCostChart({
             </g>
           ))}
 
-          {/* Baseline */}
           <line
             x1={MARGIN.left}
             y1={MARGIN.top + PLOT_H}
@@ -286,7 +272,6 @@ function DailyCostChart({
             strokeWidth={0.5}
           />
 
-          {/* Bars */}
           {data.map((d, i) => {
             const x = MARGIN.left + i * (barWidth + barGap);
             const barH = (d.cost / yMax) * PLOT_H;
@@ -324,8 +309,6 @@ function DailyCostChart({
     </Expandable>
   );
 }
-
-// ── Cost by model horizontal bar chart ───────────────────────────
 
 function ModelCostChart({ byModel, t }: { byModel: ModelCost[]; t: Strings }) {
   const sorted = [...byModel].toSorted((a, b) => b.totalCost - a.totalCost);
@@ -367,8 +350,6 @@ function ModelCostChart({ byModel, t }: { byModel: ModelCost[]; t: Strings }) {
   );
 }
 
-// ── Cost composition MixBar ──────────────────────────────────────
-
 function MixBar({ breakdown, t }: { breakdown: CostBreakdown; t: Strings }) {
   const total = breakdown.input + breakdown.output + breakdown.cacheRead + breakdown.cacheWrite;
   if (total === 0) return null;
@@ -405,8 +386,6 @@ function MixBar({ breakdown, t }: { breakdown: CostBreakdown; t: Strings }) {
     </div>
   );
 }
-
-// ── User cost table ──────────────────────────────────────────────
 
 function ClientCostTable({ byClient, t }: { byClient: ClientCost[]; t: Strings }) {
   const sorted = [...byClient].toSorted((a, b) => b.totalCost - a.totalCost);
@@ -507,8 +486,6 @@ function CostsPageContent() {
     const days = data.daily
       .toSorted((a, b) => Date.parse(a.day) - Date.parse(b.day))
       .slice(-DAY_RANGE_DAYS[range]);
-    // The snapshot ends partway through its last UTC day, so that day is left
-    // out of the per-day average (it would drag the average down).
     const complete = days.filter((d) => Date.parse(d.day) < Date.parse(LAST_DAY_ISO));
     const total = days.reduce((sum, d) => sum + d.cost, 0);
     const avg =
@@ -518,7 +495,6 @@ function CostsPageContent() {
 
   return (
     <div className="space-y-6">
-      {/* ── Stats ───────────────────────────────────────────────── */}
       <div>
         <SectionHeader label={t.summary} />
         {loading ? (
@@ -569,7 +545,6 @@ function CostsPageContent() {
 
       {data && (
         <>
-          {/* ── Pricing Coverage ──────────────────────────────────── */}
           <div>
             <SectionHeader
               label={t.pricingCoverage}
@@ -578,7 +553,6 @@ function CostsPageContent() {
             <PricingCoverageCard coverage={data.pricingCoverage} />
           </div>
 
-          {/* ── Daily Cost Chart ────────────────────────────────────── */}
           {spend && (
             <div>
               <SectionHeader
@@ -595,7 +569,6 @@ function CostsPageContent() {
             </div>
           )}
 
-          {/* ── Cost by Model ───────────────────────────────────────── */}
           <div>
             <SectionHeader label={t.costByModel} detail={t.modelCount(data.byModel.length)} />
             <div className="rounded-md border border-border bg-surface p-3 space-y-4">
@@ -609,7 +582,6 @@ function CostsPageContent() {
             </div>
           </div>
 
-          {/* ── Cost by Client ────────────────────────────────────────── */}
           <div>
             <SectionHeader label={t.costByClient} detail={t.clientCount(data.byClient.length)} />
             <div className="rounded-md border border-border bg-surface p-3">

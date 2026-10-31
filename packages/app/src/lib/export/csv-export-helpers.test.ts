@@ -88,7 +88,6 @@ describe('inferenceChartToCsv', () => {
     const data = [makePoint()];
     const { headers, rows } = inferenceChartToCsv(data, 'llama-3.1-405b', '1k/1k');
 
-    // Should have all metric columns
     expect(headers).toContain('Throughput/Chip (tok/s)');
     expect(headers).toContain('Mean TTFT (s)');
     expect(headers).toContain('P99 TTFT (s)');
@@ -259,7 +258,6 @@ describe('inferenceChartToCsv', () => {
     const fp8Point = makePoint({ hwKey: 'h100-sxm-sglang', precision: 'fp8' });
     const allData = [fp4Point, fp8Point];
 
-    // Simulate ChartDisplay.tsx onExportCsv filter
     const activeHwTypes = new Set(['h100-sxm-sglang']);
     const selectedPrecisions = ['fp4'];
     const visibleData = allData.filter(
@@ -308,7 +306,6 @@ describe('inferenceChartToCsv', () => {
   });
 
   it('uses empty string for missing optional fields', () => {
-    // Minimal point — most AggDataEntry fields are optional via Partial
     const data = [
       {
         x: 1,
@@ -329,7 +326,6 @@ describe('inferenceChartToCsv', () => {
     const { headers, rows } = inferenceChartToCsv(data, 'llama-3.1-405b', '1k/1k');
     const row = rows[0];
 
-    // Missing optional fields should be ''
     expect(row[headers.indexOf('Hardware')]).toBe('');
     expect(row[headers.indexOf('Framework')]).toBe('');
     expect(row[headers.indexOf('Throughput/Chip (tok/s)')]).toBe('');
@@ -379,7 +375,6 @@ describe('reliabilityChartToCsv (mirrors ReliabilityChartDisplay export)', () =>
   });
 
   it('exports all visible GPUs from chartData (no extra filtering needed)', () => {
-    // ReliabilityChartDisplay passes chartData directly — no precision/GPU filter
     const chartData = [
       { model: 'h100-sxm', modelLabel: 'H100 SXM', successRate: 99.5, n_success: 199, total: 200 },
       { model: 'a100-sxm', modelLabel: 'A100 SXM', successRate: 95, n_success: 95, total: 100 },
@@ -458,7 +453,6 @@ describe('evaluationChartToCsv (mirrors EvaluationChartDisplay export)', () => {
   });
 
   it('exports all chartData entries directly (no extra filtering needed)', () => {
-    // EvaluationChartDisplay passes chartData directly from context
     const data = [
       makeEvalPoint({ hwKey: 'h100-sxm-vllm', precision: 'fp8' }),
       makeEvalPoint({ hwKey: 'b200-sxm-sglang', precision: 'fp4' }),
@@ -473,8 +467,6 @@ describe('evaluationChartToCsv (mirrors EvaluationChartDisplay export)', () => {
   });
 
   it('includes Benchmark column reflecting the selected eval type (pre-filtered by context)', () => {
-    // EvaluationContext filters rawData by selectedBenchmark before building chartData,
-    // so all rows in the export share the same benchmark value
     const data = [
       makeEvalPoint({ benchmark: 'mmlu', hwKey: 'h100-sxm-vllm' }),
       makeEvalPoint({ benchmark: 'mmlu', hwKey: 'b200-sxm-sglang' }),
@@ -487,7 +479,6 @@ describe('evaluationChartToCsv (mirrors EvaluationChartDisplay export)', () => {
   });
 
   it('only contains data for one benchmark at a time (context filters by selectedBenchmark)', () => {
-    // Simulates that context already filtered to only 'humaneval' — no 'mmlu' rows leak through
     const data = [
       makeEvalPoint({ benchmark: 'humaneval', hwKey: 'h100-sxm-vllm' }),
       makeEvalPoint({ benchmark: 'humaneval', hwKey: 'b200-sxm-sglang' }),
@@ -571,7 +562,6 @@ describe('calculatorChartToCsv (mirrors ThroughputCalculatorDisplay export)', ()
   });
 
   it('exports results with label resolver (mirrors ThroughputCalculatorDisplay export)', () => {
-    // ThroughputCalculatorDisplay uses a getLabel that resolves hwKey → display name
     const results = [
       {
         resultKey: 'h100-sxm-sglang',
@@ -611,6 +601,20 @@ describe('calculatorChartToCsv (mirrors ThroughputCalculatorDisplay export)', ()
 });
 
 describe('historicalTrendToCsv (mirrors HistoricalTrendsDisplay export)', () => {
+  it('labels AgentX operating points as P90 without changing the values', () => {
+    const lines = new Map([['h200_trt', [{ date: '2026-03-01', value: 300, x: 35 }]]]);
+    const result = historicalTrendToCsv(
+      lines,
+      [{ id: 'h200_trt', label: 'H200' }],
+      'Throughput',
+      35,
+      'p90',
+    );
+    expect(result.headers).toContain('P90 Interactivity (tok/s/user)');
+    expect(result.headers).toContain('Target P90 Interactivity (tok/s/user)');
+    expect(result.rows[0][4]).toBe(300);
+    expect(result.rows[0][5]).toBe(35);
+  });
   it('flattens trend lines into rows with GPU labels', () => {
     const trendLines = new Map([
       [
@@ -636,17 +640,15 @@ describe('historicalTrendToCsv (mirrors HistoricalTrendsDisplay export)', () => 
     expect(headers).toContain('Target Interactivity (tok/s/user)');
     expect(rows).toHaveLength(3);
 
-    // First GPU, first point
     expect(rows[0][0]).toBe('H100 SXM (SGLang)');
     expect(rows[0][1]).toBe('h100-sxm-sglang');
     expect(rows[0][2]).toBe('fp8');
     expect(rows[0][3]).toBe('2025-01-10');
     expect(rows[0][4]).toBe(1100);
 
-    // Second GPU (multi-precision key splits correctly)
     expect(rows[2][0]).toBe('B200 SXM (SGLang) (FP4)');
     expect(rows[2][1]).toBe('b200-sxm-sglang');
-    expect(rows[2][6]).toBe(true); // synthetic
+    expect(rows[2][6]).toBe(true);
   });
 
   it('skips groups not in lineConfigs (hidden GPUs)', () => {
@@ -655,7 +657,6 @@ describe('historicalTrendToCsv (mirrors HistoricalTrendsDisplay export)', () => 
       ['b200', [{ date: '2025-01-10', value: 2000, x: 35 }]],
     ]);
 
-    // Only h100 is configured (b200 is hidden/filtered)
     const lineConfigs = [{ id: 'h100', label: 'H100' }];
 
     const { rows } = historicalTrendToCsv(trendLines, lineConfigs, 'Metric', 35);
@@ -670,7 +671,6 @@ describe('historicalTrendToCsv (mirrors HistoricalTrendsDisplay export)', () => 
   });
 
   it('exports with dynamic metric label and target interactivity (mirrors HistoricalTrendsDisplay export)', () => {
-    // HistoricalTrendsDisplay passes currentYLabel and targetInteractivity
     const trendLines = new Map([
       [
         'h100-sxm-sglang',

@@ -129,6 +129,28 @@
       ]
     },
     {
+      "spec": "cypress/component/bottom-toast.cy.tsx",
+      "duration": 2500,
+      "tests": [
+        {
+          "title": [
+            "BottomToast",
+            "docks as a single compact bar on a 361px phone and keeps the page end reachable"
+          ],
+          "duration": 1829,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "BottomToast",
+            "keeps the floating corner card on desktop without reserving page space"
+          ],
+          "duration": 656,
+          "attempts": 1
+        }
+      ]
+    },
+    {
       "spec": "cypress/component/chart-buttons.cy.tsx",
       "duration": 2282,
       "tests": [
@@ -2367,6 +2389,20 @@
       ]
     },
     {
+      "spec": "cypress/component/landing-banner-ab.cy.tsx",
+      "duration": 293,
+      "tests": [
+        {
+          "title": [
+            "Landing banner A/B arms",
+            "hands each arm its own definition on click and dismiss"
+          ],
+          "duration": 291,
+          "attempts": 1
+        }
+      ]
+    },
+    {
       "spec": "cypress/component/measured-metric-controls.cy.tsx",
       "duration": 4000
     },
@@ -2524,6 +2560,48 @@
     {
       "spec": "cypress/component/power-timeline.cy.tsx",
       "duration": 4000
+    },
+    {
+      "spec": "cypress/component/powerx-facility-switch.cy.tsx",
+      "duration": 4000
+    },
+    {
+      "spec": "cypress/component/powerx-tutorial-layout.cy.tsx",
+      "duration": 6900,
+      "tests": [
+        {
+          "title": [
+            "PowerX tutorial layout stability",
+            "keeps every widget box in place while the views API loads"
+          ],
+          "duration": 4761,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "PowerX tutorial layout stability",
+            "reserves the same box for any GPU draw, at most one label row taller than drawn"
+          ],
+          "duration": 1630,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "PowerX tutorial layout stability",
+            "holds the flow diagram and caption still while hovering at 390px"
+          ],
+          "duration": 189,
+          "attempts": 1
+        },
+        {
+          "title": [
+            "PowerX tutorial layout stability",
+            "holds the flow diagram and caption still while hovering at 1280px"
+          ],
+          "duration": 188,
+          "attempts": 1
+        }
+      ]
     },
     {
       "spec": "cypress/component/profit-estimator-chart.cy.tsx",
@@ -3762,6 +3840,17 @@
           "attempts": 1
         }
       ]
+    }
+  ],
+  "supplementalProvenance": [
+    {
+      "spec": "cypress/component/landing-banner-ab.cy.tsx",
+      "revision": "435e4c212421d44d07e204b0ff1e2705b44575c6",
+      "browser": "electron",
+      "kind": "component",
+      "sourceHash": "f9462906bf9940269c449ce4cae67512540137dc2d357558e7879c745a83a4a9",
+      "source": "Local Cypress component run; 1 test passed",
+      "durationMs": 293
     }
   ]
 }

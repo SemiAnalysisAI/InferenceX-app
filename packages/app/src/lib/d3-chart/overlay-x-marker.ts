@@ -31,7 +31,6 @@ export function xMarkerPath(size: number, armScale = 1): string {
   return `M ${-arm} ${-arm} L ${arm} ${arm} M ${-arm} ${arm} L ${arm} ${-arm}`;
 }
 
-/** Current rendered translation of an overlay marker group. */
 export function overlayMarkerPosition(marker: Element): { x: number; y: number } | null {
   const transform = marker.getAttribute('transform') ?? '';
   const match = transform.match(/translate\((?<x>[^, ]+)[, ]+(?<y>[^) ]+)\)/u);
@@ -56,7 +55,6 @@ export function attachOverlayXMarkerHandlers<T>(
   points
     .on('mouseenter', function (event, data) {
       if (options.handle?.isPinned()) return;
-      // Let taps reach the pinning click handler (see touch-input.ts).
       if (isTouchCompatMouseEvent(event)) return;
       d3.select(this)
         .select(options.markerSelector)

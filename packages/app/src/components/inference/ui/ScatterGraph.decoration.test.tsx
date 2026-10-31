@@ -122,8 +122,6 @@ describe('ScatterGraph toggle decoration', () => {
     expect(groups[1].querySelector('.offload-halo')).toBeNull();
     expect(groups[2].querySelector('.offload-halo')).not.toBeNull();
     expect(container.querySelector('[data-testid="spec-decode-marker-key"]')).toBeNull();
-    // The KV-offload key and optimization note moved to the axis-metric info
-    // footer rendered by ChartDisplay, so the chart itself carries neither.
     expect(container.querySelector('[data-testid="offload-halo-key"]')).toBeNull();
     expect(container.querySelector('[data-testid="agentic-optimization-note"]')).toBeNull();
     unmount();
@@ -271,7 +269,6 @@ describe('ScatterGraph toggle decoration', () => {
     expect(b200Roofline).not.toBeNull();
     expect(b200Roofline!.style.opacity).toBe('0');
 
-    // The whole point: a legend toggle is a restyle, not a teardown/rebuild.
     expect(rebuildCount()).toBe(buildsAfterMount);
     unmount();
   });
@@ -283,8 +280,6 @@ describe('ScatterGraph toggle decoration', () => {
       dotGroups(container, 'h100')[0].querySelector('.visible-shape')!.getAttribute('fill');
     const before = h100Fill();
 
-    // h100 and b200 share the NVIDIA hue zone: dropping one redistributes
-    // the remaining hues (dynamic-colors), so the dots must actually recolor.
     inferenceState.current = {
       ...inferenceState.current,
       activeHwTypes: new Set(['h100']),
@@ -301,7 +296,6 @@ describe('ScatterGraph toggle decoration', () => {
     const buildsAfterMount = rebuildCount();
     const fp4Dot = () => dotGroups(container, 'h100').find((d) => d.dataset.precision === 'fp4')!;
 
-    // Single precision: fp4 points are hidden circles.
     expect(fp4Dot().style.opacity).toBe('0');
     expect(fp4Dot().querySelector('.visible-shape')!.tagName.toLowerCase()).toBe('circle');
 
@@ -311,7 +305,6 @@ describe('ScatterGraph toggle decoration', () => {
     };
     rerender();
 
-    // Second precision becomes visible as the square shape (slot 2).
     expect(fp4Dot().style.opacity).toBe('1');
     const shape = fp4Dot().querySelector<SVGElement>('.visible-shape')!;
     expect(shape.tagName.toLowerCase()).toBe('rect');

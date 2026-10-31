@@ -26,7 +26,6 @@ vi.mock('next/link', () => ({
   ),
 }));
 
-// Rendered outside the App Router, so `useSearchParams` has no context.
 vi.mock('next/navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof NextNavigation>()),
   useSearchParams: () => new URLSearchParams(),

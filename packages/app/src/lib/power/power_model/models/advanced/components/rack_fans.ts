@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** Air-load fan control and coupled cooling/conversion calculation. */
 
 import {
   FrozenModel,
@@ -104,7 +103,6 @@ export class RackFanAssembly extends FrozenModel {
   }
 }
 
-/** Include air-cooled conversion loss without counting liquid-cooled chip heat. */
 export function solve_cooling(
   component_power_w: number,
   air_heat_w: number,

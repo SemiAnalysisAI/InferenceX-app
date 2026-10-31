@@ -9,8 +9,8 @@ export const metadata: Metadata = tabMetadataZh('gpu-specs');
 export default function ZhGpuSpecsPage() {
   return (
     <>
-      <ZhTabIntro tab="gpu-specs" />
       <GpuSpecsContent />
+      <ZhTabIntro tab="gpu-specs" />
     </>
   );
 }

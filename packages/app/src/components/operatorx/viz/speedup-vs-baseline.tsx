@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
+import { track } from '@/lib/analytics/analytics';
 
 import { EmptyChart } from '../charts/empty';
 import { HardwareLegend, OpxChart, tooltipHtml } from '../charts/kit';
@@ -24,7 +25,6 @@ interface Bar {
   cases: number;
 }
 
-/** Case indices per group, in display order. */
 function groupCases(model: ComparisonModel, grouping: Grouping): [string, number[]][] {
   const all = model.view.cases.map((_, i) => i);
   if (grouping === 'none') return [['All', all]];
@@ -57,7 +57,10 @@ function SpeedupVsBaseline({ model }: { model: ComparisonModel }) {
     <div className="space-y-3">
       <SegmentedToggle
         value={grouping}
-        onValueChange={setGrouping}
+        onValueChange={(value) => {
+          track('operatorx_speedup_grouping_selected', { grouping: value });
+          setGrouping(value);
+        }}
         ariaLabel="Group by"
         options={[
           { value: 'none', label: 'Overall' },

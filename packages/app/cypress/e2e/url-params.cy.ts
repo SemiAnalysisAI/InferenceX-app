@@ -1,12 +1,16 @@
 import { selectXAxisMode } from '../support/e2e';
-/**
- * Tests that URL parameters correctly drive UI state and that user interactions
- * update the visible output (selector text, SVG axis labels).
- * Merged from url-params.cy.ts + chart-filter-effects.cy.ts + high-contrast.cy.ts.
- */
 import { expandLegendAdvanced } from '../support/legend-advanced';
+
+const withFixtureModel = (path: string) => {
+  const url = new URL(path, 'http://localhost');
+  if (url.pathname === '/inference' && !url.searchParams.has('g_model')) {
+    url.searchParams.set('g_model', 'DeepSeek-V4-Pro');
+  }
+  return `${url.pathname}${url.search}${url.hash}`;
+};
+
 const visitWithDismissedModal = (path: string) => {
-  cy.visit(path, {
+  cy.visit(withFixtureModel(path), {
     onBeforeLoad(win) {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     },
@@ -14,7 +18,7 @@ const visitWithDismissedModal = (path: string) => {
 };
 
 const visitWithErrorSpy = (path: string) => {
-  cy.visit(path, {
+  cy.visit(withFixtureModel(path), {
     onBeforeLoad(win) {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       cy.stub(win.console, 'error').as('consoleError');
@@ -79,7 +83,6 @@ describe('URL Parameter Persistence', () => {
     it('refreshes the automatic Best per SKU selection when the metric changes', () => {
       visitWithDismissedModal('/inference');
 
-      // Best per SKU lives in the Quick Filters dialog now.
       cy.get('[data-testid="scatter-quick-filters"]').click();
       cy.get('[data-testid="quick-filter-best-per-sku"]').should(
         'have.attr',
@@ -122,7 +125,6 @@ describe('URL Parameter Persistence', () => {
       cy.get('[data-testid="model-selector"]').click();
       cy.contains('[role="option"]', 'Qwen3.5 397B').click();
       cy.get('[data-testid="model-selector"]').should('contain.text', 'Qwen3.5 397B');
-      // Navigate immediately to cover pending writes inside the debounce window.
       cy.get('[data-testid="tab-trigger-submissions"]').click();
       cy.url().should('include', '/submissions');
       cy.get('[data-testid="tab-trigger-inference"]').click();
@@ -169,8 +171,6 @@ describe('URL Parameter Persistence', () => {
     it('changing Y-axis metric via dropdown updates SVG axis label', () => {
       visitWithDismissedModal('/inference');
 
-      // The dashboard opens on Hyperscaler ownership Total Tokens per $1 TCO,
-      // so the first axis is infrastructure purchasing power before switching.
       cy.get('[data-testid="scatter-graph"]')
         .first()
         .find('svg text[transform="rotate(-90)"]')
@@ -309,8 +309,6 @@ describe('URL Parameter Persistence', () => {
 
   describe('Hydration on shared-link entry', () => {
     it('/compare/[slug] with ?i_seq=1k/1k seeds the sequence without a hydration error', () => {
-      // Visit the canonical model-prefixed slug so the assertion is directly
-      // about the rendered page, not about a bare-slug redirect interleaving.
       visitWithErrorSpy('/compare/deepseek-r1-h100-vs-h200?i_seq=1k/1k');
       cy.get('[data-testid="scenario-selector"]').should('contain.text', '1K / 1K');
       assertNoHydrationMismatch();
@@ -338,8 +336,6 @@ describe('URL Parameter Persistence', () => {
     });
 
     it('/inference with invalid ?i_prec=junk falls back to the default', () => {
-      // Pair with a multi-precision model — the FP4-only default model hides
-      // the precision selector entirely, leaving nothing to assert against.
       visitWithErrorSpy('/inference?g_model=DeepSeek-R1-0528&i_prec=junk');
       cy.get('[data-testid="precision-multiselect"]').invoke('text').should('not.contain', 'junk');
       assertNoHydrationMismatch();
@@ -350,17 +346,10 @@ describe('URL Parameter Persistence', () => {
       cy.get('[data-testid="scenario-selector"]').should('contain.text', '1K / 1K');
       assertNoHydrationMismatch();
 
-      // Pair `i_prec=fp8` with a model that actually has FP8 in availability.
-      // The default model (DeepSeek-V4-Pro) is FP4-only in the test fixtures,
-      // so `effectivePrecisions` would otherwise intersect the URL selection
-      // with the available set and fall back to FP4.
       visitWithErrorSpy('/inference?g_model=DeepSeek-R1-0528&i_prec=fp8');
       cy.get('[data-testid="precision-multiselect"]').should('contain.text', 'FP8');
       assertNoHydrationMismatch();
 
-      // Use a model + precision combination that the data supports, otherwise
-      // `effectivePrecisions` intersects the selection with available precisions
-      // and the UI may render the fallback. dsr1 + fp8 + 1k/1k is supported.
       visitWithErrorSpy('/inference?i_seq=1k/1k&g_model=DeepSeek-R1-0528&i_prec=fp8');
       cy.get('[data-testid="scenario-selector"]').should('contain.text', '1K / 1K');
       cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek');
@@ -391,8 +380,6 @@ describe('URL Parameter Persistence', () => {
     });
 
     it('historical trends tab shares the inference high-contrast default (off)', () => {
-      // Historical reads highContrast from the shared inference display domain,
-      // so it inherits the default-off behavior.
       visitWithDismissedModal('/historical');
       cy.get('[data-testid="historical-trends-display"]').should('exist');
       cy.get('#historical-high-contrast').first().should('have.attr', 'data-state', 'unchecked');
@@ -406,7 +393,7 @@ describe('URL Parameter Persistence', () => {
   });
 
   describe('Default toggle states (share-link correctness)', () => {
-    it('a bare /inference link with neither param renders high contrast AND parallelism labels off', () => {
+    it('an /inference link with neither toggle param renders high contrast AND parallelism labels off', () => {
       visitWithDismissedModal('/inference');
       cy.get('[data-testid="scatter-graph"]').should('exist');
       expandLegendAdvanced();

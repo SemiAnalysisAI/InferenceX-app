@@ -2,19 +2,11 @@ import type { ConfigParams } from './config-cache';
 import { parseBool, parseInt2, parseOptionalBool } from './normalizers';
 import { physicalChipCount, roleChipCount } from './tpu-normalization';
 
-/** Deployment topology shared by benchmark and evaluation ingestion. */
 export type ConfigTopology = Omit<
   ConfigParams,
   'hardware' | 'framework' | 'model' | 'precision' | 'specMethod'
 >;
 
-/**
- * Normalize single-engine and role-shaped artifact metadata into the same
- * deployment identity. Explicit counts win; fallback counts are per worker.
- * Aggregate configs mirror one engine into both role columns for DB readers.
- * A mirrored single-node SGLang 1P/1D payload is the eval producer's encoding
- * of one engine, unless an explicit/framework disaggregation signal says otherwise.
- */
 export function resolveConfigTopology(
   src: Record<string, any>,
   framework: string,
@@ -22,10 +14,6 @@ export function resolveConfigTopology(
 ): ConfigTopology {
   const topologyMarker = parseOptionalBool(src.is_multinode);
   const isMultinode = topologyMarker === true;
-  // SGLang's explicit topology and the v3 AgentX contract share EP/DCP
-  // devices with TP. Other legacy artifacts retain their TP x EP fallback.
-  // AgentX evals use zero sequence lengths; performance artifacts name the
-  // scenario. Older fixed-sequence artifacts retain their historical contract.
   const agentxTopology =
     String(src.scenario_type ?? '').startsWith('agentic') ||
     (parseInt2(src.isl) === 0 && parseInt2(src.osl) === 0);
@@ -115,7 +103,6 @@ export function resolveConfigTopology(
       roleChipCount(src.num_decode_gpu) ?? physicalChipCount(src.num_gpus) ?? gpuCount(tp, ep);
   }
 
-  // Node placement alone does not imply separate prefill/decode engines.
   const disagg = disaggFromFw || decodeNumWorkers > 0;
 
   if (!disagg) {

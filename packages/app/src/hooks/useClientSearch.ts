@@ -31,7 +31,6 @@ function stopListening(): void {
   listening = false;
 }
 
-/** One shared external store for the browser's current query string. */
 export function subscribeClientSearch(subscriber: () => void): () => void {
   subscribers.add(subscriber);
   startListening();
@@ -56,10 +55,6 @@ export function getServerSearchSnapshot(): string {
   return '';
 }
 
-/**
- * Hydration-safe live query-string snapshot. History writes remain explicit;
- * callers that use pushState/replaceState must dispatch CLIENT_SEARCH_CHANGE_EVENT.
- */
 export function useClientSearch(): string {
   return useSyncExternalStore(
     subscribeClientSearch,
@@ -68,7 +63,6 @@ export function useClientSearch(): string {
   );
 }
 
-/** Filter-reader adapter; navigation links must use the actual query snapshot above. */
 export function useClientRouteSearch(): string {
   return useSyncExternalStore(
     subscribeClientSearch,

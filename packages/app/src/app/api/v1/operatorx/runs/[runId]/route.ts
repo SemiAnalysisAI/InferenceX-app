@@ -7,10 +7,10 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
-export async function GET(_request: NextRequest, context: { params: Promise<{ runId: string }> }) {
+export async function GET(request: NextRequest, context: { params: Promise<{ runId: string }> }) {
   try {
     const { runId } = await context.params;
-    return cachedJson(await getDataset(runId), { tag: operatorXCacheTag() });
+    return cachedJson(request, await getDataset(runId), { tag: operatorXCacheTag() });
   } catch (error) {
     console.error('OperatorX run read', error);
     const message = error instanceof Error ? error.message : 'OperatorX run unavailable';

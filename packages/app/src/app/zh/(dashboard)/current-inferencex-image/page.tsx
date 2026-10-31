@@ -9,8 +9,8 @@ export const metadata: Metadata = tabMetadataZh('current-inferencex-image');
 export default function ZhCurrentInferenceXImagePage() {
   return (
     <>
-      <ZhTabIntro tab="current-inferencex-image" />
       <CurrentImageContent />
+      <ZhTabIntro tab="current-inferencex-image" />
     </>
   );
 }

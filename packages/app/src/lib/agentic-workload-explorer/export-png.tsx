@@ -1,3 +1,4 @@
+import { track } from '@/lib/analytics/analytics';
 import type { Locale } from '@/lib/i18n/i18n';
 
 import { ExpandTrigger } from '@/components/agentic-workload-explorer/expandable-chart';
@@ -11,10 +12,6 @@ const STRINGS = {
   },
 } as const;
 
-/**
- * Export an SVG element as a PNG image with a title overlay.
- * Detects minecraft/light mode from document classes.
- */
 export function exportSvgToPng(
   svg: SVGSVGElement,
   opts: {
@@ -49,27 +46,22 @@ export function exportSvgToPng(
     const ctx = canvas.getContext('2d')!;
     ctx.scale(scale, scale);
 
-    // Background
     ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, canvasW, canvasH);
 
-    // Title
     ctx.fillStyle = fgColor;
     ctx.font = 'bold 14px monospace';
     ctx.fillText(opts.title, padding, padding + 20);
 
-    // Subtitle
     if (opts.subtitle) {
       ctx.fillStyle = mutedColor;
       ctx.font = '10px monospace';
       ctx.fillText(opts.subtitle, padding, padding + 34);
     }
 
-    // SVG
     ctx.drawImage(img, padding, titleHeight + padding, opts.svgWidth, opts.svgHeight);
     URL.revokeObjectURL(url);
 
-    // Download
     const a = document.createElement('a');
     a.download = opts.filename;
     a.href = canvas.toDataURL('image/png');
@@ -79,15 +71,17 @@ export function exportSvgToPng(
   img.src = url;
 }
 
-/** Render an Export PNG button. */
 export function ExportPngButton({
   onClick,
   label,
   locale = 'en',
+  analyticsChart,
 }: {
   onClick: () => void;
   label?: string;
   locale?: Locale;
+  /** Stable chart id. When set, clicks send `agentic_workload_export_png` with `chart`. */
+  analyticsChart?: string;
 }) {
   const t = STRINGS[locale];
   const ariaLabel = label ?? t.exportPng;
@@ -95,7 +89,10 @@ export function ExportPngButton({
     <>
       <button
         type="button"
-        onClick={onClick}
+        onClick={() => {
+          if (analyticsChart) track('agentic_workload_export_png', { chart: analyticsChart });
+          onClick();
+        }}
         aria-label={ariaLabel}
         className="px-2 py-0.5 text-3xs font-mono rounded border border-border text-subtle hover:text-foreground hover:bg-surface-hover transition-colors"
       >

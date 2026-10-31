@@ -53,18 +53,6 @@ const STRINGS = {
   },
 } as const;
 
-/**
- * Bar histogram of per-request sequence lengths with vertical p50/p75/p90/p95
- * guide lines. Designed for the detail-page card — fills its container width
- * via `viewBox` + 100% width.
- *
- * Bins are uniform in ln(value), not in value: ISL/OSL span orders of magnitude,
- * so linear bins pile nearly every request into the leftmost few and stretch a
- * near-empty tail across the rest of the axis. On a log axis the same roughly
- * lognormal data reads as an ordinary bell instead.
- *
- * Hover shows the bin range + count + cumulative percentile.
- */
 export function Distribution({
   values,
   unit,
@@ -88,8 +76,6 @@ export function Distribution({
     return {
       sorted: positive.toSorted((a, b) => a - b),
       histogram,
-      // Zero-token requests are real but unplottable on a log axis; they are
-      // reported under the chart rather than silently folded into bin one.
       excluded: values.length - positive.length,
     };
   }, [values]);
@@ -100,8 +86,6 @@ export function Distribution({
   const { sorted, histogram, excluded } = computed;
   const { counts, edges, lnMin, lnMax } = histogram;
 
-  // Wrap the legend, then grow the viewBox and bottom padding by the same
-  // amount so the plot area is untouched (see TimeSeriesChart).
   const legendEntries: ChartLegendEntry[] = GUIDES.map(({ label, q, color }) => ({
     label: `${label} ${fmtCount(quantile(sorted, q))}`,
     color,
@@ -130,14 +114,11 @@ export function Distribution({
 
   const fmt = fmtCount;
 
-  // Hover: report the bin range under cursor, its count, and what percentile
-  // the bin's midpoint represents in the empirical distribution.
   const resolve = (fraction: number) => {
     const binIdx = Math.min(nBins - 1, Math.max(0, Math.floor(fraction * nBins)));
     const binLo = edges[binIdx]!;
     const binHi = edges[binIdx + 1]!;
     const count = counts[binIdx] ?? 0;
-    // Cumulative % at the bin's right edge.
     let cumCount = 0;
     for (let i = 0; i <= binIdx; i++) cumCount += counts[i] ?? 0;
     const cumPct = (cumCount / sorted.length) * 100;
@@ -159,7 +140,6 @@ export function Distribution({
         {t.logScale}
       </div>
       <ChartHover pad={pad} width={W} height={H} resolve={resolve}>
-        {/* y-axis gridlines + labels */}
         {yTickVals.map((v, i) => {
           const y = yScale(v);
           return (
@@ -186,7 +166,6 @@ export function Distribution({
           );
         })}
 
-        {/* Bars */}
         {counts.map((c, i) => {
           const h = (Math.min(c, yMax) / yMax) * innerH;
           const x = PAD.left + i * barW;
@@ -204,7 +183,6 @@ export function Distribution({
           );
         })}
 
-        {/* Percentile guide lines */}
         {GUIDES.map(({ q, color }) => {
           const v = quantile(sorted, q);
           const x = xScale(v);
@@ -223,7 +201,6 @@ export function Distribution({
           );
         })}
 
-        {/* X axis */}
         <line
           x1={PAD.left}
           x2={PAD.left + innerW}
@@ -270,7 +247,6 @@ export function Distribution({
           {t.countAxis}
         </text>
 
-        {/* Percentile legend chips */}
         <ChartLegend
           entries={legendEntries}
           layout={legend}

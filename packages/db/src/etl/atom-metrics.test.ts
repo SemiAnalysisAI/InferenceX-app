@@ -44,6 +44,41 @@ function atomMetrics(): MetricsMap {
   };
 }
 
+const PREFILL = 'http://10.0.0.1:6100/metrics';
+const DECODE = 'http://10.0.0.2:6100/metrics';
+
+function onEndpoint(endpointUrl: string, values: number[], extra = {}) {
+  return {
+    endpoint_url: endpointUrl,
+    labels: { dp_rank: '0', engine_role: 'default' },
+    ...extra,
+    timeslices: values.map((rate, index) => ({
+      start_ns: index * 1e9,
+      end_ns: (index + 1) * 1e9,
+      rate,
+    })),
+  };
+}
+
+function atomPdMetrics(): MetricsMap {
+  const counter = (prefill: number[], decode: number[]) => ({
+    series: [onEndpoint(PREFILL, prefill), onEndpoint(DECODE, decode)],
+  });
+  return {
+    'atom:prompt_tokens': counter([100, 100], [100, 100]),
+    'atom:prefix_cache_full_tokens': counter([100, 100], [100, 100]),
+    'atom:prefix_cache_cached_tokens': counter([70, 80], [90, 90]),
+    'atom:prefix_cache_offload_tokens': counter([20, 10], [0, 0]),
+    'atom:generation_tokens': counter([1, 1], [50, 50]),
+    'atom:prefill_batch_tokens': {
+      series: [
+        onEndpoint(PREFILL, [], { stats: { count: 10 } }),
+        onEndpoint(DECODE, [], { stats: { count: 0 } }),
+      ],
+    },
+  };
+}
+
 const blob = (metrics: MetricsMap, warmup_metrics: MetricsMap = {}) =>
   gzipSync(JSON.stringify({ metrics, warmup_metrics }));
 
@@ -60,7 +95,6 @@ describe('ATOM server metrics', () => {
     expect(result.prefixCacheHitsTps.map((p) => p.value)).toEqual([80, 60]);
     expect(result.prefixCacheHitRate.map((p) => p.value)).toEqual([0.8, 0.6]);
     expect(result.promptTokensBySource['compute (miss)']?.map((p) => p.value)).toEqual([20, 40]);
-    // The exporter provides a cluster-wide KV gauge, not per-DP-rank or CPU-pool gauges.
     expect(result.kvCacheUsageByEngine).toEqual([]);
     expect(result.hostKvCacheUsage).toEqual([]);
     expect(result.metricSources).toEqual([]);
@@ -121,5 +155,29 @@ describe('ATOM server metrics', () => {
     expect(extractServerMetricSamples(JSON.stringify({ metrics: parsed.metrics }))).toEqual(
       extractServerMetricSamples(JSON.stringify({ metrics: original })),
     );
+  });
+
+  it('reads ATOM P/D prompt and cache counters from prefill only, with offload as the CPU tier', async () => {
+    const result = (await computeChartSeries(blob(atomPdMetrics()), {
+      framework: 'mooncake-atom',
+      disagg: true,
+    }))!;
+    expect(result.prefillTps.map((p) => p.value)).toEqual([100, 100]);
+    expect(result.prefixCacheHitsTps.map((p) => p.value)).toEqual([70, 80]);
+    expect(result.prefixCacheHitRate.map((p) => p.value)).toEqual([0.7, 0.8]);
+    expect(result.promptTokensBySource['cache hit (HBM)']?.map((p) => p.value)).toEqual([70, 80]);
+    expect(result.promptTokensBySource['cache hit (CPU offload)']?.map((p) => p.value)).toEqual([
+      20, 10,
+    ]);
+    expect(result.promptTokensBySource['compute (miss)']?.map((p) => p.value)).toEqual([10, 10]);
+    expect(result.decodeTps.map((p) => p.value)).toEqual([51, 51]);
+  });
+
+  it('keeps every endpoint when no ATOM prefill marker is exported', async () => {
+    const metrics = atomPdMetrics();
+    delete metrics['atom:prefill_batch_tokens'];
+    const result = (await computeChartSeries(blob(metrics), { framework: 'mooncake-atom' }))!;
+    expect(result.prefixCacheHitsTps.map((p) => p.value)).toEqual([160, 170]);
+    expect(result.promptTokensBySource['cache hit (CPU offload)']).toBeUndefined();
   });
 });

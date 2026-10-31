@@ -18,11 +18,12 @@ import { test } from 'node:test';
 import { packageInfo, packageRoot, packedSkillSuite, succeeded } from './packed-skill.mjs';
 
 const suite = packedSkillSuite();
-const { project, run } = suite;
+const { project, run, npmRun } = suite;
 const metadataName = '.inferencex-skills.json';
 const installedNames = [
   'inferencex',
   'inferencex-api',
+  'inferencex-pr-improvements',
   'inferencex-to-chart',
   'inferencex-to-table',
 ];
@@ -58,7 +59,7 @@ function snapshot(root) {
 
 test('the real npm archive installs the entry and shared skill with all bundled resources', () => {
   const cwd = project();
-  const result = run(['install', '--target', 'codex'], cwd);
+  const result = npmRun(['install', '--target', 'codex'], cwd);
   succeeded(result);
   assert.ok(result.stdout.includes(`Installed version: ${packageInfo.version}\n`));
   assert.deepEqual(readdirSync(join(cwd, '.agents', 'skills')), installedNames);
@@ -142,6 +143,34 @@ test('repeat installation skips changes; explicit force merges and preserves nei
   assert.equal(readFileSync(join(skillsRoot, 'other-skill/SKILL.md'), 'utf8'), 'neighbor');
 });
 
+test('the PR improvements helper is integrity checked and local changes require a forced reinstall', () => {
+  const cwd = project();
+  const args = ['--target', 'codex', '--json'];
+  const installed = jsonResult(run(['install', ...args], cwd));
+  const name = 'inferencex-pr-improvements';
+  assert.equal(installed.shortcuts[name].installation_state, 'installed');
+  assert.equal(installed.ready, true);
+  const helper = join(cwd, '.agents/skills', name, 'scripts/waterfall.mjs');
+  const original = readFileSync(helper);
+  writeFileSync(helper, '// local helper changes\n');
+
+  const status = jsonResult(run(['status', ...args], cwd));
+  assert.equal(status.shortcuts[name].installation_state, 'unknown');
+  assert.match(status.shortcuts[name].reason, /scripts\/waterfall.mjs: Bytes differ/u);
+  assert.equal(status.ready, false);
+  const skipped = jsonResult(run(['install', ...args], cwd));
+  assert.equal(skipped.shortcuts[name].outcome, 'skipped');
+  assert.equal(readFileSync(helper, 'utf8'), '// local helper changes\n');
+  const before = snapshot(cwd);
+  const preview = jsonResult(run(['install', '--force', '--dry-run', ...args], cwd));
+  assert.equal(preview.shortcuts[name].outcome, 'would_overwrite');
+  assert.deepEqual(snapshot(cwd), before);
+
+  const repaired = jsonResult(run(['install', '--force', ...args], cwd));
+  assert.equal(repaired.ready, true);
+  assert.deepEqual(readFileSync(helper), original);
+});
+
 test('offline status distinguishes the installer and installed version without changing local files', () => {
   const cwd = project();
   succeeded(run(['install', '--target', 'codex'], cwd));
@@ -160,7 +189,12 @@ test('offline status distinguishes the installer and installed version without c
     result.stdout,
     [
       `Installer version: ${packageInfo.version}\nInstalled version: 0.1.99\nSkill path: ${destination}\n`,
-      ...['inferencex', 'inferencex-to-chart', 'inferencex-to-table'].map(
+      ...[
+        'inferencex',
+        'inferencex-to-chart',
+        'inferencex-to-table',
+        'inferencex-pr-improvements',
+      ].map(
         (name) =>
           `Installer version: ${packageInfo.version}\nInstalled version: ${packageInfo.version}\nSkill path: ${join(cwd, '.agents/skills', name)}\n`,
       ),
@@ -356,9 +390,17 @@ test('force refuses packaged destination symlinks and preserves their neighborin
 });
 
 test('help and list use the packed executable without writing into the project', () => {
-  for (const args of [[], ['help'], ['--help'], ['-h'], ['install', '--help'], ['list']]) {
+  for (const [index, args] of [
+    [],
+    ['help'],
+    ['--help'],
+    ['-h'],
+    ['install', '--help'],
+    ['list'],
+  ].entries()) {
     const cwd = project();
-    const result = run(args, cwd);
+    // One case proves npm resolves the packed bin; the rest cover argument handling.
+    const result = (index === 0 ? npmRun : run)(args, cwd);
     succeeded(result);
     assert.match(result.stdout, /inferencex-api/);
     assert.deepEqual(readdirSync(cwd), []);
@@ -429,7 +471,7 @@ test('JSON status reports absent and installed versions separately from the inst
     reason: null,
     ready: false,
     shortcuts: Object.fromEntries(
-      ['inferencex-to-chart', 'inferencex-to-table'].map((name) => [
+      ['inferencex-to-chart', 'inferencex-to-table', 'inferencex-pr-improvements'].map((name) => [
         name,
         {
           schema_version: 1,

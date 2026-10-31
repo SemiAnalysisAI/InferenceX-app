@@ -55,15 +55,10 @@ export function OverviewTierSlider({
   useEffect(() => {
     const index = tierIndex(tier);
     committedIndex.current = index;
-    // A payload settling mid-drag must not yank the thumb away from the stop
-    // the pointer is choosing; the gesture's own pointerup/cancel settles it.
     if (!pointerActive.current) setSelectedIndex(index);
   }, [tier]);
 
   useEffect(() => {
-    // A failed load leaves the settled tier behind while the thumb and URL
-    // stay on the unsuccessful stop. Re-open the guard so activating that
-    // same stop again retries the navigation instead of returning early.
     if (navigationError) committedIndex.current = tierIndex(tier);
   }, [navigationError, tier]);
 

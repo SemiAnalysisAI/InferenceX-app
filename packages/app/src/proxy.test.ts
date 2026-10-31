@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { unstable_doesMiddlewareMatch } from 'next/dist/experimental/testing/server/middleware-testing-utils';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { proxy } from './proxy';
+import { config, proxy } from './proxy';
 
 beforeEach(() => {
   vi.stubEnv('VERCEL_ENV', 'production');
@@ -50,4 +51,93 @@ it('preserves embed headers and CSP and sends no event for pages', () => {
     expect(response.headers.get('x-middleware-request-x-inferencex-embed-skin')).toBe('vllm');
   }
   expect(send).not.toHaveBeenCalled();
+});
+
+it('sends an old Inference Performance power link to PowerX with its filters', () => {
+  vi.stubGlobal('fetch', vi.fn());
+  const response = proxy(
+    new NextRequest(
+      'https://inferencex.semianalysis.com/inference?g_model=DeepSeek-R1-0528&i_metric=y_measuredAvgPower',
+    ),
+    { waitUntil: vi.fn() },
+  );
+  expect(response.status).toBe(307);
+  expect(response.headers.get('location')).toBe(
+    'https://inferencex.semianalysis.com/powerx?g_model=DeepSeek-R1-0528&i_metric=y_measuredAvgPower',
+  );
+});
+
+it('canonicalizes a compare slug with any query intact, including i_metric and utm tags', () => {
+  vi.stubGlobal('fetch', vi.fn());
+  const response = proxy(
+    new NextRequest(
+      'https://inferencex.semianalysis.com/zh/compare/deepseek-r1-h100-vs-gb200?i_metric=y_tpPerGpu&utm_source=newsletter&utm_campaign=launch',
+    ),
+    { waitUntil: vi.fn() },
+  );
+  expect(response.status).toBe(308);
+  expect(response.headers.get('location')).toBe(
+    'https://inferencex.semianalysis.com/zh/compare/deepseek-r1-gb200-vs-h100?i_metric=y_tpPerGpu&utm_source=newsletter&utm_campaign=launch',
+  );
+});
+
+it('passes a compare URL without a query through to the page', () => {
+  vi.stubGlobal('fetch', vi.fn());
+  const response = proxy(
+    new NextRequest('https://inferencex.semianalysis.com/compare/deepseek-r1-h100-vs-gb200'),
+    { waitUntil: vi.fn() },
+  );
+  expect(response.headers.get('x-middleware-next')).toBe('1');
+  expect(response.headers.has('location')).toBe(false);
+});
+
+describe('proxy matcher', () => {
+  it.each([
+    '/api/v1/availability',
+    '/api/openapi.json',
+    '/embed/model/test',
+    '/zh/embed/model/test',
+    '/inference?i_metric=y_measuredAvgPower',
+    '/inference/deepseek-r1?i_power=certified',
+    '/zh/inference?i_power=legacy',
+    '/zh/inference/deepseek-r1?i_metric=y_measuredAvgPower',
+    '/compare/deepseek-r1-b200-vs-mi355x?g_model=DeepSeek-R1-0528',
+    '/zh/compare-per-dollar/deepseek-r1-b200-vs-mi355x?i_seq=8k%2F1k',
+    '/compare-precision/deepseek-r1-b200-fp4-vs-fp8/agentic?i_prec=fp4',
+    '/compare/deepseek-r1-mi355x-vs-b200?i_metric=y_tpPerGpu',
+    '/zh/compare-spec-decode/deepseek-r1-b200-fp8-mtp?utm_source=x',
+    '/compare/deepseek-r1-b200-vs-mi355x',
+  ])('runs on %s', (url) => {
+    expect(unstable_doesMiddlewareMatch({ config, url })).toBe(true);
+  });
+
+  it('skips client RSC navigations to compare pages', () => {
+    expect(
+      unstable_doesMiddlewareMatch({
+        config,
+        url: '/compare/deepseek-r1-mi355x-vs-b200?i_metric=y_tpPerGpu',
+        headers: { rsc: '1' },
+      }),
+    ).toBe(false);
+  });
+
+  it.each([
+    '/',
+    '/zh',
+    '/inference',
+    '/inference/deepseek-r1?g_model=DeepSeek-R1-0528',
+    '/compare-per-dollar/deepseek-r1-b200-vs-mi355x/performance-per-dollar.png?lang=zh',
+    '/compare/deepseek-r1-b200-vs-mi355x/8k-1k/extra?utm_source=x',
+    '/compare?g_model=DeepSeek-R1-0528',
+    '/comparisons/x?g_model=DeepSeek-R1-0528',
+    '/blog/some-post',
+    '/_next/static/chunks/main.js',
+    '/_next/image?url=%2Fimages%2Fa.png&w=1200&q=75',
+    '/favicon.ico',
+    '/images/post/figure.png',
+    '/brand/left-pattern-full.svg',
+    '/ingest/e/',
+  ])('skips %s', (url) => {
+    expect(unstable_doesMiddlewareMatch({ config, url })).toBe(false);
+  });
 });

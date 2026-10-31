@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** The requested facility PUE policy; independent of equipment fan power. */
 
 import { FrozenModel, ValidationError } from './base';
 

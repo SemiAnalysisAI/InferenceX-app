@@ -17,7 +17,6 @@ export function renderOffloadHalo(
     .selectAll<SVGCircleElement, boolean>('.offload-halo')
     .data(point.offload_mode === 'on' ? [true] : [])
     .join('circle')
-    // Every chart render re-syncs every point; skip unchanged writes.
     .each(function () {
       setAttrIfChanged(this, 'class', 'offload-halo');
       setAttrIfChanged(this, 'r', String(OFFLOAD_HALO_RADIUS));

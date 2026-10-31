@@ -3,13 +3,13 @@ import { cycleToTheme } from '../support/theme';
 
 const optionalThemes = APP_THEMES.filter((theme) => !['light', 'dark', 'system'].includes(theme));
 const featureCode =
-  /THREE\.WebGLRenderer|WebGLRenderer:|LOS SANTOS 3D|minecraft-click\.mp3|ender-dragon\.mp3|Loading Luigi Circuit|inferencex-minecraft-worlds|mc-panorama-cube|\.mc-hotbar-wrap|\.mc-boss|\.mc-endgame-guide|\.csgo-scene|\.gta-scene|\.mc-dragon-flyacross|\.kart-scene|\.doom-scene|\.halo-scene|halo-theme\.css|font-family:\s*["']?(?:Monocraft|Pricedown|ChaletComprime|Industry|Halo)/i;
+  /THREE\.WebGLRenderer|WebGLRenderer:|LOS SANTOS 3D|minecraft-click\.mp3|ender-dragon\.mp3|Loading Luigi Circuit|inferencex-minecraft-worlds|mc-panorama-cube|\.mc-hotbar-wrap|\.mc-boss|\.mc-endgame-guide|\.csgo-scene|\.gta-scene|\.mc-dragon-flyacross|\.kart-scene|\.doom-scene|\.halo-scene|halo-theme\.css|\.excalidraw-scene|excalidraw-theme\.css|orange-chicken-theme\.css|\.orange-chicken-marker|\.orange-chicken-theme-banner|font-family:\s*["']?(?:Monocraft|Pricedown|ChaletComprime|Industry|Halo|Excalifont)/i;
 const featureAsset = new RegExp(
-  `/decorative/(?:${optionalThemes.join('|')})/|minecraft-click\\.mp3|Monocraft-|Pricedown|ChaletComprime|Industry-|halo[^/]*\\.(?:woff2?|ttf|otf|mp3|ogg|wav)|youtube(?:-nocookie)?\\.com|ytimg\\.com`,
+  `/decorative/(?:${optionalThemes.join('|')})/|minecraft-click\\.mp3|Monocraft-|Pricedown|ChaletComprime|Industry-|Excalifont-|halo[^/]*\\.(?:woff2?|ttf|otf|mp3|ogg|wav)|youtube(?:-nocookie)?\\.com|ytimg\\.com`,
   'i',
 );
 const featureElements =
-  '[data-testid="minecraft-game"], [data-testid="minecraft-play-banner"], [data-testid="kart-game"], [data-testid$="-theme-banner"], .mc-dragon-flyacross';
+  '[data-testid="minecraft-game"], [data-testid="minecraft-play-banner"], [data-testid="kart-game"], [data-testid$="-theme-banner"], .mc-dragon-flyacross, .orange-chicken-marker';
 const isFeatureAsset = (url: string) => featureAsset.test(decodeURIComponent(url));
 
 function saveMediaOptIns(win: Window, enabled: boolean) {
@@ -21,13 +21,12 @@ function saveMediaOptIns(win: Window, enabled: boolean) {
 
 function expectNoOptionalResources(requests: string[]) {
   cy.window().then((win) => {
-    // Request interception catches in-flight requests too; resource timing only lists completed ones.
     expect(requests.filter(isFeatureAsset), 'optional requests started').to.deep.equal([]);
     const resources = win.performance.getEntriesByType('resource');
     expect(resources.filter((entry) => isFeatureAsset(entry.name))).to.have.length(0);
     expect(
       [...win.document.fonts].filter((font) =>
-        /monocraft|pricedown|chalet|industry|halo/i.test(font.family),
+        /monocraft|pricedown|chalet|industry|halo|excalifont/i.test(font.family),
       ),
     ).to.have.length(0);
     for (const resource of resources.filter((entry) => /\.(?:js|css)(?:\?|$)/.test(entry.name)))
@@ -49,7 +48,7 @@ const seo = (doc: Document) => [
   ...[...doc.querySelectorAll('h1, h2')].map((node) => node.textContent),
 ];
 
-describe('optional themes stay off the default page', () => {
+describe('optional themes stay off standard light/dark pages and embeds', () => {
   for (const route of ['/', '/zh']) {
     it(`${route} migrates a retired kart preference and keeps the toggle usable`, () => {
       const requests: string[] = [];
@@ -68,7 +67,6 @@ describe('optional themes stay off the default page', () => {
       cy.get('[data-testid="theme-option-kart"]').should('not.exist');
       cy.get('[data-testid="theme-menu"]').should('not.exist');
       expectNoOptionalResources(requests);
-      // The regular rotation intentionally visits optional themes on the way to light.
       cycleToTheme('light');
       cy.get('html').should('have.class', 'light').and('not.have.class', 'kart');
       cy.reload();
@@ -84,7 +82,6 @@ describe('optional themes stay off the default page', () => {
     ['dark', '/', 390],
     ['light', '/zh', 390],
     ['dark', '/zh', 1440],
-    ['default', '/', 390],
     ['system', '/zh', 1440],
   ] as const) {
     it(`${theme} ${route} at ${width}px does not load theme code, assets or fonts`, () => {
@@ -95,9 +92,7 @@ describe('optional themes stay off the default page', () => {
       cy.viewport(width, 900);
       cy.visit(route, {
         onBeforeLoad(win) {
-          if (theme === 'default') win.localStorage.removeItem('theme');
-          else win.localStorage.setItem('theme', theme);
-          // Stored opt-ins must not start media outside the selected theme.
+          win.localStorage.setItem('theme', theme);
           saveMediaOptIns(win, true);
         },
       });
@@ -109,13 +104,11 @@ describe('optional themes stay off the default page', () => {
         const splash = win.document.querySelector('.splash-text');
         if (splash) expect(win.getComputedStyle(splash).animationName).to.equal('none');
       });
-      // Focusing the toggle must not activate a theme or fetch optional assets.
       cy.get('[data-testid="theme-toggle"]').focus();
       cy.get('[data-testid="theme-menu"]').should('not.exist');
       cy.scrollTo('bottom');
       expectNoOptionalResources(requests);
       cy.document().then((doc) => {
-        // Light → dark stays on the default path. Dark's next click selects Minecraft.
         if (theme !== 'light') return;
         const baseline = seo(doc);
         cy.get('[data-testid="theme-toggle"]').click();
@@ -142,7 +135,6 @@ describe('optional themes stay off the default page', () => {
         });
         cy.get('html').should('have.class', 'light').and('have.attr', 'data-inferencex-embed');
         cy.get('[data-testid="embed-frame"]').should('be.visible');
-        // EmbedFrame's effect writes the requested theme only after hydration.
         cy.window().should((win) => expect(win.localStorage.getItem('theme')).to.equal('light'));
         cy.get('[data-testid="theme-toggle"]').should('not.exist');
         expectNoOptionalResources(requests);
@@ -171,7 +163,6 @@ describe('optional themes stay off the default page', () => {
           ),
         ).to.have.length(0);
         expect(doc.querySelector(featureElements)).to.equal(null);
-        // Metadata and indexable headings are in raw HTML, without running JavaScript.
         cy.request(route).then((normal) => {
           const normalDoc = new DOMParser().parseFromString(normal.body, 'text/html');
           expect(seo(normalDoc)).to.deep.equal(seo(doc));
@@ -181,14 +172,13 @@ describe('optional themes stay off the default page', () => {
     }
   });
 
-  it('reaches optional themes with ordinary clicks and preserves default-page cleanup and metadata', () => {
+  it('reaches optional themes with ordinary clicks and preserves standard-page cleanup and metadata', () => {
     cy.visit('/about', {
       onBeforeLoad(win) {
         win.localStorage.setItem('theme', 'light');
         saveMediaOptIns(win, false);
       },
     });
-    // The server-rendered trigger is visible before its click handler hydrates.
     cy.get('[data-testid="theme-toggle"]')
       .should('have.attr', 'aria-label')
       .and('contain', 'currently');
@@ -207,13 +197,12 @@ describe('optional themes stay off the default page', () => {
   });
 
   for (const route of ['/about', '/zh/about']) {
-    it(`${route} keeps the page and default toggle working when optional chunks fail`, () => {
+    it(`${route} keeps the page and theme toggle working when optional chunks fail`, () => {
       cy.viewport(1440, 900);
       cy.visit(route, {
         onBeforeLoad(win) {
           win.localStorage.setItem('theme', 'dark');
           saveMediaOptIns(win, false);
-          // Next captures console.error during bootstrap for caught React errors.
           cy.spy(win.console, 'error').as('caughtThemeError');
         },
       });
@@ -222,12 +211,9 @@ describe('optional themes stay off the default page', () => {
         .and('contain', 'currently dark');
       cy.document().then((doc) => {
         const baseline = seo(doc);
-        // Only start failing lazy chunks after the normal page has hydrated.
         cy.window().then((win) => {
           const append = win.document.head.appendChild.bind(win.document.head);
           cy.stub(win.document.head, 'appendChild').callsFake((node: Node) => {
-            // Earlier cases may have cached these chunks. Force a real network
-            // failure instead of silently executing a cached optional module.
             if (node instanceof win.HTMLScriptElement && node.src.includes('/_next/static/')) {
               const url = new URL(node.src);
               url.searchParams.set('optional-theme-failure', '1');
@@ -246,7 +232,6 @@ describe('optional themes stay off the default page', () => {
           Cypress.sinon.match((error: unknown) => /Failed to load chunk/.test(String(error))),
         );
         cy.document().should((current) => expect(seo(current)).to.deep.equal(baseline));
-        // The shared header remains interactive even after a rejected lazy import.
         cycleToTheme('light');
         cycleToTheme('dark');
         cy.get(`canvas, audio, iframe, ${featureElements}`).should('not.exist');

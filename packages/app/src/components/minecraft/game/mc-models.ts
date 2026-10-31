@@ -1,19 +1,8 @@
 import * as THREE from 'three';
 
-/**
- * Minecraft entity models built from the vanilla box layouts.
- *
- * Boxes are authored in Minecraft model space (pixels, y down, front -Z,
- * entity right -X) with the vanilla texture-unwrapping convention, then the
- * model root is rotated 180 degrees about Z and lifted 24px so it stands on
- * the ground in world space facing -Z.
- */
-
 export interface BoxSpec {
-  /** Texture offset of the unwrapped box. */
   u: number;
   v: number;
-  /** Box origin and size in model pixels (relative to the part pivot). */
   x: number;
   y: number;
   z: number;
@@ -24,7 +13,6 @@ export interface BoxSpec {
   mirror?: boolean;
 }
 
-/** Build one textured box as raw arrays. */
 function pushBox(b: BoxSpec, tw: number, th: number, pos: number[], uv: number[], index: number[]) {
   const g = b.inflate ?? 0;
   const x0 = b.x - g;
@@ -34,20 +22,13 @@ function pushBox(b: BoxSpec, tw: number, th: number, pos: number[], uv: number[]
   const y1 = b.y + b.h + g;
   const z1 = b.z + b.d + g;
   const { u, v, w, h, d } = b;
-  // Each face: top-left corner, u axis end, v axis end, and texture rect.
   type V3 = [number, number, number];
   const faces: [V3, V3, V3, number, number, number, number][] = [
-    // front (-Z): image left is entity right (-X)
     [[x0, y0, z0], [x1, y0, z0], [x0, y1, z0], u + d, v + d, w, h],
-    // back (+Z)
     [[x1, y0, z1], [x0, y0, z1], [x1, y1, z1], u + d + w + d, v + d, w, h],
-    // right side (-X)
     [[x0, y0, z1], [x0, y0, z0], [x0, y1, z1], u, v + d, d, h],
-    // left side (+X)
     [[x1, y0, z0], [x1, y0, z1], [x1, y1, z0], u + d + w, v + d, d, h],
-    // top (-Y in model space)
     [[x0, y0, z1], [x1, y0, z1], [x0, y0, z0], u + d, v, w, d],
-    // bottom (+Y)
     [[x0, y1, z0], [x1, y1, z0], [x0, y1, z1], u + d + w, v, w, d],
   ];
   for (const [tl, tr, bl, ru, rv, rw, rh] of faces) {
@@ -68,7 +49,6 @@ export function boxGeometry(boxes: BoxSpec[], tw: number, th: number) {
   const index: number[] = [];
   for (const b of boxes) {
     if (b.mirror) {
-      // Mirrored boxes render as a mirror image of the unmirrored box, like vanilla.
       pushMirrored(b, tw, th, pos, uv, index);
     } else pushBox(b, tw, th, pos, uv, index);
   }
@@ -88,7 +68,6 @@ function pushMirrored(
   uv: number[],
   index: number[],
 ) {
-  // Build the box mirrored around its own X center.
   const start = pos.length;
   pushBox({ ...b, mirror: false }, tw, th, pos, uv, index);
   const cx = b.x + b.w / 2;
@@ -100,7 +79,6 @@ export interface PartSpec {
   pivot: [number, number, number];
   rotation?: [number, number, number];
   boxes: BoxSpec[];
-  /** Optional overlay boxes using a second texture (sheep fur). */
   overlay?: BoxSpec[];
   children?: PartSpec[];
 }
@@ -356,7 +334,6 @@ export function disposeModelGeometry() {
   geometryCache.clear();
 }
 
-/** Instantiate a model with the given skin texture (and optional overlay texture). */
 export function buildModel(
   name: ModelName,
   texture: THREE.Texture,
@@ -425,16 +402,13 @@ export function buildModel(
 export interface Pose {
   limbSwing: number;
   limbAmount: number;
-  /** Head yaw relative to the body, radians. */
   headYaw: number;
   headPitch: number;
-  /** Arm swing progress 0..1 for attacks. */
   attack: number;
   age: number;
   sneaking?: boolean;
 }
 
-/** Apply vanilla-style walk animation to a model. */
 export function poseModel(name: ModelName, m: ModelInstance, pose: Pose) {
   const { parts } = m;
   const swing = pose.limbSwing * 0.6662;
@@ -451,7 +425,6 @@ export function poseModel(name: ModelName, m: ModelInstance, pose: Pose) {
       parts.rightArm.rotation.x = Math.cos(swing + Math.PI) * amount;
       parts.leftArm.rotation.x = Math.cos(swing) * amount;
     } else {
-      // Zombies and skeletons hold their arms out.
       const bob = Math.sin(pose.age * 0.067) * 0.05;
       parts.rightArm.rotation.x = -HALF_PI + bob;
       parts.leftArm.rotation.x = -HALF_PI - bob;

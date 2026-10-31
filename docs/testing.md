@@ -1,9 +1,5 @@
 # Testing
 
-The [October 2026 E2E audit](testing/e2e-usefulness-audit-2026-10.md) records
-per-test usefulness rankings, the 25% runtime-case reduction, and the
-validated browser-specific timing refresh procedure.
-
 ## Structure
 
 **Unit tests**: Vitest, colocated with source (`*.test.ts` next to `*.ts`). Config: `packages/app/vitest.config.ts`.
@@ -22,7 +18,7 @@ Enforced by `@pr-claude` — missing/low-quality tests are flagged 🔴 BLOCKING
 
 ## Easter egg themes and games
 
-Easter egg themes (Minecraft, CS:GO, GTA, DOOM, Halo, and any future optional theme) and every game launched from them are just for fun. They do not need stable infrastructure, have no compatibility or uptime guarantees, and may be deleted at any point without notice or migration.
+Easter egg themes (Minecraft, CS:GO, GTA, DOOM, Halo, Excalidraw, and any future optional theme) and every game launched from them are just for fun. They do not need stable infrastructure, have no compatibility or uptime guarantees, and may be deleted at any point without notice or migration.
 
 - Do not add unit, Cypress component, Cypress E2E, or CI checks for easter egg features. The only exceptions are the two main-site isolation checks listed below.
 - The mandatory test requirements above do not apply to them. Reviewers, including `@pr-claude`, must not flag missing tests on easter egg code as blocking or request them.
@@ -35,6 +31,8 @@ Retain and maintain exactly these two checks:
 - `packages/app/cypress/e2e/optional-theme-isolation.cy.ts`: checks normal light/dark pages, embeds, resource loading, and SEO, including theme activation/cleanup needed to verify isolation.
 
 Keep their existing support helper and E2E browser setup. Do not expand these checks into gameplay, decorative styling, or visual-fidelity tests. Ordinary light/dark UI, dashboard, export, and announcement tests remain required; those are not easter egg tests.
+
+The site defaults to Minecraft when no theme preference is saved; saved preferences still take precedence. The E2E support hook seeds `dark` only when no preference exists, keeping ordinary dashboard tests on a standard theme. Specs can override or remove that preference in `onBeforeLoad`. The isolation checks cover explicit light/dark/system preferences and embeds, not the Minecraft default.
 
 ## Pre-commit Checklist
 
@@ -58,23 +56,25 @@ current spec and rejects removed entries.
 
 CI uploads raw per-shard, per-test observations and validates the complete
 20-shard matrix before publishing `cypress-timing-baselines`. Refresh all
-three baselines with the [documented artifact procedure](testing/e2e-usefulness-audit-2026-10.md#timing-evidence-and-sharding).
+three baselines from a successful full run:
+
+```sh
+gh run download RUN_ID --pattern 'cypress-timings-*' --dir /tmp/cypress-observations
+bun packages/app/scripts/refresh-cypress-timings.ts /tmp/cypress-observations
+```
+
+Use a fresh destination directory, review the generated diff and balance
+report, and commit the baselines on a branch.
 Do not invent timings or treat the plugin's merged output as a fresh full
 measurement. Spec durations are Cypress's reported execution durations, not
 whole-job wall time; checkout, dependency installation, and application build
 time are not included.
 
-`E2E_FIXTURES=1` serves the committed API snapshots under `packages/app/cypress/fixtures/api/`. Refresh them with `bun run --cwd packages/app capture:fixtures`. The capture script updates `_manifest.json`, which records the fixture shape, byte length, checksum, source, and capture timestamp. The manifest guard rejects partial or hand-edited snapshots; benchmark history must also contain at least two dates so replay tests cannot silently skip their substantive path.
+`E2E_FIXTURES=1` serves the committed API snapshots under `packages/app/cypress/fixtures/api/`. Refresh them with `bun run --cwd packages/app capture:fixtures`. The capture script updates `_manifest.json`, which records the fixture shape, byte length, checksum, source, and capture timestamp. The manifest guard rejects partial or hand-edited snapshots; benchmark history must also contain at least two dates so replay tests cannot silently skip their substantive path. Fixture API responses are sent with `Cache-Control: no-store`. `cy.intercept` never sees a response the browser serves from its HTTP cache, so the production 60 s browser reuse would let an earlier test's response shadow a later test's stub.
 
 Server-cache performance regressions must assert source-reader call counts for repeated identical inputs. Do not use elapsed-time thresholds: CI scheduling and cold-start variance make wall-clock assertions nondeterministic.
 
 ## Quality Standards
-
-See the [October 2026 test suite audit](./test-suite-audit.md) for concrete examples
-of redundant coverage, disconnected test-only implementations, and the meaningful
-regression checks retained when pruning the suite.
-The [exact-text follow-up](./test-copy-audit.md) distinguishes incidental copy
-snapshots from assertions that protect units, data identity, and real behavior.
 
 1. **No tautological tests** — every test must verify a real transformation
 2. **Cover edge cases** — empty input, null, boundary values, error paths

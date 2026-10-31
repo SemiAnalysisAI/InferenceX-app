@@ -95,7 +95,6 @@ describe('buildTokenPoints', () => {
       }),
     ]);
     expect(points.map((p) => p.requestId)).toEqual(['main-1', 'main-2']);
-    // Turn numbering skips over the filtered subagent rows.
     expect(points.map((p) => p.turn)).toEqual([1, 2]);
   });
 
@@ -113,13 +112,11 @@ describe('buildTokenPoints', () => {
 
   it('measures elapsedMs from the first main-agent request, not the first overall request', () => {
     const points = buildTokenPoints([
-      // A subagent fires at t=0…
       makeReq({
         id: 'sub-1',
         timestamp: '2026-05-08T00:00:00.000Z',
         subagentLabel: 'Title Generation',
       }),
-      // …but the main agent's first turn lands at t=10s. elapsedMs[0] should be 0.
       makeReq({
         id: 'main-1',
         timestamp: '2026-05-08T00:00:10.000Z',
@@ -159,8 +156,6 @@ describe('buildTokenPoints', () => {
   });
 
   it('emits a hash split derived from the session-wide hash trie', () => {
-    // Two main requests sharing a 2-block prefix. The second request should see
-    // 2 blocks of cached prefix and any new blocks as uncached suffix.
     const points = buildTokenPoints([
       makeReq({
         id: 'r1',
@@ -175,10 +170,8 @@ describe('buildTokenPoints', () => {
         hashTokenCount: 192,
       }),
     ]);
-    // First request has nothing to match against; entire chain is uncached.
     expect(points[0].hash.cached).toBe(0);
     expect(points[0].hash.uncached).toBe(128);
-    // Second request shares blocks 0-1 with r1; block 2 is new.
     expect(points[1].hash.cached).toBe(128);
     expect(points[1].hash.uncached).toBe(64);
     expect(points[1].hash.total).toBe(192);
@@ -248,8 +241,6 @@ describe('buildTokenPoints with agentKey', () => {
     const subKey = buildAgentOptions(reqs).find((o) => o.label === 'Agent SDK')!.key;
     const points = buildTokenPoints(reqs, subKey);
     expect(points.map((p) => p.requestId)).toEqual(['s1a', 's1b']);
-    // elapsedMs anchors on the first request of the selected agent — the
-    // sub-agent starts at +00:00 in its own view.
     expect(points.map((p) => p.elapsedMs)).toEqual([0, 1_000]);
   });
 
@@ -274,7 +265,6 @@ describe('buildContextTrajectories', () => {
       makeReq({ id: 's1b', timestamp: '2026-05-08T00:00:02.000Z', subagentLabel: 'Agent SDK' }),
       makeReq({ id: 'm2', timestamp: '2026-05-08T00:00:03.000Z', subagentLabel: null }),
       makeReq({ id: 's2a', timestamp: '2026-05-08T00:00:04.000Z', subagentLabel: 'Explore Agent' }),
-      // Same label as the FIRST sub-run, but separated by a main turn → its own trajectory.
       makeReq({ id: 's3a', timestamp: '2026-05-08T00:00:05.000Z', subagentLabel: 'Agent SDK' }),
       makeReq({ id: 's3b', timestamp: '2026-05-08T00:00:06.000Z', subagentLabel: 'Agent SDK' }),
     ]);
@@ -288,7 +278,6 @@ describe('buildContextTrajectories', () => {
   });
 
   it('anchors elapsedMs on the earliest request regardless of agent type', () => {
-    // A subagent fires before the first main turn; its elapsedMs is 0.
     const t = buildContextTrajectories([
       makeReq({
         id: 's1',
@@ -342,7 +331,6 @@ describe('computeCacheHitRates', () => {
   });
 
   it('aggregates api cache hit rate across every visible point', () => {
-    // Two points share a prefix; the second adds an uncached block.
     const points = buildTokenPoints([
       makeReq({
         id: 'r1',
@@ -360,7 +348,6 @@ describe('computeCacheHitRates', () => {
       }),
     ]);
     const rates = computeCacheHitRates(points);
-    // Sum cached = 0+80=80; sum total = 100+100 = 200 → 40%.
     expect(rates.api).toBeCloseTo(40, 5);
   });
 
@@ -380,7 +367,6 @@ describe('computeCacheHitRates', () => {
       }),
     ]);
     const rates = computeCacheHitRates(points);
-    // Hash: r1 cached=0/total=128, r2 cached=128/total=192. Sum = 128/320 = 40%.
     expect(rates.hash).toBeCloseTo(40, 5);
   });
 
@@ -437,15 +423,10 @@ describe('computeSessionCacheHitRates', () => {
         inputTokens: 100,
       }),
     ]);
-    // (100 + 300) cached / (200 + 400) total = 66.67%. If sub-agents were
-    // skipped (as buildTokenPoints does) the answer would be 50%.
     expect(rates.api).toBeCloseTo(66.67, 1);
   });
 
   it('hash trie is built across every request in the session, in chronological order', () => {
-    // Two main requests sharing a 2-block prefix, with a sub-agent slotted
-    // between them. The trie still serializes by timestamp so r3 can match
-    // against r1's chain even though a sub-agent fired in between.
     const rates = computeSessionCacheHitRates([
       makeReq({
         id: 'r3',
@@ -467,8 +448,6 @@ describe('computeSessionCacheHitRates', () => {
         hashTokenCount: 128,
       }),
     ]);
-    // Per-request cached prefix: r1=0, r2=0 (no shared prefix), r3=128 (2 blocks
-    // match r1). cached=128, total=128+64+192=384 → 33.33%.
     expect(rates.hash).toBeCloseTo(33.33, 1);
   });
 
@@ -481,8 +460,6 @@ describe('computeSessionCacheHitRates', () => {
         inputTokens: 0,
       }),
     ]);
-    // 0 / 1000 = 0% — a fresh cache write is a miss, even though it'll be
-    // readable next time.
     expect(rates.api).toBe(0);
   });
 

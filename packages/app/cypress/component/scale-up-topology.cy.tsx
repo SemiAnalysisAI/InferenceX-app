@@ -1,7 +1,7 @@
 import { ScaleUpTopologyDiagram } from '@/components/gpu-specs/scale-up-topology-diagram';
+import { registerAnalyticsClient } from '@/lib/analytics/analytics';
 import type { GpuSpec } from '@/lib/catalog/gpu-specs';
 
-// Three real specs covering all topology types: switched 4-rail, switched NVL72, full mesh
 const H100_SXM: GpuSpec = {
   name: 'H100 SXM',
   vendor: 'nvidia',
@@ -76,12 +76,43 @@ describe('ScaleUpTopologyDiagram', () => {
 
   it('click opens dialog with expanded view', () => {
     cy.mount(<ScaleUpTopologyDiagram spec={H100_SXM} allSpecs={ALL_SPECS} />);
-    // Click the compact diagram to open the dialog
     cy.get('button[aria-label="Expand H100 SXM scale-up topology diagram"]').click();
-    // Dialog should show the spec name in the title
     cy.contains('H100 SXM Scale-Up Topology').should('be.visible');
-    // An expanded SVG should exist inside the dialog
     cy.get('[role="dialog"] svg[role="img"]').should('exist');
+  });
+
+  it('tracks the dialog closing with how long it was open', () => {
+    registerAnalyticsClient({ capture: cy.stub().as('capture') });
+    cy.mount(<ScaleUpTopologyDiagram spec={H100_SXM} allSpecs={ALL_SPECS} />);
+    cy.get('button[aria-label="Expand H100 SXM scale-up topology diagram"]').click();
+    cy.get('[role="dialog"]').should('be.visible');
+    cy.get('body').type('{esc}');
+    cy.get('[role="dialog"]').should('not.exist');
+    cy.get('@capture').should(
+      'have.been.calledWith',
+      'gpu_specs_scaleup_topology_closed',
+      Cypress.sinon.match({ gpu: 'H100 SXM', duration_ms: Cypress.sinon.match.number }),
+    );
+  });
+
+  it('tracks the closing with the GPU shown after Prev/Next, not the card that opened it', () => {
+    registerAnalyticsClient({ capture: cy.stub().as('capture') });
+    cy.mount(<ScaleUpTopologyDiagram spec={H100_SXM} allSpecs={ALL_SPECS} />);
+    cy.get('button[aria-label="Expand H100 SXM scale-up topology diagram"]').click();
+    cy.get('[data-testid="scaleup-topology-nav-next"]').click();
+    cy.contains('GB200 NVL72 Scale-Up Topology').should('be.visible');
+    cy.get('body').type('{esc}');
+    cy.get('[role="dialog"]').should('not.exist');
+    cy.get('@capture').should(
+      'have.been.calledWith',
+      'gpu_specs_scaleup_topology_closed',
+      Cypress.sinon.match({ gpu: 'GB200 NVL72' }),
+    );
+    cy.get('@capture').should(
+      'not.have.been.calledWith',
+      'gpu_specs_scaleup_topology_closed',
+      Cypress.sinon.match({ gpu: 'H100 SXM' }),
+    );
   });
 
   it('dialog shows GPU spec name', () => {
@@ -93,31 +124,24 @@ describe('ScaleUpTopologyDiagram', () => {
   it('Prev/Next navigation works', () => {
     cy.mount(<ScaleUpTopologyDiagram spec={H100_SXM} allSpecs={ALL_SPECS} />);
     cy.get('button[aria-label="Expand H100 SXM scale-up topology diagram"]').click();
-    // Should show H100 first with index (1 / 3)
     cy.contains('(1 / 3)').should('be.visible');
-    // Click next
     cy.get('[data-testid="scaleup-topology-nav-next"]').click();
     cy.contains('GB200 NVL72 Scale-Up Topology').should('be.visible');
     cy.contains('(2 / 3)').should('be.visible');
-    // Click next again
     cy.get('[data-testid="scaleup-topology-nav-next"]').click();
     cy.contains('MI300X Scale-Up Topology').should('be.visible');
     cy.contains('(3 / 3)').should('be.visible');
-    // Click prev to go back
     cy.get('[data-testid="scaleup-topology-nav-prev"]').click();
     cy.contains('GB200 NVL72 Scale-Up Topology').should('be.visible');
   });
 
   it('different topology types render without errors', () => {
-    // Switched 4-rail (NVIDIA Hopper)
     cy.mount(<ScaleUpTopologyDiagram spec={H100_SXM} allSpecs={[H100_SXM]} />);
     cy.get('svg[role="img"]').should('exist');
 
-    // Full mesh (AMD)
     cy.mount(<ScaleUpTopologyDiagram spec={MI300X} allSpecs={[MI300X]} />);
     cy.get('svg[role="img"]').should('exist');
 
-    // Switched NVL72 (NVIDIA GB200)
     cy.mount(<ScaleUpTopologyDiagram spec={GB200_NVL72} allSpecs={[GB200_NVL72]} />);
     cy.get('svg[role="img"]').should('exist');
   });

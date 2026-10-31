@@ -57,7 +57,6 @@ describe('GPU_SPECS', () => {
       expect(spec.scaleUpBandwidth).toBeTruthy();
       expect(spec.scaleUpWorldSize).toBeGreaterThan(0);
       expect(spec.scaleUpTopology).toBeTruthy();
-      // nic can be null for NVL72 systems
       if (!spec.name.includes('NVL72')) {
         expect(spec.nic).toBeTruthy();
       }
@@ -100,36 +99,28 @@ describe('GPU_SPECS', () => {
     expect(findGpu('B200 SXM').nic).toBe('ConnectX-7 400GbE');
     expect(findGpu('B300 SXM').nic).toBe('ConnectX-8 2x400GbE');
 
-    // NVL72 systems don't have scale-out NICs
-    expect(findGpu('GB200 NVL72').nic).toBeNull();
-    expect(findGpu('GB300 NVL72').nic).toBeNull();
+    expect(findGpu('GB200 NVL72').nic).toBe('ConnectX-7 400G');
+    expect(findGpu('GB300 NVL72').nic).toBe('ConnectX-8 800G');
 
-    // AMD GPUs use Pollara
     expect(findGpu('MI300X').nic).toBe('Pollara 400GbE');
     expect(findGpu('MI325X').nic).toBe('Pollara 400GbE');
     expect(findGpu('MI355X').nic).toBe('Pollara 400GbE');
   });
 
   it('scale out technology matches issue requirements', () => {
-    // H100 is RoCEv2 Ethernet (no vendor prefix)
     expect(findGpu('H100 SXM').scaleOutTech).toBe('RoCEv2 Ethernet');
 
-    // MI300X/MI325X/MI355X is RoCEv2 Ethernet
     expect(findGpu('MI300X').scaleOutTech).toBe('RoCEv2 Ethernet');
     expect(findGpu('MI325X').scaleOutTech).toBe('RoCEv2 Ethernet');
     expect(findGpu('MI355X').scaleOutTech).toBe('RoCEv2 Ethernet');
 
-    // GB200/GB300 is N/A
-    expect(findGpu('GB200 NVL72').scaleOutTech).toBeNull();
-    expect(findGpu('GB300 NVL72').scaleOutTech).toBeNull();
+    expect(findGpu('GB200 NVL72').scaleOutTech).toBe('InfiniBand NDR');
+    expect(findGpu('GB300 NVL72').scaleOutTech).toBe('InfiniBand XDR');
 
-    // B300 is RoCEv2 Ethernet
     expect(findGpu('B300 SXM').scaleOutTech).toBe('RoCEv2 Ethernet');
 
-    // H200 is InfiniBand NDR
     expect(findGpu('H200 SXM').scaleOutTech).toBe('InfiniBand NDR');
 
-    // B200 uses gIB RoCEv2 Ethernet
     expect(findGpu('B200 SXM').scaleOutTech).toBe('gIB RoCEv2 Ethernet');
   });
 
@@ -163,7 +154,6 @@ describe('GPU_SPECS', () => {
     for (const gpu of blackwellGpus) {
       expect(gpu.fp4).toBeGreaterThan(0);
     }
-    // MI355X (CDNA 4) supports FP4
     const mi355x = GPU_SPECS.find((s) => s.name === 'MI355X')!;
     expect(mi355x.fp4).toBeGreaterThan(0);
   });
@@ -189,36 +179,31 @@ describe('GPU_SPECS', () => {
   });
 
   it('scale-up bandwidth values are unidirectional', () => {
-    // NVLink 4.0 (Hopper): 450 GB/s unidirectional
     expect(findGpu('H100 SXM').scaleUpBandwidth).toBe('450 GB/s');
     expect(findGpu('H200 SXM').scaleUpBandwidth).toBe('450 GB/s');
 
-    // NVLink 5.0 (Blackwell): 900 GB/s unidirectional
     expect(findGpu('B200 SXM').scaleUpBandwidth).toBe('900 GB/s');
     expect(findGpu('B300 SXM').scaleUpBandwidth).toBe('900 GB/s');
     expect(findGpu('GB200 NVL72').scaleUpBandwidth).toBe('900 GB/s');
     expect(findGpu('GB300 NVL72').scaleUpBandwidth).toBe('900 GB/s');
 
-    // AMD Infinity Fabric: MI300X/MI325X = 448 GB/s, MI355X = 538 GB/s (5th Gen IF)
     expect(findGpu('MI300X').scaleUpBandwidth).toBe('448 GB/s');
     expect(findGpu('MI325X').scaleUpBandwidth).toBe('448 GB/s');
     expect(findGpu('MI355X').scaleUpBandwidth).toBe('538 GB/s');
   });
 
-  it('MI355X has higher scale-up bandwidth than MI300X/MI325X (5th Gen IF)', () => {
+  it('MI355X has higher scale-up bandwidth than MI300X/MI325X (4th Gen IF)', () => {
     const mi300xBw = parseFloat(findGpu('MI300X').scaleUpBandwidth);
     const mi325xBw = parseFloat(findGpu('MI325X').scaleUpBandwidth);
     const mi355xBw = parseFloat(findGpu('MI355X').scaleUpBandwidth);
 
-    // MI300X and MI325X share same CDNA 3 interconnect
     expect(mi300xBw).toBe(mi325xBw);
-    // MI355X (CDNA 4, 5th Gen IF) has higher bandwidth
     expect(mi355xBw).toBeGreaterThan(mi300xBw);
   });
 
-  it('MI355X uses 5th Gen Infinity Fabric', () => {
+  it('MI355X uses 4th Gen Infinity Fabric', () => {
     const mi355x = GPU_SPECS.find((s) => s.name === 'MI355X')!;
-    expect(mi355x.scaleUpTech).toBe('5th Gen Infinity Fabric');
+    expect(mi355x.scaleUpTech).toBe('4th Gen Infinity Fabric');
   });
 
   it('Blackwell Ultra (B300) has higher FP4 than Blackwell (B200)', () => {
@@ -230,7 +215,6 @@ describe('GPU_SPECS', () => {
   it('NVL72 variants have higher FLOPs than SXM variants', () => {
     const b200 = findGpu('B200 SXM');
     const gb200 = findGpu('GB200 NVL72');
-    // NVL72 liquid-cooled variants run at higher TDP
     expect(gb200.fp4).toBeGreaterThan(b200.fp4!);
     expect(gb200.fp8).toBeGreaterThan(b200.fp8);
     expect(gb200.bf16).toBeGreaterThan(b200.bf16);
@@ -261,7 +245,6 @@ describe('GPU_SPECS', () => {
     expect(findGpu('MI325X').scaleOutSwitch).toBe('51.2T Tomahawk5');
     expect(findGpu('MI355X').scaleOutSwitch).toBe('51.2T Arista Tomahawk5 DCS-7060X6-64PE');
 
-    // NVL72 systems don't use scale out
     expect(findGpu('GB200 NVL72').scaleOutSwitch).toBeNull();
     expect(findGpu('GB300 NVL72').scaleOutSwitch).toBeNull();
   });
@@ -275,23 +258,19 @@ describe('GPU_SPECS', () => {
     expect(findGpu('MI325X').scaleOutTopology).toBe('8-rail optimized');
     expect(findGpu('MI355X').scaleOutTopology).toBe('8-rail optimized');
 
-    // NVL72 systems don't use scale out
     expect(findGpu('GB200 NVL72').scaleOutTopology).toBeNull();
     expect(findGpu('GB300 NVL72').scaleOutTopology).toBeNull();
   });
 
   it('scale up switch values match requirements', () => {
-    // Hopper: NVSwitch Gen 3.0
     expect(findGpu('H100 SXM').scaleUpSwitch).toBe('7.2Tbit/s NVSwitch Gen 3.0');
     expect(findGpu('H200 SXM').scaleUpSwitch).toBe('7.2Tbit/s NVSwitch Gen 3.0');
 
-    // Blackwell / NVL72: NVSwitch Gen 4.0
     expect(findGpu('B200 SXM').scaleUpSwitch).toBe('28.8Tbit/s NVSwitch Gen 4.0');
     expect(findGpu('B300 SXM').scaleUpSwitch).toBe('28.8Tbit/s NVSwitch Gen 4.0');
     expect(findGpu('GB200 NVL72').scaleUpSwitch).toBe('28.8Tbit/s NVSwitch Gen 4.0');
     expect(findGpu('GB300 NVL72').scaleUpSwitch).toBe('28.8Tbit/s NVSwitch Gen 4.0');
 
-    // AMD: no scale-up switches (mesh topology)
     expect(findGpu('MI300X').scaleUpSwitch).toBeNull();
     expect(findGpu('MI325X').scaleUpSwitch).toBeNull();
     expect(findGpu('MI355X').scaleUpSwitch).toBeNull();
@@ -406,7 +385,7 @@ describe('getScaleUpDomainMemory', () => {
 });
 
 describe('getTopologyConfig', () => {
-  it('returns null for NVL72 GPUs (no scale-out)', () => {
+  it('returns null for NVL72 GPUs (inter-rack topology unspecified)', () => {
     const gb200 = GPU_SPECS.find((s) => s.name === 'GB200 NVL72')!;
     const gb300 = GPU_SPECS.find((s) => s.name === 'GB300 NVL72')!;
     expect(getTopologyConfig(gb200)).toBeNull();
@@ -419,11 +398,9 @@ describe('getTopologyConfig', () => {
     expect(config.railCount).toBe(8);
     expect(config.gpuCount).toBe(8);
     expect(config.nicCount).toBe(8);
-    // 1:1 NIC-to-leaf mapping for 8-rail
     expect(config.nicToLeaf).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
     expect(config.nicLabel).toBe('ConnectX-7 400G');
     expect(config.networkTech).toBe('InfiniBand NDR');
-    // H100/H200: 32 servers per rail-pod, 1 rail-pod, 4 spine switches
     expect(config.spineLabel).toBe('25.6T NVIDIA Quantum-2 QM9790');
     expect(config.spineCount).toBe(4);
     expect(config.serversPerPod).toBe(32);
@@ -435,14 +412,11 @@ describe('getTopologyConfig', () => {
     const config = getTopologyConfig(b200)!;
     expect(config.railCount).toBe(4);
     expect(config.gpuCount).toBe(8);
-    expect(config.nicCount).toBe(8); // Always 8 NICs, one per GPU
-    // 2 NICs per leaf switch for 4-rail
+    expect(config.nicCount).toBe(8);
     expect(config.nicToLeaf).toEqual([0, 0, 1, 1, 2, 2, 3, 3]);
-    // B200: 4 rail-pods, 2 spine switches, 4 servers per pod
     expect(config.spineCount).toBe(2);
     expect(config.serversPerPod).toBe(4);
     expect(config.podCount).toBe(4);
-    // B200 has separate leaf and spine switch models
     expect(config.switchLabel).toBe('12.8T Whitebox Leaf Tomahawk3');
     expect(config.spineLabel).toBe('25.6T Whitebox Tomahawk4');
   });
@@ -477,7 +451,6 @@ describe('getTopologyConfig', () => {
     expect(config.spineCount).toBe(4);
     expect(config.serversPerPod).toBe(32);
     expect(config.podCount).toBe(1);
-    // Same switch model for leaf and spine
     expect(config.switchLabel).toBe(config.spineLabel);
   });
 
@@ -502,14 +475,11 @@ describe('getTopologyConfig', () => {
   });
 
   it('spine count = half of leaf count when leaf & spine are the same model', () => {
-    // General rule: spine = railCount / 2 when leaf and spine are the same switch
-    // Applies to H100, H200, B300, MI300X, MI325X, MI355X
     for (const name of ['H100 SXM', 'H200 SXM', 'B300 SXM', 'MI300X', 'MI325X', 'MI355X']) {
       const spec = GPU_SPECS.find((s) => s.name === name)!;
       const config = getTopologyConfig(spec)!;
       expect(config.spineCount).toBe(config.railCount / 2);
     }
-    // B200 is the exception (different leaf/spine models, special Google gIB SKU)
     const b200 = GPU_SPECS.find((s) => s.name === 'B200 SXM')!;
     const b200Config = getTopologyConfig(b200)!;
     expect(b200Config.spineCount).toBe(2);
@@ -612,11 +582,11 @@ describe('getScaleUpTopologyConfig', () => {
     expect(config.gpusPerNode).toBe(4);
   });
 
-  it('MI355X uses 5th Gen Infinity Fabric in config', () => {
+  it('MI355X uses 4th Gen Infinity Fabric in config', () => {
     const mi355 = GPU_SPECS.find((s) => s.name === 'MI355X')!;
     const config = getScaleUpTopologyConfig(mi355);
     expect(config.type).toBe('mesh');
-    expect(config.techName).toBe('5th Gen Infinity Fabric');
+    expect(config.techName).toBe('4th Gen Infinity Fabric');
     expect(config.totalBandwidth).toBe('538 GB/s');
   });
 
@@ -737,10 +707,11 @@ describe('GPU_CHART_METRICS', () => {
     expect(fp8Metric.getValue(mi355x)).toBe(5033);
   });
 
-  it('scaleOutBandwidth metric returns null for NVL72 systems', () => {
+  it('scaleOutBandwidth metric includes the NVL72 NIC bandwidth', () => {
     const gb200 = GPU_SPECS.find((s) => s.name === 'GB200 NVL72')!;
     const scaleOutMetric = GPU_CHART_METRICS.find((m) => m.key === 'scaleOutBandwidth')!;
-    expect(scaleOutMetric.getValue(gb200)).toBeNull();
+    expect(scaleOutMetric.getValue(gb200)).toBe(400);
+    expect(scaleOutMetric.getValue(findGpu('GB300 NVL72'))).toBe(800);
   });
 
   it('domainMemory metric computes correct value for GB300 NVL72', () => {

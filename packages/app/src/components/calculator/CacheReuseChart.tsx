@@ -194,13 +194,11 @@ interface CacheReuseChartProps {
 
 const MARGIN = { top: 16, right: 20, bottom: 64, left: 64 };
 const HEIGHT = 480;
-/** Inner gap between the official and run bars of one concurrency. */
 const SERIES_PADDING = 0.12;
 const LABEL_FONT_SIZE = CHART_TYPE.annotation;
 
 const labelText = (s: Segment) => formatShare(s.y1 - s.y0);
 
-/** Where one bar sits: its slot on the band axis and its thickness. */
 interface BarSlot {
   start: number;
   thickness: number;
@@ -229,8 +227,6 @@ const CacheReuseChart = React.memo(
     const bandScale = useMemo(
       () => ({
         type: 'band' as const,
-        // The y range runs bottom-up, so a reversed domain puts the lowest
-        // concurrency on the top row and the sweep reads downward.
         domain: horizontal
           ? result.concurrencies.map(String).toReversed()
           : result.concurrencies.map(String),
@@ -272,7 +268,6 @@ const CacheReuseChart = React.memo(
           start: (band(String(concurrency)) ?? 0) + (inner(seriesKey) ?? 0),
           thickness,
         });
-        /** Pixel extent of a share interval along the value axis. */
         const extent = (from: number, to: number) => Math.abs(share(to) - share(from));
         const center = (s: Segment) => {
           const { start } = slot(s.bar.concurrency, s.bar.seriesKey);
@@ -311,10 +306,6 @@ const CacheReuseChart = React.memo(
           .attr('fill', (s) => CACHE_TIER_COLORS[s.tier])
           .style('pointer-events', 'none');
 
-        // Horizontal rows read every label upright along the bar. Vertical
-        // columns switch the whole chart to sideways text once the widest
-        // label no longer fits across a column, so no percentage spills over
-        // its neighbour. A segment too short for its label draws none.
         const rotated =
           !horizontal &&
           verticalLabelMode(thickness, segments.map(labelText), LABEL_FONT_SIZE) === 'rotated';
@@ -342,8 +333,6 @@ const CacheReuseChart = React.memo(
           .attr('text-anchor', 'middle')
           .attr('font-size', px(LABEL_FONT_SIZE))
           .attr('font-weight', '600')
-          // Dark ink on the pale tiers, light on the slate one: contrast holds in
-          // both themes because the tier colors are fixed, not themed.
           .style('fill', (s) => (s.tier === 'unreused' ? '#f5f5f5' : '#0b0f14'))
           .style('pointer-events', 'none')
           .text(labelText);
@@ -381,8 +370,6 @@ const CacheReuseChart = React.memo(
           .append('title')
           .text((b) => `${t.ceiling}: ${formatShare(b.share.theoretical!)}`);
 
-        // A row that ran but reported no tier is a gap in the measurement, not
-        // in the sweep, so it gets a marker rather than an empty slot.
         group
           .selectAll<SVGTextElement, CacheReuseResult['unmeasured'][number]>('.cr-empty')
           .data(result.unmeasured, (u) => `${u.concurrency}|${u.seriesKey}`)
@@ -403,8 +390,6 @@ const CacheReuseChart = React.memo(
           .append('title')
           .text(t.noTiers);
 
-        // One full-length hit target per bar carries the tooltip and, for a run,
-        // the palette-colored outline that tells it apart from the official bar.
         return group
           .selectAll<SVGRectElement, CacheReuseBar>('.cr-bar')
           .data(result.bars, (b) => b.key)

@@ -1,6 +1,7 @@
 'use client';
 
 import { track } from '@/lib/analytics/analytics';
+import type { SelectionAnalyticsContext } from '@/lib/analytics/selection-context';
 import { Download, FileSpreadsheet, Image, RotateCcw, Video } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 
@@ -11,49 +12,25 @@ import { cn } from '@/lib/shared/utils';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 interface ChartButtonsProps {
-  /** Unique chart ID for export targeting */
   chartId: string;
-  /** Analytics event prefix (e.g., 'latency', 'interactivity', 'gpu_timeseries', 'reliability', 'evaluation') */
   analyticsPrefix: string;
-  /** Optional custom zoom reset event name (defaults to `${analyticsPrefix}_zoom_reset_${chartId}`) */
   zoomResetEvent?: string;
-  /** Optional setter to temporarily expand legend during export */
   setIsLegendExpanded?: (expanded: boolean) => void;
-  /** Omit the legend from PNG exports when series are labeled in the plot. */
   hideLegendOnExport?: boolean;
-  /** Hide the zoom reset button (e.g., for charts without zoom) */
   hideZoomReset?: boolean;
-  /** Hide the PNG image export button (e.g., for table views) */
   hideImageExport?: boolean;
-  /** Optional callback to export chart data as CSV */
   onExportCsv?: () => void;
-  /** Optional callback to open the MP4 export preview (e.g., replay modal) */
   onExportMp4?: () => void;
-  /** Human-readable base name for exported files (e.g. "DeepSeek-R1_throughput_interactivity"). Falls back to chartId. */
   exportFileName?: string;
-  /**
-   * Optional controls rendered before export/reset buttons, such as a view toggle.
-   * They wrap with the actions and inherit this wrapper's no-export behavior.
-   */
   leadingControls?: ReactNode;
-  /** Optional container class override for positioning/layout variants. */
   className?: string;
-  /**
-   * Actions are visible at every width by default. An explicit opt-out remains for
-   * callers that supply an equivalent narrow-screen action surface elsewhere.
-   * The toolbar stays in normal flow so long captions are never covered.
-   */
   mobileVisible?: boolean;
+  /** The `chart` property of export and zoom-reset events. Defaults to `chartId`. */
+  analyticsChart?: string;
+  /** Dashboard state sent with every export, CSV, MP4 and zoom-reset event, next to `chart`. */
+  analyticsContext?: SelectionAnalyticsContext;
 }
 
-/**
- * Reusable chart action buttons component that provides:
- * - Export to image button with analytics tracking (or dropdown with PNG/CSV when onExportCsv is provided)
- * - Reset zoom button with custom event dispatch
- *
- * Event pattern: `${analyticsPrefix}_zoom_reset_${chartId}`
- * This ensures each chart instance has its own zoom reset event.
- */
 export function ChartButtons({
   chartId,
   analyticsPrefix,
@@ -68,6 +45,8 @@ export function ChartButtons({
   leadingControls,
   className,
   mobileVisible = true,
+  analyticsChart = chartId,
+  analyticsContext,
 }: ChartButtonsProps) {
   const locale = useLocale();
   const t =
@@ -95,25 +74,25 @@ export function ChartButtons({
     exportFileName,
   });
   const [popoverOpen, setPopoverOpen] = useState(false);
-  // always include chartId in event name for consistency
   const resetEventName = zoomResetEvent || `${analyticsPrefix}_zoom_reset_${chartId}`;
+  const eventProperties = { chart: analyticsChart, ...analyticsContext };
 
   const handleExportPng = () => {
     setPopoverOpen(false);
-    track(`${analyticsPrefix}_chart_exported`);
+    track(`${analyticsPrefix}_chart_exported`, eventProperties);
     exportToImage();
   };
 
   const handleExportCsv = () => {
     setPopoverOpen(false);
-    track(`${analyticsPrefix}_csv_exported`);
+    track(`${analyticsPrefix}_csv_exported`, eventProperties);
     onExportCsv?.();
     window.dispatchEvent(new CustomEvent('inferencex:action'));
   };
 
   const handleExportMp4 = () => {
     setPopoverOpen(false);
-    track(`${analyticsPrefix}_mp4_preview_opened`);
+    track(`${analyticsPrefix}_mp4_preview_opened`, eventProperties);
     onExportMp4?.();
   };
 
@@ -127,10 +106,18 @@ export function ChartButtons({
       )}
     >
       {leadingControls && (
-        <div className="flex min-w-0 flex-wrap items-center gap-2">{leadingControls}</div>
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 md:flex-none">
+          {leadingControls}
+        </div>
       )}
       {onExportCsv || onExportMp4 ? (
-        <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+        <Popover
+          open={popoverOpen}
+          onOpenChange={(open) => {
+            if (open) track(`${analyticsPrefix}_export_menu_opened`, eventProperties);
+            setPopoverOpen(open);
+          }}
+        >
           <PopoverTrigger asChild>
             <Button
               data-testid="export-button"
@@ -208,7 +195,7 @@ export function ChartButtons({
           disabled={hideImageExport}
           aria-label={t.reset}
           onClick={() => {
-            track(`${analyticsPrefix}_zoom_reset_button`);
+            track(`${analyticsPrefix}_zoom_reset_button`, eventProperties);
             window.dispatchEvent(new CustomEvent(resetEventName));
           }}
         >

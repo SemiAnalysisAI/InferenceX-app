@@ -2,6 +2,9 @@
 
 import * as d3 from 'd3';
 import { useMemo, useState } from 'react';
+import { useTheme } from 'next-themes';
+import { isDarkTheme } from '@/lib/themes/themes';
+import { generateVendorColors, getVendor } from '@/lib/charts/dynamic-colors';
 
 import {
   Select,
@@ -16,20 +19,19 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import type { Locale } from '@/lib/i18n/i18n';
 
 import { UBENCHX_GPU_KEYS, UBENCHX_RUNS } from './ubenchx-data';
-import { transformUbenchxRun, formatBytes, type UbenchxDerivedRow } from './ubenchx-transform';
+import {
+  transformUbenchxRun,
+  formatBytes,
+  sizeAxisTicks,
+  type UbenchxDerivedRow,
+} from './ubenchx-transform';
 
-/**
- * One color per GPU, using the repo's vendor OKLch hue zones:
- * NVIDIA: hue 120-170, chroma ~0.15; AMD: hue 12-42, chroma ~0.18-0.22.
- */
 const GPU_COLORS: Record<string, string> = {
-  // NVIDIA (green hue zone)
   'B300 SXM': 'oklch(0.62 0.15 128)',
   'GB200 NVL72': 'oklch(0.58 0.15 138)',
   'B200 SXM': 'oklch(0.54 0.15 148)',
   'H200 SXM': 'oklch(0.50 0.15 158)',
   'H100 SXM': 'oklch(0.46 0.15 168)',
-  // AMD (red-orange hue zone)
   MI355X: 'oklch(0.62 0.20 18)',
   MI325X: 'oklch(0.55 0.20 28)',
   MI300X: 'oklch(0.48 0.20 38)',
@@ -39,7 +41,9 @@ const STRINGS = {
   en: {
     pageTitle: 'HBM Bandwidth',
     pageSubtitle:
-      'Microbenchmark measuring device-memory copy bandwidth across message sizes on NVIDIA and AMD GPUs.',
+      'Microbenchmark measuring device-memory copy bandwidth across message sizes on NVIDIA, AMD and Huawei accelerators.',
+    protocolNote:
+      'Huawei uses amortized rotating-buffer graph timing; NVIDIA/AMD use Triton copy timing. Small-message latency is not directly comparable.',
     latencyTitle: 'Latency vs Message Size',
     latencyY: 'Latency (ms)',
     mbuTitle: 'Memory Bandwidth Utilization (MBU) vs Message Size',
@@ -48,10 +52,16 @@ const STRINGS = {
     bwY: 'Bandwidth (TB/s)',
     xAxis: 'Message Size',
     yMetric: 'Y-axis',
-    peakNote: "MBU is relative to each GPU's own peak HBM bandwidth from GPU_SPECS.",
+    peakNote:
+      'MBU uses each device’s bandwidth reference. Huawei’s 1.6 TB/s references are qualified below.',
     methodology: 'Methodology',
     methodologyText:
-      'Times b.copy_(a) on float32 tensors using triton.testing.do_bench; bandwidth = 2 * bytes / time (read + write). Power-of-two sizes from 8 B to 16 GiB.',
+      'NVIDIA/AMD: times b.copy_(a) on float32 tensors using triton.testing.do_bench; bandwidth = 2 * bytes / time (read + write). Power-of-two sizes from 8 B to 16 GiB.',
+    huaweiMethodology:
+      'Huawei: FP16 rotating source/destination pools of at least 512 MiB each, timed as full rotating-buffer NPU graph replays. Three processes, 360 observations per size; full copied-bit checks before/after each block. Graph time is amortized per copy, not isolated-copy latency. Protocols differ from the GPU curves. No physical HBM-traffic counters were collected. The 8 B–2 KiB points were added on 30 October with CANN 9.2.1 and 4 KiB slot spacing; touched payload may fit in cache. Points from 4 KiB upward retain the original CANN 9.1.0 run.',
+    huaweiReference:
+      'Huawei MBU uses a 1,600 GB/s reference; the exact board bandwidth ceiling was not independently measured.',
+    amortized: 'Amortized graph copy time',
     source: 'Source',
     instructions:
       'Shift+Scroll to zoom · Drag to pan · Double-click to reset · Click a point to pin tooltip',
@@ -60,12 +70,14 @@ const STRINGS = {
     tooltipLatency: 'Latency',
     tooltipBandwidth: 'Bandwidth',
     tooltipMbu: 'MBU',
-    tooltipPeak: 'Peak BW',
+    tooltipPeak: 'Bandwidth reference',
     aria: 'ubenchX device-memory copy bandwidth charts',
   },
   zh: {
     pageTitle: 'HBM 带宽',
-    pageSubtitle: '在 NVIDIA 和 AMD GPU 上测量不同消息大小的显存拷贝带宽微基准测试。',
+    pageSubtitle: '测量 NVIDIA、AMD 和 Huawei 加速器在不同消息大小下的显存拷贝带宽。',
+    protocolNote:
+      'Huawei 使用轮转缓冲区的图执行摊销计时；NVIDIA/AMD 使用 Triton 拷贝计时。小消息延迟不能直接比较。',
     latencyTitle: '延迟 vs 消息大小',
     latencyY: '延迟（ms）',
     mbuTitle: '显存带宽利用率（MBU）vs 消息大小',
@@ -74,10 +86,14 @@ const STRINGS = {
     bwY: '带宽（TB/s）',
     xAxis: '消息大小',
     yMetric: 'Y 轴',
-    peakNote: 'MBU 基于各 GPU 自身在 GPU_SPECS 中的峰值 HBM 带宽计算。',
+    peakNote: 'MBU 按各设备的带宽参考值计算。Huawei 的 1.6 TB/s 参考值及其限制见下文。',
     methodology: '测试方法',
     methodologyText:
-      '使用 triton.testing.do_bench 计时 b.copy_(a)（float32 张量）；带宽 = 2 * bytes / time（读 + 写）。消息大小为 2 的幂次，从 8 B 到 16 GiB。',
+      'NVIDIA/AMD：使用 triton.testing.do_bench 计时 b.copy_(a)（float32 张量）；带宽 = 2 * bytes / time（读 + 写）。消息大小为 2 的幂次，从 8 B 到 16 GiB。',
+    huaweiMethodology:
+      'Huawei：源和目标分别使用至少 512 MiB 的 FP16 轮转缓冲池，每次计时覆盖完整缓冲池轮转的一次 NPU 图重放。每个大小在三个进程中共测量 360 次，每个测量块前后逐位校验全部拷贝结果。图执行时间按拷贝次数摊销，不代表单次独立拷贝延迟；与 GPU 曲线的测试协议不同，且未采集物理 HBM 流量计数器。8 B–2 KiB 的数据点于 10 月 30 日使用 CANN 9.2.1 补测，缓冲槽间距为 4 KiB，实际访问的数据可能驻留在缓存中。4 KiB 及以上的数据点仍沿用原 CANN 9.1.0 的测量结果。',
+    huaweiReference: 'Huawei 的 MBU 使用 1,600 GB/s 参考值，该板卡的确切带宽上限未经独立实测。',
+    amortized: '摊销后的图拷贝时间',
     source: '数据来源',
     instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
     dismiss: '点击其他区域关闭',
@@ -85,7 +101,7 @@ const STRINGS = {
     tooltipLatency: '延迟',
     tooltipBandwidth: '带宽',
     tooltipMbu: 'MBU',
-    tooltipPeak: '峰值带宽',
+    tooltipPeak: '带宽参考值',
     aria: 'ubenchX 显存拷贝带宽图表',
   },
 } as const;
@@ -137,12 +153,16 @@ function paddedDomain(values: number[]): [number, number] {
   return min === max ? [min / 2, max * 2] : [min / 1.2, max * 1.2];
 }
 
-// Same card and row styling as the /inference scatter tooltips (tooltipUtils.ts).
 const tooltipLine = (label: string, value: string) =>
   `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${label}:</strong> ${value}</div>`;
 
-function formatTooltip(point: ChartPoint, isPinned: boolean, t: (typeof STRINGS)[Locale]): string {
-  const color = GPU_COLORS[point.gpuKey] ?? '#888';
+function formatTooltip(
+  point: ChartPoint,
+  isPinned: boolean,
+  t: (typeof STRINGS)[Locale],
+  colors: Record<string, string>,
+): string {
+  const color = colors[point.gpuKey] ?? '#888';
   return `
     <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); user-select: ${isPinned ? 'text' : 'none'};">
       ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
@@ -150,7 +170,7 @@ function formatTooltip(point: ChartPoint, isPinned: boolean, t: (typeof STRINGS)
         <span style="display: inline-block; width: 8px; height: 8px; border-radius: 9999px; background: ${color};"></span>${point.gpuKey}
       </div>
       ${tooltipLine(t.tooltipSize, point.sizeLabel)}
-      ${tooltipLine(t.tooltipLatency, `${point.timeMs.toFixed(4)} ms`)}
+      ${tooltipLine(UBENCHX_RUNS[point.gpuKey].metadata.protocol ? t.amortized : t.tooltipLatency, `${point.timeMs.toFixed(4)} ms`)}
       ${tooltipLine(t.tooltipBandwidth, `${(point.bandwidthGbps / 1000).toFixed(3)} TB/s`)}
       ${tooltipLine(t.tooltipMbu, `${point.mbuPercent.toFixed(1)}%`)}
       ${tooltipLine(t.tooltipPeak, `${point.peakBandwidthGbps / 1000} TB/s`)}
@@ -158,15 +178,20 @@ function formatTooltip(point: ChartPoint, isPinned: boolean, t: (typeof STRINGS)
   `;
 }
 
-/** Simple inline legend rendered above charts. */
-function GpuLegend({ gpuKeys }: { gpuKeys: readonly string[] }) {
+function GpuLegend({
+  gpuKeys,
+  colors,
+}: {
+  gpuKeys: readonly string[];
+  colors: Record<string, string>;
+}) {
   return (
     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
       {gpuKeys.map((key) => (
         <span key={key} className="inline-flex items-center gap-1.5">
           <span
             className="inline-block h-2.5 w-2.5 rounded-full shrink-0"
-            style={{ backgroundColor: GPU_COLORS[key] ?? '#888' }}
+            style={{ backgroundColor: colors[key] ?? '#888' }}
           />
           {key}
         </span>
@@ -182,6 +207,8 @@ function UbenchxChart({
   yLabel,
   yScaleType,
   locale,
+  colors,
+  theme,
 }: {
   chartId: string;
   allPoints: ChartPoint[];
@@ -189,6 +216,8 @@ function UbenchxChart({
   yLabel: string;
   yScaleType: 'log' | 'linear';
   locale: Locale;
+  colors: Record<string, string>;
+  theme: 'light' | 'dark';
 }) {
   const t = STRINGS[locale];
 
@@ -214,7 +243,6 @@ function UbenchxChart({
     [allPoints],
   );
 
-  // Log axes get one tick per decade; d3's default log ticks crowd the axis.
   const yTickValues = useMemo(() => {
     if (yScaleType !== 'log') return undefined;
     const [lo, hi] = yDomain;
@@ -224,14 +252,12 @@ function UbenchxChart({
     return ticks;
   }, [yScaleType, yDomain]);
 
-  const xTickValues = useMemo(() => {
-    const all = [...new Set(allPoints.map((p) => p.x))].sort((a, b) => a - b);
-    return all.filter((_, i) => i % 3 === 0 || i === all.length - 1);
-  }, [allPoints]);
+  const xTickValues = useMemo(() => sizeAxisTicks(...xDomain), [xDomain]);
 
   return (
     <D3Chart<ChartPoint>
       chartId={chartId}
+      displayIdentity={theme}
       data={allPoints}
       height={440}
       margin={{ top: 24, right: 20, bottom: 62, left: 78 }}
@@ -264,7 +290,7 @@ function UbenchxChart({
           key: `ubenchx-line-${chartId}`,
           lines,
           config: {
-            getColor: (key) => GPU_COLORS[key] ?? '#888',
+            getColor: (key) => colors[key] ?? '#888',
             strokeWidth: 2.25,
             curve: d3.curveMonotoneX,
           },
@@ -278,7 +304,7 @@ function UbenchxChart({
             getCy: () => 0,
             getX: (point) => point.x,
             getY: (point) => point.y,
-            getColor: (point) => GPU_COLORS[point.gpuKey] ?? '#888',
+            getColor: (point) => colors[point.gpuKey] ?? '#888',
             getRadius: () => 3.5,
             stroke: 'var(--background)',
             strokeWidth: 1,
@@ -293,14 +319,27 @@ function UbenchxChart({
       }}
       tooltip={{
         rulerType: 'crosshair',
+        getRulerX: (point, scale) => (scale as d3.ScaleLogarithmic<number, number>)(point.x),
+        getRulerY: (point, scale) => scale(point.y),
         attachToLayer: 1,
-        content: (point, isPinned) => formatTooltip(point, isPinned, STRINGS[locale]),
+        content: (point, isPinned) => formatTooltip(point, isPinned, STRINGS[locale], colors),
       }}
     />
   );
 }
 
 export function UbenchxContent() {
+  const theme = isDarkTheme(useTheme().resolvedTheme) ? 'dark' : 'light';
+  const colors = useMemo(
+    () => ({
+      ...GPU_COLORS,
+      ...generateVendorColors(
+        UBENCHX_GPU_KEYS.filter((key) => getVendor(key) === 'huawei'),
+        theme,
+      ),
+    }),
+    [theme],
+  );
   const locale = useLocale();
   const t = STRINGS[locale];
 
@@ -326,7 +365,6 @@ export function UbenchxContent() {
 
   const gpuKeys = viewResults.map((r) => r.gpu);
 
-  // Deduplicate source URLs for the footer.
   const sourceUrls = [...new Set(viewResults.map((r) => r.metadata.sourceUrl))];
 
   return (
@@ -334,6 +372,7 @@ export function UbenchxContent() {
       <div>
         <h2 className="text-xl font-semibold tracking-tight">{t.pageTitle}</h2>
         <p className="text-sm text-muted-foreground mt-1">{t.pageSubtitle}</p>
+        <p className="text-sm text-muted-foreground mt-2">{t.protocolNote}</p>
       </div>
 
       <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
@@ -367,7 +406,7 @@ export function UbenchxContent() {
         </Select>
       </div>
 
-      <GpuLegend gpuKeys={gpuKeys} />
+      <GpuLegend gpuKeys={gpuKeys} colors={colors} />
 
       <section>
         <h2 className="text-lg font-semibold mb-2">{t[metric.title]}</h2>
@@ -380,18 +419,24 @@ export function UbenchxContent() {
           yLabel={t[metric.label]}
           yScaleType={metric.scale}
           locale={locale}
+          colors={colors}
+          theme={theme}
         />
       </section>
 
-      {/* Methodology and metadata */}
       <section className="text-xs text-muted-foreground space-y-1">
         <h3 className="text-sm font-semibold">{t.methodology}</h3>
         <p>{t.methodologyText}</p>
+        <p>{t.huaweiMethodology}</p>
+        <p>{t.huaweiReference}</p>
         {viewResults.map((r) => (
           <p key={r.gpu}>
             <strong>{r.gpu}:</strong> {r.metadata.gpu} | Driver: {r.metadata.driver} | PyTorch:{' '}
-            {r.metadata.torch} | Triton: {r.metadata.triton} | Container: {r.metadata.container} |
-            Peak: {r.peakBandwidthGbps / 1000} TB/s (GPU_SPECS)
+            {r.metadata.torch} |{' '}
+            {r.metadata.cann
+              ? `CANN: ${r.metadata.cann} | torch_npu: ${r.metadata.torchNpu}`
+              : `Triton: ${r.metadata.triton} | Container: ${r.metadata.container}`}{' '}
+            |{r.peakBandwidthGbps / 1000} TB/s
           </p>
         ))}
         {sourceUrls.map((url) => (

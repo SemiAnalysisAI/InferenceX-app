@@ -1,15 +1,7 @@
-/**
- * Regression test: every Y-axis metric must render scatter points in the default view
- * without any user interaction beyond selecting the metric.
- * Catches bugs where custom-value metrics (costUser, powerUser) require clicking
- * "Calculate" before data appears.
- */
 const exact = (label: string) =>
   new RegExp(`^${label.replaceAll(/[$()]/gu, (char) => `\\${char}`)}$`, 'u');
 
 describe('Y-Axis Metrics All Render Data', () => {
-  // Tiered metrics are one Y-axis option each; the Cost Tier selector picks
-  // the pricing basis, so those entries name the tier option to click.
   const metrics: { label: string; tier?: 'hyperscaler' | 'rental' | 'custom' }[] = [
     { label: 'Token Throughput per Chip' },
     { label: 'Input Token Throughput per Chip' },
@@ -29,8 +21,6 @@ describe('Y-Axis Metrics All Render Data', () => {
     { label: 'Output Tokens per $1 TCO', tier: 'rental' },
     { label: 'Input Tokens per $1 TCO', tier: 'hyperscaler' },
     { label: 'Input Tokens per $1 TCO', tier: 'rental' },
-    // The custom tier is picked from the caption selector, which seeds the
-    // per-chip $/hr from the tier it replaces, so points render at once.
     { label: 'Cost per Million Total Tokens', tier: 'custom' },
     { label: 'Total Tokens per $1 TCO', tier: 'custom' },
     { label: 'Token Throughput per All in Utility MW (Custom User Values)' },
@@ -43,7 +33,7 @@ describe('Y-Axis Metrics All Render Data', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/inference');
+    cy.visit('/inference?g_model=DeepSeek-V4-Pro');
     cy.get('[data-testid="scatter-graph"]')
       .first()
       .find('svg .dot-group')

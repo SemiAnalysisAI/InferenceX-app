@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
+import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
 
 const STRINGS = {
   en: {
@@ -61,7 +62,6 @@ function readBox(svg: SVGSVGElement, attr = 'viewBox'): Box | null {
   return { x: parts[0], y: parts[1], w: parts[2], h: parts[3] };
 }
 
-/** Screen px per SVG unit (never below 1, so small screens don't enlarge text). */
 function setScale(svg: SVGSVGElement) {
   const box = readBox(svg);
   const rect = svg.getBoundingClientRect();
@@ -70,11 +70,6 @@ function setScale(svg: SVGSVGElement) {
   svg.style.setProperty('--k', String(Math.max(1, k)));
 }
 
-/**
- * Chart dialog body: keeps SVG text and strokes at their drawn size (see
- * .chart-zoom in globals.css) and lets every chart zoom with the wheel, pan by
- * dragging, and reset with a double-click, by rewriting the SVG's viewBox.
- */
 function ChartZoom({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const t = STRINGS[useLocale()];
@@ -85,7 +80,6 @@ function ChartZoom({ children }: { children: ReactNode }) {
     const rescale = () => root.querySelectorAll<SVGSVGElement>(CHART_SVG).forEach(setScale);
     const resize = new ResizeObserver(rescale);
     resize.observe(root);
-    // Charts can swap SVGs inside the dialog (toggles, data loading).
     const mutations = new MutationObserver(rescale);
     mutations.observe(root, { childList: true, subtree: true });
     rescale();
@@ -113,7 +107,6 @@ function ChartZoom({ children }: { children: ReactNode }) {
       e.preventDefault();
       const w = Math.min(o.w, Math.max(o.w / MAX_ZOOM, b.w * Math.exp(e.deltaY * 0.0015)));
       const f = w / b.w;
-      // Keep the point under the cursor fixed.
       const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(ctm.inverse());
       apply(svg, { x: p.x - (p.x - b.x) * f, y: p.y - (p.y - b.y) * f, w, h: b.h * f }, o);
     };
@@ -140,7 +133,6 @@ function ChartZoom({ children }: { children: ReactNode }) {
       apply(svg, { ...b, x: b.x - dx / ctm.a, y: b.y - dy / ctm.d }, o);
     };
     const onUp = (e: PointerEvent) => {
-      // A drag shouldn't also click the bar under the pointer.
       if (drag?.moved)
         e.target?.addEventListener('click', (c) => c.stopPropagation(), {
           once: true,
@@ -179,7 +171,6 @@ function ChartZoom({ children }: { children: ReactNode }) {
   );
 }
 
-/** Large centered dialog for an expanded chart. */
 export function ChartDialog({
   open,
   onOpenChange,
@@ -211,7 +202,6 @@ export function ChartDialog({
               {subtitle}
             </DialogDescription>
           )}
-          {/* Ensure an accessible title is always present, even if title is non-text */}
           {!title && <DialogTitle className="sr-only">{t.expandChart}</DialogTitle>}
         </div>
         {sharedZoom ? children : <ChartZoom>{children}</ChartZoom>}
@@ -220,12 +210,6 @@ export function ChartDialog({
   );
 }
 
-/**
- * Card with a header and an expand button that opens the chart in a large
- * dialog. Pass a render function to size the chart differently inside the
- * dialog (it also gets a callback that closes the dialog); plain children are
- * rendered as-is in both places.
- */
 export function ExpandableChart({
   title,
   subtitle,
@@ -238,6 +222,7 @@ export function ExpandableChart({
   sharedZoom?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  useDialogCloseTracking(open, 'agentic_workload_chart_closed');
   const [bodyHeight, setBodyHeight] = useState<number>();
   const bodyRef = useRef<HTMLDivElement>(null);
   const isRender = typeof children === 'function';
@@ -261,8 +246,6 @@ export function ExpandableChart({
           />
         </div>
       </CardHeader>
-      {/* Plain children (charts holding refs) live in one place at a time, so
-          the card keeps its height while they are shown in the dialog. */}
       <CardContent ref={bodyRef} style={open && !isRender ? { minHeight: bodyHeight } : undefined}>
         {(isRender || !open) && render(false)}
       </CardContent>
@@ -285,11 +268,6 @@ export function ExpandableChart({
 
 const ExpandContext = createContext<(() => void) | null>(null);
 
-/**
- * Makes any chart expandable into the chart dialog without restructuring it:
- * an ExportPngButton (or an ExpandTrigger) inside gains an expand button, and
- * the dialog renders the same chart again at a larger size.
- */
 export function Expandable({
   title,
   subtitle,
@@ -298,14 +276,11 @@ export function Expandable({
 }: {
   title: ReactNode;
   subtitle?: ReactNode;
-  /** Pin the expand button to the chart card's top-right, for charts without a controls row. */
   corner?: boolean;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  // Both copies share the chart's refs (e.g. the SVG used for PNG export), and
-  // unmounting the dialog copy nulls them; remounting the card copy on close
-  // reattaches them. Chart state lives above this component, so nothing resets.
+  useDialogCloseTracking(open, 'agentic_workload_chart_closed');
   const [generation, setGeneration] = useState(0);
   return (
     <ExpandContext.Provider
@@ -342,7 +317,6 @@ export function Expandable({
       >
         {open && (
           <ExpandContext.Provider value={null}>
-            {/* Chart SVGs drop their inline height caps so they scale to the dialog. */}
             <div className="mx-auto w-full max-w-[1100px] [&_svg:not(.lucide)]:!max-h-[70vh]">
               {children}
             </div>
@@ -353,7 +327,6 @@ export function Expandable({
   );
 }
 
-/** Expand button for the enclosing Expandable; renders nothing outside one or inside its dialog. */
 export function ExpandTrigger() {
   const open = useContext(ExpandContext);
   return open ? <ExpandButton onClick={open} /> : null;

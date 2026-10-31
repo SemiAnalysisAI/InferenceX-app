@@ -182,13 +182,12 @@ export const generateEvaluationTooltipContent = (
   `;
 };
 
-/** Custom y-axis label formatting for horizontal bar chart: split on newline, show multi-line */
 function formatYAxisLabels(axisGroup: d3.Selection<SVGGElement, unknown, null, undefined>) {
   axisGroup.selectAll('.tick text').each(function () {
     const el = d3.select(this);
     const label = el.text();
     const lines = label.split('\n');
-    const totalHeight = lines.length * 1.1; // em units
+    const totalHeight = lines.length * 1.1;
     el.text(null);
     lines.forEach((line: string, i: number) => {
       el.append('tspan')
@@ -202,10 +201,6 @@ function formatYAxisLabels(axisGroup: d3.Selection<SVGGElement, unknown, null, u
   });
 }
 
-/**
- * Measure every score label before writing any background geometry. Keeping the
- * DOM-read pass separate prevents one synchronous layout per label.
- */
 export function sizeScoreLabelBackgrounds(
   labelGroups: d3.Selection<SVGGElement, EvaluationChartData, SVGGElement, unknown>,
 ): void {
@@ -244,7 +239,6 @@ function renderScoreLabels(
     .data(showLabels ? data : [], (datum) => datum.configLabel)
     .join((enter) => {
       const labelGroup = enter.append('g').attr('class', 'score-label-group');
-      // Backgrounds are inserted only after every text node has been measured.
       labelGroup
         .append('text')
         .attr('class', 'score-label')
@@ -393,9 +387,6 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
   } = useUnofficialRun();
   const chartRef = useRef<D3ChartHandle>(null);
 
-  /** Look up the branch for an eval row via its `runUrl`, falling back to the
-   * first loaded run. Used so hovering an overlay bar shows that row's own
-   * branch across multi-run loads. */
   const branchForRow = useCallback(
     (datum: EvaluationChartData): string | undefined => {
       const url = datum.runUrl ?? null;
@@ -597,8 +588,6 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
 
   const legendItems = useMemo(
     () => [
-      // Overlay legend: one entry per loaded unofficial run that contributes
-      // points to the current chart. Same palette color as the chart strokes.
       ...(unofficialConfigurations.length > 0 && unofficialRunInfos.length > 0
         ? unofficialRunInfos
             .map((info, idx) => {
@@ -648,7 +637,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
         isActive: effectiveOfficialHardware.has(hwKey),
         onClick: () => {
           handleToggleHardware(hwKey);
-          track('evaluation_hw_toggled', { hw: hwKey });
+          track('evaluation_hw_toggled', { gpu: hwKey });
         },
       })),
     ],
@@ -845,7 +834,6 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
     [locale],
   );
 
-  // Horizontal bar chart: yScale = band (config labels), xScale = linear (scores)
   const layers = useMemo(
     (): LayerConfig<EvaluationChartData>[] => [
       {
@@ -854,8 +842,6 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
         render: (group, { xScale: xs, yScale: ys }) => {
           const xScale = xs as d3.ScaleLinear<number, number>;
           const yScale = ys as d3.ScaleBand<string>;
-          // Horizontal error bars: swap x/y semantics
-          // getCx = y center, getYMin = x left, getYMax = x right, capWidth = vertical cap height
           renderErrorBars(group, errorData, {
             getCx: (d: EvaluationChartData) =>
               (yScale(d.configLabel) || 0) + yScale.bandwidth() / 2,
@@ -864,8 +850,6 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
             capWidth: yScale.bandwidth() / 3,
             stroke: 'var(--foreground)',
           });
-          // Rotate error bars 90 degrees — the render draws vertical, we need horizontal.
-          // Instead, manually position: stem is horizontal, caps are vertical.
           const bars = group.selectAll<SVGGElement, EvaluationChartData>('.error-bar');
           bars
             .select('.eb-stem')
@@ -1086,7 +1070,6 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
           const container = svgNode?.parentElement as HTMLDivElement | null;
           if (!svgNode || !container) return;
 
-          // The shared wrapper portals the tooltip to document.body.
           const tooltip = d3.select(tooltipElement);
           const overlayPoints = group
             .selectAll<SVGGElement, EvaluationChartData>('.unofficial-eval-point')
@@ -1190,7 +1173,6 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
     ],
   );
 
-  // Wait for a success or error before treating missing chart data as an empty result.
   const isInitializing = evaluationChartIsInitializing({ isEvaluationDataSettled });
   if (isInitializing && chartData.length === 0 && unofficialChartData.length === 0) {
     return (
@@ -1263,7 +1245,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
           isLegendExpanded={isLegendExpanded}
           onExpandedChange={(expanded) => {
             setIsLegendExpanded(expanded);
-            track('evaluation_legend_expanded', { expanded });
+            track('evaluation_legend_expanded', { enabled: expanded });
           }}
           switches={[
             {

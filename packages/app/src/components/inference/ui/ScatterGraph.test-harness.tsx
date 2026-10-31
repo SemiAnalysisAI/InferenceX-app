@@ -117,6 +117,7 @@ export const noop = () => {};
 export function baseInferenceState() {
   return {
     activeHwTypes: new Set(['h100', 'b200']),
+    blockedHwToggles: new Map(),
     hardwareConfig: HARDWARE_CONFIG,
     toggleHwType: noop,
     removeHwType: noop,
@@ -163,6 +164,8 @@ export function baseInferenceState() {
     showGradientLabels: false,
     setShowGradientLabels: noop,
     showLineLabels: false,
+    showOffloadingLabel: true,
+    setShowOffloadingLabel: noop,
     setShowLineLabels: noop,
   };
 }

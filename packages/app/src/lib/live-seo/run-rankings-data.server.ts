@@ -1,18 +1,3 @@
-/**
- * @file run-rankings-data.server.ts
- * @description Server-side data derivation for the `/run/<pair>` and
- * `/rankings/<slug>` pages.
- *
- * Both families read through `getCachedBenchmarks` — the same cached query the
- * dashboard, /compare, and /overview use — and derive their numbers with the
- * overview's own config building and read selection (`buildOverviewModelSummary`
- * for rankings, `overviewHardwareTierReader` for run pages, which also covers
- * SKUs outside the overview matrix), so a ranked or quoted figure on these
- * pages is always the figure the overview derivation yields for that cell.
- * Fixtures mode short-circuits inside those shared helpers, so tests and
- * DB-less builds never touch a connection here.
- */
-
 import { resolveFrameworkPartLabel } from '@semianalysisai/inferencex-constants';
 
 import type { BenchmarkRow } from '@/lib/api/api';
@@ -36,10 +21,6 @@ import {
   type RankingRow,
 } from '@/lib/live-seo/rankings';
 import { getAllRunPageEntries, type RunPageEntry } from '@/lib/live-seo/run-pages';
-
-// ---------------------------------------------------------------------------
-// Availability: which (model, chip) pairs actually have benchmark rows
-// ---------------------------------------------------------------------------
 
 async function loadAvailableRunEntries(): Promise<RunPageEntry[]> {
   const rows = await getCachedAvailability();
@@ -65,21 +46,13 @@ const getCachedAvailableRunEntries = cachedDerivedData(
   'run-pages-availability-v1',
 );
 
-/** Candidate pairs narrowed to those with at least one benchmark row. Used by
- *  the sitemap, the /run index, and related-page link lists. */
 export function getAvailableRunEntries(): Promise<RunPageEntry[]> {
   return getCachedAvailableRunEntries();
 }
 
-// ---------------------------------------------------------------------------
-// /run/<pair> page data
-// ---------------------------------------------------------------------------
-
 export interface RunTierRead {
   tier: OverviewTier;
-  /** Tokens/s per GPU at this interactivity tier; null when unreachable. */
   throughputPerGpu: number | null;
-  /** $ per million total tokens at large-hyperscaler-volume ownership $/GPU/hr; null when unknown. */
   costPerMtok: number | null;
   precision: string | null;
   framework: string | null;
@@ -105,8 +78,6 @@ export interface RunPageData {
   bestMedianTpot: number | null;
   primaryTier: OverviewTier;
   tierLadder: RunTierRead[];
-  /** Cost per million tokens at the primary tier across the three $/GPU/hr
-   *  pricing tiers from HW_REGISTRY. Empty when the tier is unreachable. */
   costTiers: RunCostTier[];
   oldest: string | null;
   newest: string | null;
@@ -153,8 +124,6 @@ function buildRunPageData(entry: RunPageEntry, rows: BenchmarkRow[]): RunPageDat
     if (row.date && (newest === null || row.date > newest)) newest = row.date;
   }
 
-  // Reads come from the same derivation as the overview matrix but without
-  // its fixed platform list, so H100-class SKUs get real ladders too.
   const readAt = overviewHardwareTierReader(entry.model.model, rows, scenario);
   const tierLadder: RunTierRead[] = OVERVIEW_TIERS.map((tier) => {
     const { read, costPerMtok } = readAt(hwKey, tier);
@@ -217,10 +186,6 @@ const getCachedRunPageData = cachedDerivedData(loadRunPageData, 'run-page-data-v
 export function getRunPageData(slug: string): Promise<RunPageData | null> {
   return getCachedRunPageData(slug);
 }
-
-// ---------------------------------------------------------------------------
-// /rankings/<slug> page data
-// ---------------------------------------------------------------------------
 
 export interface RankingPageData {
   scenario: OverviewScenario;

@@ -144,7 +144,7 @@ export function ModelImpactMatrix({ data }: { data: ErrorData['byModel'] }) {
   }
 
   const changeSort = (nextKey: SortKey) => {
-    track('agentic_workload_model_impact_sort_changed', { column: nextKey });
+    track('agentic_workload_model_impact_sort_changed', { sort_key: nextKey });
     if (nextKey === sortKey) {
       setSortDirection((current) => (current === 'ascending' ? 'descending' : 'ascending'));
       return;

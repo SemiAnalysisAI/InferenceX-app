@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** One Grace CPU, one 512 GB memory pool, and exactly two GPUs. */
 
 import {
   DEFAULT_OPERATING_STATE,
@@ -30,7 +29,6 @@ const BIANCA_BOARD = new Provenance({
 
 export interface BiancaBoardFields {
   gpu_count?: number;
-  /** Maximum design power of one GPU module; separate from actual input watts. */
   gpu_tdp_w: number;
   workload_profile?: GraceWorkloadProfile;
   provenance?: Provenance;
@@ -128,7 +126,6 @@ export abstract class BiancaBoard extends FrozenModel {
       ],
       {
         provenance: this.provenance,
-        // GPU and Grace heat is cold-plated; only the modeled LPDDR5X share reaches tray air.
         details: [['air_heat_w', memory.power_w]],
       },
     );

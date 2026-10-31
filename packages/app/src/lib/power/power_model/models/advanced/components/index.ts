@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** Advanced system components and fan relationships. */
 
 export { ComponentGroup, FixedPowerComponent, GenericComponent } from './base';
 export { FanPower } from './fan';

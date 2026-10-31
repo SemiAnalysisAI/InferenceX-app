@@ -23,7 +23,6 @@ import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.share
 const defaultChartDef = createMockChartDefinition();
 const hwConfig = createMockHardwareConfig();
 
-// GPUGraph reads the unofficial-run context; no run is loaded unless a test says so.
 const mountGpuGraph = (
   tree: ReactElement,
   overrides: Parameters<typeof mountWithProviders>[1] = {},
@@ -86,6 +85,9 @@ describe('GPUGraph', () => {
     cy.get(labels).filter(':visible').first().should('have.text', '4');
     cy.get('#gpu-point-labels').click();
     cy.get(labels).filter(':visible').should('have.length', 0);
+    cy.get('label[for="gpu-offloading-label"]').should('have.text', 'Offloading Label');
+    cy.get('#gpu-offloading-label').should('have.attr', 'data-state', 'checked').click();
+    cy.get('@setShowOffloadingLabel').should('have.been.calledWith', false);
   });
 
   it('renders SVG within chart container', () => {
@@ -264,7 +266,6 @@ describe('GPUGraph', () => {
 
     cy.get('[data-testid="gpu-graph"] svg').should('exist');
 
-    // Scatter points should be rendered (visible-shape elements from scatter layer)
     cy.get('[data-testid="gpu-graph"] svg .visible-shape').should('have.length.greaterThan', 0);
   });
 
@@ -321,8 +322,6 @@ describe('GPUGraph', () => {
     cy.get('#test-gpu-agentic-decorations [data-testid="spec-decode-marker-key"]').should(
       'not.exist',
     );
-    // The KV-offload key and optimization note moved to the axis-metric info
-    // footer rendered by ChartDisplay, so the chart itself carries neither.
     cy.get('#test-gpu-agentic-decorations [data-testid="offload-halo-key"]').should('not.exist');
     cy.get('#test-gpu-agentic-decorations [data-testid="agentic-optimization-note"]').should(
       'not.exist',
@@ -333,7 +332,6 @@ describe('GPUGraph', () => {
   });
 
   it('renders date line labels along each roofline when showLineLabels is on', () => {
-    // Two GPUs × two dates with enough points each to form rooflines.
     const data = [
       createMockInferenceData({
         hwKey: 'h100',
@@ -407,19 +405,15 @@ describe('GPUGraph', () => {
       },
     );
 
-    // One label per visible (date, hwKey) — labels carry both the hw config
-    // and the date so the chart-side label is self-contained.
     cy.get('#test-gpu-line-labels svg .line-label').should('have.length', 2);
     cy.get('#test-gpu-line-labels svg .line-label').should('contain.text', '2025-03-01');
     cy.get('#test-gpu-line-labels svg .line-label').should('contain.text', '2025-03-15');
-    // Hw display labels (e.g. "H100", "B200") appear alongside the dates.
     cy.get('#test-gpu-line-labels svg .line-label')
       .invoke('text')
       .then((txt) => {
         expect(txt.toLowerCase()).to.match(/h100|h 100/iu);
         expect(txt.toLowerCase()).to.match(/b200|b 200/iu);
       });
-    // Each label has the rounded background rect.
     cy.get('#test-gpu-line-labels svg .line-label .ll-bg').should('have.length', 2);
   });
 
@@ -506,7 +500,6 @@ describe('GPUGraph', () => {
     );
 
     cy.get('.sidebar-legend').should('exist');
-    // Legend should show at least one entry (date + GPU combo)
     cy.get('.sidebar-legend label').should('have.length.greaterThan', 0);
     cy.get('[data-testid="legend-advanced-toggle"]').should('have.attr', 'aria-expanded', 'false');
     cy.get('#gpu-parallelism-labels')
@@ -696,8 +689,6 @@ describe('GPU comparison power envelopes', () => {
     cy.get('#gpu-power-curves .line-label').should('have.length', 1);
   });
 
-  // ChartDisplay draws E2E Normalized Interactivity on the e2e definition and
-  // flips the corner toward higher x.
   it('keeps boundary measurements toward higher E2E Normalized Interactivity', () => {
     mountGpuGraph(<PowerComparison normalized />);
     cy.get('#gpu-power-curves .dot-group').should('have.length', 6);
@@ -906,13 +897,11 @@ describe('GPU comparison with unofficial runs', () => {
     cy.get('.sidebar-legend')
       .should('contain.text', 'UNOFFICIAL: feat/power-sweep')
       .and('contain.text', '✕ B200');
-    // Line-label pills drop the ✕ so they do not read as X data points.
     cy.get('#gpu-overlay .line-label')
       .should('have.length', 3)
       .and('contain.text', 'B200')
       .and('not.contain.text', '✕');
 
-    // A date toggle hides that official series; the unofficial run stays.
     cy.get('.sidebar-legend label').contains('2025-03-15').click();
     cy.get('#gpu-overlay .dot-group').should('have.length', 3);
     cy.get('#gpu-overlay .unofficial-overlay-pt').should('have.length', 3);

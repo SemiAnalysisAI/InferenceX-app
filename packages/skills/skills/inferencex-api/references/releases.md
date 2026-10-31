@@ -55,9 +55,14 @@ missing:
    rows can share a hardware/date; counts describe their reported scope, not a
    release-specific failure rate.
 3. Read `/api/v1/framework-releases` when current vLLM/SGLang stable-tag context is
-   requested. Values are the latest usable stable GitHub release tags or null,
-   cached by the service. This is **not a historical release registry**: it
-   supplies no publication timeline or mapping from benchmark images to releases.
+   requested. Each value is `{tag, publishedAt, commits}` for the
+   highest-versioned stable engine release (tag starting with `v`) among the 20
+   most recent GitHub releases, or null, cached by the service. `commits` maps
+   each unversioned nightly commit in an active benchmark image to its GitHub
+   compare status against that release (`ahead`, `behind`, `diverged`,
+   `identical`). This is **not a historical release registry**: it supplies only
+   the current release, not a timeline or a mapping from benchmark images to
+   past releases.
    Keep a tag's retrieval time and verify any historical tag/commit claim
    independently with its upstream release and producer evidence.
 4. Use a raw history read only to discover an unavailable date, image, run URL, or

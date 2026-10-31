@@ -14,7 +14,6 @@ export interface RowOverrides {
   globalTokens?: number;
   stageUnavailable?: boolean;
   stageZeroBytes?: boolean;
-  /** Adds wire_byte_provenance at this multiple of byte_provenance (a token-expert LL row). */
   wireBytesFactor?: number;
 }
 
@@ -24,11 +23,10 @@ export interface ShardOverrides {
   sku?: string;
   backend?: string;
   implName?: string;
+  libraryVersion?: string;
   ep?: number;
   phase?: string;
-  /** null models a pre-LL artifact: no mode field (the case_id keeps `normal`). */
   mode?: string | null;
-  /** null models a pre-FP8 artifact: no precision field and no case_id suffix. */
   precision?: string | null;
   scaleUpTransport?: string;
   scaleOutTransport?: string | null;
@@ -52,10 +50,6 @@ function component(base: number): Json {
   return { availability: 'measured', percentiles_us: percentiles(base) };
 }
 
-// `total` defaults to the activation count (the bf16 case, where there are no
-// scale bytes). Dispatch under FP8 carries extra scale bytes, so its total
-// exceeds activation — the fixture models that so tests can prove the payload
-// rate reads total_logical_bytes rather than activation_data_bytes.
 function bytes(activation: number, total: number = activation): Json {
   return { activation_data_bytes: activation, total_logical_bytes: total };
 }
@@ -70,8 +64,6 @@ function makeRawRow(index: number, row: RowOverrides, worldSize: number): Json {
       ? { availability: 'unavailable', percentiles_us: null }
       : component(120 + index),
   };
-  // Dispatch total exceeds activation (models FP8 scale bytes); combine is
-  // always bf16 (total == activation); roundtrip total is their sum.
   const byteProvenance: Json = {
     dispatch: bytes(384763904, 400000000),
     combine: bytes(384763904),
@@ -109,6 +101,7 @@ function makeRawCase(options: ShardOverrides, caseId: string): Json {
   const phase = options.phase === 'prefill' ? 'prefill' : 'decode';
   return {
     case_id: caseId,
+    suite: 'ep-core',
     backend: options.backend ?? 'deepep-v2',
     ep: options.ep ?? 8,
     gpus_per_node: options.gpusPerNode ?? 8,
@@ -127,7 +120,6 @@ function makeRawCase(options: ShardOverrides, caseId: string): Json {
 function caseIdOf(options: ShardOverrides = {}): string {
   if (options.caseId) return options.caseId;
   const tail = options.variant ? `-${options.variant}` : '';
-  // Pre-LL artifacts (mode: null) still carried `normal` in their case_ids.
   const mode = options.mode === null ? 'normal' : (options.mode ?? 'normal');
   const precision = options.precision === null ? '' : `-${options.precision ?? 'bf16'}`;
   return `${options.sku ?? 'h200-dgxc'}-${options.backend ?? 'deepep-v2'}-${options.workload ?? 'deepseek-v3'}-${mode}-${options.phase ?? 'decode'}-ep${options.ep ?? 8}-uniform${precision}${tail}`;
@@ -149,7 +141,10 @@ export function makeRawShard(options: ShardOverrides = {}): Json {
       case_id: caseId,
       case_factors: { sku, case: makeRawCase({ ...options, backend }, caseId) },
     },
-    implementation: { name: options.implName ?? backend },
+    implementation: {
+      name: options.implName ?? backend,
+      ...(options.libraryVersion ? { library_version: options.libraryVersion } : {}),
+    },
     runtime: { vendor: options.vendor ?? 'nvidia' },
     measurement: { rows: rows.map((row, index) => makeRawRow(index, row, worldSize)) },
     outcome: {
@@ -181,10 +176,10 @@ function requestedFromShard(shard: Json): RequestedCaseSpec {
   };
 }
 
+/** The shape of a CollectiveX results directory's `cases.json`. */
 export function makeRawMatrix(requested: RequestedCaseSpec[], version = 1): Json {
   return {
     version,
-    include: [],
     requested_cases: requested.map((entry) => ({
       case: entry.case,
       sku: entry.sku,
@@ -206,7 +201,6 @@ export interface KvOverrides {
   reasons?: string[];
   disposition?: 'runnable' | 'unsupported';
   reason?: string;
-  /** String on purpose by default: the kv entrypoint emitted `version: '1'`. */
   version?: number | string;
   rows?: Partial<KvRowSpec>[];
   omitShard?: boolean;
@@ -253,11 +247,6 @@ function kvCaseIdOf(options: KvOverrides): string {
   return `${options.sku ?? 'gb200'}-${options.backend ?? 'nixl'}-${options.workload ?? 'kv-dsv4'}-${options.fabric ?? 'rdma'}-xfer-ep2-paged-${options.precision ?? 'fp8'}`;
 }
 
-/**
- * A kv-transfer shard + its matrix requested-case entry. Mirrors the real
- * artifacts: the shard's case carries only the identity factors while the
- * matrix entry carries the full case (isl_ladder, batch_sizes, topology).
- */
 export function makeKvFixture(options: KvOverrides = {}): {
   shard: Json | null;
   requested: RequestedCaseSpec;
@@ -368,8 +357,6 @@ export function makeCollectiveXDataset(): CollectiveXDataset {
     topologyClass: 'mi355x-xgmi-rdma',
     nodes: 2,
   });
-  // The same cell as shardA measured with FP8 dispatch, so consumers exercise
-  // the bf16/fp8 split of an otherwise identical configuration.
   const shardC = makeRawShard({ precision: 'fp8' });
   const unsupportedId = 'b300-deepep-v2-deepseek-v3-normal-decode-ep16-uniform-bf16';
   const pendingId = 'b200-dgxc-deepep-v2-deepseek-v3-normal-decode-ep8-uniform-bf16';

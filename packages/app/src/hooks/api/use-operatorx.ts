@@ -1,4 +1,4 @@
-import { type QueryClient, useQuery } from '@tanstack/react-query';
+import { type QueryClient, queryOptions, useQuery } from '@tanstack/react-query';
 
 import type { OperatorXRunRef } from '@semianalysisai/inferencex-db/operatorx/bundle';
 import type { ComparisonOp, ComparisonView } from '@semianalysisai/inferencex-db/operatorx/compare';
@@ -11,10 +11,18 @@ import {
   TIMELINE_VERSION,
 } from '@semianalysisai/inferencex-db/operatorx/timeline';
 
+import { ApiRequestError } from '@/lib/api/api-request-error';
+
 async function get<T>(url: string, signal: AbortSignal): Promise<T> {
   const response = await fetch(url, { signal });
   const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(body?.error ?? `OperatorX request failed (${response.status})`);
+  if (!response.ok) {
+    throw new ApiRequestError(
+      body?.error ?? `OperatorX request failed (${response.status})`,
+      response.status,
+      url,
+    );
+  }
   return body as T;
 }
 
@@ -46,10 +54,10 @@ export function useOperatorXResult(runId: string | null, index: number | null) {
   });
 }
 
-export function useOperatorXComparison(op: ComparisonOp | null, workload: string | null) {
+export function operatorXComparisonQuery(op: ComparisonOp | null, workload: string | null) {
   const params = new URLSearchParams({ op: op ?? '' });
   if (workload) params.set('workload', workload);
-  return useQuery({
+  return queryOptions({
     queryKey: ['operatorx', 'compare', op, workload],
     queryFn: ({ signal }) => get<ComparisonView>(`/api/v1/operatorx/compare?${params}`, signal),
     enabled: op !== null,
@@ -58,9 +66,12 @@ export function useOperatorXComparison(op: ComparisonOp | null, workload: string
   });
 }
 
+export function useOperatorXComparison(op: ComparisonOp | null, workload: string | null) {
+  return useQuery(operatorXComparisonQuery(op, workload));
+}
+
 export type OperatorXTimelines = Record<string, OperatorXTimeline | null>;
 
-/** Kernel timelines of stored `runId:index:revision` results. */
 function timelinesQuery(op: ComparisonOp, refs: string[]) {
   return {
     queryKey: ['operatorx', 'timelines', TIMELINE_VERSION, op, refs.join(',')],

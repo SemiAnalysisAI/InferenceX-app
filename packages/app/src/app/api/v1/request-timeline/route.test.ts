@@ -7,7 +7,10 @@ vi.mock('@/lib/cache/blob-cache', () => ({
   blobGet: vi.fn(() => Promise.resolve(null)),
   blobSet: vi.fn(),
 }));
-vi.mock('@semianalysisai/inferencex-db/connection', () => ({ getDb: () => ({}) }));
+vi.mock('@semianalysisai/inferencex-db/connection', () => ({
+  getDb: () => ({}),
+  FIXTURES_MODE: false,
+}));
 vi.mock('@semianalysisai/inferencex-db/queries/request-timeline', () => ({
   getStoredRequestTimelineGz: vi.fn(),
   getRequestTimeline: vi.fn(),
@@ -19,8 +22,10 @@ import {
 } from '@semianalysisai/inferencex-db/queries/request-timeline';
 import { GET } from './route';
 
-const request = (query: string) =>
-  new NextRequest(`http://localhost/api/v1/request-timeline${query}`);
+const request = (query: string, acceptEncoding = 'gzip') =>
+  new NextRequest(`http://localhost/api/v1/request-timeline${query}`, {
+    headers: { 'Accept-Encoding': acceptEncoding },
+  });
 beforeEach(() => vi.resetAllMocks());
 
 describe('request timeline route', () => {
@@ -37,6 +42,18 @@ describe('request timeline route', () => {
     expect(response.status).toBe(200);
     expect(Buffer.from(await response.arrayBuffer()).equals(gz)).toBe(true);
     expect(getRequestTimeline).not.toHaveBeenCalled();
+  });
+
+  it('decompresses stored gzip for clients that do not accept it', async () => {
+    const timeline = { requests: [{ cid: 'full-record', srcTrace: 'source', ack: null }] };
+    vi.mocked(getStoredRequestTimelineGz).mockResolvedValue(
+      (async function* () {
+        yield gzipSync(JSON.stringify(timeline));
+      })(),
+    );
+    const response = await GET(request('?id=445162', 'identity'));
+    expect(response.headers.get('Content-Encoding')).toBeNull();
+    expect(await response.json()).toEqual(timeline);
   });
 
   it('preserves the legacy fallback and its missing-point status', async () => {

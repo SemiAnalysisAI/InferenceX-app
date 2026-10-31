@@ -21,6 +21,7 @@ import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { isZhPathname, ZH_PREFIX } from '@/lib/i18n/i18n';
 import { withChartState } from '@/lib/routing/url-state';
+import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 
 import { AggregatesGrid } from './aggregates-grid';
 import { MetricSourceToolbar } from './metric-source-toolbar';
@@ -120,6 +121,49 @@ export const AGENTIC_POINT_DETAIL_STRINGS = {
   },
 } as const;
 
+type AgenticPointDetailStrings =
+  (typeof AGENTIC_POINT_DETAIL_STRINGS)[keyof typeof AGENTIC_POINT_DETAIL_STRINGS];
+
+/**
+ * The detail views offered in the view toggle. PowerX is feature-gated: its view appears
+ * once the gate is unlocked, or stays while a shared `?view=power` link has it open (the
+ * same rule a locked gated dashboard tab follows).
+ */
+export function agenticDetailViewOptions(
+  t: Pick<
+    AgenticPointDetailStrings,
+    'perPoint' | 'requestTimeline' | 'powerX' | 'aggregatesAcrossConfigs' | 'logs'
+  >,
+  { featureGateUnlocked, currentView }: { featureGateUnlocked: boolean; currentView: DetailView },
+): SegmentedToggleOption<DetailView>[] {
+  const showPowerView = featureGateUnlocked || currentView === 'power';
+  return [
+    { value: 'point', label: t.perPoint, testId: 'detail-view-point' },
+    { value: 'timeline', label: t.requestTimeline, testId: 'detail-view-timeline' },
+    ...(showPowerView
+      ? [{ value: 'power' as const, label: t.powerX, testId: 'detail-view-power' }]
+      : []),
+    { value: 'aggregates', label: t.aggregatesAcrossConfigs, testId: 'detail-view-aggregates' },
+    { value: 'logs', label: t.logs, testId: 'detail-view-logs' },
+  ];
+}
+
+/**
+ * Whether the per-point view shows the metric-source / phase toolbar. Both inputs arrive
+ * from client queries, so the page keeps a same-height slot whenever this is false (while
+ * loading and after). Releasing the slot once the queries settle would shift the cards up.
+ * Almost every production point has a warmup phase, so the toolbar is the usual outcome.
+ */
+export function showMetricSourceToolbar({
+  sourceCount,
+  hasWarmup,
+}: {
+  sourceCount: number;
+  hasWarmup: boolean;
+}): boolean {
+  return sourceCount > 1 || hasWarmup;
+}
+
 const RequestTimelineView = dynamic(() =>
   import('./request-timeline').then((module_) => module_.RequestTimelineView),
 );
@@ -136,62 +180,36 @@ export function AgenticPointDetail({ id }: Props) {
   const withId = (template: string) => template.replace('{id}', String(id));
   const isZh = isZhPathname(pathname);
   const inferenceBaseHref = isZh ? `${ZH_PREFIX}/inference` : '/inference';
-  // Carry the chart state the reader arrived with back to the chart. The link
-  // used to be a bare path, so it could only ever land on the default model
-  // with the default legend, no matter what the reader was looking at.
-  //
-  // Resolved after mount, not during render: `withChartState` reads the
-  // in-memory param store (seeded from this page's own URL at load), which
-  // does not exist on the server — computing it during render would make the
-  // server and client markup disagree.
   const [inferenceHref, setInferenceHref] = useState(inferenceBaseHref);
   useEffect(() => {
     setInferenceHref(withChartState(inferenceBaseHref));
   }, [inferenceBaseHref]);
-  const viewOptions: SegmentedToggleOption<DetailView>[] = useMemo(
-    () => [
-      { value: 'point', label: t.perPoint, testId: 'detail-view-point' },
-      { value: 'timeline', label: t.requestTimeline, testId: 'detail-view-timeline' },
-      { value: 'power', label: t.powerX, testId: 'detail-view-power' },
-      { value: 'aggregates', label: t.aggregatesAcrossConfigs, testId: 'detail-view-aggregates' },
-      { value: 'logs', label: t.logs, testId: 'detail-view-logs' },
-    ],
-    [t],
+  const featureGateUnlocked = useFeatureGate();
+  const [view, setView] = useDetailView();
+  const viewOptions = useMemo(
+    () => agenticDetailViewOptions(t, { featureGateUnlocked, currentView: view }),
+    [t, featureGateUnlocked, view],
   );
   const metricsQuery = useTraceServerMetrics(id, true);
   const siblingsQuery = useBenchmarkSiblings(id);
 
   const metrics = metricsQuery.data;
   const siblingsData = siblingsQuery.data;
-
-  const [view, setView] = useDetailView();
   const [metricSourceId, setMetricSourceId] = useState('all');
   const [requestActivityView, setRequestActivityView] = useState<RequestActivityView>('queue');
   const [throughputSeries, setThroughputSeries] = useState<ReadonlySet<ThroughputSeriesKey>>(
     () => new Set(['input', 'decode']),
   );
-  // Fetch aggregates only when the aggregates view is active. Uses the full
-  // sibling set (across parallelism + concurrency configs) so each chart
-  // shows how the metric varies across the SKU.
   const siblingIds = siblingsData?.siblings.map((s) => s.id) ?? [];
   const aggregatesQuery = useAgenticAggregates(siblingIds, view === 'aggregates');
-  // The default charts use a compact nine-field request projection. The much
-  // larger source-rich Gantt payload is fetched only after opening Timeline.
   const requestChartQuery = useRequestChartData(id, view === 'point');
   const requestChartData = requestChartQuery.data;
   const timelineQuery = useRequestTimeline(id, view === 'timeline');
 
-  // Warmup vs profiling stage. Only meaningful when the point actually has a
-  // warmup phase (older runs are profiling-only) — when absent the toggle is
-  // hidden and everything falls back to the full (profiling) run.
   const [phase, setPhase] = useState<StagePhase>('profiling');
   const hasWarmup = useMemo(() => timelineHasWarmup(requestChartData), [requestChartData]);
   const effectivePhase: StagePhase = hasWarmup ? phase : 'profiling';
 
-  // Server-metric boundary on the chart's own t-axis (rebased through absolute
-  // ns — see phase-slice header for the origin-gap invariant). Request charts
-  // get a phase-scoped timeline (filtered + rebased) so they share a 0-based
-  // axis with the server charts for the selected phase.
   const boundarySec = useMemo(
     () => phaseBoundarySec(metrics, requestChartData),
     [metrics, requestChartData],
@@ -226,8 +244,6 @@ export function AgenticPointDetail({ id }: Props) {
     }
     return metricSourceId === 'all' ? (metrics ?? undefined) : undefined;
   }, [metrics, metricSourceId, metricSourceQuery.data]);
-  // Phase-sliced server series (+ matching durationS) consumed by every server
-  // chart. Null only when there are no server metrics at all.
   const sliced = useMemo(
     () =>
       baseServerSeries
@@ -240,11 +256,6 @@ export function AgenticPointDetail({ id }: Props) {
         : null,
     [baseServerSeries, effectivePhase, boundarySec, metrics?.durationS],
   );
-  // Some runs only scrape server metrics during profiling — `chart_series`
-  // starts at the profiling boundary, so the warmup slice collapses to ~0–1
-  // points (just the t=0 origin) even though request-level warmup data exists.
-  // Require ≥2 points in some series to count as real warmup coverage; otherwise
-  // show an explanatory note instead of six silently-blank charts.
   const slicedHasServerData =
     (sliced?.series.kvCacheUsage.length ?? 0) > 1 ||
     (sliced?.series.queueDepth.length ?? 0) > 1 ||
@@ -253,8 +264,6 @@ export function AgenticPointDetail({ id }: Props) {
 
   return (
     <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-4 py-6">
-      {/* Points readers at /agentx/telemetry, which explains every chart below.
-          Non-centered, so the card never covers the charts it describes. */}
       <NudgeEngine scope="agentic-detail" />
 
       <div className="flex items-center gap-2">
@@ -288,13 +297,17 @@ export function AgenticPointDetail({ id }: Props) {
       ) : siblingsData ? (
         <SiblingNav sku={siblingsData.sku} siblings={siblingsData.siblings} />
       ) : siblingsQuery.isLoading ? (
-        <div className="text-sm text-muted-foreground">{t.loadingSku}</div>
+        <div className="mb-4 min-h-58 border-b border-border/40 pb-4 text-sm text-muted-foreground sm:min-h-33">
+          {t.loadingSku}
+        </div>
       ) : null}
 
       {metrics ? (
         <PointSummary meta={metrics.meta} />
       ) : metricsQuery.isLoading ? (
-        <div className="text-sm text-muted-foreground">{t.loadingPoint}</div>
+        <div className="mb-4 min-h-34 text-sm text-muted-foreground lg:min-h-[66px]">
+          {t.loadingPoint}
+        </div>
       ) : null}
 
       {view !== 'logs' && metricsQuery.isError && (
@@ -337,152 +350,157 @@ export function AgenticPointDetail({ id }: Props) {
         )}
       </div>
 
-      {view === 'point' && (metricSources.length > 1 || hasWarmup) && (
-        <MetricSourceToolbar
-          hasWarmup={hasWarmup}
-          phase={phase}
-          onPhaseChange={setPhase}
-          metricSources={metricSources}
-          selectedSource={selectedMetricSource}
-          onSourceChange={setMetricSourceId}
-          fallbackAdapter={metrics?.meta.framework}
-        />
-      )}
-
-      {view === 'logs' ? (
-        <ServerLogViewer id={id} enabled />
-      ) : view === 'power' ? (
-        <PowerTelemetryView id={id} enabled hardware={siblingsData?.sku.hardware} />
-      ) : view === 'aggregates' ? (
-        aggregatesQuery.isError ? (
-          <RetryableQueryError
-            message={t.aggregatesError}
-            analyticsEvent="inference_agentic_aggregates_retry_clicked"
-            onRetry={aggregatesQuery.refetch}
-            testId="agentic-aggregates-query-error"
+      {view === 'point' &&
+        (showMetricSourceToolbar({ sourceCount: metricSources.length, hasWarmup }) ? (
+          <MetricSourceToolbar
+            hasWarmup={hasWarmup}
+            phase={phase}
+            onPhaseChange={setPhase}
+            metricSources={metricSources}
+            selectedSource={selectedMetricSource}
+            onSourceChange={setMetricSourceId}
+            fallbackAdapter={metrics?.meta.framework}
           />
         ) : (
-          <AggregatesGrid
-            siblings={siblingsData?.siblings ?? []}
-            aggregates={aggregatesQuery.data}
-            isLoading={aggregatesQuery.isLoading}
-          />
-        )
-      ) : view === 'timeline' ? (
-        timelineQuery.isLoading ? (
-          <div className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground">
-            {t.loadingTimeline}
-          </div>
-        ) : timelineQuery.isError ? (
-          <RetryableQueryError
-            message={t.timelineError}
-            analyticsEvent="inference_agentic_timeline_retry_clicked"
-            onRetry={timelineQuery.refetch}
-            testId="agentic-timeline-query-error"
-          />
-        ) : timelineQuery.data ? (
-          <RequestTimelineView
-            data={timelineQuery.data}
-            datasetSlug={siblingsQuery.data?.sku.dataset_slug}
-            pointId={id}
-          />
+          <div aria-hidden="true" className="h-[50px]" />
+        ))}
+
+      <div className={view === 'point' ? 'contents' : 'min-h-svh'}>
+        {view === 'logs' ? (
+          <ServerLogViewer id={id} enabled />
+        ) : view === 'power' ? (
+          <PowerTelemetryView id={id} enabled hardware={siblingsData?.sku.hardware} />
+        ) : view === 'aggregates' ? (
+          aggregatesQuery.isError ? (
+            <RetryableQueryError
+              message={t.aggregatesError}
+              analyticsEvent="inference_agentic_aggregates_retry_clicked"
+              onRetry={aggregatesQuery.refetch}
+              testId="agentic-aggregates-query-error"
+            />
+          ) : (
+            <AggregatesGrid
+              siblings={siblingsData?.siblings ?? []}
+              aggregates={aggregatesQuery.data}
+              isLoading={aggregatesQuery.isLoading}
+            />
+          )
+        ) : view === 'timeline' ? (
+          timelineQuery.isLoading ? (
+            <div className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground">
+              {t.loadingTimeline}
+            </div>
+          ) : timelineQuery.isError ? (
+            <RetryableQueryError
+              message={t.timelineError}
+              analyticsEvent="inference_agentic_timeline_retry_clicked"
+              onRetry={timelineQuery.refetch}
+              testId="agentic-timeline-query-error"
+            />
+          ) : timelineQuery.data ? (
+            <RequestTimelineView
+              data={timelineQuery.data}
+              datasetSlug={siblingsQuery.data?.sku.dataset_slug}
+              pointId={id}
+            />
+          ) : (
+            <div className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground">
+              {withId(t.missingTimeline)}
+            </div>
+          )
         ) : (
-          <div className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground">
-            {withId(t.missingTimeline)}
-          </div>
-        )
-      ) : (
-        <>
-          {requestChartQuery.isError && (
-            <RetryableQueryError
-              message={t.requestChartsError}
-              analyticsEvent="inference_agentic_request_charts_retry_clicked"
-              onRetry={requestChartQuery.refetch}
-              testId="agentic-request-charts-query-error"
-            />
-          )}
-          {!requestChartQuery.isError && effectivePhase === 'warmup' && (
-            <p
-              className="rounded-md border-l-2 border-amber-500/60 bg-amber-500/10 px-3 py-2 text-xs text-muted-foreground"
-              data-testid="warmup-phase-note"
-            >
-              {t.warmupNotePrefix}
-              <span className="font-medium text-foreground">{t.warmupWord}</span>
-              {t.warmupNoteBody}
-              {!slicedHasServerData && t.warmupNoServerData}
-            </p>
-          )}
-          {metricSourceQuery.isError && (
-            <RetryableQueryError
-              message={t.metricSourceError}
-              analyticsEvent="inference_agentic_metric_source_retry_clicked"
-              onRetry={metricSourceQuery.refetch}
-              testId="agentic-metric-source-query-error"
-            />
-          )}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {!requestChartQuery.isError && (
-              <>
-                <SequenceMetricCard
-                  metric="isl"
-                  timeline={phaseRequestData}
-                  timelineLoading={requestChartQuery.isLoading}
-                />
-                <SequenceMetricCard
-                  metric="osl"
-                  timeline={phaseRequestData}
-                  timelineLoading={requestChartQuery.isLoading}
-                />
-
-                <RequestMetricOverTime
-                  title={t.interactivityOverTime}
-                  metric="interactivity"
-                  timeline={phaseRequestData}
-                  isLoading={requestChartQuery.isLoading}
-                />
-
-                <RequestMetricOverTime
-                  title={t.ttftOverTime}
-                  metric="ttft"
-                  timeline={phaseRequestData}
-                  isLoading={requestChartQuery.isLoading}
-                  latencySelector
-                />
-              </>
-            )}
-
-            <KvCacheUtilizationCard sliced={sliced} />
-
-            <RequestActivityCard
-              sliced={sliced}
-              phaseTimeline={phaseRequestData}
-              timelineLoading={requestChartQuery.isLoading}
-              timelineError={requestChartQuery.isError ? t.requestChartsError : undefined}
-              view={requestActivityView}
-              onViewChange={setRequestActivityView}
-            />
-
-            <PrefixCacheHitRateCard sliced={sliced} />
-
-            <ThroughputCard
-              sliced={sliced}
-              selectedSource={selectedMetricSource}
-              selected={throughputSeries}
-              onSelectedChange={setThroughputSeries}
-            />
-
-            <PromptTokenSourceCard sliced={sliced} />
-
-            {!requestChartQuery.isError && (
-              <InflightUniqueTokensCard
-                phaseTimeline={phaseRequestData}
-                timelineLoading={requestChartQuery.isLoading}
-                kvCachePoolTokens={metrics?.kvCachePoolTokens ?? null}
+          <>
+            {requestChartQuery.isError && (
+              <RetryableQueryError
+                message={t.requestChartsError}
+                analyticsEvent="inference_agentic_request_charts_retry_clicked"
+                onRetry={requestChartQuery.refetch}
+                testId="agentic-request-charts-query-error"
               />
             )}
-          </div>
-        </>
-      )}
+            {!requestChartQuery.isError && effectivePhase === 'warmup' && (
+              <p
+                className="rounded-md border-l-2 border-amber-500/60 bg-amber-500/10 px-3 py-2 text-xs text-muted-foreground"
+                data-testid="warmup-phase-note"
+              >
+                {t.warmupNotePrefix}
+                <span className="font-medium text-foreground">{t.warmupWord}</span>
+                {t.warmupNoteBody}
+                {!slicedHasServerData && t.warmupNoServerData}
+              </p>
+            )}
+            {metricSourceQuery.isError && (
+              <RetryableQueryError
+                message={t.metricSourceError}
+                analyticsEvent="inference_agentic_metric_source_retry_clicked"
+                onRetry={metricSourceQuery.refetch}
+                testId="agentic-metric-source-query-error"
+              />
+            )}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {!requestChartQuery.isError && (
+                <>
+                  <SequenceMetricCard
+                    metric="isl"
+                    timeline={phaseRequestData}
+                    timelineLoading={requestChartQuery.isLoading}
+                  />
+                  <SequenceMetricCard
+                    metric="osl"
+                    timeline={phaseRequestData}
+                    timelineLoading={requestChartQuery.isLoading}
+                  />
+
+                  <RequestMetricOverTime
+                    title={t.interactivityOverTime}
+                    metric="interactivity"
+                    timeline={phaseRequestData}
+                    isLoading={requestChartQuery.isLoading}
+                  />
+
+                  <RequestMetricOverTime
+                    title={t.ttftOverTime}
+                    metric="ttft"
+                    timeline={phaseRequestData}
+                    isLoading={requestChartQuery.isLoading}
+                    latencySelector
+                  />
+                </>
+              )}
+
+              <KvCacheUtilizationCard sliced={sliced} />
+
+              <RequestActivityCard
+                sliced={sliced}
+                phaseTimeline={phaseRequestData}
+                timelineLoading={requestChartQuery.isLoading}
+                timelineError={requestChartQuery.isError ? t.requestChartsError : undefined}
+                view={requestActivityView}
+                onViewChange={setRequestActivityView}
+              />
+
+              <PrefixCacheHitRateCard sliced={sliced} />
+
+              <ThroughputCard
+                sliced={sliced}
+                selectedSource={selectedMetricSource}
+                selected={throughputSeries}
+                onSelectedChange={setThroughputSeries}
+              />
+
+              <PromptTokenSourceCard sliced={sliced} />
+
+              {!requestChartQuery.isError && (
+                <InflightUniqueTokensCard
+                  phaseTimeline={phaseRequestData}
+                  timelineLoading={requestChartQuery.isLoading}
+                  kvCachePoolTokens={metrics?.kvCachePoolTokens ?? null}
+                />
+              )}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

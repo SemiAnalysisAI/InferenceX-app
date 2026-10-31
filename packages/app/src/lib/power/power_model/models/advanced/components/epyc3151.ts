@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-only
-/** NVSwitch tray management CPU; independent of inference workload. */
 
 import { Provenance, ValidationError } from '../../../base';
 import { FixedPowerComponent } from './base';

@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
 /* oxlint-disable max-classes-per-file -- mirrors the upstream Python module, class for class */
-/** DC/DC loss curves with enabled idle draw and explicit capacity. */
 
 import {
   FrozenModel,
@@ -145,7 +144,6 @@ export class DCConverterAssembly extends FrozenModel {
   }
 }
 
-/** One converter for the entire tray, retaining its aggregate 8 kW loss profile. */
 export function compute_tray_converter(): DCConverterAssembly {
   return new DCConverterAssembly({
     module_capacity_w: 8000,

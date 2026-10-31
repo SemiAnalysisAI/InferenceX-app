@@ -1,0 +1,26 @@
+---
+title: 'Qwen3.8 27B'
+developer: 'Alibaba (Qwen)'
+releaseDate: '2026 年 8 月 5 日'
+description: 'Qwen 的 27B 稠密视觉语言模型，包含 48 层 Gated DeltaNet 和 16 层 Gated Attention，原生上下文为 262K token。'
+---
+
+## 概述
+
+Qwen3.8-27B 是稠密视觉语言模型，与采用 MoE 的 Qwen3.8-Flash-Next 不同。它支持文本、图像和视频输入，输出文本。Qwen 公布的参数量为 27B，原生上下文为 262,144 token，可扩展至 1M（[模型卡](https://huggingface.co/Qwen/Qwen3.8-27B)）。
+
+## 架构
+
+- **主干：**64 层，隐藏维度 5120，词表大小 248320。
+- **重复单元：**每组先执行 3 层 Gated DeltaNet，再执行 1 层 Gated Attention，共重复 16 组，即 48 层线性注意力和 16 层全局注意力。
+- **线性注意力：**48 个 value head、16 个 QK head，head 维度 128，卷积核宽度 4。
+- **全局注意力：**24 个 query head、4 个 KV head，head 维度 256；使用输出门控与 64 维旋转位置编码。
+- **FFN：**中间维度 17408 的稠密 SwiGLU，没有 MoE router 或 expert 选择。
+- **投机解码：**配置 1 层 MTP，训练时采用多步预测。
+- **精度与许可证：**BF16 参考 checkpoint，以 Apache 2.0 许可证发布。
+
+各项维度与完整层顺序可在[公开配置](https://huggingface.co/Qwen/Qwen3.8-27B/raw/main/config.json)中核对。
+
+## InferenceX 执行变体
+
+InferenceX 中的标准条目与 eager 条目使用相同的 Qwen3.8-27B checkpoint 架构。Eager 表示执行方式，不代表另一套参数量、注意力分布或模型家族。两者的结果分开呈现，便于比较不同执行设置，又不会混淆二者的身份。

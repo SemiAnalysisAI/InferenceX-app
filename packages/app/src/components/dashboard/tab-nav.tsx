@@ -1,7 +1,6 @@
 'use client';
 
 import { ChevronDown } from 'lucide-react';
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   type ReactNode,
@@ -11,6 +10,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from 'react';
 
 import { track } from '@/lib/analytics/analytics';
@@ -25,13 +25,19 @@ import { localePath } from '@/lib/i18n/i18n';
 import { TAB_LABELS_ZH } from '@/lib/routing/tab-meta-zh';
 import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 import { Card } from '@/components/ui/card';
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useClientRouteSearch } from '@/hooks/useClientSearch';
 import { profitRoutePathname } from '@/lib/routing/profit-estimator-routes';
+import {
+  getInferenceNavigationModel,
+  subscribeInferenceNavigationModel,
+} from '@/lib/routing/inference-navigation-state';
 import { cn } from '@/lib/shared/utils';
 
 const TAB_LABELS_EN: Record<DashboardRouteKey, string> = {
   inference: 'Inference Performance',
+  powerx: 'PowerX',
   evaluation: 'Accuracy Evals',
   historical: 'Historical Trends',
   calculator: 'TCO Calculator',
@@ -79,13 +85,6 @@ function handleDesktopClick(tab: DashboardRouteKey) {
   track('tab_changed', { tab });
 }
 
-/**
- * Sliding active-tab indicator. Measures the active link and translates a
- * 2px bar under it (transform + width on an absolutely positioned element,
- * so no layout impact on the tabs themselves). While unmeasured — first
- * paint, no-JS, or a gated tab active in the popover — each link's static
- * `border-b` fallback renders instead, so the active state is never lost.
- */
 function useTabIndicator(current: DashboardRouteKey, gateUnlocked: boolean) {
   const navRef = useRef<HTMLElement>(null);
   const hasAnimatedRef = useRef(false);
@@ -104,18 +103,11 @@ function useTabIndicator(current: DashboardRouteKey, gateUnlocked: boolean) {
 
   useLayoutEffect(measure, [measure, current]);
 
-  // The gated "Hidden" trigger mounts a tick after hydration (the feature
-  // gate reads localStorage in an effect), which shifts every sibling under
-  // `justify-evenly` WITHOUT resizing the nav box — the ResizeObserver below
-  // stays silent, so the indicator would keep pre-unlock coordinates.
-  // Reposition without animating, exactly as for a resize.
   useLayoutEffect(() => {
     hasAnimatedRef.current = false;
     measure();
   }, [measure, gateUnlocked]);
 
-  // Only slide between positions after the first measurement has painted;
-  // the initial placement (and any resize reflow) must not animate.
   useLayoutEffect(() => {
     if (indicator) {
       const id = requestAnimationFrame(() => {
@@ -153,6 +145,11 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
 
   const { navRef, indicator, animate } = useTabIndicator(current, featureGateUnlocked);
   const search = useClientRouteSearch();
+  const retainedModel = useSyncExternalStore(
+    subscribeInferenceNavigationModel,
+    getInferenceNavigationModel,
+    () => undefined,
+  );
   const unofficialIds = useMemo(() => {
     for (const [key, value] of new URLSearchParams(search)) {
       if (/^unofficialruns?$/iu.test(key) && value) return value;
@@ -160,19 +157,19 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
     return '';
   }, [search]);
   const tabHref = (path: string) => {
-    if (!unofficialIds) return path;
-    return (
-      profitRoutePathname(path, new URLSearchParams({ unofficialruns: unofficialIds })) ??
-      `${path}?unofficialruns=${unofficialIds}`
-    );
+    const href = unofficialIds
+      ? (profitRoutePathname(path, new URLSearchParams({ unofficialruns: unofficialIds })) ??
+        `${path}?unofficialruns=${unofficialIds}`)
+      : path;
+    if (retainedModel && (path === '/inference' || path === '/zh/inference')) {
+      return `${href}${unofficialIds ? '&' : '?'}g_model=${encodeURIComponent(retainedModel)}`;
+    }
+    return href;
   };
 
   return (
     <div className="mb-1 pt-3 lg:mb-4 lg:pt-0">
       <Card className="vt-dashboard-tabs p-0 md:p-0" data-slot="dashboard-navigation">
-        {/* Mobile: one-tap, horizontally scrollable chart tabs. Every primary
-            chart is visible as a pill (no dropdown round-trip), the active one
-            is scrolled into view, and edge fades hint at overflow. */}
         <MobileTabStrip
           ariaLabel={locale === 'zh' ? '选择图表' : 'Select Chart'}
           current={current}
@@ -188,7 +185,6 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
           onSelect={handleMobileSelect}
         />
 
-        {/* Desktop: Nav links */}
         <div className="hidden overflow-x-auto p-6 lg:block">
           <nav
             ref={navRef}
@@ -196,7 +192,7 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
             className="relative flex items-center justify-evenly min-w-0"
           >
             {PRIMARY_TABS.map((route) => (
-              <Link
+              <IntentPrefetchLink
                 key={route.key}
                 href={tabHref(localePath(route.path, locale))}
                 data-testid={`tab-trigger-${route.key}`}
@@ -205,14 +201,12 @@ export function TabNav({ footer }: { footer?: ReactNode }) {
                 onClick={() => handleDesktopClick(route.key)}
                 className={cn(
                   tabLinkClass,
-                  // The static border is the no-JS/unmeasured fallback; once the
-                  // sliding indicator is live it owns the underline.
                   currentTabClass(current === route.key && !indicator),
                   current === route.key && 'text-secondary dark:text-primary',
                 )}
               >
                 {tabLabel(route)}
-              </Link>
+              </IntentPrefetchLink>
             ))}
             {indicator && (
               <span
@@ -277,7 +271,7 @@ function HiddenTabsPopover({
             const isActive = current === route.key;
             return (
               <li key={route.key}>
-                <Link
+                <IntentPrefetchLink
                   href={tabHref(route.path)}
                   data-testid={`tab-trigger-${route.key}`}
                   data-ph-capture-attribute-tab={route.key}
@@ -294,7 +288,7 @@ function HiddenTabsPopover({
                   )}
                 >
                   {tabLabel(route)}
-                </Link>
+                </IntentPrefetchLink>
               </li>
             );
           })}
@@ -304,13 +298,6 @@ function HiddenTabsPopover({
   );
 }
 
-/**
- * Mobile chart navigation: every primary chart as a one-tap pill in a
- * horizontally scrollable strip. Replaces the old Select dropdown, which hid
- * the five destinations behind an extra tap and a full-screen listbox.
- * The active pill is scrolled into view on mount and on route change, and the
- * strip fades at whichever edge has more content.
- */
 function MobileTabStrip({
   ariaLabel,
   current,
@@ -348,7 +335,6 @@ function MobileTabStrip({
     if (!el) return;
     const active = el.querySelector<HTMLElement>('[aria-current="page"]');
     if (active) {
-      // Centre the active pill without moving the page vertically.
       const target = active.offsetLeft - (el.clientWidth - active.offsetWidth) / 2;
       el.scrollLeft = Math.max(0, target);
     }
@@ -366,16 +352,13 @@ function MobileTabStrip({
   const renderPill = (route: DashboardRoute) => {
     const active = current === route.key;
     return (
-      <Link
+      <IntentPrefetchLink
         key={route.key}
         href={tabHref(route.path)}
         aria-current={active ? 'page' : undefined}
         data-testid={`mobile-tab-${route.key}`}
         data-ph-capture-attribute-tab={route.key}
         onClick={(event) => {
-          // Already on this exact chart page: tabHref keeps only
-          // `unofficialruns`, so navigating would drop the selector state held
-          // in the URL. Child pages (e.g. /inference/agentic) still navigate.
           if (active && isCurrentPage(route)) {
             event.preventDefault();
             return;
@@ -391,7 +374,7 @@ function MobileTabStrip({
         )}
       >
         {tabLabel(route)}
-      </Link>
+      </IntentPrefetchLink>
     );
   };
 

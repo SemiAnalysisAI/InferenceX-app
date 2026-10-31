@@ -136,7 +136,6 @@ describe('runPerIdBackfill', () => {
     });
     expect(seen).toEqual([1, 2, 3]);
     expect(process.exitCode).toBeUndefined();
-    // Two ✓ lines (skipped rows do not log) plus the summary line.
     const logged = vi.mocked(console.log).mock.calls.map((c) => String(c[0]));
     expect(logged.filter((l) => l.includes('✓')).length).toBe(2);
     expect(logged.at(-1)).toContain('=== backfill complete: 2 ok, 0 failed');

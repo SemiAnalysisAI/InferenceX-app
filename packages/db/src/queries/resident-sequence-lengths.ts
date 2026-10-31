@@ -17,17 +17,10 @@ interface StoredStats {
 export interface ResidentSequenceLengthSketches {
   isl: TokenLengthSketch | null;
   osl: TokenLengthSketch | null;
-  /** Resident benchmark points represented by current-version sketches. */
   coveredPoints: number;
   requestedPoints: number;
 }
 
-/**
- * Merge the precomputed request-length sketches for a bounded set of chart
- * points. There is deliberately no raw-blob fallback here: a stale row is
- * omitted until the versioned backfill reaches it rather than making a chart
- * load decompress multi-megabyte request profiles.
- */
 export async function getResidentSequenceLengthSketches(
   sql: DbClient,
   benchmarkResultIds: number[],

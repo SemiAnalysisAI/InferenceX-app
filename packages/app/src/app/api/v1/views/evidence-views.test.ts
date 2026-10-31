@@ -21,14 +21,14 @@ vi.mock('@/app/api/v1/collectivex/runs/[runId]/route', () => ({ GET: mocks.run }
 vi.mock('@/app/api/v1/latest-images/route', () => ({ GET: mocks.images }));
 vi.mock('@/app/api/v1/framework-releases/route', () => ({ GET: mocks.releases }));
 vi.mock('@/lib/cache/api-cache', () => ({
-  cachedJson: (data: unknown) => Response.json(data),
+  cachedJson: (_request: Request, data: unknown) => Response.json(data),
   cachedQuery: (fn: unknown) => fn,
 }));
 const request = (view: string, query: string) =>
   new NextRequest(`http://localhost/api/v1/views/${view}?${query}`);
 const dataset = makeCollectiveXDataset();
 const image = {
-  model: 'dsv4',
+  model: 'dsv41flash',
   hardware: 'b200',
   framework: 'sglang',
   precision: 'fp8',
@@ -37,7 +37,7 @@ const image = {
   isl: null,
   osl: null,
   benchmark_type: 'agentic_traces',
-  image: 'example:v1',
+  image: 'example:v1.0.0',
   date: '2026-09-01',
 };
 
@@ -50,7 +50,9 @@ beforeEach(() => {
   mocks.images.mockImplementation(() =>
     Response.json([image, { ...image, disagg: true, hardware: 'h200' }]),
   );
-  mocks.releases.mockImplementation(() => Response.json({ sglang: 'v2' }));
+  mocks.releases.mockImplementation(() =>
+    Response.json({ sglang: { tag: 'v2.0.0', publishedAt: '2026-01-01T00:00:00Z', commits: {} } }),
+  );
 });
 
 describe('public evidence projections', () => {
@@ -86,7 +88,7 @@ describe('public evidence projections', () => {
     const response = await images(
       request(
         'current-inferencex-image',
-        `model=${Model.DeepSeek_V4_Pro}&hardware=b200&precision=fp8&frameworks=sglang&spec=none&sequence=agentic-traces&asOf=2026-09-19`,
+        `model=${Model.DeepSeek_V4_1_Flash}&hardware=b200&precision=fp8&frameworks=sglang&spec=none&sequence=agentic-traces&asOf=2026-09-19`,
       ),
     );
     expect(response.status).toBe(200);

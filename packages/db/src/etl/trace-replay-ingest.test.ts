@@ -98,9 +98,6 @@ function mockSqlWithTransaction(
 
 describe('uploadTraceReplayPayloadChunks', () => {
   it('bounds every Bind payload for the measured 90 MiB staging row', async () => {
-    // Exact payload sizes from InferenceX run 29181694248, item 8/9. That run
-    // stored its request timeline as 22,146,655 bytes of JSON. The gzip copy
-    // uploaded now is several times smaller, so that size is an upper bound.
     const measuredPayloads = [
       ['profile_export_jsonl_gz', Buffer.alloc(22_992_290)],
       ['server_metrics_json_gz', Buffer.alloc(49_891_135)],
@@ -360,7 +357,6 @@ describe('persistPreparedTraceReplay (PostgreSQL)', () => {
     expect(row.request_timeline_version).toBe(REQUEST_TIMELINE_VERSION);
     expect(row.request_count).toBe(3);
     expect(row.request_timeline).toBeNull();
-    // Every other value still lands in its own column.
     expect(Buffer.from(row.profile_export_jsonl_gz!).toString()).toBe('profile');
     expect(row.profile_size).toBe(70);
     expect(Buffer.from(row.server_metrics_csv!).toString()).toBe('csv');
@@ -388,6 +384,7 @@ describe('persistPreparedTraceReplay (PostgreSQL)', () => {
     expect(row.chart_series).toEqual({ version: 12 });
   });
 
+  // The multi-megabyte PGlite round trip can exceed 5 seconds under parallel CI load.
   it('round-trips a chunked profile and exposes charts without a single oversized value', async () => {
     const profile = Buffer.alloc(PROFILE_INLINE_BYTES + 17);
     for (let i = 0; i < profile.length; i++) profile[i] = i % 251;
@@ -405,9 +402,8 @@ describe('persistPreparedTraceReplay (PostgreSQL)', () => {
     expect(restored?.equals(profile)).toBe(true);
     expect(await getTraceAvailability(pg, [41, 43])).toEqual({ 41: true, 43: true });
     expect(gunzipRequestTimeline(row.request_timeline_gz!)).toEqual(persistedTimeline);
-    // Re-ingestion leaves the linked trace and its immutable chunks untouched.
     expect(await persistPreparedTraceReplay(pg, [43], prepared)).toBe(0);
     const after = await storedTrace(43);
     expect(after.trace_replay_id).toBe(row.trace_replay_id);
-  });
+  }, 30_000);
 });

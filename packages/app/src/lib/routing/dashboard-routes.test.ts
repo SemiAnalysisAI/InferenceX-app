@@ -68,6 +68,21 @@ describe('dashboard route registry', () => {
     expect(dashboardRouteForPathname('/profit-estimator/kimi-k3')?.key).toBe('profit-estimator');
   });
 
+  it('keeps PowerX behind the feature gate while its routes still resolve', () => {
+    const powerx = getDashboardRoute('powerx');
+    expect(powerx.navGroup).toBe('feature-gated');
+    expect(powerx.indexable).toBe(false);
+    expect(powerx.localeMirrored).toBe(true);
+    expect(dashboardRouteForPathname('/powerx')?.key).toBe('powerx');
+    expect(dashboardRouteForPathname('/zh/powerx')?.key).toBe('powerx');
+  });
+
+  it('exposes OperatorX in primary navigation for both locales', () => {
+    expect(getDashboardRoute('operatorx').navGroup).toBe('primary');
+    expect(dashboardRouteForPathname('/operatorx')?.key).toBe('operatorx');
+    expect(dashboardRouteForPathname('/zh/operatorx')?.key).toBe('operatorx');
+  });
+
   it('declares the standalone and self-seeded provider capabilities', () => {
     expect(getDashboardRoute('collectivex').providers).toEqual({
       globalFilters: false,
@@ -135,7 +150,8 @@ describe('dashboard route registry', () => {
   it('resolves English, Chinese, canonical, and dashboard child paths', () => {
     expect(dashboardRouteForPathname('/evaluation')?.key).toBe('evaluation');
     expect(dashboardRouteForPathname('/zh/evaluation')?.key).toBe('evaluation');
-    expect(dashboardRouteForPathname('/')?.key).toBe('inference');
+    expect(dashboardRouteForPathname('/inference')?.key).toBe('inference');
+    expect(dashboardRouteForPathname('/')).toBeUndefined();
     expect(dashboardRouteForPathname('/zh/inference/agentic/42')?.key).toBe('inference');
     expect(dashboardRouteForPathname('/compare/foo-vs-bar')).toBeUndefined();
     expect(isDashboardRouteKey('not-a-tab')).toBe(false);

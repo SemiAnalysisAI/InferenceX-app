@@ -4,6 +4,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 import * as d3 from 'd3';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { track } from '@/lib/analytics/analytics';
+import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
 import { isUnofficialHostname } from '@/lib/runtime/unofficial-domain';
 
 import {
@@ -67,14 +68,6 @@ export interface ScaleUpTopologyDiagramHandle {
   openDialog: () => void;
 }
 
-/**
- * Renders D3-based scale-up topology diagrams for GPU SKUs.
- * Three layout types:
- * - Switched (H100/H200, B200/B300): NVSwitches at top, GPUs at bottom
- * - Full Mesh (MI300/MI325/MI355): GPUs in octagon, all-to-all connections
- * - Switched NVL72 (GB200/GB300): Nodes + NVSwitches
- * Expanded dialog supports left/right arrow navigation between GPU SKUs.
- */
 export const ScaleUpTopologyDiagram = forwardRef<
   ScaleUpTopologyDiagramHandle,
   { spec: GpuSpec; allSpecs: GpuSpec[] }
@@ -86,11 +79,10 @@ export const ScaleUpTopologyDiagram = forwardRef<
   const displayedIndexRef = useRef(0);
   displayedIndexRef.current = displayedIndex;
 
-  // Compact view always uses own spec
   const compactConfig = getScaleUpTopologyConfig(spec);
 
-  // Dialog uses the displayed (navigable) spec
   const displayedSpec = allSpecs[displayedIndex] ?? spec;
+  useDialogCloseTracking(open, 'gpu_specs_scaleup_topology_closed', { gpu: displayedSpec.name });
   const displayedConfig = getScaleUpTopologyConfig(displayedSpec);
 
   const navigate = useCallback(
@@ -122,7 +114,6 @@ export const ScaleUpTopologyDiagram = forwardRef<
     },
   }));
 
-  // Keyboard arrow navigation when dialog is open
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -267,8 +258,6 @@ function ScaleUpTopologyD3({ spec, config, compact, locale }: ScaleUpD3Props) {
   return <div ref={containerRef} />;
 }
 
-// ─── Switched topology (H100/H200 4-switch, B200/B300 2-switch) ─────────────
-
 function renderSwitchedTopology(
   container: d3.Selection<HTMLDivElement, unknown, null, undefined>,
   spec: GpuSpec,
@@ -326,7 +315,6 @@ function renderSwitchedTopology(
     );
 
   if (!isUnofficialHostname(window.location.hostname)) {
-    // Add background logo watermark
     const patternId = `logo-scaleup-sw-${spec.name.replaceAll(/\s+/gu, '-')}-${compact ? 'c' : 'e'}`;
     svg
       .append('defs')
@@ -350,7 +338,6 @@ function renderSwitchedTopology(
       .attr('fill', `url(#${patternId})`);
   }
 
-  // Connections: each GPU → each NVSwitch
   const conns = svg.append('g').attr('class', 'connections');
   for (const gpu of gpuPositions) {
     for (const sw of swPositions) {
@@ -366,7 +353,6 @@ function renderSwitchedTopology(
     }
   }
 
-  // NVSwitch boxes
   const swGroup = svg.append('g').attr('class', 'nvswitches');
   for (let i = 0; i < switchCount; i++) {
     const pos = swPositions[i];
@@ -388,7 +374,6 @@ function renderSwitchedTopology(
       .text(`NVSwitch ${i}`);
   }
 
-  // GPU boxes
   const gpuGroup = svg.append('g').attr('class', 'gpus');
   for (let i = 0; i < gpuCount; i++) {
     const pos = gpuPositions[i];
@@ -414,7 +399,6 @@ function renderSwitchedTopology(
       .text(`${STRINGS[locale].chip} ${i}`);
   }
 
-  // Subtitle label
   if (!compact) {
     svg
       .append('text')
@@ -429,8 +413,6 @@ function renderSwitchedTopology(
   }
 }
 
-// ─── Full Mesh topology (MI300/MI325/MI355) ──────────────────────────────────
-
 function renderMeshTopology(
   container: d3.Selection<HTMLDivElement, unknown, null, undefined>,
   spec: GpuSpec,
@@ -439,7 +421,7 @@ function renderMeshTopology(
   locale: 'en' | 'zh',
 ) {
   const { gpuCount } = config;
-  const vendorColor = '#ed1c24'; // AMD red
+  const vendorColor = '#ed1c24';
   const fontSize = compact ? '8px' : '11px';
   const smallFont = compact ? '7px' : '9px';
 
@@ -452,7 +434,6 @@ function renderMeshTopology(
   const totalW = cx * 2;
   const totalH = cy * 2;
 
-  // Place GPUs in octagon: start from top-right, clockwise
   const gpuPositions = Array.from({ length: gpuCount }, (_, i) => {
     const angle = (-3 * Math.PI) / 8 + (i * 2 * Math.PI) / gpuCount;
     return {
@@ -463,7 +444,6 @@ function renderMeshTopology(
     };
   });
 
-  // All pairs for full mesh connections
   const pairs: [number, number][] = [];
   for (let i = 0; i < gpuCount; i++) {
     for (let j = i + 1; j < gpuCount; j++) {
@@ -485,7 +465,6 @@ function renderMeshTopology(
     );
 
   if (!isUnofficialHostname(window.location.hostname)) {
-    // Add background logo watermark
     const patternId = `logo-scaleup-mesh-${spec.name.replaceAll(/\s+/gu, '-')}-${compact ? 'c' : 'e'}`;
     svg
       .append('defs')
@@ -509,7 +488,6 @@ function renderMeshTopology(
       .attr('fill', `url(#${patternId})`);
   }
 
-  // Mesh connections
   const meshConns = svg.append('g').attr('class', 'mesh-connections');
   for (const [i, j] of pairs) {
     meshConns
@@ -523,12 +501,10 @@ function renderMeshTopology(
       .attr('stroke-width', compact ? 1 : 1.5);
   }
 
-  // GPU boxes — opaque background rect hides mesh lines behind GPU boxes
   const gpuGroup = svg.append('g').attr('class', 'gpus');
   for (let i = 0; i < gpuCount; i++) {
     const pos = gpuPositions[i];
     const g = gpuGroup.append('g');
-    // Opaque background to cover mesh lines
     g.append('rect')
       .attr('x', pos.x)
       .attr('y', pos.y)
@@ -536,7 +512,6 @@ function renderMeshTopology(
       .attr('height', gpuBoxH)
       .attr('rx', 4)
       .style('fill', 'var(--card)');
-    // Colored overlay
     g.append('rect')
       .attr('x', pos.x)
       .attr('y', pos.y)
@@ -558,7 +533,6 @@ function renderMeshTopology(
       .text(`${STRINGS[locale].chip} ${i}`);
   }
 
-  // Center label
   if (!compact) {
     svg
       .append('text')
@@ -572,8 +546,6 @@ function renderMeshTopology(
   }
 }
 
-// ─── Switched NVL72 topology (GB200/GB300) ───────────────────────────────────
-
 function renderSwitchedNvl72Topology(
   container: d3.Selection<HTMLDivElement, unknown, null, undefined>,
   spec: GpuSpec,
@@ -582,11 +554,10 @@ function renderSwitchedNvl72Topology(
   locale: 'en' | 'zh',
 ) {
   const { switchCount, gpusPerNode, nodeCount } = config;
-  const vendorColor = '#76b900'; // NVIDIA green
+  const vendorColor = '#76b900';
   const fontSize = compact ? '8px' : '10px';
   const smallFont = compact ? '7px' : '9px';
 
-  // Node 1 detail
   const gpuBoxW = compact ? 30 : 42;
   const gpuBoxH = compact ? 16 : 22;
   const gpuGap = compact ? 4 : 8;
@@ -596,14 +567,12 @@ function renderSwitchedNvl72Topology(
   const node1W = gpuRowW + 2 * nodePad;
   const node1H = gpuBoxH + nodeLabelH + 2 * nodePad;
 
-  // Abstracted nodes
   const absBoxW = compact ? 20 : 32;
   const absBoxH = node1H;
   const absGap = compact ? 4 : 6;
   const dotsW = compact ? 14 : 22;
   const absAreaW = 2 * absBoxW + absGap + dotsW + absGap;
 
-  // NVSwitch row - show: [0] [1] ... [17]
   const swBoxW = compact ? 42 : 58;
   const swBoxH = compact ? 16 : 22;
   const swGap = compact ? 4 : 6;
@@ -623,7 +592,6 @@ function renderSwitchedNvl72Topology(
   const bottomPad = compact ? 14 : 20;
   const viewBoxH = swY + swBoxH + bottomPad;
 
-  // Node 1 position
   const nodeAreaStartX = padX + (contentW - nodeAreaW) / 2;
   const node1X = nodeAreaStartX;
   const gpuRowX = node1X + nodePad;
@@ -634,13 +602,11 @@ function renderSwitchedNvl72Topology(
     cx: gpuRowX + i * (gpuBoxW + gpuGap) + gpuBoxW / 2,
   }));
 
-  // Abstracted nodes
   const absStartX = node1X + node1W + nodeGap;
   const abs2X = absStartX;
   const absDotsX = abs2X + absBoxW + absGap + dotsW / 2;
   const abs18X = absStartX + absBoxW + absGap + dotsW + absGap;
 
-  // NVSwitch positions
   const swStartX = padX + (contentW - swRowW) / 2;
   const sw1X = swStartX;
   const sw2X = sw1X + swBoxW + swGap;
@@ -659,7 +625,6 @@ function renderSwitchedNvl72Topology(
     );
 
   if (!isUnofficialHostname(window.location.hostname)) {
-    // Add background logo watermark
     const patternId = `logo-scaleup-nvl72-${spec.name.replaceAll(/\s+/gu, '-')}-${compact ? 'c' : 'e'}`;
     svg
       .append('defs')
@@ -683,7 +648,6 @@ function renderSwitchedNvl72Topology(
       .attr('fill', `url(#${patternId})`);
   }
 
-  // Connections: each GPU → each visible NVSwitch
   const gpuSwConns = svg.append('g').attr('class', 'gpu-switch-connections');
   for (const gpu of gpuPositions) {
     for (const swCx of swCenters) {
@@ -699,7 +663,6 @@ function renderSwitchedNvl72Topology(
     }
   }
 
-  // Abstracted nodes → NVSwitches (dashed)
   const absSwConns = svg.append('g').attr('class', 'abs-switch-connections');
   const absNodeCenters = [abs2X + absBoxW / 2, abs18X + absBoxW / 2];
   for (const nx of absNodeCenters) {
@@ -716,7 +679,6 @@ function renderSwitchedNvl72Topology(
     }
   }
 
-  // Node 1 boundary
   svg
     .append('rect')
     .attr('x', node1X)
@@ -736,7 +698,6 @@ function renderSwitchedNvl72Topology(
     .style('font-weight', '500')
     .text(`${STRINGS[locale].node} 0`);
 
-  // GPU boxes inside Node 1
   const gpuGroup = svg.append('g').attr('class', 'gpus');
   for (let i = 0; i < gpusPerNode; i++) {
     const pos = gpuPositions[i];
@@ -762,10 +723,8 @@ function renderSwitchedNvl72Topology(
       .text(`${STRINGS[locale].chip} ${i}`);
   }
 
-  // Abstracted node boxes
   const absGroup = svg.append('g').attr('class', 'abstracted-nodes');
 
-  // Node 2
   absGroup
     .append('rect')
     .attr('x', abs2X)
@@ -784,7 +743,6 @@ function renderSwitchedNvl72Topology(
     .style('font-size', smallFont)
     .text('1');
 
-  // Dots
   absGroup
     .append('text')
     .attr('x', absDotsX)
@@ -794,7 +752,6 @@ function renderSwitchedNvl72Topology(
     .style('font-size', fontSize)
     .html('&bull;&bull;&bull;');
 
-  // Node N-1 (0-indexed, so last node is nodeCount - 1)
   absGroup
     .append('rect')
     .attr('x', abs18X)
@@ -813,7 +770,6 @@ function renderSwitchedNvl72Topology(
     .style('font-size', smallFont)
     .text(`${nodeCount - 1}`);
 
-  // NVSwitch boxes
   const swGroup = svg.append('g').attr('class', 'nvswitches');
   const switchItems = [
     { x: sw1X, label: 'NVSwitch 0' },
@@ -840,7 +796,6 @@ function renderSwitchedNvl72Topology(
       .text(sw.label);
   }
 
-  // Dots between NVSwitches
   svg
     .append('text')
     .attr('x', swDotsX)
@@ -850,7 +805,6 @@ function renderSwitchedNvl72Topology(
     .style('font-size', fontSize)
     .html('&bull;&bull;&bull;');
 
-  // Label
   if (!compact) {
     svg
       .append('text')

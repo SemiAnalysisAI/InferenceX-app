@@ -3,7 +3,6 @@ import type * as d3 from 'd3';
 import { lttbDownsample } from '../downsample';
 import type { ContinuousScale } from '../types';
 
-/** Default max points before LTTB kicks in. Set to Infinity to disable. */
 const DEFAULT_MAX_POINTS = 2000;
 
 export interface PointConfig<T> {
@@ -14,18 +13,11 @@ export interface PointConfig<T> {
   stroke?: string;
   strokeWidth?: number;
   keyFn?: (d: T) => string;
-  /** Data-space X accessor. When set, initial render and zoom use scale(getX(d)) instead of getCx. */
   getX?: (d: T) => number;
-  /** Data-space Y accessor. When set, initial render and zoom use scale(getY(d)) instead of getCy. */
   getY?: (d: T) => number;
-  /**
-   * Max points before LTTB downsampling kicks in.
-   * Requires getX and getY. Defaults to 2000. Set to Infinity to disable.
-   */
   maxPoints?: number;
 }
 
-/** Render circle points with D3 enter/update/exit. */
 export function renderPoints<T>(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
   data: T[],
@@ -36,7 +28,6 @@ export function renderPoints<T>(
   const cx = config.getX && xScale ? (d: T) => xScale(config.getX!(d)) : config.getCx;
   const cy = config.getY && yScale ? (d: T) => yScale(config.getY!(d)) : config.getCy;
 
-  // LTTB downsample when getX/getY are available and data exceeds maxPoints
   let renderData = data;
   if (config.getX && config.getY) {
     const max = config.maxPoints ?? DEFAULT_MAX_POINTS;
@@ -59,7 +50,6 @@ export function renderPoints<T>(
     .attr('cursor', 'pointer');
 }
 
-/** Update point positions on zoom. */
 export function updatePointsOnZoom<T>(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
   getCx: (d: T) => number,

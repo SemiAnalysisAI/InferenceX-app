@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { Card } from '@/components/ui/card';
 import { enAlternates } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 const REGIONAL_ACKNOWLEDGEMENTS = [
   {
@@ -31,17 +32,13 @@ export const metadata: Metadata = {
   description:
     'A land acknowledgement for the Indigenous peoples and homelands connected to InferenceX US benchmark clusters in San Jose, Los Angeles, and Chicago.',
   alternates: enAlternates('/land-acknowledgement'),
-  openGraph: {
+  ...socialMetadata({
     title: 'Land Acknowledgement | InferenceX',
     description:
       'A land acknowledgement for the Indigenous peoples and homelands connected to InferenceX US benchmark clusters in San Jose, Los Angeles, and Chicago.',
     url: `${SITE_URL}/land-acknowledgement`,
-  },
-  twitter: {
-    title: 'Land Acknowledgement | InferenceX',
-    description:
-      'A land acknowledgement for the Indigenous peoples and homelands connected to InferenceX US benchmark clusters in San Jose, Los Angeles, and Chicago.',
-  },
+    locale: 'en',
+  }),
 };
 
 export default function LandAcknowledgementPage() {

@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
 /* oxlint-disable max-classes-per-file -- mirrors the upstream Python module, class for class */
-/** HGX PSU load sharing, efficiency, and capacity limits. */
 
 import {
   formatG,

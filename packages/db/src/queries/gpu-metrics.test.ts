@@ -28,11 +28,6 @@ afterAll(async () => {
   await db?.close();
 });
 
-/**
- * Run 1 holds a two-node artifact (one CSV per serving node) whose first CSV is
- * shared by points 10 and 11; runs 3 and 4 are two attempts of one GitHub run.
- * Point 12 is deliberately left unlinked.
- */
 beforeEach(async () => {
   await db.exec(`TRUNCATE workflow_runs, configs RESTART IDENTITY CASCADE;
     INSERT INTO workflow_runs (id, github_run_id, run_attempt, name, status, conclusion,
@@ -128,7 +123,6 @@ describe('getGpuMetricsForRun', () => {
       endedAt: '2026-09-11T04:19:43.000Z',
       sidecars: { context: { timestamp_timezone: 'UTC' } },
     });
-    // Statistics come from the stored samples; a missing reading is not zero.
     const gpu0 = node0!.stats.filter((stat) => stat.gpuIndex === 0);
     expect(Object.fromEntries(gpu0.map((stat) => [stat.metric, [stat.count, stat.mean]]))).toEqual({
       power_w: [1, 187.5],
@@ -386,7 +380,6 @@ it('pages a single large series without dropping microseconds and retries change
   const observed: DbClient = async (strings, ...values) => {
     const rows = await sql(strings, ...values);
     if (strings.join('').includes('from gpu_metric_samples')) {
-      // Model the bounded HTTP transport, which a whole-series query would exceed.
       expect(rows.length).toBeLessThanOrEqual(SAMPLE_PAGE_SIZE);
       pages++;
       if (pages === 1) {

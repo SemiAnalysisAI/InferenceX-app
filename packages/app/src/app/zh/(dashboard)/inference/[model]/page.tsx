@@ -1,23 +1,19 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
+import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
-import { ZhTabIntro } from '@/components/zh/zh-tab-intro';
-import { ZH_OG_LOCALE, zhAlternates, zhPath } from '@/lib/i18n/i18n';
+import { InferencePageIntro } from '@/components/inference/inference-page-intro';
+import { zhAlternates, zhPath } from '@/lib/i18n/i18n';
 import { inferenceModelMetaZh } from '@/lib/routing/inference-model-meta';
 import {
   getInferenceModelBySlug,
   INFERENCE_MODEL_SLUGS,
   inferenceModelPath,
 } from '@/lib/routing/inference-model-slug';
-
-/**
- * `/zh/inference/<model>` — Chinese sibling of `/inference/<model>`. Same
- * pinned-model chart body; metadata and intro copy are Simplified Chinese.
- */
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 interface Props {
   params: Promise<{ model: string }>;
@@ -35,21 +31,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const enPath = inferenceModelPath(entry.slug);
   const url = `${SITE_URL}${zhPath(enPath)}`;
   return {
-    title: { absolute: `${title} | ${SITE_NAME} by ${AUTHOR_NAME}` },
+    title: { absolute: `${title} | ${SITE_NAME}` },
     description,
     alternates: zhAlternates(enPath),
-    openGraph: {
-      title: `${title} | ${SITE_NAME}`,
-      description,
-      url,
-      type: 'website',
-      locale: ZH_OG_LOCALE,
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: `${title} | ${SITE_NAME}`,
-      description,
-    },
+    ...socialMetadata({ title: `${title} | ${SITE_NAME}`, description, url, locale: 'zh' }),
   };
 }
 
@@ -57,13 +42,11 @@ export default async function ZhInferenceModelPage({ params }: Props) {
   const { model } = await params;
   const entry = getInferenceModelBySlug(model);
   if (!entry) notFound();
-  // Known aliases are canonicalized in next.config.ts before this SSG route
-  // renders. Next's config redirect also preserves the incoming query string.
   return (
     <>
-      <ZhTabIntro tab="inference" />
+      <InferencePageIntro locale="zh" />
       <InferenceProvider activeTab="inference">
-        <InferenceChartDisplay />
+        <InferenceChartDisplay centerOnEnter />
       </InferenceProvider>
     </>
   );

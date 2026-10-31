@@ -124,6 +124,7 @@ export const VIEW_QUERY_PARAMS = {
   ],
   'gpu-specs': ['format', 'metric'],
   historical: [
+    'chart',
     'deployment',
     'end',
     'extendToDate',
@@ -176,7 +177,10 @@ export const VIEW_QUERY_PARAMS = {
     'serviceTarget',
     'roleShare',
     'powerFit',
+    'powerBreakdown',
+    'headroom',
   ],
+  'model-architectures': ['model'],
   options: ['format'],
   overview: ['compare', 'engine', 'format', 'hwrows', 'models', 'ref', 'rows', 'tier'],
   'profit-estimator': [
@@ -258,7 +262,7 @@ export const DASHBOARD_API_COVERAGE = {
   inference: {
     view: 'inference',
     exclusion:
-      'The same-SKU vLLM/SGLang confirmation dialog is a local presentation acknowledgement, not an API access restriction. best=true ranks across frameworks; best=false returns both without interactive consent state.',
+      'The same-SKU vLLM/SGLang confirmation dialog is a local presentation acknowledgement, not an API access restriction. best=true ranks across frameworks; best=false returns both without interactive consent state. GPU-count, parallelism, concurrency, line, gradient, and offloading labels are independent presentation settings with no API parameters. Offloading Label hides only the footer key; offload fields and benchmark rows remain unchanged.',
   },
   'profit-estimator-per-gigawatt': { view: 'profit-estimator-per-gigawatt' },
   'profit-estimator': { view: 'profit-estimator' },
@@ -275,6 +279,7 @@ export const DASHBOARD_API_COVERAGE = {
     exclusion:
       'Feature-gated Agentic Workload Explorer reads a frozen, anonymized ProxyTrace snapshot from a separate database through page-owned /api/v1/agentic-workload-explorer/* routes whose shapes follow the pages; no stable public read-only view is published.',
   },
+  powerx: { view: 'inference' },
   operatorx: {
     exclusion:
       'Feature-gated OperatorX explorer uses page-owned routes; no stable public read-only view is published.',

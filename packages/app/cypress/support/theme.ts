@@ -1,11 +1,10 @@
 import { APP_THEMES } from '../../src/lib/themes/themes';
 
-/** Reach a theme through ordinary clicks, waiting for each React update. */
 export function cycleToTheme(theme: string, remaining = APP_THEMES.length): void {
   expect(APP_THEMES, 'registered target theme').to.include(theme);
   cy.get('[data-testid="theme-toggle"]')
     .should('have.attr', 'aria-label')
-    .and('contain', 'currently');
+    .and('match', /currently|当前/);
   cy.get('html').then(($html) => {
     if ($html.hasClass(theme)) return;
     expect(remaining, `clicks left to reach ${theme}`).to.be.greaterThan(0);
