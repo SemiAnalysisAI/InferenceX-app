@@ -8,7 +8,7 @@ import {
   getTooltipContainerGeometry,
   invalidateTooltipGeometry,
 } from '../layers/scatter-points';
-import { setupChartStructure } from '../chart-setup';
+import { DEFAULT_CHART_MARGIN, setupChartStructure } from '../chart-setup';
 import {
   raiseInOrder,
   renderAxes,
@@ -231,7 +231,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
   const {
     chartId,
     data,
-    margin = { top: 24, right: 10, bottom: 40, left: 60 },
+    margin = DEFAULT_CHART_MARGIN,
     watermark = 'logo',
     clipContent = true,
     dataIdentity,

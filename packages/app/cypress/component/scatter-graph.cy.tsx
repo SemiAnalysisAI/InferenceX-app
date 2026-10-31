@@ -856,7 +856,9 @@ describe('ScatterGraph', () => {
     ).should('have.css', 'opacity', '1');
   });
 
-  it('renders legend with hardware items', () => {
+  it('keeps the desktop legend below the top guideline without changing the mobile gap', () => {
+    cy.viewport(1440, 900);
+    const chartId = 'test-scatter-legend';
     const data = [
       createMockInferenceData({ hwKey: 'b200_trt', x: 64, y: 320, precision: Precision.FP4 }),
       createMockInferenceData({ hwKey: 'h100', x: 32, y: 210, precision: Precision.FP4 }),
@@ -865,7 +867,7 @@ describe('ScatterGraph', () => {
     mountWithProviders(
       <div style={{ width: 800, height: 600 }}>
         <ScatterGraph
-          chartId="test-scatter-legend"
+          chartId={chartId}
           modelLabel="DeepSeek R1"
           data={data}
           xLabel="Concurrency"
@@ -886,6 +888,26 @@ describe('ScatterGraph', () => {
 
     cy.get('.sidebar-legend').should('exist');
     cy.get('.sidebar-legend label').should('have.length.greaterThan', 0);
+
+    const assertDesktopAlignment = () => {
+      cy.get(`#${chartId}`).should(($chart) => {
+        const legend = $chart[0].querySelector('.sidebar-legend')!.getBoundingClientRect();
+        const guideline = $chart[0].querySelector('.border-top')!.getBoundingClientRect();
+        expect(legend.top - guideline.top, 'legend below top guideline').to.be.closeTo(8, 0.1);
+      });
+    };
+    assertDesktopAlignment();
+
+    cy.viewport(375, 812);
+    cy.get('[data-slot="chart-legend-wrapper"]').should(($legend) => {
+      expect(getComputedStyle($legend[0]).marginTop, 'unchanged mobile gap').to.equal('12px');
+      const svg = $legend[0].parentElement!.querySelector('svg')!;
+      expect($legend[0].getBoundingClientRect().top).to.be.at.least(
+        svg.getBoundingClientRect().bottom,
+      );
+    });
+    cy.viewport(1440, 900);
+    assertDesktopAlignment();
   });
 
   it('renders line labels for both official and overlay (unofficial) rooflines', () => {

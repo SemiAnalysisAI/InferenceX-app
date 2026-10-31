@@ -133,6 +133,7 @@ export interface D3ChartWrapperProps {
   tooltipRef: React.RefObject<HTMLDivElement | null>;
   setContainerRef: (el: HTMLDivElement | null) => void;
   dimensions: { width: number; height: number };
+  plotTop?: number;
   pinnedPoint: unknown | null;
   isPinned: () => boolean;
   dismissTooltip: () => void;
@@ -157,6 +158,7 @@ export function D3ChartWrapper({
   tooltipRef,
   setContainerRef,
   dimensions,
+  plotTop = 0,
   pinnedPoint,
   isPinned,
   dismissTooltip,
@@ -236,7 +238,8 @@ export function D3ChartWrapper({
       {legendElement && (
         <div
           data-slot="chart-legend-wrapper"
-          className="w-full lg:w-auto lg:shrink-0 lg:self-start relative mt-3 lg:mt-0 lg:has-[.sidebar-legend]:w-fit lg:has-[.sidebar-legend]:min-w-48 lg:has-[.sidebar-legend]:max-w-96"
+          className="w-full lg:w-auto lg:shrink-0 lg:self-start relative mt-3 lg:mt-[var(--chart-legend-top)] lg:has-[.sidebar-legend]:w-fit lg:has-[.sidebar-legend]:min-w-48 lg:has-[.sidebar-legend]:max-w-96"
+          style={{ '--chart-legend-top': `${plotTop + 8}px` } as React.CSSProperties}
         >
           {legendElement}
         </div>

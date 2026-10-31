@@ -1,5 +1,13 @@
 # D3 Chart Design Rationale
 
+## Desktop legend alignment
+
+The shared chart wrapper places the desktop legend 8px below the plot's top
+guideline, using the same top margin as the SVG renderer. Below the `lg`
+breakpoint, the legend stays below the chart with its existing 12px gap.
+Official and unofficial series share this layout. This is presentation-only;
+API responses, filters, and `inferencex-skills` contracts are unchanged.
+
 ## PNG export aspect ratio
 
 Inference charts keep the title above the plot and place cost controls, pricing
