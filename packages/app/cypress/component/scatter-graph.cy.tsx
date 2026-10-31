@@ -2059,7 +2059,7 @@ describe('ChartDisplay responsive status notes', () => {
             powerCompare: 'breakdown',
             selectedGPUs: history ? ['b200_trt'] : [],
             selectedDates: history ? ['2025-03-01'] : [],
-            activeDates: new Set(['2025-03-01']),
+            activeDates: new Set(['2025-03-01_b200_trt']),
             graphs: [
               {
                 model: Model.DeepSeek_R1,
