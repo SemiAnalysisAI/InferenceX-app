@@ -680,6 +680,14 @@ export const apiRouteCatalog = [
     sourceSha256: 'dcdda2fb8d266449de4f7a5e1b63dde13a628aa3ee52e44e7cc5a8ee5b28aa82',
   },
   {
+    source: 'src/app/api/v1/collectivex/changelog/route.ts',
+    path: '/api/v1/collectivex/changelog',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'list-collectivex-changelog',
+    sourceSha256: 'abad71b135910ba5f9d471a70e1064f362fd5453a30ddd2163d5533587d907c0',
+  },
+  {
     source: 'src/app/api/v1/collectivex/latest/route.ts',
     path: '/api/v1/collectivex/latest',
     method: 'GET',
@@ -1665,7 +1673,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/api/api.ts',
-    sourceSha256: '8fd6eac0b6c3d0df45f9475083eb0c28a07775ca11dac4127ab3abe2f98998e1',
+    sourceSha256: 'b1b01e8a22384e4a47eaa4e3605c58295311c7a8eba5e06e92a766e1c0675aa8',
     reviewArea: {
       en: 'Public API client parameter serialization and TypeScript response contracts.',
       zh: '公开 API 客户端的参数序列化和 TypeScript 响应契约。',
@@ -1760,7 +1768,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/collectivex.ts',
-    sourceSha256: 'c268a38a78ac9f11b8cf65bf14a7a69eba9b94b5cfa2f94f47cc34475a60b5c1',
+    sourceSha256: 'e4771fecf43cc7902000c5d11053e2a89e97ec4f56775e6fc974312c18a365b7',
     reviewArea: {
       en: 'CollectiveX dataset projection, run summaries, coverage, series, and latest-run ordering.',
       zh: 'CollectiveX 数据集投影、运行汇总、覆盖范围、序列和最新运行排序。',

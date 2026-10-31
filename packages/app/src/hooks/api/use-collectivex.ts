@@ -1,6 +1,10 @@
 import { useQueries, useQuery } from '@tanstack/react-query';
 
-import { fetchCollectiveXRun, fetchCollectiveXRunList } from '@/lib/api/api';
+import {
+  fetchCollectiveXChangelog,
+  fetchCollectiveXRun,
+  fetchCollectiveXRunList,
+} from '@/lib/api/api';
 import {
   COLLECTIVEX_DEFAULT_VERSION,
   type CollectiveXVersion,
@@ -19,5 +23,12 @@ export function useCollectiveXRunDatasets(version: CollectiveXVersion, runIds: r
       queryKey: ['collectivex-run', version, runId],
       queryFn: ({ signal }: { signal: AbortSignal }) => fetchCollectiveXRun(version, runId, signal),
     })),
+  });
+}
+
+export function useCollectiveXChangelog(version: CollectiveXVersion) {
+  return useQuery({
+    queryKey: ['collectivex-changelog', version],
+    queryFn: ({ signal }) => fetchCollectiveXChangelog(version, signal),
   });
 }
