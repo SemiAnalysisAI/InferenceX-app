@@ -217,7 +217,7 @@ it('exposes Huawei rotating-copy evidence without inventing missing tests or siz
   const body = await response.json();
   const run = body.memBw.gpus[0];
   expect(run.gpu).toBe('Huawei 950PR');
-  expect(run.peakBandwidthGbps).toBe(1600);
+  expect(run.peakBandwidthGbps).toBe(1638.4);
   expect(run.peakBandwidthSource).toContain('not independently verified');
   expect(run.metadata).toMatchObject({
     protocol: 'rotating-pool-npu-graph',
@@ -245,7 +245,7 @@ it('exposes Huawei rotating-copy evidence without inventing missing tests or siz
   expect(run.rows.some((row: { bytes: number }) => row.bytes === 17179869184)).toBe(true);
   const endpoint = run.rows.find((row: { bytes: number }) => row.bytes === 17179869184);
   expect(endpoint.bandwidthGbps).toBeCloseTo(1447.2735584561165, 6);
-  expect(endpoint.mbuPercent).toBeCloseTo(90.45459740350728, 6);
+  expect(endpoint.mbuPercent).toBeCloseTo(88.33456777686257, 6);
   expect(endpoint.observations).toBe(360);
   expect(body.smL2Distance.gpus).toEqual([]);
   expect(body.tpcSkyline.gpus).toEqual([]);

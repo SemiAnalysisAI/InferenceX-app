@@ -62,11 +62,13 @@ describe('Ascend OperatorX reference', () => {
     expect(view.workload).toBe('gemm:DeepSeek-V4-Pro');
     expect(reference).toMatchObject({
       peakTflops: { bf16: 378, fp8: 756, fp4: null },
-      memoryBandwidthTBs: 1.6,
+      memoryBandwidthTBs: 1.6384,
       memoryBandwidthAssumed: true,
     });
     expect(reference.source).toContain('Ascend-ubench.md');
     expect(reference.qualification).toContain('memory/ECC');
+    expect(reference.qualification).toContain('3200 MHz HBM clock');
+    expect(reference.source).toContain('HBM Clock Speed 3200 MHz');
     expect(hardwareLabel('ascend950pr')).toBe(reference.label);
     expect(reference.label).toBe('950PR');
     expect(view.defaults).toEqual({
@@ -76,7 +78,7 @@ describe('Ascend OperatorX reference', () => {
     });
     expect(peakTflops('ascend950pr', 'bf16')).toBe(reference.peakTflops.bf16);
     expect(peakBandwidthTBs('ascend950pr')).toBe(reference.memoryBandwidthTBs);
-    expect(reference.peakTflops.bf16! / reference.memoryBandwidthTBs).toBe(236.25);
+    expect(reference.peakTflops.bf16! / reference.memoryBandwidthTBs).toBe(230.712890625);
     const c = view.cases[0];
     const us = view.measurements.ascend950pr.latencyUs[0]!;
     expect(us).toBe(10);
@@ -85,7 +87,7 @@ describe('Ascend OperatorX reference', () => {
       12,
     );
     expect(metricById('bandwidthUtil').value(c, us, 'ascend950pr')).toBeCloseTo(
-      (3 * 1024 ** 2 * 2) / (10 * 1e6) / 1.6,
+      (3 * 1024 ** 2 * 2) / (10 * 1e6) / 1.6384,
       12,
     );
   });
@@ -100,7 +102,7 @@ describe('Ascend OperatorX reference', () => {
       214.7483648 / 756,
       12,
     );
-    expect(peakTflops('ascend950pr', 'fp8')! / peakBandwidthTBs('ascend950pr')!).toBe(472.5);
+    expect(peakTflops('ascend950pr', 'fp8')! / peakBandwidthTBs('ascend950pr')!).toBe(461.42578125);
   });
 
   it('leaves unregistered precisions and existing hardware references unchanged', () => {

@@ -431,9 +431,9 @@ for (const [gpu, points] of Object.entries(huawei.curves)) {
         'https://github.com/SemiAnalysisAI/InferenceX-app/blob/0e7525c9b62124a43856d26e1ce2ac5b2ae31b93/packages/app/src/components/ubenchx/data/huawei-bandwidth.json',
     },
     bandwidthReference: {
-      gbps: 1600,
+      gbps: 1638.4,
       source:
-        '950PR 128 GiB nominal reference assumed at 1600 GB/s; not independently verified by memory-controller counters',
+        '950PR 128 GiB reference derived at 1638.4 GB/s from the card’s 3200 MHz HBM clock (npu-smi) and the 4096-bit bus implied by Huawei’s rounded 1.6 TB/s figure; not independently verified by memory-controller counters',
     },
     rows: [...smallMessages.points, ...points].map((point) => ({
       bytes: point.size_bytes,
