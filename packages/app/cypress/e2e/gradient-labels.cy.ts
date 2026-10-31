@@ -1,5 +1,3 @@
-import { expandLegendAdvanced } from '../support/legend-advanced';
-
 describe('Gradient Labels Toggle', () => {
   before(() => {
     cy.visit('/inference?g_model=DeepSeek-V4-Pro', {
@@ -9,7 +7,8 @@ describe('Gradient Labels Toggle', () => {
     });
     cy.get('[data-testid="scatter-graph"]').should('be.visible');
     cy.get('.sidebar-legend').first().should('be.visible');
-    expandLegendAdvanced();
+    cy.get('[data-testid="legend-advanced-toggle"]').should('have.attr', 'aria-expanded', 'false');
+    cy.get('#scatter-parallelism-labels').should('be.visible');
   });
 
   it('both toggles can be enabled simultaneously', () => {

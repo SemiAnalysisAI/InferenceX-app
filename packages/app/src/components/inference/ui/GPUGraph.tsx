@@ -50,7 +50,7 @@ import {
   HIT_AREA_RADIUS,
   logTickFormat,
 } from '@/lib/charts/chart-rendering';
-import { computeTooltipPosition } from '@/lib/d3-chart/layers/scatter-points';
+import { computeTooltipPosition, syncPointLabel } from '@/lib/d3-chart/layers/scatter-points';
 import {
   attachOverlayXMarkerHandlers,
   overlayMarkerPosition,
@@ -170,10 +170,11 @@ const GPU_STRINGS = {
     optimalOnly: 'Optimal Only',
     powerBoundaryInfo:
       'Show only points on the upper measured power boundary. Turn off to show all measurements; the boundary stays the same. This is a power-load boundary, not an energy-efficiency frontier.',
-    labels: 'Labels',
+    labels: '# of GPUs Label',
     parallelismLabels: 'Parallelism Labels',
     concurrencyLabels: '# Concurrent Sessions',
     lineLabels: 'Line Labels',
+    offloadingLabel: 'Offloading Label',
     perfRuler: 'Perf Ruler',
     perfRulerInfo:
       'Click two curves to place a vertical ruler, then drag it to measure the ratio of their Y-axis values at any x value — across dates of the same chip config or across chip configs. Repeat to add more rulers (up to 8); hover a ruler and click × to delete it. Turning the toggle off clears all rulers.',
@@ -194,10 +195,11 @@ const GPU_STRINGS = {
     optimalOnly: '仅最优',
     powerBoundaryInfo:
       '仅显示实测功率上边界上的点。关闭后显示全部测量点，边界曲线保持不变。这是功率负载边界，不是能效前沿。',
-    labels: '标签',
+    labels: 'GPU 数量标签',
     parallelismLabels: '并行配置标签',
     concurrencyLabels: '并发会话数',
     lineLabels: '曲线标签',
+    offloadingLabel: 'offload 标签',
     perfRuler: '性能标尺',
     perfRulerInfo:
       '先点击两条曲线放置垂直标尺，再拖动标尺，比较任意横坐标下两条曲线的纵轴数值之比，既可比较同一芯片配置的不同日期，也可比较不同芯片配置。重复操作可添加多把标尺（最多 8 把）；悬停标尺并点击 × 可删除该标尺。关闭开关将清除所有标尺。',
@@ -248,7 +250,9 @@ const GPUGraph = React.memo(
       showConcurrencyLabels,
       highContrast,
       showLineLabels,
+      showOffloadingLabel,
     } = useInferenceDisplay();
+    const pointLabelsVisible = showPointLabels || useAdvancedLabels || showConcurrencyLabels;
     const {
       setSelectedDates,
       toggleActiveDate,
@@ -262,6 +266,7 @@ const GPUGraph = React.memo(
       setHighContrast,
       selectAllActiveDates,
       setShowLineLabels,
+      setShowOffloadingLabel,
       setQuickFilterVendors,
       setQuickFilterFrameworks,
       setQuickFilterDeployment,
@@ -1097,7 +1102,12 @@ const GPUGraph = React.memo(
         zoomGroup
           .selectAll<SVGGElement, InferenceData>('.unofficial-overlay-pt')
           .each(function (d) {
-            const lines = pointLabelText(d, useAdvancedLabels, showConcurrencyLabels).split('\n');
+            const lines = pointLabelText(
+              d,
+              showPointLabels,
+              useAdvancedLabels,
+              showConcurrencyLabels,
+            ).split('\n');
             d3.select(this)
               .selectAll<SVGTextElement, boolean>('.overlay-label')
               .data([true])
@@ -1108,7 +1118,7 @@ const GPUGraph = React.memo(
               .attr('font-weight', '700')
               .attr('pointer-events', 'none')
               .style('fill', 'var(--foreground)')
-              .style('display', showPointLabels ? '' : 'none')
+              .style('display', pointLabelsVisible ? '' : 'none')
               .selectAll<SVGTSpanElement, string>('tspan')
               .data(lines)
               .join('tspan')
@@ -1122,7 +1132,7 @@ const GPUGraph = React.memo(
       return {
         type: 'custom',
         key: 'overlay-points',
-        displayIdentity: `labels:${showPointLabels}`,
+        displayIdentity: `labels:${showPointLabels}:${useAdvancedLabels}:${showConcurrencyLabels}`,
         render: (zoomGroup, ctx) => {
           const xScale = ctx.xScale as ContinuousScale;
           const yScale = ctx.yScale as ContinuousScale;
@@ -1225,6 +1235,7 @@ const GPUGraph = React.memo(
       overlayRunOf,
       overlayData,
       showPointLabels,
+      pointLabelsVisible,
       useAdvancedLabels,
       showConcurrencyLabels,
       xLabel,
@@ -1271,7 +1282,7 @@ const GPUGraph = React.memo(
       }
       const group = ctx.layout.zoomGroup;
       group.selectAll('.point-label').style('fill', 'var(--foreground)');
-      if (showPointLabels) keepPointLabelsInPlot(group);
+      if (pointLabelsVisible) keepPointLabelsInPlot(group);
       group
         .selectAll('.dot-group, .unofficial-overlay-pt, .roofline-path')
         .style('transition', 'opacity 150ms ease');
@@ -1328,7 +1339,7 @@ const GPUGraph = React.memo(
         chartId={chartId}
         dataIdentity={dataIdentity}
         metricIdentity={metricIdentity}
-        displayIdentity={`${showPointLabels}:${paletteIdentity}:${selectedPrecisions.join(',')}`}
+        displayIdentity={`${showPointLabels}:${useAdvancedLabels}:${showConcurrencyLabels}:${paletteIdentity}:${selectedPrecisions.join(',')}`}
         data={officialPoints}
         margin={CHART_MARGIN}
         watermark={getChartWatermark()}
@@ -1365,8 +1376,13 @@ const GPUGraph = React.memo(
             data: officialPoints,
             config: {
               getColor,
-              hideLabels: !showPointLabels,
-              getLabelText: (d) => pointLabelText(d, useAdvancedLabels, showConcurrencyLabels),
+              hideLabels: !pointLabelsVisible,
+              // Match ScatterGraph: concurrency (C=) is appended only when the
+              // advanced "# Concurrent Sessions" toggle is on, so compare-mode
+              // points are annotated the same way as the single-run scatter
+              // chart.
+              getLabelText: (d) =>
+                pointLabelText(d, showPointLabels, useAdvancedLabels, showConcurrencyLabels),
               foreground: 'var(--foreground)',
               dataAttrs: {
                 series: (d) => `${d.date}_${d.hwKey}`,
@@ -1395,7 +1411,8 @@ const GPUGraph = React.memo(
                 d3.axisLeft(newYScale).ticks(10).tickFormat(logTickFormat(newYScale)) as any,
               );
             }
-            if (showPointLabels) keepPointLabelsInPlot(ctx.layout.zoomGroup);
+            // Zoom moves points toward the plot edges; keep their labels inside.
+            if (pointLabelsVisible) keepPointLabelsInPlot(ctx.layout.zoomGroup);
           },
         }}
         tooltip={{
@@ -1505,7 +1522,20 @@ const GPUGraph = React.memo(
           attachToLayer: 1,
         }}
         onDisplayUpdate={(ctx: RenderContext) => {
-          if (showPointLabels) keepPointLabelsInPlot(ctx.layout.zoomGroup);
+          ctx.layout.zoomGroup
+            .selectAll<SVGGElement, InferenceData>('.dot-group')
+            .each(function (point) {
+              syncPointLabel(
+                this,
+                pointLabelText(point, showPointLabels, useAdvancedLabels, showConcurrencyLabels),
+                'var(--foreground)',
+                !pointLabelsVisible,
+              );
+            });
+          // Point labels are laid out only while visible (a hidden label has
+          // no measurable box), so re-run the plot-bounds constraint once the
+          // display phase has turned them back on.
+          if (pointLabelsVisible) keepPointLabelsInPlot(ctx.layout.zoomGroup);
         }}
         onRender={(ctx: RenderContext) => {
           lastRenderCtxRef.current = ctx;
@@ -1590,12 +1620,10 @@ const GPUGraph = React.memo(
               {
                 id: 'gpu-parallelism-labels',
                 label: legendT.parallelismLabels,
-                advanced: true,
                 checked: useAdvancedLabels,
                 onCheckedChange: (c) => {
                   setUseAdvancedLabels(c);
                   track('interactivity_advanced_labels_toggled', { enabled: c });
-                  if (c && !showPointLabels) setShowPointLabels(true);
                 },
               },
               {
@@ -1616,7 +1644,16 @@ const GPUGraph = React.memo(
                 onCheckedChange: (c) => {
                   setShowConcurrencyLabels(c);
                   track('interactivity_concurrency_labels_toggled', { enabled: c });
-                  if (c && !showPointLabels) setShowPointLabels(true);
+                },
+              },
+              {
+                id: 'gpu-offloading-label',
+                label: legendT.offloadingLabel,
+                advanced: true,
+                checked: showOffloadingLabel,
+                onCheckedChange: (checked: boolean) => {
+                  setShowOffloadingLabel(checked);
+                  track('interactivity_offloading_label_toggled', { enabled: checked });
                 },
               },
               {

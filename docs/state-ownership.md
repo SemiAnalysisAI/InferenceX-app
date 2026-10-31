@@ -62,6 +62,15 @@ four independently memoized domains: `useInferenceData`, `useInferenceFilters`,
 domains they read. Display changes stay in `useInferenceDisplay`, so a contrast or label
 toggle does not notify filter-only or data-only consumers.
 
+GPU-count (`i_label`), parallelism (`i_advlabel`), and concurrency (`i_conclabel`)
+annotations are independent. Agentic and fixed-sequence charts default to curve
+labels on and point annotations off. Parallelism is available outside Advanced.
+The default-on Offloading Label control in Advanced uses `i_offloadlabel=0` to hide
+the dotted-circle “KV offload ON” footer key without hiding point halos or filtering
+results. It applies to official and unofficial data and GPU-history comparisons.
+These are presentation-only controls: the read-only API and skills data contracts
+keep every benchmark row and offload field unchanged.
+
 `useInferenceFilters` owns inference-only selection state. GPU selections and comparison
 dates do not belong in global filter state because evaluation and reliability do not use
 them.
