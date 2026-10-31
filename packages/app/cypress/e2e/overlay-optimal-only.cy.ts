@@ -12,8 +12,8 @@ const OVERLAY_CONFIGS = [...REAL_CONFIGS, DOMINATED_CONFIG];
 function chartSnapshot(svg: Element) {
   const clone = svg.cloneNode(true) as Element;
   // Trace metadata can finish loading during export without changing chart geometry.
-  for (const mark of clone.querySelectorAll('[data-trace-availability]')) {
-    mark.removeAttribute('data-trace-availability');
+  for (const mark of clone.querySelectorAll<SVGElement>('[data-trace-availability]')) {
+    delete mark.dataset.traceAvailability;
   }
   return clone.outerHTML;
 }
@@ -133,7 +133,9 @@ describe('Overlay points follow Optimal Only on the selected axes', () => {
           const bounds = $svg[0].getBoundingClientRect();
           expect(bounds.width).to.eq(originalWidth);
           expect(bounds.height).to.eq(originalHeight);
-          expect(chartSnapshot($svg[0]), 'export does not mutate live marks or defs').to.eq(originalSvg);
+          expect(chartSnapshot($svg[0]), 'export does not mutate live marks or defs').to.eq(
+            originalSvg,
+          );
         });
     });
     cy.then(() => {
