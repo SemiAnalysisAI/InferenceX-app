@@ -44,10 +44,11 @@ function assertContextBelowPlot(root: Element) {
       legend.getBoundingClientRect().bottom,
     );
   }
+  // Firefox can round touching layout edges to slightly different subpixel coordinates.
   expect(
     root.querySelector('h2')!.getBoundingClientRect().bottom,
     'heading above plot',
-  ).to.be.at.most(plot.getBoundingClientRect().top);
+  ).to.be.at.most(plot.getBoundingClientRect().top + 0.01);
 }
 
 const measuredRows = (runUrl: string | null) =>
