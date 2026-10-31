@@ -8,7 +8,7 @@ describe('Chinese (/zh) pages', () => {
 
     it('renders the Chinese landing content', () => {
       cy.get('[data-testid="intro-section"]').should('contain.text', 'AI 加速器系统基准测试');
-      cy.get('[data-testid="splash-text"]').should('have.text', 'AgentX 来了！！');
+      cy.get('[data-testid="splash-text"]').should('not.exist');
       cy.get('[data-testid="landing-quick-comparisons"]').should('not.exist');
       cy.contains('快速对比').should('not.exist');
     });
