@@ -185,6 +185,15 @@ carried-forward points, whose producer identity must remain intact. Do not move
 a staging link to production and assume that its unpublished run is available
 there. `i_linelabel=1` controls rendered labels only and has no API equivalent.
 
+GPU-count (`i_label`), parallelism (`i_advlabel`), and concurrency (`i_conclabel`)
+annotations are independent presentation controls, not data filters. Both
+Agentic and fixed-sequence charts default to line labels on and point labels off;
+Parallelism Labels is outside Advanced. Advanced's default-on Offloading Label
+uses `i_offloadlabel=0` to hide only the dotted-circle “KV offload ON” footer key.
+It does not hide point halos or remove official, historical, or unofficial
+benchmark rows. These controls have no read-only API parameters; offload fields
+and returned values are unchanged.
+
 ## View selection
 
 For AgentX inference and historical comparisons, read

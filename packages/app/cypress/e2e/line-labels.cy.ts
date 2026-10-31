@@ -9,6 +9,7 @@ describe('Line Labels Toggle', () => {
     });
     cy.get('[data-testid="scatter-graph"]').should('be.visible');
     cy.get('.sidebar-legend').first().should('be.visible');
+    // Line and GPU-count switches remain in the Advanced drawer.
     expandLegendAdvanced();
   });
 
@@ -132,8 +133,8 @@ describe('Line Labels Toggle', () => {
     cy.get('[data-testid="scatter-graph"] svg g.line-label').should('have.length.greaterThan', 0);
   });
 
-  it('legacy URL param i_nolabel=1 keeps point labels hidden on load', () => {
-    cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_nolabel=1', {
+  it('legacy URL param i_nolabel=1 keeps GPU-count labels off on load', () => {
+    cy.visit('/inference?g_model=deepseek-v4-pro&i_nolabel=1', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -143,20 +144,8 @@ describe('Line Labels Toggle', () => {
     cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
   });
 
-  it('legacy URL param i_advlabel=1 auto-enables Labels so advanced labels render', () => {
-    cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_advlabel=1', {
-      onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      },
-    });
-    cy.get('[data-testid="scatter-graph"]').should('be.visible');
-    expandLegendAdvanced();
-    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
-    cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'checked');
-  });
-
-  it('legacy URL combo i_advlabel=1&i_nolabel=1 keeps point labels hidden (i_nolabel wins)', () => {
-    cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_advlabel=1&i_nolabel=1', {
+  it('URL param i_advlabel=1 renders parallelism without enabling GPU-count labels', () => {
+    cy.visit('/inference?g_model=deepseek-v4-pro&i_advlabel=1', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -165,6 +154,24 @@ describe('Line Labels Toggle', () => {
     expandLegendAdvanced();
     cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
     cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
+    cy.get('[data-testid="scatter-graph"] .dot-group .point-label')
+      .filter(':visible')
+      .should('have.length.greaterThan', 0);
+  });
+
+  it('legacy i_nolabel=1 suppresses GPU counts without suppressing explicit parallelism', () => {
+    cy.visit('/inference?g_model=deepseek-v4-pro&i_advlabel=1&i_nolabel=1', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+    cy.get('[data-testid="scatter-graph"]').should('be.visible');
+    expandLegendAdvanced();
+    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
+    cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
+    cy.get('[data-testid="scatter-graph"] .dot-group .point-label')
+      .filter(':visible')
+      .should('have.length.greaterThan', 0);
   });
 
   it('places the precision between the GPU and engine when multiple precisions are selected', () => {

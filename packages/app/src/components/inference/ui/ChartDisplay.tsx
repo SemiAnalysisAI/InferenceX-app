@@ -341,6 +341,7 @@ export default function ChartDisplay({
     selectedXAxisMode,
     tokenRevenuePricing,
     showLineLabels,
+    showOffloadingLabel,
     powerCompare,
     tokenBasis,
   } = useInferenceDisplay();
@@ -1134,7 +1135,8 @@ export default function ChartDisplay({
               ...(footerOverlay?.data ?? []),
               ...(footerOverlay?.clippedData ?? []).map((entry) => entry.point),
             ];
-            const hasOffloadHalo = footerPoints.some((point) => point.offload_mode === 'on');
+            const hasOffloadHalo =
+              showOffloadingLabel && footerPoints.some((point) => point.offload_mode === 'on');
             const hasAtomSeries = footerPoints.some(
               (point) =>
                 point.framework !== undefined &&

@@ -430,6 +430,7 @@ export interface InferenceDisplayContextType {
   logScale: boolean;
   useAdvancedLabels: boolean;
   showConcurrencyLabels: boolean;
+  showOffloadingLabel: boolean;
   showGradientLabels: boolean;
   showLineLabels: boolean;
   showParetoFrontier: boolean;
@@ -477,6 +478,7 @@ export interface InferenceActionsContextType {
   setLogScale: (logScale: boolean) => void;
   setUseAdvancedLabels: (useAdvancedLabels: boolean) => void;
   setShowConcurrencyLabels: (showConcurrencyLabels: boolean) => void;
+  setShowOffloadingLabel: (show: boolean) => void;
   setShowGradientLabels: (showGradientLabels: boolean) => void;
   setShowLineLabels: (showLineLabels: boolean) => void;
   setShowParetoFrontier: (show: boolean) => void;

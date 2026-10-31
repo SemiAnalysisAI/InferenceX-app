@@ -598,6 +598,9 @@ export function InferenceProvider({
     () => getUrlParam('i_gradlabel') === '1',
   );
   const [showLineLabels, setShowLineLabels] = useState(initialLabelState.showLineLabels);
+  const [showOffloadingLabel, setShowOffloadingLabel] = useState(
+    () => getUrlParam('i_offloadlabel') !== '0',
+  );
   const {
     visible: showParetoFrontier,
     playful: paretoFrontierPlayful,
@@ -1624,6 +1627,7 @@ export function InferenceProvider({
       i_legend: isLegendExpanded ? '' : '0',
       i_advlabel: serializedLabelState.i_advlabel,
       i_conclabel: showConcurrencyLabels ? '1' : '',
+      i_offloadlabel: showOffloadingLabel ? '1' : '0',
       i_gradlabel: showGradientLabels ? '1' : '',
       i_frontier: showParetoFrontier ? (paretoFrontierPlayful ? '2' : '1') : '',
       i_linelabel: serializedLabelState.i_linelabel,
@@ -1660,6 +1664,7 @@ export function InferenceProvider({
       isLegendExpanded,
       useAdvancedLabels,
       showConcurrencyLabels,
+      showOffloadingLabel,
       showGradientLabels,
       showParetoFrontier,
       paretoFrontierPlayful,
@@ -1884,6 +1889,7 @@ export function InferenceProvider({
       logScale,
       useAdvancedLabels,
       showConcurrencyLabels,
+      showOffloadingLabel,
       showGradientLabels,
       showParetoFrontier,
       paretoFrontierPlayful,
@@ -1912,6 +1918,7 @@ export function InferenceProvider({
       logScale,
       useAdvancedLabels,
       showConcurrencyLabels,
+      showOffloadingLabel,
       showGradientLabels,
       showParetoFrontier,
       paretoFrontierPlayful,
@@ -1956,6 +1963,7 @@ export function InferenceProvider({
     setShowGradientLabels,
     setShowParetoFrontier,
     setShowLineLabels,
+    setShowOffloadingLabel,
     setSelectedGPUs: setSelectedGPUsAndClear,
     setSelectedDates: setSelectedDatesAndClear,
     setSelectedDatesFromRunExpansion: setSelectedDates,
