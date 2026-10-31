@@ -12,10 +12,29 @@ vi.mock('@jpinsonneau/html-to-image', () => ({
 
 import {
   getExportCaptureDimensions,
+  getPngExportDimensions,
   getExportFontFamily,
   normalizeChartSvgWidthsForExport,
   useChartExport,
 } from './useChartExport';
+
+describe('PNG export aspect ratios', () => {
+  it.each([
+    [1600, 1020, 'auto', 1600, 1020],
+    [1600, 1020, '16:9', 1824, 1026],
+    [2400, 1000, '16:9', 2400, 1350],
+    [1600, 1020, '1:1', 1600, 1600],
+    [600, 1800, '1:1', 1800, 1800],
+  ] as const)('fits %s x %s into %s including the footer', (width, height, ratio, w, h) => {
+    const result = getPngExportDimensions(width, height, ratio);
+    expect(result).toEqual({ width: w, height: h });
+    expect(result.width).toBeGreaterThanOrEqual(width);
+    expect(result.height).toBeGreaterThanOrEqual(height);
+    if (ratio !== 'auto') {
+      expect(result.width / result.height).toBe(ratio === '16:9' ? 16 / 9 : 1);
+    }
+  });
+});
 
 describe('useChartExport failure messages', () => {
   let root: Root;

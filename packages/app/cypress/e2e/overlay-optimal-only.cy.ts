@@ -45,6 +45,71 @@ describe('Overlay points follow Optimal Only on the selected axes', () => {
     });
   });
 
+  it('exports exact PNG ratios with official and overlay points without resizing the live chart', () => {
+    let originalWidth: number;
+    let originalHeight: number;
+    let png = '';
+    cy.get('[data-testid="d3-chart-svg"]')
+      .first()
+      .then(($svg) => {
+        const bounds = $svg[0].getBoundingClientRect();
+        originalWidth = bounds.width;
+        originalHeight = bounds.height;
+      });
+    cy.window().then((win) => {
+      cy.stub(win.HTMLAnchorElement.prototype, 'click').callsFake(
+        function (this: HTMLAnchorElement) {
+          if (this.download.endsWith('.png')) {
+            png = this.href;
+            const exported = win.document.querySelector('#chart-0-export')!;
+            expect(exported.querySelectorAll('.dot-group').length).to.be.greaterThan(0);
+            expect(exported.querySelectorAll('.unofficial-overlay-pt').length).to.be.greaterThan(0);
+          }
+        },
+      );
+    });
+    (
+      [
+        ['16:9', 16 / 9],
+        ['1:1', 1],
+      ] as const
+    ).forEach(([ratio, expected]) => {
+      cy.then(() => {
+        png = '';
+      });
+      cy.get('[data-testid="chart-figure"] [data-testid="export-button"]').first().click();
+      cy.get('[data-testid="png-aspect-ratio"]').select(ratio);
+      cy.get('[data-testid="export-png-button"]').click();
+      cy.wrap(null, { timeout: 30000 })
+        .should(() => {
+          expect(png).to.match(/^data:image\/png;base64,/u);
+        })
+        .then(
+          () =>
+            new Cypress.Promise<void>((resolve, reject) => {
+              const image = new Image();
+              image.addEventListener('load', () => {
+                try {
+                  expect(image.naturalWidth / image.naturalHeight).to.eq(expected);
+                  resolve();
+                } catch (error) {
+                  reject(error);
+                }
+              });
+              image.addEventListener('error', () => reject(new Error('PNG decode failed')));
+              image.src = png;
+            }),
+        );
+      cy.get('[data-testid="d3-chart-svg"]')
+        .first()
+        .should(($svg) => {
+          const bounds = $svg[0].getBoundingClientRect();
+          expect(bounds.width).to.eq(originalWidth);
+          expect(bounds.height).to.eq(originalHeight);
+        });
+    });
+  });
+
   it('shows all overlay points when Optimal Only is turned off', () => {
     cy.get('#scatter-hide-non-optimal').click();
     cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'unchecked');
