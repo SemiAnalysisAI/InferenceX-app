@@ -77,7 +77,7 @@ export async function fetchEntries(
   parseYaml: (text: string) => unknown,
 ): Promise<ChangelogEntry[]> {
   const url = `https://raw.githubusercontent.com/${REPO}/main/collectivex/perf-changelog.yaml`;
-  const response = await fetch(url);
+  const response = await fetch(url, { signal: AbortSignal.timeout(30_000) });
   if (!response.ok) throw new Error(`perf-changelog.yaml returned HTTP ${response.status}`);
   const entries = parseChangelog(parseYaml(await response.text()));
   const missing = prs.filter((pr) => !entries.some((entry) => entry.prNumber === pr));
@@ -103,7 +103,10 @@ export function uncoveredCases(
 async function github(path: string): Promise<unknown> {
   const headers: Record<string, string> = { Accept: 'application/vnd.github+json' };
   if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
-  const response = await fetch(`https://api.github.com/repos/${REPO}${path}`, { headers });
+  const response = await fetch(`https://api.github.com/repos/${REPO}${path}`, {
+    headers,
+    signal: AbortSignal.timeout(30_000),
+  });
   if (!response.ok) throw new Error(`GitHub ${path} returned HTTP ${response.status}`);
   return response.json();
 }

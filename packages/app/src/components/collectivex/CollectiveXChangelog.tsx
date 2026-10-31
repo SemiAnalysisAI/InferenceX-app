@@ -65,7 +65,7 @@ export function CollectiveXChangelog({ version }: { version: CollectiveXVersion 
               {entry.changes.slice(0, SHOWN).map((change) => (
                 <li key={`${change.sku}/${change.case_id}`}>
                   {change.case_id}
-                  {[point(change, 0, t.new), point(change, -1, t.new)]
+                  {[...new Set([point(change, 0, t.new), point(change, -1, t.new)])]
                     .filter(Boolean)
                     .map((text) => ` · ${text}`)}
                 </li>
