@@ -1,10 +1,18 @@
 import { GET as videoRuns } from '@/app/api/video-runs/route';
 import { compareSide, pairCases } from '@/components/video-benchmark/compare';
 import {
+  publishedResultsSide,
+  resultsClipEvidence,
+  resultsClipPoints,
+} from '@/components/video-benchmark/results-clips';
+import {
   VIDEO_HISTORY_MAX_PAGES,
   type VideoHistoryPage,
 } from '@/components/video-benchmark/history';
 import { servingCells } from '@/components/video-benchmark/serving';
+import { namedRunPoints, videoPoints } from '@/components/video-benchmark/points';
+import { parseResultsState, resultProjection } from '@/components/video-benchmark/results';
+import { RESULT_CSV_COLUMNS, resultCsvRows } from '@/components/video-benchmark/results-csv';
 import { storedBundle, type StoredArtifact } from '@/components/video-benchmark/stored';
 import {
   efficiencyValue,
@@ -24,13 +32,14 @@ import {
 import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
 import { readResponse, sourceRequest } from '@/lib/views-api/source';
 import { videoDashboardProjection } from '@/lib/views-api/video-dashboard';
+import { toCsv } from '@/lib/views-api/csv';
 import { type NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 const headers = { 'Cache-Control': 'private, no-store' };
 
-async function dashboardResponse(request: NextRequest, view: 'dashboard' | 'compare') {
+async function dashboardResponse(request: NextRequest, view: 'dashboard' | 'compare' | 'overview') {
   const pages: VideoHistoryPage[] = [];
   let nextPage: number | null = 1;
   for (let page = 1; page <= VIDEO_HISTORY_MAX_PAGES; page++) {
@@ -44,6 +53,71 @@ async function dashboardResponse(request: NextRequest, view: 'dashboard' | 'comp
     pages.push(payload);
     nextPage = payload.nextPage;
     if (nextPage === null) break;
+  }
+  if (view === 'overview') {
+    const state = parseResultsState(request.nextUrl.search);
+    const projection = resultProjection(
+      videoPoints(pages),
+      state,
+      namedRunPoints(pages, state.unofficialRun),
+    );
+    if (request.nextUrl.searchParams.get('format') === 'csv')
+      return new Response(toCsv(resultCsvRows(projection), RESULT_CSV_COLUMNS), {
+        headers: {
+          ...headers,
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': 'attachment; filename="videogenx-results.csv"',
+        },
+      });
+    const selected = resultsClipPoints([...projection.cells, ...projection.overlayCells], {
+      tier: state.costTier,
+    });
+    const stored = new Map<string, Promise<StoredArtifact | null>>();
+    const reads = await Promise.allSettled(
+      selected.map(async (point) => {
+        const key = JSON.stringify([point.runId, point.artifactId]);
+        if (!stored.has(key))
+          stored.set(
+            key,
+            (async () => {
+              const response = await videoRuns(
+                sourceRequest(request, '/api/video-runs', {
+                  run: point.runId,
+                  artifact: String(point.artifactId),
+                  format: 'published',
+                }),
+              );
+              return response.status === 204 ? null : readResponse<StoredArtifact>(response);
+            })(),
+          );
+        const artifact = await stored.get(key)!;
+        return artifact === null ? null : publishedResultsSide(artifact, point);
+      }),
+    );
+    const sides = reads.flatMap((read) =>
+      read.status === 'fulfilled' && read.value ? [read.value] : [],
+    );
+    const clipQuality = {
+      status:
+        sides.length === selected.length ? 'ready' : sides.length > 0 ? 'partial' : 'unavailable',
+      groups: resultsClipEvidence(sides),
+    };
+    return NextResponse.json(
+      {
+        view: 'video',
+        apiVersion: 'v1',
+        ...projection,
+        clipQuality,
+        params: { ...projection.state, view },
+        coverage: {
+          pagesRead: pages.length,
+          maxPages: VIDEO_HISTORY_MAX_PAGES,
+          nextPage,
+          truncated: nextPage !== null,
+        },
+      },
+      { headers },
+    );
   }
   const projection = videoDashboardProjection(pages, request.nextUrl.search);
   const { baseline, candidate } = projection.comparison;
@@ -141,9 +215,33 @@ export function GET(request: NextRequest) {
     const mode = parseEnumParam(
       s.get('view'),
       'view',
-      ['dashboard', 'compare', 'discovery', 'results', 'tradeoff'],
+      ['dashboard', 'compare', 'overview', 'discovery', 'results', 'tradeoff'],
       s.has('run') || s.has('artifact') ? 'results' : 'dashboard',
     );
+    if (mode === 'overview') {
+      parseEnumParam(s.get('format'), 'format', ['json', 'csv'], 'json');
+      if (s.has('unofficialrun') && s.has('unofficialruns'))
+        throw new ViewsApiParamError('unofficialruns', 'Use one overlay parameter alias, not both');
+      for (const key of ['unofficialrun', 'unofficialruns'])
+        if (s.has(key)) parseRunIdParam(s.get(key), key);
+      for (const key of s.keys())
+        if (
+          key !== 'view' &&
+          key !== 'format' &&
+          key !== 'unofficialrun' &&
+          key !== 'unofficialruns' &&
+          !key.startsWith('r_')
+        )
+          throw new ViewsApiParamError(
+            key,
+            'Results overview accepts r_ selectors and one unofficialrun/unofficialruns ID',
+          );
+      return dashboardResponse(request, mode);
+    }
+    if (s.has('format')) throw new ViewsApiParamError('format', 'CSV requires view=overview');
+    for (const key of s.keys())
+      if (key.startsWith('r_') || key === 'unofficialrun' || key === 'unofficialruns')
+        throw new ViewsApiParamError(key, 'Results selectors require view=overview');
     if (mode === 'dashboard' || mode === 'compare') {
       for (const key of s.keys())
         if (key !== 'view' && !key.startsWith('v_'))

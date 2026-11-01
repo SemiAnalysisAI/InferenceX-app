@@ -14,11 +14,13 @@ export default function VideoSelect({
   value,
   onValueChange,
   options,
+  testId,
 }: {
   label: string;
   value: string;
   onValueChange: (value: string) => void;
   options: { value: string; label: string }[];
+  testId?: string;
 }) {
   const id = useId();
   return (
@@ -29,8 +31,9 @@ export default function VideoSelect({
       <Select value={value} onValueChange={onValueChange} disabled={options.length === 0}>
         <SelectTrigger
           id={id}
+          data-testid={testId}
           aria-label={label}
-          className="w-full focus-visible:ring-2 focus-visible:ring-ring"
+          className="w-full min-w-0 focus-visible:ring-2 focus-visible:ring-ring *:data-[slot=select-value]:block *:data-[slot=select-value]:min-w-0 *:data-[slot=select-value]:truncate"
         >
           <SelectValue placeholder="—" />
         </SelectTrigger>

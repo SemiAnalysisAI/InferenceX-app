@@ -32,7 +32,75 @@ Native matrix artifacts use `h3-results-<run>-<attempt>-<recipe-fingerprint>` wh
 
 Only in development, `E2E_FIXTURES=1` serves `cypress/fixtures/api/video-history.json` through the existing fixture loader and checksum manifest. The fixture is a metadata-only projection of retained H100/H200/B200 observations and two fidelity artifacts; it contains no infrastructure paths or video bytes. Its synthetic `approved: true` flags exercise the default chart layout and are not real publication receipts. Unknown publication timestamps remain null. The response header `X-VideoGenX-Replay: 1` causes a visible replay notice. These are historical retained observations, not newly measured results or a new publication.
 
+For a local browser replay of original artifacts, set `E2E_FIXTURES=1` and
+`E2E_VIDEO_REPLAY_MANIFEST=/absolute/replay-input.json` on the development server.
+The JSON manifest contains absolute `zipPath` and `metadataPath` fields, plus
+`expectedPlanSha256`, or an `artifacts` array of objects with those same fields.
+The server independently verifies each original ZIP against its metadata and
+plan hash, replaces History with their unapproved entries, and serves each exact
+run/artifact pair and its MP4 byte ranges through `/api/video-runs`. Empty arrays,
+duplicate run/artifact pairs, or any invalid member reject the entire collection.
+The original ZIPs are read-only. Unknown identities and paths cannot use the production fallback while
+this adapter is active. `format=replay-asset` is unavailable outside the gate.
+This mode preserves the original `releaseQualified=false` verdict and never
+creates an approval receipt. The ordinary fixture remains the default when no
+explicit manifest is set. Restart the development server after changing the
+manifest. The existing `unofficialrun` selector accepts one run ID; artifacts
+from that run compare only when their canonical workloads match.
+
+### Original CI ZIP reader check
+
+The replay manifest may also contain
+`quality: { path: "/absolute/quality.json", sha256: "<digest>" }`. This independent
+v1 attachment names the scorer revision/hash and original reference receipts, then
+binds each comparison to the candidate run/artifact/source/manifest/cell/slot/case/
+prompt/seed/media SHA. Each reference descriptor contains `receipt_path`,
+`receipt_sha256` and the adjacent SHA256SUMS file's `checksums_sha256`. The reader
+verifies receipt and referenced MP4 bytes before exposing scores or reference URLs.
+Private paths and free-text decoder errors never enter the JSON response; public
+checks contain allowlisted names/status and only numeric or boolean observations.
+Raw diagnostics remain in the sealed local attachment.
+
+Original ZIPs stay unchanged. Duplicate pairs, substituted identities, unsafe paths
+or invalid seals fail the attachment closed. Reference MP4s use the existing replay
+byte-range path with a receipt-scoped source identity and exact candidate
+run/artifact membership; unbound cases are unavailable. This route remains
+development-only. PSNR comes from complete decoded RGB24 comparison, not the browser
+difference canvas. Exact equality and incompatible media have distinct statuses
+with null PSNR. Original plan hashes, unjudged quality and releaseQualified=false
+remain visible.
+
+中文：回放配置可额外提供 `quality: { path, sha256 }`，读取独立封存的 v1 配对附件。读取前校验原始参考回执、相邻 SHA256SUMS 及所引用 MP4 字节，并精确绑定候选运行、产物、来源、manifest、测量单元、slot、用例、prompt、seed 和媒体 SHA。本机路径和解码器自由文本错误不进入 API；公开检查仅保留允许的名称、状态及数值或布尔观察值，完整诊断留在本地封存附件。重复配对、身份替换、不安全路径或封印失效均拒绝读取。参考视频按参考回执和候选 run/artifact 隔离，只提供该产物实际绑定的用例，不授予发布批准，也不修改原始 ZIP。
+
+From `packages/app`, replay an unmodified native H3 CI ZIP with its original GitHub
+artifact-object JSON and the expected sealed plan SHA256:
+
+```sh
+bun --no-env-file scripts/replay-video-artifact.ts original.zip github-artifact.json EXPECTED_PLAN_SHA256
+```
+
+The command reads local files only and disables `fetch`. It requires the original
+archive size, SHA256 digest, artifact ID/name and workflow run/head identity, then
+uses the same archive, bundle, serving, History and Results readers as the app.
+It prints JSON containing each cell's plan hash, frame/case/distinct-prompt counts,
+completion and power verdicts, both GPU counts, source errors and Results diagnostics
+for every qualifying workload. Source errors, missing cells and mismatched expected
+plan hashes produce a nonzero exit. Recorded benchmark failures remain in the report.
+
+Local replay has no approval receipt: `approved` is false, `publishedAt` is null and
+`officialPoints` is zero. Named diagnostics still obey the Results sample and workload
+requirements. The command neither publishes metadata nor creates media URLs, and it
+does not modify fixtures. Reader acceptance of an older plan does not qualify a new
+workload or establish browser/API/playback, CI E2E, or release acceptance.
+
 ## 中文说明
+
+从 `packages/app` 使用上述 `bun --no-env-file` 命令，可离线读取未改动的原始 CI ZIP、
+GitHub 产物元数据和预期 plan SHA256。读取器校验原始字节摘要与执行身份，逐 cell 输出
+实际工作负载、完成/失败计数、功率结论和参与/已分配 GPU 数；来源错误、空 cells 或 plan
+哈希不符时以非零状态退出。此操作不写存储、不更新 fixture、不生成媒体地址，也不授予
+发布批准；`officialPoints` 应为 0。旧工作负载读取成功不能代替新 workload 的 CI E2E、
+页面/API/播放或发布验收。
 
 `publish-video-results` repository dispatch 明确传入 `source_run_id` 与 `merge_run_id`；手动 `workflow_dispatch` 必须指定来源 `run_id`，不再定时扫描全部运行。任务只列举指定运行的 GitHub 产物及其后续分页，对每个产物以现有失效密钥调用受 Bearer 保护的 `POST /api/video-runs`。已存索引仍会重试，以补写可能缺失的批准回执；某个产物失败后继续尝试后续产物，但任务最终报告失败。此授权只批准指定来源的发布，不代表 benchmark 通过质量验收。
 
@@ -47,3 +115,14 @@ serving 矩阵有两种来源，`serving.ts` 按 manifest 的 `evidence_kind` �
 当前展示观测值，未选择匹配基线，也不计算 before/after。延迟、吞吐量使用提交到下载完成的窗口；板卡能耗使用记录的生成窗口。保真度、阈值校准、发布验收单独展示。筛选仅作用于已加载的页面，可继续加载较早结果。
 
 仅在开发环境中，`E2E_FIXTURES=1` 使用保留结果的脱敏元数据回放，遵循现有 fixture 校验和清单，并显示回放提示。fixture 中合成的 `approved: true` 仅验证图表布局，不是实际批准回执。未知发布时间保持为空；这不是新测量或新发布。
+
+原始产物的本地浏览器回放需在开发服务器设置 `E2E_FIXTURES=1` 和指向绝对路径的
+`E2E_VIDEO_REPLAY_MANIFEST`。该 JSON 文件填写原始 ZIP、GitHub 元数据的绝对路径
+`zipPath`、`metadataPath` 及 `expectedPlanSha256`；也可用 `artifacts` 数组列出多组相同字段。
+服务器逐一核对每份原始 ZIP 的元数据和 plan hash，以各自的未批准记录替换 History，
+并按准确的 run/artifact 身份通过现有 `/api/video-runs` 读取原始 MP4 字节。
+数组为空、run/artifact 身份重复或任一成员校验失败时，整组回放均不可用。输入 ZIP 不会被修改；
+未知身份或路径不会回退到线上读取，`format=replay-asset` 在此模式外返回 404。
+原有 `releaseQualified=false` 结论保持不变，也不会生成批准回执；不配置显式 manifest 时仍使用普通 fixture。
+修改 manifest 后需重启开发服务器。现有 `unofficialrun` 筛选仅接受一个 run ID；该运行内的产物
+只有在完整工作负载身份一致时才会并排比较。

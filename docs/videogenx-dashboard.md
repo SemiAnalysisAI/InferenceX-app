@@ -1,57 +1,196 @@
-# VideoGenX dashboard (/video)
+# VideoGenX results (/video)
 
-Why `/video` leads with a cross-hardware chart instead of a CI-run browser, and the rules its metrics obey. Component code lives in `packages/app/src/components/video-benchmark/` (`VideoDashboard.tsx` is the root).
+`VideoDashboard` renders the same shared results view at `/video` and `/zh/video`.
+It preserves the existing feature gate, route registry, published History reader,
+and sealed media loader. All visible copy lives in component-local `STRINGS`.
 
-## Data path
+## Selection and evidence
 
-Stored blob indexes and explicit publication receipts → `GET /api/video-runs?format=history` (the per-cell projection described in [Video performance history](./video-history.md), with additive nullable fields for GPU counts, wall time, clip shape, board power, enforced limit and server layout) → `points.ts` (`videoPoints`, `latestVideoCells`) → `metrics.ts` (`metricValue`). History keeps unapproved stored sources; `videoPoints` admits only entries whose receipt matches the original source and checkout. The browser reads at most five history pages and never parses an artifact bundle for the chart. The previous CI-run viewer has been removed: `history-*` links open Performance history; Compare loads published media on demand. The public `/api/v1/views/video` dashboard projection reuses these selectors and formulas; explicit legacy views remain available through the API.
+Stored Blob indexes and matching publication approvals →
+`GET /api/video-runs?format=history` → `videoPoints` →
+`resultProjection`. Reads stop after five pages; the view API reports pagination
+coverage. History retains unapproved stored sources; `videoPoints` admits only
+entries with an approval receipt matching their original source and checkout.
+Approval is separate from full-sweep or release qualification. The browser never
+publishes a run or generates a clip. The read-only
+`GET /api/v1/views/video?view=overview` returns the same selectors and calculations.
+Legacy dashboard, compare, results, tradeoff and discovery API modes remain.
 
-## Axes and defaults
+Comparisons require one complete canonical workload identity, C1, exactly 20
+scheduled clips and at least ten valid samples on every hardware. Model revision,
+all generation settings, prompts, seeds and measurement semantics remain in the
+identity. The default selects the cohort covering the most target hardware.
+Smoke, incomplete and unmatched evidence stays in Performance history. The four
+default comparison targets are GB200, B200, MI355X and H200; missing hardware remains
+visible without invented results. H100 joins the roster when qualified approved
+evidence or the exact named diagnostic run is available, with the same workload
+and sample requirements. Its label and costs use the hardware registry. These are
+comparison targets, not claims that all models run on all hardware.
 
-`video-url-state.ts` owns the `v_*` URL params (`v_x`, `v_y`, `v_tier`, `v_view`, `v_optimal`, `v_api`, `v_hidden`); defaults are omitted from the URL and every other param is left alone.
+Latest observations are selected separately by workload, hardware, deployment
+and engine. Engine identity comes from recorded configuration. Missing metadata
+is not filled from a runtime SHA or hardware name. The GPU-count selector narrows
+cards and tables; latency-versus-GPU-count and the deployment frontier retain the
+other measured GPU counts for the same workload. Workload-mix rows preserve each
+cohort separately rather than averaging across resolutions, durations or modes.
 
-- **X = P90 time to video (s)**, lower is better; `p50Latency` is the alternative.
-- **Y = videos per $1 TCO** at the _Owning at Large Hyperscaler Volume_ tier; TCO cost per video, videos per GPU-hour and GPU-board energy per video (kJ) are the alternatives. Cost per GPU-hour comes from `HW_REGISTRY` (`costh`/`costr`), the same SemiAnalysis TCO source `/inference` uses; the badge row and source link sit above the chart.
-- **Per participating GPU**: every per-GPU metric divides by the boards that generated the clip (4 per video with TP2 × Ulysses 2), never by the boards a job reserved. The retained H100 and B200 jobs reserved eight and used four, so a note under the chart header names them ("B200 (4 of 8), H100 (4 of 8) … the idle boards are not counted") and their KPI card headers read "4 of 8 GPUs". Idle boards are stated, not billed; there is no GPU-basis toggle.
-- **Both axes start at zero** (`chart-domain.ts`), so per-dollar and per-video readings compare by length, not by offset.
-- **Chrome mirrors `/inference`**: a `Card` with `DashboardSectionHeader` (title, description, Share) sits above the two config panels; the cost tier is picked inline in the chart caption (`video-cost-tier`, a `SearchableSelect` with an `export-only` text twin) like the inference caption's Cost Tier selector; the Compare and performance evidence sections fold behind a chevron (`CollapsibleSection`), and Compare opens on load for `v_base`/`v_cand`/`v_case` deep links. The video route declares `shareParamScopes: ['v_']`, and `collectTabParams` reads that scope live from the address bar, so Share links carry the current `v_` params. Hidden hardware is canonicalized in `v_hidden`; it filters the chart, table and CSV while KPI cards, Compare and evidence retain the selected workload.
+`r_*` URL parameters record filters, hidden hardware, deadline, cost tier, entered
+mode prices and utilization. `r_workload` uses a compact source point identifier;
+canonical workload JSON stays inside the projection. Share includes the `r_`
+registry scope. `?unofficialrun=<id>` reads only that stored run through
+`namedRunPoints`, retaining its actual approval status. While selected, that run
+appears only in `overlayCells`, even if approved; it leaves official cells,
+deployment cells and workload mix. Clearing the selection cannot promote an
+unapproved source. Dismissal clears a workload selection absent from the approved
+choices and preserves valid approved selections. All comparison filters and sample requirements still apply.
+Unknown or unstored runs remain unavailable; the URL cannot trigger publication,
+storage writes or GPU work.
 
-## Deployments, not concurrency, make the curve
+Approved evidence determines the preferred cohort. A workload available only in
+the named run requires explicit selection, or becomes the fallback when no approved
+cohort matches. The browser retains one bounded History read and rederives both
+lists when the URL changes. Legacy dashboard/compare APIs remain approved-only.
+The overview API returns JSON by default. `format=csv` downloads the same selected official and named cells with exact source/workload/run/artifact identities, approval state, units and both GPU cost bases. Missing values remain empty cells; CSV is private and no-store.
 
-`/inference` sweeps batch size to trace each hardware's latency-vs-throughput frontier. The retained fixture uses a batch-one, single-replica H3 server: its C1/C2/C4 cells show throughput within ±1.5 % while latency grows with C. This describes that recorded configuration; it is not a claim about every diffusion server or future runtime. Joining those cells would draw a flat "curve" that measures the queue, not the hardware, so the chart never does.
+The Workload menu shows compact summaries derived from recorded model and generation
+metadata. Its existing help control shows the full source label, exact source
+point ID. Matching summaries get distinct source-ID suffixes. This is presentation
+only; query IDs and API projection values remain unchanged.
 
-The knob that does trade latency for efficiency is the **deployment**: how many GPU boards serve one request and how they split the model (`tp_size` × `ulysses_degree`). `deployment.ts` keys cells by it (`deploymentKey`), classifies `concurrency > replicas` as queueing (`isQueueing`; bundles that predate `execution.deployment.replica_count` ran one endpoint, so null reads as one), and picks each hardware's most efficient deployment as its representative (`leadCell`, used by the KPI cards, the Compare panel and the legend).
+The header keeps the five selectors in one shared control panel. Its help explains
+the 20-clip cohort and fixture replay; the replay label appears only when active.
+Hardware checkboxes sit above a full-width clip comparison, with four default slots
+and an H100 slot when its evidence is available. Item help
+holds longer metric notes while chart encodings and modeled TCO remain visible.
+Validity keeps the workload identity visible and discloses full hashes on request.
+The uncalibrated rating schema is also disclosed on request.
 
-`plot.ts` (`plotVideoPoints`) then builds the chart from the non-queued cells only: a queued cell never reaches the chart (or the table and CSV) and lives in the evidence panel instead. Per hardware it takes the Pareto frontier over the remaining deployment cells (`frontier.ts` flips lower-is-better axes and reuses `paretoFrontUpperLeft` from the calculator); a solid line appears automatically once a hardware has two or more frontier deployments, and dominated deployments render faded. The one switch is **Optimal Only** in the legend (`v_optimal`, on by default, mirroring the inference tab's `i_optimal`): on, the chart, the table and the CSV (`listedVideoCells`) carry only the frontier deployments; off, dominated deployments join, faded on the chart. There is no "show queued requests" switch and no cross-hardware frontier.
+## Nine groups and available measurements
 
-The retained dashboard fixture has exactly one measured deployment per measured hardware (4 GPUs per video, TP2 × Ulysses 2), so the chart is an honest three-point scatter and the caption says a per-hardware curve needs the GPUs-per-video sweep. That sweep (design plan P6) is backend work in InferenceX `experimental/video-generation` — the serving matrix currently varies only concurrency — and needs GPU authorisation; the frontend needs no change when its cells arrive, because they differ in `deploymentKey` and therefore add points rather than replace them.
+| Group                    | Available when retained                                                                                   | Empty until evidence exists                                    |
+| ------------------------ | --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Validity                 | Workload/manifest hashes, sealed validation, completion counts, power validity; links to per-clip PSNR    | Unsealed or incompatible pairs; audio summaries                |
+| Latency                  | Serial/harness latency, client delivery P50/P90, P95 from >=20 aligned valid timings, deadline attainment | Missing client timestamps; text/denoise/VAE/encode stages      |
+| Throughput               | Valid clips/wall second, generated video seconds/wall second, deadline goodput                            | Unsupported workload/mode distributions                        |
+| Resources & Energy       | Valid participating-board power samples, mean/observed peak, J/clip, J/frame                              | Missing samples, GPU/host memory without their own measurement |
+| Cost                     | Modelled TCO from registry rates and measured output; both GPU counts                                     | Missing allocation count or rate                               |
+| Quality                  | Sealed per-clip PSNR; seven named human-rating dimensions without scores                                  | SSIM, VBench/CLIP/VLM and calibrated human scores              |
+| Stability                | Recorded failure categories, with unknown failures preserved                                              | Sustained-load behavior                                        |
+| Startup                  | Recorded warmup request duration, explicitly separate from compile                                        | Load, isolated compile, first request and switch time          |
+| Parallelism & Deployment | Per-hardware frontier of measured deployments                                                             | Best topology without the GPU-count sweep                      |
 
-## Sections below the chart
+No illustrative measurement, video, coefficient, timestamp, phase band or
+hardware-support matrix is shipped. Hatched areas are actual empty states.
+A technical validity check does not imply quality acceptance or release
+qualification. A median from a native harness is not relabeled client latency.
+Power invalidation is propagated; power and energy stay null when it fails.
+GPU-board energy excludes host, chassis and facility energy.
 
-- **API price reference** (`api-reference.ts`, `VideoApiReference.tsx`): a dated, editable USD per video-second list price (`v_api`, default `H3_API_REFERENCE`) feeds exactly one derived number, the API list price per video (`apiPricePerVideo` = price × clip seconds). It is shown beside the TCO cost per video on the KPI cards and as a table and CSV column; the chart never plots it, and no revenue, profit or price multiple is derived from it. The default records the MiniMax platform pay-as-you-go page captured on 2026-09-24 (the source has no effective date); it is a dated list-price input, not a current price guarantee; a null or non-positive price nulls the list price, and `parseApiPrice` falls back to the reference rather than pricing at 0.
-- **Compare** (`compare.ts`, `compare-url-state.ts`, `VideoCompare.tsx`): arena-style baseline vs. candidate, video first — the same prompt + seed clips from both CI runs play side by side with shared play/pause/restart and previous/next case arrows (no blind mode, no case dropdown); the deltas below are fixed to time to video (P50), TCO cost per video and energy per video (`COMPARE_METRICS`, registry polarity), with the cost tier stated in a footnote. One selectable cell per hardware (its lead deployment), defaulting to the slowest hardware as baseline and the fastest as candidate; `v_base`, `v_cand`, `v_case` in the URL. The two stored artifacts (several MB each) load once the panel scrolls into view; an HTTP 204 side reads as "clips not published", never as an error.
-- **Performance evidence** (`evidence.ts`, `VideoEvidence.tsx`): recorded board-power ratios, concurrency throughput/latency ratios and observed speed-ups beside memory-bandwidth/FLOPS specifications. Cross-hardware rows require a known canonical workload, a complete matching deployment layout and C1 (`sharedLayoutCells`); unmatched hardware is omitted, never replaced with its lead cell. Concurrency ratios require a matching workload, layout and replica count. The copy reports numbers without inferring power saturation, a throughput plateau or a compute/memory bottleneck. These mechanisms need separate experiments and telemetry.
+## Synchronized clips
 
-## Rules
+`VideoResultsClips` reads `format=published` once per selected artifact. It validates
+source identity and matches prompt, seed, repetition and recorded generation
+configuration before showing clips together. Missing media does not erase numeric
+evidence. The shared transport seeks and plays real video elements, stops at the
+shared playable duration, and pauses when the selection or page visibility changes.
 
-- **Unavailable hardware** stays visible. `VIDEO_HARDWARE_ROSTER` in `hardware.ts` lists the campaign targets; MI355X has no valid run and renders as a muted legend row, a "Not measured" KPI card with the failed-run link, and no table row. A missing point is never a zero.
-- **Nulls**: every formula returns `null` when an input is missing or invalid — power phase invalid, fewer than ten samples for P90, unknown hardware key, missing GPU count. `formatMetric` prints `—`.
-- **Newest observation wins**: `latestVideoCells` keeps the first (newest publication) observation per hardware × deployment × concurrency, so a re-run replaces, never duplicates, a point, while a new server layout adds one.
-- **Explicit publication, one workload, real samples**: only receipt-backed entries become default dashboard points. The additive `workloadKey` preserves the full canonical workload identity from the source, including prompts and seeds; the shortened workload label is display text only. Missing identity stays null and is isolated by original source manifest. Runtime revision remains a disclosed comparison variable. `dashboardCells` keeps only the workload measured on the most hardware and drops cells with fewer than ten valid clips (the P90 floor), so a smoke run of a shorter plan never becomes a point, a KPI lead or a Compare side; the Performance history list still shows it, and the Workload fact counts the hidden workloads. Publication approval does not assert benchmark qualification.
-- **Strings**: component-local `STRINGS = { en, zh }` via `useLocale()`; SKUs, units and identifiers stay English.
-- **Native srt-slurm bundles**: the `h3-results-<run>-<attempt>` artifacts of InferenceX #2916 (`evidence_kind: srt_slurm_h3_service`) feed the same projection; see [Video performance history](./video-history.md) for the contract. They record no GPU model, so a point joins the per-SKU chart, cards and Compare only when `ci.site.gpu_model` or the CI runner's name identifies the hardware; otherwise it stays in the Performance history list with an empty hardware. Invalid or missing power renders as not measured.
-- **Fixture**: `cypress/fixtures/api/video-history.json` is rebuilt from retained `StoredArtifact` exports with `bun run fixtures:video-history <dir>` (`scripts/build-video-history-fixture.ts`); it is metadata only and registered in `_manifest.json`. Its synthetic approval flags test the chart layout under the visible replay notice; they are not production publication receipts. Exports for runs the fixture does not list yet are appended as new entries with an unknown publication time. A downloaded `h3-results-<run>-<attempt>` bundle becomes such an export with `bun scripts/export-stored-artifact.ts <dir> <runId> <artifactId> <name> <bytes> <out.json>`; the retained native H200 run 39002901777 entered the fixture this way.
+Difference displays an amplified absolute RGB difference at matched playback time
+against an explicitly bound official Diffusers reference MP4. Hardware and step
+count alone never establish a reference. It fails closed for absent references,
+unequal frame geometry or blocked cross-origin pixel access. This preview is not a
+sealed PSNR result. Distilled and full-step workloads are not silently equated.
+Per-tile wall time is the selected request's duration; energy is the cell's mean
+J/valid clip and is labeled accordingly.
+The default tiles show hardware, recorded GPU count, media, wall time, per-clip
+PSNR when a sealed pair exists, mean energy and both modeled TCO bases. The reference
+is a separate synchronized video with its recorded update/sigma-point counts and
+no serving performance metrics. Prompt, seed, take, run, artifact,
+runtime and media source remain in the keyboard-accessible Prompt & sources
+disclosure. The Difference label identifies the amplified browser preview; its
+help carries the full qualification.
+
+## Per-clip quality
+
+Per-clip quality is independent of the original candidate ZIP. The attachment binds
+run, artifact, source, manifest, cell, slot, case, prompt, seed, media path and SHA256.
+Model, generation, fairness and the selected plan case must match. Both original
+full-plan hashes are retained when an unrelated case changed. Only completed cases
+retained in the original reference receipt are eligible.
+
+`evaluator.media.compare_media` compares every decoded RGB24 pixel/frame using
+full-stream MSE and peak=1 after division by 255, without resizing, trimming or
+best-offset alignment. Finite PSNR is shown in dB; exact decoded equality is labelled
+separately with null PSNR. Missing and incompatible pairs stay empty. These are
+descriptive cross-engine measurements, with no quality threshold or release claim.
+The reference uses its recorded Diffusers revision and schedule; the current protocol
+has 49 updates / 50 sigma points.
+
+The UI and overview JSON share the same exact per-clip association. JSON returns
+all groups under `clipQuality`, so case navigation changes presentation only.
+Validity and Quality link to these per-clip scores. Cell-granularity CSV has no
+per-clip PSNR aggregate. Official and exact named channels retain their approval rules.
+
+中文：质量附件独立于原始候选 ZIP，精确绑定运行、产物、来源、manifest、测量单元、slot、用例、prompt、seed、媒体路径与 SHA256。模型、生成配置、公平性配置和所选计划用例必须一致；其他用例发生变化时仍保留双方原始完整计划哈希。只使用参考回执中实际完成并保留的用例。PSNR 对比全部解码 RGB24 像素和帧；完全一致单独标注，缺失或不兼容配对保持为空。该数值不代表语义质量或发布合格。JSON 返回全部用例组，CSV 不虚构逐条 PSNR 汇总值，发布批准规则不变。
+
+## Cost and profit
+
+Both bases are always visible: participating boards and allocated boards. An
+allocation must be evidenced; participating count is never substituted for it.
+TCO per video = recorded GPU count × registry $/GPU-hour / measured clips/hour.
+Cost per video-second divides by the recorded duration. Owning and rental tiers
+reuse `hardware.ts` and the shared hardware registry. These are modelled costs,
+not measurements or API bills.
+
+The estimator begins with empty price inputs. Each T2V/I2V/R2V price is a user
+scenario for the selected resolution and duration. Unknown mode yields no assumed
+mode price. Revenue/hour = valid video-seconds/hour × utilization × entered price;
+profit/hour subtracts the entire hourly GPU TCO for that basis. Both are normalized
+by the corresponding GPU count for the plotted profit/GPU-hour. Utilization
+reduces revenue, not the hours billed. This does not establish sustained capacity.
+
+## Control coverage
+
+| Control                                                                     | Read-only API coverage                                                                 |
+| --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Model, workload, resolution, duration, mode, steps, GPU count, engine, date | `r_*` selection fields                                                                 |
+| Hardware visibility, named stored run                                       | `r_hidden`, `unofficialrun`, separate overlay cells preserving approval                |
+| Deadline, cost tier, mode prices, utilization                               | Same pure calculations in `resultProjection`                                           |
+| Clip/frame energy                                                           | Both normalized values returned; toggle is presentation only                           |
+| Power trace hardware                                                        | All selected cell traces returned; selector is presentation only                       |
+| Clip transport, Difference, case navigation, History expand, theme, Share   | Presentation only; published media metadata uses the existing read-only media contract |
+| Cohort/item help, prompt/source, hashes and rating disclosures, media link  | Presentation only; existing history and published media reads provide their data       |
+
+Admin/publication handlers, private artifacts and credentials are excluded.
+Video results controls and the new disclosures/media link record `video_results_*`
+events. Shared `InfoHelp` retains its `selector_option_help_opened` event. Tests cover projection/API parity, both GPU bases,
+nulls and invalid power, sample floors, overlay filtering, clip alignment, real
+browser playback and difference failure, bilingual layout and 390px overflow.
 
 ## 中文说明
 
-`/video` 以跨硬件图表为首屏：数据来自已发布 blob 索引的 per-cell 投影，浏览器不再为图表解析产物包；已发布结果的“性能历史”列表收进可展开区块，`history-*` 深链接会自动展开；原有的按运行查看、trade-off 图表与 CI 运行浏览已移除。仪表板只取硬件覆盖最广的那个工作负载，并剔除有效视频不足 10 条的 cell（与 P90 门槛一致），因此较短 plan 的 smoke 运行不会成为图上的点、KPI 领先部署或 Compare 的一方，但仍会出现在性能历史列表中；工作负载一栏会注明隐藏的其他工作负载数量。`video-url-state.ts` 管理 `v_x`、`v_y`、`v_tier`、`v_view`、`v_optimal`、`v_api`、`v_hidden` 等 URL 参数，默认值不写入 URL。页面外观与 `/inference` 对齐：标题、说明和分享按钮放在同一张 Card 的 DashboardSectionHeader 中，两组配置面板位于其下；成本档位改为在图表说明行内选择；Compare 与性能测量证据两个区块默认折叠，携带 `v_base`/`v_cand`/`v_case` 的深链接会自动展开 Compare；分享按钮会带上当前的 `v_` 参数。`v_hidden` 保存隐藏的硬件，作用于图表、表格和 CSV；KPI 卡、Compare 和证据面板仍展示所选工作负载。X 轴可选 P90（默认）或 P50 出片时间；Y 轴可选每 1 美元 TCO 视频数（默认，Hyperscaler 自有设备档位，单价与 `/inference` 同源）、每条视频 TCO 成本、每 GPU 小时视频数和每条视频 GPU 板卡能耗（kJ）。所有按 GPU 计的指标都以参与计算的 GPU 为分母（每条视频 4 张，TP2 × Ulysses 2），而不是任务预留的板卡数；保留数据中 H100 与 B200 的运行预留了 8 张却只用 4 张，图表标题下方的说明会点名这些硬件，对应 KPI 卡标题显示“4 / 8 张 GPU”。空闲板卡只作说明、不计成本，没有 GPU 口径切换。两条坐标轴都从 0 起，便于按长度比较。
+`/video` 与 `/zh/video` 共用结果页，沿用现有路由、功能开关、History 和封存媒体读取器。
+比较要求固定的 20 条视频 C1 工作负载，每种硬件至少 10 个有效样本；完整身份包含模型版本、
+生成参数、prompt、seed 和测量语义。较短 smoke、未完成及未匹配结果留在性能历史，不混入比较。
+历史记录保留尚无发布批准的存储结果；默认图表仅接纳发布回执与原始来源及 checkout 匹配的记录。
+发布批准与 full-sweep 或发布资格验收分开。界面按有效性、延迟、吞吐量、资源与能耗、成本、质量、稳定性、启动、并行与部署的顺序展示。
+待采集指标是真正的斜线空态，不使用示意数值。功率无效时不展示功率或能耗结论。
+页首用一个共享控件区域展示五项筛选条件；硬件开关位于视频对比上方。默认保留四个硬件窗口；
+符合相同工作负载及样本门槛的已批准 H100 结果或明确指定的诊断运行会增加 H100 窗口，名称和成本沿用硬件注册表。指标说明、
+完整哈希及尚未校准的人工评分维度按需展开，图表图例与 TCO 估算口径仍直接可见。
 
-曲线来自部署而不是并发：保留的 fixture 使用 batch-one、单副本 H3 服务，C1/C2/C4 的吞吐量相差不到 1.5%，延迟随 C 增长；这只描述该次配置，不代表所有 diffusion 服务或未来 runtime。仪表板将超过副本数的并发视为同一部署的排队观测，不把这些点连成部署曲线。真正在延迟与效率之间取舍的是部署方式：每条视频占用多少张 GPU 以及模型如何切分（`tp_size` × `ulysses_degree`）。`deployment.ts` 以此为 cell 键，把 `concurrency > replicas` 判定为排队，并为每种硬件选出最高效的部署作为代表（KPI 卡、Compare 面板和图例都用它）；`plot.ts` 只用未排队的 cell 绘图——排队 cell 不会进入图表、表格和 CSV，只出现在证据面板——再按硬件对剩余部署点求 Pareto 前沿：某硬件有两个及以上前沿部署时自动画出实线，被支配的部署以淡色显示。唯一的开关是图例中的“仅最优”（`v_optimal`，默认开启，与 inference 页的 `i_optimal` 一致）：开启时图表、表格和 CSV 只包含前沿部署，关闭后被支配的部署以淡色加入图表；没有“显示排队请求”开关，也没有跨硬件前沿。保留的仪表板 fixture 中，每种已测硬件只有一种实测部署（每条视频 4 张 GPU，TP2 × Ulysses 2），所以图表是诚实的三点散点图，说明文字会指出每硬件曲线还需扫描每条视频占用的 GPU 数；该扫描属于 InferenceX 后端工作并需要 GPU 授权，前端无需改动即可接收新 cell。MI355X 以“未测得”形式保留在图例与 KPI 卡中；缺失指标一律为 null，绝不写成 0。
+视频窗口只读取已存储产物，核对 prompt、seed、重复次数和生成配置后同步播放。
+Difference 是相对明确绑定的官方 Diffusers 参考视频的浏览器 RGB 差异预览，与封存的全帧 PSNR 测量分别展示。不能根据硬件型号或步数推断参考身份。
+参考视频、尺寸或跨域读取条件不满足时显示不可用。蒸馏与完整步数分组保留。
+默认视频卡片保留硬件、GPU 数量、媒体及两种 TCO 口径；完整 prompt、seed、重复次数、
+运行、产物、Runtime 和媒体来源可在“Prompt 与来源”中查看。
 
-图表下方还有三个区块。带日期、可编辑的 API 参考价（`v_api`，记录 MiniMax 开放平台按量付费页在 2026-09-24 的价格，页面未标注生效日期；不保证当前仍适用）只推导一个数字——每条视频 API 标价（单价 × 视频秒数），显示在 KPI 卡每条视频 TCO 成本旁边，并作为表格和 CSV 的一列；它不进入图表，也不再推导收入、利润或价格倍数。价格缺失或不为正时该值为 null，`parseApiPrice` 会回退到参考价，而不是按 0 计价。Arena 式 Compare 以视频为主：同一 prompt 与 seed 在两种硬件上的视频并排播放，支持同步播放/暂停/重播和上一个/下一个用例箭头，没有盲测模式，也没有用例下拉框；下方的差值行固定为出片时间（P50）、每条视频 TCO 成本和每条视频能耗，并以脚注注明成本档位。每种硬件只有一个可选 cell（其代表部署），默认以最慢的硬件为基线、最快的为候选，选择记录在 `v_base`、`v_cand`、`v_case` 中；面板滚入视口时才加载两个已发布产物，HTTP 204 读作“未发布视频”而不是错误。性能测量证据面板展示板卡功率相对生效上限的比值、并发下的吞吐量和延迟比值，以及带宽/FLOPS 规格比与实测加速比。跨硬件比较要求完整且相同的工作负载身份、完整部署布局和 C1；缺少匹配布局的硬件直接省略，不回退到其代表部署。并发比较还要求相同副本数。文案只描述数值，不据此断言功率饱和、吞吐量平台或计算/内存瓶颈。
-
-InferenceX #2916 的原生 srt-slurm 产物包（`h3-results-<run>-<attempt>`，`evidence_kind: srt_slurm_h3_service`）走同一条投影路径，契约见[视频性能历史](./video-history.md)。它们不记录 GPU 型号：只有在 `ci.site.gpu_model` 或 CI runner 名称能识别出硬件时，对应点才会进入按 SKU 划分的图表、KPI 卡和 Compare；否则只保留在性能历史列表中，硬件留空。功率无效或缺失时显示为未测得。
-
-完整工作负载身份由附加字段 `workloadKey` 保存，包含 prompts 与 seeds；缩写标签只用于显示。身份缺失时保持 null，按原始 source manifest 隔离，不跨来源合并。runtime revision 作为比较变量单独披露。仪表板最多读取五页历史；公开 `/api/v1/views/video` 默认复用相同选择与计算逻辑，旧 API 视图仍可显式指定。
-
-`cypress/fixtures/api/video-history.json` 由保留的 `StoredArtifact` 导出通过 `bun run fixtures:video-history <dir>` 重建，只含元数据，并登记在 `_manifest.json` 中。fixture 尚未收录的 run 会作为新条目追加在末尾，发布时间记为未知。下载的 `h3-results-<run>-<attempt>` 产物包可用 `bun scripts/export-stored-artifact.ts <dir> <runId> <artifactId> <name> <bytes> <out.json>` 转成这种导出；保留的原生 H200 run 39002901777 就是这样进入 fixture 的。
+成本同时按参与计算和分配的 GPU 数量估算，分配证据缺失时不填补。利润输入默认空白，属于用户
+场景假设；利用率只降低收入，不减少付费时长。模式未知时不套用 T2V/I2V/R2V 价格。
+只读 API 与页面共用选择和计算逻辑，`r_*` 参数可以分享，`?unofficialrun=` 只读取指定的已存储运行，
+保留其发布批准状态，并单独放入 overlayCells；选中期间，即使已批准也不进入正式结果、部署或工作负载构成。
+默认优先选择有已批准结果的工作负载；仅由指定运行提供的工作负载须明确选择，
+或在没有匹配的已批准结果时作为回退。
+支持隐藏硬件及移除；清除叠加运行后不会将未批准数据转为正式结果。
+移除时，工作负载选择仅在已批准选项中仍然有效时保留。overview 默认返回 JSON；`format=csv` 下载当前筛选的正式及指定运行数据点，保留来源、工作负载、运行、产物和批准状态，标明单位及两种 GPU 成本口径。缺失值保留为空单元格，CSV 不缓存。
+读取不会启动 GPU、写入 Blob 或发布媒体。测试覆盖 API 一致性、样本门槛、
+两种成本口径、缺失证据、同步视频与中英文 390px 布局。
