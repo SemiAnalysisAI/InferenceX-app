@@ -313,16 +313,17 @@ describe('imageRowSequence', () => {
 describe('isActiveImageRow', () => {
   it('keeps active models on scenarios they still sweep', () => {
     expect(isActiveImageRow(imageRow('dsv41flash', 'agentic'))).toBe(true);
-    expect(isActiveImageRow(imageRow('qwen3.5', '8k/1k'))).toBe(true);
     expect(isActiveImageRow(imageRow('qwen3.5', 'agentic'))).toBe(true);
     expect(isActiveImageRow(imageRow('minimaxm31flash', 'agentic'))).toBe(true);
     expect(isActiveImageRow(imageRow('dsr1', '8k/1k'))).toBe(true);
   });
 
-  it('drops the per-model retired MiniMax M3 and DeepSeek V4 Pro 8K/1K sweeps while keeping 8K/1K elsewhere', () => {
+  it('drops retired 8K/1K sweeps while keeping active 8K/1K and Qwen3.5 AgentX', () => {
     expect(isActiveImageRow(imageRow('minimaxm3', '8k/1k'))).toBe(false);
     expect(isActiveImageRow(imageRow('dsv4', '8k/1k'))).toBe(false);
-    expect(isActiveImageRow(imageRow('qwen3.5', '8k/1k'))).toBe(true);
+    expect(isActiveImageRow(imageRow('qwen3.5', '8k/1k'))).toBe(false);
+    expect(isActiveImageRow(imageRow('qwen3.5', 'agentic'))).toBe(true);
+    expect(isActiveImageRow(imageRow('dsr1', '8k/1k'))).toBe(true);
   });
 
   it('drops globally retired 1K/1K and 1K/8K sweeps for every model', () => {
