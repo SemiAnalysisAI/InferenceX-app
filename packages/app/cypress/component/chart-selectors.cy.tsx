@@ -681,6 +681,7 @@ describe('Chart Selectors', () => {
         cy.get('[data-testid="scenario-selector"]').click('right');
         const active = locale === 'zh' ? '固定序列长度' : 'Fixed Sequence Length';
         const deprecated = locale === 'zh' ? '1K / 1K（已弃用）' : '1K / 1K (deprecated)';
+        const deprecatedEightK = locale === 'zh' ? '8K / 1K（已弃用）' : '8K / 1K (deprecated)';
         cy.get('[data-slot="select-label"]').should('have.length', 1);
         cy.contains('[data-select-option]', deprecated).should(($option) => {
           const option = $option[0];
@@ -700,7 +701,7 @@ describe('Chart Selectors', () => {
           .should('have.length', 2)
           .then(($options) => {
             expect([...$options].map((option) => option.textContent)).to.deep.equal([
-              '8K / 1K',
+              deprecatedEightK,
               deprecated,
             ]);
           });
