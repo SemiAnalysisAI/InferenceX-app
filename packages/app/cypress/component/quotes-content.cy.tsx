@@ -71,6 +71,37 @@ describe('QuotesContent', () => {
     }
   });
 
+  it('shows supporter logos in full color in light mode', () => {
+    cy.get('button[aria-label^="Jump to"] img').each(($logo) => {
+      const style = getComputedStyle($logo[0]);
+      expect(style.filter, `${$logo.attr('alt')} filter`).to.equal('none');
+      expect(style.opacity, `${$logo.attr('alt')} opacity`).to.equal('1');
+    });
+    cy.get('blockquote')
+      .first()
+      .closest('[id^="quote-"]')
+      .find('img')
+      .first()
+      .should(($logo) => {
+        expect(getComputedStyle($logo[0]).filter).to.equal('none');
+      });
+  });
+
+  it('keeps the monochrome inverted logo treatment in dark mode', () => {
+    cy.mount(
+      <div className="dark">
+        <QuotesContent />
+      </div>,
+    );
+    cy.get('button[aria-label^="Jump to"] img')
+      .first()
+      .should(($logo) => {
+        const filter = getComputedStyle($logo[0]).filter;
+        expect(filter).to.contain('grayscale');
+        expect(filter).to.contain('invert');
+      });
+  });
+
   it('scrolls to the matching quote when a logo is clicked', () => {
     const targetOrg = uniqueOrgsWithLogo[0];
 
