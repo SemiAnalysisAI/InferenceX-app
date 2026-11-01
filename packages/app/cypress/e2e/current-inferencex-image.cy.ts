@@ -122,7 +122,7 @@ describe('Current InferenceX Image localized routes', () => {
       date: today,
     },
     {
-      model: 'gptoss',
+      model: 'qwen3.8next',
       hardware: 'b200',
       framework: 'vllm',
       precision: 'fp4',

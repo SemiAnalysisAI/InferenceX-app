@@ -312,6 +312,9 @@ describe('imageRowSequence', () => {
 
 describe('isActiveImageRow', () => {
   it('keeps active models on scenarios they still sweep', () => {
+    const qwenNext = imageRow('qwen3.8next', '8k/1k');
+    expect(imageRowModel(qwenNext)).toBe(Model.Qwen3_8_Flash_Next);
+    expect(isActiveImageRow(qwenNext)).toBe(true);
     expect(isActiveImageRow(imageRow('dsv41flash', 'agentic'))).toBe(true);
     expect(isActiveImageRow(imageRow('qwen3.5', 'agentic'))).toBe(true);
     expect(isActiveImageRow(imageRow('minimaxm31flash', 'agentic'))).toBe(true);
