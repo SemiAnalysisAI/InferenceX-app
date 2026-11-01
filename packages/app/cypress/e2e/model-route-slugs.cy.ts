@@ -39,8 +39,10 @@ describe('GLM-5.3-Flash registration without published observations', () => {
         cy.get('[data-testid="inference-page-heading"]').should('contain.text', 'GLM');
         cy.location('pathname').should('eq', `${locale}/inference/glm-5-3-flash`);
         cy.get('[data-testid="inference-chart"] [data-layer="scatter"] circle').should('not.exist');
+        cy.get('[data-testid="model-architecture-link"]').should('not.exist');
         cy.reload();
         cy.get('[data-testid="model-selector"]').should('contain.text', 'GLM 5.3 Flash');
+        cy.get('[data-testid="model-architecture-link"]').should('not.exist');
         cy.location('pathname').should('eq', `${locale}/inference/glm-5-3-flash`);
       });
     }
