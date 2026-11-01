@@ -224,6 +224,7 @@ describe('GlobalFilterProvider context isolation', () => {
     mountProvider();
 
     expect(availabilitySnapshot?.availableModels).not.toContain(Model.Muse_Spark_Open);
+    expect(availabilitySnapshot?.availableModels).not.toContain(Model.GLM_5_3_Flash);
     expect(availabilitySnapshot?.availableModels).toContain(Model.Kimi_K3);
     expect(availabilitySnapshot?.availableModels).not.toContain(Model.DeepSeek_V4_Pro);
   });
@@ -254,5 +255,45 @@ describe('GlobalFilterProvider context isolation', () => {
     mountProvider();
     act(() => selectModel?.(Model.Muse_Spark_Open));
     expect(availabilitySnapshot?.availableSequences).toEqual([Sequence.AgenticTraces]);
+  });
+
+  it('keeps Flash out of shared selectors while availability is loading or failed', () => {
+    mocks.availability.data = undefined;
+    mountProvider();
+    expect(availabilitySnapshot?.availableModels).not.toContain(Model.GLM_5_3_Flash);
+    act(() => {
+      mocks.availability.isError = true;
+      rerenderProvider?.();
+    });
+    expect(availabilitySnapshot?.availableModels).not.toContain(Model.GLM_5_3_Flash);
+    act(() => selectModel?.(Model.GLM_5_3_Flash));
+    expect(availabilitySnapshot?.availableSequences).toEqual([Sequence.AgenticTraces]);
+  });
+
+  it('offers Flash once its own database observations exist', () => {
+    mocks.availability.data = [
+      {
+        model: 'glm5.3flash',
+        precision: 'fp8',
+        benchmark_type: 'agentic_traces',
+        isl: null,
+        osl: null,
+      },
+    ];
+    mountProvider();
+    expect(availabilitySnapshot?.availableModels).toContain(Model.GLM_5_3_Flash);
+    expect(availabilitySnapshot?.availableModels).not.toContain(Model.GLM_5_2);
+  });
+
+  it('offers an unofficial Flash run while published availability is still loading', () => {
+    mocks.availability.data = undefined;
+    mocks.unofficialAvailable = [
+      { model: Model.GLM_5_3_Flash, sequence: Sequence.AgenticTraces, precision: Precision.FP4 },
+    ];
+    mountProvider();
+    act(() => selectModel?.(Model.GLM_5_3_Flash));
+    expect(availabilitySnapshot?.availableModels).toContain(Model.GLM_5_3_Flash);
+    expect(availabilitySnapshot?.availableSequences).toEqual([Sequence.AgenticTraces]);
+    expect(selectionSnapshot?.effectiveSequence).toBe(Sequence.AgenticTraces);
   });
 });

@@ -19,6 +19,34 @@ const unlockPointerEvents = () => {
   });
 };
 
+describe('GLM-5.3-Flash registration without published observations', () => {
+  for (const locale of ['', '/zh']) {
+    for (const width of [1280, 375]) {
+      it(`keeps ${locale}/inference/glm-5-3-flash distinct at ${width}px`, () => {
+        cy.viewport(width, 900);
+        cy.intercept('GET', '/api/v1/availability', { body: [] });
+        cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
+          if (new URL(request.url).searchParams.get('model') === 'GLM-5.3-Flash') {
+            request.alias = 'flashBenchmarks';
+          }
+          request.reply({ body: [] });
+        });
+        cy.visit(`${locale}/inference/kimi-k3`, visitOptions);
+        cy.get('[data-testid="model-selector"]').click();
+        cy.get('[role="option"]').contains('GLM 5.3 Flash').click();
+        cy.wait('@flashBenchmarks');
+        cy.get('[data-testid="model-selector"]').should('contain.text', 'GLM 5.3 Flash');
+        cy.get('[data-testid="inference-page-heading"]').should('contain.text', 'GLM');
+        cy.location('pathname').should('eq', `${locale}/inference/glm-5-3-flash`);
+        cy.get('[data-testid="inference-chart"] [data-layer="scatter"] circle').should('not.exist');
+        cy.reload();
+        cy.get('[data-testid="model-selector"]').should('contain.text', 'GLM 5.3 Flash');
+        cy.location('pathname').should('eq', `${locale}/inference/glm-5-3-flash`);
+      });
+    }
+  }
+});
+
 describe('Per-model dashboard routes', () => {
   for (const locale of ['', '/zh']) {
     it(`retains an explicit legacy model across ${locale}/evaluation`, () => {

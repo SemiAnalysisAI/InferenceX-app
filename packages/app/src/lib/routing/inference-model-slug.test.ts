@@ -65,6 +65,16 @@ describe('INFERENCE_MODEL_SLUGS registry', () => {
 });
 
 describe('getInferenceModelBySlug', () => {
+  it('keeps bilingual Flash routes distinct from GLM-5.3', () => {
+    expect(getInferenceModelBySlug('glm-5-3')?.model).toBe(Model.GLM_5_2);
+    expect(getInferenceModelBySlug('glm-5-3-flash')?.model).toBe(Model.GLM_5_3_Flash);
+    for (const locale of ['', '/zh']) {
+      expect(inferenceModelForPathname(`${locale}/inference/glm-5-3-flash`)).toBe(
+        Model.GLM_5_3_Flash,
+      );
+    }
+  });
+
   it('resolves canonical slugs', () => {
     expect(getInferenceModelBySlug('kimi-k3')?.model).toBe(Model.Kimi_K3);
     expect(getInferenceModelBySlug('deepseek-v4')?.model).toBe(Model.DeepSeek_V4_Pro);

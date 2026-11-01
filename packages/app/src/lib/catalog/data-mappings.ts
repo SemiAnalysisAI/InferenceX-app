@@ -18,6 +18,7 @@ export enum Model {
   MiniMax_M3_1_Flash = 'MiniMax-M3.1-Flash',
   GLM_5 = 'GLM-5',
   GLM_5_2 = 'GLM-5.2',
+  GLM_5_3_Flash = 'GLM-5.3-Flash',
   DeepSeek_V4_Pro = 'DeepSeek-V4-Pro',
   DeepSeek_V4_1_Flash = 'DeepSeek-V4.1-Flash',
   Muse_Spark_Open = 'Muse-Spark-Open',
@@ -49,6 +50,8 @@ interface ModelConfig {
   openRouterModelId?: string;
   logo?: string;
   exclusion?: ExclusionSpec[];
+  /** Pending registrations remain inference-selectable, but are not measured fallback choices. */
+  requiresObservations?: boolean;
 }
 
 const MTP_ENGINE_EXCLUSION: ExclusionSpec[] = [
@@ -147,6 +150,13 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     openRouterModelId: 'qwen/qwen3.5-397b-a17b',
     logo: 'qwen-color.svg',
   },
+  [Model.GLM_5_3_Flash]: {
+    label: 'GLM 5.3 Flash',
+    prefix: 'glm5.3flash',
+    category: 'default',
+    logo: 'zai-color.svg',
+    requiresObservations: true,
+  },
   [Model.Qwen3_8_Flash_Next]: {
     label: 'Qwen3.8 Flash Next 176B',
     prefix: 'qwen3.8next',
@@ -211,6 +221,7 @@ const MODEL_SELECTOR_ORDER: readonly Model[] = [
   Model.Kimi_K3,
   Model.DeepSeek_V4_1_Flash,
   Model.GLM_5_2,
+  Model.GLM_5_3_Flash,
   Model.MiniMax_M3_1_Flash,
   Model.Muse_Spark_Open,
   Model.Qwen3_5,
@@ -259,6 +270,10 @@ export function getOpenRouterModelId(model: Model): string | null {
 
 export function getModelLogo(model: Model): string | null {
   return MODEL_CONFIG[model]?.logo ?? null;
+}
+
+export function modelRequiresObservations(model: Model): boolean {
+  return MODEL_CONFIG[model]?.requiresObservations ?? false;
 }
 
 export function getModelExclusion(model: Model | string | null | undefined): ExclusionSpec[] {
@@ -421,6 +436,9 @@ export function isSequenceDeprecatedForModel(model: Model, sequence: Sequence): 
 }
 
 const MODEL_HIDDEN_SEQUENCES: Partial<Record<Model, ReadonlySet<Sequence>>> = {
+  [Model.GLM_5_3_Flash]: new Set(
+    SEQUENCE_OPTIONS.filter((sequence) => sequence !== Sequence.AgenticTraces),
+  ),
   [Model.Muse_Spark_Open]: new Set(
     SEQUENCE_OPTIONS.filter((sequence) => sequence !== Sequence.AgenticTraces),
   ),

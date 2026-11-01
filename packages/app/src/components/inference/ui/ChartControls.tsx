@@ -70,7 +70,12 @@ import {
 } from '../measured-metric-config';
 import { XAxisModeSelector } from './XAxisModeSelector';
 import { TokenBasisToggle } from './TokenBasisToggle';
-import { Sequence, type Model } from '@/lib/catalog/data-mappings';
+import {
+  Sequence,
+  type Model,
+  MODEL_OPTIONS,
+  modelRequiresObservations,
+} from '@/lib/catalog/data-mappings';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { DEFAULT_Y_AXIS_METRIC } from '@/lib/routing/url-state';
 
@@ -237,6 +242,17 @@ export default function ChartControls({
     setPowerCompare,
   } = useInferenceActions();
   const powerXSurface = usePowerXSurface();
+  // Pending registrations are discoverable on inference without making them
+  // measured choices in shared calculator/TCO, PowerX, or historical selectors.
+  const selectableModels = useMemo(
+    () =>
+      tcoSource === 'inference' && !powerXSurface
+        ? MODEL_OPTIONS.filter(
+            (model) => availableModels.includes(model) || modelRequiresObservations(model),
+          )
+        : availableModels,
+    [availableModels, powerXSurface, tcoSource],
+  );
   const analyticsContext = useInferenceAnalyticsContext();
 
   const featureGateUnlocked = useFeatureGate();
@@ -512,7 +528,7 @@ export default function ChartControls({
                 onChange={handleModelChange}
                 open={openDropdown === 'model'}
                 onOpenChange={handleDropdownOpenChange('model')}
-                availableModels={availableModels}
+                availableModels={selectableModels}
                 data-testid="model-selector"
                 trailing={<ModelArchitectureInfoLink model={selectedModel} locale={locale} />}
                 newModels={AGENTX_NEW_MODEL_DISPLAY_NAMES}

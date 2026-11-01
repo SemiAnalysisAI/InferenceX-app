@@ -39,6 +39,7 @@ import {
   isSequenceHiddenForModel,
   Model,
   MODEL_OPTIONS,
+  modelRequiresObservations,
   Precision,
   PRECISION_OPTIONS,
   Sequence,
@@ -362,10 +363,10 @@ export function GlobalFilterProvider({
   );
 
   const availableModels = useMemo(() => {
-    if (!availabilityRows) return MODEL_OPTIONS;
     const unofficialModels = new Set(unofficialAvailable.map((a) => a.model));
     return MODEL_OPTIONS.filter((m) => {
       if (unofficialModels.has(m)) return true;
+      if (!availabilityRows) return !modelRequiresObservations(m);
       const keys = DISPLAY_MODEL_TO_DB[m] ?? [m];
       return availabilityRows.some((r) => keys.includes(r.model));
     });

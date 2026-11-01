@@ -14,6 +14,13 @@ export interface CompareModelSlug {
 
 export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
   {
+    slug: 'glm-5-3-flash',
+    displayName: 'GLM-5.3-Flash',
+    dbKeys: ['glm5.3flash'],
+    label: 'GLM 5.3 Flash',
+    seoName: 'GLM-5.3-Flash',
+  },
+  {
     slug: 'muse-spark-open',
     displayName: 'Muse-Spark-Open',
     dbKeys: ['musespark'],
