@@ -72,6 +72,12 @@ official and unofficial data, GPU-history comparisons, and chart exports.
 These are presentation-only controls: the read-only API and skills data contracts
 keep every benchmark row and offload field unchanged.
 
+Advanced also has a default-on Framework Line Label control (`i_frameworklabel=0`
+to hide). It hides the framework suffix inside existing line labels, retaining
+hardware names, precision, comparison dates and overlay run tags. It shares state
+across the main chart, GPU-history comparisons, replay and exports, independently
+of Line Labels. It does not filter frameworks or change read-only API data.
+
 `useInferenceFilters` owns inference-only selection state. GPU selections and comparison
 dates do not belong in global filter state because evaluation and reliability do not use
 them.

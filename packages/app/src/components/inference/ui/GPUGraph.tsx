@@ -153,14 +153,18 @@ const currentZoomRenderContext = (svg: SVGSVGElement, ctx: RenderContext): Rende
   };
 };
 
-function hardwareLabelFor(pts: InferenceData[]): string {
+function hardwareLabelFor(pts: InferenceData[], showFrameworkLabel = true): string {
   const hwKey = String(pts[0].hwKey);
   const cfg = getInferenceHardwareConfig(hwKey, pts[0].model, pts);
-  return cfg ? getDisplayLabel(cfg) : hwKey;
+  return cfg ? (showFrameworkLabel ? getDisplayLabel(cfg) : cfg.label) : hwKey;
 }
 
-function labelTextFor(pts: InferenceData[], numbering: Map<string, number>): string {
-  return `${hardwareLabelFor(pts)} • ${comparisonEntryLabel(String(pts[0].date), numbering)}`;
+function labelTextFor(
+  pts: InferenceData[],
+  numbering: Map<string, number>,
+  showFrameworkLabel: boolean,
+): string {
+  return `${hardwareLabelFor(pts, showFrameworkLabel)} • ${comparisonEntryLabel(String(pts[0].date), numbering)}`;
 }
 
 const GPU_STRINGS = {
@@ -174,6 +178,7 @@ const GPU_STRINGS = {
     parallelismLabels: 'Parallelism Labels',
     concurrencyLabels: '# Concurrent Sessions',
     lineLabels: 'Line Labels',
+    frameworkLabel: 'Framework Line Label',
     offloadingLabel: 'Offloading Label',
     perfRuler: 'Perf Ruler',
     perfRulerInfo:
@@ -199,6 +204,7 @@ const GPU_STRINGS = {
     parallelismLabels: '并行配置标签',
     concurrencyLabels: '并发会话数',
     lineLabels: '曲线标签',
+    frameworkLabel: '曲线框架标签',
     offloadingLabel: 'offload 标签',
     perfRuler: '性能标尺',
     perfRulerInfo:
@@ -252,6 +258,7 @@ const GPUGraph = React.memo(
       highContrast,
       showLineLabels,
       showOffloadingLabel,
+      showFrameworkLabel,
     } = useInferenceDisplay();
     const pointLabelsVisible = showPointLabels || useAdvancedLabels || showConcurrencyLabels;
     const {
@@ -268,6 +275,7 @@ const GPUGraph = React.memo(
       selectAllActiveDates,
       setShowLineLabels,
       setShowOffloadingLabel,
+      setShowFrameworkLabel,
       setQuickFilterVendors,
       setQuickFilterFrameworks,
       setQuickFilterDeployment,
@@ -657,7 +665,7 @@ const GPUGraph = React.memo(
         }
         const overlayLabelFor = (points: InferenceData[]) => {
           const info = unofficialRunInfos[overlayRunOf(points[0])];
-          const hardwareLabel = hardwareLabelFor(points);
+          const hardwareLabel = hardwareLabelFor(points, showFrameworkLabel);
           const sharesHardware = (overlayRunsByHw.get(String(points[0].hwKey))?.size ?? 0) > 1;
           return info ? getOverlayLineLabel(hardwareLabel, info, sharesHardware) : hardwareLabel;
         };
@@ -666,7 +674,7 @@ const GPUGraph = React.memo(
           seriesId: graphId,
           label: overlayPointSet.has(points[0])
             ? overlayLabelFor(points)
-            : labelTextFor(points, runNumbering),
+            : labelTextFor(points, runNumbering, showFrameworkLabel),
           color: getRooflineColor(key),
           points,
         }));
@@ -687,7 +695,7 @@ const GPUGraph = React.memo(
       return {
         type: 'custom',
         key: 'line-labels',
-        displayIdentity: `${showLineLabels ? 'visible' : 'hidden'}:${paletteIdentity}`,
+        displayIdentity: `${showLineLabels ? 'visible' : 'hidden'}:${showFrameworkLabel}:${paletteIdentity}`,
         render: (zoomGroup, ctx) => {
           renderLineLabels(
             zoomGroup,
@@ -728,6 +736,7 @@ const GPUGraph = React.memo(
       };
     }, [
       showLineLabels,
+      showFrameworkLabel,
       rooflines,
       isRooflineVisible,
       getRooflineColor,
@@ -1655,6 +1664,16 @@ const GPUGraph = React.memo(
                 onCheckedChange: (c) => {
                   setShowLineLabels(c);
                   track('interactivity_line_labels_toggled', { enabled: c });
+                },
+              },
+              {
+                id: 'gpu-framework-label',
+                label: legendT.frameworkLabel,
+                advanced: true,
+                checked: showFrameworkLabel,
+                onCheckedChange: (enabled) => {
+                  setShowFrameworkLabel(enabled);
+                  track('interactivity_framework_label_toggled', { enabled });
                 },
               },
               {

@@ -165,6 +165,7 @@ export function baseInferenceState() {
     setShowGradientLabels: noop,
     showLineLabels: false,
     showOffloadingLabel: true,
+    showFrameworkLabel: true,
     setShowOffloadingLabel: noop,
     setShowLineLabels: noop,
   };

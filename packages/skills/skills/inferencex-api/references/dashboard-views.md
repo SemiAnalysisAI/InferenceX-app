@@ -207,6 +207,12 @@ historical, or unofficial points or benchmark rows. These controls have no
 read-only API parameters; offload fields
 and returned values are unchanged.
 
+Advanced's Framework Line Label switch defaults on. `i_frameworklabel=0` hides
+the framework suffix in existing chart line labels, including unofficial overlays,
+GPU-history comparisons and exports. Hardware names, precision and run/date labels
+remain. This presentation-only setting has no read-only API parameter and does not
+change framework selection or returned benchmark data.
+
 ## View selection
 
 For AgentX inference and historical comparisons, read
