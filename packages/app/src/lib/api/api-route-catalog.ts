@@ -155,7 +155,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-view-options',
-    sourceSha256: '2ebc71f82cc22912f634c41a1c764cc697d515554c9c78cc74cf537f035c6486',
+    sourceSha256: '79f8765d704cef43d9c976fe2a40e1a4dd23a3de0b30c411dacbf8144a345327',
   },
   {
     source: 'src/app/api/v1/views/overview/route.ts',

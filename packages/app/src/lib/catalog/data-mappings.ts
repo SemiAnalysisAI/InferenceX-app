@@ -411,6 +411,7 @@ export function getSequenceCategory(sequence: Sequence): CategoryTag {
 }
 
 const MODEL_DEPRECATED_SEQUENCES: Partial<Record<Model, ReadonlySet<Sequence>>> = {
+  [Model.Qwen3_5]: new Set([Sequence.EightK_OneK]),
   [Model.MiniMax_M3]: new Set([Sequence.EightK_OneK]),
   [Model.DeepSeek_V4_Pro]: new Set([Sequence.EightK_OneK]),
   [Model.GLM_5_2]: new Set([Sequence.EightK_OneK]),

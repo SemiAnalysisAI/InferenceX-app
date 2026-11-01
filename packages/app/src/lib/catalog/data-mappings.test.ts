@@ -269,9 +269,16 @@ describe('isSequenceDeprecatedForModel / getSequenceCategoryForModel', () => {
     );
   });
 
+  it('deprecates Qwen3.5 8K/1K without hiding history or retiring AgentX', () => {
+    expect(isSequenceDeprecatedForModel(Model.Qwen3_5, Sequence.EightK_OneK)).toBe(true);
+    expect(getSequenceCategoryForModel(Sequence.EightK_OneK, Model.Qwen3_5)).toBe('deprecated');
+    expect(isSequenceHiddenForModel(Model.Qwen3_5, Sequence.EightK_OneK)).toBe(false);
+    expect(isModelDeprecated(Model.Qwen3_5)).toBe(false);
+    expect(getSequenceCategoryForModel(Sequence.AgenticTraces, Model.Qwen3_5)).toBe('default');
+  });
+
   it('keeps 8K/1K default for models still sweeping it', () => {
-    expect(isSequenceDeprecatedForModel(Model.Qwen3_5, Sequence.EightK_OneK)).toBe(false);
-    expect(getSequenceCategoryForModel(Sequence.EightK_OneK, Model.Qwen3_5)).toBe('default');
+    expect(getSequenceCategoryForModel(Sequence.EightK_OneK, Model.DeepSeek_R1)).toBe('default');
   });
 
   it('does not un-deprecate globally deprecated sequences', () => {
