@@ -288,6 +288,8 @@ export abstract class HGXSystemChassis extends GPUSystem {
 
 export class MI300HGXSystemChassis extends HGXSystemChassis {
   static override readonly typeName: string = 'MI300HGXSystemChassis';
+  static override readonly dimm_count: number = 16;
+  static override readonly dimm_capacity_gb: number = 96;
   static override readonly default_networking: readonly NetworkGroup[] = [AMD_TWO_TIER_NETWORK];
   static override readonly pex89144_count: number = 4;
   static override readonly default_nic_type: ScaleOutNICCardType = Thor2NICCard;
@@ -303,6 +305,8 @@ export class MI300HGXSystemChassis extends HGXSystemChassis {
 
 export class MI325HGXSystemChassis extends HGXSystemChassis {
   static override readonly typeName: string = 'MI325HGXSystemChassis';
+  static override readonly dimm_count: number = 24;
+  static override readonly dimm_capacity_gb: number = 96;
   static override readonly default_networking: readonly NetworkGroup[] = [AMD_TWO_TIER_NETWORK];
   static override readonly pex89144_count: number = 4;
   static override readonly default_nic_type: ScaleOutNICCardType = Thor2NICCard;
@@ -318,6 +322,8 @@ export class MI325HGXSystemChassis extends HGXSystemChassis {
 
 export class MI355HGXSystemChassis extends HGXSystemChassis {
   static override readonly typeName: string = 'MI355HGXSystemChassis';
+  static override readonly dimm_count: number = 24;
+  static override readonly dimm_capacity_gb: number = 128;
   static override readonly default_networking: readonly NetworkGroup[] = [AMD_TWO_TIER_NETWORK];
   static override readonly pex89144_count: number = 4;
   static override readonly default_nic_type: ScaleOutNICCardType = PollaraNICCard;

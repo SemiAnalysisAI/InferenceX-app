@@ -98,8 +98,8 @@ export class X86CPU extends CPU {
 export class DDR5DIMM extends GenericComponent {
   static override readonly typeName: string = 'DDR5DIMM';
   static readonly memory_type = 'DDR5';
-  static readonly idle_power_w = 3.8;
-  static readonly active_power_w = 7;
+  static readonly idle_power_w = 2.75;
+  static readonly active_power_w = 2.75;
   readonly capacity_gb: number;
   readonly state: 'idle' | 'active';
 
