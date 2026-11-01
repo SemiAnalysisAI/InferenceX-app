@@ -125,7 +125,7 @@ export function QuotesContent({ locale = 'en' }: { locale?: Locale } = {}) {
                     alt={org}
                     width={96}
                     height={40}
-                    className="h-8 max-w-24 object-contain grayscale opacity-70 transition-opacity group-hover:opacity-100 dark:invert"
+                    className="h-8 max-w-24 object-contain transition-opacity dark:opacity-70 dark:grayscale dark:invert dark:group-hover:opacity-100"
                   />
                 </button>
               ))}

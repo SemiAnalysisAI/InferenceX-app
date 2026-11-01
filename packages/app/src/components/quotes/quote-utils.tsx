@@ -24,7 +24,7 @@ export function CompanyLogo({ org, logo }: { org: string; logo?: string }) {
       alt={org}
       width={80}
       height={40}
-      className="h-10 min-w-10 max-w-20 shrink-0 object-contain grayscale opacity-70 dark:invert"
+      className="h-10 min-w-10 max-w-20 shrink-0 object-contain dark:opacity-70 dark:grayscale dark:invert"
       onError={() => setFailed(true)}
     />
   );
