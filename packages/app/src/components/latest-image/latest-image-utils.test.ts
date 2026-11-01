@@ -312,7 +312,7 @@ describe('imageRowSequence', () => {
 
 describe('isActiveImageRow', () => {
   it('keeps active models on scenarios they still sweep', () => {
-    expect(isActiveImageRow(imageRow('dsv4', 'agentic'))).toBe(true);
+    expect(isActiveImageRow(imageRow('dsv41flash', 'agentic'))).toBe(true);
     expect(isActiveImageRow(imageRow('qwen3.5', '8k/1k'))).toBe(true);
     expect(isActiveImageRow(imageRow('qwen3.5', 'agentic'))).toBe(true);
     expect(isActiveImageRow(imageRow('minimaxm31flash', 'agentic'))).toBe(true);
@@ -332,6 +332,8 @@ describe('isActiveImageRow', () => {
   });
 
   it('drops deprecated models on every scenario, including point-release buckets', () => {
+    expect(isActiveImageRow(imageRow('dsv4', 'agentic'))).toBe(false);
+    expect(isActiveImageRow(imageRow('dsv4', { isl: 4096, osl: 512 }))).toBe(false);
     expect(isActiveImageRow(imageRow('minimaxm3', 'agentic'))).toBe(false);
     expect(isActiveImageRow(imageRow('kimik2.5', '8k/1k'))).toBe(false);
     expect(isActiveImageRow(imageRow('kimik2.6', '8k/1k'))).toBe(false);
@@ -348,7 +350,7 @@ describe('isActiveImageRow', () => {
   });
 
   it('keeps unmapped isl/osl combos so a new sweep shape is not silently hidden', () => {
-    expect(isActiveImageRow(imageRow('dsv4', { isl: 4096, osl: 512 }))).toBe(true);
+    expect(isActiveImageRow(imageRow('dsv41flash', { isl: 4096, osl: 512 }))).toBe(true);
   });
 });
 

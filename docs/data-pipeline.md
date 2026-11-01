@@ -31,10 +31,13 @@ there are no duplicated metric-specific columns on `benchmark_results` or
 
 Computing the newest logical curve from the full result table is expensive. The
 materialized view pre-computes the newest logical curve snapshot, including
-same-image append-only history when applicable. Point identity within that snapshot
-remains config, scenario, sequence, offload mode, recipe fingerprint, and concurrency.
-API routes use the view when no date filter is specified; date-filtered requests
-use the same `benchmark_curve_runs` view and `benchmark_curve_scope` function.
+append-only history when applicable. An append-only run extends the run before it
+when every line both contain keeps its image; an AgentX curve spans AGG/disagg and
+offload lines that may run different images, matching InferenceX's append-only check. Point
+identity within that snapshot remains config, scenario, sequence, offload mode,
+recipe fingerprint, and concurrency. API routes use the view when no date filter is
+specified; date-filtered requests use the same `benchmark_curve_runs` view and
+`benchmark_curve_scope` function and compute the line images inline.
 
 `REFRESH CONCURRENTLY` allows reads during refresh (no downtime). The trade-off is a brief window where the view is stale after ingest, which is acceptable because ingests are infrequent.
 
@@ -117,12 +120,12 @@ point provenance; `curve_date` and `curve_workflow_run_id` carry the separate lo
 snapshot identity used by charts and history. InferenceX CI separately verifies that
 the generated matrix is strictly additive: existing recipes and points are immutable,
 while newly added concurrency points or complete recipe variants may run as deltas.
-All appended points must retain the target curve's image, and benchmark-affecting code
+All appended points must retain their AGG/disagg and offload line's image, and benchmark-affecting code
 changes must be isolated to the new points.
 
 `/api/unofficial-run` previews an append-only run the same way. For each curve the run
-touches, it adds the current published points from `latest_benchmarks` when the run and
-that curve share one image. A point the run re-measures replaces the published one.
+touches, it adds the current published points from `latest_benchmarks`, walking their
+producer runs newest first while every shared line keeps its image. A point the run re-measures replaces the published one.
 Inherited rows keep their producer date, workflow-run ID and result ID. They take the
 unofficial run's URL because overlays group series by run URL. Every row in the stitched
 curve gets the run's date as `curve_date` and the negated GitHub run ID as

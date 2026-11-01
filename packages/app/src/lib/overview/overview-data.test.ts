@@ -1319,7 +1319,6 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
 
     expect(page.models.map((m) => `${m.model}/${m.scenario}`)).toEqual([
       `${Model.Muse_Spark_Open}/agentx`,
-      `${Model.DeepSeek_V4_Pro}/agentx`,
       `${Model.DeepSeek_V4_1_Flash}/agentx`,
       `${Model.Kimi_K3}/agentx`,
       `${Model.MiniMax_M3_1_Flash}/agentx`,
@@ -1332,7 +1331,14 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
     expect(page).not.toHaveProperty('datasetThroughDate');
     expect(page.tier).toBe(50);
 
-    const deepseek = page.models.find(
+    const allModelsPage = assembleOverviewPageData(
+      overviewRowsFixture as unknown as Record<string, BenchmarkRow[]>,
+      50,
+      'community',
+      'b200',
+      'all',
+    );
+    const deepseek = allModelsPage.models.find(
       (m) => m.model === Model.DeepSeek_V4_Pro && m.scenario === 'agentx',
     )!;
     const dsB300 = headlinePairOf(deepseek, 'b300-vs-b200')!;
@@ -1365,13 +1371,6 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
       ),
     ).toBe(false);
 
-    const allModelsPage = assembleOverviewPageData(
-      overviewRowsFixture as unknown as Record<string, BenchmarkRow[]>,
-      50,
-      'community',
-      'b200',
-      'all',
-    );
     const minimax = allModelsPage.models.find(
       (m) => m.model === Model.MiniMax_M3 && m.scenario === 'agentx',
     )!;
@@ -1449,6 +1448,7 @@ describe('overview model scope', () => {
     expect(new Set(page.models.map((m) => m.model))).toEqual(new Set(DEFAULT_MODELS));
     expect(page.modelScope).toBe('default');
     expect(page.models.some((m) => m.model === Model.MiniMax_M3)).toBe(false);
+    expect(page.models.some((m) => m.model === Model.DeepSeek_V4_Pro)).toBe(false);
     expect(page.models.some((m) => m.model === Model.MiniMax_M3_1_Flash)).toBe(true);
   });
 
@@ -1458,8 +1458,11 @@ describe('overview model scope', () => {
     expect(orderedUniqueModels).toEqual([
       ...DEFAULT_MODELS,
       ...MAINTENANCE_MODELS,
+      Model.DeepSeek_V4_Pro,
       Model.MiniMax_M3,
-      ...[...DEPRECATED_MODELS].filter((model) => model !== Model.MiniMax_M3),
+      ...[...DEPRECATED_MODELS].filter(
+        (model) => model !== Model.MiniMax_M3 && model !== Model.DeepSeek_V4_Pro,
+      ),
     ]);
     expect(page.modelScope).toBe('all');
   });
@@ -1467,7 +1470,7 @@ describe('overview model scope', () => {
   it('stamps each model summary with its category', () => {
     const page = assembleOverviewPageData({}, 50, 'community', 'b200', 'all');
     const categoryOf = (model: Model) => page.models.find((m) => m.model === model)?.category;
-    expect(categoryOf(Model.DeepSeek_V4_Pro)).toBe('default');
+    expect(categoryOf(Model.DeepSeek_V4_Pro)).toBe('deprecated');
     expect(categoryOf(Model.DeepSeek_R1)).toBe('maintenance');
     expect(categoryOf(Model.GLM_5)).toBe('deprecated');
     expect(categoryOf(Model.GptOss)).toBe('deprecated');
@@ -1481,8 +1484,11 @@ describe('overview model scope', () => {
     expect(orderedUniqueModels).toEqual([
       ...DEFAULT_MODELS,
       ...MAINTENANCE_MODELS,
+      Model.DeepSeek_V4_Pro,
       Model.MiniMax_M3,
-      ...[...DEPRECATED_MODELS].filter((model) => model !== Model.MiniMax_M3),
+      ...[...DEPRECATED_MODELS].filter(
+        (model) => model !== Model.MiniMax_M3 && model !== Model.DeepSeek_V4_Pro,
+      ),
     ]);
     expect(page.modelScope).toBe('all');
   });

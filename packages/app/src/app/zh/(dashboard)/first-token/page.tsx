@@ -16,8 +16,8 @@ export default async function ZhFirstTokenPage({ searchParams }: Props) {
   const seed = resolveCalculatorUrlSeed(sp);
   return (
     <>
-      <ZhTabIntro tab="first-token" />
       <FirstTokenLimitsDisplay urlSeed={seed} />
+      <ZhTabIntro tab="first-token" />
     </>
   );
 }

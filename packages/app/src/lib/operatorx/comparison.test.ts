@@ -125,3 +125,41 @@ describe('cross-backend hardware comparison', () => {
     expect(tied.measurements.h200.backend).toEqual(['first']);
   });
 });
+
+function moe(ids: string[]): Comparison {
+  return {
+    op: 'moe',
+    rows: [],
+    hardware: [],
+    // Listed in API order: most hardware first, so DeepSeek-R1-0528 would win by position.
+    workloads: ids.map((id) => ({ id, label: id, cases: 0, hardware: [] })),
+  };
+}
+
+describe('default workload', () => {
+  it('opens MoE on DeepSeek-V4.1-Flash when the request names no valid workload', () => {
+    const c = moe(['moe:DeepSeek-R1-0528', 'moe:DeepSeek-V4.1-Flash']);
+    expect(comparisonView(c, null).workload).toBe('moe:DeepSeek-V4.1-Flash');
+    // `/operatorx?op=moe&workload=moe` names no real workload.
+    expect(comparisonView(c, 'moe').workload).toBe('moe:DeepSeek-V4.1-Flash');
+  });
+
+  it('keeps an explicit workload choice', () => {
+    const c = moe(['moe:DeepSeek-R1-0528', 'moe:DeepSeek-V4.1-Flash']);
+    expect(comparisonView(c, 'moe:DeepSeek-R1-0528').workload).toBe('moe:DeepSeek-R1-0528');
+  });
+
+  it('falls back to the first listed workload when the preferred one has no data', () => {
+    expect(comparisonView(moe(['moe:DeepSeek-R1-0528']), null).workload).toBe(
+      'moe:DeepSeek-R1-0528',
+    );
+  });
+
+  it('leaves GEMM on its first listed workload', () => {
+    const gemm = comparisonView(
+      { ...moe(['gemm:DeepSeek-V4-Pro', 'gemm:GLM-5']), op: 'gemm' },
+      null,
+    );
+    expect(gemm.workload).toBe('gemm:DeepSeek-V4-Pro');
+  });
+});

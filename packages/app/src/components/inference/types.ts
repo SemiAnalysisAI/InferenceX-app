@@ -319,6 +319,7 @@ export interface ScatterGraphProps {
   yLabel: string;
   chartDefinition: ChartDefinition;
   caption?: React.ReactNode;
+  footer?: React.ReactNode;
   onShowTable?: () => void;
   showAllHardwareTypes?: boolean;
   hardwareConfigOverride?: HardwareConfig;
@@ -430,6 +431,8 @@ export interface InferenceDisplayContextType {
   logScale: boolean;
   useAdvancedLabels: boolean;
   showConcurrencyLabels: boolean;
+  showOffloadingLabel: boolean;
+  showFrameworkLabel: boolean;
   showGradientLabels: boolean;
   showLineLabels: boolean;
   showParetoFrontier: boolean;
@@ -477,6 +480,8 @@ export interface InferenceActionsContextType {
   setLogScale: (logScale: boolean) => void;
   setUseAdvancedLabels: (useAdvancedLabels: boolean) => void;
   setShowConcurrencyLabels: (showConcurrencyLabels: boolean) => void;
+  setShowOffloadingLabel: (show: boolean) => void;
+  setShowFrameworkLabel: (show: boolean) => void;
   setShowGradientLabels: (showGradientLabels: boolean) => void;
   setShowLineLabels: (showLineLabels: boolean) => void;
   setShowParetoFrontier: (show: boolean) => void;

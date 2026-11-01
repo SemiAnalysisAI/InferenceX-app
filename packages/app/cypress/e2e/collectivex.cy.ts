@@ -49,14 +49,37 @@ const kvWireCeilingDataset = buildDataset({
   kv: [
     {
       rows: [
-        { kind: 'paged', page_tokens: 64, batch: 1, isl: 4096, gbps_p50: 5.1 },
-        { kind: 'paged', page_tokens: 64, batch: 1, isl: 32768, gbps_p50: 7.39 },
-        { kind: 'bulk', page_tokens: null, batch: 1, isl: 4096, gbps_p50: 52.3 },
-        { kind: 'bulk', page_tokens: null, batch: 1, isl: 32768, gbps_p50: 89.41 },
+        { kind: 'paged', op: 'push', batch: 1, isl: 4096, gbps_p50: 5.1 },
+        { kind: 'paged', op: 'push', batch: 1, isl: 32768, gbps_p50: 7.39 },
+        { kind: 'bulk', op: 'push', page_tokens: null, batch: 1, isl: 4096, gbps_p50: 52.3 },
+        { kind: 'bulk', op: 'push', page_tokens: null, batch: 1, isl: 32768, gbps_p50: 89.41 },
       ],
     },
   ],
   meta: { run_id: '165', generated_at: '2026-08-10T12:20:00Z', source_sha: 'b'.repeat(40) },
+});
+const kvRangeDataset = buildDataset({
+  shards: [makeRawShard()],
+  kv: [
+    {
+      implementation: { library_version: '1.5.0', maturity: 'production', transport: 'ucx' },
+      network: 'infiniband',
+      rows: [
+        { kind: 'paged', op: 'push', batch: 1, isl: 4096, latency_p50: 0.6 },
+        { kind: 'paged', op: 'push', batch: 1, isl: 32768, latency_p50: 4.5 },
+      ],
+    },
+    {
+      backend: 'mooncake',
+      implementation: { library_version: '0.3.13', maturity: 'candidate', transport: 'verbs' },
+      network: 'infiniband',
+      rows: [
+        { kind: 'paged', op: 'push', batch: 1, isl: 4096, latency_p50: 0.9 },
+        { kind: 'paged', op: 'push', batch: 1, isl: 32768, latency_p50: 5.8 },
+      ],
+    },
+  ],
+  meta: { run_id: '166', generated_at: '2026-08-11T12:20:00Z', source_sha: 'd'.repeat(40) },
 });
 
 function installRuns(bodies: CollectiveXDataset[] = [dataset]) {
@@ -467,10 +490,10 @@ describe('CollectiveX neutral run view', () => {
     )
       .should('have.attr', 'data-status', 'broken')
       .and('have.attr', 'title')
-      .and('include', 'ROCm/mori#610');
+      .and('include', 'AINIC 1.117.5-a-77');
     cy.get('[data-testid="collectivex-known-notes-normal"]').should(
       'contain.text',
-      'ROCm/mori#610',
+      'AINIC 1.117.5-a-77',
     );
     cy.get(
       '[data-testid="collectivex-known-cell"][data-mode="normal"][data-sku="h100"][data-library="mori"] [data-testid="collectivex-known-na"]',
@@ -668,7 +691,7 @@ describe('CollectiveX source repository links', () => {
 });
 
 describe('CollectiveX kv-transfer card', () => {
-  it('renders kv cases with bandwidth-bound cells and per-case outcomes', () => {
+  it('renders kv cases with request, peak and contiguous cells and per-case outcomes', () => {
     installRuns([kvDataset]);
     installRun(kvDataset);
     openCollectiveX();
@@ -678,35 +701,44 @@ describe('CollectiveX kv-transfer card', () => {
       .and('contain.text', 'KV-cache transfer')
       .and('contain.text', '2 cases')
       .and('contain.text', '1 measured');
+    cy.get('[data-testid="collectivex-methodology-link"]')
+      .should('have.attr', 'href')
+      .and('match', /\/collectivex\/docs\/kv-transfer\.md$/u);
     cy.get('[data-testid="collectivex-kv-table-table"]').within(() => {
       cy.contains('td', 'GB200').parent().as('measured');
-      cy.get('@measured').should('contain.text', 'nixl').and('contain.text', 'kv-dsv4');
-      cy.get('@measured').should('contain.text', '89.41');
-      cy.get('@measured').should('contain.text', '7.39');
-      cy.get('@measured').should('contain.text', '15.12 (b16)');
-      cy.get('@measured').should('contain.text', '2.72');
-      cy.get('@measured').should('contain.text', '24.8');
+      cy.get('@measured').should('contain.text', 'NIXL').and('contain.text', 'rdma');
+      cy.get('@measured').should('contain.text', '22.82 (32k)');
+      cy.get('@measured').should('contain.text', '8.02 (b1 · 32k)');
+      cy.get('@measured').should('contain.text', '92.10');
+      cy.get('@measured').should('contain.text', '9%');
       cy.contains('td', 'MI355X').parent().as('failed');
-      cy.get('@failed').should('contain.text', 'mori-io').and('contain.text', 'invalid');
+      cy.get('@failed').should('contain.text', 'invalid');
       cy.get('@failed').should('contain.text', 'transfer-verification-failed');
     });
+    cy.get('[data-testid="collectivex-kv-op-toggle"]').contains('button', 'pull').click();
+    cy.get('[data-testid="collectivex-kv-table-table"]')
+      .contains('td', 'GB200')
+      .parent()
+      .should('contain.text', '15.12 (b4 · 32k)')
+      .and('contain.text', '89.41');
     cy.get('[data-testid="collectivex-display"]').should(
       'contain.text',
       `${kvDataset.run.measured_cases}/${kvDataset.run.requested_cases}`,
     );
   });
 
-  it('plots the kv chart and switches metric, axis, and page size', () => {
+  it('opens on request latency against ISL and switches metric, axis and direction', () => {
     installRuns([kvDataset]);
     installRun(kvDataset);
     openCollectiveX();
     showSuite('KV');
     cy.get('[data-testid="collectivex-kv-chart"]').should('be.visible');
-    cy.get('[data-testid="collectivex-kv-chart"] circle').should('have.length', 2);
+    cy.get('[data-testid="collectivex-kv-chart"] circle').should('have.length', 1);
     cy.get('[data-testid="collectivex-kv-chart"]').should(
       'contain.text',
-      'Aggregate pull bandwidth at p50 (GB/s, log)',
+      'Request latency p50, batch 1 (ms, log)',
     );
+    cy.get('[data-testid="collectivex-kv-view-toggle"]').should('not.exist');
     cy.get('[data-testid="collectivex-kv-chart"] .line-path').should(
       'have.attr',
       'stroke-width',
@@ -719,7 +751,7 @@ describe('CollectiveX kv-transfer card', () => {
       .should('have.attr', 'aria-checked', 'false');
     cy.get('[data-testid="collectivex-kv-chart"] .x-axis-label').should(
       'have.text',
-      'Requests per burst',
+      'Input sequence length, tokens',
     );
     cy.get('[data-testid="collectivex-kv-y-log-scale"]')
       .should('have.attr', 'aria-checked', 'true')
@@ -727,19 +759,54 @@ describe('CollectiveX kv-transfer card', () => {
       .should('have.attr', 'aria-checked', 'false');
     cy.get('[data-testid="collectivex-kv-chart"] .y-axis-label').should(
       'have.text',
-      'Aggregate pull bandwidth at p50 (GB/s)',
+      'Request latency p50, batch 1 (ms)',
     );
-    cy.get('[data-testid="collectivex-kv-metric-toggle"]').contains('button', 'ms').click();
-    cy.get('[data-testid="collectivex-kv-chart"]').should(
-      'contain.text',
-      'Burst completion latency p50 (ms)',
+    cy.get('[data-testid="collectivex-kv-metric-toggle"]').contains('button', 'GB/s').click();
+    cy.get('[data-testid="collectivex-kv-chart"] .y-axis-label').should(
+      'have.text',
+      'Aggregate push bandwidth at p50 (GB/s)',
     );
-    cy.get('[data-testid="collectivex-kv-xaxis-toggle"]').contains('button', 'ISL').click();
-    cy.get('[data-testid="collectivex-kv-chart"] circle').should('have.length', 1);
-    cy.get('[data-testid="collectivex-kv-page-toggle"]').contains('button', '16').click();
-    cy.get('[data-testid="collectivex-kv-chart"] circle').should('have.length', 1);
+    cy.get('[data-testid="collectivex-kv-op-toggle"]').contains('button', 'pull').click();
+    cy.get('[data-testid="collectivex-kv-xaxis-toggle"]').contains('button', 'Batch').click();
+    cy.get('[data-testid="collectivex-kv-chart"] circle').should('have.length', 2);
+    cy.get('[data-testid="collectivex-kv-chart"] .x-axis-label').should(
+      'have.text',
+      'Requests per burst',
+    );
     cy.get('[data-testid="collectivex-kv-table"]').should('be.visible');
     cy.get('[data-testid="collectivex-main-chart"]').should('not.exist');
+  });
+
+  it('combines libraries into a band per SKU and fabric in the range and best views', () => {
+    installRuns([kvRangeDataset]);
+    installRun(kvRangeDataset);
+    openCollectiveX();
+    showSuite('KV');
+    cy.get('[data-testid="collectivex-kv-op-toggle"]').should('not.exist');
+    cy.get('[data-testid="collectivex-kv-table-table"]')
+      .should('contain.text', 'production')
+      .and('contain.text', 'candidate')
+      .and('contain.text', '0.3.13')
+      .and('contain.text', 'infiniband · verbs');
+    cy.get('[data-testid="collectivex-kv-table"]').should(
+      'contain.text',
+      'cannot serve DeepSeek-V4 in vLLM 0.32.0 yet',
+    );
+    cy.get('[data-testid="collectivex-kv-chart"] .line-path').should('have.length', 2);
+    cy.get('[data-testid="collectivex-kv-range-band"]').should('not.exist');
+
+    cy.get('[data-testid="collectivex-kv-view-toggle"]').contains('button', 'Range by SKU').click();
+    cy.get('[data-testid="collectivex-kv-range-band"]').should('have.length', 1);
+    cy.get('[data-testid="collectivex-kv-chart"] .line-path').should('have.length', 1);
+    cy.get('[data-testid="collectivex-kv-chart"] [data-testid="chart-legend"]').should(
+      'contain.text',
+      'GB200 · rdma',
+    );
+    cy.get('[data-testid="collectivex-kv-range-note"]').should('contain.text', 'median');
+
+    cy.get('[data-testid="collectivex-kv-view-toggle"]').contains('button', 'Best by SKU').click();
+    cy.get('[data-testid="collectivex-kv-range-band"]').should('not.exist');
+    cy.get('[data-testid="collectivex-kv-range-note"]').should('contain.text', 'best library');
   });
 
   it('plots the envelope axes as one solid line for the shown run', () => {
@@ -752,7 +819,7 @@ describe('CollectiveX kv-transfer card', () => {
     cy.get('[data-testid="collectivex-kv-metric-toggle"]').should('not.exist');
     cy.get('[data-testid="collectivex-kv-frontier-chart"]')
       .should('contain.text', 'Sequence length (ISL tokens, log)')
-      .and('contain.text', 'Aggregate pull bandwidth at p50 (GB/s, log)');
+      .and('contain.text', 'Aggregate push bandwidth at p50 (GB/s, log)');
     cy.get(
       '[data-testid="collectivex-kv-frontier-chart"] [data-testid="legend-advanced-toggle"]',
     ).click();
@@ -764,7 +831,7 @@ describe('CollectiveX kv-transfer card', () => {
     );
     cy.get('[data-testid="collectivex-kv-frontier-chart"] .y-axis-label').should(
       'have.text',
-      'Aggregate pull bandwidth at p50 (GB/s)',
+      'Aggregate push bandwidth at p50 (GB/s)',
     );
     cy.get('[data-testid="collectivex-kv-frontier-chart"] .line-path')
       .should('have.length', 1)
@@ -797,7 +864,7 @@ describe('CollectiveX kv-transfer card', () => {
     ).should('not.exist');
     cy.get('[data-testid="collectivex-kv-frontier-chart"]')
       .should('contain.text', 'hover a point for its batch, latency, and status')
-      .and('not.contain.text', 'dotted line above each backend');
+      .and('not.contain.text', 'dotted line above each library');
 
     cy.get('[data-testid="collectivex-kv-bulk-wire-ceiling"]').click();
     cy.get(
@@ -811,6 +878,7 @@ describe('CollectiveX kv-transfer card', () => {
     openCollectiveX();
     showSuite('KV');
 
+    cy.get('[data-testid="collectivex-kv-op-toggle"]').contains('button', 'pull').click();
     cy.get('[data-testid="collectivex-kv-xaxis-toggle"]')
       .contains('button', 'Overlap gain')
       .click();
@@ -834,7 +902,7 @@ describe('CollectiveX kv-transfer card', () => {
     cy.get('[data-testid="collectivex-kv-xaxis-toggle"]').contains('button', '带宽包络').click();
     cy.get('[data-testid="collectivex-kv-frontier-chart"]')
       .should('contain.text', '序列长度（ISL token，对数）')
-      .and('contain.text', 'p50 聚合 pull 带宽（GB/s，对数）')
+      .and('contain.text', 'p50 聚合 push 带宽（GB/s，对数）')
       .and('contain.text', '越高越优');
     cy.get(
       '[data-testid="collectivex-kv-frontier-chart"] [data-testid="legend-advanced-toggle"]',
@@ -842,10 +910,10 @@ describe('CollectiveX kv-transfer card', () => {
     cy.get('[data-testid="collectivex-kv-frontier-chart"] [data-testid="chart-legend"]')
       .should('contain.text', 'X 轴对数缩放')
       .and('contain.text', 'Y 轴对数缩放')
-      .and('contain.text', 'Bulk 连续传输基线');
+      .and('contain.text', '连续传输基线');
     cy.get('[data-testid="collectivex-kv-table"]')
       .closest('[data-slot="card"]')
-      .should('contain.text', '分页行按随机块表')
+      .should('contain.text', '每次计时传输均经过校验')
       .and('contain.text', '个用例 · 已测')
       .and('contain.text', '批大小');
   });

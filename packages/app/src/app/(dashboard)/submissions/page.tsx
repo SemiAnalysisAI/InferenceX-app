@@ -9,8 +9,8 @@ export const metadata: Metadata = tabMetadata('submissions');
 export default function SubmissionsPage() {
   return (
     <>
-      <TabIntro tab="submissions" />
       <SubmissionsDisplay />
+      <TabIntro tab="submissions" />
     </>
   );
 }

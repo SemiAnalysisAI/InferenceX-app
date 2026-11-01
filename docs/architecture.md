@@ -55,6 +55,13 @@ Other dashboards keep their existing query-state behavior.
 
 **Prefix convention**: `g_` (global), `i_` (inference), `e_` (evaluation), `r_` (reliability), and `c_` (calculator). The canonical dashboard route registry declares which scopes belong in each share URL.
 
+Inference and PowerX place Scenario, Precision, and Run context inside More chart
+controls below the `md` breakpoint; Model stays visible. Desktop keeps Scenario
+and Precision beside Model and renders Run context full-width below chart settings.
+Embedded charts retain their standalone run panel. This is a presentation-only API
+coverage exclusion: expanding the section does not change scenario, precision, or
+date/run selection, API parameters, defaults, measurements, or unofficial overlays.
+
 ## Analytics
 
 PostHog loads after `window.load` plus an idle callback to keep it off the critical path. If the page is hidden (`visibilitychange` to hidden or `pagehide`) while events are still queued, it starts loading immediately instead, so a visitor who switches tabs or leaves before the idle callback still sends the pageview. It posts through the first-party `/ingest` rewrites in `next.config.ts`, with dead-click capture off and autocapture on. Network timing in recordings drops `search`, `q` and `query` URL params (`lib/analytics/network-request-mask.ts`) so typed search text is never captured.

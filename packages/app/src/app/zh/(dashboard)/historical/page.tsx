@@ -10,10 +10,10 @@ export const metadata: Metadata = tabMetadataZh('historical');
 export default function ZhHistoricalPage() {
   return (
     <>
-      <ZhTabIntro tab="historical" />
       <InferenceProvider activeTab="historical">
         <HistoricalTrendsDisplay />
       </InferenceProvider>
+      <ZhTabIntro tab="historical" />
     </>
   );
 }

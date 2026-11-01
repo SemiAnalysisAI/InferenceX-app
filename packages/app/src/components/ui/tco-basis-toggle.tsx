@@ -20,7 +20,15 @@ export function useShowsTcoBasisSelector(): boolean {
   return showsTcoBasisSelector(selectedModel, effectiveSequence);
 }
 
-export function TcoBasisToggle({ source, className }: { source: string; className?: string }) {
+export function TcoBasisToggle({
+  source,
+  className,
+  caption = false,
+}: {
+  source: string;
+  className?: string;
+  caption?: boolean;
+}) {
   const { tcoBasis } = useGlobalFilterSelection();
   const { setTcoBasis } = useGlobalFilterActions();
   const labels = LABELS[useLocale()];
@@ -43,7 +51,8 @@ export function TcoBasisToggle({ source, className }: { source: string; classNam
       }}
       ariaLabel={labels.aria}
       testId="tco-basis-toggle"
-      className={cn('w-fit self-start', className)}
+      className={cn('w-fit self-start', caption && 'md:min-h-6', className)}
+      buttonClassName={caption ? 'text-xs md:min-h-4 md:py-0' : undefined}
     />
   );
 }

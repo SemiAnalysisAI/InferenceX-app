@@ -17,7 +17,6 @@ export default async function ZhProfitEstimatorPage({ searchParams }: Props) {
   const seed = resolveCalculatorUrlSeed(sp);
   return (
     <>
-      <ZhTabIntro tab="profit-estimator-per-gigawatt" />
       <ProfitEstimatorDisplay
         basis="gw-year"
         urlSeed={{
@@ -25,6 +24,7 @@ export default async function ZhProfitEstimatorPage({ searchParams }: Props) {
           model: seed.model ?? defaultRouteModel('profit-estimator-per-gigawatt'),
         }}
       />
+      <ZhTabIntro tab="profit-estimator-per-gigawatt" />
     </>
   );
 }

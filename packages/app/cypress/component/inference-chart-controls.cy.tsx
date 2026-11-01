@@ -2,9 +2,29 @@ import 'cypress-axe';
 import WorkflowInfoDisplay from '@/components/inference/ui/WorkflowInfoDisplay';
 import { Model, Sequence } from '@/lib/catalog/data-mappings';
 import InferenceChartControls from '@/components/inference/ui/ChartControls';
+import { TcoBasisCaption } from '@/components/inference/ui/TcoBasisCaption';
+import { ResultContext } from '@/components/ui/result-context';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import { mountWithProviders } from '../support/test-utils';
+
+function CostControls({ showTcoBasis = false }: { showTcoBasis?: boolean }) {
+  return (
+    <>
+      <InferenceChartControls showXAxisMode />
+      <ResultContext
+        locale="en"
+        costTier="Owning at Large Hyperscaler Volume"
+        tcoBasis={
+          <TcoBasisCaption
+            hardwareKeys={new Set(showTcoBasis ? ['tpuv7_vllm'] : ['b200_sglang'])}
+            source="inference"
+          />
+        }
+      />
+    </>
+  );
+}
 
 describe('Inference ChartControls', () => {
   beforeEach(() => {
@@ -196,16 +216,24 @@ describe('Inference ChartControls', () => {
     mountWithProviders(<InferenceChartControls showXAxisMode />, { inference: {}, unofficial: {} });
 
     cy.get('#model-select').should('be.visible');
+    cy.get('#scenario-select').should('have.length', 1).and('not.be.visible');
+    cy.get('#precision-select').should('have.length', 1).and('not.be.visible');
     cy.get('[data-testid="inference-secondary-controls"] > button')
       .should('have.attr', 'aria-expanded', 'false')
       .click()
       .should('have.attr', 'aria-expanded', 'true');
     cy.get('[data-testid="yaxis-metric-selector"]').should('be.visible');
+    cy.get('[data-testid="inference-secondary-controls"]').within(() => {
+      cy.get('#scenario-select').should('be.visible');
+      cy.get('#precision-select').should('be.visible');
+    });
 
     cy.get('[data-testid="inference-secondary-controls"] > button')
       .click()
       .should('have.attr', 'aria-expanded', 'false');
     cy.get('[data-testid="yaxis-metric-selector"]').should('not.be.visible');
+    cy.get('#scenario-select').should('not.be.visible');
+    cy.get('#precision-select').should('not.be.visible');
     cy.get('#model-select').should('contain.text', 'DeepSeek R1 0528');
   });
 
@@ -233,7 +261,7 @@ describe('Inference ChartControls', () => {
 
 describe('Inference ChartControls cost metrics', () => {
   beforeEach(() => {
-    mountWithProviders(<InferenceChartControls showXAxisMode showTcoBasis />, {
+    mountWithProviders(<CostControls showTcoBasis />, {
       unofficial: {},
       inference: {
         selectedYAxisMetric: 'y_costh',
@@ -246,7 +274,7 @@ describe('Inference ChartControls cost metrics', () => {
 
   for (const sequence of [Sequence.EightK_OneK, Sequence.AgenticTraces]) {
     it(`switches the global TCO basis for Kimi K3 on ${sequence}`, () => {
-      mountWithProviders(<InferenceChartControls showXAxisMode showTcoBasis />, {
+      mountWithProviders(<CostControls showTcoBasis />, {
         unofficial: {},
         inference: {
           selectedYAxisMetric: 'y_costh',
@@ -262,7 +290,7 @@ describe('Inference ChartControls cost metrics', () => {
   }
 
   it('hides the TCO basis toggle for other models and scenarios', () => {
-    mountWithProviders(<InferenceChartControls showXAxisMode showTcoBasis />, {
+    mountWithProviders(<CostControls showTcoBasis />, {
       unofficial: {},
       inference: {
         selectedYAxisMetric: 'y_costh',
@@ -276,7 +304,7 @@ describe('Inference ChartControls cost metrics', () => {
     });
     cy.get('[data-testid="yaxis-metric-selector"]').should('exist');
     cy.get('[data-testid="tco-basis-toggle"]').should('not.exist');
-    mountWithProviders(<InferenceChartControls showXAxisMode showTcoBasis />, {
+    mountWithProviders(<CostControls showTcoBasis />, {
       unofficial: {},
       inference: {
         selectedYAxisMetric: 'y_costh',
@@ -290,7 +318,7 @@ describe('Inference ChartControls cost metrics', () => {
 
   for (const selectedYAxisMetric of ['y_tpPerGpu', 'y_tpPerMw'] as const) {
     it(`hides TCO for ${selectedYAxisMetric} even with visible TPU hardware`, () => {
-      mountWithProviders(<InferenceChartControls showXAxisMode showTcoBasis />, {
+      mountWithProviders(<CostControls showTcoBasis />, {
         unofficial: {},
         inference: {
           selectedYAxisMetric,
@@ -305,7 +333,7 @@ describe('Inference ChartControls cost metrics', () => {
   }
 
   it('hides TCO for a cost metric when no TPU hardware is visible', () => {
-    mountWithProviders(<InferenceChartControls showXAxisMode />, {
+    mountWithProviders(<CostControls />, {
       unofficial: {},
       inference: {
         selectedYAxisMetric: 'y_costh',
@@ -720,6 +748,58 @@ describe('Workflow run dropdown', () => {
       conclusion: 'failure',
     },
   };
+
+  for (const locale of ['en', 'zh'] as const) {
+    it(`folds run context into mobile controls without duplicating desktop controls (${locale})`, () => {
+      cy.viewport(375, 812);
+      mountWithProviders(
+        <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
+          <InferenceChartControls showXAxisMode runContext={<WorkflowInfoDisplay />} />
+        </PathnameContext.Provider>,
+        { inference: { availableRuns }, globalFilters: {}, unofficial: {} },
+      );
+
+      cy.get('[data-testid="inference-run-context"]')
+        .should('have.length', 1)
+        .and('not.be.visible');
+      cy.get('[data-testid="inference-secondary-controls"] > button')
+        .should('contain.text', locale === 'zh' ? '更多图表设置' : 'More chart controls')
+        .click();
+      cy.get('[data-testid="inference-secondary-controls"]')
+        .find('[data-testid="inference-run-context"]')
+        .should('be.visible');
+      cy.get('#run-select').click('left');
+      cy.contains(
+        '[role="option"]',
+        locale === 'zh' ? '第 2 次运行（共 2 次）' : 'Run 2/2',
+      ).click();
+      cy.get('@setSelectedRunId').should('have.been.calledOnceWith', '12345679');
+      cy.get('[data-testid="inference-secondary-controls"] > button').click();
+      cy.get('[data-testid="inference-run-context"]').should('not.be.visible');
+
+      cy.viewport(1280, 900);
+      cy.get('[data-testid="inference-secondary-controls"] > button').should('not.be.visible');
+      cy.get('[data-testid="inference-run-context"]')
+        .should('have.length', 1)
+        .and('be.visible')
+        .then(($run) => {
+          cy.get('[data-testid="inference-chart-configuration"]').then(($chart) => {
+            expect($run[0].getBoundingClientRect().top).to.be.gte(
+              $chart[0].getBoundingClientRect().bottom,
+            );
+          });
+        });
+      cy.get('#run-select').should('have.length', 1);
+      cy.get('#scenario-select').should('have.length', 1).and('be.visible');
+      cy.get('#precision-select').should('have.length', 1).and('be.visible');
+      cy.get('[data-testid="inference-secondary-controls"] #scenario-select').should('not.exist');
+      cy.get('[data-testid="inference-secondary-controls"] #precision-select').should('not.exist');
+      cy.viewport(375, 812);
+      cy.get('[data-testid="inference-run-context"]').should('not.be.visible');
+      cy.get('#scenario-select').should('have.length', 1).and('not.be.visible');
+      cy.get('#precision-select').should('have.length', 1).and('not.be.visible');
+    });
+  }
 
   it('steps between runs and keeps date navigation, status, run selection, and external links', () => {
     mountWithProviders(<WorkflowInfoDisplay />, {

@@ -284,6 +284,13 @@ describe('Huawei copy-bandwidth evidence', () => {
     cy.contains('Huawei 950PR').should('be.visible');
     cy.contains('910B3').should('not.exist');
     cy.contains('Graph time is amortized per copy').should('be.visible');
+    cy.contains('touched payload may fit in cache').should('be.visible');
+    cy.get('circle.point')
+      .filter((_, el) => {
+        const d = (el as unknown as { __data__: { gpuKey: string; bytes: number } }).__data__;
+        return d.gpuKey === 'Huawei 950PR' && d.bytes < 4096;
+      })
+      .should('have.length', 9);
     cy.get('[data-testid="ubenchx-metric-select"]').click();
     cy.contains('[role="option"]', 'Bandwidth (TB/s)').click();
     cy.contains('h2', 'Bandwidth vs Message Size').should('be.visible');
@@ -295,8 +302,11 @@ describe('Huawei copy-bandwidth evidence', () => {
   });
   it('serves measured endpoints and empty unavailable tests through the public API', () => {
     cy.request('/api/v1/views/ubenchx?test=all&gpu=Huawei%20950PR').then(({ body }) => {
+      expect(body.memBw.gpus[0].rows).to.have.length(51);
+      expect(body.memBw.gpus[0].rows[0].bytes).to.equal(8);
+      expect(body.memBw.gpus[0].metadata.smallMessageExtension.cann).to.equal('9.2.1');
       expect(body.memBw.gpus[0].rows.at(-1).bytes).to.equal(17179869184);
-      expect(body.memBw.gpus[0].rows.at(-1).mbuPercent).to.be.closeTo(90.4545974, 0.0001);
+      expect(body.memBw.gpus[0].rows.at(-1).mbuPercent).to.be.closeTo(88.3345678, 0.0001);
       expect(body.smL2Distance.gpus).to.deep.equal([]);
       expect(body.tpcSkyline.gpus).to.deep.equal([]);
     });

@@ -48,7 +48,11 @@ export function collectiveXSkuLabel(sku: string): string {
 }
 
 /** Display names for backends whose project styles the name differently from the backend id. */
-const COLLECTIVEX_BACKEND_LABELS: Record<string, string> = { mori: 'MoRI' };
+const COLLECTIVEX_BACKEND_LABELS: Record<string, string> = {
+  mori: 'MoRI',
+  nixl: 'NIXL',
+  mooncake: 'Mooncake',
+};
 
 export function collectiveXBackendLabel(backend: string): string {
   return COLLECTIVEX_BACKEND_LABELS[backend] ?? backend;
@@ -349,21 +353,53 @@ export function collectiveXRangeBands(
     .toSorted((a, b) => a.label.localeCompare(b.label));
 }
 
+/**
+ * One row family's table cell: `b1` is batch 1 at the largest ISL measured at batch 1 (one
+ * request's handoff), `peak` the highest aggregate GB/s at any ISL and batch.
+ */
 export function collectiveXKvCell(
   rows: CollectiveXKvRow[],
   kind: CollectiveXKvRow['kind'],
-  pageTokens: number | null,
-  batch: 'min' | 'max',
+  op: CollectiveXKvRow['op'],
+  cell: 'b1' | 'peak',
 ): CollectiveXKvRow | null {
-  const matching = rows.filter(
-    (row) => row.kind === kind && row.page_tokens === pageTokens && row.op === 'pull',
-  );
-  if (matching.length === 0) return null;
-  const isl = Math.max(...matching.map((row) => row.isl));
-  const atIsl = matching.filter((row) => row.isl === isl);
-  const pick = (better: (a: number, b: number) => boolean) =>
-    atIsl.reduce((best, row) => (better(row.batch, best.batch) ? row : best));
-  return batch === 'min' ? pick((a, b) => a < b) : pick((a, b) => a > b);
+  const matching = rows.filter((row) => row.kind === kind && row.op === op);
+  if (cell === 'peak') {
+    return matching.reduce<CollectiveXKvRow | null>(
+      (best, row) => (best === null || row.gbps_p50 > best.gbps_p50 ? row : best),
+      null,
+    );
+  }
+  return matching
+    .filter((row) => row.batch === 1)
+    .reduce<CollectiveXKvRow | null>(
+      (best, row) => (best === null || row.isl > best.isl ? row : best),
+      null,
+    );
+}
+
+/**
+ * The ISL a batch sweep reads: the one measured at the most batches (the ladder stops growing the
+ * batch as the ISL grows), the larger on a tie.
+ */
+export function collectiveXKvBatchIsl(rows: readonly CollectiveXKvRow[]): number | null {
+  if (rows.length === 0) return null;
+  const batches = new Map<number, Set<number>>();
+  for (const row of rows) {
+    const seen = batches.get(row.isl) ?? new Set<number>();
+    seen.add(row.batch);
+    batches.set(row.isl, seen);
+  }
+  const [[isl]] = [...batches].toSorted(([a, x], [b, y]) => y.size - x.size || b - a);
+  return isl;
+}
+
+/** The direction a case's cells read: push when the library only pushes, else the selection. */
+export function collectiveXKvCaseOp(
+  kase: CollectiveXKvCase,
+  preferred: CollectiveXKvRow['op'],
+): CollectiveXKvRow['op'] {
+  return kase.rows.some((row) => row.op === preferred) ? preferred : 'push';
 }
 
 export type CollectiveXKvRunCase = CollectiveXKvCase & { run_id: string; run_index: number };
@@ -372,7 +408,6 @@ export interface CollectiveXKvChartSelection {
   x: 'batch' | 'isl';
   y: 'bandwidth' | 'latency';
   op: 'pull' | 'push';
-  pageTokens: number;
 }
 
 export interface CollectiveXKvChartPoint {
@@ -382,6 +417,8 @@ export interface CollectiveXKvChartPoint {
   x: number;
   y: number;
   row: CollectiveXKvRow;
+  /** Set on a SKU-range point: the extent across libraries and every contributing case. */
+  range?: { lo: number; hi: number; members: { label: string; y: number }[] };
 }
 
 export function collectiveXKvColorKey(kase: CollectiveXKvCase): string {
@@ -389,12 +426,11 @@ export function collectiveXKvColorKey(kase: CollectiveXKvCase): string {
 }
 
 export function collectiveXKvLegendLabel(kase: CollectiveXKvCase): string {
-  return `${collectiveXSkuLabel(kase.sku)} · ${kase.backend} · ${kase.fabric} · ${kase.precision}`;
+  return `${collectiveXSkuLabel(kase.sku)} · ${collectiveXBackendLabel(kase.backend)} · ${kase.fabric}`;
 }
 
 export interface CollectiveXKvFrontierSelection {
   op: 'pull' | 'push';
-  pageTokens: number;
   isl?: number;
 }
 
@@ -417,16 +453,16 @@ function frontierBeats(
   return a.x === b.x && a.y > b.y;
 }
 
+function pagedRows(kase: CollectiveXKvCase, op: CollectiveXKvRow['op']): CollectiveXKvRow[] {
+  return kase.rows.filter((row) => row.kind === 'paged' && row.op === op);
+}
+
 export function collectiveXKvFrontierPoints(
   cases: readonly CollectiveXKvRunCase[],
   selection: CollectiveXKvFrontierSelection,
 ): CollectiveXKvFrontierPoint[] {
-  const points = cases.flatMap((kase) => {
-    const matching = kase.rows.filter(
-      (row) =>
-        row.kind === 'paged' && row.op === selection.op && row.page_tokens === selection.pageTokens,
-    );
-    return matching.flatMap((row) => {
+  const points = cases.flatMap((kase) =>
+    pagedRows(kase, selection.op).flatMap((row) => {
       const x = row.isl;
       const y = row.gbps_p50;
       if (!Number.isFinite(x) || x <= 0 || !Number.isFinite(y) || y <= 0) return [];
@@ -443,8 +479,8 @@ export function collectiveXKvFrontierPoints(
           row,
         },
       ];
-    });
-  });
+    }),
+  );
   for (const point of points) {
     point.onSeriesFrontier = !points.some(
       (other) => other.seriesId === point.seriesId && frontierBeats(other, point),
@@ -461,12 +497,9 @@ export function collectiveXKvOverlapPoints(
   selection: CollectiveXKvFrontierSelection,
 ): CollectiveXKvChartPoint[] {
   return cases.flatMap((kase) => {
-    const matching = kase.rows.filter(
-      (row) =>
-        row.kind === 'paged' && row.op === selection.op && row.page_tokens === selection.pageTokens,
-    );
+    const matching = pagedRows(kase, selection.op);
     if (matching.length === 0) return [];
-    const isl = selection.isl ?? Math.max(...matching.map((row) => row.isl));
+    const isl = selection.isl ?? collectiveXKvBatchIsl(matching);
     const atIsl = matching.filter((row) => row.isl === isl);
     const baseline = atIsl.find((row) => row.batch === 1);
     if (!baseline || !(baseline.gbps_p50 > 0)) return [];
@@ -490,31 +523,11 @@ export function collectiveXKvOverlapPoints(
 
 export function collectiveXKvIslValues(
   cases: readonly CollectiveXKvRunCase[],
-  selection: Pick<CollectiveXKvFrontierSelection, 'op' | 'pageTokens'>,
+  op: CollectiveXKvRow['op'],
 ): number[] {
   const values = new Set<number>();
-  for (const kase of cases) {
-    for (const row of kase.rows) {
-      if (
-        row.kind === 'paged' &&
-        row.op === selection.op &&
-        row.page_tokens === selection.pageTokens
-      ) {
-        values.add(row.isl);
-      }
-    }
-  }
+  for (const kase of cases) for (const row of pagedRows(kase, op)) values.add(row.isl);
   return [...values].toSorted((a, b) => a - b);
-}
-
-export function collectiveXKvPageValues(cases: readonly CollectiveXKvRunCase[]): number[] {
-  const values = new Set<number>();
-  for (const kase of cases) {
-    for (const row of kase.rows) {
-      if (row.kind === 'paged' && row.page_tokens !== null) values.add(row.page_tokens);
-    }
-  }
-  return [...values].toSorted((a, b) => b - a);
 }
 
 export interface CollectiveXKvWireCeilingPoint {
@@ -548,28 +561,118 @@ export function collectiveXKvWireCeilings(
   return ceilings;
 }
 
+function kvMetric(row: CollectiveXKvRow, y: CollectiveXKvChartSelection['y']): number {
+  return y === 'bandwidth' ? row.gbps_p50 : row.latency_ms.p50;
+}
+
+/** Each case's paged rows for the selection: batch 1 across ISLs, or every batch at one ISL. */
+function kvSelectedRows(
+  kase: CollectiveXKvCase,
+  selection: CollectiveXKvChartSelection,
+): CollectiveXKvRow[] {
+  const matching = pagedRows(kase, selection.op);
+  if (selection.x === 'isl') return matching.filter((row) => row.batch === 1);
+  const isl = collectiveXKvBatchIsl(matching);
+  return matching.filter((row) => row.isl === isl);
+}
+
 export function collectiveXKvChartPoints(
   cases: readonly CollectiveXKvRunCase[],
   selection: CollectiveXKvChartSelection,
 ): CollectiveXKvChartPoint[] {
   return cases.flatMap((kase) => {
-    const matching = kase.rows.filter(
-      (row) =>
-        row.kind === 'paged' && row.op === selection.op && row.page_tokens === selection.pageTokens,
-    );
-    if (matching.length === 0) return [];
-    const rows =
-      selection.x === 'batch'
-        ? matching.filter((row) => row.isl === Math.max(...matching.map((item) => item.isl)))
-        : matching.filter((row) => row.batch === 1);
     const seriesId = `${kase.run_id}:${kase.case_id}`;
-    return rows.map((row) => ({
+    return kvSelectedRows(kase, selection).map((row) => ({
       seriesId,
       seriesLabel: collectiveXKvLegendLabel(kase),
       colorKey: collectiveXKvColorKey(kase),
       x: selection.x === 'batch' ? row.batch : row.isl,
-      y: selection.y === 'bandwidth' ? row.gbps_p50 : row.latency_ms.p50,
+      y: kvMetric(row, selection.y),
       row,
     }));
   });
+}
+
+/** Every library of one SKU and fabric, combined into one band (or its best line). */
+export interface CollectiveXKvRangeBand {
+  id: string;
+  label: string;
+  colorKey: string;
+  runIndex: number;
+  points: CollectiveXKvChartPoint[];
+}
+
+export function collectiveXKvRangeColorKey(kase: CollectiveXKvCase): string {
+  return `${kase.vendor ?? 'unknown'}_${normalizeCollectiveXSku(kase.sku)}_${kase.fabric}_range`;
+}
+
+/**
+ * One band per (run, SKU, fabric): at each x, the lowest to the highest value across every library
+ * that measured it. `range` places the point at the median, `best` at the best library (lowest
+ * latency, highest bandwidth); the point's row is the best library's.
+ */
+export function collectiveXKvRangeBands(
+  cases: readonly CollectiveXKvRunCase[],
+  selection: CollectiveXKvChartSelection,
+  mode: 'range' | 'best',
+): CollectiveXKvRangeBand[] {
+  const higherIsBetter = selection.y === 'bandwidth';
+  const bands = new Map<
+    string,
+    {
+      band: Omit<CollectiveXKvRangeBand, 'points'>;
+      byX: Map<number, { label: string; y: number; row: CollectiveXKvRow }[]>;
+    }
+  >();
+  for (const kase of cases) {
+    const id = `${kase.run_id}:${collectiveXKvRangeColorKey(kase)}`;
+    let entry = bands.get(id);
+    if (!entry) {
+      entry = {
+        band: {
+          id,
+          label: `${collectiveXSkuLabel(kase.sku)} · ${kase.fabric}`,
+          colorKey: collectiveXKvRangeColorKey(kase),
+          runIndex: kase.run_index,
+        },
+        byX: new Map(),
+      };
+      bands.set(id, entry);
+    }
+    for (const row of kvSelectedRows(kase, selection)) {
+      const x = selection.x === 'batch' ? row.batch : row.isl;
+      const y = kvMetric(row, selection.y);
+      if (!Number.isFinite(y) || y <= 0) continue;
+      const members = entry.byX.get(x) ?? [];
+      members.push({ label: collectiveXBackendLabel(kase.backend), y, row });
+      entry.byX.set(x, members);
+    }
+  }
+  return [...bands.values()]
+    .map(({ band, byX }) => ({
+      ...band,
+      points: [...byX]
+        .map(([x, unsorted]) => {
+          const members = unsorted.toSorted((a, b) => (higherIsBetter ? b.y - a.y : a.y - b.y));
+          const ys = members.map((member) => member.y).toSorted((a, b) => a - b);
+          const middle = Math.floor(ys.length / 2);
+          const mid = ys.length % 2 === 1 ? ys[middle] : (ys[middle - 1] + ys[middle]) / 2;
+          return {
+            seriesId: band.id,
+            seriesLabel: band.label,
+            colorKey: band.colorKey,
+            x,
+            y: mode === 'best' ? members[0].y : mid,
+            row: members[0].row,
+            range: {
+              lo: ys[0],
+              hi: ys.at(-1)!,
+              members: members.map(({ label, y }) => ({ label, y })),
+            },
+          };
+        })
+        .toSorted((a, b) => a.x - b.x),
+    }))
+    .filter((band) => band.points.length > 0)
+    .toSorted((a, b) => a.label.localeCompare(b.label));
 }

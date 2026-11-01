@@ -45,6 +45,7 @@ import {
   SEQUENCE_OPTIONS,
 } from '@/lib/catalog/data-mappings';
 import { inferenceModelForPathname } from '@/lib/routing/inference-model-slug';
+import { setInferenceNavigationModel } from '@/lib/routing/inference-navigation-state';
 import { computeAutoSwitchDecision } from '@/lib/benchmarks/unofficial-run-auto-switch';
 import {
   countCurvesByPrecision,
@@ -227,6 +228,9 @@ export function GlobalFilterProvider({
   const [selectedModel, setSelectedModel] = useState<Model>(
     () => initialModel ?? routeModelForPathname(pathname) ?? Model.DeepSeek_V4_Pro,
   );
+  useIsomorphicLayoutEffect(() => {
+    setInferenceNavigationModel(selectedModel);
+  }, [selectedModel]);
   // The model the user last picked. A path sync counts as a pageview only when it applies that pick.
   const userSelectedModelRef = useRef<Model | null>(null);
   const selectModel = useCallback(

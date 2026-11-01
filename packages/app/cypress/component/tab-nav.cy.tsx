@@ -3,6 +3,7 @@ import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.share
 
 import { TabNav } from '@/components/dashboard/tab-nav';
 import { CLIENT_PATHNAME_CHANGE_EVENT } from '@/lib/routing/client-navigation';
+import { setInferenceNavigationModel } from '@/lib/routing/inference-navigation-state';
 import {
   UnofficialRunBanner,
   UnofficialRunContext,
@@ -10,6 +11,10 @@ import {
 } from '@/providers/unofficial-run-provider';
 import { createMockUnofficialRunContext } from '../support/mock-data';
 import { createMockRouter } from '../support/mock-router';
+
+beforeEach(() => {
+  setInferenceNavigationModel(undefined);
+});
 
 function mountTabNav(opts: {
   pathname?: string;
@@ -47,6 +52,35 @@ const bannerRun = {
   status: 'completed',
   isNonMainBranch: true,
 };
+
+describe('TabNav retained inference model', () => {
+  afterEach(() => {
+    setInferenceNavigationModel(undefined);
+  });
+
+  for (const locale of ['', '/zh']) {
+    for (const width of [375, 1280]) {
+      it(`preserves the selected model and unofficial run from ${locale}/evaluation at ${width}px`, () => {
+        cy.viewport(width, 900);
+        setInferenceNavigationModel('Qwen-3.5-397B-A17B');
+        mountTabNav({ pathname: `${locale}/evaluation`, search: '?unofficialruns=12345' });
+        cy.get(`[data-testid="${width < 768 ? 'mobile-tab' : 'tab-trigger'}-inference"]`)
+          .filter(':visible')
+          .should(
+            'have.attr',
+            'href',
+            `${locale}/inference?unofficialruns=12345&g_model=Qwen-3.5-397B-A17B`,
+          );
+        cy.then(() => setInferenceNavigationModel('DeepSeek-V4-Pro'));
+        cy.get(`[data-testid="${width < 768 ? 'mobile-tab' : 'tab-trigger'}-inference"]`).should(
+          'have.attr',
+          'href',
+          `${locale}/inference?unofficialruns=12345&g_model=DeepSeek-V4-Pro`,
+        );
+      });
+    }
+  }
+});
 
 describe('TabNav — attached unofficial-run banner', () => {
   for (const width of [320, 390, 768, 1440]) {

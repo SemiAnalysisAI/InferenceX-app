@@ -10,10 +10,10 @@ export const metadata: Metadata = tabMetadata('reliability');
 export default function ReliabilityPage() {
   return (
     <>
-      <TabIntro tab="reliability" />
       <ReliabilityProvider>
         <ReliabilityChartDisplay />
       </ReliabilityProvider>
+      <TabIntro tab="reliability" />
     </>
   );
 }

@@ -94,7 +94,8 @@ describe('OperatorX distribution projection', () => {
       normalized: true,
     });
     expect(bandwidth).toMatchObject({ metric: 'bandwidthUtil', normalized: true });
-    expect(bandwidth.boxes[0].p50).toBe(1.5);
+    // 2.4 TB/s achieved against the derived 1.6384 TB/s 950PR reference.
+    expect(bandwidth.boxes[0].p50).toBeCloseTo(2.4 / 1.6384, 12);
 
     const latency = distributionView(view(), {
       metric: 'latency',

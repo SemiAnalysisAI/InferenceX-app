@@ -5,6 +5,7 @@ import { overlaySelectionReducer, UnofficialRunContext } from '@/providers/unoff
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
 import { useParetoHighlightToggle } from '@/components/inference/hooks/useParetoHighlightToggle';
 import ChartDisplay from '@/components/inference/ui/ChartDisplay';
+import { PowerXSurfaceProvider } from '@/components/inference/ui/powerx-surface';
 import chartDefinitions from '@/components/inference/metric-registry';
 import { mountWithProviders } from '../support/test-utils';
 import { expandLegendAdvanced } from '../support/legend-advanced';
@@ -856,7 +857,9 @@ describe('ScatterGraph', () => {
     ).should('have.css', 'opacity', '1');
   });
 
-  it('renders legend with hardware items', () => {
+  it('keeps the desktop legend below the top guideline without changing the mobile gap', () => {
+    cy.viewport(1440, 900);
+    const chartId = 'test-scatter-legend';
     const data = [
       createMockInferenceData({ hwKey: 'b200_trt', x: 64, y: 320, precision: Precision.FP4 }),
       createMockInferenceData({ hwKey: 'h100', x: 32, y: 210, precision: Precision.FP4 }),
@@ -865,7 +868,7 @@ describe('ScatterGraph', () => {
     mountWithProviders(
       <div style={{ width: 800, height: 600 }}>
         <ScatterGraph
-          chartId="test-scatter-legend"
+          chartId={chartId}
           modelLabel="DeepSeek R1"
           data={data}
           xLabel="Concurrency"
@@ -886,6 +889,26 @@ describe('ScatterGraph', () => {
 
     cy.get('.sidebar-legend').should('exist');
     cy.get('.sidebar-legend label').should('have.length.greaterThan', 0);
+
+    const assertDesktopAlignment = () => {
+      cy.get(`#${chartId}`).should(($chart) => {
+        const legend = $chart[0].querySelector('.sidebar-legend')!.getBoundingClientRect();
+        const guideline = $chart[0].querySelector('.border-top')!.getBoundingClientRect();
+        expect(legend.top - guideline.top, 'legend below top guideline').to.be.closeTo(8, 0.1);
+      });
+    };
+    assertDesktopAlignment();
+
+    cy.viewport(375, 812);
+    cy.get('[data-slot="chart-legend-wrapper"]').should(($legend) => {
+      expect(getComputedStyle($legend[0]).marginTop, 'unchanged mobile gap').to.equal('12px');
+      const svg = $legend[0].parentElement!.querySelector('svg')!;
+      expect($legend[0].getBoundingClientRect().top).to.be.at.least(
+        svg.getBoundingClientRect().bottom,
+      );
+    });
+    cy.viewport(1440, 900);
+    assertDesktopAlignment();
   });
 
   it('renders line labels for both official and overlay (unofficial) rooflines', () => {
@@ -1814,6 +1837,71 @@ describe('ChartDisplay modeled power disclosures', () => {
 });
 
 describe('ChartDisplay responsive status notes', () => {
+  const atomDisclaimer =
+    '1 The ATOM engine is promising, however it has yet to serve production tokens. It is still in its infant stage.';
+
+  function assertAtomPngExport(ratio: 'auto' | '16:9' | '1:1') {
+    let exportedPng = '';
+    let exportedNote:
+      | {
+          text: string | null;
+          excluded: boolean;
+          bounds: DOMRect;
+          plotBottom: number;
+          rootBottom: number;
+          removedNotes: number;
+        }
+      | undefined;
+    cy.window().then((win) => {
+      cy.stub(win.HTMLAnchorElement.prototype, 'click').callsFake(
+        function (this: HTMLAnchorElement) {
+          if (!this.download.endsWith('.png')) return;
+          exportedPng = this.href;
+          const root = win.document.querySelector('#chart-0-export')!;
+          const note = root.querySelector<HTMLElement>('[data-testid="atom-engine-footnote"]');
+          if (!note) return;
+          exportedNote = {
+            text: note.textContent,
+            excluded: Boolean(note.closest('.no-export')),
+            bounds: note.getBoundingClientRect(),
+            plotBottom: root
+              .querySelector('svg[data-testid="d3-chart-svg"]')!
+              .getBoundingClientRect().bottom,
+            rootBottom: root.getBoundingClientRect().bottom,
+            removedNotes: root.querySelectorAll(
+              '[data-testid="agentic-optimization-note"], [data-testid="cache-reuse-link"]',
+            ).length,
+          };
+        },
+      );
+    });
+    cy.get('[data-testid="export-button"]').first().click();
+    cy.get('[data-testid="png-aspect-ratio"]').select(ratio);
+    cy.get('[data-testid="export-png-button"]').click();
+    cy.window().should(() => {
+      expect(exportedPng).to.match(/^data:image\/png;base64,/u);
+      expect(exportedNote, 'ATOM disclaimer captured with the PNG').not.to.equal(undefined);
+      expect(exportedNote!.text).to.equal(atomDisclaimer);
+      expect(exportedNote!.excluded).to.equal(false);
+      expect(exportedNote!.bounds.top).to.be.at.least(exportedNote!.plotBottom);
+      expect(exportedNote!.bounds.bottom).to.be.at.most(exportedNote!.rootBottom);
+      expect(exportedNote!.bounds.height).to.be.greaterThan(0);
+      expect(exportedNote!.removedNotes).to.equal(0);
+    });
+    cy.window().then(async (win) => {
+      const image = new win.Image();
+      image.src = exportedPng;
+      await image.decode();
+      expect(image.naturalWidth).to.be.greaterThan(0);
+      if (ratio !== 'auto') {
+        expect(image.naturalWidth / image.naturalHeight).to.be.closeTo(
+          ratio === '16:9' ? 16 / 9 : 1,
+          0.001,
+        );
+      }
+    });
+  }
+
   for (const locale of ['en', 'zh'] as const) {
     for (const width of [390, 1440]) {
       it(`uses available width and preserves complete notices (${locale}, ${width}px)`, () => {
@@ -1850,49 +1938,25 @@ describe('ChartDisplay responsive status notes', () => {
           const offload = notes
             .querySelector('[data-testid="offload-halo-key"]')!
             .getBoundingClientRect();
-          const optimization = notes
-            .querySelector('[data-testid="agentic-optimization-note"]')!
-            .getBoundingClientRect();
-          const footnote = notes
-            .querySelector('[data-testid="atom-engine-footnote"]')!
-            .getBoundingClientRect();
-          for (const item of [offload, optimization, footnote]) {
-            expect(item.left).to.be.at.least(bounds.left);
-            expect(item.right).to.be.at.most(bounds.right + 1);
-          }
-          if (width === 1440) {
-            expect(optimization.left).to.be.greaterThan(offload.right);
-            expect(footnote.left).to.be.greaterThan(optimization.right);
-            expect(optimization.top + optimization.height / 2).to.be.closeTo(
-              offload.top + offload.height / 2,
-              1,
-            );
-          } else {
-            expect(footnote.top, 'long caveat wraps below short status notes').to.be.at.least(
-              optimization.bottom,
-            );
-            expect(notes.scrollWidth, 'notes never overflow horizontally').to.be.at.most(
-              notes.clientWidth,
-            );
-          }
+          expect(offload.left).to.be.at.least(bounds.left);
+          expect(offload.right).to.be.at.most(bounds.right + 1);
+          expect(notes.scrollWidth).to.be.at.most(notes.clientWidth);
         });
         cy.get('[data-testid="offload-halo-key"]').should(
           'contain.text',
           locale === 'zh' ? 'KV offload 已开启' : 'KV offload ON',
         );
-        cy.get('[data-testid="atom-engine-footnote"]').should(
+        cy.get('#chart-0 [data-slot="chart-footer"] [data-testid="atom-engine-footnote"]').should(
           'have.text',
           locale === 'zh'
             ? '1 ATOM 引擎前景可期，但尚未用于生产环境 token 服务，仍处于早期阶段。'
             : '1 The ATOM engine is promising, however it has yet to serve production tokens. It is still in its infant stage.',
         );
-        cy.get('[data-testid="agentic-optimization-note"] button').click();
-        cy.get('[data-testid="option-help-content-agentic-optimizations"]').should(
-          'contain.text',
-          locale === 'zh'
-            ? '每项配置可能使用投机解码等推理优化。将鼠标悬停在数据点上可查看其具体设置。'
-            : 'Each configuration may use inference optimizations such as speculative decoding. Hover over a point to see its exact settings.',
-        );
+        cy.get('[data-testid="atom-engine-footnote"]').should(($note) => {
+          expect($note[0].scrollWidth).to.be.at.most($note[0].clientWidth);
+        });
+        cy.get('[data-testid="agentic-optimization-note"]').should('not.exist');
+        cy.get('[data-testid="chart-figure"] [data-testid="cache-reuse-link"]').should('not.exist');
       });
     }
   }
@@ -1932,11 +1996,105 @@ describe('ChartDisplay responsive status notes', () => {
       'contain.text',
       'KV offload ON',
     );
-    cy.get('[data-testid="chart-status-notes"] [data-testid="atom-engine-footnote"]').should(
+    cy.get('#chart-0 [data-testid="atom-engine-footnote"]').should(
       'contain.text',
       'has yet to serve production tokens',
     );
+    assertAtomPngExport('16:9');
   });
+
+  for (const ratio of ['auto', '16:9', '1:1'] as const) {
+    it(`includes the complete selected ATOM disclaimer in ${ratio} PNG exports`, () => {
+      mountWithProviders(<ChartDisplay />, {
+        inference: {
+          graphs: [
+            {
+              model: Model.DeepSeek_R1,
+              sequence: Sequence.AgenticTraces,
+              chartDefinition: defaultChartDef,
+              data: [createMockInferenceData({ framework: 'atom' })],
+            },
+          ],
+        },
+        globalFilters: {},
+        unofficial: {},
+      });
+      cy.get('#chart-0 [data-testid="atom-engine-footnote"]').should('have.text', atomDisclaimer);
+      assertAtomPngExport(ratio);
+    });
+  }
+
+  it('omits the ATOM disclaimer when its series is not selected', () => {
+    mountWithProviders(<ChartDisplay />, {
+      inference: {
+        graphs: [
+          {
+            model: Model.DeepSeek_R1,
+            sequence: Sequence.AgenticTraces,
+            chartDefinition: defaultChartDef,
+            data: [
+              createMockInferenceData(),
+              createMockInferenceData({ hwKey: 'mi355x_atom', framework: 'atom' }),
+            ],
+          },
+        ],
+        activeHwTypes: new Set(['b200_trt']),
+      },
+      globalFilters: {},
+      unofficial: {},
+    });
+    cy.get('#chart-0 .dot-group').should('have.length.greaterThan', 0);
+    cy.get('[data-testid="atom-engine-footnote"]').should('not.exist');
+  });
+
+  for (const history of [false, true]) {
+    it(`shows one ATOM disclaimer in PowerX Where ${history ? 'history' : 'chip'} comparison`, () => {
+      mountWithProviders(
+        <PowerXSurfaceProvider>
+          <ChartDisplay />
+        </PowerXSurfaceProvider>,
+        {
+          inference: {
+            selectedYAxisMetric: 'y_measuredAvgPower',
+            powerCompare: 'breakdown',
+            selectedGPUs: history ? ['b200_trt'] : [],
+            selectedDates: history ? ['2025-03-01'] : [],
+            activeDates: new Set(['2025-03-01_b200_trt']),
+            graphs: [
+              {
+                model: Model.DeepSeek_R1,
+                sequence: Sequence.AgenticTraces,
+                chartDefinition: defaultChartDef,
+                data: [createMockInferenceData({ framework: 'atom' })],
+              },
+            ],
+          },
+          globalFilters: {},
+          unofficial: {},
+        },
+      );
+      cy.get('[data-testid="powerx-where-controls"]').should('be.visible');
+      cy.get('[data-testid="atom-engine-footnote"]')
+        .should('have.length', 1)
+        .and('have.text', atomDisclaimer)
+        .and('be.visible');
+      if (history) {
+        cy.get('#chart-0 [data-slot="chart-footer"] [data-testid="atom-engine-footnote"]').should(
+          'have.length',
+          1,
+        );
+        assertAtomPngExport('16:9');
+      } else {
+        cy.get('[data-testid="chart-figure"]').should(($figure) => {
+          const panels = $figure[0].querySelector('[data-testid="power-analysis-panels"]')!;
+          const note = $figure[0].querySelector('[data-testid="atom-engine-footnote"]')!;
+          expect(note.getBoundingClientRect().top).to.be.at.least(
+            panels.getBoundingClientRect().bottom,
+          );
+        });
+      }
+    });
+  }
 });
 
 describe('ChartDisplay engine comparison guard', () => {

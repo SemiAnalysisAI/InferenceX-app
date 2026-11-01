@@ -8,6 +8,8 @@ import {
   positionUnofficialWatermarkImage,
 } from './watermark';
 
+export const DEFAULT_CHART_MARGIN = { top: 24, right: 10, bottom: 40, left: 60 };
+
 export function setupChartStructure(
   svgElement: SVGSVGElement,
   config: ChartSetupConfig,

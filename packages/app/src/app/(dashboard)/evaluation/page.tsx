@@ -11,11 +11,11 @@ export const metadata: Metadata = tabMetadata('evaluation');
 export default function EvaluationPage() {
   return (
     <>
-      <TabIntro tab="evaluation" />
       <EvaluationProvider>
         <EvaluationChartDisplay />
         <NudgeEngine scope="evaluation" />
       </EvaluationProvider>
+      <TabIntro tab="evaluation" />
     </>
   );
 }

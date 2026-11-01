@@ -1,3 +1,5 @@
+import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
+
 import { FlowWidget } from '@/components/powerx/widgets/flow-widget';
 import { LadderWidget } from '@/components/powerx/widgets/ladder-widget';
 import { MeasuredVsModeledWidget } from '@/components/powerx/widgets/measured-vs-modeled-widget';
@@ -144,7 +146,7 @@ describe('PowerX tutorial layout stability', () => {
             {[0.35, 0.6, 0.95].map((draw) => (
               <PowerLadder
                 key={draw}
-                ladder={buildLadder(hardware, buildLadder(hardware, 1)!.tdpWatts * draw)!}
+                ladder={buildLadder(hardware, HW_REGISTRY[hardware].tdp * draw)!}
                 color="#16a34a"
                 locale={locale}
                 compact={compact}
