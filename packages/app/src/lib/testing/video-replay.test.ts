@@ -57,6 +57,44 @@ async function configure() {
   return replay;
 }
 
+async function configureCollection(artifactIds: number[], invalidArtifact?: number) {
+  const original = await configure();
+  const manifest = process.env.E2E_VIDEO_REPLAY_MANIFEST!;
+  const artifacts = await Promise.all(
+    artifactIds.map(async (id) => {
+      const metadataPath = `${manifest}.${id}.json`;
+      const zipPath = `${manifest}.${id}.zip`;
+      await Promise.all([
+        writeFile(metadataPath, JSON.stringify({ id })),
+        writeFile(zipPath, `zip-${id}`),
+      ]);
+      return { zipPath, metadataPath, expectedPlanSha256: String(id).repeat(64) };
+    }),
+  );
+  await writeFile(manifest, JSON.stringify({ artifacts }));
+  vi.mocked(readVideoReplay).mockImplementation(async (zip, metadata, expectedPlanSha256) => {
+    if (typeof metadata !== 'object' || metadata === null || Array.isArray(metadata))
+      throw new Error('Expected artifact metadata');
+    const id = Number(metadata.id);
+    expect(await zip.text()).toBe(`zip-${id}`);
+    expect(expectedPlanSha256).toBe(String(id).repeat(64));
+    return {
+      ...original,
+      report: {
+        ...original.report,
+        ok: id !== invalidArtifact,
+        errors: id === invalidArtifact ? ['plan SHA256 mismatch'] : [],
+      },
+      stored: {
+        ...original.stored,
+        artifact: { ...original.stored.artifact, id },
+        sources: original.stored.sources.map((source) => ({ ...source })),
+      },
+      media: new Map([['123', new Map([[mediaPath, new Blob([`clip-${id}`])]])]]),
+    };
+  });
+}
+
 afterEach(async () => {
   vi.unstubAllEnvs();
   vi.mocked(readVideoReplay).mockReset();
@@ -106,6 +144,57 @@ describe('original-artifact development replay', () => {
     const unsatisfiable = await GET(new NextRequest(url(''), { headers: { range: 'bytes=10-' } }));
     expect(unsatisfiable.status).toBe(416);
     expect(unsatisfiable.headers.get('content-range')).toBe('bytes */10');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps same-run artifacts and colliding media paths separate without approval', async () => {
+    await configureCollection([7, 8]);
+    const history = await GET(new NextRequest('http://localhost/api/video-runs?format=history'));
+    expect(history.status).toBe(200);
+    const page = await history.json();
+    expect(page.entries).toHaveLength(2);
+    expect(page.entries.map((entry: { artifact: { id: number } }) => entry.artifact.id)).toEqual([
+      7, 8,
+    ]);
+    for (const entry of page.entries) {
+      expect(entry).toMatchObject({ runId: '123', approved: false, publishedAt: null });
+      expect(entry.sources[0].releaseQualified).toBe(false);
+      const artifact = await GET(
+        new NextRequest(
+          `http://localhost/api/video-runs?run=123&artifact=${entry.artifact.id}&format=published`,
+        ),
+      );
+      expect(artifact.status).toBe(200);
+      const saved = await artifact.json();
+      const assetUrl = saved.sources[0].assets[0][1].url;
+      const media = await GET(new NextRequest(`http://localhost${assetUrl}`));
+      expect(await media.text()).toBe(`clip-${entry.artifact.id}`);
+    }
+    const wrongRun = await GET(new NextRequest(url('').replace('run=123', 'run=124')));
+    expect(wrongRun.status).toBe(404);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { ids: [], error: 'nonempty artifacts array' },
+    { ids: [7, 7], error: 'Duplicate replay artifact' },
+  ])('rejects an ambiguous or empty collection: $ids', async ({ ids, error }) => {
+    await configureCollection(ids);
+    const response = await GET(new NextRequest('http://localhost/api/video-runs?format=history'));
+    expect(response.status).toBe(503);
+    const body = await response.json();
+    expect(body.error).toContain(error);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('withholds every artifact when the second member fails verification', async () => {
+    await configureCollection([7, 8], 8);
+    for (const path of ['http://localhost/api/video-runs?format=history', url('')]) {
+      const response = await GET(new NextRequest(path));
+      expect(response.status).toBe(503);
+      const body = await response.json();
+      expect(body.error).toContain('plan SHA256 mismatch');
+    }
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

@@ -16,7 +16,7 @@ interface Snapshot {
   media: Map<string, Map<string, Blob>>;
 }
 
-let cached: { manifest: string; value: Promise<Snapshot> } | null = null;
+let cached: { manifest: string; value: Promise<Snapshot[]> } | null = null;
 
 function active() {
   return (
@@ -26,58 +26,77 @@ function active() {
   );
 }
 
-function snapshot(): Promise<Snapshot> {
+async function readSnapshot(config: unknown): Promise<Snapshot> {
+  if (typeof config !== 'object' || config === null || Array.isArray(config))
+    throw new Error('Replay artifact configuration must be an object');
+  const { zipPath, metadataPath, expectedPlanSha256 } = config as Record<string, unknown>;
+  if (
+    typeof zipPath !== 'string' ||
+    !isAbsolute(zipPath) ||
+    typeof metadataPath !== 'string' ||
+    !isAbsolute(metadataPath) ||
+    typeof expectedPlanSha256 !== 'string'
+  )
+    throw new Error('Replay manifest needs absolute ZIP and metadata paths and a plan hash');
+  const [zip, metadataText] = await Promise.all([
+    readFile(zipPath),
+    readFile(metadataPath, 'utf8'),
+  ]);
+  const replay = await readVideoReplay(
+    new Blob([new Uint8Array(zip)]),
+    JSON.parse(metadataText),
+    expectedPlanSha256,
+  );
+  if (!replay.report.ok) throw new Error(replay.report.errors.join('; '));
+  const { stored, media } = replay;
+  for (const source of stored.sources) {
+    source.assets = [...(media.get(source.id) ?? new Map())].map(([path]) => {
+      const url = new URL('/api/video-runs', 'http://localhost');
+      for (const [key, value] of Object.entries({
+        format: 'replay-asset',
+        run: stored.runId,
+        artifact: String(stored.artifact.id),
+        source: source.id,
+        path,
+      }))
+        url.searchParams.set(key, value);
+      return [
+        path,
+        { url: `${url.pathname}${url.search}`, downloadUrl: `${url.pathname}${url.search}` },
+      ];
+    });
+  }
+  const history = videoHistoryEntry(stored, null);
+  history.approved = false;
+  if (history.sources.some((source) => source.releaseQualified !== false))
+    throw new Error('Replay source must retain its original releaseQualified=false verdict');
+  return { stored, history, media };
+}
+
+function snapshot(): Promise<Snapshot[]> {
   const manifest = process.env.E2E_VIDEO_REPLAY_MANIFEST!;
   if (!cached || cached.manifest !== manifest) {
     cached = {
       manifest,
       value: (async () => {
         if (!isAbsolute(manifest)) throw new Error('Replay manifest must be an absolute path');
-        const config = JSON.parse(await readFile(manifest, 'utf8')) as Record<string, unknown>;
-        const zipPath = config.zipPath;
-        const metadataPath = config.metadataPath;
-        const expectedPlanSha256 = config.expectedPlanSha256;
-        if (
-          typeof zipPath !== 'string' ||
-          !isAbsolute(zipPath) ||
-          typeof metadataPath !== 'string' ||
-          !isAbsolute(metadataPath) ||
-          typeof expectedPlanSha256 !== 'string'
-        )
-          throw new Error('Replay manifest needs absolute ZIP and metadata paths and a plan hash');
-        const [zip, metadataText] = await Promise.all([
-          readFile(zipPath),
-          readFile(metadataPath, 'utf8'),
-        ]);
-        const replay = await readVideoReplay(
-          new Blob([new Uint8Array(zip)]),
-          JSON.parse(metadataText),
-          expectedPlanSha256,
-        );
-        if (!replay.report.ok) throw new Error(replay.report.errors.join('; '));
-        const { stored, media } = replay;
-        for (const source of stored.sources) {
-          source.assets = [...(media.get(source.id) ?? new Map())].map(([path]) => {
-            const url = new URL('/api/video-runs', 'http://localhost');
-            for (const [key, value] of Object.entries({
-              format: 'replay-asset',
-              run: stored.runId,
-              artifact: String(stored.artifact.id),
-              source: source.id,
-              path,
-            }))
-              url.searchParams.set(key, value);
-            return [
-              path,
-              { url: `${url.pathname}${url.search}`, downloadUrl: `${url.pathname}${url.search}` },
-            ];
-          });
+        const config: unknown = JSON.parse(await readFile(manifest, 'utf8'));
+        const inputs =
+          typeof config === 'object' && config !== null && 'artifacts' in config
+            ? config.artifacts
+            : [config];
+        if (!Array.isArray(inputs) || inputs.length === 0)
+          throw new Error('Replay manifest needs a nonempty artifacts array');
+        const snapshots: Snapshot[] = [];
+        const identities = new Set<string>();
+        for (const input of inputs) {
+          const replay = await readSnapshot(input);
+          const identity = JSON.stringify([replay.stored.runId, replay.stored.artifact.id]);
+          if (identities.has(identity)) throw new Error(`Duplicate replay artifact: ${identity}`);
+          identities.add(identity);
+          snapshots.push(replay);
         }
-        const history = videoHistoryEntry(stored, null);
-        history.approved = false;
-        if (history.sources.some((source) => source.releaseQualified !== false))
-          throw new Error('Replay source must retain its original releaseQualified=false verdict');
-        return { stored, history, media };
+        return snapshots;
       })(),
     };
   }
@@ -140,9 +159,9 @@ function assetResponse(request: NextRequest, replay: Snapshot): Response {
 /** Null means the fixture adapter is disabled; active reads never reach an external source. */
 export async function localVideoReplayResponse(request: NextRequest): Promise<Response | null> {
   if (!active()) return null;
-  let replay: Snapshot;
+  let snapshots: Snapshot[];
   try {
-    replay = await snapshot();
+    snapshots = await snapshot();
   } catch (error) {
     return Response.json(
       {
@@ -156,16 +175,16 @@ export async function localVideoReplayResponse(request: NextRequest): Promise<Re
   if (format === 'history' && !q.has('run') && !q.has('artifact')) {
     return Response.json(
       Number(q.get('page') ?? '1') === 1
-        ? { schemaVersion: 1, entries: [replay.history], nextPage: null }
+        ? { schemaVersion: 1, entries: snapshots.map((replay) => replay.history), nextPage: null }
         : { schemaVersion: 1, entries: [], nextPage: null },
       { headers: privateHeaders },
     );
   }
-  if (
-    q.get('run') !== replay.stored.runId ||
-    q.get('artifact') !== String(replay.stored.artifact.id)
-  )
-    return new Response(null, { status: 404, headers: privateHeaders });
+  const replay = snapshots.find(
+    ({ stored }) =>
+      q.get('run') === stored.runId && q.get('artifact') === String(stored.artifact.id),
+  );
+  if (!replay) return new Response(null, { status: 404, headers: privateHeaders });
   if (format === 'replay-asset') return assetResponse(request, replay);
   if (format === 'published' || format === 'media')
     return Response.json(replay.stored, { headers: privateHeaders });

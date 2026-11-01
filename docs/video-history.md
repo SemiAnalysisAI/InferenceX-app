@@ -32,17 +32,21 @@ Native matrix artifacts use `h3-results-<run>-<attempt>-<recipe-fingerprint>` wh
 
 Only in development, `E2E_FIXTURES=1` serves `cypress/fixtures/api/video-history.json` through the existing fixture loader and checksum manifest. The fixture is a metadata-only projection of retained H100/H200/B200 observations and two fidelity artifacts; it contains no infrastructure paths or video bytes. Its synthetic `approved: true` flags exercise the default chart layout and are not real publication receipts. Unknown publication timestamps remain null. The response header `X-VideoGenX-Replay: 1` causes a visible replay notice. These are historical retained observations, not newly measured results or a new publication.
 
-For a local browser replay of one original artifact, set `E2E_FIXTURES=1` and
+For a local browser replay of original artifacts, set `E2E_FIXTURES=1` and
 `E2E_VIDEO_REPLAY_MANIFEST=/absolute/replay-input.json` on the development server.
 The JSON manifest contains absolute `zipPath` and `metadataPath` fields, plus
-`expectedPlanSha256`. The server verifies the original ZIP and metadata
-once, replaces History with its unapproved entry, and serves its exact stored
-artifact and MP4 byte ranges through `/api/video-runs`. The original ZIP is
-read-only. Unknown identities and paths cannot use the production fallback while
+`expectedPlanSha256`, or an `artifacts` array of objects with those same fields.
+The server independently verifies each original ZIP against its metadata and
+plan hash, replaces History with their unapproved entries, and serves each exact
+run/artifact pair and its MP4 byte ranges through `/api/video-runs`. Empty arrays,
+duplicate run/artifact pairs, or any invalid member reject the entire collection.
+The original ZIPs are read-only. Unknown identities and paths cannot use the production fallback while
 this adapter is active. `format=replay-asset` is unavailable outside the gate.
 This mode preserves the original `releaseQualified=false` verdict and never
 creates an approval receipt. The ordinary fixture remains the default when no
-explicit manifest is set.
+explicit manifest is set. Restart the development server after changing the
+manifest. The existing `unofficialrun` selector accepts one run ID; artifacts
+from that run compare only when their canonical workloads match.
 
 ### Original CI ZIP reader check
 
@@ -92,7 +96,11 @@ serving 矩阵有两种来源，`serving.ts` 按 manifest 的 `evidence_kind` �
 
 原始产物的本地浏览器回放需在开发服务器设置 `E2E_FIXTURES=1` 和指向绝对路径的
 `E2E_VIDEO_REPLAY_MANIFEST`。该 JSON 文件填写原始 ZIP、GitHub 元数据的绝对路径
-`zipPath`、`metadataPath` 及 `expectedPlanSha256`。服务器校验后以原运行的未批准记录
-替换 History，并通过现有 `/api/video-runs` 读取原始 MP4 字节。输入 ZIP 不会被修改；
+`zipPath`、`metadataPath` 及 `expectedPlanSha256`；也可用 `artifacts` 数组列出多组相同字段。
+服务器逐一核对每份原始 ZIP 的元数据和 plan hash，以各自的未批准记录替换 History，
+并按准确的 run/artifact 身份通过现有 `/api/video-runs` 读取原始 MP4 字节。
+数组为空、run/artifact 身份重复或任一成员校验失败时，整组回放均不可用。输入 ZIP 不会被修改；
 未知身份或路径不会回退到线上读取，`format=replay-asset` 在此模式外返回 404。
-原有 `releaseQualified=false` 结论保持不变；不配置显式 manifest 时仍使用普通 fixture。
+原有 `releaseQualified=false` 结论保持不变，也不会生成批准回执；不配置显式 manifest 时仍使用普通 fixture。
+修改 manifest 后需重启开发服务器。现有 `unofficialrun` 筛选仅接受一个 run ID；该运行内的产物
+只有在完整工作负载身份一致时才会并排比较。
