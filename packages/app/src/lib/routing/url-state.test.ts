@@ -69,6 +69,17 @@ describe('PARAM_DEFAULTS', () => {
     expect(PARAM_DEFAULTS.i_gradlabel).toBe('');
   });
 
+  it('defaults framework labels on and preserves only the off override in share links', async () => {
+    setupWindow('?i_frameworklabel=0');
+    const { PARAM_DEFAULTS, readUrlParams, buildShareUrl, writeUrlParams } =
+      await import('@/lib/routing/url-state');
+    expect(PARAM_DEFAULTS.i_frameworklabel).toBe('1');
+    expect(readUrlParams().i_frameworklabel).toBe('0');
+    expect(new URL(buildShareUrl()).searchParams.get('i_frameworklabel')).toBe('0');
+    writeUrlParams({ i_frameworklabel: '1' });
+    expect(new URL(buildShareUrl()).searchParams.has('i_frameworklabel')).toBe(false);
+  });
+
   it.each(['1', '2'])(
     'preserves frontier mode %s and ignores retired hinterland state in share links',
     async (mode) => {

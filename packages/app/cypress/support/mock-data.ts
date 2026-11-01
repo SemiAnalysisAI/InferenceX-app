@@ -250,6 +250,8 @@ export function createMockInferenceContextValues(
     setShowGradientLabels: namedStub('setShowGradientLabels'),
     showLineLabels: false,
     showOffloadingLabel: true,
+    showFrameworkLabel: true,
+    setShowFrameworkLabel: namedStub('setShowFrameworkLabel'),
     setShowOffloadingLabel: namedStub('setShowOffloadingLabel'),
     setShowLineLabels: namedStub('setShowLineLabels'),
     showParetoFrontier: false,
