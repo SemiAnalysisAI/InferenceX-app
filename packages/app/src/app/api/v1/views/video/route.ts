@@ -1,6 +1,11 @@
 import { GET as videoRuns } from '@/app/api/video-runs/route';
 import { compareSide, pairCases } from '@/components/video-benchmark/compare';
 import {
+  publishedResultsSide,
+  resultsClipEvidence,
+  resultsClipPoints,
+} from '@/components/video-benchmark/results-clips';
+import {
   VIDEO_HISTORY_MAX_PAGES,
   type VideoHistoryPage,
 } from '@/components/video-benchmark/history';
@@ -64,11 +69,45 @@ async function dashboardResponse(request: NextRequest, view: 'dashboard' | 'comp
           'Content-Disposition': 'attachment; filename="videogenx-results.csv"',
         },
       });
+    const selected = resultsClipPoints([...projection.cells, ...projection.overlayCells], {
+      tier: state.costTier,
+    });
+    const stored = new Map<string, Promise<StoredArtifact | null>>();
+    const reads = await Promise.allSettled(
+      selected.map(async (point) => {
+        const key = JSON.stringify([point.runId, point.artifactId]);
+        if (!stored.has(key))
+          stored.set(
+            key,
+            (async () => {
+              const response = await videoRuns(
+                sourceRequest(request, '/api/video-runs', {
+                  run: point.runId,
+                  artifact: String(point.artifactId),
+                  format: 'published',
+                }),
+              );
+              return response.status === 204 ? null : readResponse<StoredArtifact>(response);
+            })(),
+          );
+        const artifact = await stored.get(key)!;
+        return artifact === null ? null : publishedResultsSide(artifact, point);
+      }),
+    );
+    const sides = reads.flatMap((read) =>
+      read.status === 'fulfilled' && read.value ? [read.value] : [],
+    );
+    const clipQuality = {
+      status:
+        sides.length === selected.length ? 'ready' : sides.length > 0 ? 'partial' : 'unavailable',
+      groups: resultsClipEvidence(sides),
+    };
     return NextResponse.json(
       {
         view: 'video',
         apiVersion: 'v1',
         ...projection,
+        clipQuality,
         params: { ...projection.state, view },
         coverage: {
           pagesRead: pages.length,

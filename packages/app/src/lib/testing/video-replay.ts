@@ -3,6 +3,8 @@ import { isAbsolute } from 'node:path';
 import { readVideoReplay } from '@/components/video-benchmark/replay';
 import { videoHistoryEntry } from '@/components/video-benchmark/history';
 import type { StoredArtifact } from '@/components/video-benchmark/stored';
+import { readLocalVideoQuality } from './video-quality';
+import type { Json } from '@/components/video-benchmark/bundle';
 import type { NextRequest } from 'next/server';
 
 const privateHeaders = {
@@ -95,6 +97,43 @@ function snapshot(): Promise<Snapshot[]> {
           if (identities.has(identity)) throw new Error(`Duplicate replay artifact: ${identity}`);
           identities.add(identity);
           snapshots.push(replay);
+        }
+        if (typeof config === 'object' && config !== null && 'quality' in config) {
+          const quality = await readLocalVideoQuality(
+            config.quality as Json,
+            snapshots.map((item) => item.stored),
+          ).catch(() => {
+            // Filesystem/decoder details belong to local diagnostics, never the HTTP response.
+            throw new Error('Quality attachment failed verification');
+          });
+          for (const replay of snapshots) {
+            replay.stored.quality = quality.pairs
+              .filter(
+                (pair) =>
+                  pair.candidate.run_id === replay.stored.runId &&
+                  pair.candidate.artifact_id === replay.stored.artifact.id,
+              )
+              .map((pair) => {
+                const source = `reference:${pair.reference.receipt_sha256}`;
+                const files = replay.media.get(source) ?? new Map<string, Blob>();
+                files.set(
+                  pair.reference.media_path,
+                  quality.media.get(pair.reference.receipt_sha256)!.get(pair.reference.media_path)!,
+                );
+                replay.media.set(source, files);
+                const query = new URLSearchParams({
+                  format: 'replay-asset',
+                  run: replay.stored.runId,
+                  artifact: String(replay.stored.artifact.id),
+                  source,
+                  path: pair.reference.media_path,
+                });
+                return {
+                  ...pair,
+                  reference: { ...pair.reference, url: `/api/video-runs?${query}` },
+                };
+              });
+          }
         }
         return snapshots;
       })(),

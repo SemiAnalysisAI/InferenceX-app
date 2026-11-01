@@ -12,11 +12,13 @@ import {
   absoluteFrameDifference,
   publishedResultsSide,
   resultsClipGroups,
+  resultsClipReference,
   type ResultsClipGroup,
   type ResultsClipSide,
 } from './results-clips';
 import { RESULTS_HARDWARE, resultsHardwareRoster } from './results';
 import type { StoredArtifact } from './stored';
+import VideoSelect from './VideoSelect';
 
 const STRINGS = {
   en: {
@@ -26,6 +28,7 @@ const STRINGS = {
     approved: 'Approved',
     unapproved: 'No matching receipt',
     prompt: 'Prompt',
+    case: 'Case',
     sources: 'Prompt & sources',
     source: 'Source',
     run: 'Run',
@@ -46,13 +49,20 @@ const STRINGS = {
     difference: 'Difference',
     view: 'Clip view',
     differenceNote:
-      'Absolute RGB difference ×4 against the H200 50-step reference at the same playback time. This browser view is not a sealed quality measurement.',
+      'Absolute RGB difference ×4 against the matched Diffusers reference at the same playback time. This browser preview is separate from the all-frame PSNR measurement.',
     differenceLabel: 'RGB difference ×4 · preview',
-    noReference: 'A matched H200 50-step reference is not available.',
+    noReference: 'No sealed reference pair for this clip.',
     differenceUnavailable:
       'Difference unavailable: frames must have matching geometry and permit cross-origin pixel reads.',
     mediaError: 'This clip could not be played.',
-    reference: 'H200 50-step reference',
+    reference: 'Official Diffusers reference',
+    schedule: (updates: number, sigmas: number) => `${updates} updates · ${sigmas} sigma points`,
+    exactMatch: 'Exact match',
+    incompatible: 'Paired media are incompatible; PSNR is unavailable.',
+    psnrMeasured: (frames: number) =>
+      `Decoded RGB24 · all ${frames} frames · full-stream MSE. Descriptive cross-engine comparison; no quality pass/fail threshold.`,
+    referenceNote:
+      'Encoded reference MP4. PSNR compares every decoded RGB pixel and frame; it does not measure semantic quality.',
     wall: 'wall time',
     psnr: 'PSNR',
     energy: 'J / clip',
@@ -61,9 +71,9 @@ const STRINGS = {
     allocatedCost: 'Allocated',
     energyNote:
       'Mean GPU-board joules per valid clip in the selected measurement cell; not a per-clip energy trace.',
-    psnrNote: 'Planned: no sealed paired PSNR result is available for this clip.',
+    psnrNote: 'No sealed paired PSNR result is available for this clip.',
     metricsHelp:
-      'PSNR is planned until a sealed pair is available. J/clip is the selected cell mean, not a per-clip trace. Both TCO bases use the selected tier and recorded GPU count.',
+      'PSNR uses a sealed Diffusers reference pair and every decoded RGB frame. J/clip is the selected cell mean. Both TCO bases use the selected tier and recorded GPU count.',
     gpu: (n: number) => `${n} GPU`,
     seconds: 's',
   },
@@ -74,6 +84,7 @@ const STRINGS = {
     approved: '已批准',
     unapproved: '暂无匹配记录',
     prompt: 'Prompt',
+    case: '用例',
     sources: 'Prompt 与来源',
     source: '来源',
     run: '运行',
@@ -94,12 +105,18 @@ const STRINGS = {
     difference: '差异',
     view: '视频视图',
     differenceNote:
-      '与 H200 50-step 参考视频在相同播放时间的 RGB 绝对差异，放大 4 倍。浏览器预览不是已封存的质量测量结果。',
+      '与匹配的 Diffusers 参考视频在相同播放时间的 RGB 绝对差异，放大 4 倍。浏览器预览与全帧 PSNR 测量分别展示。',
     differenceLabel: 'RGB 差异 ×4 · 预览',
-    noReference: '没有匹配的 H200 50-step 参考视频。',
+    noReference: '此视频暂无已封存的参考配对。',
     differenceUnavailable: '无法显示差异：帧尺寸必须一致，且视频需允许跨域像素读取。',
     mediaError: '此视频无法播放。',
-    reference: 'H200 50-step 参考',
+    reference: '官方 Diffusers 参考',
+    schedule: (updates: number, sigmas: number) => `${updates} 次更新 · ${sigmas} 个 sigma 点`,
+    exactMatch: '完全一致',
+    incompatible: '配对媒体不兼容，无法提供 PSNR。',
+    psnrMeasured: (frames: number) =>
+      `解码后 RGB24 · 全部 ${frames} 帧 · 全流 MSE。仅作跨引擎数值对比，不设质量合格阈值。`,
+    referenceNote: '已编码的参考 MP4。PSNR 对比全部解码 RGB 像素和帧，不衡量语义质量。',
     wall: '出片时间',
     psnr: 'PSNR',
     energy: 'J / clip',
@@ -107,9 +124,9 @@ const STRINGS = {
     participatingCost: '参与 GPU',
     allocatedCost: '分配 GPU',
     energyNote: '所选测量单元每条有效视频的平均 GPU 板卡能耗，不是单条视频的能耗轨迹。',
-    psnrNote: '计划中：此视频尚无已封存的配对 PSNR 结果。',
+    psnrNote: '此视频尚无已封存的配对 PSNR 结果。',
     metricsHelp:
-      'PSNR 需等待已封存的配对结果。J/clip 是所选测量单元的平均值，不是单条视频的能耗轨迹。两种 TCO 口径均使用所选成本档位和记录的 GPU 数量。',
+      'PSNR 使用已封存的 Diffusers 参考配对，比较全部解码 RGB 帧。J/clip 是所选测量单元的平均值。两种 TCO 口径均使用所选成本档位和记录的 GPU 数量。',
     gpu: (n: number) => `${n} 张 GPU`,
     seconds: 's',
   },
@@ -188,9 +205,16 @@ export default function VideoResultsClips({
     });
     return () => controller.abort();
   }, [selected, retry]);
-  const group = useMemo(() => resultsClipGroups(sides)[0] ?? null, [sides]);
+  const groups = useMemo(() => resultsClipGroups(sides), [sides]);
+  const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
+  const group = groups.find((item) => item.key === selectedGroup) ?? groups[0] ?? null;
   return (
-    <section aria-label={s.label} data-testid="video-results-clips" className="min-w-0 space-y-3">
+    <section
+      id="comparison-clips"
+      aria-label={s.label}
+      data-testid="video-results-clips"
+      className="min-w-0 scroll-mt-24 space-y-3"
+    >
       {loading && (
         <p role="status" className="text-sm text-muted-foreground">
           {s.loading}
@@ -210,6 +234,25 @@ export default function VideoResultsClips({
           >
             {s.retry}
           </Button>
+        </div>
+      )}
+      {groups.length > 1 && (
+        <div className="max-w-sm">
+          <VideoSelect
+            label={s.case}
+            value={group?.key ?? ''}
+            testId="video-results-case"
+            options={groups.map((item, index) => ({
+              value: item.key,
+              label: `${index + 1}. ${[...item.clips.values()][0]?.record.caseId ?? s.case} · ${s.take(item.take)}`,
+            }))}
+            onValueChange={(value) => {
+              track('video_results_case_changed', {
+                index: groups.findIndex((item) => item.key === value),
+              });
+              setSelectedGroup(value);
+            }}
+          />
         </div>
       )}
       <SynchronizedClips
@@ -245,12 +288,13 @@ function SynchronizedClips({
   const [errors, setErrors] = useState<ReadonlySet<string>>(new Set());
   const [differenceErrors, setDifferenceErrors] = useState<ReadonlySet<string>>(new Set());
   const visible = roster.filter((key) => !hidden.has(key));
-  const visibleKey = visible.join(',');
-  const playable = visible.filter((key) => group?.clips.has(key) && !errors.has(key));
-  const reference =
-    !hidden.has('h200') &&
-    !errors.has('h200') &&
-    group?.clips.get('h200')?.side.h200FiftyStepReference === true;
+  const referenceClip = resultsClipReference(group, hidden);
+  const reference = referenceClip && !errors.has('reference') ? referenceClip : null;
+  const visibleKey = [...visible, ...(referenceClip ? ['reference'] : [])].join(',');
+  const playable = [
+    ...visible.filter((key) => group?.clips.has(key) && !errors.has(key)),
+    ...(reference ? ['reference'] : []),
+  ];
   const knownDurations = playable.flatMap((key) => (durations[key] > 0 ? [durations[key]] : []));
   const duration = knownDurations.length > 0 ? Math.min(...knownDurations) : 0;
 
@@ -307,7 +351,7 @@ function SynchronizedClips({
       }
       if (view === 'difference' && reference && context && now - lastDraw >= 100) {
         lastDraw = now;
-        const ref = videos.current.get('h200');
+        const ref = videos.current.get('reference');
         if (ref && ref.readyState >= 2 && ref.videoWidth > 0) {
           buffer.width = ref.videoWidth;
           buffer.height = ref.videoHeight;
@@ -447,16 +491,81 @@ function SynchronizedClips({
           </table>
         </div>
       </details>
+      {referenceClip && (
+        <figure
+          data-testid="video-results-reference"
+          className="grid min-w-0 gap-3 rounded-lg border p-3 sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)] sm:items-center"
+        >
+          <div className="relative aspect-video overflow-hidden bg-black">
+            <video
+              ref={(element) => {
+                if (element) videos.current.set('reference', element);
+                else videos.current.delete('reference');
+              }}
+              src={referenceClip.url}
+              muted
+              playsInline
+              crossOrigin="anonymous"
+              preload="metadata"
+              aria-label={s.reference}
+              className="size-full object-contain"
+              onLoadedMetadata={(event) => {
+                const value = event.currentTarget.duration;
+                if (Number.isFinite(value) && value > 0)
+                  setDurations((previous) => ({ ...previous, reference: value }));
+              }}
+              onError={() => setErrors((previous) => new Set([...previous, 'reference']))}
+              onEnded={() => {
+                for (const video of videos.current.values()) video.pause();
+                setPlaying(false);
+              }}
+            />
+            {errors.has('reference') && (
+              <p
+                role="status"
+                className="absolute inset-0 grid place-content-center bg-muted p-2 text-xs text-muted-foreground"
+              >
+                {s.mediaError}
+              </p>
+            )}
+          </div>
+          <figcaption className="min-w-0 space-y-2 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1 text-sm font-medium text-foreground">
+              <span>{s.reference}</span>
+              <InfoHelp label={s.reference} value="reference-method">
+                {s.referenceNote}
+              </InfoHelp>
+            </div>
+            <p>{s.schedule(referenceClip.denoising_updates, referenceClip.sigma_points)}</p>
+            <p className="break-all font-mono">
+              Diffusers {referenceClip.diffusers_revision.slice(0, 12)}
+            </p>
+            <a
+              href={referenceClip.url}
+              className="underline"
+              onClick={() => track('video_results_reference_opened')}
+            >
+              {s.media}
+            </a>
+          </figcaption>
+        </figure>
+      )}
       <div
         className={`grid min-w-0 grid-cols-1 gap-3 min-[360px]:grid-cols-2 lg:grid-cols-4 lg:gap-4 ${visible.length > 4 ? 'xl:grid-cols-5' : ''}`}
       >
         {visible.map((key) => {
           const point = points.find((item) => item.hardwareKey === key);
           const clip = group?.clips.get(key);
+          const pairedReference =
+            reference &&
+            clip?.quality &&
+            clip.quality.status !== 'incompatible' &&
+            clip.quality.reference.receipt_sha256 === reference.receipt_sha256 &&
+            clip.quality.reference.media_sha256 === reference.media_sha256;
           const unavailable = errors.has(key)
             ? s.mediaError
             : clip
-              ? view === 'difference' && !reference
+              ? view === 'difference' && !pairedReference
                 ? s.noReference
                 : view === 'difference' && differenceErrors.has(key)
                   ? s.differenceUnavailable
@@ -535,11 +644,6 @@ function SynchronizedClips({
                     {s.unofficial}
                   </span>
                 )}
-                {!unavailable && clip?.side.h200FiftyStepReference && (
-                  <span className="absolute bottom-1 right-1 bg-black/60 px-1 text-3xs text-white">
-                    {s.reference}
-                  </span>
-                )}
               </div>
               <dl className="space-y-1 text-xs tabular-nums">
                 {[
@@ -550,7 +654,19 @@ function SynchronizedClips({
                       : `${display(clip.record.seconds)} ${s.seconds}`,
                     '',
                   ],
-                  [s.psnr, '—', s.psnrNote],
+                  [
+                    s.psnr,
+                    clip?.quality?.status === 'identical'
+                      ? s.exactMatch
+                      : clip?.quality?.status === 'measured'
+                        ? `${display(clip.quality.psnrDb, 2)} dB`
+                        : '—',
+                    clip?.quality
+                      ? clip.quality.status === 'incompatible'
+                        ? s.incompatible
+                        : s.psnrMeasured(clip.quality.totalFrames)
+                      : s.psnrNote,
+                  ],
                   [
                     s.energy,
                     display(!point || point.energyKj === null ? null : point.energyKj * 1000, 0),

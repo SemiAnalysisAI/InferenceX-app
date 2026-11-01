@@ -38,6 +38,7 @@ import {
   type VideoMode,
 } from './results';
 import VideoResultsClips from './VideoResultsClips';
+import { resultsClipPoints } from './results-clips';
 import {
   ResultsBars,
   ResultsLines,
@@ -87,6 +88,8 @@ const STRINGS = {
     integrity: 'Technical integrity',
     counts: 'Completion counts',
     fidelity: 'Paired fidelity',
+    perClipPsnr: 'Per-clip PSNR → Comparison clips',
+    ssim: 'SSIM',
     hashNote:
       'Model revision, step schedule, resolution, fps, prompt set and seeds remain part of the workload identity. Full-step and distilled runs are separate cohorts; paired fidelity needs its own sealed comparison.',
     sealed: 'SHA256SUMS',
@@ -232,6 +235,8 @@ const STRINGS = {
     integrity: '技术完整性',
     counts: '完成数量',
     fidelity: '配对保真度',
+    perClipPsnr: '逐条视频 PSNR → 视频对比',
+    ssim: 'SSIM',
     hashNote:
       '工作负载身份包含模型版本、步数、分辨率、fps、prompt 集合与 seed。完整步数与蒸馏版本分组展示；配对保真度需要单独封存的比较产物。',
     sealed: 'SHA256SUMS',
@@ -836,15 +841,7 @@ export default function VideoDashboard() {
       <div className={styles.body}>
         <div className={styles.content}>
           <VideoResultsClips
-            points={representatives
-              .filter(
-                (c) =>
-                  c.overlay ||
-                  !representatives.some(
-                    (other) => other.overlay && other.point.hardwareKey === c.point.hardwareKey,
-                  ),
-              )
-              .map((c) => c.point)}
+            points={resultsClipPoints(cells, { tier: state.costTier })}
             colorFor={(key) =>
               representatives.some((c) => c.overlay && c.point.hardwareKey === key)
                 ? overlayRunColor(0)
@@ -922,8 +919,15 @@ export default function VideoDashboard() {
                   : noRows}
               </Table>
             </Item>
-            <Item title={s.fidelity} wide state={s.tbd}>
-              <Empty s={s} kind="planned" note={`PSNR · ${s.audioCosine} · ${s.rms}`} />
+            <Item title={s.fidelity} wide>
+              <a
+                href="#comparison-clips"
+                className="text-sm underline"
+                onClick={() => track('video_results_quality_clips_opened', { metric: 'psnr' })}
+              >
+                {s.perClipPsnr}
+              </a>
+              <Empty s={s} kind="planned" note={`${s.audioCosine} · ${s.rms}`} />
             </Item>
           </Group>
           <Group id="latency" title={s.latency}>
@@ -1204,8 +1208,15 @@ export default function VideoDashboard() {
             </Item>
           </Group>
           <Group id="quality" title={s.quality}>
-            <Item title={s.pixel} state={s.planned}>
-              <Empty s={s} kind="planned" />
+            <Item title={s.pixel}>
+              <a
+                href="#comparison-clips"
+                className="text-sm underline"
+                onClick={() => track('video_results_quality_clips_opened', { metric: 'psnr' })}
+              >
+                {s.perClipPsnr}
+              </a>
+              <Empty s={s} kind="planned" note={s.ssim} />
             </Item>
             <Item title={s.semantic} state={s.planned}>
               <Empty s={s} kind="planned" />

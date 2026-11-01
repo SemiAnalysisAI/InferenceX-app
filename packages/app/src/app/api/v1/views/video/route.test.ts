@@ -1,15 +1,23 @@
 import { compareMetrics } from '@/components/video-benchmark/compare';
 import { resolveCompareSelection } from '@/components/video-benchmark/compare-url-state';
 import { concurrencyPlateau, powerUtilization } from '@/components/video-benchmark/evidence';
-import type {
-  VideoHistoryObservation,
-  VideoHistoryPage,
+import {
+  videoHistoryEntry,
+  type VideoHistoryObservation,
+  type VideoHistoryPage,
 } from '@/components/video-benchmark/history';
 import { metricValue } from '@/components/video-benchmark/metrics';
 import { listedVideoCells, plotVideoPoints } from '@/components/video-benchmark/plot';
 import { dashboardCells, namedRunPoints, videoPoints } from '@/components/video-benchmark/points';
 import { parseResultsState, resultProjection } from '@/components/video-benchmark/results';
 import { servingFixture } from '@/components/video-benchmark/serving.fixture';
+import { referenceQualityFixture } from '@/components/video-benchmark/reference-quality.fixture';
+import { verifiedReferencePairs } from '@/components/video-benchmark/reference-quality';
+import {
+  publishedResultsSide,
+  resultsClipEvidence,
+  resultsClipPoints,
+} from '@/components/video-benchmark/results-clips';
 import type { StoredArtifact } from '@/components/video-benchmark/stored';
 import {
   metricOptions,
@@ -173,6 +181,97 @@ beforeEach(() => {
 });
 
 describe('published VideoGenX dashboard projection', () => {
+  it('prefers the older slower named clip over a faster official clip on the same hardware', async () => {
+    const named = referenceQualityFixture(20);
+    const official = referenceQualityFixture(20, '124', 8, '4'.repeat(64));
+    official.attachment.pairs[0].comparison.metrics.video_psnr_db = 35;
+    for (const f of [named, official]) {
+      f.stored.quality = verifiedReferencePairs(
+        f.attachment,
+        f.receipts,
+        [f.stored],
+        '9'.repeat(64),
+      );
+      const mediaPath = f.attachment.pairs[0].candidate.media_path;
+      f.stored.sources[0].assets = [
+        [mediaPath, { url: `/${f.stored.runId}.mp4`, downloadUrl: `/${f.stored.runId}.mp4` }],
+      ];
+    }
+    const namedEntry = videoHistoryEntry(named.stored, null);
+    const officialEntry = videoHistoryEntry(official.stored, null);
+    officialEntry.approved = true;
+    namedEntry.sources[0].observedAt = '2025-01-01T00:00:00Z';
+    officialEntry.sources[0].observedAt = '2026-01-01T00:00:00Z';
+    for (const entry of officialEntry.sources[0].observations) {
+      entry.p50 = 60;
+      entry.clipsGpuHour = 100;
+    }
+    const history: VideoHistoryPage = {
+      schemaVersion: 1,
+      nextPage: null,
+      entries: [officialEntry, namedEntry],
+    };
+    source.mockImplementation((req: NextRequest) =>
+      Response.json(
+        req.nextUrl.searchParams.get('format') === 'history'
+          ? history
+          : req.nextUrl.searchParams.get('run') === '123'
+            ? named.stored
+            : official.stored,
+      ),
+    );
+    const response = await GET(request('view=overview&unofficialrun=123'));
+    const body = await response.json();
+    expect(body.cells[0].point.runId).toBe('124');
+    expect(body.overlayCells[0].point.runId).toBe('123');
+    expect(body.clipQuality.groups[0].clips[0].quality.candidate.run_id).toBe('123');
+    expect(body.clipQuality.groups[0].clips[0].quality.psnrDb).toBe(25);
+    const projection = resultProjection(
+      videoPoints([history]),
+      parseResultsState('unofficialrun=123'),
+      namedRunPoints([history], '123'),
+    );
+    const uiPoints = resultsClipPoints([...projection.cells, ...projection.overlayCells], {
+      tier: 'h',
+    });
+    expect(uiPoints.map((point) => point.runId)).toEqual(['123']);
+    expect(body.clipQuality.groups).toEqual(
+      resultsClipEvidence(uiPoints.map((point) => publishedResultsSide(named.stored, point))),
+    );
+    const clearedResponse = await GET(request('view=overview'));
+    const cleared = await clearedResponse.json();
+    expect(cleared.clipQuality.groups[0].clips[0].quality.candidate.run_id).toBe('124');
+    expect(cleared.clipQuality.groups[0].clips[0].quality.psnrDb).toBe(35);
+  });
+  it('returns the same exact per-clip quality as the UI and removes it with the named run', async () => {
+    const f = referenceQualityFixture(20);
+    f.stored.quality = verifiedReferencePairs(f.attachment, f.receipts, [f.stored], '9'.repeat(64));
+    const mediaPath = f.attachment.pairs[0].candidate.media_path;
+    f.stored.sources[0].assets = [[mediaPath, { url: '/media.mp4', downloadUrl: '/media.mp4' }]];
+    const history: VideoHistoryPage = {
+      schemaVersion: 1,
+      nextPage: null,
+      entries: [videoHistoryEntry(f.stored, null)],
+    };
+    source.mockImplementation((req: NextRequest) =>
+      Response.json(req.nextUrl.searchParams.get('format') === 'history' ? history : f.stored),
+    );
+    const response = await GET(request('view=overview&unofficialrun=123'));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    const points = namedRunPoints([history], '123');
+    const point = points.find((item) => item.cell === 'c1')!;
+    expect(body.clipQuality).toEqual({
+      status: 'ready',
+      groups: resultsClipEvidence([publishedResultsSide(f.stored, point)]),
+    });
+    expect(body.clipQuality.groups[0].clips[0].quality.psnrDb).toBe(25);
+    expect(body.clipQuality.groups[0].clips[0].quality.releaseQualified).toBe(false);
+    const clearedResponse = await GET(request('view=overview'));
+    const cleared = await clearedResponse.json();
+    expect(cleared.clipQuality.groups).toEqual([]);
+    expect(cleared.cells).toEqual([]);
+  });
   it('returns H100 in the shared roster and keeps its unapproved named projection isolated', async () => {
     const history = structuredClone(retainedHistory) as unknown as VideoHistoryPage;
     history.nextPage = null;
@@ -213,7 +312,7 @@ describe('published VideoGenX dashboard projection', () => {
     ).toBe(false);
   });
 
-  it('returns the same nine-group selection and economics as the UI without reading or publishing media', async () => {
+  it('returns the same nine-group selection and economics with read-only stored media metadata', async () => {
     const history = structuredClone(retainedHistory) as unknown as VideoHistoryPage;
     history.nextPage = null;
     source.mockImplementation(() => Response.json(history));
@@ -228,7 +327,9 @@ describe('published VideoGenX dashboard projection', () => {
     expect(body.params.view).toBe('overview');
     expect(body.coverage.pagesRead).toBe(1);
     expect(
-      source.mock.calls.every(([req]) => req.nextUrl.searchParams.get('format') === 'history'),
+      source.mock.calls.every(([req]) =>
+        ['history', 'published'].includes(req.nextUrl.searchParams.get('format')),
+      ),
     ).toBe(true);
     const mixed = await GET(request('view=overview&v_api=0.08'));
     const wrongView = await GET(request('view=dashboard&r_tier=h'));
@@ -293,7 +394,9 @@ describe('published VideoGenX dashboard projection', () => {
       cleared.cells.map((cell: { point: { runId: string } }) => cell.point.runId),
     ).not.toContain(run);
     expect(
-      source.mock.calls.every(([req]) => req.nextUrl.searchParams.get('format') === 'history'),
+      source.mock.calls.every(([req]) =>
+        ['history', 'published'].includes(req.nextUrl.searchParams.get('format')),
+      ),
     ).toBe(true);
   });
 

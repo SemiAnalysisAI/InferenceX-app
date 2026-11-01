@@ -50,6 +50,28 @@ from that run compare only when their canonical workloads match.
 
 ### Original CI ZIP reader check
 
+The replay manifest may also contain
+`quality: { path: "/absolute/quality.json", sha256: "<digest>" }`. This independent
+v1 attachment names the scorer revision/hash and original reference receipts, then
+binds each comparison to the candidate run/artifact/source/manifest/cell/slot/case/
+prompt/seed/media SHA. Each reference descriptor contains `receipt_path`,
+`receipt_sha256` and the adjacent SHA256SUMS file's `checksums_sha256`. The reader
+verifies receipt and referenced MP4 bytes before exposing scores or reference URLs.
+Private paths and free-text decoder errors never enter the JSON response; public
+checks contain allowlisted names/status and only numeric or boolean observations.
+Raw diagnostics remain in the sealed local attachment.
+
+Original ZIPs stay unchanged. Duplicate pairs, substituted identities, unsafe paths
+or invalid seals fail the attachment closed. Reference MP4s use the existing replay
+byte-range path with a receipt-scoped source identity and exact candidate
+run/artifact membership; unbound cases are unavailable. This route remains
+development-only. PSNR comes from complete decoded RGB24 comparison, not the browser
+difference canvas. Exact equality and incompatible media have distinct statuses
+with null PSNR. Original plan hashes, unjudged quality and releaseQualified=false
+remain visible.
+
+中文：回放配置可额外提供 `quality: { path, sha256 }`，读取独立封存的 v1 配对附件。读取前校验原始参考回执、相邻 SHA256SUMS 及所引用 MP4 字节，并精确绑定候选运行、产物、来源、manifest、测量单元、slot、用例、prompt、seed 和媒体 SHA。本机路径和解码器自由文本错误不进入 API；公开检查仅保留允许的名称、状态及数值或布尔观察值，完整诊断留在本地封存附件。重复配对、身份替换、不安全路径或封印失效均拒绝读取。参考视频按参考回执和候选 run/artifact 隔离，只提供该产物实际绑定的用例，不授予发布批准，也不修改原始 ZIP。
+
 From `packages/app`, replay an unmodified native H3 CI ZIP with its original GitHub
 artifact-object JSON and the expected sealed plan SHA256:
 

@@ -747,8 +747,35 @@ evidence remains. An older H100 workload does not qualify a newer workload.
 request samples, deadline metrics, both cost bases and modelled profit per GPU-hour.
 `evidence` includes recorded validity, hashes, completion counts and valid power
 samples. Missing quality, stage timing, memory and startup data remains null.
-PSNR against an H200 full-step reference requires separately sealed paired evidence;
-playable clips alone do not establish it. Never replace nulls with example numbers.
+Per-clip PSNR requires separately sealed pairs against the pinned official Diffusers
+reference. Playable clips or hardware labels alone do not establish a reference.
+Never replace nulls with example numbers.
+
+`view=overview` returns `clipQuality: { status, groups }`. The status describes
+artifact-read coverage (`ready`, `partial`, `unavailable`), not quality. Every group
+retains prompt, seed and take; each clip retains hardware, point/slot/case/media
+identity and nullable `quality`. The UI uses this same matching projection. All
+groups are returned, so the case picker is presentation-only.
+
+Quality retains `attachmentSha256`, exact candidate run/artifact/source/manifest/
+cell/slot/case/prompt/seed/media identity and original plan SHA; the reference's
+separate receipt/plan/media hashes and pinned Diffusers/model/schedule identity; and
+the scorer revision/hash/method. `decoded-rgb24-all-frames` compares every decoded
+RGB pixel/frame using full-stream MSE, peak=1 after division by 255. `measured` has
+finite `psnrDb` in dB; `identical` means exact decoded equality with null PSNR;
+`incompatible` also withholds PSNR and retains safe public checks. Missing pairs
+are null. `qualityStatus=unjudged` and `releaseQualified=false` remain explicit.
+No threshold, semantic score or cohort average is implied.
+
+The reference plays separately with shared playback/scrub and its recorded schedule
+(currently 49 updates / 50 sigma points). It is not a hardware serving result.
+Original plan hashes remain separate even when an unrelated case differs; selected
+case, model, generation and fairness must match exactly. Cell-granularity CSV
+excludes per-clip quality. Original-artifact development replay can attach locally
+sealed pairs under its existing gate, without publishing or approving them. Private
+filesystem paths, raw decoder error text and reference arrays are excluded.
+
+中文：overview 的 `clipQuality` 与界面共用逐条视频匹配投影，返回全部用例组；status 仅表示产物读取覆盖情况，不是质量结论。缺失配对为 null；有证据时保留候选与参考各自的完整身份、原始计划哈希及 scorer 版本。PSNR 使用全部解码 RGB24 像素和帧。measured 返回有限 dB 值；identical 表示完全一致、PSNR 为 null；incompatible 保留安全的检查字段并隐藏数值。质量仍为 unjudged、releaseQualified=false，不设合格阈值或样本组均值。参考视频独立同步播放，不冒充硬件 serving 结果。CSV 不包含逐条质量汇总；开发回放不会发布或批准附件，本机路径、原始解码错误及参考数组不对外返回。
 
 Play/pause, scrub time, clip/difference rendering, theme, and expand controls are
 presentation-only exclusions. Media is read through the existing published-only

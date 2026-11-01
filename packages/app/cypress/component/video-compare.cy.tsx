@@ -6,6 +6,8 @@ import VideoCompare from '@/components/video-benchmark/VideoCompare';
 import VideoResultsClips from '@/components/video-benchmark/VideoResultsClips';
 import history from '../fixtures/api/video-history.json';
 import { servingArtifact } from '../support/video-artifacts';
+import { referenceQualityFixture } from '@/components/video-benchmark/reference-quality.fixture';
+import { verifiedReferencePairs } from '@/components/video-benchmark/reference-quality';
 
 // Retained H100/H200/B200 C1/C2/C4 observations; clips come from synthetic stored artifacts.
 const points = videoPoints([history as unknown as VideoHistoryPage]);
@@ -211,7 +213,7 @@ describe('Video compare panel (retained fixture)', () => {
     cy.wait(['@h100', '@unpublished']);
     cy.get('[data-testid="video-compare-clips"]').should(
       'contain',
-      'Clips are not published for one of these runs',
+      'Retained clips are unavailable for one of these runs',
     );
     cy.get('[data-testid="video-compare-clip"]').should('not.exist');
     metricRow('p50Latency').should('contain', '-53.4%');
@@ -251,6 +253,13 @@ describe('Video compare panel (retained fixture)', () => {
 
 // These decoder fixtures are test inputs, never benchmark evidence.
 function mountResultsClips(keys = ['b200', 'h200'], pathname = '/video') {
+  const referenceMedia = { url: '' };
+  cy.fixture('video-results/reference.mp4', 'base64').then((encoded: string) => {
+    cy.window().then((win) => {
+      const bytes = Uint8Array.from(win.atob(encoded), (char) => char.codePointAt(0)!);
+      referenceMedia.url = win.URL.createObjectURL(new win.Blob([bytes], { type: 'video/mp4' }));
+    });
+  });
   for (const key of keys) {
     cy.fixture(`video-results/${key === 'h200' ? 'reference' : 'candidate'}.mp4`, 'base64').then(
       (encoded: string) => {
@@ -271,6 +280,22 @@ function mountResultsClips(keys = ['b200', 'h200'], pathname = '/video') {
             path,
             { ...asset, url },
           ]);
+          const qualityFixture = referenceQualityFixture();
+          const [quality] = verifiedReferencePairs(
+            qualityFixture.attachment,
+            qualityFixture.receipts,
+            [qualityFixture.stored],
+            '9'.repeat(64),
+          );
+          quality.candidate = {
+            ...quality.candidate,
+            run_id: point.runId,
+            artifact_id: point.artifactId,
+            source_id: saved.sources[0].id,
+            manifest_sha256: point.id.split(':')[0],
+          };
+          quality.reference.url = referenceMedia.url;
+          saved.quality = [quality];
           cy.intercept('GET', mediaUrl(point), saved).as(`results-${key}`);
         });
       },
@@ -433,7 +458,7 @@ describe('Video results synchronized clips', () => {
       'not.contain',
       'Unofficial run',
     );
-    cy.get('[data-testid="video-results-clip"][data-hardware="h200"] video').then(($video) => {
+    cy.get('[data-testid="video-results-reference"] video').then(($video) => {
       const video = $video[0] as HTMLVideoElement;
       video.src = 'data:video/mp4;base64,YmFk';
       video.load();
@@ -444,7 +469,7 @@ describe('Video results synchronized clips', () => {
     ).should('contain', 'reference');
     cy.get('[data-testid="video-results-clips"]').should(
       'contain',
-      'A matched H200 50-step reference is not available.',
+      'No sealed reference pair for this clip.',
     );
   });
 });

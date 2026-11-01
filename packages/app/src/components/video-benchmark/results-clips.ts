@@ -1,15 +1,41 @@
-import { at, number, text } from './bundle';
+import { at, text } from './bundle';
 import { compareSide, type CaseRecord, type CompareSide } from './compare';
-import type { VideoPoint } from './metrics';
+import type { MetricOptions, VideoPoint } from './metrics';
+import { leadCell } from './deployment';
+import { RESULTS_HARDWARE, type ResultCell } from './results';
 import { servingCells } from './serving';
 import { storedBundle, type StoredArtifact } from './stored';
+import type { ClipQuality } from './reference-quality';
+
+/** A named result owns its hardware's clip, even when the official result is newer or faster. */
+export function resultsClipPoints(
+  cells: readonly Pick<ResultCell, 'point' | 'overlay'>[],
+  options: MetricOptions,
+): VideoPoint[] {
+  return RESULTS_HARDWARE.flatMap((key) => {
+    const choices = cells.filter((cell) => cell.point.hardwareKey === key);
+    const named = leadCell(
+      choices.filter((cell) => cell.overlay).map((cell) => cell.point),
+      key,
+      options,
+    );
+    const lead =
+      named ??
+      leadCell(
+        choices.filter((cell) => !cell.overlay).map((cell) => cell.point),
+        key,
+        options,
+      );
+    return lead && lead.p50 !== null ? [lead] : [];
+  });
+}
 
 export interface ResultsClipSide extends CompareSide {
   pointId: string;
   hardwareKey: string;
   /** Exact recorded model, revision and generation settings, not a display label. */
   generationKey: string;
-  h200FiftyStepReference: boolean;
+  quality: Map<string, ClipQuality>;
 }
 
 export function publishedResultsSide(saved: StoredArtifact, point: VideoPoint): ResultsClipSide {
@@ -30,16 +56,34 @@ export function publishedResultsSide(saved: StoredArtifact, point: VideoPoint): 
   const revision = text(at(plan, 'model_revision'));
   const generation = at(plan, 'generation');
   const identified = model !== '' && revision !== '' && generation !== null;
+  const quality = new Map<string, ClipQuality>();
+  for (const record of side.records) {
+    const matches = (saved.quality ?? []).filter((pair) => {
+      const c = pair.candidate;
+      return (
+        c.run_id === saved.runId &&
+        c.artifact_id === saved.artifact.id &&
+        c.source_id === sources[0].id &&
+        c.manifest_sha256 === manifestSha &&
+        c.cell_id === cellId &&
+        c.slot_id === record.slotId &&
+        c.case_id === record.caseId &&
+        c.prompt === record.prompt &&
+        c.seed === record.seed &&
+        c.media_path === record.mediaPath &&
+        sources[0].checksums.some(
+          ([path, sha]) => path === record.mediaPath && sha === c.media_sha256,
+        )
+      );
+    });
+    if (matches.length === 1) quality.set(record.slotId, matches[0]);
+  }
   return {
     ...side,
     pointId: point.id,
     hardwareKey: point.hardwareKey ?? '',
     generationKey: identified ? (point.workloadKey ?? '') : '',
-    h200FiftyStepReference:
-      point.hardwareKey === 'h200' &&
-      model === 'MiniMaxAI/MiniMax-H3' &&
-      /^[a-f0-9]{40,64}$/iu.test(revision) &&
-      number(at(generation, 'num_inference_steps')) === 50,
+    quality,
   };
 }
 
@@ -47,6 +91,7 @@ export interface ResultsClip {
   side: ResultsClipSide;
   record: CaseRecord;
   url: string;
+  quality: ClipQuality | null;
 }
 export interface ResultsClipGroup {
   key: string;
@@ -84,11 +129,54 @@ export function resultsClipGroups(sides: ResultsClipSide[]): ResultsClipGroup[] 
       };
       // Duplicate case identities in one cell are ambiguous, not extra comparison candidates.
       if (group.clips.has(side.hardwareKey)) continue;
-      group.clips.set(side.hardwareKey, { side, record, url });
+      group.clips.set(side.hardwareKey, {
+        side,
+        record,
+        url,
+        quality: side.quality.get(record.slotId) ?? null,
+      });
       groups.set(key, group);
     }
   }
   return [...groups.values()].sort((a, b) => b.clips.size - a.clips.size || a.take - b.take);
+}
+
+/** One explicit reference for the visible paired clips; hardware identity never selects it. */
+export function resultsClipReference(group: ResultsClipGroup | null, hidden: ReadonlySet<string>) {
+  const references = new Map<string, ClipQuality['reference']>();
+  for (const [key, clip] of group?.clips ?? []) {
+    if (
+      hidden.has(key) ||
+      !clip.quality ||
+      clip.quality.status === 'incompatible' ||
+      !clip.quality.reference.url
+    )
+      continue;
+    const reference = clip.quality.reference;
+    references.set(
+      JSON.stringify([reference.receipt_sha256, reference.media_path, reference.media_sha256]),
+      reference,
+    );
+  }
+  return references.size === 1 ? [...references.values()][0] : null;
+}
+
+/** Same per-clip projection as the UI, including absent pairs; no per-cell PSNR aggregation. */
+export function resultsClipEvidence(sides: ResultsClipSide[]) {
+  return resultsClipGroups(sides).map((group) => ({
+    key: group.key,
+    prompt: group.prompt,
+    seed: group.seed,
+    take: group.take,
+    clips: [...group.clips].map(([hardware, clip]) => ({
+      hardware,
+      pointId: clip.side.pointId,
+      slotId: clip.record.slotId,
+      caseId: clip.record.caseId,
+      mediaPath: clip.record.mediaPath,
+      quality: clip.quality,
+    })),
+  }));
 }
 
 /** Absolute RGB difference at matched geometry. This display is not a PSNR measurement. */

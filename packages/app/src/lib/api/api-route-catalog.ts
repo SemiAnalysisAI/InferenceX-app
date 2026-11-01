@@ -211,7 +211,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-video-view',
-    sourceSha256: '92ac2d9794ba38ba33d9bcb0d31112136044b8f99b15905c33b95d3ccfc158d3',
+    sourceSha256: 'f250c6e333c2c533930c193606144e6dd6f7aebb001341412bb34ccbdb275105',
   },
   // Agentic Workload Explorer page backend (frozen ProxyTrace snapshot).
   {
@@ -1484,7 +1484,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/testing/video-replay.ts',
-    sourceSha256: 'fb2992279731725f57123538fbec759ea23278b2973598d8726a6a7513b7d3fa',
+    sourceSha256: 'fe3b190ac221e7d0ff1d6195a130d33e53182dc3d4cc7a9c6ad8e1969d9988e7',
     reviewArea: {
       en: 'Development-only original artifact replay, exact source media membership and private byte-range delivery.',
       zh: '仅开发环境使用的原始产物回放、精确来源媒体匹配及私有字节区间读取。',
@@ -1496,6 +1496,38 @@ export const apiContractSourceDigests = [
     reviewArea: {
       en: 'Sealed video completion, client timing and valid power metadata; absent measurements remain null.',
       zh: '封印视频的完成数、客户端计时及有效功率元数据；缺失测量保留 null。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/reference-quality.ts',
+    sourceSha256: '68391c8be2717443d602dbd963b8016bba3786bc077b4e4bae0c9bb25e4f7ef9',
+    reviewArea: {
+      en: 'Sealed per-clip reference identity, decoded all-frame PSNR, exact equality, missing/incompatible states and safe public diagnostics.',
+      zh: '封存的逐条视频参考身份、解码全帧 PSNR、完全一致、缺失与不兼容状态，以及安全的公开诊断字段。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/results-clips.ts',
+    sourceSha256: 'b0dd574554dfd6e9891523365b0f896da44daebc4d3911407da1f5714c36a17e',
+    reviewArea: {
+      en: 'Exact candidate/reference pairing and per-clip quality projection shared by Results and the overview API.',
+      zh: 'Results 与 overview API 共用的精确候选/参考配对及逐条质量投影。',
+    },
+  },
+  {
+    source: 'src/components/video-benchmark/stored.ts',
+    sourceSha256: 'c61813d610729e412827adc49ef06c921894b0c8b5cb7ddb487d3d9b1ca3e834',
+    reviewArea: {
+      en: 'Original stored artifact identity and independently verified optional quality attachment without approval promotion.',
+      zh: '原始已存储产物身份及独立校验的可选质量附件，不提升发布批准状态。',
+    },
+  },
+  {
+    source: 'src/lib/testing/video-quality.ts',
+    sourceSha256: '42b4c0aac5723d8f7b90cbf3af1c7e1474063842beb6ae1871931fd869d9efa0',
+    reviewArea: {
+      en: 'Development-only quality manifest and original reference receipt/media byte seals; private filesystem paths stay local.',
+      zh: '仅开发环境使用的质量配置、原始参考回执和媒体字节封印；本机路径仅保留在本地。',
     },
   },
   {

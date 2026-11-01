@@ -19,4 +19,18 @@ describe('VideoGenX overview API documentation', () => {
       example: toCsv([], RESULT_CSV_COLUMNS),
     });
   });
+  it('documents per-clip decoded RGB PSNR, explicit exact matches and missing pairs', () => {
+    const document = buildOpenApiDocument('https://api-docs.test');
+    const operation = (document.paths['/api/v1/views/video'] as Record<string, unknown>).get as {
+      responses: Record<string, { content: Record<string, { schema: { $ref: string } }> }>;
+    };
+    const name = operation.responses['200'].content['application/json'].schema.$ref
+      .split('/')
+      .at(-1)!;
+    const schema = document.components.schemas[name] as { properties: Record<string, unknown> };
+    const quality = schema.properties.clipQuality;
+    expect(JSON.stringify(quality)).toContain('decoded-rgb24-all-frames');
+    expect(JSON.stringify(quality)).toContain('identical');
+    expect(JSON.stringify(quality)).toContain('No cohort PSNR aggregate');
+  });
 });

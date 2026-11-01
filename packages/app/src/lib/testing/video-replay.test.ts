@@ -1,10 +1,12 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { NextRequest } from 'next/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readVideoReplay } from '@/components/video-benchmark/replay';
 import { GET } from '@/app/api/video-runs/route';
+import { sha256 } from '@/components/video-benchmark/bundle';
+import { referenceQualityFixture } from '@/components/video-benchmark/reference-quality.fixture';
 
 vi.mock('@/components/video-benchmark/replay', () => ({ readVideoReplay: vi.fn() }));
 const fetchMock = vi.fn<typeof fetch>();
@@ -103,6 +105,91 @@ afterEach(async () => {
 });
 
 describe('original-artifact development replay', () => {
+  it('fails a bad quality attachment closed without returning its private file path', async () => {
+    await configure();
+    const manifest = process.env.E2E_VIDEO_REPLAY_MANIFEST!;
+    const config = JSON.parse(await readFile(manifest, 'utf8'));
+    await writeFile(
+      manifest,
+      JSON.stringify({
+        ...config,
+        quality: { path: '/private/missing-quality.json', sha256: '0'.repeat(64) },
+      }),
+    );
+    const response = await GET(new NextRequest('http://localhost/api/video-runs?format=history'));
+    expect(response.status).toBe(503);
+    const body = await response.text();
+    expect(body).toContain('Quality attachment failed verification');
+    expect(body).not.toContain('/private/');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it('attaches sealed quality without approval and isolates reference byte-range URLs', async () => {
+    const replay = await configure();
+    const f = referenceQualityFixture();
+    Object.assign(replay.stored, f.stored);
+    const referenceRoot = await mkdtemp(join(tmpdir(), 'replay-reference-'));
+    dirs.push(referenceRoot);
+    await mkdir(join(referenceRoot, 'drum-taps'));
+    const referenceBytes = 'reference-video';
+    const referenceMediaSha = await sha256(new Blob([referenceBytes]));
+    f.receipt.cases[0].sha256['reference.mp4'] = referenceMediaSha;
+    const receiptText = JSON.stringify(f.receipt),
+      receiptSha = await sha256(new Blob([receiptText]));
+    const sums = `${receiptSha}  reference.json\n${referenceMediaSha}  drum-taps/reference.mp4\n`;
+    f.attachment.references = [
+      {
+        receipt_path: join(referenceRoot, 'reference.json'),
+        receipt_sha256: receiptSha,
+        checksums_sha256: await sha256(new Blob([sums])),
+      },
+    ];
+    Object.assign(f.attachment.pairs[0].reference, {
+      receipt_sha256: receiptSha,
+      media_sha256: referenceMediaSha,
+    });
+    const attachmentText = JSON.stringify(f.attachment),
+      qualityPath = join(referenceRoot, 'quality.json');
+    await Promise.all([
+      writeFile(qualityPath, attachmentText),
+      writeFile(join(referenceRoot, 'reference.json'), receiptText),
+      writeFile(join(referenceRoot, 'SHA256SUMS'), sums),
+      writeFile(join(referenceRoot, 'drum-taps/reference.mp4'), referenceBytes),
+    ]);
+    const manifestPath = process.env.E2E_VIDEO_REPLAY_MANIFEST!;
+    const config = JSON.parse(await readFile(manifestPath, 'utf8'));
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        ...config,
+        quality: { path: qualityPath, sha256: await sha256(new Blob([attachmentText])) },
+      }),
+    );
+    const response = await GET(
+      new NextRequest('http://localhost/api/video-runs?run=123&artifact=7&format=published'),
+    );
+    expect(response.status, await response.clone().text()).toBe(200);
+    const saved = await response.json();
+    expect(saved.quality[0]).toMatchObject({ psnrDb: 25, releaseQualified: false });
+    expect(JSON.stringify(saved)).not.toContain(referenceRoot);
+    const referenceUrl = new URL(saved.quality[0].reference.url, 'http://localhost');
+    const video = await GET(new NextRequest(referenceUrl, { headers: { range: 'bytes=0-8' } }));
+    expect(video.status).toBe(206);
+    expect(await video.text()).toBe('reference');
+    referenceUrl.searchParams.set('artifact', '8');
+    const otherArtifact = await GET(new NextRequest(referenceUrl));
+    expect(otherArtifact.status).toBe(404);
+    referenceUrl.searchParams.set('artifact', '7');
+    referenceUrl.searchParams.set('path', '../reference.json');
+    const unsafePath = await GET(new NextRequest(referenceUrl));
+    expect(unsafePath.status).toBe(404);
+    const historyResponse = await GET(
+      new NextRequest('http://localhost/api/video-runs?format=history'),
+    );
+    const history = await historyResponse.json();
+    expect(history.entries[0].approved).toBe(false);
+    expect(history.entries[0].publishedAt).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
   it('replaces history and exact artifact without an external read or approval', async () => {
     await configure();
     const history = await GET(new NextRequest('http://localhost/api/video-runs?format=history'));

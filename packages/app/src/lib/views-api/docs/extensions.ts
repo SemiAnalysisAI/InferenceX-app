@@ -13,6 +13,84 @@ import { VIEW_QUERY_PARAMS, type ReadonlyView } from '../registry';
 const object: ApiSchema = { type: 'object', additionalProperties: true };
 const objects: ApiSchema = { type: 'array', items: object };
 const strings: ApiSchema = { type: 'array', items: { type: 'string' } };
+const clipQuality: ApiSchema & { 'x-description-zh': string } = {
+  type: 'object',
+  description:
+    'Per-clip evidence from the same selected artifacts and matching helper as the UI. No cohort PSNR aggregate; missing pairs remain null.',
+  'x-description-zh':
+    '与界面共用所选产物和匹配函数的逐条视频证据。不计算样本组 PSNR 汇总值；缺失配对保留 null。',
+  properties: {
+    status: { type: 'string', enum: ['ready', 'partial', 'unavailable'] },
+    groups: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          key: { type: 'string' },
+          prompt: { type: 'string' },
+          seed: { type: 'number' },
+          take: { type: 'integer' },
+          clips: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                hardware: { type: 'string' },
+                pointId: { type: 'string' },
+                slotId: { type: 'string' },
+                caseId: { type: ['string', 'null'] },
+                mediaPath: { type: ['string', 'null'] },
+                quality: {
+                  type: ['object', 'null'],
+                  properties: {
+                    attachmentSha256: { type: 'string' },
+                    candidate: object,
+                    reference: {
+                      ...object,
+                      description:
+                        'Original receipt/plan/media hashes, official Diffusers/model revisions, denoising_updates, sigma_points and read-only media URL. Reference execution is not a hardware performance result.',
+                    },
+                    scorer: {
+                      ...object,
+                      description:
+                        'evaluator.media.compare_media source revision and SHA256; method decoded-rgb24-all-frames.',
+                    },
+                    status: { type: 'string', enum: ['measured', 'identical', 'incompatible'] },
+                    psnrDb: {
+                      type: ['number', 'null'],
+                      description:
+                        'Decoded RGB24, every pixel/frame, peak=1 after division by 255, full-stream MSE; dB. Null for exact decoded equality or incompatible pairs; status distinguishes them. No quality pass/fail threshold.',
+                    },
+                    comparedFrames: { type: 'integer', minimum: 0 },
+                    totalFrames: { type: 'integer', minimum: 0 },
+                    checks: objects,
+                    notes: strings,
+                    qualityStatus: { type: 'string', enum: ['unjudged'] },
+                    releaseQualified: { type: 'boolean', enum: [false] },
+                  },
+                  required: [
+                    'candidate',
+                    'reference',
+                    'scorer',
+                    'status',
+                    'psnrDb',
+                    'comparedFrames',
+                    'totalFrames',
+                    'qualityStatus',
+                    'releaseQualified',
+                  ],
+                },
+              },
+              required: ['hardware', 'pointId', 'slotId', 'caseId', 'mediaPath', 'quality'],
+            },
+          },
+        },
+        required: ['key', 'prompt', 'seed', 'take', 'clips'],
+      },
+    },
+  },
+  required: ['status', 'groups'],
+};
 const imageAgePoint: ApiSchema = {
   type: 'object',
   properties: {
@@ -622,6 +700,7 @@ const NEW_VIEWS = {
       deploymentCells: objects,
       workloadMix: objects,
       overlayCells: objects,
+      clipQuality,
       options: object,
       state: object,
       workloadKey: { type: ['string', 'null'] },

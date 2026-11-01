@@ -69,12 +69,12 @@ The uncalibrated rating schema is also disclosed on request.
 
 | Group                    | Available when retained                                                                                   | Empty until evidence exists                                    |
 | ------------------------ | --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| Validity                 | Workload/manifest hashes, sealed validation, completion counts, power validity                            | Exact paired PSNR/audio comparison without a sealed pair       |
+| Validity                 | Workload/manifest hashes, sealed validation, completion counts, power validity; links to per-clip PSNR    | Unsealed or incompatible pairs; audio summaries                |
 | Latency                  | Serial/harness latency, client delivery P50/P90, P95 from >=20 aligned valid timings, deadline attainment | Missing client timestamps; text/denoise/VAE/encode stages      |
 | Throughput               | Valid clips/wall second, generated video seconds/wall second, deadline goodput                            | Unsupported workload/mode distributions                        |
 | Resources & Energy       | Valid participating-board power samples, mean/observed peak, J/clip, J/frame                              | Missing samples, GPU/host memory without their own measurement |
 | Cost                     | Modelled TCO from registry rates and measured output; both GPU counts                                     | Missing allocation count or rate                               |
-| Quality                  | Seven named human-rating dimensions, with no score polygon                                                | PSNR/SSIM, VBench/CLIP/VLM and calibrated human scores         |
+| Quality                  | Sealed per-clip PSNR; seven named human-rating dimensions without scores                                  | SSIM, VBench/CLIP/VLM and calibrated human scores              |
 | Stability                | Recorded failure categories, with unknown failures preserved                                              | Sustained-load behavior                                        |
 | Startup                  | Recorded warmup request duration, explicitly separate from compile                                        | Load, isolated compile, first request and switch time          |
 | Parallelism & Deployment | Per-hardware frontier of measured deployments                                                             | Best topology without the GPU-count sweep                      |
@@ -95,16 +95,42 @@ evidence. The shared transport seeks and plays real video elements, stops at the
 shared playable duration, and pauses when the selection or page visibility changes.
 
 Difference displays an amplified absolute RGB difference at matched playback time
-against a recorded H200 H3 50-step reference. It fails closed for absent references,
+against an explicitly bound official Diffusers reference MP4. Hardware and step
+count alone never establish a reference. It fails closed for absent references,
 unequal frame geometry or blocked cross-origin pixel access. This preview is not a
 sealed PSNR result. Distilled and full-step workloads are not silently equated.
 Per-tile wall time is the selected request's duration; energy is the cell's mean
 J/valid clip and is labeled accordingly.
-The default tiles show hardware, recorded GPU count, media, wall time, unknown
-PSNR, mean energy and both modeled TCO bases. Prompt, seed, take, run, artifact,
+The default tiles show hardware, recorded GPU count, media, wall time, per-clip
+PSNR when a sealed pair exists, mean energy and both modeled TCO bases. The reference
+is a separate synchronized video with its recorded update/sigma-point counts and
+no serving performance metrics. Prompt, seed, take, run, artifact,
 runtime and media source remain in the keyboard-accessible Prompt & sources
 disclosure. The Difference label identifies the amplified browser preview; its
 help carries the full qualification.
+
+## Per-clip quality
+
+Per-clip quality is independent of the original candidate ZIP. The attachment binds
+run, artifact, source, manifest, cell, slot, case, prompt, seed, media path and SHA256.
+Model, generation, fairness and the selected plan case must match. Both original
+full-plan hashes are retained when an unrelated case changed. Only completed cases
+retained in the original reference receipt are eligible.
+
+`evaluator.media.compare_media` compares every decoded RGB24 pixel/frame using
+full-stream MSE and peak=1 after division by 255, without resizing, trimming or
+best-offset alignment. Finite PSNR is shown in dB; exact decoded equality is labelled
+separately with null PSNR. Missing and incompatible pairs stay empty. These are
+descriptive cross-engine measurements, with no quality threshold or release claim.
+The reference uses its recorded Diffusers revision and schedule; the current protocol
+has 49 updates / 50 sigma points.
+
+The UI and overview JSON share the same exact per-clip association. JSON returns
+all groups under `clipQuality`, so case navigation changes presentation only.
+Validity and Quality link to these per-clip scores. Cell-granularity CSV has no
+per-clip PSNR aggregate. Official and exact named channels retain their approval rules.
+
+中文：质量附件独立于原始候选 ZIP，精确绑定运行、产物、来源、manifest、测量单元、slot、用例、prompt、seed、媒体路径与 SHA256。模型、生成配置、公平性配置和所选计划用例必须一致；其他用例发生变化时仍保留双方原始完整计划哈希。只使用参考回执中实际完成并保留的用例。PSNR 对比全部解码 RGB24 像素和帧；完全一致单独标注，缺失或不兼容配对保持为空。该数值不代表语义质量或发布合格。JSON 返回全部用例组，CSV 不虚构逐条 PSNR 汇总值，发布批准规则不变。
 
 ## Cost and profit
 
@@ -153,7 +179,7 @@ browser playback and difference failure, bilingual layout and 390px overflow.
 完整哈希及尚未校准的人工评分维度按需展开，图表图例与 TCO 估算口径仍直接可见。
 
 视频窗口只读取已存储产物，核对 prompt、seed、重复次数和生成配置后同步播放。
-Difference 是相对已记录 H200 H3 50-step 视频的浏览器 RGB 差异预览，不是封存的 PSNR 测量。
+Difference 是相对明确绑定的官方 Diffusers 参考视频的浏览器 RGB 差异预览，与封存的全帧 PSNR 测量分别展示。不能根据硬件型号或步数推断参考身份。
 参考视频、尺寸或跨域读取条件不满足时显示不可用。蒸馏与完整步数分组保留。
 默认视频卡片保留硬件、GPU 数量、媒体及两种 TCO 口径；完整 prompt、seed、重复次数、
 运行、产物、Runtime 和媒体来源可在“Prompt 与来源”中查看。
