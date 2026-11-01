@@ -71,6 +71,42 @@ describe('QuotesContent', () => {
     }
   });
 
+  it('shows supporter logos in full color in light mode', () => {
+    cy.get('button[aria-label^="Jump to"] img').each(($logo) => {
+      const style = getComputedStyle($logo[0]);
+      expect(style.filter, `${$logo.attr('alt')} filter`).to.equal('none');
+      expect(style.opacity, `${$logo.attr('alt')} opacity`).to.equal('1');
+    });
+    cy.get('blockquote')
+      .first()
+      .closest('[id^="quote-"]')
+      .find('img')
+      .first()
+      .should(($logo) => {
+        expect(getComputedStyle($logo[0]).filter).to.equal('none');
+      });
+  });
+
+  it('keeps wall logos in color on a light tile in dark mode', () => {
+    cy.mount(
+      <div className="dark">
+        <QuotesContent />
+      </div>,
+    );
+    cy.get('button[aria-label^="Jump to"] img').each(($logo) => {
+      expect(getComputedStyle($logo[0]).filter, `${$logo.attr('alt')} filter`).to.equal('none');
+      const tile = $logo[0].closest('button')!;
+      expect(getComputedStyle(tile).backgroundColor, 'tile background').to.equal(
+        'rgb(255, 255, 255)',
+      );
+    });
+    cy.get('#quote-anyscale img[alt="Anyscale"]').should(($logo) => {
+      const filter = getComputedStyle($logo[0]).filter;
+      expect(filter).to.contain('grayscale');
+      expect(filter).to.contain('invert');
+    });
+  });
+
   it('scrolls to the matching quote when a logo is clicked', () => {
     const targetOrg = uniqueOrgsWithLogo[0];
 
@@ -85,5 +121,62 @@ describe('QuotesContent', () => {
       const scrolledToAnchor = calls.some((c) => c.thisValue.id === orgAnchorId(targetOrg));
       expect(scrolledToAnchor, 'scrolled to the org anchor element').to.equal(true);
     });
+  });
+});
+
+describe('QuotesContent supporter logo wall', () => {
+  const groupIds = [
+    'chinese-frontier-labs',
+    'us-labs',
+    'hyperscalers-clouds',
+    'open-source',
+    'silicon-neoclouds-academia',
+    'other',
+  ];
+
+  it('renders every group with a bilingual heading', () => {
+    cy.mount(<QuotesContent />);
+    cy.get('[data-testid="supporter-logo-wall"] h3').should('have.length', groupIds.length);
+    for (const id of groupIds) cy.get(`[data-testid="supporter-group-${id}"]`).should('exist');
+    cy.get('[data-testid="supporter-group-other"] h3').should('have.text', 'Other');
+
+    cy.mount(<QuotesContent locale="zh" />);
+    cy.get('[data-testid="supporter-group-other"] h3').should('have.text', '其他');
+    cy.get('[data-testid="supporter-group-chinese-frontier-labs"] h3').should(
+      'have.text',
+      '中国前沿实验室',
+    );
+    cy.get('button[aria-label="查看 OpenAI 的评价"]').should('exist');
+  });
+
+  it('shows supporter logos in full color and loads each image', () => {
+    cy.mount(<QuotesContent />);
+    cy.get('button[aria-label^="Jump to"] img').should('have.length.greaterThan', 0);
+    cy.get('button[aria-label^="Jump to"] img, [data-testid="supporter-logo-wall"] img').each(
+      ($img) => {
+        const img = $img[0] as HTMLImageElement;
+        expect(img.className, img.alt).not.to.match(/grayscale|invert/);
+        expect(getComputedStyle(img).filter, img.alt).to.equal('none');
+        cy.wrap($img).should(($el) => {
+          expect(($el[0] as HTMLImageElement).naturalWidth, img.alt).to.be.greaterThan(0);
+        });
+      },
+    );
+  });
+
+  it('puts quoted orgs outside the curated groups under Other', () => {
+    cy.mount(<QuotesContent />);
+    cy.get('[data-testid="supporter-group-other"]').within(() => {
+      cy.get('button[aria-label="Jump to WEKA’s quote"]').should('exist');
+      cy.get('button[aria-label="Jump to OpenAI’s quote"]').should('not.exist');
+    });
+  });
+
+  it('renders logos without a quote as static tiles', () => {
+    cy.mount(<QuotesContent />);
+    cy.get('[data-testid="supporter-group-chinese-frontier-labs"]')
+      .find('img[alt="DeepSeek"]')
+      .closest('button')
+      .should('not.exist');
   });
 });

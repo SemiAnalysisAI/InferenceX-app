@@ -4,6 +4,21 @@ Reference for agents modifying filter behavior. Explains which context to touch 
 
 ## Provider State Map
 
+The bare `/inference` and `/zh/inference` routes use a temporary redirect to
+Kimi K3 in `next.config.ts`. Explicit `g_model` share links bypass that redirect,
+and all other query parameters are carried forward. Model-specific paths and
+other dashboard defaults are unchanged. The read-only inference API still
+requires an explicit `model`; its example and the skills guide use `Kimi-K3`
+for parity with this navigation default.
+Tab navigation includes the retained model when returning to inference, so the
+entry redirect does not reset a user's selection.
+`GlobalFilterProvider` publishes the selected model to the client-only
+`inference-navigation-state.ts` store. Tab navigation subscribes to that value,
+including selections omitted from share URLs because they match an older default.
+The store survives provider remounts but resets on a full page load.
+Share links from the bare inference route explicitly include this model, even
+when it matches the legacy URL-state default.
+
 ### GlobalFilterProvider
 
 File: `packages/app/src/providers/GlobalFilterContext.tsx`
@@ -46,6 +61,22 @@ four independently memoized domains: `useInferenceData`, `useInferenceFilters`,
 `useInferenceDisplay`, and `useInferenceActions`. Consumers must subscribe only to the
 domains they read. Display changes stay in `useInferenceDisplay`, so a contrast or label
 toggle does not notify filter-only or data-only consumers.
+
+GPU-count (`i_label`), parallelism (`i_advlabel`), and concurrency (`i_conclabel`)
+annotations are independent. Agentic and fixed-sequence charts default to curve
+labels on and point annotations off. Parallelism is available outside Advanced.
+The default-on Offloading Label control in Advanced uses `i_offloadlabel=0` to hide
+both the dotted-circle “KV offload ON” footer key and the dotted halos around
+offloaded points, without hiding the points or filtering results. It applies to
+official and unofficial data, GPU-history comparisons, and chart exports.
+These are presentation-only controls: the read-only API and skills data contracts
+keep every benchmark row and offload field unchanged.
+
+Advanced also has a default-on Framework Line Label control (`i_frameworklabel=0`
+to hide). It hides the framework suffix inside existing line labels, retaining
+hardware names, precision, comparison dates and overlay run tags. It shares state
+across the main chart, GPU-history comparisons, replay and exports, independently
+of Line Labels. It does not filter frameworks or change read-only API data.
 
 `useInferenceFilters` owns inference-only selection state. GPU selections and comparison
 dates do not belong in global filter state because evaluation and reliability do not use

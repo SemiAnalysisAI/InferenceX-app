@@ -428,6 +428,7 @@ const FirstTokenLimitsChart = React.memo(
         instructions={t.instructions}
         tooltip={tooltip}
         onRender={onRender}
+        onExportRender={onRender}
         legendElement={legendElement}
         caption={caption}
       />

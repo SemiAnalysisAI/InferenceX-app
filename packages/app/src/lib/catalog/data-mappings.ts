@@ -79,7 +79,7 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
   [Model.DeepSeek_V4_Pro]: {
     label: 'DeepSeek V4 Pro 0813 1.6T',
     prefix: 'dsv4',
-    category: 'default',
+    category: 'deprecated',
     openRouterModelId: 'deepseek/deepseek-v4-pro-0813',
     logo: 'deepseek-color.svg',
     exclusion: MTP_ENGINE_EXCLUSION,
@@ -213,7 +213,6 @@ const MODEL_SELECTOR_ORDER: readonly Model[] = [
   Model.GLM_5_2,
   Model.MiniMax_M3_1_Flash,
   Model.Muse_Spark_Open,
-  Model.DeepSeek_V4_Pro,
   Model.Qwen3_5,
   Model.Qwen3_8_Flash_Next,
 ];

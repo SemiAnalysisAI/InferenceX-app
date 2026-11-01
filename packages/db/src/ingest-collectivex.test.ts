@@ -35,11 +35,11 @@ afterEach(() => {
 
 describe('parseIngestArgs', () => {
   it('uploads a results directory', () => {
-    expect(parseIngestArgs(['--dir', '/tmp/results', '--yes', '--no-ssl'])).toEqual({
+    expect(parseIngestArgs(['--dir', '/tmp/results', '--pr', '7', '--yes', '--no-ssl'])).toEqual({
       mode: 'upload',
       dir: '/tmp/results',
+      prs: [7],
     });
-    expect(parseIngestArgs(['--dir=results', '-y'])).toEqual({ mode: 'upload', dir: 'results' });
   });
 
   it('deletes one named run', () => {
@@ -50,11 +50,9 @@ describe('parseIngestArgs', () => {
   });
 
   it('needs exactly one of --dir and --delete-run', () => {
-    expect(() => parseIngestArgs([])).toThrow(/exactly one of --dir or --delete-run/u);
-    expect(() => parseIngestArgs(['--dir', 'r', '--delete-run', '5'])).toThrow(
-      /exactly one of --dir or --delete-run/u,
-    );
-    expect(() => parseIngestArgs(['--dir', ''])).toThrow(/--dir needs a path/u);
+    expect(() => parseIngestArgs([])).toThrow(/exactly one of/u);
+    expect(() => parseIngestArgs(['--dir', 'r', '--delete-run', '5'])).toThrow(/exactly one of/u);
+    expect(() => parseIngestArgs(['--dir', '', '--pr', '7'])).toThrow(/--dir needs a path/u);
   });
 
   it('rejects malformed run ids', () => {

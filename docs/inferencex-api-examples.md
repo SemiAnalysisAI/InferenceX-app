@@ -39,6 +39,14 @@ retains obsolete files. Installed copies do not update automatically.
 
 ## Find recent benchmark observations
 
+MiniMax-M3 and DeepSeek-V4-Pro are deprecated, but their historical observations
+remain queryable. `/api/v1/views/options` reports `category=deprecated` for both;
+the overview excludes them by default and includes them with `modelScope=all`.
+Current-image views omit their retired sweep rows. MiniMax-M3.1-Flash and
+DeepSeek-V4.1-Flash remain active. The examples below intentionally preserve
+explicit historical selectors; deprecation does not delete data or change raw API
+contracts, saved links, or unofficial-run overlays.
+
 > Use inferencex-api to show up to five latest available DeepSeek-V4-Pro
 > observations, limited to raw model dsv4 and single-turn requests with 8192 input
 > and 1024 output tokens. Include observation IDs, hardware, framework,

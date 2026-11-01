@@ -122,7 +122,7 @@ const responseExample = {
     {
       name: 'DeepSeek-V4-Pro',
       dbKeys: ['dsv4'],
-      category: 'default',
+      category: 'deprecated',
       releaseDate: '2026-06-30',
       compareSlug: 'deepseek-v4-pro',
     },

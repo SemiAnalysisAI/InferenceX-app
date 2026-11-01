@@ -62,7 +62,7 @@ describe('COLLECTIVEX_KNOWN_SUPPORT', () => {
     expect(order.length).toBeGreaterThan(0);
     const cell = COLLECTIVEX_KNOWN_SUPPORT.normal.mi355x.mori;
     expect(cell.ep8.status).toBe('works');
-    expect(cell.ep16).toEqual({ status: 'broken', note: 'mori-inter-node-corruption' });
+    expect(cell.ep16).toEqual({ status: 'broken', note: 'mi355x-ainic-a77' });
   });
 });
 

@@ -13,6 +13,7 @@ export interface ResultContextProps {
   metric?: string;
   costTier?: string;
   costTierControl?: ReactNode;
+  tcoBasis?: ReactNode;
   utilization?: string;
   utilizationControl?: ReactNode;
   utilizationControlId?: string;
@@ -29,7 +30,7 @@ export interface ResultContextProps {
   costBasisTestId?: string;
 }
 
-function CaptionField({
+export function CaptionField({
   label,
   value,
   control,
@@ -73,6 +74,7 @@ export function ResultContext({
   metric,
   costTier,
   costTierControl,
+  tcoBasis,
   utilization,
   utilizationControl,
   utilizationControlId,
@@ -166,6 +168,7 @@ export function ResultContext({
           testId="result-context-cost-tier"
         />
       )}
+      {tcoBasis}
       {utilization && (
         <CaptionField
           label={labels.utilization}

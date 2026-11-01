@@ -32,11 +32,6 @@ export default async function ProfitEstimatorModelPage({ params, searchParams }:
   const seed = resolveCalculatorUrlSeed(sp);
   return (
     <>
-      <TabIntro
-        tab="profit-estimator-per-gigawatt"
-        title={MODEL_TAB_META['profit-estimator-per-gigawatt'].title(resolved.route.seoName)}
-        intro={MODEL_TAB_META['profit-estimator-per-gigawatt'].intro(resolved.route.seoName)}
-      />
       <ProfitEstimatorDisplay
         basis="gw-year"
         urlSeed={{
@@ -44,6 +39,11 @@ export default async function ProfitEstimatorModelPage({ params, searchParams }:
           model: seed.model ?? resolved.route.model,
           profitRouteKey: JSON.stringify(sp),
         }}
+      />
+      <TabIntro
+        tab="profit-estimator-per-gigawatt"
+        title={MODEL_TAB_META['profit-estimator-per-gigawatt'].title(resolved.route.seoName)}
+        intro={MODEL_TAB_META['profit-estimator-per-gigawatt'].intro(resolved.route.seoName)}
       />
     </>
   );

@@ -11,11 +11,11 @@ export const metadata: Metadata = tabMetadataZh('evaluation');
 export default function ZhEvaluationPage() {
   return (
     <>
-      <ZhTabIntro tab="evaluation" />
       <EvaluationProvider>
         <EvaluationChartDisplay />
         <NudgeEngine scope="evaluation" />
       </EvaluationProvider>
+      <ZhTabIntro tab="evaluation" />
     </>
   );
 }

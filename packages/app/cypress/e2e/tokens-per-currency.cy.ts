@@ -6,7 +6,7 @@ describe('Tokens per dollar and agentic controls', () => {
   });
 
   it('defaults the y-axis to TCO total tokens per dollar and preserves hardware comparison', () => {
-    cy.visit('/inference');
+    cy.visit('/inference?g_model=DeepSeek-V4-Pro');
     cy.get('[data-testid="yaxis-metric-selector"]').should(
       'contain.text',
       'Total Tokens per $1 TCO',

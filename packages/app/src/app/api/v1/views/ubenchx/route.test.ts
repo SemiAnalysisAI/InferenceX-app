@@ -1,3 +1,4 @@
+import originalHuawei from '@/components/ubenchx/data/huawei-bandwidth.json';
 import { SM_L2_RUNS } from '@/components/ubenchx/sm-l2-data';
 import { transformSmL2Run } from '@/components/ubenchx/sm-l2-transform';
 import { TPC_SKYLINE_RUNS } from '@/components/ubenchx/tpc-skyline-data';
@@ -216,17 +217,35 @@ it('exposes Huawei rotating-copy evidence without inventing missing tests or siz
   const body = await response.json();
   const run = body.memBw.gpus[0];
   expect(run.gpu).toBe('Huawei 950PR');
-  expect(run.peakBandwidthGbps).toBe(1600);
-  expect(run.peakBandwidthSource).toContain('not independently verified');
+  expect(run.peakBandwidthGbps).toBe(1638.4);
+  expect(run.peakBandwidthSource).toContain('256 bits × 6.4 Gbps');
   expect(run.metadata).toMatchObject({
     protocol: 'rotating-pool-npu-graph',
     dtype: 'float16',
     missingSizesBytes: [],
   });
+  expect(run.rows).toHaveLength(51);
+  expect(run.rows.slice(0, 9).map((row: { bytes: number }) => row.bytes)).toEqual([
+    8, 16, 32, 64, 128, 256, 512, 1024, 2048,
+  ]);
+  expect(run.metadata.smallMessageExtension).toMatchObject({
+    cann: '9.2.1',
+    date: '2026-10-30',
+    slotStrideBytes: 4096,
+    sizeRangeBytes: [8, 2048],
+  });
+  expect(run.metadata.cann).toBe('9.1.0');
+  expect(run.rows[0].timeMs).toBeCloseTo(0.000465661971247755, 10);
+  for (const original of originalHuawei.curves['Huawei 950PR']) {
+    const actual = run.rows.find((row: { bytes: number }) => row.bytes === original.size_bytes);
+    expect(actual.timeMs).toBe(original.amortized_copy_ms);
+    expect(actual.bandwidthGbps).toBe(original.effective_GBps);
+    expect(actual.processBandwidthGbps).toEqual(original.process_GBps);
+  }
   expect(run.rows.some((row: { bytes: number }) => row.bytes === 17179869184)).toBe(true);
   const endpoint = run.rows.find((row: { bytes: number }) => row.bytes === 17179869184);
   expect(endpoint.bandwidthGbps).toBeCloseTo(1447.2735584561165, 6);
-  expect(endpoint.mbuPercent).toBeCloseTo(90.45459740350728, 6);
+  expect(endpoint.mbuPercent).toBeCloseTo(88.33456777686257, 6);
   expect(endpoint.observations).toBe(360);
   expect(body.smL2Distance.gpus).toEqual([]);
   expect(body.tpcSkyline.gpus).toEqual([]);

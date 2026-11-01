@@ -1,5 +1,59 @@
 # D3 Chart Design Rationale
 
+## Desktop legend alignment
+
+The shared chart wrapper places the desktop legend 8px below the plot's top
+guideline, using the same top margin as the SVG renderer. Below the `lg`
+breakpoint, the legend stays below the chart with its existing 12px gap.
+Official and unofficial series share this layout. This is presentation-only;
+API responses, filters, and `inferencex-skills` contracts are unchanged.
+
+## PNG export aspect ratio
+
+Inference charts keep the title above the plot and place cost controls, pricing
+assumptions, attribution, and the deployment notice below the plot and legend.
+The shared `D3Chart` / `D3ChartWrapper` `footer` slot keeps this context inside
+the chart's export root. PowerX retains its existing header layout.
+
+The inference footer omits the optimization note and prefix-cache navigation
+link. The complete ATOM disclaimer lives in the exportable chart footer whenever
+a selected official or unofficial series uses ATOM, including history comparisons.
+It appears below the plot in Auto, 16:9, and 1:1 PNG exports. Hidden ATOM series
+do not add the disclaimer.
+
+The download popover offers Auto, 16:9, and 1:1 for PNG export only. Auto retains
+the existing image dimensions. Fixed ratios lay out an offscreen clone at a
+1280×720 or 1000×1000 CSS-pixel frame (captured at 2× resolution). The exporter
+measures caption and source-footer space, then gives the remaining height and
+width to the plot. Long captions can grow the complete frame proportionally.
+The chart rebuilds axes, grids, points and curves using copied visible scales,
+without stretching a bitmap or adding letterbox bars. Text and mark sizes stay
+constant; official points and unofficial overlays use the new coordinates.
+
+Each D3 SVG registers a clone renderer. Export copies D3 bindings before keyed
+joins and namespaces SVG IDs to keep clipping/gradients independent of the live
+chart. Export decorations use `onExportRender`, never a callback that updates
+live-chart refs. Auto keeps the previous capture path.
+
+The choice stays local to each download menu. It does not resize the live chart,
+change benchmark data or share links, or affect CSV and MP4 export. The
+presentation-only choice has no read-only API parameter.
+
+PNG and replay MP4 link footers resolve background, foreground, and font from
+the active export context rather than choosing a separate light/dark palette.
+The footer retains the originating hostname and route and fits long links to
+the output width. This is presentation-only; API responses, skills, and benchmark
+data are unchanged.
+
+## Cost controls in the caption
+
+Inference and historical charts place TCO Basis immediately after Cost Tier
+below the graph. The model/scenario, cost-metric and visible-TPUv7 gates apply
+to official data and unofficial overlays. The shared caption field exports the
+selected basis as text; embedded charts do not expose interactive controls.
+This placement is presentation-only: `tcoBasis`, API responses, defaults and
+calculations are unchanged.
+
 ## Four Invalidation Phases
 
 One effect for every D3 operation takes roughly 500ms (React reconciliation ~200ms plus a full SVG update ~300ms). `D3Chart` separates structure, stable-identity data joins, metric coordinates, and display decoration. The most common interaction, switching the Y-axis metric, then takes roughly 100ms:

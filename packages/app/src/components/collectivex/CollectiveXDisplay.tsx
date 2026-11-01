@@ -27,6 +27,7 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import { CollectiveXChart } from './CollectiveXChart';
 import { CollectiveXSwapSection } from './CollectiveXSwapSection';
 import { CollectiveXKvSection } from './CollectiveXKvSection';
+import { CollectiveXChangelog } from './CollectiveXChangelog';
 import { CollectiveXSupportMatrices } from './CollectiveXSupportMatrices';
 import {
   collectiveXBackendLabel,
@@ -61,6 +62,12 @@ interface SelectOption<T extends string | number> {
 }
 
 type CollectiveXSuite = 'ep' | 'kv' | 'swap';
+
+const METHODOLOGY_DOC: Record<CollectiveXSuite, string> = {
+  ep: 'methodology',
+  kv: 'kv-transfer',
+  swap: 'swap-blocks',
+};
 
 const PERCENTILE_OPTIONS: SegmentedToggleOption<CollectiveXPercentile>[] = [
   { value: 'p50', label: 'p50' },
@@ -649,7 +656,7 @@ export default function CollectiveXDisplay() {
                 </a>
                 <a
                   data-testid="collectivex-methodology-link"
-                  href={`https://github.com/${sourceRepository}/blob/${singleDataset.run.source_sha}/collectivex/docs/${shownSuite === 'swap' ? 'swap-blocks' : 'methodology'}.md`}
+                  href={`https://github.com/${sourceRepository}/blob/${singleDataset.run.source_sha}/collectivex/docs/${METHODOLOGY_DOC[shownSuite]}.md`}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() =>
@@ -960,6 +967,7 @@ export default function CollectiveXDisplay() {
         </>
       )}
       <CollectiveXSupportMatrices series={combinedSeries} />
+      <CollectiveXChangelog version={version} />
     </section>
   );
 }

@@ -1,7 +1,14 @@
 import type { ComparisonCase, ComparisonOp, ComparisonView, ComputePrecision } from './compare';
+import { parallelLabel } from './describe';
 
 export function sliceKey(op: ComparisonOp, c: ComparisonCase): string {
-  if (op === 'gemm') return `N=${c.dims.n} K=${c.dims.k} · ${c.precision}`;
+  if (op === 'gemm') {
+    // Only split cases pay for parsing; GEMM workloads hold thousands of single-device cases.
+    const split = c.key.includes('"parallel"')
+      ? parallelLabel(JSON.parse(c.key) as Record<string, unknown>)
+      : '';
+    return `N=${c.dims.n} K=${c.dims.k}${split} · ${c.precision}`;
+  }
   return `${c.shape.replace(/^T=\d+ /u, '')} · ${c.precision}`;
 }
 

@@ -9,8 +9,8 @@ export const metadata: Metadata = tabMetadataZh('ai-chart');
 export default function ZhAiChartPage() {
   return (
     <>
-      <ZhTabIntro tab="ai-chart" />
       <AiChartDisplay />
+      <ZhTabIntro tab="ai-chart" />
     </>
   );
 }

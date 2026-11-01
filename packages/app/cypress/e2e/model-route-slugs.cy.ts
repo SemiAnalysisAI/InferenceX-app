@@ -20,6 +20,63 @@ const unlockPointerEvents = () => {
 };
 
 describe('Per-model dashboard routes', () => {
+  for (const locale of ['', '/zh']) {
+    it(`retains an explicit legacy model across ${locale}/evaluation`, () => {
+      cy.visit(`${locale}/inference/deepseek-v4`, visitOptions);
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek V4 Pro');
+      cy.get('[data-testid="tab-trigger-evaluation"]').click();
+      cy.location('pathname').should('eq', `${locale}/evaluation`);
+      cy.get('[data-testid="tab-trigger-inference"]')
+        .should('have.attr', 'href', `${locale}/inference?g_model=DeepSeek-V4-Pro`)
+        .click();
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek V4 Pro');
+    });
+
+    it(`renders Kimi K3 chart data from bare ${locale}/inference`, () => {
+      cy.intercept('GET', '/api/v1/availability', {
+        body: modelSelectionAvailability
+          .filter((row) => row.model === 'dsv4')
+          .map((row) => ({ ...row, model: 'kimik3' })),
+      });
+      cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
+        expect(new URL(request.url).searchParams.get('model')).to.eq('Kimi-K3');
+        request.reply({
+          body: modelSelectionBenchmarks
+            .filter((row) => row.model === 'dsv4')
+            .map((row) => ({ ...row, model: 'kimik3' })),
+        });
+      });
+      cy.visit(`${locale}/inference`, visitOptions);
+      cy.location('pathname').should('eq', `${locale}/inference/kimi-k3`);
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'Kimi K3');
+      cy.get('[data-testid="scatter-graph"] svg .dot-group').should('have.length.greaterThan', 0);
+    });
+
+    it(`opens bare ${locale}/inference on Kimi K3 without dropping shared filters`, () => {
+      const query = '?i_seq=agentic-traces&i_prec=fp4&utm_source=default-model-test';
+      cy.request({ url: `${locale}/inference${query}`, followRedirect: false }).then((response) => {
+        expect(response.status).to.eq(307);
+        const destination = new URL(
+          String(response.headers.location),
+          String(Cypress.config('baseUrl')),
+        );
+        expect(destination.pathname).to.eq(`${locale}/inference/kimi-k3`);
+        expect(destination.search).to.eq(query);
+      });
+      cy.visit(`${locale}/inference${query}`, visitOptions);
+      cy.location('pathname').should('eq', `${locale}/inference/kimi-k3`);
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'Kimi K3');
+      cy.get('[data-testid="inference-page-heading"]').should('contain.text', 'Kimi K3');
+    });
+
+    it(`retains the current model when navigating from ${locale}/evaluation`, () => {
+      cy.visit(`${locale}/evaluation`, visitOptions);
+      cy.get('[data-testid="tab-trigger-inference"]').click();
+      cy.location('pathname').should('eq', `${locale}/inference`);
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek V4 Pro');
+    });
+  }
+
   it('seeds /historical/<slug> to the routed model and rewrites the URL on switch without a reload', () => {
     cy.visit('/historical/minimax-m3', visitOptions);
     cy.get('[data-testid="historical-trends-display"]').should('be.visible');
@@ -76,6 +133,14 @@ describe('Per-model dashboard routes', () => {
     cy.visit('/zh/historical/minimax-m3', visitOptions);
     cy.get('[data-testid="zh-tab-intro"]').should('be.visible').and('contain.text', 'MiniMax M3');
     cy.get('[data-testid="historical-trends-display"]').should('be.visible');
+    cy.get('[data-testid="historical-trends-display"]').then(([display]) => {
+      cy.get('[data-testid="zh-tab-intro"]').then(([intro]) => {
+        // The intro sits below the dashboard so the chart and selectors load first.
+        expect(
+          display.compareDocumentPosition(intro) & Node.DOCUMENT_POSITION_FOLLOWING,
+        ).to.be.above(0);
+      });
+    });
   });
 });
 
@@ -150,12 +215,11 @@ describe('Inference model presentation', () => {
         cy.window().then((win) => {
           (win as MarkerWindow).__modelRouteNoReloadMarker = true;
         });
-        const intro = `[data-testid="${locale ? 'zh-' : ''}tab-intro"]`;
+        const heading = '[data-testid="inference-page-heading"]';
         const suffix = locale ? '推理基准测试' : 'Inference Benchmarks';
         const expectModel = (name: string, slug: string) => {
           const title = `${name} ${suffix}`;
-          cy.get(`${intro} h1`).should('have.text', title);
-          cy.get(`${intro} p`).first().should('contain.text', name);
+          cy.get(heading).should('have.text', title);
           cy.title().should('eq', `${title} | InferenceX`);
           cy.get('meta[name="description"]').should('have.attr', 'content').and('contain', name);
           cy.get('meta[property="og:title"]').should(
@@ -215,17 +279,14 @@ describe('Inference model presentation', () => {
     it(`updates a bare ${locale}/inference intro when the selector creates a model route`, () => {
       visitModel('DeepSeek-V4.1-Flash', '', `${locale}/inference`);
       selectModel(PRO);
-      cy.get(`[data-testid="${locale ? 'zh-' : ''}tab-intro"] h1`).should(
-        'contain.text',
-        'DeepSeek V4 Pro',
-      );
+      cy.get('[data-testid="inference-page-heading"]').should('contain.text', 'DeepSeek V4 Pro');
       cy.title().should('contain', 'DeepSeek V4 Pro');
     });
 
     it(`follows an explicit query-model override on ${locale}/inference/kimi-k3`, () => {
       visitModel('DeepSeek-V4.1-Flash', '', `${locale}/inference/kimi-k3`);
       cy.get('[data-testid="model-selector"]').should('contain.text', FLASH);
-      cy.get(`[data-testid="${locale ? 'zh-' : ''}tab-intro"] h1`).should(
+      cy.get('[data-testid="inference-page-heading"]').should(
         'contain.text',
         'DeepSeek V4.1 Flash',
       );
@@ -238,7 +299,6 @@ describe('Inference model presentation', () => {
         expect(document.querySelector('h1')?.textContent).to.eq(
           locale ? 'Kimi K3 推理基准测试' : 'Kimi K3 Inference Benchmarks',
         );
-        expect(document.querySelector('h1 + p')?.textContent).to.contain('Kimi K3 2.8T');
         expect(document.title).to.contain('Kimi K3');
       });
     });

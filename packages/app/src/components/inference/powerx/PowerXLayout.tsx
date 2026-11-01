@@ -18,7 +18,7 @@ import {
   modeledItWattsPerGpu,
   POWER_COUNT_LABELS,
 } from '@/lib/power/power-basis';
-import { FACILITY_PUE_NOTE } from '@/lib/power/system-power-model';
+import { FACILITY_PUE_NOTE, formatPueRange } from '@/lib/power/system-power-model';
 import { getHardwareConfig } from '@/lib/catalog/constants';
 import { Switch } from '@/components/ui/switch';
 import type { InferenceData } from '@/components/inference/types';
@@ -99,7 +99,8 @@ const STRINGS = {
       at: (conc: number, x: string) => `c${conc} · ${x} tok/s/user`,
     },
     includeFacility: (pue: string) => `Include facility (PUE ${pue})`,
-    includeFacilityHelp: 'Appends the PUE overhead after the IT stack; off by default on PowerX.',
+    includeFacilityHelp:
+      'Appends the PUE overhead after the IT stack; on by default. Turn off for IT only.',
     per: 'Per',
     perHelp:
       'What one unit of energy is charged to: every token including the prompt (the default), an output token, an input token, or one successful query in watt-hours. Aggregated serving runs prefill and decode on the same GPUs, so per output token also bills the prompt to the output.',
@@ -172,7 +173,7 @@ const STRINGS = {
       at: (conc: number, x: string) => `c${conc} · ${x} tok/s/user`,
     },
     includeFacility: (pue: string) => `计入数据中心开销（PUE ${pue}）`,
-    includeFacilityHelp: '在 IT 堆叠之后追加 PUE 开销；PowerX 默认关闭。',
+    includeFacilityHelp: '在 IT 堆叠之后追加 PUE 开销；默认开启，关闭后仅显示 IT。',
     per: '计量单位',
     perHelp:
       '能耗的计量单位：含提示词的全部 Token（默认）、每输出 Token、每输入 Token，或每次成功查询（以 Wh 计）。聚合式部署中预填充与解码共用同一批 GPU，按输出 Token 计量会把提示词的能耗也算到输出上。',
@@ -700,8 +701,11 @@ export function PowerXReadout({
   );
 }
 
-/** The Where view's Include facility switch; the stack is IT-only until it is on. */
-export function PowerXFacilitySwitch({ pue }: { pue: number | null }) {
+/**
+ * The Where view's Include facility switch. `pues` are the PUEs of the visible chips;
+ * the label shows their range, since air- and liquid-cooled systems differ.
+ */
+export function PowerXFacilitySwitch({ pues }: { pues: readonly number[] }) {
   const locale = useLocale();
   const t = STRINGS[locale];
   const includeFacility = usePowerXIncludeFacility();
@@ -721,7 +725,7 @@ export function PowerXFacilitySwitch({ pue }: { pue: number | null }) {
           title={t.includeFacilityHelp}
         />
         <span className="font-medium text-foreground">
-          {t.includeFacility(pue === null ? '—' : String(pue))}
+          {t.includeFacility(formatPueRange(pues))}
         </span>
       </label>
       <span className="text-xs text-muted-foreground" data-testid="powerx-facility-note">

@@ -9,8 +9,8 @@ export const metadata: Metadata = tabMetadataZh('agentic-workload-explorer');
 export default function ZhAgenticWorkloadExplorerPage() {
   return (
     <>
-      <ZhTabIntro tab="agentic-workload-explorer" />
       <OverviewView />
+      <ZhTabIntro tab="agentic-workload-explorer" />
     </>
   );
 }

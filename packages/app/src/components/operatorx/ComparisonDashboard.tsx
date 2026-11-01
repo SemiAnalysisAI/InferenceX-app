@@ -35,15 +35,30 @@ import type { VizDefinition } from './viz/types';
 
 const NO_BASELINE = 'none';
 
-function layout(visible: VizDefinition[]): { viz: VizDefinition; wide: boolean }[] {
-  const out = visible.map((viz) => ({ viz, wide: Boolean(viz.wide) }));
+// Literal class names so Tailwind generates them.
+const SPAN_CLASS = {
+  5: 'lg:col-span-5',
+  6: 'lg:col-span-6',
+  7: 'lg:col-span-7',
+  12: 'lg:col-span-12',
+} as const;
+
+type Span = keyof typeof SPAN_CLASS;
+
+function layout(visible: VizDefinition[]): { viz: VizDefinition; span: Span }[] {
+  const out = visible.map((viz) => ({ viz, span: (viz.wide ? 12 : 6) as Span }));
   let run: typeof out = [];
   for (const card of [...out, null]) {
-    if (card && !card.wide) {
+    if (card && card.span !== 12) {
       run.push(card);
       continue;
     }
-    if (run.length % 2 === 1) run.at(-1)!.wide = true;
+    if (run.length % 2 === 1) run.at(-1)!.span = 12;
+    for (let i = 0; i + 1 < run.length; i += 2) {
+      const [first, second] = [run[i], run[i + 1]];
+      first.span = first.viz.span ?? (second.viz.span ? ((12 - second.viz.span) as Span) : 6);
+      second.span = (12 - first.span) as Span;
+    }
     run = [];
   }
   return out;
@@ -76,12 +91,12 @@ const VizCard = memo(
   ({
     model,
     viz,
-    wide,
+    span,
     eager,
   }: {
     model: ComparisonModel;
     viz: VizDefinition;
-    wide: boolean;
+    span: Span;
     eager: boolean;
   }) => {
     const [mounted, setMounted] = useState(eager);
@@ -111,7 +126,7 @@ const VizCard = memo(
         aria-labelledby={`operatorx-title-${viz.id}`}
         tabIndex={mounted ? undefined : 0}
         onFocus={() => setMounted(true)}
-        className={`min-w-0 ${wide ? 'lg:col-span-2' : ''}`}
+        className={`min-w-0 ${SPAN_CLASS[span]}`}
       >
         <Heading id={`operatorx-title-${viz.id}`} as="h2" level="card" className="mb-4">
           {viz.title}
@@ -274,11 +289,11 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
         </div>
       </Card>
       <Pending active={switching} label={`Loading ${pending?.label ?? 'workload'}…`}>
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-12">
           {layout(
             VISUALIZATIONS.filter((v) => v.ops.includes(op) && (baseline || !v.needsBaseline)),
-          ).map(({ viz, wide }, index) => (
-            <VizCard key={viz.id} model={model} viz={viz} wide={wide} eager={index === 0} />
+          ).map(({ viz, span }, index) => (
+            <VizCard key={viz.id} model={model} viz={viz} span={span} eager={index === 0} />
           ))}
         </div>
       </Pending>

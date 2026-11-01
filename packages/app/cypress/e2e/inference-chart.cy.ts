@@ -32,6 +32,25 @@ function openYAxisHelp(metric: string) {
   cy.get(`[data-testid="option-help-${metric}"]`).scrollIntoView().click();
 }
 
+function assertContextBelowPlot(root: Element) {
+  const plot = root.querySelector('[data-testid="d3-chart-svg"]')!;
+  const context = root.querySelector('[data-testid="result-context"]')!;
+  const legend = root.querySelector('[data-slot="chart-legend-wrapper"]');
+  expect(context.getBoundingClientRect().top, 'context below plot').to.be.at.least(
+    plot.getBoundingClientRect().bottom,
+  );
+  if (legend) {
+    expect(context.getBoundingClientRect().top, 'context below legend').to.be.at.least(
+      legend.getBoundingClientRect().bottom,
+    );
+  }
+  // Firefox can round touching layout edges to slightly different subpixel coordinates.
+  expect(
+    root.querySelector('h2')!.getBoundingClientRect().bottom,
+    'heading above plot',
+  ).to.be.at.most(plot.getBoundingClientRect().top + 0.01);
+}
+
 const measuredRows = (runUrl: string | null) =>
   singleTurnRows(runUrl).map((row, index) => ({
     ...row,
@@ -117,7 +136,7 @@ describe('Inference Chart', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/inference');
+    cy.visit('/inference?g_model=DeepSeek-V4-Pro');
     cy.wait(['@chartAvailability', '@chartBenchmarks']);
   });
 
@@ -157,6 +176,7 @@ describe('Inference Chart', () => {
       .and('not.contain.text', 'Workload:')
       .and('not.contain.text', 'Precision:')
       .and('not.contain.text', 'Metric:');
+    cy.get('#chart-0').should(($chart) => assertContextBelowPlot($chart[0]!));
   });
 
   it('plots OpenRouter-priced token revenue for official and unofficial runs', () => {
@@ -233,6 +253,22 @@ describe('Inference Chart', () => {
       .and(($body) => {
         expect($body.text()).not.to.include('—');
       });
+  });
+
+  it('keeps cost controls below the plot when changing tiers on mobile', () => {
+    cy.viewport(375, 900);
+    cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_metric=tokensPerDollarH');
+    cy.get('#chart-0 [data-testid="d3-chart-svg"] .dot-group').should('have.length.greaterThan', 0);
+    cy.get('#chart-0').should(($chart) => assertContextBelowPlot($chart[0]!));
+    cy.get('#chart-0 [data-testid="cost-tier-selector"]').click();
+    cy.get('[data-testid="cost-tier-rental"]').click();
+    cy.get('#chart-0 input[aria-label="B200 $/chip/hr"]').should('have.value', '3.7');
+    cy.get('#chart-0 [data-testid="cost-tier-selector"]').should(
+      'contain.text',
+      'Rent - 3 Year Commit',
+    );
+    cy.get('#chart-0').should(($chart) => assertContextBelowPlot($chart[0]!));
+    expectNoPageOverflow();
   });
 
   it('plots infrastructure total tokens per dollar for official and unofficial runs', () => {
@@ -466,6 +502,7 @@ describe('Deprecated model source attribution', () => {
           expect(win.document.querySelector('#chart-0-export .deprecated-watermark')).to.equal(
             null,
           );
+          assertContextBelowPlot(win.document.querySelector('#chart-0-export')!);
         }
       };
     });
@@ -481,6 +518,7 @@ describe('Deprecated model source attribution', () => {
     });
     cy.wait('@historicalM3Overlay');
     cy.get('#chart-0 .unofficial-overlay-pt').should('have.length.greaterThan', 0);
+    cy.get('#chart-0').should(($chart) => assertContextBelowPlot($chart[0]!));
     cy.get('#chart-0 [data-testid="result-context"]').should(
       'contain.text',
       'Source: SemiAnalysis InferenceX™ + UNOFFICIAL overlays (Deprecated)',
@@ -504,6 +542,7 @@ describe('Deprecated model source attribution', () => {
       '来源: SemiAnalysis InferenceX™ + 非官方 overlays (已弃用)',
     );
     cy.get('.deprecated-watermark').should('not.exist');
+    cy.get('#chart-0').should(($chart) => assertContextBelowPlot($chart[0]!));
     expectNoPageOverflow();
   });
 });
@@ -521,7 +560,18 @@ describe('Inference Chart — Simplified Chinese mobile path', () => {
 
   it('keeps chart controls reachable and localizes the complete table click path', () => {
     cy.contains('h2', '推理性能').should('be.visible');
+    cy.get('[data-testid="inference-run-context"]').should('have.length', 1).and('not.be.visible');
+    cy.get('#scenario-select').should('have.length', 1).and('not.be.visible');
+    cy.get('#precision-select').should('have.length', 1).and('not.be.visible');
     cy.get('[data-testid="inference-secondary-controls"] > button').click();
+    cy.get('[data-testid="inference-secondary-controls"]').within(() => {
+      cy.get('#scenario-select').should('be.visible');
+      cy.get('#precision-select').should('be.visible');
+    });
+    cy.get('[data-testid="inference-secondary-controls"]')
+      .find('[data-testid="inference-run-context"]')
+      .should('be.visible')
+      .and('contain.text', '运行信息');
     cy.get('label[for="x-axis-mode-select"]').should('have.text', 'X 轴指标');
     cy.get('[data-testid="x-axis-mode-selector"]').click();
     cy.get('[data-testid="x-axis-mode-e2e"]').should('have.text', '端到端延迟').click();

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { ComparisonCase, ComparisonColumns, ComputePrecision } from './compare';
+import { opLabels } from './describe';
 import { comparisonDefaults, sliceKey } from './visualization';
 
 function row(x: number, precision: ComputePrecision, n = 64): ComparisonCase {
@@ -110,5 +111,53 @@ describe('OperatorX visualization defaults', () => {
       comparisonDefaults({ op: 'gemm', cases: [row(1, 'other')], measurements: {} })
         .rooflinePrecision,
     ).toBeNull();
+  });
+});
+
+function moeCase(tokens: number, extra: Record<string, unknown> = {}): ComparisonCase {
+  const args = {
+    experts: { num: 384, top_k: 6, inter: 2304, a1: { dtype: 'e4m3' }, w1: { dtype: 'e2m1' } },
+    hidden: 5120,
+    router: { select: { kind: 'topk' } },
+    tokens,
+    ...extra,
+  };
+  const labels = opLabels('moe', args);
+  return {
+    key: JSON.stringify(args),
+    testlist: 'moe',
+    sources: [],
+    ...labels,
+    computePrecision: 'fp8',
+    x: tokens,
+    dims: { tokens },
+    flops: 1,
+    bytes: 1,
+  };
+}
+
+describe('OperatorX metric-vs-size slices', () => {
+  it('puts token counts of one operation on one line', () => {
+    expect(sliceKey('moe', moeCase(8))).toBe(sliceKey('moe', moeCase(256)));
+  });
+
+  it('keeps split layouts and hash routing off the single-device line', () => {
+    const keys = [
+      moeCase(8),
+      moeCase(8, { parallel: { tp: 8 } }),
+      moeCase(8, { parallel: { ep: 8, tp: 8 } }),
+      moeCase(8, { parallel: { dp: 8, ep: 8 } }),
+      moeCase(8, { router: { select: { kind: 'hash', vocab: 129280 } } }),
+    ].map((c) => sliceKey('moe', c));
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it('separates tensor-parallel GEMMs from single-device GEMMs of the same N and K', () => {
+    const split = {
+      ...row(8, 'bf16'),
+      key: JSON.stringify({ m: 8, n: 64, k: 128, parallel: { tp: 4 } }),
+    };
+    expect(sliceKey('gemm', split)).toBe('N=64 K=128 · tp=4 · bf16');
+    expect(sliceKey('gemm', row(8, 'bf16'))).toBe('N=64 K=128 · bf16');
   });
 });

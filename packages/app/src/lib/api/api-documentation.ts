@@ -799,7 +799,8 @@ export const apiDocumentationGroups: readonly ApiDocumentationGroup[] = [
 // published OpenAPI. Its hardware[].reference normalization basis, bandwidth
 // assumptions, cross-backend argument alignment (fastest successful backend per
 // hardware/case, with measurements[].backend provenance), and workload-resolved
-// chart defaults and optional distribution quantiles/normalization selectors are
+// chart defaults, optional distribution quantiles and per-hardware/shared-cohort roofline
+// median/best summaries with precision/hardware/normalization/cohort selectors are
 // documented in docs/operatorx.md. Ingest-time compact run
 // projections are fetched in one revision-aware bulk query, preserving response
 // and source identities; legacy fallback and
@@ -939,8 +940,8 @@ export const apiOperations: readonly ApiOperation[] = [
         'query',
         false,
         'boolean',
-        'With runId, read its logical stored snapshot, including same-image predecessors for append-only runs. Cannot accompany date or exact. Only literal true/false accepted.',
-        '与 runId 一起读取该运行已存储的逻辑快照；append-only 运行包含此前相同镜像的数据。不能同时提供 date 或 exact。仅接受字面值 true/false。',
+        'With runId, read its logical stored snapshot. Append-only runs include predecessors whose shared topologies keep the same image. Cannot accompany date or exact. Only literal true/false accepted.',
+        '与 runId 一起读取该运行已存储的逻辑快照；append-only 运行还会包含此前运行的数据，前提是两者共有的拓扑使用同一镜像。不能同时提供 date 或 exact。仅接受字面值 true/false。',
         { type: 'boolean', default: false },
         false,
       ),
@@ -1091,8 +1092,8 @@ export const apiOperations: readonly ApiOperation[] = [
         'query',
         false,
         'boolean',
-        'With a numeric runId, return that run’s logical snapshot, including same-image predecessors for append-only runs.',
-        '与数字 runId 一起使用时，返回该次运行对应的逻辑快照；append-only 运行的快照包含此前使用相同镜像的数据。',
+        'With a numeric runId, return that run’s logical snapshot. Append-only runs include predecessors whose shared topologies keep the same image.',
+        '与数字 runId 一起使用时，返回该次运行对应的逻辑快照；append-only 运行的快照还会包含此前运行的数据，前提是两者共有的拓扑使用同一镜像。',
         { type: 'boolean', default: false },
         false,
       ),
@@ -2087,6 +2088,83 @@ export const apiOperations: readonly ApiOperation[] = [
     ],
     responseShapeName: 'CollectiveXRunList',
     curlUrl: `${API_BASE_URL}/api/v1/collectivex/runs?version=1`,
+  },
+  {
+    id: 'list-collectivex-changelog',
+    group: 'collectivex',
+    method: 'GET',
+    path: '/api/v1/collectivex/changelog',
+    summary: text('List CollectiveX changelog entries', '列出 CollectiveX 变更记录'),
+    description: text(
+      'Returns the InferenceX collectivex/perf-changelog.yaml entries linked to stored runs, newest first: one row per run and entry, with the pair-period p50 before and after for every selected case that run changed.',
+      '按从新到旧返回已关联到已存储运行的 InferenceX collectivex/perf-changelog.yaml 记录：每个运行与记录一行，并附上该运行改变的每个被选中用例在之前和之后的 pair-period p50。',
+    ),
+    audience: 'public',
+    stability: 'beta',
+    parameters: [
+      parameter(
+        'version',
+        'query',
+        true,
+        'enum',
+        'CollectiveX contract version.',
+        'CollectiveX 契约版本。',
+        { type: 'integer', enum: [...COLLECTIVEX_VERSIONS] },
+        COLLECTIVEX_VERSIONS.at(-1) ?? 1,
+      ),
+    ],
+    responses: [
+      success(
+        'Version and linked changelog entries.',
+        '版本与已关联的变更记录。',
+        objectSchema({
+          version: integerSchema,
+          entries: arraySchema(
+            objectSchema({
+              run_id: stringSchema,
+              entry_index: integerSchema,
+              pr_number: integerSchema,
+              pr_link: stringSchema,
+              date: stringSchema,
+              pools: arraySchema(stringSchema),
+              selectors: anyObjectSchema,
+              description: stringSchema,
+              changes: arraySchema(anyObjectSchema),
+            }),
+          ),
+        }),
+        {
+          version: 1,
+          entries: [
+            {
+              run_id: '1793344844',
+              entry_index: 14,
+              pr_number: 4674,
+              pr_link: 'https://github.com/SemiAnalysisAI/InferenceX/pull/4674',
+              date: '2026-10-30',
+              pools: ['mi300x'],
+              selectors: { backends: ['uccl-ep'], modes: ['low-latency'], precisions: ['fp8'] },
+              description: "Model uccl-ep's in-kernel FP8 cast exactly in low-latency mode.",
+              changes: [],
+            },
+          ],
+        },
+      ),
+      errorResponse(
+        '400',
+        'version is missing or unsupported.',
+        'version 缺失或不受支持。',
+        'Unknown version',
+      ),
+      errorResponse(
+        '500',
+        'The changelog query failed.',
+        '变更记录查询失败。',
+        'Internal server error',
+      ),
+    ],
+    responseShapeName: 'CollectiveXChangelog',
+    curlUrl: `${API_BASE_URL}/api/v1/collectivex/changelog?version=1`,
   },
   {
     id: 'get-collectivex-run',

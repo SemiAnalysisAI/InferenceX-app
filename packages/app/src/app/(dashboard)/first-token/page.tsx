@@ -16,8 +16,8 @@ export default async function FirstTokenPage({ searchParams }: Props) {
   const seed = resolveCalculatorUrlSeed(sp);
   return (
     <>
-      <TabIntro tab="first-token" />
       <FirstTokenLimitsDisplay urlSeed={seed} />
+      <TabIntro tab="first-token" />
     </>
   );
 }

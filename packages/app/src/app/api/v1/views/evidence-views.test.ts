@@ -28,7 +28,7 @@ const request = (view: string, query: string) =>
   new NextRequest(`http://localhost/api/v1/views/${view}?${query}`);
 const dataset = makeCollectiveXDataset();
 const image = {
-  model: 'dsv4',
+  model: 'dsv41flash',
   hardware: 'b200',
   framework: 'sglang',
   precision: 'fp8',
@@ -88,7 +88,7 @@ describe('public evidence projections', () => {
     const response = await images(
       request(
         'current-inferencex-image',
-        `model=${Model.DeepSeek_V4_Pro}&hardware=b200&precision=fp8&frameworks=sglang&spec=none&sequence=agentic-traces&asOf=2026-09-19`,
+        `model=${Model.DeepSeek_V4_1_Flash}&hardware=b200&precision=fp8&frameworks=sglang&spec=none&sequence=agentic-traces&asOf=2026-09-19`,
       ),
     );
     expect(response.status).toBe(200);

@@ -8,7 +8,7 @@ describe('Chinese (/zh) pages', () => {
 
     it('renders the Chinese landing content', () => {
       cy.get('[data-testid="intro-section"]').should('contain.text', 'AI 加速器系统基准测试');
-      cy.get('[data-testid="splash-text"]').should('have.text', 'AgentX 来了！！');
+      cy.get('[data-testid="splash-text"]').should('not.exist');
       cy.get('[data-testid="landing-quick-comparisons"]').should('not.exist');
       cy.contains('快速对比').should('not.exist');
     });
@@ -67,11 +67,10 @@ describe('Chinese (/zh) pages', () => {
       cy.visit('/zh/inference');
     });
 
-    it('renders the Chinese SEO intro above the chart', () => {
-      cy.get('[data-testid="zh-tab-intro"]').within(() => {
-        cy.contains('h1', '智能体推理基准测试').should('exist');
-        cy.contains('长上下文、多轮').should('exist');
-      });
+    it('renders the Chinese h1 without an intro box', () => {
+      cy.location('pathname').should('eq', '/zh/inference/kimi-k3');
+      cy.get('[data-testid="inference-page-heading"]').should('have.text', 'Kimi K3 推理基准测试');
+      cy.get('[data-testid="zh-tab-intro"]').should('not.exist');
 
       cy.get('[data-testid="tab-trigger-evaluation"]')
         .should('contain.text', '准确率评估')
@@ -81,12 +80,11 @@ describe('Chinese (/zh) pages', () => {
   });
 
   describe('zh per-model inference page', () => {
-    it('renders a model-specific Chinese h1 and intro', () => {
+    it('renders a model-specific Chinese h1', () => {
       cy.visit('/zh/inference/kimi-k3');
-      cy.get('[data-testid="zh-tab-intro"]').within(() => {
-        cy.get('h1').should('contain.text', 'Kimi').and('contain.text', '推理基准测试');
-        cy.get('p').first().should('contain.text', 'Kimi').and('contain.text', '本页面展示');
-      });
+      cy.get('[data-testid="inference-page-heading"]')
+        .should('contain.text', 'Kimi')
+        .and('contain.text', '推理基准测试');
     });
   });
 

@@ -9,8 +9,8 @@ export const metadata: Metadata = tabMetadataZh('operatorx');
 export default function ZhOperatorXPage() {
   return (
     <>
-      <ZhTabIntro tab="operatorx" />
       <OperatorXView />
+      <ZhTabIntro tab="operatorx" />
     </>
   );
 }

@@ -236,9 +236,17 @@ export interface ComparisonView {
 const measured = (r: ComparisonRow) =>
   r.status === 'ok' && r.latencyUs !== null && Number.isFinite(r.latencyUs) && r.latencyUs > 0;
 
+/** Workload shown when the request names none (or an unknown one), if the data has it. */
+export const DEFAULT_WORKLOADS: Partial<Record<ComparisonOp, string>> = {
+  moe: 'moe:DeepSeek-V4.1-Flash',
+};
+
 export function comparisonView(comparison: Comparison, workloadId: string | null): ComparisonView {
+  const find = (id: string | null | undefined) =>
+    id ? comparison.workloads.find((w) => w.id === id)?.id : undefined;
   const workload =
-    comparison.workloads.find((w) => w.id === workloadId)?.id ??
+    find(workloadId) ??
+    find(DEFAULT_WORKLOADS[comparison.op]) ??
     comparison.workloads[0]?.id ??
     null;
   // Raw rows retain backend identity. Hardware comparisons align full operation
