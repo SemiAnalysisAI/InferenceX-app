@@ -50,7 +50,7 @@ Approved evidence determines the preferred cohort. A workload available only in
 the named run requires explicit selection, or becomes the fallback when no approved
 cohort matches. The browser retains one bounded History read and rederives both
 lists when the URL changes. Legacy dashboard/compare APIs remain approved-only.
-The overview API returns JSON; `format=csv` remains unsupported and returns 400.
+The overview API returns JSON by default. `format=csv` downloads the same selected official and named cells with exact source/workload/run/artifact identities, approval state, units and both GPU cost bases. Missing values remain empty cells; CSV is private and no-store.
 
 The Workload menu shows compact summaries derived from recorded model and generation
 metadata. Its existing help control shows the full source label, exact source
@@ -165,6 +165,6 @@ Difference 是相对已记录 H200 H3 50-step 视频的浏览器 RGB 差异预�
 默认优先选择有已批准结果的工作负载；仅由指定运行提供的工作负载须明确选择，
 或在没有匹配的已批准结果时作为回退。
 支持隐藏硬件及移除；清除叠加运行后不会将未批准数据转为正式结果。
-移除时，工作负载选择仅在已批准选项中仍然有效时保留。overview 仅返回 JSON，`format=csv` 返回 400。
+移除时，工作负载选择仅在已批准选项中仍然有效时保留。overview 默认返回 JSON；`format=csv` 下载当前筛选的正式及指定运行数据点，保留来源、工作负载、运行、产物和批准状态，标明单位及两种 GPU 成本口径。缺失值保留为空单元格，CSV 不缓存。
 读取不会启动 GPU、写入 Blob 或发布媒体。测试覆盖 API 一致性、样本门槛、
 两种成本口径、缺失证据、同步视频与中英文 390px 布局。

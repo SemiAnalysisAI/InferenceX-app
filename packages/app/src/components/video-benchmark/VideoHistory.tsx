@@ -60,7 +60,7 @@ const STRINGS = {
     metricNote:
       'Latency and throughput cover submission to downloaded media. Energy uses the recorded generation window and participating GPU boards; lower is better. Failed attempts remain in the recorded measurement window.',
     samples: 'Valid latency samples',
-    replay: 'Retained-data replay for local verification; no new measurements or publication.',
+    replay: 'Local replay · unpublished. Original retained evidence; no new measurement.',
   },
   zh: {
     title: '性能历史',
@@ -108,7 +108,7 @@ const STRINGS = {
     metricNote:
       '延迟与吞吐量涵盖提交到媒体下载完成。能耗使用记录的生成时间窗口，按参与计算的 GPU 板卡统计，越低越好；失败尝试的耗时仍计入对应测量窗口。',
     samples: '有效延迟样本数',
-    replay: '本地验证使用保留数据回放，未重新测量或发布。',
+    replay: '本地回放 · 未发布。使用原始保留数据，未重新测量。',
   },
 };
 const STATUS: Record<string, { en: string; zh: string }> = {

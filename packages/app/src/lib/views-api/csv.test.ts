@@ -24,6 +24,10 @@ describe('toCsv', () => {
   it('serializes null and undefined as empty cells', () => {
     expect(toCsv([{ a: null, b: undefined, c: 0 }])).toBe('a,b,c\r\n,,0\r\n');
   });
+
+  it('keeps explicitly selected columns when there are no rows', () => {
+    expect(toCsv([], ['a', 'b'])).toBe('a,b\r\n');
+  });
 });
 
 describe('csvResponse', () => {

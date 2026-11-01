@@ -4,7 +4,7 @@ import { videoHistoryEntry, type VideoHistoryPage } from './history';
 import { namedRunPoints, videoPoints } from './points';
 import { DEFAULT_RESULTS_STATE, resultProjection } from './results';
 import { isNativeH3, servingCells } from './serving';
-import type { StoredSource } from './stored';
+import type { StoredArtifact, StoredSource } from './stored';
 
 function replayArtifact(metadata: Json, size: number): CIArtifact {
   const id = number(at(metadata, 'id'));
@@ -39,13 +39,14 @@ function replayArtifact(metadata: Json, size: number): CIArtifact {
   };
 }
 
-/** Offline reader acceptance only; a local ZIP cannot establish publication approval. */
-export async function replayVideoArtifact(blob: Blob, metadata: Json, expectedPlanSha256: string) {
+/** The CLI and local development adapter share one verified, HTTP-independent reader. */
+export async function readVideoReplay(blob: Blob, metadata: Json, expectedPlanSha256: string) {
   if (!/^[a-f0-9]{64}$/u.test(expectedPlanSha256))
     throw new Error('Expected plan SHA256 is required');
   const artifact = replayArtifact(metadata, blob.size);
   const archive = await archiveSources(blob, artifact);
   const sources: StoredSource[] = [];
+  const media = new Map<string, Map<string, Blob>>();
   const errors: string[] = [];
   const cells: {
     source: string;
@@ -93,12 +94,14 @@ export async function replayVideoArtifact(blob: Blob, metadata: Json, expectedPl
         assets: [],
         texts: [],
       });
+      media.set(source.id, new Map([...bundle.files].filter(([path]) => path.endsWith('.mp4'))));
     } catch (error) {
       errors.push(`${source.id}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
   const runId = String(artifact.workflow_run!.id);
-  const entry = videoHistoryEntry({ storageVersion: 1, runId, artifact, sources }, null);
+  const stored: StoredArtifact = { storageVersion: 1, runId, artifact, sources };
+  const entry = videoHistoryEntry(stored, null);
   entry.approved = false;
   if (entry.error) errors.push(entry.error);
   for (const source of entry.sources)
@@ -111,7 +114,7 @@ export async function replayVideoArtifact(blob: Blob, metadata: Json, expectedPl
     { ...DEFAULT_RESULTS_STATE, unofficialRun: runId },
     named,
   );
-  return {
+  const report = {
     ok: errors.length === 0 && cells.length > 0,
     artifact: metadata,
     expectedPlanSha256,
@@ -164,4 +167,11 @@ export async function replayVideoArtifact(blob: Blob, metadata: Json, expectedPl
       };
     }),
   };
+  return { report, stored, media };
+}
+
+/** Offline reader acceptance only; a local ZIP cannot establish publication approval. */
+export async function replayVideoArtifact(blob: Blob, metadata: Json, expectedPlanSha256: string) {
+  const replay = await readVideoReplay(blob, metadata, expectedPlanSha256);
+  return replay.report;
 }

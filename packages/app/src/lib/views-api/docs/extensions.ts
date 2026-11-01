@@ -6,6 +6,7 @@ import type {
 } from '@/lib/api/api-documentation';
 import { API_BASE_URL } from '@/lib/api/api-documentation-base';
 import { VIDEO_HISTORY_MAX_PAGES } from '@/components/video-benchmark/history';
+import { RESULT_CSV_COLUMNS } from '@/components/video-benchmark/results-csv';
 import { text } from '@/lib/api/api-documentation-helpers';
 import { VIEW_QUERY_PARAMS, type ReadonlyView } from '../registry';
 
@@ -478,26 +479,31 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
 
 export function viewParameter(view: ReadonlyView, name: string): ApiParameter {
   const note: readonly [string, string] =
-    view === 'video' && (name === 'unofficialrun' || name === 'unofficialruns')
+    view === 'video' && name === 'format'
       ? [
-          'Single stored run ID (unofficialrun or canonical unofficialruns alias; multiple IDs and both aliases together return 400) for separate overview overlayCells, whether approved or unapproved. Actual approval is preserved; the selected run is excluded from official cells. Unknown or ineligible runs return no overlay. No publication is triggered.',
-          '单个已存储运行 ID，可用 unofficialrun 或分享链接的 unofficialruns 别名；多个 ID 或同时使用两个别名返回 400。所选运行无论是否已批准，都只放入 overview 中独立的 overlayCells，保留实际批准状态，并从正式结果中排除；未知或未达准入要求的运行不返回叠加结果。该参数不会触发发布。',
+          'JSON by default. CSV is available only with view=overview and flattens its selected official and named cells with source identities, both GPU cost bases and units. Empty CSV cells represent missing values.',
+          '默认返回 JSON。CSV 仅适用于 view=overview，按当前选择导出正式及指定运行的数据点，包含来源标识、两种 GPU 成本口径和单位。CSV 空单元格表示数据缺失。',
         ]
-      : view === 'current-inferencex-image' && name === 'sequence'
-        ? ([
-            'Image scenario. Defaults to agentic-traces (Agentic), falling back to the first available active scenario for the selected model.',
-            '镜像场景。默认为 agentic-traces（Agentic）；所选模型无此场景时，回退到其首个有效场景。',
-          ] as const)
-        : (view === 'profit-estimator' || view === 'profit-estimator-per-gigawatt') &&
-            name === 'model'
+      : view === 'video' && (name === 'unofficialrun' || name === 'unofficialruns')
+        ? [
+            'Single stored run ID (unofficialrun or canonical unofficialruns alias; multiple IDs and both aliases together return 400) for separate overview overlayCells, whether approved or unapproved. Actual approval is preserved; the selected run is excluded from official cells. Unknown or ineligible runs return no overlay. No publication is triggered.',
+            '单个已存储运行 ID，可用 unofficialrun 或分享链接的 unofficialruns 别名；多个 ID 或同时使用两个别名返回 400。所选运行无论是否已批准，都只放入 overview 中独立的 overlayCells，保留实际批准状态，并从正式结果中排除；未知或未达准入要求的运行不返回叠加结果。该参数不会触发发布。',
+          ]
+        : view === 'current-inferencex-image' && name === 'sequence'
           ? ([
-              'Model display name or comparison slug. The dashboards offer agentic-trace models with usable benchmark curves and token pricing; this API also accepts other known models, which may return no estimated rows. Check /api/v1/availability for agentic_traces data.',
-              '模型显示名称或比较页 slug。仪表板提供具有可用 AgentX 测试曲线和 token 定价的模型；本 API 也接受其他已知模型，但可能返回空的估算结果。可通过 /api/v1/availability 查询 agentic_traces 数据。',
+              'Image scenario. Defaults to agentic-traces (Agentic), falling back to the first available active scenario for the selected model.',
+              '镜像场景。默认为 agentic-traces（Agentic）；所选模型无此场景时，回退到其首个有效场景。',
             ] as const)
-          : (PARAMETER_NOTES[name] ?? [
-              `${name} selector for ${view}; resolved value is returned in params.`,
-              `${view} 的 ${name} 选择项；解析后的值在 params 中返回。`,
-            ]);
+          : (view === 'profit-estimator' || view === 'profit-estimator-per-gigawatt') &&
+              name === 'model'
+            ? ([
+                'Model display name or comparison slug. The dashboards offer agentic-trace models with usable benchmark curves and token pricing; this API also accepts other known models, which may return no estimated rows. Check /api/v1/availability for agentic_traces data.',
+                '模型显示名称或比较页 slug。仪表板提供具有可用 AgentX 测试曲线和 token 定价的模型；本 API 也接受其他已知模型，但可能返回空的估算结果。可通过 /api/v1/availability 查询 agentic_traces 数据。',
+              ] as const)
+            : (PARAMETER_NOTES[name] ?? [
+                `${name} selector for ${view}; resolved value is returned in params.`,
+                `${view} 的 ${name} 选择项；解析后的值在 params 中返回。`,
+              ]);
   return {
     name,
     location: 'query',
@@ -506,7 +512,10 @@ export function viewParameter(view: ReadonlyView, name: string): ApiParameter {
         !['current-inferencex-image', 'overview', 'rankings', 'compare'].includes(view)) ||
       (view === 'gpu-metrics' && name === 'runId'),
     type: 'string',
-    schema: { type: 'string' },
+    schema:
+      view === 'video' && name === 'format'
+        ? { type: 'string', enum: ['json', 'csv'], default: 'json' }
+        : { type: 'string' },
     description: text(...note),
     example: name === 'model' ? 'DeepSeek-V4-Pro' : name === 'runId' ? '123' : '',
   };
@@ -667,8 +676,8 @@ const NEW_VIEWS = {
 } as const;
 
 const RESULTS_OVERVIEW_NOTES = {
-  en: 'view=overview shares resultProjection with the nine-group UI, admits one canonical 20-clip C1 workload with ten valid samples per hardware, and returns measured metrics plus separately labelled participating/allocated cost and modelled profit. Missing allocation remains null. Default points require publication approval. unofficialrun selects only the exact stored run into overlayCells with its actual approval, excluding it from official cells, deployments and workload mix. Approved cohorts retain default preference; named-only workloads require explicit selection or no matching approved cohort. Clearing never promotes unapproved evidence. Dismissal retains a workload selector only if it remains in the approved choices. The overview is JSON-only; format=csv returns 400. Missing quality, stage timing, memory and startup evidence stays null. Play/pause, scrub, difference rendering, theme and expand controls are presentation-only; media uses the published-only read path. ',
-  zh: 'view=overview 与九组指标界面共用 resultProjection，只准入同一份计划 20 条视频的 C1 工作负载，各硬件统一至少 10 个有效样本。响应包含实测指标及分别标注的参与/已分配 GPU 成本和估算利润；分配证据缺失时保留 null。默认数据点须有发布批准。unofficialrun 只把指定的已存储运行放入 overlayCells，保留其实际批准状态，并将其排除在正式结果、部署和工作负载构成之外。默认优先选择有已批准结果的工作负载；仅由指定运行提供的工作负载须明确选择，或在没有匹配的已批准结果时作为回退。清除叠加运行后也不会把未批准数据转为正式结果。移除时，工作负载选择仅在已批准选项中仍然有效时保留。overview 仅返回 JSON，format=csv 返回 400。质量、阶段计时、内存和启动证据缺失时保留 null。播放、拖动、差异显示、主题和展开控件只影响展示；媒体使用只读已发布路径。',
+  en: 'view=overview shares resultProjection with the nine-group UI, admits one canonical 20-clip C1 workload with ten valid samples per hardware, and returns measured metrics plus separately labelled participating/allocated cost and modelled profit. Missing allocation remains null. Default points require publication approval. unofficialrun selects only the exact stored run into overlayCells with its actual approval, excluding it from official cells, deployments and workload mix. Approved cohorts retain default preference; named-only workloads require explicit selection or no matching approved cohort. Clearing never promotes unapproved evidence. Dismissal retains a workload selector only if it remains in the approved choices. The overview returns JSON by default; format=csv returns selected official and named cells with source identities, units and both GPU cost bases as a private no-store download. Missing values are empty CSV cells. Missing quality, stage timing, memory and startup evidence stays null. Play/pause, scrub, difference rendering, theme and expand controls are presentation-only; media uses the published-only read path. ',
+  zh: 'view=overview 与九组指标界面共用 resultProjection，只准入同一份计划 20 条视频的 C1 工作负载，各硬件统一至少 10 个有效样本。响应包含实测指标及分别标注的参与/已分配 GPU 成本和估算利润；分配证据缺失时保留 null。默认数据点须有发布批准。unofficialrun 只把指定的已存储运行放入 overlayCells，保留其实际批准状态，并将其排除在正式结果、部署和工作负载构成之外。默认优先选择有已批准结果的工作负载；仅由指定运行提供的工作负载须明确选择，或在没有匹配的已批准结果时作为回退。清除叠加运行后也不会把未批准数据转为正式结果。移除时，工作负载选择仅在已批准选项中仍然有效时保留。overview 默认返回 JSON；format=csv 导出当前筛选的正式及指定运行数据点，包含来源标识、单位和两种 GPU 成本口径。CSV 响应设置 Cache-Control: private, no-store；缺失值以空单元格表示。质量、阶段计时、内存和启动证据缺失时保留 null。播放、拖动、差异显示、主题和展开控件只影响展示；媒体使用只读已发布路径。',
 };
 
 export const operations: ApiOperation[] = Object.entries(NEW_VIEWS).map(
@@ -723,6 +732,17 @@ export const operations: ApiOperation[] = Object.entries(NEW_VIEWS).map(
           },
           example: { view, apiVersion: 'v1', params: {} },
           mediaType: 'application/json',
+          ...(view === 'video'
+            ? {
+                alternateRepresentations: [
+                  {
+                    mediaType: 'text/csv',
+                    schema: { type: 'string' },
+                    example: `${RESULT_CSV_COLUMNS.join(',')}\r\n`,
+                  },
+                ],
+              }
+            : {}),
         },
         ...(view === 'video'
           ? [

@@ -297,7 +297,7 @@ describe('published VideoGenX dashboard projection', () => {
     ).toBe(true);
   });
 
-  it('returns the shared diagnostic-only projection and keeps CSV unsupported', async () => {
+  it('returns the shared diagnostic-only projection and CSV from the same selected cells', async () => {
     const history = structuredClone(retainedHistory) as unknown as VideoHistoryPage;
     history.nextPage = null;
     const run = videoPoints([history]).find((point) => point.hardwareKey === 'b200')!.runId;
@@ -316,8 +316,23 @@ describe('published VideoGenX dashboard projection', () => {
         namedRunPoints([history], run),
       ),
     );
-    const csv = await GET(request('view=overview&format=csv'));
-    expect(csv.status).toBe(400);
+    const csv = await GET(request(`view=overview&unofficialruns=${run}&format=csv`));
+    expect(csv.status).toBe(200);
+    expect(csv.headers.get('cache-control')).toBe('private, no-store');
+    const text = await csv.text();
+    expect(text).toContain('source_manifest_sha256');
+    expect(text).toContain('named,false,');
+    expect(text).toContain(String(body.overlayCells[0].point.id));
+    expect(text).not.toContain('official,true,');
+  });
+  it('keeps CSV headers when hardware selection removes every cell', async () => {
+    const response = await GET(
+      request('view=overview&format=csv&r_hidden=gb200,b200,mi355x,h200,h100'),
+    );
+    expect(response.status).toBe(200);
+    expect(await response.text()).toMatch(
+      /^channel,approved,published_at,run_id,artifact_id,.*\r\n$/u,
+    );
   });
   it('defaults to the current dashboard, reads history pages and preserves numerical parity', async () => {
     const response = await GET(request());

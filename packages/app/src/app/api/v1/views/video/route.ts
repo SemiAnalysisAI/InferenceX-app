@@ -7,6 +7,7 @@ import {
 import { servingCells } from '@/components/video-benchmark/serving';
 import { namedRunPoints, videoPoints } from '@/components/video-benchmark/points';
 import { parseResultsState, resultProjection } from '@/components/video-benchmark/results';
+import { RESULT_CSV_COLUMNS, resultCsvRows } from '@/components/video-benchmark/results-csv';
 import { storedBundle, type StoredArtifact } from '@/components/video-benchmark/stored';
 import {
   efficiencyValue,
@@ -26,6 +27,7 @@ import {
 import { VIEW_QUERY_PARAMS } from '@/lib/views-api/registry';
 import { readResponse, sourceRequest } from '@/lib/views-api/source';
 import { videoDashboardProjection } from '@/lib/views-api/video-dashboard';
+import { toCsv } from '@/lib/views-api/csv';
 import { type NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -54,6 +56,14 @@ async function dashboardResponse(request: NextRequest, view: 'dashboard' | 'comp
       state,
       namedRunPoints(pages, state.unofficialRun),
     );
+    if (request.nextUrl.searchParams.get('format') === 'csv')
+      return new Response(toCsv(resultCsvRows(projection), RESULT_CSV_COLUMNS), {
+        headers: {
+          ...headers,
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': 'attachment; filename="videogenx-results.csv"',
+        },
+      });
     return NextResponse.json(
       {
         view: 'video',
@@ -170,6 +180,7 @@ export function GET(request: NextRequest) {
       s.has('run') || s.has('artifact') ? 'results' : 'dashboard',
     );
     if (mode === 'overview') {
+      parseEnumParam(s.get('format'), 'format', ['json', 'csv'], 'json');
       if (s.has('unofficialrun') && s.has('unofficialruns'))
         throw new ViewsApiParamError('unofficialruns', 'Use one overlay parameter alias, not both');
       for (const key of ['unofficialrun', 'unofficialruns'])
@@ -177,6 +188,7 @@ export function GET(request: NextRequest) {
       for (const key of s.keys())
         if (
           key !== 'view' &&
+          key !== 'format' &&
           key !== 'unofficialrun' &&
           key !== 'unofficialruns' &&
           !key.startsWith('r_')
@@ -187,6 +199,7 @@ export function GET(request: NextRequest) {
           );
       return dashboardResponse(request, mode);
     }
+    if (s.has('format')) throw new ViewsApiParamError('format', 'CSV requires view=overview');
     for (const key of s.keys())
       if (key.startsWith('r_') || key === 'unofficialrun' || key === 'unofficialruns')
         throw new ViewsApiParamError(key, 'Results selectors require view=overview');

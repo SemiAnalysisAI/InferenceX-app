@@ -244,6 +244,7 @@ export const VIEW_QUERY_PARAMS = {
     'cell',
     'compare',
     'costs',
+    'format',
     'gpuBasis',
     'page',
     'phase',

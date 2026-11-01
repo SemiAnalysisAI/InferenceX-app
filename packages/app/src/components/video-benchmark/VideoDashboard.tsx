@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
   type ReactNode,
@@ -78,7 +79,7 @@ const STRINGS = {
     cohort: '20-clip C1 cohort · ≥10 valid per hardware',
     cohortHelp:
       'One canonical 20-clip C1 workload; at least 10 valid samples on every hardware. Other runs remain in Performance history. A fixture replay reads retained evidence and is not a new measurement.',
-    replay: 'Fixture replay',
+    replay: 'Local replay · unpublished',
     hidden: 'Excluded from this comparison',
     validity: 'Validity',
     hash: 'Workload hash',
@@ -186,6 +187,7 @@ const STRINGS = {
     dismiss: 'Dismiss',
     sources: 'Read-only data',
     api: 'View API',
+    csv: 'Download CSV',
     basis: 'GPU basis',
     perVideo: '$/video',
     perSecond: '$/video-s',
@@ -222,7 +224,7 @@ const STRINGS = {
     cohort: '20 条视频的 C1 工作负载 · 每种硬件至少 10 个有效样本',
     cohortHelp:
       '所有硬件共用一个固定的 20 条视频 C1 工作负载，至少需要 10 个有效样本。其他运行保留在性能历史中。Fixture 回放只读取已保留的证据，不是新测量。',
-    replay: 'Fixture 回放',
+    replay: '本地回放 · 未发布',
     hidden: '未纳入本次比较',
     validity: '有效性',
     hash: '工作负载哈希',
@@ -325,6 +327,7 @@ const STRINGS = {
     dismiss: '移除',
     sources: '只读数据',
     api: '视图 API',
+    csv: '下载 CSV',
     basis: 'GPU 口径',
     perVideo: '$/video',
     perSecond: '$/video-s',
@@ -427,6 +430,7 @@ export default function VideoDashboard() {
   const locale = useLocale(),
     s = STRINGS[locale];
   const [state, setState] = useState<ResultsState>(DEFAULT_RESULTS_STATE);
+  const latest = useRef(DEFAULT_RESULTS_STATE);
   const { points, namedPoints, loading, error, replay, retry } = useVideoPoints(
     state.unofficialRun,
   );
@@ -434,36 +438,39 @@ export default function VideoDashboard() {
   const [traceHardware, setTraceHardware] = useState('h200');
   const [historyOpen, setHistoryOpen] = useState(false);
   useEffect(() => {
-    const read = () => setState(parseResultsState(location.search));
+    const read = () => {
+      const next = parseResultsState(location.search);
+      latest.current = next;
+      setState(next);
+    };
     read();
     window.addEventListener('popstate', read);
     return () => window.removeEventListener('popstate', read);
   }, []);
   const update = useCallback((patch: Partial<ResultsState>) => {
-    setState((current) => {
-      const changesWorkload = ['model', 'workload', 'resolution', 'duration', 'mode', 'steps'].some(
-        (key) => key in patch,
-      );
-      const next = {
-        ...current,
-        ...patch,
-        ...(changesWorkload
-          ? { apiPrice: null, apiPrices: { t2v: null, i2v: null, r2v: null } }
-          : {}),
-      };
-      const params = new URLSearchParams(
-        [...new URLSearchParams(location.search)].filter(
-          ([key]) => !key.startsWith('r_') && key !== 'unofficialrun' && key !== 'unofficialruns',
-        ),
-      );
-      for (const [key, value] of new URLSearchParams(resultsSearch(next))) params.set(key, value);
-      history.replaceState(
-        null,
-        '',
-        `${location.pathname}${params.size > 0 ? `?${params}` : ''}${location.hash}`,
-      );
-      return next;
-    });
+    const changesWorkload = ['model', 'workload', 'resolution', 'duration', 'mode', 'steps'].some(
+      (key) => key in patch,
+    );
+    const next = {
+      ...latest.current,
+      ...patch,
+      ...(changesWorkload
+        ? { apiPrice: null, apiPrices: { t2v: null, i2v: null, r2v: null } }
+        : {}),
+    };
+    latest.current = next;
+    const params = new URLSearchParams(
+      [...new URLSearchParams(location.search)].filter(
+        ([key]) => !key.startsWith('r_') && key !== 'unofficialrun' && key !== 'unofficialruns',
+      ),
+    );
+    for (const [key, value] of new URLSearchParams(resultsSearch(next))) params.set(key, value);
+    history.replaceState(
+      null,
+      '',
+      `${location.pathname}${params.size > 0 ? `?${params}` : ''}${location.hash}`,
+    );
+    setState(next);
     track('video_results_config_changed', { controls: Object.keys(patch).join(',') });
   }, []);
   const projection = useMemo(
@@ -1304,6 +1311,14 @@ export default function VideoDashboard() {
             {historyOpen && <VideoHistory />}
           </details>
           <footer className="mt-9 flex flex-wrap justify-end gap-3 border-t py-5 text-xs text-muted-foreground">
+            <a
+              className="underline"
+              href={`${apiUrl}&format=csv`}
+              download="videogenx-results.csv"
+              onClick={() => track('video_results_csv_downloaded')}
+            >
+              {s.csv}
+            </a>
             <a
               className="underline"
               href={apiUrl}

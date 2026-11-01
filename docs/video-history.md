@@ -32,6 +32,18 @@ Native matrix artifacts use `h3-results-<run>-<attempt>-<recipe-fingerprint>` wh
 
 Only in development, `E2E_FIXTURES=1` serves `cypress/fixtures/api/video-history.json` through the existing fixture loader and checksum manifest. The fixture is a metadata-only projection of retained H100/H200/B200 observations and two fidelity artifacts; it contains no infrastructure paths or video bytes. Its synthetic `approved: true` flags exercise the default chart layout and are not real publication receipts. Unknown publication timestamps remain null. The response header `X-VideoGenX-Replay: 1` causes a visible replay notice. These are historical retained observations, not newly measured results or a new publication.
 
+For a local browser replay of one original artifact, set `E2E_FIXTURES=1` and
+`E2E_VIDEO_REPLAY_MANIFEST=/absolute/replay-input.json` on the development server.
+The JSON manifest contains absolute `zipPath` and `metadataPath` fields, plus
+`expectedPlanSha256`. The server verifies the original ZIP and metadata
+once, replaces History with its unapproved entry, and serves its exact stored
+artifact and MP4 byte ranges through `/api/video-runs`. The original ZIP is
+read-only. Unknown identities and paths cannot use the production fallback while
+this adapter is active. `format=replay-asset` is unavailable outside the gate.
+This mode preserves the original `releaseQualified=false` verdict and never
+creates an approval receipt. The ordinary fixture remains the default when no
+explicit manifest is set.
+
 ### Original CI ZIP reader check
 
 From `packages/app`, replay an unmodified native H3 CI ZIP with its original GitHub
@@ -77,3 +89,10 @@ serving 矩阵有两种来源，`serving.ts` 按 manifest 的 `evidence_kind` �
 当前展示观测值，未选择匹配基线，也不计算 before/after。延迟、吞吐量使用提交到下载完成的窗口；板卡能耗使用记录的生成窗口。保真度、阈值校准、发布验收单独展示。筛选仅作用于已加载的页面，可继续加载较早结果。
 
 仅在开发环境中，`E2E_FIXTURES=1` 使用保留结果的脱敏元数据回放，遵循现有 fixture 校验和清单，并显示回放提示。fixture 中合成的 `approved: true` 仅验证图表布局，不是实际批准回执。未知发布时间保持为空；这不是新测量或新发布。
+
+原始产物的本地浏览器回放需在开发服务器设置 `E2E_FIXTURES=1` 和指向绝对路径的
+`E2E_VIDEO_REPLAY_MANIFEST`。该 JSON 文件填写原始 ZIP、GitHub 元数据的绝对路径
+`zipPath`、`metadataPath` 及 `expectedPlanSha256`。服务器校验后以原运行的未批准记录
+替换 History，并通过现有 `/api/video-runs` 读取原始 MP4 字节。输入 ZIP 不会被修改；
+未知身份或路径不会回退到线上读取，`format=replay-asset` 在此模式外返回 404。
+原有 `releaseQualified=false` 结论保持不变；不配置显式 manifest 时仍使用普通 fixture。
