@@ -37,9 +37,44 @@ const evidence = (overrides: Partial<ResultsEvidence> = {}): ResultsEvidence => 
 });
 
 describe('VideoGenX results contract', () => {
+  it('includes qualified H100 evidence without adding an empty slot to legacy comparisons', () => {
+    // Synthetic hardware substitution exercises admission; it is not an H100 measurement.
+    const h100 = { ...eligible, id: 'h100:c1', hardwareKey: 'h100', allocated: 8 };
+    const legacy = resultProjection(
+      points.filter((point) => point.hardwareKey !== 'h100'),
+      state(),
+    );
+    expect(legacy.roster).toEqual(['gb200', 'b200', 'mi355x', 'h200']);
+    const result = resultProjection([h100], state());
+    expect(result.roster).toEqual(['gb200', 'b200', 'mi355x', 'h200', 'h100']);
+    expect(result.cells[0].point.id).toBe(h100.id);
+    expect(result.cells[0].cost.allocated!.perVideo).toBeCloseTo(
+      result.cells[0].cost.participating!.perVideo * 2,
+    );
+    expect(resultProjection([h100], { ...state(), hidden: ['h100'] }).cells).toEqual([]);
+    expect(resultProjection([{ ...h100, samples: 9 }], state()).roster).not.toContain('h100');
+  });
+
+  it('keeps a named H100 diagnostic out of default results and removes its slot on dismissal', () => {
+    const h100 = {
+      ...eligible,
+      id: 'h100:c1',
+      hardwareKey: 'h100',
+      runId: '200',
+      approved: false,
+    };
+    const selection = { ...state(), unofficialRun: h100.runId };
+    const result = resultProjection([eligible], selection, [h100]);
+    expect(result.roster).toContain('h100');
+    expect(result.overlayCells[0].point).toMatchObject({ id: h100.id, approved: false });
+    expect(result.cells.map((cell) => cell.point.id)).toEqual([eligible.id]);
+    expect(resultProjection([eligible], state(), [h100]).roster).not.toContain('h100');
+    expect(resultProjection([eligible], state(), [h100]).overlayCells).toEqual([]);
+  });
+
   it('uses one complete 20-clip C1 workload, the same ten-sample floor and the requested hardware roster', () => {
     const result = resultProjection(points, state());
-    expect(result.cells.map((c) => c.point.hardwareKey).sort()).toEqual(['b200', 'h200']);
+    expect(result.cells.map((c) => c.point.hardwareKey).sort()).toEqual(['b200', 'h100', 'h200']);
     expect(new Set(result.cells.map((c) => c.point.workloadKey)).size).toBe(1);
     expect(result.cells.every((c) => c.point.scheduled === 20 && c.point.concurrency === 1)).toBe(
       true,
@@ -171,11 +206,12 @@ describe('VideoGenX results contract', () => {
 
   it('prefers an approved cohort but permits explicit or fallback diagnostic-only selection', () => {
     const identity = JSON.parse(eligible.workloadKey!);
-    identity.plan.generation.width = 512;
+    identity.plan.generation.frame_count = 124;
     const named = {
       ...eligible,
       id: 'diagnostic:c1',
       runId: '200',
+      hardwareKey: 'h100',
       approved: false,
       workloadKey: JSON.stringify(identity),
     };

@@ -24,7 +24,10 @@ describe('VideoGenX results routes', () => {
       const projection = resultProjection(videoPoints([page]), parseResultsState(search));
       const h200 = projection.cells.find((cell) => cell.point.hardwareKey === 'h200');
       expect(h200, 'H200 remains admitted').not.to.equal(undefined);
-      expect(projection.cells.map((cell) => cell.point.hardwareKey)).to.deep.equal(['h200']);
+      expect(projection.cells.map((cell) => cell.point.hardwareKey).sort()).to.deep.equal([
+        'h100',
+        'h200',
+      ]);
       cy.visit(`/video?${search}`);
       cy.get(
         '[data-testid="results-cost-table"] [data-hardware="h200"][data-basis="participating"]',
@@ -84,14 +87,14 @@ describe('VideoGenX results routes', () => {
       cy.get('[data-testid="video-results"] section[id]').should(($sections) => {
         expect([...$sections].map((section) => section.id)).to.deep.equal(RESULT_GROUPS);
       });
-      cy.get('[data-testid="video-results-clip"]').should('have.length', 4);
+      cy.get('[data-testid="video-results-clip"]').should('have.length', 5);
       cy.get('[data-testid="video-results-clip"]').should(($tiles) => {
         const columns = new Set(
           [...$tiles].map((tile) => Math.round(tile.getBoundingClientRect().left)),
         );
-        expect(columns.size, 'responsive comparison columns').to.equal(width >= 1024 ? 4 : 2);
+        expect(columns.size, 'responsive comparison columns').to.equal(width >= 1280 ? 5 : 2);
       });
-      cy.get('[data-testid="video-results-media-empty"]').should('have.length', 4);
+      cy.get('[data-testid="video-results-media-empty"]').should('have.length', 5);
       cy.get('[data-testid="video-results-play"]').should('be.disabled');
       cy.get('[data-testid="video-results-scrub"]').should('be.disabled');
       cy.get('#quality [data-testid="results-empty"]').should('exist');

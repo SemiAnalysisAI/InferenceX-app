@@ -21,9 +21,11 @@ scheduled clips and at least ten valid samples on every hardware. Model revision
 all generation settings, prompts, seeds and measurement semantics remain in the
 identity. The default selects the cohort covering the most target hardware.
 Smoke, incomplete and unmatched evidence stays in Performance history. The four
-comparison targets are GB200, B200, MI355X and H200; missing hardware remains
-visible without invented results. These are comparison targets, not claims that
-all models run on all hardware.
+default comparison targets are GB200, B200, MI355X and H200; missing hardware remains
+visible without invented results. H100 joins the roster when qualified approved
+evidence or the exact named diagnostic run is available, with the same workload
+and sample requirements. Its label and costs use the hardware registry. These are
+comparison targets, not claims that all models run on all hardware.
 
 Latest observations are selected separately by workload, hardware, deployment
 and engine. Engine identity comes from recorded configuration. Missing metadata
@@ -57,7 +59,8 @@ only; query IDs and API projection values remain unchanged.
 
 The header keeps the five selectors in one shared control panel. Its help explains
 the 20-clip cohort and fixture replay; the replay label appears only when active.
-Hardware checkboxes sit above a full-width four-slot clip comparison. Item help
+Hardware checkboxes sit above a full-width clip comparison, with four default slots
+and an H100 slot when its evidence is available. Item help
 holds longer metric notes while chart encodings and modeled TCO remain visible.
 Validity keeps the workload identity visible and discloses full hashes on request.
 The uncalibrated rating schema is also disclosed on request.
@@ -145,10 +148,11 @@ browser playback and difference failure, bilingual layout and 390px overflow.
 历史记录保留尚无发布批准的存储结果；默认图表仅接纳发布回执与原始来源及 checkout 匹配的记录。
 发布批准与 full-sweep 或发布资格验收分开。界面按有效性、延迟、吞吐量、资源与能耗、成本、质量、稳定性、启动、并行与部署的顺序展示。
 待采集指标是真正的斜线空态，不使用示意数值。功率无效时不展示功率或能耗结论。
-页首用一个共享控件区域展示五项筛选条件；硬件开关位于四栏视频对比上方。指标说明、
+页首用一个共享控件区域展示五项筛选条件；硬件开关位于视频对比上方。默认保留四个硬件窗口；
+符合相同工作负载及样本门槛的已批准 H100 结果或明确指定的诊断运行会增加 H100 窗口，名称和成本沿用硬件注册表。指标说明、
 完整哈希及尚未校准的人工评分维度按需展开，图表图例与 TCO 估算口径仍直接可见。
 
-四个视频窗口只读取已发布产物，核对 prompt、seed、重复次数和生成配置后同步播放。
+视频窗口只读取已存储产物，核对 prompt、seed、重复次数和生成配置后同步播放。
 Difference 是相对已记录 H200 H3 50-step 视频的浏览器 RGB 差异预览，不是封存的 PSNR 测量。
 参考视频、尺寸或跨域读取条件不满足时显示不可用。蒸馏与完整步数分组保留。
 默认视频卡片保留硬件、GPU 数量、媒体及两种 TCO 口径；完整 prompt、seed、重复次数、

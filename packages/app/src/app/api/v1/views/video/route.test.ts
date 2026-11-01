@@ -173,6 +173,46 @@ beforeEach(() => {
 });
 
 describe('published VideoGenX dashboard projection', () => {
+  it('returns H100 in the shared roster and keeps its unapproved named projection isolated', async () => {
+    const history = structuredClone(retainedHistory) as unknown as VideoHistoryPage;
+    history.nextPage = null;
+    source.mockImplementation(() => Response.json(history));
+    const point = videoPoints([history]).find(
+      (item) => item.hardwareKey === 'h100' && item.concurrency === 1,
+    )!;
+    const officialResponse = await GET(request('view=overview'));
+    const official = await officialResponse.json();
+    expect(official.roster).toContain('h100');
+    expect(
+      official.cells.find((cell: { point: { id: string } }) => cell.point.id === point.id).point
+        .hardwareKey,
+    ).toBe('h100');
+    history.entries.find((entry) => entry.runId === point.runId)!.approved = false;
+    const namedResponse = await GET(request(`view=overview&unofficialrun=${point.runId}`));
+    const named = await namedResponse.json();
+    expect(named).toMatchObject(
+      resultProjection(
+        videoPoints([history]),
+        parseResultsState(`unofficialrun=${point.runId}`),
+        namedRunPoints([history], point.runId),
+      ),
+    );
+    expect(named.overlayCells[0].point).toMatchObject({ hardwareKey: 'h100', approved: false });
+    const hiddenResponse = await GET(
+      request(`view=overview&unofficialrun=${point.runId}&r_hidden=h100`),
+    );
+    const hidden = await hiddenResponse.json();
+    expect(hidden.overlayCells).toEqual([]);
+    const clearedResponse = await GET(request('view=overview'));
+    const cleared = await clearedResponse.json();
+    expect(cleared.roster).not.toContain('h100');
+    expect(
+      cleared.cells.some(
+        (cell: { point: { hardwareKey: string } }) => cell.point.hardwareKey === 'h100',
+      ),
+    ).toBe(false);
+  });
+
   it('returns the same nine-group selection and economics as the UI without reading or publishing media', async () => {
     const history = structuredClone(retainedHistory) as unknown as VideoHistoryPage;
     history.nextPage = null;

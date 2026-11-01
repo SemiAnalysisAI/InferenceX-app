@@ -4,8 +4,6 @@ import type { VideoPoint } from './metrics';
 import { servingCells } from './serving';
 import { storedBundle, type StoredArtifact } from './stored';
 
-export const RESULTS_CLIP_HARDWARE = ['gb200', 'b200', 'mi355x', 'h200'] as const;
-
 export interface ResultsClipSide extends CompareSide {
   pointId: string;
   hardwareKey: string;

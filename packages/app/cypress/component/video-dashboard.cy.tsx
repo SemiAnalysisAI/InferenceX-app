@@ -45,6 +45,53 @@ const costRow = (hardware: string, basis = 'participating') =>
   cy.get(`[data-testid="results-cost-table"] [data-hardware="${hardware}"][data-basis="${basis}"]`);
 
 describe('VideoGenX results', () => {
+  it('keeps four comparison slots when no qualified H100 evidence is present', () => {
+    mount({
+      edit: (observation) => {
+        if (observation.hardware.includes('H100')) observation.samples = 9;
+      },
+    });
+    cy.get('[data-testid="video-results-clip"]').should('have.length', 4);
+    cy.get('[data-testid="results-hardware-h100"]').should('not.exist');
+    costRow('h100').should('not.exist');
+  });
+
+  for (const [pathname, width] of [
+    ['/video', 1440],
+    ['/zh/video', 390],
+  ] as const) {
+    it(`shows and dismisses a named H100 diagnostic in ${pathname} at ${width}px`, () => {
+      cy.viewport(width, 900);
+      mount({
+        pathname,
+        search: '?unofficialrun=34336635063',
+        editPage: (page) => {
+          // Approval is changed only in this isolated test fixture.
+          page.entries.find((entry) => entry.runId === '34336635063')!.approved = false;
+        },
+      });
+      costRow('h100').should('have.attr', 'data-overlay', 'true');
+      cy.get('[data-testid="video-results-clip"][data-hardware="h100"]').should(
+        'contain',
+        pathname.startsWith('/zh') ? '非官方运行' : 'Unofficial run',
+      );
+      cy.get('[data-testid="results-hardware-h100"]').uncheck();
+      costRow('h100').should('not.exist');
+      cy.get('[data-testid="video-results-clip"][data-hardware="h100"]').should('not.exist');
+      cy.location('search').should('contain', 'r_hidden=h100');
+      cy.get('[data-testid="results-hardware-h100"]').check();
+      costRow('h100').should('have.attr', 'data-overlay', 'true');
+      assertResultsFit();
+      cy.get('[data-testid="video-results-clips"]').screenshot(`h100-test-overlay-${width}`, {
+        overwrite: true,
+      });
+      cy.get('[data-testid="results-overlay-dismiss"]').click();
+      costRow('h100').should('not.exist');
+      cy.get('[data-testid="results-hardware-h100"]').should('not.exist');
+      cy.get('[data-testid="video-results-clip"]').should('have.length', 4);
+    });
+  }
+
   it('keeps unapproved stored evidence in History and out of the default comparison', () => {
     mount({
       editPage: (page) => {
@@ -321,15 +368,14 @@ describe('VideoGenX results', () => {
     costRow('b200').should('contain', '0.15');
     costRow('b200', 'allocated').should('contain', '0.3');
     costRow('h200').should('contain', '0.204');
-    // The older H100 fixture is outside this four-hardware comparison; the
-    // four-sample native H200 smoke stays out of every comparison metric.
-    cy.get('[data-testid="results-cost-table"] [data-hardware="h100"]').should('not.exist');
-    cy.get('[data-testid="results-cost-table"] [data-hardware]').should('have.length', 4);
+    // Legacy H100 matches this cohort; the four-sample native H200 smoke stays out.
+    costRow('h100').should('contain', '0.217');
+    cy.get('[data-testid="results-cost-table"] [data-hardware]').should('have.length', 6);
     // One GPU-count observation still has a measured P90 marker; P95 is absent
     // from the retained projection and must not become an illustrative band.
     cy.get('[data-testid="results-latency-series"] [data-percentile="p90"]').should(
       'have.length',
-      2,
+      3,
     );
     cy.get('[data-testid="results-latency-series"] [data-percentile="p95"]').should('not.exist');
     cy.get('#quality [data-testid="results-empty"]').should('exist');
@@ -362,7 +408,7 @@ describe('VideoGenX results', () => {
     cy.get('#latency [data-hardware="b200"]').should('not.exist');
     cy.get('#energy [data-hardware="b200"]').should('not.exist');
     cy.location('search').should('contain', 'r_hidden=b200');
-    for (const hardware of ['gb200', 'mi355x', 'h200'])
+    for (const hardware of ['gb200', 'mi355x', 'h200', 'h100'])
       cy.get(`[data-testid="results-hardware-${hardware}"]`).uncheck();
     cy.get('[data-testid="results-cost-table"] [data-hardware]').should('not.exist');
     cy.get('#latency [data-hardware] circle').should('not.exist');
@@ -384,7 +430,7 @@ describe('VideoGenX results', () => {
     // projections. It is never written to the committed history fixture.
     mount({
       edit: (observation) => {
-        // Turn the out-of-roster H100 row into an explicitly synthetic second
+        // Turn the H100 row into an explicitly synthetic second
         // workload so the test changes clip duration without replacing the
         // retained B200/H200 cohort used for the scenario assertions below.
         if (observation.hardware.includes('H100')) {
@@ -480,7 +526,7 @@ describe('VideoGenX results', () => {
         });
       assertResultsFit();
       cy.get('[data-testid="video-results-clip"]').should(($tiles) => {
-        expect($tiles).to.have.length(4);
+        expect($tiles).to.have.length(5);
         const first = $tiles[0].getBoundingClientRect();
         const second = $tiles[1].getBoundingClientRect();
         if (width === 320) expect(second.top).to.be.greaterThan(first.top);

@@ -31,7 +31,6 @@ import {
   parseResultsState,
   resultProjection,
   resultsSearch,
-  RESULTS_HARDWARE,
   resultMetadata,
   type ResultCell,
   type ResultsState,
@@ -471,7 +470,7 @@ export default function VideoDashboard() {
     () => resultProjection(points, state, namedPoints),
     [points, state, namedPoints],
   );
-  const { options, overlayCells } = projection;
+  const { options, overlayCells, roster } = projection;
   const workloadOptions = useMemo(() => {
     const byId = new Map([...namedPoints, ...points].map((point) => [point.id, point]));
     const rows = options.workloads.map(({ key, label }) => {
@@ -521,7 +520,7 @@ export default function VideoDashboard() {
   const hidden = useMemo(() => new Set(state.hidden), [state.hidden]);
   const { resolveColor, getCssColor } = useThemeColors({
     highContrast: false,
-    activeKeys: [...RESULTS_HARDWARE],
+    activeKeys: roster,
   });
   const mounted = useSyncExternalStore(
     subscribe,
@@ -536,7 +535,7 @@ export default function VideoDashboard() {
     state.unofficialRun === cell.point.runId
       ? overlayRunColor(0)
       : colorFor(cell.point.hardwareKey ?? '');
-  const representatives = RESULTS_HARDWARE.flatMap((key) =>
+  const representatives = roster.flatMap((key) =>
     [false, true].flatMap((overlay) => {
       const choices = cells.filter((c) => c.point.hardwareKey === key && c.overlay === overlay);
       const lead = leadCell(
@@ -552,18 +551,28 @@ export default function VideoDashboard() {
     get: (c: ResultCell) => number | null,
     secondary?: (c: ResultCell) => number | null,
   ): ResultBar[] =>
-    RESULTS_HARDWARE.filter((key) => !hidden.has(key)).flatMap((key) => {
-      const rows = representatives.filter((c) => c.point.hardwareKey === key);
-      return rows.length > 0
-        ? rows.map((c) => ({
-            key: c.overlay ? `${key}-overlay` : key,
-            label: cellLabel(c),
-            color: color(c),
-            value: get(c),
-            secondary: secondary?.(c) ?? null,
-          }))
-        : [{ key, label: hardwareLabel(key), color: colorFor(key), value: null, secondary: null }];
-    });
+    roster
+      .filter((key) => !hidden.has(key))
+      .flatMap((key) => {
+        const rows = representatives.filter((c) => c.point.hardwareKey === key);
+        return rows.length > 0
+          ? rows.map((c) => ({
+              key: c.overlay ? `${key}-overlay` : key,
+              label: cellLabel(c),
+              color: color(c),
+              value: get(c),
+              secondary: secondary?.(c) ?? null,
+            }))
+          : [
+              {
+                key,
+                label: hardwareLabel(key),
+                color: colorFor(key),
+                value: null,
+                secondary: null,
+              },
+            ];
+      });
   const barChart = (
     title: string,
     unit: string,
@@ -581,27 +590,29 @@ export default function VideoDashboard() {
     ) : (
       <Empty s={s} />
     );
-  const series: ResultSeries[] = RESULTS_HARDWARE.filter((key) => !hidden.has(key)).flatMap((key) =>
-    [false, true].map((overlay) => ({
-      key: overlay ? `${key}-overlay` : key,
-      label: hardwareLabel(key),
-      color: overlay ? overlayRunColor(0) : colorFor(key),
-      points: deploymentCells
-        .filter(
-          (c) =>
-            c.point.hardwareKey === key &&
-            c.overlay === overlay &&
-            c.point.participating !== null &&
-            c.deliveryP50 !== null,
-        )
-        .map((c) => ({
-          x: c.point.participating!,
-          y: c.deliveryP50!,
-          middle: c.point.p90,
-          upper: c.p95,
-        })),
-    })),
-  );
+  const series: ResultSeries[] = roster
+    .filter((key) => !hidden.has(key))
+    .flatMap((key) =>
+      [false, true].map((overlay) => ({
+        key: overlay ? `${key}-overlay` : key,
+        label: hardwareLabel(key),
+        color: overlay ? overlayRunColor(0) : colorFor(key),
+        points: deploymentCells
+          .filter(
+            (c) =>
+              c.point.hardwareKey === key &&
+              c.overlay === overlay &&
+              c.point.participating !== null &&
+              c.deliveryP50 !== null,
+          )
+          .map((c) => ({
+            x: c.point.participating!,
+            y: c.deliveryP50!,
+            middle: c.point.p90,
+            upper: c.p95,
+          })),
+      })),
+    );
   const trace = representatives.find((c) => c.point.id === traceHardware) ?? representatives[0];
   const selector = (
     key: 'model' | 'engine' | 'date',
@@ -796,7 +807,7 @@ export default function VideoDashboard() {
         </div>
       )}
       <div className={`${styles.legend} mt-5 text-xs`} aria-label={s.hardware}>
-        {RESULTS_HARDWARE.map((key) => (
+        {roster.map((key) => (
           <label key={key}>
             <input
               data-testid={`results-hardware-${key}`}
@@ -833,6 +844,7 @@ export default function VideoDashboard() {
                 : colorFor(key)
             }
             hidden={hidden}
+            roster={roster}
             options={{ tier: state.costTier }}
             costs={costByPoint}
             unofficialRun={state.unofficialRun ?? undefined}
@@ -1251,21 +1263,25 @@ export default function VideoDashboard() {
                   label={s.pareto}
                   xLabel="P50 (s)"
                   yLabel="clips/GPU-hr"
-                  series={RESULTS_HARDWARE.filter((key) => !hidden.has(key)).flatMap((key) =>
-                    [false, true].map((overlay) => ({
-                      key: overlay ? `${key}-overlay` : key,
-                      label: hardwareLabel(key),
-                      color: overlay ? overlayRunColor(0) : colorFor(key),
-                      points: deploymentCells
-                        .filter((c) => c.point.hardwareKey === key && c.overlay === overlay)
-                        .flatMap((c) => {
-                          const y = metricValue(c.point, 'videosPerGpuHour', {
-                            tier: state.costTier,
-                          });
-                          return c.point.p50 === null || y === null ? [] : [{ x: c.point.p50, y }];
-                        }),
-                    })),
-                  )}
+                  series={roster
+                    .filter((key) => !hidden.has(key))
+                    .flatMap((key) =>
+                      [false, true].map((overlay) => ({
+                        key: overlay ? `${key}-overlay` : key,
+                        label: hardwareLabel(key),
+                        color: overlay ? overlayRunColor(0) : colorFor(key),
+                        points: deploymentCells
+                          .filter((c) => c.point.hardwareKey === key && c.overlay === overlay)
+                          .flatMap((c) => {
+                            const y = metricValue(c.point, 'videosPerGpuHour', {
+                              tier: state.costTier,
+                            });
+                            return c.point.p50 === null || y === null
+                              ? []
+                              : [{ x: c.point.p50, y }];
+                          }),
+                      })),
+                    )}
                 />
               ) : (
                 <Empty s={s} />

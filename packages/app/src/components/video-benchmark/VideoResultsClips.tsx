@@ -11,11 +11,11 @@ import type { MetricOptions, VideoPoint } from './metrics';
 import {
   absoluteFrameDifference,
   publishedResultsSide,
-  RESULTS_CLIP_HARDWARE,
   resultsClipGroups,
   type ResultsClipGroup,
   type ResultsClipSide,
 } from './results-clips';
+import { RESULTS_HARDWARE, resultsHardwareRoster } from './results';
 import type { StoredArtifact } from './stored';
 
 const STRINGS = {
@@ -120,6 +120,7 @@ export interface VideoResultsClipsProps {
   points: VideoPoint[];
   colorFor: (key: string) => string;
   hidden: ReadonlySet<string>;
+  roster?: readonly string[];
   options?: MetricOptions;
   costs?: Costs;
   unofficialRun?: string;
@@ -138,15 +139,14 @@ export default function VideoResultsClips({
   points,
   colorFor,
   hidden,
+  roster = resultsHardwareRoster(points),
   costs,
   unofficialRun,
 }: VideoResultsClipsProps) {
   const s = STRINGS[useLocale()];
   const selected = useMemo(
     () =>
-      comparablePoints(points).filter((p) =>
-        RESULTS_CLIP_HARDWARE.some((key) => p.hardwareKey === key),
-      ),
+      comparablePoints(points).filter((p) => RESULTS_HARDWARE.some((key) => p.hardwareKey === key)),
     [points],
   );
   const cache = useRef(new Map<string, ResultsClipSide | null>());
@@ -218,6 +218,7 @@ export default function VideoResultsClips({
         points={selected}
         colorFor={colorFor}
         hidden={hidden}
+        roster={roster}
         costs={costs}
         unofficialRun={unofficialRun}
       />
@@ -230,6 +231,7 @@ function SynchronizedClips({
   points,
   colorFor,
   hidden,
+  roster = resultsHardwareRoster(points),
   costs,
   unofficialRun,
 }: Omit<VideoResultsClipsProps, 'options'> & { group: ResultsClipGroup | null }) {
@@ -242,7 +244,7 @@ function SynchronizedClips({
   const [durations, setDurations] = useState<Record<string, number>>({});
   const [errors, setErrors] = useState<ReadonlySet<string>>(new Set());
   const [differenceErrors, setDifferenceErrors] = useState<ReadonlySet<string>>(new Set());
-  const visible = RESULTS_CLIP_HARDWARE.filter((key) => !hidden.has(key));
+  const visible = roster.filter((key) => !hidden.has(key));
   const visibleKey = visible.join(',');
   const playable = visible.filter((key) => group?.clips.has(key) && !errors.has(key));
   const reference =
@@ -445,7 +447,9 @@ function SynchronizedClips({
           </table>
         </div>
       </details>
-      <div className="grid min-w-0 grid-cols-1 gap-3 min-[360px]:grid-cols-2 lg:grid-cols-4 lg:gap-4">
+      <div
+        className={`grid min-w-0 grid-cols-1 gap-3 min-[360px]:grid-cols-2 lg:grid-cols-4 lg:gap-4 ${visible.length > 4 ? 'xl:grid-cols-5' : ''}`}
+      >
         {visible.map((key) => {
           const point = points.find((item) => item.hardwareKey === key);
           const clip = group?.clips.get(key);

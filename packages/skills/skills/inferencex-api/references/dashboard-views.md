@@ -653,6 +653,12 @@ Pass a returned `data.recipes[].key` as `recipe`; `params.recipe` identifies the
 `coverage.truncated` remains authoritative. It never triggers media publication.
 The earlier dashboard/compare and run/artifact results views remain available.
 
+`roster` retains GB200, B200, MI355X and H200 as default slots. H100 is added when
+qualified approved evidence or the exact named diagnostic run is available; the
+same canonical workload and sample floor apply. `r_hidden=h100` hides its results
+and clips. Dismissing an unapproved H100 run removes its slot unless approved H100
+evidence remains. An older H100 workload does not qualify a newer workload.
+
 | UI controls                       | API parameters                                       | Contract                                                                                                                                                                                                |
 | --------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Model and frozen workload         | `r_model`, `r_workload`                              | Compact key from options.workloads resolves to full canonical identity; one 20-scheduled-clip C1 spec, at least 10 valid samples on every hardware; shorter historical runs remain History-only.        |

@@ -32,7 +32,37 @@ Native matrix artifacts use `h3-results-<run>-<attempt>-<recipe-fingerprint>` wh
 
 Only in development, `E2E_FIXTURES=1` serves `cypress/fixtures/api/video-history.json` through the existing fixture loader and checksum manifest. The fixture is a metadata-only projection of retained H100/H200/B200 observations and two fidelity artifacts; it contains no infrastructure paths or video bytes. Its synthetic `approved: true` flags exercise the default chart layout and are not real publication receipts. Unknown publication timestamps remain null. The response header `X-VideoGenX-Replay: 1` causes a visible replay notice. These are historical retained observations, not newly measured results or a new publication.
 
+### Original CI ZIP reader check
+
+From `packages/app`, replay an unmodified native H3 CI ZIP with its original GitHub
+artifact-object JSON and the expected sealed plan SHA256:
+
+```sh
+bun --no-env-file scripts/replay-video-artifact.ts original.zip github-artifact.json EXPECTED_PLAN_SHA256
+```
+
+The command reads local files only and disables `fetch`. It requires the original
+archive size, SHA256 digest, artifact ID/name and workflow run/head identity, then
+uses the same archive, bundle, serving, History and Results readers as the app.
+It prints JSON containing each cell's plan hash, frame/case/distinct-prompt counts,
+completion and power verdicts, both GPU counts, source errors and Results diagnostics
+for every qualifying workload. Source errors, missing cells and mismatched expected
+plan hashes produce a nonzero exit. Recorded benchmark failures remain in the report.
+
+Local replay has no approval receipt: `approved` is false, `publishedAt` is null and
+`officialPoints` is zero. Named diagnostics still obey the Results sample and workload
+requirements. The command neither publishes metadata nor creates media URLs, and it
+does not modify fixtures. Reader acceptance of an older plan does not qualify a new
+workload or establish browser/API/playback, CI E2E, or release acceptance.
+
 ## 中文说明
+
+从 `packages/app` 使用上述 `bun --no-env-file` 命令，可离线读取未改动的原始 CI ZIP、
+GitHub 产物元数据和预期 plan SHA256。读取器校验原始字节摘要与执行身份，逐 cell 输出
+实际工作负载、完成/失败计数、功率结论和参与/已分配 GPU 数；来源错误、空 cells 或 plan
+哈希不符时以非零状态退出。此操作不写存储、不更新 fixture、不生成媒体地址，也不授予
+发布批准；`officialPoints` 应为 0。旧工作负载读取成功不能代替新 workload 的 CI E2E、
+页面/API/播放或发布验收。
 
 `publish-video-results` repository dispatch 明确传入 `source_run_id` 与 `merge_run_id`；手动 `workflow_dispatch` 必须指定来源 `run_id`，不再定时扫描全部运行。任务只列举指定运行的 GitHub 产物及其后续分页，对每个产物以现有失效密钥调用受 Bearer 保护的 `POST /api/video-runs`。已存索引仍会重试，以补写可能缺失的批准回执；某个产物失败后继续尝试后续产物，但任务最终报告失败。此授权只批准指定来源的发布，不代表 benchmark 通过质量验收。
 

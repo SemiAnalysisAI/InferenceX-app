@@ -4,7 +4,13 @@ import { metricValue, type VideoPoint } from './metrics';
 import { DASHBOARD_SAMPLE_FLOOR, latestVideoCells } from './points';
 import type { ResultsEvidence } from './results-evidence';
 
-export const RESULTS_HARDWARE = ['gb200', 'b200', 'mi355x', 'h200'] as const;
+export const RESULTS_HARDWARE = ['gb200', 'b200', 'mi355x', 'h200', 'h100'] as const;
+
+export function resultsHardwareRoster(points: readonly Pick<VideoPoint, 'hardwareKey'>[]) {
+  return RESULTS_HARDWARE.filter(
+    (key) => key !== 'h100' || points.some((point) => point.hardwareKey === key),
+  );
+}
 export type VideoMode = 't2v' | 'i2v' | 'r2v';
 export interface ResultsState {
   model: string | null;
@@ -419,6 +425,6 @@ export function resultProjection(
     excludedCount: points.length - qualified.length,
     sampleFloor: DASHBOARD_SAMPLE_FLOOR,
     scheduledClips: 20,
-    roster: RESULTS_HARDWARE,
+    roster: resultsHardwareRoster(available),
   };
 }

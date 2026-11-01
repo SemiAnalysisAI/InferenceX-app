@@ -250,8 +250,8 @@ describe('Video compare panel (retained fixture)', () => {
 });
 
 // These decoder fixtures are test inputs, never benchmark evidence.
-function mountResultsClips() {
-  for (const key of ['b200', 'h200']) {
+function mountResultsClips(keys = ['b200', 'h200'], pathname = '/video') {
+  for (const key of keys) {
     cy.fixture(`video-results/${key === 'h200' ? 'reference' : 'candidate'}.mp4`, 'base64').then(
       (encoded: string) => {
         cy.window().then((win) => {
@@ -261,7 +261,7 @@ function mountResultsClips() {
           const saved = servingArtifact(
             Number(point.runId),
             point.artifactId,
-            key === 'h200' ? 'NVIDIA H200' : 'NVIDIA B200',
+            `NVIDIA ${key.toUpperCase()}`,
           );
           saved.sources[0].checksums = saved.sources[0].checksums.map(([path, sha]) => [
             path,
@@ -277,19 +277,52 @@ function mountResultsClips() {
     );
   }
   cy.mount(
-    <PathnameContext.Provider value="/video">
+    <PathnameContext.Provider value={pathname}>
       <VideoResultsClips
-        points={[c1('b200'), c1('h200')]}
+        points={keys.map(c1)}
         colorFor={colorFor}
         hidden={new Set()}
         costs={{ [c1('b200').id]: { participating: 0.02, allocated: null } }}
       />
     </PathnameContext.Provider>,
   );
-  cy.wait(['@results-b200', '@results-h200']);
+  cy.wait(keys.map((key) => `@results-${key}` as const));
 }
 
 describe('Video results synchronized clips', () => {
+  for (const [pathname, width] of [
+    ['/video', 1440],
+    ['/zh/video', 390],
+  ] as const) {
+    it(`includes H100 in the synchronized test clips in ${pathname} at ${width}px`, () => {
+      cy.viewport(width, 900);
+      mountResultsClips(['b200', 'h200', 'h100'], pathname);
+      cy.get('[data-testid="video-results-clip"]').should('have.length', 5);
+      cy.get('[data-testid="video-results-clip"][data-hardware="h100"] video').should(($video) => {
+        expect(($video[0] as HTMLVideoElement).videoWidth).to.equal(32);
+      });
+      cy.get('[data-testid="video-results-play"]').click();
+      cy.get('[data-testid="video-results-clip"] video')
+        .should('have.length', 3)
+        .each(($video) => {
+          cy.wrap($video).should(($element) =>
+            expect(($element[0] as HTMLVideoElement).paused).to.equal(false),
+          );
+        });
+      cy.get('[data-testid="video-results-play"]').click();
+      cy.document().should((doc) => expect(doc.documentElement.scrollWidth).to.equal(width));
+      cy.get('[data-testid="video-results-clip"]').should(($tiles) => {
+        const lefts = new Set(
+          [...$tiles].map((tile) => Math.round(tile.getBoundingClientRect().left)),
+        );
+        expect(lefts.size).to.equal(width === 1440 ? 5 : 2);
+      });
+      cy.get('[data-testid="video-results-clips"]').screenshot(`h100-synthetic-clips-${width}`, {
+        overwrite: true,
+      });
+    });
+  }
+
   it('keeps exact prompt and source identity behind one focusable disclosure', () => {
     cy.viewport(1440, 900);
     mountResultsClips();
