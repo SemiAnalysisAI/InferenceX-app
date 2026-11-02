@@ -41,6 +41,13 @@ describe('logo wall sizing', () => {
     }
   });
 
+  it('sizes the TokenSpeed mark + wordmark as a wide logo that flips in dark mode', () => {
+    const tokenspeed = logoSize('tokenspeed.webp');
+    expect(tokenspeed.width / tokenspeed.height).toBeGreaterThan(5);
+    expect(tokenspeed.height).toBeLessThan(BASE_ARTWORK_HEIGHT);
+    expect(tokenspeed.invertInDark).toBe(true);
+  });
+
   it('falls back to a square base size for an unmeasured logo', () => {
     expect(logoSize('not-measured.svg')).toEqual({
       height: BASE_ARTWORK_HEIGHT,
