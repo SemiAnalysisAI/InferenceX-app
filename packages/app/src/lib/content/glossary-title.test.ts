@@ -67,6 +67,14 @@ describe('glossaryMetaTitle', () => {
     expect(glossaryMetaTitle(getZhGlossaryEntry('pareto-frontier')!, 'zh')).toBe(
       '什么是 Pareto 前沿？',
     );
+    expect(glossaryMetaTitle(getZhGlossaryEntry('xla')!, 'zh')).toBe(
+      '什么是 XLA（加速线性代数）？',
+    );
+    // English expansions never leak into Chinese titles.
+    for (const entry of getAllZhGlossaryEntries()) {
+      if (entry.expansion)
+        expect(entry.expansion, entry.slug).not.toBe(getGlossaryEntry(entry.slug)!.expansion);
+    }
     // A translated term that already carries a parenthetical is not qualified twice.
     expect(glossaryMetaTitle(getZhGlossaryEntry('tpu')!, 'zh')).toBe(
       '什么是 TPU（张量处理单元）？',

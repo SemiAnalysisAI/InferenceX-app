@@ -2025,6 +2025,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   },
   xla: {
     term: 'XLA',
+    expansion: '加速线性代数',
     aliases: ['XLA', 'Accelerated Linear Algebra', 'StableHLO', 'XLA 编译器'],
     plainEnglish:
       'XLA 是把模型计算图编译成 TPU 机器码的编译器，决定每个操作如何切分、补齐、融合和调度。',
@@ -2678,9 +2679,10 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   },
 };
 
-const entries = getAllGlossaryEntries().map((entry) => {
+const entries = getAllGlossaryEntries().map(({ expansion: _englishExpansion, ...entry }) => {
   const translation = translations[entry.slug];
   if (!translation) throw new Error(`Missing Chinese glossary translation: ${entry.slug}`);
+  // The English expansion never carries over: a Chinese title shows one only when translated.
   return { ...entry, ...translation };
 });
 const entriesBySlug: Readonly<Record<string, GlossaryEntry>> = Object.fromEntries(
