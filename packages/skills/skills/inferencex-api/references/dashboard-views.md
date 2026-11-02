@@ -16,10 +16,13 @@ the landing page. Existing model-specific links and historical results remain av
 `/api/v1/views/inference` 仍要求显式传入 `model`，使用 `model=Kimi-K3&sequence=agentic-traces`
 可查询入口页面对应的模型。已有模型链接和历史结果不受影响。
 
-On mobile inference and PowerX charts, Scenario, Precision, and Run context (date,
-run selection and changelog) are inside More chart controls; Model stays visible.
-Desktop keeps Scenario and Precision beside Model and Run context below chart
-settings. Embedded charts keep their standalone run controls. This is
+Inference places Scenario beside Cost Tier and TCO Basis below the plot on desktop
+and mobile. An empty selection keeps Scenario below the empty chart for recovery.
+PowerX keeps Scenario beside Model on desktop and inside More chart controls on
+mobile. Both surfaces put Precision and Run context (date, run selection and
+changelog) inside More chart controls on mobile; Model stays visible. Desktop keeps
+Precision beside Model and Run context below chart settings.
+Embedded charts keep their standalone run controls. This is
 presentation-only: scenario/precision/run/date parameters, defaults, returned
 measurements and unofficial overlays are unchanged; no API parameter represents
 the collapsed state.

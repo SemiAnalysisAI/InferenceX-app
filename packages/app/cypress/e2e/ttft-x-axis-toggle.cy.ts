@@ -414,13 +414,27 @@ describe('Default scenario', () => {
       interceptAgenticData();
       interceptDerivedAgenticMetrics();
       cy.visit('/inference');
-      if (width < 768) {
-        cy.get('[data-testid="scenario-selector"]').should('not.be.visible');
-        cy.get('[data-testid="inference-secondary-controls"] > button').click();
-      }
+      cy.get('fieldset [data-testid="scenario-selector"]').should('not.exist');
+      cy.get('#chart-0').should(($chart) => {
+        const plot = $chart[0]!.querySelector('[data-testid="d3-chart-svg"]')!;
+        const selector = $chart[0]!.querySelector('[data-testid="scenario-selector"]')!;
+        expect(selector.getBoundingClientRect().top, 'Scenario below plot').to.be.at.least(
+          plot.getBoundingClientRect().bottom,
+        );
+      });
       cy.get('[data-testid="scenario-selector"]')
         .should('be.visible')
         .and('contain.text', 'Agentic');
+      cy.get('[data-testid="scenario-selector"]').should(($selector) => {
+        const label = $selector[0]!.querySelector('span')!;
+        const helpIcon = $selector[0]!
+          .closest('[data-testid="result-context-scenario"]')!
+          .querySelector('[data-slot="info-help-icon"]')!;
+        expect(
+          helpIcon.getBoundingClientRect().left,
+          'help does not overlap the label',
+        ).to.be.at.least(label.getBoundingClientRect().right);
+      });
       cy.get('label[for="scenario-select"]').should('be.visible').and('contain.text', 'Scenario');
       cy.get('h2 [data-testid="scenario-selector"]').should('not.exist');
       cy.get('[data-testid="scenario-selector"]').click('right', {
@@ -440,8 +454,8 @@ describe('Default scenario', () => {
   it('keeps 8K / 1K when the link asks for it explicitly', () => {
     interceptAgenticData();
     cy.visit('/zh/inference');
-    cy.get('label[for="scenario-select"]').should('be.visible').and('have.text', '场景');
-    cy.get('fieldset [data-testid="scenario-selector"]').should('be.visible');
+    cy.get('label[for="scenario-select"]').should('be.visible').and('have.text', '场景:');
+    cy.get('[data-testid="result-context"] [data-testid="scenario-selector"]').should('be.visible');
     cy.get('h2 [data-testid="scenario-selector"]').should('not.exist');
 
     interceptFixedSequenceData();

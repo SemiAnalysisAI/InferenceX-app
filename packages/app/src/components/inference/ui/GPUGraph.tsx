@@ -1355,6 +1355,7 @@ const GPUGraph = React.memo(
               </Button>
             </div>
           </div>
+          {footer}
           <QuickFiltersDialog open={quickFiltersOpen} onOpenChange={setQuickFiltersOpen} />
         </div>
       );
