@@ -193,7 +193,7 @@ export default function RootLayout({
           <QueryProvider>
             <ThemeProvider
               attribute="class"
-              defaultTheme="minecraft"
+              defaultTheme="dark"
               themes={APP_THEMES}
               enableSystem
               disableTransitionOnChange
