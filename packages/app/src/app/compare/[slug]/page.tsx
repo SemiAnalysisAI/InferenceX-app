@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 
 import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
+import { compareChipPageLink } from '@/lib/compare/compare-chip-link';
 import { JsonLd } from '@/components/seo/json-ld';
 import { comparisonScenarioForModel } from '@/lib/compare/compare-agentx';
 import {
@@ -216,6 +217,7 @@ async function CompareDetail({
         bVendor={bMeta?.vendor ?? ''}
         aArch={aMeta?.arch ?? ''}
         bArch={bMeta?.arch ?? ''}
+        chipPageLink={compareChipPageLink(parsed.a, parsed.b, 'en')}
       />
     </>
   );
