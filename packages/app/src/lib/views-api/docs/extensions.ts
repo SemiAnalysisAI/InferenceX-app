@@ -5,6 +5,7 @@ import type {
   ApiSchema,
 } from '@/lib/api/api-documentation';
 import { API_BASE_URL } from '@/lib/api/api-documentation-base';
+import { VIDEO_HISTORY_MAX_PAGES } from '@/components/video-benchmark/history';
 import { text } from '@/lib/api/api-documentation-helpers';
 import { VIEW_QUERY_PARAMS, type ReadonlyView } from '../registry';
 
@@ -250,8 +251,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     'OperatorX 状态：ok（默认）、unsupported、error、missing 或 all。',
   ],
   page: [
-    'OperatorX zero-based table page; video one-based CI discovery page.',
-    'OperatorX 表格页码从 0 开始；视频 CI 发现页码从 1 开始。',
+    'OperatorX zero-based table page; video one-based CI discovery page (view=discovery). Video dashboard/compare read at most the first five published history pages.',
+    'OperatorX 表格页码从 0 开始；视频 CI 发现页码从 1 开始（view=discovery）。视频 dashboard/compare 最多读取前五页已发布历史。',
   ],
   metric: [
     'View-specific metric key. OperatorX: tflops or latency; GPU metrics: power, temperature, clocks, utilization or available AMD metrics.',
@@ -322,7 +323,10 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     'Speculative decoding filter; the image view trims whitespace and ignores case for a single value, default all. Inference uses a comma-separated list.',
     '投机解码筛选；镜像视图使用单个值，去除首尾空白、不区分大小写，默认 all。推理视图使用逗号分隔列表。',
   ],
-  run: ['Public video CI run ID. Omit to discover runs.', '公开视频 CI 运行 ID。省略时列出运行。'],
+  run: [
+    'Public video CI run ID; retains legacy run/artifact selection. Omit for the dashboard, or use view=discovery to list runs.',
+    '公开视频 CI 运行 ID；保留原有运行/产物选择方式。省略时读取仪表板；使用 view=discovery 列出运行。',
+  ],
   compare: [
     'Video: up to eight comma-separated run:artifact pairs of already published evidence.',
     '视频：最多八组已发布证据的 run:artifact，以逗号分隔。',
@@ -364,7 +368,50 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     'ubenchX test selector: mem-bw, sm-l2-distance, tpc-skyline, core-memory-profiles, or all (default). Determines which benchmark data is returned.',
     'ubenchX 测试选择：mem-bw、sm-l2-distance、tpc-skyline、core-memory-profiles 或 all（默认），决定返回哪种基准测试数据。',
   ],
-  view: ['Video results (default) or tradeoff.', '视频 results（默认）或 tradeoff。'],
+  view: [
+    'Video dashboard (default without run/artifact), compare (dashboard plus published matched-case records), or legacy discovery/results/tradeoff. run/artifact defaults to results. Dashboard v_* and legacy selectors cannot be mixed.',
+    '视频 dashboard（未指定 run/artifact 时默认）、compare（仪表板及已发布匹配用例记录），或原有 discovery/results/tradeoff。指定 run/artifact 时默认 results。v_* 仪表板选择项不能与原有参数混用。',
+  ],
+  v_x: [
+    'Dashboard X metric: p90Latency (default) or p50Latency, in seconds. Invalid values use the UI default.',
+    '仪表板 X 轴指标：p90Latency（默认）或 p50Latency，单位秒。无效值按界面默认值处理。',
+  ],
+  v_y: [
+    'Dashboard Y metric: videosPerDollar (default), dollarsPerVideo, videosPerGpuHour or kjPerVideo. Invalid values use the UI default.',
+    '仪表板 Y 轴指标：videosPerDollar（默认）、dollarsPerVideo、videosPerGpuHour 或 kjPerVideo。无效值按界面默认值处理。',
+  ],
+  v_tier: [
+    'TCO cost tier: h (owning, default) or r (renting), from the same hardware registry as the dashboard; invalid values use h.',
+    'TCO 成本档位：h（自有，默认）或 r（租赁），使用与仪表板相同的硬件成本表；无效值使用 h。',
+  ],
+  v_view: [
+    'chart (default) or table; presentation-only preference, echoed as params.displayView without changing returned datasets.',
+    'chart（默认）或 table；仅影响展示，在 params.displayView 中返回，不改变数据集。',
+  ],
+  v_optimal: [
+    'Per-hardware Pareto deployments only unless exactly 0. Changes chart/table rows; queued cells never enter either.',
+    '除值恰为 0 外，仅保留每种硬件的 Pareto 部署。作用于图表和表格；排队 cell 始终不进入这两者。',
+  ],
+  v_api: [
+    'Positive USD/video-second API list-price reference, rounded to four decimals; invalid values use the dated UI reference. Multiplies clip duration only, not TCO or chart efficiency.',
+    '正数 API 视频秒参考价，单位 USD/video-second，四舍五入至四位小数；无效值回退至界面带日期的参考价。仅用于乘以视频时长，不影响 TCO 或图表效率。',
+  ],
+  v_hidden: [
+    'Comma-separated hidden hardware keys from the video roster; default empty, deduplicated and sorted, unknown keys ignored. Filters chart/table only, not KPI/Compare/Evidence.',
+    '以逗号分隔的隐藏硬件键，仅接受视频硬件列表中的键；默认空，排序去重，忽略未知键。只筛选图表和表格，不改变 KPI、Compare 或 Evidence。',
+  ],
+  v_base: [
+    'Baseline hardware key; unavailable/invalid selection resolves to the UI default (slowest eligible lead deployment). The two sides stay distinct: a side that would match the other moves to the other default.',
+    '基线硬件键；无效或无可用测量时回退到界面默认值（符合条件的代表部署中最慢的一种）。两侧始终为不同硬件：若一侧与另一侧相同，则改用另一侧的默认值。',
+  ],
+  v_cand: [
+    'Candidate hardware key; unavailable/invalid selection resolves to the UI default (fastest eligible lead deployment). The two sides stay distinct: a side that would match the other moves to the other default.',
+    '候选硬件键；无效或无可用测量时回退到界面默认值（符合条件的代表部署中最快的一种）。两侧始终为不同硬件：若一侧与另一侧相同，则改用另一侧的默认值。',
+  ],
+  v_case: [
+    'Zero-based matched-case index, 0–9999 (default 0). view=compare clamps it to the available pairs and returns cases.resolvedCaseIndex; dashboard leaves media not-requested.',
+    '匹配用例索引从零开始，范围 0–9999（默认 0）。view=compare 按可用配对范围收敛，并在 cases.resolvedCaseIndex 返回实际索引；dashboard 不加载媒体。',
+  ],
 };
 
 export function viewParameter(view: ReadonlyView, name: string): ApiParameter {
@@ -492,9 +539,28 @@ const NEW_VIEWS = {
     },
   ],
   video: [
-    'Published video evidence and tradeoffs',
-    '已发布视频证据与权衡数据',
+    'VideoGenX dashboard and published comparison evidence',
+    'VideoGenX 仪表板与已发布对比证据',
     {
+      cells: objects,
+      metricDefinitions: object,
+      plot: object,
+      rows: objects,
+      kpis: objects,
+      comparison: object,
+      provenance: objects,
+      workload: { type: ['string', 'null'] },
+      otherWorkloads: { type: 'integer', minimum: 0 },
+      coverage: {
+        type: 'object',
+        properties: {
+          pagesRead: { type: 'integer', minimum: 1, maximum: VIDEO_HISTORY_MAX_PAGES },
+          maxPages: { type: 'integer', enum: [VIDEO_HISTORY_MAX_PAGES] },
+          nextPage: { type: ['integer', 'null'] },
+          truncated: { type: 'boolean' },
+        },
+        required: ['pagesRead', 'maxPages', 'nextPage', 'truncated'],
+      },
       sources: objects,
       points: objects,
       curves: object,
@@ -529,7 +595,7 @@ export const operations: ApiOperation[] = Object.entries(NEW_VIEWS).map(
       description: text(
         `Read-only ${en.toLowerCase()} using the dashboard's source handlers and calculation helpers. Unknown and repeated query keys return 400. The response includes resolved params and preserves missing evidence. Renderer-only styling is not an API parameter.${view === 'ubenchx' ? ' tpc-skyline also returns skuConfigurations separately from measured NVIDIA gpus. gpu=all (default) or Huawei 950PR includes all nine supplied 950PR configurations; an exact Ascend 950PR_<suffix> selects one. Rows preserve Cube/Vector/AICPU counts, MHz clocks, GiB memory, MiB L2, virtualisationOptions and raw ddrRate values with unit=null. Source metadata links the supplied screenshot and marks vendorSourceVerified=false; these are not topology measurements. test=all includes the same array inside tpcSkyline, honoring explicit gpu filters. core-memory-profiles defaults to gpu=all and returns Ascend 950PR_9579 first, followed by B200 SXM; gpu selects either device. B200 retains orderedSms, smInfo, gpcBounds, matrix, stats and metadata, with unit=clock64 cycles and its own colorLimits. The legacy sm-l2-distance API remains available with its original shape. Ascend returns panels with actual coreIds, dieGroups, full matrices, raw SYS_CNT tick units and unique-pair within/between-group statistics; a missing pair class is null. Shared colorLimits and limitations preserve the interpretation. These are profile differences, not core-to-core latency or a floorplan. mem-bw includes Huawei rotating-pool FP16 graph results. timeMs is amortized per copy for metadata.protocol=rotating-pool-npu-graph. peakBandwidthSource documents the per-run normalization reference; optional rows retain observations, bandwidthP10Gbps, bandwidthP90Gbps, processBandwidthGbps, slots and combinedPoolBytes. Missing sizes are listed in metadata.missingSizesBytes. Huawei now covers 8 B through 16 GiB. metadata.smallMessageExtension identifies the separate CANN 9.2.1 run for 8 B–2 KiB, its 4096-byte slot stride, archive digest and cache qualification; the original run metadata applies from 4 KiB upward.' : ''}${
           view === 'video'
-            ? ' Only already published artifacts are read. Cell, phase, slot and GPU-basis choices select result evidence and normalized serving rates; x/y/cost/workload filters produce computed tradeoff points. Local bundles and arbitrary URLs are excluded. Responses are no-store.'
+            ? ' Default dashboard mode reuses published history → videoPoints → dashboardCells → metrics/plot/compare/evidence. It reads at most the same first five history pages as the UI, reports coverage/truncation, selects one canonical workload and keeps the shared sample floor. v_hidden affects chart/table only. view=compare additionally reads at most two already-published media artifacts, pairs cases with the UI helper and returns relative media paths without asset URLs; missing/failed media remains explicit. run/artifact or explicit discovery/results/tradeoff preserve the legacy contract. Discovery includes standard run-sweep runs; these may have no video artifacts. Run artifact listings cover all GitHub pages and retain legacy and unique native matrix names. Allocated GPU counts require retained scheduler allocation evidence; native power device counts cannot substitute for it. Missing allocation and allocation-normalized metrics remain null. No date range, full-catalog completeness, power/quality qualification or causal bottleneck claim is implied. Local bundles and arbitrary URLs are excluded. Responses are no-store.'
             : view === 'current-inferencex-image'
               ? " ageSummary is the nearest-rank p90 of current filtered row submission ages at asOf (future-dated rows excluded). includeHistory=true adds 90 daily ageHistory points reconstructed from the successful image-bearing submissions of those same configurations, so the last point equals ageSummary. Configurations absent from the current table, such as speculation or node-type variants replaced by a newer run, are excluded. Each displayed configuration has one vote; repeated submissions reset its age even if the image tag is unchanged. Neither metric measures container build age. A row is outdated when its tag version is below the base engine's latest vLLM or SGLang release. A nightly whose commit GitHub resolves is outdated only when that commit is an ancestor of the release. Other nightlies compare their build date with the release's publish date: the tag's date, else the build's earliest submission in the catalog. Other tags, and engines without a release stream, are not flagged."
               : view === 'gpu-metrics'
@@ -538,7 +604,7 @@ export const operations: ApiOperation[] = Object.entries(NEW_VIEWS).map(
         }`,
         `只读${zh}，使用仪表板的数据读取和计算函数。未知或重复查询键返回 400；响应包含解析后的参数，保留缺失数据。仅影响样式的控件不作为 API 参数。${view === 'ubenchx' ? ' tpc-skyline 另外返回 skuConfigurations，与 NVIDIA 实测的 gpus 分开列出。gpu=all（默认）或 Huawei 950PR 时返回所提供的全部九种 950PR 配置；指定完整的 Ascend 950PR_<suffix> 时只返回该 SKU。每行保留 Cube/Vector/AICPU 数量、频率（MHz）、内存（GiB）、L2（MiB）、virtualisationOptions，以及原始 ddrRate 数值（unit=null）。来源元数据链接到所提供的截图，并标记 vendorSourceVerified=false；这些配置数据不是拓扑实测结果。test=all 时，tpcSkyline 中返回同一数组，并遵循显式指定的 gpu 筛选。 core-memory-profiles 默认 gpu=all，先返回 Ascend 950PR_9579，再返回 B200 SXM；gpu 可单独选择设备。B200 保留 orderedSms、smInfo、gpcBounds、matrix、stats 和 metadata，单位为 clock64 cycles，使用独立 colorLimits。旧版 sm-l2-distance API 仍可使用，响应结构不变。Ascend 返回各面板的实际 coreIds、dieGroups、完整矩阵、原始 SYS_CNT tick 单位及去重核心对的组内和组间统计；没有对应核心对时为 null。colorLimits 和 limitations 保留统一色标及解释限制。这些数据是访存特征差异，不是核心间通信延迟或物理布局图。 mem-bw 包含 Huawei FP16 轮转缓冲池图执行结果。metadata.protocol=rotating-pool-npu-graph 时，timeMs 为每次拷贝的摊销时间。peakBandwidthSource 说明该次测量采用的归一化参考值；行数据可保留 observations、bandwidthP10Gbps、bandwidthP90Gbps、processBandwidthGbps、slots 和 combinedPoolBytes。缺失大小列在 metadata.missingSizesBytes。Huawei 现覆盖 8 B 至 16 GiB。metadata.smallMessageExtension 记录 8 B–2 KiB 的独立 CANN 9.2.1 测量、4096 字节槽间距、归档摘要及缓存影响说明；原测量元数据适用于 4 KiB 及以上。' : ''}${
           view === 'video'
-            ? ' 仅读取已发布产物。cell、阶段、slot 和 GPU 口径选择对应结果证据，并计算 serving 归一化速率；x/y、成本及工作负载筛选生成权衡图数据点。不读取本地数据包或任意 URL。响应不缓存。'
+            ? ' 默认 dashboard 模式复用已发布历史 → videoPoints → dashboardCells → metrics/plot/compare/evidence。与界面一样最多读取前五页历史，返回覆盖范围和截断状态，选择一个 canonical workload 并应用相同样本门槛。v_hidden 只影响图表和表格。view=compare 额外读取最多两份已发布媒体产物，复用界面配对函数，仅返回相对媒体路径，不返回 asset URL；媒体缺失或读取失败会明确标记。run/artifact 或显式 discovery/results/tradeoff 保留原有契约。发现列表包括标准 run-sweep 运行，其中可能没有视频产物。单次运行的产物列表读取 GitHub 全部分页，兼容旧名称和原生矩阵的唯一名称。已分配 GPU 数须有保留的调度器分配证据，原生功率设备数不能替代；缺失的分配数量及按其归一化的指标保持 null。不代表日期区间、完整历史、功率/质量验收或瓶颈因果判断。不读取本地数据包或任意 URL。响应不缓存。'
             : view === 'current-inferencex-image'
               ? ' ageSummary 按最近秩法计算当前筛选行在 asOf 的提交年龄 P90（排除未来日期行）。includeHistory=true 基于同一批配置的带镜像成功提交，重建 90 个每日 ageHistory 点，因此最后一个点与 ageSummary 一致。当前表格中没有的配置（例如已被更新 run 取代的投机解码或节点类型变体）不计入。每个展示配置计一次；即使镜像标签未变，重新提交仍会重置年龄。两项指标均不代表镜像构建年龄。镜像标签中的版本号低于对应基础引擎（vLLM 或 SGLang）的最新 release 时，该行标记为 outdated。nightly 镜像的 commit 若能在 GitHub 上解析，则仅当该 commit 是此 release 的祖先提交时才标记；其余 nightly 镜像比较构建日期与 release 发布日期，构建日期取标签中的日期，标签无日期时取该构建在镜像目录中最早的提交日期。其他标签以及没有 release 来源的引擎不作标记。'
               : view === 'gpu-metrics'

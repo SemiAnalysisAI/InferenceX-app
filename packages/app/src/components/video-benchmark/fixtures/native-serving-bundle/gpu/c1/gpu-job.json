@@ -1,0 +1,65 @@
+{
+  "aggregate_path": "aggregate.json",
+  "allocation": {
+    "label": "srt-slurm job assigned at launch",
+    "mode": "dedicated_ci"
+  },
+  "authorization": {
+    "approval_reference": "InferenceX #2916 native srt-slurm H3 serving run, authorized by the repository owner on 2026-10-17 (SemiAnalysis clusters only); model use per the MiniMax-H3 license review recorded for the #2894 baseline (user-confirmation-2026-09-02).",
+    "compute_approved": true,
+    "model_license_reviewed": true
+  },
+  "bundle_type": "srt_slurm_h3_service_receipt",
+  "ci_accepted": false,
+  "cleanup_status": "srt_slurm_job_teardown",
+  "evidence_kind": "srt_slurm_h3_service",
+  "execution_id": "slurm-77",
+  "failures": [],
+  "finished_at": "2026-10-17T00:10:00Z",
+  "job_id": "github-123456789-1-c1",
+  "measurement_status": "complete",
+  "measurement_verified": true,
+  "plan_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "power": {
+    "invalid_reasons": [],
+    "path": "power.json",
+    "sha256": "763232b739ae6aa6efad4b3e42c1b5fada11d45b95deb173802a8332a06ab677",
+    "valid": true
+  },
+  "power_verified": true,
+  "regression_status": "inconclusive",
+  "release_qualified": false,
+  "roles": {
+    "baseline": {
+      "finished_at": "2026-10-17T00:10:00Z",
+      "run_path": "baseline/run.json",
+      "run_sha256": "fee60ee8349f71bc43805a42ea61e1da79c727cbd9c4ada6fb930b9cdbbd939d",
+      "run_status": "complete",
+      "run_summary": {
+        "completed": 4,
+        "failed": 0,
+        "latency_median_seconds": 119.0,
+        "not_started": 0,
+        "scheduled": 4,
+        "valid": 4,
+        "valid_clips_per_second": 0.06666666666666667
+      },
+      "started_at": "2026-10-17T00:00:00Z",
+      "status": "complete"
+    }
+  },
+  "schema_version": "0.1.0",
+  "server": {
+    "argv": [
+      "x"
+    ],
+    "slurm_job_id": "77"
+  },
+  "slurm": {
+    "job_id": "77",
+    "state": "COMPLETED"
+  },
+  "spec_sha256": "3fe1ad75b8e1cd485e3b376cefdea422385cbe9743ed7b154cf8fc614ccb9269",
+  "started_at": "2026-10-17T00:00:00Z",
+  "status": "complete"
+}

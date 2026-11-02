@@ -1,0 +1,41 @@
+{
+  "ci": {
+    "actor": null,
+    "repository": "SemiAnalysisAI/InferenceX",
+    "run_url": "https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123456789",
+    "runner_name": null,
+    "triggering_actor": null,
+    "workflow_ref": null,
+    "workflow_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "ci_accepted": false,
+  "concurrencies": [
+    1,
+    2,
+    4
+  ],
+  "evidence_kind": "srt_slurm_h3_service",
+  "failures": [],
+  "finished_at": "2026-10-17T03:38:07.267054Z",
+  "launcher": "srt-slurm",
+  "mode": "serving-smoke",
+  "phase": "complete",
+  "power": {
+    "exporter_image_sha256": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "producer_git_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "power_verified": true,
+  "release_qualified": false,
+  "result_filename": "r",
+  "run_attempt": "1",
+  "run_id": "123456789",
+  "schema_version": 1,
+  "slurm_job": {
+    "job_id": "77",
+    "state": "COMPLETED"
+  },
+  "source_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "started_at": "2026-10-17T03:38:07.253472Z",
+  "status": "complete",
+  "task_id": "h3-video"
+}
