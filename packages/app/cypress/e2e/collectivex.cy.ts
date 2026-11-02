@@ -919,6 +919,20 @@ describe('CollectiveX kv-transfer card', () => {
   });
 });
 
+/** The page description and the section heading set the vLLM function name as inline code. */
+function shouldShowSwapBlocksAsCode() {
+  for (const scope of ['collectivex-description', 'collectivex-swap-section']) {
+    cy.get(`[data-testid="${scope}"] code`).as('code').should('have.text', 'swap_blocks');
+    cy.get('@code')
+      .should('have.css', 'font-family')
+      .and('match', /monospace/u);
+    cy.get('@code')
+      .should('have.css', 'background-color')
+      .and('not.be.oneOf', ['transparent', 'rgba(0, 0, 0, 0)']);
+  }
+  cy.get('[data-testid="collectivex-swap-section"] h2').should('have.text', 'vLLM swap_blocks');
+}
+
 describe('CollectiveX swap_blocks', () => {
   beforeEach(() => {
     const swap = buildDatasetFromNeutral(swapMatrix, [makeSwapDoc()], swapMeta);
@@ -930,10 +944,11 @@ describe('CollectiveX swap_blocks', () => {
     suiteTabs().then(($tabs) => {
       expect([...$tabs].map((tab) => tab.textContent?.trim())).to.deep.equal(['swap_blocks']);
     });
-    cy.get('[data-testid="collectivex-suite-filter"] [role="tab"][aria-selected="true"]').should(
-      'have.text',
-      'swap_blocks',
-    );
+    cy.get('[data-testid="collectivex-suite-filter"] [role="tab"][aria-selected="true"]')
+      .should('have.text', 'swap_blocks')
+      .and('have.css', 'font-family')
+      .and('match', /monospace/u);
+    shouldShowSwapBlocksAsCode();
     cy.get('[data-testid="collectivex-empty-state"]').should('not.exist');
     cy.get('[data-testid="collectivex-chart-filters"]').should('not.exist');
     cy.get('[data-testid="collectivex-methodology-link"]')
@@ -971,6 +986,11 @@ describe('CollectiveX swap_blocks', () => {
     cy.wait('@runs');
     cy.wait('@run');
     showSuite('swap_blocks');
+    shouldShowSwapBlocksAsCode();
+    cy.get('[data-testid="collectivex-description"]').should(
+      'contain.text',
+      '的延迟与有效载荷带宽',
+    );
     cy.get('[data-testid="swap-metric"]').contains('延迟').click();
     cy.get('[data-testid="collectivex-swap-chart"]').should('contain.text', '块大小（字节，对数）');
     cy.get('[data-testid="collectivex-swap-chart"] .point').last().click({ force: true });
