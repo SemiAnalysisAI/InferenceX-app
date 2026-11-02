@@ -1,10 +1,10 @@
 'use client';
-import { useSearchParams } from 'next/navigation';
+import { useClientSearchParams } from '@/hooks/useClientSearch';
 import { useQuery } from '@tanstack/react-query';
 import { WEKA_EXPERIMENT, type ExperimentResponse } from '@/lib/benchmarks/experiment-benchmarks';
 
 export function useExperimentSelected(): boolean {
-  return useSearchParams()?.get('experiment') === WEKA_EXPERIMENT;
+  return useClientSearchParams().get('experiment') === WEKA_EXPERIMENT;
 }
 
 export function useExperiment(enabled = true) {
