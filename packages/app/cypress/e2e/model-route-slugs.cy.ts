@@ -128,9 +128,14 @@ describe('GLM-5.3-Flash registration without published observations', () => {
     });
 
     it(`blocks a locked Flash route and saved selection in ${locale || 'en'}`, () => {
-      const kimiAvailability = modelSelectionAvailability
-        .filter((row) => row.model === 'dsv4-pro')
-        .map((row) => ({ ...row, model: 'kimik3' }));
+      const sourceAvailability = modelSelectionAvailability.filter(
+        (row) => row.model === MODEL_SELECTION_DB_KEYS['DeepSeek-V4-Pro'],
+      );
+      expect(sourceAvailability.length, 'nonempty source availability fixture').to.be.greaterThan(
+        0,
+      );
+      const kimiAvailability = sourceAvailability.map((row) => ({ ...row, model: 'kimik3' }));
+      expect([...new Set(kimiAvailability.map((row) => row.model))]).to.deep.equal(['kimik3']);
       cy.intercept('GET', '/api/v1/availability*', { body: kimiAvailability });
       cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
         expect(
