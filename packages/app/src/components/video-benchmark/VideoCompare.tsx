@@ -51,10 +51,11 @@ const STRINGS = {
     worse: 'Candidate worse',
     neutral: 'No difference',
     loading: 'Loading clips…',
-    loadingHint: 'Fetching the retained clips of both runs (two published artifacts).',
+    loadingHint: 'Fetching retained clips for both selected runs.',
     error: 'Could not load clips',
     retry: 'Retry',
-    noClips: 'Clips are not published for one of these runs; the metric deltas below still apply.',
+    noClips:
+      'Retained clips are unavailable for one of these runs; the metric deltas below still apply.',
     prompt: 'Prompt',
     seed: 'seed',
     take: (n: number) => `take ${n}`,
@@ -67,7 +68,7 @@ const STRINGS = {
     noPairs: 'No case with the same prompt and seed exists in both runs.',
     unmatched: (baseline: number, candidate: number) =>
       `${baseline} baseline and ${candidate} candidate records have no counterpart.`,
-    noClip: 'Clip not published for this record.',
+    noClip: 'Clip unavailable for this record.',
     mediaError: 'The clip could not be played.',
     timeToVideo: 'time to video',
     footnote:
@@ -89,10 +90,10 @@ const STRINGS = {
     worse: '候选更差',
     neutral: '无差异',
     loading: '正在加载视频…',
-    loadingHint: '正在读取两次运行保留的视频（两个已发布产物）。',
+    loadingHint: '正在读取两次所选运行保留的视频。',
     error: '无法加载视频',
     retry: '重试',
-    noClips: '其中一次运行没有发布视频；下方的指标差异仍然有效。',
+    noClips: '其中一次运行的保留视频不可用；下方的指标差异仍然有效。',
     prompt: 'Prompt',
     seed: 'seed',
     take: (n: number) => `第 ${n} 次`,
@@ -105,7 +106,7 @@ const STRINGS = {
     noPairs: '两次运行中没有 prompt 与 seed 均相同的用例。',
     unmatched: (baseline: number, candidate: number) =>
       `${baseline} 条基线记录与 ${candidate} 条候选记录没有对应项。`,
-    noClip: '此记录的视频未发布。',
+    noClip: '此记录的视频不可用。',
     mediaError: '视频无法播放。',
     timeToVideo: '出片时间',
     footnote:

@@ -1,508 +1,1345 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
-  HW_REGISTRY,
-  TCO_SOURCE_TITLE,
-  TCO_SOURCE_URL,
-} from '@semianalysisai/inferencex-constants';
-import { Button } from '@/components/ui/button';
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from 'react';
+import { useLocale } from '@/lib/i18n/use-locale';
+import { track } from '@/lib/analytics/analytics';
+import { useThemeColors } from '@/hooks/useThemeColors';
+import { overlayRunColor } from '@/lib/charts/overlay-run-style';
+import { ShareButton } from '@/components/ui/share-button';
 import { Card } from '@/components/ui/card';
-import ChartLegend from '@/components/ui/chart-legend';
-import { ChartSection } from '@/components/ui/chart-section';
-import { CollapsibleSection } from '@/components/ui/collapsible-section';
+import { ControlPanel } from '@/components/ui/control-panel';
+import { InfoHelp } from '@/components/ui/option-info';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { Heading } from '@/components/ui/heading';
-import { captionControlTriggerClassName } from '@/components/ui/result-context';
-import { SearchableSelect } from '@/components/ui/searchable-select';
-import { ShareButton } from '@/components/ui/share-button';
-import { useThemeColors } from '@/hooks/useThemeColors';
-import { track } from '@/lib/analytics/analytics';
-import { useLocale } from '@/lib/i18n/use-locale';
-import { isQueueing, layoutLabel, leadCell } from './deployment';
-import { costPerGpuHour, hardwareLabel, VIDEO_HARDWARE_ROSTER, type CostTier } from './hardware';
-import {
-  COST_TIERS,
-  metricLabel,
-  metricValue,
-  TIER_LABELS,
-  VIDEO_METRICS,
-  type MetricId,
-  type VideoPoint,
-} from './metrics';
-import { dashboardCells } from './points';
-import { formatApiPrice, H3_API_REFERENCE } from './api-reference';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select';
+import { SegmentedToggle } from '@/components/ui/segmented-toggle';
+import { hardwareLabel, costPerGpuHour } from './hardware';
+import { leadCell } from './deployment';
+import { COST_TIERS, TIER_LABELS, metricValue } from './metrics';
 import { useVideoPoints } from './use-video-points';
+import {
+  DEFAULT_RESULTS_STATE,
+  parseResultsState,
+  resultProjection,
+  resultsSearch,
+  resultMetadata,
+  type ResultCell,
+  type ResultsState,
+  type VideoMode,
+} from './results';
+import VideoResultsClips from './VideoResultsClips';
+import { resultsClipPoints } from './results-clips';
+import {
+  ResultsBars,
+  ResultsLines,
+  ResultsPareto,
+  ResultsRatingSchema,
+  resultsNumber as n,
+  type ResultBar,
+  type ResultSeries,
+} from './VideoResultsCharts';
 import VideoHistory from './VideoHistory';
-import VideoCompare from './VideoCompare';
-import VideoConfigBar from './VideoConfigBar';
-import VideoEvidence from './VideoEvidence';
-import VideoHardwareChart, { VIDEO_CHART_ID } from './VideoHardwareChart';
-import VideoKpiCards from './VideoKpiCards';
-import VideoPointsTable, { videoTableRows } from './VideoPointsTable';
-import { useVideoDashboardState } from './use-video-dashboard-state';
-import { metricOptions } from './video-url-state';
-
-/** History filter params; a deep link carrying one opens the history section on load. */
-const HISTORY_SECTION_PARAMS = ['history-hardware', 'history-concurrency', 'history-query'];
-/** Compare choices; a deep link carrying one opens the Compare section on load. */
-const COMPARE_SECTION_PARAMS = ['v_base', 'v_cand', 'v_case'];
-const CSV_METRICS: readonly MetricId[] = [
-  'p50Latency',
-  'p90Latency',
-  'videosPerGpuHour',
-  'videosPerDollar',
-  'dollarsPerVideo',
-  'kjPerVideo',
-  'powerPctCap',
-  'apiPricePerVideo',
-];
+import styles from './results.module.css';
 
 const STRINGS = {
   en: {
-    title: 'VideoGenX · MiniMax-H3 across hardware',
-    subtitle:
-      'Measured GPU deployments on one workload: time to video, useful output per GPU-hour and per TCO dollar, and metered GPU-board energy. Runtime and layout details accompany each result.',
-    chart: 'Chart',
-    table: 'Table',
-    viewToggle: 'Chart or table view',
-    optimalOnly: 'Optimal Only',
-    optimalInfo:
-      "Show only each hardware's Pareto-optimal deployments for the selected axes; turn off to see the dominated deployments faded.",
-    compare: 'Compare',
-    evidence: 'Performance evidence',
-    toggleCompare: 'Show or hide the Compare section',
-    toggleEvidence: 'Show or hide performance evidence',
-    tier: 'Cost tier',
-    badges: 'TCO $/chip/hr',
-    source: 'Source',
-    apiReference: 'API reference',
-    idle: (list: string) =>
-      `Per participating GPU: ${list} reserved more boards than one video uses; the idle boards are not counted.`,
-    idleItem: (hardware: string, used: number, reserved: number) =>
-      `${hardware} (${used} of ${reserved})`,
-    deployments: (n: number) => `${n} deployments`,
-    history: 'Performance history',
-    historyHint: 'Stored H3 evidence, including older runs without approval.',
+    title: 'VideoGenX',
+    config: 'Comparison',
+    model: 'Model',
+    workload: 'Workload',
+    gpus: 'GPU count',
+    engine: 'Engine',
+    date: 'Run date',
+    all: 'All',
+    automatic: 'Matched workload',
+    publishedLabel: 'Source label',
+    sourceId: 'Source ID',
+    stepsUnit: 'steps',
+    latest: 'Latest published',
+    unknown: 'Not recorded',
+    hardware: 'Hardware',
+    notMeasured: 'Not measured',
     loading: 'Loading video results…',
-    error: 'Could not load video results',
+    error: 'Could not load video results.',
     retry: 'Retry',
-    replay: 'Replaying retained results (local fixture), not a new measurement.',
-    vs: 'vs.',
-    notMeasured: 'not measured',
-    runtime: 'runtime',
-    workloads: (n: number) => ` (${n} other workloads hidden)`,
+    planned: 'planned',
+    tbd: 'tbd',
+    empty: 'No measured data for this selection',
+    plannedEmpty: '—',
+    schemaEmpty: 'Schema only · not calibrated',
+    cohort: '20-clip C1 cohort · ≥10 valid per hardware',
+    cohortHelp:
+      'One canonical 20-clip C1 workload; at least 10 valid samples on every hardware. Other runs remain in Performance history. A fixture replay reads retained evidence and is not a new measurement.',
+    replay: 'Local replay · unpublished',
+    hidden: 'Excluded from this comparison',
+    validity: 'Validity',
+    hash: 'Workload hash',
+    hashDetails: 'Full hashes',
+    integrity: 'Technical integrity',
+    counts: 'Completion counts',
+    fidelity: 'Paired fidelity',
+    perClipPsnr: 'Per-clip PSNR → Comparison clips',
+    ssim: 'SSIM',
+    hashNote:
+      'Model revision, step schedule, resolution, fps, prompt set and seeds remain part of the workload identity. Full-step and distilled runs are separate cohorts; paired fidelity needs its own sealed comparison.',
+    sealed: 'SHA256SUMS',
+    powerValid: 'Power valid',
+    runtime: 'Runtime',
+    verified: 'Verified',
+    invalid: 'Invalid',
+    scheduled: 'Scheduled',
+    attempted: 'Attempted',
+    completed: 'Completed',
+    valid: 'Valid',
+    failed: 'Failed',
+    notStarted: 'Not started',
+    latency: 'Latency',
+    serial: 'Serial request latency',
+    deadline: 'Deadline attainment',
+    delivery: 'Serving delivery latency P50 / P90 / P95',
+    stages: 'Server-side stage timing',
+    stagesNote: 'text encode / denoise / VAE / encode',
+    deadlineInput: 'Deadline (s)',
+    deadlineNote:
+      'Share of valid clips delivered within the selected deadline. Requires every valid request timestamp.',
+    deliveryNote:
+      'GPU count is the x-axis. Solid: P50 · dotted: P90 · band: P50–P95. Only observed deployments are drawn.',
+    deliveryLegend: 'Solid P50 · dotted P90 · band P50–P95',
+    throughput: 'Throughput',
+    clips: 'Valid clips per second',
+    seconds: 'Video seconds generated per second',
+    goodput: 'Deadline goodput',
+    slo: 'SLO per-video latency distribution',
+    mix: 'Workload mix: resolution × duration × mode. Each row retains its own workload identity.',
+    energy: 'Resources & Energy',
+    trace: 'GPU power time series',
+    traceSelect: 'Trace',
+    power: 'Average and observed peak power',
+    memory: 'GPU memory usage',
+    joules: 'GPU energy per valid clip',
+    host: 'Host memory usage',
+    hostNote:
+      'Host RAM requires a host-side sampler; GPU memory and offload settings do not substitute for it.',
+    powerNote:
+      'GPU-board power of participating GPUs only. No system or facility power is inferred.',
+    peak: 'observed peak',
+    energyBasis: 'Energy basis',
+    cost: 'Cost',
+    costMetrics: 'Modelled TCO per video and video-second',
+    tier: 'Cost basis',
+    estimator: 'Video profit estimator',
+    participating: 'Participating GPUs',
+    allocated: 'Allocated GPUs',
+    utilization: 'Utilisation',
+    price: 'API $ / video-s',
+    priceNote: 'Scenario prices · not current API rates',
+    priceDetail:
+      'Scenario inputs, not measured revenue or current API prices. Enter a price for each mode; an unknown mode has no price.',
+    costNote:
+      'Modelled TCO from the hardware registry and measured output rate. Both GPU bases are shown; missing allocation evidence stays unknown. Each price applies only to the selected resolution, duration and mode.',
+    profitNote:
+      'Revenue = measured video-s/hr × utilisation × entered $/video-s. Profit subtracts all hourly GPU TCO; divide by the stated GPU count. No capacity or sustained-load claim.',
+    scenarioPrice: 'API $ / video-s · selected workload',
+    quality: 'Quality',
+    pixel: 'Pixel-level quality: PSNR / SSIM',
+    semantic: 'Semantic / perceptual quality: VBench, CLIP, VLM judge',
+    human: 'Seven-dimension human rating',
+    dimensions: [
+      'Prompt adherence',
+      'Motion quality',
+      'Temporal consistency',
+      'Visual quality',
+      'Aesthetics',
+      'Audio sync',
+      'Safety',
+    ],
+    stability: 'Stability',
+    failures: 'Failure classification',
+    sustained: 'Sustained-load behavior',
+    timeout: 'Timeout',
+    oom: 'OOM',
+    engineError: 'Engine error',
+    transport: 'Transport error',
+    other: 'Unclassified',
+    startup: 'Startup',
+    load: 'Model load time',
+    warmup: 'Compile and warmup time',
+    warmupNote: 'Recorded warmup request duration only; compile time is not isolated.',
+    first: 'First-request latency',
+    switch: 'LoRA / model switch time',
+    deploy: 'Parallelism & Deployment',
+    topology: 'Best topology per GPU count',
+    pareto: 'Per-deployment Pareto frontier',
+    paretoNote:
+      'Per-hardware measured deployments: lower P50, higher valid clips per participating GPU-hour. One deployment is a point; missing topologies are not interpolated.',
+    history: 'Performance history',
+    historyNote: 'Stored evidence, including unapproved, low-sample and unmatched runs.',
+    overlay: 'Unofficial run',
+    overlayMissing:
+      'No matching stored observation for this run. Loading it does not publish or generate media.',
+    dismiss: 'Dismiss',
+    sources: 'Read-only data',
+    api: 'View API',
+    csv: 'Download CSV',
+    basis: 'GPU basis',
+    perVideo: '$/video',
+    perSecond: '$/video-s',
+    audioCosine: 'Audio spectral cosine',
+    rms: 'RMS ratio error',
+    time: 'Time (s)',
+    sample: 'Valid samples',
   },
   zh: {
-    title: 'VideoGenX · MiniMax-H3 跨硬件对比',
-    subtitle:
-      '同一工作负载在不同 GPU 部署下的实测结果：出片时间、每 GPU 小时和每美元 TCO 的有效产出，以及 GPU 板卡能耗。各结果同时列出 runtime 与部署配置。',
-    chart: '图表',
-    table: '表格',
-    viewToggle: '图表或表格视图',
-    optimalOnly: '仅最优',
-    optimalInfo: '只显示各硬件在当前坐标轴下的 Pareto 最优部署；关闭后以淡色显示被支配的部署。',
-    compare: '对比',
-    evidence: '性能测量证据',
-    toggleCompare: '展开或收起“对比”区块',
-    toggleEvidence: '展开或收起性能测量证据',
-    tier: '成本档位',
-    badges: 'TCO $/chip/hr',
-    source: '来源',
-    apiReference: 'API 参考价',
-    idle: (list: string) =>
-      `按参与计算的 GPU 计：${list}预留的板卡多于单条视频所需，空闲板卡未计入。`,
-    idleItem: (hardware: string, used: number, reserved: number) =>
-      `${hardware}（${used} / ${reserved} 张）`,
-    deployments: (n: number) => `${n} 种部署`,
-    history: '性能历史',
-    historyHint: '已存储的 H3 结果，包括尚无发布批准记录的旧运行。',
-    loading: '正在加载视频结果…',
-    error: '无法加载视频结果',
-    retry: '重试',
-    replay: '正在回放保留结果（本地 fixture），不是新的测量。',
-    vs: 'vs.',
+    title: 'VideoGenX',
+    config: '对比条件',
+    model: '模型',
+    workload: '工作负载',
+    gpus: 'GPU 数量',
+    engine: '引擎',
+    date: '运行日期',
+    all: '全部',
+    automatic: '匹配的工作负载',
+    publishedLabel: '来源标签',
+    sourceId: '来源 ID',
+    stepsUnit: '步',
+    latest: '最新已发布结果',
+    unknown: '未记录',
+    hardware: '硬件',
     notMeasured: '未测得',
-    runtime: 'runtime',
-    workloads: (n: number) => `（另有 ${n} 个工作负载未显示）`,
+    loading: '正在加载视频结果…',
+    error: '无法加载视频结果。',
+    retry: '重试',
+    planned: '计划中',
+    tbd: '待确认',
+    empty: '当前选择没有实测数据',
+    plannedEmpty: '—',
+    schemaEmpty: '仅定义评分维度，尚未校准',
+    cohort: '20 条视频的 C1 工作负载 · 每种硬件至少 10 个有效样本',
+    cohortHelp:
+      '所有硬件共用一个固定的 20 条视频 C1 工作负载，至少需要 10 个有效样本。其他运行保留在性能历史中。Fixture 回放只读取已保留的证据，不是新测量。',
+    replay: '本地回放 · 未发布',
+    hidden: '未纳入本次比较',
+    validity: '有效性',
+    hash: '工作负载哈希',
+    hashDetails: '完整哈希',
+    integrity: '技术完整性',
+    counts: '完成数量',
+    fidelity: '配对保真度',
+    perClipPsnr: '逐条视频 PSNR → 视频对比',
+    ssim: 'SSIM',
+    hashNote:
+      '工作负载身份包含模型版本、步数、分辨率、fps、prompt 集合与 seed。完整步数与蒸馏版本分组展示；配对保真度需要单独封存的比较产物。',
+    sealed: 'SHA256SUMS',
+    powerValid: '功率有效性',
+    runtime: 'Runtime',
+    verified: '已验证',
+    invalid: '无效',
+    scheduled: '计划',
+    attempted: '已尝试',
+    completed: '已完成',
+    valid: '有效',
+    failed: '失败',
+    notStarted: '未启动',
+    latency: '延迟',
+    serial: '串行请求延迟',
+    deadline: '截止时间达成率',
+    delivery: '服务交付延迟 P50 / P90 / P95',
+    stages: '服务端阶段耗时',
+    stagesNote: 'text encode / denoise / VAE / encode',
+    deadlineInput: '截止时间（s）',
+    deadlineNote: '在所选截止时间内交付的有效视频占比，需要所有有效请求的时间记录。',
+    deliveryNote: '横轴为 GPU 数量。实线 P50，虚线 P90，色带 P50–P95。只绘制实测部署。',
+    deliveryLegend: '实线 P50 · 虚线 P90 · 色带 P50–P95',
+    throughput: '吞吐量',
+    clips: '每秒有效视频数',
+    seconds: '每秒生成视频秒数',
+    goodput: '满足截止时间的有效吞吐量',
+    slo: '各视频的 SLO 延迟分布',
+    mix: '工作负载分布：分辨率 × 时长 × 模式。每行保留各自的工作负载身份。',
+    energy: '资源与能耗',
+    trace: 'GPU 功率时间序列',
+    traceSelect: '功率曲线',
+    power: '平均功率与观测峰值',
+    memory: 'GPU 显存占用',
+    joules: '每条有效视频的 GPU 能耗',
+    host: '主机内存占用',
+    hostNote: '主机内存需要主机侧采样；GPU 显存与 offload 配置不能代替这项测量。',
+    powerNote: '仅表示参与计算的 GPU 板卡功率，不推算整机或设施功率。',
+    peak: '观测峰值',
+    energyBasis: '能耗口径',
+    cost: '成本',
+    costMetrics: '每条视频及每视频秒的 TCO 估算',
+    tier: '成本档位',
+    estimator: '视频利润估算器',
+    participating: '参与计算的 GPU',
+    allocated: '分配的 GPU',
+    utilization: '利用率',
+    price: 'API $ / video-s',
+    priceNote: '场景价格，非当前 API 报价',
+    priceDetail:
+      '价格输入是场景假设，不是实测收入或当前 API 报价。分别填写各模式的价格；未知模式不套用价格。',
+    costNote:
+      '使用硬件注册表的 TCO 与实测产出速率建模，同时展示两种 GPU 口径；分配证据缺失时保持未知。价格仅适用于所选分辨率、时长和模式。',
+    profitNote:
+      '收入 = 实测 video-s/hr × 利用率 × 输入单价。利润扣除全部每小时 GPU TCO，再除以相应 GPU 数量。不据此推断容量或持续负载能力。',
+    scenarioPrice: 'API $ / video-s · 当前工作负载',
+    quality: '质量',
+    pixel: '像素级质量：PSNR / SSIM',
+    semantic: '语义与感知质量：VBench、CLIP、VLM judge',
+    human: '七维人工评分',
+    dimensions: [
+      'Prompt 遵循度',
+      '运动质量',
+      '时间一致性',
+      '画面质量',
+      '美感',
+      '音画同步',
+      '安全性',
+    ],
+    stability: '稳定性',
+    failures: '失败分类',
+    sustained: '持续负载表现',
+    timeout: '超时',
+    oom: 'OOM',
+    engineError: '引擎错误',
+    transport: '传输错误',
+    other: '未分类',
+    startup: '启动',
+    load: '模型加载时间',
+    warmup: '编译与 warmup 时间',
+    warmupNote: '仅为已记录的 warmup 请求时长，编译时间尚未单独测量。',
+    first: '首次请求延迟',
+    switch: 'LoRA / 模型切换时间',
+    deploy: '并行与部署',
+    topology: '各 GPU 数量的最优拓扑',
+    pareto: '各部署的 Pareto 前沿',
+    paretoNote:
+      '按硬件展示实测部署：P50 越低、每参与 GPU 小时的有效视频数越高越好。只有一个部署时只显示一个点，缺失拓扑不插值。',
+    history: '性能历史',
+    historyNote: '已存储的结果，包括尚无发布批准、样本不足及工作负载未匹配的运行。',
+    overlay: '非官方运行',
+    overlayMissing: '这个运行没有匹配的已存储观测；加载不会发布或生成媒体。',
+    dismiss: '移除',
+    sources: '只读数据',
+    api: '视图 API',
+    csv: '下载 CSV',
+    basis: 'GPU 口径',
+    perVideo: '$/video',
+    perSecond: '$/video-s',
+    audioCosine: '音频频谱余弦相似度',
+    rms: 'RMS 比率误差',
+    time: '时间（s）',
+    sample: '有效样本',
   },
 };
+const subscribe = () => () => {};
+type Copy = (typeof STRINGS)['en'] | (typeof STRINGS)['zh'];
 
-const subscribeNoop = () => () => {};
-
-function csvCell(value: string | number | null): string {
-  if (value === null) return '';
-  const text = String(value);
-  return /[",\n]/u.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+function Empty({
+  s,
+  kind = 'measured',
+  note,
+}: {
+  s: Copy;
+  kind?: 'measured' | 'planned';
+  note?: string;
+}) {
+  return (
+    <div className={`${styles.empty} text-xs`} data-testid="results-empty" data-state={kind}>
+      <span>{kind === 'planned' ? s.plannedEmpty : s.empty}</span>
+      {note && <span>{note}</span>}
+    </div>
+  );
+}
+function Item({
+  title,
+  wide = false,
+  state,
+  children,
+  note,
+}: {
+  title: string;
+  wide?: boolean;
+  state?: string;
+  children: ReactNode;
+  note?: string;
+}) {
+  return (
+    <div className={`${styles.item} ${wide ? styles.wide : ''}`}>
+      <Heading as="h3" level="label" className="flex flex-wrap items-baseline gap-2 font-semibold">
+        {title}
+        {state && (
+          <span className="text-2xs font-normal uppercase tracking-eyebrow text-muted-foreground">
+            {state}
+          </span>
+        )}
+        {note && (
+          <InfoHelp label={title} value={title}>
+            {note}
+          </InfoHelp>
+        )}
+      </Heading>
+      {children}
+    </div>
+  );
+}
+function Group({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+  return (
+    <section id={id} className={styles.group} data-testid={`results-${id}`}>
+      <Heading as="h2" level="section" className="mb-4">
+        {title}
+      </Heading>
+      <div className={styles.items}>{children}</div>
+    </section>
+  );
+}
+function Table({
+  head,
+  children,
+  testId,
+}: {
+  head: string[];
+  children: ReactNode;
+  testId?: string;
+}) {
+  return (
+    <div className={styles.scroll}>
+      <table className={`${styles.table} text-xs`} data-testid={testId}>
+        <thead>
+          <tr>
+            {head.map((h, i) => (
+              <th key={i}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>{children}</tbody>
+      </table>
+    </div>
+  );
 }
 
-export default function VideoDashboard() {
-  const locale = useLocale();
-  const s = STRINGS[locale];
-  const { points, loading, error, replay, retry } = useVideoPoints();
-  const { state, update } = useVideoDashboardState();
-  const hidden = useMemo(() => new Set(state.hidden), [state.hidden]);
-  const [legendExpanded, setLegendExpanded] = useState(true);
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [compareOpen, setCompareOpen] = useState(false);
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    setHistoryOpen(HISTORY_SECTION_PARAMS.some((key) => params.has(key)));
-    setCompareOpen(COMPARE_SECTION_PARAMS.some((key) => params.has(key)));
-  }, []);
+const cellLabel = (cell: ResultCell) =>
+  `${hardwareLabel(cell.point.hardwareKey ?? '')}${cell.overlay ? ` · #${cell.point.runId}` : ''}`;
 
-  const hardwareKeys = useMemo(() => VIDEO_HARDWARE_ROSTER.map((item) => item.key), []);
+export default function VideoDashboard() {
+  const locale = useLocale(),
+    s = STRINGS[locale];
+  const [state, setState] = useState<ResultsState>(DEFAULT_RESULTS_STATE);
+  const latest = useRef(DEFAULT_RESULTS_STATE);
+  const { points, namedPoints, loading, error, replay, retry } = useVideoPoints(
+    state.unofficialRun,
+  );
+  const [energyBasis, setEnergyBasis] = useState<'clip' | 'frame'>('clip');
+  const [traceHardware, setTraceHardware] = useState('h200');
+  const [historyOpen, setHistoryOpen] = useState(false);
+  useEffect(() => {
+    const read = () => {
+      const next = parseResultsState(location.search);
+      latest.current = next;
+      setState(next);
+    };
+    read();
+    window.addEventListener('popstate', read);
+    return () => window.removeEventListener('popstate', read);
+  }, []);
+  const update = useCallback((patch: Partial<ResultsState>) => {
+    const changesWorkload = ['model', 'workload', 'resolution', 'duration', 'mode', 'steps'].some(
+      (key) => key in patch,
+    );
+    const next = {
+      ...latest.current,
+      ...patch,
+      ...(changesWorkload
+        ? { apiPrice: null, apiPrices: { t2v: null, i2v: null, r2v: null } }
+        : {}),
+    };
+    latest.current = next;
+    const params = new URLSearchParams(
+      [...new URLSearchParams(location.search)].filter(
+        ([key]) => !key.startsWith('r_') && key !== 'unofficialrun' && key !== 'unofficialruns',
+      ),
+    );
+    for (const [key, value] of new URLSearchParams(resultsSearch(next))) params.set(key, value);
+    history.replaceState(
+      null,
+      '',
+      `${location.pathname}${params.size > 0 ? `?${params}` : ''}${location.hash}`,
+    );
+    setState(next);
+    track('video_results_config_changed', { controls: Object.keys(patch).join(',') });
+  }, []);
+  const projection = useMemo(
+    () => resultProjection(points, state, namedPoints),
+    [points, state, namedPoints],
+  );
+  const { options, overlayCells, roster } = projection;
+  const workloadOptions = useMemo(() => {
+    const byId = new Map([...namedPoints, ...points].map((point) => [point.id, point]));
+    const rows = options.workloads.map(({ key, label }) => {
+      const metadata = resultMetadata(byId.get(key)!);
+      const summary = [
+        metadata.model,
+        metadata.resolution,
+        metadata.duration === null ? null : `${metadata.duration} s`,
+        metadata.fps === null ? null : `${metadata.fps} fps`,
+        metadata.steps === null ? null : `${metadata.steps} ${s.stepsUnit}`,
+        metadata.mode?.toUpperCase(),
+      ]
+        .filter(Boolean)
+        .join(' · ');
+      return { key, label, summary };
+    });
+    return rows.map(({ key, label, summary }) => {
+      const peers = rows.filter((row) => row.summary === summary);
+      let suffixLength = 8;
+      while (
+        peers.some(
+          (row) => row.key !== key && row.key.slice(-suffixLength) === key.slice(-suffixLength),
+        )
+      )
+        suffixLength++;
+      return {
+        value: key,
+        label: peers.length > 1 ? `${summary} · #${key.slice(-suffixLength)}` : summary,
+        help: (
+          <div className="max-w-full break-all">
+            <p>
+              {s.publishedLabel}: {label}
+            </p>
+            <p>
+              {s.sourceId}: {key}
+            </p>
+          </div>
+        ),
+      } satisfies SearchableSelectOption;
+    });
+  }, [options.workloads, points, namedPoints, s]);
+  const resolvedWorkload = workloadOptions.find(
+    (option) => option.value === projection.state.workload,
+  );
+  const cells = [...projection.cells, ...overlayCells];
+  const deploymentCells = [...projection.deploymentCells, ...overlayCells];
+  const hidden = useMemo(() => new Set(state.hidden), [state.hidden]);
   const { resolveColor, getCssColor } = useThemeColors({
     highContrast: false,
-    activeKeys: hardwareKeys,
+    activeKeys: roster,
   });
-  // Vendor hues depend on the resolved theme and computed styles, which the
-  // server cannot know; render the neutral token until hydration completes so
-  // the first client render matches the server HTML.
   const mounted = useSyncExternalStore(
-    subscribeNoop,
+    subscribe,
     () => true,
     () => false,
   );
   const colorFor = useCallback(
     (key: string) => (mounted ? getCssColor(resolveColor(key)) : 'var(--muted-foreground)'),
-    [mounted, resolveColor, getCssColor],
+    [mounted, getCssColor, resolveColor],
   );
-
-  const options = metricOptions(state);
-  const {
-    cells,
-    workload: primaryWorkload,
-    otherWorkloads,
-  } = useMemo(() => dashboardCells(points), [points]);
-  const measured = useMemo(
-    () =>
-      new Map(
-        hardwareKeys.flatMap((key) => {
-          const point = leadCell(cells, key, { tier: state.tier });
-          return point ? [[key, point] as const] : [];
-        }),
-      ),
-    [cells, hardwareKeys, state.tier],
+  const color = (cell: ResultCell) =>
+    state.unofficialRun === cell.point.runId
+      ? overlayRunColor(0)
+      : colorFor(cell.point.hardwareKey ?? '');
+  const representatives = roster.flatMap((key) =>
+    [false, true].flatMap((overlay) => {
+      const choices = cells.filter((c) => c.point.hardwareKey === key && c.overlay === overlay);
+      const lead = leadCell(
+        choices.map((c) => c.point),
+        key,
+        { tier: state.costTier },
+      );
+      const first = choices.find((c) => c.point.id === lead?.id);
+      return first ? [first] : [];
+    }),
   );
-  const lead = measured.values().next().value ?? cells[0];
-  const layouts = [
-    ...new Set(cells.filter((p) => !isQueueing(p)).map((p) => layoutLabel(p, locale))),
-  ];
-  const deploymentLabel =
-    layouts.length > 2 ? s.deployments(layouts.length) : layouts.join(' | ') || '—';
-  // "1344 × 768 · 8 s · 24 fps · 50 steps · model @ rev · seeds · prompt" → shape, then model @ rev.
-  const workloadParts = primaryWorkload?.split(' · ') ?? [];
-  const workloadLabel = workloadParts.slice(0, 4).join(' · ') || '—';
-  const modelLabel = workloadParts[4] ?? lead?.model ?? '—';
-  const workloadSuffix = otherWorkloads > 0 ? s.workloads(otherWorkloads) : '';
-  // Jobs that reserved a whole node but generated on part of it: say so beside the per-GPU numbers.
-  const idle = [...measured.values()]
-    .filter(
-      (p) => p.participating !== null && p.allocated !== null && p.allocated > p.participating,
-    )
-    .map((p) => s.idleItem(hardwareLabel(p.hardwareKey ?? ''), p.participating!, p.allocated!));
-
-  const legendItems = VIDEO_HARDWARE_ROSTER.map(({ key, unavailable }) => {
-    const point = measured.get(key);
-    return {
-      name: key,
-      hw: key,
-      label: point
-        ? `${hardwareLabel(key)} · ${s.runtime} ${point.runtime.slice(0, 8)}`
-        : `${hardwareLabel(key)} · ${s.notMeasured}`,
-      color: colorFor(key),
-      isActive: point !== undefined && !hidden.has(key),
-      isRemovable: point !== undefined,
-      title: unavailable?.[locale],
-      onClick: (name: string) => {
-        if (!measured.has(name)) return;
-        const next = new Set(hidden);
-        if (next.has(name)) next.delete(name);
-        else next.add(name);
-        update({ hidden: [...next] });
-        track('video_legend_toggled', { gpu: name });
-      },
-    };
-  });
-
-  const exportCsv = () => {
-    const rows = videoTableRows(cells, hidden, state);
-    const header = [
-      'hardware',
-      'concurrency',
-      'valid',
-      'scheduled',
-      'participating_gpus',
-      'allocated_gpus',
-      'api_price_usd_per_video_second',
-      'tp_size',
-      'ulysses_degree',
-      'replicas',
-      ...CSV_METRICS.map((id) => `${id} (${VIDEO_METRICS[id].unit})`),
-      'board_power_w',
-      'enforced_limit_w',
-      'runtime',
-      'ci_run',
-    ];
-    const lines = rows.map((p) =>
-      [
-        hardwareLabel(p.hardwareKey ?? ''),
-        p.concurrency,
-        p.valid,
-        p.scheduled,
-        p.participating,
-        p.allocated,
-        state.apiPrice,
-        p.server?.tp ?? null,
-        p.server?.ulysses ?? null,
-        p.replicas,
-        ...CSV_METRICS.map((id) => metricValue(p, id, options)),
-        p.avgPowerW,
-        p.enforcedLimitW,
-        p.runtime,
-        `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${p.runId}`,
-      ]
-        .map(csvCell)
-        .join(','),
+  const bars = (
+    get: (c: ResultCell) => number | null,
+    secondary?: (c: ResultCell) => number | null,
+  ): ResultBar[] =>
+    roster
+      .filter((key) => !hidden.has(key))
+      .flatMap((key) => {
+        const rows = representatives.filter((c) => c.point.hardwareKey === key);
+        return rows.length > 0
+          ? rows.map((c) => ({
+              key: c.overlay ? `${key}-overlay` : key,
+              label: cellLabel(c),
+              color: color(c),
+              value: get(c),
+              secondary: secondary?.(c) ?? null,
+            }))
+          : [
+              {
+                key,
+                label: hardwareLabel(key),
+                color: colorFor(key),
+                value: null,
+                secondary: null,
+              },
+            ];
+      });
+  const barChart = (
+    title: string,
+    unit: string,
+    get: (c: ResultCell) => number | null,
+    secondary?: (c: ResultCell) => number | null,
+    secondaryLabel?: string,
+  ) =>
+    representatives.some((c) => get(c) !== null || (secondary && secondary(c) !== null)) ? (
+      <ResultsBars
+        rows={bars(get, secondary)}
+        label={title}
+        unit={unit}
+        secondaryLabel={secondaryLabel}
+      />
+    ) : (
+      <Empty s={s} />
     );
-    const blob = new Blob([`${[header.join(','), ...lines].join('\n')}\n`], {
-      type: 'text/csv;charset=utf-8',
-    });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `videogenx-${state.y}-vs-${state.x}-${state.tier}.csv`;
-    anchor.click();
-    URL.revokeObjectURL(url);
-  };
-
-  return (
-    <div className="mx-auto min-w-0 w-full max-w-7xl space-y-4 py-2" data-testid="video-dashboard">
-      <section className="relative z-20">
-        <Card>
-          <div className="flex flex-col gap-4">
-            <DashboardSectionHeader
-              headingAs="h1"
-              title={s.title}
-              description={s.subtitle}
-              actions={<ShareButton />}
-            />
-            <VideoConfigBar
-              state={state}
-              onChange={update}
-              modelLabel={modelLabel}
-              workloadLabel={`${workloadLabel}${workloadSuffix}`}
-              deploymentLabel={deploymentLabel}
-            />
-          </div>
-        </Card>
-      </section>
-      <ChartSection
-        chartId={VIDEO_CHART_ID}
-        analyticsPrefix="video"
-        exportFileName={`videogenx-${state.y}-vs-${state.x}`}
-        onExportCsv={exportCsv}
-        hideImageExport={state.view === 'table'}
-        setIsLegendExpanded={setLegendExpanded}
-        leadingControls={
-          <div className="flex gap-1" role="group" aria-label={s.viewToggle}>
-            {(['chart', 'table'] as const).map((view) => (
-              <Button
-                key={view}
-                size="sm"
-                variant={state.view === view ? 'default' : 'outline'}
-                aria-pressed={state.view === view}
-                onClick={() => {
-                  update({ view });
-                  track('video_view_changed', { view });
-                }}
-              >
-                {s[view]}
-              </Button>
-            ))}
-          </div>
+  const series: ResultSeries[] = roster
+    .filter((key) => !hidden.has(key))
+    .flatMap((key) =>
+      [false, true].map((overlay) => ({
+        key: overlay ? `${key}-overlay` : key,
+        label: hardwareLabel(key),
+        color: overlay ? overlayRunColor(0) : colorFor(key),
+        points: deploymentCells
+          .filter(
+            (c) =>
+              c.point.hardwareKey === key &&
+              c.overlay === overlay &&
+              c.point.participating !== null &&
+              c.deliveryP50 !== null,
+          )
+          .map((c) => ({
+            x: c.point.participating!,
+            y: c.deliveryP50!,
+            middle: c.point.p90,
+            upper: c.p95,
+          })),
+      })),
+    );
+  const trace = representatives.find((c) => c.point.id === traceHardware) ?? representatives[0];
+  const selector = (
+    key: 'model' | 'engine' | 'date',
+    label: string,
+    choices: { value: string; label: string }[],
+    fallback: string,
+  ) => (
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <Label htmlFor={`results-${key}`}>{label}</Label>
+      <SearchableSelect
+        triggerId={`results-${key}`}
+        triggerTestId={`results-${key}`}
+        value={state[key] ?? ''}
+        onValueChange={(value) =>
+          update({ [key]: value || null, ...(key === 'model' ? { workload: null } : {}) })
         }
-      >
-        <div className="space-y-3 px-4 md:px-6" data-testid="video-chart-card">
-          <div className="min-w-0 pr-0 md:pr-56">
-            <Heading level="card">
-              {modelLabel} · {metricLabel(state.y, locale, options)} {s.vs}{' '}
-              {metricLabel(state.x, locale, options)}
-            </Heading>
-            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-              <span className="inline-flex flex-wrap items-center gap-x-1">
-                <span className="font-medium text-foreground">{s.tier}:</span>{' '}
-                <span className="no-export inline-flex items-center">
-                  <SearchableSelect
-                    triggerTestId="video-cost-tier"
-                    triggerAriaLabel={s.tier}
-                    value={state.tier}
-                    onValueChange={(value) => {
-                      update({ tier: value as CostTier });
-                      track('video_tier_changed', { value });
-                    }}
-                    placeholder={s.tier}
-                    initialLabel={TIER_LABELS[state.tier][locale]}
-                    searchable={false}
-                    trackPrefix="video_cost_tier"
-                    size="sm"
-                    className={captionControlTriggerClassName}
-                    contentClassName="w-72"
-                    groups={[
+        groups={[{ label: '', options: [{ value: '', label: fallback }, ...choices] }]}
+        placeholder={label}
+        searchable={false}
+      />
+    </div>
+  );
+  const costByPoint = Object.fromEntries(
+    cells.map((c) => [
+      c.point.id,
+      {
+        participating: c.cost.participating?.perVideoSecond ?? null,
+        allocated: c.cost.allocated?.perVideoSecond ?? null,
+      },
+    ]),
+  );
+  const apiUrl = `/api/v1/views/video?view=overview&${resultsSearch(state)}`;
+  const tableRows = (values: (c: ResultCell) => (string | number | null | undefined)[]) =>
+    representatives.map((c) => (
+      <tr key={c.point.id} data-hardware={c.point.hardwareKey} data-overlay={c.overlay}>
+        <td>
+          <span className={`${styles.dot} mr-2`} style={{ background: color(c) }} />
+          {cellLabel(c)}
+        </td>
+        {values(c).map((v, i) => (
+          <td key={i}>{typeof v === 'number' ? n(v) : (v ?? '—')}</td>
+        ))}
+      </tr>
+    ));
+  const noRows = (
+    <tr>
+      <td colSpan={8} className="text-muted-foreground">
+        {s.empty}
+      </td>
+    </tr>
+  );
+  return (
+    <div
+      className={`${styles.page} mx-auto w-full min-w-0 max-w-7xl py-4`}
+      data-testid="video-results"
+    >
+      <Card>
+        <div className="flex flex-col gap-4">
+          <DashboardSectionHeader
+            title={s.title}
+            actions={
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span>{s.cohort}</span>
+                <InfoHelp label={s.cohort} value="cohort" triggerTestId="results-cohort-help">
+                  {s.cohortHelp}
+                </InfoHelp>
+                {replay && <span data-testid="results-replay">{s.replay}</span>}
+                <ShareButton />
+              </div>
+            }
+            headingAs="h1"
+          />
+          <ControlPanel legend={s.config} className={styles.filters}>
+            {selector(
+              'model',
+              s.model,
+              options.models.map((v) => ({ value: v, label: v })),
+              s.all,
+            )}
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <Label>{s.gpus}</Label>
+              <SegmentedToggle
+                role="group"
+                value={state.gpuCount === null ? 'all' : String(state.gpuCount)}
+                options={[null, ...options.gpuCounts.toSorted((a, b) => a - b)].map((v) => ({
+                  value: v === null ? 'all' : String(v),
+                  label: v === null ? s.all : String(v),
+                }))}
+                onValueChange={(value) =>
+                  update({ gpuCount: value === 'all' ? null : Number(value) })
+                }
+                ariaLabel={s.gpus}
+                testId="results-gpus"
+              />
+            </div>
+            <div className={`${styles.workloadFilter} flex min-w-0 flex-col gap-1.5`}>
+              <Label htmlFor="results-workload">{s.workload}</Label>
+              <SearchableSelect
+                triggerId="results-workload"
+                triggerTestId="results-workload"
+                value={state.workload ?? 'automatic'}
+                onValueChange={(value) =>
+                  update({ workload: value === 'automatic' ? null : value })
+                }
+                groups={[
+                  {
+                    label: '',
+                    options: [
+                      { value: 'automatic', label: s.automatic, help: resolvedWorkload?.help },
+                      ...workloadOptions,
+                    ],
+                  },
+                ]}
+                placeholder={s.workload}
+                contentClassName="max-w-[calc(100vw-2rem)]"
+                trackPrefix="video_results_workload"
+              />
+              {state.workload === null && resolvedWorkload && (
+                <p className="text-xs text-muted-foreground" data-testid="results-automatic-detail">
+                  {resolvedWorkload.label}
+                </p>
+              )}
+            </div>
+            {selector(
+              'engine',
+              s.engine,
+              options.engines.map((v) => ({ value: v, label: v })),
+              s.all,
+            )}
+            {selector(
+              'date',
+              s.date,
+              options.dates
+                .toSorted()
+                .toReversed()
+                .map((v) => ({ value: v, label: v })),
+              s.latest,
+            )}
+          </ControlPanel>
+        </div>
+      </Card>
+      {loading && (
+        <p role="status" className="mt-3 text-sm">
+          {s.loading}
+        </p>
+      )}
+      {error && (
+        <div role="alert" className="mt-3 text-sm">
+          {s.error}{' '}
+          <button
+            className="underline"
+            onClick={() => {
+              track('video_results_retry');
+              retry();
+            }}
+          >
+            {s.retry}
+          </button>
+        </div>
+      )}
+      {state.unofficialRun && (
+        <div
+          className="mt-3 flex flex-wrap items-center gap-3 rounded border p-3 text-xs"
+          data-testid="results-overlay"
+        >
+          <span style={{ color: overlayRunColor(0) }}>
+            {s.overlay}: {state.unofficialRun}
+          </span>
+          {!cells.some((c) => c.point.runId === state.unofficialRun) && (
+            <span>{s.overlayMissing}</span>
+          )}
+          <button
+            data-testid="results-overlay-dismiss"
+            className="underline"
+            onClick={() => {
+              const approvedWorkloads = resultProjection(points, {
+                ...state,
+                unofficialRun: null,
+              }).options.workloads;
+              update({
+                unofficialRun: null,
+                ...(state.workload !== null &&
+                !approvedWorkloads.some((workload) => workload.key === state.workload)
+                  ? { workload: null }
+                  : {}),
+              });
+              track('video_results_overlay_dismissed');
+            }}
+          >
+            {s.dismiss}
+          </button>
+        </div>
+      )}
+      <div className={`${styles.legend} mt-5 text-xs`} aria-label={s.hardware}>
+        {roster.map((key) => (
+          <label key={key}>
+            <input
+              data-testid={`results-hardware-${key}`}
+              type="checkbox"
+              checked={!hidden.has(key)}
+              onChange={() => {
+                const next = new Set(state.hidden);
+                if (next.has(key)) next.delete(key);
+                else next.add(key);
+                update({ hidden: [...next] });
+                track('video_results_hardware_toggled', { gpu: key });
+              }}
+            />
+            <span className={styles.dot} style={{ background: colorFor(key) }} />
+            <span>{hardwareLabel(key)}</span>
+          </label>
+        ))}
+      </div>
+      <div className={styles.body}>
+        <div className={styles.content}>
+          <VideoResultsClips
+            points={resultsClipPoints(cells, { tier: state.costTier })}
+            colorFor={(key) =>
+              representatives.some((c) => c.overlay && c.point.hardwareKey === key)
+                ? overlayRunColor(0)
+                : colorFor(key)
+            }
+            hidden={hidden}
+            roster={roster}
+            options={{ tier: state.costTier }}
+            costs={costByPoint}
+            unofficialRun={state.unofficialRun ?? undefined}
+          />
+          <Group id="validity" title={s.validity}>
+            <Item title={s.hash} note={s.hashNote}>
+              <dl className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 text-xs">
+                <dt>{s.workload}</dt>
+                <dd className="break-words">{resolvedWorkload?.label ?? '—'}</dd>
+              </dl>
+              <details
+                className="text-xs"
+                onToggle={(event) =>
+                  track('video_results_hashes_toggled', { enabled: event.currentTarget.open })
+                }
+              >
+                <summary className="cursor-pointer text-muted-foreground">{s.hashDetails}</summary>
+                <dl className="mt-2 grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2">
+                  <dt>{s.workload}</dt>
+                  <dd className="break-words">{cells[0]?.point.workload ?? '—'}</dd>
+                  {representatives.map((c) => (
+                    <div key={c.point.id} className="contents">
+                      <dt>{cellLabel(c)}</dt>
+                      <dd className="break-all font-mono text-2xs">
+                        {c.evidence?.workloadHash ?? '—'}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </details>
+            </Item>
+            <Item title={s.integrity}>
+              <Table head={[s.hardware, s.sealed, s.powerValid, s.runtime]}>
+                {representatives.length > 0
+                  ? tableRows((c) => [
+                      c.evidence?.verified ? s.verified : s.unknown,
+                      c.evidence?.powerValid === true
+                        ? s.verified
+                        : c.evidence?.powerValid === false
+                          ? s.invalid
+                          : s.unknown,
+                      c.point.runtime.slice(0, 12) || null,
+                    ])
+                  : noRows}
+              </Table>
+            </Item>
+            <Item title={s.counts} wide>
+              <Table
+                head={[
+                  s.hardware,
+                  s.scheduled,
+                  s.attempted,
+                  s.completed,
+                  s.valid,
+                  s.failed,
+                  s.notStarted,
+                ]}
+              >
+                {representatives.length > 0
+                  ? tableRows((c) => [
+                      c.point.scheduled,
+                      c.evidence?.attempted,
+                      c.point.completed,
+                      c.point.valid,
+                      c.point.failed,
+                      c.evidence?.notStarted,
+                    ])
+                  : noRows}
+              </Table>
+            </Item>
+            <Item title={s.fidelity} wide>
+              <a
+                href="#comparison-clips"
+                className="text-sm underline"
+                onClick={() => track('video_results_quality_clips_opened', { metric: 'psnr' })}
+              >
+                {s.perClipPsnr}
+              </a>
+              <Empty s={s} kind="planned" note={`${s.audioCosine} · ${s.rms}`} />
+            </Item>
+          </Group>
+          <Group id="latency" title={s.latency}>
+            <Item title={s.serial}>{barChart(s.serial, 's', (c) => c.point.p50)}</Item>
+            <Item title={s.deadline} note={s.deadlineNote}>
+              <div className="flex max-w-52 flex-col gap-1.5">
+                <Label htmlFor="results-deadline">{s.deadlineInput}</Label>
+                <Input
+                  id="results-deadline"
+                  data-testid="results-deadline"
+                  type="number"
+                  min="1"
+                  value={state.deadlineSeconds}
+                  onChange={(e) => {
+                    const v = e.target.valueAsNumber;
+                    if (Number.isFinite(v) && v > 0) update({ deadlineSeconds: v });
+                  }}
+                />
+              </div>
+              {barChart(s.deadline, '%', (c) =>
+                c.deadlineAttainment === null ? null : c.deadlineAttainment * 100,
+              )}
+            </Item>
+            <Item title={s.delivery} wide note={s.deliveryNote}>
+              <p className="text-xs text-muted-foreground">{s.deliveryLegend}</p>
+              <div data-testid="results-latency-series">
+                {series.some((seriesItem) => seriesItem.points.length > 0) ? (
+                  <ResultsLines series={series} label={s.delivery} xLabel={s.gpus} yLabel="s" />
+                ) : (
+                  <Empty s={s} />
+                )}
+              </div>
+            </Item>
+            <Item title={s.stages} wide state={s.planned}>
+              <Empty s={s} kind="planned" note={s.stagesNote} />
+            </Item>
+          </Group>
+          <Group id="throughput" title={s.throughput}>
+            <Item title={s.clips}>{barChart(s.clips, 'clips/s', (c) => c.clipsPerSecond)}</Item>
+            <Item title={s.seconds}>
+              {barChart(s.seconds, 'video-s/s', (c) => c.videoSecondsPerSecond)}
+            </Item>
+            <Item title={s.goodput}>
+              {barChart(s.goodput, 'clips/s', (c) => c.deadlineGoodput)}
+            </Item>
+            <Item title={s.slo} wide note={s.mix}>
+              <Table head={[s.workload, 'T2V', 'I2V', 'R2V', s.unknown]}>
+                {projection.workloadMix.length > 0
+                  ? [
+                      ...new Set(
+                        projection.workloadMix.map(
+                          (c) => `${c.metadata.resolution ?? '—'} · ${n(c.metadata.duration)} s`,
+                        ),
+                      ),
+                    ].map((shape) => (
+                      <tr key={shape}>
+                        <td>{shape}</td>
+                        {['t2v', 'i2v', 'r2v', null].map((mode) => (
+                          <td key={mode ?? 'unknown'}>
+                            {projection.workloadMix
+                              .filter(
+                                (c) =>
+                                  `${c.metadata.resolution ?? '—'} · ${n(c.metadata.duration)} s` ===
+                                    shape &&
+                                  (['t2v', 'i2v', 'r2v'].includes(c.metadata.mode ?? '')
+                                    ? c.metadata.mode
+                                    : null) === mode,
+                              )
+                              .map((c) => (
+                                <div key={c.point.id} className="mb-2 min-w-40">
+                                  <span style={{ color: color(c) }}>{cellLabel(c)}</span>
+                                  <div>
+                                    P50 {n(c.deliveryP50)} · P90 {n(c.point.p90)} · P95 {n(c.p95)} s
+                                  </div>
+                                  <div className="text-muted-foreground">
+                                    {s.deadlineInput}: {n(state.deadlineSeconds)}
+                                  </div>
+                                </div>
+                              ))}
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  : noRows}
+              </Table>
+            </Item>
+          </Group>
+          <Group id="energy" title={s.energy}>
+            <Item title={s.trace} wide note={s.powerNote}>
+              <div className="flex max-w-72 flex-col gap-1.5">
+                <Label htmlFor="results-trace-select">{s.traceSelect}</Label>
+                <SearchableSelect
+                  triggerId="results-trace-select"
+                  triggerTestId="results-trace-select"
+                  value={trace?.point.id ?? ''}
+                  onValueChange={(value) => {
+                    setTraceHardware(value);
+                    track('video_results_trace_changed', {
+                      gpu:
+                        representatives.find((cell) => cell.point.id === value)?.point
+                          .hardwareKey ?? '',
+                    });
+                  }}
+                  groups={[
+                    {
+                      label: '',
+                      options:
+                        representatives.length === 0
+                          ? [{ value: '', label: s.notMeasured }]
+                          : representatives.map((c) => ({
+                              value: c.point.id,
+                              label: cellLabel(c),
+                            })),
+                    },
+                  ]}
+                  placeholder={s.traceSelect}
+                  searchable={false}
+                />
+              </div>
+              <div data-testid="results-power-trace">
+                {trace?.evidence?.powerSeries.length ? (
+                  <ResultsLines
+                    series={[
                       {
-                        label: '',
-                        options: COST_TIERS.map((tier) => ({
-                          value: tier,
-                          label: TIER_LABELS[tier][locale],
-                          testId: `video-cost-tier-${tier}`,
+                        key: trace.point.hardwareKey ?? '',
+                        label: hardwareLabel(trace.point.hardwareKey ?? ''),
+                        color: color(trace),
+                        points: trace.evidence.powerSeries.map((p) => ({
+                          x: p.seconds,
+                          y: p.watts,
                         })),
                       },
                     ]}
-                  />
-                </span>
-                <span className="export-only hidden">{TIER_LABELS[state.tier][locale]}</span>
-              </span>
-              <span className="flex flex-wrap items-center gap-1">
-                {s.badges}:
-                {hardwareKeys.map((key) => (
-                  <span
-                    key={key}
-                    className="rounded border px-1.5 py-0.5 tabular-nums"
-                    data-testid="video-tco-badge"
-                  >
-                    {HW_REGISTRY[key]?.badgeLabel ?? hardwareLabel(key)}{' '}
-                    {costPerGpuHour(key, state.tier)?.toFixed(2) ?? '—'}
-                  </span>
-                ))}
-              </span>
-              <span>
-                {s.apiReference}: {formatApiPrice(state.apiPrice)}/video-s (
-                {H3_API_REFERENCE.capturedOn})
-              </span>
-              <span>
-                {s.source}:{' '}
-                <a
-                  className="underline underline-offset-2"
-                  href={TCO_SOURCE_URL}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {TCO_SOURCE_TITLE}
-                </a>
-              </span>
-            </div>
-            {idle.length > 0 && (
-              <p className="mt-1 text-xs text-muted-foreground" data-testid="video-idle-note">
-                {s.idle(idle.join(locale === 'zh' ? '、' : ', '))}
-              </p>
-            )}
-          </div>
-          {replay && (
-            <p className="text-xs text-muted-foreground" role="status" data-testid="video-replay">
-              {s.replay}
-            </p>
-          )}
-          {loading && (
-            <p role="status" className="text-sm text-muted-foreground">
-              {s.loading}
-            </p>
-          )}
-          {error && (
-            <div role="alert" className="flex flex-wrap items-center gap-3 text-sm">
-              <p>
-                {s.error}: {error}
-              </p>
-              <Button variant="outline" size="sm" onClick={retry}>
-                {s.retry}
-              </Button>
-            </div>
-          )}
-          {!loading && !error && (
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
-              <div className="min-w-0">
-                {state.view === 'chart' ? (
-                  <VideoHardwareChart
-                    points={cells}
-                    state={state}
-                    colorFor={colorFor}
-                    hidden={hidden}
-                    onSelect={(p: VideoPoint) =>
-                      track('video_point_selected', { gpu: p.hardwareKey ?? '', run: p.runId })
-                    }
+                    label={s.trace}
+                    xLabel={s.time}
+                    yLabel="W"
                   />
                 ) : (
-                  <VideoPointsTable points={cells} state={state} hidden={hidden} />
+                  <Empty s={s} />
                 )}
               </div>
-              <div data-testid="video-legend">
-                <ChartLegend
-                  variant="sidebar"
-                  legendItems={legendItems}
-                  isLegendExpanded={legendExpanded}
-                  onExpandedChange={setLegendExpanded}
-                  disableActiveSort
-                  switches={[
+            </Item>
+            <Item title={s.power}>
+              {barChart(
+                s.power,
+                'W',
+                (c) => c.point.avgPowerW,
+                (c) => c.evidence?.peakPowerW ?? null,
+                s.peak,
+              )}
+            </Item>
+            <Item title={s.memory}>
+              {barChart(s.memory, 'MiB', (c) => c.evidence?.gpuMemoryMiB ?? null)}
+            </Item>
+            <Item title={s.joules} wide>
+              <SegmentedToggle
+                role="group"
+                value={energyBasis}
+                options={(['clip', 'frame'] as const).map((value) => ({
+                  value,
+                  label: `J / ${value}`,
+                }))}
+                onValueChange={(value) => {
+                  setEnergyBasis(value);
+                  track('video_results_energy_basis_changed', { basis: value });
+                }}
+                ariaLabel={s.energyBasis}
+              />
+              {barChart(s.joules, `J/${energyBasis}`, (c) =>
+                energyBasis === 'clip' ? c.joulesPerClip : c.joulesPerFrame,
+              )}
+            </Item>
+            <Item title={s.host} state={s.planned} note={s.hostNote}>
+              <Empty s={s} kind="planned" />
+            </Item>
+          </Group>
+          <Group id="cost" title={s.cost}>
+            <Item title={s.costMetrics} wide note={s.costNote}>
+              <div className="flex max-w-80 flex-col gap-1.5">
+                <Label htmlFor="results-cost-tier">{s.tier}</Label>
+                <SearchableSelect
+                  triggerId="results-cost-tier"
+                  triggerTestId="results-cost-tier"
+                  value={state.costTier}
+                  onValueChange={(value) => update({ costTier: value as 'h' | 'r' })}
+                  groups={[
                     {
-                      id: 'video-optimal-only',
-                      label: s.optimalOnly,
-                      checked: state.optimal,
-                      infoTooltip: s.optimalInfo,
-                      onCheckedChange: (checked) => {
-                        update({ optimal: checked });
-                        track('video_optimal_toggled', { enabled: checked });
-                      },
+                      label: '',
+                      options: COST_TIERS.map((tier) => ({
+                        value: tier,
+                        label: TIER_LABELS[tier][locale],
+                      })),
                     },
                   ]}
+                  placeholder={s.tier}
+                  searchable={false}
                 />
               </div>
-            </div>
-          )}
+              <Table
+                testId="results-cost-table"
+                head={[s.hardware, s.basis, 'GPU', s.perVideo, s.perSecond, '$/GPU-hr']}
+              >
+                {representatives.length > 0
+                  ? representatives.flatMap((c) =>
+                      (['participating', 'allocated'] as const).map((b) => (
+                        <tr
+                          key={`${c.point.id}-${b}`}
+                          data-hardware={c.point.hardwareKey}
+                          data-basis={b}
+                          data-overlay={c.overlay}
+                        >
+                          <td>{cellLabel(c)}</td>
+                          <td>{s[b]}</td>
+                          <td>{n(c.point[b], 0)}</td>
+                          <td data-value={c.cost[b]?.perVideo}>{n(c.cost[b]?.perVideo, 4)}</td>
+                          <td data-value={c.cost[b]?.perVideoSecond}>
+                            {n(c.cost[b]?.perVideoSecond, 4)}
+                          </td>
+                          <td>{n(costPerGpuHour(c.point.hardwareKey ?? '', state.costTier), 2)}</td>
+                        </tr>
+                      )),
+                    )
+                  : noRows}
+              </Table>
+            </Item>
+            <Item title={s.estimator} wide note={`${s.priceDetail} ${s.profitNote}`}>
+              <p className="text-xs text-muted-foreground">{s.priceNote}</p>
+              <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                {(['t2v', 'i2v', 'r2v'] as VideoMode[]).map((mode) => (
+                  <div key={mode} className="flex min-w-0 flex-col gap-1.5">
+                    <Label htmlFor={`results-price-${mode}`}>
+                      {s.price} · {mode.toUpperCase()}
+                    </Label>
+                    <Input
+                      id={`results-price-${mode}`}
+                      type="number"
+                      min="0"
+                      step="0.005"
+                      placeholder="—"
+                      value={state.apiPrices[mode] ?? ''}
+                      data-testid={`results-price-${mode}`}
+                      onChange={(e) => {
+                        const value = e.target.value === '' ? null : e.target.valueAsNumber;
+                        if (value === null || (Number.isFinite(value) && value >= 0))
+                          update({ apiPrices: { ...state.apiPrices, [mode]: value } });
+                      }}
+                    />
+                  </div>
+                ))}
+                <div className="flex min-w-0 flex-col gap-1.5">
+                  <Label htmlFor="results-utilization">
+                    {s.utilization} · {n(state.utilization * 100, 0)}%
+                  </Label>
+                  <input
+                    id="results-utilization"
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="5"
+                    value={state.utilization * 100}
+                    data-testid="results-utilization"
+                    onChange={(e) => update({ utilization: Number(e.target.value) / 100 })}
+                  />
+                </div>
+              </div>
+              <div data-testid="results-profit">
+                {barChart(
+                  s.estimator,
+                  '$/GPU-hr',
+                  (c) => c.profit.participating?.profitPerGpuHour ?? null,
+                  (c) => c.profit.allocated?.profitPerGpuHour ?? null,
+                  s.allocated,
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {s.participating} · {s.allocated}
+              </p>
+            </Item>
+          </Group>
+          <Group id="quality" title={s.quality}>
+            <Item title={s.pixel}>
+              <a
+                href="#comparison-clips"
+                className="text-sm underline"
+                onClick={() => track('video_results_quality_clips_opened', { metric: 'psnr' })}
+              >
+                {s.perClipPsnr}
+              </a>
+              <Empty s={s} kind="planned" note={s.ssim} />
+            </Item>
+            <Item title={s.semantic} state={s.planned}>
+              <Empty s={s} kind="planned" />
+            </Item>
+            <Item title={s.human} wide>
+              <details
+                className="text-xs text-muted-foreground"
+                onToggle={(event) =>
+                  track('video_results_rating_schema_toggled', {
+                    enabled: event.currentTarget.open,
+                  })
+                }
+              >
+                <summary className="cursor-pointer">{s.schemaEmpty}</summary>
+                <ResultsRatingSchema labels={s.dimensions} label={s.schemaEmpty} />
+              </details>
+            </Item>
+          </Group>
+          <Group id="stability" title={s.stability}>
+            <Item title={s.failures} wide>
+              <Table head={[s.hardware, s.timeout, s.oom, s.engineError, s.transport, s.other]}>
+                {representatives.length > 0
+                  ? tableRows((c) => [
+                      c.evidence?.failures?.timeout,
+                      c.evidence?.failures?.oom,
+                      c.evidence?.failures?.engine,
+                      c.evidence?.failures?.transport,
+                      c.evidence?.failures?.other,
+                    ])
+                  : noRows}
+              </Table>
+            </Item>
+            <Item title={s.sustained} wide state={s.planned}>
+              <Empty s={s} kind="planned" />
+            </Item>
+          </Group>
+          <Group id="startup" title={s.startup}>
+            <Item title={s.load} state={s.planned}>
+              <Empty s={s} kind="planned" />
+            </Item>
+            <Item title={s.warmup} note={s.warmupNote}>
+              {barChart(s.warmup, 's', (c) => c.evidence?.warmupSeconds ?? null)}
+            </Item>
+            <Item title={s.first} state={s.planned}>
+              <Empty s={s} kind="planned" />
+            </Item>
+            <Item title={s.switch} state={s.planned}>
+              <Empty s={s} kind="planned" />
+            </Item>
+          </Group>
+          <Group id="deploy" title={s.deploy}>
+            <Item title={s.topology} state={s.planned}>
+              <Empty s={s} kind="planned" />
+            </Item>
+            <Item title={s.pareto} wide note={s.paretoNote}>
+              {deploymentCells.some(
+                (c) =>
+                  c.point.p50 !== null &&
+                  metricValue(c.point, 'videosPerGpuHour', { tier: state.costTier }) !== null,
+              ) ? (
+                <ResultsPareto
+                  label={s.pareto}
+                  xLabel="P50 (s)"
+                  yLabel="clips/GPU-hr"
+                  series={roster
+                    .filter((key) => !hidden.has(key))
+                    .flatMap((key) =>
+                      [false, true].map((overlay) => ({
+                        key: overlay ? `${key}-overlay` : key,
+                        label: hardwareLabel(key),
+                        color: overlay ? overlayRunColor(0) : colorFor(key),
+                        points: deploymentCells
+                          .filter((c) => c.point.hardwareKey === key && c.overlay === overlay)
+                          .flatMap((c) => {
+                            const y = metricValue(c.point, 'videosPerGpuHour', {
+                              tier: state.costTier,
+                            });
+                            return c.point.p50 === null || y === null
+                              ? []
+                              : [{ x: c.point.p50, y }];
+                          }),
+                      })),
+                    )}
+                />
+              ) : (
+                <Empty s={s} />
+              )}
+            </Item>
+          </Group>
+          <details
+            className="mt-9 rounded border p-4"
+            open={historyOpen}
+            onToggle={(e) => {
+              const open = e.currentTarget.open;
+              if (open !== historyOpen) {
+                setHistoryOpen(open);
+                track('video_results_history_toggled', { enabled: open });
+              }
+            }}
+          >
+            <summary className="cursor-pointer text-sm font-medium">{s.history}</summary>
+            <p className="my-3 text-xs text-muted-foreground">{s.historyNote}</p>
+            {historyOpen && <VideoHistory />}
+          </details>
+          <footer className="mt-9 flex flex-wrap justify-end gap-3 border-t py-5 text-xs text-muted-foreground">
+            <a
+              className="underline"
+              href={`${apiUrl}&format=csv`}
+              download="videogenx-results.csv"
+              onClick={() => track('video_results_csv_downloaded')}
+            >
+              {s.csv}
+            </a>
+            <a
+              className="underline"
+              href={apiUrl}
+              onClick={() => track('video_results_api_opened')}
+            >
+              {s.sources} · {s.api}
+            </a>
+          </footer>
         </div>
-      </ChartSection>
-      <VideoKpiCards points={cells} state={state} colorFor={colorFor} loading={loading} />
-      {/* These mount after the first fetch resolves, so the deep-link flag read on mount is settled. */}
-      {!loading && !error && (
-        <>
-          <CollapsibleSection
-            title={s.compare}
-            toggleLabel={s.toggleCompare}
-            defaultOpen={compareOpen}
-            titleWhenOpen={false}
-            testId="video-compare-toggle"
-            onToggle={(enabled) => track('video_compare_section_toggled', { enabled })}
-          >
-            <VideoCompare points={cells} options={options} colorFor={colorFor} />
-          </CollapsibleSection>
-          <CollapsibleSection
-            title={s.evidence}
-            toggleLabel={s.toggleEvidence}
-            defaultOpen={false}
-            titleWhenOpen={false}
-            testId="video-evidence-toggle"
-            onToggle={(enabled) => track('video_evidence_section_toggled', { enabled })}
-          >
-            <VideoEvidence points={cells} colorFor={colorFor} />
-          </CollapsibleSection>
-        </>
-      )}
-      <details
-        className="rounded-xl border px-4 py-3"
-        data-testid="video-history-section"
-        open={historyOpen}
-        onToggle={(event) => {
-          const open = event.currentTarget.open;
-          if (open === historyOpen) return;
-          setHistoryOpen(open);
-          track('video_history_section_toggled', { enabled: open });
-        }}
-      >
-        <summary className="cursor-pointer text-sm font-medium">
-          {s.history}
-          <span className="ml-2 font-normal text-muted-foreground">{s.historyHint}</span>
-        </summary>
-        <div className="mt-3">{historyOpen && <VideoHistory />}</div>
-      </details>
+      </div>
     </div>
   );
 }

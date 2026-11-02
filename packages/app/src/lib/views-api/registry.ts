@@ -1,3 +1,5 @@
+import { RESULTS_QUERY_PARAMS } from '@/components/video-benchmark/results';
+
 /**
  * Public query allowlists shared by handlers, OpenAPI and coverage tests.
  * Update the matching view docs and skills reference with every selector change.
@@ -237,10 +239,12 @@ export const VIEW_QUERY_PARAMS = {
   reliability: ['asOf', 'format', 'gpus', 'range'],
   submissions: ['direction', 'limit', 'lines', 'mode', 'offset', 'onChangeOnly', 'search', 'sort'],
   video: [
+    ...RESULTS_QUERY_PARAMS,
     'artifact',
     'cell',
     'compare',
     'costs',
+    'format',
     'gpuBasis',
     'page',
     'phase',

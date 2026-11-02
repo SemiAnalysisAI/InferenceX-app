@@ -1,0 +1,112 @@
+.page {
+  --results-rule: color-mix(in srgb, var(--muted-foreground) 25%, transparent);
+}
+.filters {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.workloadFilter {
+  grid-column: 1 / -1;
+}
+.body {
+  margin-top: 16px;
+}
+.content {
+  min-width: 0;
+}
+.group {
+  border-top: 1px solid var(--results-rule);
+  margin-top: 36px;
+  padding-top: 14px;
+  scroll-margin-top: 24px;
+}
+.items {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px 28px;
+}
+.item {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.wide {
+  grid-column: 1/-1;
+}
+.empty {
+  min-height: 60px;
+  display: grid;
+  place-content: center;
+  gap: 6px;
+  text-align: center;
+  padding: 10px 14px;
+  border: 1px dashed var(--results-rule);
+  color: var(--muted-foreground);
+  background: repeating-linear-gradient(
+    135deg,
+    transparent 0 7px,
+    color-mix(in srgb, var(--muted-foreground) 8%, transparent) 7px 9px
+  );
+}
+.scroll {
+  max-width: 100%;
+  overflow: auto;
+}
+.table {
+  border-collapse: collapse;
+  width: 100%;
+  font-variant-numeric: tabular-nums;
+}
+.table th,
+.table td {
+  text-align: left;
+  padding: 7px 14px 7px 0;
+  border-bottom: 1px solid var(--results-rule);
+  white-space: nowrap;
+}
+.table th {
+  color: var(--muted-foreground);
+  font-weight: 500;
+}
+.table td:last-child,
+.table th:last-child {
+  padding-right: 0;
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+.legend label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  cursor: pointer;
+}
+.legend input {
+  accent-color: var(--primary);
+}
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+@media (min-width: 1024px) {
+  .filters {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1.7fr) minmax(0, 1fr) minmax(
+        0,
+        1fr
+      );
+  }
+  .workloadFilter {
+    grid-column: auto;
+  }
+}
+@media (max-width: 767px) {
+  .items {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

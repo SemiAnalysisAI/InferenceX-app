@@ -9,6 +9,7 @@ import {
 } from '@semianalysisai/inferencex-constants';
 import { getGithubToken } from '@/lib/github/github-artifacts';
 import { loadFixture } from '@/lib/testing/test-fixtures';
+import { localVideoReplayResponse } from '@/lib/testing/video-replay';
 import { bearerMatches } from '@/lib/api/bearer-auth';
 import type { VideoHistoryPage } from '@/components/video-benchmark/history';
 import {
@@ -71,6 +72,9 @@ export async function GET(request: NextRequest) {
       { error: 'Invalid CI run, artifact or page' },
       { status: 400, headers },
     );
+  const localReplay = await localVideoReplayResponse(request);
+  if (localReplay) return localReplay;
+  if (query.get('format') === 'replay-asset') return new Response(null, { status: 404, headers });
   if (history && process.env.NODE_ENV === 'development' && process.env.E2E_FIXTURES === '1') {
     const fixture = loadFixture<VideoHistoryPage>('video-history');
     return NextResponse.json(

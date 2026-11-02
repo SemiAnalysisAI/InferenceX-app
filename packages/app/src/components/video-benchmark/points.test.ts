@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { VideoHistoryObservation, VideoHistoryPage } from './history';
-import { dashboardCells, latestVideoCells, videoPoints } from './points';
+import { dashboardCells, latestVideoCells, namedRunPoints, videoPoints } from './points';
 
 const observation: VideoHistoryObservation = {
   id: 'sha:c1',
@@ -89,6 +89,36 @@ const page: VideoHistoryPage = {
 };
 
 describe('videoPoints', () => {
+  it.each([true, false, undefined])(
+    'preserves approval %s and provenance for one exact named run',
+    (approved) => {
+      const history = structuredClone(page);
+      for (const entry of history.entries) entry.approved = approved;
+      const other = structuredClone(history.entries[0]);
+      other.runId = '999';
+      for (const item of other.sources)
+        for (const row of item.observations) row.id = `other:${row.id}`;
+      history.entries.unshift(other);
+      const named = namedRunPoints([history], '34342452354');
+      expect(named.map((point) => point.id)).toEqual(['sha:c1', 'sha:c2']);
+      expect(named[0]).toMatchObject({
+        approved,
+        runId: '34342452354',
+        artifactId: 10107476604,
+        p50: 150.6,
+        publishedAt: '2026-09-10T00:00:00Z',
+      });
+      if (approved !== true) expect(videoPoints([history])).toEqual([]);
+    },
+  );
+
+  it.each([null, '', '0', '-1', '01', '1,2', 'abc', '99999999999999999'])(
+    'rejects invalid named run %s',
+    (run) => {
+      expect(namedRunPoints([page], run)).toEqual([]);
+    },
+  );
+
   it('keeps a legacy stored source in History without turning it into an official chart point', () => {
     const legacy = structuredClone(page);
     delete legacy.entries[0].approved;
