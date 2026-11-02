@@ -18,8 +18,9 @@ export function ModelArchitectureInfoLink({
   locale: 'en' | 'zh';
 }) {
   const entry = getModelSlugEntryForDisplayName(model);
-  if (!entry) return null;
   const arch = getModelArchitecture(model);
+  // Pending model registrations have routes but no sourced architecture article.
+  if (!entry || !arch) return null;
   const label = getModelLabel(model);
   const text =
     locale === 'zh' ? `了解 ${label} 模型架构` : `Learn more about the ${label} architecture`;

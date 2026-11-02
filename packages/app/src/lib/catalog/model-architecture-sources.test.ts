@@ -8,10 +8,17 @@ const links = (raw: string) => (raw.match(/https?:\/\/[^\s)]+/gu) ?? []).sort();
 
 describe('architecture parity with published checkpoint configs', () => {
   it('covers every public model in the upstream evidence and every canonical model page', () => {
-    expect(fixtures.models.map(({ model }) => model).sort()).toEqual([...MODEL_OPTIONS].sort());
-    expect(getModelPageSlugs().sort()).toEqual(COMPARE_MODEL_SLUGS.map(({ slug }) => slug).sort());
-    for (const model of Object.values(Model))
-      expect(getModelArchitecture(model), model).toBeDefined();
+    const sourcedModels = MODEL_OPTIONS.filter((model) => model !== Model.GLM_5_3_Flash);
+    expect(fixtures.models.map(({ model }) => model).sort()).toEqual(sourcedModels.sort());
+    expect(getModelPageSlugs().sort()).toEqual(
+      COMPARE_MODEL_SLUGS.filter(({ slug }) => slug !== 'glm-5-3-flash')
+        .map(({ slug }) => slug)
+        .sort(),
+    );
+    for (const model of sourcedModels) expect(getModelArchitecture(model), model).toBeDefined();
+    // Pending registration does not justify borrowing GLM-5.3 architecture or prose.
+    expect(getModelArchitecture(Model.GLM_5_3_Flash)).toBeUndefined();
+    expect(getModelPage('glm-5-3-flash')).toBeNull();
   });
 
   it.each(fixtures.models)(

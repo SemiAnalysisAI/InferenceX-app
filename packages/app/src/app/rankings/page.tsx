@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card';
 import { CatalogLinkCard } from '@/components/catalog/catalog-link-card';
 import { enAlternates } from '@/lib/i18n/i18n';
 import { socialMetadata } from '@/lib/seo/social-metadata';
-import { INFERENCE_MODEL_SLUGS } from '@/lib/routing/inference-model-slug';
+import { PUBLIC_INFERENCE_MODEL_SLUGS } from '@/lib/routing/inference-model-slug';
 import { getAllRankingPageEntries } from '@/lib/live-seo/rankings';
 
 const title = 'GPU Rankings for LLM Inference';
@@ -72,7 +72,7 @@ export default function RankingsIndexPage() {
           </header>
 
           <section className="mt-10 mb-16 grid gap-4 sm:grid-cols-2">
-            {INFERENCE_MODEL_SLUGS.map((model) => (
+            {PUBLIC_INFERENCE_MODEL_SLUGS.map((model) => (
               <Card key={model.slug} className="gap-0 p-5">
                 <h2 className="text-lg font-semibold tracking-tight">{model.seoName}</h2>
                 <ul className="mt-4 space-y-2">

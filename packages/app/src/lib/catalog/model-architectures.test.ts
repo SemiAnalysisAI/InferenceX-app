@@ -22,9 +22,10 @@ import {
 } from './model-architectures';
 
 describe('MODEL_RELEASE_DATES coverage', () => {
-  it('has a sourced release date for every supported model', () => {
+  it('leaves the unverified GLM-5.3-Flash release date unknown', () => {
     const missing = MODEL_OPTIONS.filter((model) => !getModelReleaseDate(model));
-    expect(missing).toEqual([]);
+    expect(missing).toEqual([Model.GLM_5_3_Flash]);
+    expect(getModelArchitecture(Model.GLM_5_3_Flash)).toBeUndefined();
   });
 
   it('anchors each model to its weights publication, not its first sweep', () => {

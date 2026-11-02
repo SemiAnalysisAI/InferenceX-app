@@ -50,6 +50,16 @@ describe('model selector ordering', () => {
 });
 
 describe('getModelAndSequence', () => {
+  it.each(['fp8', 'fp4', 'nvfp4'])(
+    'keeps Flash %s artifacts out of the older GLM buckets',
+    (precision) => {
+      expect(getModelAndSequence(`bmk_glm5.3flash_agentic_${precision}_sglang`)).toEqual({
+        model: Model.GLM_5_3_Flash,
+        sequence: Sequence.AgenticTraces,
+      });
+    },
+  );
+
   it('parses artifact name with 70b model and 1k1k sequence', () => {
     const result = getModelAndSequence('results_70b_1k1k_fp8');
     expect(result).toEqual({ model: Model.Llama3_3_70B, sequence: Sequence.OneK_OneK });
@@ -401,7 +411,7 @@ describe('getModelLabel', () => {
 describe('getOpenRouterModelId', () => {
   it('maps catalog models to exact OpenRouter ids without inventing one for Muse', () => {
     for (const model of MODEL_OPTIONS) {
-      if (model === Model.Muse_Spark_Open) {
+      if (model === Model.Muse_Spark_Open || model === Model.GLM_5_3_Flash) {
         expect(getOpenRouterModelId(model)).toBeNull();
         continue;
       }
@@ -456,11 +466,9 @@ describe('getEvalBenchmarkLabel', () => {
 });
 
 describe('isSequenceHiddenForModel', () => {
-  it('only offers AgentX for Muse Spark Open', () => {
+  it.each([Model.Muse_Spark_Open, Model.GLM_5_3_Flash])('only offers AgentX for %s', (model) => {
     expect(
-      SEQUENCE_OPTIONS.filter(
-        (sequence) => !isSequenceHiddenForModel(Model.Muse_Spark_Open, sequence),
-      ),
+      SEQUENCE_OPTIONS.filter((sequence) => !isSequenceHiddenForModel(model, sequence)),
     ).toEqual([Sequence.AgenticTraces]);
   });
   it('hides 8K/1K for GLM-5.2 / GLM-5.3 and keeps Agentic coding', () => {

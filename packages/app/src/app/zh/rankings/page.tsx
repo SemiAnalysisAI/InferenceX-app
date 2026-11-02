@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card';
 import { CatalogLinkCard } from '@/components/catalog/catalog-link-card';
 import { ZH_LANG_TAG, zhAlternates } from '@/lib/i18n/i18n';
 import { socialMetadata } from '@/lib/seo/social-metadata';
-import { INFERENCE_MODEL_SLUGS } from '@/lib/routing/inference-model-slug';
+import { PUBLIC_INFERENCE_MODEL_SLUGS } from '@/lib/routing/inference-model-slug';
 import { getAllRankingPageEntries } from '@/lib/live-seo/rankings';
 import { rankingPageHeadingZh } from '@/lib/live-seo/rankings-zh';
 
@@ -70,7 +70,7 @@ export default function ZhRankingsIndexPage() {
           </header>
 
           <section className="mt-10 mb-16 grid gap-4 sm:grid-cols-2">
-            {INFERENCE_MODEL_SLUGS.map((model) => (
+            {PUBLIC_INFERENCE_MODEL_SLUGS.map((model) => (
               <Card key={model.slug} className="gap-0 p-5">
                 <h2 className="text-lg font-semibold tracking-tight">{model.seoName}</h2>
                 <ul className="mt-4 space-y-2">

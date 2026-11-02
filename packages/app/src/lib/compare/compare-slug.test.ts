@@ -264,6 +264,7 @@ describe('compareModelDisplayLabel', () => {
 
 describe('compareModelSeoName', () => {
   const EXPECTED: Record<string, string> = {
+    'glm-5-3-flash': 'GLM-5.3-Flash',
     'muse-spark-open': 'Muse Spark Open',
     'deepseek-v4': 'DeepSeek V4 Pro',
     'deepseek-v41-flash': 'DeepSeek V4.1 Flash',

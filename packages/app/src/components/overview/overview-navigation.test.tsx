@@ -420,26 +420,26 @@ describe('OverviewNavigationProvider', () => {
     expect(readProbe('reference')).toBe('b300');
   });
 
-  it('requests a narrowed matrix for each row scope instead of reusing the full one', () => {
+  it('loads full history rows before applying UI visibility and row scope', () => {
     deferredFetch();
 
     window.history.replaceState({}, '', '/overview?compare=30d');
     renderProvider(pageData(50), '/overview?compare=30d');
     act(() => selectRowScope?.());
 
-    expect(fetch).toHaveBeenCalledWith('/api/v1/overview?compare=30d&rows=changed', {
+    expect(fetch).toHaveBeenCalledWith('/api/v1/overview?compare=30d', {
       headers: { Accept: 'application/json' },
     });
     expect(readProbe('pending')).toBe('pending');
   });
 
-  it('requests a narrowed matrix for the hardware row scope', () => {
+  it('loads full hardware rows before applying UI visibility and row scope', () => {
     deferredFetch();
 
     renderProvider(pageData(50), '/overview');
     act(() => selectHardwareRowScope?.());
 
-    expect(fetch).toHaveBeenCalledWith('/api/v1/overview?hwrows=priced', {
+    expect(fetch).toHaveBeenCalledWith('/api/v1/overview', {
       headers: { Accept: 'application/json' },
     });
     expect(readProbe('pending')).toBe('pending');

@@ -167,6 +167,37 @@ function textRect(element: Element) {
 }
 
 describe('Overview page', () => {
+  for (const locale of ['', '/zh']) {
+    it(`gates the Flash matrix row through unlock, reload, and relock in ${locale || 'en'}`, () => {
+      cy.viewport(1280, 900);
+      cy.visit(`${locale}/overview`, {
+        onBeforeLoad(win) {
+          win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
+        },
+      });
+      cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS);
+      desktopModel('GLM-5.3-Flash', AGENTX).should('not.exist');
+      cy.window().then((win) => {
+        win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
+        win.dispatchEvent(new win.Event('inferencex:feature-gate:unlocked'));
+      });
+      cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS + 1);
+      desktopModel('GLM-5.3-Flash', AGENTX)
+        .should('contain.text', 'GLM 5.3 Flash')
+        .find('[data-testid="overview-platform"]')
+        .should('have.length', 5);
+      cy.reload();
+      cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS + 1);
+      desktopModel('GLM-5.3-Flash', AGENTX).scrollIntoView().should('be.visible');
+      cy.window().then((win) => {
+        win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
+        win.dispatchEvent(new win.Event('inferencex:feature-gate:locked'));
+      });
+      cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS);
+      desktopModel('GLM-5.3-Flash', AGENTX).should('not.exist');
+    });
+  }
+
   it('updates selectors through cached overview JSON without an RSC round trip', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
@@ -870,6 +901,32 @@ describe('Overview page', () => {
             .should('contain.text', 'Show all rows')
             .and('contain.text', String(hidden))
             .and('have.attr', 'aria-label', `Show ${hidden} rows with ${sentence}`);
+          cy.window().then((win) => {
+            win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
+            win.dispatchEvent(new win.Event('inferencex:feature-gate:unlocked'));
+          });
+          cy.get(`a[${attribute}]`).should(
+            'have.attr',
+            'aria-label',
+            `Show ${hidden + 1} rows with ${sentence}`,
+          );
+          cy.get('[data-testid="overview-desktop-model"]').should(
+            'have.length',
+            MATRIX_ROWS - hidden,
+          );
+          cy.window().then((win) => {
+            win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
+            win.dispatchEvent(new win.Event('inferencex:feature-gate:locked'));
+          });
+          cy.get(`a[${attribute}]`)
+            .should('have.attr', 'aria-label', `Show ${hidden} rows with ${sentence}`)
+            .click();
+          cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS);
+          cy.get(`a[${attribute}]`).should(
+            'have.attr',
+            'aria-label',
+            `Hide ${hidden} rows with ${sentence}`,
+          );
         });
     }
   });
@@ -1041,7 +1098,7 @@ describe('Overview page', () => {
     });
   });
 
-  it('renders the full platform matrix for every active model', () => {
+  it('renders the full platform matrix for every publicly visible active model', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
 
