@@ -919,13 +919,16 @@ describe('CollectiveX kv-transfer card', () => {
   });
 });
 
-/** The page description and the section heading set the vLLM function name in monospace. */
+/** The page description and the section heading set the vLLM function name as inline code. */
 function shouldShowSwapBlocksAsCode() {
   for (const scope of ['collectivex-description', 'collectivex-swap-section']) {
-    cy.get(`[data-testid="${scope}"] code`)
-      .should('have.text', 'swap_blocks')
-      .and('have.css', 'font-family')
+    cy.get(`[data-testid="${scope}"] code`).as('code').should('have.text', 'swap_blocks');
+    cy.get('@code')
+      .should('have.css', 'font-family')
       .and('match', /monospace/u);
+    cy.get('@code')
+      .should('have.css', 'background-color')
+      .and('not.be.oneOf', ['transparent', 'rgba(0, 0, 0, 0)']);
   }
   cy.get('[data-testid="collectivex-swap-section"] h2').should('have.text', 'vLLM swap_blocks');
 }

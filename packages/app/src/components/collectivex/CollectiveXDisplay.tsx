@@ -25,7 +25,7 @@ import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 import { CollectiveXChart } from './CollectiveXChart';
-import { CollectiveXSwapSection } from './CollectiveXSwapSection';
+import { CollectiveXSwapSection, SwapBlocksName } from './CollectiveXSwapSection';
 import { CollectiveXKvSection } from './CollectiveXKvSection';
 import { CollectiveXChangelog } from './CollectiveXChangelog';
 import { CollectiveXSupportMatrices } from './CollectiveXSupportMatrices';
@@ -106,8 +106,8 @@ const STRINGS = {
     retry: 'Retry',
     description: (
       <>
-        Compare EP communication, KV-cache transfer, and vLLM{' '}
-        <code className="font-mono">swap_blocks</code> latency and payload bandwidth.
+        Compare EP communication, KV-cache transfer, and vLLM <SwapBlocksName /> latency and payload
+        bandwidth.
       </>
     ),
     source: 'Source',
@@ -191,8 +191,7 @@ const STRINGS = {
     retry: '重试',
     description: (
       <>
-        对比 EP 通信、KV 缓存传输及 vLLM <code className="font-mono">swap_blocks</code>{' '}
-        的延迟与有效载荷带宽。
+        对比 EP 通信、KV 缓存传输及 vLLM <SwapBlocksName /> 的延迟与有效载荷带宽。
       </>
     ),
     source: '源代码',

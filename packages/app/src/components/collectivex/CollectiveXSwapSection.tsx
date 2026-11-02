@@ -17,11 +17,16 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import { collectiveXRunDasharray } from './data';
 import { formatSwapBytes, swapChartPoints, swapRooflines, type SwapChartPoint } from './swap-data';
 
+/** vLLM's function name, set as inline code: monospace on a gray chip. */
+export function SwapBlocksName() {
+  return <code className="rounded bg-muted px-1 py-0.5 font-mono">swap_blocks</code>;
+}
+
 const STRINGS = {
   en: {
     heading: (
       <>
-        vLLM <code className="font-mono">swap_blocks</code>
+        vLLM <SwapBlocksName />
       </>
     ),
     metric: 'Swap-block metric',
@@ -53,7 +58,7 @@ const STRINGS = {
   zh: {
     heading: (
       <>
-        vLLM <code className="font-mono">swap_blocks</code>
+        vLLM <SwapBlocksName />
       </>
     ),
     metric: '块交换指标',
