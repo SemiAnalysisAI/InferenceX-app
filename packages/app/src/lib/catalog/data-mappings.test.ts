@@ -40,6 +40,7 @@ describe('model selector ordering', () => {
       Model.GLM_5,
       Model.Qwen3_8_27B,
       Model.Qwen3_8_27B_Eager,
+      Model.MiMo_V2_6_Flash,
       Model.GptOss,
       Model.MiniMax_M2_5,
       Model.Llama3_3_70B,
@@ -55,6 +56,16 @@ describe('getModelAndSequence', () => {
     (precision) => {
       expect(getModelAndSequence(`bmk_glm5.3flash_agentic_${precision}_sglang`)).toEqual({
         model: Model.GLM_5_3_Flash,
+        sequence: Sequence.AgenticTraces,
+      });
+    },
+  );
+
+  it.each(['sglang', 'vllm'])(
+    'maps MiMo V2.6 Flash %s AgentX artifacts to their own model',
+    (engine) => {
+      expect(getModelAndSequence(`bmk_mimov2.6flash_agentic_fp4_${engine}`)).toEqual({
+        model: Model.MiMo_V2_6_Flash,
         sequence: Sequence.AgenticTraces,
       });
     },
@@ -466,11 +477,14 @@ describe('getEvalBenchmarkLabel', () => {
 });
 
 describe('isSequenceHiddenForModel', () => {
-  it.each([Model.Muse_Spark_Open, Model.GLM_5_3_Flash])('only offers AgentX for %s', (model) => {
-    expect(
-      SEQUENCE_OPTIONS.filter((sequence) => !isSequenceHiddenForModel(model, sequence)),
-    ).toEqual([Sequence.AgenticTraces]);
-  });
+  it.each([Model.Muse_Spark_Open, Model.GLM_5_3_Flash, Model.MiMo_V2_6_Flash])(
+    'only offers AgentX for %s',
+    (model) => {
+      expect(
+        SEQUENCE_OPTIONS.filter((sequence) => !isSequenceHiddenForModel(model, sequence)),
+      ).toEqual([Sequence.AgenticTraces]);
+    },
+  );
   it('hides 8K/1K for GLM-5.2 / GLM-5.3 and keeps Agentic coding', () => {
     expect(isSequenceHiddenForModel(Model.GLM_5_2, Sequence.EightK_OneK)).toBe(true);
     expect(isSequenceHiddenForModel(Model.GLM_5_2, Sequence.AgenticTraces)).toBe(false);

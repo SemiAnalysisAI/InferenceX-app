@@ -22,6 +22,7 @@ export enum Model {
   DeepSeek_V4_Pro = 'DeepSeek-V4-Pro',
   DeepSeek_V4_1_Flash = 'DeepSeek-V4.1-Flash',
   Muse_Spark_Open = 'Muse-Spark-Open',
+  MiMo_V2_6_Flash = 'MiMo-V2.6-Flash',
 }
 
 export type CategoryTag = 'default' | 'experimental' | 'maintenance' | 'deprecated' | 'hidden';
@@ -180,6 +181,13 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     category: 'experimental',
     openRouterModelId: 'qwen/qwen3.8-27b',
     logo: 'qwen-color.svg',
+  },
+  [Model.MiMo_V2_6_Flash]: {
+    label: 'MiMo V2.6 Flash 309B',
+    prefix: 'mimov2.6flash',
+    category: 'experimental',
+    openRouterModelId: 'xiaomi/mimo-v2.6-flash',
+    logo: 'xiaomimimo.svg',
   },
   [Model.GptOss]: {
     label: 'gpt-oss 120B',
@@ -451,6 +459,9 @@ const MODEL_HIDDEN_SEQUENCES: Partial<Record<Model, ReadonlySet<Sequence>>> = {
     SEQUENCE_OPTIONS.filter((sequence) => sequence !== Sequence.AgenticTraces),
   ),
   [Model.Muse_Spark_Open]: new Set(
+    SEQUENCE_OPTIONS.filter((sequence) => sequence !== Sequence.AgenticTraces),
+  ),
+  [Model.MiMo_V2_6_Flash]: new Set(
     SEQUENCE_OPTIONS.filter((sequence) => sequence !== Sequence.AgenticTraces),
   ),
   [Model.GLM_5_2]: new Set([Sequence.EightK_OneK]),

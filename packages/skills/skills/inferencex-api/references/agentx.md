@@ -84,6 +84,15 @@ drafter, which the API reports as spec method `mtp`. Use
 `model=MiniMax-M3.1-Flash` for benchmark reads and the inference view API, with
 `sequence=agentic-traces` for the latter. Its rows never fall back to `MiniMax-M3`.
 
+MiMo V2.6 Flash uses display model `MiMo-V2.6-Flash`, raw DB key `mimov2.6flash`,
+and dashboard route `/inference/mimo-v26-flash` (also under `/zh`). It is an
+experimental model benchmarked on AgentX only, from the
+`XiaomiMiMo/MiMo-V2.6-Flash-RL` checkpoint. vLLM rows with `spec_method`
+`draft_model` use the checkpoint's DFlash drafter with synthetic acceptance from
+the golden SPEED-Bench curve; rows with `spec_method` `none` do not speculate.
+Use `model=MiMo-V2.6-Flash` for benchmark reads and the inference view API, with
+`sequence=agentic-traces` for the latter.
+
 Installed raw recipes use `scripts/capture-response.mjs`, which applies the shared
 request-header helper for version attribution. Set `INFERENCEX_TELEMETRY=0` or
 `DO_NOT_TRACK=1` to omit attribution; use `INFERENCEX_TRAFFIC=validation` for demos

@@ -62,6 +62,20 @@ describe('MiniMax M3.1 Flash ingestion', () => {
   });
 });
 
+describe('MiMo V2.6 Flash ingestion', () => {
+  it.each([
+    { infmax_model_prefix: 'mimov2.6flash' },
+    { model_prefix: 'mimov2.6flash' },
+    { model: 'XiaomiMiMo/MiMo-V2.6-Flash-RL' },
+  ])('resolves the recipe identity %j', (row) => {
+    expect(resolveModelKey(row)).toBe('mimov2.6flash');
+  });
+
+  it('keeps DFlash rows (InferenceX#4742) under their draft_model spec method', () => {
+    expect(normalizeSpecMethod('draft_model')).toBe('draft_model');
+  });
+});
+
 describe('hwToGpuKey', () => {
   it('strips -nv suffix', () => {
     expect(hwToGpuKey('h200-nv')).toBe('h200');

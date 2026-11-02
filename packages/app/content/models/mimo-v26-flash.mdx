@@ -1,0 +1,30 @@
+---
+title: 'MiMo V2.6 Flash'
+developer: 'Xiaomi'
+releaseDate: 'September 21, 2026'
+description: "Xiaomi's 309B-total / 15B-active multimodal MoE with 39 sliding-window and 9 global attention layers, a 1M-token context, and a bundled DFlash drafter."
+---
+
+## Overview
+
+MiMo-V2.6-Flash is Xiaomi's 309B-total, 15B-active mixture-of-experts model. It accepts text, image, video and audio input and generates text, with a 1M-token context. InferenceX benchmarks the RL checkpoint, `XiaomiMiMo/MiMo-V2.6-Flash-RL`, released under the MIT license ([model card](https://huggingface.co/XiaomiMiMo/MiMo-V2.6-Flash-RL)).
+
+## Architecture
+
+- **Backbone:** 48 layers, hidden size 4096, vocabulary 152576.
+- **Attention schedule:** 39 sliding-window layers with a 128-token window and a learned per-head attention sink, and 9 global layers at positions 0, 5, 11, 17, 23, 29, 35, 41 and 47.
+- **Attention heads:** 64 query heads with 192-dimensional queries and keys and 128-dimensional values. Global layers use 4 KV heads; sliding-window layers use 8.
+- **Position encoding:** partial RoPE over about a third of each head (rotary factor 0.334); RoPE theta 10,000,000 for global layers and 10,000 for sliding-window layers.
+- **FFN split:** the first layer uses a dense SwiGLU FFN with intermediate width 16384; the remaining 47 use MoE.
+- **Experts:** 256 routed experts, top-8 selected per token by sigmoid scoring with auxiliary-loss-free balancing; no shared expert; expert intermediate width 2048.
+- **Context:** config position limit 1,048,576.
+- **Quantization:** routed experts are stored as MXFP4; dense, attention QKV and MTP weights are FP8 E4M3 with 128 x 128 blocks; attention output projections stay BF16.
+- **Speculation:** the checkpoint ships 3 MTP layers and a separate 5-layer DFlash drafter.
+
+The dimensions, attention schedule and quantization layout come from the [published config](https://huggingface.co/XiaomiMiMo/MiMo-V2.6-Flash-RL/raw/main/config.json).
+
+## InferenceX coverage
+
+MiMo V2.6 Flash is an experimental model benchmarked on AgentX only, on B200 with SGLang and vLLM. Its vision and audio encoders are not exercised by the text-only AgentX traces.
+
+vLLM also runs the checkpoint's own DFlash drafter. Like every speculative AgentX submission, it uses synthetic acceptance from the model's golden SPEED-Bench curve: a mean acceptance length of 4.08 tokens with 7 draft tokens and 2.97 with 3, with thinking on. These results appear once the [DFlash sweep](https://github.com/SemiAnalysisAI/InferenceX/pull/4742) lands.

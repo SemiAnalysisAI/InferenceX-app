@@ -2,6 +2,7 @@ export const MONOCHROME_LOGO_FILES: ReadonlySet<string> = new Set([
   'amd.svg',
   'openai.svg',
   'google.svg',
+  'xiaomimimo.svg',
 ]);
 
 export function isMonochromeLogo(file: string): boolean {
@@ -15,6 +16,7 @@ export const MODEL_DEVELOPER_LOGOS: Record<string, string> = {
   MiniMax: 'minimax-color.svg',
   'Moonshot AI': 'kimi-color.svg',
   OpenAI: 'openai.svg',
+  Xiaomi: 'xiaomimimo.svg',
   'Z.ai (Zhipu AI)': 'zai-color.svg',
 };
 

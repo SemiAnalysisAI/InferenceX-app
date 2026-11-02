@@ -115,6 +115,21 @@ describe('AgentX comparison links', () => {
     expect(overviewScenariosForModel(Model.GLM_5_3_Flash)).toEqual(['agentx']);
   });
 
+  it('routes MiMo V2.6 Flash to AgentX without promoting it on the landing ledger', () => {
+    const mimo = COMPARE_MODEL_SLUGS.find((model) => model.slug === 'mimo-v26-flash')!;
+    expect(comparisonScenarioForModel(mimo)).toEqual({
+      label: 'AgentX',
+      sequence: 'agentic-traces',
+    });
+    expect(comparisonPairHref('en', 'mimo-v26-flash-b300-vs-b200')).toBe(
+      '/compare/mimo-v26-flash-b300-vs-b200',
+    );
+    expect(agentxDashboardHref('en', mimo)).toBe('/inference/mimo-v26-flash');
+    expect(agentxDashboardHref('zh', mimo)).toBe('/zh/inference/mimo-v26-flash');
+    expect(FEATURED_AGENTX_MODELS).not.toContain(mimo);
+    expect(overviewScenariosForModel(Model.MiMo_V2_6_Flash)).toEqual(['agentx']);
+  });
+
   it('agrees with the overview matrix about which models are AgentX-only', () => {
     const modelValues = new Set<string>(Object.values(Model));
     for (const entry of COMPARE_MODEL_SLUGS) {
