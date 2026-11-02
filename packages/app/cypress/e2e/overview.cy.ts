@@ -6,7 +6,6 @@ const MODEL_LABELS = [
   'Kimi K3 2.8T',
   'MiniMax M3.1 Flash 428B',
   'GLM5.2/GLM5.3',
-  'GLM 5.3 Flash',
   'Qwen3.5 397B',
 ];
 
@@ -20,7 +19,7 @@ const PLATFORM_HEADERS = [
 ];
 
 const SINGLE_TURN = 'single_turn_8k1k';
-const MATRIX_ROWS = 9;
+const MATRIX_ROWS = 8;
 const AGENTX = 'agentx';
 const AGENTX_LABEL = 'Long Context Multi-Turn Realistic Agentic Scenario (AgentX)';
 const AGENTX_LABEL_ZH = '长上下文、多轮交互的真实智能体场景（AgentX）';
@@ -168,6 +167,37 @@ function textRect(element: Element) {
 }
 
 describe('Overview page', () => {
+  for (const locale of ['', '/zh']) {
+    it(`gates the Flash matrix row through unlock, reload, and relock in ${locale || 'en'}`, () => {
+      cy.viewport(1280, 900);
+      cy.visit(`${locale}/overview`, {
+        onBeforeLoad(win) {
+          win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
+        },
+      });
+      cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS);
+      desktopModel('GLM-5.3-Flash', AGENTX).should('not.exist');
+      cy.window().then((win) => {
+        win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
+        win.dispatchEvent(new win.Event('inferencex:feature-gate:unlocked'));
+      });
+      cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS + 1);
+      desktopModel('GLM-5.3-Flash', AGENTX)
+        .should('contain.text', 'GLM 5.3 Flash')
+        .find('[data-testid="overview-platform"]')
+        .should('have.length', 5);
+      cy.reload();
+      cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS + 1);
+      desktopModel('GLM-5.3-Flash', AGENTX).scrollIntoView().should('be.visible');
+      cy.window().then((win) => {
+        win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
+        win.dispatchEvent(new win.Event('inferencex:feature-gate:locked'));
+      });
+      cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS);
+      desktopModel('GLM-5.3-Flash', AGENTX).should('not.exist');
+    });
+  }
+
   it('updates selectors through cached overview JSON without an RSC round trip', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
@@ -1042,7 +1072,7 @@ describe('Overview page', () => {
     });
   });
 
-  it('renders the full platform matrix for every active model', () => {
+  it('renders the full platform matrix for every publicly visible active model', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
 
