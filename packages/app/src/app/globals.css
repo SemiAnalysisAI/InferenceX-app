@@ -435,7 +435,6 @@ html[data-inferencex-embed] .autumn-leaves {
   --halo-menu: var(--font-industry), 'Industry', 'Arial Narrow', sans-serif;
 }
 .minecraft {
-  color-scheme: dark;
   --font-minecraft: 'Monocraft';
   --background: #1e1e1e;
   --foreground: #ffffff;

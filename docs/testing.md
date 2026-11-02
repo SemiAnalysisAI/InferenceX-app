@@ -32,8 +32,6 @@ Retain and maintain exactly these two checks:
 
 Keep their existing support helper and E2E browser setup. Do not expand these checks into gameplay, decorative styling, or visual-fidelity tests. Ordinary light/dark UI, dashboard, export, and announcement tests remain required; those are not easter egg tests.
 
-The site defaults to Minecraft when no theme preference is saved; saved preferences still take precedence. The E2E support hook seeds `dark` only when no preference exists, keeping ordinary dashboard tests on a standard theme. Specs can override or remove that preference in `onBeforeLoad`. The isolation checks cover explicit light/dark/system preferences and embeds, not the Minecraft default.
-
 ## Pre-commit Checklist
 
 ```bash
