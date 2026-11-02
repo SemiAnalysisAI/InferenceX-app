@@ -235,13 +235,12 @@ describe('PowerAnalysisPanels inline drill-down', () => {
     const rows = [...container.querySelectorAll<HTMLElement>('[data-testid="power-part-row"]')];
     expect(rows[0].dataset.category).toBe('gpu');
     expect(rows[0].querySelector('[data-testid="power-part-watts"]')?.textContent).toBe('640 W');
-    // IT only on PowerX by default: no facility row, no facility band.
-    expect(rows.map((row) => row.dataset.category)).not.toContain('facility');
+    // PowerX counts the facility overhead by default: a facility row and band.
+    expect(rows.map((row) => row.dataset.category)).toContain('facility');
     expect(
-      container.querySelectorAll(
-        '[data-testid="power-chip-compare-segment"][data-band="facility"]',
-      ),
-    ).toHaveLength(0);
+      container.querySelectorAll('[data-testid="power-chip-compare-segment"][data-band="facility"]')
+        .length,
+    ).toBeGreaterThan(0);
   });
 
   it('stays collapsed after Collapse until a bar is clicked, even when the slider moves, and a second click closes it', () => {

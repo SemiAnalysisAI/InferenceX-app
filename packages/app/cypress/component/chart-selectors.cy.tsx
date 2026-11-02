@@ -385,11 +385,12 @@ describe('Chart Selectors', () => {
         cy.get('[data-testid="model-selector"]').should('contain.text', 'Muse Spark Open').click();
         cy.get('[role="option"]').then(($options) => {
           expect(
-            [...$options].slice(0, 7).map((option) => option.textContent?.trim()),
+            [...$options].slice(0, 8).map((option) => option.textContent?.trim()),
           ).to.deep.equal([
             'Kimi K3 2.8T',
             'DeepSeek V4.1 Flash 552B',
             'GLM5.2/GLM5.3 744B',
+            'GLM 5.3 Flash',
             'MiniMax M3.1 Flash 428B',
             'Muse Spark Open 816B',
             'Qwen3.5 397B',
@@ -681,6 +682,7 @@ describe('Chart Selectors', () => {
         cy.get('[data-testid="scenario-selector"]').click('right');
         const active = locale === 'zh' ? '固定序列长度' : 'Fixed Sequence Length';
         const deprecated = locale === 'zh' ? '1K / 1K（已弃用）' : '1K / 1K (deprecated)';
+        const deprecatedEightK = locale === 'zh' ? '8K / 1K（已弃用）' : '8K / 1K (deprecated)';
         cy.get('[data-slot="select-label"]').should('have.length', 1);
         cy.contains('[data-select-option]', deprecated).should(($option) => {
           const option = $option[0];
@@ -700,7 +702,7 @@ describe('Chart Selectors', () => {
           .should('have.length', 2)
           .then(($options) => {
             expect([...$options].map((option) => option.textContent)).to.deep.equal([
-              '8K / 1K',
+              deprecatedEightK,
               deprecated,
             ]);
           });

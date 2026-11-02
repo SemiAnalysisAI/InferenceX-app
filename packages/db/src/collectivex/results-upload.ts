@@ -112,7 +112,7 @@ export function readResultsDir(dir: string): ResultsFiles {
   return { dir: root, files };
 }
 
-interface ResultDoc {
+export interface ResultDoc {
   record_type?: unknown;
   schema?: unknown;
   case_id?: unknown;
@@ -123,7 +123,7 @@ interface ResultDoc {
 }
 
 /** Identity fields of an EP case attempt or a swap_blocks result; null for anything else. */
-function resultIdentity(doc: ResultDoc | null) {
+export function resultIdentity(doc: ResultDoc | null) {
   if (doc?.record_type === 'case-attempt') {
     return {
       caseId: doc.identity?.case_id,

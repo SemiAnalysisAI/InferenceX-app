@@ -90,7 +90,7 @@ describe('Page Load & Navigation', () => {
 });
 
 describe('Splash text', () => {
-  it('announces AgentX on the landing page in both light and dark mode', () => {
+  it('omits the splash announcement on the landing page in both light and dark mode', () => {
     cy.visit('/', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -98,13 +98,13 @@ describe('Splash text', () => {
       },
     });
     cy.get('html').should('not.have.class', 'dark');
-    cy.get('[data-testid="splash-text"]').should('be.visible').and('have.text', 'AgentX is here!!');
+    cy.get('[data-testid="splash-text"]').should('not.exist');
 
     cy.get('[data-testid="theme-toggle"]')
       .should('have.attr', 'aria-label', 'Switch theme (currently light mode)')
       .click();
     cy.get('html').should('have.class', 'dark');
-    cy.get('[data-testid="splash-text"]').should('be.visible').and('have.text', 'AgentX is here!!');
+    cy.get('[data-testid="splash-text"]').should('not.exist');
   });
 });
 

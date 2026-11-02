@@ -11,13 +11,37 @@ describe('resolveLabelState', () => {
     });
   });
 
-  it('turns on parallelism labels for agentic scenarios, and keeps line labels', () => {
+  it('opens agentic scenarios with curve names but without per-point parallelism chips', () => {
     expect(resolveLabelState('agentic', {})).toEqual({
-      showPointLabels: true,
-      useAdvancedLabels: true,
+      showPointLabels: false,
+      useAdvancedLabels: false,
       showLineLabels: true,
     });
   });
+
+  it('restores agentic parallelism chips from a shared link', () => {
+    expect(resolveLabelState('agentic', { i_advlabel: '1' })).toEqual({
+      showPointLabels: false,
+      useAdvancedLabels: true,
+      showLineLabels: true,
+    });
+    expect(resolveLabelState('agentic', { i_label: '1' })).toEqual({
+      showPointLabels: true,
+      useAdvancedLabels: false,
+      showLineLabels: true,
+    });
+  });
+
+  it.each([{ i_label: '0' }, { i_nolabel: '1' }])(
+    'keeps GPU-count suppression independent of parallelism: %j',
+    (params) => {
+      expect(resolveLabelState('agentic', { ...params, i_advlabel: '1' })).toEqual({
+        showPointLabels: false,
+        useAdvancedLabels: true,
+        showLineLabels: true,
+      });
+    },
+  );
 
   it('preserves explicit and legacy URL overrides', () => {
     expect(
@@ -35,6 +59,20 @@ describe('resolveLabelState', () => {
 });
 
 describe('serializeLabelState', () => {
+  it.each(['agentic', 'fixed-seq'] as const)(
+    'round-trips independent GPU-count and parallelism settings for %s',
+    (kind) => {
+      for (const showPointLabels of [false, true]) {
+        for (const useAdvancedLabels of [false, true]) {
+          for (const showLineLabels of [false, true]) {
+            const state = { showPointLabels, useAdvancedLabels, showLineLabels };
+            expect(resolveLabelState(kind, serializeLabelState(kind, state))).toEqual(state);
+          }
+        }
+      }
+    },
+  );
+
   it('omits the scenario defaults', () => {
     expect(serializeLabelState('agentic', resolveLabelState('agentic', {}))).toEqual({
       i_label: '',
@@ -46,13 +84,13 @@ describe('serializeLabelState', () => {
   it('serializes deviations from agentic defaults', () => {
     expect(
       serializeLabelState('agentic', {
-        showPointLabels: false,
-        useAdvancedLabels: false,
+        showPointLabels: true,
+        useAdvancedLabels: true,
         showLineLabels: false,
       }),
     ).toEqual({
-      i_label: '0',
-      i_advlabel: '0',
+      i_label: '1',
+      i_advlabel: '1',
       i_linelabel: '0',
     });
   });

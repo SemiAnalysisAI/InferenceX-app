@@ -1,7 +1,10 @@
 import type { ArrayBufferTarget as ArrayBufferTargetType, Muxer as MuxerType } from 'mp4-muxer';
 
-import { getExportFooterText } from '@/lib/export/export-footer';
-import { hasDarkTheme } from '@/lib/themes/themes';
+import {
+  drawExportFooter,
+  getExportFooterStyle,
+  type ExportFooterStyle,
+} from '@/lib/export/export-footer';
 
 export type Mp4ExportStage = 'init' | 'render' | 'encode' | 'flush' | 'mux';
 
@@ -132,23 +135,17 @@ const skipNoExport = (node: Node) =>
 function drawWithWatermark(
   source: HTMLCanvasElement,
   bgColor: string,
-  isDark: boolean,
+  footerStyle: ExportFooterStyle,
 ): HTMLCanvasElement {
   const out = document.createElement('canvas');
   out.width = source.width;
   out.height = source.height + WATERMARK_HEIGHT;
   const ctx = out.getContext('2d');
   if (!ctx) return source;
-  ctx.fillStyle = bgColor || (isDark ? '#0a0a0a' : '#ffffff');
+  ctx.fillStyle = bgColor;
   ctx.fillRect(0, 0, out.width, out.height);
   ctx.drawImage(source, 0, 0);
-  ctx.fillStyle = isDark ? '#1a1a2e' : '#f5f5f5';
-  ctx.fillRect(0, source.height, out.width, WATERMARK_HEIGHT);
-  ctx.fillStyle = isDark ? '#aaa' : '#555';
-  ctx.font = 'bold 16px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(getExportFooterText(), out.width / 2, source.height + WATERMARK_HEIGHT / 2);
+  drawExportFooter(ctx, footerStyle, out.width, source.height, WATERMARK_HEIGHT, 16);
   return out;
 }
 
@@ -208,7 +205,7 @@ export async function exportReplayMp4(opts: ExportOptions): Promise<void> {
 
   const bgColor =
     getComputedStyle(document.documentElement).getPropertyValue('--background').trim() || '#fff';
-  const isDark = hasDarkTheme(document.documentElement);
+  const footerStyle = getExportFooterStyle(livePanel);
 
   let outWidth = 0;
   let outHeight = 0;
@@ -280,7 +277,7 @@ export async function exportReplayMp4(opts: ExportOptions): Promise<void> {
         filter: skipNoExport,
       });
 
-      const watermarked = drawWithWatermark(captured, bgColor, isDark);
+      const watermarked = drawWithWatermark(captured, bgColor, footerStyle);
 
       if (i === 0) {
         outWidth = Math.max(2, Math.ceil(watermarked.width / 2) * 2);

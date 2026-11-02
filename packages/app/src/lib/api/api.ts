@@ -11,6 +11,7 @@ import {
 } from '@/components/collectivex/types';
 import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
 import type { EvalRow } from '@semianalysisai/inferencex-db/queries/evaluations';
+import type { ChangelogLinkRow } from '@semianalysisai/inferencex-db/collectivex/changelog';
 
 import type { SubmissionsResponse } from '../submissions/submissions-types';
 
@@ -269,6 +270,13 @@ export function fetchSubmissions(signal?: AbortSignal) {
 }
 
 /** Stored CollectiveX run summaries, one per results upload; `discovery_complete` is always true. */
+export function fetchCollectiveXChangelog(version: CollectiveXVersion, signal?: AbortSignal) {
+  return fetchJson<{ version: CollectiveXVersion; entries: ChangelogLinkRow[] }>(
+    `/api/v1/collectivex/changelog?version=${version}`,
+    signal,
+  );
+}
+
 export function fetchCollectiveXRunList(
   version: CollectiveXVersion = COLLECTIVEX_DEFAULT_VERSION,
   signal?: AbortSignal,

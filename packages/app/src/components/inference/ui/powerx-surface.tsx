@@ -21,8 +21,8 @@ const CompareTargetContext = createContext<number | null>(null);
 const SetCompareTargetContext = createContext<((value: number | null) => void) | null>(null);
 
 /**
- * Whether the Where view counts the facility (PUE) overhead. PowerX stacks IT
- * only by default; outside PowerX the breakdown always shows the facility meter.
+ * Whether the Where view counts the facility (PUE) overhead. On by default so
+ * PowerX shows facility power like the rest of the site; switch it off for IT only.
  */
 const IncludeFacilityContext = createContext(true);
 const SetIncludeFacilityContext = createContext<((value: boolean) => void) | null>(null);
@@ -44,7 +44,7 @@ const SetActivePointContext = createContext<((value: PowerXActivePointUpdate) =>
 
 export function PowerXSurfaceProvider({ children }: { children: ReactNode }) {
   const [target, setTarget] = useState<number | null>(null);
-  const [includeFacility, setIncludeFacility] = useState(false);
+  const [includeFacility, setIncludeFacility] = useState(true);
   const [activePoint, setActivePointState] = useState<PowerXActivePoint | null>(null);
   // A hover never replaces a pinned point; hover end only clears a hover. A scrub
   // (the finger on the chart) replaces anything, and a hover end leaves it: the

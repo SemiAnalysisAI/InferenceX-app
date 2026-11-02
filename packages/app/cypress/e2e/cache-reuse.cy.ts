@@ -210,7 +210,7 @@ describe('Prefix Cache Reuse', () => {
   });
 
   describe('entry from the inference chart', () => {
-    it('links the agentic footer to the tab with the chart state attached', () => {
+    it('omits the cache-reuse link and optimization note from the agentic footer', () => {
       interceptOverlayRun();
       interceptDerivedAgenticMetrics();
       cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
@@ -220,13 +220,9 @@ describe('Prefix Cache Reuse', () => {
         },
       });
       cy.wait('@benchmarks');
-      cy.get('[data-testid="chart-status-notes"] [data-testid="cache-reuse-link"]')
-        .should('have.attr', 'href')
-        .and('match', /^\/cache-reuse\?/)
-        .and('include', 'i_seq=agentic-traces');
-      cy.get('[data-testid="cache-reuse-link"]').click();
-      cy.location('pathname').should('eq', '/cache-reuse');
-      cy.get(BARS).should('have.length', REAL_CONFIGS.length);
+      cy.get('#chart-0 svg[data-testid="d3-chart-svg"]').should('be.visible');
+      cy.get('[data-testid="chart-figure"] [data-testid="cache-reuse-link"]').should('not.exist');
+      cy.get('[data-testid="agentic-optimization-note"]').should('not.exist');
     });
 
     it('stays off the fixed-sequence chart', () => {

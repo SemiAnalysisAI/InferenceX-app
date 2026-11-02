@@ -330,10 +330,15 @@ function parallelOptions(rows: ComparisonRow[]): ParallelOption[] {
 const measured = (r: ComparisonRow) =>
   r.status === 'ok' && r.latencyUs !== null && Number.isFinite(r.latencyUs) && r.latencyUs > 0;
 
+/** Workload shown when the request names none (or an unknown one), if the data has it. */
+export const DEFAULT_WORKLOADS: Partial<Record<ComparisonOp, string>> = {
+  moe: 'moe:DeepSeek-V4.1-Flash',
+};
+
 /**
- * The cases of one workload (default: the best-covered), or, given `model`, every case
- * that model's checkpoints contribute, at one device split (default: one device, else
- * the smallest split there is).
+ * The cases of one workload (default: the op's default workload, else the best-covered),
+ * or, given `model`, every case that model's checkpoints contribute, at one device split
+ * (default: one device, else the smallest split there is).
  */
 export function comparisonView(
   comparison: Comparison,
@@ -341,9 +346,12 @@ export function comparisonView(
   model: string | null = null,
   parallel: string | null = null,
 ): ComparisonView {
+  const find = (id: string | null | undefined) =>
+    id ? comparison.workloads.find((w) => w.id === id)?.id : undefined;
   const workload = model
     ? null
-    : (comparison.workloads.find((w) => w.id === workloadId)?.id ??
+    : (find(workloadId) ??
+      find(DEFAULT_WORKLOADS[comparison.op]) ??
       comparison.workloads[0]?.id ??
       null);
   const scoped = model

@@ -4,7 +4,7 @@
  * Counts are per device: a split case's work is shared by its devices.
  */
 
-import { parallelAxes } from './parallel';
+import { parallelAxes, wellFormedSplit } from './parallel';
 
 type Args = Record<string, unknown>;
 
@@ -42,9 +42,19 @@ export interface OpLabels {
   precision: string;
 }
 
+const PARALLEL_AXES = ['tp', 'dp', 'ep', 'dcp'];
+
+/** ` · tp=8 ep=8` for a split case, empty for one device; distinguishes otherwise equal shapes. */
+export function splitSuffix(a: Args): string {
+  const p = obj(a.parallel);
+  if (!p) return '';
+  const parts = PARALLEL_AXES.flatMap((k) => (p[k] === undefined ? [] : [`${k}=${String(p[k])}`]));
+  return parts.length > 0 ? ` · ${parts.join(' ')}` : '';
+}
+
 function gemmLabels(a: Args): OpLabels {
   return {
-    shape: `${a.m}×${a.n}×${a.k}`,
+    shape: `${a.m}×${a.n}×${a.k}${splitSuffix(a)}`,
     precision: `${describeOperand(a.a)} × ${describeOperand(a.b)} → ${a.out ?? 'bf16'}`,
   };
 }
@@ -58,7 +68,9 @@ function moeLabels(a: Args): OpLabels {
     dist && dist !== 'natural'
       ? ` · ${typeof dist === 'string' ? dist : `zipf s=${(obj(dist) ?? {}).s}`}`
       : '';
-  const shape = `T=${a.tokens} H=${a.hidden} E=${ex.num}/top${ex.top_k} I=${ex.inter}${latent}${distLabel}`;
+  const select = str(obj(obj(a.router)?.select)?.kind);
+  const selectLabel = select && select !== 'topk' ? ` · ${select} routing` : '';
+  const shape = `T=${a.tokens} H=${a.hidden} E=${ex.num}/top${ex.top_k} I=${ex.inter}${latent}${distLabel}${selectLabel}${splitSuffix(a)}`;
   const shared = obj(a.shared);
   const sharedW = shared?.w1;
   const precision = `a1 ${describeOperand(ex.a1)} · w ${describeOperand(ex.w1)}${sharedW ? ` · shared w ${describeOperand(sharedW)}` : ''}`;
@@ -322,7 +334,7 @@ function attentionLabels(type: string, a: Args): OpLabels {
       ? `state ${str(a.state_dtype) ?? 'fp32'}`
       : `kv ${str(a.kv_cache_dtype) ?? 'auto'}`;
   return {
-    shape: `${ATTENTION_NAMES[type] ?? type}${variant} · ${batch}`,
+    shape: `${ATTENTION_NAMES[type] ?? type}${variant} · ${batch}${splitSuffix(a)}`,
     precision: `proj ${weights} · ${cache}`,
   };
 }
@@ -410,6 +422,48 @@ const allReduce = (n: number, size: number) => (2 * (n - 1) * size) / n;
 /** All-gather, reduce-scatter or all-to-all: each device sends (n-1)/n of the whole. */
 const spread = (n: number, size: number) => ((n - 1) * size) / n;
 
+/**
+ * Expected distinct experts that `t` tokens route to, following the forced distributions
+ * in InferenceX `operatorx/runners/common/vllm/moe.py`. `natural` (the router's own choice)
+ * and unknown values keep the uniform-random estimate. Returns null for a malformed zipf.
+ */
+export function touchedExperts(e: number, k: number, t: number, routing: unknown): number | null {
+  const dist = obj(routing)?.distribution;
+  if (dist === 'balanced') return Math.min(e, t * k);
+  if (dist === 'single_hot') {
+    // Expert 0 on every token, plus k-1 of the remaining e-1 uniformly.
+    return e === 1 ? 1 : 1 + (e - 1) * (1 - (1 - (k - 1) / (e - 1)) ** t);
+  }
+  const zipf = obj(dist);
+  if (zipf) {
+    const s = num(zipf.s);
+    return zipf.kind === 'zipf' && s !== null ? zipfTouched(e, k, t, s) : null;
+  }
+  return e * (1 - (1 - k / e) ** t);
+}
+
+/**
+ * Each token draws k experts without replacement with p ~ 1/rank^s. Rosén's approximation
+ * gives each expert's per-token inclusion probability 1 - exp(-p·τ), with τ solved so the
+ * probabilities sum to k. Against simulation it stays within 2% and errs high, so it never
+ * understates bytes.
+ */
+function zipfTouched(e: number, k: number, t: number, s: number): number {
+  if (k >= e) return e;
+  const weights = Array.from({ length: e }, (_, i) => 1 / (i + 1) ** s);
+  const total = weights.reduce((sum, w) => sum + w, 0);
+  const p = weights.map((w) => w / total);
+  const picked = (tau: number) => p.reduce((sum, q) => sum + 1 - Math.exp(-q * tau), 0);
+  let [lo, hi] = [0, 1];
+  while (picked(hi) < k) hi *= 2;
+  for (let i = 0; i < 100; i++) {
+    const mid = (lo + hi) / 2;
+    if (picked(mid) < k) lo = mid;
+    else hi = mid;
+  }
+  return p.reduce((sum, q) => sum + 1 - Math.exp(-q * hi * t), 0);
+}
+
 function gemmWork(a: Args): OpWork | null {
   const [m, n, k] = [num(a.m), num(a.n), num(a.k)];
   if (!m || !n || !k) return null;
@@ -440,14 +494,16 @@ function moeWork(a: Args): OpWork | null {
   const w = num(ex.latent) ?? h;
   // Routed experts serve every dp group's tokens, their weights split over all tp·dp devices
   // (by expert under ep, else within each expert): the experts all the tokens are expected
-  // to touch under uniform routing, over dp here and tp below.
-  const touched = (e * (1 - (1 - k / e) ** (t * dp))) / dp;
+  // to touch under the case's routing, over dp here and tp below.
+  const all = touchedExperts(e, k, t * dp, a.routing);
+  if (all === null) return null;
+  const touched = all / dp;
   const gate = obj(obj(a.router)?.gate);
   const parts: WorkPart[] = [
     {
       name: 'router',
       flops: 2 * t * h * e,
-      bytes: h * e * 2 + t * h * 2,
+      bytes: h * e * (ELEMENT_BYTES[str(gate?.dtype) ?? 'bf16'] ?? 2) + t * h * 2,
       precision: mathPrecision([gate ?? BF16]),
     },
   ];
@@ -533,8 +589,8 @@ function attentionOpWork(type: string, a: Args): OpWork | null {
  *
  * GEMM reads A as it enters the op (bf16 unless pre-quantized) and B as stored. MoE counts
  * the router, latent projections, the routed experts at their active top-k (reading the
- * weights of the experts the tokens are expected to touch, E·(1-(1-k/E)^T) under uniform
- * routing) and the shared experts; activations, routing and combine work are excluded.
+ * weights of the experts the tokens are expected to touch under the case's forced routing,
+ * E·(1-(1-k/E)^T) for uniform or natural routing) and the shared experts; activations, routing and combine work are excluded.
  * Attention counts each projection and the attention core (or linear recurrence), causal,
  * each query's keys capped where the module selects them, reading the cache or state it
  * attends. A data-parallel group's work is split over its tensor-parallel devices.
@@ -542,9 +598,10 @@ function attentionOpWork(type: string, a: Args): OpWork | null {
  * Links are the collectives the split needs at the least: a tensor-parallel GEMM's
  * all-reduce, an MoE's all-reduce, all-gather/reduce-scatter or expert-parallel
  * dispatch/combine, attention's dcp merge. Attention's tensor-parallel all-reduce runs
- * outside the op.
+ * outside the op. A malformed split has no count.
  */
 export function opWork(type: string, a: Args): OpWork | null {
+  if (!wellFormedSplit(a)) return null;
   if (type === 'gemm') return gemmWork(a);
   if (type === 'moe') return moeWork(a);
   return ATTENTION_TYPES.includes(type) ? attentionOpWork(type, a) : null;

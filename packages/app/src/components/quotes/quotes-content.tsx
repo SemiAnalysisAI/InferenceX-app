@@ -5,47 +5,30 @@ import { Fragment } from 'react';
 import { Card } from '@/components/ui/card';
 
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
-import { track } from '@/lib/analytics/analytics';
 
 import type { Locale } from '@/lib/i18n/i18n';
 
 import { CompanyLogo, highlightBrand } from './quote-utils';
 import { QUOTES, orgAnchorId } from './quotes-data';
+import { SupporterLogoWall } from './supporter-logo-wall';
 
 const STRINGS = {
   en: {
     heading: <>InferenceX&trade; Initiative Supporters</>,
     intro:
       'InferenceX™ initiative is supported by many major buyers of compute and prominent members of the ML community including those from MiniMax, Moonshot Kimi, Alibaba Qwen, OpenAI, Microsoft, vLLM, PyTorch Foundation, Oracle and more.',
-    jumpTo: (org: string) => `Jump to ${org}’s quote`,
   },
   zh: {
     heading: <>业界与社区对 InferenceX&trade; 的评价</>,
     intro:
       'InferenceX™ 获得了众多大型算力采购方和 ML 社区知名人士的认可。以下评价来自 MiniMax、Moonshot Kimi、Alibaba Qwen、OpenAI、Microsoft、vLLM、PyTorch Foundation 和 Oracle 等机构的相关人士。',
-    jumpTo: (org: string) => `查看 ${org} 的评价`,
   },
 } as const;
-
-const orgLogos: { org: string; logo: string }[] = [];
-const seenOrgs = new Set<string>();
-for (const q of QUOTES) {
-  if (q.logo && !seenOrgs.has(q.org)) {
-    seenOrgs.add(q.org);
-    orgLogos.push({ org: q.org, logo: q.logo });
-  }
-}
 
 const firstQuoteIndexForOrg: Record<string, number> = {};
 QUOTES.forEach((q, i) => {
   if (!(q.org in firstQuoteIndexForOrg)) firstQuoteIndexForOrg[q.org] = i;
 });
-
-function scrollToOrg(org: string) {
-  document
-    .querySelector(`#${orgAnchorId(org)}`)
-    ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
 
 function QuoteCard({
   id,
@@ -107,28 +90,8 @@ export function QuotesContent({ locale = 'en' }: { locale?: Locale } = {}) {
           <Card>
             <h1 className="text-2xl lg:text-4xl font-bold tracking-tight">{t.heading}</h1>
             <p className="mt-3 text-base lg:text-lg text-muted-foreground">{t.intro}</p>
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-              {orgLogos.map(({ org, logo }) => (
-                <button
-                  key={org}
-                  type="button"
-                  onClick={() => {
-                    track('quotes_logo_clicked', { org });
-                    scrollToOrg(org);
-                  }}
-                  className="group flex items-center justify-center min-h-11 px-3 cursor-pointer rounded-md transition-colors hover:bg-muted focus-visible:outline-none"
-                  title={t.jumpTo(org)}
-                  aria-label={t.jumpTo(org)}
-                >
-                  <img
-                    src={`/logos/${logo}`}
-                    alt={org}
-                    width={96}
-                    height={40}
-                    className="h-8 max-w-24 object-contain grayscale opacity-70 transition-opacity group-hover:opacity-100 dark:invert"
-                  />
-                </button>
-              ))}
+            <div className="mt-6 pt-6 border-t border-border/40">
+              <SupporterLogoWall locale={locale} />
             </div>
             <div className="mt-6 pt-6 border-t border-border/40">
               <div className="mx-auto flex max-w-4xl flex-col gap-8 md:gap-10">

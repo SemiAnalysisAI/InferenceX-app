@@ -138,7 +138,8 @@ function interceptChart(): void {
 
 function visitChart(path: string): void {
   interceptChart();
-  cy.visit(path, {
+  const separator = path.includes('?') ? '&' : '?';
+  cy.visit(`${path}${separator}g_model=DeepSeek-V4-Pro`, {
     onBeforeLoad(win) {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     },

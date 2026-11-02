@@ -18,7 +18,7 @@ import {
   formatParamCount,
   getModelArchitecture,
 } from '@/lib/catalog/model-architectures';
-import { renderDiagram } from './model-architecture-diagram-renderer';
+import { diagramHeight, renderDiagram } from './model-architecture-diagram-renderer';
 
 interface ModelArchitectureDiagramProps {
   model: Model;
@@ -87,6 +87,8 @@ function ArchitectureContent({ model, arch, isExpanded, locale }: ArchitectureCo
   const lastRenderRef = useRef<DiagramRenderState | null>(null);
   const { resolvedTheme } = useTheme();
   const releaseDate = getModelReleaseDate(model);
+  // The diagram draws after mount; the server-rendered svg already takes its final height.
+  const reservedHeight = diagramHeight(arch, expandedBlocks);
 
   const toggleBlock = useCallback(
     (blockId: string) => {
@@ -161,7 +163,12 @@ function ArchitectureContent({ model, arch, isExpanded, locale }: ArchitectureCo
       }`}
     >
       <div ref={containerRef} className="px-4 pb-4">
-        <svg ref={svgRef} className="w-full" data-testid="model-architecture-svg" />
+        <svg
+          ref={svgRef}
+          className="w-full"
+          height={reservedHeight ?? undefined}
+          data-testid="model-architecture-svg"
+        />
         {arch.advertisedContextWindow && arch.contextWindow && (
           <p className="mt-2 text-xs text-muted-foreground">
             {t.contextNote(arch.advertisedContextWindow, arch.contextWindow)}
@@ -239,6 +246,8 @@ function ArchitectureContent({ model, arch, isExpanded, locale }: ArchitectureCo
               year: 'numeric',
               month: 'short',
               day: 'numeric',
+              // Dates are UTC calendar days; formatting in UTC matches the server render.
+              timeZone: 'UTC',
             })}
           </p>
         )}

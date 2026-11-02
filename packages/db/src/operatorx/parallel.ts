@@ -17,6 +17,15 @@ function axis(args: Args, name: Axis): number {
   return typeof v === 'number' && Number.isInteger(v) && v > 1 ? v : 1;
 }
 
+/** Whether `parallel`, when present, is an object whose axes are all positive integers. */
+export function wellFormedSplit(args: Args): boolean {
+  if (args.parallel === undefined || args.parallel === null) return true;
+  if (!isObj(args.parallel)) return false;
+  return Object.values(args.parallel).every(
+    (v) => v === undefined || (typeof v === 'number' && Number.isInteger(v) && v >= 1),
+  );
+}
+
 /**
  * Args with `parallel` spelled one way: only the axes above 1, dropped when none are,
  * so every spelling of one split is the same case.

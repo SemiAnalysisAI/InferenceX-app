@@ -2,9 +2,29 @@ import 'cypress-axe';
 import WorkflowInfoDisplay from '@/components/inference/ui/WorkflowInfoDisplay';
 import { Model, Sequence } from '@/lib/catalog/data-mappings';
 import InferenceChartControls from '@/components/inference/ui/ChartControls';
+import { TcoBasisCaption } from '@/components/inference/ui/TcoBasisCaption';
+import { ResultContext } from '@/components/ui/result-context';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import { mountWithProviders } from '../support/test-utils';
+
+function CostControls({ showTcoBasis = false }: { showTcoBasis?: boolean }) {
+  return (
+    <>
+      <InferenceChartControls showXAxisMode />
+      <ResultContext
+        locale="en"
+        costTier="Owning at Large Hyperscaler Volume"
+        tcoBasis={
+          <TcoBasisCaption
+            hardwareKeys={new Set(showTcoBasis ? ['tpuv7_vllm'] : ['b200_sglang'])}
+            source="inference"
+          />
+        }
+      />
+    </>
+  );
+}
 
 describe('Inference ChartControls', () => {
   beforeEach(() => {
@@ -13,6 +33,25 @@ describe('Inference ChartControls', () => {
 
   afterEach(() => {
     cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate-konami-v1'));
+  });
+
+  it('offers pending Flash only while the shared feature gate is unlocked', () => {
+    cy.get('[data-testid="model-selector"]').click();
+    cy.contains('[role="option"]', 'GLM 5.3 Flash').should('not.exist');
+    cy.get('body').type('{esc}');
+    cy.window().then((win) => {
+      win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
+      win.dispatchEvent(new win.Event('inferencex:feature-gate:unlocked'));
+    });
+    cy.get('[data-testid="model-selector"]').click();
+    cy.contains('[role="option"]', 'GLM 5.3 Flash').click();
+    cy.get('@setSelectedModel').should('have.been.calledWith', Model.GLM_5_3_Flash);
+    cy.window().then((win) => {
+      win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
+      win.dispatchEvent(new win.Event('inferencex:feature-gate:locked'));
+    });
+    cy.get('[data-testid="model-selector"]').click();
+    cy.contains('[role="option"]', 'GLM 5.3 Flash').should('not.exist');
   });
 
   it('offers no measured power or energy metrics; they live on the PowerX tab', () => {
@@ -241,7 +280,7 @@ describe('Inference ChartControls', () => {
 
 describe('Inference ChartControls cost metrics', () => {
   beforeEach(() => {
-    mountWithProviders(<InferenceChartControls showXAxisMode showTcoBasis />, {
+    mountWithProviders(<CostControls showTcoBasis />, {
       unofficial: {},
       inference: {
         selectedYAxisMetric: 'y_costh',
@@ -254,7 +293,7 @@ describe('Inference ChartControls cost metrics', () => {
 
   for (const sequence of [Sequence.EightK_OneK, Sequence.AgenticTraces]) {
     it(`switches the global TCO basis for Kimi K3 on ${sequence}`, () => {
-      mountWithProviders(<InferenceChartControls showXAxisMode showTcoBasis />, {
+      mountWithProviders(<CostControls showTcoBasis />, {
         unofficial: {},
         inference: {
           selectedYAxisMetric: 'y_costh',
@@ -270,7 +309,7 @@ describe('Inference ChartControls cost metrics', () => {
   }
 
   it('hides the TCO basis toggle for other models and scenarios', () => {
-    mountWithProviders(<InferenceChartControls showXAxisMode showTcoBasis />, {
+    mountWithProviders(<CostControls showTcoBasis />, {
       unofficial: {},
       inference: {
         selectedYAxisMetric: 'y_costh',
@@ -284,7 +323,7 @@ describe('Inference ChartControls cost metrics', () => {
     });
     cy.get('[data-testid="yaxis-metric-selector"]').should('exist');
     cy.get('[data-testid="tco-basis-toggle"]').should('not.exist');
-    mountWithProviders(<InferenceChartControls showXAxisMode showTcoBasis />, {
+    mountWithProviders(<CostControls showTcoBasis />, {
       unofficial: {},
       inference: {
         selectedYAxisMetric: 'y_costh',
@@ -298,7 +337,7 @@ describe('Inference ChartControls cost metrics', () => {
 
   for (const selectedYAxisMetric of ['y_tpPerGpu', 'y_tpPerMw'] as const) {
     it(`hides TCO for ${selectedYAxisMetric} even with visible TPU hardware`, () => {
-      mountWithProviders(<InferenceChartControls showXAxisMode showTcoBasis />, {
+      mountWithProviders(<CostControls showTcoBasis />, {
         unofficial: {},
         inference: {
           selectedYAxisMetric,
@@ -313,7 +352,7 @@ describe('Inference ChartControls cost metrics', () => {
   }
 
   it('hides TCO for a cost metric when no TPU hardware is visible', () => {
-    mountWithProviders(<InferenceChartControls showXAxisMode />, {
+    mountWithProviders(<CostControls />, {
       unofficial: {},
       inference: {
         selectedYAxisMetric: 'y_costh',

@@ -14,6 +14,25 @@ import {
 } from './normalizers';
 import { DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants';
 
+describe('GLM-5.3-Flash ingestion', () => {
+  it.each([
+    { infmax_model_prefix: 'glm5.3flash' },
+    { model_prefix: 'glm5.3flash' },
+    { infmax_model_prefix: 'glm5.3flash-fp8' },
+    { infmax_model_prefix: 'glm5.3flash-nvfp4' },
+    { model: 'zai-org/GLM-5.3-Flash' },
+    { model: 'nvidia/GLM-5.3-Flash-NVFP4' },
+  ])('resolves the benchmark or evaluation identity %j', (row) => {
+    expect(resolveModelKey(row)).toBe('glm5.3flash');
+  });
+
+  it('preserves non-Flash GLM identities and does not register unqualified MXFP4 checkpoints', () => {
+    expect(resolveModelKey({ model: 'zai-org/GLM-5.3' })).toBe('glm5.3');
+    expect(resolveModelKey({ model: 'OneNexus/GLM-5.3-MXFP4' })).toBeNull();
+    expect(resolveModelKey({ model: 'OneNexus/GLM-5.3-Flash-MXFP4' })).toBeNull();
+  });
+});
+
 describe('Muse Spark Open ingestion', () => {
   it.each([
     { infmax_model_prefix: 'musespark' },

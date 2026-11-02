@@ -42,17 +42,26 @@ export function chipVsMetaDescription(page: ChipVsPage, locale: 'en' | 'zh'): st
   );
 }
 
-/** Chip page title (before the site suffix), shortened to fit META_TITLE_MAX. */
+/**
+ * Chip page title (before the site suffix), shortened to fit META_TITLE_MAX. English titles lead
+ * with the registry hourly rate and memory, the facts price and memory queries look for; the
+ * Chinese title already names 价格 and is left as is.
+ */
 export function chipMetaTitle(entry: ChipPageEntry, locale: 'en' | 'zh'): string {
-  return fitMetaTitle(
-    locale === 'zh'
-      ? [`${entry.title} 规格、价格与功耗`, `${entry.title} 规格与价格`, `${entry.title} 规格`]
-      : [
-          `${entry.title} Specs, Price & Power`,
-          `${entry.title} Specs & Price`,
-          `${entry.title} Specs`,
-        ],
-  );
+  if (locale === 'zh') {
+    return fitMetaTitle([
+      `${entry.title} 规格、价格与功耗`,
+      `${entry.title} 规格与价格`,
+      `${entry.title} 规格`,
+    ]);
+  }
+  const f = chipFacts(entry);
+  return fitMetaTitle([
+    `${entry.title} Specs: ~${f.price}, ${f.memory}`,
+    `${entry.title}: ~${f.price}, ${f.memory}`,
+    `${entry.title} Specs & Price`,
+    `${entry.title} Specs`,
+  ]);
 }
 
 /** Versus page title (before the site suffix), dropping descriptors until it fits META_TITLE_MAX. */

@@ -8,6 +8,7 @@ import {
 
 import { CAROUSEL_LABELS, CAROUSEL_ORGS } from '@/components/quotes/quotes-data';
 import { Card } from '@/components/ui/card';
+import { isModelVisible } from '@/lib/catalog/data-mappings';
 
 import { FaqQuestionLink } from './faq-question-link';
 
@@ -38,7 +39,7 @@ export const GENERATED_FAQ_DATA = {
     'kimik2.7-code': 'Kimi-K2.7-Code',
     'minimaxm2.7': 'MiniMax-M2.7',
     'glm5.1': 'GLM-5.1',
-  }),
+  }).filter((model) => isModelVisible(model)),
   frameworkNames: [...new Set(Object.values(FRAMEWORK_LABELS))].map((name) =>
     name.replace(/[¹²³⁴⁵⁶⁷⁸⁹⁰]+$/u, ''),
   ),

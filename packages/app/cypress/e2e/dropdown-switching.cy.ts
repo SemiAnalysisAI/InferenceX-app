@@ -3,8 +3,9 @@ describe('Dropdown one-click switching', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/inference');
+    cy.visit('/inference?g_model=DeepSeek-V4-Pro');
     cy.get('[data-testid="inference-chart-display"]').should('exist');
+    cy.get('#chart-0 [data-testid="scenario-selector"]').should('be.visible');
   });
 
   it('clicking another selector closes the first and opens the second in one click', () => {
@@ -53,7 +54,7 @@ describe('Dropdown one-click switching', () => {
         ],
       }).as('availability');
     });
-    cy.visit('/inference');
+    cy.visit('/inference?g_model=DeepSeek-V4-Pro');
     cy.wait('@availability');
     cy.get('[data-testid="inference-chart-display"]').should('exist');
     cy.get('[data-testid="model-selector"]').click();

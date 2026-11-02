@@ -9,10 +9,12 @@ export interface ResultContextProps {
   locale: Locale;
   model?: string;
   workload?: string;
+  scenario?: ReactNode;
   precision?: string;
   metric?: string;
   costTier?: string;
   costTierControl?: ReactNode;
+  tcoBasis?: ReactNode;
   utilization?: string;
   utilizationControl?: ReactNode;
   utilizationControlId?: string;
@@ -29,7 +31,7 @@ export interface ResultContextProps {
   costBasisTestId?: string;
 }
 
-function CaptionField({
+export function CaptionField({
   label,
   value,
   control,
@@ -57,7 +59,7 @@ function CaptionField({
       <dt className="font-medium text-foreground">
         {controlId ? <label htmlFor={controlId}>{label}:</label> : <>{label}:</>}
       </dt>{' '}
-      <dd className="inline-flex items-center" data-testid={testId}>
+      <dd className="inline" data-testid={testId}>
         <span className="no-export inline-flex items-center">{control}</span>
         <span className="export-only hidden">{value}</span>
       </dd>
@@ -69,10 +71,12 @@ export function ResultContext({
   locale,
   model,
   workload,
+  scenario,
   precision,
   metric,
   costTier,
   costTierControl,
+  tcoBasis,
   utilization,
   utilizationControl,
   utilizationControlId,
@@ -134,6 +138,7 @@ export function ResultContext({
       data-testid="result-context"
       className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground"
     >
+      {scenario}
       {model && (
         <div>
           <dt className="inline font-medium text-foreground">{labels.model}:</dt>{' '}
@@ -166,6 +171,7 @@ export function ResultContext({
           testId="result-context-cost-tier"
         />
       )}
+      {tcoBasis}
       {utilization && (
         <CaptionField
           label={labels.utilization}

@@ -42,9 +42,9 @@ export type X86CPUState = 'Idle' | 'FixedSeqLen' | 'Agentic' | 'AgenticOffloadin
 
 const X86_STATE_POWER_W: Record<X86CPUState, number> = {
   Idle: 80,
-  FixedSeqLen: 120,
-  Agentic: 150,
-  AgenticOffloadingOn: 200,
+  FixedSeqLen: 165,
+  Agentic: 180,
+  AgenticOffloadingOn: 195,
 };
 
 const X86_WORKLOAD_STATE: Record<WorkloadState, X86CPUState> = {

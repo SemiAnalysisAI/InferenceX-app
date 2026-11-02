@@ -116,6 +116,45 @@ describe('stitchAppendOnlyPreview', () => {
     ]);
   });
 
+  it('extends a mixed AGG/disagg curve only while each topology keeps its image', () => {
+    const disaggImage = 'lmsysorg/sglang:v0.6.1-disagg';
+    const curve = [
+      published({ conc: 4 }),
+      published({ id: 7002, conc: 2884, disagg: true, image: disaggImage }),
+    ];
+    const added = [row({ conc: 16 }), row({ conc: 1228, disagg: true, image: disaggImage })];
+    expect(
+      stitchAppendOnlyPreview(added, curve, SNAPSHOT)
+        .map((r) => r.conc)
+        .toSorted((a, b) => a - b),
+    ).toEqual([4, 16, 1228, 2884]);
+
+    const aggImageChange = [row({ conc: 16, image: 'lmsysorg/sglang:v0.6.2' }), added[1]];
+    expect(stitchAppendOnlyPreview(aggImageChange, curve, SNAPSHOT)).toEqual(aggImageChange);
+  });
+
+  it('walks the published chain run by run and stops at the first image conflict', () => {
+    const disaggImage = 'lmsysorg/sglang:v0.6.1-disagg';
+    const full = [
+      published({ conc: 4, image: 'lmsysorg/sglang:v0.6.0' }),
+      published({ id: 7002, conc: 2884, disagg: true, image: disaggImage }),
+    ];
+    const appended = published({
+      id: 7003,
+      conc: 4096,
+      disagg: true,
+      image: disaggImage,
+      date: '2026-10-25',
+      workflow_run_id: 2400,
+    });
+    const added = row({ conc: 16 });
+    expect(
+      stitchAppendOnlyPreview([added], [...full, appended], SNAPSHOT)
+        .map((r) => r.conc)
+        .toSorted((a, b) => a - b),
+    ).toEqual([16, 4096]);
+  });
+
   it('does not inherit across an image change or from a mixed-image run', () => {
     const differentImage = published({
       prefill_tp: 4,

@@ -21,7 +21,6 @@ import {
   LANDING_BANNER_DISMISSED_ATTRIBUTE,
 } from '@/lib/nudges/landing-banner';
 import { BottomToast } from '@/components/ui/bottom-toast';
-import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { CoachMark } from '@/components/ui/coach-mark';
 import { Button } from '@/components/ui/button';
 import { NewBadge } from '@/components/ui/new-badge';
@@ -80,8 +79,6 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
   const triggerCountsRef = useRef<Record<string, number>>({});
   const eventDetailRef = useRef<Record<string, unknown> | null>(null);
   const sessionDismissedRef = useRef<Set<string>>(new Set());
-
-  const isMobileViewport = useIsMobileViewport();
 
   const activeBanner = activeBannerId ? scopeNudges.find((n) => n.id === activeBannerId) : null;
   const activeOverlay = activeOverlayId ? scopeNudges.find((n) => n.id === activeOverlayId) : null;
@@ -277,7 +274,7 @@ export function NudgeEngine({ scope }: NudgeEngineProps) {
     };
   }, [activeBannerId, activeOverlayId, activeCoachMarkId, scopeNudges]);
 
-  const deferToastForCoachMark = isMobileViewport && Boolean(activeCoachMark?.content.anchor);
+  const deferToastForCoachMark = Boolean(activeCoachMark?.content.anchor);
 
   return (
     <>

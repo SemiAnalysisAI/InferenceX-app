@@ -1,6 +1,58 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { EXPORT_FOOTER_FALLBACK_HOST, getExportFooterText } from './export-footer';
+import {
+  drawExportFooter,
+  EXPORT_FOOTER_FALLBACK_HOST,
+  getExportFooterText,
+} from './export-footer';
+
+describe('drawExportFooter', () => {
+  it.each([
+    { backgroundColor: '#ffffff', color: '#1e1e1e', fontFamily: '"DM Sans", sans-serif' },
+    { backgroundColor: '#131416', color: '#eaebec', fontFamily: 'serif' },
+  ])('draws the supplied theme at the footer bounds: $backgroundColor', (style) => {
+    const fills: string[] = [];
+    const ctx = {
+      fillStyle: '',
+      fillRect: vi.fn(() => fills.push(ctx.fillStyle)),
+      measureText: vi.fn(() => ({ width: 400 })),
+      fillText: vi.fn(() => fills.push(ctx.fillStyle)),
+      font: '',
+      textAlign: '',
+      textBaseline: '',
+    };
+
+    drawExportFooter(ctx as unknown as CanvasRenderingContext2D, style, 1200, 720, 96, 40);
+
+    expect(ctx.fillRect).toHaveBeenCalledExactlyOnceWith(0, 720, 1200, 96);
+    expect(fills).toEqual([style.backgroundColor, style.color]);
+    expect(ctx.font).toBe(`bold 40px ${style.fontFamily}`);
+    expect(ctx.textAlign).toBe('center');
+    expect(ctx.textBaseline).toBe('middle');
+    expect(ctx.fillText).toHaveBeenCalledExactlyOnceWith(getExportFooterText(), 600, 768, 1152);
+  });
+
+  it('fits a long route using the selected font at replay resolution', () => {
+    const ctx = {
+      fillRect: vi.fn(),
+      measureText: vi.fn(() => ({ width: 800 })),
+      fillText: vi.fn(),
+      font: '',
+    };
+
+    drawExportFooter(
+      ctx as unknown as CanvasRenderingContext2D,
+      { backgroundColor: '#131416', color: '#eaebec', fontFamily: 'serif' },
+      448,
+      240,
+      48,
+      16,
+    );
+
+    expect(ctx.font).toBe('bold 8px serif');
+    expect(ctx.fillText).toHaveBeenCalledExactlyOnceWith(getExportFooterText(), 224, 264, 400);
+  });
+});
 
 describe('getExportFooterText', () => {
   it('joins the current hostname with the route path', () => {

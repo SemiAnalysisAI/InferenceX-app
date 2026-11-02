@@ -1,14 +1,9 @@
 // @vitest-environment jsdom
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-const pathnameStub = vi.hoisted(() => ({ value: '/' }));
-
-vi.mock('next/navigation', () => ({
-  usePathname: () => pathnameStub.value,
-}));
-
+import { stubMatchMedia } from '@/test/match-media-stub';
 import { MinecraftSplash } from './minecraft-splash';
 
 let container: HTMLDivElement;
@@ -18,12 +13,8 @@ function render() {
   act(() => root.render(<MinecraftSplash />));
 }
 
-function splashText(): string | null {
-  return container.querySelector('.splash-text')?.textContent ?? null;
-}
-
 beforeEach(() => {
-  pathnameStub.value = '/';
+  stubMatchMedia({ '(min-width: 1024px)': true });
   document.documentElement.className = '';
   container = document.createElement('div');
   document.body.append(container);
@@ -34,17 +25,13 @@ afterEach(() => {
   act(() => root.unmount());
   container.remove();
   document.documentElement.className = '';
+  window.history.replaceState({}, '', '/');
 });
 
 describe('standard-page announcement', () => {
-  it('announces AgentX on standard pages', () => {
+  it.each(['/', '/zh'])('does not render a splash announcement on %s', (pathname) => {
+    window.history.replaceState({}, '', pathname);
     render();
-    expect(splashText()).toBe('AgentX is here!!');
-  });
-
-  it('announces AgentX in Chinese on /zh pages', () => {
-    pathnameStub.value = '/zh';
-    render();
-    expect(splashText()).toBe('AgentX 来了！！');
+    expect(container.childElementCount).toBe(0);
   });
 });

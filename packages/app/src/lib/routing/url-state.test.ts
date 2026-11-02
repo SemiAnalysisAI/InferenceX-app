@@ -69,6 +69,17 @@ describe('PARAM_DEFAULTS', () => {
     expect(PARAM_DEFAULTS.i_gradlabel).toBe('');
   });
 
+  it('defaults framework labels on and preserves only the off override in share links', async () => {
+    setupWindow('?i_frameworklabel=0');
+    const { PARAM_DEFAULTS, readUrlParams, buildShareUrl, writeUrlParams } =
+      await import('@/lib/routing/url-state');
+    expect(PARAM_DEFAULTS.i_frameworklabel).toBe('1');
+    expect(readUrlParams().i_frameworklabel).toBe('0');
+    expect(new URL(buildShareUrl()).searchParams.get('i_frameworklabel')).toBe('0');
+    writeUrlParams({ i_frameworklabel: '1' });
+    expect(new URL(buildShareUrl()).searchParams.has('i_frameworklabel')).toBe(false);
+  });
+
   it.each(['1', '2'])(
     'preserves frontier mode %s and ignores retired hinterland state in share links',
     async (mode) => {
@@ -301,6 +312,31 @@ describe('writeUrlParams + buildShareUrl', () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
+  });
+
+  it.each(['/inference', '/zh/inference'])(
+    'keeps the selected legacy model in share links from %s',
+    async (pathname) => {
+      setupWindow('', pathname);
+      const { writeUrlParams, buildShareUrl } = await import('@/lib/routing/url-state');
+      const { setInferenceNavigationModel } =
+        await import('@/lib/routing/inference-navigation-state');
+      setInferenceNavigationModel('DeepSeek-V4-Pro');
+      writeUrlParams({ g_model: 'DeepSeek-V4-Pro' });
+      await vi.advanceTimersByTimeAsync(200);
+      const url = new URL(buildShareUrl());
+      expect(url.pathname).toBe(pathname);
+      expect(url.searchParams.get('g_model')).toBe('DeepSeek-V4-Pro');
+    },
+  );
+
+  it('does not add the inference navigation default to other tabs', async () => {
+    setupWindow('', '/historical');
+    const { buildShareUrl } = await import('@/lib/routing/url-state');
+    const { setInferenceNavigationModel } =
+      await import('@/lib/routing/inference-navigation-state');
+    setInferenceNavigationModel('DeepSeek-V4-Pro');
+    expect(new URL(buildShareUrl()).searchParams.has('g_model')).toBe(false);
   });
 
   it('stores params and includes them in share URL after flush', async () => {

@@ -783,6 +783,7 @@ export default function ThroughputBarChart({
       }
       tooltip={tooltip}
       onRender={onRender}
+      onExportRender={onRender}
       legendElement={legendElement}
       caption={caption}
     />

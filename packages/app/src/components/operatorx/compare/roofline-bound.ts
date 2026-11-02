@@ -1,4 +1,7 @@
-import type { ComparisonCase } from '@semianalysisai/inferencex-db/operatorx/compare';
+import type {
+  ComparisonCase,
+  ComputePrecision,
+} from '@semianalysisai/inferencex-db/operatorx/compare';
 
 import { peakBandwidthTBs, peakTflops, scaleUpTBs } from './hardware';
 
@@ -38,4 +41,23 @@ export function rooflineBound(c: ComparisonCase, hw: string): RooflineBound | nu
     link = c.work.links.reduce((t, l) => t + at(l.bytes, up), 0);
   }
   return { us: compute + memory + link, compute, memory, link };
+}
+
+/**
+ * Where a case sits against a GPU's ridge at `precision`, as a share of it: on the slope,
+ * the share of peak its bound allows (its effective intensity over the ridge point); past
+ * the ridge, or without a bound, plain FLOP/byte over the ridge point. At least 1 means
+ * compute-bound. Null when the case has no counts or a peak is unknown.
+ */
+export function ridgeShare(
+  c: ComparisonCase,
+  hw: string,
+  precision: ComputePrecision | null,
+): number | null {
+  const peak = precision ? peakTflops(hw, precision) : null;
+  const bw = peakBandwidthTBs(hw);
+  if (!peak || !bw || !c.flops || !c.bytes) return null;
+  const bound = rooflineBound(c, hw);
+  const reach = bound ? c.flops / (peak * 1e6) / bound.us : null;
+  return reach !== null && reach < 0.999 ? reach : (c.flops / c.bytes) * (bw / peak);
 }

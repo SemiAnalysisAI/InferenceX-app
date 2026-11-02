@@ -862,6 +862,6 @@ export const operations: ApiOperation[] = [
     parameters,
     responses,
     responseShapeName: 'InferenceView',
-    curlUrl: `${API_BASE_URL}/api/v1/views/inference?model=DeepSeek-V4-Pro&metric=y_tokensPerDollarN&sequence=8k-1k`,
+    curlUrl: `${API_BASE_URL}/api/v1/views/inference?model=Kimi-K3&metric=y_tokensPerDollarN&sequence=agentic-traces`,
   },
 ];

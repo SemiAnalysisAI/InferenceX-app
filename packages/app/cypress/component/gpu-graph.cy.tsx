@@ -29,6 +29,120 @@ const mountGpuGraph = (
 ) => mountWithProviders(tree, { unofficial: {}, ...overrides });
 
 describe('GPUGraph', () => {
+  it('toggles framework suffixes while keeping comparison dates and hardware labels', () => {
+    const data = [8, 16, 32].map((x) =>
+      createMockInferenceData({
+        hwKey: 'b200_trt',
+        x,
+        y: 300 - x,
+        date: '2025-03-01',
+        precision: Precision.FP4,
+      }),
+    );
+    function FrameworkLabels() {
+      const [showFrameworkLabel, setShowFrameworkLabel] = useState(true);
+      const value = createMockInferenceContextValues({
+        hardwareConfig: hwConfig,
+        selectedGPUs: ['b200_trt'],
+        selectedDates: ['2025-03-01'],
+        activeDates: new Set(['2025-03-01_b200_trt']),
+        selectedPrecisions: [Precision.FP4],
+        showLineLabels: true,
+        showFrameworkLabel,
+        setShowFrameworkLabel,
+      });
+      return (
+        <InferenceContextsProvider data={value} filters={value} display={value} actions={value}>
+          <div style={{ width: 1000, height: 700 }}>
+            <GPUGraph
+              chartId="gpu-framework-labels"
+              modelLabel="DeepSeek R1"
+              data={data}
+              xLabel="Interactivity"
+              yLabel="Throughput / Chip (tok/s)"
+              chartDefinition={createMockChartDefinition({
+                chartType: 'interactivity',
+                y_tpPerGpu_roofline: 'upper_left',
+              })}
+            />
+          </div>
+        </InferenceContextsProvider>
+      );
+    }
+    mountGpuGraph(<FrameworkLabels />);
+    const labels = '[data-testid="gpu-graph"] .line-label .ll-text';
+    cy.get(labels).should('contain.text', 'TRTLLM').and('contain.text', '2025-03-01');
+    cy.get('[data-testid="legend-advanced-toggle"]').click();
+    cy.get('#gpu-framework-label').should('have.attr', 'data-state', 'checked').click();
+    cy.get(labels)
+      .should('not.contain.text', 'TRTLLM')
+      .and('contain.text', 'B200')
+      .and('contain.text', '2025-03-01');
+    cy.get('#gpu-framework-label').click();
+    cy.get(labels).should('contain.text', 'TRTLLM').and('contain.text', '2025-03-01');
+  });
+
+  it('keeps GPU-count and parallelism labels independent', () => {
+    const data = [
+      createMockInferenceData({
+        hwKey: 'h100',
+        x: 64,
+        y: 210,
+        tp: 8,
+        ep: 1,
+        physicalChips: 4,
+        date: '2025-03-01',
+        precision: Precision.FP4,
+      }),
+    ];
+    function IndependentLabels() {
+      const [showPointLabels, setShowPointLabels] = useState(false);
+      const [useAdvancedLabels, setUseAdvancedLabels] = useState(false);
+      const value = createMockInferenceContextValues({
+        hardwareConfig: hwConfig,
+        selectedGPUs: ['h100'],
+        selectedDates: ['2025-03-01'],
+        activeDates: new Set(['2025-03-01_h100']),
+        selectedPrecisions: [Precision.FP4],
+        showPointLabels,
+        setShowPointLabels,
+        useAdvancedLabels,
+        setUseAdvancedLabels,
+        showConcurrencyLabels: false,
+      });
+      return (
+        <InferenceContextsProvider data={value} filters={value} display={value} actions={value}>
+          <div style={{ width: 1000, height: 600 }}>
+            <GPUGraph
+              chartId="gpu-independent-labels"
+              modelLabel="DeepSeek R1"
+              data={data}
+              xLabel="Interactivity"
+              yLabel="Throughput"
+              chartDefinition={defaultChartDef}
+            />
+          </div>
+        </InferenceContextsProvider>
+      );
+    }
+    mountGpuGraph(<IndependentLabels />);
+    const labels = '[data-testid="gpu-graph"] .dot-group .point-label';
+    cy.get('#gpu-parallelism-labels').click();
+    cy.get('[data-testid="legend-advanced-toggle"]').click();
+    cy.get('#gpu-point-labels').should('have.attr', 'data-state', 'unchecked');
+    cy.get(labels).filter(':visible').first().should('have.text', 'TP8');
+    cy.get('#gpu-point-labels').click();
+    cy.get(labels).filter(':visible').first().should('have.text', '4TP8');
+    cy.get('#gpu-parallelism-labels').click();
+    cy.get('#gpu-point-labels').should('have.attr', 'data-state', 'checked');
+    cy.get(labels).filter(':visible').first().should('have.text', '4');
+    cy.get('#gpu-point-labels').click();
+    cy.get(labels).filter(':visible').should('have.length', 0);
+    cy.get('label[for="gpu-offloading-label"]').should('have.text', 'Offloading Label');
+    cy.get('#gpu-offloading-label').should('have.attr', 'data-state', 'checked').click();
+    cy.get('@setShowOffloadingLabel').should('have.been.calledWith', false);
+  });
+
   it('renders SVG within chart container', () => {
     const data = [
       createMockInferenceData({
@@ -440,6 +554,13 @@ describe('GPUGraph', () => {
 
     cy.get('.sidebar-legend').should('exist');
     cy.get('.sidebar-legend label').should('have.length.greaterThan', 0);
+    cy.get('[data-testid="legend-advanced-toggle"]').should('have.attr', 'aria-expanded', 'false');
+    cy.get('#gpu-parallelism-labels')
+      .should('be.visible')
+      .and('have.attr', 'data-state', 'unchecked');
+    cy.get('#gpu-parallelism-labels')
+      .parents('[data-testid="legend-advanced-controls"]')
+      .should('not.exist');
   });
 
   it('places and clears perf rulers across chip history comparison curves', () => {
@@ -741,6 +862,7 @@ describe('GPU comparison with unofficial runs', () => {
   }) {
     const [activeDates, setActiveDates] = useState(new Set(ALL_SERIES));
     const [overlayHw, setOverlayHw] = useState(new Set(['b200']));
+    const [showOffloadingLabel, setShowOffloadingLabel] = useState(true);
     const value = createMockInferenceContextValues({
       hardwareConfig: hwConfig,
       selectedGPUs: ['h100'],
@@ -752,6 +874,8 @@ describe('GPU comparison with unofficial runs', () => {
       selectedPrecisions: [Precision.FP4],
       showLineLabels: true,
       ...context,
+      showOffloadingLabel,
+      setShowOffloadingLabel,
     });
     return (
       <UnofficialRunContext.Provider value={{ ...unofficial, activeOverlayHwTypes: overlayHw }}>
@@ -811,6 +935,31 @@ describe('GPU comparison with unofficial runs', () => {
       />,
     );
   };
+
+  it('toggles official and unofficial offload halos without removing history points', () => {
+    mountComparison(
+      createMockChartDefinition({ chartType: 'interactivity', y_tpPerGpu_roofline: 'upper_left' }),
+      [8, 16, 32].map((x) => ({ ...official(DATES[0], x, 300 - x), offload_mode: 'on' })),
+      [8, 16, 32].map((x) => ({ ...overlay(x, 400 - x), offload_mode: 'on' })),
+    );
+    cy.get('#gpu-overlay .offload-halo').should('have.length', 6);
+    cy.get('#gpu-overlay .unofficial-overlay-pt .offload-halo')
+      .first()
+      .should('have.attr', 'stroke', overlayRunColor(0));
+    cy.get('[data-testid="legend-advanced-toggle"]').click();
+    cy.get('#gpu-offloading-label').should('have.attr', 'data-state', 'checked').click();
+    cy.get('#gpu-overlay .offload-halo').should('not.exist');
+    cy.get('#gpu-overlay .dot-group').should('have.length', 3);
+    cy.get('#gpu-overlay .unofficial-overlay-pt').should('have.length', 3);
+    cy.get('#gpu-overlay .roofline-path').should('have.length.at.least', 2);
+    cy.get('#gpu-parallelism-labels').click();
+    cy.get('#gpu-overlay .offload-halo').should('not.exist');
+    cy.get('#gpu-offloading-label').click();
+    cy.get('#gpu-overlay .offload-halo').should('have.length', 6);
+    cy.get('#gpu-overlay .unofficial-overlay-pt .offload-halo')
+      .first()
+      .should('have.attr', 'stroke', overlayRunColor(0));
+  });
 
   it('keeps unofficial runs on the date comparison in the run color and dash', () => {
     mountComparison(

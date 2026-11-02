@@ -107,7 +107,10 @@ import {
   isModelDeprecated,
   sequenceKind,
 } from '@/lib/catalog/data-mappings';
-import { useComparisonChangelogs } from '@/hooks/api/use-comparison-changelogs';
+import {
+  shouldFetchComparisonChangelogs,
+  useComparisonChangelogs,
+} from '@/hooks/api/use-comparison-changelogs';
 import {
   derivedModeRoofline,
   isAgenticOnlyXAxisMode,
@@ -125,11 +128,10 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import { PowerXTutorialCta } from '@/components/powerx/powerx-tutorial-cta';
 
 import { ATOM_FOOTNOTE_MARKER, AtomEngineFootnote } from '@/components/ui/atom-engine-footnote';
-import { AgenticOptimizationNote } from '@/components/inference/ui/AgenticOptimizationNote';
-import { CacheReuseLink } from '@/components/inference/ui/CacheReuseLink';
 import { OffloadHaloLegendKey } from '@/components/inference/ui/OffloadHaloLegendKey';
 import { ActiveQuickFilters } from '@/components/inference/ui/ActiveQuickFilters';
 import { ResultContext } from '@/components/ui/result-context';
+import { InferenceScenarioSelector } from './InferenceScenarioSelector';
 import { ModelLogo } from '@/components/ui/model-logo';
 
 import ChartNotices from './ChartNotices';
@@ -137,6 +139,7 @@ import { MetricExplanation } from './MetricExplanation';
 import { OptionInfo } from '@/components/ui/option-info';
 import ChartControls from './ChartControls';
 import { CostTierSelector } from './CostTierSelector';
+import { TcoBasisCaption } from './TcoBasisCaption';
 import { InferenceTcoBadges } from './InferenceTcoBadges';
 import { XAxisModeSelector } from './XAxisModeSelector';
 import ComparisonChangelog from './ComparisonChangelog';
@@ -341,6 +344,7 @@ export default function ChartDisplay({
     selectedXAxisMode,
     tokenRevenuePricing,
     showLineLabels,
+    showOffloadingLabel,
     powerCompare,
     tokenBasis,
   } = useInferenceDisplay();
@@ -410,6 +414,13 @@ export default function ChartDisplay({
   const workflowInfoBenchmarkType =
     selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : undefined;
 
+  const [changelogOpened, setChangelogOpened] = useState(false);
+  const changelogsEnabled = shouldFetchComparisonChangelogs({
+    embedded,
+    changelogOpened,
+    selectedDateRange,
+    selectedDates,
+  });
   const {
     changelogs,
     loading: changelogsLoading,
@@ -419,6 +430,7 @@ export default function ChartDisplay({
     selectedDateRange,
     dateRangeAvailableDates,
     workflowInfoBenchmarkType,
+    changelogsEnabled,
   );
 
   const modelDbKeys = useMemo(
@@ -1128,31 +1140,48 @@ export default function ChartDisplay({
               selectedGPUs.length > 0 &&
               ((selectedDateRange.startDate && selectedDateRange.endDate) ||
                 selectedDates.length > 0);
+            const powerXWherePanelsOnly =
+              powerXLayout && powerXTab === 'where' && powerCompare !== 'roles' && !isGpuComparison;
             const footerOverlay = overlayDataByChartType[graph.chartDefinition.chartType];
             const footerPoints = [
               ...graph.data,
               ...(footerOverlay?.data ?? []),
               ...(footerOverlay?.clippedData ?? []).map((entry) => entry.point),
             ];
-            const hasOffloadHalo = footerPoints.some((point) => point.offload_mode === 'on');
-            const hasAtomSeries = footerPoints.some(
+            const hasOffloadHalo =
+              showOffloadingLabel && footerPoints.some((point) => point.offload_mode === 'on');
+            const footerOfficialRows = [
+              ...graph.data,
+              ...(graph.clippedData ?? []).map((entry) => entry.point),
+            ];
+            const footerOverlayRows = footerOverlay
+              ? {
+                  ...footerOverlay,
+                  data: [
+                    ...footerOverlay.data,
+                    ...(footerOverlay.clippedData ?? []).map((entry) => entry.point),
+                  ],
+                }
+              : footerOverlay;
+            const selectedFooterRows = isGpuComparison
+              ? visibleDateComparisonRows(footerOfficialRows, footerOverlayRows)
+              : visibleComparisonRows(footerOfficialRows, footerOverlayRows);
+            const hasAtomSeries = [
+              ...selectedFooterRows.officialRows,
+              ...selectedFooterRows.overlayRows,
+            ].some(
               (point) =>
                 point.framework !== undefined &&
                 getFrameworkLabel(point.framework).includes(ATOM_FOOTNOTE_MARKER),
             );
             const footerNotices =
-              hasOffloadHalo || isAgenticSequence || hasAtomSeries ? (
+              hasOffloadHalo || residentSequenceLengths ? (
                 <>
                   <div
                     data-testid="chart-status-notes"
                     className="flex flex-wrap items-center gap-x-5 gap-y-2"
                   >
                     {hasOffloadHalo && <OffloadHaloLegendKey />}
-                    {isAgenticSequence && <AgenticOptimizationNote />}
-                    {isAgenticSequence && !minimalChrome && <CacheReuseLink />}
-                    {hasAtomSeries && (
-                      <AtomEngineFootnote className="min-w-0 flex-[1_1_24rem] text-xs leading-5" />
-                    )}
                   </div>
                   {residentSequenceLengths && !minimalChrome && !powerXSurface && (
                     <p
@@ -1184,7 +1213,7 @@ export default function ChartDisplay({
                   {!minimalChrome && renderChartButtons(graph, graphIndex)}
                   <Card data-coach-mark-root="">
                     {(() => {
-                      const chartCaption = (
+                      const chartHeading = (
                         <>
                           <div className="flex items-start gap-1">
                             <Heading as="h2" level="card">
@@ -1241,8 +1270,24 @@ export default function ChartDisplay({
                               </OptionInfo>
                             )}
                           </div>
+                        </>
+                      );
+                      const chartContext = (
+                        <div>
                           <ResultContext
                             locale={locale}
+                            scenario={
+                              !powerXSurface && !embedded && !minimalChrome ? (
+                                <InferenceScenarioSelector
+                                  variant="caption"
+                                  id={
+                                    graphIndex === 0
+                                      ? 'scenario-select'
+                                      : `scenario-select-${graphIndex}`
+                                  }
+                                />
+                              ) : undefined
+                            }
                             deprecated={isModelDeprecated(selectedModel)}
                             precision={
                               embedded
@@ -1262,6 +1307,13 @@ export default function ChartDisplay({
                             })()}
                             costTierControl={
                               embedded || minimalChrome ? undefined : <CostTierSelector />
+                            }
+                            tcoBasis={
+                              <TcoBasisCaption
+                                hardwareKeys={captionHwKeys}
+                                source="inference"
+                                interactive={!embedded && !minimalChrome}
+                              />
                             }
                             date={selectedRunDate}
                             dates={selectedDates}
@@ -1366,7 +1418,21 @@ export default function ChartDisplay({
                               </p>
                             )}
                           <UnofficialDomainNotice />
+                        </div>
+                      );
+                      const chartCaption = (
+                        <>
+                          {chartHeading}
+                          {powerXSurface && chartContext}
                         </>
+                      );
+                      const chartFooter = (!powerXSurface || hasAtomSeries) && (
+                        <div className="mt-3">
+                          {!powerXSurface && chartContext}
+                          {hasAtomSeries && (
+                            <AtomEngineFootnote className="mt-2 text-xs leading-5" />
+                          )}
+                        </div>
                       );
 
                       if (getViewMode(graphIndex) === 'table') {
@@ -1395,6 +1461,7 @@ export default function ChartDisplay({
                               chartDefinition={graph.chartDefinition}
                               selectedYAxisMetric={selectedYAxisMetric}
                             />
+                            {chartFooter}
                           </>
                         );
                       }
@@ -1412,6 +1479,7 @@ export default function ChartDisplay({
                                 overlayDataByChartType[graph.chartDefinition.chartType] ?? undefined
                               }
                               caption={chartCaption}
+                              footer={chartFooter}
                               comparison={Boolean(isGpuComparison)}
                               runNumbering={runNumbering}
                             />
@@ -1429,6 +1497,7 @@ export default function ChartDisplay({
                             yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
                             chartDefinition={graph.chartDefinition}
                             caption={chartCaption}
+                            footer={chartFooter}
                             overlayData={footerOverlay ?? undefined}
                             runNumbering={runNumbering}
                           />
@@ -1445,6 +1514,7 @@ export default function ChartDisplay({
                             yLabel={metricLabel(graph.chartDefinition, selectedYAxisMetric, locale)}
                             chartDefinition={graph.chartDefinition}
                             caption={caption}
+                            footer={chartFooter}
                             overlayData={
                               overlayDataByChartType[graph.chartDefinition.chartType] ?? undefined
                             }
@@ -1456,7 +1526,7 @@ export default function ChartDisplay({
                       // Where view: the caption stays at the top of the card and the chip
                       // comparison is the visual; the boundary curves live on Power draw
                       // under Count: All.
-                      if (powerXLayout && powerXTab === 'where' && powerCompare !== 'roles')
+                      if (powerXWherePanelsOnly)
                         return <div className="order-first">{chartCaption}</div>;
                       if (powerXLayout && powerXHeadroom) {
                         const { officialRows, overlayRows } = isGpuComparison
@@ -1497,11 +1567,11 @@ export default function ChartDisplay({
                                 />
                                 {powerCompare !== 'roles' && (
                                   <PowerXFacilitySwitch
-                                    pue={
-                                      [...officialRows, ...overlayRows]
-                                        .map((point) => point.modeledSystemPower)
-                                        .find((model) => model?.status === 'supported')?.pue ?? null
-                                    }
+                                    pues={[...officialRows, ...overlayRows].flatMap((point) =>
+                                      point.modeledSystemPower?.status === 'supported'
+                                        ? [point.modeledSystemPower.pue]
+                                        : [],
+                                    )}
                                   />
                                 )}
                               </div>
@@ -1516,6 +1586,9 @@ export default function ChartDisplay({
                               showRoles={powerCompare === 'roles'}
                               placement={powerCompare === 'roles' ? 'after' : 'before'}
                             />
+                            {powerXWherePanelsOnly && hasAtomSeries && (
+                              <AtomEngineFootnote className="mt-2 text-xs leading-5" />
+                            )}
                           </>
                         );
                       })()}
@@ -1577,9 +1650,9 @@ export default function ChartDisplay({
                     />
                   )}
                   <ChartControls
+                    scenarioInFooter={!powerXSurface}
                     showXAxisMode
                     runContext={selectedGPUs.length === 0 ? <WorkflowInfoDisplay /> : undefined}
-                    showTcoBasis={[...captionHwKeys].some((key) => key.split('_')[0] === 'tpuv7')}
                     powerXControls={
                       powerXLayout && powerXMounted
                         ? (slots) => (
@@ -1609,6 +1682,10 @@ export default function ChartDisplay({
                   selectedSequence={selectedSequence}
                   defaultExpanded={!embedded}
                   loading={changelogsLoading}
+                  deferred={!changelogsEnabled}
+                  onExpandedChange={(expanded) => {
+                    if (expanded) setChangelogOpened(true);
+                  }}
                   totalDatesQueried={totalDatesQueried}
                   selectedDates={selectedDates}
                   selectedDateRange={selectedDateRange}
@@ -1641,6 +1718,12 @@ export default function ChartDisplay({
         aria-busy={isRefetching || undefined}
       >
         {displayGraphs}
+        {!powerXSurface && !embedded && !minimalChrome && renderableGraphs.length === 0 && (
+          <ResultContext
+            locale={locale}
+            scenario={<InferenceScenarioSelector variant="caption" />}
+          />
+        )}
       </div>
     </div>
   );

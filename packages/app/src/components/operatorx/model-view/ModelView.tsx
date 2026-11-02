@@ -665,7 +665,9 @@ export function ModelView() {
       .map(([key, n]) => ({ key, label: parallelLabel(key), cases: n }))
       .sort((a, b) => compareSplits(a.key, b.key));
   }, [gemm.data, moe.data, attention.data]);
-  const split = requestedSplit ?? splits[0]?.key ?? '';
+  // A split the model has; any other (e.g. the Data API's `1` for one device) opens on the
+  // first, as the compare API answers it.
+  const split = splits.find((s) => s.key === requestedSplit)?.key ?? splits[0]?.key ?? '';
   // A view without cases at the split falls back to another; its cases are not this split's.
   const atSplit = (v: ComparisonView | undefined) => (v?.parallel === split ? v : undefined);
   const gemmView = atSplit(gemm.data);
@@ -697,10 +699,10 @@ export function ModelView() {
   const hardware = picked ? available.filter((h) => picked.includes(h)) : available;
   const precisionCounts = useMemo(() => {
     const m = new Map<ComputePrecision, number>();
-    for (const v of views)
+    for (const v of atSplitViews)
       for (const c of v.cases) m.set(c.computePrecision, (m.get(c.computePrecision) ?? 0) + 1);
     return m;
-  }, [views]);
+  }, [atSplitViews]);
   const precisions = PRECISIONS.filter((p) => precisionCounts.has(p));
   const precision =
     pickedPrecision && precisions.includes(pickedPrecision)

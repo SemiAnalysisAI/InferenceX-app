@@ -2,6 +2,7 @@ import { LIFECYCLE_DEFAULTS } from '@/components/calculator/lifecycle';
 import { dashboardRouteForPathname, getDashboardRoute } from '@/lib/routing/dashboard-routes';
 import { routeModelForPathname } from '@/lib/routing/model-routes';
 import { replaceClientPathname } from '@/lib/routing/client-navigation';
+import { getInferenceNavigationModel } from '@/lib/routing/inference-navigation-state';
 import {
   PROFIT_ROUTE_PARAMS,
   profitRouteParams,
@@ -40,6 +41,8 @@ const URL_STATE_KEYS = [
   'i_legend',
   'i_advlabel',
   'i_conclabel',
+  'i_offloadlabel',
+  'i_frameworklabel',
   'i_gradlabel',
   'i_frontier',
   'i_linelabel',
@@ -130,6 +133,8 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   i_legend: '',
   i_advlabel: '',
   i_conclabel: '',
+  i_offloadlabel: '1',
+  i_frameworklabel: '1',
   i_gradlabel: '',
   i_frontier: '',
   i_linelabel: '',
@@ -310,6 +315,12 @@ function collectTabParams(): URLSearchParams {
     ) {
       filtered.set(key, value);
     }
+  }
+
+  // Bare inference now has a different entry default than the retained legacy model.
+  if (/^(?:\/zh)?\/inference\/?$/u.test(window.location.pathname)) {
+    const model = getInferenceNavigationModel();
+    if (model) filtered.set('g_model', model);
   }
 
   if (routeModelForPathname(window.location.pathname) === filtered.get('g_model')) {

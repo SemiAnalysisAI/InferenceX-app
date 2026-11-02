@@ -34,6 +34,15 @@ export const FACILITY_PUE_NOTE: Record<Locale, string> = {
   zh: `数据中心功耗 = 实测 IT 功耗 × 假定 PUE（风冷 ${AIR_COOLED_SYSTEM_PUE}，液冷 ${LIQUID_COOLED_RACK_PUE}）。`,
 };
 
+/** The PUE label for a set of systems: one value, a `min–max` range, or `—` when none. */
+export const formatPueRange = (pues: readonly number[]): string => {
+  const finite = pues.filter((pue) => Number.isFinite(pue));
+  if (finite.length === 0) return '—';
+  const low = Math.min(...finite);
+  const high = Math.max(...finite);
+  return low === high ? String(low) : `${low}–${high}`;
+};
+
 export const isSystemPowerHardware = (hardware: string): hardware is SystemPowerHardware =>
   Object.hasOwn(CHASSIS_SYSTEMS, hardware);
 

@@ -17,6 +17,37 @@ const respond = (path: string) =>
   });
 
 describe('next.config custom routes', () => {
+  it.each(['/inference', '/zh/inference'])(
+    'temporarily redirects %s to Kimi K3 and preserves query filters',
+    async (path) => {
+      for (const query of [
+        '',
+        '?i_seq=agentic-traces&i_prec=fp4&unofficialrun=123&utm_source=test',
+      ]) {
+        const response = await respond(`${path}${query}`);
+        expect(response.status).toBe(307);
+        expect(getRedirectUrl(response)).toBe(
+          `https://inferencex.semianalysis.com${path}/kimi-k3${query}`,
+        );
+      }
+    },
+  );
+
+  it.each(['/inference', '/zh/inference'])(
+    'preserves explicit model selections on %s',
+    async (path) => {
+      for (const suffix of [
+        '?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces',
+        '/deepseek-v4',
+        '/kimi-k3',
+      ]) {
+        const response = await respond(`${path}${suffix}`);
+        expect(response.status).toBe(200);
+        expect(getRedirectUrl(response)).toBeNull();
+      }
+    },
+  );
+
   it.each([
     ['/about/', '/about'],
     ['/zh/blog/some-post/', '/zh/blog/some-post'],

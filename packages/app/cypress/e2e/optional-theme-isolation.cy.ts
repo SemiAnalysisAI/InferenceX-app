@@ -83,6 +83,7 @@ describe('optional themes stay off the default page', () => {
     ['light', '/zh', 390],
     ['dark', '/zh', 1440],
     ['default', '/', 390],
+    ['default', '/zh', 1440],
     ['system', '/zh', 1440],
   ] as const) {
     it(`${theme} ${route} at ${width}px does not load theme code, assets or fonts`, () => {
@@ -99,6 +100,10 @@ describe('optional themes stay off the default page', () => {
         },
       });
       if (theme === 'light' || theme === 'dark') cy.get('html').should('have.class', theme);
+      if (theme === 'default') {
+        cy.get('html').should('have.class', 'light').and('not.have.class', 'dark');
+        cy.window().should((win) => expect(win.localStorage.getItem('theme')).to.equal(null));
+      }
       cy.get('[data-testid="theme-toggle"]')
         .should('have.attr', 'aria-label')
         .and('contain', 'currently');
@@ -111,13 +116,15 @@ describe('optional themes stay off the default page', () => {
       cy.scrollTo('bottom');
       expectNoOptionalResources(requests);
       cy.document().then((doc) => {
-        if (theme !== 'light') return;
+        if (theme !== 'light' && theme !== 'default') return;
         const baseline = seo(doc);
         cy.get('[data-testid="theme-toggle"]').click();
         cy.get('html').should('have.class', 'dark');
         cy.window().should((win) => expect(win.localStorage.getItem('theme')).to.equal('dark'));
         cy.document().should((current) => expect(seo(current)).to.deep.equal(baseline));
         expectNoOptionalResources(requests);
+        cy.reload();
+        cy.get('html').should('have.class', 'dark').and('not.have.class', 'light');
       });
     });
   }

@@ -61,7 +61,7 @@ describe('chart header toolbar overlap', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/inference');
+    cy.visit('/inference?g_model=DeepSeek-V4-Pro');
     selectXAxisMode('interactivity');
     cy.get('[data-testid="chart-figure"]').first().find('h2').should('not.be.empty');
   });

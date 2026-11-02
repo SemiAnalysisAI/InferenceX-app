@@ -1,6 +1,5 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from 'next-themes';
 import { isDarkTheme } from '@/lib/themes/themes';
@@ -9,6 +8,7 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { ComparisonOp } from '@semianalysisai/inferencex-db/operatorx/compare';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
+import { CONTROL_HEIGHT } from '@/components/ui/control-styles';
 import { Heading } from '@/components/ui/heading';
 import { Label } from '@/components/ui/label';
 import { Pending } from '@/components/ui/pending';
@@ -35,15 +35,30 @@ import type { VizDefinition } from './viz/types';
 
 const NO_BASELINE = 'none';
 
-function layout(visible: VizDefinition[]): { viz: VizDefinition; wide: boolean }[] {
-  const out = visible.map((viz) => ({ viz, wide: Boolean(viz.wide) }));
+// Literal class names so Tailwind generates them.
+const SPAN_CLASS = {
+  5: 'lg:col-span-5',
+  6: 'lg:col-span-6',
+  7: 'lg:col-span-7',
+  12: 'lg:col-span-12',
+} as const;
+
+type Span = keyof typeof SPAN_CLASS;
+
+function layout(visible: VizDefinition[]): { viz: VizDefinition; span: Span }[] {
+  const out = visible.map((viz) => ({ viz, span: (viz.wide ? 12 : 6) as Span }));
   let run: typeof out = [];
   for (const card of [...out, null]) {
-    if (card && !card.wide) {
+    if (card && card.span !== 12) {
       run.push(card);
       continue;
     }
-    if (run.length % 2 === 1) run.at(-1)!.wide = true;
+    if (run.length % 2 === 1) run.at(-1)!.span = 12;
+    for (let i = 0; i + 1 < run.length; i += 2) {
+      const [first, second] = [run[i], run[i + 1]];
+      first.span = first.viz.span ?? (second.viz.span ? ((12 - second.viz.span) as Span) : 6);
+      second.span = (12 - first.span) as Span;
+    }
     run = [];
   }
   return out;
@@ -86,12 +101,12 @@ const VizCard = memo(
   ({
     model,
     viz,
-    wide,
+    span,
     eager,
   }: {
     model: ComparisonModel;
     viz: VizDefinition;
-    wide: boolean;
+    span: Span;
     eager: boolean;
   }) => {
     const [mounted, setMounted] = useState(eager);
@@ -121,7 +136,7 @@ const VizCard = memo(
         aria-labelledby={`operatorx-title-${viz.id}`}
         tabIndex={mounted ? undefined : 0}
         onFocus={() => setMounted(true)}
-        className={`min-w-0 ${wide ? 'lg:col-span-2' : ''}`}
+        className={`min-w-0 ${SPAN_CLASS[span]}`}
       >
         <Heading id={`operatorx-title-${viz.id}`} as="h2" level="card" className="mb-4">
           {viz.title}
@@ -129,15 +144,66 @@ const VizCard = memo(
         {mounted ? (
           <viz.Component model={model} />
         ) : (
-          <Skeleton
-            aria-hidden="true"
-            className={viz.id === 'roofline' ? 'h-[460px]' : 'h-[420px]'}
-          />
+          <Skeleton aria-hidden="true" className={vizSkeletonClass(viz)} />
         )}
       </Card>
     );
   },
 );
+
+function vizSkeletonClass(viz: VizDefinition): string {
+  return viz.id === 'roofline' ? 'h-[460px]' : 'h-[420px]';
+}
+
+function visibleVisualizations(op: ComparisonOp, baseline: string | null): VizDefinition[] {
+  return VISUALIZATIONS.filter((v) => v.ops.includes(op) && (baseline || !v.needsBaseline));
+}
+
+const CONTROL_LABELS = ['Workload', 'Metric', 'Baseline'] as const;
+
+/**
+ * Loading state laid out like the loaded dashboard (controls card, then the card grid with
+ * each chart's placeholder height), so the content that replaces it does not move the cards
+ * or the footer under a reader who has already scrolled.
+ */
+function ComparisonSkeleton({ op }: { op: ComparisonOp }) {
+  return (
+    <div
+      className="flex flex-col gap-4"
+      data-testid="operatorx-loading"
+      aria-busy="true"
+      aria-label="Loading results…"
+    >
+      <Card className="relative z-10 py-4 md:py-5">
+        <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+          {CONTROL_LABELS.map((label) => (
+            <div key={label} className="min-w-0 space-y-1.5">
+              <Label>{label}</Label>
+              <Skeleton aria-hidden="true" className={CONTROL_HEIGHT.default} />
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 border-t border-border/60 pt-3">
+          <Skeleton aria-hidden="true" className="h-[106px] lg:h-[62px]" />
+        </div>
+      </Card>
+      <div className="grid gap-4 lg:grid-cols-12">
+        {layout(visibleVisualizations(op, null)).map(({ viz, span }) => (
+          <Card
+            key={viz.id}
+            data-testid={`operatorx-viz-skeleton-${viz.id}`}
+            className={`min-w-0 ${SPAN_CLASS[span]}`}
+          >
+            <Heading as="h2" level="card" className="mb-4">
+              {viz.title}
+            </Heading>
+            <Skeleton aria-hidden="true" className={vizSkeletonClass(viz)} />
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
   const search = new URLSearchParams(useClientSearch());
@@ -200,13 +266,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
         testId="operatorx-comparison-error"
       />
     );
-  if (isLoading || !view || !model)
-    return (
-      <Card data-testid="operatorx-loading" className="min-h-svh items-center justify-center">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
-        <p className="mt-3 text-sm text-muted-foreground">Loading results…</p>
-      </Card>
-    );
+  if (isLoading || !view || !model) return <ComparisonSkeleton op={op} />;
   const pending = switching
     ? view.workloads.find((w) => w.id === search.get('workload'))
     : undefined;
@@ -304,11 +364,9 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
         </div>
       </Card>
       <Pending active={switching} label={`Loading ${pending?.label ?? 'workload'}…`}>
-        <div className="grid gap-4 lg:grid-cols-2">
-          {layout(
-            VISUALIZATIONS.filter((v) => v.ops.includes(op) && (baseline || !v.needsBaseline)),
-          ).map(({ viz, wide }, index) => (
-            <VizCard key={viz.id} model={model} viz={viz} wide={wide} eager={index === 0} />
+        <div className="grid gap-4 lg:grid-cols-12">
+          {layout(visibleVisualizations(op, baseline)).map(({ viz, span }, index) => (
+            <VizCard key={viz.id} model={model} viz={viz} span={span} eager={index === 0} />
           ))}
         </div>
       </Pending>

@@ -7,6 +7,8 @@ export interface VizDefinition {
   title: string;
   ops: ComparisonOp[];
   wide?: boolean;
+  /** Desktop columns out of 12 when paired with another card; the partner takes the rest. */
+  span?: 5 | 6 | 7;
   needsBaseline?: boolean;
   Component: (props: { model: ComparisonModel }) => React.ReactNode;
 }

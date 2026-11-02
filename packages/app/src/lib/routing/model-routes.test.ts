@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { Model, MODEL_OPTIONS } from '../catalog/data-mappings';
+import { isModelVisible, Model, MODEL_OPTIONS } from '../catalog/data-mappings';
 import {
   DEFAULT_ROUTE_MODEL,
   defaultRouteModel,
@@ -212,7 +212,12 @@ describe('modelRoutesForTab', () => {
       expect(modelRouteAvailableForTab(tab, Model.GLM_5)).toBe(false);
     }
     for (const tab of ['calculator', 'historical'] as const) {
-      expect(modelRoutesForTab(tab)).toEqual(MODEL_ROUTES);
+      expect(modelRoutesForTab(tab)).toEqual(
+        MODEL_ROUTES.filter((route) => isModelVisible(route.model)),
+      );
+      expect(modelRoutesForTab(tab).some((route) => route.model === Model.GLM_5_3_Flash)).toBe(
+        false,
+      );
       expect(modelRouteAvailableForTab(tab, Model.DeepSeek_V4_Pro)).toBe(true);
     }
   });

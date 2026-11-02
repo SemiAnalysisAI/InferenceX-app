@@ -11,6 +11,7 @@ import {
   getGlossaryEntry,
   getRelatedGlossaryEntries,
 } from '@/lib/content/glossary';
+import { glossaryMetaTitle } from '@/lib/content/glossary-title';
 import { enAlternates } from '@/lib/i18n/i18n';
 import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 import { clampMetaDescription } from '@/lib/seo/meta-text';
@@ -32,7 +33,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const entry = getGlossaryEntry(slug);
   if (!entry) return {};
 
-  const title = `What Is ${entry.term}?`;
+  const title = glossaryMetaTitle(entry, 'en');
   const description = clampMetaDescription(entry.definition, 'en');
   const url = `${SITE_URL}/glossary/${entry.slug}`;
   const keywords = [

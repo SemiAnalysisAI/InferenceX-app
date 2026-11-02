@@ -1,5 +1,7 @@
 import {
   benchmarkCurveScope,
+  curveLineImages,
+  extendCurveLineImages,
   type BenchmarkCurveInput,
 } from '@semianalysisai/inferencex-constants';
 import type { DbClient } from '../connection';
@@ -28,8 +30,14 @@ export interface CurvePoint {
   appendOnly: boolean;
 }
 
+const curveInput = (point: CurvePoint) => point.identity as unknown as BenchmarkCurveInput;
+
 function scope(point: CurvePoint): string {
-  return benchmarkCurveScope(point.identity as unknown as BenchmarkCurveInput);
+  return benchmarkCurveScope(curveInput(point));
+}
+
+function runLineImages(points: readonly CurvePoint[]) {
+  return curveLineImages(points.map((point) => ({ ...curveInput(point), image: point.image })));
 }
 
 export function publishedCurve(points: readonly CurvePoint[]): Map<string, CurvePoint[]> {
@@ -61,23 +69,18 @@ export function publishedCurve(points: readonly CurvePoint[]): Map<string, Curve
           (a[0].runStartedAt ? Date.parse(a[0].runStartedAt) : -Infinity) ||
         b[0].workflowRunId - a[0].workflowRunId,
     );
-    const rootImage = ranked[0][0].image;
-    const uniformImage = (rows: CurvePoint[]) =>
-      rootImage !== null && rows.every((row) => row.image === rootImage);
     const selected = new Map<string, CurvePoint>();
+    let chain = runLineImages(ranked[0]);
     for (let index = 0; index < ranked.length; index++) {
       const current = ranked[index];
       for (const point of byRun.get(current[0].workflowRunId) ?? []) {
         const id = stablePowerPointIdentity(point.identity);
         if (!selected.has(id)) selected.set(id, point);
       }
-      if (
-        !current[0].appendOnly ||
-        !uniformImage(current) ||
-        !ranked[index + 1] ||
-        !uniformImage(ranked[index + 1])
-      )
-        break;
+      const older = ranked[index + 1];
+      chain =
+        current[0].appendOnly && older ? extendCurveLineImages(chain, runLineImages(older)) : null;
+      if (!chain) break;
     }
     result.set(key, [...selected.values()]);
   }

@@ -1,6 +1,7 @@
 import { GPU_KEYS, HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
 import { fitMetaTitle } from '../seo/meta-text';
+import { isModelVisible } from '../catalog/data-mappings';
 
 const SEPARATOR = '-vs-';
 
@@ -13,6 +14,13 @@ export interface CompareModelSlug {
 }
 
 export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
+  {
+    slug: 'glm-5-3-flash',
+    displayName: 'GLM-5.3-Flash',
+    dbKeys: ['glm5.3flash'],
+    label: 'GLM 5.3 Flash',
+    seoName: 'GLM-5.3-Flash',
+  },
   {
     slug: 'muse-spark-open',
     displayName: 'Muse-Spark-Open',
@@ -133,6 +141,11 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
     seoName: 'Llama 3.3 70B',
   },
 ];
+
+/** Discovery only; parsers and read-only API contracts retain the complete registry. */
+export const PUBLIC_COMPARE_MODEL_SLUGS = COMPARE_MODEL_SLUGS.filter((entry) =>
+  isModelVisible(entry.displayName),
+);
 
 export const COMPARE_MODEL_ALIASES: Record<string, string> = {
   deepseek: 'deepseek-r1',

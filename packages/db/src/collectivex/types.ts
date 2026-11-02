@@ -129,8 +129,12 @@ export interface CollectiveXKvRow {
   page_tokens: number | null;
   batch: number;
   op: 'pull' | 'push';
+  /** Entries the library posts for one request (whole rows; Mooncake adds page entries). */
   descs: number;
+  /** One request's KV bytes, the same for every library, so GB/s compares on one payload. */
   req_bytes: number;
+  /** Bytes the library posts for one request; absent on rows measured before it was recorded. */
+  posted_bytes?: number;
   prep_ms: number;
   latency_ms: CollectiveXKvLatency;
   /**
@@ -143,6 +147,8 @@ export interface CollectiveXKvRow {
   /** Cold-path rate: descriptor/handle prep paid once per burst. */
   gbps_p50_incl_prep?: number;
   verify_passed: boolean;
+  /** Why verification failed; absent when it passed. */
+  verify_detail?: string;
 }
 
 /**
@@ -164,6 +170,14 @@ export interface CollectiveXKvCase {
   outcome: CollectiveXOutcome;
   reason: string | null;
   detail: string | null;
+  /** The measured library build (`implementation.library_version`); null when unmeasured. */
+  library_version: string | null;
+  /** `production` when vLLM can run this library for the model today; null when unmeasured. */
+  maturity: 'production' | 'candidate' | null;
+  /** Probed link layer (`infiniband`, `roce`, `efa`) or `mnnvl`; null when unmeasured. */
+  network: string | null;
+  /** Wire transport under the library (`ucx`, `libfabric`, `verbs`); null when unmeasured. */
+  transport: string | null;
   rows: CollectiveXKvRow[];
 }
 

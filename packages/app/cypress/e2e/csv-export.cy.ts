@@ -8,7 +8,7 @@ interface ExportRoute {
 
 const routes: readonly ExportRoute[] = [
   {
-    route: '/inference',
+    route: '/inference?g_model=DeepSeek-V4-Pro',
     ready: '[data-testid="scatter-graph"] svg .dot-group',
     headers: ['Hardware Key', 'Throughput/Chip (tok/s)', 'Mean TTFT (s)'],
   },

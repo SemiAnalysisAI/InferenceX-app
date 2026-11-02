@@ -56,6 +56,10 @@ describe('GET /api/v1/views/options', () => {
     expect(dsv4).toBeDefined();
     expect(dsv4.dbKeys).toContain('dsv4');
     expect(dsv4.category).toBe('deprecated');
+    expect(body.models.find((m: { name: string }) => m.name === 'GLM-5.3-Flash')).toMatchObject({
+      dbKeys: ['glm5.3flash'],
+      releaseDate: null,
+    });
     expect(body.models.every((m: { dbKeys: string[] }) => m.dbKeys.length > 0)).toBe(true);
     expect(body.models.find((m: { name: string }) => m.name === 'MiniMax-M3')).toMatchObject({
       dbKeys: ['minimaxm3'],
@@ -89,6 +93,7 @@ describe('GET /api/v1/views/options', () => {
       'Kimi-K3',
       'DeepSeek-V4.1-Flash',
       'GLM-5.2',
+      'GLM-5.3-Flash',
       'MiniMax-M3.1-Flash',
       'Muse-Spark-Open',
       'Qwen-3.5-397B-A17B',
@@ -98,6 +103,23 @@ describe('GET /api/v1/views/options', () => {
     expect(body.models.some((model: { category: string }) => model.category === 'hidden')).toBe(
       false,
     );
+  });
+
+  it('exposes model-specific sequence retirement without retiring Qwen3.5 or global 8K/1K', async () => {
+    const res = await GET(request('/api/v1/views/options'));
+    const body = await res.json();
+    const qwen = body.models.find((model: { name: string }) => model.name === 'Qwen-3.5-397B-A17B');
+    expect(qwen.category).toBe('default');
+    expect(qwen.deprecatedSequences).toContain('8k/1k');
+    expect(qwen.deprecatedSequences).toContain('1k/1k');
+    expect(qwen.deprecatedSequences).not.toContain('agentic-traces');
+    expect(
+      body.sequences.find((sequence: { key: string }) => sequence.key === '8k/1k'),
+    ).toMatchObject({
+      deprecated: false,
+    });
+    const dsr1 = body.models.find((model: { name: string }) => model.name === 'DeepSeek-R1-0528');
+    expect(dsr1.deprecatedSequences).not.toContain('8k/1k');
   });
 
   it('describes hardware and metrics from the registries', async () => {

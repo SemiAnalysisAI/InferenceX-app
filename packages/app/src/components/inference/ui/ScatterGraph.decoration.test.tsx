@@ -32,9 +32,9 @@ describe('pointLabelText', () => {
     const mtp = { ...standard, spec_decoding: 'mtp' };
     const eagle = { ...standard, spec_decoding: 'eagle' };
 
-    expect(pointLabelText(standard, false, true)).toBe('8\nC=16');
-    expect(pointLabelText(mtp, false, true)).toBe('8\nC=16');
-    expect(pointLabelText(eagle, false, true)).toBe('8\nC=16');
+    expect(pointLabelText(standard, true, false, true)).toBe('8\nC=16');
+    expect(pointLabelText(mtp, true, false, true)).toBe('8\nC=16');
+    expect(pointLabelText(eagle, true, false, true)).toBe('8\nC=16');
   });
 
   it('omits concurrency unless the advanced toggle enables it', () => {
@@ -42,8 +42,8 @@ describe('pointLabelText', () => {
     standard.benchmark_type = 'agentic_traces';
     standard.spec_decoding = 'none';
 
-    expect(pointLabelText(standard, false, false)).toBe('8');
-    expect(pointLabelText(standard, false, true)).toBe('8\nC=16');
+    expect(pointLabelText(standard, true, false, false)).toBe('8');
+    expect(pointLabelText(standard, true, false, true)).toBe('8\nC=16');
   });
 
   it('keeps fixed-sequence labels unchanged', () => {
@@ -51,7 +51,7 @@ describe('pointLabelText', () => {
     fixed.benchmark_type = 'single_turn';
     fixed.spec_decoding = 'mtp';
 
-    expect(pointLabelText(fixed, false, true)).toBe('8\nC=16');
+    expect(pointLabelText(fixed, true, false, true)).toBe('8\nC=16');
   });
 });
 
@@ -113,7 +113,7 @@ describe('ScatterGraph toggle decoration', () => {
       ...baseInferenceState(),
       selectedSequence: 'agentic-traces',
     };
-    const { container, unmount } = mountChart({
+    const { container, rerender, unmount } = mountChart({
       data: [standard, mtp, mtpWithOffload, fixedMtp],
     });
     const groups = dotGroups(container);
@@ -124,6 +124,18 @@ describe('ScatterGraph toggle decoration', () => {
     expect(container.querySelector('[data-testid="spec-decode-marker-key"]')).toBeNull();
     expect(container.querySelector('[data-testid="offload-halo-key"]')).toBeNull();
     expect(container.querySelector('[data-testid="agentic-optimization-note"]')).toBeNull();
+    const positions = groups.map((group) => group.getAttribute('transform'));
+    const builds = rebuildCount();
+    inferenceState.current = { ...inferenceState.current, showOffloadingLabel: false };
+    rerender();
+    expect(container.querySelector('.offload-halo')).toBeNull();
+    expect(dotGroups(container)).toEqual(groups);
+    expect(groups.map((group) => group.getAttribute('transform'))).toEqual(positions);
+    expect(rebuildCount()).toBe(builds);
+    inferenceState.current = { ...inferenceState.current, showOffloadingLabel: true };
+    rerender();
+    expect(groups[2].querySelector('.offload-halo')).not.toBeNull();
+    expect(container.querySelectorAll('.offload-halo')).toHaveLength(1);
     unmount();
   });
 
@@ -242,6 +254,38 @@ describe('ScatterGraph toggle decoration', () => {
         (element) => element instanceof SVGElement && element.classList.contains('point-label'),
       ),
     ).toBe(true);
+    unmount();
+  });
+
+  it('updates each annotation while another keeps point labels visible', () => {
+    inferenceState.current = {
+      ...baseInferenceState(),
+      showPointLabels: true,
+    };
+    const { container, rerender, unmount } = mountChart({
+      data: [{ ...point('h100', 'fp8', 20, 200, 8), ep: 1 }],
+    });
+    const dot = container.querySelector('.dot-group');
+    const buildsAfterMount = rebuildCount();
+    const lines = () =>
+      [...container.querySelectorAll('.point-label tspan')].map((span) => span.textContent);
+    expect(lines()).toEqual(['8']);
+
+    const changes = [
+      { useAdvancedLabels: true, expected: ['8', 'TP8'] },
+      { showConcurrencyLabels: true, expected: ['8', 'TP8', 'C=16'] },
+      { useAdvancedLabels: false, expected: ['8', 'C=16'] },
+      { showPointLabels: false, expected: ['C=16'] },
+      { useAdvancedLabels: true, expected: ['TP8', 'C=16'] },
+      { showConcurrencyLabels: false, expected: ['TP8'] },
+    ];
+    for (const { expected, ...change } of changes) {
+      inferenceState.current = { ...inferenceState.current, ...change };
+      rerender();
+      expect(lines()).toEqual(expected);
+      expect(container.querySelector('.dot-group')).toBe(dot);
+      expect(rebuildCount()).toBe(buildsAfterMount);
+    }
     unmount();
   });
 

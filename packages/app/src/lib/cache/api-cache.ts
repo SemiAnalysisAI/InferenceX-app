@@ -79,6 +79,25 @@ function cdnCacheTag(): string {
   return namespace ? `db-cdn:${namespace}` : 'db-cdn';
 }
 
+/**
+ * CDN tag for stored benchmark log text. Ingest never rewrites a stored log:
+ * it only links new bundles and adds missing files, so a response for one
+ * (id, file, range) cannot change. Ordinary ingests therefore leave this tag
+ * alone; only an immediate purge (corrections and retractions) drops it.
+ */
+export function serverLogCacheTag(): string {
+  const namespace = cacheNamespace();
+  return namespace ? `db-log:${namespace}` : 'db-log';
+}
+
+/**
+ * Stored log text is immutable, so the CDN keeps it for a year and browsers
+ * for an hour. Each Neon read of a deep offset decompresses the log up to that
+ * offset, so every CDN hit saves real database time.
+ */
+export const SERVER_LOG_CACHE_CONTROL =
+  'public, max-age=3600, s-maxage=31536000, stale-while-revalidate=86400';
+
 interface CachedQueryOptions {
   /** Use blob storage directly, skipping unstable_cache. Use for payloads known to exceed 2MB. */
   blobOnly?: boolean;
@@ -241,6 +260,7 @@ export async function purgeAll({
   revalidateTag(cacheTag(), { expire: 0 });
   revalidateTag(pageCacheTag(), stale);
   revalidateTag(cdnCacheTag(), stale);
+  if (immediate) revalidateTag(serverLogCacheTag(), { expire: 0 });
   // CollectiveX responses are cached only under their own tag (no blobs), so
   // a full purge must drop that tag explicitly.
   purgeCollectiveX({ immediate });
@@ -421,22 +441,38 @@ function compressedBody(bytes: Uint8Array, encoding: 'br' | 'gzip'): ReadableStr
 }
 
 /**
+ * Who compresses a cachedJson body.
+ *
+ * - `origin` (default): the function negotiates br, gzip or identity and sends
+ *   `Vary: Accept-Encoding`. The Vercel CDN keys that Vary on the raw header
+ *   string, so `gzip, deflate`, `deflate, gzip` and `gzip, deflate, br, zstd`
+ *   each get their own cache entry and their own origin miss.
+ * - `cdn`: the function always sends plain JSON without Vary, so each URL has
+ *   one CDN entry, which the CDN compresses for each client as it serves it.
+ */
+export type JsonCompression = 'origin' | 'cdn';
+
+/**
  * CDN-cached streamed JSON response — supports up to 20 MB on Vercel CDN.
- * The body is brotli, gzip, or identity per the request's Accept-Encoding,
- * with `Vary: Accept-Encoding` and a strong ETag; a matching If-None-Match
- * gets a bodiless 304.
+ * With `compression: 'origin'` (default) the body is brotli, gzip, or identity
+ * per the request's Accept-Encoding, with `Vary: Accept-Encoding`. With `'cdn'`
+ * it is always identity. Either way it carries a strong ETag, and a matching
+ * If-None-Match gets a bodiless 304.
  */
 export function cachedJson<T>(
   request: Request,
   data: T,
-  options?: { tag?: string; cacheControl?: string },
+  options?: { tag?: string; cacheControl?: string; compression?: JsonCompression },
 ): Response {
   const bytes = new TextEncoder().encode(JSON.stringify(data));
-  const encoding = negotiateEncoding(request.headers.get('Accept-Encoding'));
+  const originCompression = options?.compression !== 'cdn';
+  const encoding = originCompression
+    ? negotiateEncoding(request.headers.get('Accept-Encoding'))
+    : 'identity';
   const etag = entityTag(bytes, encoding);
   const cacheHeaders = {
     ETag: etag,
-    Vary: 'Accept-Encoding',
+    ...(originCompression ? { Vary: 'Accept-Encoding' } : {}),
     ...cdnHeaders(options?.tag, options?.cacheControl),
   };
   if (matchesIfNoneMatch(request.headers.get('If-None-Match'), etag)) {

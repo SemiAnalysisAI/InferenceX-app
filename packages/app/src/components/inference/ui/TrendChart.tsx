@@ -340,6 +340,7 @@ const TrendChart = React.memo(
           zoom={zoomConfig}
           tooltip={tooltipConfig}
           onRender={onRender}
+          onExportRender={onRender}
           legendElement={legendElement}
           caption={caption}
         />

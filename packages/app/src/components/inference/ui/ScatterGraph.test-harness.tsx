@@ -164,6 +164,9 @@ export function baseInferenceState() {
     showGradientLabels: false,
     setShowGradientLabels: noop,
     showLineLabels: false,
+    showOffloadingLabel: true,
+    showFrameworkLabel: true,
+    setShowOffloadingLabel: noop,
     setShowLineLabels: noop,
   };
 }

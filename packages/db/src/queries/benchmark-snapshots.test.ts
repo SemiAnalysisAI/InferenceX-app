@@ -70,7 +70,8 @@ async function seed() {
     VALUES (1, 'glm5.2', 'gb300', 'dynamo-trt', 'fp4', 'mtp', false, 8, 8, 8, 8),
       (2, 'glm5.2', 'gb300', 'dynamo-trt', 'fp4', 'mtp', true, 4, 8, 4, 8),
       (3, 'glm5.2', 'gb300', 'sglang', 'fp4', 'none', false, 8, 8, 8, 8),
-      (4, 'glm5.2', 'gb300', 'dynamo-trt', 'fp8', 'none', false, 8, 8, 8, 8);`);
+      (4, 'glm5.2', 'gb300', 'dynamo-trt', 'fp8', 'none', false, 8, 8, 8, 8),
+      (5, 'glm5.2', 'gb300', 'dynamo-trt', 'fp4', 'none', false, 8, 8, 8, 8);`);
   await addRun(1, { githubId: 33219706372 });
   await addPoint(1, 1, 1, 1, { offload: 'off', image: 'trt:rc22' });
   await addRun(11, { githubId: 34413290524 });
@@ -126,8 +127,8 @@ beforeAll(async () => {
   await seed();
   const legacyRows = await getLatestBenchmarks(sql, 'glm5.2');
   legacyCount = legacyRows.length;
-  await db.exec(readFileSync(new URL('014_agentic_curve_snapshots.sql', dir), 'utf8'));
-  await db.exec(readFileSync(new URL('015_power_provenance.sql', dir), 'utf8'));
+  for (const name of migrations.filter((filename) => filename >= '014_'))
+    await db.exec(readFileSync(new URL(name, dir), 'utf8'));
   const retained = await db.query<{ count: number }>(
     'SELECT count(*)::int AS count FROM benchmark_results',
   );
@@ -155,7 +156,10 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
     await sql`UPDATE benchmark_results SET power_invalid_reasons = '["sampling_gap_exceeded"]'::jsonb,
       power_audit = '{"expected_gpu_count":16}'::jsonb WHERE id IN (1, 2)`;
     await db.exec(
-      readFileSync(new URL('../../migrations/015_power_provenance.sql', import.meta.url), 'utf8'),
+      readFileSync(
+        new URL('../../migrations/020_append_only_line_images.sql', import.meta.url),
+        'utf8',
+      ),
     );
     for (const rows of [
       await getLatestBenchmarks(sql, 'glm5.2'),
@@ -366,13 +370,57 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
   });
   it('stops append-only inheritance at an image change or new full snapshot', async () => {
     await addRun(12, { append: true });
-    await addPoint(8, 12, 1, 300, { offload: 'off', image: 'trt:rc27' });
+    await addPoint(8, 12, 2, 300, { image: 'trt:rc27' });
     expect(ids(await getBenchmarksForRun(sql, 'glm5.2', 12))).toEqual([8]);
     await addRun(13);
     await addPoint(9, 13, 2, 400, { image: 'trt:rc27' });
     await addRun(14, { append: true });
     await addPoint(10, 14, 2, 500, { image: 'trt:rc27' });
     expect(ids(await getBenchmarksForRun(sql, 'glm5.2', 14))).toEqual([9, 10]);
+  });
+  it('extends a mixed AGG/disagg curve when each shared topology keeps its image', async () => {
+    await addRun(12);
+    for (const [id, config, conc, image] of [
+      [8, 1, 1, 'agg:a'],
+      [9, 1, 4, 'agg:a'],
+      [10, 1, 16, 'agg:a'],
+      [11, 2, 2884, 'disagg:d'],
+      [12, 2, 4096, 'disagg:d'],
+      [13, 2, 7480, 'disagg:d'],
+    ] as const)
+      await addPoint(id, 12, config, conc, { image });
+    await addRun(13, { append: true });
+    await addPoint(14, 13, 1, 32, { image: 'agg:a' });
+    await addPoint(15, 13, 2, 1228, { image: 'disagg:d' });
+    const curve = [8, 9, 10, 11, 12, 13, 14, 15];
+    expect(ids(await getBenchmarksForRun(sql, 'glm5.2', 13))).toEqual(curve);
+    await expectSameCurve('append-only run extends a mixed-image AGG/disagg curve');
+    expect(ids(await getLatestBenchmarks(sql, 'glm5.2'))).toEqual(curve);
+
+    await addRun(14, { append: true });
+    await addPoint(16, 14, 1, 64, { image: 'agg:b' });
+    await addPoint(17, 14, 2, 8192, { image: 'disagg:d' });
+    expect(ids(await getBenchmarksForRun(sql, 'glm5.2', 14))).toEqual([16, 17]);
+    await expectSameCurve('an AGG image change stops the mixed-image chain');
+  });
+  it('checks each older run against every topology image already in the chain', async () => {
+    await addRun(12);
+    await addPoint(8, 12, 1, 1, { image: 'agg:y' });
+    await addPoint(9, 12, 2, 2884, { image: 'disagg:z' });
+    await addRun(13, { append: true });
+    await addPoint(10, 13, 2, 4096, { image: 'disagg:z' });
+    await addRun(14, { append: true });
+    await addPoint(11, 14, 1, 16, { image: 'agg:x' });
+    expect(ids(await getBenchmarksForRun(sql, 'glm5.2', 14))).toEqual([10, 11]);
+    await expectSameCurve('an AGG image change two runs back stops the chain');
+  });
+  it('treats AgentX speculative-decoding variants as one image line', async () => {
+    await addRun(12);
+    await addPoint(8, 12, 1, 1, { image: 'agg:a' });
+    await addRun(13, { append: true });
+    await addPoint(9, 13, 5, 4, { image: 'agg:b' });
+    expect(ids(await getBenchmarksForRun(sql, 'glm5.2', 13))).toEqual([9]);
+    await expectSameCurve('a non-MTP image change stops the chain');
   });
   it('preserves accepted rows regardless of overall workflow conclusion', async () => {
     await addRun(12, { conclusion: 'failure' });
@@ -401,10 +449,10 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
     expect(ids(await getBenchmarksForRun(sql, 'glm5.2', 34413290524))).toEqual([8]);
   });
   it.each([null, 'mixed'])(
-    'does not inherit across an incomplete or mixed image: %s',
+    'does not inherit across an incomplete or mixed image within a topology: %s',
     async (image) => {
       await addRun(12, { append: true });
-      await addPoint(8, 12, 1, 300, { image });
+      await addPoint(8, 12, 2, 300, { image });
       if (image === 'mixed') await addPoint(9, 12, 2, 400);
       expect(ids(await getBenchmarksForRun(sql, 'glm5.2', 12))).toEqual(
         image === null ? [8] : [8, 9],

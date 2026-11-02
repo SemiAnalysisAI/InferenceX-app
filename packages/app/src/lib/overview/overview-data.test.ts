@@ -1324,6 +1324,7 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
       `${Model.MiniMax_M3_1_Flash}/agentx`,
       `${Model.GLM_5_2}/agentx`,
       `${Model.Qwen3_5}/agentx`,
+      `${Model.GLM_5_3_Flash}/agentx`,
       `${Model.Qwen3_8_Flash_Next}/agentx`,
       `${Model.Qwen3_5}/single_turn_8k1k`,
     ]);

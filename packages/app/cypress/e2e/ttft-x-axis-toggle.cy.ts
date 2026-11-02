@@ -99,11 +99,96 @@ const interceptFixedSequenceData = () => {
   cy.intercept('GET', '/api/v1/benchmarks*', { body: fixedSequenceBenchmarks }).as('benchmarks');
 };
 
+describe('Parallelism labels in standard controls', () => {
+  for (const width of [1280, 375]) {
+    it(`toggles agentic parallelism labels with Advanced closed at ${width}px`, () => {
+      cy.viewport(width, 900);
+      interceptAgenticData();
+      interceptDerivedAgenticMetrics();
+      cy.visit('/inference?g_model=deepseek-v4-pro&i_seq=agentic-traces', {
+        onBeforeLoad(win) {
+          unlockAgenticGate(win);
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        },
+      });
+      cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
+      cy.get('[data-testid="legend-advanced-toggle"]').should(
+        'have.attr',
+        'aria-expanded',
+        'false',
+      );
+      cy.get('#scatter-parallelism-labels')
+        .should('be.visible')
+        .and('have.attr', 'data-state', 'unchecked')
+        .click();
+      cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
+      cy.get('[data-testid="scatter-graph"] .dot-group .point-label')
+        .filter(':visible')
+        .first()
+        .find('tspan')
+        .should('have.length', 1);
+      cy.get('[data-testid="legend-advanced-toggle"]').should(
+        'have.attr',
+        'aria-expanded',
+        'false',
+      );
+      expandLegendAdvanced();
+      cy.get('label[for="scatter-point-labels"]').should('have.text', '# of GPUs Label');
+      cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked').click();
+      cy.get('[data-testid="scatter-graph"] .dot-group .point-label')
+        .filter(':visible')
+        .first()
+        .find('tspan')
+        .should('have.length', 2);
+      cy.get('#scatter-parallelism-labels').click();
+      cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'checked');
+      cy.get('[data-testid="scatter-graph"] .dot-group .point-label')
+        .filter(':visible')
+        .first()
+        .invoke('text')
+        .should('match', /^\d+$/);
+      cy.get('#scatter-point-labels').click();
+      cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
+      cy.get('[data-testid="scatter-graph"] .dot-group .point-label')
+        .filter(':visible')
+        .should('have.length', 0);
+    });
+  }
+
+  for (const gpuCount of [false, true]) {
+    for (const parallelism of [false, true]) {
+      it(`loads independent shared-link settings: GPUs=${gpuCount}, parallelism=${parallelism}`, () => {
+        interceptAgenticData();
+        interceptDerivedAgenticMetrics();
+        cy.visit(
+          `/inference?g_model=deepseek-v4-pro&i_seq=agentic-traces&i_label=${Number(gpuCount)}&i_advlabel=${Number(parallelism)}`,
+          {
+            onBeforeLoad(win) {
+              unlockAgenticGate(win);
+            },
+          },
+        );
+        expandLegendAdvanced();
+        cy.get('#scatter-point-labels').should(
+          'have.attr',
+          'data-state',
+          gpuCount ? 'checked' : 'unchecked',
+        );
+        cy.get('#scatter-parallelism-labels').should(
+          'have.attr',
+          'data-state',
+          parallelism ? 'checked' : 'unchecked',
+        );
+      });
+    }
+  }
+});
+
 describe('X-Axis Mode Toggle (inference chart)', () => {
   before(() => {
     interceptAgenticData();
     interceptDerivedAgenticMetrics();
-    cy.visit('/inference?i_seq=agentic-traces', {
+    cy.visit('/inference?g_model=deepseek-v4-pro&i_seq=agentic-traces', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         unlockAgenticGate(win);
@@ -135,10 +220,16 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
       'P90 Interactivity (tok/s/user)',
     );
 
+    // The agentic view opens like fixed-seq: line labels name each curve,
+    // and per-point parallelism chips stay off until the user asks for them.
     expandLegendAdvanced();
-    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
-    cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'checked');
+    cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
+    cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
     cy.get('#scatter-line-labels').should('have.attr', 'data-state', 'checked');
+    cy.get('[data-testid="scatter-graph"] svg g.parallelism-label').should(($labels) => {
+      const visible = [...$labels].filter((label) => label.style.opacity !== '0');
+      expect(visible, 'visible parallelism chips').to.have.length(0);
+    });
   });
 
   it('explains normalized interactivity inside its option without changing the axis', () => {
@@ -175,6 +266,33 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
       'be.visible',
     );
     cy.get('#chart-0 [data-testid="offload-halo-key"]').should('not.exist');
+    expandLegendAdvanced();
+    cy.get('label[for="scatter-offloading-label"]').should('have.text', 'Offloading Label');
+    cy.get('#scatter-offloading-label').should('have.attr', 'data-state', 'checked').click();
+    cy.get('[data-testid="offload-halo-key"]').should('not.exist');
+    cy.get('#chart-0 .offload-halo').should('not.exist');
+    cy.get('#chart-0 .dot-group').should('have.length.at.least', 1);
+    cy.get('[data-testid="share-button"]').click();
+    cy.get('[data-testid="share-url-input"]')
+      .invoke('val')
+      .should('contain', 'i_offloadlabel=0')
+      .then((url) => {
+        interceptAgenticData();
+        interceptDerivedAgenticMetrics();
+        cy.visit(String(url));
+      });
+    expandLegendAdvanced();
+    cy.get('#chart-0 .offload-halo').should('not.exist');
+    cy.get('#scatter-offloading-label').should('have.attr', 'data-state', 'unchecked').click();
+    cy.get('#chart-0 .offload-halo').should('have.length.at.least', 1);
+    cy.get('[data-testid="chart-notices-chart-0"] [data-testid="offload-halo-key"]').should(
+      'be.visible',
+    );
+    cy.get('[data-testid="share-button"]').click();
+    cy.get('[data-testid="share-url-input"]')
+      .invoke('val')
+      .should('not.contain', 'i_offloadlabel=');
+    cy.get('body').type('{esc}');
   });
 
   it('shows the fixed p90 percentile in the Interactivity axis label', () => {
@@ -188,12 +306,15 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
   it('honors explicit label URL overrides for the agentic view', () => {
     interceptAgenticData();
     interceptDerivedAgenticMetrics();
-    cy.visit('/inference?i_seq=agentic-traces&i_label=0&i_advlabel=0&i_linelabel=0', {
-      onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        unlockAgenticGate(win);
+    cy.visit(
+      '/inference?g_model=deepseek-v4-pro&i_seq=agentic-traces&i_label=0&i_advlabel=0&i_linelabel=0',
+      {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          unlockAgenticGate(win);
+        },
       },
-    });
+    );
     cy.get('[data-testid="scenario-selector"]').should('contain.text', 'Agentic');
     cy.get('[data-testid="legend-advanced-toggle"]').first().click({ scrollBehavior: 'center' });
     cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
@@ -245,7 +366,7 @@ describe('X-axis mode URL param', () => {
   it('keeps a URL-restored mode through the agentic sequence resolving', () => {
     interceptAgenticData();
     interceptDerivedAgenticMetrics();
-    cy.visit('/inference?i_seq=agentic-traces&i_xmode=ttft', {
+    cy.visit('/inference?g_model=deepseek-v4-pro&i_seq=agentic-traces&i_xmode=ttft', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         unlockAgenticGate(win);
@@ -261,7 +382,7 @@ describe('X-axis mode URL param', () => {
   it('never shows the latency percentile selector and labels the fixed P90 basis', () => {
     interceptAgenticData();
     interceptDerivedAgenticMetrics();
-    cy.visit('/inference?i_seq=agentic-traces', {
+    cy.visit('/inference?g_model=deepseek-v4-pro&i_seq=agentic-traces', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         unlockAgenticGate(win);
@@ -293,13 +414,27 @@ describe('Default scenario', () => {
       interceptAgenticData();
       interceptDerivedAgenticMetrics();
       cy.visit('/inference');
-      if (width < 768) {
-        cy.get('[data-testid="scenario-selector"]').should('not.be.visible');
-        cy.get('[data-testid="inference-secondary-controls"] > button').click();
-      }
+      cy.get('fieldset [data-testid="scenario-selector"]').should('not.exist');
+      cy.get('#chart-0').should(($chart) => {
+        const plot = $chart[0]!.querySelector('[data-testid="d3-chart-svg"]')!;
+        const selector = $chart[0]!.querySelector('[data-testid="scenario-selector"]')!;
+        expect(selector.getBoundingClientRect().top, 'Scenario below plot').to.be.at.least(
+          plot.getBoundingClientRect().bottom,
+        );
+      });
       cy.get('[data-testid="scenario-selector"]')
         .should('be.visible')
         .and('contain.text', 'Agentic');
+      cy.get('[data-testid="scenario-selector"]').should(($selector) => {
+        const label = $selector[0]!.querySelector('span')!;
+        const helpIcon = $selector[0]!
+          .closest('[data-testid="result-context-scenario"]')!
+          .querySelector('[data-slot="info-help-icon"]')!;
+        expect(
+          helpIcon.getBoundingClientRect().left,
+          'help does not overlap the label',
+        ).to.be.at.least(label.getBoundingClientRect().right);
+      });
       cy.get('label[for="scenario-select"]').should('be.visible').and('contain.text', 'Scenario');
       cy.get('h2 [data-testid="scenario-selector"]').should('not.exist');
       cy.get('[data-testid="scenario-selector"]').click('right', {
@@ -319,12 +454,12 @@ describe('Default scenario', () => {
   it('keeps 8K / 1K when the link asks for it explicitly', () => {
     interceptAgenticData();
     cy.visit('/zh/inference');
-    cy.get('label[for="scenario-select"]').should('be.visible').and('have.text', '场景');
-    cy.get('fieldset [data-testid="scenario-selector"]').should('be.visible');
+    cy.get('label[for="scenario-select"]').should('be.visible').and('have.text', '场景:');
+    cy.get('[data-testid="result-context"] [data-testid="scenario-selector"]').should('be.visible');
     cy.get('h2 [data-testid="scenario-selector"]').should('not.exist');
 
     interceptFixedSequenceData();
-    cy.visit('/inference?i_seq=8k%2F1k', {
+    cy.visit('/inference?g_model=deepseek-v4-pro&i_seq=8k%2F1k', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -336,7 +471,7 @@ describe('Default scenario', () => {
     cy.get('[data-testid="chart-figure"] svg').should('not.contain.text', 'P90 Interactivity');
 
     interceptFixedSequenceData();
-    cy.visit('/inference?i_seq=8k%2F1k', {
+    cy.visit('/inference?g_model=deepseek-v4-pro&i_seq=8k%2F1k', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       },
@@ -366,7 +501,7 @@ describe('Default scenario', () => {
 describe('Label defaults for fixed-sequence scenarios', () => {
   it('keeps the fixed-sequence chart unchanged while keyboard-browsing other options', () => {
     interceptFixedSequenceData();
-    cy.visit('/inference?i_seq=8k%2F1k');
+    cy.visit('/inference?g_model=deepseek-v4-pro&i_seq=8k%2F1k');
     selectXAxisMode('ttft', 'TTFT');
     openXAxisMenu();
     cy.get('[data-testid="x-axis-mode-interactivity"]').focus().type('{esc}');
@@ -376,7 +511,7 @@ describe('Label defaults for fixed-sequence scenarios', () => {
 
   it('offers only the three supported axes for fixed sequences', () => {
     interceptFixedSequenceData();
-    cy.visit('/inference?i_seq=8k%2F1k');
+    cy.visit('/inference?g_model=deepseek-v4-pro&i_seq=8k%2F1k');
     openXAxisMenu();
     cy.get('[role="grid"] [data-select-option]').should('have.length', 3);
     cy.get('[data-testid="x-axis-mode-interactivity"]').should('be.visible');
@@ -388,11 +523,14 @@ describe('Label defaults for fixed-sequence scenarios', () => {
 
   it('honors explicit label URL overrides', () => {
     interceptFixedSequenceData();
-    cy.visit('/inference?i_seq=8k%2F1k&i_label=1&i_advlabel=1&i_linelabel=0', {
-      onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+    cy.visit(
+      '/inference?g_model=deepseek-v4-pro&i_seq=8k%2F1k&i_label=1&i_advlabel=1&i_linelabel=0',
+      {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        },
       },
-    });
+    );
     cy.get('[data-testid="scenario-selector"]').should('contain.text', '8K / 1K');
     expandLegendAdvanced();
     cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
@@ -605,6 +743,14 @@ describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', ()
     cy.get('[data-testid="chart-notices-chart-0"] [data-testid="offload-halo-key"]')
       .should('be.visible')
       .and('contain.text', 'KV offload ON');
+    expandLegendAdvanced();
+    cy.get('#scatter-offloading-label').click();
+    cy.get('[data-testid="offload-halo-key"]').should('not.exist');
+    cy.get('#chart-0 .offload-halo').should('not.exist');
+    cy.get('#chart-0 .unofficial-overlay-pt').should('have.length.greaterThan', 0);
+    cy.get('#scatter-offloading-label').click();
+    cy.get('[data-testid="offload-halo-key"]').should('contain.text', 'KV offload ON');
+    cy.get('#chart-0 .unofficial-overlay-pt .offload-halo').should('have.length.at.least', 1);
   });
 
   it('e2e-normalized-interactivity mode shows suppression banner for unofficial-run overlays', () => {

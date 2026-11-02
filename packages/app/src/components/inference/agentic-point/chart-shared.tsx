@@ -38,17 +38,41 @@ export const fmtSeconds = (s: number): string => {
   return `${m}m ${rem}s`;
 };
 
-export function ChartEmpty({ height = 260, message }: { height?: number; message?: string }) {
+/** Empty state with the chart's aspect ratio, so it occupies the same box as the skeleton. */
+export function ChartEmpty({
+  width = CHART_SIZES.inline.width,
+  height = CHART_SIZES.inline.height,
+  message,
+}: {
+  width?: number;
+  height?: number;
+  message?: string;
+}) {
   const locale = useLocale();
   return (
-    <div className="grid place-items-center text-xs text-muted-foreground" style={{ height }}>
+    <div
+      data-testid="agentic-chart-empty"
+      className="grid w-full place-items-center text-xs text-muted-foreground"
+      style={{ aspectRatio: `${width} / ${height}` }}
+    >
       {message ?? (locale === 'zh' ? '暂无数据' : 'No data')}
     </div>
   );
 }
 
-export function ChartSkeleton() {
-  return <div className="h-[260px] rounded-md bg-muted/30 animate-pulse" />;
+/**
+ * Loading placeholder with the chart's own aspect ratio. Charts scale their viewBox to the
+ * card width, so a fixed pixel height would shift the cards below once the chart draws.
+ */
+export function ChartSkeleton({ size = 'inline' }: { size?: keyof typeof CHART_SIZES }) {
+  const { width, height } = CHART_SIZES[size];
+  return (
+    <div
+      data-testid="agentic-chart-skeleton"
+      className="w-full rounded-md bg-muted/30 animate-pulse"
+      style={{ aspectRatio: `${width} / ${height}` }}
+    />
+  );
 }
 
 export type LegendSwatch = 'line' | 'dashed-line' | 'area';

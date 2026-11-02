@@ -1,4 +1,4 @@
-import { distribution } from './distribution';
+import { throughputSummary } from './throughput-summary';
 import { metricVsSize } from './metric-vs-size';
 import { pairwiseScatter } from './pairwise-scatter';
 import { roofline } from './roofline';
@@ -8,7 +8,7 @@ import type { VizDefinition } from './types';
 export const VISUALIZATIONS: VizDefinition[] = [
   speedupVsBaseline,
   roofline,
-  metricVsSize,
-  distribution,
+  throughputSummary,
   pairwiseScatter,
+  metricVsSize,
 ];

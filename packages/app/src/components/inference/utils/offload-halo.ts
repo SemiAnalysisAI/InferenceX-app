@@ -12,10 +12,11 @@ export function renderOffloadHalo(
   group: d3.Selection<SVGGElement, InferenceData, null, undefined>,
   point: InferenceData,
   stroke: string,
+  enabled = true,
 ): void {
   group
     .selectAll<SVGCircleElement, boolean>('.offload-halo')
-    .data(point.offload_mode === 'on' ? [true] : [])
+    .data(enabled && point.offload_mode === 'on' ? [true] : [])
     .join('circle')
     .each(function () {
       setAttrIfChanged(this, 'class', 'offload-halo');

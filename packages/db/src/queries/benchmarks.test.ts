@@ -31,19 +31,19 @@ describe('append-only benchmark snapshots', () => {
     expect(captured.calls()).toBe(1);
 
     const { text, values } = captured.query();
-    expect(text).toContain('WITH RECURSIVE run_lines AS');
+    expect(text).toContain('WITH RECURSIVE run_line_images AS');
     expect(text).toContain('FROM ranked_runs WHERE github_run_id = ? UNION ALL');
     expect(text).not.toContain('seed_runs AS');
     expect(text).not.toContain('r.date <=');
     expect(text).toContain('WHERE current.append_only');
-    expect(text).toContain('older.image = current.root_image');
+    expect(text).toContain('current.chain_images ->> older_line.key <> older_line.value');
     expect(text).toContain('older.curve_scope = current.curve_scope');
     expect(text).toContain('point_c.id = br.config_id');
     expect(text).toContain('br.recipe_fingerprint, br.conc, cr.run_rank');
     expect(text).toContain('br.workflow_run_id, wr.run_started_at::text');
     expect(text).toContain('br.snapshot_date::text AS curve_date');
     expect(text).toContain('snapshot_wr.id = br.snapshot_workflow_run_id');
-    expect(values).toEqual([['dsv4'], 123456]);
+    expect(values).toEqual([['dsv4'], ['dsv4'], 123456]);
   });
 
   it('chooses latest seeds under both the date and as-of-run cutoffs', async () => {
@@ -57,7 +57,7 @@ describe('append-only benchmark snapshots', () => {
     expect(text).toContain('lwr.github_run_id = ?');
     expect(text).toContain('FROM seed_runs UNION ALL');
     expect(text).not.toContain('WHERE run_rank = 1');
-    expect(values).toEqual([['dsv4'], '2026-08-01', 456789]);
+    expect(values).toEqual([['dsv4'], ['dsv4'], '2026-08-01', 456789]);
   });
 
   it('keeps exact-date seeds independent from the main-chart run cutoff', async () => {
@@ -68,7 +68,7 @@ describe('append-only benchmark snapshots', () => {
     const { text, values } = captured.query();
     expect(text).toContain('FROM ranked_runs r WHERE r.date = ?::date');
     expect(text).not.toContain('lwr.github_run_id = ?');
-    expect(values).toEqual([['dsv4'], '2026-08-01']);
+    expect(values).toEqual([['dsv4'], ['dsv4'], '2026-08-01']);
   });
 
   it('stamps latest materialized-view rows with a separate logical identity', async () => {
@@ -98,7 +98,7 @@ describe('append-only benchmark snapshots', () => {
     expect(text).toContain('br.recipe_fingerprint, br.conc, cr.run_rank');
     expect(text).toContain("br.metrics - '{std_ttft,std_tpot");
     expect(text).toContain('ORDER BY br.snapshot_date, c.id, br.conc');
-    expect(values).toEqual([['dsv4'], 8192, 1024]);
+    expect(values).toEqual([['dsv4'], ['dsv4'], 8192, 1024]);
   });
 
   it('filters agentic history by scenario without imposing sequence lengths', async () => {
@@ -110,7 +110,7 @@ describe('append-only benchmark snapshots', () => {
     expect(text).toContain("AND benchmark_type = 'agentic_traces'");
     expect(text).not.toContain('AND br.isl = ?');
     expect(text).toContain('FROM ranked_runs UNION ALL');
-    expect(values).toEqual([['dsv4']]);
+    expect(values).toEqual([['dsv4'], ['dsv4']]);
   });
 });
 

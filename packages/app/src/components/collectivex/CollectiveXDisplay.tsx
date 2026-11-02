@@ -25,8 +25,9 @@ import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 import { CollectiveXChart } from './CollectiveXChart';
-import { CollectiveXSwapSection } from './CollectiveXSwapSection';
+import { CollectiveXSwapSection, SwapBlocksName } from './CollectiveXSwapSection';
 import { CollectiveXKvSection } from './CollectiveXKvSection';
+import { CollectiveXChangelog } from './CollectiveXChangelog';
 import { CollectiveXSupportMatrices } from './CollectiveXSupportMatrices';
 import {
   collectiveXBackendLabel,
@@ -61,6 +62,12 @@ interface SelectOption<T extends string | number> {
 }
 
 type CollectiveXSuite = 'ep' | 'kv' | 'swap';
+
+const METHODOLOGY_DOC: Record<CollectiveXSuite, string> = {
+  ep: 'methodology',
+  kv: 'kv-transfer',
+  swap: 'swap-blocks',
+};
 
 const PERCENTILE_OPTIONS: SegmentedToggleOption<CollectiveXPercentile>[] = [
   { value: 'p50', label: 'p50' },
@@ -97,8 +104,12 @@ const STRINGS = {
     unavailable: 'CollectiveX run unavailable',
     loadError: 'The CollectiveX dataset failed to load.',
     retry: 'Retry',
-    description:
-      'Compare EP communication, KV-cache transfer, and vLLM swap_blocks latency and payload bandwidth.',
+    description: (
+      <>
+        Compare EP communication, KV-cache transfer, and vLLM <SwapBlocksName /> latency and payload
+        bandwidth.
+      </>
+    ),
     source: 'Source',
     methodology: 'Methodology',
     refresh: 'Refresh',
@@ -178,7 +189,11 @@ const STRINGS = {
     unavailable: 'CollectiveX 运行暂不可用',
     loadError: 'CollectiveX 数据集加载失败。',
     retry: '重试',
-    description: '对比 EP 通信、KV 缓存传输及 vLLM swap_blocks 的延迟与有效载荷带宽。',
+    description: (
+      <>
+        对比 EP 通信、KV 缓存传输及 vLLM <SwapBlocksName /> 的延迟与有效载荷带宽。
+      </>
+    ),
     source: '源代码',
     methodology: '测试方法',
     refresh: '刷新',
@@ -600,7 +615,8 @@ export default function CollectiveXDisplay() {
       ? [{ value: 'ep' as const, label: 'EP' }]
       : []),
     ...(hasKv ? [{ value: 'kv' as const, label: 'KV' }] : []),
-    ...(hasSwap ? [{ value: 'swap' as const, label: 'swap_blocks' }] : []),
+    // swap_blocks is a vLLM function name, so it reads as code.
+    ...(hasSwap ? [{ value: 'swap' as const, label: 'swap_blocks', className: 'font-mono' }] : []),
   ];
   const shownSuite = suiteOptions.some((option) => option.value === suite)
     ? suite
@@ -614,7 +630,9 @@ export default function CollectiveXDisplay() {
             <Heading as="h1" level="card">
               CollectiveX
             </Heading>
-            <p className="mt-1 text-sm text-muted-foreground">{t.description}</p>
+            <p data-testid="collectivex-description" className="mt-1 text-sm text-muted-foreground">
+              {t.description}
+            </p>
           </div>
           <div className="flex shrink-0 flex-wrap items-end gap-2">
             {datasets.length > 0 && (
@@ -649,7 +667,7 @@ export default function CollectiveXDisplay() {
                 </a>
                 <a
                   data-testid="collectivex-methodology-link"
-                  href={`https://github.com/${sourceRepository}/blob/${singleDataset.run.source_sha}/collectivex/docs/${shownSuite === 'swap' ? 'swap-blocks' : 'methodology'}.md`}
+                  href={`https://github.com/${sourceRepository}/blob/${singleDataset.run.source_sha}/collectivex/docs/${METHODOLOGY_DOC[shownSuite]}.md`}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() =>
@@ -960,6 +978,7 @@ export default function CollectiveXDisplay() {
         </>
       )}
       <CollectiveXSupportMatrices series={combinedSeries} />
+      <CollectiveXChangelog version={version} />
     </section>
   );
 }

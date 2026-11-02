@@ -182,7 +182,8 @@ describe('First-load navigation', () => {
 
   it('navigates to dashboard from the header with one click', () => {
     cy.get('[data-testid="nav-link-dashboard"]').click();
-    cy.location('pathname').should('eq', '/inference');
+    cy.location('pathname').should('eq', '/inference/kimi-k3');
+    cy.get('[data-testid="model-selector"]').should('contain.text', 'Kimi K3');
   });
 
   it('navigates to comparisons from the footer with one click', () => {
