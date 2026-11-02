@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
-import { Suspense } from 'react';
 
 import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
@@ -34,7 +33,6 @@ import {
   getComparePageDerivedData,
   initialCompareBenchmarkRows,
 } from '@/lib/compare/compare-page-data.server';
-import { CompareDetailRouteSkeleton } from '@/components/motion/route-skeletons';
 
 import ComparePageClient from './page-client';
 
@@ -119,11 +117,10 @@ export function renderComparePage(slug: string, { scenarioSegment }: ScenarioOpt
     permanentRedirect(comparePath(canonical, scenarioSegment));
   }
 
-  return (
-    <Suspense fallback={<CompareDetailRouteSkeleton />}>
-      <CompareDetail parsed={parsed} canonical={canonical} scenarioSegment={scenarioSegment} />
-    </Suspense>
-  );
+  // No Suspense fallback: the page is ISR, so its HTML is complete when served. A fallback
+  // would paint a skeleton first and reveal the content after React's reveal throttle,
+  // delaying LCP and shifting everything below the header card.
+  return <CompareDetail parsed={parsed} canonical={canonical} scenarioSegment={scenarioSegment} />;
 }
 
 async function CompareDetail({

@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
-import { Suspense } from 'react';
 
 import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
@@ -32,7 +31,6 @@ import {
 import { compareSocialImages } from '@/lib/compare/compare-meta';
 import { zhAlternates } from '@/lib/i18n/i18n';
 import { socialMetadata } from '@/lib/seo/social-metadata';
-import { CompareDetailRouteSkeleton } from '@/components/motion/route-skeletons';
 
 import ComparePageClient from '../../../compare/[slug]/page-client';
 
@@ -125,9 +123,8 @@ export function renderComparePageZh(slug: string, { scenarioSegment }: ScenarioO
   }
 
   return (
-    <Suspense fallback={<CompareDetailRouteSkeleton />}>
-      <CompareDetailZh parsed={parsed} canonical={canonical} scenarioSegment={scenarioSegment} />
-    </Suspense>
+    // ISR HTML is complete when served; a Suspense fallback would only delay the reveal.
+    <CompareDetailZh parsed={parsed} canonical={canonical} scenarioSegment={scenarioSegment} />
   );
 }
 

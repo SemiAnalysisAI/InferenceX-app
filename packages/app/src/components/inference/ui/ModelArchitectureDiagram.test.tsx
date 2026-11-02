@@ -9,12 +9,14 @@ import { getModelArchitecture } from '@/lib/catalog/model-architectures';
 
 const mocks = vi.hoisted(() => ({
   renderDiagram: vi.fn(),
+  diagramHeight: vi.fn((_arch: unknown, _expanded: ReadonlySet<string>): number | null => 480),
   theme: { resolved: 'light' },
   pathname: { value: '/inference' },
 }));
 
 vi.mock('./model-architecture-diagram-renderer', () => ({
   renderDiagram: mocks.renderDiagram,
+  diagramHeight: mocks.diagramHeight,
 }));
 vi.mock('next-themes', () => ({
   useTheme: () => ({ resolvedTheme: mocks.theme.resolved }),
@@ -157,6 +159,23 @@ describe('ModelArchitectureDiagram rendering', () => {
     expect(container.textContent).toContain('模型架构');
     expect(container.textContent).not.toContain('Model Architecture');
     expect(mocks.renderDiagram.mock.calls.at(-1)?.[5]).toBe('zh');
+  });
+
+  it('reserves the diagram height on the svg before the renderer draws', () => {
+    mocks.diagramHeight.mockReturnValueOnce(512);
+    act(() => root.render(<ModelArchitectureDiagram model={Model.DeepSeek_R1} variant="inline" />));
+
+    const svg = container.querySelector('[data-testid="model-architecture-svg"]');
+    expect(svg?.getAttribute('height')).toBe('512');
+    expect(mocks.diagramHeight.mock.calls[0]?.[1]).toEqual(new Set());
+  });
+
+  it('leaves the svg height to the renderer when the layout height is unknown', () => {
+    mocks.diagramHeight.mockReturnValueOnce(null);
+    act(() => root.render(<ModelArchitectureDiagram model={Model.DeepSeek_R1} variant="inline" />));
+
+    const svg = container.querySelector('[data-testid="model-architecture-svg"]');
+    expect(svg?.hasAttribute('height')).toBe(false);
   });
 
   it('renders once on initial expansion and ignores the observer callback for the same width', () => {
