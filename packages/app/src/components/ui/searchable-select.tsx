@@ -57,7 +57,7 @@ interface SearchableSelectProps {
   placeholder?: string;
   initialLabel?: string;
   className?: string;
-  compact?: boolean;
+  showSelectedHelp?: boolean;
   contentClassName?: string;
   triggerId?: string;
   triggerTestId?: string;
@@ -82,7 +82,7 @@ export function SearchableSelect({
   placeholder: placeholderProp,
   initialLabel,
   className,
-  compact = false,
+  showSelectedHelp = true,
   contentClassName,
   triggerId,
   triggerAriaLabel,
@@ -167,7 +167,7 @@ export function SearchableSelect({
   const selectedOption = groups
     .flatMap((group) => group.options)
     .find((option) => (mounted ? option.value === value : option.label === initialLabel));
-  const selectedHelp = selectedOption?.help;
+  const selectedHelp = showSelectedHelp ? selectedOption?.help : undefined;
 
   const handleSelect = (optionValue: string) => {
     if (disabled) return;
@@ -264,16 +264,8 @@ export function SearchableSelect({
           </button>
         </PopoverTrigger>
         {selectedHelp && selectedOption && !isOpen && (
-          <div
-            className={cn(
-              'pointer-events-none absolute inset-y-0 flex items-center',
-              compact ? 'left-1.5 right-5 font-medium' : 'left-3 right-9',
-            )}
-          >
-            <span
-              aria-hidden="true"
-              className={cn('invisible min-w-0 truncate', compact ? 'text-xs' : 'text-sm')}
-            >
+          <div className="pointer-events-none absolute inset-y-0 left-3 right-9 flex items-center">
+            <span aria-hidden="true" className="invisible min-w-0 truncate text-sm">
               {triggerLabel}
             </span>
             <SelectedOptionInfo

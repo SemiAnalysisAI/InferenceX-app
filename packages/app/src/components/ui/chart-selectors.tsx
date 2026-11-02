@@ -384,7 +384,7 @@ export function ScenarioSelector({
 
   const select = (
     <SearchableSelect
-      compact={variant === 'caption'}
+      showSelectedHelp={variant !== 'caption'}
       className={variant === 'caption' ? captionControlTriggerClassName : undefined}
       key={isOnlySelectedScenario ? 'fixed' : 'selectable'}
       disabled={isOnlySelectedScenario}
@@ -416,7 +416,19 @@ export function ScenarioSelector({
       <CaptionField
         label={t.scenario}
         value={scenarioLabel(value)}
-        control={select}
+        control={
+          <div className="flex items-center gap-1">
+            {select}
+            <InfoHelp
+              label={scenarioLabel(value)}
+              value={value}
+              triggerTestId={`selected-option-help-${value}`}
+              contentTestId={`selected-option-help-content-${value}`}
+            >
+              {toScenarioOption(value).help}
+            </InfoHelp>
+          </div>
+        }
         controlId={id}
         testId="result-context-scenario"
       />

@@ -427,9 +427,9 @@ describe('Default scenario', () => {
         .and('contain.text', 'Agentic');
       cy.get('[data-testid="scenario-selector"]').should(($selector) => {
         const label = $selector[0]!.querySelector('span')!;
-        const helpIcon = $selector[0]!.parentElement!.querySelector(
-          '[data-slot="info-help-icon"]',
-        )!;
+        const helpIcon = $selector[0]!
+          .closest('[data-testid="result-context-scenario"]')!
+          .querySelector('[data-slot="info-help-icon"]')!;
         expect(
           helpIcon.getBoundingClientRect().left,
           'help does not overlap the label',
