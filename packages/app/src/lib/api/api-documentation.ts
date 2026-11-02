@@ -20,6 +20,7 @@ import {
 
 import { POWER_VALIDITY_FILTERS } from '../benchmarks/benchmark-power-validity';
 import { PUBLIC_API_ERRORS } from './public-api-errors';
+import { experimentOperations } from './experiment-documentation';
 import { PARETO_DIRECTIONS, PARETO_SEQUENCES } from './pareto-api';
 import { operations as calculatorViews } from '../views-api/docs/calculator';
 import { operations as compareViews } from '../views-api/docs/compare';
@@ -810,6 +811,7 @@ export const apiDocumentationGroups: readonly ApiDocumentationGroup[] = [
 // comparisons may use a revision-keyed shared Blob cache; scope invalidation awaits
 // deletion and partial/concurrently replaced generations remain uncached.
 export const apiOperations: readonly ApiOperation[] = [
+  ...experimentOperations,
   ...extendViewOperations([
     ...optionsViews,
     ...inferenceViews,

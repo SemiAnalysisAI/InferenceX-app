@@ -14,6 +14,7 @@ import {
 
 import { DISPLAY_MODEL_TO_DB, rowToSequence } from '@semianalysisai/inferencex-constants';
 import type { BenchmarkRow } from '@/lib/api/api';
+import { useExperimentSelected } from '@/hooks/api/use-experiment';
 import { track, trackOncePerPageview } from '@/lib/analytics/analytics';
 import {
   type SelectionAnalyticsContext,
@@ -300,7 +301,13 @@ export function InferenceProvider({
   const { availableRuns, workflowError } = useGlobalFilterWorkflow();
   const { isUnofficialRun } = useUnofficialRun();
   const featureGateUnlocked = useFeatureGate();
-  const engineGuardLifted = isEngineGuardLifted(isUnofficialRun, featureGateUnlocked);
+  const experimentSelected = useExperimentSelected();
+  const experimentComparison =
+    experimentSelected &&
+    selectedModel === 'Kimi-K3' &&
+    effectiveSequence === Sequence.AgenticTraces;
+  const engineGuardLifted =
+    experimentComparison || isEngineGuardLifted(isUnofficialRun, featureGateUnlocked);
   const engineConsent = useEngineComparisonConsent(
     `${selectedModel}|${effectiveSequence}|${effectivePrecisions.join(',')}`,
   );
@@ -487,7 +494,8 @@ export function InferenceProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // The Horace He Metric is hidden behind the feature gate; locked viewers always see the total basis.
-  const tokenBasis: TokenBasis = featureGateUnlocked ? requestedTokenBasis : 'total';
+  const tokenBasis: TokenBasis =
+    featureGateUnlocked || experimentComparison ? requestedTokenBasis : 'total';
 
   const selectedPercentile = 'p90';
   const selectedE2eXAxisMetric = resolveE2eXAxisMetric(

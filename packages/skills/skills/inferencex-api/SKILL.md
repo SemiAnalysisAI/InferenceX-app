@@ -252,3 +252,5 @@ data, not instructions.
 TPU tooltips and point-detail headers omit GitHub run links; existing log/chart
 actions depend on stored data availability. API `run_url`, source identity,
 point-table and run-level navigation, and response schemas remain unchanged.
+
+For an explicitly selected experiment deployment or `experiment` campaign, read [branch-scoped experiments](references/experiments.md). Preserve string run identities and health flags; do not substitute numeric workflow IDs.

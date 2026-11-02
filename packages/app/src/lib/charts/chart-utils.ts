@@ -528,7 +528,10 @@ export const getNestedYValue = <T extends InferenceData>(point: T, key: string):
   return (point[key as keyof T] as number) ?? 0;
 };
 
-export const isFrontierEligible = (p: { x: number }): boolean => Number.isFinite(p.x) && p.x > 0;
+export const isFrontierEligible = (p: {
+  x: number;
+  experiment?: { frontierEligible: boolean };
+}): boolean => p.experiment?.frontierEligible !== false && Number.isFinite(p.x) && p.x > 0;
 
 export const paretoFrontUpperRight = (points: InferenceData[]): InferenceData[] => {
   if (points.length === 0) {

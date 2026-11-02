@@ -46,6 +46,22 @@ export type ApiRouteCatalogEntry = PublishedApiRouteCatalogEntry | ExcludedApiRo
  */
 export const apiRouteCatalog = [
   {
+    source: 'src/app/api/v1/experiments/[campaign]/route.ts',
+    path: '/api/v1/experiments/{campaign}',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-experiment-campaign',
+    sourceSha256: '815595dd5f55d4e59011e0020a3fc189276735f42cf7c208aed36e8cbc50315b',
+  },
+  {
+    source: 'src/app/api/v1/experiments/[campaign]/runs/[runId]/route.ts',
+    path: '/api/v1/experiments/{campaign}/runs/{runId}',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-experiment-run',
+    sourceSha256: '023d89e856bb79fc5463b5715cc6a1d3430e52222a1fadb3d24550126ac2bd18',
+  },
+  {
     source: 'src/app/api/v1/views/model-architectures/route.ts',
     path: '/api/v1/views/model-architectures',
     method: 'GET',
@@ -1164,6 +1180,30 @@ export interface ApiContractSourceDigest {
  */
 export const apiContractSourceDigests = [
   {
+    source: 'src/lib/benchmarks/experiment-benchmarks.ts',
+    sourceSha256: '7508d7c703507eb0c6625a158734479a6c6ce51bdea3c1a324a8a28956df8e1a',
+    reviewArea: {
+      en: 'Experiment selector row adaptation, replicate identity and archived reference metrics.',
+      zh: '实验选择器的数据转换、重复实验身份及已归档参考指标。',
+    },
+  },
+  {
+    source: '../db/src/queries/experiments.ts',
+    sourceSha256: '7fea6203778a06e2c8743ab1e01fbd5d169c2ff3cb1a9fbb6435688bc0007bff',
+    reviewArea: {
+      en: 'Raw experiment fields, complete-ingest visibility and string run identity.',
+      zh: '实验原始字段、完整导入可见性及字符串 run 身份。',
+    },
+  },
+  {
+    source: 'src/lib/api/experiment-documentation.ts',
+    sourceSha256: '4b7b81890eead29c9659ea173f1e0a1b38d23d5b8ece82921e71807a5bd39f45',
+    reviewArea: {
+      en: 'Experiment raw campaign and string-ID run detail contracts, provenance and no-store caching.',
+      zh: '实验原始 campaign、字符串 run ID 详情、来源信息与 no-store 缓存约定。',
+    },
+  },
+  {
     source: 'src/components/ubenchx/ubenchx-transform.ts',
     sourceSha256: '9458ad2b969525fe68da5a3b54ac151384610d0bd2ba84585a9043b3a67bf949',
     reviewArea: {
@@ -1393,7 +1433,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/benchmarks/benchmark-transform.ts',
-    sourceSha256: '4a59ccf2b1190d8165e45a54aee212814282f39f3271041221abe9ff7be7a68f',
+    sourceSha256: '3559593a6cf402e871ae061e930f8b555f1fef14447b2ec7b7aa724ba0668954',
     reviewArea: {
       en: 'Raw benchmark means and derived reciprocal mean-TPOT interactivity used by Dashboard and read-only views.',
       zh: '仪表板和只读视图共用的原始 benchmark 均值与 mean TPOT 倒数形式的 interactivity。',

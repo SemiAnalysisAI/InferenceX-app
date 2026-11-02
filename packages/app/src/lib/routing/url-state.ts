@@ -1,3 +1,4 @@
+import { WEKA_EXPERIMENT } from '@/lib/benchmarks/experiment-benchmarks';
 import { LIFECYCLE_DEFAULTS } from '@/components/calculator/lifecycle';
 import { dashboardRouteForPathname, getDashboardRoute } from '@/lib/routing/dashboard-routes';
 import { routeModelForPathname } from '@/lib/routing/model-routes';
@@ -328,6 +329,12 @@ function collectTabParams(): URLSearchParams {
   }
 
   const liveParams = profitRouteSearch(window.location.pathname, window.location.search);
+  if (
+    /^(?:\/zh)?\/inference(?:\/|$)/u.test(window.location.pathname) &&
+    liveParams.get('experiment') === WEKA_EXPERIMENT
+  ) {
+    filtered.set('experiment', WEKA_EXPERIMENT);
+  }
   for (const [key, value] of liveParams) {
     if (UNOFFICIAL_RUN_PARAM_RE.test(key) && value) {
       filtered.set('unofficialruns', value);

@@ -18,6 +18,9 @@ export const FW_REGISTRY: Record<string, FwEntry> = {
   teacup: { label: 'Teacup' },
   trt: { label: 'TRTLLM' },
   vllm: { label: 'vLLM' },
+  'vllm-weka-amg': { label: 'vLLM · WEKA AMG' },
+  'vllm-mooncake-dram': { label: 'vLLM · Mooncake DRAM' },
+  'vllm-mooncake-recovered': { label: 'vLLM · Mooncake C150 †' },
 };
 
 export const FRAMEWORK_KEYS = new Set(Object.keys(FW_REGISTRY));

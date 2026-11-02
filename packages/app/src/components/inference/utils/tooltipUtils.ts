@@ -580,7 +580,7 @@ const ACTION_STRINGS = {
   },
 } as const;
 
-type TooltipAction = 'view-charts' | 'view-logs' | 'view-power-trace';
+type TooltipAction = 'view-charts' | 'view-logs' | 'view-power-trace' | 'view-experiment';
 
 const pointDetailActionLink = (action: TooltipAction, href: string, label: string) =>
   `<a data-action="${action}" href="${href}" style="
@@ -641,6 +641,20 @@ const viewActionsHTML = ({
   const t = ACTION_STRINGS[locale];
   const actions: string[] = [];
   const pointId = point.id;
+  if (point.experiment) {
+    const identity = point.experiment;
+    const label = locale === 'zh' ? '运行证据与配置' : 'Run evidence and configuration';
+    actions.push(pointDetailActionLink('view-experiment', identity.detailHref, label));
+    if (!identity.frontierEligible) {
+      actions.push(
+        `<div class="text-xs">${
+          locale === 'zh'
+            ? '已恢复的 cache miss；不纳入无读取故障的 frontier；GPU-memory utilization 0.89。'
+            : 'Recovered cache miss; excluded from clean frontier; GPU-memory utilization 0.89.'
+        }</div>`,
+      );
+    }
+  }
   const isAgentic = point.benchmark_type === 'agentic_traces';
   const showCharts = isAgentic && hasTraceData;
   if (isPersistedBenchmarkId(pointId) && (showCharts || hasLogData)) {

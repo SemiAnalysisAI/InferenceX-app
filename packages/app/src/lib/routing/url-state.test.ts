@@ -1034,3 +1034,18 @@ describe('rememberChartStateInUrl — params this module does not own', () => {
     expect(params.has('unofficialrun')).toBe(false);
   });
 });
+
+describe('explicit experiment share links', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('retains the campaign selector when sharing changed chart axes in English and Chinese', async () => {
+    const { buildShareUrl, chartStateHref } = await import('@/lib/routing/url-state');
+    for (const path of ['/inference', '/zh/inference/kimi-k3']) {
+      setupWindow('?experiment=weka-amg-kimi-k3', path);
+      expect(new URL(buildShareUrl()).searchParams.get('experiment')).toBe('weka-amg-kimi-k3');
+      const changed = new URL(chartStateHref({ i_xmode: 'ttft' }));
+      expect(changed.searchParams.get('experiment')).toBe('weka-amg-kimi-k3');
+      expect(changed.searchParams.get('i_xmode')).toBe('ttft');
+    }
+  });
+});

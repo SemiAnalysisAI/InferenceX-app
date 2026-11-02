@@ -1,0 +1,22 @@
+"""Freeze local, hash-bound inputs; never connects to a database."""
+from pathlib import Path
+import hashlib,json
+W=Path('/Users/quilicic/weka-amg-agentx-20261028');E=W/'extension-20261029';D=E/'pareto-final/final-native/delivery-20261102-final'
+def read(p):return json.loads(p.read_text())
+def file(p):return {'path':str(p.resolve().relative_to(W)),'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'bytes':p.stat().st_size}
+points=read(D/'plot-data.json');published={str(r['id']):r for r in read(W/'reference/b300-overlay-20261029/benchmarks.json')};
+for p in points:
+ if p['series']=='published':p['date']=published[str(p['run_id'])].get('date')
+native={q['concurrency']:q for q in read(D/'evidence.json')['qualifications']};weka={r['run_id']:r for r in read(E/'aggregate/valid.json') if r['backend']=='weka'};cache={r['run_id']:r for r in read(D/'cache-evidence.json')['runs']}
+runs=[]
+for point in points:
+ if point['series']=='published':continue
+ rid=point['run_id'];c=point['concurrency'];is_weka=point['series']=='weka';r=weka[rid] if is_weka else native[c];results=Path(r['raw_collection'])/'results';aiperf=results/'aiperf_artifacts'
+ config=read(results/'run-config.json');config={k:v for k,v in config.items() if k in {'image','model','model_revision','tokenizer_revision','harness','dataset_revision','gpu_count','serving_dram_limit_bytes','client_dram_limit_bytes','nvme_hard_quota_bytes','recipe_fingerprint','gpu_memory_utilization','engine_commit','engine_version','sdk_version','mc_store_memcpy','async_scheduling','enable_cumem_allocator','total_cpu_dram_GiB','per_rank_cpu_dram_GiB','per_rank_buffer_GiB','cpu_request_limit','memory_request_limit_GiB','tp','dcp','master_lease_ttl_ms','master_threads','protocol','gid_index','profile_seconds'}};health={'status':'completed','profiling_http_errors':0} if is_weka else native[c]['health'];clean=is_weka or native[c]['clean_backend_qualified'];health={k:v for k,v in health.items() if k in {'status','profiling_http_errors','metrics_phase','successful_load_bytes','failed_load_keys_counter','profile_cache_read_failures','cache_health','log_events_by_phase','log_write_failure_observations_by_phase','counter_baseline_note'}}
+ public_cache={k:v for k,v in cache[rid].items() if k in {'run_id','backend','concurrency','replicate','series','backend_health_status','profiling_http_errors','warmup_http_errors','phases','phase_time_ranges','metric_export_sha256','source_archive_sha256'}}
+ files={'aggregate':file(Path(point['source'])),'profile':file(aiperf/'profile_export.jsonl'),'server_metrics':file(aiperf/'server_metrics_export.json'),'server_log':file(results/'server.log'),'run_config':file(results/'run-config.json')}
+ plot={k:point[k] for k in ['run_id','series','concurrency','replicate','total_tps_gpu','input_tps_gpu','output_tps_gpu','theoretical_hit_rate','uncached_tps_gpu','p90_interactivity','p90_ttft']}
+ runs.append({'run_id':rid,'series':point['series'],'concurrency':c,'replicate':point.get('replicate'),'clean_backend_qualified':clean,'frontier_eligible':clean,'plot_metrics':plot,'configuration':config,'health':health,'cache_evidence':public_cache,'provenance':{'source_archive_sha256':point['source_archive_sha256'],'artifact_identity':str(results.parent.relative_to(W)),'phase_time_ranges':public_cache['phase_time_ranges'],'pod_uid':r.get('pod_uid'),'aggregate_sha256':point['source_sha256'],'qualification':None if is_weka else {'measurement_complete':True,'clean_backend_qualified':clean,'recovered_cache_miss':None if clean else {k:v for k,v in native[c]['recovered_cache_miss'].items() if k!='source_line'},'cleanup_observation':native[c]['cleanup_observation']}},'files':files})
+assert len(runs)==16 and len({r['run_id'] for r in runs})==16
+m={'version':1,'slug':'weka-amg-kimi-k3','title':'Kimi K3: WEKA AMG and Mooncake on B300','description':'Sixteen completed bespoke measurements with the unchanged published InferenceX B300 reference. Repeats retain separate run identities.','reference_points':[p for p in points if p['series']=='published'],'comparison_notes':{'caption':(D/'caption.txt').read_text().strip(),'cache_notes':read(D/'cache-evidence.json')['notes'],'artifact_identity':str(D.relative_to(W)),'published_reference_sha256':file(W/'reference/b300-overlay-20261029/benchmarks.json')['sha256']},'runs':runs}
+out=Path(__file__).with_name('weka-amg-kimi-k3.manifest.json');out.write_text(json.dumps(m,indent=2)+'\n');print(out,hashlib.sha256(out.read_bytes()).hexdigest())

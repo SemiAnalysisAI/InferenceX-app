@@ -4,6 +4,8 @@ Design rationale and non-obvious conventions. Repo-wide rules are in [AGENTS.md]
 
 ## Docs
 
+- [Experiment Campaigns](./experiment-campaigns.md) covers branch-scoped raw APIs, string run identities and inference-view coverage.
+
 - [App Source Organization](./source-organization.md) covers import and refactor conventions for app source.
 
 - [API Skill Examples](./inferencex-api-examples.md) shows how to install the public API skill, query benchmarks, and export measured PowerX data.

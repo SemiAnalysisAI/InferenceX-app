@@ -2292,6 +2292,14 @@ const ScatterGraph = React.memo(
           const tooltipEl = chartRef.current?.getTooltipElement();
           if (!tooltipEl) return;
 
+          const experimentBtn = tooltipEl.querySelector('[data-action="view-experiment"]');
+          if (experimentBtn && d.experiment) {
+            experimentBtn.addEventListener('click', (event) => {
+              event.stopPropagation();
+              if (!ephemeralUrlState) rememberChartStateInUrl();
+              track('inference_experiment_run_open', { run_id: d.experiment!.runId });
+            });
+          }
           const viewBtn = tooltipEl.querySelector('[data-action="view-charts"]');
           if (viewBtn && isPersistedBenchmarkId(d.id)) {
             viewBtn.addEventListener('click', (btnEvent) => {

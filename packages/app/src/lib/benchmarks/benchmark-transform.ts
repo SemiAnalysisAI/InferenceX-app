@@ -169,6 +169,7 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
   // emitting `?ids=NaN` or an `/inference/agentic/NaN` link.
   const numericId = typeof row.id === 'number' ? row.id : Number(row.id);
   return {
+    experiment: (row as BenchmarkRow & { experiment?: AggDataEntry['experiment'] }).experiment,
     rawMetricKeys: Object.keys(m),
     id: isPersistedBenchmarkId(numericId) ? numericId : undefined,
     recipe_fingerprint: row.recipe_fingerprint ?? undefined,
