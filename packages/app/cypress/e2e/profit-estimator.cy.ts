@@ -1757,7 +1757,7 @@ describe('VR publication economics', () => {
             const vrHours = basis === 'chip-hour' ? 1 : (1_000_000 / 3.3) * 8760;
             const gbHours = basis === 'chip-hour' ? 1 : (1_000_000 / 2.12) * 8760;
             expect(vr!.tco).to.be.closeTo(vrHours * (basis === 'chip-hour' ? 8.75 : 3.61), 0.01);
-            expect(gb!.tco).to.be.closeTo(gbHours * (basis === 'chip-hour' ? 5 : 2.31), 0.01);
+            expect(gb!.tco).to.be.closeTo(gbHours * (basis === 'chip-hour' ? 5.7 : 2.31), 0.01);
             const revenuePerHour =
               (((12_600 * ((1 - cacheHitRate) * 1.32 + cacheHitRate * 0.044) + 5_400 * 3.96) *
                 3600) /
