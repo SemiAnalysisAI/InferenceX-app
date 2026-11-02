@@ -41,6 +41,19 @@ const HTTP_METHOD: Readonly<Record<ApiRouteHttpMethod, true>> = {
   OPTIONS: true,
 };
 
+describe('GLM-5.3-Flash API registration', () => {
+  it('exposes a separate model enum in OpenAPI without replacing historical GLM identities', () => {
+    const document = buildOpenApiDocument('https://api-docs.test');
+    const pathItem = document.paths['/api/v1/benchmarks'] as {
+      get: { parameters: { name: string; schema: { enum?: string[] } }[] };
+    };
+    const model = pathItem.get.parameters.find((parameter) => parameter.name === 'model');
+    expect(model?.schema.enum).toEqual(
+      expect.arrayContaining(['GLM-5', 'GLM-5.2', 'GLM-5.3-Flash']),
+    );
+  });
+});
+
 interface DiscoveredRoute {
   readonly source: string;
   readonly path: string;

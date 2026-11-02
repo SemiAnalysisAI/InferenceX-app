@@ -48,7 +48,7 @@ const seo = (doc: Document) => [
   ...[...doc.querySelectorAll('h1, h2')].map((node) => node.textContent),
 ];
 
-describe('optional themes stay off standard light/dark pages and embeds', () => {
+describe('optional themes stay off the default page', () => {
   for (const route of ['/', '/zh']) {
     it(`${route} migrates a retired kart preference and keeps the toggle usable`, () => {
       const requests: string[] = [];
@@ -82,6 +82,8 @@ describe('optional themes stay off standard light/dark pages and embeds', () => 
     ['dark', '/', 390],
     ['light', '/zh', 390],
     ['dark', '/zh', 1440],
+    ['default', '/', 390],
+    ['default', '/zh', 1440],
     ['system', '/zh', 1440],
   ] as const) {
     it(`${theme} ${route} at ${width}px does not load theme code, assets or fonts`, () => {
@@ -92,11 +94,16 @@ describe('optional themes stay off standard light/dark pages and embeds', () => 
       cy.viewport(width, 900);
       cy.visit(route, {
         onBeforeLoad(win) {
-          win.localStorage.setItem('theme', theme);
+          if (theme === 'default') win.localStorage.removeItem('theme');
+          else win.localStorage.setItem('theme', theme);
           saveMediaOptIns(win, true);
         },
       });
       if (theme === 'light' || theme === 'dark') cy.get('html').should('have.class', theme);
+      if (theme === 'default') {
+        cy.get('html').should('have.class', 'light').and('not.have.class', 'dark');
+        cy.window().should((win) => expect(win.localStorage.getItem('theme')).to.equal(null));
+      }
       cy.get('[data-testid="theme-toggle"]')
         .should('have.attr', 'aria-label')
         .and('contain', 'currently');
@@ -109,13 +116,15 @@ describe('optional themes stay off standard light/dark pages and embeds', () => 
       cy.scrollTo('bottom');
       expectNoOptionalResources(requests);
       cy.document().then((doc) => {
-        if (theme !== 'light') return;
+        if (theme !== 'light' && theme !== 'default') return;
         const baseline = seo(doc);
         cy.get('[data-testid="theme-toggle"]').click();
         cy.get('html').should('have.class', 'dark');
         cy.window().should((win) => expect(win.localStorage.getItem('theme')).to.equal('dark'));
         cy.document().should((current) => expect(seo(current)).to.deep.equal(baseline));
         expectNoOptionalResources(requests);
+        cy.reload();
+        cy.get('html').should('have.class', 'dark').and('not.have.class', 'light');
       });
     });
   }
@@ -172,7 +181,7 @@ describe('optional themes stay off standard light/dark pages and embeds', () => 
     }
   });
 
-  it('reaches optional themes with ordinary clicks and preserves standard-page cleanup and metadata', () => {
+  it('reaches optional themes with ordinary clicks and preserves default-page cleanup and metadata', () => {
     cy.visit('/about', {
       onBeforeLoad(win) {
         win.localStorage.setItem('theme', 'light');
@@ -197,7 +206,7 @@ describe('optional themes stay off standard light/dark pages and embeds', () => 
   });
 
   for (const route of ['/about', '/zh/about']) {
-    it(`${route} keeps the page and theme toggle working when optional chunks fail`, () => {
+    it(`${route} keeps the page and default toggle working when optional chunks fail`, () => {
       cy.viewport(1440, 900);
       cy.visit(route, {
         onBeforeLoad(win) {

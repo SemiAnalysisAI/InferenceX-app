@@ -45,6 +45,13 @@ describe('DB_MODEL_TO_DISPLAY / DISPLAY_MODEL_TO_DB consistency', () => {
     expect(DISPLAY_MODEL_TO_DB['MiniMax-M3']).toEqual(['minimaxm3']);
   });
 
+  it('keeps GLM-5.3-Flash separate from both historical GLM buckets', () => {
+    expect(DISPLAY_MODEL_TO_DB['GLM-5.3-Flash']).toEqual(['glm5.3flash']);
+    expect(DISPLAY_MODEL_TO_DB['GLM-5.2']).toEqual(['glm5.2', 'glm5.3']);
+    expect(DISPLAY_MODEL_TO_DB['GLM-5']).toEqual(['glm5', 'glm5.1']);
+    expect(getModelReleaseDate('GLM-5.3-Flash')).toBeNull();
+  });
+
   it('keeps minimaxm31flash in its own MiniMax-M3.1-Flash display bucket', () => {
     expect(DISPLAY_MODEL_TO_DB['MiniMax-M3.1-Flash']).toEqual(['minimaxm31flash']);
     expect(DISPLAY_MODEL_TO_DB['MiniMax-M3']).not.toContain('minimaxm31flash');

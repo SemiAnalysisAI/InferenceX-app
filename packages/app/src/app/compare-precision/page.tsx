@@ -9,7 +9,7 @@ import { socialMetadata } from '@/lib/seo/social-metadata';
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
 import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
-import { COMPARE_MODEL_SLUGS } from '@/lib/compare/compare-slug';
+import { PUBLIC_COMPARE_MODEL_SLUGS } from '@/lib/compare/compare-slug';
 import { formatModelList } from '@/lib/compare/compare-ssr';
 import { getPrecisionPairsByModelSlug } from '@/lib/compare/compare-variant-availability';
 import {
@@ -49,7 +49,7 @@ const jsonLd = {
 export default async function ComparePrecisionIndexPage() {
   const precisionPairsByModel = await getPrecisionPairsByModelSlug();
   const totalUrls = [...precisionPairsByModel.values()].reduce((s, p) => s + p.length, 0);
-  const modelsWithPairs = COMPARE_MODEL_SLUGS.filter(
+  const modelsWithPairs = PUBLIC_COMPARE_MODEL_SLUGS.filter(
     (m) => (precisionPairsByModel.get(m.slug)?.length ?? 0) > 0,
   );
 

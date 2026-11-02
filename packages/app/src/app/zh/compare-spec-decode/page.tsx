@@ -10,7 +10,7 @@ import {
   getSpecDecodePairsByModelSlug,
   type SpecDecodePair,
 } from '@/lib/compare/compare-variant-availability';
-import { COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare/compare-slug';
+import { PUBLIC_COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare/compare-slug';
 import { formatModelListZh } from '@/lib/compare/compare-ssr-zh';
 import {
   canonicalSpecDecodeCompareSlug,
@@ -70,7 +70,7 @@ function buildCards(
 export default async function CompareSpecDecodeIndexPageZh() {
   const pairsByModel = await getSpecDecodePairsByModelSlug();
   const totalUrls = [...pairsByModel.values()].reduce((s, p) => s + p.length, 0);
-  const modelsWithPairs = COMPARE_MODEL_SLUGS.filter(
+  const modelsWithPairs = PUBLIC_COMPARE_MODEL_SLUGS.filter(
     (m) => (pairsByModel.get(m.slug)?.length ?? 0) > 0,
   );
 

@@ -348,6 +348,7 @@ export function overviewScenarioForModel(
   // 8K/1K; MiniMax M3 retired it on 2026-08-04 (InferenceX#2493, MODELS.md)
   // and DeepSeek V4 Pro after 2026-09-08 (InferenceX#2728, MODELS.md).
   return model === Model.Kimi_K3 ||
+    model === Model.GLM_5_3_Flash ||
     model === Model.GLM_5_2 ||
     model === Model.Qwen3_8_Flash_Next ||
     model === Model.MiniMax_M3 ||
@@ -363,6 +364,7 @@ export function overviewScenarioForModel(
  * both get one matrix row each, in OVERVIEW_SCENARIOS order.
  */
 const OVERVIEW_MODEL_SCENARIOS: Partial<Record<Model, readonly OverviewScenario[]>> = {
+  [Model.GLM_5_3_Flash]: ['agentx'],
   [Model.Muse_Spark_Open]: ['agentx'],
   // DeepSeek V4 Pro's single-turn 8k1k sweep ran for the last time on
   // 2026-09-08 (InferenceX#2728, MODELS.md Deprecation Notice). Historical
