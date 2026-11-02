@@ -35,6 +35,25 @@ describe('Inference ChartControls', () => {
     cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate-konami-v1'));
   });
 
+  it('offers pending Flash only while the shared feature gate is unlocked', () => {
+    cy.get('[data-testid="model-selector"]').click();
+    cy.contains('[role="option"]', 'GLM 5.3 Flash').should('not.exist');
+    cy.get('body').type('{esc}');
+    cy.window().then((win) => {
+      win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
+      win.dispatchEvent(new win.Event('inferencex:feature-gate:unlocked'));
+    });
+    cy.get('[data-testid="model-selector"]').click();
+    cy.contains('[role="option"]', 'GLM 5.3 Flash').click();
+    cy.get('@setSelectedModel').should('have.been.calledWith', Model.GLM_5_3_Flash);
+    cy.window().then((win) => {
+      win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
+      win.dispatchEvent(new win.Event('inferencex:feature-gate:locked'));
+    });
+    cy.get('[data-testid="model-selector"]').click();
+    cy.contains('[role="option"]', 'GLM 5.3 Flash').should('not.exist');
+  });
+
   it('offers no measured power or energy metrics; they live on the PowerX tab', () => {
     cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1'));
     mountWithProviders(<InferenceChartControls showXAxisMode />, { inference: {}, unofficial: {} });

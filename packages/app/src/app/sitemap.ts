@@ -1,4 +1,5 @@
 import type { MetadataRoute } from 'next';
+import { isFeatureGatedModelPath } from '@/lib/routing/model-feature-visibility';
 import { FIXTURES_MODE, getDb } from '@semianalysisai/inferencex-db/connection';
 import { listDatasets } from '@semianalysisai/inferencex-db/queries/datasets';
 
@@ -92,7 +93,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const zhPosts = new Set(getAllPosts('zh').map((post) => post.slug));
   const zhHardwarePages = new Set(getAllHardwarePages('zh').map((page) => page.slug));
 
-  return [
+  const entries: MetadataRoute.Sitemap = [
     ...localizedPair('/', { lastModified: latestData, changeFrequency: 'daily', priority: 1 }),
     ...DASHBOARD_ROUTES.filter((route) => route.indexable).flatMap((route) =>
       localizedPair(route.canonicalPath, {
@@ -321,4 +322,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       });
     }),
   ];
+  return entries.filter((entry) => !isFeatureGatedModelPath(new URL(entry.url).pathname));
 }

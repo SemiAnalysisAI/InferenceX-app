@@ -10,7 +10,7 @@ import { zhAlternates, zhPath } from '@/lib/i18n/i18n';
 import { inferenceModelMetaZh } from '@/lib/routing/inference-model-meta';
 import {
   getInferenceModelBySlug,
-  INFERENCE_MODEL_SLUGS,
+  PUBLIC_INFERENCE_MODEL_SLUGS,
   inferenceModelPath,
 } from '@/lib/routing/inference-model-slug';
 import { socialMetadata } from '@/lib/seo/social-metadata';
@@ -20,7 +20,7 @@ interface Props {
 }
 
 export function generateStaticParams(): { model: string }[] {
-  return INFERENCE_MODEL_SLUGS.map((entry) => ({ model: entry.slug }));
+  return PUBLIC_INFERENCE_MODEL_SLUGS.map((entry) => ({ model: entry.slug }));
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {

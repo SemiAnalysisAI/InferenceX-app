@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Model, Precision, Sequence } from '@/lib/catalog/data-mappings';
 
 const mocks = vi.hoisted(() => ({
+  featureGateUnlocked: false,
   availability: {
     data: [] as unknown[] | undefined,
     error: null as Error | null,
@@ -29,6 +30,10 @@ const mocks = vi.hoisted(() => ({
   unofficialAvailable: [] as { model: string; sequence: string; precision: string }[],
   getUrlParam: vi.fn(() => undefined),
   setUrlParams: vi.fn(),
+}));
+
+vi.mock('@/lib/runtime/use-feature-gate', () => ({
+  useFeatureGate: () => mocks.featureGateUnlocked,
 }));
 
 vi.mock('@/hooks/api/use-availability', () => ({
@@ -121,6 +126,7 @@ function mountProvider(): void {
 }
 
 beforeEach(() => {
+  mocks.featureGateUnlocked = false;
   mocks.availability.data = [];
   mocks.availability.error = null;
   mocks.availability.isError = false;
@@ -258,6 +264,7 @@ describe('GlobalFilterProvider context isolation', () => {
   });
 
   it('keeps Flash out of shared selectors while availability is loading or failed', () => {
+    mocks.featureGateUnlocked = true;
     mocks.availability.data = undefined;
     mountProvider();
     expect(availabilitySnapshot?.availableModels).not.toContain(Model.GLM_5_3_Flash);
@@ -271,6 +278,7 @@ describe('GlobalFilterProvider context isolation', () => {
   });
 
   it('offers Flash once its own database observations exist', () => {
+    mocks.featureGateUnlocked = true;
     mocks.availability.data = [
       {
         model: 'glm5.3flash',
@@ -286,6 +294,7 @@ describe('GlobalFilterProvider context isolation', () => {
   });
 
   it('offers an unofficial Flash run while published availability is still loading', () => {
+    mocks.featureGateUnlocked = true;
     mocks.availability.data = undefined;
     mocks.unofficialAvailable = [
       { model: Model.GLM_5_3_Flash, sequence: Sequence.AgenticTraces, precision: Precision.FP4 },
@@ -294,6 +303,49 @@ describe('GlobalFilterProvider context isolation', () => {
     act(() => selectModel?.(Model.GLM_5_3_Flash));
     expect(availabilitySnapshot?.availableModels).toContain(Model.GLM_5_3_Flash);
     expect(availabilitySnapshot?.availableSequences).toEqual([Sequence.AgenticTraces]);
+    expect(selectionSnapshot?.effectiveSequence).toBe(Sequence.AgenticTraces);
+  });
+
+  it('does not unlock Flash from observations, an unofficial run, or an explicit selection', () => {
+    mocks.availability.data = [
+      { model: 'glm5.3flash', precision: 'fp8', sequence: 'agentic-traces' },
+    ];
+    mocks.unofficialAvailable = [
+      { model: Model.GLM_5_3_Flash, sequence: Sequence.AgenticTraces, precision: Precision.FP8 },
+    ];
+    mountProvider();
+    act(() => selectModel?.(Model.GLM_5_3_Flash));
+    expect(availabilitySnapshot?.availableModels).not.toContain(Model.GLM_5_3_Flash);
+    expect(selectionSnapshot?.selectedModel).not.toBe(Model.GLM_5_3_Flash);
+  });
+
+  it('removes the active Flash selection and availability immediately on relock', () => {
+    mocks.featureGateUnlocked = true;
+    mocks.unofficialAvailable = [
+      { model: Model.GLM_5_3_Flash, sequence: Sequence.AgenticTraces, precision: Precision.FP8 },
+    ];
+    mountProvider();
+    act(() => selectModel?.(Model.GLM_5_3_Flash));
+    expect(selectionSnapshot?.selectedModel).toBe(Model.GLM_5_3_Flash);
+    act(() => {
+      mocks.featureGateUnlocked = false;
+      rerenderProvider?.();
+    });
+    expect(selectionSnapshot?.selectedModel).toBe(Model.Kimi_K3);
+    expect(availabilitySnapshot?.availableModels).not.toContain(Model.GLM_5_3_Flash);
+  });
+
+  it('auto-selects a previously locked unofficial Flash run when the gate is enabled', () => {
+    mocks.unofficialAvailable = [
+      { model: Model.GLM_5_3_Flash, sequence: Sequence.AgenticTraces, precision: Precision.FP8 },
+    ];
+    mountProvider();
+    expect(selectionSnapshot?.selectedModel).not.toBe(Model.GLM_5_3_Flash);
+    act(() => {
+      mocks.featureGateUnlocked = true;
+      rerenderProvider?.();
+    });
+    expect(selectionSnapshot?.selectedModel).toBe(Model.GLM_5_3_Flash);
     expect(selectionSnapshot?.effectiveSequence).toBe(Sequence.AgenticTraces);
   });
 });

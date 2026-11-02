@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
 import { DASHBOARD_ROUTES } from '@/lib/routing/dashboard-routes';
 import { getAllChipRouteSlugs } from '@/lib/catalog/chip-pages';
-import { INFERENCE_MODEL_SLUGS } from '@/lib/routing/inference-model-slug';
+import { PUBLIC_INFERENCE_MODEL_SLUGS as INFERENCE_MODEL_SLUGS } from '@/lib/routing/inference-model-slug';
+import { isFeatureGatedModelPath } from '@/lib/routing/model-feature-visibility';
 import { languageAlternates, zhPath } from '@/lib/i18n/i18n';
 import { getModelPageSlugs } from '@/lib/catalog/model-pages';
 import {
@@ -71,6 +72,18 @@ import { EXPLORER_SECTION_META } from '@/lib/agentic-workload-explorer/page-meta
 import sitemap from './sitemap';
 
 describe('sitemap locale parity', () => {
+  it('omits gated model URLs in both locales, even when observations exist', async () => {
+    mocks.availability.push({ model: 'glm5.3flash', hardware: 'b200', date: '2026-10-25' });
+    try {
+      const entries = await sitemap();
+      expect(entries.some((entry) => isFeatureGatedModelPath(new URL(entry.url).pathname))).toBe(
+        false,
+      );
+      expect(entries.some((entry) => entry.url.includes('/inference/glm-5-3'))).toBe(true);
+    } finally {
+      mocks.availability.pop();
+    }
+  });
   it('includes the shareable AgentX quickstart in both languages', async () => {
     const entries = await sitemap();
     for (const path of ['/agentx/quickstart', '/zh/agentx/quickstart']) {
@@ -198,8 +211,9 @@ describe('sitemap locale parity', () => {
     const rankingEntries = getAllRankingPageEntries();
     expect(rankingEntries.length).toBeGreaterThan(0);
     for (const entry of rankingEntries) {
-      expect(urls.has(`${SITE_URL}/rankings/${entry.slug}`)).toBe(true);
-      expect(urls.has(`${SITE_URL}${zhPath(`/rankings/${entry.slug}`)}`)).toBe(true);
+      const visible = !isFeatureGatedModelPath(`/rankings/${entry.slug}`);
+      expect(urls.has(`${SITE_URL}/rankings/${entry.slug}`)).toBe(visible);
+      expect(urls.has(`${SITE_URL}${zhPath(`/rankings/${entry.slug}`)}`)).toBe(visible);
     }
   });
 

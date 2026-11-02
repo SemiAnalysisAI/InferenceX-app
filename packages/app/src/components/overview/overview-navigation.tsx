@@ -1,5 +1,8 @@
 'use client';
 
+import { isModelVisible } from '@/lib/catalog/data-mappings';
+import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
+
 import {
   createContext,
   type MutableRefObject,
@@ -311,8 +314,19 @@ export function useOverviewNavigationError(): boolean {
 
 export function useOverviewData(): OverviewPageData {
   const value = useContext(OverviewDataContext);
+  const unlocked = useFeatureGate();
+  const visible = useMemo(
+    () =>
+      value === null
+        ? null
+        : {
+            ...value,
+            models: value.models.filter((entry) => isModelVisible(entry.model, unlocked)),
+          },
+    [value, unlocked],
+  );
   if (value === null) throw new Error('Overview controls require OverviewNavigationProvider');
-  return value;
+  return visible!;
 }
 
 export function useOverviewReference(): OverviewReferenceHardware {

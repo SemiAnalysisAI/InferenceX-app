@@ -7,7 +7,7 @@ import { CatalogLinkCard } from '@/components/catalog/catalog-link-card';
 import { Card } from '@/components/ui/card';
 import { enAlternates } from '@/lib/i18n/i18n';
 import { socialMetadata } from '@/lib/seo/social-metadata';
-import { INFERENCE_MODEL_SLUGS } from '@/lib/routing/inference-model-slug';
+import { PUBLIC_INFERENCE_MODEL_SLUGS } from '@/lib/routing/inference-model-slug';
 import { runPageHeading, type RunPageEntry } from '@/lib/live-seo/run-pages';
 import { getAvailableRunEntries } from '@/lib/live-seo/run-rankings-data.server';
 
@@ -49,7 +49,7 @@ export default async function RunIndexPage() {
     list.push(entry);
     byModel.set(entry.model.slug, list);
   }
-  const models = INFERENCE_MODEL_SLUGS.filter((model) => byModel.has(model.slug));
+  const models = PUBLIC_INFERENCE_MODEL_SLUGS.filter((model) => byModel.has(model.slug));
 
   const jsonLd = {
     '@context': 'https://schema.org',

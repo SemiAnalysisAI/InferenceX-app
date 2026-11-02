@@ -3,7 +3,7 @@ import {
   COMPARE_MODEL_SLUGS,
   type CompareModelSlug,
 } from '@/lib/compare/compare-slug';
-import { Model, MODEL_OPTIONS } from '@/lib/catalog/data-mappings';
+import { isModelVisible, Model, MODEL_OPTIONS } from '@/lib/catalog/data-mappings';
 
 export const MODEL_ROUTE_TABS = [
   'calculator',
@@ -47,7 +47,9 @@ const MODEL_ROUTE_TAB_MODELS: Partial<Record<ModelRouteTab, readonly Model[]>> =
 
 export function modelRoutesForTab(tab: ModelRouteTab): ModelRoute[] {
   const allowed = MODEL_ROUTE_TAB_MODELS[tab];
-  return allowed ? MODEL_ROUTES.filter((route) => allowed.includes(route.model)) : MODEL_ROUTES;
+  return MODEL_ROUTES.filter(
+    (route) => isModelVisible(route.model) && (!allowed || allowed.includes(route.model)),
+  );
 }
 
 export function modelRouteAvailableForTab(tab: ModelRouteTab, model: Model): boolean {

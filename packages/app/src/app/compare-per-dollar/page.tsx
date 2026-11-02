@@ -13,7 +13,7 @@ import { comparisonPairHref, comparisonScenarioForModel } from '@/lib/compare/co
 import { getComparablePairsByModelSlug } from '@/lib/compare/compare-availability';
 import {
   type ComparePair,
-  COMPARE_MODEL_SLUGS,
+  PUBLIC_COMPARE_MODEL_SLUGS,
   type CompareModelSlug,
 } from '@/lib/compare/compare-slug';
 import { bucketComparePairsByVendor, formatModelList } from '@/lib/compare/compare-ssr';
@@ -86,7 +86,7 @@ const jsonLd = {
 export default async function ComparePerDollarIndexPage() {
   const comparablePairsByModel = await getComparablePairsByModelSlug();
   const totalUrls = [...comparablePairsByModel.values()].reduce((s, p) => s + p.length, 0);
-  const modelsWithPairs = COMPARE_MODEL_SLUGS.filter(
+  const modelsWithPairs = PUBLIC_COMPARE_MODEL_SLUGS.filter(
     (m) => (comparablePairsByModel.get(m.slug)?.length ?? 0) > 0,
   );
 

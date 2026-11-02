@@ -28,6 +28,16 @@ context value. Consumers subscribe through five independently memoized domains:
 `useGlobalFilterSelection`, `useGlobalFilterActions`, `useGlobalFilterRun`,
 `useGlobalFilterAvailability`, and `useGlobalFilterWorkflow`.
 
+GLM-5.3-Flash uses the existing Konami UI feature gate. The provider retains a
+requested model but publishes a safe effective selection while locked, including
+on first render and after relock. It waits for gate hydration before synchronizing
+the URL, so an unlocked deep link survives reload. Unofficial availability cannot
+unlock a model. The root model boundary also blocks direct gated routes; public
+discovery excludes them and client overview/search surfaces respect the gate.
+This is UI-only visibility, not authorization. Following PowerX, the read-only
+API parameters, raw model registry and response data remain unchanged; the API
+and packaged skills document this presentation-only parity exception.
+
 Workflow query updates therefore do not notify selection or action consumers. Selection
 updates do not notify workflow-only consumers. Components should subscribe only to the
 domains they read.

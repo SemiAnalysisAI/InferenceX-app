@@ -74,6 +74,7 @@ import {
   Sequence,
   type Model,
   MODEL_OPTIONS,
+  isModelVisible,
   modelRequiresObservations,
 } from '@/lib/catalog/data-mappings';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -242,20 +243,22 @@ export default function ChartControls({
     setPowerCompare,
   } = useInferenceActions();
   const powerXSurface = usePowerXSurface();
+  const featureGateUnlocked = useFeatureGate();
   // Pending registrations are discoverable on inference without making them
   // measured choices in shared calculator/TCO, PowerX, or historical selectors.
   const selectableModels = useMemo(
     () =>
       tcoSource === 'inference' && !powerXSurface
         ? MODEL_OPTIONS.filter(
-            (model) => availableModels.includes(model) || modelRequiresObservations(model),
+            (model) =>
+              isModelVisible(model, featureGateUnlocked) &&
+              (availableModels.includes(model) || modelRequiresObservations(model)),
           )
         : availableModels,
-    [availableModels, powerXSurface, tcoSource],
+    [availableModels, powerXSurface, tcoSource, featureGateUnlocked],
   );
   const analyticsContext = useInferenceAnalyticsContext();
 
-  const featureGateUnlocked = useFeatureGate();
   const visibleGroups = useMemo(
     () =>
       METRIC_GROUPS.filter(

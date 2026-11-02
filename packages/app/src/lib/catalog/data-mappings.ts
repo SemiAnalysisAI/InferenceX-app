@@ -52,6 +52,8 @@ interface ModelConfig {
   exclusion?: ExclusionSpec[];
   /** Pending registrations remain inference-selectable, but are not measured fallback choices. */
   requiresObservations?: boolean;
+  /** UI visibility only; raw benchmark/API identities remain available. */
+  featureGated?: boolean;
 }
 
 const MTP_ENGINE_EXCLUSION: ExclusionSpec[] = [
@@ -156,6 +158,7 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
     category: 'default',
     logo: 'zai-color.svg',
     requiresObservations: true,
+    featureGated: true,
   },
   [Model.Qwen3_8_Flash_Next]: {
     label: 'Qwen3.8 Flash Next 176B',
@@ -239,6 +242,14 @@ export const MODEL_OPTIONS = (Object.keys(MODEL_CONFIG) as Model[])
   });
 
 export const DEFAULT_MODELS: ReadonlySet<Model> = modelsByCategory('default');
+
+export function modelRequiresFeatureGate(model: string): boolean {
+  return MODEL_CONFIG[model as Model]?.featureGated === true;
+}
+
+export function isModelVisible(model: string, featureGateUnlocked = false): boolean {
+  return featureGateUnlocked || !modelRequiresFeatureGate(model);
+}
 export const MAINTENANCE_MODELS: ReadonlySet<Model> = modelsByCategory('maintenance');
 export const DEPRECATED_MODELS: ReadonlySet<Model> = modelsByCategory('deprecated');
 export const EXPERIMENTAL_MODELS: ReadonlySet<Model> = modelsByCategory('experimental');

@@ -6,7 +6,7 @@ import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-con
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
 import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
-import { COMPARE_MODEL_SLUGS } from '@/lib/compare/compare-slug';
+import { PUBLIC_COMPARE_MODEL_SLUGS } from '@/lib/compare/compare-slug';
 import { formatModelListZh } from '@/lib/compare/compare-ssr-zh';
 import { zhAlternates } from '@/lib/i18n/i18n';
 import { socialMetadata } from '@/lib/seo/social-metadata';
@@ -49,7 +49,7 @@ const jsonLd = {
 export default async function ComparePrecisionIndexPageZh() {
   const precisionPairsByModel = await getPrecisionPairsByModelSlug();
   const totalUrls = [...precisionPairsByModel.values()].reduce((s, p) => s + p.length, 0);
-  const modelsWithPairs = COMPARE_MODEL_SLUGS.filter(
+  const modelsWithPairs = PUBLIC_COMPARE_MODEL_SLUGS.filter(
     (m) => (precisionPairsByModel.get(m.slug)?.length ?? 0) > 0,
   );
 
