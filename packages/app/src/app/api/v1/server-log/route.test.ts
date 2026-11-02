@@ -109,13 +109,23 @@ describe('GET /api/v1/server-log', () => {
 
     const res = await GET(req('/api/v1/server-log?id=42'));
     expect(res.status).toBe(413);
-    await expect(res.json()).resolves.toMatchObject({
-      bytes: 951_652_286,
-      maxBytes: 16 * MiB,
-      error: expect.stringContaining('offset and limit'),
-    });
+    const body = await res.json();
+    expect(body).toMatchObject({ bytes: 951_652_286, maxBytes: 16 * MiB });
+    // Too large to download as well, so the hint must not suggest download=1.
+    expect(body.error).toContain('offset and limit');
+    expect(body.error).not.toContain('download=1');
     expect(res.headers.get('cache-control')).toBe(LOG_CACHE);
     expect(mockGetServerLogChunk).not.toHaveBeenCalled();
+  });
+
+  it('suggests download=1 for a file too large to read whole but small enough to download', async () => {
+    mockGetBoundedServerLog.mockResolvedValueOnce(bounded(null, 20 * MiB));
+
+    const res = await GET(req('/api/v1/server-log?id=42'));
+    expect(res.status).toBe(413);
+    await expect(res.json()).resolves.toMatchObject({
+      error: expect.stringContaining('download=1'),
+    });
   });
 
   it('returns a bounded chunk when offset or limit is provided', async () => {
@@ -219,7 +229,9 @@ describe('GET /api/v1/server-log', () => {
     const res = await GET(req('/api/v1/server-log?id=42&download=1'));
 
     expect(res.status).toBe(413);
-    await expect(res.json()).resolves.toMatchObject({ maxBytes: 512 * MiB });
+    expect(res.headers.get('content-type')).toBe('text/plain; charset=utf-8');
+    expect(res.headers.get('content-disposition')).toBeNull();
+    await expect(res.text()).resolves.toContain('above the 536870912-byte download limit');
     expect(mockGetServerLogChunk).not.toHaveBeenCalled();
   });
 

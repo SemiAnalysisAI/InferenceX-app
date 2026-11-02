@@ -2676,8 +2676,8 @@ export const apiOperations: readonly ApiOperation[] = [
       ),
       errorResponse(
         '413',
-        'The file exceeds the size limit for a complete read (16 MiB) or a download (512 MiB). The body also carries bytes and maxBytes.',
-        '文件超过完整读取（16 MiB）或下载（512 MiB）的大小上限。响应体同时包含 bytes 和 maxBytes。',
+        'The file exceeds the size limit for a complete read (16 MiB, JSON body with bytes and maxBytes) or a download (512 MiB, plain-text body).',
+        '文件超过完整读取（16 MiB，JSON 响应体包含 bytes 和 maxBytes）或下载（512 MiB，纯文本响应体）的大小上限。',
         'Log file is 951652286 bytes, above the 16777216-byte limit for this mode. Read it with offset and limit, or stream it with download=1.',
       ),
       errorResponse(

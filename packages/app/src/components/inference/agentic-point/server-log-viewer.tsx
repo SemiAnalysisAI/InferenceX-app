@@ -51,7 +51,7 @@ const STRINGS = {
     searchError: 'The logs could not be searched. Try again in a moment.',
     noMatches: 'No matches found.',
     searchIncomplete:
-      'Search stopped after the first 64 million characters. Download a log to search the rest.',
+      'Search stopped after the first 64 million characters; later content was not searched.',
     match: 'match',
     matches: 'matches',
     firstMatches: 'Showing the first',
@@ -81,7 +81,7 @@ const STRINGS = {
     searching: '正在搜索……',
     searchError: '无法搜索日志，请稍后重试。',
     noMatches: '未找到匹配内容。',
-    searchIncomplete: '搜索已在前 6,400 万个字符处停止。如需搜索其余内容，请下载日志。',
+    searchIncomplete: '搜索已在前 6,400 万个字符处停止，之后的内容未被搜索。',
     match: '处匹配',
     matches: '处匹配',
     firstMatches: '显示前',

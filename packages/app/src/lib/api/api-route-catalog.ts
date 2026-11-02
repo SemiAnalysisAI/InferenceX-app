@@ -928,7 +928,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-server-log',
-    sourceSha256: '79eada356899fe52036fa05c0c72481de5dff8fd97efd2d854a35ac1831582b5',
+    sourceSha256: 'cd3472b77b906fe1ec3c9c036a26ad890890e0b65c7ff1421e326909d8a01f5f',
   },
   {
     source: 'src/app/api/v1/submissions/route.ts',

@@ -175,10 +175,16 @@ export async function GET(request: NextRequest) {
         return publicApiError(PUBLIC_API_ERRORS.notFound, 404);
       }
       if (whole.bytes > MAX_DOWNLOAD_SERVER_LOG_BYTES) {
-        return tooLargeResponse(
-          whole.bytes,
-          MAX_DOWNLOAD_SERVER_LOG_BYTES,
-          'Read it in ranges with offset and limit.',
+        // Plain text, not JSON: the viewer's download link may save this body as a file.
+        return new Response(
+          `Log file is ${whole.bytes} bytes, above the ${MAX_DOWNLOAD_SERVER_LOG_BYTES}-byte download limit. Read it in ranges with /api/v1/server-log?offset=&limit=, or scroll through it in the log viewer.\n`,
+          {
+            status: 413,
+            headers: {
+              ...cdnHeaders(serverLogCacheTag(), SERVER_LOG_CACHE_CONTROL),
+              'Content-Type': 'text/plain; charset=utf-8',
+            },
+          },
         );
       }
       const first: ServerLogChunk | null =
@@ -240,7 +246,9 @@ export async function GET(request: NextRequest) {
       return tooLargeResponse(
         log.bytes,
         MAX_COMPLETE_SERVER_LOG_BYTES,
-        'Read it with offset and limit, or stream it with download=1.',
+        log.bytes <= MAX_DOWNLOAD_SERVER_LOG_BYTES
+          ? 'Read it with offset and limit, or stream it with download=1.'
+          : 'Read it in ranges with offset and limit.',
       );
     }
     const serverLog = log.serverLog;
