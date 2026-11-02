@@ -193,7 +193,7 @@ export default function RootLayout({
           <QueryProvider>
             <ThemeProvider
               attribute="class"
-              defaultTheme="dark"
+              defaultTheme="light"
               themes={APP_THEMES}
               enableSystem
               disableTransitionOnChange
