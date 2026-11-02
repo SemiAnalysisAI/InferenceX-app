@@ -5,7 +5,7 @@ import type {
   ComputePrecision,
 } from '@semianalysisai/inferencex-db/operatorx/compare';
 import { peakBandwidthTBs, peakTflops } from '@/components/operatorx/compare/hardware';
-import { ridgeShare } from '@/components/operatorx/compare/roofline-bound';
+import { computeBound } from '@/components/operatorx/compare/roofline-bound';
 
 export interface RooflineSummaryParams {
   precision: ComputePrecision | null;
@@ -48,9 +48,6 @@ export function rooflineSummary(view: ComparisonView, params: RooflineSummaryPar
     const value = flops / (us * 1e6);
     return Number.isFinite(value) && value > 0 ? value : null;
   };
-  // past the ridge where the roofline draws it: at its effective intensity for staged work
-  const computeBound = (i: number, hw: string) =>
-    (ridgeShare(view.cases[i], hw, params.precision) ?? 0) >= 1;
   const shared =
     hardware.length > 0
       ? view.cases.flatMap((c, i) =>
@@ -69,7 +66,9 @@ export function rooflineSummary(view: ComparisonView, params: RooflineSummaryPar
   const caseIndices =
     missingReferences.length > 0
       ? []
-      : shared.filter((i) => hardware.every((hw) => computeBound(i, hw)));
+      : shared.filter((i) =>
+          hardware.every((hw) => computeBound(view.cases[i], hw, params.precision)),
+        );
   const sharedOnly = params.sharedOnly ?? true;
   const bars: RooflineSummaryBar[] = hardware
     .flatMap((hw) => {
@@ -83,7 +82,7 @@ export function rooflineSummary(view: ComparisonView, params: RooflineSummaryPar
             c.bytes &&
             c.bytes > 0 &&
             Number.isFinite(c.bytes) &&
-            computeBound(i, hw)
+            computeBound(c, hw, params.precision)
               ? [i]
               : [],
           );

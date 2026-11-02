@@ -1240,7 +1240,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/operatorx/roofline-summary.ts',
-    sourceSha256: '46da32f54515ad5821446c99461a041a65d7077622d17670ab86a18abe12bdf0',
+    sourceSha256: '3de17956e01ad89e1890140b35a8e7bbfc069e9e60fc22d09b45f121f050aeee',
     reviewArea: {
       en: 'OperatorX per-hardware and shared compute-bound cohorts, median/best throughput, precision and normalized values shared by the roofline bars and API.',
       zh: 'OperatorX 的各硬件自身及共同计算受限用例、吞吐量中位数与最佳值、精度及归一化数值，由 roofline 柱状图与 API 共用。',

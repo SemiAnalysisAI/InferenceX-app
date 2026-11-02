@@ -61,3 +61,20 @@ export function ridgeShare(
   const reach = bound ? c.flops / (peak * 1e6) / bound.us : null;
   return reach !== null && reach < 0.999 ? reach : (c.flops / c.bytes) * (bw / peak);
 }
+
+/**
+ * Whether a case is compute-bound on a GPU at `precision`: compute takes at least half its
+ * roofline time (for one stage, FLOP/byte at or past the ridge point), or, without a work
+ * breakdown, plain FLOP/byte at or past the ridge. False when a peak is unknown.
+ */
+export function computeBound(
+  c: ComparisonCase,
+  hw: string,
+  precision: ComputePrecision | null,
+): boolean {
+  const peak = precision ? peakTflops(hw, precision) : null;
+  const bw = peakBandwidthTBs(hw);
+  if (!peak || !bw || !c.flops || !c.bytes) return false;
+  const bound = rooflineBound(c, hw);
+  return bound ? bound.compute >= bound.memory + bound.link : c.flops / c.bytes >= peak / bw;
+}
