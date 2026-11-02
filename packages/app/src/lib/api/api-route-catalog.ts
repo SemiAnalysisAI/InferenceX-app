@@ -920,7 +920,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'search-server-logs',
-    sourceSha256: '183ed41ec785a32c3bda5b3bbed250b8605bd52190048246ff456d272ebfca12',
+    sourceSha256: 'cb9cda1bbd8413f9df039107a36201368d887e362e672bd95ca6acf5359e8b1e',
   },
   {
     source: 'src/app/api/v1/server-log/route.ts',
@@ -928,7 +928,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-server-log',
-    sourceSha256: '3d9e480b37e7f69c14902832605e6a3a51d651b403990885ff11955756c81c85',
+    sourceSha256: 'cd3472b77b906fe1ec3c9c036a26ad890890e0b65c7ff1421e326909d8a01f5f',
   },
   {
     source: 'src/app/api/v1/submissions/route.ts',
@@ -1601,7 +1601,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/cache/api-cache.ts',
-    sourceSha256: '6ba6cbb02c0278e31a9765bc4ff9fad002d2f0bf410aa84991835432545c0008',
+    sourceSha256: '3c4790f16dafceee25010f62a85735c8a0a079a14b02e3f4523c87ed4b5a0e7d',
     reviewArea: {
       en: 'Public CDN tags, cache lifetimes, Blob key dimensions, and purge behavior.',
       zh: '公开 CDN 标签、缓存时长、Blob 键维度和清除行为。',
@@ -1832,10 +1832,10 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/server-logs.ts',
-    sourceSha256: '7a6f6b0b3c60e1713f73f6d543745931886654f060cf55d6dc4be9619a64b479',
+    sourceSha256: '23cac33618e89dbd1a8795892065d24638add7e5842813eed6cc82c8a4ddb311',
     reviewArea: {
-      en: 'Log filename discovery, selected-file reads, bounded chunk metadata, complete-file search, availability, and legacy-schema fallback.',
-      zh: '日志文件名发现、指定文件读取、有界分块元数据、完整文件搜索、可用性以及旧版 schema 回退行为。',
+      en: 'Log filename discovery, size-capped selected-file reads, bounded chunk metadata, budgeted complete-file search, availability, and legacy-schema fallback.',
+      zh: '日志文件名发现、有大小上限的指定文件读取、有界分块元数据、有扫描预算的完整文件搜索、可用性以及旧版 schema 回退行为。',
     },
   },
   {

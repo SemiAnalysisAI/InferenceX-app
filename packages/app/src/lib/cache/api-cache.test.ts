@@ -276,6 +276,8 @@ describe('purgeAll', () => {
     expect(mockRevalidateTag).toHaveBeenCalledWith('db-page', 'max');
     expect(mockRevalidateTag).toHaveBeenCalledWith('db-cdn', 'max');
     expect(mockRevalidateTag).not.toHaveBeenCalledWith('db-cdn', { expire: 0 });
+    // Stored log text never changes on ingest, so its year-long CDN entries survive.
+    expect(mockRevalidateTag).not.toHaveBeenCalledWith('db-log', expect.anything());
   });
 
   it('drops every layer outright when asked to purge immediately', async () => {
@@ -287,6 +289,8 @@ describe('purgeAll', () => {
     expect(mockRevalidateTag).toHaveBeenCalledWith('db-page', { expire: 0 });
     expect(mockRevalidateTag).toHaveBeenCalledWith('db-cdn', { expire: 0 });
     expect(mockRevalidateTag).toHaveBeenCalledWith('collectivex', { expire: 0 });
+    // Retractions must drop cached server logs too.
+    expect(mockRevalidateTag).toHaveBeenCalledWith('db-log', { expire: 0 });
     expect(mockRevalidateTag).not.toHaveBeenCalledWith(expect.anything(), 'max');
   });
 

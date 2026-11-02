@@ -79,6 +79,25 @@ function cdnCacheTag(): string {
   return namespace ? `db-cdn:${namespace}` : 'db-cdn';
 }
 
+/**
+ * CDN tag for stored benchmark log text. Ingest never rewrites a stored log:
+ * it only links new bundles and adds missing files, so a response for one
+ * (id, file, range) cannot change. Ordinary ingests therefore leave this tag
+ * alone; only an immediate purge (corrections and retractions) drops it.
+ */
+export function serverLogCacheTag(): string {
+  const namespace = cacheNamespace();
+  return namespace ? `db-log:${namespace}` : 'db-log';
+}
+
+/**
+ * Stored log text is immutable, so the CDN keeps it for a year and browsers
+ * for an hour. Each Neon read of a deep offset decompresses the log up to that
+ * offset, so every CDN hit saves real database time.
+ */
+export const SERVER_LOG_CACHE_CONTROL =
+  'public, max-age=3600, s-maxage=31536000, stale-while-revalidate=86400';
+
 interface CachedQueryOptions {
   /** Use blob storage directly, skipping unstable_cache. Use for payloads known to exceed 2MB. */
   blobOnly?: boolean;
@@ -241,6 +260,7 @@ export async function purgeAll({
   revalidateTag(cacheTag(), { expire: 0 });
   revalidateTag(pageCacheTag(), stale);
   revalidateTag(cdnCacheTag(), stale);
+  if (immediate) revalidateTag(serverLogCacheTag(), { expire: 0 });
   // CollectiveX responses are cached only under their own tag (no blobs), so
   // a full purge must drop that tag explicitly.
   purgeCollectiveX({ immediate });

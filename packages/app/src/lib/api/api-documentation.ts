@@ -2581,8 +2581,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/server-log',
     summary: text('Read a benchmark server log', '读取基准服务器日志'),
     description: text(
-      'Returns one stored .log/.out file for a benchmark result ID. Use file with a name from server-log-files. Add offset or limit for a bounded chunk; add download=1 to stream the complete selected file as a text attachment.',
-      '返回某个基准测试结果 ID 对应的一份已存储的 .log/.out 文件。file 应使用 server-log-files 返回的文件名。可添加 offset 或 limit，按指定范围分块读取；添加 download=1 可将完整的所选文件作为文本附件流式下载。',
+      'Returns one stored .log/.out file for a benchmark result ID. Use file with a name from server-log-files. Add offset or limit for a bounded chunk; add download=1 to stream the complete selected file as a text attachment. Without offset, limit, or download, files over 16 MiB return 413; download=1 returns 413 for files over 512 MiB, which must be read in offset/limit ranges. Stored logs never change, so successful responses are CDN-cached for a year.',
+      '返回某个基准测试结果 ID 对应的一份已存储的 .log/.out 文件。file 应使用 server-log-files 返回的文件名。可添加 offset 或 limit，按指定范围分块读取；添加 download=1 可将完整的所选文件作为文本附件流式下载。不带 offset、limit 或 download 时，超过 16 MiB 的文件返回 413；使用 download=1 时，超过 512 MiB 的文件返回 413，需改用 offset/limit 分段读取。已存储的日志不会变化，因此成功响应会在 CDN 缓存一年。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -2675,6 +2675,12 @@ export const apiOperations: readonly ApiOperation[] = [
         'Not found',
       ),
       errorResponse(
+        '413',
+        'The file exceeds the size limit for a complete read (16 MiB, JSON body with bytes and maxBytes) or a download (512 MiB, plain-text body).',
+        '文件超过完整读取（16 MiB，JSON 响应体包含 bytes 和 maxBytes）或下载（512 MiB，纯文本响应体）的大小上限。',
+        'Log file is 951652286 bytes, above the 16777216-byte limit for this mode. Read it with offset and limit, or stream it with download=1.',
+      ),
+      errorResponse(
         '500',
         'The server log query failed.',
         '服务器日志查询失败。',
@@ -2691,8 +2697,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/server-log-search',
     summary: text('Search complete benchmark logs', '搜索完整基准测试日志'),
     description: text(
-      'Runs a literal, case-insensitive search across every stored .log/.out file for one benchmark result. The bounded response contains contextual snippets without transferring complete log files.',
-      '在某个基准测试结果对应的所有已存储 .log/.out 文件中，按字面值执行不区分大小写的搜索。响应仅返回数量受限的上下文片段，无需传输完整日志文件。',
+      'Runs a literal, case-insensitive search across every stored .log/.out file for one benchmark result. The bounded response contains contextual snippets without transferring complete log files. One request scans at most 64 million characters across all files; incomplete is true when that budget stopped the scan before the end. A search that exceeds its time budget returns 504.',
+      '在某个基准测试结果对应的所有已存储 .log/.out 文件中，按字面值执行不区分大小写的搜索。响应仅返回数量受限的上下文片段，无需传输完整日志文件。单次请求在所有文件中最多扫描 6,400 万个字符；若扫描因该上限而未到达末尾，incomplete 为 true。搜索超时则返回 504。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -2745,6 +2751,7 @@ export const apiOperations: readonly ApiOperation[] = [
             }),
           ),
           truncated: booleanSchema,
+          incomplete: booleanSchema,
         }),
         {
           id: 421,
@@ -2759,9 +2766,16 @@ export const apiOperations: readonly ApiOperation[] = [
             },
           ],
           truncated: false,
+          incomplete: false,
         },
       ),
       errorResponse('400', 'The search parameters are invalid.', '搜索参数无效。', 'Invalid query'),
+      errorResponse(
+        '504',
+        'The search exceeded its time budget.',
+        '搜索超时。',
+        'Search timed out. Try a more specific term.',
+      ),
       errorResponse(
         '500',
         'The complete-log search failed.',
