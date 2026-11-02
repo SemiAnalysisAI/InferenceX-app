@@ -57,6 +57,7 @@ interface SearchableSelectProps {
   placeholder?: string;
   initialLabel?: string;
   className?: string;
+  compact?: boolean;
   contentClassName?: string;
   triggerId?: string;
   triggerTestId?: string;
@@ -81,6 +82,7 @@ export function SearchableSelect({
   placeholder: placeholderProp,
   initialLabel,
   className,
+  compact = false,
   contentClassName,
   triggerId,
   triggerAriaLabel,
@@ -262,8 +264,16 @@ export function SearchableSelect({
           </button>
         </PopoverTrigger>
         {selectedHelp && selectedOption && !isOpen && (
-          <div className="pointer-events-none absolute inset-y-0 left-3 right-9 flex items-center">
-            <span aria-hidden="true" className="invisible min-w-0 truncate text-sm">
+          <div
+            className={cn(
+              'pointer-events-none absolute inset-y-0 flex items-center',
+              compact ? 'left-1.5 right-9' : 'left-3 right-9',
+            )}
+          >
+            <span
+              aria-hidden="true"
+              className={cn('invisible min-w-0 truncate', compact ? 'text-xs' : 'text-sm')}
+            >
               {triggerLabel}
             </span>
             <SelectedOptionInfo

@@ -8,6 +8,7 @@ import { ModelLogo } from '@/components/ui/model-logo';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { NewBadge } from '@/components/ui/new-badge';
+import { CaptionField, captionControlTriggerClassName } from '@/components/ui/result-context';
 import {
   Select,
   SelectContent,
@@ -318,6 +319,7 @@ export function SequenceSelector({
 }
 
 interface ScenarioSelectorProps {
+  variant?: 'field' | 'caption';
   id?: string;
   value: string;
   onChange: (value: Sequence) => void;
@@ -329,6 +331,7 @@ interface ScenarioSelectorProps {
 }
 
 export function ScenarioSelector({
+  variant = 'field',
   id = 'scenario-select',
   value,
   onChange,
@@ -379,33 +382,51 @@ export function ScenarioSelector({
       ),
   });
 
+  const select = (
+    <SearchableSelect
+      compact={variant === 'caption'}
+      className={variant === 'caption' ? captionControlTriggerClassName : undefined}
+      key={isOnlySelectedScenario ? 'fixed' : 'selectable'}
+      disabled={isOnlySelectedScenario}
+      value={value}
+      initialLabel={scenarioLabel(value)}
+      contentClassName="min-w-[min(16rem,var(--radix-popover-content-available-width))]"
+      placeholder={t.scenario}
+      triggerId={id}
+      triggerTestId={testId}
+      searchable={false}
+      onValueChange={(v) => {
+        track('selector_scenario_changed', { scenario: v });
+        onChange(v as Sequence);
+      }}
+      open={isOnlySelectedScenario ? false : open}
+      onOpenChange={onOpenChange}
+      groups={[
+        { label: '', options: agentic.map(toScenarioOption) },
+        {
+          label: t.fixedSequenceLength,
+          options: [...fixedGroups.default, ...fixedGroups.deprecated].map(toScenarioOption),
+        },
+      ].filter((group) => group.options.length > 0)}
+    />
+  );
+
+  if (variant === 'caption') {
+    return (
+      <CaptionField
+        label={t.scenario}
+        value={scenarioLabel(value)}
+        control={select}
+        controlId={id}
+        testId="result-context-scenario"
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col space-y-1.5 lg:col-span-1">
       <LabelWithTooltip htmlFor={id} label={t.scenario} tooltip={t.scenarioTooltip} />
-      <SearchableSelect
-        key={isOnlySelectedScenario ? 'fixed' : 'selectable'}
-        disabled={isOnlySelectedScenario}
-        value={value}
-        initialLabel={scenarioLabel(value)}
-        contentClassName="min-w-[min(16rem,var(--radix-popover-content-available-width))]"
-        placeholder={t.scenario}
-        triggerId={id}
-        triggerTestId={testId}
-        searchable={false}
-        onValueChange={(v) => {
-          track('selector_scenario_changed', { scenario: v });
-          onChange(v as Sequence);
-        }}
-        open={isOnlySelectedScenario ? false : open}
-        onOpenChange={onOpenChange}
-        groups={[
-          { label: '', options: agentic.map(toScenarioOption) },
-          {
-            label: t.fixedSequenceLength,
-            options: [...fixedGroups.default, ...fixedGroups.deprecated].map(toScenarioOption),
-          },
-        ].filter((group) => group.options.length > 0)}
-      />
+      {select}
     </div>
   );
 }

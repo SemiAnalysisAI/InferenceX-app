@@ -55,9 +55,12 @@ Other dashboards keep their existing query-state behavior.
 
 **Prefix convention**: `g_` (global), `i_` (inference), `e_` (evaluation), `r_` (reliability), and `c_` (calculator). The canonical dashboard route registry declares which scopes belong in each share URL.
 
-Inference and PowerX place Scenario, Precision, and Run context inside More chart
-controls below the `md` breakpoint; Model stays visible. Desktop keeps Scenario
-and Precision beside Model and renders Run context full-width below chart settings.
+Inference places Scenario in the chart footer beside Cost Tier and TCO Basis on
+desktop and mobile, including below an empty chart so users can recover from an
+empty selection. PowerX keeps Scenario beside Model on
+desktop and inside More chart controls on mobile. Both surfaces put Precision and
+Run context inside More chart controls below `md`; Model stays visible. Desktop
+keeps Precision beside Model and Run context full-width below chart settings.
 Embedded charts retain their standalone run panel. This is a presentation-only API
 coverage exclusion: expanding the section does not change scenario, precision, or
 date/run selection, API parameters, defaults, measurements, or unofficial overlays.

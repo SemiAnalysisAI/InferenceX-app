@@ -9,6 +9,7 @@ export interface ResultContextProps {
   locale: Locale;
   model?: string;
   workload?: string;
+  scenario?: ReactNode;
   precision?: string;
   metric?: string;
   costTier?: string;
@@ -70,6 +71,7 @@ export function ResultContext({
   locale,
   model,
   workload,
+  scenario,
   precision,
   metric,
   costTier,
@@ -136,6 +138,7 @@ export function ResultContext({
       data-testid="result-context"
       className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground"
     >
+      {scenario}
       {model && (
         <div>
           <dt className="inline font-medium text-foreground">{labels.model}:</dt>{' '}
