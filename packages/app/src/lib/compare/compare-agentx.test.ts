@@ -121,8 +121,8 @@ describe('AgentX comparison links', () => {
       label: 'AgentX',
       sequence: 'agentic-traces',
     });
-    expect(comparisonPairHref('en', 'mimo-v26-flash-b300-vs-b200', mimo)).toBe(
-      '/compare/mimo-v26-flash-b300-vs-b200/agentic',
+    expect(comparisonPairHref('en', 'mimo-v26-flash-b300-vs-b200')).toBe(
+      '/compare/mimo-v26-flash-b300-vs-b200',
     );
     expect(agentxDashboardHref('en', mimo)).toBe('/inference/mimo-v26-flash');
     expect(agentxDashboardHref('zh', mimo)).toBe('/zh/inference/mimo-v26-flash');
