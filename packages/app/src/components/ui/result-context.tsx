@@ -59,7 +59,7 @@ export function CaptionField({
       <dt className="font-medium text-foreground">
         {controlId ? <label htmlFor={controlId}>{label}:</label> : <>{label}:</>}
       </dt>{' '}
-      <dd className="inline-flex items-center" data-testid={testId}>
+      <dd className="inline" data-testid={testId}>
         <span className="no-export inline-flex items-center">{control}</span>
         <span className="export-only hidden">{value}</span>
       </dd>
