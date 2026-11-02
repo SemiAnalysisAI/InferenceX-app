@@ -64,12 +64,15 @@ async function verifyPublishedSources(bundle: FidelityBundle, signal: AbortSigna
     const id = number(at(reference, 'ci', 'databaseId'));
     const artifactId = number(at(reference, 'artifact', 'id'));
     const name = text(at(reference, 'artifact', 'name'));
+    const identity = videoArtifactIdentity(name);
     if (
       !Number.isSafeInteger(id) ||
       !id ||
       !Number.isSafeInteger(artifactId) ||
       !artifactId ||
-      !new RegExp(`^h3-video-${id}-[1-9]\\d*$`, 'u').test(name)
+      identity?.run !== String(id) ||
+      identity?.attempt !== String(number(at(reference, 'ci', 'runAttempt'))) ||
+      name.startsWith('h3-fidelity-')
     )
       throw new Error('Invalid original fidelity artifact');
     const saved = await readStoredArtifact(String(id), {
@@ -83,7 +86,7 @@ async function verifyPublishedSources(bundle: FidelityBundle, signal: AbortSigna
       throw new Error('Fidelity media requires an already published original source');
     const original = storedBundle(source);
     servingCells(original);
-    const revision = at(original.manifest, 'git_commit');
+    const revision = at(original.manifest, 'ci', 'head_sha') ?? at(original.manifest, 'git_commit');
     if (
       revision !== at(reference, 'ci', 'headSha') ||
       revision !== at(reference, 'artifact', 'workflow_run', 'head_sha') ||

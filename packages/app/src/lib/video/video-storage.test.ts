@@ -187,53 +187,56 @@ describe('persistent H3 media', () => {
     expect(await readVideoPublication('10', artifact, saved)).toBeNull();
   });
 
-  it('publishes native fidelity metadata while reusing already published original videos', async () => {
-    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
-    const fixture = await fidelityFixture();
-    vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
-      const url = String(input);
-      const original = fixture.originals.find((item) => url.includes(`/runs/${item.runId}/`));
-      if (original) return Promise.resolve(Response.json(original));
-      for (const [id, files] of fixture.originalFiles)
-        if (url.endsWith(`/${id}/SHA256SUMS`))
-          return Promise.resolve(new Response(files.get('SHA256SUMS')));
-      throw new Error(`Unexpected synthetic URL: ${url}`);
-    });
-    const zip = new Blob([
-      zipSync(
-        Object.fromEntries(
-          await Promise.all(
-            [...fixture.files].map(async ([path, blob]) => [
-              path,
-              new Uint8Array(await blob.arrayBuffer()),
-            ]),
+  it.each([false, true])(
+    'publishes fidelity reusing original videos (native names: %s)',
+    async (nativeOriginals) => {
+      vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'synthetic-test-token');
+      const fixture = await fidelityFixture({ nativeOriginals });
+      vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+        const url = String(input);
+        const original = fixture.originals.find((item) => url.includes(`/runs/${item.runId}/`));
+        if (original) return Promise.resolve(Response.json(original));
+        for (const [id, files] of fixture.originalFiles)
+          if (url.endsWith(`/${id}/SHA256SUMS`))
+            return Promise.resolve(new Response(files.get('SHA256SUMS')));
+        throw new Error(`Unexpected synthetic URL: ${url}`);
+      });
+      const zip = new Blob([
+        zipSync(
+          Object.fromEntries(
+            await Promise.all(
+              [...fixture.files].map(async ([path, blob]) => [
+                path,
+                new Uint8Array(await blob.arrayBuffer()),
+              ]),
+            ),
           ),
-        ),
-      ).buffer,
-    ]);
-    const result = await storeVideoArtifact(
-      fixture.runId,
-      fixture.artifact,
-      zip,
-      new AbortController().signal,
-    );
-    expect(result.sources[0].kind).toBe('fidelity');
-    vi.mocked(fetch).mockResolvedValueOnce(Response.json(result));
-    const saved = await readStoredArtifact(fixture.runId, fixture.artifact);
-    expect(storedFidelityBundle(saved!.sources[0]).comparisonSha256).toBe(
-      fixture.checksums.get('comparison.json'),
-    );
-    expect(result.sources[0].assets.filter(([path]) => path.endsWith('.mp4'))).toHaveLength(4);
-    expect(result.sources[0].assets.find(([path]) => path.endsWith('.mp4'))?.[1].url).toContain(
-      '/101/gpu/c1/baseline/artifacts/',
-    );
-    expect(vi.mocked(put).mock.calls.some((call) => call[2]?.contentType === 'video/mp4')).toBe(
-      false,
-    );
-    expect(vi.mocked(put).mock.calls.at(-1)?.[0]).toBe(
-      'h3-video-media/v1/runs/789/h3-fidelity-789-1_987.json',
-    );
-  });
+        ).buffer,
+      ]);
+      const result = await storeVideoArtifact(
+        fixture.runId,
+        fixture.artifact,
+        zip,
+        new AbortController().signal,
+      );
+      expect(result.sources[0].kind).toBe('fidelity');
+      vi.mocked(fetch).mockResolvedValueOnce(Response.json(result));
+      const saved = await readStoredArtifact(fixture.runId, fixture.artifact);
+      expect(storedFidelityBundle(saved!.sources[0]).comparisonSha256).toBe(
+        fixture.checksums.get('comparison.json'),
+      );
+      expect(result.sources[0].assets.filter(([path]) => path.endsWith('.mp4'))).toHaveLength(4);
+      expect(result.sources[0].assets.find(([path]) => path.endsWith('.mp4'))?.[1].url).toContain(
+        '/101/gpu/c1/baseline/artifacts/',
+      );
+      expect(vi.mocked(put).mock.calls.some((call) => call[2]?.contentType === 'video/mp4')).toBe(
+        false,
+      );
+      expect(vi.mocked(put).mock.calls.at(-1)?.[0]).toBe(
+        'h3-video-media/v1/runs/789/h3-fidelity-789-1_987.json',
+      );
+    },
+  );
 
   it.each(['missing', 'digest', 'seal', 'media'])(
     'does not publish fidelity with an unaccepted original source: %s',
