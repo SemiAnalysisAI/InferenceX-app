@@ -368,7 +368,9 @@ async function fetchUnofficialRuns(
   signal: AbortSignal,
 ): Promise<UnofficialRunResponse> {
   const url = `/api/unofficial-run?runId=${encodeURIComponent(ids.join(','))}`;
-  const response = await fetch(url, { cache: 'no-store', signal });
+  // Default cache mode: the route's Cache-Control already keeps in-progress
+  // runs fresh, and `no-store` would make every load bypass the CDN copy.
+  const response = await fetch(url, { signal });
   const data = (await response.json()) as Partial<UnofficialRunResponse> & {
     error?: string;
   };
