@@ -8,6 +8,7 @@ import { replaceRouterPathname } from '@/lib/routing/client-navigation';
 import { AGENTX_NEW_MODEL_DISPLAY_NAMES } from '@/lib/compare/compare-agentx';
 import { inferenceModelRouteForSelection } from '@/lib/routing/inference-model-slug';
 import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
+import { useExperimentSelected } from '@/hooks/api/use-experiment';
 
 import {
   useInferenceActions,
@@ -251,6 +252,7 @@ export default function ChartControls({
   } = useInferenceActions();
   const powerXSurface = usePowerXSurface();
   const featureGateUnlocked = useFeatureGate();
+  const experimentSelected = useExperimentSelected();
   // Pending registrations are discoverable on inference without making them
   // measured choices in shared calculator/TCO, PowerX, or historical selectors.
   const selectableModels = useMemo(
@@ -485,7 +487,7 @@ export default function ChartControls({
     (selectedDateRange.startDate && selectedDateRange.endDate ? 1 : 0);
   const tokenBasisVisible =
     mounted &&
-    featureGateUnlocked &&
+    (featureGateUnlocked || (experimentSelected && selectedModel === 'Kimi-K3')) &&
     tcoSource === 'inference' &&
     selectedSequence === Sequence.AgenticTraces &&
     countsInputTokens(selectedYAxisMetric);

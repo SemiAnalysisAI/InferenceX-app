@@ -1,0 +1,9 @@
+{
+  "purpose": "weka-amg-kimi-k3-isolated-import",
+  "project_id": "silent-pond-29172997",
+  "parent_branch_id": "br-restless-voice-ai2vkru2",
+  "child_branch_id": "br-odd-math-aif8e7ha",
+  "endpoint_host": "ep-empty-dream-aio1rvub-pooler.c-4.us-east-1.aws.neon.tech",
+  "database": "neondb",
+  "expires_at": null
+}

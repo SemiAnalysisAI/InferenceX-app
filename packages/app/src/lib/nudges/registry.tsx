@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
 
+import { WEKA_EXPERIMENT } from '@/lib/benchmarks/experiment-benchmarks';
 import { MOBILE_VIEWPORT_QUERY } from '@/hooks/useMediaQuery';
 import { isZhPathname, localePath } from '@/lib/i18n/i18n';
 import {
@@ -79,7 +80,14 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     trigger: { type: 'timer', delayMs: 1500 },
     dismissal: { type: 'permanent' },
     storageKey: 'inferencex-reproducibility-nudge-dismissed',
-    conditions: [{ check: notPhoneWidthPowerX }],
+    conditions: [
+      { check: notPhoneWidthPowerX },
+      {
+        check: () =>
+          typeof window === 'undefined' ||
+          new URLSearchParams(window.location.search).get('experiment') !== WEKA_EXPERIMENT,
+      },
+    ],
     priority: 10,
     scope: 'dashboard',
     content: {

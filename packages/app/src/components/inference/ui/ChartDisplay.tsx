@@ -138,6 +138,7 @@ import { InferenceScenarioSelector } from './InferenceScenarioSelector';
 import { ModelLogo } from '@/components/ui/model-logo';
 
 import ChartNotices from './ChartNotices';
+import { ExperimentNotice } from './ExperimentNotice';
 import { MetricExplanation } from './MetricExplanation';
 import { OptionInfo } from '@/components/ui/option-info';
 import ChartControls from './ChartControls';
@@ -1664,6 +1665,13 @@ export default function ChartDisplay({
       data-powerx-surface={powerXLayout ? '' : undefined}
       className="flex flex-col gap-4"
     >
+      <ExperimentNotice
+        enabled={
+          selectedModel === 'Kimi-K3' &&
+          selectedSequence === Sequence.AgenticTraces &&
+          !powerXSurface
+        }
+      />
       {!minimalChrome && (
         <section className="relative z-20">
           <Card>

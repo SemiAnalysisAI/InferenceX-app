@@ -1,0 +1,421 @@
+{
+  "campaign": "weka-amg-kimi-k3",
+  "manifest_sha256": "a8a73b2042f48635621c5ca26c7703534a4e484a081e64320037163062a9a2a8",
+  "target": {
+    "purpose": "weka-amg-kimi-k3-isolated-import",
+    "project_id": "silent-pond-29172997",
+    "parent_branch_id": "br-restless-voice-ai2vkru2",
+    "child_branch_id": "br-odd-math-aif8e7ha",
+    "endpoint_host": "ep-empty-dream-aio1rvub-pooler.c-4.us-east-1.aws.neon.tech",
+    "database": "neondb",
+    "expires_at": null
+  },
+  "completed_at": "2026-11-02T19:56:05.600Z",
+  "runs": [
+    {
+      "run_id": "cam-k3-amg-c56-r1",
+      "status": "unchanged"
+    },
+    {
+      "run_id": "cam-k3-amg-c56-r2",
+      "status": "unchanged"
+    },
+    {
+      "run_id": "cam-k3-amg-c70-r1",
+      "status": "unchanged"
+    },
+    {
+      "run_id": "cam-k3-amg-c70-r2",
+      "status": "unchanged"
+    },
+    {
+      "run_id": "cam-k3-amg-c96-r1",
+      "status": "unchanged"
+    },
+    {
+      "run_id": "cam-k3-amg-c96-r2",
+      "status": "unchanged"
+    },
+    {
+      "run_id": "cam-k3-amg-c128-r1",
+      "status": "unchanged"
+    },
+    {
+      "run_id": "cam-k3-amg-c128-r2",
+      "status": "unchanged"
+    },
+    {
+      "run_id": "cam-k3-amg-c140-r1",
+      "status": "unchanged"
+    },
+    {
+      "run_id": "cam-k3-amg-c150-r1",
+      "status": "unchanged"
+    },
+    {
+      "run_id": "sa-k3-original-rdma2048-c56",
+      "status": "unchanged"
+    },
+    {
+      "run_id": "sa-k3-original-rdma2048-c70",
+      "status": "unchanged"
+    },
+    {
+      "run_id": "sa-k3-original-rdma2048-c96",
+      "status": "unchanged"
+    },
+    {
+      "run_id": "sa-k3-original-rdma2048-c128",
+      "status": "unchanged"
+    },
+    {
+      "run_id": "sa-k3-original-rdma2048-c140",
+      "status": "unchanged"
+    },
+    {
+      "run_id": "sa-k3-original-rdma2048-c150-m089",
+      "status": "unchanged"
+    }
+  ],
+  "stored_count": 16,
+  "payloads": [
+    {
+      "run_id": "cam-k3-amg-c128-r1",
+      "kind": "profile",
+      "parts": 4,
+      "bytes": "3320966",
+      "payload_sha256": "32a16f9d3a337db18a1764894747ab2727c1f6f75a8e147432313715f1f3a72d"
+    },
+    {
+      "run_id": "cam-k3-amg-c128-r1",
+      "kind": "server_log",
+      "parts": 1,
+      "bytes": "995863",
+      "payload_sha256": "a7ecc44f0bb0d7492367e48ce16600e28b70d4868d6543377ebca135ff06787b"
+    },
+    {
+      "run_id": "cam-k3-amg-c128-r1",
+      "kind": "server_metrics",
+      "parts": 25,
+      "bytes": "25969998",
+      "payload_sha256": "b61849912c2144bc553724622bb25b1db61fa687bd19999698166f17ed408f37"
+    },
+    {
+      "run_id": "cam-k3-amg-c128-r2",
+      "kind": "profile",
+      "parts": 4,
+      "bytes": "3314233",
+      "payload_sha256": "113bf525fb1ed1ec842ebb7c73b1a05c48fdea1901053299dc1bd2cc1e9b92cc"
+    },
+    {
+      "run_id": "cam-k3-amg-c128-r2",
+      "kind": "server_log",
+      "parts": 1,
+      "bytes": "997251",
+      "payload_sha256": "e4389937d503317829a8b888bf5ec997aef6e6a81bf538f5b47cf65c39e827ef"
+    },
+    {
+      "run_id": "cam-k3-amg-c128-r2",
+      "kind": "server_metrics",
+      "parts": 25,
+      "bytes": "25694772",
+      "payload_sha256": "20b7c5221fef7dbbdaa72d803e1dae74d0675e26431e8f01bc2b187e7f561a32"
+    },
+    {
+      "run_id": "cam-k3-amg-c140-r1",
+      "kind": "profile",
+      "parts": 4,
+      "bytes": "3418820",
+      "payload_sha256": "de1ae6725399a7d2068879f429c720acb8630c2384c9a822f0715202e1078ada"
+    },
+    {
+      "run_id": "cam-k3-amg-c140-r1",
+      "kind": "server_log",
+      "parts": 1,
+      "bytes": "1029980",
+      "payload_sha256": "16ba330a5c7a31af54c61a2840499ef3d8af9a2d235bd52e98e62c787c4e9b94"
+    },
+    {
+      "run_id": "cam-k3-amg-c140-r1",
+      "kind": "server_metrics",
+      "parts": 26,
+      "bytes": "26668720",
+      "payload_sha256": "9ff86cca63265701518c431fe1721d47a03aae163ef8e99d3ad0f92b3fadd054"
+    },
+    {
+      "run_id": "cam-k3-amg-c150-r1",
+      "kind": "profile",
+      "parts": 4,
+      "bytes": "3411092",
+      "payload_sha256": "4a3717e4a69b44670a1d7a94ac338113cc47147f638b513515dfe2a2275db78b"
+    },
+    {
+      "run_id": "cam-k3-amg-c150-r1",
+      "kind": "server_log",
+      "parts": 2,
+      "bytes": "1048660",
+      "payload_sha256": "6478eda3e9a9ba08eda58662bf61133c47411a8c83a72589db9619382b6769bb"
+    },
+    {
+      "run_id": "cam-k3-amg-c150-r1",
+      "kind": "server_metrics",
+      "parts": 27,
+      "bytes": "27579362",
+      "payload_sha256": "da6401596c346c830d331f1b9fc14f23ce37560e7bc0ca1b860f17bf9e9c28eb"
+    },
+    {
+      "run_id": "cam-k3-amg-c56-r1",
+      "kind": "profile",
+      "parts": 3,
+      "bytes": "2295419",
+      "payload_sha256": "3a4f89b99fea8fdbdcd48b58177bd3ee861c0c6953beeb296d9452a955663c66"
+    },
+    {
+      "run_id": "cam-k3-amg-c56-r1",
+      "kind": "server_log",
+      "parts": 1,
+      "bytes": "650361",
+      "payload_sha256": "e6361974f4f6712a9aa4eab4f3a734153f5a705cf7a736808a9430ecf6669f8b"
+    },
+    {
+      "run_id": "cam-k3-amg-c56-r1",
+      "kind": "server_metrics",
+      "parts": 19,
+      "bytes": "19309044",
+      "payload_sha256": "8e46f4d8d950007070fbed703c40dc548a8976e0bd6d3ebf7d04ccc0b3199bf8"
+    },
+    {
+      "run_id": "cam-k3-amg-c56-r2",
+      "kind": "profile",
+      "parts": 3,
+      "bytes": "2295592",
+      "payload_sha256": "9e918c97e18dca9c15be32a93e0a50bff354643589d390e24149a2ab4cd00cdb"
+    },
+    {
+      "run_id": "cam-k3-amg-c56-r2",
+      "kind": "server_log",
+      "parts": 1,
+      "bytes": "650769",
+      "payload_sha256": "d551376b826615f82ebe6c559ebfc9e5855f6003b65cc81f6df556efb7505a89"
+    },
+    {
+      "run_id": "cam-k3-amg-c56-r2",
+      "kind": "server_metrics",
+      "parts": 19,
+      "bytes": "19412028",
+      "payload_sha256": "8686360563d65f1f96ced7dc4a3bfba78c7c1db90936ef03e046b286c2d25c30"
+    },
+    {
+      "run_id": "cam-k3-amg-c70-r1",
+      "kind": "profile",
+      "parts": 3,
+      "bytes": "2553408",
+      "payload_sha256": "9f67dabd7255011c9af34e857e8382b8fee1693a9edaae8c9ee00c4111b461f4"
+    },
+    {
+      "run_id": "cam-k3-amg-c70-r1",
+      "kind": "server_log",
+      "parts": 1,
+      "bytes": "758458",
+      "payload_sha256": "e3222a825206b04e488b79adf884753917c8e818fceea968903241f9d61389bf"
+    },
+    {
+      "run_id": "cam-k3-amg-c70-r1",
+      "kind": "server_metrics",
+      "parts": 20,
+      "bytes": "20806113",
+      "payload_sha256": "efc2dcb86299454efbc4f79234ae16014ebd3b08d242bb7b0e3e76eb3cb06d2b"
+    },
+    {
+      "run_id": "cam-k3-amg-c70-r2",
+      "kind": "profile",
+      "parts": 3,
+      "bytes": "2591394",
+      "payload_sha256": "1ce5fc464c47359fd97fb5ed720456a468cab90cdcb507c74042c931feefbfd1"
+    },
+    {
+      "run_id": "cam-k3-amg-c70-r2",
+      "kind": "server_log",
+      "parts": 1,
+      "bytes": "758539",
+      "payload_sha256": "1c87933e5102ebfaec4bf58c0355ee8a564a998918a679c0417eaf3ce9517f9c"
+    },
+    {
+      "run_id": "cam-k3-amg-c70-r2",
+      "kind": "server_metrics",
+      "parts": 20,
+      "bytes": "20703334",
+      "payload_sha256": "c8d20784a987838f4f7726f2f281baafd87aa347757c28e139197c2d2e2d0669"
+    },
+    {
+      "run_id": "cam-k3-amg-c96-r1",
+      "kind": "profile",
+      "parts": 3,
+      "bytes": "2984671",
+      "payload_sha256": "00ef0a1b9d3692d7c9fe5c816bab9164f26295e1037b613dde37a2f7ee83a645"
+    },
+    {
+      "run_id": "cam-k3-amg-c96-r1",
+      "kind": "server_log",
+      "parts": 1,
+      "bytes": "909411",
+      "payload_sha256": "ee591e3a83189643da6864926be05f764efd8512277d415dbb066d29b16c4796"
+    },
+    {
+      "run_id": "cam-k3-amg-c96-r1",
+      "kind": "server_metrics",
+      "parts": 23,
+      "bytes": "23492451",
+      "payload_sha256": "aa7fb4be971457dc3db7284f47dc4e827d15a4f1115339672aedff0761ecce99"
+    },
+    {
+      "run_id": "cam-k3-amg-c96-r2",
+      "kind": "profile",
+      "parts": 3,
+      "bytes": "2959228",
+      "payload_sha256": "9f89417c570b36a3050451ea4d37bcdcee1a3b00ff522211d147730d6b038cca"
+    },
+    {
+      "run_id": "cam-k3-amg-c96-r2",
+      "kind": "server_log",
+      "parts": 1,
+      "bytes": "902044",
+      "payload_sha256": "3ea63144590cc90545b7575327b1e8826a0bb0c8aa8477a315fa741ae4ca376a"
+    },
+    {
+      "run_id": "cam-k3-amg-c96-r2",
+      "kind": "server_metrics",
+      "parts": 23,
+      "bytes": "23370296",
+      "payload_sha256": "eed2ae1eb4636397ef751f8011d9983edca9ea213140a37ef571ddc6063f06bc"
+    },
+    {
+      "run_id": "sa-k3-original-rdma2048-c128",
+      "kind": "profile",
+      "parts": 2,
+      "bytes": "1396854",
+      "payload_sha256": "a4f4be3d02980260fb7f839128a59cc8ba5d6359eeb3eeaa00cefd265f7f8b24"
+    },
+    {
+      "run_id": "sa-k3-original-rdma2048-c128",
+      "kind": "server_log",
+      "parts": 1,
+      "bytes": "80718",
+      "payload_sha256": "a467cb785290f288711cfcb7691134c7c088c56fd805e75f4b52cf620a0e82c8"
+    },
+    {
+      "run_id": "sa-k3-original-rdma2048-c128",
+      "kind": "server_metrics",
+      "parts": 6,
+      "bytes": "6256219",
+      "payload_sha256": "d60435490df9966dd2ff274acffc0239f5347e144e203946f5219c7fbf029c00"
+    },
+    {
+      "run_id": "sa-k3-original-rdma2048-c140",
+      "kind": "profile",
+      "parts": 2,
+      "bytes": "1424159",
+      "payload_sha256": "ef38eede63499743f1289e2be8680591e87b8eeda218aad0f22459aa7190f5e4"
+    },
+    {
+      "run_id": "sa-k3-original-rdma2048-c140",
+      "kind": "server_log",
+      "parts": 1,
+      "bytes": "86864",
+      "payload_sha256": "5aa1054bef687a9cc96501e1469142caccb981843bfad396a9b1cbe9f56709cb"
+    },
+    {
+      "run_id": "sa-k3-original-rdma2048-c140",
+      "kind": "server_metrics",
+      "parts": 7,
+      "bytes": "6604384",
+      "payload_sha256": "5deebf8b4e639c80c7c4f6ec660bdfc3883affc7b75c858be8fe00dfe6925298"
+    },
+    {
+      "run_id": "sa-k3-original-rdma2048-c150-m089",
+      "kind": "profile",
+      "parts": 2,
+      "bytes": "1202391",
+      "payload_sha256": "84395825980446d414938943c8c121f26641f64184851940312a70027139ef89"
+    },
+    {
+      "run_id": "sa-k3-original-rdma2048-c150-m089",
+      "kind": "server_log",
+      "parts": 1,
+      "bytes": "84926",
+      "payload_sha256": "c3854c2236068bfbfcff74dbe571aee4073ac1e8cd8394bd0d32b7dab8212ec5"
+    },
+    {
+      "run_id": "sa-k3-original-rdma2048-c150-m089",
+      "kind": "server_metrics",
+      "parts": 7,
+      "bytes": "6707231",
+      "payload_sha256": "1388b21d94d6a4eadcd9a6351e4ed1becee602efee10a25bd310d3e6dde9c109"
+    },
+    {
+      "run_id": "sa-k3-original-rdma2048-c56",
+      "kind": "profile",
+      "parts": 3,
+      "bytes": "2615429",
+      "payload_sha256": "3fcc8c2fd4a7afa9d0733427928594704732db8b5ad5b1800d711c38e80ef0e8"
+    },
+    {
+      "run_id": "sa-k3-original-rdma2048-c56",
+      "kind": "server_log",
+      "parts": 1,
+      "bytes": "63616",
+      "payload_sha256": "b1dc2c077d4b78b99ab77687464c9e4ba86c59536ff8773c9f867cb8aec9287c"
+    },
+    {
+      "run_id": "sa-k3-original-rdma2048-c56",
+      "kind": "server_metrics",
+      "parts": 5,
+      "bytes": "5096072",
+      "payload_sha256": "4d4aa7ea03e6a8834b7e3bbb532a00db6a139ac33271c5a8212df44423c7e4aa"
+    },
+    {
+      "run_id": "sa-k3-original-rdma2048-c70",
+      "kind": "profile",
+      "parts": 3,
+      "bytes": "2894720",
+      "payload_sha256": "34556ed380241a0feb327ea01149f8e9a444abc4caed30dd3cba8ad3139aee8f"
+    },
+    {
+      "run_id": "sa-k3-original-rdma2048-c70",
+      "kind": "server_log",
+      "parts": 1,
+      "bytes": "71036",
+      "payload_sha256": "e297a18a27c69dd10a7e3bf5cd374f2156064541b3ae00779087ff2d3532e24c"
+    },
+    {
+      "run_id": "sa-k3-original-rdma2048-c70",
+      "kind": "server_metrics",
+      "parts": 6,
+      "bytes": "5510464",
+      "payload_sha256": "f1fcc5808dcfa1d5b2d6c612739b66169b17f309f2cfbc459346bed71c72eb9b"
+    },
+    {
+      "run_id": "sa-k3-original-rdma2048-c96",
+      "kind": "profile",
+      "parts": 2,
+      "bytes": "1683808",
+      "payload_sha256": "b676d0deb643d65dd672541fa1c261167c3a78e4e2dc36b2556a5dfdc6650ced"
+    },
+    {
+      "run_id": "sa-k3-original-rdma2048-c96",
+      "kind": "server_log",
+      "parts": 1,
+      "bytes": "78550",
+      "payload_sha256": "62c6e00e75060512c542cb900c8f8b95bd11fc28eca85120462d352e5e50c875"
+    },
+    {
+      "run_id": "sa-k3-original-rdma2048-c96",
+      "kind": "server_metrics",
+      "parts": 6,
+      "bytes": "5752508",
+      "payload_sha256": "7927edf6f3d9ee0891d72e8ab33a4e17e8e17d92c75533d20a2e0fdaa36e8858"
+    }
+  ],
+  "initial_import_receipt_sha256": "19a11dd615eaf9efc677fc3f136693cf0767ea50813fd4f23155b5f48d97ce1d",
+  "reingest_unchanged_count": 16
+}

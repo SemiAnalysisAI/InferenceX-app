@@ -1519,6 +1519,9 @@ const GPUGraph = React.memo(
                 event.stopPropagation();
                 if (action === 'view-power-trace') {
                   openPowerTrace(event, d, isOverlay);
+                } else if (action === 'view-experiment' && d.experiment) {
+                  if (!ephemeralUrlState) rememberChartStateInUrl();
+                  track('inference_experiment_run_open', { run_id: d.experiment.runId });
                 } else if (action === 'view-charts') {
                   if (!ephemeralUrlState) rememberChartStateInUrl();
                   track('gpu_timeseries_view_charts_opened', {

@@ -18,6 +18,13 @@ export type { WorkerPower };
 export type WorkerRole = 'prefill' | 'decode' | 'agg' | 'frontend';
 
 export interface AggDataEntry {
+  experiment?: {
+    campaign: string;
+    runId: string;
+    replicate: number | null;
+    frontierEligible: boolean;
+    detailHref: string;
+  };
   trendSource?: TrendSource;
   rawMetricKeys?: string[];
   id?: number;

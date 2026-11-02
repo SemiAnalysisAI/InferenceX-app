@@ -1,3 +1,4 @@
+import { WEKA_EXPERIMENT } from '@/lib/benchmarks/experiment-benchmarks';
 import { LIFECYCLE_DEFAULTS } from '@/components/calculator/lifecycle';
 import { dashboardRouteForPathname, getDashboardRoute } from '@/lib/routing/dashboard-routes';
 import { routeModelForPathname } from '@/lib/routing/model-routes';
@@ -332,6 +333,14 @@ function collectTabParams(): URLSearchParams {
   }
 
   const liveParams = profitRouteSearch(window.location.pathname, window.location.search);
+  if (
+    window.location.pathname
+      .replace(/^\/zh(?=\/)/u, '')
+      .startsWith(getDashboardRoute('inference').path) &&
+    liveParams.get('experiment') === WEKA_EXPERIMENT
+  ) {
+    filtered.set('experiment', WEKA_EXPERIMENT);
+  }
   // Video controls own their URL state; share every registered video scope
   // from the live address bar, including the results view's r_ parameters.
   if (prefixes.some((prefix) => prefix === 'v_')) {

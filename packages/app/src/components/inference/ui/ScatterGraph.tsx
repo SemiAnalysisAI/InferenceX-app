@@ -2376,6 +2376,9 @@ const ScatterGraph = React.memo(
         event.stopPropagation();
         if (action === 'view-power-trace') {
           openPowerTrace(event, d, isOverlay);
+        } else if (action === 'view-experiment' && d.experiment) {
+          if (!ephemeralUrlState) rememberChartStateInUrl();
+          track('inference_experiment_run_open', { run_id: d.experiment.runId });
         } else if (action === 'view-charts') {
           if (!ephemeralUrlState) rememberChartStateInUrl();
           track('latency_view_charts_opened', { id: d.id, gpu: String(d.hwKey), conc: d.conc });

@@ -40,6 +40,7 @@ export function pointDetailHref(
   locale: Locale = 'en',
 ): { href: string | null; isExternal: boolean } {
   if (isOverlay) return { href: null, isExternal: false };
+  if (d.experiment) return { href: d.experiment.detailHref, isExternal: false };
   if (d.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(d.id)) {
     return { href: agenticDetailHref(d.id, locale), isExternal: false };
   }

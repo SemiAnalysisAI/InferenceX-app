@@ -1,3 +1,5 @@
+import { useExperiment } from '@/hooks/api/use-experiment';
+import { withExperimentRows } from '@/lib/benchmarks/experiment-benchmarks';
 import { useMemo, useRef } from 'react';
 import {
   FLIP_MAP,
@@ -144,6 +146,9 @@ export function useChartData(
   prefetchLatestRows = false,
   chipBasis: ChipBasis = DEFAULT_CHIP_BASIS,
 ) {
+  const experiment = useExperiment(
+    enabled && selectedModel === 'Kimi-K3' && selectedSequence === Sequence.AgenticTraces,
+  );
   const queryDate = asOfRunId
     ? (selectedRunDate ?? '')
     : selectedRunDate && latestAvailableDate && selectedRunDate === latestAvailableDate
@@ -239,13 +244,17 @@ export function useChartData(
 
   const comparisonLoading = comparisonQueries.some((q) => q.isLoading);
 
-  const loading = queryLoading || !allRows || (comparisonDates.length > 0 && comparisonLoading);
+  const loading =
+    queryLoading ||
+    !allRows ||
+    experiment.isLoading ||
+    (comparisonDates.length > 0 && comparisonLoading);
   const refreshing = !loading && (basePlaceholder || baseFetching);
-  const error = queryError ? queryError.message : null;
+  const error = queryError?.message ?? experiment.error?.message ?? null;
 
   const comparisonDataKey = comparisonQueries.map((q) => q.dataUpdatedAt).join(',');
 
-  const rows = useMemo(() => {
+  const baselineRows = useMemo(() => {
     if (!allRows) return [];
     const seqFilter = (r: { isl: number | null; osl: number | null; benchmark_type: string }) =>
       rowToSequence(r) === selectedSequence;
@@ -285,6 +294,16 @@ export function useChartData(
     overviewHistoryPair?.currentConfigKey,
     overviewHistoryPair?.baselineConfigKey,
   ]);
+
+  const rows = useMemo(
+    () =>
+      experiment.isLoading
+        ? []
+        : experiment.data
+          ? withExperimentRows(baselineRows, experiment.data)
+          : baselineRows,
+    [baselineRows, experiment.data, experiment.isLoading],
+  );
 
   const { chartData, hardwareConfig: rawHardwareConfig } = useMemo(() => {
     if (rows.length === 0)

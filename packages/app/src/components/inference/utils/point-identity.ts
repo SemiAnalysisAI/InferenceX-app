@@ -18,6 +18,9 @@ export function scatterPointConfigId(point: InferenceData): string {
   if (point.dp !== undefined) key += `|dp-${point.dp}`;
   if (point.offload_mode) key += `|offload-${point.offload_mode}`;
   if (point.recipe_fingerprint) key += `|recipe-${point.recipe_fingerprint}`;
+  if (point.experiment) {
+    key += `|experiment-${point.experiment.campaign}|run-${point.experiment.runId}`;
+  }
   key += agenticSpecDecodingKeySuffix(point);
   if (point.powerVariant) key += `|variant-${point.powerVariant.id}`;
   return key;
