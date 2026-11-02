@@ -16,6 +16,7 @@ vi.mock('@/components/ui/unofficial-banner', () => ({ UnofficialBanner: () => nu
 
 interface PendingRequest {
   url: string;
+  cache: RequestCache | undefined;
   signal: AbortSignal;
   resolve: (response: Response) => void;
 }
@@ -62,6 +63,7 @@ function installPendingFetch(): void {
     const { promise, resolve } = Promise.withResolvers<Response>();
     requests.push({
       url: String(input),
+      cache: init?.cache,
       signal: init?.signal as AbortSignal,
       resolve,
     });
@@ -132,6 +134,8 @@ describe('UnofficialRunProvider query lifecycle', () => {
     const root = mountProvider();
     await flush();
     expect(requests[0].url).toContain('runId=1');
+    // The route's run-state Cache-Control decides freshness; no-store would bypass the CDN.
+    expect(requests[0].cache).toBeUndefined();
 
     act(() => {
       window.history.pushState({}, '', '/inference?unofficialruns=2');

@@ -28,6 +28,7 @@ const COMPARISON_CHANGELOG_STRINGS = {
     label: (count: number) =>
       `Config Changelog (${count} date${count === 1 ? '' : 's'} with changes)`,
     loading: 'Config Changelog (loading...)',
+    deferred: 'Config Changelog',
     emptyLabel: (count: number) =>
       `Config Changelog (${count} date${count === 1 ? '' : 's'} queried — no matching changelog data)`,
     addAll: 'Add all to chart',
@@ -47,6 +48,7 @@ const COMPARISON_CHANGELOG_STRINGS = {
     workflowRun: '工作流运行记录',
     label: (count: number) => `配置变更日志（${count} 个日期有变更）`,
     loading: '配置变更日志（加载中……）',
+    deferred: '配置变更日志',
     emptyLabel: (count: number) => `配置变更日志（已查询 ${count} 个日期，无匹配数据）`,
     addAll: '全部添加到图表',
     empty:
@@ -116,6 +118,10 @@ interface ComparisonChangelogProps {
   modelDbKeys: string[];
   selectedSequence: SequenceType;
   loading?: boolean;
+  /** Changelog data has not been requested yet; the label shows no count. */
+  deferred?: boolean;
+  /** Called with the new state whenever the reader toggles the panel. */
+  onExpandedChange?: (expanded: boolean) => void;
   totalDatesQueried: number;
   selectedDates: string[];
   selectedDateRange: { startDate: string; endDate: string };
@@ -134,6 +140,8 @@ export default function ComparisonChangelog({
   modelDbKeys,
   selectedSequence,
   loading,
+  deferred = false,
+  onExpandedChange,
   totalDatesQueried,
   selectedDates,
   selectedDateRange,
@@ -255,6 +263,7 @@ export default function ComparisonChangelog({
   const handleToggle = () => {
     const newState = !isExpanded;
     setIsExpanded(newState);
+    onExpandedChange?.(newState);
     track(`${analyticsSection}_comparison_changelog_toggled`, { enabled: newState });
   };
 
@@ -272,8 +281,9 @@ export default function ComparisonChangelog({
       .join(', ');
   };
 
-  const label =
-    filteredChangelogs.length > 0
+  const label = deferred
+    ? t.deferred
+    : filteredChangelogs.length > 0
       ? t.label(filteredChangelogs.length)
       : loading
         ? t.loading

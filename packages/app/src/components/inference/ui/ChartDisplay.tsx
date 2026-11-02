@@ -107,7 +107,10 @@ import {
   isModelDeprecated,
   sequenceKind,
 } from '@/lib/catalog/data-mappings';
-import { useComparisonChangelogs } from '@/hooks/api/use-comparison-changelogs';
+import {
+  shouldFetchComparisonChangelogs,
+  useComparisonChangelogs,
+} from '@/hooks/api/use-comparison-changelogs';
 import {
   derivedModeRoofline,
   isAgenticOnlyXAxisMode,
@@ -410,6 +413,13 @@ export default function ChartDisplay({
   const workflowInfoBenchmarkType =
     selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : undefined;
 
+  const [changelogOpened, setChangelogOpened] = useState(false);
+  const changelogsEnabled = shouldFetchComparisonChangelogs({
+    embedded,
+    changelogOpened,
+    selectedDateRange,
+    selectedDates,
+  });
   const {
     changelogs,
     loading: changelogsLoading,
@@ -419,6 +429,7 @@ export default function ChartDisplay({
     selectedDateRange,
     dateRangeAvailableDates,
     workflowInfoBenchmarkType,
+    changelogsEnabled,
   );
 
   const modelDbKeys = useMemo(
@@ -1657,6 +1668,10 @@ export default function ChartDisplay({
                   selectedSequence={selectedSequence}
                   defaultExpanded={!embedded}
                   loading={changelogsLoading}
+                  deferred={!changelogsEnabled}
+                  onExpandedChange={(expanded) => {
+                    if (expanded) setChangelogOpened(true);
+                  }}
                   totalDatesQueried={totalDatesQueried}
                   selectedDates={selectedDates}
                   selectedDateRange={selectedDateRange}

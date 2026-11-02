@@ -1,6 +1,8 @@
 /**
- * DO NOT ADD CACHING (blob, CDN, or unstable_cache) to this route.
- * It fetches live GitHub Actions artifacts which change while a run is in progress.
+ * Live GitHub Actions artifacts for unofficial-run overlays. CDN caching follows
+ * run state (`unofficialRunCacheControl`): artifacts keep changing while a run
+ * is queued or in progress, so those responses are cached for seconds only.
+ * There is no Blob or unstable_cache layer.
  */
 import { type NextRequest, NextResponse } from 'next/server';
 
@@ -20,6 +22,7 @@ import {
 import type { BenchmarkRow, EvalRow } from '@/lib/api/api';
 import { stitchAppendOnlyPreview } from '@/lib/benchmarks/append-only-preview';
 import { getCachedBenchmarks } from '@/lib/benchmarks/benchmark-query-cache.server';
+import { cachedJson } from '@/lib/cache/api-cache';
 import {
   downloadGithubArtifact,
   extractZipEntries,
@@ -38,6 +41,72 @@ import {
  * clear of GitHub's secondary rate limits while still parallelizing.
  */
 const PER_CONFIG_DOWNLOAD_BATCH_SIZE = 8;
+
+/**
+ * Every run has completed, so its artifacts no longer change. The CDN keeps the
+ * response for an hour and then refreshes it in the background for up to a
+ * day, so a re-run of failed jobs shows up within the hour. The response
+ * carries the default dashboard CDN tag, so an ingest also refreshes it:
+ * append-only previews stitch in the published curve.
+ */
+export const COMPLETED_RUN_CACHE_CONTROL =
+  'public, max-age=60, s-maxage=3600, stale-while-revalidate=86400';
+/** A run is still queued or in progress, so artifacts can appear at any moment. */
+export const ACTIVE_RUN_CACHE_CONTROL = 'public, max-age=0, s-maxage=30';
+/** GitHub has no such run, or the artifact expired. Absorbs repeated polling of a dead id. */
+export const MISSING_RUN_CACHE_CONTROL = 'public, max-age=0, s-maxage=300';
+/** Transient failures (rate limits, GitHub or server errors) are never cached. */
+export const UNCACHED = 'no-store';
+
+/** Cache policy for a successful response: long only when every run has completed. */
+export function unofficialRunCacheControl(runInfos: readonly { status: string | null }[]): string {
+  return runInfos.length > 0 && runInfos.every((run) => run.status === 'completed')
+    ? COMPLETED_RUN_CACHE_CONTROL
+    : ACTIVE_RUN_CACHE_CONTROL;
+}
+
+function errorJson(error: string, status: number, cacheControl: string, retryAfter?: string) {
+  return NextResponse.json(
+    { error },
+    {
+      status,
+      headers: {
+        'Cache-Control': cacheControl,
+        ...(retryAfter ? { 'Retry-After': retryAfter } : {}),
+      },
+    },
+  );
+}
+
+/** Seconds until GitHub accepts requests again, or null when the failure is not a rate limit. */
+export function githubRateLimitRetryAfter(response: Response): string | null {
+  const header = (name: string) => response.headers?.get?.(name) ?? null;
+  const retryAfter = header('retry-after');
+  const remaining = header('x-ratelimit-remaining');
+  if (response.status !== 429 && !(response.status === 403 && (retryAfter || remaining === '0'))) {
+    return null;
+  }
+  if (retryAfter && /^\d+$/u.test(retryAfter)) return retryAfter;
+  const reset = Number(header('x-ratelimit-reset'));
+  if (Number.isFinite(reset) && reset > 0) {
+    return String(Math.max(1, Math.ceil(reset - Date.now() / 1000)));
+  }
+  return '60';
+}
+
+/**
+ * Map a failed GitHub response. A rate limit is the server token's problem,
+ * not the caller's, so it becomes an uncached 503 with Retry-After. A missing
+ * run or expired artifact is cached briefly. Anything else passes through uncached.
+ */
+function githubFailure(response: Response, message: string): NextResponse {
+  const retryAfter = githubRateLimitRetryAfter(response);
+  if (retryAfter) {
+    return errorJson('GitHub API rate limit exceeded; retry later', 503, UNCACHED, retryAfter);
+  }
+  const missing = response.status === 404 || response.status === 410;
+  return errorJson(message, response.status, missing ? MISSING_RUN_CACHE_CONTROL : UNCACHED);
+}
 
 /** Normalize raw artifact rows into the BenchmarkRow shape the frontend expects. */
 export function normalizeArtifactRows(
@@ -199,10 +268,7 @@ async function downloadArtifactRows(archiveUrl: string, githubToken: string) {
   if (!response.ok) {
     return {
       rows: [] as Record<string, unknown>[],
-      errorResponse: NextResponse.json(
-        { error: `Artifact download failed: ${response.statusText}` },
-        { status: response.status },
-      ),
+      errorResponse: githubFailure(response, `Artifact download failed: ${response.statusText}`),
     };
   }
 
@@ -271,15 +337,13 @@ async function processSingleRun(
     };
   }
   if (!githubToken)
-    return {
-      errorResponse: NextResponse.json({ error: 'GitHub token not configured' }, { status: 500 }),
-    };
+    return { errorResponse: errorJson('GitHub token not configured', 500, UNCACHED) };
   const runResp = await fetchGithubWorkflowRun(runId, githubToken);
   if (!runResp.ok) {
     return {
-      errorResponse: NextResponse.json(
-        { error: `GitHub API error for runId ${runId}: ${runResp.statusText}` },
-        { status: runResp.status },
+      errorResponse: githubFailure(
+        runResp,
+        `GitHub API error for runId ${runId}: ${runResp.statusText}`,
       ),
     };
   }
@@ -318,12 +382,13 @@ async function processSingleRun(
       ];
 
   if (!bmkArtifact && perConfigBmkArtifacts.length === 0 && !evalArtifact) {
+    // A failed artifact listing also lands here, so even a completed run's
+    // 404 stays short-lived instead of taking the missing-run TTL.
     return {
-      errorResponse: NextResponse.json(
-        {
-          error: `No results_bmk, per-config bmk_*, or eval_results_all artifact found for runId ${runId}`,
-        },
-        { status: 404 },
+      errorResponse: errorJson(
+        `No results_bmk, per-config bmk_*, or eval_results_all artifact found for runId ${runId}`,
+        404,
+        ACTIVE_RUN_CACHE_CONTROL,
       ),
     };
   }
@@ -400,13 +465,13 @@ async function processSingleRun(
 export async function GET(request: NextRequest) {
   const { ids: runIds, error: runIdError } = parseRunIds(request.nextUrl.searchParams.get('runId'));
   if (runIdError) {
-    return NextResponse.json({ error: runIdError }, { status: 400 });
+    return errorJson(runIdError, 400, MISSING_RUN_CACHE_CONTROL);
   }
 
   const githubToken = getGithubToken();
   const localPreview = localArtifactPreviewEnabled(request.nextUrl.hostname);
   if (!githubToken && !localPreview) {
-    return NextResponse.json({ error: 'GitHub token not configured' }, { status: 500 });
+    return errorJson('GitHub token not configured', 500, UNCACHED);
   }
 
   try {
@@ -432,13 +497,13 @@ export async function GET(request: NextRequest) {
       evalConfigIdOffset = result.nextEvalConfigIdOffset;
     }
 
-    return NextResponse.json({
-      runInfos,
-      benchmarks,
-      evaluations,
-    });
+    return cachedJson(
+      request,
+      { runInfos, benchmarks, evaluations },
+      { cacheControl: localPreview ? UNCACHED : unofficialRunCacheControl(runInfos) },
+    );
   } catch (error) {
     console.error('Error processing unofficial run:', error);
-    return NextResponse.json({ error: 'Failed to process unofficial run' }, { status: 500 });
+    return errorJson('Failed to process unofficial run', 500, UNCACHED);
   }
 }
