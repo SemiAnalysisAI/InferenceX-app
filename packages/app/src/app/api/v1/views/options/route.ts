@@ -39,6 +39,7 @@ import { COMPARE_MODEL_SLUGS } from '@/lib/compare/compare-slug';
 import {
   getModelCategory,
   getSequenceLabel,
+  getSequenceCategoryForModel,
   isSequenceDeprecated,
   Model,
   MODEL_OPTIONS,
@@ -96,6 +97,9 @@ function buildOptionsPayload() {
       category: getModelCategory(model),
       releaseDate: getModelReleaseDate(model),
       compareSlug: COMPARE_SLUG_BY_DISPLAY.get(model) ?? null,
+      deprecatedSequences: SEQUENCE_OPTIONS.filter(
+        (sequence) => getSequenceCategoryForModel(sequence, model) === 'deprecated',
+      ),
     };
   });
 

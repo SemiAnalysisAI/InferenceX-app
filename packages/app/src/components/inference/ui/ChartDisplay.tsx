@@ -107,7 +107,10 @@ import {
   isModelDeprecated,
   sequenceKind,
 } from '@/lib/catalog/data-mappings';
-import { useComparisonChangelogs } from '@/hooks/api/use-comparison-changelogs';
+import {
+  shouldFetchComparisonChangelogs,
+  useComparisonChangelogs,
+} from '@/hooks/api/use-comparison-changelogs';
 import {
   derivedModeRoofline,
   isAgenticOnlyXAxisMode,
@@ -128,6 +131,7 @@ import { ATOM_FOOTNOTE_MARKER, AtomEngineFootnote } from '@/components/ui/atom-e
 import { OffloadHaloLegendKey } from '@/components/inference/ui/OffloadHaloLegendKey';
 import { ActiveQuickFilters } from '@/components/inference/ui/ActiveQuickFilters';
 import { ResultContext } from '@/components/ui/result-context';
+import { InferenceScenarioSelector } from './InferenceScenarioSelector';
 import { ModelLogo } from '@/components/ui/model-logo';
 
 import ChartNotices from './ChartNotices';
@@ -410,6 +414,13 @@ export default function ChartDisplay({
   const workflowInfoBenchmarkType =
     selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : undefined;
 
+  const [changelogOpened, setChangelogOpened] = useState(false);
+  const changelogsEnabled = shouldFetchComparisonChangelogs({
+    embedded,
+    changelogOpened,
+    selectedDateRange,
+    selectedDates,
+  });
   const {
     changelogs,
     loading: changelogsLoading,
@@ -419,6 +430,7 @@ export default function ChartDisplay({
     selectedDateRange,
     dateRangeAvailableDates,
     workflowInfoBenchmarkType,
+    changelogsEnabled,
   );
 
   const modelDbKeys = useMemo(
@@ -1264,6 +1276,18 @@ export default function ChartDisplay({
                         <div>
                           <ResultContext
                             locale={locale}
+                            scenario={
+                              !powerXSurface && !embedded && !minimalChrome ? (
+                                <InferenceScenarioSelector
+                                  variant="caption"
+                                  id={
+                                    graphIndex === 0
+                                      ? 'scenario-select'
+                                      : `scenario-select-${graphIndex}`
+                                  }
+                                />
+                              ) : undefined
+                            }
                             deprecated={isModelDeprecated(selectedModel)}
                             precision={
                               embedded
@@ -1626,6 +1650,7 @@ export default function ChartDisplay({
                     />
                   )}
                   <ChartControls
+                    scenarioInFooter={!powerXSurface}
                     showXAxisMode
                     runContext={selectedGPUs.length === 0 ? <WorkflowInfoDisplay /> : undefined}
                     powerXControls={
@@ -1657,6 +1682,10 @@ export default function ChartDisplay({
                   selectedSequence={selectedSequence}
                   defaultExpanded={!embedded}
                   loading={changelogsLoading}
+                  deferred={!changelogsEnabled}
+                  onExpandedChange={(expanded) => {
+                    if (expanded) setChangelogOpened(true);
+                  }}
                   totalDatesQueried={totalDatesQueried}
                   selectedDates={selectedDates}
                   selectedDateRange={selectedDateRange}
@@ -1689,6 +1718,12 @@ export default function ChartDisplay({
         aria-busy={isRefetching || undefined}
       >
         {displayGraphs}
+        {!powerXSurface && !embedded && !minimalChrome && renderableGraphs.length === 0 && (
+          <ResultContext
+            locale={locale}
+            scenario={<InferenceScenarioSelector variant="caption" />}
+          />
+        )}
       </div>
     </div>
   );

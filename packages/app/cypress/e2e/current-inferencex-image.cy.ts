@@ -122,7 +122,7 @@ describe('Current InferenceX Image localized routes', () => {
       date: today,
     },
     {
-      model: 'qwen3.5',
+      model: 'qwen3.8next',
       hardware: 'b200',
       framework: 'vllm',
       precision: 'fp4',
@@ -318,11 +318,22 @@ describe('Current InferenceX Image localized routes', () => {
     cy.viewport(1440, 900);
     const retiredImage = 'lmsysorg/sglang:v0.4.9-minimax-8k1k-retired';
     const retiredDeepSeekImage = 'vllm/vllm-openai:v0.10.0-dsv4-8k1k-retired';
+    const retiredQwenImage = 'vllm/vllm-openai:v0.10.1-qwen35-8k1k-retired';
+    const activeQwenImage = 'vllm/vllm-openai:v0.10.1-qwen35-agentic';
     const activeFlashImage = 'lmsysorg/sglang:v0.5.2-minimax-m31flash-agentic';
     const deprecatedModelImage = 'vllm/vllm-openai:v0.9.0-kimi-k2.5';
     cy.intercept('GET', '**/api/v1/latest-images', [
       ...imageRows,
       { ...imageRows[1], model: 'dsv4', image: retiredDeepSeekImage, date: '2026-09-08' },
+      { ...imageRows[1], model: 'qwen3.5', image: retiredQwenImage },
+      {
+        ...imageRows[1],
+        model: 'qwen3.5',
+        isl: null,
+        osl: null,
+        benchmark_type: 'agentic_traces',
+        image: activeQwenImage,
+      },
       {
         ...imageRows[0],
         model: 'minimaxm3',
@@ -355,6 +366,7 @@ describe('Current InferenceX Image localized routes', () => {
       .and('contain.text', 'vllm/vllm-openai:v0.10.1')
       .and('not.contain.text', retiredImage)
       .and('not.contain.text', retiredDeepSeekImage)
+      .and('not.contain.text', retiredQwenImage)
       .and('not.contain.text', deprecatedModelImage);
 
     cy.get('#image-sequence-select').click();
@@ -374,6 +386,16 @@ describe('Current InferenceX Image localized routes', () => {
     cy.get('[data-slot="select-item"]').contains('Agentic').click();
     cy.get('[data-testid="current-image-result-count"]').should('contain.text', '1 configuration');
     cy.get('table').should('contain.text', activeFlashImage).and('not.contain.text', retiredImage);
+
+    cy.get('#image-model-select').click();
+    cy.get('[data-slot="select-item"]').contains('Qwen-3.5-397B-A17B').click();
+    cy.get('#image-sequence-select').should('contain.text', 'Agentic').click();
+    cy.get('[data-slot="select-item"]').should('have.length', 1).and('contain.text', 'Agentic');
+    cy.get('[data-slot="select-item"]').contains('Agentic').click();
+    cy.get('[data-testid="current-image-result-count"]').should('contain.text', '1 configuration');
+    cy.get('table')
+      .should('contain.text', activeQwenImage)
+      .and('not.contain.text', retiredQwenImage);
   });
   it('keeps full configuration and long image tags readable while filtering the catalog', () => {
     cy.viewport(1440, 900);

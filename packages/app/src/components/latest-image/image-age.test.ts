@@ -8,7 +8,7 @@ import {
 } from './image-age';
 
 const row: ImageAgeObservation = {
-  model: 'qwen3.5',
+  model: 'dsr1',
   hardware: 'b200',
   framework: 'sglang',
   precision: 'fp8',
@@ -134,6 +134,13 @@ describe('image age p90', () => {
       ),
     ).toBe(true);
     expect(matchesImageFilters({ ...row, model: 'minimaxm3' }, filters)).toBe(false);
+    expect(matchesImageFilters({ ...row, model: 'qwen3.5' }, filters)).toBe(false);
+    expect(
+      matchesImageFilters(
+        { ...row, model: 'qwen3.5', benchmark_type: 'agentic_traces', isl: null, osl: null },
+        { ...filters, sequence: 'agentic-traces' },
+      ),
+    ).toBe(true);
     expect(matchesImageFilters({ ...row, model: 'brand-new-model' }, filters)).toBe(true);
   });
 });

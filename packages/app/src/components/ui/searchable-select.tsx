@@ -57,6 +57,7 @@ interface SearchableSelectProps {
   placeholder?: string;
   initialLabel?: string;
   className?: string;
+  showSelectedHelp?: boolean;
   contentClassName?: string;
   triggerId?: string;
   triggerTestId?: string;
@@ -81,6 +82,7 @@ export function SearchableSelect({
   placeholder: placeholderProp,
   initialLabel,
   className,
+  showSelectedHelp = true,
   contentClassName,
   triggerId,
   triggerAriaLabel,
@@ -165,7 +167,7 @@ export function SearchableSelect({
   const selectedOption = groups
     .flatMap((group) => group.options)
     .find((option) => (mounted ? option.value === value : option.label === initialLabel));
-  const selectedHelp = selectedOption?.help;
+  const selectedHelp = showSelectedHelp ? selectedOption?.help : undefined;
 
   const handleSelect = (optionValue: string) => {
     if (disabled) return;

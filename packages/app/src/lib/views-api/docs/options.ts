@@ -40,6 +40,11 @@ const responseSchema = objectSchema(
           category: stringSchema,
           releaseDate: nullableStringSchema,
           compareSlug: nullableStringSchema,
+          deprecatedSequences: {
+            ...arraySchema(stringSchema),
+            description:
+              'Sequence keys categorized as deprecated for this model, including globally deprecated sequences. Historical selections remain available; this does not retire the model.',
+          },
         }),
       ),
       description:
@@ -125,6 +130,7 @@ const responseExample = {
       category: 'deprecated',
       releaseDate: '2026-06-30',
       compareSlug: 'deepseek-v4-pro',
+      deprecatedSequences: ['1k/1k', '1k/8k', '8k/1k'],
     },
     {
       name: 'MiniMax-M3',
@@ -132,6 +138,7 @@ const responseExample = {
       category: 'deprecated',
       releaseDate: '2026-06-07',
       compareSlug: 'minimax-m3',
+      deprecatedSequences: ['1k/1k', '1k/8k', '8k/1k'],
     },
   ],
   sequences: [
@@ -201,8 +208,8 @@ const responses: readonly ApiResponse[] = [
   {
     status: '200',
     description: text(
-      'Every option domain the views endpoints accept, plus dashboard-parity defaults.',
-      '各 views 端点接受的全部选项域，以及与仪表盘一致的默认值。',
+      'Every option domain the views endpoints accept, plus dashboard-parity defaults. Each model includes deprecatedSequences, combining global and model-specific sequence retirements. Qwen3.5 8K/1K is deprecated; Qwen3.5 AgentX and explicit historical selections remain available.',
+      '各 views 端点接受的全部选项域，以及与仪表盘一致的默认值。每个模型的 deprecatedSequences 包含全局弃用和该模型单独弃用的序列。Qwen3.5 的 8K/1K 已弃用；Qwen3.5 AgentX 保持启用，仍可显式选择历史结果。',
     ),
     schema: responseSchema,
     example: responseExample,

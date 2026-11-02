@@ -4154,6 +4154,7 @@ const ScatterGraph = React.memo(
       return (
         <div className="relative w-full p-3">
           <div className="flex min-h-100 items-center justify-center">{emptyState}</div>
+          {footer}
           <QuickFiltersDialog
             open={quickFiltersOpen}
             onOpenChange={setQuickFiltersOpen}

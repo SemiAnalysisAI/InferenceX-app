@@ -16,10 +16,13 @@ the landing page. Existing model-specific links and historical results remain av
 `/api/v1/views/inference` 仍要求显式传入 `model`，使用 `model=Kimi-K3&sequence=agentic-traces`
 可查询入口页面对应的模型。已有模型链接和历史结果不受影响。
 
-On mobile inference and PowerX charts, Scenario, Precision, and Run context (date,
-run selection and changelog) are inside More chart controls; Model stays visible.
-Desktop keeps Scenario and Precision beside Model and Run context below chart
-settings. Embedded charts keep their standalone run controls. This is
+Inference places Scenario beside Cost Tier and TCO Basis below the plot on desktop
+and mobile. An empty selection keeps Scenario below the empty chart for recovery.
+PowerX keeps Scenario beside Model on desktop and inside More chart controls on
+mobile. Both surfaces put Precision and Run context (date, run selection and
+changelog) inside More chart controls on mobile; Model stays visible. Desktop keeps
+Precision beside Model and Run context below chart settings.
+Embedded charts keep their standalone run controls. This is
 presentation-only: scenario/precision/run/date parameters, defaults, returned
 measurements and unofficial overlays are unchanged; no API parameter represents
 the collapsed state.
@@ -72,6 +75,14 @@ results or treat its interpolated values as separately measured operating points
 
 ## Capture and select
 
+Qwen3.5 workload-retirement coverage:
+
+| Surface                                     | Read-only behavior                                                                                                                       |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Inference and historical sequence selectors | `options.models[].deprecatedSequences` includes Qwen3.5 `8k/1k`; explicit inference and historical requests still return stored results. |
+| Current-image dashboard                     | Its shared active-row filter excludes Qwen3.5 `8k/1k`, while AgentX stays active. Raw latest-image responses retain historical rows.     |
+| Unofficial overlays and exports             | Explicit Qwen3.5 `8k/1k` selections remain available; no calculation or export format changes.                                           |
+
 1. Resolve the view and missing selectors from the table below. Read `options`
    for static model, hardware, sequence and metric registries; use each specialized
    view's `options`, `configurations`, `workloads`, or raw run-list operation for
@@ -81,6 +92,14 @@ results or treat its interpolated values as separately measured operating points
    `modelScope=all`. MiniMax M3.1 Flash and DeepSeek V4.1 Flash remain in the default
    model group. Historical data and unofficial-run overlays remain available;
    current-image views exclude both retired models.
+   Qwen3.5 remains active for AgentX; only its 8K/1K workload is retired.
+   Read `options.models[].deprecatedSequences` for each model's deprecated
+   sequence keys, including global retirements. The global
+   `options.sequences[].deprecated` flag alone does not capture per-model
+   retirement. Qwen3.5 8K/1K stays selectable in the inference and historical
+   sequence selectors under Deprecated, including explicit links and unofficial
+   overlays, but is excluded from current-image views. The raw benchmark and
+   latest-image APIs keep historical rows; no data is deleted.
    Preserve `options.models` order within each category when rendering model
    selectors. The default group is Kimi K3, DeepSeek V4.1 Flash, GLM5.2/GLM5.3,
    MiniMax M3.1 Flash, Muse Spark Open, Qwen3.5, then
