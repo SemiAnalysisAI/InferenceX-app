@@ -96,6 +96,8 @@ The overview page (`/overview`, `/zh/overview`) is prerendered with the default 
 
 `cachedJson()` (`lib/cache/api-cache.ts`) takes the incoming request. It serves brotli, then gzip, then plain JSON according to `Accept-Encoding`, so a client that sends no header (curl, scripts) gets plain JSON. Every response carries `Vary: Accept-Encoding` and a strong `ETag` hashed from the payload and the chosen encoding. A matching `If-None-Match` returns a bodiless `304`. Route handlers that call other handlers directly use `sourceRequest()`, which sends no `Accept-Encoding`, so they always read plain JSON.
 
+The Vercel CDN keys `Vary: Accept-Encoding` on the raw header string, so `gzip, deflate` and `deflate, gzip` are separate entries and separate origin misses. `/api/v1/benchmarks`, the busiest programmatic route, passes `compression: 'cdn'`: it sends plain JSON without `Vary`, the CDN keeps one entry per URL, and the CDN compresses that entry for each client. The route also validates every query parameter before reading the database (`lib/benchmarks/benchmark-request-params.ts`), so malformed values return 400 instead of a Postgres cast error.
+
 `Cache-Control` is `public, max-age=60, s-maxage=86400, stale-while-revalidate=86400`. Vercel strips `s-maxage` and `stale-while-revalidate` before the browser, so a browser reuses a response for 60 s and then revalidates it with its ETag, which costs a round trip but no body. Browsers get no stale-while-revalidate window, which keeps a returning visitor from seeing pre-ingest data for longer than a minute.
 
 Fixture builds (`E2E_FIXTURES=1`) send `Cache-Control: no-store` instead, so every E2E request reaches the network where `cy.intercept` stubs it.

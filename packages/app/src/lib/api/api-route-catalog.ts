@@ -669,7 +669,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'list-benchmarks',
-    sourceSha256: 'c8fe822b1a3b42585b2f9984ad867b639d59fe46433a2d3de291942600a93412',
+    sourceSha256: 'c55c44a73e9c7500abc9e4a463588b08a1c1af05d5a274c298dff8a443ae9a7d',
   },
   {
     source: 'src/app/api/v1/benchmarks/history/route.ts',
@@ -1601,10 +1601,18 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/cache/api-cache.ts',
-    sourceSha256: 'f70cdf1994432842d0249c3d601b95c6c292b86bf7f811253f77c5b09a404e28',
+    sourceSha256: '6ba6cbb02c0278e31a9765bc4ff9fad002d2f0bf410aa84991835432545c0008',
     reviewArea: {
       en: 'Public CDN tags, cache lifetimes, Blob key dimensions, and purge behavior.',
       zh: '公开 CDN 标签、缓存时长、Blob 键维度和清除行为。',
+    },
+  },
+  {
+    source: 'src/lib/benchmarks/benchmark-request-params.ts',
+    sourceSha256: '76ebf0e9a7827db72580944926b42fd6b0f933a1db642260b895b0eae07257b6',
+    reviewArea: {
+      en: '/api/v1/benchmarks query validation and 400 messages.',
+      zh: '/api/v1/benchmarks 查询参数校验与 400 错误信息。',
     },
   },
   {
