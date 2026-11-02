@@ -8,7 +8,7 @@ import {
 import { FRAMEWORK_LABELS, HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
 import { cachedQuery } from '@/lib/cache/api-cache';
-import { COMPARE_MODEL_SLUGS } from '@/lib/compare/compare-slug';
+import { PUBLIC_COMPARE_MODEL_SLUGS } from '@/lib/compare/compare-slug';
 import { loadFixture } from '@/lib/testing/test-fixtures';
 
 export const getCachedAgenticCatalog = cachedQuery(() => {
@@ -41,7 +41,7 @@ export interface AgenticCatalogModelGroup {
 
 function buildModelLabels(): Map<string, string> {
   const labels = new Map<string, string>();
-  for (const model of COMPARE_MODEL_SLUGS) {
+  for (const model of PUBLIC_COMPARE_MODEL_SLUGS) {
     for (const dbKey of model.dbKeys) labels.set(dbKey, model.label);
   }
   return labels;

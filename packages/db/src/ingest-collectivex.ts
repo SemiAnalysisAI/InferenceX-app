@@ -272,9 +272,8 @@ async function main(): Promise<void> {
       }
       console.log(`  ${result} run ${planned.run.run_id}`);
       wrote = true;
-      console.log(
-        `  linked ${await upsertCollectiveXChangelogLinks(sql, links)} changelog entries`,
-      );
+      await upsertCollectiveXChangelogLinks(sql, links);
+      console.log(`  linked ${links.length} changelog entries`);
     }
   } finally {
     await sql.end();

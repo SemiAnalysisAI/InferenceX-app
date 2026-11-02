@@ -28,6 +28,25 @@ context value. Consumers subscribe through five independently memoized domains:
 `useGlobalFilterSelection`, `useGlobalFilterActions`, `useGlobalFilterRun`,
 `useGlobalFilterAvailability`, and `useGlobalFilterWorkflow`.
 
+GLM-5.3-Flash uses the existing Konami UI feature gate. The provider retains a
+requested model but publishes a safe effective selection while locked, including
+on first render and after relock. It waits for gate hydration before synchronizing
+the URL, so an unlocked deep link survives reload. Unofficial availability cannot
+unlock a model. The root model boundary also blocks direct gated routes; public
+discovery excludes them and client overview/search surfaces respect the gate.
+Saved gated `g_model` selections on inference routes are canonicalized by the frontend
+proxy before rendering, preserving locale and query parameters. This gives SSR and
+the fresh client provider the same requested model without delaying public-model SSR.
+Overview UI requests retain the complete matrix, then apply model visibility before
+row scopes and toggle counts; the read-only API retains its original scoped responses.
+
+While a requested gated model awaits hydration, its consumers, navigation-model
+write and date-scoped workflow query wait too. Locked routes redirect directly
+to the localized canonical Kimi K3 route, avoiding a transient bare-route default.
+This is UI-only visibility, not authorization. Following PowerX, the read-only
+API parameters, raw model registry and response data remain unchanged; the API
+and packaged skills document this presentation-only parity exception.
+
 Workflow query updates therefore do not notify selection or action consumers. Selection
 updates do not notify workflow-only consumers. Components should subscribe only to the
 domains they read.
@@ -71,6 +90,12 @@ offloaded points, without hiding the points or filtering results. It applies to
 official and unofficial data, GPU-history comparisons, and chart exports.
 These are presentation-only controls: the read-only API and skills data contracts
 keep every benchmark row and offload field unchanged.
+
+Advanced also has a default-on Framework Line Label control (`i_frameworklabel=0`
+to hide). It hides the framework suffix inside existing line labels, retaining
+hardware names, precision, comparison dates and overlay run tags. It shares state
+across the main chart, GPU-history comparisons, replay and exports, independently
+of Line Labels. It does not filter frameworks or change read-only API data.
 
 `useInferenceFilters` owns inference-only selection state. GPU selections and comparison
 dates do not belong in global filter state because evaluation and reliability do not use

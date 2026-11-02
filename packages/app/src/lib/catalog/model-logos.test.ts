@@ -66,6 +66,7 @@ describe('model developer logos', () => {
   it('uses the actual Z.ai mark for GLM models', () => {
     expect(getModelLogo(Model.GLM_5)).toBe('zai-color.svg');
     expect(getModelLogo(Model.GLM_5_2)).toBe('zai-color.svg');
+    expect(getModelLogo(Model.GLM_5_3_Flash)).toBe('zai-color.svg');
     expect(getModelDeveloperLogo('Z.ai (Zhipu AI)')).toBe('zai-color.svg');
   });
 

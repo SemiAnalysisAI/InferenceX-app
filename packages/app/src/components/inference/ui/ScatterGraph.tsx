@@ -453,6 +453,7 @@ const SCATTER_STRINGS = {
     concurrencyLabels: '# Concurrent Sessions',
     gradientLabels: 'Gradient Labels',
     lineLabels: 'Line Labels',
+    frameworkLabel: 'Framework Line Label',
     offloadingLabel: 'Offloading Label',
     perfRuler: 'Perf Ruler',
     perfRulerInfo:
@@ -489,6 +490,7 @@ const SCATTER_STRINGS = {
     concurrencyLabels: '并发会话数',
     gradientLabels: '渐变标签',
     lineLabels: '曲线标签',
+    frameworkLabel: '曲线框架标签',
     offloadingLabel: 'offload 标签',
     perfRuler: '性能标尺',
     perfRulerInfo:
@@ -563,6 +565,7 @@ const ScatterGraph = React.memo(
       showGradientLabels,
       showLineLabels,
       showOffloadingLabel,
+      showFrameworkLabel,
       showParetoFrontier,
       paretoFrontierPlayful,
     } = useInferenceDisplay();
@@ -582,6 +585,7 @@ const ScatterGraph = React.memo(
       setShowGradientLabels,
       setShowLineLabels,
       setShowOffloadingLabel,
+      setShowFrameworkLabel,
       setShowParetoFrontier,
       setQuickFilterVendors,
       setQuickFilterFrameworks,
@@ -2105,6 +2109,7 @@ const ScatterGraph = React.memo(
     const lastShowGpuCountRef = useRef(showPointLabels);
     const lastPointLabelsVisibleRef = useRef(pointLabelsVisible);
     const lastShowLineLabelsRef = useRef(showLineLabels);
+    const lastShowFrameworkLabelRef = useRef(showFrameworkLabel);
     const lastShowGradientLabelsRef = useRef(showGradientLabels);
 
     const getDisplaySelection = useCallback(() => {
@@ -2378,7 +2383,7 @@ const ScatterGraph = React.memo(
       const rooflineLayer: CustomLayerConfig = {
         type: 'custom',
         key: 'rooflines',
-        displayIdentity: `${showGradientLabels}:${showLineLabels}`,
+        displayIdentity: `${showGradientLabels}:${showLineLabels}:${showFrameworkLabel}`,
         render: (zoomGroup, ctx) => {
           const ir = interactionRef.current;
           const xScale = ctx.xScale as ContinuousScale;
@@ -2769,7 +2774,7 @@ const ScatterGraph = React.memo(
                           },
                         ]
                       : []),
-                    ...(engineLabel
+                    ...(engineLabel && showFrameworkLabel
                       ? [
                           {
                             className: 'll-engine',
@@ -3728,6 +3733,7 @@ const ScatterGraph = React.memo(
       useAdvancedLabels,
       showConcurrencyLabels,
       showOffloadingLabel,
+      showFrameworkLabel,
       buildPointId,
       overlayData,
       processedOverlayData,
@@ -3947,12 +3953,20 @@ const ScatterGraph = React.memo(
       const visibilityChanged = lastPointLabelsVisibleRef.current !== pointLabelsVisible;
       const gpuCountChanged = lastShowGpuCountRef.current !== showPointLabels;
       const lineLabelsChanged = lastShowLineLabelsRef.current !== showLineLabels;
+      const frameworkLabelChanged = lastShowFrameworkLabelRef.current !== showFrameworkLabel;
       const gradientLabelsChanged = lastShowGradientLabelsRef.current !== showGradientLabels;
-      if (!visibilityChanged && !gpuCountChanged && !lineLabelsChanged && !gradientLabelsChanged)
+      if (
+        !visibilityChanged &&
+        !gpuCountChanged &&
+        !lineLabelsChanged &&
+        !gradientLabelsChanged &&
+        !frameworkLabelChanged
+      )
         return;
       lastShowGpuCountRef.current = showPointLabels;
       lastPointLabelsVisibleRef.current = pointLabelsVisible;
       lastShowLineLabelsRef.current = showLineLabels;
+      lastShowFrameworkLabelRef.current = showFrameworkLabel;
       lastShowGradientLabelsRef.current = showGradientLabels;
       const display = getDisplaySelection();
       if (!display) return;
@@ -3967,7 +3981,10 @@ const ScatterGraph = React.memo(
           );
         });
       }
-      if ((lineLabelsChanged || gradientLabelsChanged) && (showLineLabels || showGradientLabels)) {
+      if (
+        (lineLabelsChanged || gradientLabelsChanged || frameworkLabelChanged) &&
+        (showLineLabels || showGradientLabels)
+      ) {
         const entranceInFlight = zoomGroup
           .selectAll<SVGPathElement, unknown>('.roofline-path')
           .nodes()
@@ -3986,6 +4003,7 @@ const ScatterGraph = React.memo(
       showConcurrencyLabels,
       showGradientLabels,
       showLineLabels,
+      showFrameworkLabel,
     ]);
 
     useLayoutEffect(() => {
@@ -4417,6 +4435,16 @@ const ScatterGraph = React.memo(
                   onCheckedChange: (checked: boolean) => {
                     setShowLineLabels(checked);
                     track('latency_line_labels_toggled', { enabled: checked });
+                  },
+                },
+                {
+                  id: 'scatter-framework-label',
+                  label: legendT.frameworkLabel,
+                  advanced: true,
+                  checked: showFrameworkLabel,
+                  onCheckedChange: (checked: boolean) => {
+                    setShowFrameworkLabel(checked);
+                    track('latency_framework_label_toggled', { enabled: checked });
                   },
                 },
                 {

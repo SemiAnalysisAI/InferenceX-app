@@ -67,9 +67,13 @@ export const COLLECTIVEX_KNOWN_FOOTNOTES: Record<string, CollectiveXKnownFootnot
     en: 'Low-latency EP16 runs over EFA with a ~1.2 ms floor at T=1 (vs ~28 µs on EP8 NVLink) and passes correctness at every rung. Decode only: the prefill ladder does not finish inside the 90-minute case budget.',
     zh: '低延迟 EP16 可在 EFA 上运行，T=1 下限约 1.2 ms（EP8 NVLink 约 28 µs），所有梯级正确性通过。仅有 decode：prefill 梯级无法在 90 分钟的单用例时限内完成。',
   },
+  'b300-efa-deepep-aws-fork': {
+    en: "Runs AWS's EFA fork of DeepEP V2 (amazon-contributing/DeepEP), whose unordered scale-out kernels need only the weak GIN signals the EFA proxy provides; upstream DeepEP does not support EFA. EP16 is about 0.86 ms at T=1 and 7.3 ms for T=8192 prefill, 2-5x faster than upstream DeepEP V2 on the same nodes.",
+    zh: '使用 AWS 的 DeepEP V2 EFA fork（amazon-contributing/DeepEP），其乱序 scale-out 内核只需 EFA 代理提供的弱 GIN 信号；上游 DeepEP 不支持 EFA。EP16 在 T=1 约 0.86 ms，T=8192 prefill 约 7.3 ms，比同节点上的上游 DeepEP V2 快 2-5 倍。',
+  },
   'efa-no-ibgda': {
-    en: "DeepEP V2's low-latency path uses the bundled V1 buffer, which needs NVSHMEM IBGDA on Mellanox NICs; EFA has no IBGDA, and every rank segfaults at setup. DeepEP V2.5 drops V1 and could run low-latency over NCCL GIN.",
-    zh: 'DeepEP V2 的低延迟路径使用内置的 V1 缓冲，需要 Mellanox 网卡上的 NVSHMEM IBGDA；EFA 不支持 IBGDA，所有 rank 在初始化时段错误。DeepEP V2.5 移除了 V1，可经 NCCL GIN 运行低延迟模式。',
+    en: "DeepEP V2's low-latency path uses the bundled V1 buffer, which needs NVSHMEM IBGDA on Mellanox NICs; EFA has no IBGDA, and every rank segfaults at setup. DeepEP V2.5 removes V1 and its low-latency mode; its single EPBuffer path covers decode.",
+    zh: 'DeepEP V2 的低延迟路径使用内置的 V1 缓冲，需要 Mellanox 网卡上的 NVSHMEM IBGDA；EFA 不支持 IBGDA，所有 rank 在初始化时段错误。DeepEP V2.5 移除了 V1 及其低延迟模式，由单一的 EPBuffer 路径覆盖 decode。',
   },
   'h100-efa-uccl-ll': {
     en: 'Low-latency EP16 runs over EFA and passes correctness at every rung, with a ~3.4 ms floor at T=1 and ~5.1 ms at the T=256 top rung (BF16), versus ~0.15 ms at T=1 on H200 InfiniBand.',
@@ -165,7 +169,7 @@ const NORMAL: KnownMatrix = {
     'flashinfer-ep': off('gb-only'),
   },
   b300: {
-    'deepep-v2': bothWork,
+    'deepep-v2': cell(works, worksWith('b300-efa-deepep-aws-fork')),
     mori: off('amd-only'),
     'uccl-ep': off('uccl-not-brought-up'),
     'nccl-ep': cell(works, worksWith('nccl-v02-gin')),

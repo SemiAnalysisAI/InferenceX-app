@@ -634,10 +634,10 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'ui-artifact-read',
     exclusionReason: {
-      en: 'UI-only overlay for unofficial workflow artifacts. Append-only runs also include the published curve points they extend when each shared topology keeps its image. Development on loopback hosts may explicitly opt into local artifact files via INFERENCEX_LOCAL_ARTIFACT_DIR; production only reads the public GitHub source. Artifact availability and shape are not stable.',
-      zh: '仅供界面叠加非官方工作流产物。append-only 运行还会包含其所扩展的已发布曲线数据点，前提是两者共有的每种拓扑都使用同一镜像。开发环境通过本机地址访问时，可用 INFERENCEX_LOCAL_ARTIFACT_DIR 显式启用本地文件；生产环境仅从公开 GitHub 来源读取。产物的可用性和结构并不稳定。',
+      en: 'UI-only overlay for unofficial workflow artifacts. Append-only runs also include the published curve points they extend when each shared topology keeps its image. Development on loopback hosts may explicitly opt into local artifact files via INFERENCEX_LOCAL_ARTIFACT_DIR; production only reads the public GitHub source. Artifact availability and shape are not stable. The CDN caches completed runs for an hour, queued or in-progress runs for 30 seconds, and missing runs for five minutes; a GitHub rate limit returns an uncached 503 with Retry-After.',
+      zh: '仅供界面叠加非官方工作流产物。append-only 运行还会包含其所扩展的已发布曲线数据点，前提是两者共有的每种拓扑都使用同一镜像。开发环境通过本机地址访问时，可用 INFERENCEX_LOCAL_ARTIFACT_DIR 显式启用本地文件；生产环境仅从公开 GitHub 来源读取。产物的可用性和结构并不稳定。CDN 对已完成的运行缓存 1 小时，对排队中或进行中的运行缓存 30 秒，对不存在的运行缓存 5 分钟；触发 GitHub 速率限制时返回不缓存的 503，并附带 Retry-After。',
     },
-    sourceSha256: '735305384997ffb8cd82a4cca9a1fcd512f7ffe06ce9ac82776616da5e49fe5f',
+    sourceSha256: '312e22912abcf110e2fd9ec7a283a32e3c577a343eedab5fa00aac3f488d5fb1',
   },
   {
     source: 'src/app/api/v1/agentic-aggregates/route.ts',
@@ -669,7 +669,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'list-benchmarks',
-    sourceSha256: 'c8fe822b1a3b42585b2f9984ad867b639d59fe46433a2d3de291942600a93412',
+    sourceSha256: 'c55c44a73e9c7500abc9e4a463588b08a1c1af05d5a274c298dff8a443ae9a7d',
   },
   {
     source: 'src/app/api/v1/benchmarks/history/route.ts',
@@ -760,7 +760,7 @@ export const apiRouteCatalog = [
       en: 'UI-only evaluation sample reader backed by live workflow artifacts with an unstable artifact contract.',
       zh: '仅供界面读取由实时工作流产物支持的评测样本；该产物契约不稳定。',
     },
-    sourceSha256: '64d3881d026ca257336208dc3c515438d507aebcf681c4cc8860f5fb1d6b3f44',
+    sourceSha256: '1cd0b94aa255feeef9ce8d80f40da127eece26e3bd6d16de6d6eac70f779fe85',
   },
   {
     source: 'src/app/api/v1/eval-samples/route.ts',
@@ -920,7 +920,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'search-server-logs',
-    sourceSha256: '183ed41ec785a32c3bda5b3bbed250b8605bd52190048246ff456d272ebfca12',
+    sourceSha256: 'cb9cda1bbd8413f9df039107a36201368d887e362e672bd95ca6acf5359e8b1e',
   },
   {
     source: 'src/app/api/v1/server-log/route.ts',
@@ -928,7 +928,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-server-log',
-    sourceSha256: '3d9e480b37e7f69c14902832605e6a3a51d651b403990885ff11955756c81c85',
+    sourceSha256: 'cd3472b77b906fe1ec3c9c036a26ad890890e0b65c7ff1421e326909d8a01f5f',
   },
   {
     source: 'src/app/api/v1/submissions/route.ts',
@@ -1567,7 +1567,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: '6a0840f3c3feeb205bb80e9948365d2daff8f214d47204e09e71baf6ba7b53d1',
+    sourceSha256: 'd8739b7fc97c527270a2ef8fdd44f0ec867d4f558de96772f7485e0e4bfd4b8b',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1601,10 +1601,18 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/cache/api-cache.ts',
-    sourceSha256: 'f70cdf1994432842d0249c3d601b95c6c292b86bf7f811253f77c5b09a404e28',
+    sourceSha256: '3c4790f16dafceee25010f62a85735c8a0a079a14b02e3f4523c87ed4b5a0e7d',
     reviewArea: {
       en: 'Public CDN tags, cache lifetimes, Blob key dimensions, and purge behavior.',
       zh: '公开 CDN 标签、缓存时长、Blob 键维度和清除行为。',
+    },
+  },
+  {
+    source: 'src/lib/benchmarks/benchmark-request-params.ts',
+    sourceSha256: '76ebf0e9a7827db72580944926b42fd6b0f933a1db642260b895b0eae07257b6',
+    reviewArea: {
+      en: '/api/v1/benchmarks query validation and 400 messages.',
+      zh: '/api/v1/benchmarks 查询参数校验与 400 错误信息。',
     },
   },
   {
@@ -1688,7 +1696,8 @@ export const apiContractSourceDigests = [
     // Reviewed for the MiniMax-M3.1-Flash addition (InferenceX#4426): the model
     // joins OVERVIEW_MODEL_SCENARIOS as AgentX-only. No parameter or response
     // shape change, so the docs stand.
-    sourceSha256: 'b722464d1738566c5b71eb44975539028eca4d0a68342362dceff041c5b43a97',
+    // GLM-5.3-Flash adds an AgentX-only row without changing the response shape.
+    sourceSha256: '69d7ebf49af0b92517814c7a90b02eee78482071131bbd969c76c82a1c1258f3',
     reviewArea: {
       en: 'Overview BFF tier, engine, comparison-window, reference, and model-scope parameters plus the OverviewPageData response shape.',
       zh: '概览 BFF 的档位、引擎、对比时间窗口、参考硬件和模型范围参数，以及 OverviewPageData 响应结构。',
@@ -1717,7 +1726,9 @@ export const apiContractSourceDigests = [
     // Reviewed for the MiniMax-M3.1-Flash addition (InferenceX#4426): one new DB
     // key, `minimaxm31flash`, with its own display name and release date. The
     // AgentX cookbook documents the model; no endpoint or parameter shape changes.
-    sourceSha256: '9afbd7db9690502ea53977496f228c89dc184c41e4a81a13a248bbf6fd38afb9',
+    // GLM-5.3-Flash / glm5.3flash is separate from GLM-5.2/5.3; the API
+    // model documentation and AgentX cookbook describe the publication boundary.
+    sourceSha256: '2727c70b999445eab770a6095d362e33b94354aabb90bacaa35eb165f1b1ae52',
     reviewArea: {
       en: 'Published benchmark and TCO model names, aliases, and parameter enums.',
       zh: '已发布基准与 TCO 模型名称、别名和参数枚举。',
@@ -1821,10 +1832,10 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/server-logs.ts',
-    sourceSha256: '7a6f6b0b3c60e1713f73f6d543745931886654f060cf55d6dc4be9619a64b479',
+    sourceSha256: '23cac33618e89dbd1a8795892065d24638add7e5842813eed6cc82c8a4ddb311',
     reviewArea: {
-      en: 'Log filename discovery, selected-file reads, bounded chunk metadata, complete-file search, availability, and legacy-schema fallback.',
-      zh: '日志文件名发现、指定文件读取、有界分块元数据、完整文件搜索、可用性以及旧版 schema 回退行为。',
+      en: 'Log filename discovery, size-capped selected-file reads, bounded chunk metadata, budgeted complete-file search, availability, and legacy-schema fallback.',
+      zh: '日志文件名发现、有大小上限的指定文件读取、有界分块元数据、有扫描预算的完整文件搜索、可用性以及旧版 schema 回退行为。',
     },
   },
   {

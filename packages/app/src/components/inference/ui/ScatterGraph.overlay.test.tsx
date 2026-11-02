@@ -25,6 +25,53 @@ const measurements = (offset: number, runUrl?: string): InferenceData[] => [
 ];
 
 describe('ScatterGraph unofficial overlays', () => {
+  it('hides framework text for official and unofficial line labels without rebuilding points', () => {
+    const hwKey = 'b200_trt';
+    const points = [point(hwKey, 'fp8', 10, 300, 1), point(hwKey, 'fp8', 20, 200, 2)];
+    const runUrl = 'https://github.com/o/r/actions/runs/123';
+    inferenceState.current = {
+      ...baseInferenceState(),
+      activeHwTypes: new Set([hwKey]),
+      hwTypesWithData: new Set([hwKey]),
+      showLineLabels: true,
+      showFrameworkLabel: true,
+    };
+    overlayState.current = {
+      ...baseOverlayState(),
+      isUnofficialRun: true,
+      activeOverlayHwTypes: new Set([hwKey]),
+      allOverlayHwTypes: new Set([hwKey]),
+      runIndexByUrl: { [runUrl]: 0 },
+      unofficialRunInfos: [{ id: '123', branch: 'framework-toggle', url: runUrl }],
+    };
+    const { container, rerender, unmount } = mountChart({
+      data: points,
+      overlayData: {
+        data: points.map((p) => ({ ...p, y: p.y + 100, run_url: runUrl })),
+        hardwareConfig: {},
+        label: 'framework-toggle',
+      },
+    });
+    const labels = () =>
+      [...container.querySelectorAll('.line-label .ll-text')].map((n) => n.textContent);
+    expect(labels().filter((label) => label?.includes('TRTLLM'))).toHaveLength(2);
+    const dot = container.querySelector('.dot-group');
+    const overlay = container.querySelector('.overlay-roofline-path');
+    const color = overlay?.getAttribute('stroke');
+    const builds = rebuildCount();
+    inferenceState.current = { ...inferenceState.current, showFrameworkLabel: false };
+    rerender();
+    expect(labels()).toEqual(['B200', 'B200']);
+    expect(container.querySelector('.dot-group')).toBe(dot);
+    expect(container.querySelector('.overlay-roofline-path')).toBe(overlay);
+    expect(overlay?.getAttribute('stroke')).toBe(color);
+    expect(rebuildCount()).toBe(builds);
+    inferenceState.current = { ...inferenceState.current, showFrameworkLabel: true };
+    rerender();
+    expect(labels().filter((label) => label?.includes('TRTLLM'))).toHaveLength(2);
+    unmount();
+  });
+
   it('labels measured overlay boundary configurations in run colors without labeling off-boundary samples', () => {
     const runUrls = [
       'https://github.com/o/r/actions/runs/123',

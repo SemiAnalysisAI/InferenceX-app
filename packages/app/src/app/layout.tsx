@@ -1,14 +1,14 @@
 import '@/lib/runtime/polyfills';
 import './globals.css';
 
-import { Analytics } from '@vercel/analytics/next';
-import { SpeedInsights } from '@vercel/speed-insights/next';
 import type { Metadata } from 'next';
 import { DM_Sans } from 'next/font/google';
 
+import { VercelAnalytics } from '@/components/analytics/vercel-analytics';
 import { Footer } from '@/components/footer/footer';
 import { Header } from '@/components/header/header';
 import { RouteTransition } from '@/components/motion/route-transition';
+import { ModelFeatureBoundary } from '@/components/model-feature-boundary';
 import { JsonLd } from '@/components/seo/json-ld';
 import { AutumnLeaves } from '@/components/effects/autumn-leaves';
 import { CircuitBackground } from '@/components/effects/circuit-background';
@@ -193,7 +193,7 @@ export default function RootLayout({
           <QueryProvider>
             <ThemeProvider
               attribute="class"
-              defaultTheme="minecraft"
+              defaultTheme="light"
               themes={APP_THEMES}
               enableSystem
               disableTransitionOnChange
@@ -202,13 +202,14 @@ export default function RootLayout({
               <Header />
               <EasterEggThemeLazy />
               <div className="grow flex flex-col">
-                <RouteTransition>{children}</RouteTransition>
+                <ModelFeatureBoundary>
+                  <RouteTransition>{children}</RouteTransition>
+                </ModelFeatureBoundary>
               </div>
               <Footer />
             </ThemeProvider>
           </QueryProvider>
-          {process.env.VERCEL && <Analytics />}
-          {process.env.VERCEL && <SpeedInsights />}
+          {process.env.VERCEL && <VercelAnalytics />}
         </PostHogProvider>
       </body>
     </html>

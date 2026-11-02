@@ -19,6 +19,150 @@ const unlockPointerEvents = () => {
   });
 };
 
+describe('GLM-5.3-Flash registration without published observations', () => {
+  for (const locale of ['', '/zh']) {
+    for (const width of [1280, 375]) {
+      it(`keeps ${locale}/inference/glm-5-3-flash distinct at ${width}px`, () => {
+        cy.viewport(width, 900);
+        cy.intercept('GET', '/api/v1/availability', { body: [] });
+        cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
+          if (new URL(request.url).searchParams.get('model') === 'GLM-5.3-Flash') {
+            request.alias = 'flashBenchmarks';
+          }
+          request.reply({ body: [] });
+        });
+        cy.visit(`${locale}/inference/kimi-k3`, {
+          onBeforeLoad(win) {
+            visitOptions.onBeforeLoad(win);
+            win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
+          },
+        });
+        cy.get('[data-testid="model-selector"]').click();
+        cy.get('[role="option"]').contains('GLM 5.3 Flash').click();
+        cy.wait('@flashBenchmarks');
+        cy.get('[data-testid="model-selector"]').should('contain.text', 'GLM 5.3 Flash');
+        cy.get('[data-testid="inference-page-heading"]').should('contain.text', 'GLM');
+        cy.location('pathname').should('eq', `${locale}/inference/glm-5-3-flash`);
+        cy.get('[data-testid="inference-chart"] [data-layer="scatter"] circle').should('not.exist');
+        cy.get('[data-testid="model-architecture-link"]').should('not.exist');
+        cy.reload();
+        cy.get('[data-testid="model-selector"]').should('contain.text', 'GLM 5.3 Flash');
+        cy.get('[data-testid="model-architecture-link"]').should('not.exist');
+        cy.location('pathname').should('eq', `${locale}/inference/glm-5-3-flash`);
+        cy.window().then((win) => {
+          win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
+          win.dispatchEvent(new win.Event('inferencex:feature-gate:locked'));
+        });
+        cy.get('[data-testid="model-selector"]').should('not.contain.text', 'GLM 5.3 Flash');
+        cy.location('pathname').should('not.contain', 'glm-5-3-flash');
+      });
+    }
+  }
+
+  for (const locale of ['', '/zh']) {
+    for (const route of ['/inference/glm-5-3-flash', '/inference?g_model=GLM-5.3-Flash']) {
+      it(`requests only Flash from the first unlocked ${locale}${route} render and reload`, () => {
+        const requestedModels: (string | null)[] = [];
+        cy.intercept('GET', '/api/v1/availability*', { body: [] });
+        cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
+          const model = new URL(request.url).searchParams.get('model');
+          requestedModels.push(model);
+          expect(model, 'every benchmark request, including the first').to.eq('GLM-5.3-Flash');
+          request.reply({ body: [] });
+        }).as('initialFlashBenchmarks');
+        // A non-seeded date forces a real client request rather than relying
+        // on the latest model route's fresh SSR query data.
+        cy.visit(`${locale}${route}${route.includes('?') ? '&' : '?'}g_rundate=2026-10-01`, {
+          onBeforeLoad(win) {
+            visitOptions.onBeforeLoad(win);
+            win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
+          },
+        });
+        cy.wait('@initialFlashBenchmarks');
+        cy.location('pathname').should('eq', `${locale}/inference/glm-5-3-flash`);
+        cy.get('[data-testid="model-selector"]').should('contain.text', 'GLM 5.3 Flash');
+        cy.reload();
+        cy.wait('@initialFlashBenchmarks');
+        cy.get('[data-testid="model-selector"]').should('contain.text', 'GLM 5.3 Flash');
+        cy.then(() => {
+          expect(requestedModels.length).to.be.at.least(2);
+          expect([...new Set(requestedModels)]).to.deep.equal(['GLM-5.3-Flash']);
+        });
+      });
+    }
+
+    it(`does not let an unofficial Flash run unlock ${locale || 'en'} selection`, () => {
+      cy.fixture('api/muse-spark-unofficial-run.json').then((run) => {
+        cy.intercept('GET', '/api/unofficial-run*', {
+          body: {
+            ...run,
+            benchmarks: run.benchmarks.map((row: Record<string, unknown>) => ({
+              ...row,
+              model: 'glm5.3flash',
+              precision: 'fp8',
+              spec_method: 'mtp',
+            })),
+            evaluations: [],
+          },
+        }).as('flashOverlay');
+      });
+      cy.intercept('GET', '/api/v1/availability*', { body: [] });
+      cy.intercept('GET', '/api/v1/benchmarks*', { body: [] });
+      cy.visit(`${locale}/inference?unofficialrun=38825822770`, {
+        onBeforeLoad(win) {
+          visitOptions.onBeforeLoad(win);
+          win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
+        },
+      });
+      cy.wait('@flashOverlay');
+      cy.get('[data-testid="model-selector"]').should('not.contain.text', 'GLM 5.3 Flash');
+      cy.window().then((win) => {
+        win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
+        win.dispatchEvent(new win.Event('inferencex:feature-gate:unlocked'));
+      });
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'GLM 5.3 Flash');
+      cy.get('[data-testid="scatter-graph"] .unofficial-overlay-pt').should(
+        'have.length.greaterThan',
+        0,
+      );
+    });
+
+    it(`blocks a locked Flash route and saved selection in ${locale || 'en'}`, () => {
+      const sourceAvailability = modelSelectionAvailability.filter(
+        (row) => row.model === MODEL_SELECTION_DB_KEYS['DeepSeek-V4-Pro'],
+      );
+      expect(sourceAvailability.length, 'nonempty source availability fixture').to.be.greaterThan(
+        0,
+      );
+      const kimiAvailability = sourceAvailability.map((row) => ({ ...row, model: 'kimik3' }));
+      expect([...new Set(kimiAvailability.map((row) => row.model))]).to.deep.equal(['kimik3']);
+      cy.intercept('GET', '/api/v1/availability*', { body: kimiAvailability });
+      cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
+        expect(
+          new URL(request.url).searchParams.get('model'),
+          'first and later locked requests',
+        ).to.eq('Kimi-K3');
+        request.reply({ body: [] });
+      });
+      const locked = {
+        onBeforeLoad(win: Cypress.AUTWindow) {
+          visitOptions.onBeforeLoad(win);
+          win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
+        },
+      };
+      cy.visit(`${locale}/inference/glm-5-3-flash`, locked);
+      cy.location('pathname').should('eq', `${locale}/inference/kimi-k3`);
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'Kimi K3');
+      cy.get('[data-testid="model-selector"]').click();
+      cy.contains('[role="option"]', 'GLM 5.3 Flash').should('not.exist');
+      cy.get('body').type('{esc}');
+      cy.visit(`${locale}/inference?g_model=GLM-5.3-Flash`, locked);
+      cy.location('pathname').should('eq', `${locale}/inference/kimi-k3`);
+      cy.get('[data-testid="model-selector"]').should('not.contain.text', 'GLM 5.3 Flash');
+    });
+  }
+});
+
 describe('Per-model dashboard routes', () => {
   for (const locale of ['', '/zh']) {
     it(`retains an explicit legacy model across ${locale}/evaluation`, () => {

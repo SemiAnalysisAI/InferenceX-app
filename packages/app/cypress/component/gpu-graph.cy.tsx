@@ -29,6 +29,59 @@ const mountGpuGraph = (
 ) => mountWithProviders(tree, { unofficial: {}, ...overrides });
 
 describe('GPUGraph', () => {
+  it('toggles framework suffixes while keeping comparison dates and hardware labels', () => {
+    const data = [8, 16, 32].map((x) =>
+      createMockInferenceData({
+        hwKey: 'b200_trt',
+        x,
+        y: 300 - x,
+        date: '2025-03-01',
+        precision: Precision.FP4,
+      }),
+    );
+    function FrameworkLabels() {
+      const [showFrameworkLabel, setShowFrameworkLabel] = useState(true);
+      const value = createMockInferenceContextValues({
+        hardwareConfig: hwConfig,
+        selectedGPUs: ['b200_trt'],
+        selectedDates: ['2025-03-01'],
+        activeDates: new Set(['2025-03-01_b200_trt']),
+        selectedPrecisions: [Precision.FP4],
+        showLineLabels: true,
+        showFrameworkLabel,
+        setShowFrameworkLabel,
+      });
+      return (
+        <InferenceContextsProvider data={value} filters={value} display={value} actions={value}>
+          <div style={{ width: 1000, height: 700 }}>
+            <GPUGraph
+              chartId="gpu-framework-labels"
+              modelLabel="DeepSeek R1"
+              data={data}
+              xLabel="Interactivity"
+              yLabel="Throughput / Chip (tok/s)"
+              chartDefinition={createMockChartDefinition({
+                chartType: 'interactivity',
+                y_tpPerGpu_roofline: 'upper_left',
+              })}
+            />
+          </div>
+        </InferenceContextsProvider>
+      );
+    }
+    mountGpuGraph(<FrameworkLabels />);
+    const labels = '[data-testid="gpu-graph"] .line-label .ll-text';
+    cy.get(labels).should('contain.text', 'TRTLLM').and('contain.text', '2025-03-01');
+    cy.get('[data-testid="legend-advanced-toggle"]').click();
+    cy.get('#gpu-framework-label').should('have.attr', 'data-state', 'checked').click();
+    cy.get(labels)
+      .should('not.contain.text', 'TRTLLM')
+      .and('contain.text', 'B200')
+      .and('contain.text', '2025-03-01');
+    cy.get('#gpu-framework-label').click();
+    cy.get(labels).should('contain.text', 'TRTLLM').and('contain.text', '2025-03-01');
+  });
+
   it('keeps GPU-count and parallelism labels independent', () => {
     const data = [
       createMockInferenceData({
