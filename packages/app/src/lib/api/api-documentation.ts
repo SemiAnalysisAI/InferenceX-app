@@ -740,7 +740,7 @@ const percentileSchema = objectSchema({
   n: integerSchema,
 });
 const nullablePercentileSchema: ApiSchema = { oneOf: [percentileSchema, { type: 'null' }] };
-const idListSchema: ApiSchema = { type: 'string', pattern: '^\\d+(,\\d+)*$' };
+const idListSchema: ApiSchema = { type: 'string', pattern: String.raw`^\d+(,\d+)*$` };
 const positiveIdSchema: ApiSchema = { type: 'integer', minimum: 1 };
 const safePositiveIdSchema: ApiSchema = { ...positiveIdSchema, maximum: Number.MAX_SAFE_INTEGER };
 
@@ -1062,8 +1062,8 @@ export const apiOperations: readonly ApiOperation[] = [
         'query',
         false,
         'date',
-        'Latest data on or before YYYY-MM-DD, unless exact is true.',
-        'YYYY-MM-DD 当日或之前的最新数据，exact 为 true 时仅限当日。',
+        'Latest data on or before this calendar date (YYYY-MM-DD), unless exact is true. An empty value means the latest data; any other value, such as latest, yields 400.',
+        '返回该日期（YYYY-MM-DD）当日或之前的最新数据，exact 为 true 时仅限当日。空值表示最新数据；不是有效日期的取值（如 latest）返回 400。',
         { type: 'string', format: 'date' },
         '2026-08-08',
       ),
@@ -1072,8 +1072,8 @@ export const apiOperations: readonly ApiOperation[] = [
         'query',
         false,
         'boolean',
-        'Set true to require the supplied date exactly.',
-        '设为 true 时严格匹配所给日期。',
+        'Set true to require the supplied date exactly. Only true and false are accepted.',
+        '设为 true 时严格匹配所给日期。仅接受 true 或 false。',
         { type: 'boolean', default: false },
         false,
       ),
@@ -1082,8 +1082,8 @@ export const apiOperations: readonly ApiOperation[] = [
         'query',
         false,
         'integer',
-        'Numeric GitHub Actions run ID. Non-numeric values are ignored.',
-        'GitHub Actions 数字运行 ID。非数字值会被忽略。',
+        'Positive integer GitHub Actions run ID. Other values yield 400.',
+        'GitHub Actions 运行 ID，须为正整数。其他取值返回 400。',
         positiveIdSchema,
         123456789,
       ),
@@ -1092,8 +1092,8 @@ export const apiOperations: readonly ApiOperation[] = [
         'query',
         false,
         'boolean',
-        'With a numeric runId, return that run’s logical snapshot. Append-only runs include predecessors whose shared topologies keep the same image.',
-        '与数字 runId 一起使用时，返回该次运行对应的逻辑快照；append-only 运行的快照还会包含此前运行的数据，前提是两者共有的拓扑使用同一镜像。',
+        'With a numeric runId, return that run’s logical snapshot. Append-only runs include predecessors whose shared topologies keep the same image. Only true and false are accepted, and true requires runId.',
+        '与数字 runId 一起使用时，返回该次运行对应的逻辑快照；append-only 运行的快照还会包含此前运行的数据，前提是两者共有的拓扑使用同一镜像。仅接受 true 或 false，且为 true 时必须提供 runId。',
         { type: 'boolean', default: false },
         false,
       ),
@@ -1102,8 +1102,8 @@ export const apiOperations: readonly ApiOperation[] = [
         'query',
         false,
         'enum',
-        'calculator trims each row to the page-owned metric allowlist the throughput calculator consumes and removes workers; measured power metrics are excluded from this view. Requires sequence. Omit for every stored metric, including measured power.',
-        'calculator 会将每行裁剪为吞吐量计算器所需的页面专用指标允许列表并移除 workers；此视图不包含实测功率指标。需要同时提供 sequence。省略则返回全部已存储指标，包括实测功率。',
+        'calculator trims each row to the page-owned metric allowlist the throughput calculator consumes and removes workers; measured power metrics are excluded from this view. Requires sequence. Omit for every stored metric, including measured power. Other values yield 400 Unknown view.',
+        'calculator 会将每行裁剪为吞吐量计算器所需的页面专用指标允许列表并移除 workers；此视图不包含实测功率指标。需要同时提供 sequence。省略则返回全部已存储指标，包括实测功率。其他取值返回 400 Unknown view。',
         { type: 'string', enum: ['calculator'] },
         'calculator',
       ),
@@ -1137,8 +1137,8 @@ export const apiOperations: readonly ApiOperation[] = [
       ),
       errorResponse(
         '400',
-        'The model is missing or unsupported, the calculator sequence is unknown, a supplied powerValid value is not strictV2, or powerValid=strictV2 is combined with view=calculator.',
-        '模型缺失或不受支持、计算器序列未知、提供的 powerValid 取值不是 strictV2，或 powerValid=strictV2 与 view=calculator 组合使用。',
+        'A query parameter is malformed, so nothing is read from the database: the model is missing or unsupported, date is not a YYYY-MM-DD calendar date, exact or exactRun is not true or false, runId is not a positive integer, exactRun=true has no runId, view is not calculator, the calculator sequence is unknown, a supplied powerValid value is not strictV2, or powerValid=strictV2 is combined with view=calculator. Unknown parameters are ignored.',
+        '查询参数格式错误，请求不会读取数据库：模型缺失或不受支持、date 不是 YYYY-MM-DD 格式的有效日期、exact 或 exactRun 不是 true 或 false、runId 不是正整数、exactRun=true 但未提供 runId、view 不是 calculator、计算器序列未知、提供的 powerValid 取值不是 strictV2，或 powerValid=strictV2 与 view=calculator 组合使用。未知参数会被忽略。',
         PUBLIC_API_ERRORS.unknownModel,
       ),
       errorResponse(
@@ -1416,7 +1416,11 @@ export const apiOperations: readonly ApiOperation[] = [
         'CSV workload list',
         'Comma-separated <isl>x<osl> token pairs.',
         '以逗号分隔的 <isl>x<osl> token 组合。',
-        { type: 'string', default: '1024x1024,8192x1024', pattern: '^\\d+x\\d+(,\\d+x\\d+)*$' },
+        {
+          type: 'string',
+          default: '1024x1024,8192x1024',
+          pattern: String.raw`^\d+x\d+(,\d+x\d+)*$`,
+        },
         '1024x1024,8192x1024',
       ),
       parameter(
@@ -3287,8 +3291,8 @@ const overview = {
       id: 'cache',
       title: text('Caching', '缓存'),
       description: text(
-        'Read endpoints may be served from shared caches. JSON is brotli- or gzip-compressed when Accept-Encoding allows it and uncompressed otherwise, with Vary: Accept-Encoding. Most database-backed JSON responses carry a strong ETag; send it in If-None-Match to receive an empty 304 while the data is unchanged. Browsers may reuse those responses for 60 seconds. Right after a data ingest, a cache may serve the previous response once while it refreshes. CollectiveX responses stay cached until a results upload purges them, and framework releases use a one-hour shared cache.',
-        '只读端点可能由共享缓存提供。若 Accept-Encoding 允许，JSON 以 brotli 或 gzip 压缩，否则不压缩，并附带 Vary: Accept-Encoding。大多数基于数据库的 JSON 响应带有强 ETag；在 If-None-Match 中回传该值，数据未变化时将收到无响应体的 304。浏览器最多可复用这些响应 60 秒。新数据导入后，缓存刷新期间可能再返回一次旧响应。CollectiveX 响应会一直缓存，直到结果上传时被清除；框架版本使用一小时共享缓存。',
+        'Read endpoints may be served from shared caches. JSON is brotli- or gzip-compressed when Accept-Encoding allows it and uncompressed otherwise, with Vary: Accept-Encoding. /api/v1/benchmarks is the exception: the shared cache compresses it, so its ETag and Vary headers come from that cache. Most database-backed JSON responses carry a strong ETag; send it in If-None-Match to receive an empty 304 while the data is unchanged. Browsers may reuse those responses for 60 seconds. Right after a data ingest, a cache may serve the previous response once while it refreshes. CollectiveX responses stay cached until a results upload purges them, and framework releases use a one-hour shared cache.',
+        '只读端点可能由共享缓存提供。若 Accept-Encoding 允许，JSON 以 brotli 或 gzip 压缩，否则不压缩，并附带 Vary: Accept-Encoding。/api/v1/benchmarks 例外：由共享缓存负责压缩，因此其 ETag 和 Vary 头由该缓存决定。大多数基于数据库的 JSON 响应带有强 ETag；在 If-None-Match 中回传该值，数据未变化时将收到无响应体的 304。浏览器最多可复用这些响应 60 秒。新数据导入后，缓存刷新期间可能再返回一次旧响应。CollectiveX 响应会一直缓存，直到结果上传时被清除；框架版本使用一小时共享缓存。',
       ),
     },
     {

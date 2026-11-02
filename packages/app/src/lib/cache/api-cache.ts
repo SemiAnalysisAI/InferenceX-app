@@ -417,22 +417,38 @@ function compressedBody(bytes: Uint8Array, encoding: 'br' | 'gzip'): ReadableStr
 }
 
 /**
+ * Who compresses a cachedJson body.
+ *
+ * - `origin` (default): the function negotiates br, gzip or identity and sends
+ *   `Vary: Accept-Encoding`. The Vercel CDN keys that Vary on the raw header
+ *   string, so `gzip, deflate`, `deflate, gzip` and `gzip, deflate, br, zstd`
+ *   each get their own cache entry and their own origin miss.
+ * - `cdn`: the function always sends plain JSON without Vary, so each URL has
+ *   one CDN entry, which the CDN compresses for each client as it serves it.
+ */
+export type JsonCompression = 'origin' | 'cdn';
+
+/**
  * CDN-cached streamed JSON response — supports up to 20 MB on Vercel CDN.
- * The body is brotli, gzip, or identity per the request's Accept-Encoding,
- * with `Vary: Accept-Encoding` and a strong ETag; a matching If-None-Match
- * gets a bodiless 304.
+ * With `compression: 'origin'` (default) the body is brotli, gzip, or identity
+ * per the request's Accept-Encoding, with `Vary: Accept-Encoding`. With `'cdn'`
+ * it is always identity. Either way it carries a strong ETag, and a matching
+ * If-None-Match gets a bodiless 304.
  */
 export function cachedJson<T>(
   request: Request,
   data: T,
-  options?: { tag?: string; cacheControl?: string },
+  options?: { tag?: string; cacheControl?: string; compression?: JsonCompression },
 ): Response {
   const bytes = new TextEncoder().encode(JSON.stringify(data));
-  const encoding = negotiateEncoding(request.headers.get('Accept-Encoding'));
+  const originCompression = options?.compression !== 'cdn';
+  const encoding = originCompression
+    ? negotiateEncoding(request.headers.get('Accept-Encoding'))
+    : 'identity';
   const etag = entityTag(bytes, encoding);
   const cacheHeaders = {
     ETag: etag,
-    Vary: 'Accept-Encoding',
+    ...(originCompression ? { Vary: 'Accept-Encoding' } : {}),
     ...cdnHeaders(options?.tag, options?.cacheControl),
   };
   if (matchesIfNoneMatch(request.headers.get('If-None-Match'), etag)) {

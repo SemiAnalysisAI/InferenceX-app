@@ -441,6 +441,38 @@ describe('cachedJson', () => {
     expect(JSON.parse(await bodyText(res))).toEqual(data);
   });
 
+  it.each(['gzip, deflate, br, zstd', 'deflate, gzip', 'br', undefined])(
+    'leaves compression to the CDN with one variant for Accept-Encoding %j',
+    async (acceptEncoding) => {
+      const data = { label: '基准测试', rows: [1, 2, 3] };
+      const res = cachedJson(
+        apiRequest(acceptEncoding === undefined ? {} : { 'Accept-Encoding': acceptEncoding }),
+        data,
+        { compression: 'cdn' },
+      );
+      expect(res.status).toBe(200);
+      expect(res.headers.get('Content-Encoding')).toBeNull();
+      expect(res.headers.get('Vary')).toBeNull();
+      expect(res.headers.get('ETag')).toBe(
+        cachedJson(apiRequest(), data, { compression: 'cdn' }).headers.get('ETag'),
+      );
+      expect(res.headers.get('Cache-Control')).toBe(
+        'public, max-age=60, s-maxage=86400, stale-while-revalidate=86400',
+      );
+      expect(JSON.parse(await bodyText(res))).toEqual(data);
+    },
+  );
+
+  it('answers If-None-Match without Vary when the CDN compresses', () => {
+    const data = { rows: [1] };
+    const etag = cachedJson(apiRequest(), data, { compression: 'cdn' }).headers.get('ETag')!;
+    const res = cachedJson(apiRequest({ 'Accept-Encoding': 'br', 'If-None-Match': etag }), data, {
+      compression: 'cdn',
+    });
+    expect(res.status).toBe(304);
+    expect(res.headers.get('Vary')).toBeNull();
+  });
+
   it('streams large payloads across multiple chunks', async () => {
     const res = cachedJson(apiRequest(), { big: 'x'.repeat(200_000) });
     const reader = res.body!.getReader();
