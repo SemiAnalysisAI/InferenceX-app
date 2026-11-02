@@ -214,6 +214,7 @@ describe('Agentic point request metric time series', () => {
             },
           ],
           truncated: false,
+          incomplete: true,
         },
       });
     }).as('serverLogSearch');
@@ -263,6 +264,10 @@ describe('Agentic point request metric time series', () => {
       .and('contain.text', 'results/router.log')
       .and('contain.text', 'character 70,028')
       .and('contain.text', 'INFO router ready for requests');
+    cy.get('[data-testid="server-log-search-incomplete"]').should(
+      'contain.text',
+      'Search stopped after the first 64 million characters',
+    );
 
     cy.get('[data-testid="go-to-server-log-match"]').click();
     cy.wait('@serverLogJumpChunk').then(({ request }) => {

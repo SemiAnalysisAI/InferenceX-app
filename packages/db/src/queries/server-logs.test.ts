@@ -2,16 +2,29 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { DbClient } from '../connection.js';
 import {
-  escapePostgresRegexLiteral,
+  getBoundedServerLog,
   getServerLogAvailability,
   getServerLogChunk,
   getServerLogFileNames,
   searchServerLogs,
+  ServerLogSearchTimeoutError,
 } from './server-logs.js';
 
 function mockSql(rows: unknown[]) {
   const sql = vi.fn(() => Promise.resolve(rows)) as unknown as DbClient;
   return { sql, call: sql as unknown as ReturnType<typeof vi.fn> };
+}
+
+function noMatchRow(charCount: number, hasMore: boolean) {
+  return {
+    file_name: 'results/router.log',
+    match_position: 0,
+    before_text: '',
+    match_text: '',
+    after_text: '',
+    char_count: charCount,
+    has_more: hasMore,
+  };
 }
 
 describe('getServerLogChunk', () => {
@@ -88,12 +101,6 @@ describe('getServerLogFileNames', () => {
 });
 
 describe('searchServerLogs', () => {
-  it('escapes regex syntax so searches remain literal', () => {
-    expect(escapePostgresRegexLiteral('error[42] + retry?')).toBe(
-      String.raw`error\[42\] \+ retry\?`,
-    );
-  });
-
   it('maps bounded matches across files and reports truncation', async () => {
     const call = vi
       .fn()
@@ -133,8 +140,12 @@ describe('searchServerLogs', () => {
         },
       ],
       truncated: true,
+      incomplete: false,
     });
-    expect(call.mock.calls[1]?.[0].join('')).toContain('regexp_instr(chunk_text');
+    expect(call.mock.calls[1]?.[0].join('')).toContain('strpos(lower(chunk_text), lower(');
+    expect(call.mock.calls[1]?.[0].join('')).not.toContain('regexp_instr');
+    // The search term is a bound parameter, never a regex pattern.
+    expect(call.mock.calls[1]?.slice(1)).toContain('ready');
     expect(call.mock.calls[1]?.[0].join('')).toContain('substring(sl.server_log');
   });
 
@@ -157,6 +168,7 @@ describe('searchServerLogs', () => {
     await expect(searchServerLogs(sql, 42, 'missing', 50)).resolves.toEqual({
       matches: [],
       truncated: false,
+      incomplete: false,
     });
   });
 
@@ -200,7 +212,83 @@ describe('searchServerLogs', () => {
         },
       ],
       truncated: false,
+      incomplete: false,
     });
+  });
+
+  it('stops at the scan budget and reports the search as incomplete', async () => {
+    const call = vi
+      .fn()
+      .mockResolvedValueOnce([{ file_name: 'results/router.log' }, { file_name: 'b.log' }])
+      .mockResolvedValue([noMatchRow(100, true)]);
+    const sql = call as unknown as DbClient;
+
+    await expect(
+      searchServerLogs(sql, 42, 'x', 50, { maxScannedCharacters: 250 }),
+    ).resolves.toEqual({ matches: [], truncated: false, incomplete: true });
+    // One filename query plus slices at offsets 0, 100 and 200; the 300 slice is never read.
+    expect(call).toHaveBeenCalledTimes(4);
+  });
+
+  it('counts earlier files against the scan budget', async () => {
+    const call = vi
+      .fn()
+      .mockResolvedValueOnce([{ file_name: 'a.log' }, { file_name: 'b.log' }])
+      .mockResolvedValueOnce([noMatchRow(300, false)]);
+    const sql = call as unknown as DbClient;
+
+    await expect(
+      searchServerLogs(sql, 42, 'x', 50, { maxScannedCharacters: 300 }),
+    ).resolves.toEqual({ matches: [], truncated: false, incomplete: true });
+    expect(call).toHaveBeenCalledTimes(2);
+  });
+
+  it('throws a timeout error once the wall-clock budget is spent', async () => {
+    let clock = 0;
+    const call = vi
+      .fn()
+      .mockResolvedValueOnce([{ file_name: 'results/router.log' }])
+      .mockImplementation(() => {
+        clock += 10;
+        return Promise.resolve([noMatchRow(100, true)]);
+      });
+    const sql = call as unknown as DbClient;
+
+    await expect(
+      searchServerLogs(sql, 42, 'x', 50, { deadlineMs: 25, now: () => clock }),
+    ).rejects.toBeInstanceOf(ServerLogSearchTimeoutError);
+    expect(call).toHaveBeenCalledTimes(4);
+  });
+});
+
+describe('getBoundedServerLog', () => {
+  it('returns the text when the file fits within the byte cap', async () => {
+    const { sql, call } = mockSql([
+      { file_name: 'results/server.log', bytes: '5', log_text: 'hello' },
+    ]);
+    await expect(getBoundedServerLog(sql, 42, 16)).resolves.toEqual({
+      fileName: 'results/server.log',
+      bytes: 5,
+      serverLog: 'hello',
+    });
+    const query = call.mock.calls[0]?.[0].join('');
+    expect(query).toContain('octet_length(sl.server_log)');
+    expect(query).toContain('case when bytes <= ::bigint then log_text end');
+    expect(call.mock.calls[0]?.slice(1)).toContain(16);
+  });
+
+  it('reports the size without the text when the file is over the cap', async () => {
+    const { sql } = mockSql([{ file_name: 'router.log', bytes: 951652286, log_text: null }]);
+    await expect(getBoundedServerLog(sql, 42, 0, 'router.log')).resolves.toEqual({
+      fileName: 'router.log',
+      bytes: 951652286,
+      serverLog: null,
+    });
+  });
+
+  it('returns null when the benchmark has no linked log', async () => {
+    const { sql } = mockSql([]);
+    await expect(getBoundedServerLog(sql, 42, 16)).resolves.toBeNull();
   });
 });
 

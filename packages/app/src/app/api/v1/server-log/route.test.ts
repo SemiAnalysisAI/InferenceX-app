@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-const { mockGetServerLog, mockGetServerLogChunk, mockGetDb } = vi.hoisted(() => ({
-  mockGetServerLog: vi.fn(),
+const { mockGetBoundedServerLog, mockGetServerLogChunk, mockGetDb } = vi.hoisted(() => ({
+  mockGetBoundedServerLog: vi.fn(),
   mockGetServerLogChunk: vi.fn(),
   mockGetDb: vi.fn(() => 'mock-sql'),
 }));
@@ -12,14 +12,42 @@ vi.mock('@semianalysisai/inferencex-db/connection', () => ({
 }));
 
 vi.mock('@semianalysisai/inferencex-db/queries/server-logs', () => ({
-  getServerLog: mockGetServerLog,
+  getBoundedServerLog: mockGetBoundedServerLog,
   getServerLogChunk: mockGetServerLogChunk,
 }));
 
 vi.mock('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: any[]) => any) => fn,
-  cachedJson: (_request: Request, data: unknown) => Response.json(data),
+  cachedJson: (
+    _request: Request,
+    data: unknown,
+    options?: { cacheControl?: string; tag?: string },
+  ) =>
+    Response.json(data, {
+      headers: {
+        'Cache-Control': options?.cacheControl ?? 'default',
+        'Vercel-Cache-Tag': options?.tag ?? 'db-cdn',
+      },
+    }),
+  cdnHeaders: (tag: string, cacheControl: string) => ({
+    'Cache-Control': cacheControl,
+    'Vercel-Cache-Tag': tag,
+    'X-Content-Type-Options': 'nosniff',
+  }),
+  serverLogCacheTag: () => 'db-log',
+  SERVER_LOG_CACHE_CONTROL: 'public, max-age=3600, s-maxage=31536000, stale-while-revalidate=86400',
 }));
+
+const LOG_CACHE = 'public, max-age=3600, s-maxage=31536000, stale-while-revalidate=86400';
+const MiB = 1024 * 1024;
+
+function bounded(
+  serverLog: string | null,
+  bytes = serverLog?.length ?? 0,
+  fileName = 'server.log',
+) {
+  return { fileName, bytes, serverLog };
+}
 
 import { GET } from './route';
 import { NextRequest } from 'next/server';
@@ -55,7 +83,7 @@ describe('GET /api/v1/server-log', () => {
   });
 
   it('returns 404 when server log not found', async () => {
-    mockGetServerLog.mockResolvedValueOnce(null);
+    mockGetBoundedServerLog.mockResolvedValueOnce(null);
 
     const res = await GET(req('/api/v1/server-log?id=999'));
     expect(res.status).toBe(404);
@@ -65,13 +93,29 @@ describe('GET /api/v1/server-log', () => {
 
   it('returns server log for valid id', async () => {
     const mockLog = 'Server started on port 8080\nModel loaded successfully';
-    mockGetServerLog.mockResolvedValueOnce(mockLog);
+    mockGetBoundedServerLog.mockResolvedValueOnce(bounded(mockLog));
 
     const res = await GET(req('/api/v1/server-log?id=42'));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual({ id: 42, serverLog: mockLog });
-    expect(mockGetServerLog).toHaveBeenCalledWith('mock-sql', 42);
+    expect(mockGetBoundedServerLog).toHaveBeenCalledWith('mock-sql', 42, 16 * MiB, undefined);
+    expect(res.headers.get('cache-control')).toBe(LOG_CACHE);
+    expect(res.headers.get('vercel-cache-tag')).toBe('db-log');
+  });
+
+  it('returns a cacheable 413 instead of reading a file over 16 MiB whole', async () => {
+    mockGetBoundedServerLog.mockResolvedValueOnce(bounded(null, 951_652_286));
+
+    const res = await GET(req('/api/v1/server-log?id=42'));
+    expect(res.status).toBe(413);
+    await expect(res.json()).resolves.toMatchObject({
+      bytes: 951_652_286,
+      maxBytes: 16 * MiB,
+      error: expect.stringContaining('offset and limit'),
+    });
+    expect(res.headers.get('cache-control')).toBe(LOG_CACHE);
+    expect(mockGetServerLogChunk).not.toHaveBeenCalled();
   });
 
   it('returns a bounded chunk when offset or limit is provided', async () => {
@@ -100,7 +144,9 @@ describe('GET /api/v1/server-log', () => {
       1024,
       'results/router.log',
     );
-    expect(mockGetServerLog).not.toHaveBeenCalled();
+    expect(mockGetBoundedServerLog).not.toHaveBeenCalled();
+    expect(res.headers.get('cache-control')).toBe(LOG_CACHE);
+    expect(res.headers.get('vercel-cache-tag')).toBe('db-log');
   });
 
   it('uses bounded defaults when only one chunk parameter is provided', async () => {
@@ -116,20 +162,10 @@ describe('GET /api/v1/server-log', () => {
     expect(mockGetServerLogChunk).toHaveBeenCalledWith('mock-sql', 42, 0, 64 * 1024, undefined);
   });
 
-  it('streams the complete selected file as a download attachment', async () => {
-    mockGetServerLogChunk
-      .mockResolvedValueOnce({
-        fileName: 'nested/router log.out',
-        serverLog: 'INFO',
-        offset: 0,
-        nextOffset: 4,
-      })
-      .mockResolvedValueOnce({
-        fileName: 'nested/router log.out',
-        serverLog: ' ready\n',
-        offset: 4,
-        nextOffset: null,
-      });
+  it('serves a small download from the single sizing query', async () => {
+    mockGetBoundedServerLog.mockResolvedValueOnce(
+      bounded('INFO ready\n', 11, 'nested/router log.out'),
+    );
 
     const res = await GET(
       req('/api/v1/server-log?id=42&file=nested%2Frouter%20log.out&download=1'),
@@ -140,24 +176,57 @@ describe('GET /api/v1/server-log', () => {
     expect(res.headers.get('content-disposition')).toContain(
       'attachment; filename="router log.out"',
     );
+    expect(res.headers.get('cache-control')).toBe(LOG_CACHE);
+    expect(res.headers.get('vercel-cache-tag')).toBe('db-log');
     await expect(res.text()).resolves.toBe('INFO ready\n');
-    expect(mockGetServerLogChunk).toHaveBeenNthCalledWith(
-      1,
+    expect(mockGetBoundedServerLog).toHaveBeenCalledWith(
       'mock-sql',
       42,
-      0,
-      256 * 1024,
+      8 * MiB,
       'nested/router log.out',
     );
-    expect(mockGetServerLogChunk).toHaveBeenNthCalledWith(
-      2,
-      'mock-sql',
-      42,
-      4,
-      256 * 1024,
-      'nested/router log.out',
-    );
-    expect(mockGetServerLog).not.toHaveBeenCalled();
+    expect(mockGetServerLogChunk).not.toHaveBeenCalled();
+  });
+
+  it('streams a large download as a sequence of bounded 8 Mi-character reads', async () => {
+    mockGetBoundedServerLog.mockResolvedValueOnce(bounded(null, 20 * MiB, 'results/server.log'));
+    mockGetServerLogChunk
+      .mockResolvedValueOnce({
+        fileName: 'results/server.log',
+        serverLog: 'INFO',
+        offset: 0,
+        nextOffset: 4,
+      })
+      .mockResolvedValueOnce({
+        fileName: 'results/server.log',
+        serverLog: ' ready\n',
+        offset: 4,
+        nextOffset: null,
+      });
+
+    const res = await GET(req('/api/v1/server-log?id=42&download=1'));
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-disposition')).toContain('filename="server.log"');
+    await expect(res.text()).resolves.toBe('INFO ready\n');
+    expect(mockGetServerLogChunk).toHaveBeenNthCalledWith(1, 'mock-sql', 42, 0, 8 * MiB, undefined);
+    expect(mockGetServerLogChunk).toHaveBeenNthCalledWith(2, 'mock-sql', 42, 4, 8 * MiB, undefined);
+  });
+
+  it('refuses to stream a download over 512 MiB', async () => {
+    mockGetBoundedServerLog.mockResolvedValueOnce(bounded(null, 951_652_286));
+
+    const res = await GET(req('/api/v1/server-log?id=42&download=1'));
+
+    expect(res.status).toBe(413);
+    await expect(res.json()).resolves.toMatchObject({ maxBytes: 512 * MiB });
+    expect(mockGetServerLogChunk).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 for a download with no linked log', async () => {
+    mockGetBoundedServerLog.mockResolvedValueOnce(null);
+    const res = await GET(req('/api/v1/server-log?id=42&download=1'));
+    expect(res.status).toBe(404);
   });
 
   it.each(['download=0', 'download=yes', 'download=1&offset=0', 'download=1&limit=1'])(
@@ -185,18 +254,18 @@ describe('GET /api/v1/server-log', () => {
   it('returns 400 for an empty filename', async () => {
     const res = await GET(req('/api/v1/server-log?id=42&file='));
     expect(res.status).toBe(400);
-    expect(mockGetServerLog).not.toHaveBeenCalled();
+    expect(mockGetBoundedServerLog).not.toHaveBeenCalled();
   });
 
   it('returns a complete named log for compatibility clients', async () => {
-    mockGetServerLog.mockResolvedValueOnce('router output');
+    mockGetBoundedServerLog.mockResolvedValueOnce(bounded('router output', 13, 'router.log'));
     const res = await GET(req('/api/v1/server-log?id=42&file=router.log'));
     await expect(res.json()).resolves.toEqual({
       id: 42,
       fileName: 'router.log',
       serverLog: 'router output',
     });
-    expect(mockGetServerLog).toHaveBeenCalledWith('mock-sql', 42, 'router.log');
+    expect(mockGetBoundedServerLog).toHaveBeenCalledWith('mock-sql', 42, 16 * MiB, 'router.log');
   });
 
   it('returns 404 when a requested chunk has no linked log', async () => {
@@ -206,7 +275,7 @@ describe('GET /api/v1/server-log', () => {
   });
 
   it('returns 500 when query throws', async () => {
-    mockGetServerLog.mockRejectedValueOnce(new Error('Connection reset'));
+    mockGetBoundedServerLog.mockRejectedValueOnce(new Error('Connection reset'));
 
     const res = await GET(req('/api/v1/server-log?id=42'));
     expect(res.status).toBe(500);
@@ -215,10 +284,15 @@ describe('GET /api/v1/server-log', () => {
   });
 
   it('handles large numeric id', async () => {
-    mockGetServerLog.mockResolvedValueOnce('log data');
+    mockGetBoundedServerLog.mockResolvedValueOnce(bounded('log data'));
 
     const res = await GET(req('/api/v1/server-log?id=1234567890'));
     expect(res.status).toBe(200);
-    expect(mockGetServerLog).toHaveBeenCalledWith('mock-sql', 1234567890);
+    expect(mockGetBoundedServerLog).toHaveBeenCalledWith(
+      'mock-sql',
+      1234567890,
+      16 * MiB,
+      undefined,
+    );
   });
 });
