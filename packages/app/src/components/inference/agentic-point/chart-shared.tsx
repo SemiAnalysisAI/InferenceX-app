@@ -47,8 +47,19 @@ export function ChartEmpty({ height = 260, message }: { height?: number; message
   );
 }
 
-export function ChartSkeleton() {
-  return <div className="h-[260px] rounded-md bg-muted/30 animate-pulse" />;
+/**
+ * Loading placeholder with the chart's own aspect ratio. Charts scale their viewBox to the
+ * card width, so a fixed pixel height would shift the cards below once the chart draws.
+ */
+export function ChartSkeleton({ size = 'inline' }: { size?: keyof typeof CHART_SIZES }) {
+  const { width, height } = CHART_SIZES[size];
+  return (
+    <div
+      data-testid="agentic-chart-skeleton"
+      className="w-full rounded-md bg-muted/30 animate-pulse"
+      style={{ aspectRatio: `${width} / ${height}` }}
+    />
+  );
 }
 
 export type LegendSwatch = 'line' | 'dashed-line' | 'area';
