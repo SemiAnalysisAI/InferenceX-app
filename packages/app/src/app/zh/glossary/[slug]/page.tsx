@@ -12,6 +12,7 @@ import {
   getRelatedZhGlossaryEntries,
   getZhGlossaryEntry,
 } from '@/lib/content/glossary-zh';
+import { glossaryMetaTitle } from '@/lib/content/glossary-title';
 import { ZH_LANG_TAG, zhAlternates } from '@/lib/i18n/i18n';
 import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 import { clampMetaDescription } from '@/lib/seo/meta-text';
@@ -33,7 +34,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const entry = getZhGlossaryEntry(slug);
   if (!entry) return {};
 
-  const title = `什么是 ${entry.term}？`;
+  const title = glossaryMetaTitle(entry, 'zh');
   const description = clampMetaDescription(entry.definition, 'zh');
   const url = `${SITE_URL}/zh/glossary/${entry.slug}`;
   const keywords = [
