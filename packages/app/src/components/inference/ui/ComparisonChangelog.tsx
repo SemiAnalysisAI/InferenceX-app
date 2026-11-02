@@ -29,6 +29,7 @@ const COMPARISON_CHANGELOG_STRINGS = {
       `Config Changelog (${count} date${count === 1 ? '' : 's'} with changes)`,
     loading: 'Config Changelog (loading...)',
     deferred: 'Config Changelog',
+    loadingBody: 'Loading changelog…',
     emptyLabel: (count: number) =>
       `Config Changelog (${count} date${count === 1 ? '' : 's'} queried — no matching changelog data)`,
     addAll: 'Add all to chart',
@@ -49,6 +50,7 @@ const COMPARISON_CHANGELOG_STRINGS = {
     label: (count: number) => `配置变更日志（${count} 个日期有变更）`,
     loading: '配置变更日志（加载中……）',
     deferred: '配置变更日志',
+    loadingBody: '正在加载变更日志……',
     emptyLabel: (count: number) => `配置变更日志（已查询 ${count} 个日期，无匹配数据）`,
     addAll: '全部添加到图表',
     empty:
@@ -332,7 +334,9 @@ export default function ComparisonChangelog({
       >
         <div className="px-4 pt-2 pb-4 flex flex-col gap-3">
           {filteredChangelogs.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t.empty}</p>
+            <p className="text-sm text-muted-foreground">
+              {loading || deferred ? t.loadingBody : t.empty}
+            </p>
           ) : (
             filteredChangelogs.map((item) => {
               const runs = runMetaFor(item);
