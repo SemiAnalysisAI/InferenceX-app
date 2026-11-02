@@ -19,7 +19,11 @@ import { formatSwapBytes, swapChartPoints, swapRooflines, type SwapChartPoint } 
 
 const STRINGS = {
   en: {
-    heading: 'vLLM swap_blocks',
+    heading: (
+      <>
+        vLLM <code className="font-mono">swap_blocks</code>
+      </>
+    ),
     metric: 'Swap-block metric',
     direction: 'Swap-block direction',
     layout: 'Swap-block layout',
@@ -47,7 +51,11 @@ const STRINGS = {
       'Shift+Scroll to zoom · Drag to pan · Double-click to reset · Click a point to pin tooltip',
   },
   zh: {
-    heading: 'vLLM swap_blocks',
+    heading: (
+      <>
+        vLLM <code className="font-mono">swap_blocks</code>
+      </>
+    ),
     metric: '块交换指标',
     direction: '块交换方向',
     layout: '块交换布局',

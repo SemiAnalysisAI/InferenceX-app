@@ -104,8 +104,12 @@ const STRINGS = {
     unavailable: 'CollectiveX run unavailable',
     loadError: 'The CollectiveX dataset failed to load.',
     retry: 'Retry',
-    description:
-      'Compare EP communication, KV-cache transfer, and vLLM swap_blocks latency and payload bandwidth.',
+    description: (
+      <>
+        Compare EP communication, KV-cache transfer, and vLLM{' '}
+        <code className="font-mono">swap_blocks</code> latency and payload bandwidth.
+      </>
+    ),
     source: 'Source',
     methodology: 'Methodology',
     refresh: 'Refresh',
@@ -185,7 +189,12 @@ const STRINGS = {
     unavailable: 'CollectiveX 运行暂不可用',
     loadError: 'CollectiveX 数据集加载失败。',
     retry: '重试',
-    description: '对比 EP 通信、KV 缓存传输及 vLLM swap_blocks 的延迟与有效载荷带宽。',
+    description: (
+      <>
+        对比 EP 通信、KV 缓存传输及 vLLM <code className="font-mono">swap_blocks</code>{' '}
+        的延迟与有效载荷带宽。
+      </>
+    ),
     source: '源代码',
     methodology: '测试方法',
     refresh: '刷新',
@@ -607,7 +616,8 @@ export default function CollectiveXDisplay() {
       ? [{ value: 'ep' as const, label: 'EP' }]
       : []),
     ...(hasKv ? [{ value: 'kv' as const, label: 'KV' }] : []),
-    ...(hasSwap ? [{ value: 'swap' as const, label: 'swap_blocks' }] : []),
+    // swap_blocks is a vLLM function name, so it reads as code.
+    ...(hasSwap ? [{ value: 'swap' as const, label: 'swap_blocks', className: 'font-mono' }] : []),
   ];
   const shownSuite = suiteOptions.some((option) => option.value === suite)
     ? suite
@@ -621,7 +631,9 @@ export default function CollectiveXDisplay() {
             <Heading as="h1" level="card">
               CollectiveX
             </Heading>
-            <p className="mt-1 text-sm text-muted-foreground">{t.description}</p>
+            <p data-testid="collectivex-description" className="mt-1 text-sm text-muted-foreground">
+              {t.description}
+            </p>
           </div>
           <div className="flex shrink-0 flex-wrap items-end gap-2">
             {datasets.length > 0 && (
