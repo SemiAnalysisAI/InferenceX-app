@@ -128,7 +128,10 @@ describe('GLM-5.3-Flash registration without published observations', () => {
     });
 
     it(`blocks a locked Flash route and saved selection in ${locale || 'en'}`, () => {
-      cy.intercept('GET', '/api/v1/availability*', { body: [] });
+      const kimiAvailability = modelSelectionAvailability
+        .filter((row) => row.model === 'dsv4-pro')
+        .map((row) => ({ ...row, model: 'kimik3' }));
+      cy.intercept('GET', '/api/v1/availability*', { body: kimiAvailability });
       cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
         expect(
           new URL(request.url).searchParams.get('model'),

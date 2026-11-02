@@ -922,7 +922,11 @@ describe('Overview page', () => {
             .should('have.attr', 'aria-label', `Show ${hidden} rows with ${sentence}`)
             .click();
           cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS);
-          cy.get(`a[${attribute}]`).should('contain.text', `Hide ${hidden}`);
+          cy.get(`a[${attribute}]`).should(
+            'have.attr',
+            'aria-label',
+            `Hide ${hidden} rows with ${sentence}`,
+          );
         });
     }
   });
