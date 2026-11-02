@@ -19,7 +19,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 1800,
     power: 3.3,
     costh: 3.61,
-    costr: 8.5,
+    costr: 8.75,
   },
   h100: {
     vendor: 'NVIDIA',
@@ -39,7 +39,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 700,
     power: 1.37,
     costh: 1.22,
-    costr: 2.9,
+    costr: 3.1,
   },
   b200: {
     vendor: 'NVIDIA',
@@ -49,7 +49,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 1000,
     power: 1.71,
     costh: 1.73,
-    costr: 3.7,
+    costr: 4,
   },
   b300: {
     vendor: 'NVIDIA',
@@ -59,7 +59,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 1200,
     power: 1.9,
     costh: 2.26,
-    costr: 4.25,
+    costr: 4.8,
   },
   gb200: {
     vendor: 'NVIDIA',
@@ -69,7 +69,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 1200,
     power: 1.87,
     costh: 1.86,
-    costr: 4,
+    costr: 3.9,
   },
   gb300: {
     vendor: 'NVIDIA',
@@ -79,7 +79,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 1400,
     power: 2.12,
     costh: 2.31,
-    costr: 5,
+    costr: 5.7,
   },
   mi300x: {
     vendor: 'AMD',
@@ -89,7 +89,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 750,
     power: 1.39,
     costh: 0.95,
-    costr: 1.3,
+    costr: 1.63,
   },
   mi325x: {
     vendor: 'AMD',
@@ -99,7 +99,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 1000,
     power: 1.69,
     costh: 1.1,
-    costr: 1.6,
+    costr: 1.63,
   },
   mi355x: {
     vendor: 'AMD',
@@ -109,7 +109,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 1400,
     power: 2.09,
     costh: 1.5,
-    costr: 2.9,
+    costr: 2.93,
   },
   rtx6000pro: {
     vendor: 'NVIDIA',
@@ -119,7 +119,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     tdp: 600,
     power: 0.975,
     costh: 0.68,
-    costr: 0.52,
+    costr: 1.2,
   },
   jalapeno: {
     vendor: 'OpenAI',

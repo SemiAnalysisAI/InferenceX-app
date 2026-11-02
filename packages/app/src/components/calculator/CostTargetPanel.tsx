@@ -341,7 +341,7 @@ export default function CostTargetPanel({
                         className="underline hover:text-foreground"
                         href="https://semianalysis.com/ai-cloud-tco-model/"
                       >
-                        SemiAnalysis Market July 2026 Pricing Surveys & AI Cloud TCO Model
+                        SemiAnalysis Market September 2026 Pricing Surveys & AI Cloud TCO Model
                         <ExternalLinkIcon />
                       </Link>
                     </small>

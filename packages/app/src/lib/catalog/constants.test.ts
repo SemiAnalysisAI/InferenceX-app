@@ -160,7 +160,7 @@ describe('getHardwareConfig', () => {
       tdp: 1800,
       power: 3.3,
       costh: 3.61,
-      costr: 8.5,
+      costr: 8.75,
     });
   });
 
@@ -231,17 +231,17 @@ describe('getHardwareConfig', () => {
     }
   });
 
-  it('uses the July 2026 TCO rates for modeled datacenter GPUs', () => {
+  it('uses the September 2026 TCO rates for modeled datacenter GPUs', () => {
     const expectedRates = {
       h100: [1.17, 2],
-      h200: [1.22, 2.9],
-      b200: [1.73, 3.7],
-      b300: [2.26, 4.25],
-      gb200: [1.86, 4],
-      gb300: [2.31, 5],
-      mi300x: [0.95, 1.3],
-      mi325x: [1.1, 1.6],
-      mi355x: [1.5, 2.9],
+      h200: [1.22, 3.1],
+      b200: [1.73, 4],
+      b300: [2.26, 4.8],
+      gb200: [1.86, 3.9],
+      gb300: [2.31, 5.7],
+      mi300x: [0.95, 1.63],
+      mi325x: [1.1, 1.63],
+      mi355x: [1.5, 2.93],
     } as const;
 
     for (const [gpu, [costh, costr]] of Object.entries(expectedRates)) {
