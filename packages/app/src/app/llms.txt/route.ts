@@ -3,7 +3,7 @@ import { getAllHardwarePages, hardwarePagePath } from '@/lib/hardware/hardware';
 import { getAllChipPages, getAllChipVsPages } from '@/lib/catalog/chip-pages';
 import { getAllRankingPageEntries, rankingPageHeading } from '@/lib/live-seo/rankings';
 import { inferenceModelMeta } from '@/lib/routing/inference-model-meta';
-import { INFERENCE_MODEL_SLUGS } from '@/lib/routing/inference-model-slug';
+import { PUBLIC_INFERENCE_MODEL_SLUGS } from '@/lib/routing/inference-model-slug';
 import { getAllWhitepapers } from '@/lib/content/whitepapers';
 import { AUTHOR_NAME, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
@@ -33,7 +33,7 @@ export async function GET() {
     '',
     `## Model Benchmark Pages`,
     '',
-    ...INFERENCE_MODEL_SLUGS.map(
+    ...PUBLIC_INFERENCE_MODEL_SLUGS.map(
       (entry) =>
         `- [${inferenceModelMeta(entry).title}](${SITE_URL}/inference/${entry.slug}): ${entry.label}`,
     ),

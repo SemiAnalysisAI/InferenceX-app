@@ -11,12 +11,12 @@ export interface OperatorXHardwareReference {
 export const OPERATORX_HARDWARE_REFERENCES: Record<string, OperatorXHardwareReference> = {
   ascend950pr: {
     label: '950PR',
-    peakTflops: { bf16: 378, fp8: null, fp4: null },
-    memoryBandwidthTBs: 1.6,
+    peakTflops: { bf16: 378, fp8: 756, fp4: null },
+    memoryBandwidthTBs: 1.6384,
     memoryBandwidthAssumed: true,
     source:
-      'Ascend-ubench.md, hardware configuration and section 5; Huawei Ascend 950 white paper, table 3-1',
+      'Ascend-ubench.md, hardware configuration and section 5; Huawei Ascend 950 white paper, table 3-1; npu-smi info -t memory on the benchmarked card (HBM Clock Speed 3200 MHz)',
     qualification:
-      '28-Cube Ascend950PR_9579: dense BF16 Cube peak, excluding Vector compute. The 1.6 TB/s bandwidth is the report assumption for the 128 GB configuration; exact memory/ECC configuration is unresolved. Other precision ceilings are not registered here.',
+      '28-Cube Ascend950PR_9579: dense Cube peaks of 378 BF16 and 756 FP8 TFLOPS, excluding Vector compute. Peak memory bandwidth is 1.6384 TB/s: 8 HBM stacks × 256 bits × 6.4 Gbps per pin (npu-smi HBM clock 3200 MHz), which Huawei rounds to 1.6 TB/s. FP4 remains unregistered.',
   },
 };

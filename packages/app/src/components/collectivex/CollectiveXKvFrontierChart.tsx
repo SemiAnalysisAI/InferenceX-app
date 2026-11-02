@@ -32,7 +32,7 @@ interface CollectiveXKvFrontierChartProps {
 
 const STRINGS = {
   en: {
-    noData: 'No measured KV rows match the selected page size and direction.',
+    noData: 'No measured KV rows match the selected direction.',
     instructions:
       'Shift+Scroll to zoom · Drag to pan · Double-click to reset · Click a point to pin tooltip',
     xAxis: (logScale: boolean) => `Sequence length (ISL tokens${logScale ? ', log' : ''})`,
@@ -43,7 +43,7 @@ const STRINGS = {
     backendFrontier: 'backend best at this ISL',
     dominated: 'below the envelope',
     pointContext: (row: CollectiveXKvFrontierPoint['row'], tier: string) =>
-      `${row.op} · page ${row.page_tokens} · batch ${row.batch} · ISL ${row.isl.toLocaleString('en-US')} · <strong>${tier}</strong>`,
+      `${row.op} · batch ${row.batch} · ISL ${row.isl.toLocaleString('en-US')} · <strong>${tier}</strong>`,
     pointMetrics: (point: CollectiveXKvFrontierPoint) => {
       const aggregate = `Aggregate ${point.y.toFixed(point.y >= 100 ? 0 : 2)} GB/s`;
       const req = point.row.request_ms;
@@ -60,7 +60,7 @@ const STRINGS = {
     verify: (passed: boolean) => `verify: ${passed ? 'passed' : 'FAILED'}`,
   },
   zh: {
-    noData: '没有与所选页大小和传输方向匹配的 KV 实测数据。',
+    noData: '没有与所选传输方向匹配的 KV 实测数据。',
     instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
     xAxis: (logScale: boolean) => `序列长度（ISL token${logScale ? '，对数' : ''}）`,
     yAxis: (op: CollectiveXKvFrontierSelection['op'], logScale: boolean) =>
@@ -70,7 +70,7 @@ const STRINGS = {
     backendFrontier: '该 ISL 下后端最优',
     dominated: '低于包络线',
     pointContext: (row: CollectiveXKvFrontierPoint['row'], tier: string) =>
-      `${row.op} · 页大小 ${row.page_tokens} · batch ${row.batch} · ISL ${row.isl.toLocaleString('en-US')} · <strong>${tier}</strong>`,
+      `${row.op} · batch ${row.batch} · ISL ${row.isl.toLocaleString('en-US')} · <strong>${tier}</strong>`,
     pointMetrics: (point: CollectiveXKvFrontierPoint) => {
       const aggregate = `聚合带宽 ${point.y.toFixed(point.y >= 100 ? 0 : 2)} GB/s`;
       const req = point.row.request_ms;

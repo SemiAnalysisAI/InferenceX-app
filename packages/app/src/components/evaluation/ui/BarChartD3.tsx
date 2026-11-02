@@ -637,7 +637,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
         isActive: effectiveOfficialHardware.has(hwKey),
         onClick: () => {
           handleToggleHardware(hwKey);
-          track('evaluation_hw_toggled', { hw: hwKey });
+          track('evaluation_hw_toggled', { gpu: hwKey });
         },
       })),
     ],
@@ -1245,7 +1245,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
           isLegendExpanded={isLegendExpanded}
           onExpandedChange={(expanded) => {
             setIsLegendExpanded(expanded);
-            track('evaluation_legend_expanded', { expanded });
+            track('evaluation_legend_expanded', { enabled: expanded });
           }}
           switches={[
             {

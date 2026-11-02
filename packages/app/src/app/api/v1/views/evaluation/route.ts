@@ -181,7 +181,7 @@ export function GET(request: NextRequest) {
       );
     }
 
-    return cachedJson({
+    return cachedJson(request, {
       view: 'evaluation',
       apiVersion: 'v1',
       params,

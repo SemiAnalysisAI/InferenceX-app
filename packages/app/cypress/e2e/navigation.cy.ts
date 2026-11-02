@@ -82,15 +82,22 @@ describe('Chart Section Tabs — E2E', () => {
     cy.get('[data-testid="gpu-specs-content"]').should('exist');
   });
 
-  it('keeps the sliding indicator aligned after the ↑↑↓↓ unlock inserts the Hidden trigger', () => {
+  it('keeps the sliding indicator aligned after the Konami code unlock inserts the Hidden trigger', () => {
     cy.visit('/inference', {
       onBeforeLoad(win) {
-        win.localStorage.removeItem('inferencex-feature-gate');
+        win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
+        win.localStorage.setItem('inferencex-feature-gate', '1');
       },
     });
     cy.get('[data-testid="tab-trigger-hidden"]').should('not.exist');
     cy.get('[data-testid="chart-section-tabs"] .tab-indicator').should('exist');
     cy.get('body').type('{upArrow}{upArrow}{downArrow}{downArrow}');
+    cy.get('[data-testid="tab-trigger-hidden"]').should('not.exist');
+    cy.get('body').type('{leftArrow}{rightArrow}{leftArrow}{rightArrow}ba');
+    cy.get('[data-testid="tab-trigger-hidden"]').should('not.exist');
+    cy.get('body').type(
+      '{upArrow}{upArrow}{downArrow}{downArrow}{leftArrow}{rightArrow}{leftArrow}{rightArrow}BA',
+    );
     cy.get('[data-testid="tab-trigger-hidden"]').should('be.visible');
     cy.get('[data-testid="chart-section-tabs"] .tab-indicator').should(($indicator) => {
       const active = $indicator
@@ -103,7 +110,38 @@ describe('Chart Section Tabs — E2E', () => {
       expect(Number(match!.groups!.left)).to.be.closeTo(active.offsetLeft, 1);
       expect(indicator.getBoundingClientRect().width).to.be.closeTo(active.offsetWidth, 1);
     });
-    cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate'));
+    cy.reload();
+    cy.get('[data-testid="tab-trigger-hidden"]').should('be.visible');
+    cy.window().then((win) => win.localStorage.removeItem('inferencex-feature-gate-konami-v1'));
+  });
+
+  for (const [path, landing] of [
+    ['/powerx', '/'],
+    ['/zh/powerx', '/zh'],
+    ['/powerx/tutorial', '/'],
+    ['/zh/powerx/tutorial', '/zh'],
+  ] as const) {
+    it(`sends a locked visitor from ${path} to the landing page`, () => {
+      cy.visit(path, {
+        onBeforeLoad(win) {
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+          win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
+          win.localStorage.setItem('inferencex-feature-gate', '1');
+        },
+      });
+      cy.location('pathname').should('eq', landing);
+    });
+  }
+
+  it('keeps PowerX open once the feature gate is unlocked', () => {
+    cy.visit('/powerx', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
+      },
+    });
+    cy.get('[data-testid="inference-chart-display"]').should('exist');
+    cy.location('pathname').should('eq', '/powerx');
   });
 
   it('permanently redirects the retired PowerX page to the inference dashboard', () => {
@@ -124,7 +162,8 @@ describe('First-load navigation', () => {
       onBeforeLoad(win) {
         win.localStorage.removeItem('inferencex-starred');
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        win.localStorage.removeItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed');
+        win.localStorage.removeItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed');
+        win.localStorage.setItem('inferencex-landing-banner-variant', 'ubenchx');
       },
     });
 
@@ -143,7 +182,8 @@ describe('First-load navigation', () => {
 
   it('navigates to dashboard from the header with one click', () => {
     cy.get('[data-testid="nav-link-dashboard"]').click();
-    cy.location('pathname').should('eq', '/inference');
+    cy.location('pathname').should('eq', '/inference/kimi-k3');
+    cy.get('[data-testid="model-selector"]').should('contain.text', 'Kimi K3');
   });
 
   it('navigates to comparisons from the footer with one click', () => {
@@ -163,8 +203,8 @@ describe('First-load navigation', () => {
 
   it('leads the landing page with the AgentX hero and its two CTAs', () => {
     cy.get('[data-testid="compare-agentx-primary"]').within(() => {
-      cy.get('h2').should('have.text', 'Compare Realistic Agentic Inference Perf');
-      cy.get('h1').should('not.exist');
+      cy.get('h1').should('have.text', 'Compare Realistic Agentic Inference Perf');
+      cy.get('h2').should('not.exist');
       cy.get('[data-testid="compare-agentx-revenue-calculator-link"]')
         .should('contain.text', 'Token Revenue Calculator')
         .and('have.attr', 'href', '/profit-estimator-per-gigawatt');
@@ -199,34 +239,104 @@ describe('First-load navigation', () => {
   });
 });
 
-describe('TPUv7 AgentX launch banner', { testIsolation: true }, () => {
+describe('Huawei UBenchX launch banner', { testIsolation: true }, () => {
   for (const locale of ['', '/zh']) {
-    it(`opens Qwen3.5 AgentX results from ${locale || '/'} landing page`, () => {
+    it(`opens Huawei core-memory profiles from ${locale || '/'} landing page`, () => {
       cy.visit(locale || '/', {
         onBeforeLoad(win) {
           win.localStorage.setItem('inferencex-rubin-minimax-m3-banner-dismissed', '1');
-          win.localStorage.removeItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed');
+          win.localStorage.setItem('inferencex-tpuv7-qwen-3-5-agentx-banner-dismissed', '1');
+          win.localStorage.removeItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed');
+          win.localStorage.setItem('inferencex-landing-banner-variant', 'ubenchx');
           win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         },
       });
-      cy.get('[data-testid="launch-banner"]')
-        .should(
-          'have.attr',
-          'href',
-          `${locale}/inference/qwen-3-5?g_model=Qwen-3.5-397B-A17B&i_xmode=interactivity&i_seq=agentic-traces&i_prec=fp8`,
+      cy.get('[data-testid="launch-banner"]:visible')
+        .should('have.attr', 'href', `${locale}/ubenchx/core-memory-profiles`)
+        .and(
+          'contain.text',
+          locale ? 'Huawei Ascend 950PR 微基准测试' : 'Huawei Ascend 950PR Microbenchmarks',
         )
-        .and('contain.text', locale ? 'Google TPUv7 加入 AgentX' : 'Google TPUv7 joins AgentX')
         .and(
           'contain.text',
           locale
-            ? 'TPUv7 Kimi K3 2.8T 初步提交：成绩具有竞争力'
-            : 'TPUv7 Kimi K3 2.8T prelimary Submisison: Competitive Results',
+            ? '周期级核心访存微基准测试（Beta）'
+            : 'Cycle Level Core memory-access MicroBenchmarks (Beta)',
         )
         .click();
-      cy.location('pathname').should('eq', `${locale}/inference/qwen-3-5`);
-      cy.get('[data-testid="inference-chart-display"]').should('be.visible');
+      cy.location('pathname').should('eq', `${locale}/ubenchx/core-memory-profiles`);
+      cy.get('[data-testid="ascend-core-profiles"]').should('be.visible');
     });
   }
+});
+
+describe('OperatorX launch banner A/B arm', { testIsolation: true }, () => {
+  for (const locale of ['', '/zh']) {
+    it(`opens OperatorX from ${locale || '/'} landing page`, () => {
+      cy.visit(locale || '/', {
+        onBeforeLoad(win) {
+          win.localStorage.removeItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed');
+          win.localStorage.setItem('inferencex-landing-banner-variant', 'operatorx');
+          win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        },
+      });
+      cy.get('[data-testid="launch-banner"]:visible')
+        .should('have.length', 1)
+        .and('have.attr', 'href', `${locale}/operatorx`)
+        .and(
+          'contain.text',
+          locale ? 'Huawei Ascend 950PR 微基准测试' : 'Huawei Ascend 950PR Microbenchmarks',
+        )
+        .and(
+          'contain.text',
+          locale
+            ? '950PR GEMM FLOPs 与最大 FLOPS 利用率'
+            : '950PR GEMM FLOPs and Max FLOPS utilization',
+        )
+        .click();
+      cy.location('pathname').should('eq', `${locale}/operatorx`);
+      cy.get('[data-testid="operatorx-page"]').should('be.visible');
+    });
+  }
+
+  it('assigns a sticky arm on first visit and shows only that arm', () => {
+    cy.clearAllLocalStorage();
+    cy.visit('/', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+    cy.get('html')
+      .invoke('attr', 'data-landing-banner-variant')
+      .then((variant) => {
+        expect(variant).to.be.oneOf(['ubenchx', 'operatorx']);
+        cy.window()
+          .its('localStorage')
+          .invoke('getItem', 'inferencex-landing-banner-variant')
+          .should('eq', variant);
+        cy.get('[data-testid="launch-banner"]:visible')
+          .should('have.length', 1)
+          .and(
+            'have.attr',
+            'href',
+            variant === 'operatorx' ? '/operatorx' : '/ubenchx/core-memory-profiles',
+          );
+        cy.reload();
+        cy.get('html').should('have.attr', 'data-landing-banner-variant', variant);
+      });
+  });
+
+  it('shares dismissal across arms', () => {
+    cy.visit('/', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed', '1');
+        win.localStorage.setItem('inferencex-landing-banner-variant', 'operatorx');
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+      },
+    });
+    cy.get('[data-testid="intro-section"]').should('be.visible');
+    cy.get('[data-testid="launch-banner"]').should('not.exist');
+  });
 });
 
 describe('TPUv7 results', { testIsolation: true }, () => {
@@ -428,13 +538,15 @@ describe('H3 video artifact viewer', () => {
     cy.viewport(1440, 1000);
     cy.visit('/video', {
       onBeforeLoad(win) {
-        win.localStorage.removeItem('inferencex-feature-gate');
+        win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
       },
     });
     cy.get('[data-testid="video-ci-runs"]').should('contain', 'No H3 runs in this page');
     cy.get('video[data-role]').should('not.exist');
     cy.get('[data-testid="tab-trigger-hidden"]').should('not.exist');
-    cy.get('body').type('{upArrow}{upArrow}{downArrow}{downArrow}');
+    cy.get('body').type(
+      '{upArrow}{upArrow}{downArrow}{downArrow}{leftArrow}{rightArrow}{leftArrow}{rightArrow}BA',
+    );
     cy.get('[data-testid="tab-trigger-hidden"]').click();
     cy.contains('a', 'Video').should('have.attr', 'href', '/video');
     cy.get('head meta[name="robots"]').should('have.attr', 'content', 'noindex, nofollow');

@@ -18,15 +18,6 @@ import type {
 } from './types';
 import type { XAxisMode } from './hooks/useChartData';
 
-export function selectUnofficialOverlayForMode<T>(
-  xAxisMode: string,
-  chartType: 'e2e' | 'interactivity',
-  overlays: { e2e: T | null; interactivity: T | null },
-): T | null {
-  if (xAxisMode === 'e2e-normalized-interactivity') return null;
-  return overlays[chartType];
-}
-
 export interface ProcessedChartData {
   data: InferenceData[];
   clippedData: ClippedInferenceData[];
@@ -211,16 +202,39 @@ export function processOverlayChartDataWithClipping(
       isAgentic,
     },
   );
+  const tableData = isAllInMeasuredConfigKey(selectedYAxisMetric)
+    ? expandPowerCompareSeries(
+        allInMeasuredTableData(sourceData, metricKey, xAxisField),
+        selectedYAxisMetric,
+        options?.powerCompare ?? 'none',
+      )
+    : undefined;
+  if (
+    !isAgentic ||
+    chartType !== 'e2e' ||
+    options?.selectedXAxisMode !== 'e2e-normalized-interactivity'
+  ) {
+    return { ...partition, ...(tableData ? { tableData } : {}) };
+  }
+
+  // Overlay rows are not persisted, so they carry the run's own normalized value.
+  const normalizedField =
+    selectedPercentile === 'p75' ? 'p75_e2e_norm_intvty' : 'p90_e2e_norm_intvty';
+  const normalizedX = (point: InferenceData): number | undefined => {
+    const x = point[normalizedField];
+    return typeof x === 'number' && Number.isFinite(x) ? x : undefined;
+  };
   return {
-    ...partition,
-    ...(isAllInMeasuredConfigKey(selectedYAxisMetric)
-      ? {
-          tableData: expandPowerCompareSeries(
-            allInMeasuredTableData(sourceData, metricKey, xAxisField),
-            selectedYAxisMetric,
-            options?.powerCompare ?? 'none',
-          ),
-        }
+    data: partition.data.flatMap((point) => {
+      const x = normalizedX(point);
+      return x === undefined ? [] : [{ ...point, x }];
+    }),
+    clippedData: partition.clippedData.flatMap((entry) => {
+      const x = normalizedX(entry.point);
+      return x === undefined ? [] : [{ ...entry, point: { ...entry.point, x } }];
+    }),
+    ...(tableData
+      ? { tableData: tableData.map((point) => ({ ...point, x: normalizedX(point) ?? NaN })) }
       : {}),
   };
 }

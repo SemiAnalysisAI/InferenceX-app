@@ -193,7 +193,7 @@ describe('GPU comparison agentic point detail', () => {
     cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        win.localStorage.removeItem('inferencex-feature-gate');
+        win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
       },
     });
     const checked = '[data-testid="chart-legend"] ul input[type="checkbox"]:checked';
@@ -212,7 +212,7 @@ describe('GPU comparison agentic point detail', () => {
     cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        win.localStorage.removeItem('inferencex-feature-gate');
+        win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
       },
     });
     const checked = '[data-testid="chart-legend"] ul input[type="checkbox"]:checked';
@@ -275,7 +275,7 @@ describe('GPU comparison agentic point detail', () => {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
         win.localStorage.setItem('inferencex-filter-hint-nudge-dismissed', 'true');
-        win.localStorage.removeItem('inferencex-feature-gate');
+        win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
       },
     });
 

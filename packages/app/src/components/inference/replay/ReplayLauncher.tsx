@@ -6,6 +6,7 @@ import { forwardRef, useImperativeHandle, useState } from 'react';
 import type { ChartDefinition } from '@/components/inference/types';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 const REPLAY_PANEL_MIN_HEIGHT = 620;
@@ -29,6 +30,7 @@ export interface ReplayLauncherHandle {
 const ReplayLauncher = forwardRef<ReplayLauncherHandle, ReplayLauncherProps>(
   ({ parentChartId, chartDefinition, yLabel, xLabel }, ref) => {
     const [open, setOpen] = useState(false);
+    useDialogCloseTracking(open, 'inference_replay_closed', { chart: parentChartId });
     const locale = useLocale();
     useImperativeHandle(ref, () => ({ open: () => setOpen(true) }), []);
     return (

@@ -177,6 +177,8 @@ export const VIEW_QUERY_PARAMS = {
     'serviceTarget',
     'roleShare',
     'powerFit',
+    'powerBreakdown',
+    'headroom',
   ],
   'model-architectures': ['model'],
   options: ['format'],
@@ -260,7 +262,7 @@ export const DASHBOARD_API_COVERAGE = {
   inference: {
     view: 'inference',
     exclusion:
-      'The same-SKU vLLM/SGLang confirmation dialog is a local presentation acknowledgement, not an API access restriction. best=true ranks across frameworks; best=false returns both without interactive consent state.',
+      'The same-SKU vLLM/SGLang confirmation dialog is a local presentation acknowledgement, not an API access restriction. best=true ranks across frameworks; best=false returns both without interactive consent state. GPU-count, parallelism, concurrency, line, gradient, and offloading labels are independent presentation settings with no API parameters. Framework Line Label defaults on in Advanced; i_frameworklabel=0 hides framework suffixes in existing line labels, including overlays, history comparisons and exports, without filtering data. Offloading Label hides the footer key and dotted point halos in charts and exports; plotted measurements, offload fields, and benchmark rows remain unchanged. Chart footers omit the optimization note and prefix-cache link; selected ATOM series retain their disclaimer in all PNG layouts. These presentation changes do not alter cache-reuse views or benchmark data.',
   },
   'profit-estimator-per-gigawatt': { view: 'profit-estimator-per-gigawatt' },
   'profit-estimator': { view: 'profit-estimator' },
@@ -277,6 +279,7 @@ export const DASHBOARD_API_COVERAGE = {
     exclusion:
       'Feature-gated Agentic Workload Explorer reads a frozen, anonymized ProxyTrace snapshot from a separate database through page-owned /api/v1/agentic-workload-explorer/* routes whose shapes follow the pages; no stable public read-only view is published.',
   },
+  powerx: { view: 'inference' },
   operatorx: {
     exclusion:
       'Feature-gated OperatorX explorer uses page-owned routes; no stable public read-only view is published.',

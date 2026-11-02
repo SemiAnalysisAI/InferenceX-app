@@ -3,8 +3,10 @@
 import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 import { getMeasuredMetricConfig } from '@/components/inference/measured-metric-config';
 import { track } from '@/lib/analytics/analytics';
+import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
 import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
 import { useEphemeralUrlState } from '@/hooks/useUrlState';
+import { useIsCoarsePointer } from '@/hooks/useMediaQuery';
 import { rememberChartStateInUrl } from '@/lib/routing/url-state';
 import * as d3 from 'd3';
 import { CHART_TYPE } from '@/lib/d3-chart/typography';
@@ -70,7 +72,11 @@ import type {
 } from '@/lib/d3-chart/D3Chart/types';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { raiseInOrder, setAttrIfChanged } from '@/lib/d3-chart/chart-update';
-import { computeTooltipPosition, syncPointShape } from '@/lib/d3-chart/layers/scatter-points';
+import {
+  computeTooltipPosition,
+  syncPointLabel,
+  syncPointShape,
+} from '@/lib/d3-chart/layers/scatter-points';
 import {
   EMPTY_PERF_RULER_STATE,
   clampIsoX,
@@ -104,6 +110,7 @@ import {
   overlayRunColor,
   overlayRunIndex,
 } from '@/lib/charts/overlay-run-style';
+import { nearestScrubCandidate, type ScrubCandidate } from '@/lib/charts/powerx-scrub';
 import {
   HIT_AREA_RADIUS,
   formatLargeNumber,
@@ -143,8 +150,9 @@ import {
 } from '@/components/inference/utils/tooltipUtils';
 import { usePowerTraceAction } from '@/components/inference/hooks/usePowerTraceAction';
 import { QuickFiltersDialog } from '@/components/inference/ui/QuickFiltersDialog';
+import { describeEngineComparisonConflict } from '@/components/inference/ui/engine-comparison-conflict-toast';
 import { ScatterEmptyState } from '@/components/inference/ui/ScatterEmptyState';
-import { ALL_IN_MEASURED_EMPTY } from '@/lib/power/power-basis';
+import { ALL_IN_MEASURED_EMPTY, type PowerBasisLabelStyle } from '@/lib/power/power-basis';
 import {
   scatterPointConfigId,
   scatterPointJoinId,
@@ -191,6 +199,14 @@ import {
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import { bestSeriesPerSku } from '@/components/inference/utils/best-series-per-sku';
 import { legendChangelogsByHardware } from '@/components/inference/utils/legend-changelog';
+import { powerBreakdownInteractivity } from '@/components/inference/utils/power-breakdown';
+import {
+  usePowerXSurface,
+  useSetPowerXActivePoint,
+  useSetPowerXCompareTarget,
+  type PowerXActivePointUpdate,
+} from '@/components/inference/ui/powerx-surface';
+import { POWER_PERCENT_TDP_METRIC } from '@/components/inference/powerx/powerx-views';
 import {
   buildFrontierContinuations,
   fitContinuationLabelBaseline,
@@ -267,6 +283,7 @@ const VARIANT_DASH_BY_ID = new Map<string, string>(
       ['basis', 'gpu-measured'],
       ['basis', 'gpu-provisioned'],
       ['basis', 'utility-provisioned'],
+      ['basis', 'it-modeled'],
       ['basis', 'utility-modeled'],
       ['role', 'all'],
       ['role', 'prefill'],
@@ -430,12 +447,14 @@ const SCATTER_STRINGS = {
     optimalInfo: 'Optimal points form the Pareto frontier for the selected axes.',
     powerBoundaryInfo:
       'Show only points on the upper measured power boundary. Turn off to show all measurements; the boundary stays the same. This is a power-load boundary, not an energy-efficiency frontier.',
-    labels: 'Labels',
+    labels: '# of GPUs Label',
     highContrast: 'High Contrast',
     parallelismLabels: 'Parallelism Labels',
     concurrencyLabels: '# Concurrent Sessions',
     gradientLabels: 'Gradient Labels',
     lineLabels: 'Line Labels',
+    frameworkLabel: 'Framework Line Label',
+    offloadingLabel: 'Offloading Label',
     perfRuler: 'Perf Ruler',
     perfRulerInfo:
       'Click two curves to place a vertical ruler, then drag it to measure the ratio of their Y-axis values at any x value. Repeat to add more rulers (up to 8); hover a ruler and click × to delete it. Turning the toggle off clears all rulers.',
@@ -465,12 +484,14 @@ const SCATTER_STRINGS = {
     optimalInfo: '最优点构成当前所选坐标轴的 Pareto 前沿。',
     powerBoundaryInfo:
       '仅显示实测功率上边界上的点。关闭后显示全部测量点，边界曲线保持不变。这是功率负载边界，不是能效前沿。',
-    labels: '标签',
+    labels: 'GPU 数量标签',
     highContrast: '高对比度',
     parallelismLabels: '并行配置标签',
     concurrencyLabels: '并发会话数',
     gradientLabels: '渐变标签',
     lineLabels: '曲线标签',
+    frameworkLabel: '曲线框架标签',
+    offloadingLabel: 'offload 标签',
     perfRuler: '性能标尺',
     perfRulerInfo:
       '先点击两条曲线放置垂直标尺，再拖动标尺，比较任意横坐标下两条曲线的纵轴数值之比。重复操作可添加多把标尺（最多 8 把）；悬停标尺并点击 × 可删除该标尺。关闭开关将清除所有标尺。',
@@ -503,6 +524,7 @@ const ScatterGraph = React.memo(
     yLabel,
     chartDefinition,
     caption,
+    footer,
     onShowTable,
     showAllHardwareTypes = false,
     hardwareConfigOverride,
@@ -512,6 +534,7 @@ const ScatterGraph = React.memo(
     pinLineLabels = false,
     xExtentOverride,
     yExtentOverride,
+    plotHeight,
   }: ScatterGraphProps) => {
     const {
       hardwareConfig: contextHardwareConfig,
@@ -521,6 +544,7 @@ const ScatterGraph = React.memo(
     const {
       activeHwTypes,
       bestPerSku,
+      blockedHwToggles,
       selectedPrecisions,
       selectedRunId,
       selectedSequence,
@@ -540,6 +564,8 @@ const ScatterGraph = React.memo(
       showConcurrencyLabels,
       showGradientLabels,
       showLineLabels,
+      showOffloadingLabel,
+      showFrameworkLabel,
       showParetoFrontier,
       paretoFrontierPlayful,
     } = useInferenceDisplay();
@@ -558,6 +584,8 @@ const ScatterGraph = React.memo(
       setShowConcurrencyLabels,
       setShowGradientLabels,
       setShowLineLabels,
+      setShowOffloadingLabel,
+      setShowFrameworkLabel,
       setShowParetoFrontier,
       setQuickFilterVendors,
       setQuickFilterFrameworks,
@@ -591,6 +619,14 @@ const ScatterGraph = React.memo(
       [showPowerEnvelope, paretoDirection, selectedYAxisMetric],
     );
     const locale = useLocale();
+    // PowerX names the measured boundaries the way its Count control does.
+    const powerXSurface = usePowerXSurface();
+    const powerLabelStyle: PowerBasisLabelStyle = powerXSurface ? 'count' : 'basis';
+    // PowerX on a touch-primary device: the pinned point sheet says Tap, not Click.
+    const touchPrimary = useIsCoarsePointer();
+    const touchCopy = powerXSurface && touchPrimary;
+    // PowerX, Power draw as % of TDP: shade each chip's headroom from its P90 draw to 100 %.
+    const headroomShading = powerXSurface && selectedYAxisMetric === POWER_PERCENT_TDP_METRIC;
     const featureGateUnlocked = useFeatureGate();
     const showPowerTelemetry =
       featureGateUnlocked || getMeasuredMetricConfig(selectedYAxisMetric) !== undefined;
@@ -1187,6 +1223,10 @@ const ScatterGraph = React.memo(
 
     const [pointsTableTarget, setPointsTableTarget] = useState<LegendPointsTarget | null>(null);
     const [quickFiltersOpen, setQuickFiltersOpen] = useState(false);
+    useDialogCloseTracking(quickFiltersOpen, 'inference_quick_filters_dialog_closed');
+    useDialogCloseTracking(pointsTableTarget !== null, 'inference_legend_points_table_closed');
+    useDialogCloseTracking(fixedLogPointId !== null, 'latency_logs_closed');
+    useDialogCloseTracking(powerTelemetryPoint !== null, 'inference_power_telemetry_closed');
     const quickFilterCount =
       quickFilters.vendors.length +
       (lockedFrameworks ? 0 : quickFilters.frameworks.length) +
@@ -1363,10 +1403,17 @@ const ScatterGraph = React.memo(
         yMin = Math.max(0, ext[0] - range * 0.05);
       }
 
+      // Bounded metrics (% TDP) read against their full 0-to-limit range, with headroom
+      // so the dashed limit line stays visible.
       const ceiling = metricAxisCeiling(selectedYAxisMetric);
+      if (ceiling !== undefined && !useLog) yMin = 0;
+      // % TDP stops at 100%; values above the rating keep the plain 5% headroom.
+      // The PowerX headroom band runs up to the rating, so the axis reaches it then.
       const yMax =
         ceiling !== undefined && ext[1] <= ceiling
-          ? Math.min(ext[1] * 1.05, ceiling)
+          ? headroomShading
+            ? ceiling
+            : Math.min(ext[1] * 1.05, ceiling)
           : ext[1] * 1.05;
 
       return {
@@ -1381,6 +1428,7 @@ const ScatterGraph = React.memo(
       niceAxes,
       yExtentOverride,
       selectedYAxisMetric,
+      headroomShading,
     ]);
     const yScaleConfig = useStableValue(yScaleConfigRaw, isSameScaleConfig);
 
@@ -1660,7 +1708,15 @@ const ScatterGraph = React.memo(
         return {
           name: legendId,
           hw: legendId,
-          label: powerVariantLabel(variant, locale),
+          label: powerVariantLabel(variant, locale, powerLabelStyle),
+          section:
+            variant.kind === 'basis'
+              ? locale === 'zh'
+                ? '功耗边界'
+                : 'Boundary'
+              : locale === 'zh'
+                ? 'GPU 角色'
+                : 'GPU role',
           color: 'var(--foreground)',
           lineDasharray: isBase ? '1 0' : powerVariantDash(variant) || '1 0',
           isActive: !hiddenPowerVariants.has(isBase ? '' : id),
@@ -1675,7 +1731,7 @@ const ScatterGraph = React.memo(
             });
             track('inference_power_compare_series_toggled', {
               series: id,
-              visible: hiddenPowerVariants.has(key),
+              enabled: hiddenPowerVariants.has(key),
             });
           },
         };
@@ -1686,6 +1742,7 @@ const ScatterGraph = React.memo(
       selectedYAxisMetric,
       powerCompareBaseId,
       locale,
+      powerLabelStyle,
       hiddenPowerVariants,
     ]);
 
@@ -1858,6 +1915,19 @@ const ScatterGraph = React.memo(
       [runIndexByUrl, clampPerfRulerIsoXToOverlap],
     );
 
+    const setCompareTarget = useSetPowerXCompareTarget();
+    // PowerX: the readout row under the caption follows the hovered or pinned point.
+    const setActivePoint = useSetPowerXActivePoint();
+    const activePointRef = useRef<((update: PowerXActivePointUpdate) => void) | null>(null);
+    activePointRef.current = setActivePoint;
+    // PowerX on a coarse pointer: the finger in flight on the plot (its pointer id).
+    const scrubPointerRef = useRef<number | null>(null);
+    const touchScrub = powerXSurface && touchPrimary;
+    const compareFollowsHoverRef = useRef<((x: number) => void) | null>(null);
+    compareFollowsHoverRef.current =
+      setCompareTarget && powerBreakdownInteractivity(chartDefinition.x_scale_field).fromChart
+        ? setCompareTarget
+        : null;
     const perfRulerRef = useRef({ mode: perfRulerMode, onPointClick: handlePerfRulerPointClick });
     perfRulerRef.current = { mode: perfRulerMode, onPointClick: handlePerfRulerPointClick };
 
@@ -2032,11 +2102,14 @@ const ScatterGraph = React.memo(
     drawPerfRulerRef.current = drawPerfRuler;
 
     const lastRenderCtxRef = useRef<RenderContext | null>(null);
-    const labelDisplayRef = useRef({ showPointLabels, showGradientLabels, showLineLabels });
-    labelDisplayRef.current = { showPointLabels, showGradientLabels, showLineLabels };
-    const pointLabelsVisible = showPointLabels && !showGradientLabels;
+    const pointLabelsVisible =
+      (showPointLabels || useAdvancedLabels || showConcurrencyLabels) && !showGradientLabels;
+    const labelDisplayRef = useRef({ pointLabelsVisible, showGradientLabels, showLineLabels });
+    labelDisplayRef.current = { pointLabelsVisible, showGradientLabels, showLineLabels };
+    const lastShowGpuCountRef = useRef(showPointLabels);
     const lastPointLabelsVisibleRef = useRef(pointLabelsVisible);
     const lastShowLineLabelsRef = useRef(showLineLabels);
+    const lastShowFrameworkLabelRef = useRef(showFrameworkLabel);
     const lastShowGradientLabelsRef = useRef(showGradientLabels);
 
     const getDisplaySelection = useCallback(() => {
@@ -2152,19 +2225,12 @@ const ScatterGraph = React.memo(
               d3.axisLeft(newYS).ticks(10).tickFormat(logTickFormat(newYS)) as any,
             );
           }
-          if (showPointLabels && !showGradientLabels) {
+          if (pointLabelsVisible) {
             avoidPointLabelCollisions(ctx.layout.zoomGroup);
           }
         },
       }),
-      [
-        zoomResetEventName,
-        eventPrefix,
-        xScaleConfig._isLog,
-        yScaleConfig.type,
-        showPointLabels,
-        showGradientLabels,
-      ],
+      [zoomResetEventName, eventPrefix, xScaleConfig._isLog, yScaleConfig.type, pointLabelsVisible],
     );
 
     const tooltipConfig = useMemo(
@@ -2188,32 +2254,41 @@ const ScatterGraph = React.memo(
               ? (interactionRef.current.logAvailability?.[d.id] ?? false)
               : false,
             locale,
+            powerLabelStyle,
+            touch: touchCopy,
           }),
         getRulerX: (d: InferenceData, xScale: any) => (xScale as ContinuousScale)(d.x),
         getRulerY: (d: InferenceData, yScale: any) => (yScale as ContinuousScale)(d.y),
-        onHoverStart: (sel: d3.Selection<any, InferenceData, any, any>, d: InferenceData) =>
+        onHoverStart: (sel: d3.Selection<any, InferenceData, any, any>, d: InferenceData) => {
+          // PowerX: the chip comparison follows the hovered point's interactivity.
+          if (compareFollowsHoverRef.current) compareFollowsHoverRef.current(d.x);
+          activePointRef.current?.({ point: d, source: 'hover' });
           applyHoverState(
             sel.select('.visible-shape') as any,
             getShapeKeyForPrecision(d.precision, interactionRef.current.selectedPrecisions),
-          ),
-        onHoverEnd: (sel: d3.Selection<any, InferenceData, any, any>, d: InferenceData) =>
+          );
+        },
+        onHoverEnd: (sel: d3.Selection<any, InferenceData, any, any>, d: InferenceData) => {
+          activePointRef.current?.(null);
           applyNormalState(
             sel.select('.visible-shape') as any,
             getShapeKeyForPrecision(d.precision, interactionRef.current.selectedPrecisions),
-          ),
+          );
+        },
         onPointClick: (d: InferenceData) => {
+          activePointRef.current?.({ point: d, source: 'pinned' });
           const ruler = perfRulerRef.current;
           if (ruler.mode) {
             track('latency_data_point_clicked', {
-              hw: String(d.hwKey),
+              gpu: String(d.hwKey),
               x: d.x,
               y: d.y,
-              perfRuler: true,
+              perf_ruler: true,
             });
             ruler.onPointClick(d, 'official');
             return;
           }
-          track('latency_data_point_clicked', { hw: String(d.hwKey), x: d.x, y: d.y });
+          track('latency_data_point_clicked', { gpu: String(d.hwKey), x: d.x, y: d.y });
           const tooltipEl = chartRef.current?.getTooltipElement();
           if (!tooltipEl) return;
 
@@ -2224,7 +2299,7 @@ const ScatterGraph = React.memo(
               if (!ephemeralUrlState) rememberChartStateInUrl();
               track('latency_view_charts_opened', {
                 id: d.id,
-                hwKey: String(d.hwKey),
+                gpu: String(d.hwKey),
                 conc: d.conc,
               });
             });
@@ -2235,7 +2310,7 @@ const ScatterGraph = React.memo(
               event.stopPropagation();
               setPowerTelemetryPoint(d);
               chartRef.current?.dismissTooltip();
-              track('inference_power_telemetry_opened', { id: d.id, hwKey: d.hwKey, conc: d.conc });
+              track('inference_power_telemetry_opened', { id: d.id, gpu: d.hwKey, conc: d.conc });
             });
           }
           const logsBtn = tooltipEl.querySelector('[data-action="view-logs"]');
@@ -2249,9 +2324,9 @@ const ScatterGraph = React.memo(
               }
               track('latency_view_logs_opened', {
                 id: d.id,
-                hwKey: String(d.hwKey),
+                gpu: String(d.hwKey),
                 conc: d.conc,
-                benchmarkType: d.benchmark_type ?? 'single_turn',
+                benchmark_type: d.benchmark_type ?? 'single_turn',
               });
             });
           }
@@ -2259,7 +2334,16 @@ const ScatterGraph = React.memo(
         },
         attachToLayer: 1,
       }),
-      [attachPowerTraceAction, xLabel, yLabel, selectedYAxisMetric, hardwareConfig, locale],
+      [
+        attachPowerTraceAction,
+        xLabel,
+        yLabel,
+        selectedYAxisMetric,
+        hardwareConfig,
+        locale,
+        powerLabelStyle,
+        touchCopy,
+      ],
     );
 
     const layers = useMemo((): LayerConfig<InferenceData>[] => {
@@ -2277,16 +2361,29 @@ const ScatterGraph = React.memo(
         powerLineLabelSuffix(identity.variant, {
           isBase: identity.isBase,
           locale,
+          labelStyle: powerLabelStyle,
           flatWatts:
             !identity.isBase && wattsAxis && identity.variant?.kind === 'basis'
               ? flatSeriesValue(points.map((point) => point.y))
               : null,
         });
 
+      // Comparison lines carry no label pill (the legend's line styles name them) unless they
+      // are flat references whose value is the point of the pill, e.g. "TDP 1 kW".
+      const showsLinePill = (hw: string, points: readonly InferenceData[]) => {
+        const identity = lineLabelIdentity(hw, points);
+        if (identity.isBase) return true;
+        return (
+          wattsAxis &&
+          identity.variant?.kind === 'basis' &&
+          flatSeriesValue(points.map((point) => point.y)) !== null
+        );
+      };
+
       const rooflineLayer: CustomLayerConfig = {
         type: 'custom',
         key: 'rooflines',
-        displayIdentity: `${showGradientLabels}:${showLineLabels}`,
+        displayIdentity: `${showGradientLabels}:${showLineLabels}:${showFrameworkLabel}`,
         render: (zoomGroup, ctx) => {
           const ir = interactionRef.current;
           const xScale = ctx.xScale as ContinuousScale;
@@ -2530,26 +2627,26 @@ const ScatterGraph = React.memo(
               }
             }
 
-            const officialSeries: LineLabelSeries<InferenceData>[] = [
-              ...officialByGroup.values(),
-            ].map((entry) => {
-              const identity = lineLabelIdentity(entry.hw, entry.points);
-              const suffix = lineLabelSuffix(identity, entry.points);
-              lineLabelMeta.set(entry.key, { variantId: identity.variantId, suffix, runTag: '' });
-              return {
-                key: entry.key,
-                seriesId: identity.seriesId,
-                label: `${lineLabelText(
-                  entry.hw,
-                  entry.precision,
-                  multiPrecision,
-                  modelLabel,
-                  entry.points,
-                )}${suffix}`,
-                color: ir.getCssColor(ir.resolveColor(entry.hw)),
-                points: entry.points,
-              };
-            });
+            const officialSeries: LineLabelSeries<InferenceData>[] = [...officialByGroup.values()]
+              .filter((entry) => showsLinePill(entry.hw, entry.points))
+              .map((entry) => {
+                const identity = lineLabelIdentity(entry.hw, entry.points);
+                const suffix = lineLabelSuffix(identity, entry.points);
+                lineLabelMeta.set(entry.key, { variantId: identity.variantId, suffix, runTag: '' });
+                return {
+                  key: entry.key,
+                  seriesId: identity.seriesId,
+                  label: `${lineLabelText(
+                    entry.hw,
+                    entry.precision,
+                    multiPrecision,
+                    modelLabel,
+                    entry.points,
+                  )}${suffix}`,
+                  color: ir.getCssColor(ir.resolveColor(entry.hw)),
+                  points: entry.points,
+                };
+              });
             const overlayRunsByHw = new Map<string, Set<number>>();
             for (const group of Object.values(displayedOverlayRooflines)) {
               if (!ir.activeOverlayHwTypes.has(group.hwKey)) continue;
@@ -2560,6 +2657,7 @@ const ScatterGraph = React.memo(
               displayedOverlayRooflines,
             ).flatMap(([overlayKey, group]) => {
               if (!ir.activeOverlayHwTypes.has(group.hwKey)) return [];
+              if (!showsLinePill(group.hwKey, group.points)) return [];
               const info = unofficialRunInfos[group.runIndex];
               const precision = group.points[0]?.precision ?? '';
               const hardwareLabel = lineLabelText(
@@ -2676,7 +2774,7 @@ const ScatterGraph = React.memo(
                           },
                         ]
                       : []),
-                    ...(engineLabel
+                    ...(engineLabel && showFrameworkLabel
                       ? [
                           {
                             className: 'll-engine',
@@ -2885,8 +2983,11 @@ const ScatterGraph = React.memo(
           getOpacity: (d) =>
             interactionRef.current.isPointVisible(d) ? pointOpacityForVariant(d) : 0,
           getPointerEvents: (d) => (interactionRef.current.isPointVisible(d) ? 'auto' : 'none'),
-          hideLabels: !showPointLabels || showGradientLabels,
-          getLabelText: (d) => pointLabelText(d, useAdvancedLabels, showConcurrencyLabels),
+          hideLabels: !pointLabelsVisible,
+          // Concurrency (C=) is appended only when the advanced
+          // "# Concurrent Sessions" toggle is on.
+          getLabelText: (d) =>
+            pointLabelText(d, showPointLabels, useAdvancedLabels, showConcurrencyLabels),
           foreground: 'var(--foreground)',
           dataAttrs: {
             'hw-key': (d) => String(d.hwKey),
@@ -2907,12 +3008,12 @@ const ScatterGraph = React.memo(
           '.unofficial-overlay-pt',
         );
         const powerLabels = showPowerEnvelope && showGradientLabels;
-        const showLabels = powerLabels || (showPointLabels && !showGradientLabels);
+        const showLabels = powerLabels || pointLabelsVisible;
         overlayPoints.each(function (d) {
           const lines = (
             powerLabels
               ? getParetoLabel(d)
-              : pointLabelText(d, useAdvancedLabels, showConcurrencyLabels)
+              : pointLabelText(d, showPointLabels, useAdvancedLabels, showConcurrencyLabels)
           ).split('\n');
           const text = d3
             .select(this)
@@ -2950,7 +3051,7 @@ const ScatterGraph = React.memo(
         ? {
             type: 'custom',
             key: 'overlay',
-            displayIdentity: `${showPointLabels}:${showGradientLabels}`,
+            displayIdentity: `${showPointLabels}:${useAdvancedLabels}:${showConcurrencyLabels}:${showGradientLabels}`,
             render: (zoomGroup, ctx) => {
               const xScale = ctx.xScale as ContinuousScale;
               const yScale = ctx.yScale as ContinuousScale;
@@ -3051,6 +3152,7 @@ const ScatterGraph = React.memo(
                   d3.select(this),
                   d,
                   overlayRunColor(overlayRunIndex(d.run_url ?? null, runIndexByUrl)),
+                  showOffloadingLabel,
                 );
               });
 
@@ -3084,6 +3186,8 @@ const ScatterGraph = React.memo(
                     hardwareConfig: overlayData.hardwareConfig,
                     overlayData,
                     locale,
+                    powerLabelStyle,
+                    touch: touchCopy,
                   }),
                 position: (event) => {
                   const [mouseX, mouseY] = d3.pointer(event, container);
@@ -3097,17 +3201,17 @@ const ScatterGraph = React.memo(
                   const ruler = perfRulerRef.current;
                   if (ruler.mode) {
                     track('latency_data_point_clicked', {
-                      hw: String(point.hwKey),
+                      gpu: String(point.hwKey),
                       x: point.x,
                       y: point.y,
                       overlay: true,
-                      perfRuler: true,
+                      perf_ruler: true,
                     });
                     ruler.onPointClick(point, 'overlay');
                     return;
                   }
                   track('latency_data_point_clicked', {
-                    hw: String(point.hwKey),
+                    gpu: String(point.hwKey),
                     x: point.x,
                     y: point.y,
                     overlay: true,
@@ -3306,7 +3410,7 @@ const ScatterGraph = React.memo(
           onLinkClick: (annotation) =>
             annotation.issue &&
             track('inference_known_issue_clicked', {
-              hwKey: annotation.issue.hwKey,
+              gpu: annotation.issue.hwKey,
               issue: annotation.issue.issueRef,
             }),
         };
@@ -3333,9 +3437,283 @@ const ScatterGraph = React.memo(
           ),
       };
 
-      const result: LayerConfig<InferenceData>[] = [rooflineLayer, scatterLayer];
+      const axisCeiling = metricAxisCeiling(selectedYAxisMetric);
+      const drawCeiling = (
+        zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+        yScale: ContinuousScale,
+        width: number,
+      ) => {
+        const domainTop = Math.max(...(yScale.domain() as number[]));
+        // Only mark the rating when the axis reaches it.
+        const y = axisCeiling === undefined || axisCeiling > domainTop ? null : yScale(axisCeiling);
+        const g = zoomGroup
+          .selectAll<SVGGElement, number>('g.metric-ceiling')
+          .data(y === null || !Number.isFinite(y) ? [] : [y])
+          .join('g')
+          .attr('class', 'metric-ceiling')
+          .attr('pointer-events', 'none');
+        g.selectAll('line')
+          .data((d) => [d])
+          .join('line')
+          .attr('x1', 0)
+          .attr('x2', width)
+          .attr('y1', (d) => d)
+          .attr('y2', (d) => d)
+          .attr('stroke', 'var(--muted-foreground)')
+          .attr('stroke-width', 1)
+          .attr('stroke-dasharray', '5,4');
+        g.selectAll('text')
+          .data((d) => [d])
+          .join('text')
+          .attr('x', width - 4)
+          .attr('y', (d) => d - 4)
+          .attr('text-anchor', 'end')
+          .attr('font-size', 11)
+          .attr('fill', 'var(--muted-foreground)')
+          .text('100% TDP');
+      };
+      const ceilingLayer: CustomLayerConfig = {
+        type: 'custom',
+        key: 'metric-ceiling',
+        render: (zoomGroup, ctx) =>
+          drawCeiling(zoomGroup, (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale, ctx.width),
+        onZoom: (zoomGroup, ctx) =>
+          drawCeiling(zoomGroup, ctx.newYScale as ContinuousScale, ctx.width),
+      };
+
+      // PowerX headroom: the band between each chip's P90 draw (dotted) and 100 % TDP,
+      // for the official chip lines and for every unofficial-run overlay line in its run color.
+      const headroomBand = (points: InferenceData[], optimal: (p: InferenceData) => boolean) =>
+        points
+          .filter(
+            (p) =>
+              selectedPrecisions.includes(p.precision) &&
+              (!hideNonOptimal || optimal(p)) &&
+              Number.isFinite(p.measuredP90Power?.y) &&
+              Number.isFinite(p.measuredAvgPower?.y) &&
+              (p.measuredAvgPower?.y ?? 0) > 0 &&
+              Number.isFinite(p.measuredPowerPercentTdp?.y),
+          )
+          .map((p) => ({
+            x: p.x,
+            // % TDP at P90 = P90 W × (% TDP ÷ avg W), the point's own TDP ratio.
+            y: (p.measuredP90Power!.y * p.measuredPowerPercentTdp!.y) / p.measuredAvgPower!.y,
+          }))
+          .toSorted((a, b) => a.x - b.x);
+      const headroomSeries: {
+        key: string;
+        color: string;
+        band: { x: number; y: number }[];
+        runIndex: number | null;
+      }[] = headroomShading
+        ? [
+            ...Object.entries(groupedData).flatMap(([key, points]) => {
+              if (points[0]?.powerVariant) return [];
+              const hwKey = points[0]?.hwKey;
+              if (!hwKey || !effectiveActiveHwTypes.has(hwKey)) return [];
+              const band = headroomBand(points, (p) => optimalPointKeys.has(optimalPointKey(p)));
+              return band.length >= 2
+                ? [{ key, color: getCssColor(resolveColor(hwKey)), band, runIndex: null }]
+                : [];
+            }),
+            ...Object.entries(overlayGroups).flatMap(([key, group]) => {
+              if (group.variant !== null || !activeOverlayHwTypes.has(group.hwKey)) return [];
+              const band = headroomBand(group.points, (p) => overlayOptimalPoints.has(p));
+              return band.length >= 2
+                ? [
+                    {
+                      key: `overlay-${key}`,
+                      color: overlayRunColor(group.runIndex),
+                      band,
+                      runIndex: group.runIndex,
+                    },
+                  ]
+                : [];
+            }),
+          ]
+        : [];
+      const drawHeadroom = (
+        zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
+        xScale: ContinuousScale,
+        yScale: ContinuousScale,
+      ) => {
+        const domainTop = Math.max(...(yScale.domain() as number[]));
+        const topY = yScale(Math.min(100, domainTop));
+        const area = d3
+          .area<{ x: number; y: number }>()
+          .x((d) => xScale(d.x))
+          .y0(() => topY)
+          .y1((d) => yScale(d.y));
+        const line = d3
+          .line<{ x: number; y: number }>()
+          .x((d) => xScale(d.x))
+          .y((d) => yScale(d.y));
+        const g = zoomGroup
+          .selectAll<SVGGElement, (typeof headroomSeries)[number]>('g.headroom-band')
+          .data(headroomSeries, (d) => d.key)
+          .join('g')
+          .attr('class', 'headroom-band')
+          .attr('data-testid', 'headroom-band')
+          .attr('data-run-index', (d) => (d.runIndex === null ? null : d.runIndex))
+          .attr('pointer-events', 'none');
+        g.selectAll('path.headroom-area')
+          .data((d) => [d])
+          .join('path')
+          .attr('class', 'headroom-area')
+          .attr('fill', (d) => d.color)
+          .attr('fill-opacity', 0.09)
+          .attr('stroke', 'none')
+          .attr('d', (d) => area(d.band));
+        g.selectAll('path.headroom-p90')
+          .data((d) => [d])
+          .join('path')
+          .attr('class', 'headroom-p90')
+          .attr('fill', 'none')
+          .attr('stroke', (d) => d.color)
+          .attr('stroke-width', 1)
+          .attr('stroke-dasharray', '2,3')
+          .attr('d', (d) => line(d.band));
+      };
+      const headroomLayer: CustomLayerConfig = {
+        type: 'custom',
+        key: 'powerx-headroom',
+        render: (zoomGroup, ctx) =>
+          drawHeadroom(
+            zoomGroup,
+            (ctx.renderedXScale ?? ctx.xScale) as ContinuousScale,
+            (ctx.renderedYScale ?? ctx.yScale) as ContinuousScale,
+          ),
+        onZoom: (zoomGroup, ctx) =>
+          drawHeadroom(
+            zoomGroup,
+            ctx.newXScale as ContinuousScale,
+            ctx.newYScale as ContinuousScale,
+          ),
+      };
+
+      // PowerX on a coarse pointer: there is no hover tooltip, so a finger dragged across
+      // the plot snaps to the nearest visible point (official or overlay, under the current
+      // zoom) and the readout above the chart reads it; a tap on a point still opens its
+      // sheet through the point's own click. One-finger touches never reach d3-zoom
+      // (zoomEventFilter), the svg keeps touch-action pan-y so a vertical pan scrolls the
+      // page, and it is none only while a scrub is in progress.
+      const scrubLayer: CustomLayerConfig | null = touchScrub
+        ? {
+            type: 'custom',
+            key: 'powerx-scrub',
+            render: (zoomGroup, ctx) => {
+              // A re-render (the readout's own update re-renders the chart) keeps the mark
+              // where the finger last was; the next finger, or a zoom, moves or drops it.
+              zoomGroup.select('g.powerx-scrub').raise();
+              const svg = ctx.layout.svg;
+              const svgNode = svg.node();
+              const candidates = (): ScrubCandidate<InferenceData>[] => {
+                if (!svgNode) return [];
+                const zoomed = currentZoomRenderContext(svgNode, ctx);
+                const xScale = zoomed.xScale as ContinuousScale;
+                const yScale = zoomed.yScale as ContinuousScale;
+                const ir = interactionRef.current;
+                return [
+                  ...pointsData
+                    .filter((point) => ir.isPointVisible(point))
+                    .map((point) => ({
+                      point,
+                      x: xScale(point.x),
+                      y: yScale(point.y),
+                      overlay: false,
+                    })),
+                  ...processedOverlayData
+                    .filter((point) => ir.isOverlayPointVisible(point))
+                    .map((point) => ({
+                      point,
+                      x: xScale(point.x),
+                      y: yScale(point.y),
+                      overlay: true,
+                    })),
+                ];
+              };
+              const snap = (event: PointerEvent) => {
+                const [mx, my] = d3.pointer(event, zoomGroup.node());
+                const best = nearestScrubCandidate(candidates(), mx, my);
+                if (!best) return;
+                const ir = interactionRef.current;
+                const color = best.overlay
+                  ? overlayRunColor(overlayRunIndex(best.point.run_url ?? null, runIndexByUrl))
+                  : ir.getCssColor(ir.resolveColor(best.point.hwKey as string));
+                let mark = zoomGroup.select<SVGGElement>('g.powerx-scrub');
+                if (mark.empty()) {
+                  mark = zoomGroup
+                    .append('g')
+                    .attr('class', 'powerx-scrub')
+                    .attr('data-testid', 'powerx-scrub')
+                    .attr('pointer-events', 'none');
+                  mark
+                    .append('line')
+                    .attr('class', 'powerx-scrub-rule')
+                    .attr('stroke', 'var(--foreground)')
+                    .attr('stroke-width', 1.5)
+                    .attr('stroke-opacity', 0.7);
+                  mark
+                    .append('circle')
+                    .attr('class', 'powerx-scrub-ring')
+                    .attr('r', 9)
+                    .attr('fill', 'none')
+                    .attr('stroke-width', 2.5);
+                }
+                mark
+                  .attr('data-hw-key', String(best.point.hwKey))
+                  .attr('data-conc', String(best.point.conc))
+                  .attr('data-overlay', best.overlay ? 'true' : null)
+                  .raise();
+                mark
+                  .select('line.powerx-scrub-rule')
+                  .attr('x1', best.x)
+                  .attr('x2', best.x)
+                  .attr('y1', 0)
+                  .attr('y2', ctx.height);
+                mark
+                  .select('circle.powerx-scrub-ring')
+                  .attr('cx', best.x)
+                  .attr('cy', best.y)
+                  .attr('stroke', color);
+                activePointRef.current?.({ point: best.point, source: 'scrub' });
+              };
+              svg
+                .on('pointerdown.powerxScrub', (event: PointerEvent) => {
+                  if (event.pointerType === 'mouse' || event.isPrimary === false) return;
+                  scrubPointerRef.current = event.pointerId;
+                  snap(event);
+                })
+                .on('pointermove.powerxScrub', (event: PointerEvent) => {
+                  if (scrubPointerRef.current !== event.pointerId) return;
+                  if (svgNode) svgNode.style.touchAction = 'none';
+                  snap(event);
+                })
+                .on('pointerup.powerxScrub pointercancel.powerxScrub', (event: PointerEvent) => {
+                  if (scrubPointerRef.current !== event.pointerId) return;
+                  scrubPointerRef.current = null;
+                  if (svgNode) svgNode.style.touchAction = 'pan-y';
+                });
+            },
+            // The mark's pixel position is stale after a zoom; the next finger redraws it.
+            onZoom: (zoomGroup) => {
+              zoomGroup.selectAll('.powerx-scrub').remove();
+            },
+          }
+        : null;
+
+      const result: LayerConfig<InferenceData>[] = headroomShading
+        ? [headroomLayer, rooflineLayer, scatterLayer]
+        : [rooflineLayer, scatterLayer];
       if (overlayLayer) result.push(overlayLayer);
-      result.push(overflowContinuationLayer, paretoHighlightLayer, perfRulerLayer, knownIssueLayer);
+      result.push(
+        overflowContinuationLayer,
+        paretoHighlightLayer,
+        perfRulerLayer,
+        knownIssueLayer,
+        ceilingLayer,
+      );
+      if (scrubLayer) result.push(scrubLayer);
       return result;
     }, [
       displayedRooflines,
@@ -3351,8 +3729,11 @@ const ScatterGraph = React.memo(
       chartId,
       pointsData,
       showPointLabels,
+      pointLabelsVisible,
       useAdvancedLabels,
       showConcurrencyLabels,
+      showOffloadingLabel,
+      showFrameworkLabel,
       buildPointId,
       overlayData,
       processedOverlayData,
@@ -3366,25 +3747,59 @@ const ScatterGraph = React.memo(
       yLabel,
       selectedYAxisMetric,
       powerCompareBaseId,
+      headroomShading,
+      groupedData,
+      overlayGroups,
+      activeOverlayHwTypes,
+      overlayOptimalPoints,
+      effectiveActiveHwTypes,
+      selectedPrecisions,
+      hideNonOptimal,
+      optimalPointKeys,
+      getCssColor,
+      resolveColor,
       chartDefinition,
       locale,
+      powerLabelStyle,
       drawPerfRuler,
       attachPowerTraceAction,
+      touchScrub,
     ]);
 
     const layersRef = useRef(layers);
     layersRef.current = layers;
 
-    const onRender = useCallback(
+    const syncOffloadHalos = useCallback(
+      (zoomGroup: RenderContext['layout']['zoomGroup']) => {
+        zoomGroup.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (point) {
+          renderOffloadHalo(d3.select(this), point, 'var(--foreground)', showOffloadingLabel);
+        });
+        zoomGroup
+          .selectAll<SVGGElement, InferenceData>('.unofficial-overlay-pt')
+          .each(function (point) {
+            renderOffloadHalo(
+              d3.select(this),
+              point,
+              overlayRunColor(overlayRunIndex(point.run_url ?? null, runIndexByUrl)),
+              showOffloadingLabel,
+            );
+          });
+      },
+      [showOffloadingLabel, runIndexByUrl],
+    );
+
+    useLayoutEffect(() => {
+      const display = getDisplaySelection();
+      if (display) syncOffloadHalos(display.zoomGroup);
+    }, [getDisplaySelection, syncOffloadHalos]);
+
+    const onExportRender = useCallback(
       (ctx: RenderContext) => {
-        lastRenderCtxRef.current = ctx;
         const { zoomGroup } = ctx.layout;
 
         zoomGroup.selectAll('.dot-group').style('transition', 'opacity 150ms ease');
 
-        zoomGroup.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (d) {
-          renderOffloadHalo(d3.select(this), d, 'var(--foreground)');
-        });
+        syncOffloadHalos(zoomGroup);
 
         avoidPointLabelCollisions(zoomGroup);
 
@@ -3402,6 +3817,7 @@ const ScatterGraph = React.memo(
         }
       },
       [
+        syncOffloadHalos,
         hardwareConfig,
         xScaleConfig._isLog,
         yScaleConfig.type,
@@ -3409,6 +3825,14 @@ const ScatterGraph = React.memo(
         getCssColor,
         resolveColor,
       ],
+    );
+
+    const onRender = useCallback(
+      (ctx: RenderContext) => {
+        lastRenderCtxRef.current = ctx;
+        onExportRender(ctx);
+      },
+      [onExportRender],
     );
 
     useLayoutEffect(() => {
@@ -3527,22 +3951,40 @@ const ScatterGraph = React.memo(
 
     useLayoutEffect(() => {
       const visibilityChanged = lastPointLabelsVisibleRef.current !== pointLabelsVisible;
+      const gpuCountChanged = lastShowGpuCountRef.current !== showPointLabels;
       const lineLabelsChanged = lastShowLineLabelsRef.current !== showLineLabels;
+      const frameworkLabelChanged = lastShowFrameworkLabelRef.current !== showFrameworkLabel;
       const gradientLabelsChanged = lastShowGradientLabelsRef.current !== showGradientLabels;
-      if (!visibilityChanged && !lineLabelsChanged && !gradientLabelsChanged) return;
+      if (
+        !visibilityChanged &&
+        !gpuCountChanged &&
+        !lineLabelsChanged &&
+        !gradientLabelsChanged &&
+        !frameworkLabelChanged
+      )
+        return;
+      lastShowGpuCountRef.current = showPointLabels;
       lastPointLabelsVisibleRef.current = pointLabelsVisible;
       lastShowLineLabelsRef.current = showLineLabels;
+      lastShowFrameworkLabelRef.current = showFrameworkLabel;
       lastShowGradientLabelsRef.current = showGradientLabels;
       const display = getDisplaySelection();
       if (!display) return;
       const { svg, ctx, zoomGroup } = display;
-      if (visibilityChanged) {
-        zoomGroup
-          .selectAll<SVGTextElement, unknown>('.dot-group .point-label')
-          .style('display', pointLabelsVisible ? '' : 'none')
-          .style('opacity', pointLabelsVisible ? 1 : 0);
+      if (visibilityChanged || gpuCountChanged) {
+        zoomGroup.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (point) {
+          syncPointLabel(
+            this,
+            pointLabelText(point, showPointLabels, useAdvancedLabels, showConcurrencyLabels),
+            'var(--foreground)',
+            !pointLabelsVisible,
+          );
+        });
       }
-      if ((lineLabelsChanged || gradientLabelsChanged) && (showLineLabels || showGradientLabels)) {
+      if (
+        (lineLabelsChanged || gradientLabelsChanged || frameworkLabelChanged) &&
+        (showLineLabels || showGradientLabels)
+      ) {
         const entranceInFlight = zoomGroup
           .selectAll<SVGPathElement, unknown>('.roofline-path')
           .nodes()
@@ -3553,7 +3995,16 @@ const ScatterGraph = React.memo(
         }
       }
       if (pointLabelsVisible) avoidPointLabelCollisions(zoomGroup);
-    }, [getDisplaySelection, pointLabelsVisible, showGradientLabels, showLineLabels]);
+    }, [
+      getDisplaySelection,
+      pointLabelsVisible,
+      showPointLabels,
+      useAdvancedLabels,
+      showConcurrencyLabels,
+      showGradientLabels,
+      showLineLabels,
+      showFrameworkLabel,
+    ]);
 
     useLayoutEffect(() => {
       const display = getDisplaySelection();
@@ -3571,7 +4022,7 @@ const ScatterGraph = React.memo(
           rooflineLayer.render(zoomGroup, currentZoomRenderContext(svg, ctx));
         }
       }
-      if (labelDisplay.showPointLabels && !labelDisplay.showGradientLabels) {
+      if (labelDisplay.pointLabelsVisible) {
         avoidPointLabelCollisions(zoomGroup);
       }
     }, [
@@ -3713,11 +4164,18 @@ const ScatterGraph = React.memo(
     }
 
     return (
-      <>
+      <div
+        className="contents"
+        data-orange-chicken-eligible={
+          selectedSequence === Sequence.AgenticTraces ? 'true' : undefined
+        }
+      >
         <D3Chart<InferenceData>
           ref={chartRef}
-          instructions={minimalChrome ? '' : undefined}
+          // PowerX drops the interaction hint under its charts; /inference keeps it.
+          instructions={minimalChrome || powerXSurface ? '' : undefined}
           chartId={chartId}
+          height={plotHeight}
           data={pointsData}
           dataIdentity={dataIdentity}
           metricIdentity={metricIdentity}
@@ -3726,6 +4184,7 @@ const ScatterGraph = React.memo(
           testId="scatter-graph"
           grabCursor={true}
           caption={caption}
+          footer={footer}
           xScale={xScaleConfig}
           yScale={yScaleConfig}
           xAxis={xAxisConfig}
@@ -3735,6 +4194,7 @@ const ScatterGraph = React.memo(
           tooltip={tooltipConfig}
           transitionDuration={transitionDuration}
           onRender={onRender}
+          onExportRender={onExportRender}
           noDataOverlay={
             filteredData.length === 0 && processedOverlayData.length === 0 ? (
               <div
@@ -3786,7 +4246,7 @@ const ScatterGraph = React.memo(
                               branch,
                             });
                             track('inference_legend_points_table_opened', {
-                              hw: `overlay-run-${info.id}`,
+                              gpu: `overlay-run-${info.id}`,
                               framework: 'overlay',
                             });
                           },
@@ -3823,40 +4283,49 @@ const ScatterGraph = React.memo(
                   .toSorted(
                     ([a], [b]) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
                   )
-                  .map(([key, hwConfig]: [string, any]) => ({
-                    name: hwConfig.name,
-                    label: getDisplayLabel(hwConfig),
-                    color: resolveColor(key),
-                    title: hwConfig.gpu,
-                    isHighlighted: legendChangelogs.get(key)?.runId === selectedRunId,
-                    hw: key,
-                    isActive: showAllHardwareTypes ? true : effectiveOfficialHwTypes.has(key),
-                    onClick: showAllHardwareTypes
-                      ? () => {}
-                      : () => {
-                          handleToggleHwType(key);
-                          track('latency_hw_type_toggled', { hw: key });
-                        },
-                    onShowPoints: () => {
-                      setPointsTableTarget({ kind: 'official', hwKey: key });
-                      track('inference_legend_points_table_opened', {
-                        hw: key,
-                        framework: hwConfig.framework ?? '',
-                      });
-                    },
-                    tooltip: legendChangelogs.has(key)
-                      ? formatChangelogDescription(
-                          legendChangelogs.get(key)!.entries.map((entry) => entry.description),
-                        )
-                      : null,
-                  })),
+                  .map(([key, hwConfig]: [string, any]) => {
+                    const isActive = showAllHardwareTypes
+                      ? true
+                      : effectiveOfficialHwTypes.has(key);
+                    const blocked = isActive ? undefined : blockedHwToggles.get(key);
+                    return {
+                      name: hwConfig.name,
+                      label: getDisplayLabel(hwConfig),
+                      color: resolveColor(key),
+                      title: hwConfig.gpu,
+                      isHighlighted: legendChangelogs.get(key)?.runId === selectedRunId,
+                      hw: key,
+                      isActive,
+                      blockedReason: blocked
+                        ? describeEngineComparisonConflict({ kind: 'blocked', ...blocked }, locale)
+                        : undefined,
+                      onClick: showAllHardwareTypes
+                        ? () => {}
+                        : () => {
+                            handleToggleHwType(key);
+                            track('latency_hw_type_toggled', { gpu: key });
+                          },
+                      onShowPoints: () => {
+                        setPointsTableTarget({ kind: 'official', hwKey: key });
+                        track('inference_legend_points_table_opened', {
+                          gpu: key,
+                          framework: hwConfig.framework ?? '',
+                        });
+                      },
+                      tooltip: legendChangelogs.has(key)
+                        ? formatChangelogDescription(
+                            legendChangelogs.get(key)!.entries.map((entry) => entry.description),
+                          )
+                        : null,
+                    };
+                  }),
                 ...powerVariantLegendItems,
               ]}
               disableActiveSort={false}
               isLegendExpanded={isLegendExpanded}
               onExpandedChange={(expanded) => {
                 setIsLegendExpanded(expanded);
-                track('latency_legend_expanded', { expanded });
+                track('latency_legend_expanded', { enabled: expanded });
               }}
               switches={[
                 ...(selectedYAxisMetric === 'y_inputTputPerGpu'
@@ -3927,12 +4396,10 @@ const ScatterGraph = React.memo(
                 {
                   id: 'scatter-parallelism-labels',
                   label: legendT.parallelismLabels,
-                  advanced: true,
                   checked: useAdvancedLabels,
                   onCheckedChange: (checked: boolean) => {
                     setUseAdvancedLabels(checked);
                     track('latency_advanced_labels_toggled', { enabled: checked });
-                    if (checked && !showPointLabels) setShowPointLabels(true);
                     if (checked && !showGradientLabels) {
                       window.dispatchEvent(
                         new CustomEvent(GRADIENT_NUDGE_EVENT, {
@@ -3971,6 +4438,26 @@ const ScatterGraph = React.memo(
                   },
                 },
                 {
+                  id: 'scatter-framework-label',
+                  label: legendT.frameworkLabel,
+                  advanced: true,
+                  checked: showFrameworkLabel,
+                  onCheckedChange: (checked: boolean) => {
+                    setShowFrameworkLabel(checked);
+                    track('latency_framework_label_toggled', { enabled: checked });
+                  },
+                },
+                {
+                  id: 'scatter-offloading-label',
+                  label: legendT.offloadingLabel,
+                  advanced: true,
+                  checked: showOffloadingLabel,
+                  onCheckedChange: (checked: boolean) => {
+                    setShowOffloadingLabel(checked);
+                    track('latency_offloading_label_toggled', { enabled: checked });
+                  },
+                },
+                {
                   id: 'scatter-perf-ruler',
                   label: legendT.perfRuler,
                   advanced: true,
@@ -3993,12 +4480,11 @@ const ScatterGraph = React.memo(
                   onCheckedChange: (checked: boolean) => {
                     setShowConcurrencyLabels(checked);
                     track('latency_concurrency_labels_toggled', { enabled: checked });
-                    if (checked && !showPointLabels) setShowPointLabels(true);
                   },
                 },
               ]}
               onAdvancedExpandedChange={(expanded) => {
-                track('latency_advanced_controls_toggled', { expanded });
+                track('latency_advanced_controls_toggled', { enabled: expanded });
               }}
               actions={[
                 ...(effectiveOfficialHwTypes.size < hwTypesWithData.size ||
@@ -4064,7 +4550,7 @@ const ScatterGraph = React.memo(
             isOverlay={pointsTable.isOverlay}
             onRowClick={(row) =>
               track('inference_legend_points_table_row_clicked', {
-                hw: pointsTable.hw,
+                gpu: pointsTable.hw,
                 conc: row.conc,
                 href: row.href ?? '',
               })
@@ -4100,7 +4586,7 @@ const ScatterGraph = React.memo(
             }}
           />
         )}
-      </>
+      </div>
     );
   },
 );

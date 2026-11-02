@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/card';
 import { Heading } from '@/components/ui/heading';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useClientSearch } from '@/hooks/useClientSearch';
+import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { replaceClientSearch } from '@/lib/routing/client-navigation';
 
@@ -22,6 +23,7 @@ function isCategory(value: string | null): value is Category {
 }
 
 function selectCategory(value: string) {
+  track('operatorx_category_selected', { category: value });
   const params = new URLSearchParams(window.location.search);
   params.set('op', value);
   params.delete('workload');

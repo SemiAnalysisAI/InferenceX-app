@@ -388,10 +388,11 @@ const LANDING_HARDWARE_RESULTS = [
     vendor: 'Huawei',
     title: 'Huawei Ascend 950PR',
     titleZh: '华为 Ascend 950PR',
-    subtitle: 'OperatorX',
-    href: '/operatorx',
+    subtitle: 'UbenchX',
+    href: '/ubenchx/core-memory-profiles',
     model: 'ascend950pr',
     analyticsEvent: 'landing_huawei_results_clicked',
+    isNew: true,
   },
   {
     id: 'tpu-kimi-k3',
@@ -435,7 +436,6 @@ const LANDING_HARDWARE_RESULTS = [
     href: '/inference/minimax-m31-flash',
     model: 'minimax-m31-flash',
     analyticsEvent: 'landing_minimax_m31_flash_results_clicked',
-    isNew: true,
   },
 ] as const;
 
@@ -581,7 +581,6 @@ export function AgentXCompareHero({
                       key={result.id}
                       data-testid={`landing-${result.id}-results-link`}
                       href={`${prefix}${result.href}`}
-                      prefetchOperatorX={result.id === 'huawei'}
                       analyticsEvent={result.analyticsEvent}
                       analyticsTarget={result.model}
                       analyticsSurface={surface}

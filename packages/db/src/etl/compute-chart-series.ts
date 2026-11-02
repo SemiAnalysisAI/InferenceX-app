@@ -63,6 +63,7 @@ type RawSliceField = 'avg' | 'rate' | 'sumRate';
 interface RawSeries {
   endpoint_url?: string;
   labels?: Record<string, string>;
+  stats?: { count?: number };
   timeslices?: RawSlice[];
 }
 
@@ -94,7 +95,9 @@ export const CHART_METRIC_KEYS = new Set([
   'atom:kv_cache_usage_ratio',
   'atom:prefix_cache_cached_tokens',
   'atom:prefix_cache_full_tokens',
+  'atom:prefix_cache_offload_tokens',
   'atom:prefix_cache_hit_ratio',
+  'atom:prefill_batch_tokens',
   'atom:requests_running',
   'atom:requests_waiting',
   'atom:prompt_tokens',
@@ -543,12 +546,49 @@ function byT(points: readonly TimeSeriesPoint[]): Map<number, number> {
   return new Map(points.map((p) => [p.t, p.value]));
 }
 
+const ATOM_PROMPT_COUNTERS = [
+  'atom:prompt_tokens',
+  'atom:prefix_cache_cached_tokens',
+  'atom:prefix_cache_full_tokens',
+  'atom:prefix_cache_offload_tokens',
+];
+
+/**
+ * ATOM P/D endpoints carry no role label. Decode re-reports every prompt and
+ * counts KV received from prefill as cached, so prompt and cache counters are
+ * read from endpoints that ran prefill batches only.
+ */
+function scopeAtomPdToPrefill(metrics: MetricsMap): { metrics: MetricsMap; pd: boolean } {
+  const prefill = new Set<string>();
+  for (const s of metrics['atom:prefill_batch_tokens']?.series ?? []) {
+    if (s.endpoint_url && (s.stats?.count ?? 0) > 0) prefill.add(s.endpoint_url);
+  }
+  if (prefill.size === 0) return { metrics, pd: false };
+  const counterEndpoints = ATOM_PROMPT_COUNTERS.flatMap((name) =>
+    (metrics[name]?.series ?? []).map((s) => s.endpoint_url),
+  );
+  if (counterEndpoints.every((url) => url !== undefined && prefill.has(url))) {
+    return { metrics, pd: false };
+  }
+  const scoped = { ...metrics };
+  for (const name of ATOM_PROMPT_COUNTERS) {
+    const series = metrics[name]?.series;
+    if (series) {
+      scoped[name] = {
+        series: series.filter((s) => s.endpoint_url && prefill.has(s.endpoint_url)),
+      };
+    }
+  }
+  return { metrics: scoped, pd: true };
+}
+
 function buildSeriesFromMetrics(
-  metrics: MetricsMap,
+  rawMetrics: MetricsMap,
   context: ServerMetricsContext,
   includeMetricSources = true,
   originStartNs?: number,
 ): ChartSeries {
+  const { metrics, pd: atomPd } = scopeAtomPdToPrefill(rawMetrics);
   let startNs = Number.POSITIVE_INFINITY;
   let endNs = 0;
   let timeslicesCount = 0;
@@ -762,6 +802,8 @@ function buildSeriesFromMetrics(
   }
   if (Object.keys(promptTokensBySource).length === 0) {
     const cached = prefixCacheHitsTps.filter((point) => point.value > 0);
+    const offloadTps = atomPd ? counterRate('atom:prefix_cache_offload_tokens') : [];
+    const offloadByT = byT(offloadTps);
     const cachedByT = byT(prefixCacheHitsTps);
     const computed =
       trtllmComputedPromptTps.length > 0
@@ -772,10 +814,12 @@ function buildSeriesFromMetrics(
           )
             .map(({ t, value: prompt }) => ({
               t,
-              value: Math.max(0, prompt - (cachedByT.get(t) ?? 0)),
+              value: Math.max(0, prompt - (cachedByT.get(t) ?? 0) - (offloadByT.get(t) ?? 0)),
             }))
             .filter((point) => point.value > 0);
+    const offloaded = offloadTps.filter((point) => point.value > 0);
     if (cached.length > 0) promptTokensBySource['cache hit (HBM)'] = cached;
+    if (offloaded.length > 0) promptTokensBySource['cache hit (CPU offload)'] = offloaded;
     if (computed.length > 0) promptTokensBySource['compute (miss)'] = computed;
   }
 

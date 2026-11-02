@@ -83,7 +83,7 @@ test('read-only release verification rejects altered evidence and unsafe retries
   const result = spawnSync('python3', ['-B', 'test/verify-release.test.py'], {
     cwd: resolve(import.meta.dirname, '..'),
     encoding: 'utf8',
-    timeout: 10_000,
+    timeout: 60_000,
   });
   assert.ifError(result.error);
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);

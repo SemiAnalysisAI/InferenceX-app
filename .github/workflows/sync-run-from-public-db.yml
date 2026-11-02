@@ -1,0 +1,120 @@
+name: Sync Runs From Public Database
+
+# For downstream deployments: copies the given runs from the public InferenceX
+# database into this deployment's DATABASE_WRITE_URL. Insert-only; rows already in
+# the target are never changed. See docs/data-pipeline.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      run-ids:
+        description: Comma-separated GitHub Actions run ids, each optionally <run id>#<attempt>
+        required: true
+        type: string
+      dry-run:
+        description: List what would be copied without writing
+        required: false
+        default: false
+        type: boolean
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Sync runs
+    # The public database is this repository's own database.
+    if: github.repository != 'SemiAnalysisAI/InferenceX-app'
+    timeout-minutes: 120
+    # Server logs and trace payloads can approach 1 GB per value.
+    runs-on: blacksmith-16vcpu-ubuntu-2404
+    permissions:
+      contents: read
+    env:
+      DRY_RUN: ${{ inputs.dry-run == true }}
+      RUN_IDS: ${{ inputs.run-ids }}
+    steps:
+      - name: Check inputs and configuration
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
+          PUBLIC_DATABASE_READONLY_URL: ${{ secrets.PUBLIC_DATABASE_READONLY_URL }}
+          VERCEL_INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
+        run: |
+          if ! [[ "$RUN_IDS" =~ ^[0-9]+(#[1-9][0-9]*)?(,[0-9]+(#[1-9][0-9]*)?)*$ ]]; then
+            echo "::error::run-ids must be comma-separated <run id>[#<attempt>] entries without spaces"
+            exit 1
+          fi
+          : "${PUBLIC_DATABASE_READONLY_URL:?PUBLIC_DATABASE_READONLY_URL secret is not set}"
+          : "${DATABASE_WRITE_URL:?DATABASE_WRITE_URL secret is not set}"
+          if [ "$DRY_RUN" != "true" ]; then
+            : "${APP_URL:?APP_URL repository variable is not set}"
+            : "${VERCEL_INVALIDATE_SECRET:?VERCEL_INVALIDATE_SECRET secret is not set}"
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Bun
+        id: setup-bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - name: Cache Bun packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ runner.arch }}-${{
+            steps.setup-bun.outputs.bun-version }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-${{ runner.arch }}-${{ steps.setup-bun.outputs.bun-version }}-
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+        env:
+          CYPRESS_INSTALL_BINARY: '0'
+
+      - name: Run migrations
+        if: env.DRY_RUN != 'true'
+        env:
+          DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
+        run: bun run admin:db:migrate --yes
+
+      - name: Sync runs
+        env:
+          DATABASE_WRITE_URL: ${{ secrets.DATABASE_WRITE_URL }}
+          PUBLIC_DATABASE_READONLY_URL: ${{ secrets.PUBLIC_DATABASE_READONLY_URL }}
+        run: |
+          set -o pipefail
+          if [ "$DRY_RUN" = "true" ]; then mode=--dry-run; else mode=--yes; fi
+          bun run admin:db:sync-public --run-id "$RUN_IDS" "$mode" 2>&1 | tee sync.log
+
+      - name: Write job summary
+        if: always()
+        run: |
+          [ -f sync.log ] || exit 0
+          {
+            echo '### Synced runs'
+            echo '```'
+            grep -E '^(  [a-z0-9]|    [0-9]|===|  ✗|  ✓)' sync.log | head -200
+            echo '```'
+          } >>"$GITHUB_STEP_SUMMARY"
+
+      - name: Invalidate cache
+        if: env.DRY_RUN != 'true'
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
+          VERCEL_PROTECTION_BYPASS_SECRET: ${{ secrets.VERCEL_PROTECTION_BYPASS_SECRET }}
+        run: bun run admin:cache:invalidate "$APP_URL"
+
+      - name: Warm up cache
+        if: env.DRY_RUN != 'true'
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          VERCEL_PROTECTION_BYPASS_SECRET: ${{ secrets.VERCEL_PROTECTION_BYPASS_SECRET }}
+        run: bun run admin:cache:warmup "$APP_URL"

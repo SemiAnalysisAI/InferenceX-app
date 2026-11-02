@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
+import { META_TITLE_MAX } from '@/lib/seo/meta-text';
+
 import {
   allCanonicalComparePairs,
   allCanonicalCompareSlugs,
@@ -262,6 +264,7 @@ describe('compareModelDisplayLabel', () => {
 
 describe('compareModelSeoName', () => {
   const EXPECTED: Record<string, string> = {
+    'glm-5-3-flash': 'GLM-5.3-Flash',
     'muse-spark-open': 'Muse Spark Open',
     'deepseek-v4': 'DeepSeek V4 Pro',
     'deepseek-v41-flash': 'DeepSeek V4.1 Flash',
@@ -307,23 +310,24 @@ describe('compareSeoTitle', () => {
   it('leads with the GPU pair and keeps "Inference Benchmark" when it fits', () => {
     const title = compareSeoTitle('B200 vs B300', 'GLM-5');
     expect(title).toBe('B200 vs B300: GLM-5 Inference Benchmark');
-    expect(title.startsWith('B200 vs B300:')).toBe(true);
-    expect(title.length).toBeLessThanOrEqual(60);
+    expect(title.length).toBeLessThanOrEqual(META_TITLE_MAX);
   });
 
-  it('drops "Inference" → "Benchmark" for a long GPU pair + model name', () => {
-    const title = compareSeoTitle('GB200 NVL72 vs GB300 NVL72', 'DeepSeek V4 Pro');
-    expect(title).toBe('GB200 NVL72 vs GB300 NVL72: DeepSeek V4 Pro Benchmark');
-    expect(title.includes('Inference Benchmark')).toBe(false);
-    expect(title.startsWith('GB200 NVL72 vs GB300 NVL72:')).toBe(true);
+  it('drops the metric words before cutting the GPU pair or model name', () => {
+    expect(compareSeoTitle('H100 vs MI355X', 'DeepSeek V4 Pro')).toBe(
+      'H100 vs MI355X: DeepSeek V4 Pro Benchmark',
+    );
+    expect(compareSeoTitle('GB200 NVL72 vs GB300 NVL72', 'DeepSeek V4 Pro')).toBe(
+      'GB200 NVL72 vs GB300 NVL72: DeepSeek V4 Pro',
+    );
   });
 
-  it('always starts with the GPU pair for every real (model × pair)', () => {
+  it('starts with the GPU pair and fits the title budget for every real (model × pair)', () => {
     for (const model of COMPARE_MODEL_SLUGS) {
       const gpuLabel = compareDisplayLabel('gb200', 'gb300');
       const title = compareSeoTitle(gpuLabel, compareModelSeoName(model));
       expect(title.startsWith(`${gpuLabel}:`), `pair-led for ${model.slug}`).toBe(true);
-      expect(/(?<suffix>Inference Benchmark|Benchmark)$/u.test(title)).toBe(true);
+      expect(title.length, title).toBeLessThanOrEqual(META_TITLE_MAX);
     }
   });
 });

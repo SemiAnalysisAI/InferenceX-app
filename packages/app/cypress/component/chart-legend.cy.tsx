@@ -79,6 +79,58 @@ describe('ChartLegend in an enclosing controls panel', () => {
   });
 });
 
+describe('ChartLegend blocked items', () => {
+  const reason =
+    "vLLM and SGLang use engine-specific benchmark implementations, so their numbers aren't directly comparable in this view. Remove the SGLang configs first to switch.";
+
+  it('explains why an inactive item cannot be enabled and still reports the click', () => {
+    const onHardware = cy.stub().as('hardwareChange');
+    cy.mount(
+      <ChartLegend
+        legendItems={[
+          { ...MOCK_ITEMS[0], onClick: onHardware },
+          {
+            ...MOCK_ITEMS[1],
+            isActive: false,
+            blockedReason: reason,
+            onClick: onHardware,
+          },
+        ]}
+        variant="sidebar"
+        isLegendExpanded
+        onExpandedChange={() => {}}
+      />,
+    );
+    cy.get('#checkbox-h200-sxm')
+      .should('have.attr', 'aria-disabled', 'true')
+      .invoke('attr', 'aria-describedby')
+      .then((descriptionId) => {
+        cy.get(`#${descriptionId}`).should('have.text', reason);
+      });
+    cy.contains('label', 'NVIDIA H200 SXM')
+      .should('have.attr', 'title', reason)
+      .and('have.class', 'cursor-not-allowed')
+      .click();
+    cy.get('@hardwareChange').should('have.been.calledWith', 'h200-sxm');
+    cy.get('#checkbox-h100-sxm').should('not.have.attr', 'aria-disabled');
+    cy.contains('label', 'NVIDIA H100 SXM').should('have.class', 'cursor-pointer');
+  });
+
+  it('ignores the blocked reason once the item is active', () => {
+    cy.mount(
+      <ChartLegend
+        legendItems={[{ ...MOCK_ITEMS[1], isActive: true, blockedReason: reason }]}
+        variant="sidebar"
+        isLegendExpanded
+        onExpandedChange={() => {}}
+      />,
+    );
+    cy.get('#checkbox-h200-sxm').should('not.have.attr', 'aria-disabled');
+    cy.get('#checkbox-h200-sxm').should('not.have.attr', 'aria-describedby');
+    cy.contains('label', 'NVIDIA H200 SXM').should('not.have.attr', 'title', reason);
+  });
+});
+
 function ChartLegendWrapper({
   items = MOCK_ITEMS,
   inChart = false,
@@ -581,4 +633,74 @@ describe('ChartLegend points-table icon + dialog', () => {
     cy.get('[data-testid="legend-points-overlay-run-99"]').click();
     cy.get('[data-testid="legend-points-dialog"]').should('be.visible');
   });
+});
+
+const measureLegendSpacing = (selector: string) =>
+  cy.get(`${selector} [data-testid="chart-legend"]`).then(($legend) => {
+    const rows = [...$legend[0].querySelectorAll('ul > li')].map(
+      (li) => li.getBoundingClientRect().top,
+    );
+    const header = $legend[0].firstElementChild as HTMLElement;
+    const switches = [
+      ...$legend[0].querySelectorAll('[data-testid="legend-display-controls"] [role="switch"]'),
+    ].map((el) => el.getBoundingClientRect().top);
+    return {
+      pitches: rows.slice(1).map((top, i) => Math.round(top - rows[i])),
+      switchPitches: switches.slice(1).map((top, i) => Math.round(top - switches[i])),
+      header: Math.round(header.getBoundingClientRect().height),
+    };
+  });
+
+describe('ChartLegend spacing on PowerX surfaces', () => {
+  for (const width of [361, 1280]) {
+    it(`matches the AgentX legend row spacing at ${width}px`, () => {
+      cy.viewport(width, 900);
+      const legend = (
+        <ChartLegend
+          variant="sidebar"
+          legendItems={MOCK_ITEMS}
+          isLegendExpanded
+          onExpandedChange={() => {}}
+          switches={[
+            {
+              id: 'spacing-switch',
+              label: 'One line per GPU',
+              checked: false,
+              onCheckedChange: () => {},
+              infoTooltip: 'Draw every GPU',
+            },
+            {
+              id: 'spacing-switch-raw',
+              label: 'Raw 1-s samples',
+              checked: false,
+              onCheckedChange: () => {},
+              infoTooltip: 'Plot every sample',
+            },
+          ]}
+        />
+      );
+      cy.mount(
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div data-testid="agentx-legend" style={{ width: 300 }}>
+            {legend}
+          </div>
+          <div data-testid="powerx-legend" data-powerx-surface="" style={{ width: 300 }}>
+            {legend}
+          </div>
+        </div>,
+      );
+      measureLegendSpacing('[data-testid="agentx-legend"]').then((agentx) => {
+        expect(agentx.pitches, 'AgentX rows').to.have.length(MOCK_ITEMS.length - 1);
+        expect(Math.max(...agentx.pitches), 'AgentX row pitch').to.be.lessThan(30);
+        measureLegendSpacing('[data-testid="powerx-legend"]').then((powerx) => {
+          expect(powerx.pitches, 'PowerX row pitch').to.deep.equal(agentx.pitches);
+          expect(powerx.header, 'PowerX legend header height').to.equal(agentx.header);
+          expect(agentx.switchPitches, 'AgentX switch rows').to.have.length(1);
+          expect(powerx.switchPitches, 'PowerX switch row pitch').to.deep.equal(
+            agentx.switchPitches,
+          );
+        });
+      });
+    });
+  }
 });

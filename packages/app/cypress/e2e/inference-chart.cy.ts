@@ -32,6 +32,25 @@ function openYAxisHelp(metric: string) {
   cy.get(`[data-testid="option-help-${metric}"]`).scrollIntoView().click();
 }
 
+function assertContextBelowPlot(root: Element) {
+  const plot = root.querySelector('[data-testid="d3-chart-svg"]')!;
+  const context = root.querySelector('[data-testid="result-context"]')!;
+  const legend = root.querySelector('[data-slot="chart-legend-wrapper"]');
+  expect(context.getBoundingClientRect().top, 'context below plot').to.be.at.least(
+    plot.getBoundingClientRect().bottom,
+  );
+  if (legend) {
+    expect(context.getBoundingClientRect().top, 'context below legend').to.be.at.least(
+      legend.getBoundingClientRect().bottom,
+    );
+  }
+  // Firefox can round touching layout edges to slightly different subpixel coordinates.
+  expect(
+    root.querySelector('h2')!.getBoundingClientRect().bottom,
+    'heading above plot',
+  ).to.be.at.most(plot.getBoundingClientRect().top + 0.01);
+}
+
 const measuredRows = (runUrl: string | null) =>
   singleTurnRows(runUrl).map((row, index) => ({
     ...row,
@@ -42,6 +61,7 @@ const measuredRows = (runUrl: string | null) =>
       avg_power_w: 450 + index * 10,
       p75_power_w: (runUrl ? 550 : 500) + index * 10,
       joules_per_output_token: (runUrl ? 3 : 2) + index,
+      joules_per_total_token: (runUrl ? 3 : 2) + index,
     },
   }));
 
@@ -52,6 +72,7 @@ const boundaryRows = (runUrl: string | null) =>
       ...row.metrics,
       avg_power_w: [900, 200, 700, 650][index] + (runUrl ? 50 : 0),
       joules_per_output_token: [2, 4.5, 4, 5][index] + (runUrl ? 1 : 0),
+      joules_per_total_token: [2, 4.5, 4, 5][index] + (runUrl ? 1 : 0),
     },
   }));
 
@@ -115,7 +136,7 @@ describe('Inference Chart', () => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/inference');
+    cy.visit('/inference?g_model=DeepSeek-V4-Pro');
     cy.wait(['@chartAvailability', '@chartBenchmarks']);
   });
 
@@ -155,6 +176,7 @@ describe('Inference Chart', () => {
       .and('not.contain.text', 'Workload:')
       .and('not.contain.text', 'Precision:')
       .and('not.contain.text', 'Metric:');
+    cy.get('#chart-0').should(($chart) => assertContextBelowPlot($chart[0]!));
   });
 
   it('plots OpenRouter-priced token revenue for official and unofficial runs', () => {
@@ -231,6 +253,22 @@ describe('Inference Chart', () => {
       .and(($body) => {
         expect($body.text()).not.to.include('—');
       });
+  });
+
+  it('keeps cost controls below the plot when changing tiers on mobile', () => {
+    cy.viewport(375, 900);
+    cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_metric=tokensPerDollarH');
+    cy.get('#chart-0 [data-testid="d3-chart-svg"] .dot-group').should('have.length.greaterThan', 0);
+    cy.get('#chart-0').should(($chart) => assertContextBelowPlot($chart[0]!));
+    cy.get('#chart-0 [data-testid="cost-tier-selector"]').click();
+    cy.get('[data-testid="cost-tier-rental"]').click();
+    cy.get('#chart-0 input[aria-label="B200 $/chip/hr"]').should('have.value', '3.7');
+    cy.get('#chart-0 [data-testid="cost-tier-selector"]').should(
+      'contain.text',
+      'Rent - 3 Year Commit',
+    );
+    cy.get('#chart-0').should(($chart) => assertContextBelowPlot($chart[0]!));
+    expectNoPageOverflow();
   });
 
   it('plots infrastructure total tokens per dollar for official and unofficial runs', () => {
@@ -464,6 +502,7 @@ describe('Deprecated model source attribution', () => {
           expect(win.document.querySelector('#chart-0-export .deprecated-watermark')).to.equal(
             null,
           );
+          assertContextBelowPlot(win.document.querySelector('#chart-0-export')!);
         }
       };
     });
@@ -479,6 +518,7 @@ describe('Deprecated model source attribution', () => {
     });
     cy.wait('@historicalM3Overlay');
     cy.get('#chart-0 .unofficial-overlay-pt').should('have.length.greaterThan', 0);
+    cy.get('#chart-0').should(($chart) => assertContextBelowPlot($chart[0]!));
     cy.get('#chart-0 [data-testid="result-context"]').should(
       'contain.text',
       'Source: SemiAnalysis InferenceX™ + UNOFFICIAL overlays (Deprecated)',
@@ -502,6 +542,7 @@ describe('Deprecated model source attribution', () => {
       '来源: SemiAnalysis InferenceX™ + 非官方 overlays (已弃用)',
     );
     cy.get('.deprecated-watermark').should('not.exist');
+    cy.get('#chart-0').should(($chart) => assertContextBelowPlot($chart[0]!));
     expectNoPageOverflow();
   });
 });
@@ -519,7 +560,18 @@ describe('Inference Chart — Simplified Chinese mobile path', () => {
 
   it('keeps chart controls reachable and localizes the complete table click path', () => {
     cy.contains('h2', '推理性能').should('be.visible');
+    cy.get('[data-testid="inference-run-context"]').should('have.length', 1).and('not.be.visible');
+    cy.get('#scenario-select').should('have.length', 1).and('not.be.visible');
+    cy.get('#precision-select').should('have.length', 1).and('not.be.visible');
     cy.get('[data-testid="inference-secondary-controls"] > button').click();
+    cy.get('[data-testid="inference-secondary-controls"]').within(() => {
+      cy.get('#scenario-select').should('be.visible');
+      cy.get('#precision-select').should('be.visible');
+    });
+    cy.get('[data-testid="inference-secondary-controls"]')
+      .find('[data-testid="inference-run-context"]')
+      .should('be.visible')
+      .and('contain.text', '运行信息');
     cy.get('label[for="x-axis-mode-select"]').should('have.text', 'X 轴指标');
     cy.get('[data-testid="x-axis-mode-selector"]').click();
     cy.get('[data-testid="x-axis-mode-e2e"]').should('have.text', '端到端延迟').click();
@@ -646,7 +698,7 @@ describe('AgentX replaces a complete curve while preserving an unofficial compar
   });
 });
 
-it('hydrates a direct PowerX metric link', () => {
+it('opens an old Inference power link on PowerX with the same metric', () => {
   cy.intercept('GET', '/api/v1/availability').as('powerLinkAvailability');
   cy.intercept('GET', '/api/v1/benchmarks*').as('powerLinkBenchmarks');
   cy.viewport(1440, 900);
@@ -658,8 +710,16 @@ it('hydrates a direct PowerX metric link', () => {
     },
   });
   cy.wait(['@powerLinkAvailability', '@powerLinkBenchmarks']);
-  cy.get('[data-testid="yaxis-metric-selector"]').should('contain', 'Measured Power');
-  cy.get('[data-testid="measured-power-display"]').should('contain', 'TDP');
+  cy.location('pathname').should('eq', '/powerx');
+  cy.contains('[data-testid="powerx-unit"] button', 'TDP').should(
+    'have.attr',
+    'aria-pressed',
+    'true',
+  );
+  // Scope and Power statistic are plain Chart Config controls; no second control layer.
+  cy.get('[data-testid="powerx-advanced"]').should('not.exist');
+  cy.get('[data-testid="powerx-more-views-toggle"]').should('not.exist');
+  cy.get('[data-testid="measured-power-display"]').should('not.exist');
   cy.get('[data-testid="measured-power-statistic-average"]').should(
     'have.attr',
     'aria-pressed',
@@ -672,7 +732,7 @@ it('replots measured settings for official and unofficial data and preserves ove
   interceptMeasuredComparison();
   cy.viewport(1440, 900);
   cy.visit(
-    `/inference?g_model=DeepSeek-V4-Pro&unofficialrun=${OVERLAY_RUN_ID}&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_measuredAvgPower`,
+    `/powerx?g_model=DeepSeek-V4-Pro&unofficialrun=${OVERLAY_RUN_ID}&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_measuredAvgPower`,
     { onBeforeLoad: unlockAgenticGate },
   );
   cy.wait('@measuredOverlay');
@@ -683,11 +743,8 @@ it('replots measured settings for official and unofficial data and preserves ove
   cy.get('[data-testid="chart-figure"] h2').should('contain', 'Measured P75 Fleet Power per Chip');
   assertMeasuredValues('.dot-group', [500, 510, 520, 530]);
   assertMeasuredValues('.unofficial-overlay-pt', [550, 560, 570, 580]);
-  cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-  cy.contains('[data-slot="select-item"]', /^Measured Energy$/u)
-    .scrollIntoView()
-    .click();
-  cy.get('[data-testid="chart-figure"] h2').should('contain', 'Measured Joules per Output Token');
+  cy.get('[data-testid="powerx-tab-energy"]').click();
+  cy.get('[data-testid="chart-figure"] h2').should('contain', 'Measured Joules per Token');
   assertMeasuredValues('.dot-group', [2, 3, 4, 5]);
   assertMeasuredValues('.unofficial-overlay-pt', [3, 4, 5, 6]);
   cy.get('[aria-label="Dismiss measured-comparison"]').click();
@@ -699,17 +756,17 @@ it('says when chosen chip configs report no measured power, and plots them on ot
   interceptMeasuredComparison(singleTurnRows(null), []);
   cy.viewport(1440, 900);
   cy.visit(
-    '/inference?g_model=DeepSeek-V4-Pro&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_measuredAvgPower&i_gpus=b300_sglang',
+    '/powerx?g_model=DeepSeek-V4-Pro&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_measuredAvgPower&i_gpus=b300_sglang',
     { onBeforeLoad: unlockAgenticGate },
   );
   cy.get('[data-testid="gpu-multiselect"]').should('contain', 'B300 (SGLang)');
   cy.get('[data-testid="scatter-empty-state"]')
     .should('have.attr', 'data-reason', 'selection')
     .and('contain', 'No measured GPU power is reported for this selection.');
-  cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-  cy.contains('[data-slot="select-item"]', /^Token Throughput per Chip/u)
-    .scrollIntoView()
-    .click();
+  cy.visit(
+    '/inference?g_model=DeepSeek-V4-Pro&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_tpPerGpu&i_gpus=b300_sglang',
+    { onBeforeLoad: unlockAgenticGate },
+  );
   cy.get('[data-testid="scatter-empty-state"]').should('not.exist');
   cy.get('[data-testid="inference-chart-display"] svg .dot-group').should(
     'have.length.at.least',
@@ -721,7 +778,7 @@ it('uses Optimal Only to filter power boundary dots without replacing official o
   interceptMeasuredComparison(boundaryRows(null), boundaryRows(OVERLAY_RUN_URL));
   cy.viewport(1440, 900);
   cy.visit(
-    `/inference?g_model=DeepSeek-V4-Pro&unofficialrun=${OVERLAY_RUN_ID}&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_measuredAvgPower`,
+    `/powerx?g_model=DeepSeek-V4-Pro&unofficialrun=${OVERLAY_RUN_ID}&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_measuredAvgPower`,
     { onBeforeLoad: unlockAgenticGate },
   );
   cy.wait('@measuredOverlay');
@@ -764,11 +821,8 @@ it('uses Optimal Only to filter power boundary dots without replacing official o
       }
     });
 
-  cy.get('[data-testid="yaxis-metric-selector"]').click('right');
-  cy.contains('[data-slot="select-item"]', /^Measured Energy$/u)
-    .scrollIntoView()
-    .click();
-  cy.get('[data-testid="chart-figure"] h2').should('contain', 'Measured Joules per Output Token');
+  cy.get('[data-testid="powerx-tab-energy"]').click();
+  cy.get('[data-testid="chart-figure"] h2').should('contain', 'Measured Joules per Token');
   cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
   assertVisibleMeasuredValues('.dot-group', [2, 4, 5]);
   assertVisibleMeasuredValues('.unofficial-overlay-pt', [3, 5, 6]);
@@ -879,7 +933,7 @@ describe('VR default date preference', () => {
     interceptVrPublicationData(true);
     cy.visit('/inference/deepseek-v4?i_metric=y_tpPerGpu');
     assertVrDate(VR_FIXTURE_DATE);
-    cy.contains('button', 'Run Date:').click();
+    cy.contains('[data-slot="date-field"]', 'Run date').find('button[aria-labelledby]').click();
     cy.get('[role="dialog"]').contains('button', 'Apply').click();
     assertVrDate(VR_LATEST_FIXTURE_DATE);
   });
@@ -934,7 +988,7 @@ describe('Date comparison with unofficial runs', () => {
     interceptMeasuredComparison();
     cy.viewport(1440, 900);
     cy.visit(
-      `/inference?g_model=DeepSeek-V4-Pro&unofficialrun=${OVERLAY_RUN_ID}&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_measuredAvgPower&i_gpus=b300_sglang&i_dstart=${SINGLE_TURN_DATE}&i_dend=${SINGLE_TURN_DATE}&i_optimal=0`,
+      `/powerx?g_model=DeepSeek-V4-Pro&unofficialrun=${OVERLAY_RUN_ID}&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_measuredAvgPower&i_gpus=b300_sglang&i_dstart=${SINGLE_TURN_DATE}&i_dend=${SINGLE_TURN_DATE}&i_optimal=0`,
       { onBeforeLoad: unlockAgenticGate },
     );
     cy.wait('@measuredOverlay');
@@ -956,7 +1010,7 @@ describe('Exact topology quick filter', () => {
     interceptMeasuredComparison(withTp4(officialBase), withTp4(overlayBase));
     cy.viewport(1440, 900);
     cy.visit(
-      `/inference?g_model=DeepSeek-V4-Pro&unofficialrun=${OVERLAY_RUN_ID}&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_measuredAvgPower&i_optimal=0&i_best=0`,
+      `/powerx?g_model=DeepSeek-V4-Pro&unofficialrun=${OVERLAY_RUN_ID}&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_measuredAvgPower&i_optimal=0&i_best=0`,
       { onBeforeLoad: unlockAgenticGate },
     );
     cy.wait('@measuredOverlay');
@@ -1216,5 +1270,18 @@ describe('Qwen3.5 chart defaults', () => {
       'interactivity',
     );
     cy.contains('button', 'More chart controls').should('not.contain.text', 'changed');
+  });
+});
+
+describe('PowerX controls on a phone', () => {
+  beforeEach(() => {
+    cy.viewport(390, 844);
+    cy.visit('/powerx', {
+      onBeforeLoad(win) {
+        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
+        unlockAgenticGate(win);
+      },
+    });
+    cy.get('[data-testid="inference-chart-display"]').should('exist');
   });
 });

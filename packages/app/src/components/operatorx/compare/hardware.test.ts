@@ -4,13 +4,19 @@ import { buildComparison, comparisonView } from '@semianalysisai/inferencex-db/o
 import { normalizeBundle } from '@semianalysisai/inferencex-db/operatorx/normalize';
 import { generateVendorColors } from '@/lib/charts/dynamic-colors';
 
-import { hardwareLabel, operatorXColors, peakBandwidthTBs, peakTflops } from './hardware';
+import {
+  hardwareLabel,
+  operatorXColors,
+  peakBandwidthTBs,
+  peakTflops,
+  toggleHardwareSelection,
+} from './hardware';
 import { metricById } from './metrics';
 
-function comparison() {
+function comparison(dtype = 'bf16') {
   const op = {
     type: 'gemm',
-    args: { m: 1024, n: 1024, k: 1024, a: { dtype: 'bf16' }, b: { dtype: 'bf16' }, out: 'bf16' },
+    args: { m: 1024, n: 1024, k: 1024, a: { dtype }, b: { dtype }, out: 'bf16' },
     sources: ['deepseek-ai/DeepSeek-V4-Pro/mlp'],
     backend: 'torch_npu_linear',
   };
@@ -55,12 +61,12 @@ describe('Ascend OperatorX reference', () => {
     const reference = view.hardware[0].reference!;
     expect(view.workload).toBe('gemm:DeepSeek-V4-Pro');
     expect(reference).toMatchObject({
-      peakTflops: { bf16: 378, fp8: null, fp4: null },
-      memoryBandwidthTBs: 1.6,
+      peakTflops: { bf16: 378, fp8: 756, fp4: null },
+      memoryBandwidthTBs: 1.6384,
       memoryBandwidthAssumed: true,
     });
     expect(reference.source).toContain('Ascend-ubench.md');
-    expect(reference.qualification).toContain('memory/ECC');
+    expect(reference.qualification).toContain('8 HBM stacks × 256 bits × 6.4 Gbps');
     expect(hardwareLabel('ascend950pr')).toBe(reference.label);
     expect(reference.label).toBe('950PR');
     expect(view.defaults).toEqual({
@@ -70,7 +76,7 @@ describe('Ascend OperatorX reference', () => {
     });
     expect(peakTflops('ascend950pr', 'bf16')).toBe(reference.peakTflops.bf16);
     expect(peakBandwidthTBs('ascend950pr')).toBe(reference.memoryBandwidthTBs);
-    expect(reference.peakTflops.bf16! / reference.memoryBandwidthTBs).toBe(236.25);
+    expect(reference.peakTflops.bf16! / reference.memoryBandwidthTBs).toBe(230.712890625);
     const c = view.cases[0];
     const us = view.measurements.ascend950pr.latencyUs[0]!;
     expect(us).toBe(10);
@@ -79,13 +85,25 @@ describe('Ascend OperatorX reference', () => {
       12,
     );
     expect(metricById('bandwidthUtil').value(c, us, 'ascend950pr')).toBeCloseTo(
-      (3 * 1024 ** 2 * 2) / (10 * 1e6) / 1.6,
+      (3 * 1024 ** 2 * 2) / (10 * 1e6) / 1.6384,
       12,
     );
   });
 
-  it('does not invent other precision peaks or change existing hardware references', () => {
-    expect(peakTflops('ascend950pr', 'fp8')).toBeNull();
+  it('normalizes FP8 measurements with the same Cube peak in the API and UI', () => {
+    const view = comparisonView(comparison('e4m3'), 'gemm:DeepSeek-V4-Pro');
+    expect(view.hardware[0].reference!.peakTflops.fp8).toBe(756);
+    expect(view.defaults.rooflinePrecision).toBe('fp8');
+    expect(view.cases[0].computePrecision).toBe('fp8');
+    expect(view.measurements.ascend950pr.latencyUs[0]).toBe(10);
+    expect(metricById('computeUtil').value(view.cases[0], 10, 'ascend950pr')).toBeCloseTo(
+      214.7483648 / 756,
+      12,
+    );
+    expect(peakTflops('ascend950pr', 'fp8')! / peakBandwidthTBs('ascend950pr')!).toBe(461.42578125);
+  });
+
+  it('leaves unregistered precisions and existing hardware references unchanged', () => {
     expect(peakTflops('ascend950pr', 'fp4')).toBeNull();
     expect(peakTflops('ascend950pr', 'other')).toBeNull();
     expect(peakTflops('unknown', 'bf16')).toBeNull();
@@ -121,4 +139,16 @@ describe('Ascend OperatorX reference', () => {
       expect(operatorXColors([], theme)).toEqual({});
     },
   );
+});
+
+describe('toggleHardwareSelection', () => {
+  it('removes a selected GPU and appends an unselected one', () => {
+    expect(toggleHardwareSelection(['b200', 'h200', 'mi355x'], 'h200')).toEqual(['b200', 'mi355x']);
+    expect(toggleHardwareSelection(['b200'], 'h200')).toEqual(['b200', 'h200']);
+  });
+
+  it('keeps the last selected GPU and returns the same array so callers can skip the update', () => {
+    const only = ['b200'];
+    expect(toggleHardwareSelection(only, 'b200')).toBe(only);
+  });
 });

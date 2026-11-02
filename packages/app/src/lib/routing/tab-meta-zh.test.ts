@@ -34,9 +34,9 @@ describe('isZhTab', () => {
 });
 
 describe('tabMetadataZh', () => {
-  it('canonicalizes the inference tab to the zh homepage, mirroring English', () => {
+  it('canonicalizes the inference tab to its own zh URL, not the zh landing page', () => {
     const meta = tabMetadataZh('inference');
-    expect(meta.alternates?.canonical).toBe(`${SITE_URL}/zh`);
+    expect(meta.alternates?.canonical).toBe(`${SITE_URL}/zh/inference`);
   });
 
   it('canonicalizes other tabs to their own zh URL with bidirectional hreflang', () => {
@@ -53,5 +53,16 @@ describe('tabMetadataZh', () => {
     const meta = tabMetadataZh('gpu-specs');
     expect(meta.openGraph?.locale).toBe('zh_CN');
     expect(meta.openGraph?.url).toBe(`${SITE_URL}/zh/gpu-specs`);
+  });
+});
+
+describe('PowerX copy', () => {
+  it('describes energy per token, the PowerX default unit, not per output token', () => {
+    expect(TAB_META.powerx.description).toContain('energy per token');
+    expect(TAB_META.powerx.description).not.toContain('output token');
+    for (const text of [TAB_META_ZH.powerx.description, TAB_INTRO_ZH.powerx]) {
+      expect(text).toContain('每 Token 能耗');
+      expect(text).not.toContain('输出 Token');
+    }
   });
 });

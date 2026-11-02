@@ -40,6 +40,9 @@ export const DB_MODEL_TO_DISPLAY: Record<string, string> = {
   // under its own `glm5.3` prefix (InferenceX#3330); it shares the GLM-5.2
   // display bucket the same way glm5.1 folds into GLM-5.
   'glm5.3': 'GLM-5.2',
+  // Experimental AgentX producer identity (InferenceX#4718 / #4714), not
+  // the historical non-Flash glm5.3 alias above.
+  'glm5.3flash': 'GLM-5.3-Flash',
   dsv4: 'DeepSeek-V4-Pro',
   // V4.1-Flash is a separate CED/CSA2 architecture (552B backbone, 8B prefill /
   // 16B decode active), not a V4-Pro point release, so it gets its own bucket.

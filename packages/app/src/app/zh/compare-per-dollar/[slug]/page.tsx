@@ -1,14 +1,10 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 
-import {
-  HW_REGISTRY,
-  SITE_NAME,
-  SITE_URL,
-  SUPPORTERS_LINE_ZH,
-} from '@semianalysisai/inferencex-constants';
+import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { JsonLd } from '@/components/seo/json-ld';
+import { comparisonScenarioForModel } from '@/lib/compare/compare-agentx';
 import {
   isAgenticSequence,
   type ScenarioSegment,
@@ -16,12 +12,6 @@ import {
 } from '@/lib/compare/compare-scenario-route';
 import { canonicalCompareSlug, parseCompareSlug } from '@/lib/compare/compare-slug';
 import { getGpuSpecs } from '@/lib/catalog/constants';
-import {
-  KNOWN_MODELS,
-  KNOWN_PRECISIONS,
-  KNOWN_SEQUENCES,
-  pickString,
-} from '@/lib/compare/compare-ssr';
 import {
   getComparePageDerivedData,
   initialCompareBenchmarkRows,
@@ -32,11 +22,18 @@ import {
   buildJsonLdZh,
   compareTableNarrativeZh,
 } from '@/lib/compare/compare-ssr-zh';
-import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
+import { zhAlternates } from '@/lib/i18n/i18n';
+import { compareSocialImages } from '@/lib/compare/compare-meta';
+import { perDollarMetaDescriptionZh, perDollarMetaTitleZh } from '@/lib/compare/compare-meta-zh';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 import ComparePerDollarPageClient from '../../../compare-per-dollar/[slug]/page-client';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
+
+export function generateStaticParams(): { slug: string }[] {
+  return [];
+}
 
 export interface ScenarioOptions {
   scenarioSegment?: ScenarioSegment;
@@ -62,7 +59,6 @@ function gpuPairLabelZh(a: string, b: string): string {
 
 interface Props {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -81,62 +77,37 @@ export function buildPerDollarMetadataZh(
   const canonical = canonicalCompareSlug(parsed.model.slug, parsed.a, parsed.b);
   const routePath = scenarioPath(canonical, scenarioSegment);
   const url = `${SITE_URL}${routePath}`;
-  const description = `${gpuLabel} 在 ${parsed.model.label} 上的每美元性能对比。InferenceX 是 SemiAnalysis 推出的独立开源基准测试平台；本页提供经过验证、可复现的每百万 token 成本数据，并采用 Hyperscaler 自有设备 TCO 口径。${SUPPORTERS_LINE_ZH}比较各交互性水平下哪款芯片的成本更低。`;
+  const description = perDollarMetaDescriptionZh(gpuLabel, parsed.model.label);
+  const title = perDollarMetaTitleZh(gpuLabel, parsed.model.label);
   return {
-    title: `${fullLabel} — 每美元性能`,
+    title,
     description,
     alternates: zhAlternates(enScenarioPath(canonical)),
-    openGraph: {
-      title: `${fullLabel} — 每美元性能 | ${SITE_NAME}`,
+    ...socialMetadata({
+      title: `${title} | ${SITE_NAME}`,
       description,
       url,
-      type: 'website',
-      locale: ZH_OG_LOCALE,
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: `${fullLabel} — 每美元性能`,
-      description,
-    },
+      locale: 'zh',
+      images: compareSocialImages(scenarioPath(canonical), `${fullLabel} 每美元性能`),
+    }),
   };
 }
 
-export default async function ComparePerDollarPageZh({ params, searchParams }: Props) {
+export default async function ComparePerDollarPageZh({ params }: Props) {
   const { slug } = await params;
-  return renderPerDollarPageZh(slug, await searchParams, {});
+  return renderPerDollarPageZh(slug, {});
 }
 
-export async function renderPerDollarPageZh(
-  slug: string,
-  sp: Record<string, string | string[] | undefined>,
-  { scenarioSegment }: ScenarioOptions,
-) {
+export async function renderPerDollarPageZh(slug: string, { scenarioSegment }: ScenarioOptions) {
   const parsed = parseCompareSlug(slug);
   if (!parsed) notFound();
 
   const canonical = canonicalCompareSlug(parsed.model.slug, parsed.a, parsed.b);
   if (canonical !== slug.toLowerCase()) {
-    const qs = Object.entries(sp)
-      .flatMap(([k, v]) => {
-        if (Array.isArray(v)) return v.map((vv) => [k, vv] as const);
-        if (v === undefined) return [];
-        return [[k, v] as const];
-      })
-      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
-      .join('&');
-    permanentRedirect(`${scenarioPath(canonical, scenarioSegment)}${qs ? `?${qs}` : ''}`);
+    permanentRedirect(scenarioPath(canonical, scenarioSegment));
   }
 
-  const fallbackSequence = null;
-
-  const urlSeq = pickString(sp.i_seq);
-  const urlPrec = pickString(sp.i_prec);
-  const urlModel = pickString(sp.g_model);
-  const effectiveModel =
-    urlModel && KNOWN_MODELS.has(urlModel) ? urlModel : parsed.model.displayName;
   const pathSequence = scenarioSegment ? sequenceForScenarioSegment(scenarioSegment) : null;
-  const requestedSequence = pathSequence ?? (urlSeq && KNOWN_SEQUENCES.has(urlSeq) ? urlSeq : null);
-  const requestedPrecision = urlPrec && KNOWN_PRECISIONS.has(urlPrec) ? urlPrec : null;
   const {
     sequence: effectiveSequence,
     precision: effectivePrecision,
@@ -152,9 +123,9 @@ export async function renderPerDollarPageZh(
     parsed.model.dbKeys,
     parsed.a,
     parsed.b,
-    requestedSequence,
-    requestedPrecision,
-    fallbackSequence,
+    pathSequence,
+    null,
+    comparisonScenarioForModel(parsed.model).sequence,
   );
 
   const url = `${SITE_URL}${scenarioPath(canonical, scenarioSegment)}`;
@@ -200,14 +171,13 @@ export async function renderPerDollarPageZh(
         slug={canonical}
         label={label}
         modelLabel={parsed.model.label}
-        defaultModel={effectiveModel}
+        defaultModel={parsed.model.displayName}
         defaultSequence={effectiveSequence}
         defaultPrecision={effectivePrecision}
         ssrTableData={{ defaultTargets, ssrRows, interactivityRange }}
         initialBenchmarkRows={initialCompareBenchmarkRows(
-          parsed.model.displayName,
-          effectiveModel,
           initialPairBenchmarkRows,
+          effectiveSequence,
         )}
         narrative={narrative}
         agenticIntro={isAgenticSequence(effectiveSequence) ? AGENTIC_SCENARIO_INTRO_ZH : null}

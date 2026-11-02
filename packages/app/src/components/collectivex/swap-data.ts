@@ -34,21 +34,26 @@ export function swapChartPoints(
 ): SwapChartPoint[] {
   return datasets.flatMap((dataset) =>
     (dataset.swap_blocks ?? []).flatMap((result) =>
-      result.points
-        .filter((row) => row.direction === selection.direction && row.layout === selection.layout)
-        .map((row) => ({
-          x: row.block_bytes,
-          y:
-            selection.metric === 'latency'
-              ? row.latency_us[selection.percentile]
-              : row.payload_gbps_at_latency_percentile[selection.percentile],
-          seriesId: `${dataset.run.run_id}__${result.result_id}__${row.num_blocks}`,
-          colorKey: `${result.sku}:${row.num_blocks}`,
-          runId: dataset.run.run_id,
-          device: result.runtime.device.trim() || SWAP_GPU_NAMES[result.sku] || result.sku,
-          sku: result.sku,
-          row,
-        })),
+      result.points.flatMap((row) => {
+        if (row.direction !== selection.direction || row.layout !== selection.layout) return [];
+        const y: number | null =
+          selection.metric === 'latency'
+            ? row.latency_us[selection.percentile]
+            : row.payload_gbps_at_latency_percentile[selection.percentile];
+        if (y === null || !Number.isFinite(y)) return [];
+        return [
+          {
+            x: row.block_bytes,
+            y,
+            seriesId: `${dataset.run.run_id}__${result.result_id}__${row.num_blocks}`,
+            colorKey: `${result.sku}:${row.num_blocks}`,
+            runId: dataset.run.run_id,
+            device: result.runtime.device.trim() || SWAP_GPU_NAMES[result.sku] || result.sku,
+            sku: result.sku,
+            row,
+          },
+        ];
+      }),
     ),
   );
 }

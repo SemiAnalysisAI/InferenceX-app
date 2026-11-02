@@ -52,9 +52,29 @@ describe('INFERENCE_MODEL_SLUGS registry', () => {
       ACTIVE_INFERENCE_MODEL_SLUGS.some((entry) => entry.model === Model.MiniMax_M3_1_Flash),
     ).toBe(true);
   });
+
+  it('keeps retired DeepSeek V4 Pro links addressable without promoting them as active', () => {
+    expect(getInferenceModelBySlug('deepseek-v4-pro')?.model).toBe(Model.DeepSeek_V4_Pro);
+    expect(
+      ACTIVE_INFERENCE_MODEL_SLUGS.some((entry) => entry.model === Model.DeepSeek_V4_Pro),
+    ).toBe(false);
+    expect(
+      ACTIVE_INFERENCE_MODEL_SLUGS.some((entry) => entry.model === Model.DeepSeek_V4_1_Flash),
+    ).toBe(true);
+  });
 });
 
 describe('getInferenceModelBySlug', () => {
+  it('keeps bilingual Flash routes distinct from GLM-5.3', () => {
+    expect(getInferenceModelBySlug('glm-5-3')?.model).toBe(Model.GLM_5_2);
+    expect(getInferenceModelBySlug('glm-5-3-flash')?.model).toBe(Model.GLM_5_3_Flash);
+    for (const locale of ['', '/zh']) {
+      expect(inferenceModelForPathname(`${locale}/inference/glm-5-3-flash`)).toBe(
+        Model.GLM_5_3_Flash,
+      );
+    }
+  });
+
   it('resolves canonical slugs', () => {
     expect(getInferenceModelBySlug('kimi-k3')?.model).toBe(Model.Kimi_K3);
     expect(getInferenceModelBySlug('deepseek-v4')?.model).toBe(Model.DeepSeek_V4_Pro);

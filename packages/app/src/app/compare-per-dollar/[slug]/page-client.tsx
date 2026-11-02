@@ -7,10 +7,7 @@ import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-con
 
 import type { GPUDataPoint } from '@/components/calculator/types';
 import { useThroughputData } from '@/components/calculator/useThroughputData';
-import {
-  CompareTableRenderer,
-  type CompareTableData,
-} from '@/components/compare/compare-table-renderer';
+import { CompareTableRenderer } from '@/components/compare/compare-table-renderer';
 import {
   GlobalFilterProvider,
   useGlobalFilterAvailability,
@@ -20,11 +17,12 @@ import {
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { Card } from '@/components/ui/card';
-import { track } from '@/lib/analytics/analytics';
+import { track, trackOncePerPageview } from '@/lib/analytics/analytics';
 import type { BenchmarkRow } from '@/lib/api/api';
 import { toCalculatorBenchmarkRows } from '@/lib/benchmarks/benchmark-api-view';
 import { toModel, toPrecisions, toSequence } from '@/lib/compare/compare-enum-coerce';
 import type { AgenticScenarioIntro } from '@/lib/compare/compare-ssr';
+import type { CompareTableData } from '@/lib/compare/compare-table-view';
 
 const PER_DOLLAR_TABLE_METRICS = ['Cost ($/M tok)', 'Concurrency'];
 
@@ -116,8 +114,12 @@ export default function ComparePerDollarPageClient({
   locale = 'en',
 }: ComparePerDollarPageClientProps) {
   useEffect(() => {
-    track('compare_per_dollar_page_view', { gpu_a: a, gpu_b: b, default_model: defaultModel });
-  }, [a, b, defaultModel]);
+    trackOncePerPageview(
+      'compare_per_dollar_page_view',
+      { slug, gpus: [a, b], model: defaultModel },
+      slug,
+    );
+  }, [slug, a, b, defaultModel]);
 
   const compareGpuPair = useMemo(() => [a, b] as const, [a, b]);
   const initialModel = toModel(defaultModel);
@@ -148,6 +150,7 @@ export default function ComparePerDollarPageClient({
         benchmarkQueryScope={benchmarkQueryScope}
         initialBenchmarkModel={initialModel}
         initialBenchmarkRows={initialBenchmarkRows}
+        initialBenchmarkSequence={defaultSequence ?? undefined}
       >
         <div className="flex flex-col gap-4">
           <Card className="flex w-full min-w-0 flex-col gap-3">
@@ -283,6 +286,8 @@ export default function ComparePerDollarPageClient({
               aLabel={aLabel}
               bLabel={bLabel}
               ssrTableData={ssrTableData}
+              ssrSequence={defaultSequence}
+              ssrPrecisions={initialPrecisions}
               initialModel={initialModel}
               initialSequence={initialSequence}
               initialCalculatorRows={initialCalculatorRows}
@@ -303,9 +308,11 @@ function CompareTableSection({
   aLabel,
   bLabel,
   ssrTableData,
+  ssrSequence,
   initialModel,
   initialSequence,
   initialCalculatorRows,
+  ssrPrecisions,
   emptyStateText,
   isZh,
 }: {
@@ -314,14 +321,22 @@ function CompareTableSection({
   aLabel: string;
   bLabel: string;
   ssrTableData: CompareTableData;
+  ssrSequence: string | null;
+  ssrPrecisions: string[] | undefined;
   initialModel: ReturnType<typeof toModel>;
   initialSequence: ReturnType<typeof toSequence>;
   initialCalculatorRows?: BenchmarkRow[];
   emptyStateText: string;
   isZh: boolean;
 }) {
-  const { effectiveSequence, effectivePrecisions, selectedModel, sequenceResolved } =
-    useGlobalFilterSelection();
+  const {
+    selectedSequence,
+    effectiveSequence,
+    effectivePrecisions,
+    selectedModel,
+    selectedPrecisions,
+    sequenceResolved,
+  } = useGlobalFilterSelection();
   const { availableDates } = useGlobalFilterAvailability();
   const { selectedRunDate } = useGlobalFilterRun();
   const latestAvailableDate = availableDates.at(-1) ?? '';
@@ -336,7 +351,7 @@ function CompareTableSection({
       ? initialCalculatorRows
       : undefined;
 
-  const { gpuDataByGroupKey, ranges, hasData } = useThroughputData(
+  const { gpuDataByGroupKey, ranges, hasData, loading, error } = useThroughputData(
     selectedModel,
     effectiveSequence,
     effectivePrecisions,
@@ -358,16 +373,26 @@ function CompareTableSection({
     return { pointsA: pA, pointsB: pB };
   }, [gpuDataByGroupKey, a, b]);
 
-  const clientRange = hasData ? ranges.interactivity : ssrTableData.interactivityRange;
-
   return (
     <CompareTableRenderer
       aLabel={aLabel}
       bLabel={bLabel}
       ssrTableData={ssrTableData}
-      interactivityRange={clientRange}
-      gpuDataPointsA={pointsA}
-      gpuDataPointsB={pointsB}
+      ssrSequence={ssrSequence}
+      ssrModel={initialModel}
+      ssrPrecisions={ssrPrecisions ?? []}
+      selectedSequence={selectedSequence}
+      effectiveSequence={effectiveSequence}
+      sequenceResolved={sequenceResolved}
+      selectedModel={selectedModel}
+      selectedPrecisions={selectedPrecisions}
+      effectivePrecisions={effectivePrecisions}
+      latestRun={calculatorRunDate === ''}
+      pointsA={pointsA}
+      pointsB={pointsB}
+      clientInteractivityRange={hasData ? ranges.interactivity : null}
+      loading={loading}
+      error={error}
       emptyStateText={emptyStateText}
       metricLabelOverrides={PER_DOLLAR_LABEL_OVERRIDES[isZh ? 'zh' : 'en']}
       visibleMetricLabels={PER_DOLLAR_TABLE_METRICS}

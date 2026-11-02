@@ -66,12 +66,12 @@ describe('AgentX comparison links', () => {
       label: 'AgentX',
       sequence: 'agentic-traces',
     });
-    expect(comparisonPairHref('en', 'deepseek-v41-flash-gb300-vs-b200', flash)).toBe(
-      '/compare/deepseek-v41-flash-gb300-vs-b200/agentic',
+    expect(comparisonPairHref('en', 'deepseek-v41-flash-gb300-vs-b200')).toBe(
+      '/compare/deepseek-v41-flash-gb300-vs-b200',
     );
-    expect(
-      comparisonPairHref('zh', 'deepseek-v41-flash-gb300-vs-b200', flash, 'compare-per-dollar'),
-    ).toBe('/zh/compare-per-dollar/deepseek-v41-flash-gb300-vs-b200/agentic');
+    expect(comparisonPairHref('zh', 'deepseek-v41-flash-gb300-vs-b200', 'compare-per-dollar')).toBe(
+      '/zh/compare-per-dollar/deepseek-v41-flash-gb300-vs-b200',
+    );
     expect(FEATURED_AGENTX_MODELS[2]).toBe(flash);
     expect(agentxDashboardHref('en', flash)).toBe('/inference/deepseek-v41-flash');
   });
@@ -84,8 +84,8 @@ describe('AgentX comparison links', () => {
       label: 'AgentX',
       sequence: 'agentic-traces',
     });
-    expect(comparisonPairHref('en', 'muse-spark-open-mi355x-vs-b200', muse)).toBe(
-      '/compare/muse-spark-open-mi355x-vs-b200/agentic',
+    expect(comparisonPairHref('en', 'muse-spark-open-mi355x-vs-b200')).toBe(
+      '/compare/muse-spark-open-mi355x-vs-b200',
     );
     expect(overviewScenariosForModel(Model.Muse_Spark_Open)).toEqual(['agentx']);
   });
@@ -96,14 +96,26 @@ describe('AgentX comparison links', () => {
       label: 'AgentX',
       sequence: 'agentic-traces',
     });
-    expect(comparisonPairHref('en', 'minimax-m31-flash-b300-vs-b200', flash)).toBe(
-      '/compare/minimax-m31-flash-b300-vs-b200/agentic',
+    expect(comparisonPairHref('zh', 'minimax-m31-flash-b300-vs-b200')).toBe(
+      '/zh/compare/minimax-m31-flash-b300-vs-b200',
     );
     expect(FEATURED_AGENTX_MODELS).not.toContain(flash);
     expect(overviewScenariosForModel(Model.MiniMax_M3_1_Flash)).toEqual(['agentx']);
   });
 
-  it('routes MiMo V2.6 Flash to AgentX without featuring it on the ledger', () => {
+  it('routes GLM-5.3-Flash to AgentX without promoting it on the landing ledger', () => {
+    const flash = COMPARE_MODEL_SLUGS.find((model) => model.slug === 'glm-5-3-flash')!;
+    expect(comparisonScenarioForModel(flash)).toEqual({
+      label: 'AgentX',
+      sequence: 'agentic-traces',
+    });
+    expect(agentxDashboardHref('en', flash)).toBe('/inference/glm-5-3-flash');
+    expect(agentxDashboardHref('zh', flash)).toBe('/zh/inference/glm-5-3-flash');
+    expect(FEATURED_AGENTX_MODELS).not.toContain(flash);
+    expect(overviewScenariosForModel(Model.GLM_5_3_Flash)).toEqual(['agentx']);
+  });
+
+  it('routes MiMo V2.6 Flash to AgentX without promoting it on the landing ledger', () => {
     const mimo = COMPARE_MODEL_SLUGS.find((model) => model.slug === 'mimo-v26-flash')!;
     expect(comparisonScenarioForModel(mimo)).toEqual({
       label: 'AgentX',
@@ -112,6 +124,8 @@ describe('AgentX comparison links', () => {
     expect(comparisonPairHref('en', 'mimo-v26-flash-b300-vs-b200', mimo)).toBe(
       '/compare/mimo-v26-flash-b300-vs-b200/agentic',
     );
+    expect(agentxDashboardHref('en', mimo)).toBe('/inference/mimo-v26-flash');
+    expect(agentxDashboardHref('zh', mimo)).toBe('/zh/inference/mimo-v26-flash');
     expect(FEATURED_AGENTX_MODELS).not.toContain(mimo);
     expect(overviewScenariosForModel(Model.MiMo_V2_6_Flash)).toEqual(['agentx']);
   });
@@ -137,21 +151,24 @@ describe('AgentX comparison links', () => {
       label: 'AgentX',
       sequence: 'agentic-traces',
     });
-    expect(comparisonPairHref('en', 'deepseek-v4-h100-vs-h200', deepSeekV4)).toBe(
-      '/compare/deepseek-v4-h100-vs-h200/agentic',
-    );
     expect(comparisonScenarioForModel(deepSeekR1)).toEqual({
       label: '8K/1K',
       sequence: '8k/1k',
     });
-    expect(comparisonPairHref('zh', 'deepseek-r1-h100-vs-h200', deepSeekR1)).toBe(
-      '/zh/compare/deepseek-r1-h100-vs-h200/8k-1k',
+  });
+
+  it('links hub cards to the canonical pair page, not a scenario variant', () => {
+    expect(comparisonPairHref('en', 'deepseek-v4-h100-vs-h200')).toBe(
+      '/compare/deepseek-v4-h100-vs-h200',
     );
-    expect(
-      comparisonPairHref('en', 'deepseek-v4-h100-vs-h200', deepSeekV4, 'compare-per-dollar'),
-    ).toBe('/compare-per-dollar/deepseek-v4-h100-vs-h200/agentic');
-    expect(
-      comparisonPairHref('zh', 'deepseek-r1-h100-vs-h200', deepSeekR1, 'compare-per-dollar'),
-    ).toBe('/zh/compare-per-dollar/deepseek-r1-h100-vs-h200/8k-1k');
+    expect(comparisonPairHref('zh', 'deepseek-r1-h100-vs-h200')).toBe(
+      '/zh/compare/deepseek-r1-h100-vs-h200',
+    );
+    expect(comparisonPairHref('en', 'deepseek-v4-h100-vs-h200', 'compare-per-dollar')).toBe(
+      '/compare-per-dollar/deepseek-v4-h100-vs-h200',
+    );
+    expect(comparisonPairHref('zh', 'deepseek-r1-h100-vs-h200', 'compare-per-dollar')).toBe(
+      '/zh/compare-per-dollar/deepseek-r1-h100-vs-h200',
+    );
   });
 });

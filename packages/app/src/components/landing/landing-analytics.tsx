@@ -4,12 +4,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
-import { track } from '@/lib/analytics/analytics';
+import { track, trackOncePerPageview } from '@/lib/analytics/analytics';
+import { placementFor } from '@/lib/analytics/placement';
 import { navigateInApp } from '@/lib/routing/client-navigation';
 
 export function LandingPageAnalytics() {
   useEffect(() => {
-    track('landing_page_viewed');
+    trackOncePerPageview('landing_page_viewed');
   }, []);
 
   return null;
@@ -37,7 +38,7 @@ export function LandingTrackedLink({
       onClick={(event) => {
         onClick?.(event);
         if (event.defaultPrevented) return;
-        track(analyticsEvent);
+        track(analyticsEvent, { placement: placementFor(event.currentTarget) });
         if (appNavigation) navigateInApp(event, router, href);
       }}
     />

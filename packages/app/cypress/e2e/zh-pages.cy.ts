@@ -8,14 +8,14 @@ describe('Chinese (/zh) pages', () => {
 
     it('renders the Chinese landing content', () => {
       cy.get('[data-testid="intro-section"]').should('contain.text', 'AI 加速器系统基准测试');
-      cy.get('[data-testid="splash-text"]').should('have.text', 'AgentX 来了！！');
+      cy.get('[data-testid="splash-text"]').should('not.exist');
       cy.get('[data-testid="landing-quick-comparisons"]').should('not.exist');
       cy.contains('快速对比').should('not.exist');
     });
 
     it('renders the AgentX hero on the Chinese landing page', () => {
       cy.get('[data-testid="compare-agentx-primary"]').within(() => {
-        cy.get('h2').should('have.text', '真实智能体工作负载下的推理性能对比');
+        cy.get('h1').should('have.text', '真实智能体工作负载下的推理性能对比');
         cy.get('[data-testid="compare-agentx-revenue-calculator-link"]')
           .should('contain.text', 'Token 收入计算器')
           .and('have.attr', 'href', '/zh/profit-estimator-per-gigawatt');
@@ -67,16 +67,24 @@ describe('Chinese (/zh) pages', () => {
       cy.visit('/zh/inference');
     });
 
-    it('renders the Chinese SEO intro above the chart', () => {
-      cy.get('[data-testid="zh-tab-intro"]').within(() => {
-        cy.contains('h1', '智能体推理基准测试').should('exist');
-        cy.contains('长上下文、多轮').should('exist');
-      });
+    it('renders the Chinese h1 without an intro box', () => {
+      cy.location('pathname').should('eq', '/zh/inference/kimi-k3');
+      cy.get('[data-testid="inference-page-heading"]').should('have.text', 'Kimi K3 推理基准测试');
+      cy.get('[data-testid="zh-tab-intro"]').should('not.exist');
 
       cy.get('[data-testid="tab-trigger-evaluation"]')
         .should('contain.text', '准确率评估')
         .and('have.attr', 'href')
         .and('match', /^\/zh\/evaluation/u);
+    });
+  });
+
+  describe('zh per-model inference page', () => {
+    it('renders a model-specific Chinese h1', () => {
+      cy.visit('/zh/inference/kimi-k3');
+      cy.get('[data-testid="inference-page-heading"]')
+        .should('contain.text', 'Kimi')
+        .and('contain.text', '推理基准测试');
     });
   });
 
@@ -135,22 +143,20 @@ describe('Chinese (/zh) pages', () => {
   });
 
   describe('Run and Rankings model links', () => {
-    it('adds index supporter attribution only to the search description, matching English scope', () => {
+    it('keeps index descriptions free of supporter attribution and identical across search, social, and JSON-LD', () => {
       for (const path of ['/zh/run', '/zh/rankings']) {
         cy.request(path).then(({ body }) => {
           const document = new DOMParser().parseFromString(body, 'text/html');
           const content = (selector: string) =>
             document.querySelector(selector)?.getAttribute('content');
-          const baseDescription = content('meta[property="og:description"]');
-          expect(baseDescription).to.be.a('string').and.not.include(SUPPORTERS_LINE_ZH);
-          expect(content('meta[name="description"]')).to.eq(
-            `${baseDescription}${SUPPORTERS_LINE_ZH}`,
-          );
-          expect(content('meta[name="twitter:description"]')).to.eq(baseDescription);
+          const description = content('meta[name="description"]');
+          expect(description).to.be.a('string').and.not.include(SUPPORTERS_LINE_ZH);
+          expect(content('meta[property="og:description"]')).to.eq(description);
+          expect(content('meta[name="twitter:description"]')).to.eq(description);
           const collection = [...document.querySelectorAll('script[type="application/ld+json"]')]
             .map((script) => JSON.parse(script.textContent ?? '{}'))
             .find((data) => data['@type'] === 'CollectionPage');
-          expect(collection?.description).to.eq(baseDescription);
+          expect(collection?.description).to.eq(description);
         });
       }
     });
@@ -169,7 +175,8 @@ describe('Chinese (/zh) pages', () => {
 
         cy.get('meta[name="description"]')
           .invoke('attr', 'content')
-          .should('match', new RegExp(`${SUPPORTERS_LINE_ZH}$`, 'u'))
+          .should('be.a', 'string')
+          .and('not.include', SUPPORTERS_LINE_ZH)
           .then((description) => {
             cy.get('meta[property="og:description"]').should('have.attr', 'content', description);
             cy.get('meta[name="twitter:description"]').should('have.attr', 'content', description);
@@ -404,7 +411,7 @@ describe('Chinese (/zh) pages', () => {
       cy.intercept('GET', '**/api/v1/feedback/list', { body: { rows: [] } }).as('feedbackList');
       cy.visit('/zh/feedback', {
         onBeforeLoad(win) {
-          win.localStorage.setItem('inferencex-feature-gate', '1');
+          win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
         },
       });
       cy.wait('@feedbackList');

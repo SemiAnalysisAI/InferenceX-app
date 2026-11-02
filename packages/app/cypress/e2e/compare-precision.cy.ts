@@ -36,12 +36,12 @@ describe('Compare precision index page', () => {
       .first()
       .should('contain.text', 'AgentX')
       .and('have.attr', 'href')
-      .and('match', /\/agentic$/u);
+      .and('match', /^\/compare\/deepseek-v4-[^/?]+$/u);
     cy.get('#deepseek-r1 a[data-scenario="8K/1K"]')
       .first()
       .should('contain.text', '8K/1K')
       .and('have.attr', 'href')
-      .and('match', /\/8k-1k$/u);
+      .and('match', /^\/compare\/deepseek-r1-[^/?]+$/u);
     cy.get('a[data-scenario] img[src="/logos/nvidia-color.svg"]').should('exist');
     cy.get('a[data-scenario] img[src="/logos/amd.svg"]').should('exist');
   });
@@ -71,7 +71,7 @@ describe('Compare precision index page', () => {
     cy.get('#deepseek-v4 a[data-scenario="AgentX"]')
       .first()
       .should('have.attr', 'href')
-      .and('match', /^\/zh\/compare\/.+\/agentic$/u);
+      .and('match', /^\/zh\/compare\/deepseek-v4-[^/?]+$/u);
     cy.get('a[data-scenario] img[src="/logos/nvidia-color.svg"]').should('exist');
     cy.get('a[data-scenario] img[src="/logos/amd.svg"]').should('exist');
   });

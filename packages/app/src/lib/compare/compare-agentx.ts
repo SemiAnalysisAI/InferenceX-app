@@ -1,4 +1,3 @@
-import { scenarioSegmentForSequence } from '@/lib/compare/compare-scenario-route';
 import { COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare/compare-slug';
 import { getInferenceModelBySlug, inferenceModelPath } from '@/lib/routing/inference-model-slug';
 
@@ -15,7 +14,11 @@ const FEATURED_AGENTX_MODEL_SLUGS = [
 
 const AGENTX_NEW_MODEL_SLUGS: readonly (typeof FEATURED_AGENTX_MODEL_SLUGS)[number][] = [];
 
-const AGENTX_ONLY_MODEL_SLUGS: readonly string[] = ['minimax-m31-flash', 'mimo-v26-flash'];
+const AGENTX_ONLY_MODEL_SLUGS: readonly string[] = [
+  'minimax-m31-flash',
+  'glm-5-3-flash',
+  'mimo-v26-flash',
+];
 
 const AGENTX_SCENARIO_MODEL_SET = new Set<string>([
   ...FEATURED_AGENTX_MODEL_SLUGS,
@@ -63,10 +66,7 @@ export function comparisonScenarioForModel(model: CompareModelSlug): ComparisonS
 export function comparisonPairHref(
   locale: 'en' | 'zh',
   slug: string,
-  model: CompareModelSlug,
   family: 'compare' | 'compare-per-dollar' = 'compare',
 ): string {
-  const path = locale === 'zh' ? `/zh/${family}/${slug}` : `/${family}/${slug}`;
-  const segment = scenarioSegmentForSequence(comparisonScenarioForModel(model).sequence);
-  return segment ? `${path}/${segment}` : path;
+  return locale === 'zh' ? `/zh/${family}/${slug}` : `/${family}/${slug}`;
 }

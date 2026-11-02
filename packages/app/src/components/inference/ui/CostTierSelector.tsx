@@ -6,6 +6,7 @@ import { useGlobalFilterSelection } from '@/providers/GlobalFilterContext';
 
 import {
   useInferenceActions,
+  useInferenceAnalyticsContext,
   useInferenceDisplay,
   useInferenceFilters,
 } from '@/components/inference/InferenceContext';
@@ -66,6 +67,7 @@ export function CostTierSelector({
   const { selectedYAxisMetric } = useInferenceDisplay();
   const { selectedModel, selectedSequence, selectedPrecisions, userCosts } = useInferenceFilters();
   const { setSelectedYAxisMetric, setUserCosts } = useInferenceActions();
+  const analyticsContext = useInferenceAnalyticsContext();
   const { tcoBasis } = useGlobalFilterSelection();
   const { interceptLocked, dialog } = useLockedTierDialog('yaxis_cost_tier');
 
@@ -111,6 +113,7 @@ export function CostTierSelector({
     }
     setSelectedYAxisMetric(value);
     track('inference_cost_tier_selected', {
+      ...analyticsContext,
       metric: value,
       cost_tier: (isMetricKey(tierKey) ? metricCostTier(tierKey) : undefined) ?? 'unknown',
       metric_label: isMetricKey(tierKey) ? metricOptionTitle(tierKey, 'en') : value,
@@ -120,9 +123,9 @@ export function CostTierSelector({
         model: selectedModel,
         sequence: selectedSequence,
         precision: selectedPrecisions.join(','),
-        yAxisMetric: value,
-        yAxisMetricLabel: isMetricKey(tierKey) ? metricOptionTitle(tierKey, 'en') : value,
-        yAxisMetricGroup:
+        metric: value,
+        metric_label: isMetricKey(tierKey) ? metricOptionTitle(tierKey, 'en') : value,
+        metric_group:
           METRIC_CONTROL_GROUPS.find((group) =>
             (group.metrics as readonly string[]).includes(value),
           )?.label ?? 'Unknown',

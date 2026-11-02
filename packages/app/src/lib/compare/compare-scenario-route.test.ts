@@ -8,12 +8,12 @@ import {
   scenarioSegmentForSequence,
   sequenceForScenarioSegment,
 } from './compare-scenario-route';
-import { KNOWN_SEQUENCES } from './compare-ssr';
+import { Sequence } from '@/lib/catalog/data-mappings';
 
 describe('compare scenario segments', () => {
-  it('covers every sequence the query param accepts', () => {
+  it('covers every sequence', () => {
     const mapped = new Set<string>(Object.values(SCENARIO_SEGMENT_TO_SEQUENCE));
-    expect(mapped).toEqual(new Set(KNOWN_SEQUENCES));
+    expect(mapped).toEqual(new Set(Object.values(Sequence)));
   });
 
   it('round-trips every segment through its sequence', () => {

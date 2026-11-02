@@ -1,7 +1,16 @@
 import { selectXAxisMode } from '../support/e2e';
 import { expandLegendAdvanced } from '../support/legend-advanced';
+
+const withFixtureModel = (path: string) => {
+  const url = new URL(path, 'http://localhost');
+  if (url.pathname === '/inference' && !url.searchParams.has('g_model')) {
+    url.searchParams.set('g_model', 'DeepSeek-V4-Pro');
+  }
+  return `${url.pathname}${url.search}${url.hash}`;
+};
+
 const visitWithDismissedModal = (path: string) => {
-  cy.visit(path, {
+  cy.visit(withFixtureModel(path), {
     onBeforeLoad(win) {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     },
@@ -9,7 +18,7 @@ const visitWithDismissedModal = (path: string) => {
 };
 
 const visitWithErrorSpy = (path: string) => {
-  cy.visit(path, {
+  cy.visit(withFixtureModel(path), {
     onBeforeLoad(win) {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
       cy.stub(win.console, 'error').as('consoleError');
@@ -384,7 +393,7 @@ describe('URL Parameter Persistence', () => {
   });
 
   describe('Default toggle states (share-link correctness)', () => {
-    it('a bare /inference link with neither param renders high contrast AND parallelism labels off', () => {
+    it('an /inference link with neither toggle param renders high contrast AND parallelism labels off', () => {
       visitWithDismissedModal('/inference');
       cy.get('[data-testid="scatter-graph"]').should('exist');
       expandLegendAdvanced();

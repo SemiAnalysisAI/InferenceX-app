@@ -8,6 +8,7 @@ import {
 } from '@semianalysisai/inferencex-db/operatorx/compare';
 
 import { distributionView } from '@/lib/operatorx/distribution-view';
+import { rooflineSummary } from '@/lib/operatorx/roofline-summary';
 import { getComparison } from '@/lib/operatorx/service';
 
 import { GET } from './route';
@@ -17,7 +18,7 @@ vi.mock('@/lib/operatorx/service', () => ({
   isPartialComparison: vi.fn(() => false),
 }));
 vi.mock('@/lib/cache/api-cache', () => ({
-  cachedJson: vi.fn((body) => NextResponse.json(body)),
+  cachedJson: vi.fn((_request: Request, body: unknown) => NextResponse.json(body)),
   operatorXCacheTag: vi.fn(() => 'opx'),
 }));
 
@@ -101,4 +102,68 @@ it('rejects invalid distribution selectors without changing the default comparis
     new NextRequest('http://localhost/api/v1/operatorx/compare?op=gemm'),
   );
   expect(await defaultResponse.json()).not.toHaveProperty('distribution');
+});
+
+it.each([false, true])(
+  'returns matching summary controls and values with sharedOnly=%s',
+  async (sharedOnly) => {
+    const source = comparison();
+    vi.mocked(getComparison).mockResolvedValue(source);
+    const response = await GET(
+      new NextRequest(
+        `http://localhost/api/v1/operatorx/compare?op=gemm&rooflinePrecision=bf16&rooflineHardware=ascend950pr,h200&rooflineNormalized=false&rooflineSharedOnly=${sharedOnly}`,
+      ),
+    );
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body.rooflineSummary).toEqual(
+      rooflineSummary(comparisonView(source, null), {
+        precision: 'bf16',
+        hardware: ['ascend950pr', 'h200'],
+        normalized: false,
+        sharedOnly,
+      }),
+    );
+    expect(body.rooflineSummary.bars).toMatchObject([
+      { hardware: 'ascend950pr', n: 1, median: 378, best: 378 },
+      { hardware: 'h200', n: 1, median: 189, best: 189 },
+    ]);
+  },
+);
+
+it('defaults the roofline summary to the shared cohort', async () => {
+  vi.mocked(getComparison).mockResolvedValue(comparison());
+  const response = await GET(
+    new NextRequest('http://localhost/api/v1/operatorx/compare?op=gemm&rooflinePrecision=bf16'),
+  );
+  const body = await response.json();
+  expect(body.rooflineSummary).toMatchObject({ sharedOnly: true, cohort: 'shared-compute-bound' });
+});
+
+it.each([
+  'rooflinePrecision=other',
+  'rooflineNormalized=yes',
+  'rooflineSharedOnly=yes',
+  'rooflineHardware=unknown',
+  'rooflineHardware=',
+])('rejects an invalid roofline selector: %s', async (query) => {
+  vi.mocked(getComparison).mockResolvedValue(comparison());
+  const response = await GET(
+    new NextRequest(`http://localhost/api/v1/operatorx/compare?op=gemm&${query}`),
+  );
+  expect(response.status).toBe(400);
+});
+
+it('returns an empty summary when the selected workload has no measured hardware', async () => {
+  vi.mocked(getComparison).mockResolvedValue({ op: 'gemm', hardware: [], workloads: [], rows: [] });
+  const response = await GET(
+    new NextRequest('http://localhost/api/v1/operatorx/compare?op=gemm&rooflineNormalized=true'),
+  );
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  expect(body.rooflineSummary).toMatchObject({
+    hardware: [],
+    bars: [],
+    caseIndices: [],
+  });
 });

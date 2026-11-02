@@ -1,9 +1,15 @@
 import type { RankingPageEntry } from '@/lib/live-seo/rankings';
+import { fitMetaTitle } from '@/lib/seo/meta-text';
 
 export function rankingPageTitleZh(entry: RankingPageEntry): string {
+  const model = entry.model.seoName;
   return entry.kind === 'fastest-gpu'
-    ? `${entry.model.seoName} 推理最快 GPU 实时排行`
-    : `运行 ${entry.model.seoName} 最省钱的 GPU：每百万 token 成本排行`;
+    ? fitMetaTitle([`${model} 推理最快 GPU 实时排行`, `${model} 最快 GPU 排行`])
+    : fitMetaTitle([
+        `运行 ${model} 最省钱的 GPU：每百万 token 成本排行`,
+        `运行 ${model} 最省钱的 GPU`,
+        `${model} 最低成本 GPU 排行`,
+      ]);
 }
 
 export function rankingPageHeadingZh(entry: RankingPageEntry): string {

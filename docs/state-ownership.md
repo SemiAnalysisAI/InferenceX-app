@@ -4,6 +4,21 @@ Reference for agents modifying filter behavior. Explains which context to touch 
 
 ## Provider State Map
 
+The bare `/inference` and `/zh/inference` routes use a temporary redirect to
+Kimi K3 in `next.config.ts`. Explicit `g_model` share links bypass that redirect,
+and all other query parameters are carried forward. Model-specific paths and
+other dashboard defaults are unchanged. The read-only inference API still
+requires an explicit `model`; its example and the skills guide use `Kimi-K3`
+for parity with this navigation default.
+Tab navigation includes the retained model when returning to inference, so the
+entry redirect does not reset a user's selection.
+`GlobalFilterProvider` publishes the selected model to the client-only
+`inference-navigation-state.ts` store. Tab navigation subscribes to that value,
+including selections omitted from share URLs because they match an older default.
+The store survives provider remounts but resets on a full page load.
+Share links from the bare inference route explicitly include this model, even
+when it matches the legacy URL-state default.
+
 ### GlobalFilterProvider
 
 File: `packages/app/src/providers/GlobalFilterContext.tsx`
@@ -13,9 +28,35 @@ context value. Consumers subscribe through five independently memoized domains:
 `useGlobalFilterSelection`, `useGlobalFilterActions`, `useGlobalFilterRun`,
 `useGlobalFilterAvailability`, and `useGlobalFilterWorkflow`.
 
+GLM-5.3-Flash uses the existing Konami UI feature gate. The provider retains a
+requested model but publishes a safe effective selection while locked, including
+on first render and after relock. It waits for gate hydration before synchronizing
+the URL, so an unlocked deep link survives reload. Unofficial availability cannot
+unlock a model. The root model boundary also blocks direct gated routes; public
+discovery excludes them and client overview/search surfaces respect the gate.
+Saved gated `g_model` selections on inference routes are canonicalized by the frontend
+proxy before rendering, preserving locale and query parameters. This gives SSR and
+the fresh client provider the same requested model without delaying public-model SSR.
+Overview UI requests retain the complete matrix, then apply model visibility before
+row scopes and toggle counts; the read-only API retains its original scoped responses.
+
+While a requested gated model awaits hydration, its consumers, navigation-model
+write and date-scoped workflow query wait too. Locked routes redirect directly
+to the localized canonical Kimi K3 route, avoiding a transient bare-route default.
+This is UI-only visibility, not authorization. Following PowerX, the read-only
+API parameters, raw model registry and response data remain unchanged; the API
+and packaged skills document this presentation-only parity exception.
+
 Workflow query updates therefore do not notify selection or action consumers. Selection
 updates do not notify workflow-only consumers. Components should subscribe only to the
 domains they read.
+
+`InferencePageIntro` reads the selected model and the live client pathname on the English
+and Chinese inference pages. Model switches use shallow history updates, so the intro also
+synchronizes the browser title, descriptions, social metadata, canonical URL, and language
+alternates without remounting the chart. Server metadata remains defined by each route.
+This is presentation-only: the read-only API and `inferencex-skills` model/filter contracts
+and returned benchmark data are unchanged.
 
 Availability owns explicit settled and error states. Consumers must distinguish an
 unresolved request from a settled empty result. Inference fetches are gated on
@@ -39,6 +80,22 @@ four independently memoized domains: `useInferenceData`, `useInferenceFilters`,
 `useInferenceDisplay`, and `useInferenceActions`. Consumers must subscribe only to the
 domains they read. Display changes stay in `useInferenceDisplay`, so a contrast or label
 toggle does not notify filter-only or data-only consumers.
+
+GPU-count (`i_label`), parallelism (`i_advlabel`), and concurrency (`i_conclabel`)
+annotations are independent. Agentic and fixed-sequence charts default to curve
+labels on and point annotations off. Parallelism is available outside Advanced.
+The default-on Offloading Label control in Advanced uses `i_offloadlabel=0` to hide
+both the dotted-circle “KV offload ON” footer key and the dotted halos around
+offloaded points, without hiding the points or filtering results. It applies to
+official and unofficial data, GPU-history comparisons, and chart exports.
+These are presentation-only controls: the read-only API and skills data contracts
+keep every benchmark row and offload field unchanged.
+
+Advanced also has a default-on Framework Line Label control (`i_frameworklabel=0`
+to hide). It hides the framework suffix inside existing line labels, retaining
+hardware names, precision, comparison dates and overlay run tags. It shares state
+across the main chart, GPU-history comparisons, replay and exports, independently
+of Line Labels. It does not filter frameworks or change read-only API data.
 
 `useInferenceFilters` owns inference-only selection state. GPU selections and comparison
 dates do not belong in global filter state because evaluation and reliability do not use
@@ -140,9 +197,9 @@ Prefixes name share scopes (see [Architecture](./architecture.md#url-state-persi
 
 ### Snapshot, external subscriptions, and writes
 
-`url-state.ts` snapshots known share parameters at module load and removes them from the
-visible address bar after hydration while preserving the pathname and hash. Route-owned
-entry points pass typed seeds where they render URL-controlled state on the server.
+`url-state.ts` snapshots known share parameters at module load and leaves the address bar
+as it loaded, so reloading a share link reopens the same view. Route-owned entry points pass
+typed seeds where they render URL-controlled state on the server.
 
 Live address-bar consumers use the shared `useClientSearch` external store. It subscribes
 once to `popstate`, `CLIENT_SEARCH_CHANGE_EVENT`, and `CLIENT_PATHNAME_CHANGE_EVENT` through `useSyncExternalStore`;
@@ -160,10 +217,11 @@ set from the destination URL.
 ### Carrying state across a full-document navigation
 
 The two effects above combine into a trap: filter changes reach only the
-in-memory `currentState`, and the address bar is stripped clean, so **the URL of
-the `/inference` history entry describes nothing**. Any full-document navigation
-away from the chart therefore destroys the state entirely — the module is torn
-down, and Back returns to a bare `/inference` that rebuilds from defaults.
+in-memory `currentState`, and the address bar keeps only the parameters the page
+loaded with, so **the URL of the `/inference` history entry does not describe the
+current chart**. Any full-document navigation away from the chart therefore loses
+every change made since load. The module is torn down, and Back returns to the
+loaded URL, which rebuilds from those parameters and the defaults.
 
 The agentic point-detail links (`/inference/agentic/<id>`, rendered by
 `tooltipUtils.viewActionsHTML` and `legend-points-table.pointDetailHref`)
@@ -177,7 +235,7 @@ open-in-new-tab. Three helpers in `url-state.ts` bridge the gap:
 | `currentChartSearch()`      | `withChartState()`                                           | resolves the tab through the `/zh` prefix, flushes pending writes, filters    |
 
 The detail page reads the state back through `withChartState` (its own URL was
-snapshotted into `currentState` at load, then stripped as usual), which is what
+snapshotted into `currentState` at load), which is what
 makes its "Inference chart" link land on the chart the reader left rather than
 on defaults.
 
@@ -223,14 +281,24 @@ the chart prunes them against the rendered curves, so a link written from one da
 degrades to fewer rulers, never to an error. Overlay ids depend on the run order in `unofficialruns`, which the share
 link already carries.
 
-`i_pcompare` (inference scope, default `''`) is the power comparison mode, `boundaries` or
-`roles`, owned by `InferenceProvider` as `powerCompare` (display context) with
+`i_pcompare` (inference scope, default `''`) is the power comparison mode, `boundaries`,
+`provisioned`, `all` (share links only) or `roles`, owned by `InferenceProvider` as `powerCompare` (display context) with
 `setPowerCompare` (actions). It is written as `''` for `none`. It is deliberately NOT cleared
 when the metric changes to one without a common axis for the siblings: the chart then draws
 the metric alone and the Measured controls show a hint, so the link's intent survives a
 detour through another setting. Which comparison rows a reader hid from the legend is
 `ScatterGraph` component state (`hiddenPowerVariants`), never shared — see
 [PowerX Permanent View](./powerx-permanent-view.md#comparison-series-i_pcompare).
+
+`i_pbpoint` (inference scope, default `''`) is the set of per-chip compared points on the
+Where the power goes view: `seriesKey:concurrency` pairs joined by commas, one per chip
+pinned by a column click in its drill-down, owned by `PowerAnalysisPanels` component state
+(`comparedPoints`) and written through `useUrlState` whenever it changes (`''` when no chip
+is pinned, so the parameter leaves the link). It is read once on mount; a pair naming a chip
+or a concurrency the current view lacks is carried but applies to nothing. The comparison
+interactivity itself (the slider) is `PowerXSurfaceProvider` context, not a URL parameter,
+and moving it clears every pin. See
+[PowerX Permanent View](./powerx-permanent-view.md#powerx-layout).
 
 ### Staged-result chart links
 

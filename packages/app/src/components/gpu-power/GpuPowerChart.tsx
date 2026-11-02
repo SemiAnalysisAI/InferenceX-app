@@ -33,7 +33,7 @@ const STRINGS = {
     empty: 'No Chip metrics data to display.',
     instructions:
       'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset · Click a point to pin tooltip',
-    seconds: 'Seconds',
+    seconds: 'Time (s)',
     dismiss: 'Click elsewhere to dismiss',
     chip: 'Chip',
     power: 'Power',
@@ -48,7 +48,7 @@ const STRINGS = {
   zh: {
     empty: '暂无可显示的芯片指标数据。',
     instructions: 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
-    seconds: '秒',
+    seconds: '时间（秒）',
     dismiss: '点击其他区域关闭',
     chip: '芯片',
     power: '功耗',

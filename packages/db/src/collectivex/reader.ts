@@ -1,4 +1,4 @@
-import { readSwapResults, isSwapMatrix } from './swap-reader';
+import { readSwapResults } from './swap-reader';
 
 import type {
   CollectiveXComponent,
@@ -10,11 +10,11 @@ import type {
   CollectiveXKvRow,
   CollectiveXMode,
   CollectiveXOutcome,
-  CollectiveXPercentiles,
   CollectiveXPoint,
   CollectiveXPrecision,
   CollectiveXRunSummary,
   CollectiveXSeries,
+  CollectiveXTailPercentiles,
   CollectiveXTerminalStatus,
 } from './types';
 
@@ -38,13 +38,13 @@ interface RawCase {
 
 interface RawComponent {
   availability: string;
-  percentiles_us: CollectiveXPercentiles | null;
+  percentiles_us: CollectiveXTailPercentiles | null;
 }
 
 interface RawRow {
   tokens_per_rank: number;
   global_tokens: number;
-  token_rate_at_latency_percentile: CollectiveXPercentiles;
+  token_rate_at_latency_percentile: CollectiveXTailPercentiles;
   components: Record<string, RawComponent | null>;
   byte_provenance: Record<string, { activation_data_bytes: number; total_logical_bytes?: number }>;
   wire_byte_provenance?: Record<
@@ -61,10 +61,11 @@ interface RawKvRow {
   op: string;
   descs: number;
   req_bytes: number;
+  posted_bytes?: number;
   prep_ms?: number;
-  latency_ms: CollectiveXKvLatency;
-  request_ms?: CollectiveXKvLatency;
-  gbps_p50: number;
+  latency_ms: CollectiveXKvLatency | null;
+  request_ms?: CollectiveXKvLatency | null;
+  gbps_p50: number | null;
   gbps_p50_incl_prep?: number;
   verify?: { passed: boolean; detail?: string };
 }
@@ -76,7 +77,13 @@ interface RawShard {
     case_id: string;
     case_factors: { sku: string; case: RawCase };
   };
-  implementation: { name: string };
+  implementation: {
+    name: string;
+    library_version?: unknown;
+    maturity?: unknown;
+    transport?: unknown;
+  };
+  topology?: { network?: unknown };
   runtime: { vendor: string };
   measurement: { rows: RawRow[] };
   outcome: { status: string; reasons?: string[] };
@@ -115,7 +122,6 @@ function toSupportedVendor(raw: string): CollectiveXVendor | null {
 }
 
 function matrixOf(value: unknown): RawMatrix {
-  if (isSwapMatrix(value)) return { version: 1, requested_cases: [] };
   const matrix = value as RawMatrix;
   if (!Number.isSafeInteger(matrix?.version) || !Array.isArray(matrix?.requested_cases)) {
     throw new TypeError('invalid CollectiveX matrix');
@@ -152,10 +158,11 @@ function toMode(raw: string | undefined): CollectiveXMode {
 
 function ratesFrom(
   bytes: number,
-  latency: CollectiveXPercentiles,
+  latency: CollectiveXTailPercentiles,
   divisor = 1,
-): CollectiveXPercentiles {
-  const rate = (us: number) => (bytes / divisor / us) * 1e-3;
+): CollectiveXTailPercentiles {
+  const rate = (us: number | null) =>
+    us !== null && us > 0 ? (bytes / divisor / us) * 1e-3 : null;
   return {
     p50: rate(latency.p50),
     p90: rate(latency.p90),
@@ -210,6 +217,11 @@ function topologyOf(kase: RawCase) {
   };
 }
 
+function libraryVersionOf(shard: RawShard): string | null {
+  const version = shard.implementation.library_version;
+  return typeof version === 'string' && version.trim() ? version.trim() : null;
+}
+
 function buildSeries({ shard, vendor }: SupportedShard): CollectiveXSeries {
   const kase = shard.identity.case_factors.case;
   return {
@@ -218,6 +230,7 @@ function buildSeries({ shard, vendor }: SupportedShard): CollectiveXSeries {
     mode: toMode(kase.mode),
     precision: toPrecision(kase.precision),
     backend: shard.implementation.name,
+    library_version: libraryVersionOf(shard),
     system: {
       ...topologyOf(kase),
       sku: shard.identity.case_factors.sku,
@@ -285,24 +298,41 @@ function isKvCase(kase: RawCase): boolean {
   return kase.suite === 'kv-transfer';
 }
 
-function mapKvRow(row: RawKvRow): CollectiveXKvRow {
-  return {
-    kind: row.kind === 'bulk' ? 'bulk' : 'paged',
-    isl: row.isl,
-    page_tokens: row.page_tokens ?? null,
-    batch: row.batch ?? 1,
-    op: row.op === 'push' ? 'push' : 'pull',
-    descs: row.descs,
-    req_bytes: row.req_bytes,
-    prep_ms: row.prep_ms ?? 0,
-    latency_ms: row.latency_ms,
-    ...(row.request_ms ? { request_ms: row.request_ms } : {}),
-    gbps_p50: row.gbps_p50,
-    ...(typeof row.gbps_p50_incl_prep === 'number'
-      ? { gbps_p50_incl_prep: row.gbps_p50_incl_prep }
-      : {}),
-    verify_passed: row.verify?.passed ?? true,
-  };
+// swap_blocks cases have no EP ladder; their measurements come from swap-reader.
+function isSwapCase(kase: RawCase): boolean {
+  return kase.suite === 'swap-blocks';
+}
+
+/** A row whose first burst failed carries no samples; its case outcome says why. */
+function mapKvRow(row: RawKvRow): CollectiveXKvRow[] {
+  if (!row.latency_ms || typeof row.gbps_p50 !== 'number') return [];
+  return [
+    {
+      kind: row.kind === 'bulk' ? 'bulk' : 'paged',
+      isl: row.isl,
+      page_tokens: row.page_tokens ?? null,
+      batch: row.batch ?? 1,
+      op: row.op === 'push' ? 'push' : 'pull',
+      descs: row.descs,
+      req_bytes: row.req_bytes,
+      ...(typeof row.posted_bytes === 'number' ? { posted_bytes: row.posted_bytes } : {}),
+      prep_ms: row.prep_ms ?? 0,
+      latency_ms: row.latency_ms,
+      ...(row.request_ms ? { request_ms: row.request_ms } : {}),
+      gbps_p50: row.gbps_p50,
+      ...(typeof row.gbps_p50_incl_prep === 'number'
+        ? { gbps_p50_incl_prep: row.gbps_p50_incl_prep }
+        : {}),
+      verify_passed: row.verify?.passed ?? true,
+      ...(row.verify?.passed === false && row.verify.detail
+        ? { verify_detail: row.verify.detail }
+        : {}),
+    },
+  ];
+}
+
+function textOf(value: unknown): string | null {
+  return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
 function buildKvCases(
@@ -336,6 +366,7 @@ function buildKvCases(
     const workload = kase.workload ?? 'kv';
     const precision = toPrecision(kase.precision);
     const shard = measured ?? failed;
+    const maturity = shard?.shard.implementation.maturity;
     return [
       {
         case_id: caseId,
@@ -351,8 +382,12 @@ function buildKvCases(
         outcome,
         reason,
         detail: requested.detail ?? null,
+        library_version: shard ? libraryVersionOf(shard.shard) : null,
+        maturity: maturity === 'production' || maturity === 'candidate' ? maturity : null,
+        network: textOf(shard?.shard.topology?.network),
+        transport: textOf(shard?.shard.implementation.transport),
         rows: measured
-          ? (measured.shard.measurement.rows as unknown as RawKvRow[]).map(mapKvRow)
+          ? (measured.shard.measurement.rows as unknown as RawKvRow[]).flatMap(mapKvRow)
           : [],
       },
     ];
@@ -365,12 +400,17 @@ export function buildDatasetFromNeutral(
   run: CollectiveXNeutralRunMeta,
 ): CollectiveXDataset {
   const matrix = matrixOf(matrixRaw);
-  const swap = readSwapResults(matrixRaw, docs, run.source_sha);
+  const swapRequested = matrix.requested_cases.filter((requested) => isSwapCase(requested.case));
+  const swap = readSwapResults(matrix.requested_cases, docs);
   const swapPoints = swap.reduce((count, result) => count + result.points.length, 0);
   const shards = docs.flatMap((doc) => {
     const shard = shardOf(doc);
     if (!shard) return [];
-    if (Number(shard.version) !== matrix.version) throw new Error('CollectiveX version mismatch');
+    if (Number(shard.version) !== matrix.version) {
+      throw new Error(
+        `CollectiveX version mismatch: ${shard.identity.case_id} has version ${String(shard.version)}, cases.json has ${matrix.version}`,
+      );
+    }
     return [shard];
   });
   const supportedShards = shards.flatMap((shard): SupportedShard[] => {
@@ -397,7 +437,7 @@ export function buildDatasetFromNeutral(
   const coverage: CollectiveXCoverage[] = matrix.requested_cases.flatMap((requested) => {
     const kase = requested.case;
     const caseId = kase.case_id;
-    if (isKvCase(kase) || !caseId || hiddenCaseIds.has(caseId)) return [];
+    if (isKvCase(kase) || isSwapCase(kase) || !caseId || hiddenCaseIds.has(caseId)) return [];
     const measured = successful.get(caseId)?.shard;
     const failed = terminal.get(caseId)?.shard;
     let outcome: CollectiveXOutcome;
@@ -446,7 +486,7 @@ export function buildDatasetFromNeutral(
     version: matrix.version,
     run: {
       ...run,
-      requested_cases: coverage.length + kv.length + swap.length,
+      requested_cases: coverage.length + kv.length + swapRequested.length,
       terminal_cases:
         coverage.filter((item) => item.points.every((point) => point.terminal_status !== 'pending'))
           .length +
@@ -468,14 +508,15 @@ export function buildDatasetFromNeutral(
         points.filter((point) => point.terminal_status !== 'pending').length + swapPoints,
       measured_points:
         points.filter((point) => point.terminal_status === 'measured').length + swapPoints,
+      // Pools with at least one measured result; requested-only pools are not covered.
       covered_skus: [
         ...new Set([
-          ...coverage.map((item) => item.sku),
-          ...kv.map((item) => item.sku),
+          ...coverage.filter((item) => item.outcome === 'success').map((item) => item.sku),
+          ...kv.filter((item) => item.outcome === 'success').map((item) => item.sku),
           ...swap.map((item) => item.sku),
         ]),
       ].toSorted(),
-      swap_requested_cases: swap.length,
+      swap_requested_cases: swapRequested.length,
       swap_measured_cases: swap.length,
       kv_requested_cases: kv.length,
       kv_measured_cases: kv.filter((item) => item.outcome === 'success').length,
@@ -516,20 +557,4 @@ export function buildRunSummary(dataset: CollectiveXDataset): CollectiveXRunSumm
       measured: run.kv_measured_cases ?? 0,
     },
   };
-}
-
-export function isMatrixDoc(doc: unknown): boolean {
-  if (isSwapMatrix(doc)) return true;
-  const candidate = doc as { requested_cases?: unknown; include?: unknown } | null;
-  return (
-    Array.isArray(candidate?.requested_cases) &&
-    Array.isArray(candidate?.include) &&
-    matrixVersion(doc) !== null
-  );
-}
-
-export function matrixVersion(doc: unknown): number | null {
-  if (isSwapMatrix(doc)) return 1;
-  const value = (doc as { version?: unknown } | null)?.version;
-  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : null;
 }

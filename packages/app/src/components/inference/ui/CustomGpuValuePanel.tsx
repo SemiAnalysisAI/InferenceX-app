@@ -225,7 +225,7 @@ const CustomGpuValuePanel = memo(
     const handleReset = useCallback(() => {
       track(config.resetEvent, {
         metric: selectedYAxisMetric,
-        gpuCount: stableGpus.length,
+        gpu_count: stableGpus.length,
       });
 
       const { numericDefaults } = buildDefaultCustomGpuValues(stableGpus, config.getDefaultValue);
@@ -241,7 +241,7 @@ const CustomGpuValuePanel = memo(
 
       track(config.calculatedEvent, {
         metric: selectedYAxisMetric,
-        gpuCount: stableGpus.length,
+        gpu_count: stableGpus.length,
       });
 
       const currentValues = buildAppliedCustomGpuValues(stableGpus, lastCalculatedValues);

@@ -125,7 +125,7 @@ function MoreMenu({
       <button
         type="button"
         onClick={() => {
-          track('agentic_workload_more_menu_toggled', { open: !open });
+          track('agentic_workload_more_menu_toggled', { enabled: !open });
           setOpen(!open);
         }}
         aria-expanded={open}

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
 import type { TokenRevenuePricing } from '@/components/inference/types';
+import { ApiRequestError } from '@/lib/api/api-request-error';
 import { DEFAULT_CACHED_INPUT_PRICE_RATIO } from '@/lib/calculator/cache-pricing';
 
 export const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
@@ -49,7 +50,13 @@ export async function fetchOpenRouterPricing(
   signal?: AbortSignal,
 ): Promise<TokenRevenuePricing> {
   const response = await fetch(OPENROUTER_MODELS_URL, { signal });
-  if (!response.ok) throw new Error(`OpenRouter pricing request failed (${response.status})`);
+  if (!response.ok) {
+    throw new ApiRequestError(
+      `OpenRouter pricing request failed (${response.status})`,
+      response.status,
+      OPENROUTER_MODELS_URL,
+    );
+  }
   const pricing = openRouterPricingForModel(
     (await response.json()) as OpenRouterModelsResponse,
     modelId,

@@ -2,7 +2,6 @@ import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-con
 
 const MODEL_LABELS = [
   'Muse Spark Open 816B',
-  'DeepSeek V4 Pro 0813 1.6T',
   'DeepSeek V4.1 Flash 552B',
   'Kimi K3 2.8T',
   'MiniMax M3.1 Flash 428B',
@@ -20,7 +19,7 @@ const PLATFORM_HEADERS = [
 ];
 
 const SINGLE_TURN = 'single_turn_8k1k';
-const MATRIX_ROWS = 9;
+const MATRIX_ROWS = 8;
 const AGENTX = 'agentx';
 const AGENTX_LABEL = 'Long Context Multi-Turn Realistic Agentic Scenario (AgentX)';
 const AGENTX_LABEL_ZH = '长上下文、多轮交互的真实智能体场景（AgentX）';
@@ -168,6 +167,37 @@ function textRect(element: Element) {
 }
 
 describe('Overview page', () => {
+  for (const locale of ['', '/zh']) {
+    it(`gates the Flash matrix row through unlock, reload, and relock in ${locale || 'en'}`, () => {
+      cy.viewport(1280, 900);
+      cy.visit(`${locale}/overview`, {
+        onBeforeLoad(win) {
+          win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
+        },
+      });
+      cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS);
+      desktopModel('GLM-5.3-Flash', AGENTX).should('not.exist');
+      cy.window().then((win) => {
+        win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
+        win.dispatchEvent(new win.Event('inferencex:feature-gate:unlocked'));
+      });
+      cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS + 1);
+      desktopModel('GLM-5.3-Flash', AGENTX)
+        .should('contain.text', 'GLM 5.3 Flash')
+        .find('[data-testid="overview-platform"]')
+        .should('have.length', 5);
+      cy.reload();
+      cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS + 1);
+      desktopModel('GLM-5.3-Flash', AGENTX).scrollIntoView().should('be.visible');
+      cy.window().then((win) => {
+        win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
+        win.dispatchEvent(new win.Event('inferencex:feature-gate:locked'));
+      });
+      cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS);
+      desktopModel('GLM-5.3-Flash', AGENTX).should('not.exist');
+    });
+  }
+
   it('updates selectors through cached overview JSON without an RSC round trip', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
@@ -350,7 +380,7 @@ describe('Overview page', () => {
     cy.go('back');
     cy.location('search').should('eq', '');
     cy.go('back');
-    cy.location('pathname').should('eq', '/inference');
+    cy.location('pathname').should('eq', '/inference/kimi-k3');
   });
 
   it('warms a hovered option and derives the reference without a request', () => {
@@ -393,6 +423,8 @@ describe('Overview page', () => {
     cy.visit('/overview');
     cy.get('[data-testid="overview-desktop-model"][data-model="gpt-oss-120b"]').should('not.exist');
     desktopModel('MiniMax-M3').should('not.exist');
+    desktopModel('DeepSeek-V4-Pro').should('not.exist');
+    desktopModel('MiniMax-M3.1-Flash', AGENTX).should('exist');
 
     cy.get('[data-testid="overview-model-scope-toggle"]')
       .find('[data-overview-model-scope="all"]')
@@ -412,7 +444,7 @@ describe('Overview page', () => {
       .should('have.attr', 'data-category', 'maintenance');
     desktopModel('DeepSeek-V4-Pro', AGENTX)
       .find('[data-testid="overview-model-category-badge"]')
-      .should('not.exist');
+      .should('have.attr', 'data-category', 'deprecated');
     cy.get('[data-testid="overview-desktop-model"]').then(([...rows]) => {
       const models = rows.map((row) => row.dataset.model);
       expect(models.indexOf('gpt-oss-120b')).to.be.greaterThan(
@@ -430,6 +462,7 @@ describe('Overview page', () => {
     cy.location('search').should('eq', '?tier=75');
     cy.get('[data-testid="overview-desktop-model"][data-model="gpt-oss-120b"]').should('not.exist');
     desktopModel('MiniMax-M3').should('not.exist');
+    desktopModel('DeepSeek-V4-Pro').should('not.exist');
   });
 
   it('uses a selectable hardware reference and preserves it across overview controls', () => {
@@ -668,7 +701,7 @@ describe('Overview page', () => {
 
   it('compares each platform with its own validated result from 30–60 days earlier', () => {
     cy.viewport(1280, 900);
-    cy.visit('/overview?compare=30d');
+    cy.visit('/overview?compare=30d&models=all');
 
     desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
       cy.contains('a', 'View details').should('not.exist');
@@ -868,6 +901,32 @@ describe('Overview page', () => {
             .should('contain.text', 'Show all rows')
             .and('contain.text', String(hidden))
             .and('have.attr', 'aria-label', `Show ${hidden} rows with ${sentence}`);
+          cy.window().then((win) => {
+            win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
+            win.dispatchEvent(new win.Event('inferencex:feature-gate:unlocked'));
+          });
+          cy.get(`a[${attribute}]`).should(
+            'have.attr',
+            'aria-label',
+            `Show ${hidden + 1} rows with ${sentence}`,
+          );
+          cy.get('[data-testid="overview-desktop-model"]').should(
+            'have.length',
+            MATRIX_ROWS - hidden,
+          );
+          cy.window().then((win) => {
+            win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
+            win.dispatchEvent(new win.Event('inferencex:feature-gate:locked'));
+          });
+          cy.get(`a[${attribute}]`)
+            .should('have.attr', 'aria-label', `Show ${hidden} rows with ${sentence}`)
+            .click();
+          cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS);
+          cy.get(`a[${attribute}]`).should(
+            'have.attr',
+            'aria-label',
+            `Hide ${hidden} rows with ${sentence}`,
+          );
         });
     }
   });
@@ -1039,7 +1098,7 @@ describe('Overview page', () => {
     });
   });
 
-  it('renders the full platform matrix for every active model', () => {
+  it('renders the full platform matrix for every publicly visible active model', () => {
     cy.viewport(1280, 900);
     cy.visit('/overview');
 
@@ -1107,7 +1166,7 @@ describe('Overview page', () => {
     for (const label of MODEL_LABELS) {
       cy.get('[data-testid="overview-desktop-matrix"]').should('contain.text', label);
     }
-    for (const model of ['DeepSeek-V4-Pro', 'DeepSeek-V4.1-Flash', 'Kimi-K3', 'GLM-5.2']) {
+    for (const model of ['DeepSeek-V4.1-Flash', 'Kimi-K3', 'GLM-5.2']) {
       desktopModel(model).within(() => {
         expectAgentxScenario(AGENTX_LABEL);
       });
@@ -1119,7 +1178,7 @@ describe('Overview page', () => {
 
   it('gives a model benchmarked on both scenarios one row each, priced independently', () => {
     cy.viewport(1280, 900);
-    cy.visit('/overview');
+    cy.visit('/overview?models=all');
 
     cy.get('[data-testid="overview-desktop-model"][data-model="Qwen-3.5-397B-A17B"]').should(
       'have.length',
@@ -1202,7 +1261,7 @@ describe('Overview page', () => {
 
   it('links each cost to the raw source dashboard for exactly that configuration', () => {
     cy.viewport(1280, 900);
-    cy.visit('/overview');
+    cy.visit('/overview?models=all');
 
     desktopModel('Qwen-3.5-397B-A17B', SINGLE_TURN).within(() => {
       platform('mi355x').within(() => {
@@ -1360,7 +1419,7 @@ describe('Overview page', () => {
       });
     });
 
-    cy.visit('/overview?tier=30');
+    cy.visit('/overview?tier=30&models=all');
     desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
       platform('b300').within(() => {
         cy.get('[data-testid="overview-pair-missing"][data-hardware="b300"]')
@@ -1400,7 +1459,7 @@ describe('Overview page', () => {
   it('uses the same cell semantics on mobile and fits both 390px and 320px widths', () => {
     for (const width of [390, 320]) {
       cy.viewport(width, 844);
-      cy.visit('/overview');
+      cy.visit('/overview?models=all');
 
       cy.get('[data-testid="mobile-chart-select"]').should('not.exist');
       cy.get('[data-testid="overview-mobile-list"]').should('be.visible');
@@ -1439,7 +1498,7 @@ describe('Overview page', () => {
   it('aligns every platform to the same compact row axes on phones', () => {
     for (const width of [390, 320]) {
       cy.viewport(width, 844);
-      cy.visit('/overview');
+      cy.visit('/overview?models=all');
 
       mobileModel('DeepSeek-V4-Pro', AGENTX).within(() => {
         cy.get('[data-testid="overview-mobile-platform-row"]')
@@ -1466,7 +1525,7 @@ describe('Overview page', () => {
 
     for (const width of [320, 390, 768, 1024, 1279]) {
       cy.viewport(width, 900);
-      cy.visit('/overview');
+      cy.visit('/overview?models=all');
 
       mobileModel('DeepSeek-V4-Pro', AGENTX).within(() => {
         cy.get('[data-testid="overview-mobile-platform-row"]').then(($rows) => {
@@ -1596,7 +1655,7 @@ describe('Overview page', () => {
 
   it('renders the Chinese sibling with equivalent matrix copy and semantics', () => {
     cy.viewport(1280, 900);
-    cy.visit('/zh/overview');
+    cy.visit('/zh/overview?models=all');
 
     cy.get('[data-testid="chart-section-tabs"]').should('not.exist');
     cy.get('[data-testid="nav-link-overview"]')
@@ -1654,9 +1713,7 @@ describe('Overview page', () => {
     desktopModel('DeepSeek-V4-Pro', AGENTX).within(() => {
       platform('b200').should('contain.text', 'SGLang · FP4').and('not.contain.text', 'STP');
     });
-    cy.get('[data-testid="overview-model-scope-toggle"]')
-      .find('[data-overview-model-scope="all"]')
-      .click();
+    desktopModel('DeepSeek-V4-Pro', AGENTX).should('contain.text', '已弃用');
     desktopModel('MiniMax-M3', AGENTX).within(() => {
       platform('gb300')
         .find('[data-testid="overview-cost-delta"]')
@@ -1679,7 +1736,7 @@ describe('Overview page', () => {
     });
     cy.contains('如果某款芯片没有可用的 FP4 投机解码配置，则改用次优配置。').should('exist');
 
-    cy.visit('/zh/overview?tier=100');
+    cy.visit('/zh/overview?tier=100&models=all');
     cy.get('[data-testid="overview-scope"]').should('have.text', SCOPE_LINE_ZH);
     cy.get('[data-testid="overview-tier-switcher"]')
       .should('have.attr', 'aria-label', 'SLO')

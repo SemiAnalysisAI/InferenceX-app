@@ -1,4 +1,10 @@
-import { POWER_BASES, type PowerBasis } from '@/lib/power/power-basis';
+import {
+  POWER_BASES,
+  POWER_BASIS_FIELDS,
+  POWER_QUANTITIES,
+  type PowerBasis,
+  type PowerQuantity,
+} from '@/lib/power/power-basis';
 import type { MetricConfigKey } from './metric-registry';
 
 export type MeasuredMetricFamily = 'power' | 'energy';
@@ -33,10 +39,16 @@ export type MeasuredMetricConfigChange = Partial<{
 
 export const MEASURED_METRIC_DEFAULTS = {
   power: 'y_measuredAvgPower',
-  energy: 'y_measuredJPerOutputToken',
+  energy: 'y_measuredJPerTotalToken',
 } as const satisfies Record<MeasuredMetricFamily, MetricConfigKey>;
 
 const measured = { basis: 'gpu-measured' } as const;
+
+const POWER_QUANTITY_CONFIGS = {
+  watts: { family: 'power', scope: 'all', statistic: 'average', display: 'watts' },
+  joulesPerOutputToken: { family: 'energy', scope: 'all', denominator: 'output', unit: 'joules' },
+  joulesPerTotalToken: { family: 'energy', scope: 'all', denominator: 'total', unit: 'joules' },
+} as const satisfies Record<PowerQuantity, MeasuredMetricConfigChange>;
 
 const MEASURED_METRIC_CONFIGS: readonly (readonly [MetricConfigKey, MeasuredMetricConfig])[] = [
   [
@@ -95,26 +107,12 @@ const MEASURED_METRIC_CONFIGS: readonly (readonly [MetricConfigKey, MeasuredMetr
     'y_measuredWhPerSuccessfulQuery',
     { family: 'energy', ...measured, scope: 'all', denominator: 'query', unit: 'wattHours' },
   ],
-  [
-    'y_utilityModeledWatts',
-    {
-      family: 'power',
-      basis: 'utility-modeled',
-      scope: 'all',
-      statistic: 'average',
-      display: 'watts',
-    },
-  ],
-  ...(
-    [
-      ['gpu-provisioned', 'y_gpuProvisionedJPerOutputToken'],
-      ['utility-provisioned', 'y_utilityProvisionedJPerOutputToken'],
-      ['utility-modeled', 'y_utilityModeledJPerOutputToken'],
-    ] as const satisfies readonly (readonly [PowerBasis, MetricConfigKey])[]
-  ).map(([basis, energy]): readonly [MetricConfigKey, MeasuredMetricConfig] => [
-    energy,
-    { family: 'energy', basis, scope: 'all', denominator: 'output', unit: 'joules' },
-  ]),
+  ...POWER_BASES.filter((basis) => basis !== 'gpu-measured').flatMap((basis) =>
+    POWER_QUANTITIES.flatMap((quantity): (readonly [MetricConfigKey, MeasuredMetricConfig])[] => {
+      const field = POWER_BASIS_FIELDS[basis][quantity];
+      return field ? [[`y_${field}`, { ...POWER_QUANTITY_CONFIGS[quantity], basis }]] : [];
+    }),
+  ),
 ];
 
 export function measuredMetricBases(family: MeasuredMetricFamily): PowerBasis[] {
@@ -142,15 +140,17 @@ export function changeMeasuredMetricConfig(
     current?.family === family
       ? current
       : getMeasuredMetricConfig(MEASURED_METRIC_DEFAULTS[family])!;
-  const changesOtherDimension = OTHER_DIMENSIONS.some((key) => change[key] !== undefined);
-  const basis =
-    change.basis ?? (changesOtherDimension ? 'gpu-measured' : (current ?? config).basis);
+  const basis = change.basis ?? (current ?? config).basis;
   if (basis !== 'gpu-measured') {
-    return (
-      MEASURED_METRIC_CONFIGS.find(
-        ([, candidate]) => candidate.family === family && candidate.basis === basis,
-      )?.[0] ?? MEASURED_METRIC_DEFAULTS[family]
+    const unchanged: MeasuredMetricConfigChange = config;
+    const onBasis = MEASURED_METRIC_CONFIGS.filter(
+      ([, candidate]) => candidate.family === family && candidate.basis === basis,
     );
+    const published = onBasis.find(([, candidate]: readonly [string, MeasuredMetricConfigChange]) =>
+      OTHER_DIMENSIONS.every((key) => candidate[key] === (change[key] ?? unchanged[key])),
+    );
+    if (published) return published[0];
+    if (change.basis !== undefined) return onBasis[0]?.[0] ?? MEASURED_METRIC_DEFAULTS[family];
   }
   let scope = change.scope ?? config.scope;
 

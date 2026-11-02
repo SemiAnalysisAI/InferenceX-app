@@ -94,6 +94,14 @@ export const PURGED_RUNS: ReadonlySet<number> = new Set([
   34819564154, // 2026-09-19 | Reason: user-reported Kimi K3 GB300 chart regression and missing points compared with the pre-PowerX curve
   34819961093, // 2026-09-19 | Reason: sibling of 34819578354 — this kimik3-fp4-h200-vllm-agentic-simple sweep (PR #3054, feat/kimik3-h200-simple-power) carries only the TP8/EP32/DPA offload=on arm (c8-c32, 13 points). Once 34819578354 was purged it became the latest H200 Kimi-K3 curve and kept hiding the three-arm 2026-09-13 set (35 points: TP16/EP32 c1-c12, TP8/EP32 offload=off c1-c16, TP8/EP32 offload=on c8-c32). Same vllm/vllm-openai:kimi-k3 image and recipe as the arm it duplicates, so no coverage is lost; re-ingest once the full H200 curve set is collected with measured power
   40065869885, // 2026-10-25 | Reason: Uses skip indexer
+  40316025285, // 2026-10-27 | DeepSeek-V4.1-Flash FP4 GB300 Dynamo-SGLang AgentX disagg | Reason: Klaud Cold image-update partial re-sweep (PR #4515) ingested without append-only, replacing the full curve with three disagg points
+  40054839636, // 2026-10-27 | GLM-5.2 FP4 GB300 Dynamo-SGLang AgentX agg | Reason: Klaud Cold image-update partial re-sweep (PR #4449) ingested without append-only, replacing the full curve with two agg points
+  40279236382, // 2026-10-27 | DeepSeek-V4-Pro FP4 GB200 Dynamo-SGLang AgentX agg | Reason: Klaud Cold image-update partial re-sweep (PR #4529) ingested without append-only, replacing the full curve
+  40185235651, // 2026-10-27 | DeepSeek-V4.1-Flash FP4 GB300 Dynamo-SGLang AgentX agg | Reason: Klaud Cold image-update partial re-sweep (PR #4497) ingested without append-only, replacing the full curve
+  38953283564, // 2026-10-27 | DeepSeek-V4-Pro FP4 GB200 Dynamo-SGLang AgentX agg | Reason: Klaud Cold image-update partial re-sweep (PR #4196) ingested without append-only. Once 40279236382 was purged it became the latest curve and kept hiding the 8-point agg+disagg 2026-10-12 set (PR #3701)
+  38960572895, // 2026-10-27 | DeepSeek-V4-Pro FP4 B200 Dynamo-SGLang AgentX agg | Reason: Klaud Cold image-update partial re-sweep (PR #4203) ingested without append-only, hiding the 6-point agg+disagg 2026-09-22 set (PR #3257)
+  38925477096, // 2026-10-27 | DeepSeek-V4-Pro FP4 B200 Dynamo-SGLang AgentX disagg | Reason: Klaud Cold image-update partial re-sweep (PR #4176) ingested without append-only; would become the latest curve once 38960572895 is purged and keep hiding the 2026-09-22 set (PR #3257)
+  39339355047, // 2026-10-27 | DeepSeek-V4.1-Flash FP4 H100 SGLang AgentX | Reason: Klaud Cold image-update partial re-sweep (PR #4324) ingested without append-only, replacing the 10-point 2026-09-24 curve (PR #3345) with four points
 ]);
 
 export const PURGED_RUN_ATTEMPTS: ReadonlyMap<number, ReadonlySet<number>> = new Map([
@@ -295,6 +303,18 @@ export const CHANGELOG_BACKFILLS: readonly ChangelogBackfill[] = [
     headRef: '1c3e892a8493ae4bc6b25bc688ccd6d6916742c3',
     set: {
       prLink: 'https://github.com/SemiAnalysisAI/InferenceX/pull/4511',
+    },
+  },
+  {
+    id: 'run-41085412898-restore-append-only',
+    reason:
+      'PR #4675 produced an append-only delta sweep, but conflict resolution with #4676 removed the marker before its artifacts were reused for merge ingestion.',
+    githubRunId: 41085412898,
+    runAttempt: 3,
+    baseRef: 'fcb4a75b563c5c14e4922f47c3d53ed14500acf2',
+    headRef: 'bd626adbc0fc2a61f0165a455a1242e87008c74b',
+    set: {
+      appendOnly: true,
     },
   },
 ];

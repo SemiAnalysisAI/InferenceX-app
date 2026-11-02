@@ -344,7 +344,7 @@ export default function StatisticsPage() {
                     onBucketClick={(bi) => {
                       track('agentic_workload_statistics_bucket_selected', {
                         key,
-                        bucketIdx: bi,
+                        bucket_index: bi,
                       });
                       setSelectedBucket(
                         selectedIdx === bi

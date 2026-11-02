@@ -9,6 +9,7 @@ import { DM_Sans } from 'next/font/google';
 import { Footer } from '@/components/footer/footer';
 import { Header } from '@/components/header/header';
 import { RouteTransition } from '@/components/motion/route-transition';
+import { ModelFeatureBoundary } from '@/components/model-feature-boundary';
 import { JsonLd } from '@/components/seo/json-ld';
 import { AutumnLeaves } from '@/components/effects/autumn-leaves';
 import { CircuitBackground } from '@/components/effects/circuit-background';
@@ -25,13 +26,11 @@ import {
   SITE_TITLE,
   SITE_URL,
 } from '@semianalysisai/inferencex-constants';
-import { fetchStarCount } from '@/lib/github/github-stars.server';
 import { QueryProvider } from '@/providers/query-provider';
 import { PostHogProvider, PostHogPageView } from '@/providers/posthog-provider';
-import { VisitTracker } from '@/providers/visit-tracker';
 import {
-  LANDING_BANNER_DISMISSED_ATTRIBUTE,
-  LANDING_BANNER_STORAGE_KEY,
+  landingBannerPrepaintScript as buildLandingBannerPrepaintScript,
+  landingBannerPrepaintStyle as buildLandingBannerPrepaintStyle,
 } from '@/lib/nudges/landing-banner';
 
 const dm_sans = DM_Sans({
@@ -44,7 +43,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
     default: SITE_TITLE,
-    template: `%s | ${SITE_NAME} by ${AUTHOR_NAME}`,
+    template: `%s | ${SITE_NAME}`,
   },
   description: DESCRIPTION,
   keywords: [
@@ -93,7 +92,6 @@ export const metadata: Metadata = {
     },
   },
   alternates: {
-    canonical: SITE_URL,
     types: {
       'application/rss+xml': `${SITE_URL}/feed.xml`,
     },
@@ -169,30 +167,16 @@ const jsonLd = {
   ],
 };
 
-const landingBannerPrepaintScript = `try{if(localStorage.getItem(${JSON.stringify(
-  LANDING_BANNER_STORAGE_KEY,
-)})){document.documentElement.setAttribute(${JSON.stringify(
-  LANDING_BANNER_DISMISSED_ATTRIBUTE,
-)},'')}}catch{}`;
-const landingBannerPrepaintStyle = `html[${LANDING_BANNER_DISMISSED_ATTRIBUTE}] [data-initial-banner]{display:none}`;
+const landingBannerPrepaintScript = buildLandingBannerPrepaintScript();
+const landingBannerPrepaintStyle = buildLandingBannerPrepaintStyle();
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const starCount = await fetchStarCount();
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <link
-          rel="preload"
-          as="image"
-          href="/brand/left-pattern-full.svg"
-          fetchPriority="high"
-          media="(min-width: 640px)"
-        />
-      </head>
       <body className={`${dm_sans.variable} antialiased relative min-h-screen flex flex-col`}>
         <style
           id="landing-banner-prepaint-style"
@@ -210,19 +194,20 @@ export default async function RootLayout({
           <QueryProvider>
             <ThemeProvider
               attribute="class"
-              defaultTheme="dark"
+              defaultTheme="light"
               themes={APP_THEMES}
               enableSystem
               disableTransitionOnChange
             >
               <PostHogPageView />
-              <VisitTracker />
-              <Header starCount={starCount} />
+              <Header />
               <EasterEggThemeLazy />
               <div className="grow flex flex-col">
-                <RouteTransition>{children}</RouteTransition>
+                <ModelFeatureBoundary>
+                  <RouteTransition>{children}</RouteTransition>
+                </ModelFeatureBoundary>
               </div>
-              <Footer starCount={starCount} />
+              <Footer />
             </ThemeProvider>
           </QueryProvider>
           {process.env.VERCEL && <Analytics />}

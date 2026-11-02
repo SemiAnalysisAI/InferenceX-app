@@ -8,26 +8,24 @@ import { buildFaqJsonLd, FaqList } from '@/components/about/faq';
 import { PromoVideo } from '@/components/about/promo-video';
 import { JsonLd } from '@/components/seo/json-ld';
 import { enAlternates } from '@/lib/i18n/i18n';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 import { GITHUB_OWNER, GITHUB_REPO, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 const faqJsonLd = buildFaqJsonLd(FAQ_ITEMS);
 
 const ABOUT_DESCRIPTION =
-  'InferenceX benchmarks agentic and fixed-sequence AI inference across accelerators and serving stacks. AgentX is its long-context, multi-turn coding scenario.';
+  'InferenceX benchmarks agentic and fixed-sequence inference across accelerators and serving stacks. AgentX is its long-context, multi-turn coding scenario.';
 
 export const metadata: Metadata = {
   title: 'About',
   description: ABOUT_DESCRIPTION,
   alternates: enAlternates('/about'),
-  openGraph: {
+  ...socialMetadata({
     title: 'About | InferenceX',
     description: ABOUT_DESCRIPTION,
     url: `${SITE_URL}/about`,
-  },
-  twitter: {
-    title: 'About | InferenceX',
-    description: ABOUT_DESCRIPTION,
-  },
+    locale: 'en',
+  }),
 };
 
 export default function AboutPage() {
@@ -41,10 +39,10 @@ export default function AboutPage() {
 
         <section>
           <Card>
-            <h2 className="text-lg font-semibold mb-2">
+            <h1 className="text-lg font-semibold mb-2">
               Open-Source Continuous Agentic Inference Benchmark Trusted by Operators of
               Trillion-Dollar, GigaWatt-Scale Token Factories
-            </h2>
+            </h1>
             <p className="text-muted-foreground mb-2">
               As the world progresses exponentially towards AGI, software development and model
               releases move at the speed of light. Existing benchmarks rapidly become obsolete due

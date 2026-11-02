@@ -96,7 +96,7 @@ export function TelemetryDisplayControls({
               value={String(value.windowS)}
               onValueChange={(raw) => {
                 const windowS = Number(raw) as SmoothingWindowS;
-                track(`${analyticsPrefix}_smoothing_window_changed`, { windowS });
+                track(`${analyticsPrefix}_smoothing_window_changed`, { window_s: windowS });
                 onChange({ ...value, windowS });
               }}
             >

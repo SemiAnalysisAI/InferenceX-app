@@ -10,6 +10,8 @@ import type { Locale } from '@/lib/i18n/i18n';
 import { cn } from '@/lib/shared/utils';
 import type { SearchResult } from '@/lib/site-search/search-index';
 import { getSiteSearchEngine, type SiteSearchStatus } from '@/lib/site-search/site-search-engine';
+import { isFeatureGatedModelPath } from '@/lib/routing/model-feature-visibility';
+import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 
 const STRINGS = {
   en: {
@@ -77,6 +79,7 @@ export function SiteSearchDialog({
   const strings = STRINGS[locale];
   const pathname = usePathname() ?? '/';
   const engine = getSiteSearchEngine(locale);
+  const featureGateUnlocked = useFeatureGate();
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<SiteSearchStatus>(() => engine.status());
   const [activeIndex, setActiveIndex] = useState(0);
@@ -100,9 +103,14 @@ export function SiteSearchDialog({
   }, [engine, query]);
 
   const results: SearchResult[] = useMemo(
-    () => (query.trim() ? engine.search(query, 20) : []),
+    () =>
+      query.trim()
+        ? engine
+            .search(query, 20)
+            .filter((result) => featureGateUnlocked || !isFeatureGatedModelPath(result.url))
+        : [],
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- version is the index revision
-    [engine, query, status.version],
+    [engine, query, status.version, featureGateUnlocked],
   );
 
   useEffect(() => setActiveIndex(0), [query]);
@@ -112,7 +120,7 @@ export function SiteSearchDialog({
     const trimmed = query.trim();
     if (!trimmed) return;
     const timer = setTimeout(() => {
-      track('header_search_queried', { query: trimmed.slice(0, 100), results: results.length });
+      track('header_search_queried', { query_length: trimmed.length, results: results.length });
     }, QUERY_TRACK_DELAY_MS);
     return () => clearTimeout(timer);
     // oxlint-disable-next-line react-hooks/exhaustive-deps

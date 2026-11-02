@@ -79,7 +79,7 @@ export function calculatorExtension(view: CalculatorExtension, request: NextRequ
       );
       const costProvider = parseCostProviderParam(search.get('costProvider'));
       const costType = parseCostTypeParam(search.get('costType'));
-      return cachedJson({
+      return cachedJson(request, {
         ...envelope,
         params: { ...envelope.params, caps, minInteractivity, costProvider, costType },
         data: selectFirstTokenWinners({
@@ -111,7 +111,7 @@ export function calculatorExtension(view: CalculatorExtension, request: NextRequ
             recipe: search.get('recipe') ?? undefined,
           })
         : null;
-      return cachedJson({
+      return cachedJson(request, {
         ...envelope,
         params: { ...envelope.params, config, recipe: data?.recipe ?? null },
         configurations,
@@ -239,7 +239,7 @@ export function calculatorExtension(view: CalculatorExtension, request: NextRequ
         return { entry, data: estimate(group.official) };
       }),
     );
-    return cachedJson({
+    return cachedJson(request, {
       ...envelope,
       params: {
         ...envelope.params,

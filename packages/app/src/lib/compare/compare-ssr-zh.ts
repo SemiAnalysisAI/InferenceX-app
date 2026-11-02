@@ -15,12 +15,13 @@ import {
   fmtCost,
   fmtPctDelta,
   type FullBoth,
-  META_DESCRIPTION_MAX,
   type PairSummary,
   type PerDollarBoth,
   pickRotated,
   type SsrInterpolatedRow,
 } from '@/lib/compare/compare-ssr';
+import { datasetJsonLd } from '@/lib/seo/dataset-jsonld';
+import { clampMetaDescription, fitMetaTitle, META_DESCRIPTION_MAX } from '@/lib/seo/meta-text';
 
 export function formatModelListZh(models: CompareModelSlug[]): string {
   const labels = models.map((model) => model.label);
@@ -265,6 +266,14 @@ export function compareTableNarrativeZh(
   return paragraphs;
 }
 
+export function compareSeoTitleZh(gpuLabel: string, modelSeoName: string): string {
+  return fitMetaTitle([
+    `${gpuLabel}：${modelSeoName} 推理基准测试`,
+    `${gpuLabel}：${modelSeoName} 基准测试`,
+    `${gpuLabel}：${modelSeoName}`,
+  ]);
+}
+
 function firstUnderZh(candidates: string[], max: number): string | undefined {
   return candidates.find((c) => c.length <= max);
 }
@@ -288,8 +297,8 @@ export function compareMetaDescriptionZh(
         `${gpuLabel} 在 ${modelName} 上的推理基准测试，来自 ${SITE_NAME}。`,
         `${gpuLabel} 在 ${modelName} 上的推理基准测试。`,
       ],
-      META_DESCRIPTION_MAX,
-    ) ?? `${gpuLabel} 推理基准测试`.slice(0, META_DESCRIPTION_MAX);
+      META_DESCRIPTION_MAX.zh,
+    ) ?? clampMetaDescription(`${gpuLabel} 在 ${modelName} 上的推理基准测试。`, 'zh');
 
   const stat = computeCompareStat(a, b, ssrRows);
   if (!stat) return fallback;
@@ -312,7 +321,7 @@ export function compareMetaDescriptionZh(
         `${core}数据来自 ${SITE_NAME} 开源基准测试，结果经过验证。`,
         core,
       ],
-      META_DESCRIPTION_MAX,
+      META_DESCRIPTION_MAX.zh,
     ) ?? fallback
   );
 }
@@ -437,15 +446,16 @@ export function buildJsonLdZh(
           { name: `${bLabel} 并发数`, value: String(Math.round(row.b.concurrency)) },
         );
       }
-      return {
-        '@type': 'Dataset',
+      return datasetJsonLd({
         name: `${model.label}：目标交互性 ${row.target} tok/s/user 下的对比`,
+        description: `${model.label} 在 ${row.target} tok/s/user 交互性下 ${aLabel} 与 ${bLabel} 的吞吐量、每百万 token 成本、tok/s/MW 与并发数，由 InferenceX CI 实测。`,
+        inLanguage: 'zh-CN',
         variableMeasured: metrics.map((m) => ({
           '@type': 'PropertyValue',
           name: m.name,
           value: m.value,
         })),
-      };
+      });
     });
 
   return {

@@ -1,7 +1,11 @@
 import type { ComponentType, ReactNode } from 'react';
 
+import type { LandingBannerVariant } from './landing-banner';
+
 export type NudgeTrigger =
   | { type: 'immediate' }
+  /** After the page has loaded and the main thread is idle, so it never delays first paint. */
+  | { type: 'idle' }
   | { type: 'timer'; delayMs: number }
   | {
       type: 'event';
@@ -104,6 +108,8 @@ export interface NudgeDefinition {
   priority: number;
   scope: NudgeScope;
   renderOnInitialLoad?: boolean;
+  /** A/B arm of the landing banner; only the arm assigned to the visitor is shown. */
+  variant?: LandingBannerVariant;
 
   schedule?: {
     showAfter?: string;

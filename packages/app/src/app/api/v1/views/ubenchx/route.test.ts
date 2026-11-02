@@ -1,3 +1,4 @@
+import originalHuawei from '@/components/ubenchx/data/huawei-bandwidth.json';
 import { SM_L2_RUNS } from '@/components/ubenchx/sm-l2-data';
 import { transformSmL2Run } from '@/components/ubenchx/sm-l2-transform';
 import { TPC_SKYLINE_RUNS } from '@/components/ubenchx/tpc-skyline-data';
@@ -9,7 +10,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { GET } from './route';
 
 vi.mock('@/lib/cache/api-cache', () => ({
-  cachedJson: (data: unknown) => Response.json(data),
+  cachedJson: (_request: Request, data: unknown) => Response.json(data),
   cachedQuery: (fn: unknown) => fn,
 }));
 
@@ -190,14 +191,14 @@ it('combines both hardware profiles without converting or pooling their units', 
   const body = await response.json();
   expect(body.params).toEqual({ test: 'core-memory-profiles', gpu: 'all' });
   expect(body.gpus.map((run: { gpu: string }) => run.gpu)).toEqual([
-    'B200 SXM',
     'Ascend 950PR_9579',
+    'B200 SXM',
   ]);
-  const b200 = body.gpus[0];
+  const b200 = body.gpus[1];
   expect(b200).toMatchObject(transformSmL2Run('B200 SXM', SM_L2_RUNS['B200 SXM']));
   expect(b200.unit).toBe('clock64 cycles');
   expect(b200.colorLimits).toEqual([0, b200.stats.max]);
-  expect(body.gpus[1].panels[0].unit).toBe('SYS_CNT ticks');
+  expect(body.gpus[0].panels[0].unit).toBe('SYS_CNT ticks');
   const filteredResponse = await GET(request({ test: 'core-memory-profiles', gpu: 'b200 sxm' }));
   const filtered = await filteredResponse.json();
   expect(filtered.params.gpu).toBe('B200 SXM');
@@ -216,17 +217,35 @@ it('exposes Huawei rotating-copy evidence without inventing missing tests or siz
   const body = await response.json();
   const run = body.memBw.gpus[0];
   expect(run.gpu).toBe('Huawei 950PR');
-  expect(run.peakBandwidthGbps).toBe(1600);
-  expect(run.peakBandwidthSource).toContain('not independently verified');
+  expect(run.peakBandwidthGbps).toBe(1638.4);
+  expect(run.peakBandwidthSource).toContain('256 bits × 6.4 Gbps');
   expect(run.metadata).toMatchObject({
     protocol: 'rotating-pool-npu-graph',
     dtype: 'float16',
     missingSizesBytes: [],
   });
+  expect(run.rows).toHaveLength(51);
+  expect(run.rows.slice(0, 9).map((row: { bytes: number }) => row.bytes)).toEqual([
+    8, 16, 32, 64, 128, 256, 512, 1024, 2048,
+  ]);
+  expect(run.metadata.smallMessageExtension).toMatchObject({
+    cann: '9.2.1',
+    date: '2026-10-30',
+    slotStrideBytes: 4096,
+    sizeRangeBytes: [8, 2048],
+  });
+  expect(run.metadata.cann).toBe('9.1.0');
+  expect(run.rows[0].timeMs).toBeCloseTo(0.000465661971247755, 10);
+  for (const original of originalHuawei.curves['Huawei 950PR']) {
+    const actual = run.rows.find((row: { bytes: number }) => row.bytes === original.size_bytes);
+    expect(actual.timeMs).toBe(original.amortized_copy_ms);
+    expect(actual.bandwidthGbps).toBe(original.effective_GBps);
+    expect(actual.processBandwidthGbps).toEqual(original.process_GBps);
+  }
   expect(run.rows.some((row: { bytes: number }) => row.bytes === 17179869184)).toBe(true);
   const endpoint = run.rows.find((row: { bytes: number }) => row.bytes === 17179869184);
   expect(endpoint.bandwidthGbps).toBeCloseTo(1447.2735584561165, 6);
-  expect(endpoint.mbuPercent).toBeCloseTo(90.45459740350728, 6);
+  expect(endpoint.mbuPercent).toBeCloseTo(88.33456777686257, 6);
   expect(endpoint.observations).toBe(360);
   expect(body.smL2Distance.gpus).toEqual([]);
   expect(body.tpcSkyline.gpus).toEqual([]);
@@ -252,4 +271,55 @@ it('does not expose the removed 910B3 bandwidth series', async () => {
   expect(body.gpus.some((run: { gpu: string }) => run.gpu === 'Ascend 910B3')).toBe(false);
   const removed = await GET(request({ test: 'mem-bw', gpu: 'Ascend 910B3' }));
   expect(removed.status).toBe(400);
+});
+
+describe('Huawei SKU configuration evidence', () => {
+  it('keeps configuration rows separate from measured NVIDIA groupings', async () => {
+    const bodyResponse = await GET(request({ test: 'tpc-skyline' }));
+    const body = await bodyResponse.json();
+    expect(body.gpus).toHaveLength(5);
+    expect(body.skuConfigurations).toHaveLength(9);
+    expect(
+      body.skuConfigurations.find((row: { sku: string }) => row.sku === 'PR_957c'),
+    ).toMatchObject({
+      cubeCores: 28,
+      vectorCores: 56,
+      memoryGiB: 84,
+      l2MiB: 112,
+      ddrRate: { base: 14, read: 14, write: 14, unit: null },
+      source: { vendorSourceVerified: false, kind: 'provided-sku-table' },
+    });
+    expect(
+      body.skuConfigurations
+        .filter((row: { hasCoreProfileMeasurements: boolean }) => row.hasCoreProfileMeasurements)
+        .map((row: { sku: string }) => row.sku),
+    ).toEqual(['PR_9579']);
+  });
+
+  it('filters the family or exact SKU case-insensitively without inventing measurements', async () => {
+    const familyResponse = await GET(request({ test: 'tpc-skyline', gpu: 'huawei 950pr' }));
+    const family = await familyResponse.json();
+    expect(family.gpus).toEqual([]);
+    expect(family.skuConfigurations).toHaveLength(9);
+    const oneResponse = await GET(request({ test: 'all', gpu: 'ascend 950pr_9599' }));
+    const one = await oneResponse.json();
+    expect(one.params.gpu).toBe('Ascend 950PR_9599');
+    expect(one.tpcSkyline.skuConfigurations).toHaveLength(1);
+    expect(one.tpcSkyline.skuConfigurations[0]).toMatchObject({
+      cubeCores: 36,
+      vectorCores: 72,
+      cubeClockMHz: 1800,
+    });
+    expect(one.tpcSkyline.gpus).toEqual([]);
+    expect(one.memBw.gpus).toEqual([]);
+    expect(one.coreMemoryProfiles.gpus).toEqual([]);
+    const nvidiaResponse = await GET(request({ test: 'tpc-skyline', gpu: 'B200 SXM' }));
+    const nvidia = await nvidiaResponse.json();
+    expect(nvidia.skuConfigurations).toEqual([]);
+    const allResponse = await GET(request());
+    const all = await allResponse.json();
+    expect(all.tpcSkyline.skuConfigurations).toHaveLength(9);
+    const unknown = await GET(request({ test: 'tpc-skyline', gpu: 'Ascend 950PR_unknown' }));
+    expect(unknown.status).toBe(400);
+  });
 });

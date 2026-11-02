@@ -25,8 +25,8 @@ describe('Power boundary labels', () => {
       );
       const labels =
         locale === 'en'
-          ? ['GPU Level Measured', 'All in Measured']
-          : ['GPU 实测功耗', '整体实测功耗'];
+          ? ['GPU Level Measured', 'All in Measured IT (no PUE)', 'All in Measured']
+          : ['GPU 实测功耗', '整体实测 IT 功耗（不含 PUE）', '整体实测功耗'];
       cy.get('[data-testid="measured-power-basis"]').click();
       cy.get('[data-select-option]').should(($options) => {
         expect([...$options].map((option) => option.textContent?.trim())).to.deep.equal(labels);

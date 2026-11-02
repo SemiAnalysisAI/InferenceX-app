@@ -249,6 +249,10 @@ export function createMockInferenceContextValues(
     showGradientLabels: false,
     setShowGradientLabels: namedStub('setShowGradientLabels'),
     showLineLabels: false,
+    showOffloadingLabel: true,
+    showFrameworkLabel: true,
+    setShowFrameworkLabel: namedStub('setShowFrameworkLabel'),
+    setShowOffloadingLabel: namedStub('setShowOffloadingLabel'),
     setShowLineLabels: namedStub('setShowLineLabels'),
     showParetoFrontier: false,
     setShowParetoFrontier: namedStub('setShowParetoFrontier'),
@@ -288,6 +292,7 @@ export function createMockInferenceContextValues(
     compareGpuPair: null,
     lockedFrameworks: null,
     minimalChrome: false,
+    blockedHwToggles: new Map(),
     ...overrides,
   };
 }

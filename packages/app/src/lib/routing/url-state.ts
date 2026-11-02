@@ -1,8 +1,8 @@
 import { LIFECYCLE_DEFAULTS } from '@/components/calculator/lifecycle';
-import { MEASURED_METRIC_DEFAULTS } from '@/components/inference/measured-metric-config';
 import { dashboardRouteForPathname, getDashboardRoute } from '@/lib/routing/dashboard-routes';
 import { routeModelForPathname } from '@/lib/routing/model-routes';
 import { replaceClientPathname } from '@/lib/routing/client-navigation';
+import { getInferenceNavigationModel } from '@/lib/routing/inference-navigation-state';
 import {
   PROFIT_ROUTE_PARAMS,
   profitRouteParams,
@@ -22,8 +22,8 @@ const URL_STATE_KEYS = [
   'i_pctl',
   'i_mstat',
   'i_tokens',
-  'i_roleshare',
-  'i_powerfit',
+  'i_pbview',
+  'i_pbpoint',
   'i_xmetric',
   'i_e2e_xmetric',
   'i_xmode',
@@ -41,6 +41,8 @@ const URL_STATE_KEYS = [
   'i_legend',
   'i_advlabel',
   'i_conclabel',
+  'i_offloadlabel',
+  'i_frameworklabel',
   'i_gradlabel',
   'i_frontier',
   'i_linelabel',
@@ -56,6 +58,7 @@ const URL_STATE_KEYS = [
   'i_ptwindow',
   'i_ptfocus',
   'i_ptutility',
+  'i_ptraw',
   'i_ptconc',
   'i_rulers',
   'i_pcompare',
@@ -96,10 +99,6 @@ export type UrlStateParams = Partial<Record<UrlStateKey, string>>;
 
 export const DEFAULT_Y_AXIS_METRIC = 'y_tokensPerDollarH';
 
-export function defaultYAxisMetric(powerTiers: readonly string[]): string {
-  return powerTiers.length > 0 ? MEASURED_METRIC_DEFAULTS.power : DEFAULT_Y_AXIS_METRIC;
-}
-
 export const DEFAULT_FLEET_MW = '10';
 export const DEFAULT_LIFECYCLE_RAMP_MONTHS = String(LIFECYCLE_DEFAULTS.rampMonths);
 
@@ -115,8 +114,8 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   i_pctl: 'p90',
   i_mstat: 'median',
   i_tokens: 'total',
-  i_roleshare: '0',
-  i_powerfit: '0',
+  i_pbview: 'area',
+  i_pbpoint: '',
   i_xmetric: 'p90_ttft',
   i_e2e_xmetric: 'p90_ttft',
   i_xmode: '',
@@ -134,6 +133,8 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   i_legend: '',
   i_advlabel: '',
   i_conclabel: '',
+  i_offloadlabel: '1',
+  i_frameworklabel: '1',
   i_gradlabel: '',
   i_frontier: '',
   i_linelabel: '',
@@ -149,6 +150,7 @@ export const PARAM_DEFAULTS: Record<UrlStateKey, string> = {
   i_ptwindow: '',
   i_ptfocus: '',
   i_ptutility: '',
+  i_ptraw: '',
   i_ptconc: '',
   i_rulers: '',
   i_pcompare: '',
@@ -197,30 +199,6 @@ if (typeof window !== 'undefined') {
       explicitUrlParams[key] = value;
       currentState[key] = value;
     }
-  }
-  if (Object.keys(_initialParams).length > 0) {
-    setTimeout(() => {
-      const sp = new URLSearchParams(window.location.search);
-      let dirty = false;
-      for (const key of URL_STATE_KEYS) {
-        if (sp.has(key)) {
-          sp.delete(key);
-          dirty = true;
-        }
-      }
-      if (!dirty) return;
-      const s = sp.toString();
-      const replace =
-        typeof History === 'undefined'
-          ? window.history.replaceState
-          : History.prototype.replaceState;
-      replace.call(
-        window.history,
-        window.history.state,
-        '',
-        `${window.location.pathname}${s ? `?${s}` : ''}${window.location.hash}`,
-      );
-    }, 0);
   }
 }
 
@@ -337,6 +315,12 @@ function collectTabParams(): URLSearchParams {
     ) {
       filtered.set(key, value);
     }
+  }
+
+  // Bare inference now has a different entry default than the retained legacy model.
+  if (/^(?:\/zh)?\/inference\/?$/u.test(window.location.pathname)) {
+    const model = getInferenceNavigationModel();
+    if (model) filtered.set('g_model', model);
   }
 
   if (routeModelForPathname(window.location.pathname) === filtered.get('g_model')) {

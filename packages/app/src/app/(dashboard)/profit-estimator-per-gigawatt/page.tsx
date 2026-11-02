@@ -4,6 +4,7 @@ import ProfitEstimatorDisplay from '@/components/calculator/ProfitEstimatorDispl
 import { resolveCalculatorUrlSeed } from '@/components/calculator/url-seed';
 import { defaultRouteModel } from '@/lib/routing/model-routes';
 import { tabMetadata } from '@/lib/routing/tab-meta';
+import { TabIntro } from '@/components/dashboard/tab-intro';
 
 export const metadata: Metadata = tabMetadata('profit-estimator-per-gigawatt');
 
@@ -15,9 +16,15 @@ export default async function ProfitEstimatorPage({ searchParams }: Props) {
   const sp = await searchParams;
   const seed = resolveCalculatorUrlSeed(sp);
   return (
-    <ProfitEstimatorDisplay
-      basis="gw-year"
-      urlSeed={{ ...seed, model: seed.model ?? defaultRouteModel('profit-estimator-per-gigawatt') }}
-    />
+    <>
+      <ProfitEstimatorDisplay
+        basis="gw-year"
+        urlSeed={{
+          ...seed,
+          model: seed.model ?? defaultRouteModel('profit-estimator-per-gigawatt'),
+        }}
+      />
+      <TabIntro tab="profit-estimator-per-gigawatt" />
+    </>
   );
 }

@@ -73,6 +73,8 @@ export const MODEL_TO_KEY: Record<string, string> = {
   'amd/GLM-5.1-MXFP4': 'glm5.1',
   'zai-org/GLM-5.2-FP8': 'glm5.2',
   'zai-org/GLM-5.3': 'glm5.3',
+  'zai-org/GLM-5.3-Flash': 'glm5.3flash',
+  'nvidia/GLM-5.3-Flash-NVFP4': 'glm5.3flash',
   'deepseek-ai/DeepSeek-V4-Pro': 'dsv4',
   'deepseek-ai/DeepSeek-V4.1-Flash': 'dsv41flash',
   'amd/Muse-Spark-Open-816B-A42B-Quark-MXFP4': 'musespark',

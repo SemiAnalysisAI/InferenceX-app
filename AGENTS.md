@@ -91,6 +91,8 @@ All interactive elements should have `track()` from `@/lib/analytics/analytics` 
 
 **Convention**: `[section]_[action]` — e.g., `latency_zoom_reset`, `calculator_bar_selected`, `tab_changed`
 
+Event property keys are snake_case and canonical: `gpu`/`gpus`, `gpu_count`, `metric`, `sort_key`/`sort_dir`, `file_name`, `query_length`, `enabled` for boolean toggle state (enforced by `event-property-keys.test.ts`). Mark page regions with `analyticsPlacement()` (`data-analytics-placement`) so clicks get `placement`. Use `useSearchTracking`, `useDialogCloseTracking` and `selectionAnalyticsContext` instead of ad-hoc tracking. See the Analytics section of [docs/architecture.md](./docs/architecture.md).
+
 ## Tab Structure
 
 `packages/app/src/lib/routing/dashboard-routes.ts` is the single dashboard route registry. `TabNav`, `DashboardShell`, metadata, i18n, share URLs, and the sitemap derive from it, so do not add a second route array.
@@ -116,7 +118,7 @@ The site ships a hand-authored Simplified Chinese sibling for every indexable pa
 **Every new indexable page, dashboard tab, or blog post MUST ship its Chinese version in the same PR:**
 
 1. **New page** → create `packages/app/src/app/zh/<route>/page.tsx` with fully translated content and metadata. Metadata: `alternates: zhAlternates('<en-path>')` plus `openGraph.locale: ZH_OG_LOCALE`. Switch the English page's `alternates` to `enAlternates('<en-path>')` so both sides carry bidirectional hreflang. Register non-dashboard routes in `ZH_MIRRORED_ROUTES` (`src/lib/i18n/i18n.ts`) so the header nav and EN↔中文 toggle link to them, and add them to the sitemap via `localizedPair()`.
-2. **New dashboard tab** → add one entry to `src/lib/routing/dashboard-routes.ts`, then add exact entries to `TAB_META_ZH`, `TAB_INTRO_ZH`, and `TAB_LABELS_ZH` in `src/lib/routing/tab-meta-zh.ts`. Create `src/app/zh/(dashboard)/<tab>/page.tsx` mirroring the English page with `tabMetadataZh('<tab>')` and a `<ZhTabIntro tab="<tab>" />` block above the chart; the registry automatically supplies `/zh` route matching and indexable sitemap entries. The chart's own UI strings must follow rule 5. Registry and metadata tests enforce route parity and dictionary completeness.
+2. **New dashboard tab** → add one entry to `src/lib/routing/dashboard-routes.ts`, then add exact entries to `TAB_META_ZH`, `TAB_INTRO_ZH`, and `TAB_LABELS_ZH` in `src/lib/routing/tab-meta-zh.ts`. Create `src/app/zh/(dashboard)/<tab>/page.tsx` mirroring the English page with `tabMetadataZh('<tab>')` and a `<ZhTabIntro tab="<tab>" />` block below the chart; the registry automatically supplies `/zh` route matching and indexable sitemap entries. The chart's own UI strings must follow rule 5. Registry and metadata tests enforce route parity and dictionary completeness.
 3. **New blog post** → the translation `packages/app/content/blog/zh/<same-filename>.mdx` is REQUIRED in the same PR. Translate frontmatter `title`/`subtitle` and the body; keep `date`, `publishDate`, `modifiedDate`, `tags`, and the filename/slug identical (English and Chinese posts pair by filename; visibility gating always follows the English post's `publishDate`). Rewrite internal `/blog/<slug>` links to `/zh/blog/<slug>`; never alter numbers, code blocks, or `<Figure>`/`<JsonLd>` structure. The `/zh/blog` listing, hreflang, and sitemap pick the file up automatically.
 4. **Editing an existing English page or post** → update its Chinese sibling in the same PR. Omitting the required Chinese sibling update is a 🔴 BLOCKING review issue. Fidelity or wording issues inside an updated Chinese sibling follow the advisory workflow below; serious findings require Chinese maintainer confirmation.
 5. **ALL user-visible UI strings MUST have a Chinese equivalent**, with no carve-outs for "chart internals" or "option labels". This includes: headers/footers, card titles/descriptions, control and filter labels, buttons, toggles (Log Scale, Optimal Only, …), nudges, dropdown OPTION display names (Y-axis metric names, token types, scale modes), searchable-select placeholders ("Search…"), table column headers and action buttons ("Prompts"), modal/drawer chrome, legend footnotes, and empty/loading/error messages. Mechanism: client components call `useLocale()` (`src/lib/i18n/use-locale.ts`) and read from a component-local `STRINGS = { en, zh }` dict; server components take an optional `locale` prop passed from the /zh page; registry-defined display names (e.g. `METRIC_REGISTRY` entries) carry a `labelZh` field resolved through a locale-aware label helper at render time. The `en` values must keep the exact original strings so English pages stay byte-identical.
@@ -195,7 +197,7 @@ Total / active parameter counts live in `MODEL_ARCHITECTURES` (`packages/app/src
 
 ### Add a new blog post
 
-Create `packages/app/content/blog/<slug>.mdx` and its required Simplified Chinese translation at `packages/app/content/blog/zh/<slug>.mdx` in the same PR (see [Chinese Website Pages](#chinese-website-pages-zh--mandatory-for-all-indexable-surfaces)). Frontmatter and authoring rules are in [Blog](./docs/blog.md). A post without `publishDate` stays hidden in production. No code changes are needed, since the blog list, sitemap, RSS feed, llms.txt, and OG image pick up the post automatically.
+Create `packages/app/content/blog/<slug>.mdx` and its required Simplified Chinese translation at `packages/app/content/blog/zh/<slug>.mdx` in the same PR (see [Chinese Website Pages](#chinese-website-pages-zh--mandatory-for-all-indexable-surfaces)). Frontmatter and authoring rules are in [Blog](./docs/blog.md). A post without `publishDate` stays hidden in production. No code changes are needed, since the blog list, sitemap, RSS feed, llms.txt, and OG image pick up the post automatically. After adding or replacing `<Figure>` images, run `bun run blog:figure-dimensions` in `packages/app` and commit the updated `src/lib/blog/figure-dimensions.json`.
 
 ### Add a hardware results page
 
@@ -212,8 +214,8 @@ Load `.claude/skills/write-inferencex-whitepaper/` first. It holds the numbers w
 ### Adding a new tab
 
 1. Add the canonical route entry to `packages/app/src/lib/routing/dashboard-routes.ts`, including navigation group, indexability, provider capabilities, locale mirroring, and share scopes.
-2. Add explicit English metadata in `src/lib/routing/tab-meta.ts` and Chinese metadata, intro, and label entries in `src/lib/routing/tab-meta-zh.ts`.
-3. Create the English and Chinese App Router pages. `dashboard-routes.test.ts` enforces structural parity.
+2. Add explicit English metadata and intro entries (`TAB_META`, `TAB_INTRO`) in `src/lib/routing/tab-meta.ts` and Chinese metadata, intro, and label entries in `src/lib/routing/tab-meta-zh.ts`. Keep descriptions within 155 characters.
+3. Create the English and Chinese App Router pages, rendering `<TabIntro tab="<tab>" />` (EN) and `<ZhTabIntro tab="<tab>" />` (zh) below the content unless the content already renders an h1. `dashboard-routes.test.ts` enforces structural parity.
 4. Add the tab content and any section-specific provider only when the route actually needs one; declare dashboard-wide provider needs in the registry.
 5. Use `ChartLegend` with `variant="sidebar"`, sorted by `HW_REGISTRY` sort order, default expanded.
 6. Track interactive actions with the `{tabname}_` analytics prefix.

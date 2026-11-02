@@ -75,7 +75,7 @@ function jsonBuffer(value: unknown | null): Buffer | null {
   return Buffer.from(JSON.stringify(value), 'utf8');
 }
 
-function cacheHitRatesFromChartSeries(
+export function cacheHitRatesFromChartSeries(
   chartSeries: Awaited<ReturnType<typeof computeTraceDerivedPayloads>>['chartSeries'],
 ): PreparedTraceReplay['cacheHitRates'] {
   if (!chartSeries || chartSeries.prefillTps.length === 0) return null;
@@ -194,6 +194,30 @@ export async function prepareTraceReplay(
     fullResponseMetrics,
     atomKvCacheBlocks,
   };
+}
+
+/** Overwrite row cache-hit metrics with rates derived from the trace replay's chart series. */
+export async function writeCacheHitMetrics(
+  sql: postgres.Sql | postgres.TransactionSql,
+  benchmarkIds: readonly (number | string)[],
+  rates: NonNullable<PreparedTraceReplay['cacheHitRates']>,
+): Promise<void> {
+  await sql`
+    update benchmark_results
+    set metrics = jsonb_set(
+      case when ${rates.cpu}::numeric is not null
+        then jsonb_set(
+          metrics,
+          '{server_cpu_cache_hit_rate}',
+          to_jsonb(${rates.cpu}::numeric)
+        )
+        else metrics
+      end,
+      '{server_gpu_cache_hit_rate}',
+      to_jsonb(${rates.gpu}::numeric)
+    )
+    where id = any(${sql.array([...benchmarkIds])}::bigint[])
+  `;
 }
 
 export async function persistPreparedTraceReplay(
@@ -336,22 +360,11 @@ export async function persistPreparedTraceReplay(
     log(`linked benchmark rows (${elapsed(updateStart)})`);
 
     if (cacheHitRates) {
-      await tx`
-        update benchmark_results
-        set metrics = jsonb_set(
-          case when ${cacheHitRates.cpu}::numeric is not null
-            then jsonb_set(
-              metrics,
-              '{server_cpu_cache_hit_rate}',
-              to_jsonb(${cacheHitRates.cpu}::numeric)
-            )
-            else metrics
-          end,
-          '{server_gpu_cache_hit_rate}',
-          to_jsonb(${cacheHitRates.gpu}::numeric)
-        )
-        where id = any(${tx.array(unlinked.map((row) => row.id))}::bigint[])
-      `;
+      await writeCacheHitMetrics(
+        tx,
+        unlinked.map((row) => row.id),
+        cacheHitRates,
+      );
       log('updated cache-hit metrics from chart series');
     }
     if (Object.keys(fullResponseMetrics).length > 0) {

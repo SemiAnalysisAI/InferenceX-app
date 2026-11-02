@@ -93,7 +93,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
     track('evaluation_samples_open', {
       eval_result_id: row.evalResultId,
       task: row.benchmark,
-      hw_key: row.hwKey,
+      gpu: row.hwKey,
     });
   };
 
@@ -118,7 +118,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
     track('evaluation_samples_open', {
       eval_result_id: sharedRow.evalResultId,
       task: sharedRow.benchmark,
-      hw_key: sharedRow.hwKey,
+      gpu: sharedRow.hwKey,
       source: 'shared_link',
     });
   }, [sharedRow, sharedTarget?.evalResultId]);

@@ -2,9 +2,104 @@ import { ChartButtons } from '@/components/ui/chart-buttons';
 import { Card } from '@/components/ui/card';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { ShareButton } from '@/components/ui/share-button';
+import { registerAnalyticsClient } from '@/lib/analytics/analytics';
+import { addWatermark } from '@/hooks/useChartExport';
+import { getExportFooterStyle } from '@/lib/export/export-footer';
+import { GlobalFilterSelectionContext } from '@/providers/GlobalFilterContext';
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
+import type { CSSProperties } from 'react';
 
 describe('ChartButtons', () => {
+  for (const theme of [
+    { name: 'light', background: '#ffffff', foreground: '#1e1e1e', pixel: [255, 255, 255, 255] },
+    { name: 'dark', background: '#131416', foreground: '#eaebec', pixel: [19, 20, 22, 255] },
+  ]) {
+    it(`exports the ${theme.name} footer with scoped colors and inherited typography`, () => {
+      cy.mount(
+        <div
+          id="footer-theme"
+          style={
+            {
+              '--background': theme.background,
+              '--foreground': theme.foreground,
+              fontFamily: 'serif',
+            } as CSSProperties
+          }
+        />,
+      );
+      cy.get('#footer-theme').then(async ($root) => {
+        const root = $root[0];
+        const style = getExportFooterStyle(root);
+        expect(style.fontFamily).to.eq('serif');
+        expect(style.color).to.eq(
+          theme.name === 'light' ? 'rgb(30, 30, 30)' : 'rgb(234, 235, 236)',
+        );
+        expect(root.childElementCount).to.eq(0);
+        const source = root.ownerDocument.createElement('canvas');
+        source.width = 1200;
+        source.height = 400;
+        const result = await addWatermark(source.toDataURL(), style.backgroundColor, style);
+        const image = new Image();
+        image.src = result;
+        await image.decode();
+        expect(image.width).to.eq(1200);
+        expect(image.height).to.eq(520);
+        const output = root.ownerDocument.createElement('canvas');
+        output.width = image.width;
+        output.height = image.height;
+        const ctx = output.getContext('2d')!;
+        ctx.drawImage(image, 0, 0);
+        expect([...ctx.getImageData(5, 450, 1, 1).data]).to.deep.eq(theme.pixel);
+        const textPixels = ctx.getImageData(100, 420, 1000, 60).data;
+        const hasText = textPixels.some(
+          (value, index) => index % 4 !== 3 && value !== theme.pixel[index % 4],
+        );
+        expect(hasText).to.eq(true);
+      });
+    });
+  }
+
+  it('offers PNG sizing only inside the download menu, including PNG-only charts', () => {
+    cy.mount(
+      <div>
+        <div id="png-only-chart" style={{ width: 300, height: 200 }}>
+          Chart content
+        </div>
+        <ChartButtons chartId="png-only-chart" analyticsPrefix="test" />
+      </div>,
+    );
+    cy.get('[data-testid="png-aspect-ratio"]').should('not.exist');
+    cy.get('[data-testid="export-button"]').click();
+    cy.get('[data-testid="png-aspect-ratio"]').should('have.value', 'auto');
+    for (const ratio of ['16:9', '1:1']) {
+      cy.get('[data-testid="png-aspect-ratio"]').select(ratio).should('have.value', ratio);
+      cy.get('#png-only-chart').should(($chart) => {
+        const bounds = $chart[0].getBoundingClientRect();
+        expect(bounds.width).to.eq(300);
+        expect(bounds.height).to.eq(200);
+      });
+    }
+    cy.get('[data-testid="export-button"]').click().click();
+    cy.get('[data-testid="png-aspect-ratio"]').should('have.value', '1:1');
+    cy.get('[data-testid="export-png-button"]').should('be.visible');
+    cy.get('[data-testid="export-csv-button"]').should('not.exist');
+  });
+
+  it('does not offer PNG sizing when image export is unavailable', () => {
+    cy.mount(
+      <ChartButtons
+        chartId="table-chart"
+        analyticsPrefix="test"
+        hideImageExport
+        onExportCsv={cy.stub()}
+      />,
+    );
+    cy.get('[data-testid="export-button"]').click();
+    cy.get('[data-testid="png-aspect-ratio"]').should('not.exist');
+    cy.get('[data-testid="export-png-button"]').should('have.attr', 'aria-disabled', 'true');
+    cy.get('[data-testid="export-csv-button"]').should('be.visible');
+  });
+
   describe('without CSV export', () => {
     beforeEach(() => {
       cy.mount(
@@ -78,6 +173,69 @@ describe('ChartButtons', () => {
     });
   });
 
+  describe('analytics', () => {
+    it('sends the chart id and dashboard context with export and zoom-reset events', () => {
+      registerAnalyticsClient({ capture: cy.stub().as('capture') });
+      cy.mount(
+        <div style={{ position: 'relative', width: 400, height: 200 }}>
+          <div id="test-chart">Chart content</div>
+          <ChartButtons
+            chartId="test-chart"
+            analyticsPrefix="test"
+            analyticsContext={{
+              model: 'DeepSeek-R1-0528',
+              sequence: '8k/1k',
+              precision: 'fp4,fp8',
+              gpu_count: 3,
+            }}
+            onExportCsv={cy.stub()}
+          />
+        </div>,
+      );
+      const properties = {
+        chart: 'test-chart',
+        model: 'DeepSeek-R1-0528',
+        sequence: '8k/1k',
+        precision: 'fp4,fp8',
+        gpu_count: 3,
+      };
+      cy.get('[data-testid="zoom-reset-button"]').click();
+      cy.get('@capture').should('have.been.calledWith', 'test_zoom_reset_button', properties);
+      cy.get('[data-testid="export-button"]').click();
+      cy.get('@capture').should('have.been.calledWith', 'test_export_menu_opened', properties);
+      cy.get('[data-testid="export-csv-button"]').click();
+      cy.get('@capture').should('have.been.calledWith', 'test_csv_exported', properties);
+    });
+
+    it('sends the shared view, route and selected model with share events', () => {
+      registerAnalyticsClient({ capture: cy.stub().as('capture') });
+      cy.mount(
+        <GlobalFilterSelectionContext.Provider
+          value={
+            { selectedModel: 'DeepSeek-R1-0528' } as React.ContextType<
+              typeof GlobalFilterSelectionContext
+            >
+          }
+        >
+          <ShareButton />
+        </GlobalFilterSelectionContext.Provider>,
+      );
+      const shareProperties = Cypress.sinon.match({
+        model: 'DeepSeek-R1-0528',
+        route_template: Cypress.sinon.match.string,
+      });
+      cy.get('[data-testid="share-button"]').click();
+      cy.get('@capture').should('have.been.calledWith', 'share_popover_opened', shareProperties);
+      cy.window().then((win) => cy.stub(win, 'open'));
+      cy.get('[data-testid="share-twitter"]').click();
+      cy.get('@capture').should(
+        'have.been.calledWith',
+        'social_share_twitter',
+        Cypress.sinon.match({ model: 'DeepSeek-R1-0528', placement: 'share_popover' }),
+      );
+    });
+  });
+
   describe('hideZoomReset', () => {
     it('hides zoom reset button when hideZoomReset is true', () => {
       cy.mount(
@@ -106,6 +264,10 @@ describe('ChartButtons', () => {
       .and('have.attr', 'aria-label', '下载图表')
       .click();
     cy.get('[data-testid="export-png-button"]').should('contain.text', '下载 PNG');
+    cy.get('[data-testid="png-aspect-ratio"]')
+      .should('be.visible')
+      .and('have.attr', 'aria-label', 'PNG 宽高比')
+      .select('16:9');
     cy.get('[data-testid="export-csv-button"]').should('contain.text', '下载 CSV');
     cy.get('[data-testid="zoom-reset-button"]').should('have.attr', 'aria-label', '重置缩放');
   });

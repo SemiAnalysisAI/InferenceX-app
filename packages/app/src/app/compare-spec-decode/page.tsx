@@ -1,14 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import {
-  HW_REGISTRY,
-  SITE_NAME,
-  SITE_URL,
-  SUPPORTERS_LINE,
-} from '@semianalysisai/inferencex-constants';
+import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { enAlternates } from '@/lib/i18n/i18n';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
 import { JsonLd } from '@/components/seo/json-ld';
@@ -17,7 +13,7 @@ import {
   getSpecDecodePairsByModelSlug,
   type SpecDecodePair,
 } from '@/lib/compare/compare-variant-availability';
-import { COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare/compare-slug';
+import { PUBLIC_COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare/compare-slug';
 import { formatModelList } from '@/lib/compare/compare-ssr';
 import {
   canonicalSpecDecodeCompareSlug,
@@ -25,25 +21,25 @@ import {
   specMethodDisplayLabel,
 } from '@/lib/compare/compare-variant-slug';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
 
-const DESCRIPTION = `Does speculative decoding (MTP-style multi-token prediction, model-specific methods like EAGLE for MiniMax M3) improve inference throughput and cost? InferenceX is the independent, open-source benchmark from SemiAnalysis, with verified, reproducible results. ${SUPPORTERS_LINE} Each page compares a model + chip with the speculative decoding method ON versus OFF.`;
+const DESCRIPTION =
+  'Does speculative decoding (MTP, EAGLE) improve LLM inference throughput and cost? Each page compares one model and chip with the method on versus off.';
+
+/** Search snippet; the longer DESCRIPTION stays in the JSON-LD. */
+const META_DESCRIPTION =
+  'Speculative decoding on vs off for the same model and chip: does MTP or EAGLE raise inference throughput and cut cost? Independent, open-source benchmarks.';
 
 export const metadata: Metadata = {
   title: 'Chip Speculative Decoding Comparisons',
-  description: DESCRIPTION,
+  description: META_DESCRIPTION,
   alternates: enAlternates('/compare-spec-decode'),
-  openGraph: {
+  ...socialMetadata({
     title: `Chip Speculative Decoding Comparisons | ${SITE_NAME}`,
-    description: DESCRIPTION,
+    description: META_DESCRIPTION,
     url: `${SITE_URL}/compare-spec-decode`,
-    type: 'website',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: `Chip Speculative Decoding Comparisons | ${SITE_NAME}`,
-    description: DESCRIPTION,
-  },
+    locale: 'en',
+  }),
 };
 
 const jsonLd = {
@@ -74,7 +70,7 @@ function buildCards(
 export default async function CompareSpecDecodeIndexPage() {
   const pairsByModel = await getSpecDecodePairsByModelSlug();
   const totalUrls = [...pairsByModel.values()].reduce((s, p) => s + p.length, 0);
-  const modelsWithPairs = COMPARE_MODEL_SLUGS.filter(
+  const modelsWithPairs = PUBLIC_COMPARE_MODEL_SLUGS.filter(
     (m) => (pairsByModel.get(m.slug)?.length ?? 0) > 0,
   );
 

@@ -32,7 +32,7 @@ values above 100% are retained. Matched only is recalculated after normalization
 so every displayed box uses the same eligible case set. Latency has no peak
 percentage, and already normalized metric choices keep their existing units.
 The Normalized switch is offered for raw throughput and bandwidth metrics.
-Ascend 950PR bandwidth normalization uses the documented, assumed 1.6 TB/s basis.
+Ascend 950PR bandwidth normalization uses the derived 1.6384 TB/s basis (see below).
 
 The page-owned `GET /api/v1/operatorx/compare` route accepts optional
 `distributionMetric`, `distributionNormalized`, `distributionMatchedOnly`, and
@@ -48,7 +48,7 @@ OperatorX remains a page-owned API outside the published OpenAPI document.
 | GEMM/MoE tab         | `op`                      | Selects the operation                                  |
 | Workload             | `workload`                | Selects cases before distribution                      |
 | Metric               | `distributionMetric`      | Selects the value and peak basis                       |
-| GPUs                 | `distributionHardware`    | Selects distribution columns and matched cohort        |
+| GPU legend toggles   | `distributionHardware`    | Selects distribution columns and matched cohort        |
 | Matched only         | `distributionMatchedOnly` | Uses cases eligible on every selected GPU              |
 | Normalized           | `distributionNormalized`  | Divides throughput or bandwidth by the applicable peak |
 
@@ -59,7 +59,7 @@ TB/s 除以带宽峰值；纵轴与箱线图提示均显示峰值占比。缺少
 统计，超过 100% 的实测值不会截断。“仅显示匹配用例”会按归一化后的有效数据重新
 选取共同用例。归一化开关仅用于原始吞吐量和带宽指标；延迟没有对应的峰值百分比，
 已是峰值占比的指标保持原有单位。
-950PR 的带宽归一化使用文档中假定的 1.6 TB/s 参考值。
+950PR 的带宽归一化使用推算得出的 1.6384 TB/s 参考值（见下文）。
 页面专属 `/api/v1/operatorx/compare` 接口通过上述四个 `distribution*` 参数返回
 筛选后的分布统计，并保留原始测量状态和 run/result 来源；未传这些参数时，响应保持不变。
 
@@ -125,16 +125,107 @@ normalization costs and must not be reported as an end-to-end production speedup
 写入流程在清除缓存后预热默认 GEMM 和 MoE 对比。基准测试会先校验响应完全一致；
 仅使用已归一化输入的本地结果不代表完整生产请求的性能。
 
+## Median and best throughput bars
+
+The Median and best throughput panel replaces Distribution per GPU and sits beside Head to head on desktop. Metric vs size is the last chart. Its horizontal bars show median throughput as a fill and the
+best measured throughput as an outline, sorted by the displayed median. They follow
+the selected workload, hardware, precision and Normalized switch. Normalized bars
+show a fraction of each accelerator's peak; absolute bars show TFLOPS.
+
+**Shared cases only** is on by default: every bar uses the exact same cases, measured on every selected accelerator in the selected precision, with arithmetic intensity at or above every selected accelerator's ridge point (peak TFLOPS / bandwidth TB/s). An empty intersection stays empty; for example, FP8 cases measured only with fp32 block scales and only with ue8m0 block scales never overlap.
+
+Turning the switch off gives each accelerator its own successful positive finite measurements at or above its own ridge point. Each bar shows its case count. Case sets and quantization formats may differ; these medians are descriptive, not matched-shape speedup comparisons. Hardware lacking measurements or references is omitted without hiding other hardware. Even-sized cohorts average the middle two values. Best is maximum case throughput, not the fastest timing sample. Clicking opens the best case's timeline.
+
+The page-owned comparison API accepts `rooflinePrecision=bf16|fp8|fp4`, `rooflineHardware=<comma-separated hardware keys>`, `rooflineNormalized=true|false`, and `rooflineSharedOnly=true|false`. Supplying any adds `rooflineSummary`, using the UI's pure helper. Defaults are workload precision, all hardware, normalized=true, sharedOnly=true. `cohort` is `per-hardware-compute-bound` or `shared-compute-bound`. `matchedCases` always counts shared cases before ridge filtering. `caseIndices` is the union of displayed bar indices; each bar also returns its own exact `caseIndices` and `n`. Other fields include `missingReferences`, `hardware`, `median`, `best`, `medianTflops`, `bestTflops`, and `bestCaseIndex`. Normalized values are fractions (1 = 100%); explicit TFLOPS fields remain absolute. Invalid selectors return 400. Without selectors the existing comparison response is unchanged.
+
+中文：“仅共同用例”默认开启：所有柱使用完全相同的用例，即在所选精度下每个所选加速器都有实测值，且算术强度不低于每个所选加速器的 roofline 拐点（峰值 TFLOPS / 带宽 TB/s）。没有交集时仍显示空状态；例如，只用 fp32 block scale 测量的 FP8 用例与只用 ue8m0 block scale 测量的用例不会重叠。
+
+关闭该开关后，各加速器使用所选精度下各自成功、为正且有限的实测值，并按自身的 roofline 拐点筛选计算受限用例。每条柱显示用例数量。用例集合和量化格式可能不同，中位数用于描述各自结果，不代表相同形状下的性能对比。缺少实测值或参考值的硬件不显示，但不会阻止其他硬件显示。用例数为偶数时，中位数取中间两项的平均值；最佳值是用例吞吐量的最大值，不是单次最快计时。点击可查看最佳用例的时间线。
+
+页面专属的对比 API 支持 `rooflinePrecision=bf16|fp8|fp4`、`rooflineHardware=<逗号分隔的硬件 key>`、`rooflineNormalized=true|false` 和 `rooflineSharedOnly=true|false`。传入任一参数时，响应会增加 `rooflineSummary`，与 UI 共用同一个纯函数计算。默认值为工作负载的 roofline 精度、返回的全部硬件、`normalized=true` 和 `sharedOnly=true`。`cohort` 为 `per-hardware-compute-bound` 或 `shared-compute-bound`。`matchedCases` 始终表示拐点过滤前的共同用例数；顶层 `caseIndices` 是所显示各柱用例的并集，每条柱另外返回自身的 `caseIndices` 和 `n`。其他字段包括 `missingReferences`、`hardware`、`median`、`best`、`medianTflops`、`bestTflops` 和 `bestCaseIndex`。归一化数值为比例（1 表示 100%），显式的 TFLOPS 字段始终为绝对值。无效参数返回 400；不传这些参数时，原有响应保持不变。
+
+## Per-device FLOPs and bytes for sharded cases
+
+A case with `parallel` runs on `tp × dp` devices of one node. Following InferenceX
+`operatorx/core/parallel.py`, its args keep the full unsplit shape and each dp group's
+batch, so MoE experts see `tokens × dp` tokens in total. Each case's `flops` and `bytes`
+(the useful-FLOP and ideal-DRAM-byte counts behind TFLOPS, bandwidth, utilization,
+roofline points and the median/best bars) are the node totals divided by `tp × dp`, which
+pairs one device's share with the measured latency. Arithmetic intensity does not depend
+on the device count. Cases without `parallel` are unchanged. A malformed `parallel` value
+gives null counts, so the case shows its latency but no derived throughput. Before
+comparison format 2, sharded cases were credited with the whole node's work, which put
+them above the roofline (up to 3.4× the B300 bandwidth roof for DeepSeek-V4.1-Flash EP8/TP8).
+
+MoE weight bytes count the experts the tokens actually reach, following the forced
+`routing.distribution` in InferenceX `operatorx/runners/common/vllm/moe.py`: `balanced` touches
+`min(E, T × k)` experts; `single_hot` touches expert 0 plus `k − 1` uniform picks from the rest; a
+zipf distribution (`p ∝ 1/rank^s`, k drawn without replacement) uses Rosén's inclusion-probability
+approximation, which stays within 2% of simulation and errs high. `natural` routing is the router's
+own choice and keeps the uniform-random estimate, so a few low-token sharded `natural` cases can
+still sit slightly (≤7%) above the roof when the router concentrates tokens. Before format 2,
+skewed routing used the uniform estimate too (Qwen3.5 zipf s=1.2 on H100 reached 1.09× the roof).
+
+中文：MoE 权重字节数按 token 实际路由到的 expert 计算，与 InferenceX
+`operatorx/runners/common/vllm/moe.py` 中强制指定的 `routing.distribution` 一致：`balanced`
+覆盖 `min(E, T × k)` 个 expert；`single_hot` 覆盖 expert 0，以及从其余 expert 中均匀选出的
+`k − 1` 个；zipf 分布（`p ∝ 1/rank^s`，每个 token 无放回地选取 k 个）采用 Rosén 近似计算入选概率，
+与模拟结果的偏差不超过 2%，且只会偏高。`natural` 路由由 router 自行选择，仍沿用均匀随机估计，
+因此少量低 token 数的切分 `natural` 用例在 router 集中路由时仍可能略高于 roofline（不超过 7%）。
+对比格式 2 之前，偏斜路由同样使用均匀估计（Qwen3.5 zipf s=1.2 在 H100 上达到 roofline 的 1.09 倍）。
+
+## Case labels and Metric vs size slices
+
+Case `shape` labels name everything that separates otherwise equal shapes: a split case
+appends its `parallel` axes (` · tp=8 ep=8`, in tp, dp, ep, dcp order) and a MoE case whose
+router does not pick top-k experts appends its selection kind (` · hash routing`). Metric vs size
+slices are the shape without the token count (MoE) or `N`/`K` plus any split (GEMM), followed by
+the precision label, so every point on a line is the same operation at a different size. Before
+comparison format 3, sharded and hash-routed DeepSeek-V4 and V4.1-Flash, MiniMax-M3 and Kimi-K3
+MoE cases shared a line with single-device top-k cases of the same shape (up to 10 cases at one
+token count). Router gate weights are counted at their stored `router.gate.dtype` width.
+
+中文：用例的 `shape` 标签会标出区分同形状用例的全部差异：切分用例追加其 `parallel` 维度
+（如 ` · tp=8 ep=8`，按 tp、dp、ep、dcp 顺序），router 不按 top-k 选择 expert 的 MoE 用例追加
+其选择方式（如 ` · hash routing`）。Metric vs size 的分组键为去掉 token 数的形状（MoE），或 `N`、`K`
+加上切分方式（GEMM），再加精度标签，因此同一条曲线上的点是同一个操作在不同规模下的结果。
+对比格式 3 之前，DeepSeek-V4、V4.1-Flash、MiniMax-M3 和 Kimi-K3 中切分或 hash 路由的 MoE 用例，
+会与同形状的单设备 top-k 用例画在同一条曲线上（同一 token 数下最多 10 个用例）。router gate
+权重按 `router.gate.dtype` 的实际存储宽度计算字节数。
+
+## Default MoE workload
+
+When `workload` is absent or names no available workload (for example `workload=moe`), the MoE
+view opens on `moe:DeepSeek-V4.1-Flash` (`DEFAULT_WORKLOADS` in
+`packages/db/src/operatorx/compare.ts`). If that workload has no data, it falls back to the first
+listed workload (most hardware, then label). GEMM keeps the first listed workload. An explicit
+valid `workload` always wins.
+
+中文：未传 `workload` 或其值不对应任何可用工作负载（例如 `workload=moe`）时，MoE 视图默认打开
+`moe:DeepSeek-V4.1-Flash`（见 `packages/db/src/operatorx/compare.ts` 中的 `DEFAULT_WORKLOADS`）。
+该工作负载没有数据时，回退到列表中的第一项（按硬件数量、再按名称排序）。GEMM 仍使用列表第一项。
+显式传入的有效 `workload` 始终优先。
+
+中文：带 `parallel` 的用例在单节点的 `tp × dp` 个设备上运行。按照 InferenceX
+`operatorx/core/parallel.py` 的约定，参数保留未切分的完整形状和每个 dp 组的 batch，因此 MoE
+expert 共处理 `tokens × dp` 个 token。每个用例的 `flops`（有效 FLOP 数）和 `bytes`（理想 DRAM
+字节数）取节点总量除以 `tp × dp`，即单个设备承担的份额，与实测延迟相对应。TFLOPS、带宽、利用率、
+roofline 数据点以及中位数/最佳值柱状图都由这两个计数推导。算术强度不受设备数影响；不带 `parallel` 的用例保持不变。
+`parallel` 取值无效时计数为 null，只显示延迟，不计算派生吞吐量。对比格式 2 之前，切分用例按整个节点的
+工作量计算，导致数据点高于 roofline（DeepSeek-V4.1-Flash EP8/TP8 在 B300 上最高达到带宽上限的 3.4 倍）。
+
 ## Ascend 950PR normalization
 
 The OperatorX-only hardware reference for `ascend950pr` uses the 28-Cube
 Ascend950PR_9579 basis in `Ascend-ubench.md` (hardware configuration and section 5):
-378 dense BF16 TFLOPS and **assumed** HBM bandwidth of 1.6 TB/s. The compute value
-is Cube-only (Huawei Ascend 950 white paper, table 3-1), excluding the Vector
-contribution in the 425 TFLOPS combined figure. Exact memory/ECC configuration
-remains unresolved; the chart states this qualification. Other precision ceilings
-remain null. The normalized roofline divides arithmetic intensity by 236.25
-FLOP/byte and throughput by 378 TFLOPS; raw measurements are unchanged.
+378 dense BF16 TFLOPS, 756 dense FP8 TFLOPS and a **derived** HBM bandwidth of 1.6384 TB/s.
+The compute values are Cube-only ([Huawei Ascend 950 white paper, table 3-1](https://public-download.obs.cn-east-2.myhuaweicloud.com/ascend/%E6%98%87%E8%85%BE950%20NPU%E6%9E%B6%E6%9E%84%E7%99%BD%E7%9A%AE%E4%B9%A6.pdf)),
+excluding Vector compute in the combined figures. Peak memory bandwidth is 1.6384 TB/s:
+8 HBM stacks × 256 bits × 6.4 Gbps per pin (`npu-smi` HBM clock 3200 MHz), which Huawei
+rounds to 1.6 TB/s. FP4 remains null.
+The normalized roofline divides arithmetic intensity by 230.712890625 FLOP/byte for BF16
+or 461.42578125 for FP8, and throughput by 378 or 756 TFLOPS respectively. Raw measurements
+and the inclusion of activation quantization in measured FP8 latency are unchanged.
 
 `GET /api/v1/operatorx/compare?op=gemm` includes an optional `hardware[].reference`
 object with `label`, nullable `peakTflops.{bf16,fp8,fp4}`, `memoryBandwidthTBs`,
@@ -160,11 +251,13 @@ still win; no data, hardware selection, or measurement is changed.
 ### 中文说明
 
 `ascend950pr` 的参考值仅用于 OperatorX，依据 `Ascend-ubench.md` 的硬件配置说明和第 5 节，
-以 28 个 Cube 核的 Ascend950PR_9579 为基准：BF16 稠密计算峰值为 378 TFLOPS，
-HBM 带宽**假定为** 1.6 TB/s。计算峰值取自华为 Ascend 950 白皮书表 3-1 中的 Cube 项，
-不包含 425 TFLOPS 合计值中的 Vector 算力。具体内存及 ECC 配置仍未确认，图表会显示此说明。
-其他精度的峰值保留为 null。归一化时，算术强度除以 236.25 FLOP/byte，吞吐量除以
-378 TFLOPS；实测数据不变。
+以 28 个 Cube 核的 Ascend950PR_9579 为基准：BF16 和 FP8 的稠密计算峰值分别为 378 和
+756 TFLOPS，HBM 带宽为**推算值** 1.6384 TB/s。计算峰值仅计入 Cube 算力，来源为
+[华为 Ascend 950 白皮书表 3-1](https://public-download.obs.cn-east-2.myhuaweicloud.com/ascend/%E6%98%87%E8%85%BE950%20NPU%E6%9E%B6%E6%9E%84%E7%99%BD%E7%9A%AE%E4%B9%A6.pdf)，
+不包含白皮书合计值中的 Vector 算力。峰值内存带宽为 1.6384 TB/s：8 个 HBM stack × 256 位 ×
+每引脚 6.4 Gbps（`npu-smi` 报告 HBM 时钟 3200 MHz），Huawei 将其取整为 1.6 TB/s。FP4 的峰值保留为 null。归一化时，BF16 的算术强度除以 230.712890625 FLOP/byte，
+吞吐量除以 378 TFLOPS；FP8 则分别除以 461.42578125 FLOP/byte 和 756 TFLOPS。实测数据不变，FP8 延迟仍包含
+激活量化耗时。
 
 `GET /api/v1/operatorx/compare?op=gemm` 的响应在 `hardware[].reference` 中提供可选的参考值对象：
 `label`、允许为 null 的 `peakTflops.{bf16,fp8,fp4}`、`memoryBandwidthTBs`、
@@ -264,14 +357,13 @@ Do not replace measured latencies with synthetic values for manual verification.
 ### Landing-page Huawei link
 
 The English and Chinese landing pages link Huawei Ascend 950PR results to
-`/operatorx` and `/zh/operatorx`, respectively. The logo and result button are
-presentation-only navigation to the existing OperatorX view: they add no data
-selectors, defaults, calculations, or API contracts. Existing OperatorX API
-coverage applies; no additional endpoint or OpenAPI change is needed.
+`/ubenchx/core-memory-profiles` and `/zh/ubenchx/core-memory-profiles`, respectively,
+with a UbenchX subtitle. This entry no longer opens or prefetches OperatorX.
+OperatorX remains available through its own navigation and API.
 
-中文：英文和中文首页分别通过华为 Ascend 950PR 结果入口链接至 `/operatorx` 和
-`/zh/operatorx`。Logo 和结果按钮仅用于导航，不新增数据筛选条件、默认值、计算逻辑或
-API 契约；沿用现有 OperatorX API，无需新增接口或修改 OpenAPI。
+中文：英文和中文首页的华为 Ascend 950PR 入口显示 UbenchX 副标题，分别链接至
+`/ubenchx/core-memory-profiles` 和 `/zh/ubenchx/core-memory-profiles`，
+不再打开或预取 OperatorX。OperatorX 仍可通过自身导航入口和 API 访问。
 
 ### Cross-backend case alignment
 

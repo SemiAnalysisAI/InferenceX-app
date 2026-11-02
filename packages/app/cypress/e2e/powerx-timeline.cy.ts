@@ -143,10 +143,10 @@ function interceptOverlay() {
 
 function visitChart(extraParams: string) {
   interceptRows();
-  cy.visit(`/inference?g_model=DeepSeek-V4-Pro&i_seq=8k/1k&i_prec=fp4${extraParams}`, {
+  cy.visit(`/powerx?g_model=DeepSeek-V4-Pro&i_seq=8k/1k&i_prec=fp4${extraParams}`, {
     onBeforeLoad(win) {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      win.localStorage.setItem('inferencex-feature-gate', '1');
+      win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
     },
   });
   cy.wait(['@availability', '@benchmarks']);
@@ -178,6 +178,8 @@ describe('PowerX measured power timeline', () => {
     );
     cy.get('path.power-trace[data-segment="full"]').should('not.exist');
     cy.get('path.power-trace[data-run-index="0"][data-segment="window"]').should('exist');
+    // PowerX shows no interaction hint under the timeline.
+    cy.contains('p', 'pin tooltip').should('not.exist');
     assertShareLinkParams({
       i_metric: 'y_measuredPowerTimeline',
       i_ptaxis: 'serving',

@@ -12,6 +12,8 @@ import {
   sequenceForScenarioSegment,
 } from '@/lib/compare/compare-scenario-route';
 import { languageAlternates } from '@/lib/i18n/i18n';
+import { compareSocialImages } from '@/lib/compare/compare-meta';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 import {
   canonicalCompareSlug,
   compareDisplayLabel,
@@ -26,10 +28,6 @@ import {
   buildJsonLd,
   compareMetaDescription,
   compareTableNarrative,
-  KNOWN_MODELS,
-  KNOWN_PRECISIONS,
-  KNOWN_SEQUENCES,
-  pickString,
 } from '@/lib/compare/compare-ssr';
 import {
   getComparePageDerivedData,
@@ -39,7 +37,11 @@ import { CompareDetailRouteSkeleton } from '@/components/motion/route-skeletons'
 
 import ComparePageClient from './page-client';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
+
+export function generateStaticParams(): { slug: string }[] {
+  return [];
+}
 
 function comparePath(canonical: string, scenarioSegment?: ScenarioSegment): string {
   return scenarioSegment ? `/compare/${canonical}/${scenarioSegment}` : `/compare/${canonical}`;
@@ -47,7 +49,6 @@ function comparePath(canonical: string, scenarioSegment?: ScenarioSegment): stri
 
 interface Props {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export interface ScenarioOptions {
@@ -74,7 +75,7 @@ export async function buildCompareMetadata(
   const url = `${SITE_URL}${routePath}`;
   const canonicalUrl = `${SITE_URL}${canonicalPath}`;
 
-  const title = `${compareSeoTitle(gpuLabel, modelSeoName)} | ${SITE_NAME}`;
+  const title = compareSeoTitle(gpuLabel, modelSeoName);
 
   const { ssrRows } = await getComparePageDerivedData(
     parsed.model.dbKeys,
@@ -87,60 +88,39 @@ export async function buildCompareMetadata(
   const description = compareMetaDescription(parsed.model, parsed.a, parsed.b, ssrRows);
 
   return {
-    title: { absolute: title },
+    title,
     description,
     alternates: {
       canonical: canonicalUrl,
       languages: languageAlternates(canonicalPath),
     },
-    openGraph: {
-      title: `${fullLabel} | ${SITE_NAME}`,
+    ...socialMetadata({
+      title: `${title} | ${SITE_NAME}`,
       description,
       url,
-      type: 'website',
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: `${fullLabel} Inference Benchmark`,
-      description,
-    },
+      locale: 'en',
+      images: compareSocialImages(canonicalPath, `${fullLabel} inference benchmark`),
+    }),
   };
 }
 
-export default async function ComparePage({ params, searchParams }: Props) {
+export default async function ComparePage({ params }: Props) {
   const { slug } = await params;
-  return renderComparePage(slug, await searchParams, {});
+  return renderComparePage(slug, {});
 }
 
-export function renderComparePage(
-  slug: string,
-  sp: Record<string, string | string[] | undefined>,
-  { scenarioSegment }: ScenarioOptions,
-) {
+export function renderComparePage(slug: string, { scenarioSegment }: ScenarioOptions) {
   const parsed = parseCompareSlug(slug);
   if (!parsed) notFound();
 
   const canonical = canonicalCompareSlug(parsed.model.slug, parsed.a, parsed.b);
   if (canonical !== slug.toLowerCase()) {
-    const qs = Object.entries(sp)
-      .flatMap(([k, v]) => {
-        if (Array.isArray(v)) return v.map((vv) => [k, vv] as const);
-        if (v === undefined) return [];
-        return [[k, v] as const];
-      })
-      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
-      .join('&');
-    permanentRedirect(`${comparePath(canonical, scenarioSegment)}${qs ? `?${qs}` : ''}`);
+    permanentRedirect(comparePath(canonical, scenarioSegment));
   }
 
   return (
     <Suspense fallback={<CompareDetailRouteSkeleton />}>
-      <CompareDetail
-        parsed={parsed}
-        canonical={canonical}
-        sp={sp}
-        scenarioSegment={scenarioSegment}
-      />
+      <CompareDetail parsed={parsed} canonical={canonical} scenarioSegment={scenarioSegment} />
     </Suspense>
   );
 }
@@ -148,23 +128,14 @@ export function renderComparePage(
 async function CompareDetail({
   parsed,
   canonical,
-  sp,
   scenarioSegment,
 }: {
   parsed: NonNullable<ReturnType<typeof parseCompareSlug>>;
   canonical: string;
-  sp: Record<string, string | string[] | undefined>;
   scenarioSegment?: ScenarioSegment;
 }) {
   const fallbackSequence = comparisonScenarioForModel(parsed.model).sequence;
-  const urlSeq = pickString(sp.i_seq);
-  const urlPrec = pickString(sp.i_prec);
-  const urlModel = pickString(sp.g_model);
-  const effectiveModel =
-    urlModel && KNOWN_MODELS.has(urlModel) ? urlModel : parsed.model.displayName;
   const pathSequence = scenarioSegment ? sequenceForScenarioSegment(scenarioSegment) : null;
-  const requestedSequence = pathSequence ?? (urlSeq && KNOWN_SEQUENCES.has(urlSeq) ? urlSeq : null);
-  const requestedPrecision = urlPrec && KNOWN_PRECISIONS.has(urlPrec) ? urlPrec : null;
   const {
     sequence: effectiveSequence,
     precision: effectivePrecision,
@@ -180,8 +151,8 @@ async function CompareDetail({
     parsed.model.dbKeys,
     parsed.a,
     parsed.b,
-    requestedSequence,
-    requestedPrecision,
+    pathSequence,
+    null,
     fallbackSequence,
   );
 
@@ -229,13 +200,12 @@ async function CompareDetail({
         slug={canonical}
         label={label}
         modelLabel={parsed.model.label}
-        defaultModel={effectiveModel}
+        defaultModel={parsed.model.displayName}
         defaultSequence={effectiveSequence}
         defaultPrecision={effectivePrecision}
         initialBenchmarkRows={initialCompareBenchmarkRows(
-          parsed.model.displayName,
-          effectiveModel,
           initialPairBenchmarkRows,
+          effectiveSequence,
         )}
         ssrTableData={{ defaultTargets, ssrRows, interactivityRange }}
         narrative={narrative}

@@ -107,7 +107,7 @@ export function GET(request: NextRequest) {
       return csvResponse(rankingsViewCsvRows(kind, OVERVIEW_PRIMARY_TIER, view.entries));
     }
 
-    return cachedJson({
+    return cachedJson(request, {
       view: 'rankings',
       apiVersion: 'v1',
       generatedAt: view.generatedAt,

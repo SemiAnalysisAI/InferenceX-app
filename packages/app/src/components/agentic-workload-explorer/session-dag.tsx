@@ -434,7 +434,7 @@ function SubagentGroupRow({
           }}
           onClick={() => {
             setExpanded(!expanded);
-            track('agentic_workload_dag_group_toggled', { expanded: !expanded });
+            track('agentic_workload_dag_group_toggled', { enabled: !expanded });
           }}
         >
           <span className="text-3xs text-subtle shrink-0">{expanded ? '\u25BC' : '\u25B6'}</span>

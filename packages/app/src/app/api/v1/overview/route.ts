@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
       resolveOverviewRowScope(params.get('rows') ?? undefined),
       resolveOverviewHardwareRowScope(params.get('hwrows') ?? undefined),
     );
-    return cachedJson(data);
+    return cachedJson(request, data);
   } catch (error) {
     console.error('Error fetching overview:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

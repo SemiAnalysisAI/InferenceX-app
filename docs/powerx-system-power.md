@@ -55,6 +55,25 @@ original GPU measurements or require a per-run database backfill.
    gap is resolved. A new benchmark's power must not be attached to an older
    benchmark's throughput.
 
+## Per-point breakdown
+
+A supported estimate also carries `deploymentBreakdownWatts`, the same deployment watts split
+by component class, in the stack order PowerX draws them. `breakdownPowerEstimate` in
+`system-power-model.ts` sums the pinned model's leaf components by name
+(`systemPowerLeafCategory`): `GPUs` is `gpu` (measured), `Grace socket (measured)` is
+`measuredCpu`, `X86CPU` / `GraceCPU` are `cpu`, `DDR5DIMM` / `LPDDR5XMemory` are `memory`, NIC
+cards and system-side transceivers are `nic`, NVSwitch ASICs plus the NVL72 switch tray's
+embedded EPYC are `nvswitch`, `NVMeDrive` is `storage`, PCIe switches, retimers and the shelf
+controller are `other`, fan components are `fans`, AC/DC, DC/DC and generic conversion losses are
+`psuLoss`, and everything under `Scale-out networking` is `network`. `facility` is the model's
+PUE overhead. A measured Grace socket covers CPU + LPDDR, so NVL72 rows with socket telemetry
+carry no `cpu` or `memory` part; AMD chassis carry no `nvswitch` part and the B300 chassis no
+`other` part. Extrapolated chassis
+attribute each part by the same measured-GPU share as `deploymentFacilityWatts`, so the parts
+always sum to it, and divided by allocated GPUs they sum to All in Measured W/GPU. The leaf
+names are the pinned port's; `system-power-model.test.ts` pins the full leaf → part table across
+every supported system, so a renamed upstream component (which would land in `other`) fails it.
+
 ## Boundary and assumptions
 
 The input is measured mean GPU power during a validated serving window. Modeled

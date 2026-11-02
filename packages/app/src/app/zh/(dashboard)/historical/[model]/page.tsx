@@ -48,14 +48,14 @@ export default async function ZhHistoricalModelPage({ params, searchParams }: Pr
   const meta = MODEL_TAB_META_ZH.historical;
   return (
     <>
+      <InferenceProvider activeTab="historical">
+        <HistoricalTrendsDisplay />
+      </InferenceProvider>
       <ZhTabIntro
         tab="historical"
         title={meta.title(resolved.route.seoName)}
         intro={meta.intro(resolved.route.seoName)}
       />
-      <InferenceProvider activeTab="historical">
-        <HistoricalTrendsDisplay />
-      </InferenceProvider>
     </>
   );
 }

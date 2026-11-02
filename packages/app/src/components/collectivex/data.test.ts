@@ -4,14 +4,15 @@ import {
   chartPoints,
   collectiveXCaseLabel,
   collectiveXColorKey,
-  collectiveXConclusionLabel,
   collectiveXLegendLabel,
   collectiveXRunDasharray,
   collectiveXSeriesForRun,
   collectiveXSeriesLabel,
   collectiveXSkuLabel,
+  collectiveXBackendLabel,
   collectiveXTopologyLabel,
   fitAlphaBeta,
+  formatCollectiveXLatencyPercentiles,
   metricValue,
   normalizeCollectiveXSku,
   seriesMatchesSelection,
@@ -22,41 +23,18 @@ import {
   collectiveXKvOverlapPoints,
   collectiveXKvWireCeilings,
   type CollectiveXKvRunCase,
+  collectiveXKvBatchIsl,
+  collectiveXKvCaseOp,
   collectiveXKvCell,
-  collectiveXKvPageValues,
+  collectiveXKvRangeBands,
+  collectiveXRangeBands,
+  collectiveXRangeColorKey,
 } from './data';
 import type { CollectiveXKvRow, CollectiveXPercentiles, CollectiveXSeries } from './types';
 import { makeCollectiveXDataset, makeCollectiveXSeries } from './test-fixture';
 
 const dataset = makeCollectiveXDataset();
 const [scaleUp, scaleOut] = dataset.series;
-
-describe('collectiveXConclusionLabel', () => {
-  it.each([
-    ['success', '成功'],
-    ['failure', '失败'],
-    ['cancelled', '已取消'],
-    ['skipped', '已跳过'],
-    ['timed_out', '超时'],
-    ['startup_failure', '启动失败'],
-    ['action_required', '需要处理'],
-    ['neutral', '中立'],
-    ['stale', '已过期'],
-  ])('localizes the %s workflow conclusion in Chinese', (conclusion, expected) => {
-    expect(collectiveXConclusionLabel(conclusion, 'zh')).toBe(expected);
-  });
-
-  it('derives pending only from a null workflow conclusion', () => {
-    expect(collectiveXConclusionLabel(null, 'zh')).toBe('待处理');
-    expect(collectiveXConclusionLabel(null, 'en')).toBe('pending');
-  });
-
-  it('preserves known English values and hides unknown values on Chinese pages', () => {
-    expect(collectiveXConclusionLabel('startup_failure', 'en')).toBe('startup_failure');
-    expect(collectiveXConclusionLabel('future_status', 'en')).toBe('future_status');
-    expect(collectiveXConclusionLabel('future_status', 'zh')).toBe('未知状态');
-  });
-});
 
 describe('collectiveXTopologyLabel', () => {
   it('shows only the scale-up transport when there is no scale-out fabric', () => {
@@ -80,6 +58,8 @@ describe('collectiveXSeriesLabel', () => {
     expect(normalizeCollectiveXSku('B200-nscale')).toBe('b200');
     expect(normalizeCollectiveXSku('H100-DGXC')).toBe('h100');
     expect(collectiveXSkuLabel('B200-nscale')).toBe('B200');
+    expect(collectiveXBackendLabel('mori')).toBe('MoRI');
+    expect(collectiveXBackendLabel('deepep-v2')).toBe('deepep-v2');
     expect(collectiveXCaseLabel('h100-dgxc · deepep-v2', 'h100-dgxc')).toBe('H100 · deepep-v2');
     expect(normalizeCollectiveXSku('future-accelerator')).toBe('future-accelerator');
   });
@@ -98,10 +78,10 @@ describe('collectiveXSeriesLabel', () => {
     expect(collectiveXSeriesLabel(scaleOut)).toContain('EP16 · normal · decode');
   });
 
-  it('includes the run id for namespaced multi-run series', () => {
+  it('keeps the stored snapshot id out of the label', () => {
     const [runSeries] = collectiveXSeriesForRun([scaleUp], '30165164821');
     expect(collectiveXSeriesLabel(runSeries)).toBe(
-      '#30165164821 · H200 · deepep-v2 · EP8 · normal · decode · bf16',
+      'H200 · deepep-v2 · EP8 · normal · decode · bf16',
     );
   });
 
@@ -318,6 +298,33 @@ describe('fitAlphaBeta', () => {
   });
 });
 
+describe('formatCollectiveXLatencyPercentiles', () => {
+  const component = scaleUp.points[0].components.dispatch!;
+
+  it('formats all four latency percentiles', () => {
+    const latency = { p50: 12.34, p90: 15, p95: 18.06, p99: 120.4 };
+    expect(
+      formatCollectiveXLatencyPercentiles({ ...component, latency_us: latency }, 'unavailable'),
+    ).toBe('12.3 / 15.0 / 18.1 / 120.4 µs');
+  });
+
+  it('renders a placeholder for percentiles the artifact left null', () => {
+    const latency = {
+      p50: 9.5,
+      p90: null,
+      p95: null,
+      p99: null,
+    } as unknown as CollectiveXPercentiles;
+    expect(
+      formatCollectiveXLatencyPercentiles({ ...component, latency_us: latency }, 'unavailable'),
+    ).toBe('9.5 / - / - / - µs');
+  });
+
+  it('uses the unavailable label when the component was not measured', () => {
+    expect(formatCollectiveXLatencyPercentiles(null, '不可用')).toBe('不可用');
+  });
+});
+
 describe('chartPoints', () => {
   it('emits one point per token row with populated axes', () => {
     const points = chartPoints([scaleUp], 'dispatch', 'p50', 'latency');
@@ -340,6 +347,105 @@ describe('chartPoints', () => {
   it('keeps roundtrip token-rate points', () => {
     const points = chartPoints([scaleUp], 'roundtrip', 'p50', 'tokens-per-second');
     expect(points).toHaveLength(scaleUp.points.length);
+  });
+});
+
+describe('collectiveXRangeBands', () => {
+  // Same SKU and EP size, three libraries at scaled latencies, plus another EP size.
+  const scaled = (backend: string, factor: number, tokens?: number[]) => {
+    const base = collectiveXSeriesForRun([scaleUp], '7')[0];
+    return {
+      ...base,
+      series_id: `7:${backend}`,
+      backend,
+      points: base.points
+        .filter((point) => !tokens || tokens.includes(point.tokens_per_rank))
+        .map((point) => ({
+          ...point,
+          components: {
+            ...point.components,
+            dispatch: point.components.dispatch && {
+              ...point.components.dispatch,
+              latency_us: {
+                ...point.components.dispatch.latency_us,
+                p50: (point.components.dispatch.latency_us.p50 ?? 0) * factor,
+              },
+            },
+          },
+        })),
+    };
+  };
+  const first = scaleUp.points[0].tokens_per_rank;
+  const base = scaleUp.points[0].components.dispatch!.latency_us.p50!;
+
+  it('spans the lowest to the highest library with the median as its line', () => {
+    const bands = collectiveXRangeBands(
+      [scaled('a', 1), scaled('b', 2), scaled('c', 4)],
+      'dispatch',
+      'p50',
+      'latency',
+    );
+    expect(bands).toHaveLength(1);
+    expect(bands[0].colorKey).toBe(collectiveXRangeColorKey(scaleUp));
+    expect(bands[0].label).toBe('H200 · EP8');
+    const point = bands[0].points[0];
+    expect(point.x).toBe(first);
+    expect([point.lo, point.mid, point.hi]).toEqual([base, base * 2, base * 4]);
+    expect(point.members.map((member) => member.label)).toEqual([
+      'a · normal',
+      'b · normal',
+      'c · normal',
+    ]);
+  });
+
+  it('averages the middle two for an even count and orders rates best-first', () => {
+    const [band] = collectiveXRangeBands(
+      [scaled('a', 1), scaled('b', 3)],
+      'dispatch',
+      'p50',
+      'latency',
+    );
+    expect(band.points[0].mid).toBe(base * 2);
+    const [rate] = collectiveXRangeBands(
+      [scaled('a', 1), scaled('b', 3)],
+      'roundtrip',
+      'p50',
+      'tokens-per-second',
+    );
+    const ys = rate.points[0].members.map((member) => member.y);
+    expect(ys).toEqual(ys.toSorted((a, b) => b - a));
+  });
+
+  it('covers every token count any library measured', () => {
+    const [band] = collectiveXRangeBands(
+      [scaled('a', 1, [first]), scaled('b', 2)],
+      'dispatch',
+      'p50',
+      'latency',
+    );
+    expect(band.points).toHaveLength(scaleUp.points.length);
+    expect(band.points[0].members).toHaveLength(2);
+    expect(band.points.at(-1)!.members).toHaveLength(1);
+    const last = band.points.at(-1)!;
+    expect(last.lo).toBe(last.hi);
+  });
+
+  it('counts libraries, not library-and-mode series', () => {
+    const lowLatency = { ...scaled('a', 2), series_id: '7:a-ll', mode: 'low-latency' as const };
+    const [band] = collectiveXRangeBands(
+      [scaled('a', 1), lowLatency, scaled('b', 3)],
+      'dispatch',
+      'p50',
+      'latency',
+    );
+    expect(band.points[0].members).toHaveLength(3);
+    expect(band.points[0].libraries).toBe(2);
+  });
+
+  it('keeps SKUs and EP sizes apart', () => {
+    const other = collectiveXSeriesForRun([scaleOut], '7')[0];
+    const bands = collectiveXRangeBands([scaled('a', 1), other], 'dispatch', 'p50', 'latency');
+    expect(bands.map((band) => band.label)).toEqual(['H200 · EP8', 'MI355X · EP16']);
   });
 });
 
@@ -378,43 +484,57 @@ const bulk = (overrides: Partial<CollectiveXKvRow>) =>
   ({ kind: 'bulk', page_tokens: null, ...overrides }) as Partial<CollectiveXKvRow>;
 
 describe('collectiveXKvCell', () => {
-  it('picks the largest-ISL pull row at the requested batch extreme', () => {
+  it('reads one request at the largest ISL measured at batch 1', () => {
     const rows = [
       kvRow({ isl: 4096, gbps_p50: 5 }),
       kvRow({ gbps_p50: 7.39 }),
-      kvRow({ batch: 16, gbps_p50: 15.12 }),
+      kvRow({ isl: 131072, batch: 2, gbps_p50: 40 }),
+      kvRow({ op: 'push', gbps_p50: 99 }),
+    ];
+    expect(collectiveXKvCell(rows, 'paged', 'pull', 'b1')?.gbps_p50).toBe(7.39);
+  });
+
+  it('reads the peak at any ISL and batch', () => {
+    const rows = [
+      kvRow({ gbps_p50: 7.39 }),
+      kvRow({ isl: 4096, batch: 16, gbps_p50: 15.12 }),
       kvRow({ op: 'push', batch: 16, gbps_p50: 99 }),
     ];
-    expect(collectiveXKvCell(rows, 'paged', 64, 'min')?.gbps_p50).toBe(7.39);
-    expect(collectiveXKvCell(rows, 'paged', 64, 'max')?.gbps_p50).toBe(15.12);
+    expect(collectiveXKvCell(rows, 'paged', 'pull', 'peak')).toMatchObject({
+      gbps_p50: 15.12,
+      batch: 16,
+      isl: 4096,
+    });
   });
 
-  it('returns null for an unmeasured family', () => {
-    expect(collectiveXKvCell([kvRow({})], 'paged', 16, 'min')).toBeNull();
-    expect(collectiveXKvCell([], 'bulk', null, 'min')).toBeNull();
+  it('returns null for an unmeasured family or direction', () => {
+    expect(collectiveXKvCell([kvRow({})], 'paged', 'push', 'b1')).toBeNull();
+    expect(collectiveXKvCell([], 'bulk', 'pull', 'peak')).toBeNull();
   });
 
-  it('selects bulk rows by their null page size', () => {
+  it('separates bulk rows from paged rows', () => {
     const rows = [kvRow({}), kvRow({ kind: 'bulk', page_tokens: null, gbps_p50: 89.41 })];
-    expect(collectiveXKvCell(rows, 'bulk', null, 'min')?.gbps_p50).toBe(89.41);
+    expect(collectiveXKvCell(rows, 'bulk', 'pull', 'b1')?.gbps_p50).toBe(89.41);
   });
 });
 
-describe('collectiveXKvPageValues', () => {
-  const kaseWithRows = (rows: (Partial<CollectiveXKvRow> & { latency_p50?: number })[]) =>
-    ({ rows: rows.map(kvRow) }) as CollectiveXKvRunCase;
-
-  it('collects the distinct measured page sizes descending, ignoring bulk rows', () => {
-    const cases = [
-      kaseWithRows([{}, { page_tokens: 16 }, bulk({ gbps_p50: 89.41 })]),
-      kaseWithRows([{ page_tokens: 256 }, { page_tokens: 64 }]),
+describe('collectiveXKvBatchIsl', () => {
+  it('picks the ISL with the widest batch sweep, the larger on a tie', () => {
+    const rows = [
+      kvRow({ isl: 2048 }),
+      kvRow({ isl: 2048, batch: 32 }),
+      kvRow({ isl: 2048, batch: 4 }),
+      kvRow({ isl: 8192 }),
+      kvRow({ isl: 8192, batch: 16 }),
+      kvRow({ isl: 524288 }),
     ];
-    expect(collectiveXKvPageValues(cases)).toEqual([256, 64, 16]);
+    expect(collectiveXKvBatchIsl(rows)).toBe(2048);
+    expect(collectiveXKvBatchIsl(rows.slice(1))).toBe(8192);
   });
 
-  it('is empty when no paged rows exist', () => {
-    expect(collectiveXKvPageValues([])).toEqual([]);
-    expect(collectiveXKvPageValues([kaseWithRows([bulk({})])])).toEqual([]);
+  it('falls back to the largest ISL when none is swept, and null when empty', () => {
+    expect(collectiveXKvBatchIsl([kvRow({ isl: 2048 }), kvRow({ isl: 8192 })])).toBe(8192);
+    expect(collectiveXKvBatchIsl([])).toBeNull();
   });
 });
 
@@ -444,13 +564,17 @@ describe('collectiveXKvChartPoints', () => {
     outcome: 'success',
     reason: null,
     detail: null,
+    library_version: '1.5.0',
+    maturity: 'production',
+    network: 'infiniband',
+    transport: 'ucx',
     rows: rows.map(kvRow),
     run_id: '318',
     run_index: 1,
     ...overrides,
   });
 
-  it('plots batch scaling at the largest measured ISL', () => {
+  it('plots batch scaling at the ISL with the widest batch sweep', () => {
     const points = collectiveXKvChartPoints(
       [
         kase([
@@ -458,17 +582,17 @@ describe('collectiveXKvChartPoints', () => {
           { isl: 32768, batch: 1, gbps_p50: 7.39 },
           { isl: 32768, batch: 16, gbps_p50: 15.12 },
           { isl: 32768, batch: 16, op: 'push', gbps_p50: 99 },
-          { isl: 32768, batch: 1, page_tokens: 16, gbps_p50: 2.72 },
+          { isl: 131072, batch: 1, gbps_p50: 9 },
         ]),
       ],
-      { x: 'batch', y: 'bandwidth', op: 'pull', pageTokens: 64 },
+      { x: 'batch', y: 'bandwidth', op: 'pull' },
     );
     expect(points.map((point) => [point.x, point.y])).toEqual([
       [1, 7.39],
       [16, 15.12],
     ]);
     expect(points[0].seriesId).toBe('318:gb200-nixl-kv-dsv4-rdma-xfer-ep2-paged-fp8');
-    expect(points[0].seriesLabel).toContain('#318');
+    expect(points[0].seriesLabel).not.toContain('#318');
   });
 
   it('plots ISL scaling at batch 1 with latency as the metric', () => {
@@ -480,7 +604,7 @@ describe('collectiveXKvChartPoints', () => {
           { isl: 32768, batch: 16, latency_p50: 193.7 },
         ]),
       ],
-      { x: 'isl', y: 'latency', op: 'pull', pageTokens: 64 },
+      { x: 'isl', y: 'latency', op: 'pull' },
     );
     expect(points.map((point) => [point.x, point.y])).toEqual([
       [512, 0.5],
@@ -493,13 +617,12 @@ describe('collectiveXKvChartPoints', () => {
       x: 'batch',
       y: 'bandwidth',
       op: 'pull',
-      pageTokens: 64,
     });
     expect(points).toEqual([]);
   });
 
   describe('collectiveXKvFrontierPoints', () => {
-    const selection = { op: 'pull', pageTokens: 64 } as const;
+    const selection = { op: 'pull' } as const;
 
     it('plots aggregate GB/s against ISL across the full (ISL, batch) grid', () => {
       const points = collectiveXKvFrontierPoints(
@@ -576,7 +699,7 @@ describe('collectiveXKvChartPoints', () => {
   });
 
   describe('collectiveXKvOverlapPoints', () => {
-    const selection = { op: 'pull', pageTokens: 64 } as const;
+    const selection = { op: 'pull' } as const;
 
     it('normalizes the batch ladder at the largest ISL to its batch-1 rung', () => {
       const points = collectiveXKvOverlapPoints(
@@ -594,6 +717,23 @@ describe('collectiveXKvChartPoints', () => {
         [1, 1],
         [4, 3],
         [16, 4],
+      ]);
+    });
+
+    it('reads each series at the ISL with its widest batch sweep by default', () => {
+      const points = collectiveXKvOverlapPoints(
+        [
+          kase([
+            { isl: 4096, batch: 1, gbps_p50: 6 },
+            { isl: 4096, batch: 4, gbps_p50: 18 },
+            { isl: 524288, batch: 1, gbps_p50: 90 },
+          ]),
+        ],
+        selection,
+      );
+      expect(points.map((point) => [point.x, point.y])).toEqual([
+        [1, 1],
+        [4, 3],
       ]);
     });
 
@@ -643,7 +783,7 @@ describe('collectiveXKvChartPoints', () => {
   });
 
   describe('collectiveXKvIslValues', () => {
-    it('lists distinct paged ISLs of the selected direction and page size, ascending', () => {
+    it('lists distinct paged ISLs of the selected direction, ascending', () => {
       const values = collectiveXKvIslValues(
         [
           kase([
@@ -651,13 +791,80 @@ describe('collectiveXKvChartPoints', () => {
             { isl: 32768, batch: 4 },
             { isl: 4096, batch: 1 },
             { isl: 8192, batch: 1, op: 'push' },
-            { isl: 16384, batch: 1, page_tokens: 16 },
             bulk({ isl: 65536 }),
           ]),
         ],
-        { op: 'pull', pageTokens: 64 },
+        'pull',
       );
       expect(values).toEqual([4096, 32768]);
+    });
+  });
+
+  describe('collectiveXKvCaseOp', () => {
+    it('keeps the selected direction when the case measured it, else falls back to push', () => {
+      const both = kase([{ op: 'pull' }, { op: 'push' }]);
+      const pushOnly = kase([{ op: 'push' }], { backend: 'mooncake' });
+      expect(collectiveXKvCaseOp(both, 'pull')).toBe('pull');
+      expect(collectiveXKvCaseOp(pushOnly, 'pull')).toBe('push');
+    });
+  });
+
+  describe('collectiveXKvRangeBands', () => {
+    const mooncake = (rows: (Partial<CollectiveXKvRow> & { latency_p50?: number })[]) =>
+      kase(rows, {
+        case_id: 'gb200-mooncake-kv-dsv4-rdma-xfer-ep2-paged-fp8',
+        backend: 'mooncake',
+      });
+    const selection = { x: 'isl', y: 'latency', op: 'push' } as const;
+
+    it('spans every library of a SKU and fabric, with the median as the line', () => {
+      const [band] = collectiveXKvRangeBands(
+        [
+          kase([{ op: 'push', isl: 2048, latency_p50: 1 }]),
+          mooncake([{ op: 'push', isl: 2048, latency_p50: 3 }]),
+        ],
+        selection,
+        'range',
+      );
+      expect(band.label).toBe('GB200 · rdma');
+      expect(band.points).toHaveLength(1);
+      expect(band.points[0]).toMatchObject({ x: 2048, y: 2, range: { lo: 1, hi: 3 } });
+    });
+
+    it('draws the best library in best mode: lowest latency, highest bandwidth', () => {
+      const cases = [
+        kase([{ op: 'push', isl: 2048, latency_p50: 1, gbps_p50: 40 }]),
+        mooncake([{ op: 'push', isl: 2048, latency_p50: 3, gbps_p50: 90 }]),
+      ];
+      const [latency] = collectiveXKvRangeBands(cases, selection, 'best');
+      expect(latency.points[0].y).toBe(1);
+      expect(latency.points[0].range?.members[0].label).toBe(collectiveXBackendLabel('nixl'));
+      const [bandwidth] = collectiveXKvRangeBands(cases, { ...selection, y: 'bandwidth' }, 'best');
+      expect(bandwidth.points[0].y).toBe(90);
+      expect(bandwidth.points[0].row.gbps_p50).toBe(90);
+    });
+
+    it('keeps SKUs and fabrics apart', () => {
+      const bands = collectiveXKvRangeBands(
+        [
+          kase([{ op: 'push' }]),
+          kase([{ op: 'push' }], {
+            case_id: 'gb200-nixl-kv-dsv4-mnnvl-xfer-ep2-paged-fp8',
+            fabric: 'mnnvl',
+          }),
+          kase([{ op: 'push' }], {
+            case_id: 'h200-nixl-kv-dsv4-rdma-xfer-ep2-paged-fp8',
+            sku: 'h200',
+          }),
+        ],
+        selection,
+        'range',
+      );
+      expect(bands.map((band) => band.label)).toEqual([
+        'GB200 · mnnvl',
+        'GB200 · rdma',
+        'H200 · rdma',
+      ]);
     });
   });
 

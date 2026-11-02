@@ -1,5 +1,5 @@
 import { COMPARE_MODEL_ALIASES, COMPARE_MODEL_SLUGS } from '../compare/compare-slug';
-import { getModelCategory, Model } from '../catalog/data-mappings';
+import { getModelCategory, isModelVisible, Model } from '../catalog/data-mappings';
 
 export interface InferenceModelSlug {
   slug: string;
@@ -23,6 +23,10 @@ export const INFERENCE_MODEL_SLUGS: readonly InferenceModelSlug[] = COMPARE_MODE
 
 const SLUG_TO_ENTRY: ReadonlyMap<string, InferenceModelSlug> = new Map(
   INFERENCE_MODEL_SLUGS.map((entry) => [entry.slug, entry]),
+);
+
+export const PUBLIC_INFERENCE_MODEL_SLUGS = INFERENCE_MODEL_SLUGS.filter((entry) =>
+  isModelVisible(entry.model),
 );
 
 const MODEL_TO_SLUG: ReadonlyMap<Model, string> = new Map(

@@ -9,8 +9,8 @@ export const metadata: Metadata = tabMetadataZh('collectivex');
 export default function ZhCollectiveXPage() {
   return (
     <>
-      <ZhTabIntro tab="collectivex" />
       <CollectiveXDisplay />
+      <ZhTabIntro tab="collectivex" />
     </>
   );
 }

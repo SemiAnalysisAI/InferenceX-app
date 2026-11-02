@@ -9,7 +9,8 @@ import {
   pathWithSearchParams,
   resolveModelRouteSlug,
 } from '@/lib/routing/model-routes';
-import { modelTabMetadata } from '@/lib/routing/tab-meta';
+import { MODEL_TAB_META, modelTabMetadata } from '@/lib/routing/tab-meta';
+import { TabIntro } from '@/components/dashboard/tab-intro';
 
 interface Props {
   params: Promise<{ model: string }>;
@@ -37,8 +38,15 @@ export default async function HistoricalModelPage({ params, searchParams }: Prop
     );
   }
   return (
-    <InferenceProvider activeTab="historical">
-      <HistoricalTrendsDisplay />
-    </InferenceProvider>
+    <>
+      <InferenceProvider activeTab="historical">
+        <HistoricalTrendsDisplay />
+      </InferenceProvider>
+      <TabIntro
+        tab="historical"
+        title={MODEL_TAB_META.historical.title(resolved.route.seoName)}
+        intro={MODEL_TAB_META.historical.intro(resolved.route.seoName)}
+      />
+    </>
   );
 }

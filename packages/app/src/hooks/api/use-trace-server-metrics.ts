@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
+import { ApiRequestError } from '@/lib/api/api-request-error';
+
 import { useByIdQuery } from './benchmark-id-query';
 
 export interface TimeSeriesPoint {
@@ -108,9 +110,16 @@ export function useTraceServerMetricSource(id: number | null, source: string, en
     queryFn: async ({ signal }): Promise<MetricSourceSeries | null> => {
       if (!id || !source || source === 'all') return null;
       const params = new URLSearchParams({ id: String(id), source });
-      const response = await fetch(`/api/v1/trace-server-metric-source?${params}`, { signal });
+      const url = `/api/v1/trace-server-metric-source?${params}`;
+      const response = await fetch(url, { signal });
       if (response.status === 404) return null;
-      if (!response.ok) throw new Error(`trace-server-metric-source ${response.status}`);
+      if (!response.ok) {
+        throw new ApiRequestError(
+          `trace-server-metric-source ${response.status}`,
+          response.status,
+          url,
+        );
+      }
       return (await response.json()) as MetricSourceSeries;
     },
     enabled: enabled && Boolean(id) && source !== 'all',

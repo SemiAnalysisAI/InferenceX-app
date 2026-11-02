@@ -1,20 +1,22 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 
-import {
-  HW_REGISTRY,
-  SITE_NAME,
-  SITE_URL,
-  SUPPORTERS_LINE,
-} from '@semianalysisai/inferencex-constants';
+import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { JsonLd } from '@/components/seo/json-ld';
+import { comparisonScenarioForModel } from '@/lib/compare/compare-agentx';
 import {
   isAgenticSequence,
   type ScenarioSegment,
   sequenceForScenarioSegment,
 } from '@/lib/compare/compare-scenario-route';
 import { languageAlternates } from '@/lib/i18n/i18n';
+import {
+  compareSocialImages,
+  perDollarMetaDescription,
+  perDollarMetaTitle,
+} from '@/lib/compare/compare-meta';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 import {
   canonicalCompareSlug,
   compareDisplayLabel,
@@ -27,10 +29,6 @@ import {
   buildBreadcrumbJsonLd,
   buildJsonLd,
   compareTableNarrative,
-  KNOWN_MODELS,
-  KNOWN_PRECISIONS,
-  KNOWN_SEQUENCES,
-  pickString,
 } from '@/lib/compare/compare-ssr';
 import {
   getComparePageDerivedData,
@@ -39,7 +37,11 @@ import {
 
 import ComparePerDollarPageClient from './page-client';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
+
+export function generateStaticParams(): { slug: string }[] {
+  return [];
+}
 
 export interface ScenarioOptions {
   scenarioSegment?: ScenarioSegment;
@@ -53,7 +55,6 @@ function scenarioPath(canonical: string, scenarioSegment?: ScenarioSegment): str
 
 interface Props {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -74,64 +75,40 @@ export function buildPerDollarMetadata(
   const canonicalPath = scenarioPath(canonical);
   const url = `${SITE_URL}${routePath}`;
   const canonicalUrl = `${SITE_URL}${canonicalPath}`;
-  const description = `${gpuLabel} performance per dollar on ${parsed.model.label}: verified, reproducible cost-per-million-token results from InferenceX, the independent open-source benchmark by SemiAnalysis, normalized by hyperscaler TCO. ${SUPPORTERS_LINE} See which chip is cheaper at every interactivity level.`;
+  const description = perDollarMetaDescription(gpuLabel, parsed.model.label);
+  const title = perDollarMetaTitle(gpuLabel, parsed.model.label);
   return {
-    title: `${fullLabel} — Performance per Dollar`,
+    title,
     description,
     alternates: {
       canonical: canonicalUrl,
       languages: languageAlternates(canonicalPath),
     },
-    openGraph: {
-      title: `${fullLabel} — Performance per Dollar | ${SITE_NAME}`,
+    ...socialMetadata({
+      title: `${title} | ${SITE_NAME}`,
       description,
       url,
-      type: 'website',
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: `${fullLabel} — Performance per Dollar`,
-      description,
-    },
+      locale: 'en',
+      images: compareSocialImages(canonicalPath, `${fullLabel} performance per dollar`),
+    }),
   };
 }
 
-export default async function ComparePerDollarPage({ params, searchParams }: Props) {
+export default async function ComparePerDollarPage({ params }: Props) {
   const { slug } = await params;
-  return renderPerDollarPage(slug, await searchParams, {});
+  return renderPerDollarPage(slug, {});
 }
 
-export async function renderPerDollarPage(
-  slug: string,
-  sp: Record<string, string | string[] | undefined>,
-  { scenarioSegment }: ScenarioOptions,
-) {
+export async function renderPerDollarPage(slug: string, { scenarioSegment }: ScenarioOptions) {
   const parsed = parseCompareSlug(slug);
   if (!parsed) notFound();
 
   const canonical = canonicalCompareSlug(parsed.model.slug, parsed.a, parsed.b);
   if (canonical !== slug.toLowerCase()) {
-    const qs = Object.entries(sp)
-      .flatMap(([k, v]) => {
-        if (Array.isArray(v)) return v.map((vv) => [k, vv] as const);
-        if (v === undefined) return [];
-        return [[k, v] as const];
-      })
-      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
-      .join('&');
-    permanentRedirect(`${scenarioPath(canonical, scenarioSegment)}${qs ? `?${qs}` : ''}`);
+    permanentRedirect(scenarioPath(canonical, scenarioSegment));
   }
 
-  const fallbackSequence = null;
-
-  const urlSeq = pickString(sp.i_seq);
-  const urlPrec = pickString(sp.i_prec);
-  const urlModel = pickString(sp.g_model);
-  const effectiveModel =
-    urlModel && KNOWN_MODELS.has(urlModel) ? urlModel : parsed.model.displayName;
   const pathSequence = scenarioSegment ? sequenceForScenarioSegment(scenarioSegment) : null;
-  const requestedSequence = pathSequence ?? (urlSeq && KNOWN_SEQUENCES.has(urlSeq) ? urlSeq : null);
-  const requestedPrecision = urlPrec && KNOWN_PRECISIONS.has(urlPrec) ? urlPrec : null;
   const {
     sequence: effectiveSequence,
     precision: effectivePrecision,
@@ -147,9 +124,9 @@ export async function renderPerDollarPage(
     parsed.model.dbKeys,
     parsed.a,
     parsed.b,
-    requestedSequence,
-    requestedPrecision,
-    fallbackSequence,
+    pathSequence,
+    null,
+    comparisonScenarioForModel(parsed.model).sequence,
   );
 
   const routePath = scenarioPath(canonical, scenarioSegment);
@@ -200,14 +177,13 @@ export async function renderPerDollarPage(
         slug={canonical}
         label={label}
         modelLabel={parsed.model.label}
-        defaultModel={effectiveModel}
+        defaultModel={parsed.model.displayName}
         defaultSequence={effectiveSequence}
         defaultPrecision={effectivePrecision}
         ssrTableData={{ defaultTargets, ssrRows, interactivityRange }}
         initialBenchmarkRows={initialCompareBenchmarkRows(
-          parsed.model.displayName,
-          effectiveModel,
           initialPairBenchmarkRows,
+          effectiveSequence,
         )}
         narrative={narrative}
         agenticIntro={isAgenticSequence(effectiveSequence) ? AGENTIC_SCENARIO_INTRO : null}

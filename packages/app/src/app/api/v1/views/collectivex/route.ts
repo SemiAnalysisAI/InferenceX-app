@@ -10,7 +10,6 @@ import {
   collectiveXKvFrontierPoints,
   collectiveXKvIslValues,
   collectiveXKvOverlapPoints,
-  collectiveXKvPageValues,
   collectiveXKvWireCeilings,
   collectiveXSeriesForRun,
   fitAlphaBeta,
@@ -144,25 +143,20 @@ export function GET(request: NextRequest) {
     const cases = datasets
       .flatMap((d, i) => (d.kv ?? []).map((k) => ({ ...k, run_id: d.run.run_id, run_index: i })))
       .filter((k) => active('kvSeries', `${k.run_id}:${k.case_id}`));
-    const pages = collectiveXKvPageValues(cases);
-    const pageTokens = parseNumberParam(s.get('pageTokens'), 'pageTokens', pages[0] ?? 64, {
-      integer: true,
-      min: 1,
-    });
-    const kvOp = parseEnumParam(s.get('kvOp'), 'kvOp', ['pull', 'push'], 'pull');
+    const kvOp = parseEnumParam(s.get('kvOp'), 'kvOp', ['pull', 'push'], 'push');
     const kvX = parseEnumParam(s.get('kvX'), 'kvX', ['isl', 'batch', 'frontier', 'overlap'], 'isl');
-    const kvY = parseEnumParam(s.get('kvY'), 'kvY', ['bandwidth', 'latency'], 'bandwidth');
+    const kvY = parseEnumParam(s.get('kvY'), 'kvY', ['bandwidth', 'latency'], 'latency');
     const overlapIsl =
-      s.has('overlapIsl') && s.get('overlapIsl') !== 'max'
+      s.has('overlapIsl') && !['auto', 'max'].includes(s.get('overlapIsl') ?? '')
         ? parseNumberParam(s.get('overlapIsl'), 'overlapIsl', 1, { min: 1, integer: true })
         : undefined;
-    const kvSelection = { op: kvOp, pageTokens, isl: overlapIsl };
+    const kvSelection = { op: kvOp, isl: overlapIsl };
     const kvPoints =
       kvX === 'frontier'
         ? collectiveXKvFrontierPoints(cases, kvSelection)
         : kvX === 'overlap'
           ? collectiveXKvOverlapPoints(cases, kvSelection)
-          : collectiveXKvChartPoints(cases, { op: kvOp, pageTokens, x: kvX, y: kvY });
+          : collectiveXKvChartPoints(cases, { op: kvOp, x: kvX, y: kvY });
     const swapDirection = parseEnumParam(
       s.get('swapDirection'),
       'swapDirection',
@@ -193,7 +187,7 @@ export function GET(request: NextRequest) {
       metric: swapMetric,
       percentile: swapPercentile,
     }).filter((p) => active('swapSeries', p.seriesId));
-    return cachedJson({
+    return cachedJson(request, {
       apiVersion: 'v1',
       view: 'collectivex',
       knownSupport: COLLECTIVEX_KNOWN_SUPPORT,
@@ -215,8 +209,7 @@ export function GET(request: NextRequest) {
         kvX,
         kvY,
         kvOp,
-        pageTokens,
-        overlapIsl: overlapIsl ?? 'max',
+        overlapIsl: overlapIsl ?? 'auto',
         kvSeries: cases.map((k) => `${k.run_id}:${k.case_id}`),
         swapDirection,
         swapLayout,
@@ -255,8 +248,7 @@ export function GET(request: NextRequest) {
         phases,
         modes: availableModes,
         precisions: availablePrecisions,
-        pageTokens: pages,
-        overlapIsls: collectiveXKvIslValues(cases, kvSelection),
+        overlapIsls: collectiveXKvIslValues(cases, kvOp),
       },
     });
   });

@@ -5,22 +5,25 @@ import { useEffect, useMemo } from 'react';
 
 import type { GPUDataPoint } from '@/components/calculator/types';
 import { useThroughputData } from '@/components/calculator/useThroughputData';
-import {
-  CompareTableRenderer,
-  type CompareTableData,
-} from '@/components/compare/compare-table-renderer';
+import { CompareTableRenderer } from '@/components/compare/compare-table-renderer';
 import {
   GlobalFilterProvider,
+  useGlobalFilterAvailability,
   useGlobalFilterRun,
   useGlobalFilterSelection,
 } from '@/providers/GlobalFilterContext';
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { Card } from '@/components/ui/card';
-import { track } from '@/lib/analytics/analytics';
+import { track, trackOncePerPageview } from '@/lib/analytics/analytics';
 import { toModel, toPrecisions, toSequence } from '@/lib/compare/compare-enum-coerce';
 import { SPEC_METHODS_ACTIVE } from '@/lib/compare/compare-variant-slug';
 import type { AgenticScenarioIntro } from '@/lib/compare/compare-ssr';
+import {
+  type CompareTableData,
+  compareTableDataFromPoints,
+  pinTablePrecisions,
+} from '@/lib/compare/compare-table-view';
 
 const STRINGS = {
   en: {
@@ -100,7 +103,7 @@ export default function CompareSpecDecodePageClient({
   const t = STRINGS[locale];
 
   useEffect(() => {
-    track('compare_spec_decode_page_view', { slug, gpu, method });
+    trackOncePerPageview('compare_spec_decode_page_view', { slug, gpu, method }, slug);
   }, [slug, gpu, method]);
 
   const initialModel = toModel(modelDisplayName);
@@ -251,6 +254,9 @@ export default function CompareSpecDecodePageClient({
               aLabel={isZh ? `启用 ${aLabel}` : aLabel}
               bLabel={isZh ? '关闭投机解码' : bLabel}
               ssrTableData={ssrTableData}
+              ssrSequence={defaultSequence}
+              ssrModel={initialModel}
+              ssrPrecisions={defaultPrecision ? [defaultPrecision] : (initialPrecisions ?? [])}
               emptyStateText={t.emptyState}
             />
           </Card>
@@ -268,6 +274,9 @@ function CompareTableSection({
   aLabel,
   bLabel,
   ssrTableData,
+  ssrSequence,
+  ssrModel,
+  ssrPrecisions,
   emptyStateText,
 }: {
   gpu: string;
@@ -276,12 +285,23 @@ function CompareTableSection({
   aLabel: string;
   bLabel: string;
   ssrTableData: CompareTableData;
+  ssrSequence: string | null;
+  ssrModel: ReturnType<typeof toModel>;
+  ssrPrecisions: string[];
   emptyStateText: string;
 }) {
-  const { effectiveSequence, effectivePrecisions, selectedModel } = useGlobalFilterSelection();
+  const {
+    selectedSequence,
+    effectiveSequence,
+    effectivePrecisions,
+    selectedModel,
+    selectedPrecisions,
+    sequenceResolved,
+  } = useGlobalFilterSelection();
   const { selectedRunDate } = useGlobalFilterRun();
+  const { availableDates } = useGlobalFilterAvailability();
 
-  const { gpuDataByGroupKey, ranges, hasData } = useThroughputData(
+  const { gpuDataByGroupKey, loading, error } = useThroughputData(
     selectedModel,
     effectiveSequence,
     effectivePrecisions,
@@ -306,16 +326,34 @@ function CompareTableSection({
     return { pointsA: pA, pointsB: pB };
   }, [gpuDataByGroupKey, gpu, method, precision]);
 
-  const clientRange = hasData ? ranges.interactivity : ssrTableData.interactivityRange;
+  const pinnedRange = useMemo(
+    () =>
+      pointsA.length > 0 || pointsB.length > 0
+        ? compareTableDataFromPoints(pointsA, pointsB).interactivityRange
+        : null,
+    [pointsA, pointsB],
+  );
 
   return (
     <CompareTableRenderer
       aLabel={aLabel}
       bLabel={bLabel}
       ssrTableData={ssrTableData}
-      interactivityRange={clientRange}
-      gpuDataPointsA={pointsA}
-      gpuDataPointsB={pointsB}
+      ssrSequence={ssrSequence}
+      ssrModel={ssrModel}
+      ssrPrecisions={ssrPrecisions}
+      selectedSequence={selectedSequence}
+      effectiveSequence={effectiveSequence}
+      sequenceResolved={sequenceResolved}
+      selectedModel={selectedModel}
+      selectedPrecisions={pinTablePrecisions(selectedPrecisions, precision)}
+      effectivePrecisions={pinTablePrecisions(effectivePrecisions, precision)}
+      latestRun={!selectedRunDate || selectedRunDate === availableDates.at(-1)}
+      pointsA={pointsA}
+      pointsB={pointsB}
+      clientInteractivityRange={pinnedRange}
+      loading={loading}
+      error={error}
       emptyStateText={emptyStateText}
     />
   );

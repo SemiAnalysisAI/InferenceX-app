@@ -2,8 +2,9 @@ import type { Metadata } from 'next';
 
 import { AgentXMethodologyArticle } from '@/components/datasets/agentx-methodology-article';
 import { JsonLd } from '@/components/seo/json-ld';
-import { zhAlternates, ZH_LANG_TAG, ZH_OG_LOCALE } from '@/lib/i18n/i18n';
+import { zhAlternates, ZH_LANG_TAG } from '@/lib/i18n/i18n';
 import { SITE_URL } from '@semianalysisai/inferencex-constants';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 const DESCRIPTION =
   'AgentX 如何将自愿采集的编码智能体 trace 转换为回放图，并统一 KV cache warmup 与基准测试配置。';
@@ -12,13 +13,12 @@ export const metadata: Metadata = {
   title: 'AgentX 测试方法',
   description: DESCRIPTION,
   alternates: zhAlternates('/agentx/methodology'),
-  openGraph: {
+  ...socialMetadata({
     title: 'AgentX 测试方法 | InferenceX',
     description: DESCRIPTION,
     url: `${SITE_URL}/zh/agentx/methodology`,
-    locale: ZH_OG_LOCALE,
-  },
-  twitter: { title: 'AgentX 测试方法 | InferenceX', description: DESCRIPTION },
+    locale: 'zh',
+  }),
 };
 
 const jsonLd = {

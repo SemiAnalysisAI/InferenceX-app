@@ -8,7 +8,9 @@ import type { ComputePrecision } from '@semianalysisai/inferencex-db/operatorx/c
 import { Label } from '@/components/ui/label';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { Switch } from '@/components/ui/switch';
+import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { rooflineSummary } from '@/lib/operatorx/roofline-summary';
 
 import { EmptyChart } from '../charts/empty';
 import { OpxChart, esc, HardwareLegend, tooltipHtml } from '../charts/kit';
@@ -17,18 +19,13 @@ import { hardwareLabel, peakBandwidthTBs, peakTflops } from '../compare/hardware
 import type { ComparisonModel } from '../compare/model';
 import { originRows } from '../compare/slices';
 import type { VizDefinition } from './types';
+import { RooflineBars } from './roofline-bars';
 
 const ORDER: ComputePrecision[] = ['fp4', 'fp8', 'bf16'];
 
 const STRINGS = {
-  en: {
-    ascendBasis:
-      '950PR (28 Cube): 378 TFLOPS dense BF16; assumed HBM bandwidth 1.6 TB/s. Exact memory/ECC configuration is unresolved.',
-  },
-  zh: {
-    ascendBasis:
-      '950PR（28 个 Cube 核）：BF16 稠密计算峰值为 378 TFLOPS；HBM 带宽假定为 1.6 TB/s，具体内存及 ECC 配置尚未确认。',
-  },
+  en: { sharedOnly: 'Shared cases only' },
+  zh: { sharedOnly: '仅共同用例' },
 };
 
 interface Point {
@@ -45,7 +42,13 @@ const ratio = (v: number) => String(Number(v.toPrecision(2)));
 const share = (v: number, of: number | null, what: string) =>
   of ? ` · ${ratio((v / of) * 100)}% of peak ${what}` : '';
 
-function Roofline({ model }: { model: ComparisonModel }) {
+export function Roofline({
+  model,
+  summaryOnly = false,
+}: {
+  model: ComparisonModel;
+  summaryOnly?: boolean;
+}) {
   const strings = STRINGS[useLocale()];
   const { view } = model;
   const counts = useMemo(() => {
@@ -57,6 +60,7 @@ function Roofline({ model }: { model: ComparisonModel }) {
   const precisions = ORDER.filter((p) => counts.has(p));
   const defaults = view.defaults ?? comparisonDefaults(view);
   const [picked, setPicked] = useState<ComputePrecision | null>(null);
+  const [sharedOnly, setSharedOnly] = useState(true);
   const [normalized, setNormalized] = useState(defaults.rooflineNormalized);
   const precision = picked && precisions.includes(picked) ? picked : defaults.rooflinePrecision;
   const points = useMemo<Point[]>(
@@ -78,6 +82,10 @@ function Roofline({ model }: { model: ComparisonModel }) {
         });
       }),
     [model, view, precision, normalized],
+  );
+  const summary = useMemo(
+    () => rooflineSummary(view, { precision, hardware: model.hardware, sharedOnly, normalized }),
+    [view, precision, model.hardware, normalized, sharedOnly],
   );
   if (!precision) return <EmptyChart>No case has FLOP and byte counts.</EmptyChart>;
   const xs = normalized
@@ -114,114 +122,144 @@ function Roofline({ model }: { model: ComparisonModel }) {
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
         <SegmentedToggle
           value={precision}
-          onValueChange={setPicked}
+          onValueChange={(value) => {
+            track('operatorx_roofline_precision_selected', { precision: value });
+            setPicked(value);
+          }}
           ariaLabel="Compute precision"
           options={precisions.map((p) => ({ value: p, label: p }))}
         />
         <div className="flex items-center gap-2">
           <Switch
-            id="opx-roofline-normalized"
+            id={summaryOnly ? 'opx-summary-normalized' : 'opx-roofline-normalized'}
             checked={normalized}
-            onCheckedChange={setNormalized}
+            onCheckedChange={(enabled) => {
+              track('operatorx_roofline_normalized_toggled', { enabled });
+              setNormalized(enabled);
+            }}
           />
           <Label
-            htmlFor="opx-roofline-normalized"
+            htmlFor={summaryOnly ? 'opx-summary-normalized' : 'opx-roofline-normalized'}
             className="text-sm font-normal text-muted-foreground"
           >
             Normalized
           </Label>
         </div>
+        {summaryOnly && (
+          <div className="flex items-center gap-2">
+            <Switch
+              id="opx-summary-shared"
+              checked={sharedOnly}
+              onCheckedChange={(enabled) => {
+                track('operatorx_summary_shared_toggled', { enabled });
+                setSharedOnly(enabled);
+              }}
+            />
+            <Label
+              htmlFor="opx-summary-shared"
+              className="text-sm font-normal text-muted-foreground"
+            >
+              {strings.sharedOnly}
+            </Label>
+          </div>
+        )}
       </div>
-      {model.hardware.includes('ascend950pr') && (
-        <p className="text-xs text-muted-foreground">{strings.ascendBasis}</p>
+      {summaryOnly ? (
+        <RooflineBars model={model} summary={summary} />
+      ) : (
+        <div className="min-w-0">
+          <OpxChart<Point>
+            inspect={{ model, caseOf: (p) => p.i }}
+            chartId="operatorx-roofline"
+            data={points}
+            height={400}
+            margin={{ top: 16, right: 16, bottom: 56, left: 72 }}
+            xScale={{ type: 'log', domain: [a0, a1], nice: false }}
+            yScale={{
+              type: 'log',
+              domain: [Math.max(1e-3, Math.min(...ys) / 1.5), Math.max(...ys) * 1.3],
+              nice: false,
+            }}
+            xAxis={
+              normalized
+                ? {
+                    label: 'Arithmetic intensity / ridge point',
+                    tickFormat: (v) => ratio(Number(v)),
+                  }
+                : {
+                    label: 'Arithmetic intensity (FLOP/byte)',
+                    tickFormat: (v) => formatCompact(Number(v)),
+                  }
+            }
+            yAxis={
+              normalized
+                ? {
+                    label: 'Share of peak compute (%)',
+                    tickCount: 6,
+                    tickFormat: (v) => ratio(Number(v) * 100),
+                  }
+                : {
+                    label: 'Achieved TFLOPS',
+                    tickCount: 6,
+                    tickFormat: (v) => formatCompact(Number(v)),
+                  }
+            }
+            layers={[
+              {
+                type: 'roofline',
+                key: 'roofs',
+                rooflines,
+                config: {
+                  getColor: (hw) =>
+                    hw === SHARED
+                      ? 'var(--muted-foreground)'
+                      : (model.colors[hw] ?? 'var(--muted-foreground)'),
+                  strokeWidth: 2,
+                  strokeDasharray: '6 4',
+                  curve: curveLinear,
+                },
+              },
+              {
+                type: 'point',
+                key: 'points',
+                data: points,
+                config: {
+                  getCx: () => 0,
+                  getCy: () => 0,
+                  getX: (p) => p.x,
+                  getY: (p) => p.y,
+                  getColor: (p) => model.colors[p.hw],
+                  getRadius: () => 3,
+                  keyFn: (p) => `${p.hw}-${p.i}`,
+                  maxPoints: Infinity,
+                },
+              },
+            ]}
+            tooltip={{
+              rulerType: 'none',
+              attachToLayer: 1,
+              content: (p) => {
+                const peak = peakTflops(p.hw, precision);
+                const bw = peakBandwidthTBs(p.hw);
+                const tbs = p.tflops / p.ai;
+                return tooltipHtml({
+                  title: hardwareLabel(p.hw),
+                  color: model.colors[p.hw],
+                  rows: [
+                    esc(`${view.cases[p.i].shape} · ${view.cases[p.i].precision}`),
+                    ...originRows(view, p.i),
+                    `<strong>${p.tflops.toFixed(1)} TFLOPS</strong>${share(p.tflops, peak, 'compute')}`,
+                    `<strong>${tbs.toFixed(2)} TB/s</strong>${share(tbs, bw, 'bandwidth')}`,
+                    `${p.ai.toFixed(0)} FLOP/byte`,
+                  ],
+                  footer: 'Click for kernel timeline',
+                });
+              },
+            }}
+            legendElement={<HardwareLegend model={model} />}
+          />
+        </div>
       )}
-      <OpxChart<Point>
-        inspect={{ model, caseOf: (p) => p.i }}
-        chartId="operatorx-roofline"
-        data={points}
-        height={400}
-        margin={{ top: 16, right: 16, bottom: 56, left: 72 }}
-        xScale={{ type: 'log', domain: [a0, a1], nice: false }}
-        yScale={{
-          type: 'log',
-          domain: [Math.max(1e-3, Math.min(...ys) / 1.5), Math.max(...ys) * 1.3],
-          nice: false,
-        }}
-        xAxis={
-          normalized
-            ? { label: 'Arithmetic intensity / ridge point', tickFormat: (v) => ratio(Number(v)) }
-            : {
-                label: 'Arithmetic intensity (FLOP/byte)',
-                tickFormat: (v) => formatCompact(Number(v)),
-              }
-        }
-        yAxis={
-          normalized
-            ? {
-                label: 'Share of peak compute (%)',
-                tickCount: 6,
-                tickFormat: (v) => ratio(Number(v) * 100),
-              }
-            : {
-                label: 'Achieved TFLOPS',
-                tickCount: 6,
-                tickFormat: (v) => formatCompact(Number(v)),
-              }
-        }
-        layers={[
-          {
-            type: 'roofline',
-            key: 'roofs',
-            rooflines,
-            config: {
-              getColor: (hw) =>
-                hw === SHARED
-                  ? 'var(--muted-foreground)'
-                  : (model.colors[hw] ?? 'var(--muted-foreground)'),
-              strokeWidth: 2,
-              strokeDasharray: '6 4',
-              curve: curveLinear,
-            },
-          },
-          {
-            type: 'point',
-            key: 'points',
-            data: points,
-            config: {
-              getCx: () => 0,
-              getCy: () => 0,
-              getX: (p) => p.x,
-              getY: (p) => p.y,
-              getColor: (p) => model.colors[p.hw],
-              getRadius: () => 3,
-              keyFn: (p) => `${p.hw}-${p.i}`,
-              maxPoints: Infinity,
-            },
-          },
-        ]}
-        tooltip={{
-          rulerType: 'none',
-          attachToLayer: 1,
-          content: (p) => {
-            const peak = peakTflops(p.hw, precision);
-            const bw = peakBandwidthTBs(p.hw);
-            const tbs = p.tflops / p.ai;
-            return tooltipHtml({
-              title: hardwareLabel(p.hw),
-              color: model.colors[p.hw],
-              rows: [
-                esc(`${view.cases[p.i].shape} · ${view.cases[p.i].precision}`),
-                ...originRows(view, p.i),
-                `<strong>${p.tflops.toFixed(1)} TFLOPS</strong>${share(p.tflops, peak, 'compute')}`,
-                `<strong>${tbs.toFixed(2)} TB/s</strong>${share(tbs, bw, 'bandwidth')}`,
-                `${p.ai.toFixed(0)} FLOP/byte`,
-              ],
-              footer: 'Click for kernel timeline',
-            });
-          },
-        }}
-        legendElement={<HardwareLegend model={model} />}
-      />
     </div>
   );
 }

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
+import type { SelectionAnalyticsContext } from '@/lib/analytics/selection-context';
 
 interface ChartSectionProps {
   chartId: string;
@@ -15,6 +16,7 @@ interface ChartSectionProps {
   leadingControls?: ReactNode;
   hideImageExport?: boolean;
   mobileActions?: boolean;
+  analyticsContext?: SelectionAnalyticsContext;
 }
 
 export function ChartSection({
@@ -29,6 +31,7 @@ export function ChartSection({
   leadingControls,
   hideImageExport,
   mobileActions,
+  analyticsContext,
 }: ChartSectionProps) {
   return (
     <section className={className}>
@@ -43,6 +46,7 @@ export function ChartSection({
           leadingControls={leadingControls}
           hideImageExport={hideImageExport}
           mobileVisible={mobileActions}
+          analyticsContext={analyticsContext}
         />
 
         <Card>{children}</Card>

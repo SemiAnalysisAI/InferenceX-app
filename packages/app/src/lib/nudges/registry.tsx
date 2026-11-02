@@ -11,8 +11,16 @@ import {
 } from 'lucide-react';
 import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
 
+import { MOBILE_VIEWPORT_QUERY } from '@/hooks/useMediaQuery';
 import { isZhPathname, localePath } from '@/lib/i18n/i18n';
-import { LANDING_BANNER_STORAGE_KEY, TPUV7_QWEN_3_5_AGENTX_URL } from '@/lib/nudges/landing-banner';
+import {
+  HUAWEI_UBENCHX_URL,
+  LANDING_BANNER_ANALYTICS_EVENTS,
+  LANDING_BANNER_EXPERIMENT,
+  LANDING_BANNER_STORAGE_KEY,
+  OPERATORX_URL,
+  TPUV7_QWEN_3_5_AGENTX_URL,
+} from '@/lib/nudges/landing-banner';
 
 import { GitHubIcon } from '@/components/ui/github-icon';
 import { GoogleIcon } from '@/components/ui/google-icon';
@@ -31,6 +39,20 @@ function isOnInferenceTab(): boolean {
   if (segments[0] === 'zh') segments.shift();
   return (segments[0] ?? 'inference') === 'inference';
 }
+
+/**
+ * True on a phone-width PowerX page, where a bottom toast would cover the date and
+ * run controls under the chart. Dashboard toasts stay off there; from md up, and on
+ * every other tab, they show as usual.
+ */
+export function isPhoneWidthPowerX(): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
+  const segments = window.location.pathname.split('/').filter(Boolean);
+  if (segments[0] === 'zh') segments.shift();
+  return segments[0] === 'powerx' && window.matchMedia(MOBILE_VIEWPORT_QUERY).matches;
+}
+
+const notPhoneWidthPowerX = () => !isPhoneWidthPowerX();
 
 function localizedNudgeHref(enPath: string): string {
   if (typeof window === 'undefined') return enPath;
@@ -53,6 +75,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     trigger: { type: 'timer', delayMs: 1500 },
     dismissal: { type: 'session' },
     storageKey: 'inferencex-reproducibility-nudge-shown',
+    conditions: [{ check: notPhoneWidthPowerX }],
     priority: 10,
     scope: 'dashboard',
     content: {
@@ -90,6 +113,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     storageKey: 'inferencex-star-nudge-shown',
     permanentSuppressKey: STARRED_KEY,
     permanentSuppressEvent: STARRED_EVENT,
+    conditions: [{ check: notPhoneWidthPowerX }],
     priority: 20,
     scope: 'dashboard',
     content: {
@@ -126,6 +150,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     },
     dismissal: { type: 'session' },
     storageKey: 'inferencex-export-nudge-shown',
+    conditions: [{ check: notPhoneWidthPowerX }],
     priority: 15,
     scope: 'dashboard',
     content: {
@@ -149,6 +174,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     trigger: { type: 'event', event: 'inferencex:parallelism-label-enabled' },
     dismissal: { type: 'session' },
     storageKey: 'inferencex-gradient-nudge-shown',
+    conditions: [{ check: notPhoneWidthPowerX }],
     priority: 25,
     scope: 'dashboard',
     content: {
@@ -237,7 +263,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
   {
     id: 'tpuv7-agentx-launch-modal',
     type: 'modal',
-    trigger: { type: 'immediate' },
+    trigger: { type: 'idle' },
     dismissal: { type: 'timed', durationMs: 3 * 24 * 60 * 60 * 1000 },
     storageKey: TPUV7_LAUNCH_MODAL_STORAGE_KEY,
     priority: 50,
@@ -278,7 +304,7 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     },
   },
   {
-    id: 'tpuv7-qwen-3-5-agentx-banner',
+    id: 'huawei-ascend-950pr-ubenchx-banner',
     type: 'banner',
     trigger: { type: 'immediate' },
     dismissal: { type: 'permanent' },
@@ -286,30 +312,68 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     priority: 60,
     scope: 'landing',
     renderOnInitialLoad: true,
+    variant: 'ubenchx',
     content: {
       icon: Sparkles,
       iconClassName: 'text-brand',
-      title: 'Google TPUv7 joins AgentX',
-      titleZh: 'Google TPUv7 加入 AgentX',
-      description: 'TPUv7 Kimi K3 2.8T prelimary Submisison: Competitive Results',
-      descriptionZh: 'TPUv7 Kimi K3 2.8T 初步提交：成绩具有竞争力',
+      title: 'Huawei Ascend 950PR Microbenchmarks',
+      titleZh: 'Huawei Ascend 950PR 微基准测试',
+      description: 'Cycle Level Core memory-access MicroBenchmarks (Beta)',
+      descriptionZh: '周期级核心访存微基准测试（Beta）',
       testId: 'launch-banner',
       badge: 'New',
       badgeZh: '最新',
-      href: TPUV7_QWEN_3_5_AGENTX_URL,
+      href: HUAWEI_UBENCHX_URL,
       linkLabel: 'View results',
       linkLabelZh: '查看结果',
       onLinkClick: () => {
-        window.location.href = localizedNudgeHref(TPUV7_QWEN_3_5_AGENTX_URL);
+        window.location.href = localizedNudgeHref(HUAWEI_UBENCHX_URL);
       },
     },
     analytics: {
-      shown: 'inference_tpuv7_qwen_3_5_agentx_banner_shown',
-      dismissed: 'inference_tpuv7_qwen_3_5_agentx_banner_dismissed',
-      action: 'inference_tpuv7_qwen_3_5_agentx_banner_clicked',
+      ...LANDING_BANNER_ANALYTICS_EVENTS,
       properties: {
-        banner_id: 'tpuv7-qwen-3-5-agentx',
-        destination: 'inference',
+        banner_id: 'huawei-ascend-950pr-ubenchx',
+        destination: 'ubenchx',
+        experiment: LANDING_BANNER_EXPERIMENT,
+        variant: 'ubenchx',
+      },
+    },
+  },
+  {
+    id: 'operatorx-banner',
+    type: 'banner',
+    trigger: { type: 'immediate' },
+    dismissal: { type: 'permanent' },
+    storageKey: LANDING_BANNER_STORAGE_KEY,
+    priority: 60,
+    scope: 'landing',
+    renderOnInitialLoad: true,
+    variant: 'operatorx',
+    content: {
+      icon: Sparkles,
+      iconClassName: 'text-brand',
+      title: 'Huawei Ascend 950PR Microbenchmarks',
+      titleZh: 'Huawei Ascend 950PR 微基准测试',
+      description: '950PR GEMM FLOPs and Max FLOPS utilization',
+      descriptionZh: '950PR GEMM FLOPs 与最大 FLOPS 利用率',
+      testId: 'launch-banner',
+      badge: 'New',
+      badgeZh: '最新',
+      href: OPERATORX_URL,
+      linkLabel: 'View results',
+      linkLabelZh: '查看结果',
+      onLinkClick: () => {
+        window.location.href = localizedNudgeHref(OPERATORX_URL);
+      },
+    },
+    analytics: {
+      ...LANDING_BANNER_ANALYTICS_EVENTS,
+      properties: {
+        banner_id: 'operatorx',
+        destination: 'operatorx',
+        experiment: LANDING_BANNER_EXPERIMENT,
+        variant: 'operatorx',
       },
     },
   },

@@ -6,6 +6,7 @@ export const APP_THEMES = [
   'gta',
   'doom',
   'halo',
+  'orange-chicken',
   'excalidraw',
 ];
 
@@ -17,10 +18,10 @@ const DARK_THEMES = new Set(['dark', 'minecraft', 'csgo', 'gta', 'doom', 'halo']
 
 const DARK_CHART_ALIASES = new Set(['csgo', 'gta', 'doom', 'halo']);
 
-const LIGHT_CHART_ALIASES = new Set(['excalidraw']);
+const LIGHT_CHART_ALIASES = new Set(['excalidraw', 'orange-chicken']);
 
 /** Themes that render on a light canvas, for pre-hydration checks that only see `<html>` classes. */
-export const LIGHT_THEMES = ['light', 'excalidraw'];
+export const LIGHT_THEMES = ['light', 'excalidraw', 'orange-chicken'];
 
 export function isDarkTheme(theme: string | undefined): boolean {
   return theme !== undefined && DARK_THEMES.has(theme);

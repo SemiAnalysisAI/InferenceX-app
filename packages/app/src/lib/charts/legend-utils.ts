@@ -1,3 +1,5 @@
+import { matchesSearch } from '@/lib/shared/search-match';
+
 interface LegendItem {
   label: string;
   title?: string;
@@ -11,12 +13,11 @@ export function filterAndSortLegendItems<T extends LegendItem>(
 ): T[] {
   let result = items;
 
-  const query = searchQuery.trim().toLowerCase();
+  const query = searchQuery.trim();
   if (query) {
     result = result.filter(
       (item) =>
-        item.label.toLowerCase().includes(query) ||
-        (item.title && item.title.toLowerCase().includes(query)),
+        matchesSearch(item.label, query) || (item.title && matchesSearch(item.title, query)),
     );
   }
 

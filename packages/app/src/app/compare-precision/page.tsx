@@ -1,19 +1,15 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import {
-  HW_REGISTRY,
-  SITE_NAME,
-  SITE_URL,
-  SUPPORTERS_LINE,
-} from '@semianalysisai/inferencex-constants';
+import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { enAlternates } from '@/lib/i18n/i18n';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
 import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
-import { COMPARE_MODEL_SLUGS } from '@/lib/compare/compare-slug';
+import { PUBLIC_COMPARE_MODEL_SLUGS } from '@/lib/compare/compare-slug';
 import { formatModelList } from '@/lib/compare/compare-ssr';
 import { getPrecisionPairsByModelSlug } from '@/lib/compare/compare-variant-availability';
 import {
@@ -21,25 +17,25 @@ import {
   precisionDisplayLabel,
 } from '@/lib/compare/compare-variant-slug';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
 
-const DESCRIPTION = `How does precision affect chip inference performance? InferenceX is the independent, open-source benchmark from SemiAnalysis, with verified, reproducible results. ${SUPPORTERS_LINE} Compare FP4, FP8, BF16, INT4, and more quantization levels head-to-head on the same chip across DeepSeek V4 Pro, DeepSeek R1, Kimi K2, MiniMax M3, GLM 5, Qwen 3.5 & more.`;
+const DESCRIPTION =
+  'How does precision affect chip inference? Compare FP4, FP8, BF16 and INT4 head-to-head on the same chip across DeepSeek, Kimi, MiniMax, GLM and Qwen.';
+
+/** Search snippet; the longer DESCRIPTION stays in the JSON-LD. */
+const META_DESCRIPTION =
+  'Compare FP4, FP8, BF16, INT4 and more precisions head-to-head on the same chip for DeepSeek, Kimi, MiniMax, GLM, Qwen & more. Independent, open benchmarks.';
 
 export const metadata: Metadata = {
   title: 'Chip Precision Comparisons',
-  description: DESCRIPTION,
+  description: META_DESCRIPTION,
   alternates: enAlternates('/compare-precision'),
-  openGraph: {
+  ...socialMetadata({
     title: `Chip Precision Comparisons | ${SITE_NAME}`,
-    description: DESCRIPTION,
+    description: META_DESCRIPTION,
     url: `${SITE_URL}/compare-precision`,
-    type: 'website',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: `Chip Precision Comparisons | ${SITE_NAME}`,
-    description: DESCRIPTION,
-  },
+    locale: 'en',
+  }),
 };
 
 const jsonLd = {
@@ -53,7 +49,7 @@ const jsonLd = {
 export default async function ComparePrecisionIndexPage() {
   const precisionPairsByModel = await getPrecisionPairsByModelSlug();
   const totalUrls = [...precisionPairsByModel.values()].reduce((s, p) => s + p.length, 0);
-  const modelsWithPairs = COMPARE_MODEL_SLUGS.filter(
+  const modelsWithPairs = PUBLIC_COMPARE_MODEL_SLUGS.filter(
     (m) => (precisionPairsByModel.get(m.slug)?.length ?? 0) > 0,
   );
 

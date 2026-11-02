@@ -39,6 +39,9 @@ vi.mock('@semianalysisai/inferencex-db/connection', () => ({
 vi.mock('@semianalysisai/inferencex-db/queries/gpu-metrics', () => ({
   getGpuMetricsForRun: mockGetGpuMetricsForRun,
 }));
+vi.mock('@semianalysisai/inferencex-db/queries/gpu-power-series', () => ({
+  getPrecomputedPowerSeries: () => Promise.resolve(null),
+}));
 
 vi.mock('adm-zip', () => {
   const csvContent = 'timestamp,index,power\n2026-03-01T00:00:00Z,0,300';

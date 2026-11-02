@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { scaleLinear } from 'd3';
 import { workflowInfoQueryOptions } from '@/hooks/api/use-workflow-info';
+import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { CHART_TYPE } from '@/lib/d3-chart/typography';
 import { formatLargeNumber } from '@/lib/charts/chart-rendering';
@@ -131,7 +132,10 @@ export default function ImprovementWaterfallChart({
               data-testid="waterfall-series"
               className="max-w-full rounded-md border bg-background px-3 py-2 text-sm"
               value={config?.id ?? ''}
-              onChange={(event) => setSelectedId(event.target.value)}
+              onChange={(event) => {
+                track('historical_waterfall_series_selected', { series: event.target.value });
+                setSelectedId(event.target.value);
+              }}
             >
               {lineConfigs.map((line) => (
                 <option key={line.id} value={line.id}>

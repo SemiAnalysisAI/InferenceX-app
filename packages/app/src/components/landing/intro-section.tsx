@@ -8,6 +8,7 @@ import {
   CAROUSEL_LABELS,
   orgAnchorId,
 } from '@/components/quotes/quotes-data';
+import { analyticsPlacement } from '@/lib/analytics/placement';
 import type { Locale } from '@/lib/i18n/i18n';
 
 const stripOrgs = [
@@ -30,7 +31,7 @@ const HEADING = {
 export function IntroSection({ locale = 'en' }: { locale?: Locale } = {}) {
   const isZh = locale === 'zh';
   return (
-    <section>
+    <section {...analyticsPlacement('landing_section')}>
       <Card data-testid="intro-section">
         <div className="flex items-start gap-2 mb-4">
           <Quote className="size-5 shrink-0 mt-1 text-brand" />

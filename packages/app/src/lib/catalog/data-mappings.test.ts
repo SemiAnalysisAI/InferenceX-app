@@ -17,6 +17,7 @@ import {
   getEvalBenchmarkLabel,
   isModelDeprecated,
   isModelMaintenance,
+  isModelDefault,
   isSequenceDeprecated,
   isSequenceDeprecatedForModel,
   isSequenceHiddenForModel,
@@ -29,7 +30,47 @@ import {
   EvalBenchmark,
 } from '@/lib/catalog/data-mappings';
 
+describe('model selector ordering', () => {
+  it('keeps non-default models in their existing order and excludes hidden models', () => {
+    expect(MODEL_OPTIONS.filter((model) => !isModelDefault(model))).toEqual([
+      Model.DeepSeek_V4_Pro,
+      Model.Kimi_K2_5,
+      Model.MiniMax_M3,
+      Model.DeepSeek_R1,
+      Model.GLM_5,
+      Model.Qwen3_8_27B,
+      Model.Qwen3_8_27B_Eager,
+      Model.MiMo_V2_6_Flash,
+      Model.GptOss,
+      Model.MiniMax_M2_5,
+      Model.Llama3_3_70B,
+    ]);
+    expect(new Set(MODEL_OPTIONS).size).toBe(MODEL_OPTIONS.length);
+    expect(MODEL_OPTIONS).not.toContain(Model.Llama3_1_70B);
+  });
+});
+
 describe('getModelAndSequence', () => {
+  it.each(['fp8', 'fp4', 'nvfp4'])(
+    'keeps Flash %s artifacts out of the older GLM buckets',
+    (precision) => {
+      expect(getModelAndSequence(`bmk_glm5.3flash_agentic_${precision}_sglang`)).toEqual({
+        model: Model.GLM_5_3_Flash,
+        sequence: Sequence.AgenticTraces,
+      });
+    },
+  );
+
+  it.each(['sglang', 'vllm'])(
+    'maps MiMo V2.6 Flash %s AgentX artifacts to their own model',
+    (engine) => {
+      expect(getModelAndSequence(`bmk_mimov2.6flash_agentic_fp4_${engine}`)).toEqual({
+        model: Model.MiMo_V2_6_Flash,
+        sequence: Sequence.AgenticTraces,
+      });
+    },
+  );
+
   it('parses artifact name with 70b model and 1k1k sequence', () => {
     const result = getModelAndSequence('results_70b_1k1k_fp8');
     expect(result).toEqual({ model: Model.Llama3_3_70B, sequence: Sequence.OneK_OneK });
@@ -178,6 +219,11 @@ describe('isModelDeprecated', () => {
   it('moves MiniMax M3 to deprecated while keeping M3.1 Flash active', () => {
     expect(isModelDeprecated(Model.MiniMax_M3)).toBe(true);
     expect(isModelDeprecated(Model.MiniMax_M3_1_Flash)).toBe(false);
+  });
+
+  it('retires DeepSeek V4 Pro while keeping V4.1 Flash active', () => {
+    expect(isModelDeprecated(Model.DeepSeek_V4_Pro)).toBe(true);
+    expect(isModelDeprecated(Model.DeepSeek_V4_1_Flash)).toBe(false);
   });
 
   it('returns true for deprecated model GptOss', () => {
@@ -376,7 +422,7 @@ describe('getModelLabel', () => {
 describe('getOpenRouterModelId', () => {
   it('maps catalog models to exact OpenRouter ids without inventing one for Muse', () => {
     for (const model of MODEL_OPTIONS) {
-      if (model === Model.Muse_Spark_Open) {
+      if (model === Model.Muse_Spark_Open || model === Model.GLM_5_3_Flash) {
         expect(getOpenRouterModelId(model)).toBeNull();
         continue;
       }
@@ -431,13 +477,14 @@ describe('getEvalBenchmarkLabel', () => {
 });
 
 describe('isSequenceHiddenForModel', () => {
-  it('only offers AgentX for Muse Spark Open', () => {
-    expect(
-      SEQUENCE_OPTIONS.filter(
-        (sequence) => !isSequenceHiddenForModel(Model.Muse_Spark_Open, sequence),
-      ),
-    ).toEqual([Sequence.AgenticTraces]);
-  });
+  it.each([Model.Muse_Spark_Open, Model.GLM_5_3_Flash, Model.MiMo_V2_6_Flash])(
+    'only offers AgentX for %s',
+    (model) => {
+      expect(
+        SEQUENCE_OPTIONS.filter((sequence) => !isSequenceHiddenForModel(model, sequence)),
+      ).toEqual([Sequence.AgenticTraces]);
+    },
+  );
   it('hides 8K/1K for GLM-5.2 / GLM-5.3 and keeps Agentic coding', () => {
     expect(isSequenceHiddenForModel(Model.GLM_5_2, Sequence.EightK_OneK)).toBe(true);
     expect(isSequenceHiddenForModel(Model.GLM_5_2, Sequence.AgenticTraces)).toBe(false);

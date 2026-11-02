@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { track } from '@/lib/analytics/analytics';
+import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
 
@@ -141,6 +142,7 @@ export function useLockedTierDialog(source: string): {
   dialog: ReactNode;
 } {
   const [lockedTier, setLockedTier] = useState<LockedRentTier | null>(null);
+  useDialogCloseTracking(lockedTier !== null, 'tco_model_dialog_closed', { source });
   const interceptLocked = useCallback(
     (value: string) => {
       const tier = parseLockedTierValue(value);

@@ -47,6 +47,23 @@ operation.
 
 ## Read published benchmark results
 
+GLM-5.3-Flash uses display model `GLM-5.3-Flash`, raw DB key `glm5.3flash`,
+and dashboard route `/inference/glm-5-3-flash` (also under `/zh`). Use
+`model=GLM-5.3-Flash&sequence=agentic-traces` for the inference view. Native
+`zai-org/GLM-5.3-Flash` and `nvidia/GLM-5.3-Flash-NVFP4` observations share
+this model bucket; precision remains a separate field. Registration does not
+publish experimental runs or establish hardware qualification. Preserve empty
+responses, and never substitute the older GLM-5.2/5.3 bucket. The future
+`OneNexus/GLM-5.3-Flash-MXFP4` checkpoint is not registered as a qualified
+benchmark target; `OneNexus/GLM-5.3-MXFP4` is a different, non-Flash checkpoint.
+Parameter counts, weights-publication date, OpenRouter ID and API list pricing
+remain unverified and are not inherited from GLM-5.3.
+
+The dashboard exposes this model only after its existing UI feature gate is
+enabled. This is a presentation flag, not authorization: read-only API model
+parameters, raw identities and returned data are unaffected. An unofficial
+run does not unlock the UI. Public model discovery omits Flash by default.
+
 For interactivity comparisons and performance-over-time charts, first read
 [AgentX P90 interactivity](agentic-interactivity.md). The dashboard operating point
 uses reciprocal P90 full-response ITL, not the median or P90 of token rates.

@@ -10,10 +10,10 @@ export const metadata: Metadata = tabMetadataZh('reliability');
 export default function ZhReliabilityPage() {
   return (
     <>
-      <ZhTabIntro tab="reliability" />
       <ReliabilityProvider>
         <ReliabilityChartDisplay />
       </ReliabilityProvider>
+      <ZhTabIntro tab="reliability" />
     </>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { track } from '@/lib/analytics/analytics';
+import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
 import { useLocale } from '@/lib/i18n/use-locale';
 import React, { useCallback, useMemo, useState } from 'react';
 
@@ -15,6 +16,7 @@ import { useInterpolatedTrendData } from '@/components/inference/hooks/useInterp
 import type { TrendLineConfig } from '@/components/inference/types';
 import ChartControls from '@/components/inference/ui/ChartControls';
 import { CostTierSelector } from '@/components/inference/ui/CostTierSelector';
+import { TcoBasisCaption } from '@/components/inference/ui/TcoBasisCaption';
 import TrendChart from '@/components/inference/ui/TrendChart';
 import ImprovementWaterfallChart from '@/components/inference/ui/ImprovementWaterfallChart';
 import { Card } from '@/components/ui/card';
@@ -281,11 +283,7 @@ export default function HistoricalTrendsDisplay() {
         <Card className="relative z-30">
           <div className="flex flex-col gap-4">
             <DashboardSectionHeader title={t.heading} description={t.description} />
-            <ChartControls
-              tcoSource="historical"
-              hideGpuComparison
-              showTcoBasis={[...activeHwTypes].some((key) => key.split('_')[0] === 'tpuv7')}
-            />
+            <ChartControls tcoSource="historical" hideGpuComparison />
             <div className="space-y-2">
               <Skeleton className="h-5 w-56" />
               <Skeleton className="h-9 w-full" />
@@ -336,11 +334,7 @@ export default function HistoricalTrendsDisplay() {
             description={t.description}
             actions={<ChartShareActions />}
           />
-          <ChartControls
-            tcoSource="historical"
-            hideGpuComparison
-            showTcoBasis={[...activeHwTypes].some((key) => key.split('_')[0] === 'tpuv7')}
-          />
+          <ChartControls tcoSource="historical" hideGpuComparison />
 
           {!loading && hasInteractivityChart && (
             <TooltipProvider delayDuration={0}>
@@ -434,6 +428,12 @@ export default function HistoricalTrendsDisplay() {
                 </div>
               }
               analyticsPrefix="historical"
+              analyticsContext={selectionAnalyticsContext({
+                model: selectedModel,
+                sequence: selectedSequence,
+                precisions: selectedPrecisions,
+                gpuCount: activeHwTypes.size,
+              })}
               zoomResetEvent="d3chart_zoom_reset_historical-trend"
               setIsLegendExpanded={setIsLegendExpanded}
               exportFileName={`InferenceX_historical_${selectedModel}`}
@@ -475,6 +475,9 @@ export default function HistoricalTrendsDisplay() {
                         return tier ? costTierOptionLabel(tier, locale) : undefined;
                       })()}
                       costTierControl={<CostTierSelector allowCustom={false} />}
+                      tcoBasis={
+                        <TcoBasisCaption hardwareKeys={activeHwTypes} source="historical" />
+                      }
                       target={`${isAgentic ? 'P90 ' : ''}${targetInteractivity} tok/s/user`}
                       date={
                         selectedRunDate ? historicalRunDate(selectedRunDate, locale) : undefined
@@ -519,13 +522,13 @@ export default function HistoricalTrendsDisplay() {
                         isActive: activeHwTypes.has(key),
                         onClick: () => {
                           toggleHwType(key);
-                          track('historical_hw_type_toggled', { hw: key });
+                          track('historical_hw_type_toggled', { gpu: key });
                         },
                       }))}
                     isLegendExpanded={isLegendExpanded}
                     onExpandedChange={(expanded) => {
                       setIsLegendExpanded(expanded);
-                      track('historical_legend_expanded', { expanded });
+                      track('historical_legend_expanded', { enabled: expanded });
                     }}
                     switches={[
                       ...(chartView === 'line'

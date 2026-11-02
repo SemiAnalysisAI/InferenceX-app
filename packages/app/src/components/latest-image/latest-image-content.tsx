@@ -21,7 +21,8 @@ import { useFrameworkReleases } from '@/hooks/api/use-framework-releases';
 import { useLatestImages } from '@/hooks/api/use-latest-images';
 import type { LatestImageRow } from '@/lib/api/api';
 import { track } from '@/lib/analytics/analytics';
-import { Sequence, getSequenceLabel } from '@/lib/catalog/data-mappings';
+import { Sequence, getSequenceLabel, isModelVisible } from '@/lib/catalog/data-mappings';
+import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { getFrameworkLabel } from '@/lib/shared/utils';
 import { ImageAgeChart } from './image-age-chart';
@@ -187,6 +188,7 @@ function formatSpecMethod(method: string, offLabel: string) {
 }
 
 export function CurrentImageContent() {
+  const featureGateUnlocked = useFeatureGate();
   const { data, isLoading, error, refetch: refetchImages } = useLatestImages();
   const {
     data: releases,
@@ -197,7 +199,10 @@ export function CurrentImageContent() {
   const locale = useLocale();
   const t = STRINGS[locale];
 
-  const [selectedModel, setSelectedModel] = useState<string>('all');
+  const [requestedModel, setSelectedModel] = useState<string>('all');
+  const selectedModel = isModelVisible(requestedModel, featureGateUnlocked)
+    ? requestedModel
+    : 'all';
   const [selectedPrecision, setSelectedPrecision] = useState<string>('all');
   const [selectedSequence, setSelectedSequence] = useState<string>(Sequence.AgenticTraces);
   const [selectedSpecMethod, setSelectedSpecMethod] = useState<string>('all');
@@ -205,7 +210,14 @@ export function CurrentImageContent() {
   const [selectedNodeType, setSelectedNodeType] = useState<NodeType>('all');
   const [selectedFrameworks, setSelectedFrameworks] = useState<string[]>([]);
 
-  const activeRows = useMemo(() => data?.filter(isActiveImageRow), [data]);
+  const activeRows = useMemo(
+    () =>
+      data?.filter(
+        (row) =>
+          isActiveImageRow(row) && isModelVisible(imageRowDisplayModel(row), featureGateUnlocked),
+      ),
+    [data, featureGateUnlocked],
+  );
   const firstSubmitted = useMemo(() => firstSubmissionDates(data ?? []), [data]);
 
   const options = useMemo(() => (activeRows ? deriveOptions(activeRows) : null), [activeRows]);
@@ -423,7 +435,7 @@ export function CurrentImageContent() {
                   <Select
                     value={selectedHardware}
                     onValueChange={(v) => {
-                      track('current_image_hardware_changed', { hardware: v });
+                      track('current_image_hardware_changed', { gpu: v });
                       setSelectedHardware(v);
                     }}
                   >

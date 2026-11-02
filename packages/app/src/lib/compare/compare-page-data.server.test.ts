@@ -37,6 +37,8 @@ vi.mock('@/lib/compare/compare-ssr', () => ({
   summarize: mocks.summarize,
 }));
 
+import type { BenchmarkRow } from '@/lib/api/api';
+
 import { getComparePageDerivedData, initialCompareBenchmarkRows } from './compare-page-data.server';
 
 const TABLE = {
@@ -107,11 +109,25 @@ describe('getComparePageDerivedData', () => {
   });
 });
 
-describe('initialCompareBenchmarkRows', () => {
-  it('never seeds slug rows under an overridden model key', () => {
-    const rows = [{ hardware: 'h100' }] as never[];
+const fixedSeq = (id: number, isl: number, osl: number) =>
+  ({ id, isl, osl, benchmark_type: 'single_turn' }) as BenchmarkRow;
+const agentic = (id: number) =>
+  ({ id, isl: null, osl: null, benchmark_type: 'agentic_traces' }) as BenchmarkRow;
 
-    expect(initialCompareBenchmarkRows('Slug Model', 'Slug Model', rows)).toBe(rows);
-    expect(initialCompareBenchmarkRows('Slug Model', 'Override Model', rows)).toBeUndefined();
+describe('initialCompareBenchmarkRows', () => {
+  const rows = [
+    fixedSeq(1, 8192, 1024),
+    fixedSeq(2, 1024, 1024),
+    agentic(3),
+    fixedSeq(4, 8192, 1024),
+  ];
+
+  it('embeds only the rows of the page default sequence', () => {
+    expect(initialCompareBenchmarkRows(rows, '8k/1k').map((row) => row.id)).toEqual([1, 4]);
+    expect(initialCompareBenchmarkRows(rows, 'agentic-traces').map((row) => row.id)).toEqual([3]);
+  });
+
+  it('keeps every row when the pair has no default sequence', () => {
+    expect(initialCompareBenchmarkRows(rows, null)).toBe(rows);
   });
 });

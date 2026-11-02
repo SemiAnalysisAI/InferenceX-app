@@ -1,25 +1,26 @@
 import type { Metadata } from 'next';
 
-import { SITE_NAME, SITE_URL, SUPPORTERS_LINE } from '@semianalysisai/inferencex-constants';
+import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { JsonLd } from '@/components/seo/json-ld';
 import { CatalogLinkCard } from '@/components/catalog/catalog-link-card';
 import { Card } from '@/components/ui/card';
 import { enAlternates } from '@/lib/i18n/i18n';
-import { INFERENCE_MODEL_SLUGS } from '@/lib/routing/inference-model-slug';
+import { socialMetadata } from '@/lib/seo/social-metadata';
+import { PUBLIC_INFERENCE_MODEL_SLUGS } from '@/lib/routing/inference-model-slug';
 import { runPageHeading, type RunPageEntry } from '@/lib/live-seo/run-pages';
 import { getAvailableRunEntries } from '@/lib/live-seo/run-rankings-data.server';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
 
 const title = 'Run Any Model on Any GPU: Measured Results';
 const description =
-  'Measured throughput, latency, and cost for every open LLM and GPU pairing the InferenceX fleet benchmarks: DeepSeek, Kimi, GLM, MiniMax, and Qwen on H100, H200, B200, GB200 NVL72, MI300X, MI325X, MI355X, and more.';
+  'Measured throughput, latency and cost for each open LLM and GPU pair InferenceX tests: DeepSeek, Kimi, GLM and Qwen on H100, B200, GB200, MI355X and more.';
 
 export function generateMetadata(): Metadata {
   return {
     title,
-    description: `${description} ${SUPPORTERS_LINE}`,
+    description,
     keywords: [
       'run LLM on GPU benchmark',
       'LLM GPU throughput',
@@ -31,13 +32,12 @@ export function generateMetadata(): Metadata {
       'MI355X LLM benchmark',
     ],
     alternates: enAlternates('/run'),
-    openGraph: {
+    ...socialMetadata({
       title: `${title} | ${SITE_NAME}`,
       description,
       url: `${SITE_URL}/run`,
-      type: 'website',
-    },
-    twitter: { card: 'summary_large_image', title, description },
+      locale: 'en',
+    }),
   };
 }
 
@@ -49,7 +49,7 @@ export default async function RunIndexPage() {
     list.push(entry);
     byModel.set(entry.model.slug, list);
   }
-  const models = INFERENCE_MODEL_SLUGS.filter((model) => byModel.has(model.slug));
+  const models = PUBLIC_INFERENCE_MODEL_SLUGS.filter((model) => byModel.has(model.slug));
 
   const jsonLd = {
     '@context': 'https://schema.org',

@@ -14,15 +14,16 @@ import { comparisonPairHref, comparisonScenarioForModel } from '@/lib/compare/co
 import { getComparablePairsByModelSlug } from '@/lib/compare/compare-availability';
 import {
   type ComparePair,
-  COMPARE_MODEL_SLUGS,
+  PUBLIC_COMPARE_MODEL_SLUGS,
   type CompareModelSlug,
 } from '@/lib/compare/compare-slug';
 import { bucketComparePairsByVendor } from '@/lib/compare/compare-ssr';
 import { formatModelListZh } from '@/lib/compare/compare-ssr-zh';
 import { type Model } from '@/lib/catalog/data-mappings';
-import { ZH_OG_LOCALE, zhAlternates } from '@/lib/i18n/i18n';
+import { zhAlternates } from '@/lib/i18n/i18n';
+import { socialMetadata } from '@/lib/seo/social-metadata';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
 
 const DESCRIPTION =
   '对比 Kimi K3、DeepSeek V4 Pro、MiniMax M3、Qwen 3.5 与 GLM 5.3 的 AgentX 智能体推理结果，并浏览定长序列芯片对比。';
@@ -31,18 +32,12 @@ export const metadata: Metadata = {
   title: 'AgentX 智能体推理对比',
   description: DESCRIPTION,
   alternates: zhAlternates('/compare'),
-  openGraph: {
+  ...socialMetadata({
     title: `AgentX 智能体推理对比 | ${SITE_NAME}`,
     description: DESCRIPTION,
     url: `${SITE_URL}/zh/compare`,
-    type: 'website',
-    locale: ZH_OG_LOCALE,
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: `AgentX 智能体推理对比 | ${SITE_NAME}`,
-    description: DESCRIPTION,
-  },
+    locale: 'zh',
+  }),
 };
 
 interface VendorGroup {
@@ -105,7 +100,7 @@ export default function CompareIndexPageZh() {
 async function CompareCatalogZh() {
   const comparablePairsByModel = await getComparablePairsByModelSlug();
   const totalUrls = [...comparablePairsByModel.values()].reduce((s, p) => s + p.length, 0);
-  const modelsWithPairs = COMPARE_MODEL_SLUGS.filter(
+  const modelsWithPairs = PUBLIC_COMPARE_MODEL_SLUGS.filter(
     (m) => (comparablePairsByModel.get(m.slug)?.length ?? 0) > 0,
   );
 
@@ -190,7 +185,7 @@ async function CompareCatalogZh() {
                       return (
                         <ComparePairCardLink
                           key={slug}
-                          href={comparisonPairHref('zh', slug, model)}
+                          href={comparisonPairHref('zh', slug)}
                           slug={slug}
                           label={label}
                           archLine={archLine}

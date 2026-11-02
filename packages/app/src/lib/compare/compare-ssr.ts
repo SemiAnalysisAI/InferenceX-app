@@ -22,32 +22,17 @@ import {
   compareModelDisplayLabel,
   compareModelSeoName,
 } from '@/lib/compare/compare-slug';
+import {
+  type CompareTableData,
+  compareTableDataFromPoints,
+  emptyCompareTableData,
+} from '@/lib/compare/compare-table-view';
 import { getHardwareConfig, getGpuSpecs } from '@/lib/catalog/constants';
+import { datasetJsonLd } from '@/lib/seo/dataset-jsonld';
+import { clampMetaDescription, META_DESCRIPTION_MAX } from '@/lib/seo/meta-text';
 
 export { getCachedBenchmarks };
 
-export const KNOWN_MODELS = new Set([
-  'Muse-Spark-Open',
-  'Llama-3.3-70B-Instruct-FP8',
-  'Llama-3.1-70B-Instruct-FP8-KV',
-  'DeepSeek-R1-0528',
-  'gpt-oss-120b',
-  'Qwen-3.5-397B-A17B',
-  'Qwen3.8-Flash-Next',
-  'Qwen3.8-27B',
-  'Qwen3.8-27B-Eager',
-  'Kimi-K2.5',
-  'Kimi-K3',
-  'MiniMax-M2.5',
-  'MiniMax-M3',
-  'MiniMax-M3.1-Flash',
-  'MiMo-V2.6-Flash',
-  'GLM-5',
-  'GLM-5.2',
-  'DeepSeek-V4-Pro',
-  'DeepSeek-V4.1-Flash',
-]);
-export const KNOWN_SEQUENCES = new Set(['1k/1k', '1k/8k', '8k/1k', 'agentic-traces']);
 export const KNOWN_PRECISIONS = new Set(['fp4', 'fp4fp8', 'fp8', 'bf16', 'int4', 'nvfp4', 'mxfp4']);
 
 export interface AgenticScenarioIntro {
@@ -62,12 +47,6 @@ export const AGENTIC_SCENARIO_INTRO: AgenticScenarioIntro = {
   linkLabel: 'Learn more about AgentX',
   href: '/agentx',
 };
-
-export function pickString(value: string | string[] | undefined): string | undefined {
-  if (typeof value === 'string') return value;
-  if (Array.isArray(value)) return value[0];
-  return undefined;
-}
 
 export interface PairSummary {
   hardware: string;
@@ -226,81 +205,19 @@ function buildGpuDataPointsForSequence(
   return islOsl ? buildGpuDataPoints(rows, hw, islOsl.isl, islOsl.osl, precision) : [];
 }
 
-function interactivityRangeOf(pts: GPUDataPoint[]): { min: number; max: number } | null {
-  if (pts.length === 0) return null;
-  let min = Infinity;
-  let max = -Infinity;
-  for (const p of pts) {
-    if (p.interactivity < min) min = p.interactivity;
-    if (p.interactivity > max) max = p.interactivity;
-  }
-  return { min, max };
-}
-
 export function computeCompareTableData(
   rows: BenchmarkRow[],
   a: string,
   b: string,
   sequence: string | null,
   precision: string | null,
-): {
-  defaultTargets: number[];
-  ssrRows: SsrInterpolatedRow[];
-  interactivityRange: { min: number; max: number };
-} {
-  const empty = { defaultTargets: [], ssrRows: [], interactivityRange: { min: 0, max: 100 } };
-  if (!sequence || !precision) return empty;
+): CompareTableData {
+  if (!sequence || !precision) return emptyCompareTableData();
 
-  const pointsA = buildGpuDataPointsForSequence(rows, a, sequence, precision);
-  const pointsB = buildGpuDataPointsForSequence(rows, b, sequence, precision);
-
-  if (pointsA.length === 0 && pointsB.length === 0) return empty;
-
-  const rangeA = interactivityRangeOf(pointsA);
-  const rangeB = interactivityRangeOf(pointsB);
-
-  let globalMin: number, globalMax: number;
-  if (rangeA && rangeB) {
-    globalMin = Math.max(rangeA.min, rangeB.min);
-    globalMax = Math.min(rangeA.max, rangeB.max);
-    if (globalMin >= globalMax) {
-      globalMin = Math.min(rangeA.min, rangeB.min);
-      globalMax = Math.max(rangeA.max, rangeB.max);
-    }
-  } else {
-    const r = rangeA ?? rangeB!;
-    globalMin = r.min;
-    globalMax = r.max;
-  }
-
-  const interactivityRange = {
-    min: Math.ceil(globalMin),
-    max: Math.floor(globalMax),
-  };
-
-  const span = globalMax - globalMin;
-  const defaultTargets =
-    span > 0
-      ? [
-          Math.round(globalMin + span * 0.25),
-          Math.round(globalMin + span * 0.5),
-          Math.round(globalMin + span * 0.75),
-        ]
-      : [Math.round(globalMin)];
-
-  const ssrRows: SsrInterpolatedRow[] = defaultTargets.map((target) => ({
-    target,
-    a:
-      pointsA.length > 0
-        ? interpolateForGPU(pointsA, target, 'interactivity_to_throughput', 'costh')
-        : null,
-    b:
-      pointsB.length > 0
-        ? interpolateForGPU(pointsB, target, 'interactivity_to_throughput', 'costh')
-        : null,
-  }));
-
-  return { defaultTargets, ssrRows, interactivityRange };
+  return compareTableDataFromPoints(
+    buildGpuDataPointsForSequence(rows, a, sequence, precision),
+    buildGpuDataPointsForSequence(rows, b, sequence, precision),
+  );
 }
 
 export function computeCompareImageRows(
@@ -751,8 +668,6 @@ export function computeCompareStat(
   };
 }
 
-export const META_DESCRIPTION_MAX = 155;
-
 function firstUnder(candidates: string[], max: number): string | undefined {
   return candidates.find((c) => c.length <= max);
 }
@@ -774,8 +689,8 @@ export function compareMetaDescription(
         `${gpuLabel} inference benchmark on ${modelName} from ${SITE_NAME} by ${AUTHOR_NAME}.`,
         `${gpuLabel} inference benchmark on ${modelName}.`,
       ],
-      META_DESCRIPTION_MAX,
-    ) ?? `${gpuLabel} inference benchmark`.slice(0, META_DESCRIPTION_MAX);
+      META_DESCRIPTION_MAX.en,
+    ) ?? clampMetaDescription(`${gpuLabel} inference benchmark on ${modelName}.`, 'en');
 
   const stat = computeCompareStat(a, b, ssrRows);
   if (!stat) return fallback;
@@ -802,7 +717,7 @@ export function compareMetaDescription(
         `${core} Verified open-source ${SITE_NAME} benchmarks.`,
         core,
       ],
-      META_DESCRIPTION_MAX,
+      META_DESCRIPTION_MAX.en,
     ) ?? fallback
   );
 }
@@ -943,15 +858,15 @@ export function buildJsonLd(
           { name: `${bLabel} Concurrency`, value: String(Math.round(row.b.concurrency)) },
         );
       }
-      return {
-        '@type': 'Dataset',
+      return datasetJsonLd({
         name: `${model.label} comparison at ${row.target} tok/s/user interactivity`,
+        description: `${aLabel} vs ${bLabel} throughput, cost per million tokens, tok/s/MW and concurrency for ${model.label} at ${row.target} tok/s/user interactivity, measured by InferenceX CI.`,
         variableMeasured: metrics.map((m) => ({
           '@type': 'PropertyValue',
           name: m.name,
           value: m.value,
         })),
-      };
+      });
     });
 
   return {

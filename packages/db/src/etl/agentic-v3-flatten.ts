@@ -20,6 +20,7 @@ const V3_LATENCY_METRICS: Record<string, string> = {
   intvty: 'intvty',
   full_response_itl: 'full_response_itl',
   full_response_intvty: 'full_response_intvty',
+  e2e_norm_intvty: 'e2e_norm_intvty',
 };
 
 const V3_TOKEN_METRICS: Record<string, string> = {

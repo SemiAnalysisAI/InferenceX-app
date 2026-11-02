@@ -32,15 +32,19 @@ const responseSchema = objectSchema(
     view: { type: 'string', enum: ['options'] },
     apiVersion: { type: 'string', enum: ['v1'] },
     params: objectSchema({ format: { type: 'string', enum: ['json'] } }),
-    models: arraySchema(
-      objectSchema({
-        name: stringSchema,
-        dbKeys: arraySchema(stringSchema),
-        category: stringSchema,
-        releaseDate: nullableStringSchema,
-        compareSlug: nullableStringSchema,
-      }),
-    ),
+    models: {
+      ...arraySchema(
+        objectSchema({
+          name: stringSchema,
+          dbKeys: arraySchema(stringSchema),
+          category: stringSchema,
+          releaseDate: nullableStringSchema,
+          compareSlug: nullableStringSchema,
+        }),
+      ),
+      description:
+        'Models in selector order within each category. This presentation order does not change defaults.model.',
+    },
     sequences: arraySchema(
       objectSchema({
         key: stringSchema,
@@ -118,7 +122,7 @@ const responseExample = {
     {
       name: 'DeepSeek-V4-Pro',
       dbKeys: ['dsv4'],
-      category: 'default',
+      category: 'deprecated',
       releaseDate: '2026-06-30',
       compareSlug: 'deepseek-v4-pro',
     },
@@ -188,6 +192,8 @@ const responseExample = {
     serviceCompare: false,
     roleShare: false,
     powerFit: false,
+    powerBreakdown: false,
+    headroom: false,
   },
 };
 

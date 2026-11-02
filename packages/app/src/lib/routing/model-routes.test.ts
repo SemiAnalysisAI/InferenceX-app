@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { Model, MODEL_OPTIONS } from '../catalog/data-mappings';
+import { isModelVisible, Model, MODEL_OPTIONS } from '../catalog/data-mappings';
 import {
   DEFAULT_ROUTE_MODEL,
   defaultRouteModel,
@@ -178,11 +178,11 @@ describe('modelRoutesForTab', () => {
   it('serves Kimi K3, GLM 5.2/5.3, MiniMax M3, DeepSeek V4 Pro and DeepSeek V4.1 Flash on the profit estimators and every model elsewhere', () => {
     for (const tab of ['profit-estimator', 'profit-estimator-per-gigawatt'] as const) {
       expect(modelRoutesForTab(tab).map((route) => route.model)).toEqual([
-        Model.DeepSeek_V4_Pro,
-        Model.DeepSeek_V4_1_Flash,
         Model.Kimi_K3,
-        Model.MiniMax_M3,
+        Model.DeepSeek_V4_1_Flash,
         Model.GLM_5_2,
+        Model.DeepSeek_V4_Pro,
+        Model.MiniMax_M3,
       ]);
       expect(modelRouteAvailableForTab(tab, Model.Qwen3_5)).toBe(false);
       expect(modelRouteAvailableForTab(tab, Model.GLM_5_2)).toBe(true);
@@ -212,7 +212,12 @@ describe('modelRoutesForTab', () => {
       expect(modelRouteAvailableForTab(tab, Model.GLM_5)).toBe(false);
     }
     for (const tab of ['calculator', 'historical'] as const) {
-      expect(modelRoutesForTab(tab)).toEqual(MODEL_ROUTES);
+      expect(modelRoutesForTab(tab)).toEqual(
+        MODEL_ROUTES.filter((route) => isModelVisible(route.model)),
+      );
+      expect(modelRoutesForTab(tab).some((route) => route.model === Model.GLM_5_3_Flash)).toBe(
+        false,
+      );
       expect(modelRouteAvailableForTab(tab, Model.DeepSeek_V4_Pro)).toBe(true);
     }
   });

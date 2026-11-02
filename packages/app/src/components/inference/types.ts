@@ -7,6 +7,7 @@ import type { PowerTier } from '@/lib/power/power-tier';
 import type { SystemPowerEstimate } from '@/lib/power/modeled-system-power';
 import type { MetricKey } from './metric-registry';
 import type { FixedSequenceStatistic } from './utils/resolveXAxisField';
+import type { BlockedComparisonToggle } from './utils/comparison-exclusion';
 import type { XAxisMode } from './hooks/chart-data-core';
 import type { PowerBasis } from '@/lib/power/power-basis';
 import type { TokenBasis } from '@/lib/benchmarks/benchmark-transform';
@@ -74,6 +75,8 @@ export interface AggDataEntry {
   p95_e2el: number;
   p99_e2el: number;
   'p99.9_e2el': number;
+  p75_e2e_norm_intvty?: number;
+  p90_e2e_norm_intvty?: number;
   power_valid?: number;
   power_invalid_reasons?: string[];
   power_audit?: PowerAudit;
@@ -219,20 +222,37 @@ export interface InferenceData extends Partial<Omit<AggDataEntry, AggDataConflic
   powerVariant?: PowerVariant;
 
   gpuProvisionedJPerOutputToken?: { y: number; roof: boolean };
+  gpuProvisionedJPerTotalToken?: { y: number; roof: boolean };
   utilityProvisionedJPerOutputToken?: { y: number; roof: boolean };
+  utilityProvisionedJPerTotalToken?: { y: number; roof: boolean };
+  itModeledWatts?: { y: number; roof: boolean };
+  itModeledJPerOutputToken?: { y: number; roof: boolean };
+  itModeledJPerTotalToken?: { y: number; roof: boolean };
   utilityModeledWatts?: { y: number; roof: boolean };
   utilityModeledJPerOutputToken?: { y: number; roof: boolean };
+  utilityModeledJPerTotalToken?: { y: number; roof: boolean };
 }
 
-export type PowerCompare = 'none' | 'boundaries' | 'roles';
+/**
+ * `boundaries`: GPU only, IT (no PUE) and Facility. `all`: also the two rated provisioned
+ * bounds. `roles`: prefill vs decode GPUs. `breakdown`: the PowerX Where the power goes
+ * view (per-chip stacks at one interactivity); it overlays no series on the chart.
+ */
+export type PowerCompare = 'none' | 'boundaries' | 'provisioned' | 'all' | 'roles' | 'breakdown';
 export type PowerRole = 'all' | 'prefill' | 'decode';
 export type PowerVariant = { kind: 'basis'; id: PowerBasis } | { kind: 'role'; id: PowerRole };
 
 export type PowerBasisFieldKey =
   | 'gpuProvisionedJPerOutputToken'
+  | 'gpuProvisionedJPerTotalToken'
   | 'utilityProvisionedJPerOutputToken'
+  | 'utilityProvisionedJPerTotalToken'
+  | 'itModeledWatts'
+  | 'itModeledJPerOutputToken'
+  | 'itModeledJPerTotalToken'
   | 'utilityModeledWatts'
-  | 'utilityModeledJPerOutputToken';
+  | 'utilityModeledJPerOutputToken'
+  | 'utilityModeledJPerTotalToken';
 
 export type { PowerBasis } from '@/lib/power/power-basis';
 
@@ -299,6 +319,7 @@ export interface ScatterGraphProps {
   yLabel: string;
   chartDefinition: ChartDefinition;
   caption?: React.ReactNode;
+  footer?: React.ReactNode;
   onShowTable?: () => void;
   showAllHardwareTypes?: boolean;
   hardwareConfigOverride?: HardwareConfig;
@@ -309,6 +330,8 @@ export interface ScatterGraphProps {
   xExtentOverride?: [number, number];
   yExtentOverride?: [number, number];
   runNumbering?: Map<string, number>;
+  /** Plot height in px; the default is the shared 600 px chart height. */
+  plotHeight?: number;
 }
 
 export interface LegendItemProps {
@@ -364,6 +387,8 @@ export interface InferenceDataContextType {
 export interface InferenceFiltersContextType {
   activeHwTypes: Set<string>;
   bestPerSku: boolean;
+  /** Inactive hardware keys whose legend toggle the engine exclusion blocks. */
+  blockedHwToggles: ReadonlyMap<string, BlockedComparisonToggle>;
   selectedModel: Model;
   selectedSequence: Sequence;
   selectedPrecisions: string[];
@@ -406,6 +431,8 @@ export interface InferenceDisplayContextType {
   logScale: boolean;
   useAdvancedLabels: boolean;
   showConcurrencyLabels: boolean;
+  showOffloadingLabel: boolean;
+  showFrameworkLabel: boolean;
   showGradientLabels: boolean;
   showLineLabels: boolean;
   showParetoFrontier: boolean;
@@ -453,6 +480,8 @@ export interface InferenceActionsContextType {
   setLogScale: (logScale: boolean) => void;
   setUseAdvancedLabels: (useAdvancedLabels: boolean) => void;
   setShowConcurrencyLabels: (showConcurrencyLabels: boolean) => void;
+  setShowOffloadingLabel: (show: boolean) => void;
+  setShowFrameworkLabel: (show: boolean) => void;
   setShowGradientLabels: (showGradientLabels: boolean) => void;
   setShowLineLabels: (showLineLabels: boolean) => void;
   setShowParetoFrontier: (show: boolean) => void;

@@ -9,6 +9,28 @@ interface RouterLike {
 export const CLIENT_SEARCH_CHANGE_EVENT = 'inferencex:client-search-change';
 export const CLIENT_PATHNAME_CHANGE_EVENT = 'inferencex:client-pathname-change';
 
+export interface ClientPathnameChangeDetail {
+  pathname: string;
+  /** True only when the rewrite represents a new page (model switch), not a filter tweak. */
+  pageview: boolean;
+}
+
+interface PathnameReplaceOptions {
+  pageview?: boolean;
+}
+
+function dispatchPathnameChange(pathname: string, pageview: boolean): void {
+  window.dispatchEvent(
+    new CustomEvent<ClientPathnameChangeDetail>(CLIENT_PATHNAME_CHANGE_EVENT, {
+      detail: { pathname, pageview },
+    }),
+  );
+}
+
+export function isPageviewPathnameChange(event: Event): boolean {
+  return (event as CustomEvent<ClientPathnameChangeDetail>).detail?.pageview === true;
+}
+
 export function notifyClientSearchChange(href: string): void {
   const search = new URL(href, window.location.origin).search;
   window.dispatchEvent(new CustomEvent(CLIENT_SEARCH_CHANGE_EVENT, { detail: search }));
@@ -21,7 +43,11 @@ export function replaceClientSearch(searchParams: URLSearchParams): void {
   notifyClientSearchChange(href);
 }
 
-export function replaceClientPathname(pathname: string, dropParams: readonly string[] = []): void {
+export function replaceClientPathname(
+  pathname: string,
+  dropParams: readonly string[] = [],
+  { pageview = false }: PathnameReplaceOptions = {},
+): void {
   const search = new URLSearchParams(window.location.search);
   for (const param of dropParams) search.delete(param);
   const qs = search.toString();
@@ -32,7 +58,7 @@ export function replaceClientPathname(pathname: string, dropParams: readonly str
     typeof History === 'undefined' ? window.history.replaceState : History.prototype.replaceState;
   nativeReplace.call(window.history, window.history.state, '', href);
   clientPathnameOverride = pathname;
-  window.dispatchEvent(new CustomEvent(CLIENT_PATHNAME_CHANGE_EVENT, { detail: pathname }));
+  dispatchPathnameChange(pathname, pageview);
   notifyClientSearchChange(href);
 }
 
@@ -42,7 +68,11 @@ export function getClientPathnameOverride(): string | null {
   return clientPathnameOverride;
 }
 
-export function replaceRouterPathname(target: string, dropParams: readonly string[] = []): void {
+export function replaceRouterPathname(
+  target: string,
+  dropParams: readonly string[] = [],
+  { pageview = false }: PathnameReplaceOptions = {},
+): void {
   const search = new URLSearchParams(window.location.search);
   for (const param of dropParams) search.delete(param);
   const qs = search.toString();
@@ -54,7 +84,7 @@ export function replaceRouterPathname(target: string, dropParams: readonly strin
     `${target}${qs ? `?${qs}` : ''}${window.location.hash}`,
   );
   clientPathnameOverride = target;
-  window.dispatchEvent(new CustomEvent(CLIENT_PATHNAME_CHANGE_EVENT, { detail: target }));
+  dispatchPathnameChange(target, pageview);
   notifyClientSearchChange(`${target}${qs ? `?${qs}` : ''}${window.location.hash}`);
 }
 

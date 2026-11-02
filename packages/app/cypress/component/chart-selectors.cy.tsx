@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/tooltip';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { OptionInfo, SelectedOptionInfo } from '@/components/ui/option-info';
-import { Model, Sequence } from '@/lib/catalog/data-mappings';
+import { Model, MODEL_OPTIONS, Sequence } from '@/lib/catalog/data-mappings';
 
 describe('Consistent informational help', () => {
   for (const locale of ['en', 'zh'] as const) {
@@ -366,6 +366,41 @@ describe('Chart Selectors', () => {
     beforeEach(() => {
       cy.mount(<ModelSelectorHarness />);
     });
+
+    for (const locale of ['en', 'zh']) {
+      it(`keeps default models in the requested selector order (${locale})`, () => {
+        cy.viewport(locale === 'zh' ? 390 : 1280, 720);
+        cy.mount(
+          <PathnameContext.Provider value={locale === 'zh' ? '/zh/inference' : '/inference'}>
+            <TooltipProvider>
+              <ModelSelector
+                value={Model.Muse_Spark_Open}
+                onChange={cy.stub().as('selectModel')}
+                availableModels={MODEL_OPTIONS}
+                data-testid="model-selector"
+              />
+            </TooltipProvider>
+          </PathnameContext.Provider>,
+        );
+        cy.get('[data-testid="model-selector"]').should('contain.text', 'Muse Spark Open').click();
+        cy.get('[role="option"]').then(($options) => {
+          expect(
+            [...$options].slice(0, 8).map((option) => option.textContent?.trim()),
+          ).to.deep.equal([
+            'Kimi K3 2.8T',
+            'DeepSeek V4.1 Flash 552B',
+            'GLM5.2/GLM5.3 744B',
+            'GLM 5.3 Flash',
+            'MiniMax M3.1 Flash 428B',
+            'Muse Spark Open 816B',
+            'Qwen3.5 397B',
+            'Qwen3.8 Flash Next 176B',
+          ]);
+        });
+        cy.contains('[role="option"]', 'Kimi K3 2.8T').click();
+        cy.get('@selectModel').should('have.been.calledOnceWith', Model.Kimi_K3);
+      });
+    }
 
     it('shows options when clicked', () => {
       cy.get('[data-testid="model-selector"]').click();
