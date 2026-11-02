@@ -4,7 +4,7 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { CHART_SIZES, ChartSkeleton } from './chart-shared';
+import { CHART_SIZES, ChartEmpty, ChartSkeleton } from './chart-shared';
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
@@ -41,6 +41,30 @@ describe('ChartSkeleton', () => {
     expect(skeleton().style.height).toBe('');
     expect(skeleton().className).toContain('w-full');
     expect(skeleton().className).not.toMatch(/\bh-\[/);
+  });
+
+  it('occupies the same box as the empty state that replaces it', () => {
+    act(() =>
+      root.render(
+        <>
+          <ChartSkeleton />
+          <ChartEmpty />
+        </>,
+      ),
+    );
+
+    const empty = container.querySelector<HTMLElement>('[data-testid="agentic-chart-empty"]');
+    expect(empty?.style.aspectRatio).toBe(skeleton().style.aspectRatio);
+    expect(empty?.style.height).toBe('');
+    expect(empty?.textContent).toBe('No data');
+  });
+
+  it('sizes the empty state from the chart dimensions it stands in for', () => {
+    act(() => root.render(<ChartEmpty width={1300} height={520} message="Failed" />));
+
+    const empty = container.querySelector<HTMLElement>('[data-testid="agentic-chart-empty"]');
+    expect(empty?.style.aspectRatio).toBe('1300 / 520');
+    expect(empty?.textContent).toBe('Failed');
   });
 
   it('uses the expanded chart aspect ratio for the expanded size', () => {

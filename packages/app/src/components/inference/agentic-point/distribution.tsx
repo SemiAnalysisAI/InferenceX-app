@@ -81,7 +81,7 @@ export function Distribution({
   }, [values]);
 
   if (!computed) {
-    return <ChartEmpty height={height} />;
+    return <ChartEmpty width={W} height={height} />;
   }
   const { sorted, histogram, excluded } = computed;
   const { counts, edges, lnMin, lnMax } = histogram;

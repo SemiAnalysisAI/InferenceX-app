@@ -111,7 +111,7 @@ export function TimeSeriesChart({
   };
 
   if (series.every((s) => s.data.length === 0)) {
-    return <ChartEmpty />;
+    return <ChartEmpty width={W} height={height} />;
   }
 
   return (
@@ -353,7 +353,7 @@ export function StackedAreaChart({
   }, [sourceSeries]);
 
   if (!computed) {
-    return <ChartEmpty />;
+    return <ChartEmpty width={W} height={height} />;
   }
   const { tValues, shares } = computed;
 

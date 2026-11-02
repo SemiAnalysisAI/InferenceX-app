@@ -79,7 +79,7 @@ export function AggregateChart({
   }, [points, W, H, yMax, percentileLines]);
 
   if (!computed) {
-    return <ChartEmpty height={H} />;
+    return <ChartEmpty width={W} height={H} />;
   }
   const { yTop, innerW, innerH } = computed;
 

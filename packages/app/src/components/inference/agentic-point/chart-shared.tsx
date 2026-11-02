@@ -38,10 +38,23 @@ export const fmtSeconds = (s: number): string => {
   return `${m}m ${rem}s`;
 };
 
-export function ChartEmpty({ height = 260, message }: { height?: number; message?: string }) {
+/** Empty state with the chart's aspect ratio, so it occupies the same box as the skeleton. */
+export function ChartEmpty({
+  width = CHART_SIZES.inline.width,
+  height = CHART_SIZES.inline.height,
+  message,
+}: {
+  width?: number;
+  height?: number;
+  message?: string;
+}) {
   const locale = useLocale();
   return (
-    <div className="grid place-items-center text-xs text-muted-foreground" style={{ height }}>
+    <div
+      data-testid="agentic-chart-empty"
+      className="grid w-full place-items-center text-xs text-muted-foreground"
+      style={{ aspectRatio: `${width} / ${height}` }}
+    >
       {message ?? (locale === 'zh' ? '暂无数据' : 'No data')}
     </div>
   );
