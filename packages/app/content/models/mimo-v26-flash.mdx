@@ -25,4 +25,6 @@ The dimensions, attention schedule and quantization layout come from the [publis
 
 ## InferenceX coverage
 
-MiMo V2.6 Flash is an experimental model benchmarked on AgentX only, on B200 with SGLang and vLLM and without speculative decoding. Its vision and audio encoders are not exercised by the text-only AgentX traces.
+MiMo V2.6 Flash is an experimental model benchmarked on AgentX only, on B200 with SGLang and vLLM. Its vision and audio encoders are not exercised by the text-only AgentX traces.
+
+vLLM also runs the checkpoint's own DFlash drafter. Like every speculative AgentX submission, it uses synthetic acceptance from the model's golden SPEED-Bench curve: a mean acceptance length of 4.08 tokens with 7 draft tokens and 2.97 with 3, with thinking on. These results appear once the [DFlash sweep](https://github.com/SemiAnalysisAI/InferenceX/pull/4742) lands.

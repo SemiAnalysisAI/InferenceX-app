@@ -25,4 +25,6 @@ MiMo-V2.6-Flash 是小米发布的 MoE（混合专家）模型，总参数量 30
 
 ## InferenceX 覆盖范围
 
-MiMo V2.6 Flash 是实验性模型，目前只在 AgentX 场景中测试，硬件为 B200，推理框架为 SGLang 和 vLLM，未启用投机解码。AgentX 的 trace 只有文本，因此不会用到其视觉和音频编码器。
+MiMo V2.6 Flash 是实验性模型，目前只在 AgentX 场景中测试，硬件为 B200，推理框架为 SGLang 和 vLLM。AgentX 的 trace 只有文本，因此不会用到其视觉和音频编码器。
+
+vLLM 还会运行 checkpoint 自带的 DFlash draft 模型。与所有启用投机解码的 AgentX 提交一样，它采用基于该模型 SPEED-Bench 黄金曲线的合成接受：开启思考时，7 个 draft token 的平均接受长度为 4.08，3 个为 2.97。[DFlash sweep](https://github.com/SemiAnalysisAI/InferenceX/pull/4742) 完成后会显示这些结果。
