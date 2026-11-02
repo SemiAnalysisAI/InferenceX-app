@@ -262,7 +262,7 @@ describe('Inference Chart', () => {
     cy.get('#chart-0').should(($chart) => assertContextBelowPlot($chart[0]!));
     cy.get('#chart-0 [data-testid="cost-tier-selector"]').click();
     cy.get('[data-testid="cost-tier-rental"]').click();
-    cy.get('#chart-0 input[aria-label="B200 $/chip/hr"]').should('have.value', '3.7');
+    cy.get('#chart-0 input[aria-label="B200 $/chip/hr"]').should('have.value', '4');
     cy.get('#chart-0 [data-testid="cost-tier-selector"]').should(
       'contain.text',
       'Rent - 3 Year Commit',
