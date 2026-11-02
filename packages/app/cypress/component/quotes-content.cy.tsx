@@ -87,19 +87,26 @@ describe('QuotesContent', () => {
       });
   });
 
-  it('keeps wall logos in color on a light tile in dark mode', () => {
+  it('keeps colored wall logos untouched and lifts black artwork in dark mode', () => {
     cy.mount(
       <div className="dark">
         <QuotesContent />
       </div>,
     );
-    cy.get('button[aria-label^="Jump to"] img').each(($logo) => {
-      expect(getComputedStyle($logo[0]).filter, `${$logo.attr('alt')} filter`).to.equal('none');
-      const tile = $logo[0].closest('button')!;
-      expect(getComputedStyle(tile).backgroundColor, 'tile background').to.equal(
-        'rgb(255, 255, 255)',
-      );
-    });
+    const wall = '[data-testid="supporter-logo-wall"]';
+    for (const alt of ['NVIDIA', 'Google', 'Microsoft', 'Oracle']) {
+      cy.get(`${wall} img[alt="${alt}"]`).each(($logo) => {
+        expect(getComputedStyle($logo[0]).filter, `${alt} filter`).to.equal('none');
+      });
+    }
+    for (const alt of ['OpenAI', 'Lambda', 'AMD']) {
+      cy.get(`${wall} img[alt="${alt}"]`).should(($logo) => {
+        const filter = getComputedStyle($logo[0]).filter;
+        expect(filter, `${alt} filter`).to.contain('invert');
+        expect(filter, `${alt} filter`).to.contain('hue-rotate');
+        expect(filter, `${alt} filter`).not.to.contain('grayscale');
+      });
+    }
     cy.get('#quote-anyscale img[alt="Anyscale"]').should(($logo) => {
       const filter = getComputedStyle($logo[0]).filter;
       expect(filter).to.contain('grayscale');
@@ -155,7 +162,6 @@ describe('QuotesContent supporter logo wall', () => {
     cy.get('button[aria-label^="Jump to"] img, [data-testid="supporter-logo-wall"] img').each(
       ($img) => {
         const img = $img[0] as HTMLImageElement;
-        expect(img.className, img.alt).not.to.match(/grayscale|invert/);
         expect(getComputedStyle(img).filter, img.alt).to.equal('none');
         cy.wrap($img).should(($el) => {
           expect(($el[0] as HTMLImageElement).naturalWidth, img.alt).to.be.greaterThan(0);
@@ -178,5 +184,45 @@ describe('QuotesContent supporter logo wall', () => {
       .find('img[alt="DeepSeek"]')
       .closest('button')
       .should('not.exist');
+  });
+
+  it('shows logos bare, with square marks taller than wordmarks', () => {
+    cy.mount(<QuotesContent />);
+    const wall = '[data-testid="supporter-logo-wall"]';
+    cy.get(`${wall} li`).each(($li) => {
+      const box = $li.children()[0];
+      const style = getComputedStyle(box);
+      expect(style.backgroundColor, 'tile background').to.equal('rgba(0, 0, 0, 0)');
+      expect(style.borderTopWidth, 'tile border').to.equal('0px');
+      expect(style.boxShadow, 'tile ring').to.equal('none');
+    });
+    cy.get(`${wall} img[alt="OpenAI"]`).then(($mark) => {
+      const mark = $mark[0].getBoundingClientRect();
+      expect(mark.height, 'square mark height').to.be.at.least(40);
+      cy.get(`${wall} img[alt="Lambda"]`).should(($word) => {
+        const word = $word[0].getBoundingClientRect();
+        expect(word.height).to.be.lessThan(mark.height);
+        expect(word.width).to.be.greaterThan(mark.width);
+      });
+    });
+  });
+
+  it('stacks the group label above a wrapping row on phones', () => {
+    cy.viewport(393, 852);
+    cy.mount(<QuotesContent />);
+    cy.get('[data-testid="supporter-group-silicon-neoclouds-academia"]').within(() => {
+      cy.get('h3').then(($label) => {
+        const label = $label[0].getBoundingClientRect();
+        cy.get('li').each(($li) => {
+          const li = $li[0].getBoundingClientRect();
+          expect(li.top, 'logo below label').to.be.greaterThan(label.bottom - 1);
+          expect(li.right, 'logo within phone width').to.be.at.most(393);
+        });
+      });
+      cy.get('li').then(($lis) => {
+        const rows = new Set([...$lis].map((li) => Math.round(li.getBoundingClientRect().top)));
+        expect(rows.size, 'rows of logos').to.be.greaterThan(1);
+      });
+    });
   });
 });
