@@ -901,6 +901,28 @@ describe('Overview page', () => {
             .should('contain.text', 'Show all rows')
             .and('contain.text', String(hidden))
             .and('have.attr', 'aria-label', `Show ${hidden} rows with ${sentence}`);
+          cy.window().then((win) => {
+            win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1');
+            win.dispatchEvent(new win.Event('inferencex:feature-gate:unlocked'));
+          });
+          cy.get(`a[${attribute}]`).should(
+            'have.attr',
+            'aria-label',
+            `Show ${hidden + 1} rows with ${sentence}`,
+          );
+          cy.get('[data-testid="overview-desktop-model"]').should(
+            'have.length',
+            MATRIX_ROWS - hidden,
+          );
+          cy.window().then((win) => {
+            win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
+            win.dispatchEvent(new win.Event('inferencex:feature-gate:locked'));
+          });
+          cy.get(`a[${attribute}]`)
+            .should('have.attr', 'aria-label', `Show ${hidden} rows with ${sentence}`)
+            .click();
+          cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS);
+          cy.get(`a[${attribute}]`).should('contain.text', `Hide ${hidden}`);
         });
     }
   });

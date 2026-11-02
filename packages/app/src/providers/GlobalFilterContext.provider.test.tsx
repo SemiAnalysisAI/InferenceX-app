@@ -1,12 +1,14 @@
 // @vitest-environment jsdom
-import { act, memo, useState } from 'react';
+import { act, memo, useEffect, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Model, Precision, Sequence } from '@/lib/catalog/data-mappings';
 
 const mocks = vi.hoisted(() => ({
   featureGateUnlocked: false,
+  featureGateHydratesUnlocked: false,
   availability: {
     data: [] as unknown[] | undefined,
     error: null as Error | null,
@@ -28,19 +30,37 @@ const mocks = vi.hoisted(() => ({
     error: null as Error | null,
   },
   unofficialAvailable: [] as { model: string; sequence: string; precision: string }[],
-  getUrlParam: vi.fn(() => undefined),
+  getUrlParam: vi.fn<(key: string) => string | undefined>(() => undefined),
   setUrlParams: vi.fn(),
+  setNavigationModel: vi.fn(),
+  workflowDates: vi.fn(),
 }));
 
-vi.mock('@/lib/runtime/use-feature-gate', () => ({
-  useFeatureGate: () => mocks.featureGateUnlocked,
-}));
+vi.mock('@/lib/runtime/use-feature-gate', async () => {
+  const react = await import('react');
+  return {
+    useFeatureGate: () => {
+      const [hydrated, setHydrated] = react.useState(false);
+      const hydrateUnlocked = mocks.featureGateHydratesUnlocked;
+      react.useEffect(() => {
+        if (hydrateUnlocked) setHydrated(true);
+      }, [hydrateUnlocked]);
+      return mocks.featureGateUnlocked || (hydrateUnlocked && hydrated);
+    },
+  };
+});
 
 vi.mock('@/hooks/api/use-availability', () => ({
   useAvailability: () => mocks.availability,
 }));
 vi.mock('@/hooks/api/use-workflow-info', () => ({
-  useWorkflowInfo: () => mocks.workflow,
+  useWorkflowInfo: (date: string) => {
+    mocks.workflowDates(date);
+    return mocks.workflow;
+  },
+}));
+vi.mock('@/lib/routing/inference-navigation-state', () => ({
+  setInferenceNavigationModel: mocks.setNavigationModel,
 }));
 vi.mock('@/hooks/useUrlState', () => ({
   useUrlState: () => ({ getUrlParam: mocks.getUrlParam, setUrlParams: mocks.setUrlParams }),
@@ -67,12 +87,19 @@ let selectModel: ((model: Model) => void) | undefined;
 let selectionRenders = 0;
 let actionRenders = 0;
 let workflowRenders = 0;
+const consumerModels: Model[] = [];
+const consumerRequestModels: Model[] = [];
 const actionSnapshots: GlobalFilterActionsContextType[] = [];
 let availabilitySnapshot: GlobalFilterAvailabilityContextType | undefined;
 let selectionSnapshot: GlobalFilterSelectionContextType | undefined;
 
 const SelectionProbe = memo(() => {
   selectionSnapshot = useGlobalFilterSelection();
+  const model = selectionSnapshot.selectedModel;
+  consumerModels.push(model);
+  useEffect(() => {
+    consumerRequestModels.push(model);
+  }, [model]);
   selectionRenders += 1;
   return null;
 });
@@ -101,12 +128,19 @@ const ActionIdentityProbe = memo(() => {
   return null;
 });
 
-function ProviderHarness() {
+function ProviderHarness({
+  initialModel = Model.DeepSeek_V4_Pro,
+  initialRunDate,
+}: {
+  initialModel?: Model;
+  initialRunDate?: string;
+}) {
   const [, setRevision] = useState(0);
   rerenderProvider = () => setRevision((revision) => revision + 1);
   return (
     <GlobalFilterProvider
-      initialModel={Model.DeepSeek_V4_Pro}
+      initialModel={initialModel}
+      initialRunDate={initialRunDate}
       initialSequence={Sequence.EightK_OneK}
       initialPrecisions={[Precision.FP4]}
     >
@@ -119,14 +153,21 @@ function ProviderHarness() {
   );
 }
 
-function mountProvider(): void {
+function mountProvider(initialModel?: Model, initialRunDate?: string): void {
   container = document.createElement('div');
   root = createRoot(container);
-  act(() => root?.render(<ProviderHarness />));
+  act(() =>
+    root?.render(<ProviderHarness initialModel={initialModel} initialRunDate={initialRunDate} />),
+  );
 }
 
 beforeEach(() => {
   mocks.featureGateUnlocked = false;
+  mocks.featureGateHydratesUnlocked = false;
+  consumerModels.length = 0;
+  consumerRequestModels.length = 0;
+  mocks.setNavigationModel.mockClear();
+  mocks.workflowDates.mockClear();
   mocks.availability.data = [];
   mocks.availability.error = null;
   mocks.availability.isError = false;
@@ -157,6 +198,55 @@ afterEach(() => {
 });
 
 describe('GlobalFilterProvider context isolation', () => {
+  it.each([false, true])(
+    'never mounts fallback consumers while Flash hydrates (saved=%s)',
+    (saved) => {
+      mocks.featureGateHydratesUnlocked = true;
+      if (saved) {
+        // The proxy canonicalizes the saved query before SSR; both initialModel
+        // and the still-preserved URL selection therefore name Flash.
+        window.history.replaceState({}, '', '/inference/glm-5-3-flash?g_model=GLM-5.3-Flash');
+        mocks.getUrlParam.mockImplementation((key) =>
+          key === 'g_model' ? Model.GLM_5_3_Flash : undefined,
+        );
+      }
+      mountProvider(Model.GLM_5_3_Flash, '2026-10-21');
+      expect(consumerModels.length).toBeGreaterThan(0);
+      expect({
+        renders: new Set(consumerModels),
+        requestEffects: new Set(consumerRequestModels),
+        navigationModels: new Set(mocks.setNavigationModel.mock.calls.map(([model]) => model)),
+        initialWorkflowDate: mocks.workflowDates.mock.calls[0]?.[0],
+      }).toEqual({
+        renders: new Set([Model.GLM_5_3_Flash]),
+        requestEffects: new Set([Model.GLM_5_3_Flash]),
+        navigationModels: new Set([Model.GLM_5_3_Flash]),
+        initialWorkflowDate: '',
+      });
+      expect(mocks.workflowDates).toHaveBeenLastCalledWith('2026-10-21');
+    },
+  );
+
+  it('does not delay public model consumers or their workflow query', () => {
+    mountProvider(Model.Kimi_K3, '2026-10-21');
+    expect(consumerModels[0]).toBe(Model.Kimi_K3);
+    expect(mocks.workflowDates).toHaveBeenNthCalledWith(1, '2026-10-21');
+  });
+
+  it('preserves public SSR content while withholding gated model consumers', () => {
+    const content = <span>public dashboard</span>;
+    expect(
+      renderToString(
+        <GlobalFilterProvider initialModel={Model.Kimi_K3}>{content}</GlobalFilterProvider>,
+      ),
+    ).toContain('public dashboard');
+    expect(
+      renderToString(
+        <GlobalFilterProvider initialModel={Model.GLM_5_3_Flash}>{content}</GlobalFilterProvider>,
+      ),
+    ).toBe('');
+  });
+
   it('does not notify selection or action consumers when workflow data changes', () => {
     mountProvider();
 

@@ -41,6 +41,7 @@ import {
   Model,
   MODEL_OPTIONS,
   isModelVisible,
+  modelRequiresFeatureGate,
   modelRequiresObservations,
   Precision,
   PRECISION_OPTIONS,
@@ -234,14 +235,15 @@ export function GlobalFilterProvider({
   const [requestedModel, setSelectedModel] = useState<Model>(
     () => initialModel ?? routeModelForPathname(pathname) ?? Model.DeepSeek_V4_Pro,
   );
+  const modelGatePending = modelRequiresFeatureGate(requestedModel) && !featureGateReady;
   // Derive the safe value during render, including the first SSR/hydration render
   // and the render immediately after relocking. Every consumer sees this value.
   const selectedModel = isModelVisible(requestedModel, featureGateUnlocked)
     ? requestedModel
     : Model.Kimi_K3;
   useIsomorphicLayoutEffect(() => {
-    setInferenceNavigationModel(selectedModel);
-  }, [selectedModel]);
+    if (!modelGatePending) setInferenceNavigationModel(selectedModel);
+  }, [selectedModel, modelGatePending]);
   // The model the user last picked. A path sync counts as a pageview only when it applies that pick.
   const userSelectedModelRef = useRef<Model | null>(null);
   const selectModel = useCallback(
@@ -503,7 +505,7 @@ export function GlobalFilterProvider({
     data: workflowData,
     isLoading: workflowLoading,
     error: workflowQueryError,
-  } = useWorkflowInfo(effectiveRunDate);
+  } = useWorkflowInfo(modelGatePending ? '' : effectiveRunDate);
 
   const workflowError = workflowQueryError ? workflowQueryError.message : null;
 
@@ -639,6 +641,11 @@ export function GlobalFilterProvider({
     () => ({ availableRuns, workflowLoading, workflowError }),
     [availableRuns, workflowLoading, workflowError],
   );
+
+  // A boundary can mount this provider after its own gate has hydrated. This
+  // provider's hook still starts locked; do not mount query consumers with the
+  // temporary fallback model. Ordinary public model SSR remains unchanged.
+  if (modelGatePending) return null;
 
   return (
     <GlobalFilterActionsContext.Provider value={actionsValue}>

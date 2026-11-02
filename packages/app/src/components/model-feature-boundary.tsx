@@ -16,7 +16,7 @@ export function ModelFeatureBoundary({ children }: { children: ReactNode }) {
   const blocked = isFeatureGatedModelPath(pathname ?? '') && !unlocked;
   useEffect(() => {
     if (ready && blocked) {
-      router.replace(pathname?.startsWith('/zh/') ? '/zh/inference' : '/inference');
+      router.replace(pathname?.startsWith('/zh/') ? '/zh/inference/kimi-k3' : '/inference/kimi-k3');
     }
   }, [ready, blocked, pathname, router]);
   // Never render a gated route while waiting for localStorage, including SSR.

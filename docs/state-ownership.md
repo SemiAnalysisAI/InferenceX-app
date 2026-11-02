@@ -34,6 +34,15 @@ on first render and after relock. It waits for gate hydration before synchronizi
 the URL, so an unlocked deep link survives reload. Unofficial availability cannot
 unlock a model. The root model boundary also blocks direct gated routes; public
 discovery excludes them and client overview/search surfaces respect the gate.
+Saved gated `g_model` selections on inference routes are canonicalized by the frontend
+proxy before rendering, preserving locale and query parameters. This gives SSR and
+the fresh client provider the same requested model without delaying public-model SSR.
+Overview UI requests retain the complete matrix, then apply model visibility before
+row scopes and toggle counts; the read-only API retains its original scoped responses.
+
+While a requested gated model awaits hydration, its consumers, navigation-model
+write and date-scoped workflow query wait too. Locked routes redirect directly
+to the localized canonical Kimi K3 route, avoiding a transient bare-route default.
 This is UI-only visibility, not authorization. Following PowerX, the read-only
 API parameters, raw model registry and response data remain unchanged; the API
 and packaged skills document this presentation-only parity exception.
