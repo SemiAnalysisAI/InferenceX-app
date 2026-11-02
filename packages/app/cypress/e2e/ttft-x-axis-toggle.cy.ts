@@ -425,6 +425,16 @@ describe('Default scenario', () => {
       cy.get('[data-testid="scenario-selector"]')
         .should('be.visible')
         .and('contain.text', 'Agentic');
+      cy.get('[data-testid="scenario-selector"]').should(($selector) => {
+        const label = $selector[0]!.querySelector('span')!;
+        const helpIcon = $selector[0]!.parentElement!.querySelector(
+          '[data-slot="info-help-icon"]',
+        )!;
+        expect(
+          helpIcon.getBoundingClientRect().left,
+          'help does not overlap the label',
+        ).to.be.at.least(label.getBoundingClientRect().right);
+      });
       cy.get('label[for="scenario-select"]').should('be.visible').and('contain.text', 'Scenario');
       cy.get('h2 [data-testid="scenario-selector"]').should('not.exist');
       cy.get('[data-testid="scenario-selector"]').click('right', {

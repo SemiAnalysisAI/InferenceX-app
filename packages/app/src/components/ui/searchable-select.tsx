@@ -267,7 +267,7 @@ export function SearchableSelect({
           <div
             className={cn(
               'pointer-events-none absolute inset-y-0 flex items-center',
-              compact ? 'left-1.5 right-9' : 'left-3 right-9',
+              compact ? 'left-1.5 right-5 font-medium' : 'left-3 right-9',
             )}
           >
             <span
