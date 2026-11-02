@@ -1,5 +1,8 @@
 'use client';
 
+import { overviewDataForModelVisibility } from '@/lib/overview/overview-model-visibility';
+import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
+
 import {
   createContext,
   type MutableRefObject,
@@ -104,12 +107,22 @@ export function OverviewNavigationProvider({
     if (pending !== undefined) return pending;
 
     const url = new URL(key, window.location.origin);
+    const rowScope = resolveOverviewRowScope(url.searchParams.get('rows') ?? undefined);
+    const hardwareRowScope = resolveOverviewHardwareRowScope(
+      url.searchParams.get('hwrows') ?? undefined,
+    );
+    // Keep full rows in this UI cache. Visibility must precede scope/count
+    // derivation, including when relocking while a row filter is active.
+    // The API still supports its existing scoped requests for other clients.
+    url.searchParams.delete('rows');
+    url.searchParams.delete('hwrows');
     const request = fetch(`/api/v1/overview${url.search}`, {
       headers: { Accept: 'application/json' },
     })
       .then(async (response) => {
         if (!response.ok) throw new Error(`Overview request failed (${response.status})`);
-        const nextData = (await response.json()) as OverviewPageData;
+        const fullData = (await response.json()) as OverviewPageData;
+        const nextData = { ...fullData, rowScope, hardwareRowScope };
         dataCacheRef.current.set(key, nextData);
         return nextData;
       })
@@ -311,8 +324,13 @@ export function useOverviewNavigationError(): boolean {
 
 export function useOverviewData(): OverviewPageData {
   const value = useContext(OverviewDataContext);
+  const unlocked = useFeatureGate();
+  const visible = useMemo(
+    () => (value === null ? null : overviewDataForModelVisibility(value, unlocked)),
+    [value, unlocked],
+  );
   if (value === null) throw new Error('Overview controls require OverviewNavigationProvider');
-  return value;
+  return visible!;
 }
 
 export function useOverviewReference(): OverviewReferenceHardware {

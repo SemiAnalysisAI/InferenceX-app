@@ -25,6 +25,7 @@ function isEnumValue<T extends Record<string, string>>(e: T, v: string): v is T[
 import { useAvailability } from '@/hooks/api/use-availability';
 import { useWorkflowInfo } from '@/hooks/api/use-workflow-info';
 import { useUrlState } from '@/hooks/useUrlState';
+import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 import {
   hasExplicitUrlParam,
   refreshUrlParams,
@@ -39,6 +40,9 @@ import {
   isSequenceHiddenForModel,
   Model,
   MODEL_OPTIONS,
+  isModelVisible,
+  modelRequiresFeatureGate,
+  modelRequiresObservations,
   Precision,
   PRECISION_OPTIONS,
   Sequence,
@@ -225,20 +229,30 @@ export function GlobalFilterProvider({
 
   const pathname = usePathname();
 
-  const [selectedModel, setSelectedModel] = useState<Model>(
+  const featureGateUnlocked = useFeatureGate();
+  const [featureGateReady, setFeatureGateReady] = useState(false);
+  useEffect(() => setFeatureGateReady(true), []);
+  const [requestedModel, setSelectedModel] = useState<Model>(
     () => initialModel ?? routeModelForPathname(pathname) ?? Model.DeepSeek_V4_Pro,
   );
+  const modelGatePending = modelRequiresFeatureGate(requestedModel) && !featureGateReady;
+  // Derive the safe value during render, including the first SSR/hydration render
+  // and the render immediately after relocking. Every consumer sees this value.
+  const selectedModel = isModelVisible(requestedModel, featureGateUnlocked)
+    ? requestedModel
+    : Model.Kimi_K3;
   useIsomorphicLayoutEffect(() => {
-    setInferenceNavigationModel(selectedModel);
-  }, [selectedModel]);
+    if (!modelGatePending) setInferenceNavigationModel(selectedModel);
+  }, [selectedModel, modelGatePending]);
   // The model the user last picked. A path sync counts as a pageview only when it applies that pick.
   const userSelectedModelRef = useRef<Model | null>(null);
   const selectModel = useCallback(
     (model: Model, { userSelection = true }: ModelSelectionOptions = {}) => {
+      if (!isModelVisible(model, featureGateUnlocked)) return;
       if (userSelection) userSelectedModelRef.current = model;
       setSelectedModel(model);
     },
-    [],
+    [featureGateUnlocked],
   );
 
   const [selectedSequence, setSelectedSequenceRaw] = useState<Sequence>(() => {
@@ -362,19 +376,20 @@ export function GlobalFilterProvider({
   );
 
   const availableModels = useMemo(() => {
-    if (!availabilityRows) return MODEL_OPTIONS;
     const unofficialModels = new Set(unofficialAvailable.map((a) => a.model));
     return MODEL_OPTIONS.filter((m) => {
+      if (!isModelVisible(m, featureGateUnlocked)) return false;
       if (unofficialModels.has(m)) return true;
+      if (!availabilityRows) return !modelRequiresObservations(m);
       const keys = DISPLAY_MODEL_TO_DB[m] ?? [m];
       return availabilityRows.some((r) => keys.includes(r.model));
     });
-  }, [availabilityRows, unofficialAvailable]);
+  }, [availabilityRows, unofficialAvailable, featureGateUnlocked]);
 
   const lastAutoSwitchKeyRef = useRef<string>('');
   useEffect(() => {
     const decision = computeAutoSwitchDecision(
-      unofficialAvailable,
+      unofficialAvailable.filter((entry) => isModelVisible(entry.model, featureGateUnlocked)),
       hasExplicitUrlParam('g_model') ? getUrlParam('g_model') : undefined,
       selectedModel,
       lastAutoSwitchKeyRef.current,
@@ -383,7 +398,7 @@ export function GlobalFilterProvider({
     if (decision.modelToSet !== null) {
       setSelectedModel(decision.modelToSet);
     }
-  }, [unofficialAvailable, selectedModel]);
+  }, [unofficialAvailable, selectedModel, featureGateUnlocked]);
 
   const availableSequences = useMemo(() => {
     const unofficialSeqs = unofficialAvailable
@@ -490,7 +505,7 @@ export function GlobalFilterProvider({
     data: workflowData,
     isLoading: workflowLoading,
     error: workflowQueryError,
-  } = useWorkflowInfo(effectiveRunDate);
+  } = useWorkflowInfo(modelGatePending ? '' : effectiveRunDate);
 
   const workflowError = workflowQueryError ? workflowQueryError.message : null;
 
@@ -511,6 +526,9 @@ export function GlobalFilterProvider({
   const isMountedRef = useRef(false);
   const syncedModelRef = useRef(selectedModel);
   useEffect(() => {
+    // Do not canonicalize an explicitly unlocked deep link before localStorage
+    // has been read by the existing feature-gate hook.
+    if (!featureGateReady) return;
     const modelChanged = syncedModelRef.current !== selectedModel;
     syncedModelRef.current = selectedModel;
     const userSwitchedModel = modelChanged && userSelectedModelRef.current === selectedModel;
@@ -533,6 +551,7 @@ export function GlobalFilterProvider({
       replaceClientPathname(pathnameRewrite, [], { pageview: userSwitchedModel });
     }
   }, [
+    featureGateReady,
     selectedModel,
     requestedRunDate,
     requestedRunId,
@@ -622,6 +641,11 @@ export function GlobalFilterProvider({
     () => ({ availableRuns, workflowLoading, workflowError }),
     [availableRuns, workflowLoading, workflowError],
   );
+
+  // A boundary can mount this provider after its own gate has hydrated. This
+  // provider's hook still starts locked; do not mount query consumers with the
+  // temporary fallback model. Ordinary public model SSR remains unchanged.
+  if (modelGatePending) return null;
 
   return (
     <GlobalFilterActionsContext.Provider value={actionsValue}>
