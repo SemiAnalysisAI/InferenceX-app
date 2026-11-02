@@ -7,6 +7,7 @@ import {
   modelDetailHref,
   modelEnglishArticleHref,
   modelIndexHref,
+  modelInferenceHref,
 } from './model-page-copy';
 
 describe('model page copy', () => {
@@ -17,6 +18,8 @@ describe('model page copy', () => {
         ['DeepSeek-R1-0528', '8K / 1K'],
       ]) {
         expect(copy.detailTitle(model)).toContain(model);
+        expect(copy.inferenceBenchmarksLink(model)).toContain(model);
+        expect(copy.inferenceBenchmarksLink(model)).toContain('$/M tok');
         expect(copy.dashboardHeading(model, scenario)).toContain(model);
         expect(copy.dashboardHeading(model, scenario)).toContain(scenario);
       }
@@ -35,5 +38,11 @@ describe('model page locale paths', () => {
       '/zh/inference?g_model=DeepSeek-R1-0528',
     );
     expect(modelEnglishArticleHref('deepseek-r1')).toBe('/model/deepseek-r1');
+  });
+
+  it('links each model page to its dedicated inference benchmark page', () => {
+    expect(modelInferenceHref('kimi-k3', 'en')).toBe('/inference/kimi-k3');
+    expect(modelInferenceHref('kimi-k3', 'zh')).toBe('/zh/inference/kimi-k3');
+    expect(modelInferenceHref('not-a-model', 'en')).toBeNull();
   });
 });

@@ -20,6 +20,7 @@ type GlossaryTranslation = Pick<
   GlossaryEntry,
   | 'term'
   | 'aliases'
+  | 'expansion'
   | 'plainEnglish'
   | 'definition'
   | 'explanation'
@@ -785,6 +786,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   },
   nvfp4: {
     term: 'NVFP4',
+    expansion: 'NVIDIA 4 位浮点格式',
     aliases: ['NVIDIA FP4'],
     plainEnglish:
       'NVFP4 是针对 NVIDIA Blackwell 优化的 4 位模型数值格式，目标是少搬数据并利用最快的低精度硬件。',
@@ -1799,6 +1801,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   },
   nccl: {
     term: 'NCCL',
+    expansion: 'NVIDIA 集合通信库',
     aliases: ['RCCL', 'NVIDIA 集合通信库'],
     plainEnglish:
       'NCCL 是 NVIDIA 的集合通信库，在集合操作中负责芯片之间的数据搬运，RCCL 是 AMD 的对应实现。',
@@ -1813,6 +1816,7 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   },
   gemm: {
     term: 'GEMM',
+    expansion: '通用矩阵乘法',
     aliases: ['通用矩阵乘法', 'matrix multiply'],
     plainEnglish: 'GEMM 即通用矩阵乘法，是训练和推理神经网络时占据绝大部分算术量的那一种计算。',
     definition:
@@ -2091,10 +2095,18 @@ const translations: Readonly<Record<string, GlossaryTranslation>> = {
   },
   'double-buffering': {
     term: '双缓冲',
-    aliases: ['double buffering', 'triple buffering', '三缓冲', '预取流水线', 'DMA 重叠'],
+    aliases: [
+      'double buffering',
+      '多重缓冲',
+      'multiple buffering',
+      'triple buffering',
+      '三缓冲',
+      '预取流水线',
+      'DMA 重叠',
+    ],
     plainEnglish: '双缓冲在芯片还在计算当前数据块时就预取下一块，把内存延迟藏在有效计算之后。',
     definition:
-      '双缓冲是一种 kernel 技术，分配两个片上缓冲区，让向其中一个的 DMA 传输与另一个上的计算重叠；三缓冲把同样的思路扩展为更深的流水线。',
+      '双缓冲是多重缓冲（multiple buffering）中使用两个缓冲区的形式：DMA 向其中一个片上缓冲区传输数据时，kernel 同时在另一个缓冲区上计算，从而隐藏内存延迟。三缓冲把同样的思路扩展为更深的流水线。',
     explanation:
       '在 TPU 上，Pallas kernel 通过在 MXU 处理当前块时把下一块预取进 VMEM 来隐藏 HBM 延迟。两个块必须同时放进 VMEM，因此计算块大小决定了预取能跑多远。SparseCore 上的 ReduceScatter 用双缓冲在传输一个 chunk 的同时累加另一个，把本地归约和 die-to-die 传输与更慢的芯片间流量重叠。grouped matmul 对专家权重做三缓冲，让下一组的权重在当前组计算时已在途。异步 GDN 状态传输使用同样的模式，起初占用了额外 VMEM，直到复用 scratch buffer 才解决。',
     significance:

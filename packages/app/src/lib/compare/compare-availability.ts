@@ -27,7 +27,8 @@ export function buildDbKeyToSlugMap(): Map<string, string> {
   return dbKeyToSlug;
 }
 
-async function getHardwareByModelSlug(): Promise<Map<string, Set<string>>> {
+/** Hardware keys with benchmark rows, keyed by model slug. */
+export async function getHardwareByModelSlug(): Promise<Map<string, Set<string>>> {
   const rows = await getCachedAvailability();
   const dbKeyToSlug = buildDbKeyToSlugMap();
   const out = new Map<string, Set<string>>();

@@ -4,7 +4,21 @@ import { MODEL_PAGE_COPY } from '@/components/model/model-page-copy';
 import { AUTHOR_HANDLE, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { enAlternates, type Locale, ZH_OG_LOCALE, zhAlternates } from '../i18n/i18n';
+import { getHardwareByModelSlug } from '../compare/compare-availability';
+import { toModel } from '../compare/compare-enum-coerce';
+import { getModelArchitecture } from './model-architectures';
+import { modelMetaDescription } from './model-meta-description';
 import { getLocalizedModelPage } from './model-pages-zh';
+
+/** Measured hardware keys for a model, or none when availability cannot be read. */
+async function measuredHardware(slug: string): Promise<ReadonlySet<string>> {
+  try {
+    const hardwareByModel = await getHardwareByModelSlug();
+    return hardwareByModel.get(slug) ?? new Set();
+  } catch {
+    return new Set();
+  }
+}
 
 export function modelIndexMetadata(locale: Locale): Metadata {
   const t = MODEL_PAGE_COPY[locale];
@@ -43,7 +57,7 @@ export function modelIndexMetadata(locale: Locale): Metadata {
   };
 }
 
-export function modelDetailMetadata(slug: string, locale: Locale): Metadata {
+export async function modelDetailMetadata(slug: string, locale: Locale): Promise<Metadata> {
   const page = getLocalizedModelPage(slug, locale);
   if (!page) return {};
 
@@ -53,14 +67,21 @@ export function modelDetailMetadata(slug: string, locale: Locale): Metadata {
   const enPath = `/model/${slug}`;
   const url = `${SITE_URL}${isZh ? '/zh' : ''}${enPath}`;
   const image = `${SITE_URL}${enPath}/opengraph-image`;
+  const model = toModel(page.entry.displayName);
+  const description = modelMetaDescription(
+    page.meta.title,
+    model ? getModelArchitecture(model) : undefined,
+    await measuredHardware(slug),
+    locale,
+  );
 
   return {
     title: { absolute: `${title} | ${SITE_NAME}` },
-    description: page.meta.description,
+    description,
     alternates: isZh ? zhAlternates(enPath) : enAlternates(enPath),
     openGraph: {
       title,
-      description: page.meta.description,
+      description,
       url,
       siteName: SITE_NAME,
       type: 'article',
@@ -70,7 +91,7 @@ export function modelDetailMetadata(slug: string, locale: Locale): Metadata {
     twitter: {
       card: 'summary_large_image',
       title,
-      description: page.meta.description,
+      description,
       site: AUTHOR_HANDLE,
       creator: AUTHOR_HANDLE,
       ...(isZh ? { images: [image] } : {}),
