@@ -1756,7 +1756,7 @@ describe('VR publication economics', () => {
             expect(gb, 'GB300 remains priced').not.to.equal(undefined);
             const vrHours = basis === 'chip-hour' ? 1 : (1_000_000 / 3.3) * 8760;
             const gbHours = basis === 'chip-hour' ? 1 : (1_000_000 / 2.12) * 8760;
-            expect(vr!.tco).to.be.closeTo(vrHours * (basis === 'chip-hour' ? 8.5 : 3.61), 0.01);
+            expect(vr!.tco).to.be.closeTo(vrHours * (basis === 'chip-hour' ? 8.75 : 3.61), 0.01);
             expect(gb!.tco).to.be.closeTo(gbHours * (basis === 'chip-hour' ? 5 : 2.31), 0.01);
             const revenuePerHour =
               (((12_600 * ((1 - cacheHitRate) * 1.32 + cacheHitRate * 0.044) + 5_400 * 3.96) *
@@ -1804,6 +1804,6 @@ it('keeps the latest VR snapshot in the profit estimator, matching the private p
       (((12_600 * 0.75 * (0.1 * 1.32 + 0.9 * 0.044) + 5_400 * 0.75 * 3.96) * 3600) / 1_000_000) *
       0.6;
     expect(vr!.revenue).to.be.closeTo(revenue, 0.001);
-    expect(vr!.tco).to.equal(8.5);
+    expect(vr!.tco).to.equal(8.75);
   });
 });
