@@ -39,6 +39,7 @@ const releaseFiles = [
   'skills/inferencex-api/references/cli.md',
   'skills/inferencex-api/references/collectivex.md',
   'skills/inferencex-api/references/dashboard-views.md',
+  'skills/inferencex-api/references/experiments.md',
   'skills/inferencex-api/references/offline-exports.md',
   'skills/inferencex-api/references/pareto.md',
   'skills/inferencex-api/references/powerx.md',
