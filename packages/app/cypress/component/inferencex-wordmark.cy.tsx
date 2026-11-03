@@ -1,9 +1,9 @@
 import { InferenceXWordmark } from '@/components/header/inferencex-wordmark';
 
-describe('Halloween wordmark', () => {
+describe('Thanksgiving wordmark', () => {
   for (const width of [320, 375, 1440]) {
     for (const theme of ['light', 'dark']) {
-      it(`keeps the pumpkin over the wordmark at ${width}px in ${theme} mode`, () => {
+      it(`keeps the turkey over the wordmark at ${width}px in ${theme} mode`, () => {
         cy.viewport(width, 800);
         cy.mount(
           <div className={theme}>
@@ -13,26 +13,26 @@ describe('Halloween wordmark', () => {
           </div>,
         );
 
-        cy.get('[data-testid="wordmark-pumpkin"]')
+        cy.get('[data-testid="wordmark-turkey"]')
           .should('have.attr', 'aria-hidden', 'true')
           .and('have.css', 'pointer-events', 'none')
           .and('be.visible')
-          .then(($pumpkin) => {
-            const pumpkin = $pumpkin[0].getBoundingClientRect();
-            cy.get('.halloween-wordmark-x').then(($x) => {
+          .then(($turkey) => {
+            const turkey = $turkey[0].getBoundingClientRect();
+            cy.get('.thanksgiving-wordmark-x').then(($x) => {
               const x = $x[0].getBoundingClientRect();
-              expect(pumpkin.left).to.be.lessThan(x.right);
-              expect(pumpkin.right).to.be.greaterThan(x.left);
-              expect(pumpkin.top).to.be.lessThan(x.top);
-              expect(pumpkin.bottom).to.be.greaterThan(x.top);
-              expect(pumpkin.top).to.be.at.least(0);
-              expect(pumpkin.right).to.be.at.most(width);
+              expect(turkey.left).to.be.lessThan(x.right);
+              expect(turkey.right).to.be.greaterThan(x.left);
+              expect(turkey.top).to.be.lessThan(x.top);
+              expect(turkey.bottom).to.be.greaterThan(x.top);
+              expect(turkey.top).to.be.at.least(0);
+              expect(turkey.right).to.be.at.most(width);
             });
           });
         cy.get('[data-testid="inferencex-wordmark"]').should(
           'have.css',
           'color',
-          theme === 'light' ? 'rgb(181, 71, 8)' : 'rgb(251, 146, 60)',
+          theme === 'light' ? 'rgb(146, 64, 14)' : 'rgb(251, 191, 36)',
         );
         cy.get('a').should('contain.text', 'InferenceX').click();
         cy.location('hash').should('eq', '#home');
