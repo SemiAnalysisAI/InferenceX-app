@@ -1697,6 +1697,8 @@ describe('mapBenchmarkRow — v3 agentic nested agg schema', () => {
       expect(m.tput_per_gpu).toBeCloseTo(9043.47223, 3);
       expect(m.input_tput_per_gpu).toBeCloseTo((8995.035 * 36) / 4, 2);
       expect(m.output_tput_per_gpu).toBeCloseTo((48.43723 * 36) / 32, 4);
+      expect(m.input_tput_per_total_gpu).toBeCloseTo(8995.035, 3);
+      expect(m.output_tput_per_total_gpu).toBeCloseTo(48.43723, 4);
     });
 
     it('leaves rates alone when the producer already reports them per pool', () => {
@@ -1709,6 +1711,7 @@ describe('mapBenchmarkRow — v3 agentic nested agg schema', () => {
       const m = mapBenchmarkRow(row, createSkipTracker())!.metrics;
       expect(m.input_tput_per_gpu).toBeCloseTo((8995.035 * 36) / 4, 2);
       expect(m.output_tput_per_gpu).toBeCloseTo((48.43723 * 36) / 32, 4);
+      expect(m).not.toHaveProperty('input_tput_per_total_gpu');
     });
 
     it('does not touch fixed-sequence disaggregated rows', () => {
@@ -1724,6 +1727,7 @@ describe('mapBenchmarkRow — v3 agentic nested agg schema', () => {
       )!.metrics;
       expect(m.input_tput_per_gpu).toBe(900);
       expect(m.output_tput_per_gpu).toBe(100);
+      expect(m).not.toHaveProperty('output_tput_per_total_gpu');
     });
   });
 

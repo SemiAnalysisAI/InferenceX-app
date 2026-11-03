@@ -78,8 +78,9 @@ stores it in the share URL as `g_chips=total`. It applies to unofficial-run
 overlays as well.
 
 Stored raw rows (`/api/v1/benchmarks`) keep the per-pool basis for fixed-sequence
-and AgentX runs alike. AgentX disaggregated rows ingested before this change
-divided all three rates by every chip; they were backfilled to the per-pool basis.
+and AgentX runs alike. The AgentX producer divides all three rates by every chip; ingest and a
+backfill move those rows to the per-pool basis and keep the producer's original
+rates as `input_tput_per_total_gpu` and `output_tput_per_total_gpu`.
 
 ## Historical editorial articles
 

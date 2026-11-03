@@ -9,7 +9,18 @@ describe('perPoolThroughputPatch', () => {
     expect(perPoolThroughputPatch(perTotal, 4, 12)).toEqual({
       input_tput_per_gpu: (900 * 16) / 4,
       output_tput_per_gpu: (100 * 16) / 12,
+      input_tput_per_total_gpu: 900,
+      output_tput_per_total_gpu: 100,
     });
+  });
+
+  it('never rescales a row that already holds its original per-total rates', () => {
+    expect(
+      perPoolThroughputPatch({ ...perTotal, input_tput_per_total_gpu: 900 }, 4, 12),
+    ).toBeNull();
+    expect(
+      perPoolThroughputPatch({ ...perTotal, output_tput_per_total_gpu: 100 }, 4, 12),
+    ).toBeNull();
   });
 
   it('is idempotent: a rescaled row no longer matches', () => {

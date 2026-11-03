@@ -1,8 +1,9 @@
 /**
  * Rescales stored agentic disaggregated rows from per-total-chip input and output
  * throughput to the per-pool basis the rest of the data uses (input per prefill
- * chip, output per decode chip). Rows already per pool are left alone, so the
- * script is safe to rerun.
+ * chip, output per decode chip). Non-destructive: each row keeps its original
+ * values as `input_tput_per_total_gpu` / `output_tput_per_total_gpu`. Rows already
+ * rescaled or per pool are left alone, so the script is safe to rerun.
  */
 import { hasNoSslFlag } from './cli-utils.js';
 import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils.js';
