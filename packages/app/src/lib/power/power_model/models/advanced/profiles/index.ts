@@ -20,6 +20,24 @@ export function nic_power_baseline(
   });
 }
 
+export const POLLARA_NIC_BASELINE = new Provenance({
+  profile_id: 'pollara-state-power',
+  version: '2',
+  source: 'nicctl total_power_drawn calibration on an MI355X host',
+  kind: 'estimated',
+  input_boundary: 'One scale-out NIC; excludes separately modeled transceivers and switches',
+  assumptions: [
+    'Idle power is 34.5 W and power at line rate is 39 W per card: total_power_drawn means ' +
+      'of 38.5 W idle and 42.6 W at 391 Gbit/s each way, plus a 10% margin, minus the ' +
+      'separately modeled 8 W transceiver.',
+    'Assumes total_power_drawn includes the QSFP-400G-DR4 transceiver; if it does not, ' +
+      'both values are 8 W low.',
+    'Power rises about 0.5 W per 100 Gbit/s sent plus received, so traffic below line rate ' +
+      'draws less.',
+    'Measured on the eight cards of one MI355X node, RDMA writes through the leaf switches.',
+  ],
+});
+
 export function system_side_transceiver_baseline(
   bandwidth_gbps: number,
   power_w: number,
