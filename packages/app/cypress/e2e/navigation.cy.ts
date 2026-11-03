@@ -221,7 +221,7 @@ describe('First-load navigation', () => {
         const slugs = [...$rows].map((row) =>
           (row.dataset.testid ?? '').replace('compare-agentx-model-', ''),
         );
-        expect(slugs).to.deep.equal(['muse-spark-open', 'deepseek-v41-flash']);
+        expect(slugs).to.deep.equal(['deepseek-v41-flash', 'muse-spark-open']);
       });
       cy.get('[data-testid^="compare-agentx-model-"] [data-new-badge="agentx-ledger"]').should(
         'not.exist',
