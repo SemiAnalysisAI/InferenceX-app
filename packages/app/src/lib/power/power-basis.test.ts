@@ -4,7 +4,12 @@ import type { BenchmarkRow } from '@/lib/api/api';
 import { rowToAggDataEntry, transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
 import { withChipBasis } from '@/lib/benchmarks/chip-basis';
 import { buildDerivedChartFields, getHardwareKey } from '@/lib/charts/chart-utils';
-import { POWER_BASIS_FIELDS, powerBasisNormalization } from '@/lib/power/power-basis';
+import {
+  POWER_BASIS_FIELDS,
+  powerBasisNormalization,
+  writePowerBasisChartFields,
+  type PowerBasisChartFields,
+} from '@/lib/power/power-basis';
 import { SYSTEM_POWER_CATEGORIES } from '@/lib/power/system-power-model';
 import { Sequence } from '@/lib/catalog/data-mappings';
 import { buildInferenceSeries } from '@/lib/views-api/series';
@@ -383,5 +388,56 @@ describe('powerBasisNormalization — legacy unsplit disaggregated rows', () => 
       allocatedGpus: null,
       totalOutputTokPerSec: null,
     });
+  });
+});
+
+describe('writePowerBasisChartFields', () => {
+  const supported = () => {
+    const entry = rowToAggDataEntry(row());
+    const model = entry.modeledSystemPower;
+    if (model?.status !== 'supported') throw new Error('expected a supported power model');
+    return { entry, model };
+  };
+  const specs = { tdp: 1000, power: 1.5 };
+
+  it('writes the IT and facility modeled boundaries independently', () => {
+    const { entry, model } = supported();
+    const itOnly: PowerBasisChartFields = {};
+    writePowerBasisChartFields(
+      itOnly,
+      { ...entry, modeledSystemPower: { ...model, deploymentFacilityWatts: 0 } },
+      specs,
+      undefined,
+    );
+    expect(itOnly.itModeledWatts?.y).toBeGreaterThan(0);
+    expect(itOnly.itModeledJPerOutputToken?.y).toBeGreaterThan(0);
+    expect(itOnly.utilityModeledWatts).toBeUndefined();
+
+    const facilityOnly: PowerBasisChartFields = {};
+    writePowerBasisChartFields(
+      facilityOnly,
+      { ...entry, modeledSystemPower: { ...model, deploymentItWatts: 0 } },
+      specs,
+      undefined,
+    );
+    expect(facilityOnly.utilityModeledWatts?.y).toBeGreaterThan(0);
+    expect(facilityOnly.utilityModeledJPerTotalToken?.y).toBeGreaterThan(0);
+    expect(facilityOnly.itModeledWatts).toBeUndefined();
+  });
+
+  it('leaves the utility boundaries off for hardware without a utility power figure', () => {
+    const fields: PowerBasisChartFields = {};
+    writePowerBasisChartFields(fields, supported().entry, { tdp: 1000 }, undefined);
+    expect(fields.gpuProvisionedJPerOutputToken?.y).toBeGreaterThan(0);
+    expect(fields.utilityProvisionedJPerOutputToken).toBeUndefined();
+    expect(fields.utilityProvisionedJPerTotalToken).toBeUndefined();
+  });
+
+  it('writes only the requested boundaries', () => {
+    const fields: PowerBasisChartFields = {};
+    writePowerBasisChartFields(fields, supported().entry, specs, {
+      utilityModeledJPerTotalToken: true,
+    });
+    expect(Object.keys(fields)).toEqual(['utilityModeledJPerTotalToken']);
   });
 });

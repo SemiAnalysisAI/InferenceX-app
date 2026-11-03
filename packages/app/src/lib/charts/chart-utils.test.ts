@@ -725,6 +725,47 @@ describe('createChartDataPoint', () => {
   });
 });
 
+describe('power-normalized derived fields', () => {
+  const powered = entry({
+    tput_per_gpu: 900,
+    output_tput_per_gpu: 600,
+    input_tput_per_gpu: 300,
+    avg_power_w: 400,
+  });
+  const powerKeys = [
+    'tpPerMw',
+    'inputTputPerMw',
+    'outputTputPerMw',
+    'jTotal',
+    'jOutput',
+    'jInput',
+    'measuredPowerPercentTdp',
+  ] as const;
+  const point = (power: number, tdp: number) =>
+    createChartDataPoint('2025-01-01', powered, 'median_e2el', 'tput_per_gpu', 'h100', {
+      power,
+      tdp,
+      costh: 2.8,
+      costr: 0.7,
+    });
+
+  it('omits them for hardware without a power figure', () => {
+    const unpowered = point(0, 0);
+    for (const key of powerKeys) expect(unpowered[key], key).toBeUndefined();
+  });
+
+  it('derives them for hardware below one kilowatt', () => {
+    const light = point(0.5, 0.5);
+    expect(light.tpPerMw?.y).toBeCloseTo((900 * 1000) / 0.5, 9);
+    expect(light.inputTputPerMw?.y).toBeCloseTo((300 * 1000) / 0.5, 9);
+    expect(light.outputTputPerMw?.y).toBeCloseTo((600 * 1000) / 0.5, 9);
+    expect(light.jTotal?.y).toBeCloseTo((0.5 * 1000) / 900, 9);
+    expect(light.jOutput?.y).toBeCloseTo((0.5 * 1000) / 600, 9);
+    expect(light.jInput?.y).toBeCloseTo((0.5 * 1000) / 300, 9);
+    expect(light.measuredPowerPercentTdp?.y).toBeCloseTo((400 / 0.5) * 100, 9);
+  });
+});
+
 describe('buildDerivedChartFields', () => {
   it('matches full inference formulas while emitting only requested history fields', () => {
     const e = entry({

@@ -39,9 +39,11 @@ import { benchmarkRowPhysicalChips, rowToAggDataEntry } from '@/lib/benchmarks/b
 import { pricingCacheHitRate } from '@/lib/calculator/cache-pricing';
 import {
   chartMetric,
+  derivedMetricRequest,
   getHardwareKey,
   requestsPowerChartFields,
   type DerivedMetricKey,
+  type DerivedMetricRequest,
   type ThroughputChartInput,
   writeDerivedChartFields,
   writeThroughputChartFields,
@@ -282,8 +284,7 @@ export function prepareTrendRows(
 }
 
 interface TrendPointMetrics {
-  readonly derived: readonly DerivedMetricKey[];
-  readonly wantsDerived: (key: DerivedMetricKey) => boolean;
+  readonly request: DerivedMetricRequest;
   readonly priceRevenue: boolean;
   readonly derivesFromEntry: boolean;
 }
@@ -294,8 +295,7 @@ function trendPointMetrics(requestedMetrics: readonly DerivedMetricKey[]): Trend
     ? requestedMetrics.filter((key) => key !== 'tokenRevenuePerGpuHour')
     : requestedMetrics;
   return {
-    derived,
-    wantsDerived: (key) => derived.includes(key),
+    request: derivedMetricRequest(derived),
     priceRevenue,
     derivesFromEntry: requestsPowerChartFields(derived),
   };
@@ -303,7 +303,7 @@ function trendPointMetrics(requestedMetrics: readonly DerivedMetricKey[]): Trend
 
 function trendPoint(
   trendRow: TrendRow,
-  { derived, wantsDerived, priceRevenue, derivesFromEntry }: TrendPointMetrics,
+  { request, priceRevenue, derivesFromEntry }: TrendPointMetrics,
   tokenRevenuePricing: TokenRevenuePricing | null = NORMALIZED_TOKEN_REVENUE_PRICING,
   tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
   specs: GpuSpecs = getGpuSpecs(trendRow.hwKey, tcoBasis),
@@ -314,9 +314,9 @@ function trendPoint(
       trendRow.row,
       rowToAggDataEntry(trendRow.row),
     );
-    writeDerivedChartFields(point, trendRow.derivedEntry, derived, specs);
+    writeDerivedChartFields(point, trendRow.derivedEntry, request, specs);
   } else {
-    writeThroughputChartFields(point, trendRow.derivedThroughput, wantsDerived, specs);
+    writeThroughputChartFields(point, trendRow.derivedThroughput, request, specs);
   }
   if (priceRevenue && tokenRevenuePricing) {
     const revenue = tokenRevenuePerGpuHour(point, tokenRevenuePricing);
