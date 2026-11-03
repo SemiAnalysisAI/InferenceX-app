@@ -7,6 +7,11 @@ import {
 } from '@semianalysisai/inferencex-constants';
 
 import type { DbClient } from '../connection.js';
+import {
+  CHART_SERIES_SUMMARY_VERSION,
+  encodeChartSeriesSummary,
+} from '../etl/chart-series-summary';
+import { CHART_SERIES_VERSION, type ChartSeries } from '../etl/compute-chart-series';
 import { REQUEST_TIMELINE_VERSION, type RequestTimeline } from '../etl/compute-request-timeline';
 import { gunzipRequestTimeline } from '../etl/request-timeline-codec';
 import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
@@ -16,6 +21,7 @@ import {
   SEQUENCE_LENGTH_SKETCHES_VERSION,
   sequenceLengthSketchColumns,
   STATS_VERSION,
+  writeBackChartSeries,
   writeBackRequestTimeline,
   writeBackTraceReplayJsonb,
 } from './agentic-shared';
@@ -69,6 +75,52 @@ describe('writeBackTraceReplayJsonb', () => {
 
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0]![0]).toContain('could not persist aggregate_stats');
+  });
+});
+
+describe('writeBackChartSeries', () => {
+  const series: ChartSeries = {
+    version: CHART_SERIES_VERSION,
+    startNs: 0,
+    endNs: 2_000_000_000,
+    durationS: 2,
+    timeslicesCount: 2,
+    kvCacheUsage: [{ t: 0, value: 0.25 }],
+    prefixCacheHitRate: [],
+    queueDepth: [],
+    promptTokensBySource: {},
+    prefillTps: [],
+    decodeTps: [],
+    prefixCacheHitsTps: [],
+    hostKvCacheUsage: [],
+    kvCacheUsageByEngine: [],
+    metricSources: [],
+  };
+
+  it('stores the series with its summary in one UPDATE', () => {
+    const { sql, calls } = mockSql();
+
+    writeBackChartSeries(sql, 870, series);
+
+    const json = JSON.stringify(series);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.text).toContain('chart_series_summary_gz');
+    expect(calls[0]!.values).toEqual([
+      json,
+      encodeChartSeriesSummary(json),
+      CHART_SERIES_SUMMARY_VERSION,
+      870,
+    ]);
+  });
+
+  it('swallows a rejected UPDATE and warns naming chart_series', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { sql } = mockSql(new Error('cannot execute UPDATE in a read-only transaction'));
+
+    writeBackChartSeries(sql, 1, series);
+
+    await vi.waitFor(() => expect(warn).toHaveBeenCalledTimes(1));
+    expect(warn.mock.calls[0]![0]).toContain('could not persist chart_series');
   });
 });
 

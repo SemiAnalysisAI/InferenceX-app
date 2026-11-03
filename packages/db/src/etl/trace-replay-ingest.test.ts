@@ -19,6 +19,7 @@ import {
   getRequestChartData,
   requestChartDataFromTimelineGz,
 } from '../queries/request-chart-data';
+import { CHART_SERIES_SUMMARY_VERSION } from './chart-series-summary';
 import { encodeRequestChartColumns } from './request-chart-columns';
 import {
   REQUEST_TIMELINE_VERSION,
@@ -298,6 +299,8 @@ describe('persistPreparedTraceReplay (PostgreSQL)', () => {
     metrics_size: number | null;
     aggregate_stats: unknown;
     chart_series: unknown;
+    chart_series_summary_gz: Uint8Array | null;
+    chart_series_summary_version: number | null;
     sequence_length_sketches: Uint8Array | null;
     sequence_length_sketches_version: number | null;
   }
@@ -361,6 +364,7 @@ describe('persistPreparedTraceReplay (PostgreSQL)', () => {
         atr.server_metrics_json_gz,
         atr.server_metrics_json_uncompressed_size::int as metrics_size,
         atr.aggregate_stats, atr.chart_series,
+        atr.chart_series_summary_gz, atr.chart_series_summary_version,
         atr.sequence_length_sketches, atr.sequence_length_sketches_version
       from benchmark_results br
       join agentic_trace_replay atr on atr.id = br.trace_replay_id
@@ -398,6 +402,8 @@ describe('persistPreparedTraceReplay (PostgreSQL)', () => {
     expect(row.metrics_size).toBe(700);
     expect(row.aggregate_stats).toEqual({ version: 1 });
     expect(row.chart_series).toEqual({ version: 12 });
+    expect(Buffer.from(row.chart_series_summary_gz!).toString()).toBe('chart-summary');
+    expect(row.chart_series_summary_version).toBe(CHART_SERIES_SUMMARY_VERSION);
     expect(Buffer.from(row.sequence_length_sketches!).toString()).toBe('sketches');
     expect(row.sequence_length_sketches_version).toBe(SEQUENCE_LENGTH_SKETCHES_VERSION);
   });
@@ -409,6 +415,7 @@ describe('persistPreparedTraceReplay (PostgreSQL)', () => {
         requestTimelineGz: null,
         requestChartDataGz: null,
         timelineRequests: 0,
+        chartSeriesSummaryGz: null,
       }),
     ).resolves.toBe(1);
 
@@ -420,6 +427,8 @@ describe('persistPreparedTraceReplay (PostgreSQL)', () => {
     expect(row.request_chart_data_version).toBeNull();
     expect(row.request_timeline).toBeNull();
     expect(row.chart_series).toEqual({ version: 12 });
+    expect(row.chart_series_summary_gz).toBeNull();
+    expect(row.chart_series_summary_version).toBeNull();
     expect(row.sequence_length_sketches).toBeNull();
     expect(row.sequence_length_sketches_version).toBeNull();
   });

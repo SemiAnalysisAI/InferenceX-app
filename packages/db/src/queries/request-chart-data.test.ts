@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { REQUEST_TIMELINE_VERSION, type RequestTimeline } from '../etl/compute-request-timeline';
 import { encodeRequestChartColumns } from '../etl/request-chart-columns';
-import { gzipRequestTimeline } from '../etl/request-timeline-codec';
+import { gzipRequestTimeline, gzipRequestTimelineParts } from '../etl/request-timeline-codec';
 import type { DbClient } from '../connection.js';
 
 import {
@@ -206,6 +206,27 @@ describe('request chart data', () => {
     const { sql } = mockSql([[legacyMeta(2)], []]);
 
     await expect(getRequestChartData(sql, 42)).resolves.toBeNull();
+  });
+
+  it('logs and returns null when a legacy timeline above the projection cap disappears', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { sql } = mockSql([[legacyMeta(LEGACY_PROJECTION_MAX_REQUESTS + 1)], []]);
+
+    await expect(getRequestChartData(sql, 42)).resolves.toBeNull();
+    expect(error.mock.calls[0]![0]).toContain('trace_replay_id=3811');
+  });
+
+  it('reads time bounds a gzip timeline header lacks as zero', async () => {
+    const { gz } = await gzipRequestTimelineParts(
+      { version: REQUEST_TIMELINE_VERSION },
+      timeline.requests,
+    );
+    const { sql } = mockSql([[gzipMeta(gz.length)], [{ slice: gz.toString('base64') }]]);
+
+    const result = await getRequestChartData(sql, 444941);
+
+    expect(result).toMatchObject({ startNs: 0, endNs: 0, durationS: 0 });
+    expect(result?.requests).toEqual(encodeRequestChartData(timeline, timeline.requests).requests);
   });
 
   it('serves precomputed columns from the metadata query without reading the timeline', async () => {

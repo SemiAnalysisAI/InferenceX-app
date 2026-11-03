@@ -4,13 +4,18 @@ import path from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ metadata: vi.fn(), artifacts: vi.fn(), download: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  metadata: vi.fn(),
+  artifacts: vi.fn(),
+  download: vi.fn(),
+  sleep: vi.fn((_ms: number) => Promise.resolve()),
+}));
 vi.mock('node:child_process', () => ({ execFileSync: mocks.metadata }));
 vi.mock('./lib/github-artifacts.js', () => ({
   listRunArtifacts: mocks.artifacts,
   downloadArtifact: mocks.download,
 }));
-vi.mock('node:timers/promises', () => ({ setTimeout: () => Promise.resolve() }));
+vi.mock('node:timers/promises', () => ({ setTimeout: mocks.sleep }));
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -226,6 +231,47 @@ describe('artifact downloads', () => {
       expect(fs.readdirSync(dir).toSorted()).toEqual(
         names.slice(0, 8).filter((n) => n !== 'bmk_02'),
       );
+    } finally {
+      process.exitCode = originalExitCode;
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('waits 1 s, then 2 s, before each retry of a failed download', async () => {
+    const originalExitCode = process.exitCode;
+    const events: string[] = [];
+    for (let i = 0; i < 2; i++) {
+      mocks.sleep.mockImplementationOnce((ms: number) => {
+        events.push(`sleep ${ms}`);
+        const { promise, resolve } = Promise.withResolvers<void>();
+        setImmediate(() => {
+          events.push(`woke ${ms}`);
+          resolve();
+        });
+        return promise;
+      });
+    }
+    let failures = 2;
+    const { dir } = await prepare((name, root) => {
+      if (name === 'bmk_05') {
+        events.push('download');
+        if (failures-- > 0) return Promise.reject(new Error('network'));
+      }
+      fs.mkdirSync(path.join(root, name));
+      return Promise.resolve();
+    });
+    try {
+      expect(process.exitCode).toBe(0);
+      expect(events).toEqual([
+        'download',
+        'sleep 1000',
+        'woke 1000',
+        'download',
+        'sleep 2000',
+        'woke 2000',
+        'download',
+      ]);
+      expect(fs.readdirSync(dir).toSorted()).toEqual(names);
     } finally {
       process.exitCode = originalExitCode;
       fs.rmSync(dir, { recursive: true, force: true });

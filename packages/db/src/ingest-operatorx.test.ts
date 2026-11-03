@@ -4,7 +4,7 @@ import path from 'node:path';
 
 import { afterEach, expect, it, vi } from 'vitest';
 
-import { fetchRunMeta } from './lib/github-artifacts';
+import { downloadArtifact, fetchRunMeta, listRunArtifacts } from './lib/github-artifacts';
 import { sweepBundle } from './ingest-operatorx';
 
 vi.mock('./lib/github-artifacts', () => ({
@@ -74,4 +74,48 @@ it('rejects a run from another workflow before reading its artifacts', async () 
   await expect(sweepBundle('SemiAnalysisAI/InferenceX', '123', scratch(), false)).rejects.toThrow(
     'not an OperatorX sweep',
   );
+});
+
+const artifact = (name: string, created_at: string, expired = false) => ({
+  name,
+  created_at,
+  expired,
+  archive_download_url: `${name}@${created_at}`,
+});
+
+it('downloads the newest live manifest and shard artifacts before reading them', async () => {
+  vi.mocked(fetchRunMeta).mockReturnValue(meta);
+  vi.spyOn(console, 'log').mockImplementation(() => {});
+  vi.mocked(listRunArtifacts).mockReturnValue([
+    artifact('operatorx-manifest-123', '2026-09-26T01:00:00Z'),
+    artifact('operatorx-manifest-123', '2026-09-26T02:00:00Z'),
+    artifact('operatorx-shard-123-1-s1', '2026-09-26T01:00:00Z'),
+    artifact('operatorx-shard-123-2-s1', '2026-09-26T02:00:00Z'),
+    artifact('operatorx-shard-123-1-s2', '2026-09-26T01:00:00Z'),
+    artifact('operatorx-shard-123-2-s3', '2026-09-26T02:00:00Z', true),
+  ]);
+  vi.mocked(downloadArtifact).mockImplementation(async (downloaded, root) => {
+    await Promise.resolve();
+    const file = downloaded.name.startsWith('operatorx-manifest')
+      ? 'operatorx-manifest.json'
+      : 'results/doc.json';
+    json(root, `${downloaded.name}/${file}`, { from: downloaded.archive_download_url });
+    return path.join(root, downloaded.name);
+  });
+  const dir = scratch();
+
+  const bundle = await sweepBundle('SemiAnalysisAI/InferenceX', '123', dir, true);
+
+  expect(vi.mocked(downloadArtifact).mock.calls.map(([call]) => call.archive_download_url)).toEqual(
+    [
+      'operatorx-manifest-123@2026-09-26T02:00:00Z',
+      'operatorx-shard-123-2-s1@2026-09-26T02:00:00Z',
+      'operatorx-shard-123-1-s2@2026-09-26T01:00:00Z',
+    ],
+  );
+  expect(bundle.manifest).toEqual({ from: 'operatorx-manifest-123@2026-09-26T02:00:00Z' });
+  expect(bundle.shards).toEqual([
+    { id: 's2', attempt: 1, docs: [{ from: 'operatorx-shard-123-1-s2@2026-09-26T01:00:00Z' }] },
+    { id: 's1', attempt: 2, docs: [{ from: 'operatorx-shard-123-2-s1@2026-09-26T02:00:00Z' }] },
+  ]);
 });

@@ -113,3 +113,102 @@ describe('downloadArtifact', () => {
     }
   });
 });
+
+async function withStaging(run: (root: string, stagingDirs: string[]) => Promise<void>) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gh-download-'));
+  const stagingDirs: string[] = [];
+  const realMkdtemp = fs.mkdtempSync.bind(fs);
+  const mkdtemp = vi.spyOn(fs, 'mkdtempSync').mockImplementation((prefix: string) => {
+    const dir = realMkdtemp(prefix);
+    stagingDirs.push(dir);
+    return dir;
+  });
+  try {
+    await run(root, stagingDirs);
+  } finally {
+    mkdtemp.mockRestore();
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
+describe('downloadArtifact tool failures and cleanup', () => {
+  type Exit = { code: number } | { error: Error };
+
+  function fakeTools(exits: Partial<Record<string, Exit>> = {}) {
+    mockSpawn.mockReset();
+    mockSpawn.mockImplementation(
+      (command: string, args: string[], { stdio }: { stdio: (number | string)[] }) => {
+        const listeners = new Map<string, (...values: unknown[]) => void>();
+        const exit = exits[command] ?? { code: 0 };
+        const out = stdio[1];
+        if (command === 'gh' && typeof out === 'number') fs.writeSync(out, args[1]);
+        if (command === 'unzip' && 'code' in exit && exit.code === 0) {
+          fs.writeFileSync(path.join(args[3], 'body.txt'), fs.readFileSync(args[1]));
+        }
+        setImmediate(() => {
+          if ('error' in exit) listeners.get('error')?.(exit.error);
+          else listeners.get('close')?.(exit.code, null);
+        });
+        return {
+          once: (event: string, listener: (...values: unknown[]) => void) =>
+            listeners.set(event, listener),
+        };
+      },
+    );
+  }
+
+  it('closes each zip, removes its staging dir and downloads the same artifact again', async () => {
+    fakeTools();
+    const closeSync = vi.spyOn(fs, 'closeSync');
+    await withStaging(async (root, stagingDirs) => {
+      const artifact = art('bmk_a', '2026-06-01T00:00:00Z');
+
+      const first = await downloadArtifact(artifact, root);
+      const second = await downloadArtifact(artifact, root);
+
+      expect(second).toBe(first);
+      expect(fs.readFileSync(path.join(second, 'body.txt'), 'utf8')).toBe(
+        artifact.archive_download_url,
+      );
+      const zipFds = mockSpawn.mock.calls
+        .filter(([command]) => command === 'gh')
+        .map((call) => call[2].stdio[1]);
+      expect(zipFds).toHaveLength(2);
+      expect(closeSync.mock.calls.map(([fd]) => fd)).toEqual(expect.arrayContaining(zipFds));
+      expect(stagingDirs).toHaveLength(2);
+      expect(stagingDirs.filter((dir) => fs.existsSync(dir))).toEqual([]);
+    });
+    closeSync.mockRestore();
+  });
+
+  it('rejects with the failing download, never unzips and still cleans up', async () => {
+    fakeTools({ gh: { code: 22 } });
+    await withStaging(async (root, stagingDirs) => {
+      await expect(downloadArtifact(art('bmk_a', '2026-06-01T00:00:00Z'), root)).rejects.toThrow(
+        'gh api exited with 22',
+      );
+      expect(mockSpawn.mock.calls.map(([command]) => command)).toEqual(['gh']);
+      expect(fs.existsSync(stagingDirs[0]!)).toBe(false);
+    });
+  });
+
+  it('rejects when unzip fails, naming its first argument', async () => {
+    fakeTools({ unzip: { code: 9 } });
+    await withStaging(async (root, stagingDirs) => {
+      await expect(downloadArtifact(art('bmk_a', '2026-06-01T00:00:00Z'), root)).rejects.toThrow(
+        'unzip -oq exited with 9',
+      );
+      expect(fs.existsSync(stagingDirs[0]!)).toBe(false);
+    });
+  });
+
+  it('rejects when a tool cannot start', { timeout: 2000 }, async () => {
+    const missing = new Error('spawn gh ENOENT');
+    fakeTools({ gh: { error: missing } });
+    await withStaging(async (root) => {
+      await expect(downloadArtifact(art('bmk_a', '2026-06-01T00:00:00Z'), root)).rejects.toBe(
+        missing,
+      );
+    });
+  });
+});

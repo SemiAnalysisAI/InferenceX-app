@@ -190,6 +190,20 @@ describe('stored sample blobs', () => {
     expect(await getGpuMetricsForPoint(sql, 10)).toStrictEqual(expected);
   });
 
+  it('propagates a blob query failure other than a missing table', async () => {
+    await storeBlobs(SERIES);
+    const timingOut: DbClient = (strings, ...values) =>
+      strings.join('?').includes(BLOB_QUERY)
+        ? Promise.reject(
+            Object.assign(new Error('canceling statement due to statement timeout'), {
+              code: '57014',
+            }),
+          )
+        : sql(strings, ...values);
+
+    await expect(getGpuMetricsForPoint(timingOut, 10)).rejects.toThrow('statement timeout');
+  });
+
   it('stores no blob for rows it cannot reproduce and drops the previous one', async () => {
     await storeBlobs([101]);
     await sql`update gpu_metric_samples set sampled_at = sampled_at + interval '8000 years'

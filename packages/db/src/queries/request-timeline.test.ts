@@ -174,6 +174,44 @@ describe('readRequestTimelineGz', () => {
       'Stored value changed or ended at byte 0 of 100',
     );
   });
+
+  it('reads 4 MiB of raw bytes per query by default', async () => {
+    const stored = Buffer.alloc(4 * 1024 * 1024 + 1, 3);
+    const { sql, ranges } = sliceServingSql(stored);
+
+    const gz = await readRequestTimelineGz(sql, 870, stored.length);
+
+    expect(gz.equals(stored)).toBe(true);
+    expect(ranges).toEqual([
+      [1, 4 * 1024 * 1024],
+      [4 * 1024 * 1024 + 1, 1],
+    ]);
+  });
+
+  it('reads one byte per query at the smallest slice size', async () => {
+    const stored = Buffer.from([9, 8, 7]);
+    const { sql, ranges } = sliceServingSql(stored);
+
+    await expect(readRequestTimelineGz(sql, 870, 3, 1)).resolves.toEqual(stored);
+    expect(ranges).toEqual([
+      [1, 1],
+      [2, 1],
+      [3, 1],
+    ]);
+  });
+
+  it.each([0, -1, 1.5])(
+    'rejects slice size %s before querying',
+    { timeout: 2000 },
+    async (size) => {
+      const { sql, ranges } = sliceServingSql(Buffer.alloc(100));
+
+      await expect(readRequestTimelineGz(sql, 870, 100, size)).rejects.toThrow(
+        'Invalid timeline slice size',
+      );
+      expect(ranges).toEqual([]);
+    },
+  );
 });
 
 describe('getRequestTimeline', () => {
