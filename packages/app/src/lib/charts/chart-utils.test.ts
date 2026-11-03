@@ -534,9 +534,31 @@ describe('createChartDataPoint', () => {
   });
 
   it('computes tp from prefill+decode GPU counts when disagg is true', () => {
-    const e = entry({ disagg: true, num_prefill_gpu: 4, num_decode_gpu: 2, tp: 99 });
+    const e = entry({
+      disagg: true,
+      num_prefill_gpu: 4,
+      num_decode_gpu: 2,
+      prefill_num_workers: 1,
+      decode_num_workers: 1,
+      tp: 99,
+    });
     const point = createChartDataPoint('2025-01-01', e, 'median_e2el', 'tput_per_gpu', 'h100');
     expect(point.tp).toBe(6);
+  });
+
+  it('counts a legacy unsplit disaggregated deployment once, not once per pool', () => {
+    const e = entry({
+      disagg: true,
+      num_prefill_gpu: 36,
+      num_decode_gpu: 36,
+      prefill_num_workers: 0,
+      decode_num_workers: 0,
+      tp: 36,
+    });
+    expect(
+      createChartDataPoint('2025-11-01', e, 'median_intvty', 'tput_per_gpu', 'gb200_dynamo-trt')
+        .physicalChips,
+    ).toBe(36);
   });
 
   it('uses original tp when disagg is false', () => {
@@ -892,11 +914,13 @@ describe('createChartDataPoint power-boundary fields', () => {
     expect(p.measuredJPerOutputToken).toEqual({ y: 10, roof: false });
   });
 
-  it('normalizes fixed-sequence disaggregated energy by all GPUs while jOutput stays per decode GPU', () => {
+  it('normalizes disaggregated energy by all GPUs while jOutput stays per decode GPU', () => {
     const p = boundaryPoint(
       entry({
         output_tput_per_gpu: 400,
         disagg: true,
+        prefill_num_workers: 1,
+        decode_num_workers: 1,
         benchmark_type: 'single_turn',
         num_prefill_gpu: 4,
         num_decode_gpu: 4,
@@ -911,13 +935,33 @@ describe('createChartDataPoint power-boundary fields', () => {
       entry({
         output_tput_per_gpu: 400,
         disagg: true,
+        prefill_num_workers: 1,
+        decode_num_workers: 1,
         benchmark_type: 'agentic_traces',
         num_prefill_gpu: 4,
         num_decode_gpu: 4,
       }),
     );
-    expect(agentic.gpuProvisionedJPerOutputToken).toBeUndefined();
-    expect(agentic.utilityProvisionedJPerOutputToken).toBeUndefined();
+    expect(agentic.gpuProvisionedJPerOutputToken?.y).toBeCloseTo((700 * 8) / (400 * 4), 10);
+    expect(agentic.utilityProvisionedJPerOutputToken?.y).toBeCloseTo((700_000 * 8) / (400 * 4), 10);
+
+    const totalBasis = boundaryPoint(
+      entry({
+        output_tput_per_gpu: 200,
+        disagg: true,
+        prefill_num_workers: 1,
+        decode_num_workers: 1,
+        chip_basis: 'total',
+        benchmark_type: 'single_turn',
+        num_prefill_gpu: 4,
+        num_decode_gpu: 4,
+      }),
+    );
+    expect(totalBasis.gpuProvisionedJPerOutputToken?.y).toBeCloseTo(
+      p.gpuProvisionedJPerOutputToken!.y,
+      10,
+    );
+    expect(totalBasis.jOutput?.y).toBeCloseTo(700_000 / 200, 10);
   });
 });
 

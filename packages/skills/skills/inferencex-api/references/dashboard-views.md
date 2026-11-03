@@ -60,6 +60,47 @@ below the graph, including eligible unofficial overlays. PNG captions retain the
 selected basis as text. This placement is presentation-only; it adds no API
 parameter and changes no defaults, returned values or visibility rules.
 
+## Disaggregated chip basis
+
+`chipBasis` chooses which chips divide a disaggregated configuration's input and
+output throughput in the `inference`, `historical`, `calculator`, and
+`first-token` views. `pool` (the default, matching stored rows) divides input by
+prefill chips and output by decode chips; `total` divides both by every chip in
+the deployment, the basis aggregated configurations and `tput_per_gpu` always use.
+Every metric derived from those rates follows the basis: input/output tok/s/chip,
+input/output $/M tok and tokens per $1, input/output tok/s/MW, J/input and
+J/output token, and the calculator's Input and Output token types. Total
+throughput, total-token cost, measured and provisioned power boundaries, and
+aggregated rows are identical under both. Responses echo the resolved
+`params.chipBasis`; other views reject the parameter. The dashboard exposes the
+same choice as a toggle in the disaggregated-config note below the chart and
+stores it in the share URL as `g_chips=total`; on the total basis, chart titles and
+axis labels add "(All Chips)". It applies to unofficial-run overlays and to every
+page that embeds the inference chart (PowerX and the comparison pages). The
+`compare` view and comparison-page tables stay on the stored per-pool basis.
+Token revenue and the measured input/output token mix are identical under both
+bases.
+
+CSV exports whose columns depend on the basis (every inference chart export, which
+always carries input/output throughput columns; historical charts on those metrics;
+the throughput calculator; and First-Token Limits on Input or Output tokens) end with
+a `Chip basis:` note naming it. Embedded charts
+(`/embed/model/<slug>`) accept `chips=total` (or `g_chips=total`) and show the
+basis note, without the toggle, below metrics that depend on it.
+
+Legacy fixed-sequence Dynamo rows (2025-09-29 to 2025-12-05) are marked
+disaggregated but record no workers and the whole deployment in both
+`num_prefill_gpu` and `num_decode_gpu`. Most October 2025 rows store input and
+output per deployment chip; later ones store them per pool with unrecorded pool
+sizes. The total basis uses the former as stored and solves the prefill share of
+the latter exactly from `tput_per_gpu = input × p + output × (1 − p)`. Their chip
+count and provisioned power use the deployment once rather than once per pool.
+
+Stored raw rows (`/api/v1/benchmarks`) keep the per-pool basis for fixed-sequence
+and AgentX runs alike. The AgentX producer divides all three rates by every chip; ingest and a
+backfill move those rows to the per-pool basis and keep the producer's original
+rates as `input_tput_per_total_gpu` and `output_tput_per_total_gpu`.
+
 ## Historical editorial articles
 
 The GLM-5.3 article at

@@ -1671,6 +1671,90 @@ describe('mapBenchmarkRow — v3 agentic nested agg schema', () => {
     expect(m).not.toHaveProperty('server_metrics');
   });
 
+  describe('disaggregated throughput basis', () => {
+    const disaggOverrides = {
+      framework: 'dynamo-sglang',
+      disagg: true,
+      is_multinode: true,
+      prefill_tp: 4,
+      prefill_ep: 1,
+      prefill_dp_attention: false,
+      prefill_num_workers: 1,
+      decode_tp: 8,
+      decode_ep: 1,
+      decode_dp_attention: false,
+      decode_num_workers: 4,
+      num_prefill_gpu: 4,
+      num_decode_gpu: 32,
+    };
+
+    it('rescales per-total agentic rates to input per prefill chip and output per decode chip', () => {
+      const result = mapBenchmarkRow(makeV3AgenticRow(disaggOverrides), createSkipTracker())!;
+      expect(result.config.disagg).toBe(true);
+      expect(result.config.numPrefillGpu).toBe(4);
+      expect(result.config.numDecodeGpu).toBe(32);
+      const m = result.metrics;
+      expect(m.tput_per_gpu).toBeCloseTo(9043.47223, 3);
+      expect(m.input_tput_per_gpu).toBeCloseTo((8995.035 * 36) / 4, 2);
+      expect(m.output_tput_per_gpu).toBeCloseTo((48.43723 * 36) / 32, 4);
+      expect(m.input_tput_per_total_gpu).toBeCloseTo(8995.035, 3);
+      expect(m.output_tput_per_total_gpu).toBeCloseTo(48.43723, 4);
+    });
+
+    it('leaves rates alone when the producer already reports them per pool', () => {
+      const row = makeV3AgenticRow(disaggOverrides);
+      row.request_metrics.throughput.per_gpu = {
+        total_tput_tps: 9043.47223,
+        input_tput_tps: (8995.035 * 36) / 4,
+        output_tput_tps: (48.43723 * 36) / 32,
+      };
+      const m = mapBenchmarkRow(row, createSkipTracker())!.metrics;
+      expect(m.input_tput_per_gpu).toBeCloseTo((8995.035 * 36) / 4, 2);
+      expect(m.output_tput_per_gpu).toBeCloseTo((48.43723 * 36) / 32, 4);
+      expect(m).not.toHaveProperty('input_tput_per_total_gpu');
+    });
+
+    it('rescales single-node agentic rows that record a real split', () => {
+      const m = mapBenchmarkRow(
+        makeV3AgenticRow({ ...disaggOverrides, is_multinode: false }),
+        createSkipTracker(),
+      )!.metrics;
+      expect(m.input_tput_per_gpu).toBeCloseTo((8995.035 * 36) / 4, 2);
+      expect(m.input_tput_per_total_gpu).toBeCloseTo(8995.035, 3);
+    });
+
+    it('leaves agentic rows that mirror the deployment into both pool fields alone', () => {
+      const m = mapBenchmarkRow(
+        makeV3AgenticRow({
+          ...disaggOverrides,
+          prefill_num_workers: 0,
+          decode_num_workers: 0,
+          num_prefill_gpu: 8,
+          num_decode_gpu: 8,
+        }),
+        createSkipTracker(),
+      )!.metrics;
+      expect(m.input_tput_per_gpu).toBeCloseTo(8995.035, 3);
+      expect(m).not.toHaveProperty('input_tput_per_total_gpu');
+    });
+
+    it('does not touch fixed-sequence disaggregated rows', () => {
+      const m = mapBenchmarkRow(
+        makeV1Row({
+          ...disaggOverrides,
+          framework: 'dynamo-trt',
+          tput_per_gpu: 1000,
+          input_tput_per_gpu: 900,
+          output_tput_per_gpu: 100,
+        }),
+        createSkipTracker(),
+      )!.metrics;
+      expect(m.input_tput_per_gpu).toBe(900);
+      expect(m.output_tput_per_gpu).toBe(100);
+      expect(m).not.toHaveProperty('output_tput_per_total_gpu');
+    });
+  });
+
   it('re-derives *_intvty from *_itl (matching the pre-inverted artifact values)', () => {
     const tracker = createSkipTracker();
     const m = mapBenchmarkRow(makeV3AgenticRow(), tracker)!.metrics;

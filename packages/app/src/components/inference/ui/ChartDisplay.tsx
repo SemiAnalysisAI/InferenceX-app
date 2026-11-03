@@ -1,4 +1,5 @@
 'use client';
+import { chipBasisCsvNote } from '@/lib/benchmarks/chip-basis';
 import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 import { track } from '@/lib/analytics/analytics';
 import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
@@ -39,7 +40,7 @@ import {
   useInferenceDisplay,
   useInferenceFilters,
 } from '@/components/inference/InferenceContext';
-import { useGlobalFilterSelection } from '@/providers/GlobalFilterContext';
+import { useGlobalFilterActions, useGlobalFilterSelection } from '@/providers/GlobalFilterContext';
 import type {
   AggDataEntry,
   ChartDefinition,
@@ -516,7 +517,16 @@ export default function ChartDisplay({
     activeOverlayHwTypes,
     localOfficialOverride,
   } = useUnofficialRun();
-  const { tcoBasis } = useGlobalFilterSelection();
+  const { tcoBasis, chipBasis } = useGlobalFilterSelection();
+  const { setChipBasis } = useGlobalFilterActions();
+  const chipBasisControl = useMemo(
+    () => ({ value: chipBasis, onChange: setChipBasis, source: 'inference' }),
+    [chipBasis, setChipBasis],
+  );
+  const readOnlyChipBasisControl = useMemo(
+    () => ({ ...chipBasisControl, readOnly: true }),
+    [chipBasisControl],
+  );
 
   const overlayDataByChartType = useMemo(() => {
     if (!unofficialRunInfo || !getOverlayData) {
@@ -524,12 +534,19 @@ export default function ChartDisplay({
     }
 
     const overlayTokenBasis = tokenBasisForMetric(selectedYAxisMetric, tokenBasis);
-    const e2eRaw = getOverlayData(selectedModel, selectedSequence, 'e2e', overlayTokenBasis);
+    const e2eRaw = getOverlayData(
+      selectedModel,
+      selectedSequence,
+      'e2e',
+      overlayTokenBasis,
+      chipBasis,
+    );
     const interactivityRaw = getOverlayData(
       selectedModel,
       selectedSequence,
       'interactivity',
       overlayTokenBasis,
+      chipBasis,
     );
 
     const getRunForRow = (row: InferenceData) => {
@@ -639,6 +656,7 @@ export default function ChartDisplay({
     tokenRevenuePricing,
     tcoBasis,
     tokenBasis,
+    chipBasis,
     compareGpuPair,
   ]);
 
@@ -1074,7 +1092,9 @@ export default function ChartDisplay({
             `InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`,
             headers,
             rows,
-            issueNotes,
+            // The fixed input/output throughput columns follow the chip basis on
+            // every metric, not just the plotted one.
+            [...issueNotes, chipBasisCsvNote(chipBasis, locale)],
           );
         }}
       />
@@ -1351,13 +1371,20 @@ export default function ChartDisplay({
                                 : undefined
                             }
                           />
-                          {!minimalChrome && (
+                          {minimalChrome ? (
+                            <MetricAssumptionNotes
+                              selectedYAxisMetric={selectedYAxisMetric}
+                              chipBasis={readOnlyChipBasisControl}
+                              caveatsOnly
+                            />
+                          ) : (
                             <MetricAssumptionNotes
                               tcoBasis={tcoBasis}
                               selectedYAxisMetric={selectedYAxisMetric}
                               activeHwKeys={captionHwKeys}
                               userCosts={userCosts}
                               renderCostBadges={renderInferenceTcoBadges}
+                              chipBasis={chipBasisControl}
                             />
                           )}
                           {powerXLayout &&

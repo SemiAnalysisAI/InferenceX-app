@@ -530,6 +530,12 @@ minus TTFT, then divides by `output_sequence_length - 1`. The same helper powers
 the one-time `db:backfill-full-response-interactivity` data migration, keeping
 historical rows and newly ingested rows on one definition.
 
+### Disaggregated Throughput Basis
+
+Disaggregated rows store `input_tput_per_gpu` per prefill chip, `output_tput_per_gpu` per decode chip, and `tput_per_gpu` per deployment chip. The fixed-sequence producer writes that basis directly. The AgentX producer divides all three by every chip, so `etl/disagg-throughput.ts` moves multinode agentic disaggregated rows to the per-pool basis at ingest and copies the producer's rates to `input_tput_per_total_gpu` / `output_tput_per_total_gpu`.
+
+`admin:db:backfill-agentic-disagg-throughput` applies the same change to stored rows, then refreshes `latest_benchmarks`; run `admin:cache:invalidate <origin> --immediate` afterwards. The benchmark queries apply it on read too, so the app is correct before the backfill and on public-DB copies, whose sync never updates existing rows. Raw SQL readers such as the MCP server see the per-pool basis only after the backfill. A row holding either per-total key is never rescaled twice. Legacy fixed-sequence Dynamo rows (2025-09-29 to 2025-12-05) carry `disagg: true` with no workers and the whole deployment in both pool fields. Most October 2025 rows store rates per deployment chip; later ones store them per pool with unrecorded pool sizes, which the app solves from the rates themselves (`exactPerTotalChipRates` in `lib/benchmarks/chip-basis.ts`). Their chips are counted once. Agentic rows are rescaled at ingest, by the backfill and on read only when they record a real split (workers, or unequal pool fields), the same rule the app uses.
+
 ### Agentic Point-Detail Payloads
 
 The point-detail page deliberately splits its immutable trace data by use case.

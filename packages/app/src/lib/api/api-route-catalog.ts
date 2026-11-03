@@ -67,7 +67,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-calculator-view',
-    sourceSha256: '3d28ca187d502472c5754d0d29276ab9d717f08c8948db6900b83079323bebe5',
+    sourceSha256: '9262546d652a4dc4ba7ee03425891d072f020ba181202b6e2cab1e48a95018e0',
   },
   {
     source: 'src/app/api/v1/views/collectivex/route.ts',
@@ -139,7 +139,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-historical-view',
-    sourceSha256: 'd2f7768ffee4a60618ac4f9add87bbe571cc668424eb8d9f257d78fe82a546fb',
+    sourceSha256: '13b54a14adedb3725f74a5d973e588bcd9ee7a9ecd91383ea066774fea9b5683',
   },
   {
     source: 'src/app/api/v1/views/inference/route.ts',
@@ -147,7 +147,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-inference-view',
-    sourceSha256: '18d6658379e045492907836358cf5c29a1d901af6189498b519266c249244674',
+    sourceSha256: 'e61587be769b322f974fc275534e2abab57b4a936725379bda4da1cf5dea068f',
   },
   {
     source: 'src/app/api/v1/views/options/route.ts',
@@ -1372,7 +1372,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/inference/utils/equal-service-comparison.ts',
-    sourceSha256: '5d044897542c1067bff7fc3fed59669e813b6ab6b9eaf1a7ebe2f89db6645256',
+    sourceSha256: '616e2fc8b2e7bc2887390d77122a47981dc72ad78c767d8e4d954d01c40622eb',
     reviewArea: {
       en: 'Source-scoped equal-service interpolation, comparator-relative changes, endpoint provenance, prefill share projection and role points.',
       zh: '按完整来源限定的同等服务插值、相对基准变化、端点来源、prefill 占比视图以及各角色数据点。',
@@ -1388,7 +1388,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/inference/utils/power-fit.ts',
-    sourceSha256: '4e2e566d2ccfe495af23d40b83b56d7ec329792f472e6391250eb04aa269bf60',
+    sourceSha256: 'e2a2ac73954895d5af800633d989cc83ca46909e238e93cc353b1c36f44fda1a',
     reviewArea: {
       en: 'Per-source least-squares power fit on output per allocated GPU: intercept, marginal J/token, R², fitted range and registry TDP.',
       zh: '按来源对每个已分配 GPU 的输出做最小二乘功耗拟合：截距、边际 J/token、R²、拟合范围与注册表 TDP。',
@@ -1412,7 +1412,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/benchmarks/benchmark-transform.ts',
-    sourceSha256: '4a59ccf2b1190d8165e45a54aee212814282f39f3271041221abe9ff7be7a68f',
+    sourceSha256: 'ac11e6cd116976c976294533c271990932dc4ede1f1bb2c4a64028ebf523a731',
     reviewArea: {
       en: 'Raw benchmark means and derived reciprocal mean-TPOT interactivity used by Dashboard and read-only views.',
       zh: '仪表板和只读视图共用的原始 benchmark 均值与 mean TPOT 倒数形式的 interactivity。',
@@ -1594,7 +1594,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/inference/hooks/interpolated-trend-core.ts',
-    sourceSha256: '231c59a712838f58eabce02767abcdfbc48defcd5e6bc1ad9c8c939ee308cf95',
+    sourceSha256: '4c8afca48834b3998c78422e04c6c5bd7357844a1fac816e7f838f06a8df0d61',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1621,7 +1621,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/calculator/throughput-data.ts',
-    sourceSha256: '9dbf3e828140b50023724ce129e25db90ce358ceed1e4051871d43a62ec267ef',
+    sourceSha256: '5646735ab4b3bd614b3ced464d44ecedb47a2097d3ea4140991375f02b2ea6cc',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1639,7 +1639,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/calculator-extensions.ts',
-    sourceSha256: 'e2e3ecf4e5f5e0561d81c3eceee1b5d497011e3cd9a1182328cce6ec721ca7f9',
+    sourceSha256: '8204200a643c6ed136ccc0f0b63937ccea1ccb9e09cc34198281f170795ff084',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1648,7 +1648,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/source.ts',
-    sourceSha256: '4d2a0b9d81ea157923b2ca38a94133d037316f5b4623e52a322ecf0222eedc95',
+    sourceSha256: '851f3b926dc08c52b2c8a32d9fc7fe18e12288e04167977d1efa3734e96217c8',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1666,7 +1666,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/series.ts',
-    sourceSha256: '56d51db6c3d6b49417692ad822076d57935439ea21a907e19f72cb48a9cb6c80',
+    sourceSha256: 'c858c8dd58f50167459afda9ca1ab662bb76daae8f1892847e7e65ac526c1b13',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1675,7 +1675,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: 'a1a76ac24c31ae92c6dee1e92df788a5337c5c7b3a1238a2fea2f26ad463f980',
+    sourceSha256: 'c7ab94562fea89409e03806ac560442765d86b123b21740af8645b5175a98d65',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1684,7 +1684,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/params.ts',
-    sourceSha256: '00dd4d4b6bd360e4ce7ea26027bd60a01693901f380ed772e212897dc6202a64',
+    sourceSha256: '21f92834ef015f770573923da19085fdb92a4cff9115c5e106b8c7e632cfed46',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1879,7 +1879,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/benchmarks.ts',
-    sourceSha256: '8e9a09b505a8d01ca0660116d87692ac3c8ad57a5bf80bbde7fb041bf90acf22',
+    sourceSha256: '3c1c7bf08d1b7bb137391d68cd134e95a61b266611aee7ef3dd323714a61bb1d',
     reviewArea: {
       en: 'Benchmark row fields and latest, exact-run, history, and TCO query semantics.',
       zh: '基准行字段以及最新、精确运行、历史和 TCO 查询语义。',

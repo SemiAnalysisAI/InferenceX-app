@@ -11,6 +11,7 @@ import type { BlockedComparisonToggle } from './utils/comparison-exclusion';
 import type { XAxisMode } from './hooks/chart-data-core';
 import type { PowerBasis } from '@/lib/power/power-basis';
 import type { TokenBasis } from '@/lib/benchmarks/benchmark-transform';
+import type { ChipBasis } from '@/lib/benchmarks/chip-basis';
 
 export type { WorkerPower };
 
@@ -129,6 +130,8 @@ export interface AggDataEntry {
   curve_date?: string;
   curve_workflow_run_id?: number;
   benchmark_type?: string;
+  /** Set to 'total' when input/output rates were rescaled to every deployment chip. */
+  chip_basis?: ChipBasis;
   isl?: number | null;
   osl?: number | null;
   offload_mode?: string;

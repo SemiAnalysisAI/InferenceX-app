@@ -509,3 +509,83 @@ describe('buildInferenceSeries', () => {
     expect(result.metric.polarity).toBe('higher');
   });
 });
+
+function isDisagg(entry: { hwKey: string }): boolean {
+  return entry.hwKey.includes('dynamo');
+}
+
+describe('buildInferenceSeries — chip basis', () => {
+  function disaggRows(): BenchmarkRow[] {
+    return [16, 64].map((conc) =>
+      makeRow({
+        hardware: 'gb300',
+        framework: 'dynamo-sglang',
+        disagg: true,
+        is_multinode: true,
+        prefill_num_workers: 1,
+        decode_num_workers: 1,
+        num_prefill_gpu: 4,
+        num_decode_gpu: 12,
+        conc,
+        metrics: metrics({
+          median_intvty: conc === 16 ? 40 : 12.5,
+          tput_per_gpu: 1000,
+          input_tput_per_gpu: 3600,
+          output_tput_per_gpu: 133,
+        }),
+      }),
+    );
+  }
+  const rows = () => [...disaggRows(), ...fixtureRows()];
+
+  it.each(['y_outputTputPerGpu', 'y_inputTputPerGpu', 'y_costhOutput'] as const)(
+    'matches the dashboard transform for %s under both bases',
+    (metricConfigKey) => {
+      const field = metricConfigKey.slice(2);
+      for (const chipBasis of ['pool', 'total'] as const) {
+        const result = buildInferenceSeries(rows(), {
+          ...BASE_OPTIONS,
+          metricConfigKey,
+          chipBasis,
+        });
+        const { chartData } = transformBenchmarkRows(
+          rows(),
+          'p90',
+          undefined,
+          undefined,
+          chipBasis,
+        );
+        const expected = new Map(
+          chartData[0].map((d) => [
+            `${String(d.hwKey)}|${d.conc}`,
+            (d as unknown as Record<string, { y: number } | undefined>)[field]?.y,
+          ]),
+        );
+        expect(result.series.length).toBeGreaterThan(1);
+        for (const entry of result.series) {
+          for (const point of entry.points) {
+            expect(point.y).toBe(expected.get(`${entry.hwKey}|${point.concurrency}`));
+          }
+        }
+      }
+    },
+  );
+
+  it('rescales only disaggregated series', () => {
+    const series = (chipBasis: 'pool' | 'total') =>
+      buildInferenceSeries(rows(), {
+        ...BASE_OPTIONS,
+        metricConfigKey: 'y_outputTputPerGpu',
+        chipBasis,
+      }).series;
+    const pool = series('pool');
+    const total = series('total');
+    expect(pool.find(isDisagg)!.points.map((p) => p.y)).toEqual([133, 133]);
+    for (const point of total.find(isDisagg)!.points) {
+      expect(point.y).toBeCloseTo((133 * 12) / 16, 9);
+    }
+    const aggregatedY = (entries: typeof pool) =>
+      entries.filter((entry) => !isDisagg(entry)).flatMap((entry) => entry.points.map((p) => p.y));
+    expect(aggregatedY(total)).toEqual(aggregatedY(pool));
+  });
+});
