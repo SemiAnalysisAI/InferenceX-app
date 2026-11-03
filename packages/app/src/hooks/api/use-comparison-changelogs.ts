@@ -1,8 +1,12 @@
-import { useQueries } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
-import { type ChangelogRow, type RunConfigRow, type WorkflowInfoResponse } from '@/lib/api/api';
-import { workflowInfoQueryOptions } from '@/hooks/api/use-workflow-info';
+import {
+  type ChangelogRow,
+  type RunConfigRow,
+  type WorkflowChangelogDate,
+  fetchWorkflowChangelogs,
+} from '@/lib/api/api';
 
 export interface ComparisonChangelogEntry {
   config_keys: string[];
@@ -47,20 +51,28 @@ export function useComparisonChangelogs(
     selectedDateRange.endDate,
   ]);
 
-  const queries = useQueries({
-    queries: datesToQuery.map((date) => workflowInfoQueryOptions(date, benchmarkType, hasGPUs)),
+  const from = datesToQuery.reduce((min, d) => (d < min ? d : min), datesToQuery[0] ?? '');
+  const to = datesToQuery.reduce((max, d) => (d > max ? d : max), datesToQuery[0] ?? '');
+
+  const query = useQuery({
+    queryKey: benchmarkType
+      ? (['workflow-changelogs', from, to, benchmarkType] as const)
+      : (['workflow-changelogs', from, to] as const),
+    queryFn: ({ signal }: { signal: AbortSignal }) =>
+      fetchWorkflowChangelogs(from, to, signal, benchmarkType),
+    enabled: hasGPUs && datesToQuery.length > 0,
   });
+  const rangeData = query.data;
 
   const changelogs = useMemo(() => {
     if (!hasGPUs) return [];
 
+    const byDate = new Map<string, WorkflowChangelogDate>(rangeData?.dates.map((d) => [d.date, d]));
     const results: ComparisonChangelog[] = [];
 
-    for (let i = 0; i < datesToQuery.length; i++) {
-      const query = queries[i];
-      if (!query.data) continue;
-
-      const data = query.data as WorkflowInfoResponse;
+    for (const date of datesToQuery) {
+      const data = byDate.get(date);
+      if (!data) continue;
       if (!data.changelogs || data.changelogs.length === 0) continue;
 
       const entriesByRun = new Map<number, ChangelogRow[]>();
@@ -90,7 +102,7 @@ export function useComparisonChangelogs(
         .filter((r) => r.entries.length > 0);
 
       results.push({
-        date: datesToQuery[i],
+        date,
         entries: data.changelogs.map((c: ChangelogRow) => ({
           config_keys: c.config_keys,
           description: c.description,
@@ -102,9 +114,9 @@ export function useComparisonChangelogs(
     }
 
     return results;
-  }, [hasGPUs, datesToQuery, queries]);
+  }, [hasGPUs, datesToQuery, rangeData]);
 
-  const loading = queries.some((q) => q.isLoading);
+  const loading = query.isLoading;
 
   return { changelogs, loading, totalDatesQueried: datesToQuery.length };
 }
