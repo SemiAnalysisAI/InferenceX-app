@@ -19,6 +19,16 @@ export interface Quote {
 
 export const QUOTES: Quote[] = [
   {
+    text: 'Making AI infrastructure accessible to more developers starts with measuring how real-world, multi-turn agentic workloads, including context growth and prefix-cache reuse, perform in production. We welcome open-source, reproducible benchmarks like InferenceX that highlight the cost efficiency and interactivity of Google TPUs, running open software, giving developers transparent data to deploy at scale and with confidence.',
+    textZh:
+      '要让更多开发者用上 AI 基础设施，首先需要测量真实的多轮智能体工作负载在生产环境中的表现，包括上下文增长和前缀缓存复用。我们欢迎 InferenceX 这样的开源、可复现基准测试，展示 Google TPU 运行开放软件时的成本效率和交互性能，为开发者提供透明的数据，让他们有信心进行大规模部署。',
+    name: 'Bill Jia',
+    title: 'VP of Engineering at Google',
+    titleZh: 'Google 工程副总裁',
+    org: 'Google',
+    logo: 'google-color.svg',
+  },
+  {
     text: "Ray Serve LLM's mission is to be best way to scale Ray-native LLM inference, including ergonomic Python APIs for low-latency serving across heterogeneous clusters and inference engines. Having transparent benchmark runs with engine configurations available gives us trusted reference datapoints to compare against. This makes InferenceX particularly helpful for understanding serving performance and ensuring Ray Serve LLM stays lightweight and performant.",
     textZh:
       'Ray Serve LLM 的使命是成为扩展 Ray 原生 LLM 推理的最佳方式，其中包括提供易用的 Python API，支持跨异构集群和推理引擎的低延迟服务。公开透明的基准测试运行记录及其引擎配置，为我们提供了可信赖的参考数据，便于对比。这让 InferenceX 对理解推理服务性能、确保 Ray Serve LLM 保持轻量且高性能尤其有帮助。',
@@ -579,7 +589,7 @@ export const QUOTES: Quote[] = [
 ];
 
 export const CAROUSEL_ORGS = [
-  'Anyscale',
+  'Google',
   'MiniMax',
   'Moonshot AI',
   'Alibaba Qwen',

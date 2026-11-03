@@ -46,7 +46,7 @@ export const CURATED_SUPPORTER_GROUPS: SupporterGroup[] = [
         logo: 'meta.svg',
         quoteOrg: 'Meta Superintelligence Labs',
       },
-      { label: 'Google', logo: 'google-color.svg' },
+      { label: 'Google', logo: 'google-color.svg', quoteOrg: 'Google' },
       { label: 'Periodic Labs', logo: 'periodic-labs.png', quoteOrg: 'Periodic Labs' },
       { label: 'Prime Intellect', logo: 'prime-intellect.svg', quoteOrg: 'Prime Intellect' },
       { label: 'Adaptive ML', logo: 'adaptive-ml.svg', quoteOrg: 'Adaptive ML' },

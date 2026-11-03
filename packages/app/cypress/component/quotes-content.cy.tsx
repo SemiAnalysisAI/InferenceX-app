@@ -71,6 +71,42 @@ describe('QuotesContent', () => {
     }
   });
 
+  it('renders Bill Jia’s Google quote with localized attribution and a working logo jump', () => {
+    for (const locale of ['en', 'zh'] as const) {
+      cy.mount(<QuotesContent locale={locale} />);
+      cy.get('#quote-google').within(() => {
+        cy.get('p').should(
+          'have.text',
+          locale === 'en'
+            ? '“Making AI infrastructure accessible to more developers starts with measuring how real-world, multi-turn agentic workloads, including context growth and prefix-cache reuse, perform in production. We welcome open-source, reproducible benchmarks like InferenceX that highlight the cost efficiency and interactivity of Google TPUs, running open software, giving developers transparent data to deploy at scale and with confidence.”'
+            : '“要让更多开发者用上 AI 基础设施，首先需要测量真实的多轮智能体工作负载在生产环境中的表现，包括上下文增长和前缀缓存复用。我们欢迎 InferenceX 这样的开源、可复现基准测试，展示 Google TPU 运行开放软件时的成本效率和交互性能，为开发者提供透明的数据，让他们有信心进行大规模部署。”',
+        );
+        cy.get('footer')
+          .should('contain.text', 'Bill Jia')
+          .and(
+            'contain.text',
+            locale === 'en' ? 'VP of Engineering at Google' : 'Google 工程副总裁',
+          );
+        cy.get('img[alt="Google"]')
+          .should('have.attr', 'src', '/logos/google-color.svg')
+          .and(($logo) => {
+            expect(($logo[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
+          });
+      });
+      cy.window().then((win) => {
+        cy.stub(win.Element.prototype, 'scrollIntoView').as('googleScroll');
+      });
+      cy.get('[data-testid="supporter-logo-wall"] img[alt="Google"]').closest('button').click();
+      cy.get('@googleScroll').should((stub) => {
+        const calls = (stub as unknown as { getCalls: () => { thisValue: Element }[] }).getCalls();
+        expect(calls.some((call) => call.thisValue.id === 'quote-google')).to.equal(true);
+      });
+      cy.get('@googleScroll').then((stub) => {
+        (stub as unknown as { restore: () => void }).restore();
+      });
+    }
+  });
+
   it('shows supporter logos in full color in light mode', () => {
     cy.get('button[aria-label^="Jump to"] img').each(($logo) => {
       const style = getComputedStyle($logo[0]);
