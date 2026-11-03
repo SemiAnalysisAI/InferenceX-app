@@ -78,7 +78,12 @@ function sqlFor(db: PGlite): Sql & DbClient {
   const makeTag = (client: Pick<PGlite, 'query'>): Sql => {
     const tag = async (strings: TemplateStringsArray, ...values: unknown[]) => {
       const query = strings.reduce((text, part, i) => text + (i ? `$${i}` : '') + part, '');
-      const result = await client.query<Record<string, unknown>>(query, values.map(bind));
+      // postgres.js serializes any parameter bound to a scalar jsonb slot with JSON.stringify,
+      // strings included, so a pre-serialized string is stored as a jsonb string.
+      const params = values.map((value, i) =>
+        /^::jsonb(?!\[)/u.test(strings[i + 1] ?? '') ? JSON.stringify(value) : bind(value),
+      );
+      const result = await client.query<Record<string, unknown>>(query, params);
       return result.rows;
     };
     return Object.assign(tag, {
@@ -394,6 +399,51 @@ it('reads requested compact run revisions in one query with full single-read par
     expect(await getOperatorXRunComparisons(sql, current, 'gemm')).toEqual(new Map());
     const missing = { ...captured, run_id: 'not-stored' };
     expect(await getOperatorXRunComparisons(sql, [missing], 'gemm')).toEqual(new Map());
+  } finally {
+    await db.close();
+  }
+});
+
+it('stores comparisons as JSON objects and still reads double-encoded legacy rows', async () => {
+  const db = new PGlite();
+  try {
+    await migrate(db);
+    const sql = sqlFor(db);
+    await saveOperatorXBundle(sql, bundle());
+    const stored = await db.query<{ t: string }>(
+      'SELECT DISTINCT jsonb_typeof(comparison) AS t FROM opx_run_comparisons',
+    );
+    expect(stored.rows).toEqual([{ t: 'object' }]);
+
+    const expected = await getOperatorXRunComparison(sql, '123', 'gemm');
+    // Rows written before the fix hold the comparison as a jsonb string.
+    await db.exec(
+      `UPDATE opx_run_comparisons SET comparison = to_jsonb(comparison::text) WHERE op = 'gemm'`,
+    );
+    expect(await getOperatorXRunComparison(sql, '123', 'gemm')).toEqual(expected);
+  } finally {
+    await db.close();
+  }
+});
+
+it('reads comparisons for more runs than one batch holds', async () => {
+  const db = new PGlite();
+  try {
+    await migrate(db);
+    const sql = sqlFor(db);
+    const keys = Array.from({ length: 19 }, (_, i) => String(1000 + i));
+    for (const key of keys) {
+      const run = bundle();
+      run.run.run_id = key;
+      await saveOperatorXBundle(sql, run);
+    }
+    const comparisons = await getOperatorXRunComparisons(
+      sql,
+      keys.map((run_id) => ({ run_id })),
+      'gemm',
+    );
+    expect([...comparisons.keys()].toSorted()).toEqual(keys);
+    expect([...comparisons.values()].every((c) => c.op === 'gemm')).toBe(true);
   } finally {
     await db.close();
   }

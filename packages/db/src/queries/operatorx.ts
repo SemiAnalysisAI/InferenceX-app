@@ -93,29 +93,50 @@ export async function getOperatorXRunComparison(
   return comparisons.get(runKey) ?? null;
 }
 
-/** Read the listed revisions in one query; absent/old projections use raw fallback. */
+/**
+ * Runs per comparison read. Neon's HTTP driver rejects responses over 64 MiB, and one
+ * run's gemm comparison reaches ~5 MiB, so a single query over every run overflows.
+ */
+const COMPARISON_READ_BATCH = 8;
+
+/**
+ * Comparisons written before the encoding fix were double-encoded: the driver
+ * JSON-encoded an already-serialized string into a jsonb string scalar.
+ */
+function storedComparison(value: unknown): Comparison {
+  return (typeof value === 'string' ? JSON.parse(value) : value) as Comparison;
+}
+
+/** Read the listed revisions in bounded batches; absent/old projections use raw fallback. */
 export async function getOperatorXRunComparisons(
   sql: DbClient,
   runs: Pick<OperatorXRunRef, 'run_id' | 'revision'>[],
   op: ComparisonOp,
 ): Promise<Map<string, Comparison>> {
-  if (runs.length === 0) return new Map();
-  const requested = JSON.stringify(
-    runs.map((run) => ({
-      run_key: run.run_id,
-      revision: run.revision ?? null,
-    })),
-  );
+  const comparisons = new Map<string, Comparison>();
   try {
-    const rows = await sql`
-      SELECT r.run_key, c.comparison
-      FROM jsonb_to_recordset(${requested}::jsonb) AS requested(run_key text, revision text)
-      JOIN opx_runs r ON r.run_key = requested.run_key
-        AND (requested.revision IS NULL OR r.id::text = requested.revision)
-      JOIN opx_run_comparisons c ON c.run_id = r.id
-      WHERE c.op = ${op} AND c.format_version = ${OPERATORX_COMPARISON_VERSION}
-    `;
-    return new Map(rows.map((row) => [String(row.run_key), row.comparison as Comparison]));
+    for (let i = 0; i < runs.length; i += COMPARISON_READ_BATCH) {
+      // An object, not a string or array: Neon's HTTP driver and postgres.js both JSON-encode
+      // it exactly once (Neon turns arrays into Postgres arrays; postgres.js re-encodes strings).
+      const requested = {
+        runs: runs.slice(i, i + COMPARISON_READ_BATCH).map((run) => ({
+          run_key: run.run_id,
+          revision: run.revision ?? null,
+        })),
+      };
+      const rows = await sql`
+        SELECT r.run_key, c.comparison
+        FROM jsonb_to_recordset((${requested as never}::jsonb) -> 'runs')
+          AS requested(run_key text, revision text)
+        JOIN opx_runs r ON r.run_key = requested.run_key
+          AND (requested.revision IS NULL OR r.id::text = requested.revision)
+        JOIN opx_run_comparisons c ON c.run_id = r.id
+        WHERE c.op = ${op} AND c.format_version = ${OPERATORX_COMPARISON_VERSION}
+      `;
+      for (const row of rows)
+        comparisons.set(String(row.run_key), storedComparison(row.comparison));
+    }
+    return comparisons;
   } catch (error) {
     if (typeof error === 'object' && error !== null && 'code' in error && error.code === '42P01')
       return new Map();
@@ -132,10 +153,12 @@ async function writeRunComparisons(
   dataset.run.revision = revision;
   for (const op of OPERATORX_COMPARISON_OPS) {
     const comparison = buildRunComparison(op, { runner, dataset });
+    // Pass the object: postgres.js serializes jsonb parameters itself, so a
+    // pre-stringified value would be stored as a jsonb string.
     await tx`
       INSERT INTO opx_run_comparisons (run_id, op, format_version, comparison)
       VALUES (${revision}, ${op}, ${OPERATORX_COMPARISON_VERSION},
-              ${JSON.stringify(comparison)}::jsonb)
+              ${comparison as never}::jsonb)
       ON CONFLICT (run_id, op) DO UPDATE
       SET format_version = EXCLUDED.format_version, comparison = EXCLUDED.comparison
     `;

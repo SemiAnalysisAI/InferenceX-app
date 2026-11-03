@@ -84,7 +84,10 @@ is not cached. Local-directory sources keep the raw path.
 
 ### Bulk compact reads
 
-One SQL query loads the listed run revisions; merging keeps newest-first order.
+Compact reads load the listed run revisions in batches of eight, since Neon's HTTP
+driver rejects responses over 64 MiB and one run's GEMM comparison reaches ~5 MiB;
+merging keeps newest-first order. Projections are written as JSON objects. Rows
+written before that fix hold a double-encoded jsonb string and are parsed on read.
 Missing/stale projections alone use bounded raw fallback; only a missing table
 suppresses a SQL error. Responses and timeline identities are preserved.
 
