@@ -38,12 +38,15 @@ export function pointsIn(scope: JQuery | Element): ScatterPoint[] {
     });
 }
 
-Cypress.Commands.addQuery(
-  'scatterPoints',
-  (scope: string = SCATTER_GRAPH) =>
-    () =>
-      pointsIn(Cypress.$(scope)),
-);
+export function registerScatterPointsQuery(): void {
+  if ('scatterPoints' in cy) return;
+  Cypress.Commands.addQuery(
+    'scatterPoints',
+    (scope: string = SCATTER_GRAPH) =>
+      () =>
+        pointsIn(Cypress.$(scope)),
+  );
+}
 
 export const visiblePoints = (points: ScatterPoint[]): ScatterPoint[] =>
   points.filter((point) => point.opacity !== 0);
