@@ -1621,7 +1621,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/calculator/throughput-data.ts',
-    sourceSha256: '9015f88f84f45c2fa47ef8e869f0630c59ca415e6b2cca01cb516fd9b83844da',
+    sourceSha256: '5646735ab4b3bd614b3ced464d44ecedb47a2097d3ea4140991375f02b2ea6cc',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
