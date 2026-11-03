@@ -596,6 +596,17 @@ export const QUOTES: Quote[] = [
     org: 'Morph LLM',
     logo: 'morph.svg',
   },
+  {
+    text: "Delivering cheap, reliable inference for long horizon agents depends on understanding exactly how hardware and serving software perform at different points on the throughput-latency curve. InferenceX's excellent open, continuously updated benchmarks support the work that our research team do to ensure that we are always driving the most cost efficient way to serve each model across our heterogeneous fleet.",
+    textZh:
+      '要为长周期智能体（long-horizon agents）提供低成本、可靠的推理服务，就必须准确理解硬件和推理服务软件在吞吐量-延迟曲线各个位置上的实际表现。InferenceX 出色的开放、持续更新的基准测试，为我们研究团队的工作提供了有力支撑，帮助我们始终在异构集群上以最具成本效益的方式部署每一个模型。',
+    name: 'Meryem Arik',
+    title: 'Co-Founder & CEO, Doubleword',
+    titleZh: 'Doubleword 联合创始人兼首席执行官',
+    org: 'Doubleword',
+    logo: 'doubleword.png',
+    link: 'https://www.doubleword.ai/',
+  },
 ];
 
 export const CAROUSEL_ORGS = [
