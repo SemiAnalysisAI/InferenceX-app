@@ -221,6 +221,7 @@ export function GlobalFilterProvider({
   initialPrecisions,
   initialRunDate,
   initialRunId,
+  initialChipBasis,
 }: {
   children: ReactNode;
   initialModel?: Model;
@@ -228,6 +229,8 @@ export function GlobalFilterProvider({
   initialPrecisions?: string[];
   initialRunDate?: string;
   initialRunId?: string;
+  /** Starting chip basis for surfaces without URL state, such as embeds. */
+  initialChipBasis?: ChipBasis;
 }) {
   const { getUrlParam, setUrlParams } = useUrlState();
 
@@ -297,7 +300,7 @@ export function GlobalFilterProvider({
 
   const [requestedRunId, setRequestedRunId] = useState<string>(() => initialRunId ?? '');
   const [tcoBasis, setTcoBasis] = useState<TcoBasis>(DEFAULT_TCO_BASIS);
-  const [chipBasis, setChipBasis] = useState<ChipBasis>(DEFAULT_CHIP_BASIS);
+  const [chipBasis, setChipBasis] = useState<ChipBasis>(initialChipBasis ?? DEFAULT_CHIP_BASIS);
 
   useIsomorphicLayoutEffect(() => {
     refreshUrlParams();

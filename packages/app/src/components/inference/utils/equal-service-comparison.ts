@@ -196,16 +196,7 @@ export function getEqualServiceSources(
 function deploymentOutput(point: InferenceData): number | undefined {
   if (!isPositive(point.output_tput_per_gpu)) return undefined;
   if (point.disagg) {
-    return (
-      powerBasisNormalization({
-        output_tput_per_gpu: point.output_tput_per_gpu,
-        disagg: true,
-        benchmark_type: point.benchmark_type,
-        chip_basis: point.chip_basis,
-        num_prefill_gpu: point.num_prefill_gpu ?? 0,
-        num_decode_gpu: point.num_decode_gpu ?? 0,
-      }).totalOutputTokPerSec ?? undefined
-    );
+    return powerBasisNormalization(point).totalOutputTokPerSec ?? undefined;
   }
   const count = point.physicalChips ?? point.tp;
   return isPositive(count) && Number.isSafeInteger(count)

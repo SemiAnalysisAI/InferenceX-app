@@ -1,5 +1,6 @@
 'use client';
 
+import { chipBasisCsvNote } from '@/lib/benchmarks/chip-basis';
 import { ControlPanel } from '@/components/ui/control-panel';
 import { MobileControlSection } from '@/components/ui/mobile-control-section';
 import { track } from '@/lib/analytics/analytics';
@@ -726,8 +727,11 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
       const config = hardwareConfig[hwKey] || getHardwareConfig(hwKey);
       return config ? getDisplayLabel(config) : hwKey;
     });
-    exportToCsv(`InferenceX_calculator_${selectedModel}`, headers, rows);
-  }, [results, targetValue, hardwareConfig]);
+    // Input and output columns follow the chip basis on disaggregated rows.
+    exportToCsv(`InferenceX_calculator_${selectedModel}`, headers, rows, [
+      chipBasisCsvNote(chipBasis, locale),
+    ]);
+  }, [results, targetValue, hardwareConfig, chipBasis, locale]);
 
   const handleViewModeChange = useCallback((value: CalculatorViewMode) => {
     setViewMode(value);

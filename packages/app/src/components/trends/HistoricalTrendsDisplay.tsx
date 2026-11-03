@@ -1,5 +1,6 @@
 'use client';
 
+import { CHIP_BASIS_METRICS, chipBasisCsvNote } from '@/lib/benchmarks/chip-basis';
 import { track } from '@/lib/analytics/analytics';
 import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -451,7 +452,14 @@ export default function HistoricalTrendsDisplay() {
                   targetInteractivity,
                   isAgentic ? 'p90' : 'median',
                 );
-                exportToCsv(`InferenceX_historical_${selectedModel}`, headers, rows);
+                exportToCsv(
+                  `InferenceX_historical_${selectedModel}`,
+                  headers,
+                  rows,
+                  CHIP_BASIS_METRICS.has(selectedYAxisMetric)
+                    ? [chipBasisCsvNote(chipBasis, locale)]
+                    : [],
+                );
               }}
             />
             <Card>

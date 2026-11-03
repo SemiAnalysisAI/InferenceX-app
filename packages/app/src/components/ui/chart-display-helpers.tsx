@@ -19,6 +19,7 @@ import type { Locale } from '@/lib/i18n/i18n';
 import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/catalog/constants';
 import type { ChipBasisControl } from '@/components/ui/chip-basis-note';
 import { ChipBasisToggle } from '@/components/ui/chip-basis-toggle';
+import { CHIP_BASIS_METRICS } from '@/lib/benchmarks/chip-basis';
 
 const POWER_SOURCE_METRICS = new Set(['y_tpPerMw', 'y_inputTputPerMw', 'y_outputTputPerMw']);
 const PER_TOKEN_TYPE_POWER_METRICS = new Set(['y_inputTputPerMw', 'y_outputTputPerMw']);
@@ -174,7 +175,7 @@ function DisaggCaveat({
         }`}
       >
         <p>{content}</p>
-        {chipBasis && visible && (
+        {chipBasis && !chipBasis.readOnly && visible && (
           <ChipBasisToggle
             value={chipBasis.value}
             onValueChange={chipBasis.onChange}
@@ -217,6 +218,7 @@ export function MetricAssumptionNotes({
   userCosts,
   renderCostBadges,
   chipBasis,
+  caveatsOnly = false,
 }: {
   selectedYAxisMetric: string;
   activeHwKeys?: ReadonlySet<string> | readonly string[];
@@ -234,6 +236,8 @@ export function MetricAssumptionNotes({
    * metric that divides input or output throughput describes it and offers the toggle.
    */
   chipBasis?: ChipBasisControl;
+  /** Render only the disaggregated caveats, without sources or cost badges (embeds). */
+  caveatsOnly?: boolean;
 }) {
   const locale = useLocale();
   const activeBases = useMemo(() => {
@@ -290,9 +294,11 @@ export function MetricAssumptionNotes({
         })
       : null;
 
+  if (caveatsOnly && !CHIP_BASIS_METRICS.has(selectedYAxisMetric)) return null;
+
   return (
     <>
-      {showPowerSource && (
+      {!caveatsOnly && showPowerSource && (
         <>
           <MetricBadges label={powerLabel} values={filterToActive(POWER_VALUES)} />
           <SourceLink
@@ -303,7 +309,7 @@ export function MetricAssumptionNotes({
           </SourceLink>
         </>
       )}
-      {costValues && (
+      {!caveatsOnly && costValues && (
         <>
           {editableCostBadges ?? (
             <MetricBadges
@@ -345,7 +351,7 @@ export function MetricAssumptionNotes({
           chipBasis={chipBasis}
         />
       )}
-      {showJouleSource && (
+      {!caveatsOnly && showJouleSource && (
         <>
           <MetricBadges label={powerLabel} values={filterToActive(POWER_VALUES)} />
           <SourceLink

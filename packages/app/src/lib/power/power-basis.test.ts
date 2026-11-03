@@ -4,7 +4,7 @@ import type { BenchmarkRow } from '@/lib/api/api';
 import { rowToAggDataEntry, transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
 import { withChipBasis } from '@/lib/benchmarks/chip-basis';
 import { buildDerivedChartFields, getHardwareKey } from '@/lib/charts/chart-utils';
-import { POWER_BASIS_FIELDS } from '@/lib/power/power-basis';
+import { POWER_BASIS_FIELDS, powerBasisNormalization } from '@/lib/power/power-basis';
 import { SYSTEM_POWER_CATEGORIES } from '@/lib/power/system-power-model';
 import { Sequence } from '@/lib/catalog/data-mappings';
 import { buildInferenceSeries } from '@/lib/views-api/series';
@@ -334,5 +334,46 @@ describe('J per total token at every power boundary', () => {
       ['it-modeled', official.itModeledJPerTotalToken?.y],
       ['utility-modeled', official.utilityModeledJPerTotalToken?.y],
     ]);
+  });
+});
+
+describe('powerBasisNormalization — legacy unsplit disaggregated rows', () => {
+  // Both pool fields hold the whole deployment (8) with no workers. The hidden
+  // split is 1 prefill + 7 decode chips; 7200 tok/s total at ISL:OSL 8192:1024.
+  const legacy = () =>
+    row({
+      disagg: true,
+      is_multinode: false,
+      prefill_num_workers: 0,
+      decode_num_workers: 0,
+      num_prefill_gpu: 8,
+      num_decode_gpu: 8,
+      isl: 8192,
+      osl: 1024,
+      metrics: {
+        ...row().metrics,
+        tput_per_gpu: 900,
+        input_tput_per_gpu: 6400,
+        output_tput_per_gpu: 800 / 7,
+      },
+    });
+
+  it.each(['pool', 'total'] as const)(
+    'allocates the deployment once and recovers its output on the %s basis',
+    (basis) => {
+      const entry = rowToAggDataEntry(withChipBasis(legacy(), basis));
+      expect(entry.physicalChips).toBe(8);
+      const { allocatedGpus, totalOutputTokPerSec } = powerBasisNormalization(entry);
+      expect(allocatedGpus).toBe(8);
+      expect(totalOutputTokPerSec).toBeCloseTo(800, 9);
+    },
+  );
+
+  it('withholds the normalization when the token mix is unknown', () => {
+    const entry = rowToAggDataEntry(legacy());
+    expect(powerBasisNormalization({ ...entry, isl: null, osl: null })).toEqual({
+      allocatedGpus: null,
+      totalOutputTokPerSec: null,
+    });
   });
 });

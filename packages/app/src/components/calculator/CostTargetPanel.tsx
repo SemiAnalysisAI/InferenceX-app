@@ -1,6 +1,6 @@
 'use client';
 
-import { useGlobalFilterSelection } from '@/providers/GlobalFilterContext';
+import { useGlobalFilterActions, useGlobalFilterSelection } from '@/providers/GlobalFilterContext';
 
 import Link from 'next/link';
 import { useCallback, useMemo, useState } from 'react';
@@ -8,6 +8,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { track } from '@/lib/analytics/analytics';
 import type { HardwareConfig } from '@/components/inference/types';
 import { Card } from '@/components/ui/card';
+import { ChipBasisNote } from '@/components/ui/chip-basis-note';
 import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
@@ -131,6 +132,11 @@ export default function CostTargetPanel({
   onMwInputChange,
 }: CostTargetPanelProps) {
   const { tcoBasis, chipBasis } = useGlobalFilterSelection();
+  const { setChipBasis } = useGlobalFilterActions();
+  const chipBasisControl = useMemo(
+    () => ({ value: chipBasis, onChange: setChipBasis, source: 'calculator_costcap' }),
+    [chipBasis, setChipBasis],
+  );
   const locale = useLocale();
   const t = STRINGS[locale];
 
@@ -319,19 +325,14 @@ export default function CostTargetPanel({
                     testId="calculator-costcap-table"
                     analyticsPrefix="calculator_costcap_table"
                   />
-                  {hasDisagg && (
-                    <p
-                      data-testid="calculator-costcap-disagg-note"
-                      className={`text-muted-foreground text-xs border-l-2 pl-2 py-1 ${
-                        chipBasis === 'total'
-                          ? 'border-sky-500 bg-sky-500/5'
-                          : 'border-amber-500 bg-amber-500/5'
-                      }`}
-                    >
-                      <strong>{t.note}</strong>
-                      {chipBasis === 'total' ? t.disaggFleetTotal : t.disaggFleet}
-                    </p>
-                  )}
+                  <ChipBasisNote
+                    visible={hasDisagg}
+                    testId="calculator-costcap-disagg-note"
+                    label={t.note}
+                    text={chipBasis === 'total' ? t.disaggFleetTotal : t.disaggFleet}
+                    chipBasis={chipBasisControl}
+                    showToggle={costType !== 'total'}
+                  />
                   <p className="text-xs text-muted-foreground mt-3">
                     {t.assumptions(getCostProviderLabel(costProvider))}
                   </p>

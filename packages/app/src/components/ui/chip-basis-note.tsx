@@ -8,6 +8,8 @@ export interface ChipBasisControl {
   onChange: (basis: ChipBasis) => void;
   /** Analytics `source` for the toggle. */
   source: string;
+  /** Describe the basis without offering the toggle (embeds). */
+  readOnly?: boolean;
 }
 
 /**
@@ -49,7 +51,7 @@ export function ChipBasisNote({
           <strong>{label}</strong>
           {text}
         </p>
-        {visible && showToggle && (
+        {visible && showToggle && !chipBasis.readOnly && (
           <ChipBasisToggle
             value={chipBasis.value}
             onValueChange={chipBasis.onChange}

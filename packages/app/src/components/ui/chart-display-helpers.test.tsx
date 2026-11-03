@@ -406,3 +406,30 @@ describe('MetricAssumptionNotes — chip basis toggle', () => {
     );
   });
 });
+
+describe('MetricAssumptionNotes — embed caveats', () => {
+  it('describes the basis without the toggle, sources or cost badges', () => {
+    renderUi(
+      <MetricAssumptionNotes
+        selectedYAxisMetric="y_costhOutput"
+        chipBasis={{ ...control('total'), readOnly: true }}
+        caveatsOnly
+      />,
+    );
+    expect(container.textContent).toContain('per total chip count');
+    expect(container.querySelector('[data-testid="chip-basis-toggle"]')).toBeNull();
+    expect(container.textContent).not.toContain('TCO $/chip/hr:');
+    expect(container.querySelector(`a[href="${TCO_SOURCE_URL}"]`)).toBeNull();
+  });
+
+  it('renders nothing for metrics the basis does not change', () => {
+    renderUi(
+      <MetricAssumptionNotes
+        selectedYAxisMetric="y_jTotal"
+        chipBasis={{ ...control('pool'), readOnly: true }}
+        caveatsOnly
+      />,
+    );
+    expect(container.textContent).toBe('');
+  });
+});

@@ -4,6 +4,10 @@ import type { BenchmarkRow } from '@/lib/api/api';
 
 import {
   CHIP_BASIS_METRICS,
+  chipBasisCsvNote,
+  disaggDeploymentChips,
+  exactPerTotalChipRates,
+  hasPoolSplit,
   inputTputPerTotalChip,
   measuredInputShare,
   perTotalChipRates,
@@ -204,5 +208,66 @@ describe('measuredInputShare', () => {
       measuredInputShare({ ...split, input_tput_per_gpu: 500, output_tput_per_gpu: 100 }, 0.01),
     ).toBeNull();
     expect(measuredInputShare({ ...split, tput_per_gpu: 0 }, 0.01)).toBeNull();
+  });
+});
+
+function flat(r: BenchmarkRow & { chip_basis?: 'pool' | 'total' }) {
+  return { ...r, ...r.metrics };
+}
+
+describe('legacy unsplit disaggregated rows', () => {
+  // Shape of the Oct–Nov 2025 Dynamo TRT rows: both pool fields hold the whole
+  // deployment (36) and no workers are recorded, but ISL:OSL recovers the real
+  // pools (4 prefill + 32 decode). 36 000 tok/s total, half input, half output.
+  const legacy = () =>
+    row({
+      framework: 'dynamo-trt',
+      is_multinode: false,
+      prefill_num_workers: 0,
+      decode_num_workers: 0,
+      num_prefill_gpu: 36,
+      num_decode_gpu: 36,
+      isl: 1024,
+      osl: 1024,
+      metrics: {
+        tput_per_gpu: 1000,
+        input_tput_per_gpu: 18_000 / 4,
+        output_tput_per_gpu: 18_000 / 32,
+      },
+    });
+
+  it('converts to the total basis through ISL:OSL instead of the pool fields', () => {
+    const total = withChipBasis(legacy(), 'total');
+    expect(total.chip_basis).toBe('total');
+    expect(total.metrics.input_tput_per_gpu).toBeCloseTo(500, 9);
+    expect(total.metrics.output_tput_per_gpu).toBeCloseTo(500, 9);
+    expect(total.metrics.tput_per_gpu).toBe(1000);
+  });
+
+  it('measures the same token mix on either basis', () => {
+    const pool = legacy();
+    expect(measuredInputShare(flat(pool), 0.01)).toBeCloseTo(0.5, 9);
+    expect(measuredInputShare(flat(withChipBasis(pool, 'total')), 0.01)).toBeCloseTo(0.5, 9);
+  });
+
+  it('counts the deployment once, not once per pool', () => {
+    expect(disaggDeploymentChips(legacy())).toBe(36);
+    expect(hasPoolSplit(legacy())).toBe(false);
+  });
+
+  it('keeps rows it cannot convert on the stored basis', () => {
+    const unknownMix = row({ ...legacy(), isl: null, osl: null });
+    expect(withChipBasis(unknownMix, 'total')).toBe(unknownMix);
+    expect(exactPerTotalChipRates({ ...unknownMix, ...unknownMix.metrics })).toBeNull();
+  });
+});
+
+describe('chipBasisCsvNote', () => {
+  it('names the basis and its share-link value in both locales', () => {
+    expect(chipBasisCsvNote('pool', 'en')).toContain('per prefill/decode chip');
+    expect(chipBasisCsvNote('pool', 'en')).toContain('g_chips=pool');
+    expect(chipBasisCsvNote('total', 'en')).toContain('every chip in the deployment');
+    expect(chipBasisCsvNote('total', 'zh')).toContain('按芯片总数');
+    expect(chipBasisCsvNote('total', 'zh')).toContain('g_chips=total');
   });
 });

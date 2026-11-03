@@ -1,4 +1,5 @@
 'use client';
+import { CHIP_BASIS_METRICS, chipBasisCsvNote } from '@/lib/benchmarks/chip-basis';
 import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 import { track } from '@/lib/analytics/analytics';
 import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
@@ -521,6 +522,10 @@ export default function ChartDisplay({
   const chipBasisControl = useMemo(
     () => ({ value: chipBasis, onChange: setChipBasis, source: 'inference' }),
     [chipBasis, setChipBasis],
+  );
+  const readOnlyChipBasisControl = useMemo(
+    () => ({ ...chipBasisControl, readOnly: true }),
+    [chipBasisControl],
   );
 
   const overlayDataByChartType = useMemo(() => {
@@ -1087,7 +1092,9 @@ export default function ChartDisplay({
             `InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`,
             headers,
             rows,
-            issueNotes,
+            CHIP_BASIS_METRICS.has(selectedYAxisMetric)
+              ? [...issueNotes, chipBasisCsvNote(chipBasis, locale)]
+              : issueNotes,
           );
         }}
       />
@@ -1364,7 +1371,13 @@ export default function ChartDisplay({
                                 : undefined
                             }
                           />
-                          {!minimalChrome && (
+                          {minimalChrome ? (
+                            <MetricAssumptionNotes
+                              selectedYAxisMetric={selectedYAxisMetric}
+                              chipBasis={readOnlyChipBasisControl}
+                              caveatsOnly
+                            />
+                          ) : (
                             <MetricAssumptionNotes
                               tcoBasis={tcoBasis}
                               selectedYAxisMetric={selectedYAxisMetric}

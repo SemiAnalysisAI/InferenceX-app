@@ -1,5 +1,6 @@
 'use client';
 
+import { chipBasisCsvNote } from '@/lib/benchmarks/chip-basis';
 import { useCallback, useMemo, useState } from 'react';
 
 import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
@@ -643,6 +644,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
       `${getModelLabel(selectedModel)} • ${getSequenceLabel(selectedSequence, locale)}`,
       t.captionFloor(minInteractivity, statLabel),
       getCostProviderLabel(costProvider, locale),
+      ...(costType === 'total' ? [] : [chipBasisCsvNote(chipBasis, locale)]),
     ]);
     track('first_token_csv_exported', { model: selectedModel });
   }, [
@@ -655,6 +657,8 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
     locale,
     minInteractivity,
     costProvider,
+    costType,
+    chipBasis,
   ]);
 
   const showsJalapenoPreview = includesJalapenoResult(legendHwKeys);

@@ -284,6 +284,8 @@ export function rowToAggDataEntry(row: ChipBasisRow): AggDataEntry {
         disagg: row.disagg,
         num_prefill_gpu: row.num_prefill_gpu,
         num_decode_gpu: row.num_decode_gpu,
+        prefill_num_workers: row.prefill_num_workers,
+        decode_num_workers: row.decode_num_workers,
         tp: aggregateTp,
         pp: aggregatePp,
       },

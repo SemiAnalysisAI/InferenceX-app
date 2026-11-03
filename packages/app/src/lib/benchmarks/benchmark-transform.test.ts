@@ -1346,6 +1346,8 @@ describe('transformBenchmarkRows — deployment topology', () => {
         hardware: 'h200',
         framework: 'dynamo-trt',
         disagg: true,
+        prefill_num_workers: 1,
+        decode_num_workers: 1,
         num_prefill_gpu: 4,
         num_decode_gpu: 12,
         decode_tp: 8,
