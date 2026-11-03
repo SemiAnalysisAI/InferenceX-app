@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 
+import { SupporterLogoImage } from './supporter-logo-image';
+
 export function CompanyLogo({ org, logo }: { org: string; logo?: string }) {
   const [failed, setFailed] = useState(false);
 
@@ -19,12 +21,13 @@ export function CompanyLogo({ org, logo }: { org: string; logo?: string }) {
   }
 
   return (
-    <img
-      src={`/logos/${logo}`}
+    <SupporterLogoImage
+      logo={logo}
       alt={org}
       width={80}
       height={40}
-      className="h-10 min-w-10 max-w-20 shrink-0 object-contain dark:opacity-70 dark:grayscale dark:invert"
+      className="h-10 min-w-10 max-w-20 shrink-0 object-contain"
+      darkClassName="dark:opacity-70 dark:grayscale dark:invert"
       onError={() => setFailed(true)}
     />
   );

@@ -373,7 +373,7 @@ describe('QuotesContent supporter logo wall', () => {
       cy.window().then((win) => {
         cy.stub(win.Element.prototype, 'scrollIntoView').as('providerScroll');
       });
-      cy.get(`${group} img`).should(($logos) => {
+      cy.get(`${group} img:visible`).should(($logos) => {
         expect([...$logos].map((logo) => logo.getAttribute('alt'))).to.deep.equal(providers);
         for (const logo of $logos) {
           const bounds = logo.getBoundingClientRect();
@@ -382,7 +382,7 @@ describe('QuotesContent supporter logo wall', () => {
         }
       });
       for (const org of providers) {
-        cy.get(`${group} img[alt="${org}"]`).closest('button').click();
+        cy.get(`${group} img[alt="${org}"]:visible`).closest('button').click();
         cy.get('@providerScroll').should((stub) => {
           const calls = (
             stub as unknown as { getCalls: () => { thisValue: Element }[] }
@@ -399,7 +399,7 @@ describe('QuotesContent supporter logo wall', () => {
             : '“硬件是自己买的，每一项推理服务决策都会直接影响利润率。InferenceX 的开放、可复现基准测试展示了不同加速器和推理引擎在真实工作负载下的实际表现，让我们这样规模较小的服务商也能用和行业巨头一样的数据来做基础设施决策。还没有谁能像他们这样展示 acceptance length。”',
         );
         cy.get('footer').should('contain.text', 'Nicholas Khami').and('contain.text', 'Morph LLM');
-        cy.get('img[alt="Morph LLM"]').should(($logo) => {
+        cy.get('img[alt="Morph LLM"]:visible').should(($logo) => {
           expect(($logo[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
         });
       });
@@ -418,4 +418,39 @@ describe('QuotesContent supporter logo wall', () => {
       cy.get('a[href$="#quote-google"]').should('exist');
     }
   });
+
+  for (const locale of ['en', 'zh'] as const) {
+    for (const dark of [false, true]) {
+      it(`uses the official Morph wordmark without effects (${locale}, ${dark ? 'dark' : 'light'})`, () => {
+        for (const width of [375, 1440]) {
+          cy.viewport(width, 900);
+          cy.mount(
+            <div className={dark ? 'dark' : ''}>
+              <QuotesContent locale={locale} />
+            </div>,
+          );
+          for (const section of [
+            '[data-testid="supporter-group-managed-inference-providers"]',
+            '#quote-morph-llm',
+          ]) {
+            cy.get(`${section} img[alt="Morph LLM"]:visible`)
+              .should('have.length', 1)
+              .and('have.attr', 'src', '/logos/morph.svg');
+            cy.get(`${section} img[alt="Morph LLM"]:visible`).should(($images) => {
+              const image = $images[0] as HTMLImageElement;
+              expect(image.naturalWidth).to.equal(174);
+              expect(image.naturalHeight).to.equal(48);
+              expect(getComputedStyle(image).filter).to.equal('none');
+              expect(getComputedStyle(image).opacity).to.equal('1');
+              expect(getComputedStyle(image).backgroundColor).to.equal('rgb(10, 10, 10)');
+              const rect = image.getBoundingClientRect();
+              expect(rect.left).to.be.at.least(0);
+              expect(rect.right).to.be.at.most(width);
+            });
+          }
+          cy.get('#quote-morph-llm').should('contain.text', 'Nicholas Khami');
+        }
+      });
+    }
+  }
 });
