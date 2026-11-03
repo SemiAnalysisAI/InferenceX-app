@@ -9,6 +9,7 @@ import { PowerXSurfaceProvider } from '@/components/inference/ui/powerx-surface'
 import chartDefinitions from '@/components/inference/metric-registry';
 import { mountWithProviders } from '../support/test-utils';
 import { expandLegendAdvanced } from '../support/legend-advanced';
+import { clickScatterPoint, visiblePoints } from '../support/scatter-points';
 import {
   createMockInferenceData,
   createMockChartDefinition,
@@ -23,6 +24,15 @@ import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.share
 
 const defaultChartDef = createMockChartDefinition();
 const hwConfig = createMockHardwareConfig();
+
+const expectPointsFaded = (faded: boolean) =>
+  cy.scatterPoints('#global-pareto-test').should((points) => {
+    expect(points).to.have.length(2);
+    for (const point of points) expect(point.faded, point.key).to.equal(faded);
+  });
+
+const expectVisiblePointCount = (scope: string, count: number) =>
+  cy.scatterPoints(scope).should((points) => expect(visiblePoints(points)).to.have.length(count));
 
 describe('ScatterGraph', () => {
   it('keeps the frontier modes and overlay winners without exposing the retired hinterland', () => {
@@ -107,8 +117,8 @@ describe('ScatterGraph', () => {
       .should('have.attr', 'fill', '#22c55e')
       .and('have.attr', 'data-style', 'plain');
     cy.get('.global-pareto-highlight circle').should('have.length', 2);
-    cy.get('.dot-group, .roofline-path').should(($marks) => {
-      expect($marks.length).to.be.greaterThan(2);
+    expectPointsFaded(true);
+    cy.get('.roofline-path').should(($marks) => {
       $marks.each((_, mark) => {
         expect(mark.style.filter).to.equal('opacity(0.2)');
       });
@@ -142,23 +152,19 @@ describe('ScatterGraph', () => {
       });
     });
     cy.get('#global-pareto-test-pareto-frontier').click();
-    cy.get('.dot-group, .roofline-path, .unofficial-overlay-pt, .overlay-roofline-path').should(
-      ($marks) => {
-        $marks.each((_, mark) => {
-          expect(mark.style.filter).to.equal('');
-        });
-      },
-    );
-    cy.get('#global-pareto-test-pareto-frontier').click();
-    cy.get('.dot-group').should(($marks) => {
+    expectPointsFaded(false);
+    cy.get('.roofline-path, .unofficial-overlay-pt, .overlay-roofline-path').should(($marks) => {
       $marks.each((_, mark) => {
-        expect(mark.style.filter).to.equal('opacity(0.2)');
+        expect(mark.style.filter).to.equal('');
       });
     });
+    cy.get('#global-pareto-test-pareto-frontier').click();
+    expectPointsFaded(true);
     cy.get('.pareto-hinterland').should('not.exist');
     cy.contains('button', 'Dismiss test overlay').click();
     cy.get('.global-pareto-highlight circle').should('have.length', 2);
-    cy.get('.dot-group, .roofline-path').should(($marks) => {
+    expectPointsFaded(false);
+    cy.get('.roofline-path').should(($marks) => {
       $marks.each((_, mark) => {
         expect(mark.style.filter).to.equal('');
       });
@@ -655,8 +661,9 @@ describe('ScatterGraph', () => {
       },
     );
 
-    cy.get('#test-scatter-points svg .dot-group').should('exist');
-    cy.get('#test-scatter-points svg .visible-shape').should('have.length.greaterThan', 0);
+    cy.scatterPoints('#test-scatter-points').should((points) => {
+      expect(visiblePoints(points)).to.have.length.greaterThan(0);
+    });
   });
 
   it('keeps official-only legend toggles active after a scope change', () => {
@@ -1829,7 +1836,7 @@ describe('ChartDisplay modeled power disclosures', () => {
           .should(($note) => {
             expect($note[0].scrollWidth).to.be.at.most($note[0].clientWidth);
           });
-        cy.get('.dot-group .visible-shape').should('exist');
+        cy.scatterPoints().should((points) => expect(visiblePoints(points)).to.not.be.empty);
         cy.screenshot(`all-in-measured-boundary-${locale}-${width}`, { overwrite: true });
       }
     });
@@ -2043,7 +2050,7 @@ describe('ChartDisplay responsive status notes', () => {
       globalFilters: {},
       unofficial: {},
     });
-    cy.get('#chart-0 .dot-group').should('have.length.greaterThan', 0);
+    cy.scatterPoints('#chart-0').should((points) => expect(points).to.not.be.empty);
     cy.get('[data-testid="atom-engine-footnote"]').should('not.exist');
   });
 
@@ -2742,7 +2749,7 @@ describe('Power envelopes', () => {
           },
         },
       );
-      cy.get('#power-clipped .dot-group').should('have.length', 1);
+      cy.scatterPoints('#power-clipped').should('have.length', 1);
       cy.get('#power-clipped .overflow-continuation').should('not.exist');
     });
   }
@@ -2900,7 +2907,9 @@ describe('Power envelopes', () => {
     expandLegendAdvanced();
     cy.get('#scatter-perf-ruler').click({ force: true });
     cy.get('#power-ruler .perf-ruler-hit').should('have.length', 3);
-    cy.get('#power-ruler .dot-group').last().click({ force: true });
+    cy.scatterPoints('#power-ruler')
+      .should((points) => expect(points).to.not.be.empty)
+      .then((points) => clickScatterPoint(points.at(-1)!));
     cy.get('#power-ruler .unofficial-overlay-pt').eq(3).click({ force: true });
 
     const chartId = 'power-ruler';
@@ -2988,9 +2997,7 @@ describe('Power envelopes', () => {
           .should('have.attr', 'd', boundary)
           .and('have.attr', 'stroke')
           .and('match', /^url\(#roofline-gradient-/u);
-        cy.get('#power-sweep .dot-group')
-          .filter((_, element) => element.style.opacity !== '0')
-          .should('have.length', 3);
+        expectVisiblePointCount('#power-sweep', 3);
         cy.get('#power-sweep .parallelism-label .pl-text').should(($labels) => {
           expect([...$labels].map((label) => label.textContent)).to.have.members(['TP2', 'TP4']);
         });
@@ -3000,15 +3007,11 @@ describe('Power envelopes', () => {
           );
         });
         cy.get('#scatter-hide-non-optimal').click({ force: true });
-        cy.get('#power-sweep .dot-group')
-          .filter((_, element) => element.style.opacity !== '0')
-          .should('have.length', 4);
+        expectVisiblePointCount('#power-sweep', 4);
         cy.get('#power-sweep .roofline-path').should('have.attr', 'd', boundary);
         cy.get('#power-sweep .parallelism-label').should('not.contain.text', 'TP8');
         cy.get('#scatter-hide-non-optimal').click({ force: true });
-        cy.get('#power-sweep .dot-group')
-          .filter((_, element) => element.style.opacity !== '0')
-          .should('have.length', 3);
+        expectVisiblePointCount('#power-sweep', 3);
         cy.get('#power-sweep .roofline-path').should('have.attr', 'd', boundary);
         cy.get('#scatter-gradient-labels').click({ force: true });
         cy.get('#power-sweep .roofline-path')
@@ -3016,9 +3019,7 @@ describe('Power envelopes', () => {
           .and('have.attr', 'stroke')
           .and('not.match', /^url\(/u);
         cy.get('#power-sweep .parallelism-label').should('not.exist');
-        cy.get('#power-sweep .dot-group')
-          .filter((_, element) => element.style.opacity !== '0')
-          .should('have.length', 3);
+        expectVisiblePointCount('#power-sweep', 3);
       });
     cy.get('#scatter-gradient-labels').click({ force: true });
     for (const [, label] of powerMetrics) {
@@ -3100,9 +3101,7 @@ describe('Power envelopes', () => {
 
   it('starts the power boundary at the high E2E Normalized Interactivity end', () => {
     mountWithProviders(<PowerHarness normalized />, { unofficial: {} });
-    cy.get('#power-sweep .dot-group')
-      .filter((_, element) => element.style.opacity !== '0')
-      .should('have.length', 3);
+    expectVisiblePointCount('#power-sweep', 3);
   });
 
   it('keeps a fixed measured-power boundary while Optimal Only changes measurement visibility', () => {
@@ -3111,32 +3110,30 @@ describe('Power envelopes', () => {
       'have.length',
       1,
     );
-    cy.get('#power-sweep .dot-group')
-      .filter((_, element) => element.style.opacity !== '0')
-      .should('have.length', 3);
+    expectVisiblePointCount('#power-sweep', 3);
     cy.get('#power-sweep .roofline-path[data-curve-kind="power-envelope"]')
       .should('have.length', 1)
       .invoke('attr', 'd')
       .should('match', /^M[^C]+C/u);
-    cy.get('#power-sweep .dot-group')
-      .filter((_, element) => element.style.opacity !== '0')
-      .should('have.length', 3)
-      .each(($point) => cy.wrap($point).should('have.css', 'opacity', '1'));
-    cy.get('#power-sweep .dot-group')
-      .filter((_, element) => element.style.opacity === '0')
-      .should('have.css', 'pointer-events', 'none');
+    cy.scatterPoints('#power-sweep').should((points) => {
+      const shown = visiblePoints(points);
+      expect(shown).to.have.length(3);
+      for (const point of shown) expect(point.opacity, point.key).to.equal(1);
+      const hidden = points.filter((point) => point.opacity === 0);
+      expect(hidden).to.have.length.greaterThan(0);
+      for (const point of hidden) expect(point.interactive, point.key).to.equal(false);
+    });
     cy.get('#power-sweep .roofline-path')
       .invoke('attr', 'd')
       .then((boundary) => {
         cy.get('#scatter-hide-non-optimal').click({ force: true });
-        cy.get('#power-sweep .dot-group')
-          .should('have.length', 4)
-          .each(($point) => cy.wrap($point).should('have.css', 'opacity', '1'));
+        cy.scatterPoints('#power-sweep').should((points) => {
+          expect(points).to.have.length(4);
+          for (const point of points) expect(point.opacity, point.key).to.equal(1);
+        });
         cy.get('#power-sweep .roofline-path').should('have.attr', 'd', boundary);
         cy.get('#scatter-hide-non-optimal').click({ force: true });
-        cy.get('#power-sweep .dot-group')
-          .filter((_, element) => element.style.opacity !== '0')
-          .should('have.length', 3);
+        expectVisiblePointCount('#power-sweep', 3);
         cy.get('#power-sweep .roofline-path').should('have.attr', 'd', boundary);
       });
     for (const [, label] of powerMetrics) {
@@ -3146,9 +3143,7 @@ describe('Power envelopes', () => {
         .should('have.length', 1)
         .invoke('attr', 'd')
         .should('match', /^M[^C]+C/u);
-      cy.get('#power-sweep .dot-group')
-        .filter((_, element) => element.style.opacity !== '0')
-        .should('have.length', 3);
+      expectVisiblePointCount('#power-sweep', 3);
     }
     cy.contains('button', 'Energy').click();
     cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
@@ -3265,11 +3260,9 @@ describe('Power envelopes', () => {
       }
       cy.get(officialSelector).should('have.length', 1);
       cy.get(overlaySelector).should('have.length', 2);
-      cy.get('#power-overlay .dot-group').should('have.length', 9);
+      cy.scatterPoints('#power-overlay').should('have.length', 9);
       cy.get('#power-overlay .unofficial-overlay-pt').should('have.length', 12);
-      cy.get('#power-overlay .dot-group')
-        .filter((_, element) => element.style.opacity !== '0')
-        .should('have.length', 6);
+      expectVisiblePointCount('#power-overlay', 6);
       cy.get('#power-overlay .unofficial-overlay-pt')
         .filter((_, element) => element.style.opacity !== '0')
         .should('have.length', 9);
@@ -3277,9 +3270,7 @@ describe('Power envelopes', () => {
       cy.get(`${officialSelector}, ${overlaySelector}`).then(($paths) => {
         const geometry = [...$paths].map((path) => path.getAttribute('d'));
         cy.get('#scatter-hide-non-optimal').click({ force: true });
-        cy.get('#power-overlay .dot-group')
-          .filter((_, element) => element.style.opacity !== '0')
-          .should('have.length', 9);
+        expectVisiblePointCount('#power-overlay', 9);
         cy.get('#power-overlay .unofficial-overlay-pt')
           .filter((_, element) => element.style.opacity !== '0')
           .should('have.length', 12);
@@ -3287,9 +3278,7 @@ describe('Power envelopes', () => {
           expect([...$current].map((path) => path.getAttribute('d'))).to.deep.equal(geometry);
         });
         cy.get('#scatter-hide-non-optimal').click({ force: true });
-        cy.get('#power-overlay .dot-group')
-          .filter((_, element) => element.style.opacity !== '0')
-          .should('have.length', 6);
+        expectVisiblePointCount('#power-overlay', 6);
         cy.get('#power-overlay .unofficial-overlay-pt')
           .filter((_, element) => element.style.opacity !== '0')
           .should('have.length', 9);
