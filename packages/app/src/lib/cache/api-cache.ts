@@ -88,10 +88,6 @@ function cdnCacheTag(): string {
 interface CachedQueryOptions {
   /** Use blob storage directly, skipping unstable_cache. Use for payloads known to exceed 2MB. */
   blobOnly?: boolean;
-  /**
-   * With `blobOnly`, the arguments already name the data revision. Such entries stay
-   * outside the purge generation, so a results purge does not roll them.
-   */
   revisioned?: boolean;
   /** Cache tag for the unstable_cache path (default 'db'). */
   tag?: string;
@@ -168,10 +164,6 @@ function blobKeyForArgs(keyPrefix: string, args: unknown[]): string {
   return `${keyPrefix}:${BLOB_KEY_ENCODING_VERSION}:sha256:${digest}`;
 }
 
-// Next's data cache refuses entries whose serialized form passes 2 MB and logs
-// "items over 2MB can not be cached", so such a result reached the database on
-// every read. Larger results are stored as base64 brotli(JSON), which also
-// shrinks every cache read. Both forms decode to the same JSON round trip.
 const COMPRESS_CACHED_JSON_CHARS = 64 * 1024;
 
 type CachedEntry<T> = { readonly value: T } | { readonly brotli: string };
@@ -179,7 +171,6 @@ type CachedEntry<T> = { readonly value: T } | { readonly brotli: string };
 function packCachedEntry<T>(value: T): CachedEntry<T> {
   const json = JSON.stringify(value);
   if (json === undefined || json.length <= COMPRESS_CACHED_JSON_CHARS) return { value };
-  // Quality 4 compresses a 3 MB payload in ~8 ms; decoding costs ~1 ms at any quality.
   const compressed = brotliCompressSync(json, {
     params: {
       [zlibConstants.BROTLI_PARAM_QUALITY]: 4,
@@ -196,11 +187,6 @@ function unpackCachedEntry<T>(entry: CachedEntry<T>): T {
   ) as T;
 }
 
-/**
- * Blob paths are written once per purge generation and never reused, because reads go
- * through the Blob CDN, which can keep serving a deleted object for a short while. The id
- * is a `db`-tagged entry, so a purge expires it with the database reads.
- */
 let blobGeneration: (() => Promise<string>) | undefined;
 
 /**
@@ -241,8 +227,6 @@ export function cachedQuery<T, Args extends unknown[]>(
       if (!blobEnabled()) return fn(...args);
       blobGeneration ??= cachedQuery(() => Promise.resolve(randomUUID()), 'blob-generation');
       const path = options.revisioned ? blobKey : `generation/${await blobGeneration()}/${blobKey}`;
-      // Concurrent callers share one read or fill but parse their own copy, so no
-      // caller sees another's mutations.
       const pending = inflight.get(path);
       if (pending) {
         const { json } = await pending;
@@ -260,8 +244,6 @@ export function cachedQuery<T, Args extends unknown[]>(
   }
 
   const packed = (...args: Args): Promise<CachedEntry<T>> => fn(...args).then(packCachedEntry);
-  // unstable_cache keys on its callback's source. `packed` is the same for every
-  // caller, so `fn`'s source joins the key as it did before entries were packed.
   const fnSource = fn.toString();
 
   if (options?.tag) {
@@ -431,10 +413,6 @@ export function negotiateEncoding(
   return best;
 }
 
-/**
- * Strong validator for one encoded representation of `source` (the bytes or their
- * version). `coding` names the content coding plus any non-default brotli quality.
- */
 function entityTag(source: Uint8Array | string, coding: string): string {
   const digest = createHash('sha256').update(source).digest('base64url').slice(0, 32);
   return coding === 'identity' ? `"${digest}"` : `"${digest}-${coding}"`;
@@ -456,12 +434,6 @@ const STREAM_CHUNK_BYTES = 64 * 1024;
 const BROTLI_QUALITY = 9;
 const MIB = 1024 * 1024;
 
-/**
- * Lower qualities for large bodies, measured on production payloads. From 1 MiB, q8 is
- * at most 1.6% larger for about 35% less CPU. From 4 MiB, q7 is at most 2.3% larger for
- * 30-45% less (12.7 MB history, 396 ms to 228 ms). Flat row tables such as availability
- * grow 11% at q7, and they stay under 4 MiB.
- */
 function brotliQualityFor(size: number): number {
   if (size < MIB) return BROTLI_QUALITY;
   return size < 4 * MIB ? 8 : 7;
@@ -520,10 +492,6 @@ function compressedBody(
 interface CachedJsonOptions {
   tag?: string;
   cacheControl?: string;
-  /**
-   * Identifies the payload, such as a data revision. The ETag derives from it instead of
-   * the body, so `notModifiedJson` can answer before the payload is loaded.
-   */
   version?: string;
 }
 
@@ -549,10 +517,6 @@ function jsonValidation(
   return { encoding, headers, notModified };
 }
 
-/**
- * The 304 that `cachedJson` sends for `options.version`, or null when the request
- * does not hold that version. Lets a route skip loading an unchanged payload.
- */
 export function notModifiedJson(
   request: Request,
   options: CachedJsonOptions & { version: string },
@@ -568,7 +532,6 @@ export function notModifiedJson(
  */
 export function cachedJson<T>(request: Request, data: T, options?: CachedJsonOptions): Response {
   const bytes = new TextEncoder().encode(JSON.stringify(data));
-  // A version ETag is answered before the body exists, so it keeps the default quality.
   const brotliQuality = options?.version ? BROTLI_QUALITY : brotliQualityFor(bytes.byteLength);
   const {
     encoding,

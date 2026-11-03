@@ -17,7 +17,6 @@ interface StoredSequenceLengthsJson {
 
 interface StoredSequenceLengthsRow extends StoredSequenceLengthsJson {
   benchmark_result_id: number | string;
-  /** Current `sequence_length_sketches` as base64. When set, the JSON columns are null. */
   sketches: string | null;
 }
 
@@ -36,8 +35,6 @@ export async function getResidentSequenceLengthSketches(
     return { isl: null, osl: null, coveredPoints: 0, requestedPoints: 0 };
   }
 
-  // Merging in SQL measured slower than merging in JS (Postgres unnests ~1M bins per 200 ids).
-  // Rows with current compact sketches send only those bytes, others the JSON sketches.
   const rows = (await sql`
     select
       br.id as benchmark_result_id,

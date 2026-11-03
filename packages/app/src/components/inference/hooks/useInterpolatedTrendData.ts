@@ -74,7 +74,6 @@ export function useInterpolatedTrendData({
   const trendMetricKey = resolveMetricConfigKey(selectedYAxisMetric).slice(2) as YAxisMetricKey;
   const requestedMetrics = useMemo(() => trendMetricDependencies(trendMetricKey), [trendMetricKey]);
 
-  // Row preparation does not depend on the metric, precision or pricing controls.
   const trendRows = useMemo(() => prepareTrendRows(allRows ?? []), [allRows]);
 
   const dateGroupedData = useMemo(
@@ -101,7 +100,6 @@ export function useInterpolatedTrendData({
     [dateGroupedData, trendMetricKey, tokenRevenuePricing],
   );
 
-  // Moving the target only re-evaluates the prebuilt curves.
   const { trendLines, hwKeysWithData } = useMemo(
     () =>
       evaluateTrendCurves(trendCurves, {

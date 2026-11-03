@@ -43,10 +43,6 @@ export type {
 const POINT_META_VERSION = 6;
 export const TRACE_SERVER_METRICS_VERSION = CHART_SERIES_VERSION * 100 + POINT_META_VERSION;
 
-/**
- * Summaries up to this size come back inline as base64 (about 43 MiB), under
- * Neon's 64 MiB response cap. Larger ones take the `chart_series` path.
- */
 const INLINE_SUMMARY_BYTES = 32 * 1024 * 1024;
 
 export interface PointMeta {
@@ -137,7 +133,6 @@ export interface TraceServerMetrics {
 interface RawMetaRow extends PointMeta {
   trace_replay_id: number | null;
   has_blob: boolean;
-  /** Base64 `chart_series_summary_gz` when it is current; the other series columns are then empty. */
   summary_gz: string | null;
   chart_series: Omit<ChartSeries, 'metricSources'> | null;
   metric_sources: KvMetricSource[];
@@ -194,8 +189,6 @@ export async function getTraceServerMetrics(
   sql: DbClient,
   benchmarkResultId: number,
 ): Promise<TraceServerMetrics | null> {
-  // A current summary replaces both jsonb expressions, so `chart_series`
-  // (up to 14 MB compressed) is neither decompressed nor rebuilt.
   const rows = (await sql`
     select
       br.trace_replay_id,
@@ -291,10 +284,6 @@ export async function getTraceServerMetrics(
   });
   if (!series) return null;
 
-  // Self-heal the stored chart_series and its summary so the next request
-  // takes the fast path instead of re-decompressing this (tens-of-MB) blob.
-  // `series` is complete and stamped at CHART_SERIES_VERSION here.
-  // Fire-and-forget and best-effort (no-ops on a read-only replica).
   writeBackChartSeries(sql, row.trace_replay_id, series);
 
   return { meta, kvCachePoolTokens, ...summarizeChartSeries(series, series.metricSources) };

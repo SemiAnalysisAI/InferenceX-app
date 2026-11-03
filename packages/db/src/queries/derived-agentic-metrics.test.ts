@@ -219,7 +219,6 @@ describe('getDerivedAgenticMetrics write-back', () => {
 
     const result = await getDerivedAgenticMetrics(sql, [7]);
 
-    // Cancelled requests count toward the latency ratio but not toward ISL/OSL.
     expect(result[7]?.p90_e2e_norm_intvty).toBeCloseTo(1 / 0.029, 6);
     expect(calls).toHaveLength(5);
     const [written, ...columns] = calls[4]!.values as [WrittenStats, ...unknown[]];

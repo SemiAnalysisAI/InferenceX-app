@@ -110,8 +110,6 @@ export interface GpuMetricsRunSelection {
 // 64 MiB response cap, while a 1.25M-sample run needs ~25 sequential pages, not 125.
 export const SAMPLE_PAGE_SIZE = 50_000;
 
-// Neon's HTTP driver hex-encodes bytea under a 64 MiB response cap; one blob query
-// returns at most this many raw bytes unless a single blob is larger.
 const SAMPLE_BLOB_QUERY_BYTES = 16 * 1024 * 1024;
 
 export interface RawSeriesRow {
@@ -148,7 +146,6 @@ interface RawBlobRow extends RawSeriesVersionRow {
 }
 
 export interface SampleReadOptions {
-  /** False reads `gpu_metric_samples` even where a current blob exists. */
   sampleBlobs?: boolean;
 }
 
@@ -256,7 +253,6 @@ export async function readSeriesRows(
   `) as unknown as RawSeriesRow[];
 }
 
-/** Rows of `ids` from `gpu_metric_samples`, grouped by series in the public time-then-GPU order. */
 export async function readSqlSampleRows(
   sql: DbClient,
   ids: readonly number[],
@@ -302,12 +298,6 @@ export async function readSqlSampleRows(
   return samplesBySeries;
 }
 
-/**
- * Rows of `ids` decoded from current `gpu_metric_sample_blobs` rows (migration 022),
- * plus the series version rows when a single query read every blob. Each query
- * returns the version rows of the series it asks for and their blobs up to
- * SAMPLE_BLOB_QUERY_BYTES (always at least one), so larger sets take more queries.
- */
 async function readBlobSamples(
   sql: DbClient,
   ids: readonly number[],
@@ -338,7 +328,6 @@ async function readBlobSamples(
         ) blobs
       `) as unknown as RawBlobRow[];
     } catch (error) {
-      // Before migration 022 every series reads `gpu_metric_samples`.
       if (query === 0 && (error as { code?: unknown } | null)?.code === '42P01') {
         return { samples, versionRows: null };
       }
@@ -374,7 +363,6 @@ export async function loadSeriesDetails(
   // no transaction), so a re-ingest can commit between them. The writer replaces
   // samples and the series row in one transaction and stamps `ingested_at`. An
   // unchanged key after the sample read proves both belong to the same series version.
-  // A single blob query that read every series returned its keys in the same snapshot.
   const versionRows =
     sqlIds.length === 0 && blobs.versionRows
       ? blobs.versionRows

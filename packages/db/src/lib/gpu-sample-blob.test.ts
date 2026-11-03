@@ -20,7 +20,6 @@ const fromBits = (bits: number): number => {
 };
 const MAX_FRACTION = 2 ** 23 - 1;
 
-/** Deterministic float4 values covering random bit patterns and tie-prone decimals. */
 function float4Corpus(): number[] {
   let seed = 2_654_435_769;
   const next = () => {
@@ -40,9 +39,7 @@ function float4Corpus(): number[] {
     const value = fromBits(next());
     if (Number.isFinite(value)) values.push(value);
     values.push(
-      // Few significant bits: decimal ties and exact interval bounds.
       Math.fround((next() >>> 8) * 2 ** ((next() % 64) - 32)),
-      // Telemetry-like readings with up to three decimals.
       Math.fround((next() % 2_000_000) / 1000),
     );
   }

@@ -185,7 +185,6 @@ async function loadRunPageData(slug: string): Promise<RunPageData | null> {
 
 const getCachedRunPageData = cachedDerivedData(loadRunPageData, 'run-page-data-v2');
 
-/** Memoized per request: generateMetadata and the page both read it. */
 export const getRunPageData: (slug: string) => Promise<RunPageData | null> =
   cache(getCachedRunPageData);
 
@@ -229,6 +228,5 @@ async function loadRankingPageData(slug: string): Promise<RankingPageData | null
 
 const getCachedRankingPageData = cachedDerivedData(loadRankingPageData, 'ranking-page-data-v2');
 
-/** Memoized per request: generateMetadata and the page both read it. */
 export const getRankingPageData: (slug: string) => Promise<RankingPageData | null> =
   cache(getCachedRankingPageData);

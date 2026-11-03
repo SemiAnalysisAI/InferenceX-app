@@ -54,22 +54,12 @@ interface RawChartMetaRow {
   gz_bytes: number | null;
   timeline_version: number | null;
   legacy_request_count: number | null;
-  /** octet_length(request_chart_data_gz) when it holds the current version. */
   columns_bytes: number | null;
-  /** The current columns as base64 when they are small enough to inline. */
   columns_inline: string | null;
 }
 
-/**
- * Precomputed columns up to this size come back inline with the metadata
- * query, so most points need one round trip. Larger ones are read in slices.
- */
 export const INLINE_CHART_COLUMNS_BYTES = REQUEST_TIMELINE_GZ_SLICE_BYTES;
 
-/**
- * Read a current `request_chart_data_gz` of `byteLength` bytes: decode the
- * inline copy when the metadata query returned one, else read it in slices.
- */
 export async function readRequestChartColumns(
   sql: DbClient,
   traceReplayId: number,
@@ -257,10 +247,6 @@ async function projectLegacyRequestChartData(
   );
 }
 
-/**
- * Build chart data from scanned timeline requests, coercing each field the
- * same way whether the source was gzip JSON or legacy JSONB text.
- */
 async function scanRequestChartData(
   scan: (onRequest: (request: ScannedRequest) => void) => Promise<RequestTimelineHeader>,
 ): Promise<RequestChartDataWire> {
@@ -286,7 +272,6 @@ async function scanRequestChartData(
   });
 }
 
-/** Chart data of a stored `request_timeline_gz`, as served by the route. */
 export function requestChartDataFromTimelineGz(gz: Buffer): Promise<RequestChartDataWire> {
   return scanRequestChartData((onRequest) =>
     scanRequestTimelineGz(gz, CHART_REQUEST_FIELDS, onRequest),
@@ -351,8 +336,6 @@ export async function getRequestChartData(
   const row = rows[0];
   if (!row) return null;
 
-  // Precomputed columns hold exactly what the timeline scan below would
-  // produce. A copy that cannot be read falls back to that scan.
   if (row.columns_bytes !== null) {
     try {
       return decodeRequestChartColumns(

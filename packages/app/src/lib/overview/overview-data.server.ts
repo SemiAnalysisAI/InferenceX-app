@@ -50,7 +50,6 @@ async function loadRowsByModel(
   return Object.fromEntries(entries);
 }
 
-/** Null when a history mode has no current snapshot to anchor its window. */
 async function buildOverviewCubeForScope(
   engineScope: OverviewEngineScope,
   comparisonMode: OverviewComparisonMode,
@@ -100,8 +99,6 @@ async function buildOverviewCubeForScope(
   );
 }
 
-// Tier, reference and the row scopes only slice a cube, so 20 cached cubes
-// serve every selector combination.
 const getCachedOverviewCube = cachedDerivedData(buildOverviewCubeForScope, 'overview-cube-v1');
 
 export async function getOverviewPageData(

@@ -13,7 +13,6 @@ import {
   SERVER_LOG_BLOCK_CHARS,
 } from '../server-log-blocks';
 
-// Text-path client: block-storage probes find no block marker and never reach `call`.
 function withoutBlockStorage(call: Mock): DbClient {
   return ((strings: TemplateStringsArray, ...values: unknown[]) =>
     strings.join('').includes('server_log_block_files')
@@ -87,12 +86,10 @@ describe('getServerLogChunk', () => {
 });
 
 describe('block-backed files', () => {
-  // Two astral code points per line so code points and UTF-16 units diverge, spanning 3 blocks.
   const line = 'INFO step 😀 tok/s 🚀\n';
   const text = line.repeat(Math.ceil((2.5 * SERVER_LOG_BLOCK_CHARS) / [...line].length));
   const chars = [...text];
   const blocks = encodeServerLogBlocks(text);
-  // Answers the block query like PostgreSQL: the marker row joined to the overlapping blocks.
   const sql = ((strings: TemplateStringsArray, ...values: unknown[]) => {
     if (!strings.join('').includes('server_log_block_files')) return Promise.resolve([]);
     const [offset, length] = values.slice(-3) as number[];
@@ -135,19 +132,14 @@ describe('block-backed files', () => {
 
 describe('searchServerLogs on a block-backed file', () => {
   const chunk = 16 * 1024 * 1024;
-  // Astral characters only in the prefix, so code point = unit - (astral units before it) after it.
   const prefix = '😀Ready ready😀READY x ';
   const tail = 'ready! é READY';
-  // 'zebra' straddles the first block boundary. The prefix's last 'ready' ends at code
-  // point 18, so the tail's 'ready' starts 2 before the end of the chunk from there.
   const straddle = SERVER_LOG_BLOCK_CHARS - 2 - [...prefix].length;
   const filler = `${'x'.repeat(straddle)}zebra${'x'.repeat(chunk - 10 - straddle)}`;
   const text = prefix + filler + tail;
   const blocks = encodeServerLogBlocks(text);
   const total = [...prefix].length + filler.length + [...tail].length;
   const fetched: number[] = [];
-  // Answers like PostgreSQL: file names, the block index with each bloom verdict
-  // (`get_bit` reads bit n % 8 of byte n / 8), and block data by index.
   const sql = ((strings: TemplateStringsArray, ...values: unknown[]) => {
     const query = strings.join('');
     if (query.includes('block_index = any')) {
@@ -181,8 +173,6 @@ describe('searchServerLogs on a block-backed file', () => {
     );
   }) as unknown as DbClient;
 
-  // The SQL loop: search a chunk-sized window, restart after each match, else advance by
-  // the chunk minus the overlap. Before/after text is clipped to the current chunk.
   function sqlLoop(term: string, limit: number) {
     const chars = [...prefix];
     const unit = (point: number) =>
@@ -218,8 +208,6 @@ describe('searchServerLogs on a block-backed file', () => {
   it('matches the SQL loop, clipping context to each chunk', async () => {
     const expected = sqlLoop('ready', 50);
     expect(expected.matches.length).toBe(5);
-    // The fourth match straddles the first chunk's end, so the SQL loop finds it in the next
-    // chunk and its before text starts at that chunk.
     expect(expected.matches[3].before.length).toBeLessThan(120);
     await expect(searchServerLogs(sql, 42, 'ready', 50)).resolves.toEqual(expected);
   });
@@ -233,8 +221,6 @@ describe('searchServerLogs on a block-backed file', () => {
     const expected = sqlLoop('é ready', 50);
     expect(expected.matches).toHaveLength(1);
     await expect(searchServerLogs(sql, 42, 'é ready', 50)).resolves.toEqual(expected);
-    // The term starts 16 code points into the last of 17 blocks, inside the previous block's
-    // lookahead.
     expect(fetched).toEqual([15, 16]);
   });
 

@@ -8,10 +8,8 @@ import evaluationsFixture from '../../../cypress/fixtures/api/evaluations.json';
 import { buildEvaluationChartRows } from './chart-data';
 import { compactEvalRows, expandEvalRows } from './compact-rows';
 
-// Ids are bigint columns, so the fixture (like the API) holds them as strings.
 const rawRows = evaluationsFixture as unknown as EvalRow[];
 
-// The route sends `compactEvalRows` through `cachedJson`; the client parses it with `res.json()`.
 async function overWire(rows: readonly EvalRow[]): Promise<EvalRow[]> {
   return expandEvalRows(await Response.json(compactEvalRows(rows)).json());
 }

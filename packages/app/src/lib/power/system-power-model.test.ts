@@ -38,7 +38,6 @@ function upstream(system: string, gpuWattsPerGpu: number, socketWatts: number | 
   };
 }
 
-/** The pre-reuse adapter: a freshly built upstream model for every call. */
 function fresh(
   system: string,
   gpuWattsPerGpu: number,
@@ -251,7 +250,6 @@ describe('system power model adapter', () => {
       (workload) => [false, true].map((scaleOut) => ({ workload, scaleOut })),
     );
     let compared = 0;
-    // Watts outermost, so every state reads models other states already built.
     for (const watts of [161.75, 612.5, 1010.125, 2400]) {
       for (const state of states) {
         for (const [hardware, system] of chassis) {

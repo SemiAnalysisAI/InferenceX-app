@@ -6,14 +6,9 @@ import {
 
 export interface SequenceLengthSketchesRow {
   sketches: Buffer;
-  /** MD5 of the `aggregate_stats` text the sketches were encoded from. */
   statsMd5: string;
 }
 
-/**
- * Encode the sketches of a row's stored `aggregate_stats`. Returns null when
- * the stats are missing or stale, or their sketches do not encode exactly.
- */
 export async function computeSequenceLengthSketches(
   sql: Sql,
   traceReplayId: number,
@@ -35,10 +30,6 @@ export async function computeSequenceLengthSketches(
   return sketches ? { sketches, statsMd5: row.stats_md5 } : null;
 }
 
-/**
- * Store sketches computed by `computeSequenceLengthSketches`. Returns false,
- * and writes nothing, when `aggregate_stats` changed since it was read.
- */
 export async function writeSequenceLengthSketches(
   sql: Sql,
   traceReplayId: number,

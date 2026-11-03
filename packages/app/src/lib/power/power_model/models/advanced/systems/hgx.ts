@@ -74,8 +74,6 @@ export interface HGXSystemChassisFields {
 
 type ChassisDefaults = Partial<HGXSystemChassisFields>;
 
-// Fan sizing reads only the frozen chassis at the fixed design state, so each chassis
-// sizes its fans once instead of on every estimate.
 const RESOLVED_FAN_POWER = new WeakMap<HGXSystemChassis, FanPower>();
 
 interface HostComponents {
@@ -83,8 +81,6 @@ interface HostComponents {
   generic: PowerComponentBreakdown;
 }
 
-// Without measured CPU inputs the host components read only the frozen chassis and
-// the operating state (a few workload / scale-out pairs), so each pair is built once.
 const MODELED_HOSTS = new WeakMap<HGXSystemChassis, Map<string, HostComponents>>();
 
 function host_components(

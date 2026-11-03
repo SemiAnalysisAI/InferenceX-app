@@ -8,8 +8,6 @@ export function paretoFrontUpperLeft<T>(
   const n = points.length;
   if (n === 0) return [];
 
-  // Read each coordinate once; the comparator then sees the same values it would
-  // get from the accessors, so the stable sort yields the same order.
   const xs: number[] = [];
   const ys: number[] = [];
   const order: number[] = [];
@@ -19,10 +17,8 @@ export function paretoFrontUpperLeft<T>(
     order.push(i);
   }
   if (n > 32 || !xs.every(Number.isFinite) || !ys.every(Number.isFinite)) {
-    // Large inputs, or non-finite values that make the comparator inconsistent.
     order.sort((a, b) => (xs[a] === xs[b] ? ys[b] - ys[a] : xs[a] - xs[b]));
   } else {
-    // Stable insertion sort: for a consistent comparator every stable sort agrees.
     for (let i = 1; i < n; i++) {
       const current = order[i];
       const cx = xs[current];
@@ -76,7 +72,6 @@ export function monotoneSlopes(xs: number[], ys: number[]): number[] {
     s.push(hi === 0 ? 0 : (ys[i + 1] - ys[i]) / hi);
   }
 
-  // A push loop, not Array.from with a per-element callback.
   const m: number[] = [];
   for (let i = 0; i < n; i++) m.push(0);
   for (let i = 1; i < n - 1; i++) {

@@ -16,11 +16,6 @@ import { agenticWorkflowMetadataOnly } from '@/lib/benchmarks/agentic-workflow-m
 
 export const dynamic = 'force-dynamic';
 
-/**
- * The Historical Trends page's input: the `/api/v1/benchmarks/history` rows for the
- * same parameters, reduced to what a trend reads by `compactTrendHistory`. It reads
- * the cache slots the published route owns, so both share one query.
- */
 export async function GET(request: NextRequest) {
   const model = request.nextUrl.searchParams.get('model') ?? '';
   const rawIsl = request.nextUrl.searchParams.get('isl');

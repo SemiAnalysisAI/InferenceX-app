@@ -31,7 +31,6 @@ interface Selection {
 const hwKeyOf = (r: AvailabilityRow) =>
   buildAvailabilityHwKey(r.hardware, r.framework, r.spec_method, r.disagg, r.benchmark_type);
 
-/** What GlobalFilterContext and InferenceContext derived by scanning the rows. */
 function fromRows(rows: readonly AvailabilityRow[], s: Selection) {
   const modelRows = rows.filter((r) => s.keys.includes(r.model));
   const seqRows = modelRows.filter((r) => rowToSequence(r) === s.sequence);
@@ -57,7 +56,6 @@ function fromRows(rows: readonly AvailabilityRow[], s: Selection) {
   };
 }
 
-/** The same values from the index, composed as the contexts compose them. */
 function fromIndex(index: AvailabilityIndex, s: Selection) {
   const modelLines = linesForModels(index, s.keys);
   const seqLines = modelLines.filter((line) => line.sequence === s.sequence);
@@ -106,7 +104,6 @@ function* selections(rows: readonly AvailabilityRow[]): Generator<Selection> {
   }
 }
 
-// The route sends the compact form through `cachedJson`; the client parses it with `res.json()`.
 async function overWire(rows: readonly AvailabilityRow[]): Promise<AvailabilityIndex> {
   return indexAvailability(await Response.json(compactAvailability(rows)).json());
 }
@@ -129,7 +126,6 @@ describe('availability index', () => {
   });
 
   it('keeps first-row order when rows of one date arrive in any order', async () => {
-    // Reversing within each date moves each date's first sequence and precision.
     const rows = fixtureRows
       .toReversed()
       .toSorted((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));

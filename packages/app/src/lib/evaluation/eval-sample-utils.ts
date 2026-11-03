@@ -18,7 +18,6 @@ export function extractDemonstrations(argumentsData: unknown): Demonstration[] |
   return null;
 }
 
-/** Few-shot pairs from lm-eval's serialized chat prompt (`gen_args_0.arg_0`). */
 export function parseDemonstrations(serialized: string | null): Demonstration[] | null {
   if (!serialized) return null;
 

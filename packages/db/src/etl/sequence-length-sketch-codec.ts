@@ -1,20 +1,3 @@
-/**
- * Compact form of `aggregate_stats.sequenceLengths`, stored in
- * `agentic_trace_replay.sequence_length_sketches` (migration 026) so
- * `resident-sequence-lengths` reads about 1.3 KB per point instead of two
- * dense JSON count arrays of about 20 KB, and merges without building them.
- *
- * Before zlib deflate the payload is unsigned LEB128 varints. First a presence
- * mask (1 for ISL, 2 for OSL), then `n`, `zeroCount`, `minBin` and the bin
- * count of each present sketch, ISL first. Then each present sketch's bins as
- * runs, each run being a count of zero bins, a count of nonzero bins, and
- * `count - 1` for every one of those nonzero bins.
- *
- * Only sketches that `mergeTokenLengthSketches` would merge are encoded, with
- * integer fields small enough that sums over a request stay exact. Anything
- * else is not encoded, and readers use the JSON for that row.
- */
-
 import { deflateSync, inflateSync } from 'node:zlib';
 
 import {
@@ -23,12 +6,9 @@ import {
   type TokenLengthSketch,
 } from '@semianalysisai/inferencex-constants';
 
-/** Byte layout revision, part of `SEQUENCE_LENGTH_SKETCHES_VERSION`. */
 export const SEQUENCE_LENGTH_SKETCH_FORMAT = 1;
 
-/** Covers every token length below 2^64. */
 const MAX_BIN_END = 64 * TOKEN_LENGTH_BINS_PER_OCTAVE;
-/** Per-sketch cap on `n`, `zeroCount` and counts, so summing them stays far below 2^53. */
 const MAX_COUNT = 2 ** 32;
 
 const SLOTS = [0, 1] as const;
@@ -76,10 +56,6 @@ function pushVarint(bytes: number[], value: number): void {
   bytes.push(rest);
 }
 
-/**
- * Encode a stored `sequenceLengths` value. Returns null when it is not an
- * object of sketches this format reproduces exactly.
- */
 export function encodeSequenceLengthSketches(sequenceLengths: unknown): Buffer | null {
   let pair: { isl?: unknown; osl?: unknown } = {};
   if (sequenceLengths !== null && sequenceLengths !== undefined) {
@@ -92,7 +68,6 @@ export function encodeSequenceLengthSketches(sequenceLengths: unknown): Buffer |
     [1, pair.isl],
     [2, pair.osl],
   ] as const) {
-    // Falsy values count as absent, as they do for the JSON reader.
     if (!sketch) continue;
     if (typeof sketch !== 'object' || !isEncodableSketch(sketch)) return null;
     presence |= bit;
@@ -137,7 +112,6 @@ class VarintReader {
   next(): number {
     let value = 0;
     let scale = 1;
-    // Five bytes hold every encoded value (all at most 2^32).
     for (let read = 0; read < 5 && this.at < this.bytes.length; read += 1) {
       const byte = this.bytes[this.at++];
       value += (byte & 127) * scale;
@@ -147,7 +121,6 @@ class VarintReader {
     throw malformed();
   }
 
-  /** Walk `binCount` bins of runs, adding `sign` times each count at `offset` plus its bin. */
   runs(binCount: number, into: Float64Array, offset: number, sign: number): void {
     let bin = 0;
     while (bin < binCount) {
@@ -162,7 +135,6 @@ class VarintReader {
   }
 }
 
-/** Running merge of one side, with counts indexed by absolute bin. */
 interface MergeSide {
   counts: Float64Array;
   n: number;
@@ -171,13 +143,8 @@ interface MergeSide {
   binEnd: number;
 }
 
-/** Per slot, `n`, `zeroCount`, `minBin` and bin count of the payload being walked. */
 const HEADER_FIELDS = 4;
 
-/**
- * Add (`sign` 1) or subtract (`sign` -1) one inflated payload's bin counts,
- * filling `header` and returning the presence mask. Throws when malformed.
- */
 function walkPayload(
   bytes: Uint8Array,
   sides: readonly MergeSide[],
@@ -224,16 +191,10 @@ function mergedSketch({
 export interface MergedSequenceLengthSketches {
   isl: TokenLengthSketch | null;
   osl: TokenLengthSketch | null;
-  /** Readable payloads holding at least one sketch. */
   coveredPoints: number;
-  /** Indices of payloads that could not be decoded. They add nothing to the merge. */
   unreadable: number[];
 }
 
-/**
- * Merge encoded payloads exactly as `mergeTokenLengthSketches` merges the
- * sketches they encode, adding counts from the bytes in one pass.
- */
 export function mergeSequenceLengthSketchPayloads(
   payloads: readonly Uint8Array[],
 ): MergedSequenceLengthSketches {
@@ -260,7 +221,6 @@ export function mergeSequenceLengthSketchPayloads(
     try {
       presence = walkPayload(bytes, sides, header, 1);
     } catch {
-      // Subtracting along the same walk undoes the partial adds, then fails at the same byte.
       try {
         walkPayload(bytes, sides, header, -1);
       } catch {}

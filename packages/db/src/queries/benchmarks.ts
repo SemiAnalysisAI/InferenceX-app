@@ -131,14 +131,12 @@ interface RecursiveBenchmarkPlan {
   pointIdentity: SqlPiece;
   pointOrder: SqlPiece;
   metricsExpression: SqlPiece;
-  /** Ends with the point identity so ties never fall back to plan order. */
   resultOrder: SqlPiece;
 }
 
 // An AgentX curve spans AGG/disagg and offload lines that may run different images, so
 // append-only runs inherit only while every shared line keeps its image, as InferenceX's
 // append-only check requires. `line_images` is NULL when a line has a missing or second
-// image. Lines come from the table migration 023 maintains; run metadata stays live.
 function curveRunBase(modelKeys: string[], runLineFilter: SqlPiece): SqlPiece {
   return sqlPiece`
     ranked_runs AS (
@@ -175,8 +173,6 @@ const CURVE_RECURSION = sqlPiece`
       WHERE current.chain_images ->> older_line.key <> older_line.value
     )`;
 
-// Each line lists its points, so DISTINCT ON sorts ids and keys only and the
-// wide columns are read once per selected point.
 const CURVE_POINT_SOURCE = sqlPiece`
   FROM curve_runs cr
   CROSS JOIN LATERAL unnest(cr.point_ids) AS point(id)

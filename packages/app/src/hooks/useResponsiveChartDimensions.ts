@@ -10,11 +10,6 @@ export interface UseResponsiveChartDimensionsResult {
   setContainerRef: (element: HTMLDivElement | null) => void;
 }
 
-/**
- * A width change re-renders the whole chart. During a continuous resize (window or panel
- * drag) the first change applies at once and later ones collapse into one per window,
- * ending on the final width.
- */
 export const RESIZE_COALESCE_MS = 100;
 
 export function useResponsiveChartDimensions(

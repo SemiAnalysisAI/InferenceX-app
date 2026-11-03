@@ -13,7 +13,6 @@ export const alt = '芯片推理精度基准测试对比';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
-// Rendered on first request and then cached, like the page, so builds skip one PNG per slug.
 export function generateStaticParams(): { slug: string }[] {
   return [];
 }

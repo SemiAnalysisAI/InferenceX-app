@@ -32,7 +32,6 @@ export function profitTargetUrlValue(model: Model, target: number): string {
   return target === profitModelDefaults(model).interactivity ? '' : String(target);
 }
 
-/** Reads the first value of each key, as the server's `searchParams` did for repeated keys. */
 export function resolveCalculatorUrlSeed(params: URLSearchParams): CalculatorUrlSeed {
   const seed: CalculatorUrlSeed = {};
 
@@ -75,10 +74,6 @@ export function resolveCalculatorUrlSeed(params: URLSearchParams): CalculatorUrl
   return seed;
 }
 
-/**
- * The seed for a calculator page URL: its query, with a profit route's path filters (and path
- * model) applied, falling back to the model the route selects without a query.
- */
 export function calculatorUrlSeed(
   pathname: string,
   search: string,

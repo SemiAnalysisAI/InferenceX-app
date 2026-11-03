@@ -149,11 +149,6 @@ export interface AvailabilityRow {
   date: string;
 }
 
-/**
- * Get available (model, ISL/OSL, precision, hardware, framework, spec_method, benchmark_type, date) combos for the availability API.
- * `live` collapses the successful points to their distinct keys first, so the
- * semi-join sorts about a quarter as many rows and no longer spills to disk.
- */
 export async function getAvailabilityData(sql: DbClient): Promise<AvailabilityRow[]> {
   const rows = await sql`
     WITH live AS (
@@ -190,10 +185,6 @@ export interface DateChangelogBundle {
   runConfigs: RunConfigRow[];
 }
 
-/**
- * Range form of getWorkflowRunsByDate / getChangelogByDate / getRunConfigsByDate,
- * grouped per date (ascending). Only dates with at least one changelog row are returned.
- */
 export async function getChangelogDatesInRange(
   sql: DbClient,
   from: string,

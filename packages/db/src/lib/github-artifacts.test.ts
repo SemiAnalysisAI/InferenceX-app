@@ -83,8 +83,6 @@ describe('fetchRunAttempt', () => {
 describe('downloadArtifact', () => {
   it('stages concurrent downloads in separate zips', async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gh-download-'));
-    // `gh` writes the URL as the zip body and `unzip` copies the zip body out, and
-    // both exit on a later turn so the two downloads overlap.
     mockSpawn.mockImplementation(
       (command: string, args: string[], { stdio }: { stdio: (number | string)[] }) => {
         const listeners = new Map<string, (code: number, signal: null) => void>();

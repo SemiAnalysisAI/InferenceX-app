@@ -1,6 +1,5 @@
 import type { AvailabilityRow } from '@/lib/api/api';
 
-/** A line's columns (strings as dictionary indexes), then its dates as `[gap, length, ...]` runs over `dates`. */
 export type CompactAvailabilityLine = [
   model: number,
   isl: number | null,
@@ -14,12 +13,6 @@ export type CompactAvailabilityLine = [
   dateRuns: number[],
 ];
 
-/**
- * The dashboards' form of `/api/v1/availability`. A line is a row without its date,
- * and a line repeats on many dates, so each line is sent once with its dates as runs
- * of consecutive indexes into `dates` (every date, ascending). Lines keep the order
- * of their first row, which is the order the dashboards list sequences in.
- */
 export interface CompactAvailability {
   readonly dates: string[];
   readonly models: string[];

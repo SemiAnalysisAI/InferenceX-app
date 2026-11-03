@@ -43,12 +43,7 @@ export interface TraceHistogramPoint {
 export type TraceHistogramMap = Record<number, TraceHistogramPoint>;
 
 const QUERY_CHUNK_SIZE = 12;
-/**
- * Precomputed columns up to this size come back inline with the metadata
- * query; a chunk of them stays far below Neon's 64 MiB response cap.
- */
 const INLINE_COLUMNS_BYTES = 1024 * 1024;
-/** Points read at once. Each read also keeps its own slices in flight. */
 const POINTS_IN_FLIGHT = 4;
 /** The only request fields a histogram needs from a scanned gzip timeline. */
 const SEQUENCE_LENGTH_FIELDS: ReadonlySet<string> = new Set(['isl', 'osl']);
@@ -56,9 +51,7 @@ const SEQUENCE_LENGTH_FIELDS: ReadonlySet<string> = new Set(['isl', 'osl']);
 interface TimelineRow {
   benchmark_result_id: number;
   trace_replay_id: number;
-  /** octet_length(request_chart_data_gz) when it holds the current version. */
   columns_bytes: number | null;
-  /** The current columns as base64 when they are small enough to inline. */
   columns_inline: string | null;
   /** octet_length(request_timeline_gz); null when the row has no gzip timeline. */
   gz_bytes: number | null;
@@ -82,7 +75,6 @@ function finiteNumbers(values: (number | null)[] | null): number[] {
   return out;
 }
 
-/** Scan a gzip timeline keeping each request's ISL and OSL; null when unreadable. */
 async function scanTimelineSequenceLengths(
   sql: DbClient,
   row: TimelineRow,
@@ -102,7 +94,6 @@ async function scanTimelineSequenceLengths(
   return { isl, osl };
 }
 
-/** Compatibility fallback for pre-timeline rows; null for a malformed blob. */
 async function profileSequenceLengths(
   sql: DbClient,
   traceReplayId: number,
@@ -126,7 +117,6 @@ async function profileSequenceLengths(
     }
     return { isl, osl };
   } catch {
-    // Drop malformed blobs silently — caller treats missing ids as "no data".
     return null;
   }
 }
@@ -210,9 +200,6 @@ export async function getTraceHistograms(
     rows.push(...chunkRows);
   }
 
-  // Points are read a few at a time; a point that cannot be read is omitted.
-  // Ids are integer keys, so the response order does not depend on which
-  // point finishes first.
   const result: TraceHistogramMap = {};
   let next = 0;
   const readPoints = async (): Promise<void> => {

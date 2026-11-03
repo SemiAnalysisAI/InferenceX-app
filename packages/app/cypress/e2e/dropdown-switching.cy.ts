@@ -43,7 +43,6 @@ describe('Dropdown one-click switching', () => {
       cy.intercept('GET', '/api/v1/availability/compact', {
         body: availabilityBody([
           ...rows,
-          // This stub row has never carried a benchmark_type.
           {
             model: 'dsv41flash',
             isl: null,

@@ -7,7 +7,6 @@ import {
   SERVER_LOG_BLOCK_CHARS,
 } from './server-log-blocks';
 
-// PostgreSQL substring on text counts code points.
 const substring = (text: string, start: number, length: number) =>
   [...text].slice(start, start + length).join('');
 
@@ -28,7 +27,6 @@ describe('server log blocks', () => {
   const B = SERVER_LOG_BLOCK_CHARS;
 
   it('reads any code-point range of a mixed log exactly, including across blocks', () => {
-    // An astral pair straddles the first block boundary in UTF-16 units.
     const text = sampleLog(2 * B + 4321, [B - 1, B + 77, 2 * B + 10]);
     const blocks = encodeServerLogBlocks(text);
 

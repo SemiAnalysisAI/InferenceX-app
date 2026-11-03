@@ -18,10 +18,6 @@ import {
 
 export const STATS_VERSION = 9;
 
-/**
- * Version of `agentic_trace_replay.sequence_length_sketches`, embedding the
- * `STATS_VERSION` of the `aggregate_stats` the bytes copy.
- */
 export const SEQUENCE_LENGTH_SKETCHES_VERSION = STATS_VERSION * 100 + SEQUENCE_LENGTH_SKETCH_FORMAT;
 
 export interface SequenceLengthSketchColumns {
@@ -29,11 +25,6 @@ export interface SequenceLengthSketchColumns {
   version: number | null;
 }
 
-/**
- * The `sequence_length_sketches` columns to store with an `aggregate_stats`
- * value. Both are null unless the stats are current and their sketches encode
- * exactly, so readers fall back to the JSON.
- */
 export function sequenceLengthSketchColumns(aggregateStats: unknown): SequenceLengthSketchColumns {
   const sketches =
     typeof aggregateStats === 'object' &&
@@ -55,7 +46,6 @@ export interface IslOslRecord {
   };
 }
 
-/** Appends the lengths of one profiling-phase record. Cancelled requests are skipped. */
 export function pushRecordIslOsl(rec: IslOslRecord, isl: number[], osl: number[]): void {
   if (rec.metadata?.was_cancelled === true) return;
   const m = rec.metrics ?? {};
@@ -186,7 +176,6 @@ export function writeBackTraceReplayJsonb(
   });
 }
 
-/** Store a recomputed chart series with its summary, fire-and-forget. */
 export function writeBackChartSeries(
   sql: DbClient,
   traceReplayId: number,

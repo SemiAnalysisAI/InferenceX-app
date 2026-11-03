@@ -1,16 +1,3 @@
-/**
- * Compare reads served from `gpu_metric_sample_blobs` (migration 022) with the same
- * reads from `gpu_metric_samples`, and report storage and timings.
- *
- *   bun run db:verify-gpu-sample-blobs [--limit N] [--point-id ID ...]
- *
- * Uses DATABASE_READONLY_URL through the app's driver (`getDb`). For N random
- * benchmark points whose linked series all have a current blob (or the given
- * points), the `getGpuMetricsForPoint` payload read from blobs must deep-equal and
- * serialize identically to the payload read from rows, and every linked series'
- * decoded blob must deep-equal its SQL sample rows (microsecond timestamps
- * included). Exits 1 on any difference.
- */
 import { isDeepStrictEqual } from 'node:util';
 
 import { getDb } from './connection';
@@ -77,7 +64,6 @@ async function main(): Promise<void> {
   let mismatches = 0;
   let samples = 0;
   for (const [index, pointId] of pointIds.entries()) {
-    // Alternate which read goes first so neither always sees a warmer cache.
     const order = index % 2 === 0 ? [false, true] : [true, false];
     const payloads = new Map<boolean, GpuMetricsPointPayload | null>();
     for (const sampleBlobs of order) {

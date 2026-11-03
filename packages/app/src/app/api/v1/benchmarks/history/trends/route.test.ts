@@ -90,7 +90,6 @@ describe('GET /api/v1/benchmarks/history/trends', () => {
     );
     expect(res.status).toBe(200);
     expect(mockGetAllBenchmarksForHistory).toHaveBeenCalledWith('mock-sql', ['dsr1'], 1024, 8192);
-    // Fixed-sequence rows drop the producer run metadata, as the published route does.
     const { workflow_run_id: _id, run_started_at: _startedAt, ...published } = row;
     expect(expandTrendHistory(await res.json())).toEqual([published]);
   });

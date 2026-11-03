@@ -97,8 +97,6 @@ export async function* readBase64Slices(
   while (next < byteLength || pending.length > 0) {
     while (next < byteLength && pending.length < REQUEST_TIMELINE_GZ_SLICES_IN_FLIGHT) {
       const slice = read(next);
-      // Awaited in order below; this only keeps an early failure from being
-      // reported as unhandled while an earlier slice is still pending.
       slice.catch(() => {});
       pending.push(slice);
       next += sliceBytes;
@@ -108,7 +106,6 @@ export async function* readBase64Slices(
   }
 }
 
-/** Yield a current stored `request_timeline_gz` in order; see `readBase64Slices`. */
 export function requestTimelineGzSlices(
   sql: DbClient | Sql,
   traceReplayId: number,
@@ -127,7 +124,6 @@ export function requestTimelineGzSlices(
   });
 }
 
-/** Read a current stored `request_timeline_gz` whole. */
 export async function readRequestTimelineGz(
   sql: DbClient | Sql,
   traceReplayId: number,

@@ -14,7 +14,6 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: 400 });
   }
-  // Reuse the raw endpoint's cache, fixture mode, snapshot and power-validity semantics.
   const query = parseBenchmarksQuery(parsed.sourceParams);
   if (query instanceof Response) return query;
   try {

@@ -584,7 +584,6 @@ function configPriorityIndex(config: OverviewConfigView): number {
   );
 }
 
-/** `configs` all serve one hardware. */
 function selectPlatformRead(
   configs: readonly OverviewConfigResult[],
   tier: number,
@@ -613,18 +612,14 @@ function selectPlatformRead(
   return bestMissingRead ? nonComparableAsMissing(bestMissingRead, tier) : nullTierRead(tier);
 }
 
-/** A platform's read at one tier. `config` indexes the platform's `configs`. */
 export interface OverviewCubeRead extends Omit<OverviewTierRead, 'tier' | 'config'> {
   config: number | null;
   missingReason: OverviewMissingReason | null;
 }
 
-/** One matrix cell, read at every tier. */
 export interface OverviewCubePlatform {
   hardware: OverviewReferenceHardware;
-  /** The serving series some tier's read selects. */
   configs: OverviewConfigView[];
-  /** Indexed like OVERVIEW_TIERS. */
   reads: OverviewCubeRead[];
 }
 
@@ -636,11 +631,6 @@ export interface OverviewCubeRow {
   platforms: OverviewCubePlatform[];
 }
 
-/**
- * The matrix for one (engine, comparison, model scope), read at every tier.
- * Tier, reference hardware and both row scopes only slice it, so one cube
- * serves every URL that differs in those selectors.
- */
 export interface OverviewCube {
   engineScope: OverviewEngineScope;
   modelScope: OverviewModelScope;
@@ -661,7 +651,6 @@ function missingReasonForPlatform(
   }
   if (configs.length === 0) return 'no_scenario_data';
   // `cannot reach` is a claim about the whole platform, so it holds only when
-  // EVERY qualified serving series tops out below the tier. One merely
   // under-swept stack downgrades the gap to a missing exact read.
   return configs.every((config) => readConfigAtTier(config, tier).boundary === 'unreachable')
     ? 'cannot_reach_at_tier'
@@ -881,8 +870,6 @@ function buildOverviewCubeRow(
     scenario,
     platforms: OVERVIEW_HARDWARE.map((hardware) => {
       const hardwareRows = scenarioRows.filter((row) => row.hardware === hardware);
-      // A serving series never spans hardware, so building per hardware
-      // yields the same series without valuing SKUs the matrix never shows.
       const configs = buildConfigs(model, scenario, hardwareRows);
       const selected: OverviewConfigView[] = [];
       const reads = OVERVIEW_TIERS.map((tier): OverviewCubeRead => {
@@ -1114,7 +1101,6 @@ function overviewPlatformKey(
   return `${model.model}|${model.scenario}|${platform.hardware}`;
 }
 
-/** The matrix at one tier and reference, before either row scope applies. */
 export function sliceOverviewCube(
   cube: OverviewCube,
   tier: OverviewTier,

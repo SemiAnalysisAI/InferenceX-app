@@ -355,9 +355,6 @@ export function UnofficialRunProvider({
     refetchOnMount: 'always',
   });
 
-  // The benchmark transform (and the power model behind it) only matters once the URL names
-  // unofficial runs, so it loads alongside the first fetch instead of shipping with every
-  // dashboard route. Run data is withheld until both arrive so consumers see one transition.
   const [chartDataModule, setChartDataModule] = useState<typeof UnofficialChartDataModule | null>(
     null,
   );

@@ -94,10 +94,6 @@ function applyAgenticMetricAliases(raw: Record<string, number>): Record<string, 
 }
 
 export interface AggDataEntryOptions {
-  /**
-   * Evaluate the system power model (`modeledSystemPower`). Callers that read only
-   * topology, latency and throughput fields pass false and get it undefined.
-   */
   modelPower?: boolean;
 }
 
@@ -221,7 +217,6 @@ export function rowToAggDataEntry(
     p99_tpot: m.p99_tpot ?? 0,
     'p99.9_tpot': m['p99.9_tpot'] ?? 0,
     mean_intvty: m.mean_intvty ?? 0,
-    // A mid-literal spread makes V8 define every later key at runtime (~19x slower per row).
     mean_tpot_intvty:
       typeof m.mean_tpot === 'number' && Number.isFinite(m.mean_tpot) && m.mean_tpot > 0
         ? 1 / m.mean_tpot

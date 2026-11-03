@@ -25,9 +25,6 @@ function itPower(
   }
 }
 
-// The port memoizes per frozen system and network group, and builds each system's
-// configuration on first read. One model serving every state and CPU input in turn
-// must dump exactly what a freshly built model dumps, configurations included.
 describe('power model port: reused systems', () => {
   const states = Object.values(WorkloadState).flatMap((workload_state) =>
     [false, true].map((using_scale_out) => new OperatingState({ workload_state, using_scale_out })),

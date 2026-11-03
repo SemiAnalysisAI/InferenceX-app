@@ -1,33 +1,13 @@
-/**
- * Which benchmark points have a stored trace or a linked server log, for every
- * point at once. The chart decides from these whether a point offers "View
- * charts" and "View logs". `/api/v1/trace-availability` and
- * `/api/v1/log-availability` answer their `?ids=` lookups from the same sets.
- *
- * Ids are sorted and sent as runs of consecutive ids, because ingest assigns a
- * run's rows adjacent ids. On production data that is about 1.1k runs for
- * 26k ids, a few KB of JSON for the whole table.
- */
-
 import type { DbClient } from '../connection.js';
 
-/**
- * Ascending ids as `[gap, length, gap, length, ...]`. Each run covers ids
- * `start .. start + length - 1`, where `start` is `gap` past the end of the
- * previous run (the first run's `gap` is its start id).
- */
 export type IdRuns = number[];
 
 export interface BenchmarkPresence {
-  /** Points whose trace replay has a stored profile export. */
   trace: IdRuns;
-  /** Points with a linked server log bundle. */
   log: IdRuns;
 }
 
 export async function getBenchmarkPresence(sql: DbClient): Promise<BenchmarkPresence> {
-  // Grouping by `id - row_number()` collapses each run of consecutive ids into
-  // one row, so the database returns runs rather than every id.
   const rows = (await sql`
     with present as (
       select br.id, true as trace

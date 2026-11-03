@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import { IdBitset, presentIds } from './benchmark-presence';
 
-/** The `[gap, length, ...]` encoding `getBenchmarkPresence` builds from SQL runs. */
 function encodeRuns(sortedIds: number[]): number[] {
   const runs: number[] = [];
   let end = 0;
@@ -16,7 +15,6 @@ function encodeRuns(sortedIds: number[]): number[] {
   return runs;
 }
 
-/** Clustered ids like ingest assigns them, from a fixed-seed generator. */
 function clusteredIds(seed: number, maxId: number): number[] {
   let state = seed;
   const random = () => {

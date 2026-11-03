@@ -168,7 +168,6 @@ export interface NormalizedHGXFanPowerFields {
   provenance?: Provenance;
 }
 
-// The curve reads only this frozen model, and every estimate reads it twice.
 const AFFINITY_CURVES = new WeakMap<NormalizedHGXFanPower, AffinityFanPower>();
 
 export class NormalizedHGXFanPower extends FanPower {

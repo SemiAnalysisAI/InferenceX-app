@@ -38,7 +38,6 @@ const mockGet = vi.mocked(get);
 const mockList = vi.mocked(list);
 const mockPut = vi.mocked(put);
 
-// Only the fields blobGet reads; get() also returns headers and blob metadata.
 function stored(body: Uint8Array): GetBlobResult {
   return {
     statusCode: 200,

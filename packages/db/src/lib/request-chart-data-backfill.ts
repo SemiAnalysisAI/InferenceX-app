@@ -12,15 +12,10 @@ import { readRequestTimelineGz } from '../queries/request-timeline.js';
 
 export interface RequestChartColumnsRow {
   columns: Buffer;
-  /** The timeline the columns were derived from, so the write can verify it is unchanged. */
   timelineBytes: number;
   timelineMd5: string;
 }
 
-/**
- * Derive the request-chart columns of a row's current `request_timeline_gz`.
- * Returns null when the row has no current gzip timeline.
- */
 export async function computeRequestChartColumns(
   sql: Sql,
   traceReplayId: number,
@@ -41,10 +36,6 @@ export async function computeRequestChartColumns(
   };
 }
 
-/**
- * Store columns computed by `computeRequestChartColumns`. Returns false, and
- * writes nothing, when the timeline changed since it was read.
- */
 export function writeRequestChartColumns(
   sql: Sql,
   traceReplayId: number,

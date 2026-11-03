@@ -87,7 +87,6 @@ function run(command: string, args: string[], stdout: number | 'inherit'): Promi
   return promise;
 }
 
-// Each call stages its zip in its own temp dir, so concurrent downloads never share a path.
 export async function downloadArtifact(artifact: ArtifactMeta, destRoot: string): Promise<string> {
   const zipDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gh-artifact-'));
   const zipPath = path.join(zipDir, 'artifact.zip');

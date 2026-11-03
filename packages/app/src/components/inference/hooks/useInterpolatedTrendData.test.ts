@@ -605,7 +605,6 @@ function trendLinesAt15(rows: BenchmarkRow[]) {
 
 describe('buildTrendLines', () => {
   const RUN = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123';
-  // Two concurrency points per date, both on the interactivity/throughput frontier.
   const sweep = (date: string) => [
     makeBenchmarkRow({ date, conc: 64, run_url: `${RUN}/attempts/1` }),
     makeBenchmarkRow({

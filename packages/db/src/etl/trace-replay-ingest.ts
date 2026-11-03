@@ -57,13 +57,10 @@ export interface PreparedTraceReplay {
   serverMetricsJsonGz: Buffer | null;
   serverMetricsJsonSize: number | null;
   aggregateStatsJson: Buffer | null;
-  /** `sequenceLengthSketchColumns` of the aggregate stats, null when they keep only the JSON. */
   sequenceLengthSketches: Buffer | null;
   chartSeriesJson: Buffer | null;
-  /** `encodeChartSeriesSummary` of `chartSeriesJson`. */
   chartSeriesSummaryGz: Buffer | null;
   requestTimelineGz: Buffer | null;
-  /** `encodeRequestChartColumns` of what the chart route derives from `requestTimelineGz`. */
   requestChartDataGz: Buffer | null;
   chartWindows: number;
   timelineRequests: number;
@@ -191,8 +188,6 @@ export async function prepareTraceReplay(
   const { aggregateStats, chartSeries, requestTimeline, atomKvCacheBlocks } =
     await computeTraceDerivedPayloads(profile.data, metricsJson.data, metricsContext);
   const requestTimelineGz = requestTimeline ? await gzipRequestTimeline(requestTimeline) : null;
-  // Derived from the stored bytes, not the in-memory timeline, so the columns
-  // match what the chart route would parse out of `request_timeline_gz`.
   const requestChartDataGz = requestTimelineGz
     ? encodeRequestChartColumns(await requestChartDataFromTimelineGz(requestTimelineGz))
     : null;

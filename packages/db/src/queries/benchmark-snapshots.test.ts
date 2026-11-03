@@ -125,7 +125,6 @@ beforeAll(async () => {
   for (const name of migrations.filter((filename) => filename < '014_'))
     await db.exec(readFileSync(new URL(name, dir), 'utf8'));
   await seed();
-  // Readers need migration 023, so count the pre-014 view's rows directly.
   const [legacy] = await sql`SELECT count(*)::int AS count FROM latest_benchmarks lb
     JOIN configs c ON c.id = lb.config_id WHERE c.model = 'glm5.2'`;
   legacyCount = Number(legacy.count);

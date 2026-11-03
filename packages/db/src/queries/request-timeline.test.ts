@@ -51,7 +51,6 @@ function sliceServingSql(
       const [from, length] = values as number[];
       const byteLength = values[4];
       ranges.push([from, length]);
-      // The SQL guard: no row once the stored length differs from the expected one.
       if (byteLength !== stored.length) return Promise.resolve([]);
       const slice = stored.subarray(from - 1, from - 1 + length).toString('base64');
       return Promise.resolve([{ slice }]);
@@ -158,7 +157,6 @@ describe('readRequestTimelineGz', () => {
     }) as unknown as DbClient;
 
     const read = readRequestTimelineGz(sql, 870, stored.length, 10);
-    // Answer the newest query first so completion order differs from byte order.
     const answerNewest = async (): Promise<void> => {
       await vi.waitFor(() => expect(waiting.length).toBeGreaterThan(0));
       waiting.pop()?.();

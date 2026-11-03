@@ -20,7 +20,6 @@ interface Pair {
   osl: TokenLengthSketch | null;
 }
 
-/** Seeded Park-Miller generator, so failures reproduce. */
 function random(seed: number): () => number {
   let state = seed;
   return () => {
@@ -29,7 +28,6 @@ function random(seed: number): () => number {
   };
 }
 
-/** Samples around a random centre, with repeats so some bins exceed one varint byte. */
 function samples(next: () => number): number[] {
   const count = Math.floor(next() * 600);
   const centre = 2 ** (next() * 20);
@@ -136,7 +134,6 @@ describe('sequence length sketch payloads', () => {
   it('report corrupt payloads without letting them add to the merge', () => {
     const good: Pair = { isl: sketch(400, [3, 0, 1]), osl: sketch(90, [2]) };
     const payload = encodeSequenceLengthSketches(good)!;
-    // Valid zlib around a bad layout: runs cut short, a trailing byte, and minBin 2^14.
     const truncatedRuns = deflateSync(Buffer.from([1, 4, 0, 144, 3, 3, 0, 3, 2]));
     const trailingByte = deflateSync(Buffer.from([0, 0]));
     const binPastEnd = deflateSync(Buffer.from([1, 1, 0, 128, 128, 1, 1, 0, 1, 0]));

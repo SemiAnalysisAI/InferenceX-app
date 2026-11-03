@@ -25,7 +25,6 @@ export function buildChartData(
     if (!sequence) continue;
     const key = `${displayModel}_${sequence}`;
     if (!groups.has(key)) groups.set(key, []);
-    // Same date semantics as the official chart: snapshot date, with the measured date kept.
     const chartRow = {
       ...row,
       date: benchmarkCurveDate(row),

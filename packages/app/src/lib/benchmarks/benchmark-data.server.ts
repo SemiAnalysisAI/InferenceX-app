@@ -5,7 +5,6 @@ import { agenticWorkflowMetadataOnly } from '@/lib/benchmarks/agentic-workflow-m
 import { getCachedBenchmarks as getCachedLatestBenchmarks } from '@/lib/benchmarks/benchmark-query-cache.server';
 import { loadFixture } from '@/lib/testing/test-fixtures';
 
-// Server renders read the rows `/api/v1/benchmarks` serves, from the same cache entries.
 export async function getCachedBenchmarks(dbModelKeys: string[]): Promise<BenchmarkRow[]> {
   if (FIXTURES_MODE) return loadFixture<BenchmarkRow[]>('benchmarks');
   return agenticWorkflowMetadataOnly(await getCachedLatestBenchmarks(dbModelKeys));

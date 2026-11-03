@@ -1,21 +1,3 @@
-/**
- * Columnar binary form of the request-chart-data payload. Ingest stores it in
- * `agentic_trace_replay.request_chart_data_gz` so readers decode a few bytes
- * per request instead of parsing the whole JSON request timeline.
- *
- * Layout (little-endian, then gzip):
- *   "RCD" and a format byte
- *   f64 version, timelineVersion, startNs, endNs, durationS
- *   u32 request count, u32 dictionary bytes, UTF-8 JSON `[cids, phases]`
- *   per tuple column: u8 kind, u32 byte length, payload
- *
- * Column kinds:
- *   PLAIN   unsigned varints of non-negative safe integers, no nulls
- *   DELTA   varints of `zigzag(k - previous k) + 1`, or `0` for null, where
- *           `k = round(value * scale)` and `k / scale === value` exactly
- *   FLOAT64 raw doubles with NaN for null, used when DELTA would not be exact
- */
-
 import { gunzipSync, gzipSync } from 'node:zlib';
 
 import type { RequestChartDataWire, RequestChartTuple } from '../queries/request-chart-data';
@@ -27,7 +9,6 @@ const KIND_PLAIN = 0;
 const KIND_DELTA = 1;
 const KIND_FLOAT64 = 2;
 
-/** Keeps every zigzag delta plus one at or below 2^53. */
 const MAX_DELTA_MAGNITUDE = 2 ** 50;
 
 interface ColumnSpec {
@@ -36,7 +17,6 @@ interface ColumnSpec {
   plain: boolean;
 }
 
-/** Tuple order of `RequestChartTuple`. */
 const COLUMNS: readonly ColumnSpec[] = [
   { scale: 1, nullable: false, plain: true }, // cid
   { scale: 1, nullable: false, plain: true }, // phase
@@ -251,7 +231,6 @@ function readLayout(gz: Uint8Array): ChartColumnsLayout {
   };
 }
 
-/** Decode one column to doubles, NaN marking null. */
 function readColumn(layout: ChartColumnsLayout, column: number): Float64Array {
   const { bytes, view, count } = layout;
   const { kind, start, end } = layout.columns[column];
@@ -325,7 +304,6 @@ export function decodeRequestChartColumns(gz: Uint8Array): RequestChartDataWire 
   };
 }
 
-/** Finite ISL and OSL values in request order, decoding only those two columns. */
 export function decodeRequestChartSequenceLengths(gz: Uint8Array): {
   isl: number[];
   osl: number[];

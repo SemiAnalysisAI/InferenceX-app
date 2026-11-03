@@ -12,17 +12,10 @@ import {
 
 const RETIRED_PROFIT_PARAMS = ['i_pctl', 'percentile'] as const;
 
-/** A retired percentile filter segment the profit routes drop when canonicalizing. */
 export function hasRetiredPercentileSegment(filters: readonly string[]): boolean {
   return filters.some((segment, index) => index % 2 === 0 && segment === 'percentile');
 }
 
-/**
- * Model-route pages are static, so they cannot see the query. The proxy uses this to send an
- * alias or mixed-case model slug, or a retired profit percentile, to the canonical URL with every
- * other parameter intact. Returns null when the URL should load as is: already canonical, or a 404
- * the page renders.
- */
 export function modelRouteRedirectUrl(url: URL): URL | null {
   const parsed = parseModelRoutePathname(url.pathname);
   const resolved = parsed?.slug ? resolveModelRouteSlug(parsed.slug) : null;

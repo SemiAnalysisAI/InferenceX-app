@@ -33,7 +33,6 @@ vi.mock('./blob-cache', () => ({
   blobPurge: vi.fn(),
 }));
 
-// The purge generation the `db`-tagged unstable_cache entry currently holds.
 const generation = vi.hoisted(() => ({ value: 'g1' }));
 
 import {
@@ -166,8 +165,6 @@ describe('cachedQuery', () => {
     });
 
     it('caches results whose entry would exceed the 2 MB data cache limit', async () => {
-      // Mirrors Next's unstable_cache: it stores JSON.stringify(result) inside a
-      // JSON entry, skips entries over 2 MiB and JSON.parses hits.
       const store = new Map<string, string>();
       mockUnstableCache.mockImplementation(((
         cb: (...args: unknown[]) => Promise<unknown>,
@@ -661,7 +658,6 @@ describe('cachedJson', () => {
         },
       });
       expect(body.equals(expected)).toBe(true);
-      // A version is validated before the body exists, so its ETag ignores the size.
       expect(brotli(data, { 'If-None-Match': versionTag }, 'rev').status).toBe(304);
     }
   }, 30_000);

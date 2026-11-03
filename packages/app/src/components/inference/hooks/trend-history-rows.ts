@@ -1,12 +1,5 @@
 import type { BenchmarkRow } from '@/lib/api/api';
 
-/**
- * The metric keys Historical Trends reads besides the interactivity axis, for any
- * selectable metric. They feed the trend point (`interpolated-trend-core.ts`), the
- * entry behind its derived metrics (`rowToAggDataEntry`, `buildDerivedChartFields`),
- * revenue pricing, and the modeled system power behind the facility and IT power
- * bases (`modelSystemPower`).
- */
 const TREND_METRIC_KEYS = [
   'tput_per_gpu',
   'output_tput_per_gpu',
@@ -45,14 +38,8 @@ const TREND_METRIC_KEYS = [
   'kv_offload_backend',
 ];
 
-/** A fixed-sequence row's interactivity is its stored median. */
 const FIXED_AXIS_KEYS = ['median_intvty'];
 
-/**
- * An agentic row's interactivity is `1 / P90 ITL`. A numeric P90 full-response ITL
- * decides it alone. Without one, plain P90 ITL stands in only when no other
- * percentile has a full-response ITL (`rowToAggDataEntry`).
- */
 const AGENTIC_AXIS_KEYS = ['p90_full_response_itl'];
 const AGENTIC_FALLBACK_AXIS_KEYS = [
   'p90_full_response_itl',
@@ -94,7 +81,6 @@ type CompactTrendConfig = [
   recipeFingerprint: string | null,
 ];
 
-/** Run and snapshot provenance, holding only the keys the source row has. */
 type CompactTrendRun = Pick<
   BenchmarkRow,
   | 'date'
@@ -106,7 +92,6 @@ type CompactTrendRun = Pick<
   | 'curve_run_started_at'
 >;
 
-/** Per-worker power, and the CPU audit modeled rack power checks, when the row has them. */
 type CompactTrendPower = Pick<BenchmarkRow, 'workers' | 'power_audit'>;
 
 type CompactTrendRow =
@@ -120,13 +105,6 @@ type CompactTrendRow =
       power: CompactTrendPower,
     ];
 
-/**
- * The Historical Trends form of `/api/v1/benchmarks/history`. A history repeats each
- * config's columns on all of its rows and each run's provenance on all of that run's
- * rows, so both are sent once. `metrics` is `[keyIndex, value, ...]` over `metricKeys`
- * and holds only the keys a trend reads. `power_audit` keeps only `cpu`, and
- * `power_invalid_reasons` is not sent.
- */
 export interface CompactTrendHistory {
   readonly metricKeys: readonly string[];
   readonly configs: CompactTrendConfig[];
@@ -177,7 +155,6 @@ export function compactTrendHistory(historyRows: readonly BenchmarkRow[]): Compa
       compact.configs.push(config);
     }
 
-    // Absent and null run times order agentic runs differently, so only present keys are kept.
     const run: CompactTrendRun = { date: row.date, run_url: row.run_url };
     if (row.workflow_run_id !== undefined) run.workflow_run_id = row.workflow_run_id;
     if (row.run_started_at !== undefined) run.run_started_at = row.run_started_at;
@@ -219,7 +196,6 @@ export function compactTrendHistory(historyRows: readonly BenchmarkRow[]): Compa
   return compact;
 }
 
-/** Rebuild `BenchmarkRow`s from `compactTrendHistory` output, with the trend metric keys. */
 export function expandTrendHistory({
   metricKeys,
   configs,

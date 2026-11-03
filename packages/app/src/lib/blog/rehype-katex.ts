@@ -5,7 +5,6 @@ import { SKIP, visitParents } from 'unist-util-visit-parents';
 import type { VFile } from 'vfile';
 
 type Options = Omit<KatexOptions, 'displayMode' | 'throwOnError'> & {
-  /** Called for each math node rendered, so pages load KaTeX's stylesheet only when they need it. */
   onMath?: () => void;
 };
 type HastNode = Parameters<typeof toText>[0];

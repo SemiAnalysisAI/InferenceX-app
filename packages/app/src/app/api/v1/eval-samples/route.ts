@@ -12,8 +12,6 @@ import { parseEvalSampleWindow } from '@/lib/evaluation/eval-sample-params';
 
 export const dynamic = 'force-dynamic';
 
-// Caches the response page rather than the rows, so a hit skips parsing every
-// sample's serialized prompt for its few-shot demonstrations.
 const getCachedEvalSamples = cachedQuery(
   async (
     evalResultId: number,

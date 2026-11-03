@@ -141,7 +141,6 @@ export function fetchBenchmarkHistory(
   return fetchJson<BenchmarkRow[]>(`/api/v1/benchmarks/history?${params}`, signal);
 }
 
-/** `fetchBenchmarkHistory` rows with only what Historical Trends reads. */
 export async function fetchTrendHistory(
   model: string,
   isl: number,
@@ -200,7 +199,6 @@ export interface AvailabilityRow {
   date: string;
 }
 
-/** `/api/v1/availability` rows plus the supplemental datasets, as lines with date runs. */
 export function fetchDashboardAvailability(signal?: AbortSignal) {
   return fetchJson<CompactAvailability>('/api/v1/availability/compact', signal);
 }
@@ -209,7 +207,6 @@ export function fetchReliability(signal?: AbortSignal) {
   return fetchJson<ReliabilityRow[]>('/api/v1/reliability', signal);
 }
 
-/** `fetchReliability` rows summed per day and GPU: the `/reliability` dashboard's input. */
 export function fetchReliabilityDaily(signal?: AbortSignal) {
   return fetchJson<ReliabilityRow[]>('/api/v1/reliability/daily', signal);
 }
@@ -218,7 +215,6 @@ export function fetchEvaluations(signal?: AbortSignal) {
   return fetchJson<EvalRow[]>('/api/v1/evaluations', signal);
 }
 
-/** `fetchEvaluations` rows with only the metrics the `/evaluation` dashboard reads. */
 export async function fetchDashboardEvaluations(signal?: AbortSignal): Promise<EvalRow[]> {
   return expandEvalRows(await fetchJson<CompactEvalRows>('/api/v1/evaluations/compact', signal));
 }

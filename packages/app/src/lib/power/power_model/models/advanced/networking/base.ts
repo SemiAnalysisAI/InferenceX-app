@@ -46,8 +46,6 @@ export abstract class ScaleOutNetworkingGear extends FrozenModel {
   }
 }
 
-// A group's breakdown reads only the frozen group and the operating state, which is
-// one of a few workload / scale-out pairs, so each pair is built once per group.
 const NETWORK_BREAKDOWNS = new WeakMap<NetworkGroup, Map<string, PowerComponentBreakdown>>();
 
 export class NetworkGroup extends FrozenModel {

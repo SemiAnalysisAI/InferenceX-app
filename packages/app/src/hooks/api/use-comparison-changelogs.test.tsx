@@ -73,7 +73,6 @@ const SERVER: WorkflowChangelogDate[] = [
   },
 ];
 
-// The pre-range hook's per-date construction, applied to /workflow-info responses.
 function legacyChangelogs(dates: string[], perDate: Map<string, WorkflowChangelogDate>) {
   const results: ComparisonChangelog[] = [];
   for (const date of dates) {
@@ -161,7 +160,6 @@ describe('useComparisonChangelogs', () => {
     mockFetch.mockResolvedValue({ dates: SERVER });
     const availableDates = ['2025-12-31', '2026-01-04', '2026-01-01', '2026-01-03', '2026-01-06'];
     await render(['h100'], availableDates);
-    // One timer tick is not always enough for the query to resolve and re-render.
     await act(() => vi.waitFor(() => expect(observed?.loading).toBe(false)));
 
     expect(mockFetch).toHaveBeenCalledTimes(1);

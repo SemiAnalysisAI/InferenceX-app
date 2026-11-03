@@ -78,7 +78,6 @@ export interface SkipTracker {
   unmappedModels: Set<string>;
   unmappedHws: Set<string>;
   unmappedPrecisions: Set<string>;
-  /** Numeric artifact fields stored in `metrics` without a METRIC_KEYS entry. */
   unexpectedMetrics: Set<string>;
   dbWriteErrors: DbWriteFailure[];
   dbWriteWarnings: DbWriteFailure[];

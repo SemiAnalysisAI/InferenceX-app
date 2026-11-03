@@ -39,7 +39,6 @@ function hardwareByModelSlug(rows: readonly AvailabilityRow[]): Map<string, Set<
   return out;
 }
 
-/** Pass `rows` when the caller already read availability (the sitemap reads it once). */
 export async function getComparablePairsByModelSlug(
   rows?: readonly AvailabilityRow[],
 ): Promise<Map<string, ComparePair[]>> {

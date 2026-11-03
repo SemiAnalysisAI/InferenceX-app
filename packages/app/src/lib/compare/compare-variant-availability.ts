@@ -22,7 +22,6 @@ export interface SpecDecodePair {
   method: string;
 }
 
-/** Pass `availability` when the caller already read it (the sitemap reads it once). */
 export async function getPrecisionPairsByModelSlug(
   availability?: readonly AvailabilityRow[],
 ): Promise<Map<string, PrecisionPair[]>> {
@@ -90,7 +89,6 @@ export async function getAllComparablePrecisionSlugs(
   return result;
 }
 
-/** Pass `availability` when the caller already read it (the sitemap reads it once). */
 export async function getSpecDecodePairsByModelSlug(
   availability?: readonly AvailabilityRow[],
 ): Promise<Map<string, SpecDecodePair[]>> {

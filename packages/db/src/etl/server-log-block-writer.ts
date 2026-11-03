@@ -9,7 +9,6 @@ import {
   type ServerLogBlock,
 } from '../server-log-blocks';
 
-/** `SERVER_LOG_BLOCKS=1` also stores new logs as compressed blocks (needs migration 021). */
 export const serverLogBlocksEnabled = (): boolean => process.env.SERVER_LOG_BLOCKS === '1';
 
 const INSERT_BATCH = 32;
@@ -35,11 +34,6 @@ async function insertBlocks(
   }
 }
 
-/**
- * Store one file as blocks read in ranges of whole blocks, then its marker row,
- * inside the caller's transaction. Returns false when the file already has a marker.
- * `readRange(start, length)` returns code points [start, start + length).
- */
 export async function writeServerLogBlocks(
   tx: TransactionSql,
   serverLogId: number | string,
@@ -57,7 +51,6 @@ export async function writeServerLogBlocks(
   let blockCount = 0;
   for (let start = 0; start < charCount; start += rangeChars) {
     const length = Math.min(rangeChars, charCount - start);
-    // The blooms of a range's last block read past it.
     const read = await readRange(start, length + SERVER_LOG_BLOOM_LOOKAHEAD);
     const ascii = Buffer.byteLength(read, 'utf8') === read.length;
     const text = sliceCodePoints(read, ascii, 0, length);
@@ -78,7 +71,6 @@ export async function writeServerLogBlocks(
   return true;
 }
 
-/** Store a log already held in memory (ingest caps files at 128 MiB). */
 export function writeTextAsBlocks(
   tx: TransactionSql,
   serverLogId: number | string,

@@ -122,7 +122,6 @@ export function renderScatterPoints<T extends { precision: string; x: number; y:
   return points;
 }
 
-/** Builds or updates a point's label while visible; a hidden label is not kept in the DOM. */
 export function syncPointLabel(
   group: SVGGElement,
   text: string,
@@ -134,7 +133,6 @@ export function syncPointLabel(
     existing?.remove();
     return;
   }
-  // A new label is filled in while detached, so it lands as one DOM insertion.
   const element =
     existing ?? group.ownerDocument.createElementNS('http://www.w3.org/2000/svg', 'text');
   const lines = text.split('\n');

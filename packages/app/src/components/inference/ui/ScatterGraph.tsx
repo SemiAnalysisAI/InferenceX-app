@@ -224,8 +224,6 @@ const FixedSequenceLogDialog = dynamic(
   { ssr: false },
 );
 
-// Closed or toggled-off until the reader asks for them, so they load after the chart instead of
-// with it.
 const QuickFiltersDialog = dynamic(
   () =>
     import('@/components/inference/ui/QuickFiltersDialog').then(
@@ -1570,7 +1568,6 @@ const ScatterGraph = React.memo(
     const applyParetoFadeRef = useRef<(group: RenderContext['layout']['zoomGroup']) => void>(
       () => {},
     );
-    // Zoom groups that may carry a fade filter; an inactive fade skips the rest.
     const [fadedZoomGroups] = useState(() => new WeakSet<SVGGElement>());
     applyParetoFadeRef.current = (zoomGroup) => {
       const node = zoomGroup.node();
@@ -3810,7 +3807,6 @@ const ScatterGraph = React.memo(
       (ctx: RenderContext) => {
         const { zoomGroup } = ctx.layout;
 
-        // Only this pass sets a dot's transition, so a dot that has one is already current.
         zoomGroup.selectAll<SVGGElement, unknown>('.dot-group').each(function () {
           if (this.style.getPropertyValue('transition') === '') {
             this.style.setProperty('transition', 'opacity 150ms ease');
@@ -3872,7 +3868,6 @@ const ScatterGraph = React.memo(
           getShapeKeyForPrecision(d.precision, ir.selectedPrecisions),
           color,
         );
-        // Keep the offload halo above a re-created shape.
         const halo = this.querySelector(':scope > .offload-halo');
         if (halo?.nextSibling) this.append(halo);
       });

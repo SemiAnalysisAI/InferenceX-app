@@ -257,10 +257,8 @@ export function buildDerivedChartFields(
   currentHwKey: string,
   requestedMetrics?: readonly DerivedMetricKey[],
   tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
-  /** `getGpuSpecs(currentHwKey, tcoBasis)`, when the caller already holds it. */
   specs: GpuSpecs = getGpuSpecs(currentHwKey, tcoBasis),
 ): Partial<DerivedChartFields> {
-  // Request lists hold a few keys; a linear scan beats allocating a Set per row.
   const wants = (key: DerivedMetricKey) =>
     requestedMetrics === undefined || requestedMetrics.includes(key);
   const hardwarePower = specs.power;
@@ -359,7 +357,6 @@ export function buildDerivedChartFields(
     fields.jInput = chartMetric(hardwarePower ? (hardwarePower * 1000) / inputTputPerGpu : 0);
   }
 
-  // Both builders are pure; skip them when no requested key can come from them.
   let wantsMeasured = requestedMetrics === undefined;
   let wantsPowerBasis = requestedMetrics === undefined;
   for (const key of requestedMetrics ?? []) {
@@ -472,8 +469,6 @@ type MeasuredPowerChartFields = Partial<
   Pick<InferenceData, keyof typeof MEASURED_POWER_FIELD_KEYS>
 >;
 
-// Conditional assignment, not conditional spreads: V8 builds spread chains through a slow
-// runtime path. Assignment order is the key order consumers iterate.
 function buildMeasuredPowerChartFields(
   entry: AggDataEntry,
   tdpWatts: number,

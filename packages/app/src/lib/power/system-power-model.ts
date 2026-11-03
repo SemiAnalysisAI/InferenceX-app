@@ -101,7 +101,6 @@ export const MEASURED_SYSTEM_POWER_CATEGORIES: ReadonlySet<SystemPowerCategory> 
   'measuredCpu',
 ]);
 
-/** Zero parts, keyed in {@link SYSTEM_POWER_CATEGORIES} order. */
 export const emptySystemPowerBreakdown = (): SystemPowerBreakdown => ({
   gpu: 0,
   measuredCpu: 0,
@@ -147,7 +146,6 @@ const LEAF_CATEGORY_RULES: readonly (readonly [RegExp, SystemPowerCategory])[] =
   [/loss/iu, 'psuLoss'],
 ];
 
-// Leaf names are the port's fixed component names, so each is matched once.
 const LEAF_CATEGORIES = new Map<string, SystemPowerCategory>();
 
 /** The part a leaf of the pinned model's component tree counts toward. */
@@ -185,8 +183,6 @@ export interface SystemUnitPower {
   breakdown: SystemPowerBreakdown;
 }
 
-// The model is immutable and depends only on this closed key (systems × workloads ×
-// scale-out); building it rebuilds the whole hardware tree, so build each one once.
 const POWER_MODELS = new Map<string, PowerModel>();
 
 function powerModel(system: keyof typeof SYSTEMS, state: SystemPowerOperatingState): PowerModel {

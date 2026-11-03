@@ -318,7 +318,6 @@ describe('ScatterGraph toggle decoration', () => {
 
   it('clears the Pareto fade from every faded mark when the frontier is turned off', () => {
     inferenceState.current = { ...baseInferenceState(), showParetoFrontier: true };
-    // The extra h100 point dominates both b200 points, so b200 leaves the frontier.
     const { container, rerender, unmount } = mountChart({
       data: [...POINTS, point('h100', 'fp8', 70, 300, 2)],
     });

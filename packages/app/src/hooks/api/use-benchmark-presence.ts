@@ -12,10 +12,6 @@ export interface BenchmarkPresenceSets {
 
 const PRESENCE_URL = '/api/v1/benchmark-presence';
 
-/**
- * Trace and server-log presence for every point, each decoded once into a
- * bitset. One cached request per page, shared by every chart.
- */
 export function useBenchmarkPresence(enabled: boolean) {
   return useQuery({
     queryKey: ['benchmark-presence'],

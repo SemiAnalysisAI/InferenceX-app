@@ -39,7 +39,6 @@ export function interceptTpuLaunchData(
     model === 'Kimi-K3'
       ? qwenAgenticRows.map((row) => ({ ...row, model: 'kimik3' }))
       : qwenAgenticRows;
-  // The fixture build serves this same file as the published availability.
   cy.fixture<AvailabilityRow[]>('api/availability.json').then((availability) => {
     cy.intercept('GET', '/api/v1/availability/compact', {
       body: availabilityBody([

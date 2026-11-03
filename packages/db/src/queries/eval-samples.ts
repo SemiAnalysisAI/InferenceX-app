@@ -6,10 +6,6 @@ export interface EvalSampleRow {
   target: string | null;
   response: string | null;
   raw_response: string | null;
-  /**
-   * lm-eval's serialized chat prompt (`arguments.gen_args_0.arg_0`, or its
-   * first element when it is an array), when it is a string.
-   */
   fewshot_source: string | null;
   passed: boolean | null;
   score: number | null;
@@ -43,10 +39,6 @@ export async function getEvalSamples(
         ? sql`and es.passed is false`
         : sql``;
 
-  // One statement returns the page and the filter-chip counts. The counts row
-  // is left-joined to the page so an empty page still carries them.
-  // `jsonb_to_record` detoasts `data` once per row; separate `data->...`
-  // expressions would each decompress the whole value.
   const rows = (await sql`
     with counts as (
       select

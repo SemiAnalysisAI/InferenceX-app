@@ -142,9 +142,6 @@ import { hasRoleTelemetry } from '../utils/power-chip-coverage';
 import { useFirstChartRenderTiming } from './use-first-chart-render-timing';
 import { useCenterOnEnter } from '@/hooks/useCenterOnEnter';
 
-// Off by default (table view, GPU-over-time, power timeline, PowerX Where panels and headroom
-// table, and the date-comparison changelog), so they load on first use instead of shipping with
-// every dashboard, compare page and blog chart.
 const chartViewSkeleton = () => <Skeleton className="h-[600px] w-full" />;
 const InferenceTable = dynamic(() => import('@/components/inference/ui/InferenceTable'), {
   loading: chartViewSkeleton,

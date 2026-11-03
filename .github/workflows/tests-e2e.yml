@@ -145,8 +145,6 @@ jobs:
         run: bun install --frozen-lockfile
         env:
           CYPRESS_INSTALL_BINARY: '0'
-      # The test jobs only restore this cache. This job is its single writer, which
-      # avoids concurrent cache reservations across the parallel test jobs.
       - name: Save Bun package cache
         if: ${{ steps.bun-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -163,8 +161,6 @@ jobs:
         with:
           path: packages/app/.next/cache
           key: ${{ steps.nextjs-cache.outputs.cache-primary-key }}
-      # A tarball keeps the symlinks Turbopack writes under .next/node_modules,
-      # which a plain artifact upload would replace with copies.
       - name: Archive app build
         run: >-
           tar --use-compress-program='zstd -T0' -cf "$RUNNER_TEMP/e2e-app-build.tar.zst"
@@ -181,21 +177,16 @@ jobs:
   cypress:
     name: E2E (${{ matrix.browser }}, shard ${{ matrix.shard }})
     needs: build
-    # Run even when the build fails, so the shard checks fail instead of being
-    # skipped, which branch protection would count as passing.
     if: ${{ !cancelled() && !github.event.pull_request.draft }}
     timeout-minutes: 15
     runs-on: blacksmith-8vcpu-ubuntu-2404
     permissions:
       contents: read
-      actions: read # Download this run's app build artifact.
+      actions: read
     strategy:
       fail-fast: false
       matrix:
         browser: [chrome, firefox]
-        # Eight shards per browser. Every shard repeats checkout, dependency
-        # installation, Cypress setup, and the app build download, so more shards
-        # trade extra runner time for a shorter wall-clock run.
         shard: [1, 2, 3, 4, 5, 6, 7, 8]
     steps:
       - name: Require the app build
@@ -251,8 +242,6 @@ jobs:
         with:
           path: ~/.cache/Cypress
           key: ${{ steps.cypress-cache.outputs.cache-primary-key }}
-      # The artifact belongs to this workflow run, so every shard serves the
-      # build of the commit under test.
       - name: Download app build
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:

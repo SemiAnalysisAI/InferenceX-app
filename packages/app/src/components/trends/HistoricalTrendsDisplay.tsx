@@ -61,7 +61,6 @@ import {
 } from '@/components/inference/metric-registry';
 import { Button } from '@/components/ui/button';
 
-// The waterfall view is opt-in, so it loads when selected instead of with the line chart.
 const ImprovementWaterfallChart = dynamic(
   () => import('@/components/inference/ui/ImprovementWaterfallChart'),
   { loading: () => <Skeleton className="h-[430px] w-full" /> },

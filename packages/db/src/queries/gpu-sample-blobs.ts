@@ -1,7 +1,3 @@
-/**
- * Writes `gpu_metric_sample_blobs` rows (migration 022) from the stored samples.
- * Readers prefer a current row over `gpu_metric_samples` (`loadSeriesDetails`).
- */
 import { isDeepStrictEqual } from 'node:util';
 
 import type postgres from 'postgres';
@@ -17,26 +13,17 @@ import {
 } from '../lib/gpu-sample-blob';
 import { readSqlSampleRows, type RawSampleRow } from './gpu-metrics';
 
-/** Neon's HTTP driver returns at most 64 MiB, hex-encoded; larger series keep reading rows. */
 export const GPU_SAMPLE_BLOB_MAX_BYTES = 24 * 1024 * 1024;
 
 export type StoreGpuSampleBlobResult =
   | { status: 'written'; sampleCount: number; bytes: number }
   | { status: 'skipped'; reason: string };
 
-/** A SQL sample row in the shape `decodeGpuSampleBlob` returns. */
 export function storedSample(row: RawSampleRow): StoredGpuMetricSample {
   const { series_id: _seriesId, ...sample } = row;
   return sample;
 }
 
-/**
- * Encode the series' rows exactly as the reader's SQL path returns them and store
- * the blob, stamped with the series' `ingested_at`. The caller's transaction must
- * hold the series row (the ingest's own write, or FOR SHARE) so the rows and the
- * stamp belong to one series version. A series the codec cannot reproduce exactly,
- * or whose blob exceeds GPU_SAMPLE_BLOB_MAX_BYTES, keeps no blob.
- */
 export async function storeGpuSampleBlob(
   tx: Sql | postgres.TransactionSql,
   seriesId: number,

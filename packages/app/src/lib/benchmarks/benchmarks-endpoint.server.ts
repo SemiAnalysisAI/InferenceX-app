@@ -30,10 +30,8 @@ export interface BenchmarksQuery {
   powerValidFilter: PowerValidityFilter | null;
 }
 
-/** The `/api/v1/benchmarks` query, or the 400 response the endpoint sends for it. */
 export function parseBenchmarksQuery(params: URLSearchParams): BenchmarksQuery | Response {
   const model = params.get('model') ?? '';
-  // Numeric GitHub run id only. Anything else is ignored and read as "latest".
   const runIdParam = params.get('runId');
   const view = params.get('view');
   const sequence = params.get('sequence') ?? '';
@@ -48,8 +46,6 @@ export function parseBenchmarksQuery(params: URLSearchParams): BenchmarksQuery |
   if (powerValidFilter === undefined) {
     return NextResponse.json({ error: 'Unknown powerValid filter' }, { status: 400 });
   }
-  // The calculator cache stores rows already trimmed to an allowlist that
-  // excludes power_valid, so post-cache filtering cannot work there.
   if (view === 'calculator' && powerValidFilter !== null) {
     return NextResponse.json(
       { error: 'powerValid cannot be combined with view=calculator' },
@@ -61,7 +57,6 @@ export function parseBenchmarksQuery(params: URLSearchParams): BenchmarksQuery |
     date: params.get('date') ?? undefined,
     exact: params.get('exact') === 'true',
     runId: runIdParam && /^\d+$/u.test(runIdParam) ? runIdParam : undefined,
-    // exactRun=true → return this run's logical snapshot, including append-only ancestors.
     exactRun: params.get('exactRun') === 'true',
     calculator: view === 'calculator',
     sequence,
@@ -69,10 +64,6 @@ export function parseBenchmarksQuery(params: URLSearchParams): BenchmarksQuery |
   };
 }
 
-/**
- * The rows `/api/v1/benchmarks` serializes for `query`. In-process callers use this
- * instead of calling the route, which would stringify, hash and re-parse the rows.
- */
 export async function loadBenchmarks(query: BenchmarksQuery): Promise<BenchmarkRow[]> {
   const { dbModelKeys, date, runId, sequence, powerValidFilter } = query;
   if (FIXTURES_MODE) {

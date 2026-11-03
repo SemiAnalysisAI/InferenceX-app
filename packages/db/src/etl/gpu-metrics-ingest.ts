@@ -288,7 +288,6 @@ export function upsertGpuMetricSeries(
           series.samples.slice(offset, offset + SAMPLE_BATCH_SIZE),
         );
       }
-      // Opt-in until migration 022 is applied wherever ingest runs.
       if (process.env.GPU_SAMPLE_BLOBS === '1') {
         const blob = await storeGpuSampleBlob(tx, seriesId);
         if (blob.status === 'skipped') {

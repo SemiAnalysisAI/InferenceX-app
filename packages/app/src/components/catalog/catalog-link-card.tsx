@@ -25,8 +25,6 @@ export function CatalogLinkCard({
   locale,
   event,
 }: CatalogLinkCardProps) {
-  // Index pages list many cards whose targets render on their first request, so viewport
-  // prefetch would render every visible one. Prefetch on hover, focus or touch instead.
   return (
     <IntentPrefetchLink
       href={href}

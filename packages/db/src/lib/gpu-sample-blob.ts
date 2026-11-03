@@ -1,27 +1,9 @@
-/**
- * Columnar, brotli-compressed copy of one series' `gpu_metric_samples` rows
- * (`gpu_metric_sample_blobs`, migration 022).
- *
- * The encoder takes the rows exactly as the SQL reader yields them and refuses
- * any cell the decoder could not reproduce, so `decodeGpuSampleBlob(encode(rows))`
- * deep-equals `rows` (same order, same strings, same numbers including -0 and NaN).
- *
- * Layout before compression, little-endian, each numeric column split into byte
- * planes (all low bytes, then the next byte, ...) so brotli sees runs.
- *   u8 format version, u32 row count, f64 epoch seconds of the first row
- *   gpu_index           int16 x rows
- *   sampled_at seconds  int32 delta from the previous row x rows
- *   sampled_at micros   uint24 x rows
- *   per metric column   presence bitmap (bit i set = row i not null),
- *                       float32 bits x present rows
- */
 import { brotliCompressSync, brotliDecompressSync, constants } from 'node:zlib';
 
 import type { StoredGpuMetricSample } from './gpu-metric-stats';
 
 export const GPU_SAMPLE_BLOB_FORMAT_VERSION = 1;
 
-/** Column order of the layout. Changing it needs a new format version. */
 const METRIC_COLUMNS = [
   'power_w',
   'temperature_c',
@@ -39,7 +21,6 @@ const METRIC_COLUMNS = [
   'mm_activity_pct',
 ] as const satisfies readonly Exclude<keyof StoredGpuMetricSample, 'gpu_index' | 'sampled_at'>[];
 
-/** A row the layout cannot reproduce exactly. Callers keep reading `gpu_metric_samples`. */
 export class GpuSampleBlobUnsupportedError extends Error {
   constructor(message: string) {
     super(message);
@@ -62,7 +43,6 @@ function float4FromBits(bits: number): number {
   return f32[0]!;
 }
 
-/** True when `parsed` lies exactly halfway between `rounded` and its float4 neighbour. */
 function isFloat4Midpoint(parsed: number, rounded: number): boolean {
   if (!Number.isFinite(rounded)) return false;
   const bits = float4Bits(rounded);
@@ -70,7 +50,6 @@ function isFloat4Midpoint(parsed: number, rounded: number): boolean {
   return parsed === (rounded + other) / 2;
 }
 
-// The root typecheck targets ES2018, which has no bigint literals.
 /* oxlint-disable unicorn/prefer-bigint-literals */
 const BIG_1 = BigInt(1);
 const BIG_2 = BigInt(2);
@@ -78,28 +57,20 @@ const BIG_4 = BigInt(4);
 const BIG_10 = BigInt(10);
 /* oxlint-enable unicorn/prefer-bigint-literals */
 
-/**
- * PostgreSQL's float4out (Ryu built with `acceptBounds = false`) by exact rational
- * arithmetic. The shortest decimal strictly inside the float4 rounding interval, the
- * one closest to the value among those, ties to even.
- */
 export function shortestFloat4Exact(value: number): number {
   if (value === 0 || !Number.isFinite(value)) return value;
   const bits = float4Bits(value);
   const exponentField = (bits >>> 23) & BYTE;
   const fraction = bits & FLOAT4_FRACTION_BITS;
   const mantissa = exponentField === 0 ? fraction : fraction + 2 ** 23;
-  // value = 4 * mantissa * 2^e2, interval bounds at 4m - 1 or 4m - 2 and 4m + 2.
   const e2 = (exponentField === 0 ? 1 : exponentField) - 127 - 23 - 2;
   const mv = BIG_4 * BigInt(mantissa);
   const mp = mv + BIG_2;
   const mm = mv - (fraction !== 0 || exponentField <= 1 ? BIG_2 : BIG_1);
   const magnitude = Math.abs(value);
   for (let k = Math.floor(Math.log10(magnitude)) + 2; ; k--) {
-    // scaled(x) = x * 2^e2 / 10^k = x * num / den
     const num = (e2 > 0 ? BIG_2 ** BigInt(e2) : BIG_1) * (k < 0 ? BIG_10 ** BigInt(-k) : BIG_1);
     const den = (e2 < 0 ? BIG_2 ** BigInt(-e2) : BIG_1) * (k > 0 ? BIG_10 ** BigInt(k) : BIG_1);
-    // Open interval on both sides; every quantity here is positive.
     const low = (mm * num) / den + BIG_1;
     const high = (mp * num - BIG_1) / den;
     if (low > high) continue;
@@ -115,14 +86,6 @@ export function shortestFloat4Exact(value: number): number {
   }
 }
 
-/**
- * The JS number a driver yields for the float4 `value` (an exact float32). Since
- * PostgreSQL 12 float4out prints the shortest decimal that reads back as the same
- * float4, and the drivers parse that text as a double. Outside powers of two the
- * rounding interval is symmetric, so the correctly rounded `toPrecision` at the first
- * length that round-trips is that decimal. Asymmetric intervals, parses that land
- * exactly on an interval bound and decimal ties take the exact path.
- */
 export function pgFloat4Number(value: number): number {
   if (value === 0 || !Number.isFinite(value)) return value;
   const bits = float4Bits(value);
@@ -133,7 +96,6 @@ export function pgFloat4Number(value: number): number {
     const rounded = Math.fround(parsed);
     if (rounded !== parsed && isFloat4Midpoint(parsed, rounded)) break;
     if (rounded !== value) continue;
-    // toPrecision breaks an exact tie away from zero, float4out to even.
     const longer = value.toPrecision(digits + 1);
     if (Number(longer) === value && /5(?:e|$)/u.test(longer)) break;
     return parsed;
@@ -141,7 +103,6 @@ export function pgFloat4Number(value: number): number {
   return shortestFloat4Exact(value);
 }
 
-/** `YYYY-MM-DDTHH:MM:SS` of whole epoch seconds, as `to_char` prints it in the reader. */
 const secondsPrefix = (seconds: number): string =>
   new Date(seconds * 1000).toISOString().slice(0, 19);
 
@@ -186,7 +147,6 @@ function checkedCell(row: StoredGpuMetricSample, column: string): number | null 
   throw new GpuSampleBlobUnsupportedError(`${column} holds ${typeof value}, not a float4 number`);
 }
 
-/** Encode one series' rows, in the order the SQL reader returns them. */
 export function encodeGpuSampleBlob(rows: readonly StoredGpuMetricSample[]): Buffer {
   const count = rows.length;
   const gpuIndex = new Uint32Array(count);
@@ -244,7 +204,6 @@ export function encodeGpuSampleBlob(rows: readonly StoredGpuMetricSample[]): Buf
       if (value === null) continue;
       const float = Math.fround(value);
       const floatBits = float4Bits(float);
-      // Zero keys would merge -0 with 0 in the set; zeros are exact anyway.
       if (value !== 0 && !exact.has(floatBits)) {
         if (!Object.is(pgFloat4Number(float), value)) {
           throw new GpuSampleBlobUnsupportedError(`${column} ${value} is not float4 output`);
@@ -284,7 +243,6 @@ export function encodeGpuSampleBlob(rows: readonly StoredGpuMetricSample[]): Buf
   });
 }
 
-/** Rows of one series in stored order, field for field as the SQL reader returns them. */
 export function decodeGpuSampleBlob(data: Uint8Array): StoredGpuMetricSample[] {
   const raw = brotliDecompressSync(data);
   const view = new DataView(raw.buffer, raw.byteOffset, raw.byteLength);

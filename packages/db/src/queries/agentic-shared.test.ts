@@ -46,7 +46,6 @@ describe('writeBackTraceReplayJsonb', () => {
     expect(calls).toHaveLength(1);
     expect(calls[0]!.text).toContain('update agentic_trace_replay set aggregate_stats');
     expect(calls[0]!.text).toContain('sequence_length_sketches_version');
-    // Stats without current sequence-length sketches clear the compact columns.
     expect(calls[0]!.values).toEqual([{ version: 12, foo: 'bar' }, null, null, 870]);
   });
 

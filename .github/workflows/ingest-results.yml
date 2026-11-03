@@ -138,8 +138,6 @@ jobs:
             github.event.client_payload.run-id }}
           MERGE_RUN_ID: ${{ github.event.client_payload.merge-run-id ||
             github.event.client_payload.run-id }}
-        # Polls instead of always sleeping 300 s. The shared cap keeps the old upper
-        # bound, so a run that never reports completed proceeds exactly as before.
         run: |
           deadline=$((SECONDS + 300))
           for run_id in $(printf '%s\n' "$SOURCE_RUN_ID" "$MERGE_RUN_ID" | sort -u); do
@@ -335,8 +333,6 @@ jobs:
         id: powerx
         run: bun packages/db/src/verify-power-publication.ts power-publication.json "${CACHE_INVALIDATE_URL%/api/v1/invalidate}"
 
-      # A read-only report of whole-database counts. It runs after the cache refresh
-      # so new data is not held back by it, and whenever the writes succeeded.
       - name: Verify database
         if: ${{ !cancelled() && steps.overrides.outcome == 'success' }}
         run: bun run admin:db:verify

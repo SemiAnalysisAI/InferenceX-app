@@ -1,11 +1,5 @@
 import type { EvalRow } from '@semianalysisai/inferencex-db/queries/evaluations';
 
-/**
- * The `/evaluation` dashboard's form of `/api/v1/evaluations`. Each row repeats
- * its 18 config columns and its run's timestamp and URL, so those are sent once
- * per config and per run. `metrics` keeps only the keys the dashboard reads
- * (`chart-data.ts`); the rest (n_eff, em_flexible, ...) are not sent.
- */
 export interface CompactEvalRows {
   readonly configs: CompactEvalConfig[];
   readonly runs: [timestamp: string, runUrl: string | null][];
@@ -73,7 +67,6 @@ export function compactEvalRows(evalRows: readonly EvalRow[]): CompactEvalRows {
         row.num_decode_gpu,
       ]);
     }
-    // Timestamps never contain '|', so a key without one means no run URL.
     const runKey = row.run_url === null ? row.timestamp : `${row.timestamp}|${row.run_url}`;
     let run = runIndex.get(runKey);
     if (run === undefined) {
@@ -90,7 +83,6 @@ export function compactEvalRows(evalRows: readonly EvalRow[]): CompactEvalRows {
   return compact;
 }
 
-/** Rebuild `EvalRow`s from `compactEvalRows` output, with the dashboard's metric keys. */
 export function expandEvalRows({ configs, runs, rows }: CompactEvalRows): EvalRow[] {
   return rows.map(([id, config, task, date, conc, run, metrics]) => {
     const [

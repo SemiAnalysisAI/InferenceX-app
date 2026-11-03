@@ -24,7 +24,6 @@ function wireWith(requests: RequestChartTuple[]): RequestChartDataWire {
   };
 }
 
-/** Deterministic values shaped like real timelines: unsorted µs offsets and ms latencies. */
 function sampleRequests(count: number): RequestChartTuple[] {
   let seed = 12_345;
   const next = (): number => {

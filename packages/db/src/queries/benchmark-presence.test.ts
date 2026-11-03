@@ -44,9 +44,7 @@ describe('getBenchmarkPresence', () => {
     `);
 
     await expect(getBenchmarkPresence(sql)).resolves.toEqual({
-      // Ids 3-5, then 7.
       trace: [3, 3, 1, 1],
-      // Ids 1-2 and 5, then 9-10.
       log: [1, 2, 2, 1, 3, 2],
     });
   });

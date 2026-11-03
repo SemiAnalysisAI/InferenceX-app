@@ -25,7 +25,6 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock('@/app/api/gpu-metrics/route', () => ({ readGpuMetricsForView: mocks.metrics }));
 vi.mock('@/app/api/video-runs/route', () => ({ GET: mocks.video }));
-// mocks.benchmarks receives the parsed /api/v1/benchmarks query and answers like the route.
 vi.mock('@/lib/benchmarks/benchmarks-endpoint.server', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   loadBenchmarks: async (query: BenchmarksQuery) => {

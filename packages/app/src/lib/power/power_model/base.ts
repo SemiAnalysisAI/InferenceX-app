@@ -362,11 +362,8 @@ export class Provenance extends FrozenModel {
   }
 }
 
-/** A configuration, or a pure function of frozen inputs that builds it on first read. */
 export type LazyConfiguration = JsonObject | null | (() => JsonObject);
 
-// Kept off the instance so breakdowns stay plain frozen data. Only system nodes carry
-// one, and most estimates never read it, so it is built on first read.
 const CONFIGURATIONS = new WeakMap<PowerComponentBreakdown, LazyConfiguration>();
 
 export interface PowerComponentBreakdownFields {
@@ -452,7 +449,6 @@ export class PowerComponentBreakdown extends FrozenModel {
 
   scaled(quantity: number): PowerComponentBreakdown {
     const count = validate_quantity(quantity);
-    // x * 1 === x exactly, so the copy would equal this frozen node field for field.
     if (count === 1) return this;
     return new PowerComponentBreakdown({
       name: this.name,

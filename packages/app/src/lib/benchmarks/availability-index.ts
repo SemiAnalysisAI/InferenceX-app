@@ -5,21 +5,12 @@ import { buildAvailabilityHwKey } from '@/lib/charts/chart-utils';
 
 import type { CompactAvailability } from './compact-availability';
 
-/** An availability row without its date, with the keys the dashboards filter on. */
 export interface AvailabilityLine extends Readonly<Omit<AvailabilityRow, 'date'>> {
-  /** `rowToSequence` of the line. */
   readonly sequence: string | null;
-  /** `buildAvailabilityHwKey` of the line, null when it has no hardware. */
   readonly hwKey: string | null;
-  /** Bit `i` is set when the line has a row on `AvailabilityIndex.dates[i]`. */
   readonly dates: Uint32Array;
 }
 
-/**
- * Availability decoded once per response. Each line is kept in first-row order, so
- * anything collected from lines in order (sequences, precision counts) comes out in
- * the order the rows would give. Dates are bitsets over the sorted `dates`.
- */
 export interface AvailabilityIndex {
   readonly dates: readonly string[];
   readonly lines: readonly AvailabilityLine[];
@@ -71,7 +62,6 @@ export function indexAvailability(compact: CompactAvailability): AvailabilityInd
   return { dates, lines, linesByModel };
 }
 
-/** The lines of any of `dbModelKeys`, in index order. */
 export function linesForModels(
   index: AvailabilityIndex,
   dbModelKeys: readonly string[],
@@ -80,7 +70,6 @@ export function linesForModels(
   return index.lines.filter((line) => dbModelKeys.includes(line.model));
 }
 
-/** Every date any of `lines` has, ascending and distinct. */
 export function datesOfLines(
   index: AvailabilityIndex,
   lines: readonly AvailabilityLine[],

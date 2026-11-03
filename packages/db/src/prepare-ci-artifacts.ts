@@ -35,8 +35,6 @@ function fetchRunMetadata(repo: string, runId: string): GithubRunMetadata {
   ) as GithubRunMetadata;
 }
 
-// Downloads are network-bound. Eight at a time stays far below GitHub's
-// concurrent-request limit.
 const DOWNLOAD_CONCURRENCY = 8;
 
 async function downloadWithRetries(
@@ -61,8 +59,6 @@ async function downloadWithRetries(
   }
 }
 
-// Starts downloads in plan order. After a failure no new download starts, the
-// running ones finish, and the first failing worker's error is thrown.
 async function downloadAll(
   artifacts: readonly ArtifactMeta[],
   artifactsPath: string,

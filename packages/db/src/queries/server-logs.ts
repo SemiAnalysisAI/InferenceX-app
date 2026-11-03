@@ -41,12 +41,6 @@ interface BlockBackedFile {
   charCount: number;
 }
 
-/**
- * Code points [offset, offset + length) of the file a request names, in one
- * query, when the file is stored as blocks. Resolves the file the same way the
- * text readers do (primary stream first). Null sends the caller to the text
- * columns: no such file, no block marker, or tables older than migration 021.
- */
 async function readBlockBacked(
   sql: DbClient,
   benchmarkResultId: number,
@@ -213,7 +207,6 @@ export async function getServerLogChunk(
 ): Promise<ServerLogChunk | null> {
   const block = await readBlockBacked(sql, benchmarkResultId, fileName, offset, limit);
   if (block) {
-    // Same values as the text path: `has_more` is "a character exists after the range".
     const charCount = Math.max(0, Math.min(limit, block.file.charCount - offset));
     return {
       fileName: block.file.fileName,
@@ -298,11 +291,6 @@ export async function getServerLogChunk(
   }
 }
 
-/**
- * PostgreSQL's case-insensitive regex on an escaped literal: each needle
- * character matches itself, its lowercase or its uppercase. Not Unicode case
- * folding, which would also match U+212A KELVIN SIGN to `k`.
- */
 function caseInsensitiveLiteral(term: string): RegExp {
   const classes = [...term].map((ch) => {
     const variants = new Set(

@@ -208,7 +208,6 @@ describe('stored gzip timeline streaming', () => {
     const [row] = await sql`select request_timeline_gz from agentic_trace_replay where id = 12`;
     await sql`update agentic_trace_replay set request_timeline_gz = null where id = 12`;
     try {
-      // Slices already in flight may still arrive; the first later read must fail.
       const drain = async (): Promise<void> => {
         for await (const chunk of chunks!) expect(chunk).toHaveLength(23);
       };

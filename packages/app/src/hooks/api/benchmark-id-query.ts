@@ -119,13 +119,11 @@ export function useBulkIdsQuery<T>(
   return useQuery(bulkIdsQueryOptions(useQueryClient(), endpoint, ids, enabled, fetchByIds));
 }
 
-/** ETag each revalidated payload object was served with. */
 const payloadValidators = new WeakMap<object, string>();
 
 const asObject = (value: unknown): object | undefined =>
   typeof value === 'object' && value !== null ? value : undefined;
 
-/** Structural sharing that moves the new payload's ETag onto the object the cache keeps. */
 function shareValidated(previous: unknown, next: unknown): unknown {
   const shared = replaceEqualDeep(previous, next);
   const nextObject = asObject(next);
@@ -135,10 +133,6 @@ function shareValidated(previous: unknown, next: unknown): unknown {
   return shared;
 }
 
-/**
- * `revalidate` asks the server on every mount and window focus and sends the cached
- * payload's ETag, so an unchanged payload comes back as a bodiless 304 and is reused.
- */
 export function useByIdQuery<T, TSelected = T>(
   endpoint: string,
   id: number | null,

@@ -17,10 +17,8 @@ import {
 } from './interpolated-trend-core';
 import { compactTrendHistory, expandTrendHistory } from './trend-history-rows';
 
-// The fixture predates several row columns, like older API captures.
 const fixtureRows = historyFixture as unknown as BenchmarkRow[];
 
-// The route sends `compactTrendHistory` through `cachedJson`; the client parses it with `res.json()`.
 async function overWire(rows: readonly BenchmarkRow[]): Promise<BenchmarkRow[]> {
   return expandTrendHistory(await Response.json(compactTrendHistory(rows)).json());
 }
@@ -95,7 +93,6 @@ describe('compactTrendHistory', () => {
       metrics: { tput_per_gpu: 100, p90_full_response_itl: 0.02, p99_ttft: 3 },
       workers,
     };
-    // Same run except for a null start time, which agentic dedupe tells apart from absence.
     const nullStart: BenchmarkRow = { ...base, id: 2, conc: 2, run_started_at: null };
     const fixed: BenchmarkRow = {
       ...base,
@@ -174,7 +171,6 @@ describe('compactTrendHistory', () => {
     const rows = [
       ...curve('2026-03-01', 1, (conc) => ({ p90_full_response_itl: 0.01 * conc, p90_itl: 1 })),
       ...curve('2026-03-02', 2, (conc) => ({ p90_itl: 0.012 * conc })),
-      // Another percentile's full-response ITL keeps plain P90 ITL from standing in.
       ...curve('2026-03-03', 3, (conc) => ({
         median_full_response_itl: 0.01,
         p90_itl: 0.01 * conc,

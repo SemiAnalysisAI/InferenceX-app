@@ -23,11 +23,6 @@ const getCachedLatestBenchmarks = cachedQuery(
   { blobOnly: true },
 );
 
-/**
- * `getLatestBenchmarks` through the cache. Arguments the query ignores are dropped
- * (`exact` and `runId` without a date, `runId` with `exact`), so every caller asking
- * for the same rows shares one entry.
- */
 export function getCachedBenchmarks(
   dbModelKeys: string[],
   date?: string,
@@ -49,7 +44,6 @@ export const getCachedBenchmarksForRun = cachedQuery(
   { blobOnly: true },
 );
 
-// Trimmed per sequence from the shared latest rows, so the four sequences cost one query.
 export const getCachedCalculatorBenchmarks = cachedQuery(
   async (dbModelKeys: string[], sequence: string, date?: string) =>
     toCalculatorBenchmarkRows(await getCachedBenchmarks(dbModelKeys, date), sequence),

@@ -160,7 +160,6 @@ describe('artifact downloads', () => {
     vi.stubEnv('INGEST_REPO', 'SemiAnalysisAI/InferenceX');
     vi.stubEnv('GITHUB_OUTPUT', '');
     mocks.metadata.mockReturnValue(JSON.stringify({ run_attempt: 1 }));
-    // Listed newest-name-first so the plan's sort, not the listing, sets the order.
     mocks.artifacts.mockReturnValue(
       names.toReversed().map((name) => ({
         name,
@@ -195,8 +194,6 @@ describe('artifact downloads', () => {
       const { promise, resolve } = Promise.withResolvers<void>();
       gates.push(resolve);
       peak = Math.max(peak, gates.length);
-      // Once every start in this turn has run, finish the newest download, so
-      // completion order differs from start order.
       setImmediate(() => gates.pop()?.());
       await promise;
       fs.mkdirSync(path.join(root, name));
@@ -216,7 +213,6 @@ describe('artifact downloads', () => {
     const originalExitCode = process.exitCode;
     const { dir, started, error } = await prepare(async (name, root) => {
       if (name === 'bmk_02') throw new Error('network');
-      // The failing download retries within this turn, so it fails before any other finishes.
       const { promise, resolve } = Promise.withResolvers<void>();
       setImmediate(resolve);
       await promise;

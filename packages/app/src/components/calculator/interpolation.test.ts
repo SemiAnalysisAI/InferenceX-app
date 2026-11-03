@@ -8,7 +8,6 @@ interface P {
   y: number;
 }
 
-// The accessor-based algorithm the index sort replaced.
 function referenceFront(points: P[]): P[] {
   const sorted = [...points].toSorted((a, b) => (a.x === b.x ? b.y - a.y : a.x - b.x));
   const front: P[] = [];

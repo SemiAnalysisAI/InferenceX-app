@@ -20,9 +20,6 @@ import {
 import { getDerivedAgenticMetrics } from './derived-agentic-metrics';
 import { getResidentSequenceLengthSketches } from './resident-sequence-lengths';
 
-// Real SQL over stored `aggregate_stats` rows, so a wrong JSONB path or operator shows up as a
-// changed route result rather than passing against a mock.
-
 const ISL = { mean: 1100, p50: 1000, p75: 1200, p90: 1500, p95: 1700, p99: 1900, n: 40 };
 const OSL = { mean: 210.5, p50: 200, p75: 250, p90: 300, p95: 350, p99: 390, n: 40 };
 const KV = { mean: 0.41, p50: 0.4, p75: 0.5, p90: 0.6, p95: 0.65, p99: 0.7, n: 12 };
@@ -53,7 +50,6 @@ beforeAll(async () => {
   db = await migratedPglite();
   const base = pgliteSql(db);
   writes = [];
-  // Write-backs are recorded instead of applied so every case reads the seeded rows.
   sql = (strings: TemplateStringsArray, ...values: unknown[]) => {
     if (strings.join('').includes('update agentic_trace_replay')) {
       writes.push(values);
@@ -101,7 +97,6 @@ beforeAll(async () => {
       )
     `;
   }
-  // Row 1 reads its compact sketches. Row 2 reads its JSON beside compact bytes of an older version.
   const current = sequenceLengthSketchColumns(stats[1]);
   await base`
     update agentic_trace_replay

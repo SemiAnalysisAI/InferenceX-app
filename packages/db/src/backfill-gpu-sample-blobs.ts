@@ -1,16 +1,3 @@
-/**
- * Store compressed per-series sample blobs (`gpu_metric_sample_blobs`, migration 022).
- *
- *   bun run db:backfill-gpu-sample-blobs            # count series without a current blob
- *   bun run db:backfill-gpu-sample-blobs --yes      # write them
- *   bun run db:backfill-gpu-sample-blobs --run-id <github run id> [--force] [--limit N] --yes
- *
- * Each series is read through the reader's SQL path, encoded, decoded and compared
- * with those rows, then written in one transaction that holds the series row FOR
- * SHARE, so a concurrent re-ingest waits and the blob names the version it encodes.
- * Run it once after migration 022 and after bumping GPU_SAMPLE_BLOB_FORMAT_VERSION.
- * Missing or stale blobs only make reads slower, never wrong.
- */
 import { hasNoSslFlag, hasYesFlag } from './cli-utils';
 import { createAdminSql } from './etl/db-utils';
 import { parseLimitForceFlags, parseRunIdFlag } from './lib/backfill-runner';

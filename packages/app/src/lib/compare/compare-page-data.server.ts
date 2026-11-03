@@ -86,8 +86,6 @@ function buildComparePageDerivedData(
   };
 }
 
-// generateMetadata and the page read the same pair in one render, so the pair rows (and, when
-// both ask for the same sequence, the derived data) are memoized per request.
 const readPagePairRows = cache((dbModelKeys: readonly string[], a: string, b: string) =>
   (FIXTURES_MODE ? loadComparePairRows : getCachedComparePairRows)([...dbModelKeys], a, b),
 );

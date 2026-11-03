@@ -1,12 +1,3 @@
-/**
- * Store existing server logs as compressed blocks (migration 021).
- *
- *   bun src/compact-server-logs.ts [--limit N] [--log-id ID] [--dry-run] [--no-ssl]
- *
- * Each file is read in ranges of whole blocks (a JavaScript string cannot hold
- * the largest logs), written as blocks and marked block-backed in one
- * transaction. The text columns are left as they are; readers prefer blocks.
- */
 import { hasNoSslFlag } from './cli-utils.js';
 import { createAdminSql } from './etl/db-utils.js';
 import { writeServerLogBlocks } from './etl/server-log-block-writer.js';

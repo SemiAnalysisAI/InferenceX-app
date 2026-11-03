@@ -58,13 +58,11 @@ export function historicalInteractivityAxis(isAgentic: boolean) {
   };
 }
 
-/** Metric-independent trend state for one raw row; prepared once per loaded row set. */
 export interface TrendRow {
   readonly row: BenchmarkRow;
   readonly entry: AggDataEntry;
   readonly derivedEntry: AggDataEntry;
   readonly hwKey: string;
-  /** Group key when several precisions are selected. */
   readonly precisionGroupKey: string;
   readonly x: number;
   readonly curveDate: string;
@@ -124,15 +122,9 @@ function prepareTrendRow(
 }
 
 const trendSourceKey = (source: TrendSource) => `${source.date}:${source.runId}:${source.hwKey}`;
-// Provenance dedupe keys, built once per prepared row instead of once per bucket and metric.
 const trendSourceKeys = new WeakMap<TrendSource, string>();
 
-/**
- * Dedupe agentic history runs and prepare every chartable row. The result does not depend
- * on the metric, precision or pricing, so the hook reuses it across those changes.
- */
 export function prepareTrendRows(allRows: readonly BenchmarkRow[]): TrendRow[] {
-  // One string object per distinct key, so later `===` and Map lookups compare identity.
   const canonical = new Map<string, string>();
   const intern = (value: string) => {
     const existing = canonical.get(value);
@@ -148,10 +140,6 @@ export function prepareTrendRows(allRows: readonly BenchmarkRow[]): TrendRow[] {
   return prepared;
 }
 
-/**
- * The derived metrics a trend point computes. Requested token revenue is re-priced by
- * `applyTokenRevenuePricing`, which drops the derived value, so it is not built at all.
- */
 interface TrendPointMetrics {
   readonly derived: readonly DerivedMetricKey[];
   readonly priceRevenue: boolean;
@@ -203,11 +191,6 @@ function trendPoint(
   return priceRevenue ? applyTokenRevenuePricing([point], tokenRevenuePricing)[0]! : point;
 }
 
-/**
- * Build a lightweight InferenceData-compatible point from a raw BenchmarkRow.
- * This deliberately skips full chart transformation and derives only the
- * selected trend metric plus its frontier/interpolation dependencies.
- */
 export function rowToLightweightPoint(
   row: BenchmarkRow,
   requestedMetrics: readonly DerivedMetricKey[],
@@ -306,7 +289,6 @@ interface InterpolationCurve {
   readonly at: (targetInteractivity: number) => number | null;
 }
 
-/** Returns null when the value is null at every target. */
 function buildInterpolationCurve(
   points: InferenceData[],
   metricKey: YAxisMetricKey,
@@ -330,8 +312,6 @@ function buildInterpolationCurve(
   );
   if (frontier.length === 0) return null;
 
-  // Sort frontier by interactivity ascending. The front is built in ascending x, so the sort
-  // is an identity unless an x is NaN.
   const ascending = frontier.every((p, i) => i === 0 || frontier[i - 1].x < p.x);
   const sorted = ascending ? frontier : [...frontier].toSorted((a, b) => a.x - b.x);
   const minX = sorted[0].x;
@@ -432,18 +412,10 @@ function buildInterpolationCurve(
     }
   }
 
-  // Monotone cubic Hermite spline interpolation, clamped to prevent negative
-  // values from cubic spline overshoots
   const slopes = monotoneSlopes(xs, metricYs);
   return curve((target) => Math.max(0, hermiteInterpolate(xs, metricYs, slopes, target)));
 }
 
-/**
- * Interpolate a selected metric at a target interactivity for a set of InferenceData points
- * from a single GPU. Uses a throughput-based Pareto front + monotone cubic Hermite spline.
- *
- * Exported for unit testing.
- */
 export function interpolateMetricAtInteractivity(
   points: InferenceData[],
   targetInteractivity: number,
@@ -467,10 +439,6 @@ export interface GroupTrendRowsOptions {
   readonly selectedPrecisions: readonly string[];
   readonly selectedYAxisMetric: string;
   readonly requestedMetrics: readonly DerivedMetricKey[];
-  /**
-   * Extra row-level filter (e.g. the views API's gpu/vendor/date scoping). Must be pure:
-   * it only sees rows that can chart.
-   */
   readonly rowFilter?: (row: BenchmarkRow) => boolean;
   /**
    * Pricing applied when `tokenRevenuePerGpuHour` is requested. Defaults to
@@ -491,7 +459,6 @@ export function groupTrendRowsByDate(
   return groupTrendRows(prepareTrendRows(allRows), options);
 }
 
-/** `groupTrendRowsByDate` over rows already prepared by `prepareTrendRows`. */
 export function groupTrendRows(
   trendRows: readonly TrendRow[],
   options: GroupTrendRowsOptions,
@@ -507,11 +474,9 @@ export function groupTrendRows(
 
   const multiPrecision = selectedPrecisions.length > 1;
   const tokenType = tokenMetricTypeForConfigKey(selectedYAxisMetric);
-  // Specs depend only on (hwKey, basis); a few hardware keys cover every row of one call.
   const tcoBasis = options.tcoBasis === undefined ? DEFAULT_TCO_BASIS : options.tcoBasis;
   const specsByHwKey = new Map<string, GpuSpecs>();
   const pointMetrics = trendPointMetrics(requestedMetrics);
-  // Rows of one date and group usually arrive together; reuse the last lookups.
   let lastDate: string | undefined;
   let dateMap: Map<string, InferenceData[]> | undefined;
   let lastGroupKey: string | undefined;
@@ -561,7 +526,6 @@ export function groupTrendRows(
 
 export interface BuildTrendCurvesOptions {
   readonly trendMetricKey: YAxisMetricKey;
-  /** Pricing used when interpolating `tokenRevenuePerGpuHour`. */
   readonly tokenRevenuePricing?: TokenRevenuePricing | null;
 }
 
@@ -593,16 +557,12 @@ interface TrendBucket {
   readonly waterfallEligible: boolean;
 }
 
-/** Target-independent trend state: one interpolation curve per (date, group) bucket. */
 export interface TrendCurves {
-  /** Date-major, in the input's date and group order. */
   readonly buckets: readonly TrendBucket[];
-  /** Each group's buckets, date-sorted when every date parses (`timeSorted`). */
   readonly byGroup: ReadonlyMap<string, readonly TrendBucket[]>;
   readonly timeSorted: boolean;
 }
 
-/** Build every (date, group) bucket's frontier, spline and provenance once per metric. */
 export function buildTrendCurves(
   dateGroupedData: ReadonlyMap<string, ReadonlyMap<string, InferenceData[]>>,
   options: BuildTrendCurvesOptions,
@@ -620,8 +580,6 @@ export function buildTrendCurves(
       const curve = buildInterpolationCurve(points, trendMetricKey, tokenRevenuePricing);
       if (curve === null) continue;
       // Preserve the source curve's provenance, including reused points from older runs.
-      // A repeated key keeps its first position and its last source, as `new Map(entries)`
-      // does; frontiers hold a few points, so a linear scan beats a Map.
       const keys: string[] = [];
       const sources: TrendSource[] = [];
       for (const { trendSource: source } of curve.frontier) {
@@ -656,14 +614,11 @@ export function buildTrendCurves(
     }
   }
 
-  // A stable sort of the whole group, filtered later, equals a stable sort of the
-  // filtered subset, but only for a consistent comparator: NaN times keep the late sort.
   if (timeSorted) for (const group of byGroup.values()) group.sort((a, b) => a.time - b.time);
 
   return { buckets, byGroup, timeSorted };
 }
 
-/** Evaluate every bucket at the target and assemble date-sorted trend lines per group key. */
 export function evaluateTrendCurves(
   curves: TrendCurves,
   options: EvaluateTrendCurvesOptions,
@@ -674,7 +629,6 @@ export function evaluateTrendCurves(
   const lines = new Map<string, TrendDataPoint[]>();
   const keysWithData: string[] = [];
 
-  // Lines keep the order in which each group first has a value, scanning date-major.
   for (let i = 0; i < buckets.length; i++) {
     const { groupKey } = buckets[i];
     if (values[i] === null || lines.has(groupKey)) continue;
@@ -693,7 +647,6 @@ export function evaluateTrendCurves(
     }
     if (!timeSorted) points.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    // Extend line to the requested date if the last point is earlier
     const last = points.at(-1)!;
     if (extendToDate !== undefined && last.date < extendToDate) {
       points.push({
@@ -704,7 +657,6 @@ export function evaluateTrendCurves(
       });
     }
     lines.set(groupKey, points);
-    // Return base hwKey for legend filtering
     const baseHwKey = groupKey.includes('__') ? groupKey.split('__')[0] : groupKey;
     if (!keysWithData.includes(baseHwKey)) {
       keysWithData.push(baseHwKey);
@@ -714,10 +666,6 @@ export function evaluateTrendCurves(
   return { trendLines: lines, hwKeysWithData: keysWithData };
 }
 
-/**
- * Interpolate the selected metric at the target interactivity for every
- * (date, group) bucket and assemble date-sorted trend lines per group key.
- */
 export function buildTrendLines(
   dateGroupedData: ReadonlyMap<string, ReadonlyMap<string, InferenceData[]>>,
   options: BuildTrendLinesOptions,

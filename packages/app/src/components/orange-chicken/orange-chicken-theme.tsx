@@ -99,8 +99,6 @@ function useChickenMarkers() {
           marker.setAttribute('focusable', 'false');
           marker.setAttribute('pointer-events', 'none');
           // Do not replace shapes, hit circles, data, transforms or event handlers.
-          // Being a child of the point inherits clipping, visibility and zoom. The marker
-          // sits below the label, or below the slot a hidden (unbuilt) label would take.
           const anchor = point.querySelector(':scope > text') ?? pointLabelAnchor(point);
           if (anchor) anchor.before(marker);
           else point.append(marker);

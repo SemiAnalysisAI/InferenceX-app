@@ -1,9 +1,5 @@
 import type { IdRuns } from '@semianalysisai/inferencex-db/queries/benchmark-presence';
 
-/**
- * `{[id]: true}` for each of `sortedIds` (ascending) inside `runs`, the
- * `?ids=` availability route response. One merge walk over both lists.
- */
 export function presentIds(runs: IdRuns, sortedIds: number[]): Record<number, true> {
   const present: Record<number, true> = {};
   let i = 0;
@@ -17,7 +13,6 @@ export function presentIds(runs: IdRuns, sortedIds: number[]): Record<number, tr
   return present;
 }
 
-/** Id set decoded once from runs into one bit per id, for constant-time lookups. */
 export class IdBitset {
   readonly #bits: Uint8Array;
 
@@ -32,7 +27,6 @@ export class IdBitset {
     }
   }
 
-  /** `id` must be a persisted benchmark id (a positive integer). */
   has(id: number): boolean {
     return ((this.#bits[id >>> 3] ?? 0) & (1 << (id & 7))) !== 0;
   }

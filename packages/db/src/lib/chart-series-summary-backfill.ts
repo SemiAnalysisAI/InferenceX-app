@@ -7,11 +7,6 @@ import {
 import { CHART_SERIES_VERSION } from '../etl/compute-chart-series.js';
 import type { Sql } from '../etl/db-utils.js';
 
-/**
- * Store the summary of a row's current `chart_series`. Returns false, and
- * writes nothing, when the row has no current chart series or it changed
- * while the summary was computed.
- */
 export async function backfillChartSeriesSummary(
   sql: Sql,
   traceReplayId: number,
@@ -23,8 +18,6 @@ export async function backfillChartSeriesSummary(
       and (chart_series->>'version')::int = ${CHART_SERIES_VERSION}
   `;
   if (!row) return false;
-  // jsonb text already has jsonb's key order, so this summarizes exactly what
-  // the route reads.
   const summary = encodeChartSeriesSummary(row.chart_series);
   const updated = await sql<{ id: number }[]>`
     update agentic_trace_replay

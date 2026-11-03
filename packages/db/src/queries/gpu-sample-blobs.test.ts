@@ -81,7 +81,6 @@ interface Observed {
   queries: string[];
 }
 
-/** Records every query; `blobQueryBytes` replaces the blob query's size budget. */
 function observe(blobQueryBytes?: number): Observed {
   const queries: string[] = [];
   const client: DbClient = (strings, ...values) => {
@@ -111,7 +110,6 @@ describe('stored sample blobs', () => {
     expect(payload).toStrictEqual(expected);
     expect(JSON.stringify(payload)).toBe(JSON.stringify(expected));
     expect(rowsRead(observed)).toBe(0);
-    // Series rows, then blobs with their version keys; no separate version query.
     expect(observed.queries).toHaveLength(2);
 
     const [blob] = (await sql`
@@ -169,7 +167,6 @@ describe('stored sample blobs', () => {
     expect(await getGpuMetricsForRun(observed.client, RUN, {})).toStrictEqual(expected);
     expect(count(observed, BLOB_QUERY)).toBe(2);
     expect(rowsRead(observed)).toBe(0);
-    // More than one blob query: the series keys are re-checked afterwards.
     const versionChecks = observed.queries.filter(
       (text) => text.includes('ingested_at\n') && text.includes('where id = any'),
     );

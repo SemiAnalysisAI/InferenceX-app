@@ -1,21 +1,3 @@
--- Stored curve lines.
---
--- Every curve read (`latest_benchmarks`, dated, run and history queries) starts
--- from one row per (workflow run, date, curve scope). They used to aggregate
--- them from every successful benchmark_results row of the model on each read
--- and on each refresh. This table stores those aggregates, and triggers on
--- benchmark_results and configs rebuild the rows of every run a statement
--- changes. Any writer keeps it exact, including manual SQL.
---
--- `point_ids` lists the successful rows of the run in the line's curve scope,
--- whatever their date, which is the set the readers used to join by run and
--- scope. Run metadata (attempt, start time, append_only) stays in
--- workflow_runs and is joined at read time, so conclusion overrides and new
--- attempts need no rebuild.
---
--- Readers in packages/db/src/queries/benchmarks.ts use this table, so apply
--- the migration before deploying them. Additive and idempotent. Re-running
--- this file rebuilds the same rows.
 
 set local lock_timeout = '5s';
 
@@ -30,7 +12,6 @@ create table if not exists benchmark_curve_run_lines (
   image           text,
   image_count     bigint  not null,
   images_complete boolean not null,
-  -- Image per (disagg, offload) line, NULL when a line has a missing or second image.
   line_images     jsonb,
   point_ids       bigint[] not null,
 
@@ -46,8 +27,6 @@ begin
   if coalesce(cardinality(p_run_ids), 0) = 0 then
     return;
   end if;
-  -- Writers of one run take turns. Each later statement of this function
-  -- reads a new snapshot, so a waiting writer rebuilds from committed rows.
   perform 1 from workflow_runs where id = any(p_run_ids) order by id for no key update;
 
   delete from benchmark_curve_run_lines where workflow_run_id = any(p_run_ids);
@@ -87,8 +66,6 @@ begin
 end;
 $$;
 
--- Statement-level, so a bulk write rebuilds each touched run once. Updates
--- rebuild only runs whose line inputs changed; metric-only backfills skip.
 create or replace function benchmark_results_curve_lines_trigger()
 returns trigger language plpgsql as $$
 begin
@@ -142,7 +119,6 @@ create trigger benchmark_results_curve_lines_truncate
   after truncate on benchmark_results
   for each statement execute function benchmark_results_curve_lines_trigger();
 
--- The curve scope reads these config columns.
 create or replace function configs_curve_lines_trigger()
 returns trigger language plpgsql as $$
 begin
@@ -173,8 +149,6 @@ create trigger configs_curve_lines_update
 
 select refresh_benchmark_curve_run_lines(array(select id from workflow_runs));
 
--- Keeps its migration 014 columns, so readers deployed before this migration
--- (which add their own line_images) keep working on the stored lines.
 drop materialized view if exists latest_benchmarks;
 
 create or replace view benchmark_curve_runs as
@@ -184,10 +158,6 @@ select l.model, l.benchmark_type, l.isl, l.osl, l.curve_scope,
 from benchmark_curve_run_lines l
 join latest_workflow_runs wr on wr.id = l.workflow_run_id;
 
--- Same selection as migration 020, recreated so it reads the stored lines.
--- DISTINCT ON sorts point ids and keys only, and the wide rows are joined once
--- per selected point. `br.*` is expanded at creation, so the columns stay
--- every benchmark_results column plus the snapshot identity.
 create materialized view latest_benchmarks as
 with recursive ranked_runs as (
   select l.curve_scope, l.workflow_run_id, l.date, l.line_images, l.point_ids,

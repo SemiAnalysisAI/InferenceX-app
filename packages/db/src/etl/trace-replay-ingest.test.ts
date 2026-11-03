@@ -440,7 +440,6 @@ describe('persistPreparedTraceReplay (PostgreSQL)', () => {
     expect(row.profile_export_jsonl_gz).toBeNull();
     const restored = await readTraceProfileGz(pg, row.trace_replay_id!);
     expect(restored?.equals(profile)).toBe(true);
-    // 41..43 all have a stored profile (43's only in chunks).
     const presence = await getBenchmarkPresence(pg);
     expect(presence.trace).toEqual([41, 3]);
     expect(gunzipRequestTimeline(row.request_timeline_gz!)).toEqual(persistedTimeline);

@@ -13,8 +13,6 @@ export const dynamic = 'force-dynamic';
 
 export const CACHE_KEY_PREFIX = 'gpu-metrics-point-v2';
 
-// The revision is not in the URL, so no shared cache may keep the payload. Browsers
-// keep it and revalidate on every use against the live revision.
 const CACHE_CONTROL = 'private, no-cache';
 
 const getCachedGpuMetricsForPoint = cachedQuery(
@@ -32,8 +30,6 @@ async function handleGet(request: NextRequest): Promise<Response> {
   try {
     const revision = await getGpuMetricsPointRevision(getDb(), id);
     if (revision === null) return publicApiError(PUBLIC_API_ERRORS.notFound, 404);
-    // The ETag names the same (prefix, id, revision) as the Blob key, so a request
-    // already holding that payload is answered before it is loaded or serialized.
     const cacheOptions = {
       cacheControl: CACHE_CONTROL,
       version: JSON.stringify([CACHE_KEY_PREFIX, id, revision]),

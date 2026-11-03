@@ -23,7 +23,6 @@ beforeEach(() => vi.clearAllMocks());
 
 describe('GET /api/v1/log-availability', () => {
   it('returns a presence map for valid, deduplicated ids', async () => {
-    // Logs for ids 4..5, traces for id 9.
     mockGetBenchmarkPresence.mockResolvedValueOnce({ trace: [9, 1], log: [4, 2] });
     const response = await GET(req('/api/v1/log-availability?ids=9,4,4'));
     expect(response.status).toBe(200);

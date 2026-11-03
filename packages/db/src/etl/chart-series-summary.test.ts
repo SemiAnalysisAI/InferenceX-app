@@ -47,11 +47,6 @@ function workerSource(
   };
 }
 
-/**
- * Keys out of jsonb order at every level (queue-depth points, source names of
- * different lengths, integer-like and non-ASCII names, engine entries), and
- * doubles whose shortest decimal form is awkward.
- */
 function trickySeries(metricSources: MetricSourceSeries[]): ChartSeries {
   return {
     version: CHART_SERIES_VERSION,
@@ -113,7 +108,6 @@ async function insertPoint(id: number, series: ChartSeries): Promise<void> {
   `;
 }
 
-/** The route payload, and whether it came from the stored summary. */
 async function routeJson(id: number): Promise<{ json: string; fromSummary: boolean }> {
   let fromSummary = false;
   const query: DbClient = pg;

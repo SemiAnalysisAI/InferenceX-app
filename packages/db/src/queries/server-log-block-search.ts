@@ -9,7 +9,6 @@ import {
 } from '../server-log-blocks';
 import type { ServerLogSearchMatch } from './server-logs.js';
 
-/** Variant folds per term character: the folds of the character, its lowercase and uppercase. */
 function termFolds(term: string): number[][] {
   return [...term].map((ch) => [
     ...new Set(
@@ -20,11 +19,6 @@ function termFolds(term: string): number[][] {
   ]);
 }
 
-/**
- * Bloom bits a block must hold to contain a match start: one group per gram of the
- * term (3-grams, or the single 1- or 2-gram of a shorter term), any bit of a group.
- * Empty when the term is longer than the bloom lookahead covers.
- */
 export function termBloomGroups(term: string): { groups: number[]; bits: number[] } {
   const folds = termFolds(term);
   const groups: number[] = [];
@@ -54,7 +48,6 @@ interface BlockMeta {
 
 interface DecodedBlock {
   text: string;
-  /** UTF-16 unit of each code point (non-ASCII blocks only). */
   units: Uint32Array | null;
 }
 
@@ -65,10 +58,6 @@ export interface BlockSearchFile {
   blocks: BlockMeta[];
 }
 
-/**
- * Block layout of each block-backed file among `fileNames`, with each block's bloom
- * verdict for the term, in one query. Files missing from the map are not block-backed.
- */
 export async function readBlockSearchIndexes(
   sql: DbClient,
   benchmarkResultId: number,
@@ -140,13 +129,6 @@ export async function readBlockSearchIndexes(
   return files;
 }
 
-/**
- * The SQL search loop (search a chunk from `offset`, restart after a match, else
- * advance by the chunk minus the overlap) over a block-backed file. Chunk offsets
- * are arithmetic, so chunks whose blocks the bloom rules out cost nothing, and a
- * step decodes only the blocks a match or its context touches. Matches and their
- * before/after text are clipped to each chunk exactly as the SQL steps clip them.
- */
 export async function searchBlockFile(
   sql: DbClient,
   file: BlockSearchFile,
@@ -160,7 +142,6 @@ export async function searchBlockFile(
   const { blocks } = file;
   const decoded = new Map<number, DecodedBlock>();
   const finder = new RegExp(pattern.source, 'gu');
-  // First block ending after `point` (blocks are contiguous and ordered).
   const blockAfter = (point: number) => {
     let lo = 0;
     let hi = blocks.length;
@@ -199,7 +180,6 @@ export async function searchBlockFile(
       decoded.set(i, { text, units });
     }
   };
-  // Code points [from, to) from loaded blocks.
   const text = (from: number, to: number) => {
     let out = '';
     for (let i = blockAfter(from); i < blocks.length && blocks[i].start < to; i++) {

@@ -73,7 +73,6 @@ export function interceptDerivedAgenticMetrics(): void {
   }).as('derivedAgenticMetrics');
 }
 
-/** Ids (any order) as the `/api/v1/benchmark-presence` `[gap, length, ...]` runs. */
 function presenceRuns(ids: Iterable<number>): number[] {
   const runs: number[] = [];
   let end = 0;
@@ -85,7 +84,6 @@ function presenceRuns(ids: Iterable<number>): number[] {
   return runs;
 }
 
-/** Serves `/api/v1/benchmark-presence` with the given ids as present. */
 export function interceptBenchmarkPresence({
   trace = [],
   log = [],
@@ -95,7 +93,6 @@ export function interceptBenchmarkPresence({
   });
 }
 
-/** The `/api/v1/availability/compact` body the route serves for these published rows. */
 export function availabilityBody(rows: readonly AvailabilityRow[]) {
   return compactAvailability(withSupplementalAvailability([...rows]));
 }

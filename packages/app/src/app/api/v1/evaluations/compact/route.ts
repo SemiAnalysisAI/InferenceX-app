@@ -8,7 +8,6 @@ import { loadFixture } from '@/lib/testing/test-fixtures';
 
 export const dynamic = 'force-dynamic';
 
-/** The `/evaluation` dashboard's input: `/api/v1/evaluations` dictionary-encoded. */
 export const GET = cachedReadRoute({
   cacheKey: 'evaluations-compact',
   fetch: async () => compactEvalRows(await getAllEvalResults(getDb())),

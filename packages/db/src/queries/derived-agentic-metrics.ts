@@ -30,7 +30,6 @@ interface StoredAggregateStats {
   sequenceLengths: SequenceLengthSketches;
 }
 
-/** Projected `aggregate_stats` keys. Server fields are only sent for stale rows. */
 interface StoredDerivedRow {
   benchmark_result_id: number;
   version: unknown;
@@ -131,7 +130,6 @@ export async function getDerivedAgenticMetrics(
 
   const result: DerivedAgenticMetricMap = {};
 
-  // Reads only the keys this route uses. The ~20 KB sequence-length sketches never leave Neon.
   const statsRows = (await sql`
     select
       br.id as benchmark_result_id,
@@ -201,8 +199,6 @@ export async function getDerivedAgenticMetrics(
       const prior = staleRowsById.get(id);
       const kvCacheUtil = prior?.kv_cache_util ?? null;
       const prefixCacheHitRate = prior?.prefix_cache_hit_rate ?? null;
-      // Without a server blob the aggregates fallback would also store null server fields,
-      // so the bundle is complete and later requests take the fast path.
       if (kvCacheUtil || prefixCacheHitRate || !row.has_server_metrics) {
         const merged: StoredAggregateStats = {
           version: STATS_VERSION,

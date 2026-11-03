@@ -96,8 +96,6 @@ export function applyTokenRevenuePricing(
   pricing: TokenRevenuePricing | null,
 ): InferenceData[] {
   return points.map((point) => {
-    // Omit the old value without `delete`, which would drop the copy to dictionary mode;
-    // a plain spread is the fast copy when there is nothing to omit.
     let next: InferenceData;
     if (Object.hasOwn(point, 'tokenRevenuePerGpuHour')) {
       const { tokenRevenuePerGpuHour: _previous, ...rest } = point;

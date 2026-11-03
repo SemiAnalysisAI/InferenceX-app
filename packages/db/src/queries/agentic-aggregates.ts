@@ -282,7 +282,6 @@ export async function getAgenticAggregates(
   // round-trip pulls everything we need for every requested id with no blob
   // decompression, so the slow blob-parsing fallback only runs for ids
   // whose stats are missing or were produced by an older `STATS_VERSION`.
-  // Only the keys read here are projected, so the sequence-length sketches stay in Neon.
   const statsRows = (await sql`
     select
       br.id as benchmark_result_id,
@@ -437,7 +436,6 @@ export async function getAgenticAggregates(
   return result;
 }
 
-/** Projected `aggregate_stats` keys as read back by the driver. */
 interface AggregateStatsRow {
   benchmark_result_id: number;
   version: unknown;

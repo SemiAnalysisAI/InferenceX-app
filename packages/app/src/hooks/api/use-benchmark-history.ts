@@ -9,7 +9,6 @@ export function useBenchmarkHistory(
   osl: number,
   options?: {
     benchmarkType?: 'agentic_traces';
-    /** `trends` loads only what Historical Trends reads (`/api/v1/benchmarks/history/trends`). */
     view?: 'calculator' | 'trends';
     enabled?: boolean;
   },
