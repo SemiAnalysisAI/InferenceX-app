@@ -1,7 +1,7 @@
 import { Inter, JetBrains_Mono } from 'next/font/google';
 import type { ReactNode } from 'react';
 
-import { UnofficialRunProvider } from '@/providers/unofficial-run-provider';
+import { LazyUnofficialRunProvider } from '@/providers/lazy-unofficial-run-provider';
 
 const embedSans = Inter({
   subsets: ['latin'],
@@ -17,7 +17,7 @@ const embedMono = JetBrains_Mono({
 export default function EmbedShell({ children }: { children: ReactNode }) {
   return (
     <div className={`${embedSans.variable} ${embedMono.variable} contents`}>
-      <UnofficialRunProvider>{children}</UnofficialRunProvider>
+      <LazyUnofficialRunProvider>{children}</LazyUnofficialRunProvider>
     </div>
   );
 }

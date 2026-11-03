@@ -35,7 +35,7 @@ import {
 } from '@/lib/compare/compare-page-data.server';
 import { CompareDetailRouteSkeleton } from '@/components/motion/route-skeletons';
 
-import ComparePageClient from './page-client';
+import { LazyComparePageClient } from './lazy-page-client';
 
 export const revalidate = 86400;
 
@@ -194,7 +194,7 @@ async function CompareDetail({
     <>
       <JsonLd data={jsonLd} />
       <JsonLd data={breadcrumbJsonLd} />
-      <ComparePageClient
+      <LazyComparePageClient
         a={parsed.a}
         b={parsed.b}
         slug={canonical}

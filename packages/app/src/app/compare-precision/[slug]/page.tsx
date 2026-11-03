@@ -32,7 +32,7 @@ import {
   variantCompareNarrative,
 } from '@/lib/compare/compare-variant-ssr';
 
-import ComparePrecisionPageClient from './page-client';
+import { LazyComparePrecisionPageClient } from './lazy-page-client';
 
 export const revalidate = 3600;
 
@@ -184,7 +184,7 @@ export async function renderPrecisionPage(slug: string, { scenarioSegment }: Sce
     <>
       <JsonLd data={jsonLd} />
       <JsonLd data={breadcrumbJsonLd} />
-      <ComparePrecisionPageClient
+      <LazyComparePrecisionPageClient
         gpu={parsed.gpu}
         slug={canonical}
         modelLabel={parsed.model.label}

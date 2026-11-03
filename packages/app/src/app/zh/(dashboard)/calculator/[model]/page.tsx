@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 
-import ThroughputCalculatorDisplay from '@/components/calculator/ThroughputCalculatorDisplay';
+import { LazyThroughputCalculatorDisplay } from '@/components/calculator/lazy-calculator-displays';
 import { ZhTabIntro } from '@/components/zh/zh-tab-intro';
 import { MODEL_ROUTES, modelRoutePath, resolveModelRouteSlug } from '@/lib/routing/model-routes';
 import { modelTabCanonicalPath } from '@/lib/routing/tab-meta';
@@ -36,7 +36,7 @@ export default async function ZhCalculatorModelPage({ params }: Props) {
   const meta = MODEL_TAB_META_ZH.calculator;
   return (
     <>
-      <ThroughputCalculatorDisplay routeModel={resolved.route.model} />
+      <LazyThroughputCalculatorDisplay routeModel={resolved.route.model} />
       <ZhTabIntro
         tab="calculator"
         title={meta.title(resolved.route.seoName)}

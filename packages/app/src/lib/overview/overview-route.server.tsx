@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 
 import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
-import { OverviewPageContent } from '@/components/overview/overview-page';
+import { LazyOverviewPageContent } from '@/components/overview/lazy-overview-page';
 import { enAlternates, type Locale, zhAlternates } from '@/lib/i18n/i18n';
 import { OVERVIEW_HARDWARE, overviewHardwareLabel } from '@/lib/overview/overview-data';
 import { getOverviewPageData } from '@/lib/overview/overview-data.server';
@@ -42,5 +42,5 @@ export function buildOverviewMetadata(locale: Locale): Metadata {
  */
 export async function renderOverviewPage({ locale }: { locale: Locale }) {
   const data = await getOverviewPageData();
-  return <OverviewPageContent data={data} locale={locale} />;
+  return <LazyOverviewPageContent data={data} locale={locale} />;
 }

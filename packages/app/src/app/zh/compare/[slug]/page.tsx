@@ -33,7 +33,7 @@ import { zhAlternates } from '@/lib/i18n/i18n';
 import { socialMetadata } from '@/lib/seo/social-metadata';
 import { CompareDetailRouteSkeleton } from '@/components/motion/route-skeletons';
 
-import ComparePageClient from '../../../compare/[slug]/page-client';
+import { LazyComparePageClient } from '../../../compare/[slug]/lazy-page-client';
 
 export const revalidate = 86400;
 
@@ -195,7 +195,7 @@ async function CompareDetailZh({
     <>
       <JsonLd data={jsonLd} />
       <JsonLd data={breadcrumbJsonLd} />
-      <ComparePageClient
+      <LazyComparePageClient
         a={parsed.a}
         b={parsed.b}
         slug={canonical}

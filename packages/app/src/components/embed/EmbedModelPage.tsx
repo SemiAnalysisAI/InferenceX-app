@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 
 import EmbedFrame from '@/components/embed/EmbedFrame';
-import EmbeddedModelDashboard from '@/components/model/EmbeddedModelDashboard';
+import { LazyEmbeddedModelDashboard } from '@/components/model/lazy-embedded-model-dashboard';
 import { comparisonScenarioForModel } from '@/lib/compare/compare-agentx';
 import { getCompareModelBySlug } from '@/lib/compare/compare-slug';
 import { parseEmbedOptions } from '@/lib/embed/embed';
@@ -23,7 +23,7 @@ export default function EmbedModelPage({
 
   return (
     <EmbedFrame theme={options.theme} skin={options.skin}>
-      <EmbeddedModelDashboard
+      <LazyEmbeddedModelDashboard
         displayName={entry.displayName}
         sequence={sequence}
         yAxisMetric={options.yAxisMetric}

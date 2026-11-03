@@ -34,7 +34,7 @@ import {
   type VariantCompareSide,
 } from '@/lib/compare/compare-variant-ssr';
 
-import CompareSpecDecodePageClient from './page-client';
+import { LazyCompareSpecDecodePageClient } from './lazy-page-client';
 
 export const revalidate = 3600;
 
@@ -195,7 +195,7 @@ export async function renderSpecDecodePage(slug: string, { scenarioSegment }: Sc
     <>
       <JsonLd data={jsonLd} />
       <JsonLd data={breadcrumbJsonLd} />
-      <CompareSpecDecodePageClient
+      <LazyCompareSpecDecodePageClient
         gpu={parsed.gpu}
         method={parsed.method}
         slug={canonical}

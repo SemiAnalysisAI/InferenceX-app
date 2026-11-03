@@ -1,19 +1,16 @@
 import type { Metadata } from 'next';
 
-import { InferenceProvider } from '@/components/inference/InferenceContext';
-import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
+import { LazyInferenceDashboard } from '@/components/inference/lazy-inference-dashboard';
 import { tabMetadata } from '@/lib/routing/tab-meta';
-import { InferencePageIntro } from '@/components/inference/inference-page-intro';
+import { LazyInferencePageIntro } from '@/components/inference/lazy-inference-page-intro';
 
 export const metadata: Metadata = tabMetadata('inference');
 
 export default function InferencePage() {
   return (
     <>
-      <InferencePageIntro locale="en" />
-      <InferenceProvider activeTab="inference">
-        <InferenceChartDisplay centerOnEnter />
-      </InferenceProvider>
+      <LazyInferencePageIntro locale="en" />
+      <LazyInferenceDashboard activeTab="inference" centerOnEnter />
     </>
   );
 }

@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
+import { HardwareChart } from '@/components/blog/blog-hardware-chart-lazy';
 import { KatexStyles } from '@/components/blog/katex-styles';
+import { createMdxComponents } from '@/components/blog/mdx-components';
 import { HardwarePageContent } from '@/components/hardware/hardware-page-content';
 import { JsonLd } from '@/components/seo/json-ld';
 import { extractHeadings } from '@/lib/blog/blog';
@@ -34,7 +36,10 @@ export default async function ZhHardwarePage({ params }: Props) {
   if (!page) notFound();
 
   const { meta, raw } = page;
-  const { content, hasMath } = await compileBlogMdx(raw, 'zh');
+  const { content, hasMath } = await compileBlogMdx(raw, 'zh', {
+    ...createMdxComponents('zh'),
+    HardwareChart,
+  });
 
   return (
     <>

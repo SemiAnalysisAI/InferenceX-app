@@ -1,9 +1,9 @@
-import { NudgeEngine } from '@/components/nudges/nudge-engine';
+import { LazyNudgeEngine } from '@/components/nudges/lazy-nudge-engine';
 
 export default function OverviewLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
-      <NudgeEngine scope="dashboard" />
+      <LazyNudgeEngine scope="dashboard" />
       <main className="relative">
         <div className="container mx-auto flex flex-col gap-4 px-4 lg:px-8">{children}</div>
       </main>

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-import FleetLifecycleDisplay from '@/components/calculator/FleetLifecycleDisplay';
+import { LazyFleetLifecycleDisplay } from '@/components/calculator/lazy-calculator-displays';
 import { ZhTabIntro } from '@/components/zh/zh-tab-intro';
 import { tabMetadataZh } from '@/lib/routing/tab-meta-zh';
 
@@ -9,7 +9,7 @@ export const metadata: Metadata = tabMetadataZh('fleet');
 export default function ZhFleetPage() {
   return (
     <>
-      <FleetLifecycleDisplay />
+      <LazyFleetLifecycleDisplay />
       <ZhTabIntro tab="fleet" />
     </>
   );

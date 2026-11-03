@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-import ProfitEstimatorDisplay from '@/components/calculator/ProfitEstimatorDisplay';
+import { LazyProfitEstimatorDisplay } from '@/components/calculator/lazy-calculator-displays';
 import { defaultRouteModel } from '@/lib/routing/model-routes';
 import { tabMetadata } from '@/lib/routing/tab-meta';
 import { TabIntro } from '@/components/dashboard/tab-intro';
@@ -10,7 +10,7 @@ export const metadata: Metadata = tabMetadata('profit-estimator');
 export default function ProfitEstimatorPage() {
   return (
     <>
-      <ProfitEstimatorDisplay
+      <LazyProfitEstimatorDisplay
         basis="chip-hour"
         routeModel={defaultRouteModel('profit-estimator')}
       />

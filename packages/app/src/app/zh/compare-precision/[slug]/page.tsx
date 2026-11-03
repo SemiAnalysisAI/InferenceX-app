@@ -32,7 +32,7 @@ import { compareSocialImages } from '@/lib/compare/compare-meta';
 import { precisionMetaDescriptionZh, precisionMetaTitleZh } from '@/lib/compare/compare-meta-zh';
 import { socialMetadata } from '@/lib/seo/social-metadata';
 
-import ComparePrecisionPageClient from '../../../compare-precision/[slug]/page-client';
+import { LazyComparePrecisionPageClient } from '../../../compare-precision/[slug]/lazy-page-client';
 
 export const revalidate = 3600;
 
@@ -185,7 +185,7 @@ export async function renderPrecisionPageZh(slug: string, { scenarioSegment }: S
     <>
       <JsonLd data={jsonLd} />
       <JsonLd data={breadcrumbJsonLd} />
-      <ComparePrecisionPageClient
+      <LazyComparePrecisionPageClient
         gpu={parsed.gpu}
         slug={canonical}
         modelLabel={parsed.model.label}
