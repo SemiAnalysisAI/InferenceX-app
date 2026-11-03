@@ -61,19 +61,15 @@ export function BlogPostContent({
     <main className="relative" data-testid="blog-post-page">
       <HashScroll />
       <ReadingProgressBar slug={slug} />
-      <div className="container mx-auto flex flex-col gap-10 px-4 pb-16 lg:gap-12 lg:px-8">
+      <div className="container mx-auto flex flex-col gap-10 px-4 pb-8 lg:gap-12 lg:px-8">
         <section data-blog-section="true" className="flex flex-col gap-10 lg:gap-12">
           <header
-            className="flex flex-col gap-5 border-b border-border/40 pb-8 pt-4 lg:pb-10 lg:pt-8"
+            className="flex flex-col gap-5 border-b border-border/30 pb-8 pt-4 lg:pb-10 lg:pt-8"
             data-testid="blog-post-hero"
           >
             <BlogBackLink href={basePath} label={t.backToIndex} />
             <div className="flex max-w-4xl flex-col gap-4">
-              {tags[0] && (
-                <Eyebrow as="p" wide>
-                  {tags[0]}
-                </Eyebrow>
-              )}
+              {tags[0] && <Eyebrow as="p">{tags[0]}</Eyebrow>}
               <Heading
                 as="h1"
                 level="display"
@@ -139,7 +135,7 @@ export function BlogPostContent({
                 className={BLOG_PROSE_CLASS}
               >
                 {content}
-                <p className="mt-12 max-w-[72ch] border-t border-border/40 pt-6 text-xs leading-5 text-muted-foreground">
+                <p className="mt-12 max-w-[72ch] border-t border-border/30 pt-6 text-xs leading-5 text-muted-foreground">
                   {t.copyright}
                 </p>
               </article>
@@ -147,9 +143,7 @@ export function BlogPostContent({
 
             <aside className="hidden lg:sticky lg:top-24 lg:flex lg:flex-col lg:gap-6 lg:self-start">
               {headings.length > 0 && (
-                <div className="rounded-2xl border border-border/50 bg-card/60 p-5 backdrop-blur-[2px]">
-                  <BlogToc headings={headings} locale={locale} variant="sidebar" />
-                </div>
+                <BlogToc headings={headings} locale={locale} variant="sidebar" />
               )}
               <BlogShareRow title={meta.title} slug={slug} labels={shareLabels} />
               <BlogSidebarCta href={localePath(CTA_PATH, locale)} slug={slug} labels={ctaLabels} />
@@ -166,14 +160,14 @@ export function BlogPostContent({
 
         {related.length > 0 && (
           <section
-            className="flex flex-col gap-6 border-t border-border/40 pt-10"
+            className="flex flex-col gap-6 border-t border-border/30 pt-10"
             aria-labelledby="blog-related-heading"
             data-testid="blog-related"
           >
             <Heading as="h2" level="section" id="blog-related-heading">
               {t.moreArticles}
             </Heading>
-            <div className="grid items-start gap-6 md:grid-cols-3">
+            <div className="grid gap-6 md:grid-cols-3">
               {related.map((post) => (
                 <BlogPostCard
                   key={post.slug}

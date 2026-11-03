@@ -1,21 +1,21 @@
-import { ArrowRight, ShieldCheck, Sparkles } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
+import { buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { AgentXCompareHero } from '@/components/compare/agentx-compare-hero';
 import { IntroSection } from '@/components/landing/intro-section';
 import { LandingPageAnalytics, LandingTrackedLink } from '@/components/landing/landing-analytics';
 import { CuratedViewCard } from '@/components/landing/curated-view-card';
-import { CountUp } from '@/components/motion/count-up';
-import { Reveal } from '@/components/motion/reveal';
 import { NudgeEngine } from '@/components/nudges/nudge-engine';
 import { FAVORITE_PRESETS } from '@/components/favorites/favorite-presets';
 import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
 import { analyticsPlacement } from '@/lib/analytics/placement';
 import type { Locale } from '@/lib/i18n/i18n';
+import { cn } from '@/lib/shared/utils';
 
 const STRINGS = {
   en: {
-    reproTitle: 'Every Result Is Transparently done through Public GitHub Actions Automation',
+    reproTitle: 'Every result comes from a public GitHub Actions run',
     reproP1:
       'Every data point on the dashboard is produced by a public GitHub Actions workflow run. The recipe lives in the repo, the run executes on the actual target hardware, and the full logs and artifacts are publicly viewable. Click any point on a chart to jump straight to the run that produced it. All reproducible, auditable, and open source.',
     reproStatPrefix: '',
@@ -30,9 +30,8 @@ const STRINGS = {
     browseSubmissions: 'Browse submissions',
     viewRuns: 'View benchmark runs on GitHub Actions',
     howItWorks: 'How it works',
-    quickComparisons: 'Quick Comparisons',
-    quickComparisonsDesc:
-      'Jump straight into the most popular chip inference benchmark comparisons, curated and ready to explore.',
+    quickComparisons: 'Quick comparisons',
+    quickComparisonsDesc: 'Common chip inference comparisons, preset and ready to open.',
   },
   zh: {
     reproTitle: '所有结果均通过公开的 GitHub Actions 流程生成',
@@ -49,7 +48,7 @@ const STRINGS = {
     viewRuns: '查看 GitHub Actions 运行记录',
     howItWorks: '了解复现流程',
     quickComparisons: '快速对比',
-    quickComparisonsDesc: '一键进入最热门的芯片推理基准测试对比，精选视图开箱即用。',
+    quickComparisonsDesc: '常用的芯片推理对比视图，已预设好，可直接打开。',
   },
 } as const;
 
@@ -58,83 +57,81 @@ const SHOW_QUICK_COMPARISONS = false;
 export function LandingPage({ locale = 'en' }: { locale?: Locale } = {}) {
   const t = STRINGS[locale];
   const prefix = locale === 'zh' ? '/zh' : '';
+  const weeklyDatapoints = (1000).toLocaleString(locale === 'zh' ? 'zh-CN' : 'en-US');
   return (
     <main className="relative">
       <LandingPageAnalytics />
       <NudgeEngine scope="landing" />
-      <div className="container mx-auto px-4 lg:px-8 flex flex-col gap-6 lg:gap-4">
+      <div className="container mx-auto flex flex-col gap-6 px-4 pb-8 lg:px-8">
         <div className="contents" {...analyticsPlacement('landing_hero')}>
           <AgentXCompareHero locale={locale} headingLevel="h1" surface="landing" />
         </div>
 
         <IntroSection locale={locale} />
 
-        <section className="flex flex-col gap-4 pb-8" {...analyticsPlacement('landing_section')}>
-          <Reveal>
-            <Card>
-              <div className="flex items-center gap-2 mb-3">
-                <ShieldCheck className="size-5 shrink-0 text-brand" />
-                <h2 className="text-lg font-semibold">{t.reproTitle}</h2>
+        <section className="flex flex-col gap-6" {...analyticsPlacement('landing_section')}>
+          <Card>
+            <h2 className="text-lg font-semibold text-balance">{t.reproTitle}</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">{t.reproP1}</p>
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
+              <span className="font-medium text-foreground tabular-nums">
+                {t.reproStatPrefix}
+                {weeklyDatapoints}
+                {t.reproStatSuffix}
+              </span>{' '}
+              {t.reproStatTail}
+            </p>
+            <dl className="mt-5 grid max-w-3xl gap-4 sm:grid-cols-2 sm:gap-8">
+              <div>
+                <dt className="text-sm font-medium text-foreground">{t.actionsRunsTitle}</dt>
+                <dd className="mt-1 text-sm leading-6 text-muted-foreground">
+                  {t.actionsRunsDesc}
+                </dd>
               </div>
-              <p className="text-sm text-muted-foreground mb-4">{t.reproP1}</p>
-              <p className="text-sm text-muted-foreground mb-4">
-                <span className="font-semibold text-foreground">
-                  {t.reproStatPrefix}
-                  <CountUp value={1000} locale={locale === 'zh' ? 'zh-CN' : 'en-US'} />
-                  {t.reproStatSuffix}
-                </span>{' '}
-                {t.reproStatTail}
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-                <Reveal delayMs={100} className="rounded-md border border-border bg-card p-3">
-                  <div className="text-sm font-semibold text-foreground">{t.actionsRunsTitle}</div>
-                  <div className="text-xs text-muted-foreground mt-1">{t.actionsRunsDesc}</div>
-                </Reveal>
-                <Reveal delayMs={170} className="rounded-md border border-border bg-card p-3">
-                  <div className="text-sm font-semibold text-foreground">{t.openRecipesTitle}</div>
-                  <div className="text-xs text-muted-foreground mt-1">{t.openRecipesDesc}</div>
-                </Reveal>
+              <div>
+                <dt className="text-sm font-medium text-foreground">{t.openRecipesTitle}</dt>
+                <dd className="mt-1 text-sm leading-6 text-muted-foreground">
+                  {t.openRecipesDesc}
+                </dd>
               </div>
-              <div className="flex flex-wrap gap-3 text-sm">
-                <LandingTrackedLink
-                  href={`${prefix}/submissions`}
-                  data-testid="landing-submissions-link"
-                  analyticsEvent="landing_submissions_clicked"
-                  appNavigation
-                  className="group motion-press inline-flex items-center gap-1.5 rounded-md bg-brand text-primary-foreground hover:bg-brand/90 px-3 py-1.5 transition-colors font-medium"
-                >
-                  {t.browseSubmissions}
-                  <ArrowRight className="size-3.5 motion-safe:transition-transform motion-safe:duration-200 motion-safe:group-hover:translate-x-0.5" />
-                </LandingTrackedLink>
-                <LandingTrackedLink
-                  href={`https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/actions?query=branch%3Amain+event%3Apush`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  analyticsEvent="landing_reproducibility_actions_clicked"
-                  className="group motion-press inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 hover:bg-accent transition-colors"
-                >
-                  {t.viewRuns}
-                  <ArrowRight className="size-3.5 motion-safe:transition-transform motion-safe:duration-200 motion-safe:group-hover:translate-x-0.5" />
-                </LandingTrackedLink>
-                <LandingTrackedLink
-                  href={`${prefix}/about#reproducibility`}
-                  analyticsEvent="landing_reproducibility_about_clicked"
-                  className="motion-press inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 hover:bg-accent transition-colors"
-                >
-                  {t.howItWorks}
-                </LandingTrackedLink>
-              </div>
-            </Card>
-          </Reveal>
+            </dl>
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <LandingTrackedLink
+                href={`${prefix}/submissions`}
+                data-testid="landing-submissions-link"
+                analyticsEvent="landing_submissions_clicked"
+                appNavigation
+                className={cn(buttonVariants({ variant: 'brand' }), 'group motion-press')}
+              >
+                {t.browseSubmissions}
+                <ArrowRight className="size-4 motion-safe:transition-transform motion-safe:duration-150 motion-safe:group-hover:translate-x-0.5" />
+              </LandingTrackedLink>
+              <LandingTrackedLink
+                href={`https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/actions?query=branch%3Amain+event%3Apush`}
+                target="_blank"
+                rel="noopener noreferrer"
+                analyticsEvent="landing_reproducibility_actions_clicked"
+                className={cn(buttonVariants({ variant: 'outline' }), 'motion-press')}
+              >
+                {t.viewRuns}
+              </LandingTrackedLink>
+              <LandingTrackedLink
+                href={`${prefix}/about#reproducibility`}
+                analyticsEvent="landing_reproducibility_about_clicked"
+                className={cn(buttonVariants({ variant: 'ghost' }), 'text-muted-foreground')}
+              >
+                {t.howItWorks}
+              </LandingTrackedLink>
+            </div>
+          </Card>
 
           {SHOW_QUICK_COMPARISONS && (
             <Card data-testid="landing-quick-comparisons">
-              <div className="flex items-center gap-2 mb-3">
-                <Sparkles className="size-5 shrink-0 text-brand" />
-                <h2 className="text-lg font-semibold">{t.quickComparisons}</h2>
-              </div>
-              <p className="text-sm text-muted-foreground mb-4">{t.quickComparisonsDesc}</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <h2 className="text-lg font-semibold">{t.quickComparisons}</h2>
+              <p className="mt-2 mb-4 max-w-3xl text-sm leading-6 text-muted-foreground">
+                {t.quickComparisonsDesc}
+              </p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {FAVORITE_PRESETS.filter((preset) => !preset.hidden).map((preset) => (
                   <CuratedViewCard key={preset.id} preset={preset} />
                 ))}

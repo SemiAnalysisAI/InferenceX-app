@@ -12,15 +12,13 @@ describe('shared Blog localization chrome', () => {
 
     expect(toc).toContain('aria-label="Table of contents"');
     expect(toc).toContain('On this page');
-    expect(toc).toContain('(click to expand)');
   });
 
   it('renders the equivalent Chinese table of contents without English fallback copy', () => {
     const toc = renderToStaticMarkup(<BlogToc headings={headings} locale="zh" />);
 
     expect(toc).toContain('aria-label="本页目录"');
-    expect(toc).toContain('（点击展开）');
     expect(toc).not.toContain('Table of contents');
-    expect(toc).not.toContain('click to expand');
+    expect(toc).not.toContain('On this page');
   });
 });

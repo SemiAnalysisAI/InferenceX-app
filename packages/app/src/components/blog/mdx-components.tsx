@@ -8,6 +8,8 @@ import { HardwareChart } from '@/components/blog/blog-hardware-chart-lazy';
 import { HeadingLink } from '@/components/blog/heading-link';
 import { ThemedFigureImage } from '@/components/blog/themed-figure-image';
 import { JsonLd } from '@/components/seo/json-ld';
+import { buttonVariants } from '@/components/ui/button';
+import { cn } from '@/lib/shared/utils';
 
 const FIGURE_DIMENSIONS: Record<string, readonly number[] | undefined> = figureDimensions;
 // Rendered width of the blog article column at each layout breakpoint (see blog-post-content).
@@ -220,7 +222,7 @@ export function createMdxComponents(
           ? 'https://inferencex.semianalysis.com/zh'
           : 'https://inferencex.semianalysis.com';
       const defaultLabel =
-        locale === 'zh' ? '查看完整 InferenceX 仪表板' : 'See full InferenceX Dashboard';
+        locale === 'zh' ? '查看完整 InferenceX 仪表板' : 'See full InferenceX dashboard';
       const href = props.href ?? defaultHref;
       return (
         <div className="not-prose my-8 flex justify-center">
@@ -228,7 +230,7 @@ export function createMdxComponents(
             href={href}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex min-h-10 items-center gap-2 rounded-md bg-brand px-5 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-brand/90 [&_p]:m-0"
+            className={cn(buttonVariants({ variant: 'brand' }), '[&_p]:m-0')}
           >
             {props.children ?? defaultLabel}
           </a>

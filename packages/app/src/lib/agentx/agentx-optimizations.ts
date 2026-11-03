@@ -249,8 +249,8 @@ export const OPTIMIZATIONS_OVERVIEW: OptimizationsOverview = {
     transfer: 'Transfer engine',
   },
   ui: {
-    backToAgentX: '← Back to AgentX',
-    backToOverview: '← All AgentX optimizations',
+    backToAgentX: 'Back to AgentX',
+    backToOverview: 'All AgentX optimizations',
     prsLabel: 'Upstream pull requests',
     referencesLabel: 'References',
     readMore: 'Read the optimizations',

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, LinkIcon } from 'lucide-react';
 
+import { Button } from '@/components/ui/button';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 
@@ -59,20 +60,22 @@ export function FaqQuestionLink({ id, question }: { id: string; question: string
       >
         {question}
       </a>
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="icon-2xs"
         data-testid={`faq-copy-link-${id}`}
         aria-label={`${copied ? strings.copied : strings.copyLink}: ${question}`}
         title={copied ? strings.copied : strings.copyLink}
         onClick={() => void handleCopy()}
-        className="inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground shadow-xs transition-colors hover:border-brand/50 hover:bg-muted hover:text-brand focus-visible:outline-none"
+        className="-my-0.5 text-muted-foreground hover:text-foreground"
       >
         {copied ? (
           <Check aria-hidden="true" className="size-4" />
         ) : (
           <LinkIcon aria-hidden="true" className="size-4" />
         )}
-      </button>
+      </Button>
       <span aria-live="polite" className="sr-only">
         {copied ? `${strings.copied}: ${question}` : ''}
       </span>

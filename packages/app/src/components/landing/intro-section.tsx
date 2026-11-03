@@ -1,5 +1,3 @@
-import { Quote } from 'lucide-react';
-
 import { Card } from '@/components/ui/card';
 import { SupportersStrip } from '@/components/landing/supporters-strip';
 import {
@@ -24,8 +22,8 @@ const supporterOrgs = (quotesPath: string) =>
   }));
 
 const HEADING = {
-  en: 'Open-Source Continuous AI Accelerator System Benchmark Trusted by GigaWatt Token Factories',
-  zh: 'InferenceX 提供持续更新的开源 AI 加速器系统基准测试，已获得吉瓦级 token 工厂运营方的信赖。',
+  en: 'Open-source continuous AI accelerator system benchmark trusted by gigawatt token factories',
+  zh: 'InferenceX 提供持续更新的开源 AI 加速器系统基准测试，已获得吉瓦级 token 工厂运营方的信赖',
 } as const;
 
 export function IntroSection({ locale = 'en' }: { locale?: Locale } = {}) {
@@ -33,14 +31,11 @@ export function IntroSection({ locale = 'en' }: { locale?: Locale } = {}) {
   return (
     <section {...analyticsPlacement('landing_section')}>
       <Card data-testid="intro-section">
-        <div className="flex items-start gap-2 mb-4">
-          <Quote className="size-5 shrink-0 mt-1 text-brand" />
-          <h2 className="text-lg font-semibold">{HEADING[locale]}</h2>
-        </div>
+        <h2 className="mb-4 text-lg font-semibold text-balance">{HEADING[locale]}</h2>
         <SupportersStrip
           orgs={supporterOrgs(isZh ? '/zh/quotes' : '/quotes')}
           moreHref={isZh ? '/zh/quotes' : '/quotes'}
-          moreLabel={isZh ? '查看完整评价与更多支持者 →' : undefined}
+          moreLabel={isZh ? '查看全部评价与支持者' : undefined}
         />
       </Card>
     </section>

@@ -20,8 +20,7 @@ export interface BlogThumbnailProps {
 const TILE_SIZES = '(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw';
 const CARD_SIZES = '(min-width: 1024px) 50vw, 100vw';
 
-const IMG_CLASS =
-  'block h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]';
+const IMG_CLASS = 'block h-full w-full object-cover';
 
 const TILE_MASK =
   'linear-gradient(115deg, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.4) 55%, rgba(0, 0, 0, 0.08) 90%)';
@@ -37,11 +36,6 @@ const LINES_STYLE: CSSProperties = {
   backgroundImage:
     'linear-gradient(currentColor 1px, transparent 1px), linear-gradient(90deg, currentColor 1px, transparent 1px)',
   backgroundSize: '80px 80px, 80px 80px',
-};
-
-const GLOW_STYLE: CSSProperties = {
-  background:
-    'radial-gradient(circle at 88% 8%, color-mix(in srgb, var(--primary) 14%, transparent), transparent 55%)',
 };
 
 interface GridTextureProps {
@@ -68,7 +62,6 @@ export function BlogGridTexture({ variant, className }: GridTextureProps) {
         )}
         style={{ ...LINES_STYLE, ...maskStyle }}
       />
-      {variant === 'tile' && <div className="absolute inset-0" style={GLOW_STYLE} />}
     </div>
   );
 }
@@ -102,7 +95,7 @@ export function BlogThumbnail({
           <Badge
             variant="outline"
             aria-hidden="true"
-            className="absolute bottom-3 left-3 bg-card/80 text-muted-foreground backdrop-blur-[2px]"
+            className="absolute bottom-3 left-3 bg-card text-muted-foreground"
           >
             {tag}
           </Badge>

@@ -7,9 +7,9 @@ export const BLOG_PROSE_CLASS = [
   'prose-h3:mt-10 prose-h3:mb-3 prose-h3:text-xl prose-h3:font-semibold',
   'prose-a:text-brand prose-a:decoration-brand/40 prose-a:underline-offset-2 hover:prose-a:decoration-brand',
   'prose-strong:text-foreground',
-  'prose-blockquote:border-primary/50 prose-blockquote:font-normal prose-blockquote:text-muted-foreground',
+  'prose-blockquote:border-border prose-blockquote:font-normal prose-blockquote:not-italic prose-blockquote:text-muted-foreground',
   'prose-figcaption:mt-0 prose-figcaption:text-sm prose-figcaption:text-muted-foreground',
-  'prose-img:rounded-xl prose-img:border prose-img:border-border/40',
-  'prose-pre:rounded-xl prose-pre:border prose-pre:border-border/50 prose-pre:bg-card',
-  'prose-table:text-sm prose-th:text-muted-foreground prose-th:font-medium prose-hr:border-border/40',
+  'prose-img:rounded-xl prose-img:border prose-img:border-border/30',
+  'prose-pre:rounded-xl prose-pre:border prose-pre:border-border/30 prose-pre:bg-card',
+  'prose-table:text-sm prose-th:text-muted-foreground prose-th:font-medium prose-hr:border-border/30',
 ].join(' ');

@@ -82,7 +82,7 @@ export function BlogIndexPosts({
         </div>
 
         {filtered.length === 0 ? (
-          <div className="flex flex-col items-start gap-3 rounded-2xl border border-dashed border-border/60 p-8">
+          <div className="flex flex-col items-start gap-3 rounded-xl border border-dashed border-border/50 p-8">
             <p className="text-muted-foreground">
               {activeTag ? t.emptyTag(activeTag) : t.emptyAll}
             </p>
@@ -93,10 +93,7 @@ export function BlogIndexPosts({
             )}
           </div>
         ) : (
-          <div
-            className="grid items-start gap-6 md:grid-cols-2 xl:grid-cols-3"
-            data-testid="blog-post-grid"
-          >
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3" data-testid="blog-post-grid">
             {grid.map((card, index) => (
               <BlogPostCard key={card.slug} {...card} tagsLabel={t.tags} priority={index < 3} />
             ))}

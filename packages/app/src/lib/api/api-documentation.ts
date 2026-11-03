@@ -3403,6 +3403,21 @@ const quickstartText = {
   },
 } as const;
 
+/** Prose type labels and placeholder examples; schema type names stay as identifiers. */
+const PARAMETER_TEXT_ZH: Record<string, string> = {
+  'CSV list': 'CSV 列表',
+  'CSV number list': 'CSV 数字列表',
+  'CSV GPU list': 'CSV GPU 列表',
+  'CSV workload list': 'CSV 工作负载列表',
+  'comma-separated integers': '逗号分隔的整数',
+  'Exact key returned in serviceSources': 'serviceSources 中返回的完整键',
+};
+
+function localizeParameterText<T>(value: T, locale: ApiDocumentationLocale): T | string {
+  if (locale !== 'zh' || typeof value !== 'string') return value;
+  return PARAMETER_TEXT_ZH[value] ?? value;
+}
+
 function localizeOperation(
   operation: ApiOperation,
   locale: ApiDocumentationLocale,
@@ -3413,6 +3428,8 @@ function localizeOperation(
     description: operation.description[locale],
     parameters: operation.parameters.map((item) => ({
       ...item,
+      type: localizeParameterText(item.type, locale),
+      example: localizeParameterText(item.example, locale),
       description: item.description[locale],
     })),
     responses: operation.responses.map((item) => ({

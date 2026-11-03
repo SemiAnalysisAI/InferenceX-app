@@ -198,7 +198,7 @@ export const AGENTX_TELEMETRY_GUIDE: TelemetryGuide = {
     },
   ],
   ui: {
-    backToAgentX: '← AgentX datasets',
+    backToAgentX: 'AgentX datasets',
     onThisPage: 'On this page',
     figureCta: 'Open full size',
     readMore: 'Read the telemetry tutorial',

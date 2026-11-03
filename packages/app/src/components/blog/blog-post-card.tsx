@@ -48,7 +48,7 @@ export function BlogPostCard({
     <article
       data-testid="blog-post-card"
       className={cn(
-        'group relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-border/50 bg-card/60 backdrop-blur-[2px] transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-lg hover:shadow-primary/5',
+        'group relative flex min-w-0 flex-col overflow-hidden rounded-xl border border-border/30 bg-card transition-colors hover:border-border',
         className,
       )}
     >
@@ -57,7 +57,7 @@ export function BlogPostCard({
         tag={tags[0]}
         readingLabel={readingLabel}
         priority={priority}
-        className="border-b border-border/40"
+        className="border-b border-border/30"
       />
       <div className="flex flex-1 flex-col gap-3 p-5">
         <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">

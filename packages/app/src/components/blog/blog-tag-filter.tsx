@@ -1,6 +1,6 @@
 import { ChevronDown } from 'lucide-react';
 
-import { TAG_CHIP_CLASS } from './blog-tag-chip';
+import { tagChipClass } from './blog-tag-chip';
 import { BlogTagLink } from './blog-tag-link';
 
 interface BlogTagFilterProps {
@@ -29,7 +29,7 @@ export function BlogTagFilter({ primary, more, activeTag, basePath, labels }: Bl
       {tail.length > 0 && (
         <details className="group">
           <summary
-            className={`${TAG_CHIP_CLASS} cursor-pointer list-none border-dashed border-border/60 text-muted-foreground hover:border-border hover:text-foreground [&::-webkit-details-marker]:hidden`}
+            className={`${tagChipClass(false)} cursor-pointer list-none [&::-webkit-details-marker]:hidden`}
           >
             {labels.more}
             <span className="text-muted-foreground/80 tabular-nums" aria-hidden="true">
@@ -40,7 +40,7 @@ export function BlogTagFilter({ primary, more, activeTag, basePath, labels }: Bl
               className="size-3.5 transition-transform duration-200 group-open:rotate-180"
             />
           </summary>
-          <div className="absolute inset-x-0 top-full z-20 mt-2 flex flex-wrap gap-2 rounded-xl border border-border/50 bg-card p-4 shadow-xl shadow-black/20">
+          <div className="absolute inset-x-0 top-full z-20 mt-2 flex flex-wrap gap-2 rounded-xl border border-border/30 bg-popover p-4 shadow-lg">
             {tail.map((tag) => (
               <BlogTagLink key={tag} tag={tag} basePath={basePath} />
             ))}

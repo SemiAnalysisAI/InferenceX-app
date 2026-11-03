@@ -38,7 +38,7 @@ function NavCard({
     <Link
       href={href}
       className={cn(
-        'group flex min-w-0 flex-col gap-2 rounded-2xl border border-border/50 bg-card/60 p-5 backdrop-blur-[2px] transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-lg hover:shadow-primary/5',
+        'group flex min-w-0 flex-col gap-2 rounded-xl border border-border/30 bg-card p-5 transition-colors hover:border-border',
         direction === 'next' && 'items-end text-right',
       )}
       data-testid={`blog-nav-${direction}`}
@@ -46,7 +46,6 @@ function NavCard({
     >
       <Eyebrow
         as="span"
-        tone="muted"
         className={cn(
           'inline-flex items-center gap-1.5',
           direction === 'next' && 'flex-row-reverse',
@@ -55,7 +54,7 @@ function NavCard({
         <Icon
           aria-hidden="true"
           className={cn(
-            'size-3.5 transition-transform duration-200',
+            'size-3.5 transition-transform duration-150',
             direction === 'prev' ? 'group-hover:-translate-x-0.5' : 'group-hover:translate-x-0.5',
           )}
         />

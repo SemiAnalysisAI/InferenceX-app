@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 
 export default function AgentXQuickstartPage() {
   return (
-    <main className="container mx-auto max-w-4xl px-4 pb-12 lg:px-8">
+    <main className="container mx-auto max-w-4xl px-4 pt-4 pb-8 lg:px-8 lg:pt-8">
       <AgentXQuickstartArticle locale="en" />
     </main>
   );

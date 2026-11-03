@@ -1,9 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { Search, X } from 'lucide-react';
+import { ArrowRight, Search, X } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
 
+import { tagChipClass } from '@/components/blog/blog-tag-chip';
+import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Input } from '@/components/ui/input';
 import { track } from '@/lib/analytics/analytics';
 import { useSearchTracking } from '@/lib/analytics/use-search-tracking';
 import type { GlossaryCategory, GlossaryPreview } from '@/lib/content/glossary';
@@ -24,7 +28,6 @@ export interface GlossaryBrowserLabels {
   termSingular: string;
   termPlural: string;
   clearFilters: string;
-  noMatch: string;
   noResultsTitle: string;
   noResultsDescription: string;
   showAllTerms: string;
@@ -45,13 +48,12 @@ const DEFAULT_LABELS: GlossaryBrowserLabels = {
   clearSearch: 'Clear glossary search',
   categoryFilterLabel: 'Filter glossary by category',
   letterFilterLabel: 'Filter by letter',
-  allLetters: 'ALL',
+  allLetters: 'All',
   termSingular: 'term',
   termPlural: 'terms',
   clearFilters: 'Clear filters',
-  noMatch: 'No match',
   noResultsTitle: 'No glossary terms found',
-  noResultsDescription: 'Try a broader keyword or clear the active filters.',
+  noResultsDescription: 'Try a broader keyword or clear the active filters',
   showAllTerms: 'Show all terms',
 };
 
@@ -119,33 +121,35 @@ export function GlossaryBrowser({
 
   return (
     <div>
-      <div className="border-y border-border/50 bg-background/30 px-4 py-5 backdrop-blur-[2px] md:px-6">
+      <div className="border-b border-border/30 px-4 py-5 md:px-6">
         <div className="grid gap-4 xl:grid-cols-[minmax(18rem,1fr)_auto] xl:items-center">
           <label className="relative block">
             <span className="sr-only">{labels.searchLabel}</span>
             <Search
               aria-hidden="true"
-              className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-muted-foreground"
+              className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
             />
-            <input
+            <Input
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={labels.searchPlaceholder}
-              className="h-12 w-full rounded-lg border border-border/70 bg-background/60 pr-11 pl-11 text-sm outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground"
+              className="pr-10 pl-9 md:h-8"
             />
             {query && (
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon-2xs"
                 onClick={() => {
                   track('glossary_search_cleared');
                   setQuery('');
                 }}
                 aria-label={labels.clearSearch}
-                className="absolute top-1/2 right-3 flex size-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               >
                 <X aria-hidden="true" className="size-4" />
-              </button>
+              </Button>
             )}
           </label>
 
@@ -156,12 +160,7 @@ export function GlossaryBrowser({
                 type="button"
                 aria-pressed={category === item}
                 onClick={() => toggleCategory(item)}
-                className={cn(
-                  'cursor-pointer rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
-                  category === item
-                    ? 'border-brand/45 bg-brand/12 text-brand'
-                    : 'border-border/60 bg-background/30 text-muted-foreground hover:border-foreground/25 hover:text-foreground',
-                )}
+                className={cn(tagChipClass(category === item), 'cursor-pointer')}
               >
                 {categoryLabels?.[item] ?? item}
               </button>
@@ -171,7 +170,7 @@ export function GlossaryBrowser({
 
         {groupBy === 'initial' && (
           <div
-            className="mt-5 flex items-center gap-2 overflow-x-auto pb-1"
+            className="mt-4 flex items-center gap-1 overflow-x-auto pb-1"
             aria-label={labels.letterFilterLabel}
           >
             <button
@@ -182,10 +181,10 @@ export function GlossaryBrowser({
                 setLetter(null);
               }}
               className={cn(
-                'flex h-8 min-w-10 cursor-pointer items-center justify-center rounded-md border px-2 font-mono text-xs transition-colors',
+                'flex h-8 min-w-10 cursor-pointer items-center justify-center rounded-md px-2 text-xs font-medium transition-colors',
                 letter === null
-                  ? 'border-brand/45 bg-brand/12 text-brand'
-                  : 'border-border/50 text-muted-foreground hover:text-foreground',
+                  ? 'bg-brand/10 text-brand'
+                  : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
               )}
             >
               {labels.allLetters}
@@ -200,11 +199,11 @@ export function GlossaryBrowser({
                   aria-pressed={letter === item}
                   onClick={() => toggleLetter(item)}
                   className={cn(
-                    'flex size-8 shrink-0 items-center justify-center rounded-md border font-mono text-xs transition-colors',
-                    available ? 'cursor-pointer' : 'cursor-not-allowed opacity-25',
+                    'flex size-8 shrink-0 items-center justify-center rounded-md text-xs font-medium transition-colors',
+                    available ? 'cursor-pointer' : 'cursor-not-allowed opacity-50',
                     letter === item
-                      ? 'border-brand/45 bg-brand/12 text-brand'
-                      : 'border-border/50 text-muted-foreground hover:text-foreground',
+                      ? 'bg-brand/10 text-brand'
+                      : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
                   )}
                 >
                   {item}
@@ -215,26 +214,24 @@ export function GlossaryBrowser({
         )}
       </div>
 
-      <div className="px-4 py-4 md:px-6">
-        <div className="flex items-center justify-between gap-4 text-xs text-muted-foreground">
-          <p aria-live="polite">
-            <span className="font-mono text-foreground">{filteredEntries.length}</span>{' '}
-            {filteredEntries.length === 1 ? labels.termSingular : labels.termPlural}
-          </p>
-          {hasFilters && (
-            <button
-              type="button"
-              onClick={() => clearFilters('toolbar')}
-              className="cursor-pointer font-medium text-brand hover:underline"
-            >
-              {labels.clearFilters}
-            </button>
-          )}
-        </div>
+      <div className="flex items-center justify-between gap-4 px-4 py-3 text-xs text-muted-foreground md:px-6">
+        <p aria-live="polite">
+          <span className="font-medium text-foreground tabular-nums">{filteredEntries.length}</span>{' '}
+          {filteredEntries.length === 1 ? labels.termSingular : labels.termPlural}
+        </p>
+        {hasFilters && (
+          <button
+            type="button"
+            onClick={() => clearFilters('toolbar')}
+            className="cursor-pointer font-medium text-foreground hover:underline"
+          >
+            {labels.clearFilters}
+          </button>
+        )}
       </div>
 
       {groupedEntries.length > 0 ? (
-        <div className="border-t border-border/50">
+        <div className="border-t border-border/30">
           {groupedEntries.map(([groupKey, group], groupIndex) => {
             const headingId = `glossary-group-${groupIndex}`;
             const groupLabel =
@@ -246,35 +243,35 @@ export function GlossaryBrowser({
                 key={groupKey}
                 aria-labelledby={headingId}
                 className={cn(
-                  'grid border-b border-border/50 last:border-b-0',
+                  'grid border-b border-border/30 last:border-b-0',
                   groupBy === 'category'
                     ? 'md:grid-cols-[8rem_minmax(0,1fr)]'
-                    : 'md:grid-cols-[6rem_minmax(0,1fr)]',
+                    : 'md:grid-cols-[5rem_minmax(0,1fr)]',
                 )}
               >
-                <div className="border-b border-border/40 bg-muted/8 px-5 py-5 md:border-r md:border-b-0 md:px-6 md:py-7">
+                <div className="px-4 pt-5 md:px-6 md:py-6">
                   <h2
                     id={headingId}
                     className={cn(
-                      'font-mono font-semibold text-brand md:sticky md:top-20',
+                      'font-medium md:sticky md:top-20',
                       groupBy === 'category'
-                        ? 'text-base leading-6 tracking-normal'
-                        : 'text-3xl tracking-[-0.06em]',
+                        ? 'text-sm leading-6 text-foreground'
+                        : 'text-2xl text-muted-foreground',
                     )}
                   >
                     {groupLabel}
                   </h2>
                 </div>
-                <div className="divide-y divide-border/40">
+                <div className="divide-y divide-border/20">
                   {group.map((entry) => (
                     <Link
                       key={entry.slug}
                       href={`${basePath}/${entry.slug}`}
-                      className="group grid gap-3 px-5 py-6 transition-[background-color,box-shadow] hover:bg-brand/5 focus-visible:outline-none md:grid-cols-[minmax(12rem,0.7fr)_minmax(0,1.3fr)_auto] md:items-start md:gap-8 md:px-8"
+                      className="group grid gap-2 px-4 py-5 transition-colors hover:bg-muted/40 focus-visible:outline-none md:grid-cols-[minmax(12rem,0.7fr)_minmax(0,1.3fr)_auto] md:items-start md:gap-8 md:px-6"
                     >
                       <div>
                         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                          <h3 className="text-lg font-semibold tracking-tight group-hover:text-brand group-hover:underline">
+                          <h3 className="text-base font-medium group-hover:text-brand">
                             {entry.term}
                           </h3>
                           {entry.abbreviation && (
@@ -283,19 +280,19 @@ export function GlossaryBrowser({
                             </span>
                           )}
                         </div>
-                        <p className="mt-1 text-2xs font-semibold tracking-eyebrow text-muted-foreground uppercase">
-                          {categoryLabels?.[entry.category] ?? entry.category}
-                        </p>
+                        {groupBy === 'initial' && (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {categoryLabels?.[entry.category] ?? entry.category}
+                          </p>
+                        )}
                       </div>
                       <p className="line-clamp-3 text-sm leading-6 text-muted-foreground">
                         {entry.plainEnglish}
                       </p>
-                      <span
+                      <ArrowRight
                         aria-hidden="true"
-                        className="hidden pt-1 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-brand md:block"
-                      >
-                        →
-                      </span>
+                        className="mt-1 hidden size-4 text-muted-foreground transition-colors group-hover:text-foreground md:block"
+                      />
                     </Link>
                   ))}
                 </div>
@@ -304,20 +301,19 @@ export function GlossaryBrowser({
           })}
         </div>
       ) : (
-        <div className="border-t border-border/50 px-6 py-20 text-center">
-          <p className="font-mono text-xs tracking-eyebrow text-brand uppercase">
-            {labels.noMatch}
-          </p>
-          <h2 className="mt-3 text-2xl font-semibold">{labels.noResultsTitle}</h2>
-          <p className="mt-2 text-sm text-muted-foreground">{labels.noResultsDescription}</p>
-          <button
-            type="button"
-            onClick={() => clearFilters('empty_state')}
-            className="mt-5 cursor-pointer rounded-md border border-brand/40 bg-brand/10 px-4 py-2 text-sm font-medium text-brand hover:bg-brand/15"
-          >
-            {labels.showAllTerms}
-          </button>
-        </div>
+        <EmptyState
+          bare
+          title={labels.noResultsTitle}
+          titleAs="h2"
+          action={
+            <Button type="button" variant="outline" onClick={() => clearFilters('empty_state')}>
+              {labels.showAllTerms}
+            </Button>
+          }
+          className="border-t border-border/30 px-6 py-16"
+        >
+          {labels.noResultsDescription}
+        </EmptyState>
       )}
     </div>
   );

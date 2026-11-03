@@ -10,13 +10,10 @@ import {
 
 import { enAlternates, type Locale, ZH_LANG_TAG, ZH_OG_LOCALE, zhAlternates } from '../i18n/i18n';
 
-export type WhitepaperKpiIcon = 'dollar' | 'trending' | 'percent';
-
 export interface WhitepaperKpi {
   value: string;
   label: string;
   caption: string;
-  icon: WhitepaperKpiIcon;
 }
 
 export interface WhitepaperComparisonItem {
@@ -159,7 +156,7 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
       },
     },
     en: {
-      typeLabel: 'Whitepaper · Executive Summary',
+      typeLabel: 'Whitepaper · Executive summary',
       title: 'AMD Instinct MI355X Kimi K3 Can Generate Up to $32B of Revenue per GigaWatt per Year',
       subtitle: 'Executive Summary - Agentic Inference Serving Economics Analysis',
       description:
@@ -178,20 +175,17 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
           value: '$32.6B',
           label: 'Revenue per GW-year',
           caption: 'Kimi K3 at OpenRouter list price, 60% utilization',
-          icon: 'dollar',
         },
         {
           value: '$16.5B',
           label: 'Profit per GW-year',
           caption:
             'Owned at hyperscaler volume at $1.50/GPU/hr compute; $3.95 of profit per chip-hour',
-          icon: 'trending',
         },
         {
           value: '50.7%',
           label: 'Profit margin',
           caption: 'After compute expense and 30% model license fee',
-          icon: 'percent',
         },
       ],
       comparison: {
@@ -308,19 +302,16 @@ export const WHITEPAPERS: readonly Whitepaper[] = [
           value: '$32.6B',
           label: '每 GW·年收入',
           caption: 'Kimi K3 按 OpenRouter 标价计费，60% 利用率',
-          icon: 'dollar',
         },
         {
           value: '$16.5B',
           label: '每 GW·年利润',
           caption: '按超大规模云厂商采购规模自建，算力成本 $1.50/GPU/hr；每芯片小时利润 $3.95',
-          icon: 'trending',
         },
         {
           value: '50.7%',
           label: '利润率',
           caption: '扣除算力支出和 30% 模型授权费之后',
-          icon: 'percent',
         },
       ],
       comparison: {
@@ -425,6 +416,13 @@ export function whitepaperCopy(paper: Whitepaper, locale: Locale): WhitepaperCop
   return locale === 'zh' ? paper.zh : paper.en;
 }
 
+/** Topic tags that are plain words; product, chip, and model tags render unchanged. */
+const WHITEPAPER_TAG_ZH: Record<string, string> = { Economics: '经济性' };
+
+export function whitepaperTagLabel(tag: string, locale: Locale): string {
+  return locale === 'zh' ? (WHITEPAPER_TAG_ZH[tag] ?? tag) : tag;
+}
+
 export function whitepaperIndexPath(locale: Locale): string {
   return locale === 'zh' ? '/zh/whitepaper' : '/whitepaper';
 }
@@ -448,7 +446,7 @@ export const WHITEPAPER_COPY = {
     indexDescription: `Executive summaries from the ${SITE_NAME} team on inference serving economics, measured on the live AgentX benchmark and published as downloadable PDFs.`,
     indexIntro:
       'Short research papers on inference serving economics, measured on the live AgentX benchmark and published as downloadable PDFs.',
-    indexEmpty: 'Coming soon.',
+    indexEmpty: 'No whitepapers yet',
     backToIndex: 'Back to whitepapers',
     downloadPdf: 'Download PDF',
     readSummary: 'Read the page',
@@ -464,9 +462,8 @@ export const WHITEPAPER_COPY = {
     closingBody: 'The two-page PDF includes both figures, the assumptions table, and source links.',
     pages: (count: number) => `${count} pages`,
     dataAsOf: (date: string) => `Data as of ${date}`,
-    indexEyebrow: 'InferenceX Research',
     tags: 'Tags',
-    scrollHint: 'Scroll sideways to see the full chart.',
+    scrollHint: 'Scroll sideways to see the full chart',
     keyNumbers: 'Key numbers',
     figures: 'Figures',
     onThisPage: 'On this page',
@@ -482,7 +479,7 @@ export const WHITEPAPER_COPY = {
     indexTitle: '白皮书',
     indexDescription: `${SITE_NAME} 团队发布的推理服务经济性执行摘要，基于 AgentX 基准测试的实测数据，提供 PDF 下载。`,
     indexIntro: '关于推理服务经济性的短篇研究报告，基于 AgentX 基准测试的实测数据，提供 PDF 下载。',
-    indexEmpty: '即将上线。',
+    indexEmpty: '暂无白皮书',
     backToIndex: '返回白皮书列表',
     downloadPdf: '下载 PDF',
     readSummary: '阅读摘要',
@@ -498,9 +495,8 @@ export const WHITEPAPER_COPY = {
     closingBody: '两页 PDF 包含两张图、假设条件表和数据来源链接。',
     pages: (count: number) => `共 ${count} 页`,
     dataAsOf: (date: string) => `数据截至 ${date}`,
-    indexEyebrow: 'InferenceX 研究',
     tags: '标签',
-    scrollHint: '左右滑动查看完整图表。',
+    scrollHint: '左右滑动查看完整图表',
     keyNumbers: '核心数字',
     figures: '图表',
     onThisPage: '本页目录',

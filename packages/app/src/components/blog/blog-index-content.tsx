@@ -1,6 +1,5 @@
 import Link from 'next/link';
 
-import { Eyebrow } from '@/components/ui/eyebrow';
 import { Heading } from '@/components/ui/heading';
 import {
   getPostThumbnail,
@@ -49,13 +48,10 @@ export function BlogIndexContent({ locale }: { locale: Locale }) {
 
   return (
     <div
-      className="container mx-auto flex flex-col gap-8 px-4 pb-16 lg:gap-10 lg:px-8"
+      className="container mx-auto flex flex-col gap-8 px-4 pb-8 lg:gap-10 lg:px-8"
       data-testid="blog-index-page"
     >
       <header className="flex flex-col gap-3 pt-4 lg:pt-8">
-        <Eyebrow as="p" wide>
-          {t.indexEyebrow}
-        </Eyebrow>
         <Heading as="h1" level="page" className="text-balance">
           {t.indexTitle}
         </Heading>

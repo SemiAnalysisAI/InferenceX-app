@@ -45,7 +45,7 @@ export function BlogFeaturedPost({
       data-testid="blog-featured-post"
       data-layout={thumbnail ? 'figure' : 'text'}
       className={cn(
-        'group relative min-w-0 overflow-hidden rounded-2xl border border-border/50 bg-card/60 p-5 backdrop-blur-[2px] transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-lg hover:shadow-primary/5 md:p-6 lg:p-7',
+        'group relative min-w-0 overflow-hidden rounded-xl border border-border/30 bg-card p-5 transition-colors hover:border-border md:p-6 lg:p-8',
         thumbnail
           ? 'grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-10'
           : 'flex flex-col md:px-8 md:py-8 lg:px-10 lg:py-10',
@@ -56,7 +56,7 @@ export function BlogFeaturedPost({
           thumbnail={thumbnail}
           priority
           variant="card"
-          className="rounded-xl border border-border/50"
+          className="rounded-lg border border-border/30"
         />
       ) : (
         <BlogGridTexture variant="card" />
@@ -64,9 +64,7 @@ export function BlogFeaturedPost({
       <div
         className={cn('flex min-w-0 flex-col gap-4', thumbnail ? 'lg:justify-center' : 'max-w-4xl')}
       >
-        <Eyebrow as="p" wide>
-          {labels.eyebrow}
-        </Eyebrow>
+        <Eyebrow as="p">{labels.eyebrow}</Eyebrow>
         <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
           <time dateTime={date}>{dateLabel}</time>
           <span aria-hidden="true">&middot;</span>
@@ -109,7 +107,7 @@ export function BlogFeaturedPost({
           {labels.read}
           <ArrowRight
             aria-hidden="true"
-            className="size-4 transition-transform duration-200 group-hover:translate-x-0.5"
+            className="size-4 transition-transform duration-150 group-hover:translate-x-0.5"
           />
         </span>
       </div>
