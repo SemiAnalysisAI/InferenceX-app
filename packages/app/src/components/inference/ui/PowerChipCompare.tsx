@@ -37,7 +37,7 @@ import {
 import { chipsWithoutSystemModel } from '../utils/power-chip-coverage';
 import { formatInteractivity } from '../utils/interactivity-format';
 import { PowerBasisPill } from '../powerx/PowerBasisPill';
-import { FACILITY_PUE_NOTE } from '@/lib/power/system-power-model';
+import { FACILITY_PUE_NOTE } from '@/lib/power/facility-pue';
 import {
   usePowerXCompareTarget,
   usePowerXIncludeFacility,

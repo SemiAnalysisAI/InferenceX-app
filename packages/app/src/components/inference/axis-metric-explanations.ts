@@ -1,4 +1,4 @@
-import { AIR_COOLED_SYSTEM_PUE, LIQUID_COOLED_RACK_PUE } from '@/lib/power/system-power-model';
+import { AIR_COOLED_SYSTEM_PUE, LIQUID_COOLED_RACK_PUE } from '@/lib/power/facility-pue';
 
 import { metricOptionTitle, type MetricKey } from './metric-registry';
 

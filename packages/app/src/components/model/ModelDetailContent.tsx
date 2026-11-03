@@ -1,5 +1,6 @@
 import Link from 'next/link';
 
+import { KatexStyles } from '@/components/blog/katex-styles';
 import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
 import { Heading } from '@/components/ui/heading';
@@ -29,7 +30,7 @@ export default async function ModelDetailContent({
   locale: Locale;
 }) {
   const { meta, entry, raw } = page;
-  const { content } = await compileBlogMdx(raw);
+  const { content, hasMath } = await compileBlogMdx(raw);
   const scenario = comparisonScenarioForModel(entry);
   const dashboardQuery = new URLSearchParams({
     g_model: entry.displayName,
@@ -128,6 +129,7 @@ export default async function ModelDetailContent({
                 </Link>
               </aside>
             )}
+            {hasMath && <KatexStyles />}
             <article
               data-testid="model-page-article"
               lang={locale === 'zh' ? (page.contentLocale ?? 'en') : undefined}

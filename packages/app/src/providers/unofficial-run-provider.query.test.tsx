@@ -6,6 +6,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { CLIENT_SEARCH_CHANGE_EVENT } from '@/lib/routing/client-navigation';
 
+// The provider imports the benchmark transform on demand; loading it here keeps that import
+// resolving within the flush loop instead of waiting on a cold module transform.
+import './unofficial-chart-data';
 import {
   UnofficialRunProvider,
   useUnofficialRun,
@@ -151,7 +154,7 @@ describe('UnofficialRunProvider query lifecycle', () => {
       json: () => Promise.resolve({ runInfos: [runInfo(1)], benchmarks: [], evaluations: [] }),
     } as Response);
     await flush();
-    expect(latestRunIds).toEqual([2]);
+    await waitForRunIds([2]);
     act(() => root.unmount());
   });
 

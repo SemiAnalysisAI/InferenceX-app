@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import sweep from '../../../../db/src/etl/fixtures/tpu-manual-sweep.json';
 import { normalizeArtifactRows, normalizeEvalArtifactRows } from '@/app/api/unofficial-run/route';
-import { buildChartData } from '@/providers/unofficial-run-provider';
+import { buildChartData } from '@/providers/unofficial-chart-data';
 import { getPointLabel } from '@/components/inference/utils/tooltipUtils';
 import { pointLabelText } from '@/components/inference/ui/point-label';
 import { rowToAggDataEntry, transformBenchmarkRows } from './benchmark-transform';
