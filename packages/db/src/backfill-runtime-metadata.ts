@@ -111,7 +111,7 @@ async function main(): Promise<void> {
       const artifacts = selectBenchmarkArtifacts(listRunArtifacts(repository, String(runId)));
       let files = 0;
       for (const artifact of artifacts) {
-        const artifactDir = downloadArtifact(artifact, tempDir);
+        const artifactDir = await downloadArtifact(artifact, tempDir);
         for (const file of findJsonFiles(artifactDir)) {
           files++;
           const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as unknown;

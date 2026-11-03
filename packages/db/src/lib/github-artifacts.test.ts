@@ -1,12 +1,20 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
 import { describe, expect, it, vi } from 'vitest';
 
-const { mockExecSync } = vi.hoisted(() => ({ mockExecSync: vi.fn() }));
-vi.mock('node:child_process', () => ({ execSync: mockExecSync }));
+const { mockExecSync, mockSpawn } = vi.hoisted(() => ({
+  mockExecSync: vi.fn(),
+  mockSpawn: vi.fn(),
+}));
+vi.mock('node:child_process', () => ({ execSync: mockExecSync, spawn: mockSpawn }));
 
 import {
   RUNNER_SUFFIX_RE,
   assertRequestedRunAttempt,
   dedupeArtifactsByLogicalName,
+  downloadArtifact,
   fetchRunAttempt,
 } from './github-artifacts.js';
 
@@ -70,4 +78,40 @@ describe('fetchRunAttempt', () => {
       );
     },
   );
+});
+
+describe('downloadArtifact', () => {
+  it('stages concurrent downloads in separate zips', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gh-download-'));
+    // `gh` writes the URL as the zip body and `unzip` copies the zip body out, and
+    // both exit on a later turn so the two downloads overlap.
+    mockSpawn.mockImplementation(
+      (command: string, args: string[], { stdio }: { stdio: (number | string)[] }) => {
+        const listeners = new Map<string, (code: number, signal: null) => void>();
+        const out = stdio[1];
+        if (command === 'gh' && typeof out === 'number') fs.writeSync(out, args[1]);
+        if (command === 'unzip') {
+          fs.writeFileSync(path.join(args[3], 'body.txt'), fs.readFileSync(args[1]));
+        }
+        setImmediate(() => listeners.get('close')?.(0, null));
+        return {
+          once: (event: string, listener: (code: number, signal: null) => void) =>
+            listeners.set(event, listener),
+        };
+      },
+    );
+    try {
+      const dirs = await Promise.all([
+        downloadArtifact(art('bmk_a', '2026-06-01T00:00:00Z'), root),
+        downloadArtifact(art('bmk_b', '2026-06-01T00:00:00Z'), root),
+      ]);
+      expect(dirs.map((dir) => fs.readFileSync(path.join(dir, 'body.txt'), 'utf8'))).toEqual([
+        'https://api.github.com/bmk_a',
+        'https://api.github.com/bmk_b',
+      ]);
+      expect(fs.readdirSync(root).toSorted()).toEqual(['bmk_a', 'bmk_b']);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
 });

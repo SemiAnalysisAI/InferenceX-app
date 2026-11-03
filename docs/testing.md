@@ -47,6 +47,8 @@ The local `bun run test:e2e` command is a curated smoke suite across the core pa
 
 The complete suite is `bun run test:e2e:full`. It runs all Cypress component and integration specs. GitHub Actions runs that same coverage as four component shards (Chrome) plus eight integration shards per browser, Chrome and Firefox. The CI workflow is the merge gate for the full E2E suite.
 
+One `build` job compiles the app with `E2E_FIXTURES=1` and uploads `.next` (without `.next/cache`) as a zstd tarball, the `e2e-app-build` artifact. Each integration shard installs dependencies, unpacks that artifact and runs `next start`, so the app is built once per workflow run instead of once per shard. The artifact is scoped to the run, so a shard always serves the commit under test. The build job is also the only writer of the Bun package cache and the Next.js build cache.
+
 `packages/app/timings.json` and `timings-firefox.json` are the committed Chrome
 and Firefox `cypress-split` baselines. `component-timings.json` is the Chrome
 component baseline. Their unit guard requires one positive duration for every

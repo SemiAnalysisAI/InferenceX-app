@@ -197,7 +197,7 @@ if (isDownloadMode) {
 
   for (const artifact of byLogical.values()) {
     console.log(`  ${artifact.name}`);
-    downloadArtifact(artifact, artifactsDir);
+    await downloadArtifact(artifact, artifactsDir);
   }
 
   console.log(`\n  Downloaded ${byLogical.size} artifact(s)`);

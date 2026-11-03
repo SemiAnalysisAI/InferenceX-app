@@ -3,7 +3,6 @@ import { notFound } from 'next/navigation';
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
 import { renderCompareOg } from '@/lib/compare/compare-og';
-import { getAllComparablePrecisionSlugs } from '@/lib/compare/compare-variant-availability';
 import {
   canonicalPrecisionCompareSlug,
   parsePrecisionCompareSlug,
@@ -14,11 +13,9 @@ export const alt = '芯片推理精度基准测试对比';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
-export async function generateStaticParams() {
-  const slugs = await getAllComparablePrecisionSlugs();
-  return slugs.map(({ modelSlug, gpu, precA, precB }) => ({
-    slug: canonicalPrecisionCompareSlug(modelSlug, gpu, precA, precB),
-  }));
+// Rendered on first request and then cached, like the page, so builds skip one PNG per slug.
+export function generateStaticParams(): { slug: string }[] {
+  return [];
 }
 
 export default async function OgImage({ params }: { params: Promise<{ slug: string }> }) {

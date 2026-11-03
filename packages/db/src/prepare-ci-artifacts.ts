@@ -3,6 +3,7 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { setTimeout as sleep } from 'node:timers/promises';
 
 import { requireIngestRepo } from './cli-utils.js';
 import { buildArtifactPlan } from './lib/ci-artifact-preparation.js';
@@ -34,24 +35,56 @@ function fetchRunMetadata(repo: string, runId: string): GithubRunMetadata {
   ) as GithubRunMetadata;
 }
 
-function downloadWithRetries(artifact: ArtifactMeta, artifactsPath: string, attempt = 1): void {
-  const zipPath = path.join(artifactsPath, 'artifact.zip');
+// Downloads are network-bound. Eight at a time stays far below GitHub's
+// concurrent-request limit.
+const DOWNLOAD_CONCURRENCY = 8;
+
+async function downloadWithRetries(
+  artifact: ArtifactMeta,
+  artifactsPath: string,
+  attempt = 1,
+): Promise<void> {
   const artifactPath = path.join(artifactsPath, artifact.name);
   try {
-    fs.rmSync(zipPath, { force: true });
     fs.rmSync(artifactPath, { recursive: true, force: true });
-    downloadArtifact(artifact, artifactsPath);
+    await downloadArtifact(artifact, artifactsPath);
   } catch (error) {
-    fs.rmSync(zipPath, { force: true });
     fs.rmSync(artifactPath, { recursive: true, force: true });
     if (attempt >= 3) {
       throw new Error(`Failed to download artifact ${artifact.name} after 3 attempts`, {
         cause: error,
       });
     }
-    console.warn(`  attempt ${attempt}/3 failed; retrying in ${attempt}s`);
-    execFileSync('sleep', [String(attempt)]);
-    downloadWithRetries(artifact, artifactsPath, attempt + 1);
+    console.warn(`  ${artifact.name}: attempt ${attempt}/3 failed; retrying in ${attempt}s`);
+    await sleep(attempt * 1000);
+    await downloadWithRetries(artifact, artifactsPath, attempt + 1);
+  }
+}
+
+// Starts downloads in plan order. After a failure no new download starts, the
+// running ones finish, and the first failing worker's error is thrown.
+async function downloadAll(
+  artifacts: readonly ArtifactMeta[],
+  artifactsPath: string,
+): Promise<void> {
+  let next = 0;
+  let failed = false;
+  async function worker(): Promise<void> {
+    while (!failed && next < artifacts.length) {
+      const artifact = artifacts[next++];
+      console.log(`Downloading artifact: ${artifact.name}`);
+      try {
+        await downloadWithRetries(artifact, artifactsPath);
+      } catch (error) {
+        failed = true;
+        throw error;
+      }
+    }
+  }
+  const workers = Math.min(DOWNLOAD_CONCURRENCY, artifacts.length);
+  const results = await Promise.allSettled(Array.from({ length: workers }, worker));
+  for (const result of results) {
+    if (result.status === 'rejected') throw result.reason;
   }
 }
 
@@ -95,7 +128,7 @@ function writeReuseMetadata(
   );
 }
 
-function main(): void {
+async function main(): Promise<void> {
   const args = process.argv.slice(2).filter((arg) => arg !== '--');
   const dryRun = args.includes('--dry-run');
   const positional = args.filter((arg) => arg !== '--dry-run');
@@ -143,10 +176,7 @@ function main(): void {
   if (fs.readdirSync(artifactsPath).length > 0) {
     throw new Error(`ARTIFACTS_PATH must be empty before preparation: ${artifactsPath}`);
   }
-  for (const artifact of plan.artifacts) {
-    console.log(`Downloading artifact: ${artifact.name}`);
-    downloadWithRetries(artifact, artifactsPath);
-  }
+  await downloadAll(plan.artifacts, artifactsPath);
   for (const line of describeRetryCopySelection(
     dropSupersededJobCopies(artifactsPath, plan.artifacts, sourceRunId),
   )) {
@@ -171,7 +201,7 @@ function main(): void {
 }
 
 try {
-  main();
+  await main();
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
   process.exitCode = 1;

@@ -43,7 +43,7 @@ function json(root: string, relative: string, value: unknown): void {
   fs.writeFileSync(file, JSON.stringify(value));
 }
 
-it('loads the newest completed artifact per shard while retaining untouched shards', () => {
+it('loads the newest completed artifact per shard while retaining untouched shards', async () => {
   vi.mocked(fetchRunMeta).mockReturnValue(meta);
   const dir = scratch();
   json(dir, 'operatorx-manifest-123/operatorx-manifest.json', { include: [] });
@@ -53,7 +53,7 @@ it('loads the newest completed artifact per shard while retaining untouched shar
   json(dir, 'operatorx-shard-123-1-s2/results/only.json', { value: 'untouched' });
   json(dir, 'operatorx-shard-123-3-s1/results/future.json', { value: 'future' });
 
-  const bundle = sweepBundle('SemiAnalysisAI/InferenceX', '123', dir, false);
+  const bundle = await sweepBundle('SemiAnalysisAI/InferenceX', '123', dir, false);
 
   expect(bundle.run).toMatchObject({
     run_id: '123',
@@ -68,10 +68,10 @@ it('loads the newest completed artifact per shard while retaining untouched shar
   ]);
 });
 
-it('rejects a run from another workflow before reading its artifacts', () => {
+it('rejects a run from another workflow before reading its artifacts', async () => {
   vi.mocked(fetchRunMeta).mockReturnValue({ ...meta, path: '.github/workflows/ci.yml' });
 
-  expect(() => sweepBundle('SemiAnalysisAI/InferenceX', '123', scratch(), false)).toThrow(
+  await expect(sweepBundle('SemiAnalysisAI/InferenceX', '123', scratch(), false)).rejects.toThrow(
     'not an OperatorX sweep',
   );
 });

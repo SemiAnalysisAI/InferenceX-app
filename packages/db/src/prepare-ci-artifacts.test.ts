@@ -10,6 +10,7 @@ vi.mock('./lib/github-artifacts.js', () => ({
   listRunArtifacts: mocks.artifacts,
   downloadArtifact: mocks.download,
 }));
+vi.mock('node:timers/promises', () => ({ setTimeout: () => Promise.resolve() }));
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -141,6 +142,94 @@ describe('reuse metadata', () => {
         source_run_url: `https://github.com/${repo}/actions/runs/35855544139`,
         ingest_run_url: `https://github.com/${repo}/actions/runs/99999999999`,
       });
+    } finally {
+      process.exitCode = originalExitCode;
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('artifact downloads', () => {
+  const names = Array.from({ length: 20 }, (_, i) => `bmk_${String(i).padStart(2, '0')}`);
+
+  async function prepare(download: (name: string, root: string) => Promise<void>) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'prepare-pool-'));
+    vi.stubEnv('SOURCE_RUN_ID', '35855544139');
+    vi.stubEnv('MERGE_RUN_ID', '35855544139');
+    vi.stubEnv('ARTIFACTS_PATH', dir);
+    vi.stubEnv('INGEST_REPO', 'SemiAnalysisAI/InferenceX');
+    vi.stubEnv('GITHUB_OUTPUT', '');
+    mocks.metadata.mockReturnValue(JSON.stringify({ run_attempt: 1 }));
+    // Listed newest-name-first so the plan's sort, not the listing, sets the order.
+    mocks.artifacts.mockReturnValue(
+      names.toReversed().map((name) => ({
+        name,
+        created_at: '2026-10-01',
+        archive_download_url: name,
+      })),
+    );
+    mocks.download.mockImplementation(({ name }: { name: string }, root: string) =>
+      download(name, root),
+    );
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    process.exitCode = 0;
+    await import('./prepare-ci-artifacts');
+    const started = log.mock.calls
+      .map(([line]) => String(line))
+      .filter((line) => line.startsWith('Downloading artifact: '))
+      .map((line) => line.slice('Downloading artifact: '.length));
+    return { dir, started, error };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('downloads eight at a time in plan order', async () => {
+    const originalExitCode = process.exitCode;
+    const gates: (() => void)[] = [];
+    let peak = 0;
+    const { dir, started } = await prepare(async (name, root) => {
+      const { promise, resolve } = Promise.withResolvers<void>();
+      gates.push(resolve);
+      peak = Math.max(peak, gates.length);
+      // Once every start in this turn has run, finish the newest download, so
+      // completion order differs from start order.
+      setImmediate(() => gates.pop()?.());
+      await promise;
+      fs.mkdirSync(path.join(root, name));
+    });
+    try {
+      expect(process.exitCode).toBe(0);
+      expect(peak).toBe(8);
+      expect(started).toEqual(names);
+      expect(fs.readdirSync(dir).toSorted()).toEqual(names);
+    } finally {
+      process.exitCode = originalExitCode;
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('starts nothing new after a download exhausts its retries', async () => {
+    const originalExitCode = process.exitCode;
+    const { dir, started, error } = await prepare(async (name, root) => {
+      if (name === 'bmk_02') throw new Error('network');
+      // The failing download retries within this turn, so it fails before any other finishes.
+      const { promise, resolve } = Promise.withResolvers<void>();
+      setImmediate(resolve);
+      await promise;
+      fs.mkdirSync(path.join(root, name));
+    });
+    try {
+      expect(process.exitCode).toBe(1);
+      expect(error).toHaveBeenCalledWith('Failed to download artifact bmk_02 after 3 attempts');
+      expect(mocks.download.mock.calls.filter(([{ name }]) => name === 'bmk_02')).toHaveLength(3);
+      expect(started).toEqual(names.slice(0, 8));
+      expect(fs.readdirSync(dir).toSorted()).toEqual(
+        names.slice(0, 8).filter((n) => n !== 'bmk_02'),
+      );
     } finally {
       process.exitCode = originalExitCode;
       fs.rmSync(dir, { recursive: true, force: true });
