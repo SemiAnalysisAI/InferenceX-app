@@ -800,6 +800,19 @@ Pass a returned `data.recipes[].key` as `recipe`; `params.recipe` identifies the
 `coverage.truncated` remains authoritative. It never triggers media publication.
 The earlier dashboard/compare and run/artifact results views remain available.
 
+HTTP responses remain `private, no-store`. The underlying published History and
+media metadata reader reuses payloads for at most 30 seconds in each server
+process (at most 32 entries per read kind), after a fresh public-repository check
+on every request. Errors, partial or unapproved History and missing media are not retained;
+successful publication clears that process cache. Page preloading, independent
+clip loading and real first-frame preloading are presentation-only exclusions:
+they add no API selectors and change no metrics or official/unofficial membership.
+
+中文：HTTP 响应仍为 `private, no-store`。底层已发布 History 和媒体元数据在服务进程内
+最多复用 30 秒，每类最多 32 项；每次请求先重新确认源仓库公开。错误、不完整或未批准的 History
+和缺失媒体不保留，发布成功后清空当前进程缓存。页面预读、独立加载视频及真实首帧预读
+只影响展示，不新增 API 选择项，也不改变指标或正式／指定运行的归属。
+
 `roster` retains GB200, B200, MI355X and H200 as default slots. H100 is added when
 qualified approved evidence or the exact named diagnostic run is available; the
 same canonical workload and sample floor apply. `r_hidden=h100` hides its results

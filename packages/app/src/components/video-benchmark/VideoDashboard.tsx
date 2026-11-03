@@ -27,6 +27,7 @@ import { hardwareLabel, costPerGpuHour } from './hardware';
 import { leadCell } from './deployment';
 import { COST_TIERS, TIER_LABELS, metricValue } from './metrics';
 import { useVideoPoints } from './use-video-points';
+import type { VideoInitialData } from './initial-data';
 import {
   DEFAULT_RESULTS_STATE,
   parseResultsState,
@@ -431,13 +432,14 @@ function Table({
 const cellLabel = (cell: ResultCell) =>
   `${hardwareLabel(cell.point.hardwareKey ?? '')}${cell.overlay ? ` · #${cell.point.runId}` : ''}`;
 
-export default function VideoDashboard() {
+export default function VideoDashboard({ initialData }: { initialData?: VideoInitialData }) {
   const locale = useLocale(),
     s = STRINGS[locale];
-  const [state, setState] = useState<ResultsState>(DEFAULT_RESULTS_STATE);
-  const latest = useRef(DEFAULT_RESULTS_STATE);
+  const [state, setState] = useState<ResultsState>(initialData?.state ?? DEFAULT_RESULTS_STATE);
+  const latest = useRef(state);
   const { points, namedPoints, loading, error, replay, retry } = useVideoPoints(
     state.unofficialRun,
+    initialData?.history,
   );
   const [energyBasis, setEnergyBasis] = useState<'clip' | 'frame'>('clip');
   const [traceHardware, setTraceHardware] = useState('h200');
@@ -850,6 +852,7 @@ export default function VideoDashboard() {
       <div className={styles.body}>
         <div className={styles.content}>
           <VideoResultsClips
+            initialSides={initialData?.sides}
             points={resultsClipPoints(cells, { tier: state.costTier })}
             colorFor={(key) =>
               representatives.some((c) => c.overlay && c.point.hardwareKey === key)

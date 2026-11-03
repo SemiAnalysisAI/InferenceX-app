@@ -3,14 +3,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { VIDEO_HISTORY_MAX_PAGES, type VideoHistoryPage } from './history';
 import { namedRunPoints, videoPoints } from './points';
+import type { VideoHistoryData } from './initial-data';
 
-export function useVideoPoints(runId: string | null) {
-  const [pages, setPages] = useState<VideoHistoryPage[]>([]);
-  const [loading, setLoading] = useState(true);
+export function useVideoPoints(runId: string | null, initial?: VideoHistoryData | null) {
+  const [pages, setPages] = useState<VideoHistoryPage[]>(initial?.pages ?? []);
+  const [loading, setLoading] = useState(!initial);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [replay, setReplay] = useState(false);
+  const [replay, setReplay] = useState(initial?.replay ?? false);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
+    if (initial && attempt === 0) return;
     const controller = new AbortController();
     setLoading(true);
     setLoadError(null);
@@ -42,7 +44,7 @@ export function useVideoPoints(runId: string | null) {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [attempt]);
+  }, [attempt, initial]);
   const points = useMemo(() => videoPoints(pages), [pages]);
   const namedPoints = useMemo(() => namedRunPoints(pages, runId), [pages, runId]);
   const retry = useCallback(() => setAttempt((n) => n + 1), []);

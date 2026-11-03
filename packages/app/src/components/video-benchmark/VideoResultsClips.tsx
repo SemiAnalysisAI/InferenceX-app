@@ -18,6 +18,7 @@ import {
 } from './results-clips';
 import { RESULTS_HARDWARE, resultsHardwareRoster } from './results';
 import type { StoredArtifact } from './stored';
+import { videoClipSourceKey as sourceKey, type VideoInitialData } from './initial-data';
 import VideoSelect from './VideoSelect';
 
 const STRINGS = {
@@ -157,6 +158,7 @@ export interface VideoResultsClipsProps {
   options?: MetricOptions;
   costs?: Costs;
   unofficialRun?: string;
+  initialSides?: VideoInitialData['sides'];
 }
 
 const HATCH = {
@@ -175,6 +177,7 @@ export default function VideoResultsClips({
   roster = resultsHardwareRoster(points),
   costs,
   unofficialRun,
+  initialSides = {},
 }: VideoResultsClipsProps) {
   const s = STRINGS[useLocale()];
   const selected = useMemo(
@@ -182,40 +185,44 @@ export default function VideoResultsClips({
       comparablePoints(points).filter((p) => RESULTS_HARDWARE.some((key) => p.hardwareKey === key)),
     [points],
   );
-  const cache = useRef(new Map<string, ResultsClipSide | null>());
-  const [sides, setSides] = useState<ResultsClipSide[]>([]);
+  const cache = useRef(new Map<string, ResultsClipSide | null>(Object.entries(initialSides)));
+  const [revision, setRevision] = useState(0);
+  const sides = useMemo(
+    () =>
+      selected.flatMap((point) => {
+        const side = cache.current.get(sourceKey(point));
+        return side ? [side] : [];
+      }),
+    [selected, revision],
+  );
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
   const [retry, setRetry] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(selected.length > 0);
+    const missing = selected.filter((point) => !cache.current.has(sourceKey(point)));
+    setLoading(missing.length > 0);
     setFailed(false);
-    setSides([]);
     void Promise.allSettled(
-      selected.map(async (point) => {
-        const sourceKey = JSON.stringify([point.runId, point.artifactId, point.id]);
-        if (cache.current.has(sourceKey)) return cache.current.get(sourceKey)!;
+      missing.map(async (point) => {
         const response = await fetch(
           `/api/video-runs?run=${encodeURIComponent(point.runId)}&artifact=${encodeURIComponent(String(point.artifactId))}&format=published`,
           { signal: controller.signal },
         );
         if (response.status === 204) {
-          cache.current.set(sourceKey, null);
+          if (controller.signal.aborted) return null;
+          cache.current.set(sourceKey(point), null);
           return null;
         }
         if (!response.ok) throw new Error('Published media read failed');
         const side = publishedResultsSide((await response.json()) as StoredArtifact, point);
-        cache.current.set(sourceKey, side);
+        if (controller.signal.aborted) return null;
+        cache.current.set(sourceKey(point), side);
+        setRevision((n) => n + 1);
         return side;
       }),
     ).then((results) => {
       if (controller.signal.aborted) return;
-      setSides(
-        results.flatMap((result) =>
-          result.status === 'fulfilled' && result.value ? [result.value] : [],
-        ),
-      );
       setFailed(results.some((result) => result.status === 'rejected'));
       setLoading(false);
     });
@@ -244,7 +251,6 @@ export default function VideoResultsClips({
             size="sm"
             onClick={() => {
               track('video_results_clips_retry');
-              cache.current.clear();
               setRetry((n) => n + 1);
             }}
           >
@@ -317,6 +323,20 @@ function SynchronizedClips({
   const audibleSource = audioSource && audioSources.includes(audioSource) ? audioSource : null;
   const knownDurations = playable.flatMap((key) => (durations[key] > 0 ? [durations[key]] : []));
   const duration = knownDurations.length > 0 ? Math.min(...knownDurations) : 0;
+
+  useLayoutEffect(() => {
+    // SSR media can finish loading before React attaches loadedmetadata listeners.
+    const loaded = [...videos.current].flatMap(([key, video]) =>
+      video.readyState >= 1 && Number.isFinite(video.duration) && video.duration > 0
+        ? [[key, video.duration] as const]
+        : [],
+    );
+    setDurations((previous) =>
+      loaded.some(([key, recordedDuration]) => previous[key] !== recordedDuration)
+        ? { ...previous, ...Object.fromEntries(loaded) }
+        : previous,
+    );
+  }, [group, visibleKey]);
 
   useLayoutEffect(() => {
     if (audioSource !== audibleSource) setAudioSource(null);
@@ -560,7 +580,7 @@ function SynchronizedClips({
               muted
               playsInline
               crossOrigin="anonymous"
-              preload="metadata"
+              preload="auto"
               aria-label={s.reference}
               className="size-full object-contain"
               onLoadedMetadata={(event) => {
@@ -660,7 +680,7 @@ function SynchronizedClips({
                     crossOrigin="anonymous"
                     muted={audibleSource !== key}
                     playsInline
-                    preload="metadata"
+                    preload="auto"
                     aria-label={`${hardwareLabel(key)} ${s.clip}`}
                     className={
                       view === 'clip' && !unavailable

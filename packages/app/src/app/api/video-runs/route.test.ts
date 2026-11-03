@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GET, POST } from './route';
+import { clearVideoReadCache } from '@/lib/video/video-read-cache';
 import {
   approveVideoPublication,
   publishedVideoHistory,
@@ -31,6 +32,8 @@ const post = (body: unknown, secret = 'test-secret') =>
     body: JSON.stringify(body),
   });
 afterEach(() => {
+  clearVideoReadCache();
+  vi.useRealTimers();
   fetchMock.mockReset();
   vi.mocked(videoStorageEnabled).mockReturnValue(false);
   vi.mocked(storedArtifacts).mockResolvedValue([]);
@@ -43,6 +46,72 @@ afterEach(() => {
 });
 
 describe('H3 CI artifact access', () => {
+  it('keeps metadata-only fixture media reads local instead of falling through to production', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('E2E_FIXTURES', '1');
+    const result = await GET(request('?run=10&artifact=20&format=published'));
+    expect(result.status).toBe(204);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it('reuses History for 30 seconds but checks public visibility on every read', async () => {
+    vi.useFakeTimers();
+    fetchMock.mockImplementation(() => Promise.resolve(response({ private: false })));
+    await GET(request('?format=history'));
+    await GET(request('?format=history'));
+    expect(publishedVideoHistory).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    fetchMock.mockResolvedValueOnce(response({ private: true }));
+    const privateResult = await GET(request('?format=history'));
+    expect(privateResult.status).toBe(503);
+    expect(publishedVideoHistory).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(30_000);
+    fetchMock.mockResolvedValueOnce(response({ private: false }));
+    const expiredResult = await GET(request('?format=history'));
+    expect(expiredResult.headers.get('cache-control')).toBe('private, no-store');
+    expect(publishedVideoHistory).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retain a failed History read', async () => {
+    fetchMock.mockImplementation(() => Promise.resolve(response({ private: false })));
+    vi.mocked(publishedVideoHistory).mockRejectedValueOnce(new Error('Unavailable'));
+    const failed = await GET(request('?format=history'));
+    const retried = await GET(request('?format=history'));
+    expect(failed.status).toBe(502);
+    expect(retried.status).toBe(200);
+    expect(publishedVideoHistory).toHaveBeenCalledTimes(2);
+  });
+
+  it('bounds retained History pages instead of accumulating arbitrary page keys', async () => {
+    fetchMock.mockImplementation(() => Promise.resolve(response({ private: false })));
+    for (let page = 1; page <= 33; page++) await GET(request(`?format=history&page=${page}`));
+    await GET(request('?format=history&page=33'));
+    expect(publishedVideoHistory).toHaveBeenCalledTimes(33);
+    await GET(request('?format=history&page=1'));
+    expect(publishedVideoHistory).toHaveBeenCalledTimes(34);
+  });
+
+  it('rereads unapproved History because approval lookup failures also appear as unapproved', async () => {
+    fetchMock.mockImplementation(() => Promise.resolve(response({ private: false })));
+    vi.mocked(publishedVideoHistory).mockResolvedValueOnce({
+      schemaVersion: 1,
+      nextPage: null,
+      entries: [
+        {
+          id: '10.20',
+          runId: '10',
+          artifact: { id: 20, name: 'h3-results-10-1', expired: false, size_in_bytes: 1 },
+          approved: false,
+          publishedAt: null,
+          sources: [],
+          error: null,
+        },
+      ],
+    });
+    await GET(request('?format=history'));
+    await GET(request('?format=history'));
+    expect(publishedVideoHistory).toHaveBeenCalledTimes(2);
+  });
+
   it('never serves synthetic History approval in production when fixture mode is set', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('E2E_FIXTURES', '1');
@@ -199,10 +268,17 @@ describe('H3 CI artifact access', () => {
     const saved = { storageVersion: 1 as const, runId: '10', artifact, sources: [] };
     vi.mocked(storedArtifacts).mockResolvedValue([artifact]);
     vi.mocked(readStoredArtifact).mockResolvedValue(saved);
-    fetchMock.mockResolvedValueOnce(response({ private: false }));
+    fetchMock.mockImplementation(() => Promise.resolve(response({ private: false })));
     const result = await GET(request('?run=10&artifact=20&format=media'));
     expect(await result.json()).toEqual(saved);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const repeated = await GET(request('?run=10&artifact=20&format=published'));
+    expect(await repeated.json()).toEqual(saved);
+    expect(readStoredArtifact).toHaveBeenCalledTimes(1);
+    fetchMock.mockResolvedValueOnce(response({ private: true }));
+    const privateResult = await GET(request('?run=10&artifact=20&format=published'));
+    expect(privateResult.status).toBe(503);
+    expect(readStoredArtifact).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
   it('retains stored artifacts after GitHub removes them from the run', async () => {
     const artifact = {
@@ -409,6 +485,9 @@ describe('explicit H3 publication', () => {
     vi.mocked(videoStorageEnabled).mockReturnValue(true);
     vi.mocked(readStoredArtifact).mockResolvedValue(saved as never);
     vi.mocked(approveVideoPublication).mockResolvedValue(receipt as never);
+    fetchMock.mockResolvedValueOnce(response({ private: false }));
+    await GET(request('?format=history'));
+    fetchMock.mockClear();
     fetchMock
       .mockResolvedValueOnce(response({ private: false }))
       .mockResolvedValueOnce(response(artifact));
@@ -425,6 +504,9 @@ describe('explicit H3 publication', () => {
     );
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(storeVideoArtifact).not.toHaveBeenCalled();
+    fetchMock.mockResolvedValueOnce(response({ private: false }));
+    await GET(request('?format=history'));
+    expect(publishedVideoHistory).toHaveBeenCalledTimes(2);
   });
 
   it('downloads only the named artifact on an authorized cold publication', async () => {

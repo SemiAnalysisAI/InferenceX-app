@@ -97,6 +97,17 @@ The overview page (`/overview`, `/zh/overview`) is prerendered with the default 
 
 ### API responses
 
+VideoGenX (`/video` and `/zh/video`) dynamically reads its URL selection, complete
+bounded History cohort and selected clip metadata before rendering. The existing
+read-only handler is called in process, preserving its repository visibility and
+local replay gates. Initial props contain History and parsed clip sides, including
+known missing media, rather than raw artifact documents. Hydration reuses them;
+later clip reads update independently and keep matching content visible. This
+loading behavior is a presentation-only API coverage exclusion: selectors,
+measurements, defaults and unofficial-run membership are unchanged. The page is
+not ISR cached. The transport's bounded process cache is documented in
+[Video History](./video-history.md).
+
 `cachedJson()` (`lib/cache/api-cache.ts`) takes the incoming request. It serves brotli, then gzip, then plain JSON according to `Accept-Encoding`, so a client that sends no header (curl, scripts) gets plain JSON. Every response carries `Vary: Accept-Encoding` and a strong `ETag` hashed from the payload and the chosen encoding. A matching `If-None-Match` returns a bodiless `304`. Route handlers that call other handlers directly use `sourceRequest()`, which sends no `Accept-Encoding`, so they always read plain JSON.
 
 The Vercel CDN keys `Vary: Accept-Encoding` on the raw header string, so `gzip, deflate` and `deflate, gzip` are separate entries and separate origin misses. `/api/v1/benchmarks`, the busiest programmatic route, passes `compression: 'cdn'`: it sends plain JSON without `Vary`, the CDN keeps one entry per URL, and the CDN compresses that entry for each client. The route also validates every query parameter before reading the database (`lib/benchmarks/benchmark-request-params.ts`), so malformed values return 400 instead of a Postgres cast error.

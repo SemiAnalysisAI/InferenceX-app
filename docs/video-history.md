@@ -26,6 +26,19 @@ filters; it never substitutes for decoded output duration.
 
 ## Publication and discovery
 
+Published History and media metadata reads reuse a process-local payload for at
+most 30 seconds, with at most 32 entries in each cache. Every request still checks
+that the source repository is public before accessing that cache. Visibility
+decisions, failures, partial or unapproved History pages and absent media are not cached.
+Successful publication clears both process caches; another process observes the
+new source within the 30-second bound. HTTP responses remain `private, no-store`.
+Replay keeps its existing verified, read-only snapshot and bypasses this cache.
+
+中文：已发布的 History 和媒体元数据在服务进程内最多复用 30 秒，两类缓存各保留最多 32 项。
+每次请求仍须先确认源仓库公开；公开状态、读取失败、不完整或未批准的 History 页和缺失媒体均不缓存。
+发布成功后清空当前进程缓存，其他进程最多延迟 30 秒看到新来源。HTTP 响应仍为
+`private, no-store`。本地回放继续复用原有的已校验只读快照。
+
 The `publish-video-results` repository dispatch supplies an explicit `source_run_id` and `merge_run_id`; manual `workflow_dispatch` requires a source `run_id`. There is no scheduled all-runs publisher. The job lists only that run's GitHub artifacts (including later artifact pages), then sends each exact run/artifact ID to bearer-protected `POST /api/video-runs` using the existing invalidation secret. It retries already stored indexes because they may lack an approval receipt. Failed artifacts do not prevent later artifacts from being attempted, but the job still fails. Authorization approves publication of the named source; it is not a benchmark qualification verdict.
 
 Native matrix artifacts use `h3-results-<run>-<attempt>-<recipe-fingerprint>` while legacy names remain readable. The sealed `artifact_name`, run/attempt, and `ci.head_sha` bind a new artifact to GitHub metadata. The actual benchmark checkout remains `git_commit`, which may differ from the Actions head when CI tests a merge commit. The authorized POST writes verified immutable objects before the index, checks index readback, then writes a separate immutable approval receipt bound to artifact identity, source seal and checkout. A repeat with the same identity reuses the receipt; a mismatched receipt does not authorize the source. Every public GET, including `format=media` on a cache miss, is read-only and returns 204 when stored media is absent. Legacy stored indexes and low-sample or failed sources remain in History, while only approval-backed observations enter default chart selectors; sample floors still apply.
@@ -39,6 +52,13 @@ Native matrix artifacts use `h3-results-<run>-<attempt>-<recipe-fingerprint>` wh
 - Filters apply to loaded pages. The user can load older pages without losing already loaded entries. Global execution-time sorting and an editorial change/PR catalog require a later materialized catalog; the current implementation scans index metadata only, never all full indexes.
 
 ## Local replay
+
+The metadata-only fixture answers published/media reads with 204, so server
+preloading does not fall through to production. An explicit original-artifact
+replay still supplies its verified media through the earlier replay gate.
+
+中文：纯元数据 fixture 的 published/media 请求返回 204，避免服务端预读转而访问生产环境。
+显式原始产物回放仍通过优先执行的回放分支提供已校验媒体。
 
 Only in development, `E2E_FIXTURES=1` serves `cypress/fixtures/api/video-history.json` through the existing fixture loader and checksum manifest. The fixture is a metadata-only projection of retained H100/H200/B200 observations and two fidelity artifacts; it contains no infrastructure paths or video bytes. Its synthetic `approved: true` flags exercise the default chart layout and are not real publication receipts. Unknown publication timestamps remain null. The response header `X-VideoGenX-Replay: 1` causes a visible replay notice. These are historical retained observations, not newly measured results or a new publication.
 

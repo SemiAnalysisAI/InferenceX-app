@@ -631,10 +631,10 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'ui-artifact-read',
     exclusionReason: {
-      en: 'Hidden H3 viewer transport for public CI runs, checksum-verified artifact ZIPs and stored History. Every GET is read-only, including format=media on a cache miss (204). Synthetic History replay and explicit original-artifact replay with private MP4 ranges are development-only. History retains legacy indexes but labels only source-bound approval receipts as approved; default charts use those approved entries. This UI contract is not a public data API.',
-      zh: '供隐藏的 H3 查看器读取公开 CI 运行、校验和已验证的产物 ZIP 与已存历史。所有 GET 都只读，包括 format=media 未命中时返回 204。合成历史回放及读取原始产物 MP4 字节区间的显式回放仅用于开发环境。历史保留旧索引，但只有与来源绑定的批准回执才标为 approved；默认图表只使用这些条目。此界面契约不是公开数据 API。',
+      en: 'Hidden H3 viewer transport for public CI runs, checksum-verified artifact ZIPs and stored History. Every GET is read-only, including format=media on a cache miss (204). Synthetic History replay and explicit original-artifact replay with private MP4 ranges are development-only. History retains legacy indexes but labels only source-bound approval receipts as approved; default charts use those approved entries. Published History/media payloads have a 30-second process cache (32 entries each), reached only after a fresh public-repository check; errors, partial or unapproved History and missing media are not retained. Successful publication clears that process cache. HTTP stays private, no-store. Metadata-only development fixtures return 204 for media. This UI contract is not a public data API.',
+      zh: '供隐藏的 H3 查看器读取公开 CI 运行、校验和已验证的产物 ZIP 与已存历史。所有 GET 都只读，包括 format=media 未命中时返回 204。合成历史回放及读取原始产物 MP4 字节区间的显式回放仅用于开发环境。历史保留旧索引，但只有与来源绑定的批准回执才标为 approved；默认图表只使用这些条目。已发布 History／媒体载荷在服务进程内最多复用 30 秒，每类最多 32 项，且每次先重新确认源仓库公开；错误、不完整或未批准的 History 和缺失媒体不保留。发布成功后清空当前进程缓存，HTTP 仍为 private, no-store。开发环境的纯元数据 fixture 对媒体请求返回 204。此界面契约不是公开数据 API。',
     },
-    sourceSha256: '8a7a6c36170d727c026aad1db7755ab17583b1f7ddda1bb892e1014e17f77f3b',
+    sourceSha256: 'e5056658edc4b23b705a18b4f77cfaf4ff31f9219d5d57a8646facd1716cf97a',
   },
   {
     source: 'src/app/api/video-runs/route.ts',
@@ -645,7 +645,7 @@ export const apiRouteCatalog = [
       en: 'Bearer-protected mutation for one explicit H3 source/artifact. It stores verified media and an immutable source-bound publication receipt; authorization does not assert benchmark qualification. This operator path is outside the public read API.',
       zh: '受 Bearer 密钥保护的单个 H3 来源与产物写操作。它存储已校验媒体和绑定来源的不可变发布回执；授权不代表 benchmark 质量验收。此运维入口不属于公开只读 API。',
     },
-    sourceSha256: '8a7a6c36170d727c026aad1db7755ab17583b1f7ddda1bb892e1014e17f77f3b',
+    sourceSha256: 'e5056658edc4b23b705a18b4f77cfaf4ff31f9219d5d57a8646facd1716cf97a',
   },
   {
     source: 'src/app/api/unofficial-run/route.ts',
@@ -1488,6 +1488,14 @@ export const apiContractSourceDigests = [
     reviewArea: {
       en: 'Verified offline VideoGenX ZIP reader shared with development replay, without publication approval.',
       zh: 'VideoGenX 离线 ZIP 校验读取器与开发回放共用，不授予发布批准。',
+    },
+  },
+  {
+    source: 'src/lib/video/video-read-cache.ts',
+    sourceSha256: '77aa859c316311e8d2f7afea2e925eefb48e89e50f8fe5d38b0244f11c51ee38',
+    reviewArea: {
+      en: 'VideoGenX bounded published History and media cache behind fresh repository visibility checks.',
+      zh: 'VideoGenX 已发布 History 与媒体的有界缓存，每次读取仍须确认仓库公开。',
     },
   },
   {

@@ -5,12 +5,7 @@ import { readOnlyVideoRequests, resultHistory } from '../support/video-results';
 describe('VideoGenX results routes', () => {
   beforeEach(() => {
     readOnlyVideoRequests();
-    resultHistory().then((page) => {
-      cy.intercept('GET', '/api/video-runs?format=history&page=1', {
-        body: page,
-        headers: { 'X-VideoGenX-Replay': '1' },
-      }).as('history');
-    });
+    cy.intercept('GET', '/api/video-runs?format=history&page=1').as('history');
   });
 
   it('keeps the shared fixture projection across reload and language changes', () => {
@@ -31,13 +26,13 @@ describe('VideoGenX results routes', () => {
         .first()
         .invoke('attr', 'data-value')
         .then((value) => {
-          expect(
-            Number(value),
-            'UI matches the shared projection for the intercepted fixture',
-          ).to.equal(h200!.cost.participating!.perVideo);
+          expect(Number(value), 'UI matches the shared projection for the server fixture').to.equal(
+            h200!.cost.participating!.perVideo,
+          );
         });
     });
     cy.get('[data-testid="results-hardware-b200"]').should('not.be.checked');
+    cy.get('@history.all').should('have.length', 0);
     cy.reload();
     cy.get('[data-testid="results-hardware-b200"]').should('not.be.checked');
     cy.location('search').then((sharedSearch) => cy.visit(`/zh/video${sharedSearch}`));

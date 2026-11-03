@@ -13,13 +13,17 @@ import { localVideoReplayResponse } from '@/lib/testing/video-replay';
 import { bearerMatches } from '@/lib/api/bearer-auth';
 import type { VideoHistoryPage } from '@/components/video-benchmark/history';
 import {
-  publishedVideoHistory,
   approveVideoPublication,
   readStoredArtifact,
   storedArtifacts,
   storeVideoArtifact,
   videoStorageEnabled,
 } from '@/lib/video/video-storage';
+import {
+  cachedPublishedArtifact,
+  cachedVideoHistory,
+  clearVideoReadCache,
+} from '@/lib/video/video-read-cache';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -75,7 +79,13 @@ export async function GET(request: NextRequest) {
   const localReplay = await localVideoReplayResponse(request);
   if (localReplay) return localReplay;
   if (query.get('format') === 'replay-asset') return new Response(null, { status: 404, headers });
-  if (history && process.env.NODE_ENV === 'development' && process.env.E2E_FIXTURES === '1') {
+  if (
+    process.env.NODE_ENV === 'development' &&
+    process.env.E2E_FIXTURES === '1' &&
+    (history || media)
+  ) {
+    // The committed History fixture has metadata only; media needs an explicit local replay.
+    if (media) return new Response(null, { status: 204, headers });
     const fixture = loadFixture<VideoHistoryPage>('video-history');
     return NextResponse.json(
       Number(page) === 1 ? fixture : { schemaVersion: 1, entries: [], nextPage: null },
@@ -139,16 +149,12 @@ export async function GET(request: NextRequest) {
         { error: 'Public H3 repository unavailable' },
         { status: 503, headers },
       );
-    if (history) return NextResponse.json(await publishedVideoHistory(Number(page)), { headers });
+    if (history) return NextResponse.json(await cachedVideoHistory(Number(page)), { headers });
     if (artifactId) {
       if (media && !videoStorageEnabled()) return new Response(null, { status: 204, headers });
       if (media) {
-        const saved = await storedArtifacts(runId!);
-        const stored = saved.find((a) => String(a.id) === artifactId);
-        if (stored) {
-          const result = await readStoredArtifact(runId!, stored);
-          if (result) return NextResponse.json(result, { headers });
-        }
+        const result = await cachedPublishedArtifact(runId!, artifactId);
+        if (result) return NextResponse.json(result, { headers });
         return new Response(null, { status: 204, headers });
       }
       const metaResponse = await github(`/actions/artifacts/${artifactId}`);
@@ -335,6 +341,7 @@ export async function POST(request: Request) {
       if (!saved) throw new Error('Stored video index readback failed');
     }
     const receipt = await approveVideoPublication(runId, artifact, saved, mergeRunId, deadline);
+    clearVideoReadCache();
     return NextResponse.json(receipt, { headers });
   } catch {
     return NextResponse.json(
