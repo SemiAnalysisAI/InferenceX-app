@@ -74,7 +74,6 @@ export const CURATED_SUPPORTER_GROUPS: SupporterGroup[] = [
     logos: [
       { label: 'SGLang', logo: 'sglang.webp', quoteOrg: 'SGLang' },
       { label: 'vLLM', logo: 'vllm.svg', quoteOrg: 'vLLM' },
-      { label: 'TokenSpeed', logo: 'tokenspeed.webp' },
       { label: 'PyTorch Foundation', logo: 'pytorch.svg', quoteOrg: 'PyTorch Foundation' },
       { label: 'Hugging Face', logo: 'huggingface.svg', quoteOrg: 'Hugging Face' },
       { label: 'Mooncake', logo: 'kvcache-ai.svg', quoteOrg: 'Mooncake' },
