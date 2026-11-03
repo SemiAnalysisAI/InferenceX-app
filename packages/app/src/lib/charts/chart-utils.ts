@@ -17,10 +17,20 @@ import {
   BENCHMARK_METRIC_CONFIG_KEYS,
   type BenchmarkMetricKey,
 } from '@/components/inference/metric-registry';
-import { DEFAULT_TCO_BASIS, getGpuSpecs, isKnownGpu, type TcoBasis } from '@/lib/catalog/constants';
+import {
+  DEFAULT_TCO_BASIS,
+  getGpuSpecs,
+  isKnownGpu,
+  type GpuSpecs,
+  type TcoBasis,
+} from '@/lib/catalog/constants';
 import { getVendor, type Vendor } from '@/lib/charts/dynamic-colors';
 import type { Locale } from '@/lib/i18n/i18n';
-import { buildPowerBasisChartFields, type PowerBasisChartFields } from '@/lib/power/power-basis';
+import {
+  buildPowerBasisChartFields,
+  POWER_BASIS_FIELD_KEYS,
+  type PowerBasisChartFields,
+} from '@/lib/power/power-basis';
 import { reconstructedRoleEnergy } from '@/components/inference/utils/role-energy';
 
 const BANNED_HUE_TEST: Record<Vendor, ((hue: number) => boolean) | null> = {
@@ -144,7 +154,8 @@ export const Y_AXIS_METRICS = ['y', ...BENCHMARK_METRIC_CONFIG_KEYS] as const;
 export type YAxisMetric = (typeof Y_AXIS_METRICS)[number];
 
 export const getHardwareKey = (entry: AggDataEntry): string => {
-  let normalizedHwName = entry.hw.split('-')[0];
+  const dash = entry.hw.indexOf('-');
+  let normalizedHwName = dash === -1 ? entry.hw : entry.hw.slice(0, dash);
   if (entry.framework) {
     const fw = resolveFrameworkAlias(entry.framework);
     const candidateDirect = `${normalizedHwName}_${fw}`;
@@ -239,16 +250,19 @@ export function buildDerivedChartFields(
   currentHwKey: string,
   requestedMetrics: readonly DerivedMetricKey[],
   tcoBasis?: TcoBasis,
+  specs?: GpuSpecs,
 ): Partial<DerivedChartFields>;
 export function buildDerivedChartFields(
   entry: AggDataEntry,
   currentHwKey: string,
   requestedMetrics?: readonly DerivedMetricKey[],
   tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
+  /** `getGpuSpecs(currentHwKey, tcoBasis)`, when the caller already holds it. */
+  specs: GpuSpecs = getGpuSpecs(currentHwKey, tcoBasis),
 ): Partial<DerivedChartFields> {
-  const requested = requestedMetrics ? new Set<DerivedMetricKey>(requestedMetrics) : null;
-  const wants = (key: DerivedMetricKey) => requested === null || requested.has(key);
-  const specs = getGpuSpecs(currentHwKey, tcoBasis);
+  // Request lists hold a few keys; a linear scan beats allocating a Set per row.
+  const wants = (key: DerivedMetricKey) =>
+    requestedMetrics === undefined || requestedMetrics.includes(key);
   const hardwarePower = specs.power;
   const tputPerGpu = entry.tput_per_gpu ?? 0;
   const outputTputPerGpu = entry.output_tput_per_gpu ?? 0;
@@ -345,20 +359,32 @@ export function buildDerivedChartFields(
     fields.jInput = chartMetric(hardwarePower ? (hardwarePower * 1000) / inputTputPerGpu : 0);
   }
 
-  const measured = buildMeasuredPowerChartFields(entry, specs.tdp);
-  for (const [key, value] of Object.entries(measured) as [
-    keyof MeasuredPowerChartFields,
-    { y: number; roof: boolean },
-  ][]) {
-    if (wants(key)) fields[key] = value;
+  // Both builders are pure; skip them when no requested key can come from them.
+  let wantsMeasured = requestedMetrics === undefined;
+  let wantsPowerBasis = requestedMetrics === undefined;
+  for (const key of requestedMetrics ?? []) {
+    if (Object.hasOwn(MEASURED_POWER_FIELD_KEYS, key)) wantsMeasured = true;
+    if (Object.hasOwn(POWER_BASIS_FIELD_KEYS, key)) wantsPowerBasis = true;
   }
 
-  const powerBasis = buildPowerBasisChartFields(entry, specs);
-  for (const [key, value] of Object.entries(powerBasis) as [
-    keyof PowerBasisChartFields,
-    { y: number; roof: boolean },
-  ][]) {
-    if (wants(key)) fields[key] = value;
+  if (wantsMeasured) {
+    const measured = buildMeasuredPowerChartFields(entry, specs.tdp);
+    for (const [key, value] of Object.entries(measured) as [
+      keyof MeasuredPowerChartFields,
+      { y: number; roof: boolean },
+    ][]) {
+      if (wants(key)) fields[key] = value;
+    }
+  }
+
+  if (wantsPowerBasis) {
+    const powerBasis = buildPowerBasisChartFields(entry, specs);
+    for (const [key, value] of Object.entries(powerBasis) as [
+      keyof PowerBasisChartFields,
+      { y: number; roof: boolean },
+    ][]) {
+      if (wants(key)) fields[key] = value;
+    }
   }
 
   return fields;
@@ -424,77 +450,66 @@ export function createChartDataPoint(
   };
 }
 
+const MEASURED_POWER_FIELD_KEYS = {
+  measuredAvgPower: true,
+  measuredP75Power: true,
+  measuredP90Power: true,
+  measuredPrefillAvgPower: true,
+  measuredDecodeAvgPower: true,
+  measuredJPerOutputToken: true,
+  measuredJPerTotalToken: true,
+  measuredJPerInputToken: true,
+  measuredPrefillJPerInputToken: true,
+  measuredDecodeJPerOutputToken: true,
+  measuredJPerSuccessfulQuery: true,
+  measuredWhPerSuccessfulQuery: true,
+  measuredPowerPercentTdp: true,
+  measuredPowerTimeline: true,
+  reconstructedPrefillJPerOutputToken: true,
+} as const;
+
 type MeasuredPowerChartFields = Partial<
-  Pick<
-    InferenceData,
-    | 'measuredAvgPower'
-    | 'measuredP75Power'
-    | 'measuredP90Power'
-    | 'measuredPrefillAvgPower'
-    | 'measuredDecodeAvgPower'
-    | 'measuredJPerOutputToken'
-    | 'measuredJPerTotalToken'
-    | 'measuredJPerInputToken'
-    | 'measuredPrefillJPerInputToken'
-    | 'measuredDecodeJPerOutputToken'
-    | 'measuredJPerSuccessfulQuery'
-    | 'measuredWhPerSuccessfulQuery'
-    | 'measuredPowerPercentTdp'
-    | 'measuredPowerTimeline'
-    | 'reconstructedPrefillJPerOutputToken'
-  >
+  Pick<InferenceData, keyof typeof MEASURED_POWER_FIELD_KEYS>
 >;
 
+// Conditional assignment, not conditional spreads: V8 builds spread chains through a slow
+// runtime path. Assignment order is the key order consumers iterate.
 function buildMeasuredPowerChartFields(
   entry: AggDataEntry,
   tdpWatts: number,
 ): MeasuredPowerChartFields {
   const roleEnergy = reconstructedRoleEnergy(entry);
-  return {
-    ...(typeof entry.avg_power_w === 'number'
-      ? {
-          measuredAvgPower: chartMetric(entry.avg_power_w),
-          measuredPowerTimeline: chartMetric(entry.avg_power_w),
-        }
-      : {}),
-    ...(typeof entry.p75_power_w === 'number' && Number.isFinite(entry.p75_power_w)
-      ? { measuredP75Power: chartMetric(entry.p75_power_w) }
-      : {}),
-    ...(typeof entry.p90_power_w === 'number' && Number.isFinite(entry.p90_power_w)
-      ? { measuredP90Power: chartMetric(entry.p90_power_w) }
-      : {}),
-    ...(typeof entry.prefill_avg_power_w === 'number'
-      ? { measuredPrefillAvgPower: chartMetric(entry.prefill_avg_power_w) }
-      : {}),
-    ...(typeof entry.decode_avg_power_w === 'number'
-      ? { measuredDecodeAvgPower: chartMetric(entry.decode_avg_power_w) }
-      : {}),
-    ...(typeof entry.joules_per_output_token === 'number'
-      ? { measuredJPerOutputToken: chartMetric(entry.joules_per_output_token) }
-      : {}),
-    ...(typeof entry.joules_per_total_token === 'number'
-      ? { measuredJPerTotalToken: chartMetric(entry.joules_per_total_token) }
-      : {}),
-    ...(typeof entry.joules_per_input_token === 'number'
-      ? { measuredJPerInputToken: chartMetric(entry.joules_per_input_token) }
-      : {}),
-    ...(typeof entry.prefill_joules_per_input_token === 'number'
-      ? { measuredPrefillJPerInputToken: chartMetric(entry.prefill_joules_per_input_token) }
-      : {}),
-    ...(typeof entry.decode_joules_per_output_token === 'number'
-      ? { measuredDecodeJPerOutputToken: chartMetric(entry.decode_joules_per_output_token) }
-      : {}),
-    ...(roleEnergy ? { reconstructedPrefillJPerOutputToken: chartMetric(roleEnergy.prefill) } : {}),
-    ...(typeof entry.joules_per_successful_query === 'number'
-      ? {
-          measuredJPerSuccessfulQuery: chartMetric(entry.joules_per_successful_query),
-          measuredWhPerSuccessfulQuery: chartMetric(entry.joules_per_successful_query / 3600),
-        }
-      : {}),
-    ...(typeof entry.avg_power_w === 'number' && tdpWatts > 0
-      ? { measuredPowerPercentTdp: chartMetric((entry.avg_power_w / tdpWatts) * 100) }
-      : {}),
-  };
+  const fields: MeasuredPowerChartFields = {};
+  if (typeof entry.avg_power_w === 'number') {
+    fields.measuredAvgPower = chartMetric(entry.avg_power_w);
+    fields.measuredPowerTimeline = chartMetric(entry.avg_power_w);
+  }
+  if (typeof entry.p75_power_w === 'number' && Number.isFinite(entry.p75_power_w))
+    fields.measuredP75Power = chartMetric(entry.p75_power_w);
+  if (typeof entry.p90_power_w === 'number' && Number.isFinite(entry.p90_power_w))
+    fields.measuredP90Power = chartMetric(entry.p90_power_w);
+  if (typeof entry.prefill_avg_power_w === 'number')
+    fields.measuredPrefillAvgPower = chartMetric(entry.prefill_avg_power_w);
+  if (typeof entry.decode_avg_power_w === 'number')
+    fields.measuredDecodeAvgPower = chartMetric(entry.decode_avg_power_w);
+  if (typeof entry.joules_per_output_token === 'number')
+    fields.measuredJPerOutputToken = chartMetric(entry.joules_per_output_token);
+  if (typeof entry.joules_per_total_token === 'number')
+    fields.measuredJPerTotalToken = chartMetric(entry.joules_per_total_token);
+  if (typeof entry.joules_per_input_token === 'number')
+    fields.measuredJPerInputToken = chartMetric(entry.joules_per_input_token);
+  if (typeof entry.prefill_joules_per_input_token === 'number')
+    fields.measuredPrefillJPerInputToken = chartMetric(entry.prefill_joules_per_input_token);
+  if (typeof entry.decode_joules_per_output_token === 'number')
+    fields.measuredDecodeJPerOutputToken = chartMetric(entry.decode_joules_per_output_token);
+  if (roleEnergy) fields.reconstructedPrefillJPerOutputToken = chartMetric(roleEnergy.prefill);
+  if (typeof entry.joules_per_successful_query === 'number') {
+    fields.measuredJPerSuccessfulQuery = chartMetric(entry.joules_per_successful_query);
+    fields.measuredWhPerSuccessfulQuery = chartMetric(entry.joules_per_successful_query / 3600);
+  }
+  if (typeof entry.avg_power_w === 'number' && tdpWatts > 0)
+    fields.measuredPowerPercentTdp = chartMetric((entry.avg_power_w / tdpWatts) * 100);
+  return fields;
 }
 export function remapInferencePoint(
   point: InferenceData,

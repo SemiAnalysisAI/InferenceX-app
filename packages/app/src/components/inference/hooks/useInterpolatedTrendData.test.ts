@@ -15,6 +15,7 @@ import { SUPPLEMENTAL_BENCHMARK_ROWS } from '@/lib/benchmarks/supplemental-bench
 import interactivityCases from '../../../../../skills/test/fixtures/agentic-interactivity.json';
 import { agenticP90Interactivity } from '../../../../../skills/skills/inferencex-api/scripts/agentic-interactivity.mjs';
 import { rowToAggDataEntry } from '@/lib/benchmarks/benchmark-transform';
+import { buildTrendLines, groupTrendRowsByDate } from './interpolated-trend-core';
 
 function makePoint(overrides: Partial<InferenceData> = {}): InferenceData {
   return {
@@ -588,5 +589,48 @@ describe('trendMetricDependencies', () => {
 
   it('does not route custom user metrics through benchmark-derived history fields', () => {
     expect(trendMetricDependencies('costUser')).toEqual(['tpPerGpu']);
+  });
+});
+
+function trendLinesAt15(rows: BenchmarkRow[]) {
+  return buildTrendLines(
+    groupTrendRowsByDate(rows, {
+      selectedPrecisions: ['fp8'],
+      selectedYAxisMetric: 'y_tpPerGpu',
+      requestedMetrics: trendMetricDependencies('tpPerGpu'),
+    }),
+    { targetInteractivity: 15, trendMetricKey: 'tpPerGpu' },
+  ).trendLines;
+}
+
+describe('buildTrendLines', () => {
+  const RUN = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123';
+  // Two concurrency points per date, both on the interactivity/throughput frontier.
+  const sweep = (date: string) => [
+    makeBenchmarkRow({ date, conc: 64, run_url: `${RUN}/attempts/1` }),
+    makeBenchmarkRow({
+      date,
+      conc: 128,
+      run_url: `${RUN}/attempts/2`,
+      metrics: { tput_per_gpu: 600, median_intvty: 10 },
+    }),
+  ];
+
+  it('orders each line by date whatever order the rows arrive in', () => {
+    const [line] = trendLinesAt15([
+      ...sweep('2026-03-05'),
+      ...sweep('2026-03-01'),
+      ...sweep('2026-03-03'),
+    ]).values();
+
+    expect(line.map((point) => point.date)).toEqual(['2026-03-01', '2026-03-03', '2026-03-05']);
+  });
+
+  it('lists a run once, with the source of its last frontier point', () => {
+    const [line] = trendLinesAt15(sweep('2026-03-01')).values();
+
+    expect(line[0].sources).toEqual([
+      expect.objectContaining({ runId: 123, runUrl: `${RUN}/attempts/1` }),
+    ]);
   });
 });

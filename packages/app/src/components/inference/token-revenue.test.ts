@@ -201,6 +201,20 @@ describe('token revenue', () => {
 
     expect(tokenRevenuePerGpuHour(unknownMix, openRouterPricing)).toBeNull();
   });
+
+  it('returns priced copies, re-prices last and leaves the input points untouched', () => {
+    const priced = point({ tokenRevenuePerGpuHour: { y: 9, roof: false } });
+    const unpriced = point();
+    const inputs = [priced, unpriced];
+    const before = structuredClone(inputs);
+
+    const out = applyTokenRevenuePricing(inputs, openRouterPricing);
+
+    expect(out[0]).not.toBe(priced);
+    expect(out[1]).not.toBe(unpriced);
+    expect(inputs).toStrictEqual(before);
+    for (const result of out) expect(Object.keys(result).at(-1)).toBe('tokenRevenuePerGpuHour');
+  });
 });
 
 describe('GB300 cache hit-rate fallback', () => {

@@ -1253,6 +1253,17 @@ describe('rowToAggDataEntry — extended edge cases', () => {
     expect(entry.std_intvty).toBe(2.5);
     expect(entry.p99_intvty).toBe(22.1);
   });
+
+  it('derives mean TPOT interactivity only from a positive finite mean TPOT', () => {
+    const meanTpotIntvty = (mean_tpot?: number) =>
+      rowToAggDataEntry(makeRow({ metrics: mean_tpot === undefined ? {} : { mean_tpot } }))
+        .mean_tpot_intvty;
+    expect(meanTpotIntvty(0.02)).toBe(50);
+    expect(meanTpotIntvty(0)).toBeUndefined();
+    expect(meanTpotIntvty(-0.02)).toBeUndefined();
+    expect(meanTpotIntvty(Number.POSITIVE_INFINITY)).toBeUndefined();
+    expect(meanTpotIntvty()).toBeUndefined();
+  });
 });
 
 describe('transformBenchmarkRows — deployment topology', () => {

@@ -139,6 +139,20 @@ export const isPositive = (value: unknown): value is number =>
 const count = (value: unknown): value is number => isPositive(value) && Number.isSafeInteger(value);
 const orNull = (value: number): number | null => (isPositive(value) ? value : null);
 
+/** Every key `computePowerBasisFields` can produce; the Record type keeps it exhaustive. */
+export const POWER_BASIS_FIELD_KEYS: Readonly<Record<PowerBasisFieldKey, true>> = {
+  gpuProvisionedJPerOutputToken: true,
+  gpuProvisionedJPerTotalToken: true,
+  utilityProvisionedJPerOutputToken: true,
+  utilityProvisionedJPerTotalToken: true,
+  itModeledWatts: true,
+  itModeledJPerOutputToken: true,
+  itModeledJPerTotalToken: true,
+  utilityModeledWatts: true,
+  utilityModeledJPerOutputToken: true,
+  utilityModeledJPerTotalToken: true,
+};
+
 export function computePowerBasisFields(input: PowerBasisInput): PowerBasisValues {
   const tdp = isPositive(input.tdpWatts) ? input.tdpWatts : null;
   const utility = isPositive(input.utilityWatts) ? input.utilityWatts : null;
