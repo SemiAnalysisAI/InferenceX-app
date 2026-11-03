@@ -106,7 +106,7 @@ export function SupporterLogoWall({
                 aria-labelledby={labelId}
                 style={
                   {
-                    '--cols': Math.min(group.logos.length, group.desktopColumns ?? MAX_COLUMNS),
+                    '--cols': group.desktopColumns ?? Math.min(group.logos.length, MAX_COLUMNS),
                   } as CSSProperties
                 }
                 className="flex flex-wrap items-center justify-center gap-y-3 lg:grid lg:grid-cols-[repeat(var(--cols),minmax(0,1fr))] lg:gap-x-3 lg:gap-y-2"

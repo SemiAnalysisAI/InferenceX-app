@@ -1,4 +1,5 @@
 import { QuotesContent } from '@/components/quotes/quotes-content';
+import { SupporterLogoWall } from '@/components/quotes/supporter-logo-wall';
 import { QUOTES } from '@/components/quotes/quotes-data';
 import { IntroSection } from '@/components/landing/intro-section';
 
@@ -417,5 +418,38 @@ describe('QuotesContent supporter logo wall', () => {
       cy.get('a[href$="#quote-morph-llm"]').should('not.exist');
       cy.get('a[href$="#quote-google"]').should('exist');
     }
+  });
+});
+
+const wallLogo = (label: string) => ({ label, logo: 'nvidia-color.svg' });
+const centers = (id: string) =>
+  cy
+    .get(`[data-testid="supporter-group-${id}"] li`)
+    .then(($li) => [...$li].map((li) => Math.round(li.getBoundingClientRect().left)));
+
+describe('SupporterLogoWall columns', () => {
+  it('keeps an explicit column count when a group has fewer logos than columns', () => {
+    cy.viewport(1400, 800);
+    cy.mount(
+      <SupporterLogoWall
+        groups={[
+          {
+            id: 'wide',
+            label: { en: 'Wide', zh: 'Wide' },
+            desktopColumns: 4,
+            logos: ['a', 'b', 'c', 'd', 'e'].map(wallLogo),
+          },
+          {
+            id: 'short',
+            label: { en: 'Short', zh: 'Short' },
+            desktopColumns: 4,
+            logos: ['f', 'g', 'h'].map(wallLogo),
+          },
+        ]}
+      />,
+    );
+    centers('wide').then((wide) => {
+      centers('short').should('deep.equal', wide.slice(0, 3));
+    });
   });
 });
