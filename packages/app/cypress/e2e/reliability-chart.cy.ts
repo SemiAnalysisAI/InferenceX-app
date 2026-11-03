@@ -96,7 +96,7 @@ describe('Reliability Chart — Chinese route and settled states', () => {
   });
 
   it('shows a Chinese empty state only after an empty response settles', () => {
-    cy.intercept('GET', '**/api/v1/reliability', []).as('emptyReliability');
+    cy.intercept('GET', '**/api/v1/reliability/daily', []).as('emptyReliability');
     visitReliability('/zh/reliability');
     cy.wait('@emptyReliability');
     cy.contains('所选时间范围内暂无可靠性数据。').should('be.visible');
@@ -106,7 +106,7 @@ describe('Reliability Chart — Chinese route and settled states', () => {
   it('shows a safe Chinese error and recovers through the tracked retry control', () => {
     let failRequests = true;
     cy.fixture('api/reliability.json').then((fixture) => {
-      cy.intercept('GET', '**/api/v1/reliability', (req) => {
+      cy.intercept('GET', '**/api/v1/reliability/daily', (req) => {
         req.reply(
           failRequests
             ? { statusCode: 500, body: { error: 'database-internal-detail' } }

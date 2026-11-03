@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { fetchEvaluations } from '@/lib/api/api';
+import { fetchDashboardEvaluations } from '@/lib/api/api';
 
 export function useEvaluations() {
   return useQuery({
     queryKey: ['evaluations'],
-    queryFn: ({ signal }) => fetchEvaluations(signal),
+    queryFn: ({ signal }) => fetchDashboardEvaluations(signal),
   });
 }

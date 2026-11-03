@@ -134,7 +134,7 @@ Skipped: 1 rows
 ```
 
 - **`failed run (0 successful)`:** A selected artifact had no successful requests and was skipped. Confirm that the expected successful points were stored; this message alone does not prove a good retry was selected.
-- **`auto-captured unexpected metric '<key>'`:** The value is stored in `metrics` JSONB. Review the key and add it to `METRIC_KEYS` when it should become a first-class metric.
+- **`Auto-captured unexpected metrics`:** The summary lists numeric artifact fields that are not in `METRIC_KEYS`. Their values are still stored in `metrics` JSONB. Review each key and add it to `METRIC_KEYS` when it should become a first-class metric. The `/api/unofficial-run` overlay maps artifacts with the same code but does not log these keys.
 - **`missing sibling artifact`:** A nonzero count means some agentic points have no matching trace-replay sibling. Check that the required `agentic_*` artifacts downloaded. A zero count alone does not establish that every server-metrics export is present.
 - **`Changelog: 1 written`:** The run's `changelog-metadata` artifact already produced the changelog entry. Do not add another one by hand.
 
