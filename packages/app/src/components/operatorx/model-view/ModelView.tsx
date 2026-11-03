@@ -31,6 +31,7 @@ import { Label } from '@/components/ui/label';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
+import { Switch } from '@/components/ui/switch';
 import {
   TooltipContent,
   TooltipProvider,
@@ -65,7 +66,19 @@ import {
 import { track } from '@/lib/analytics/analytics';
 import { isDarkTheme } from '@/lib/themes/themes';
 
-import { barsHeight, binTokens, gpuValues, inBin, OpBars, sizeBin } from './OpBars';
+import {
+  barsHeight,
+  binPct,
+  binTokens,
+  gpuSweep,
+  gpuValues,
+  inBin,
+  OpBars,
+  OpSweep,
+  sizeBin,
+  SWEEP_PX,
+  tokenBin,
+} from './OpBars';
 
 const DEFAULT_MODEL = 'DeepSeek-R1-0528';
 const PRECISIONS: ComputePrecision[] = ['fp4', 'fp8', 'bf16'];
@@ -130,44 +143,148 @@ const DEFAULT_TOKENS = 128;
 const formatTokens = (t: number) =>
   t >= 10_000 ? `${Number((t / 1000).toPrecision(3))}k` : t.toLocaleString();
 
-/** The token count every row shows, over the sizes any row has data at. */
-function TokenSlider({
+/** Token axis labels: both ends, and the powers of ten between them clear of the ends. */
+function tokenMarks(range: [number, number]): { tokens: number; pct: number }[] {
+  const ends = range.map((b) => ({ tokens: binTokens(b), pct: binPct(b, range) }));
+  if (range[0] === range[1]) return [ends[0]];
+  const inner: { tokens: number; pct: number }[] = [];
+  for (let t = 10; t < ends[1].tokens; t *= 10) {
+    const pct = binPct(tokenBin(t), range);
+    if (pct > 10 && pct < 90) inner.push({ tokens: t, pct });
+  }
+  return [ends[0], ...inner, ends[1]];
+}
+
+/**
+ * The token count every row shows, over the sizes any row has data at; or, with "All token
+ * counts" on, the token axis the rows' line charts share.
+ */
+function SizeControls({
   bins,
   bin,
   onChange,
+  sweep,
+  onSweep,
 }: {
   bins: number[];
   bin: number;
   onChange: (bin: number) => void;
+  sweep: boolean;
+  onSweep: (enabled: boolean) => void;
 }) {
+  const range: [number, number] = [bins[0], bins.at(-1)!];
   return (
     <div className="space-y-1">
-      <label htmlFor="operatorx-model-tokens" className="flex items-baseline gap-2 text-xs">
-        <span className="text-muted-foreground">Tokens</span>
-        <span className="font-semibold tabular-nums">≈ {formatTokens(binTokens(bin))}</span>
-      </label>
-      <input
-        id="operatorx-model-tokens"
-        type="range"
-        min={0}
-        max={bins.length - 1}
-        step={1}
-        value={bins.indexOf(bin)}
-        onChange={(e) => onChange(bins[Number(e.target.value)])}
-        className="w-full accent-primary"
-        data-testid="operatorx-model-tokens"
-      />
-      <div className="flex justify-between text-2xs text-muted-foreground tabular-nums">
-        <span>{formatTokens(binTokens(bins[0]))}</span>
-        <span>{formatTokens(binTokens(bins.at(-1)!))}</span>
+      <div className="flex items-baseline gap-2 text-xs">
+        <label htmlFor="operatorx-model-tokens" className="flex items-baseline gap-2">
+          <span className="text-muted-foreground">Tokens</span>
+          <span className="font-semibold tabular-nums">
+            {sweep
+              ? `${formatTokens(binTokens(range[0]))}–${formatTokens(binTokens(range[1]))}`
+              : `≈ ${formatTokens(binTokens(bin))}`}
+          </span>
+        </label>
+        <div className="ml-auto flex items-center gap-1.5 self-center">
+          <Switch
+            id="operatorx-model-sweep"
+            checked={sweep}
+            onCheckedChange={onSweep}
+            data-testid="operatorx-model-sweep"
+          />
+          <Label
+            htmlFor="operatorx-model-sweep"
+            className="text-xs font-normal text-muted-foreground"
+          >
+            All token counts
+          </Label>
+        </div>
       </div>
+      {sweep ? (
+        // Aligned with the charts' plot area, which leaves room for the value labels.
+        <div
+          className="relative mr-[4.5rem] h-6 border-t border-border/60 text-2xs text-muted-foreground tabular-nums"
+          data-testid="operatorx-model-token-axis"
+        >
+          {tokenMarks(range).map((m, i, all) => (
+            <span
+              key={m.tokens}
+              // too narrow for the inner powers of ten on phones: the ends only
+              className={`absolute top-1 whitespace-nowrap ${i === 0 ? '' : i === all.length - 1 ? '-translate-x-full' : '-translate-x-1/2 max-md:hidden'}`}
+              style={{ left: `${m.pct}%` }}
+            >
+              {formatTokens(m.tokens)}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <>
+          <input
+            id="operatorx-model-tokens"
+            type="range"
+            min={0}
+            max={bins.length - 1}
+            step={1}
+            value={bins.indexOf(bin)}
+            onChange={(e) => onChange(bins[Number(e.target.value)])}
+            className="w-full accent-primary"
+            data-testid="operatorx-model-tokens"
+          />
+          <div className="flex justify-between text-2xs text-muted-foreground tabular-nums">
+            <span>{formatTokens(binTokens(range[0]))}</span>
+            <span>{formatTokens(binTokens(range[1]))}</span>
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
-function SlotTooltip({ data, tokens }: { data: SlotData; tokens: number }) {
+/** Each GPU's range across every size, for the tooltip of a row of line charts. */
+function SweepTooltipRows({ model, indices }: { model: ComparisonModel; indices: number[] }) {
+  const { format, unit } = model.metric;
+  // `8.13–2222 TFLOPS`: the unit once, after the range
+  const bare = (v: number) => format(v).replace(unit, '').trim();
+  return (
+    <ul className="space-y-0.5">
+      {gpuSweep(model, indices).map(({ hardware, points }) => {
+        const values = points.map((p) => p.value);
+        return (
+          <li key={hardware} className="flex items-center gap-2 tabular-nums">
+            <span
+              className="inline-block size-2 rounded-full"
+              style={{ background: model.colors[hardware] }}
+            />
+            <span className="w-14">{hardwareLabel(hardware)}</span>
+            <strong>
+              {bare(Math.min(...values))}–{bare(Math.max(...values))} {unit}
+            </strong>
+            <span className="text-muted-foreground">
+              {points.length} {points.length === 1 ? 'size' : 'sizes'}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function SlotTooltip({ data, tokens, sweep }: { data: SlotData; tokens: number; sweep: boolean }) {
   const { model, atSize, slot, block } = data;
   if (!model) return null;
+  if (sweep)
+    return (
+      <div className="space-y-1.5 text-xs">
+        <div className="font-semibold">
+          {slot.label} <span className="font-normal text-muted-foreground">· {block.label}</span>
+        </div>
+        <div className="text-muted-foreground">
+          {data.indices.length.toLocaleString()} {data.indices.length === 1 ? 'shape' : 'shapes'} ·
+          median {model.metric.label.toLowerCase()} per size, lowest to highest
+        </div>
+        <SweepTooltipRows model={model} indices={data.indices} />
+        <div className="text-muted-foreground">Click for every shape and its kernel timeline</div>
+      </div>
+    );
   const rows = gpuValues(model, atSize);
   return (
     <div className="space-y-1.5 text-xs">
@@ -370,6 +487,7 @@ function BlockRows({
   block,
   slots,
   tokens,
+  range,
   lanes,
   isDark,
   onOpen,
@@ -378,6 +496,8 @@ function BlockRows({
   block: LayerBlock;
   slots: SlotData[];
   tokens: number;
+  /** With "All token counts" on, the size bins the line charts span; else null. */
+  range: [number, number] | null;
   /** GPUs shown, which sets the height of a row of bars. */
   lanes: number;
   isDark: boolean;
@@ -387,7 +507,7 @@ function BlockRows({
 }) {
   const [hovered, setHovered] = useState<string | null>(null);
   const c = BLOCK_COLORS[block.kind];
-  const { rows, at } = boxes(block, Math.max(barsHeight(lanes), 40));
+  const { rows, at } = boxes(block, Math.max(range ? SWEEP_PX : barsHeight(lanes), 40));
   return (
     <div
       className={`grid ${ROW_GRID} gap-x-4`}
@@ -437,7 +557,7 @@ function BlockRows({
               <TooltipRoot delayDuration={150}>
                 <TooltipTrigger asChild>{target}</TooltipTrigger>
                 <TooltipContent side="top" align="center" className="w-80">
-                  <SlotTooltip data={data} tokens={tokens} />
+                  <SlotTooltip data={data} tokens={tokens} sweep={range !== null} />
                 </TooltipContent>
               </TooltipRoot>
             ) : (
@@ -447,7 +567,16 @@ function BlockRows({
               className="pointer-events-none relative z-[2] flex items-center"
               style={{ gridColumn: 2, gridRow: gridRow(data.bar, data.bar) }}
             >
-              {measured && data.model ? (
+              {measured && data.model && range ? (
+                <div className="w-full">
+                  <OpSweep
+                    model={data.model}
+                    series={gpuSweep(data.model, data.indices)}
+                    range={range}
+                    empty="No results on these GPUs"
+                  />
+                </div>
+              ) : measured && data.model ? (
                 <div className="w-full">
                   <OpBars
                     model={data.model}
@@ -655,6 +784,7 @@ export function ModelView() {
   const [pickedPrecision, setPrecision] = useState<ComputePrecision | null>(null);
   const [open, setOpen] = useState<SlotData | null>(null);
   const [pickedBin, setBin] = useState<number | null>(null);
+  const [sweep, setSweep] = useState(false);
 
   // Device splits any of the model's ops has cases at; one device by default.
   const splits = useMemo(() => {
@@ -801,6 +931,7 @@ export function ModelView() {
     [resolved, bin],
   );
   const tokens = bin === null ? DEFAULT_TOKENS : binTokens(bin);
+  const range: [number, number] | null = sweep && bins.length > 0 ? [bins[0], bins.at(-1)!] : null;
 
   const error = gemm.error ?? moe.error ?? attention.error;
   if (error)
@@ -922,7 +1053,20 @@ export function ModelView() {
                   </button>
                 ))}
               </div>
-              {bin === null ? <div /> : <TokenSlider bins={bins} bin={bin} onChange={setBin} />}
+              {bin === null ? (
+                <div />
+              ) : (
+                <SizeControls
+                  bins={bins}
+                  bin={bin}
+                  onChange={setBin}
+                  sweep={sweep}
+                  onSweep={(enabled) => {
+                    track('operatorx_model_sweep_toggled', { model: requested, enabled });
+                    setSweep(enabled);
+                  }}
+                />
+              )}
             </div>
             <div className="flex flex-col">
               {blocks.map((block, b) => (
@@ -940,6 +1084,7 @@ export function ModelView() {
                     block={block}
                     slots={slots.get(block.id) ?? []}
                     tokens={tokens}
+                    range={range}
                     lanes={hardware.length}
                     isDark={isDark}
                     onOpen={(data) => {

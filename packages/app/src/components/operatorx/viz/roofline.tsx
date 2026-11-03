@@ -205,11 +205,11 @@ export function Roofline({
             xAxis={
               normalized
                 ? {
-                    label: `${composite ? 'Effective intensity' : 'Arithmetic intensity'} / ridge point`,
+                    label: 'Arithmetic Intensity',
                     tickFormat: (v) => ratio(Number(v)),
                   }
                 : {
-                    label: `${composite ? 'Effective intensity' : 'Arithmetic intensity'} (FLOP/byte)`,
+                    label: 'Arithmetic Intensity (FLOP/byte)',
                     tickFormat: (v) => formatCompact(Number(v)),
                   }
             }

@@ -164,7 +164,7 @@ function expectSummaryLabelsOnRows() {
 }
 
 for (const prefix of ['', '/zh']) {
-  it(`shows median and best bars beside head to head at ${prefix || '/'}`, () => {
+  it(`shows median and best bars across the row above metric vs size at ${prefix || '/'}`, () => {
     const datasets = ['ascend950pr-external', 'h200-dgxc'].map((runner, gpu) => {
       const dataset = normalizeBundle(run(`summary-${gpu}`, runner, [64, 128]));
       dataset.results = dataset.results.map((row, i) => ({
@@ -192,18 +192,15 @@ for (const prefix of ['', '/zh']) {
       .scrollIntoView()
       .should(($summary) => {
         const next = $summary.next()[0];
-        expect(next?.dataset.testid).to.equal('operatorx-viz-pairwise-scatter');
-        expect($summary[0].getBoundingClientRect().top).to.be.closeTo(
-          next.getBoundingClientRect().top,
+        expect(next?.dataset.testid).to.equal('operatorx-viz-metric-vs-size');
+        // Alone on its row, the panel spans the same 12 desktop columns as Metric vs size.
+        expect($summary[0].getBoundingClientRect().width).to.be.closeTo(
+          next.getBoundingClientRect().width,
           1,
         );
-        expect($summary[0].getBoundingClientRect().right).to.be.lessThan(
-          next.getBoundingClientRect().left,
+        expect($summary[0].getBoundingClientRect().bottom).to.be.lessThan(
+          next.getBoundingClientRect().top,
         );
-        // Head to head takes 5 of 12 desktop columns; the bars take the other 7.
-        expect(
-          next.getBoundingClientRect().width / $summary[0].getBoundingClientRect().width,
-        ).to.be.closeTo(5 / 7, 0.03);
       });
     cy.get('[data-testid="operatorx-roofline-summary"]')
       .scrollIntoView()
@@ -275,8 +272,8 @@ for (const prefix of ['', '/zh']) {
           b: { dtype: 'bf16' },
           out: 'bf16',
         },
-        // 950PR is 20x slower, so its median bar is too short to hold its label.
-        latencyUs: gpu === 0 ? 100 : 5,
+        // 950PR is 50x slower, so its median bar is too short to hold its label even across a full row.
+        latencyUs: gpu === 0 ? 250 : 5,
       }));
       return { runner, dataset };
     });
@@ -339,41 +336,6 @@ for (const prefix of ['', '/zh']) {
   });
 }
 
-for (const prefix of ['', '/zh']) {
-  it(`plots head-to-head measurements across vendor backends at ${prefix || '/'}`, () => {
-    const ascend = normalizeBundle(run('105', 'ascend950pr-external', [64, 128]));
-    ascend.results = ascend.results.map((r) => ({ ...r, backend: 'torch_npu_linear' }));
-    const nvidia = normalizeBundle(run('106', 'h200-dgxc', [64, 128]));
-    const view = comparisonView(
-      buildComparison('gemm', [
-        { runner: 'ascend950pr-external', dataset: ascend },
-        { runner: 'h200-dgxc', dataset: nvidia },
-      ]),
-      null,
-    );
-    cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view).as('crossBackend');
-    cy.visit(`${prefix}/operatorx`);
-    cy.wait('@crossBackend');
-    cy.get('[data-testid="operatorx-viz-pairwise-scatter"]')
-      .scrollIntoView()
-      .within(() => {
-        cy.contains('No case was measured on both.').should('not.exist');
-        cy.contains('of 2').should('be.visible');
-        cy.get('svg').should('exist');
-        cy.get('[data-testid="chart-legend"]').should('not.exist');
-        cy.get('span[aria-hidden="true"].rounded-full').should('have.length', 2);
-      });
-    // The plot fills the height the row leaves, so only the card padding sits below it.
-    cy.get('[data-testid="operatorx-viz-pairwise-scatter"]').should(($card) => {
-      const plot = [...$card.find('svg')]
-        .map((svg) => svg.getBoundingClientRect())
-        .toSorted((a, b) => b.width - a.width)[0];
-      const padding = Number.parseFloat(getComputedStyle($card[0]).paddingBottom);
-      expect($card[0].getBoundingClientRect().bottom - plot.bottom).to.be.closeTo(padding, 2);
-    });
-  });
-}
-
 describe('OperatorX progressive rendering', { testIsolation: true }, () => {
   for (const prefix of ['', '/zh']) {
     it(`mounts lower charts near the viewport and preserves their controls at ${prefix || '/'}`, () => {
@@ -385,10 +347,8 @@ describe('OperatorX progressive rendering', { testIsolation: true }, () => {
         .should('have.attr', 'aria-busy', 'false')
         .find('svg')
         .should('exist');
-      const lower = '[data-testid="operatorx-viz-pairwise-scatter"]';
+      const lower = '[data-testid="operatorx-viz-metric-vs-size"]';
       cy.get(lower).should('have.attr', 'aria-busy', 'true').find('svg').should('not.exist');
-      cy.get('[data-testid="operatorx-viz-metric-vs-size"]').scrollIntoView();
-      cy.get('[data-testid="operatorx-viz-metric-vs-size"] svg').should('exist');
       cy.get(lower).scrollIntoView();
       cy.get(lower).should('have.attr', 'aria-busy', 'false').find('svg').should('exist');
       cy.get('[data-testid="operatorx-viz-throughput-summary"]').scrollIntoView();
@@ -427,7 +387,7 @@ describe('OperatorX progressive rendering', { testIsolation: true }, () => {
       },
     });
     cy.wait('@comparison');
-    cy.get('[data-testid="operatorx-viz-pairwise-scatter"]')
+    cy.get('[data-testid="operatorx-viz-metric-vs-size"]')
       .should('have.attr', 'aria-busy', 'false')
       .find('svg')
       .should('exist');

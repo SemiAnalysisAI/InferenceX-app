@@ -493,7 +493,7 @@ selection (` · hash routing`). Slices drop only the token count (MoE) or M (GEM
 slice never mixes split layouts or router kinds; treat each slice as one operation swept
 over size. Router gate bytes use `router.gate.dtype`.
 
-The Median and best throughput panel sits beside Head to head and replaces Distribution per GPU; Metric vs size is last. Precision, Normalized, and Shared cases only controls map to `rooflinePrecision=bf16|fp8|fp4`, `rooflineHardware=<comma-separated keys>`, `rooflineNormalized=true|false`, and `rooflineSharedOnly=true|false` on `/api/v1/operatorx/compare?op=gemm`. Supplying any adds `rooflineSummary`. Defaults: workload precision, all hardware, normalized=true, sharedOnly=true.
+The Median and best throughput panel spans its own row and replaces Distribution per GPU; Metric vs size is last. Precision, Normalized, and Shared cases only controls map to `rooflinePrecision=bf16|fp8|fp4`, `rooflineHardware=<comma-separated keys>`, `rooflineNormalized=true|false`, and `rooflineSharedOnly=true|false` on `/api/v1/operatorx/compare?op=gemm`. Supplying any adds `rooflineSummary`. Defaults: workload precision, all hardware, normalized=true, sharedOnly=true.
 
 By default (shared-only) every bar uses the same cases measured on every selected accelerator and compute-bound on every one (at or above each ridge point; for staged MoE and attention cases and split cases with collectives, compute at least half the roofline time); an empty intersection remains empty (for example, FP8 fp32-scale and ue8m0-scale cases never overlap). With `rooflineSharedOnly=false` each bar uses that hardware's successful positive finite measurements that are compute-bound on it by the same test; case sets and quantization formats can differ, so these are descriptive medians, not matched-shape speedups. Missing references omit only the affected hardware. `cohort` identifies `per-hardware-compute-bound` or `shared-compute-bound`. `matchedCases` counts shared cases before ridge filtering; top-level `caseIndices` is the union of displayed bar indices, and each bar's `caseIndices` and `n` identify its own cohort. Bars also contain median, best, medianTflops, bestTflops, bestCaseIndex and hardware. Normalized values are fractions. Invalid selectors return 400; no selectors leave the original response unchanged. Hover and click are presentation-only.
 
@@ -834,8 +834,8 @@ successful finite positive latency across backends; ties keep the first result.
 If no backend succeeds, the first explicit status is retained without inventing a
 measurement. The newest-per-hardware/case/backend raw selection is unchanged.
 `measurements[hardware].backend` identifies the selected backend alongside its
-original run, revision, result index, kernel, and CUDA Graph flag. Head-to-head
-points and timeline inspection use these same selected measurements. Thus identical
+original run, revision, result index, kernel, and CUDA Graph flag. Chart points and
+timeline inspection use these same selected measurements. Thus identical
 BF16 cases measured by `torch_npu_linear` and `vllm` can be compared, while different
 precision or quantization arguments remain separate. This adds no OpenAPI
 operation; the compare route stays page-owned.
@@ -845,7 +845,7 @@ operation; the compare route stays page-owned.
 有限正数的最快结果；延迟相同则保留首条结果。若没有成功结果，则保留首条明确状态，不补造测量值。
 原始数据仍按设备、用例和 backend 分别选取最新结果。`measurements[hardware].backend`
 记录所选 backend，并保留原始 run、revision、result index、kernel 和 CUDA Graph 标记；
-Head to head 与时间线使用同一条测量记录。OperatorX 仍使用页面专属 API，不新增公开 OpenAPI 接口。
+图表数据点与时间线使用同一条测量记录。OperatorX 仍使用页面专属 API，不新增公开 OpenAPI 接口。
 
 ### OperatorX compact reads
 
