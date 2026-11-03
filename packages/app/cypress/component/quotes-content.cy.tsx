@@ -347,6 +347,7 @@ describe('QuotesContent supporter logo wall', () => {
         'Google',
         'AMD',
         'NVIDIA',
+        'OpenAI Jalapeño',
         'SambaNova',
       ]);
     });
