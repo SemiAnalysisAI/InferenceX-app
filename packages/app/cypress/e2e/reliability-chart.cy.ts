@@ -88,11 +88,14 @@ describe('Reliability Chart — Chinese route and settled states', () => {
     cy.get('#reliability-chart svg .overlay-label').first().should('contain.text', '次运行');
     cy.get('#reliability-chart').closest('figure').should('contain.text', 'Shift+滚轮横向缩放');
     cy.get('#reliability-chart svg rect.bar').first().click({ force: true });
-    cy.get('[data-chart-tooltip]:visible')
-      .should('contain.text', '点击其他区域关闭')
-      .and('contain.text', '成功率：')
-      .and('contain.text', '成功次数：')
-      .and('contain.text', '总运行次数：');
+    cy.get('[data-testid="point-details-panel"]')
+      .should('be.visible')
+      .and('contain.text', '成功率')
+      .and('contain.text', '成功次数')
+      .and('contain.text', '总运行次数');
+    cy.get('[data-testid="chart-pin-ring"]').should('exist');
+    cy.get('body').type('{esc}');
+    cy.get('[data-testid="point-details-panel"]').should('not.exist');
   });
 
   it('shows a Chinese empty state only after an empty response settles', () => {

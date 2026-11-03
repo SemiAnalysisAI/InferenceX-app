@@ -170,7 +170,7 @@ describe('Historical Trends AgentX P90 operating point', () => {
         .and('contain', 'P90');
       cy.get('[data-testid="historical-trend-figure"] h2').should('contain.text', 'P90');
       cy.get('[data-testid="trend-chart-svg"] .dot-group circle').first().click({ force: true });
-      cy.get('[data-chart-tooltip]:visible').should('contain.text', '300');
+      cy.get('[data-testid="point-details-panel"]').should('contain.text', '300');
     }
   });
 });
@@ -286,7 +286,7 @@ describe('Historical Trends — Content & Interactions', () => {
     });
     cy.get('[data-testid="historical-trend-figure"]').should('exist');
 
-    cy.get('[data-testid="historical-trend-figure"] [data-testid="result-context"]')
+    cy.get('[data-testid="historical-trend-figure"] h2')
       .first()
       .invoke('text')
       .then((initialSubtitle) => {
@@ -295,7 +295,7 @@ describe('Historical Trends — Content & Interactions', () => {
           if ($options.length <= 1) return;
           cy.wrap($options).last().click();
 
-          cy.get('[data-testid="historical-trend-figure"] [data-testid="result-context"]')
+          cy.get('[data-testid="historical-trend-figure"] h2')
             .first()
             .invoke('text')
             .should('not.eq', initialSubtitle);
@@ -320,8 +320,8 @@ describe('Historical Trends — Chinese route', () => {
     cy.get('[data-testid="historical-trend-figure"] h2').should('contain.text', '随时间变化');
     cy.get('[data-testid="historical-trend-figure"]').should('contain.text', 'Shift+滚轮横向缩放');
     cy.get('[data-testid="trend-chart-svg"] .dot-group circle').first().click({ force: true });
-    cy.get('[data-chart-tooltip]:visible')
-      .should('contain.text', '点击其他区域关闭')
+    cy.get('[data-testid="point-details-panel"]')
+      .should('contain.text', '目标交互性')
       .invoke('text')
       .should('match', /\d{4}年/u);
   });
@@ -344,10 +344,10 @@ describe('Historical Trends — Chinese route', () => {
     );
     cy.wait('@agenticAvailability');
     cy.wait('@agenticBenchmarks');
+    cy.get('[data-testid="historical-trend-figure"] h2').should('contain.text', '智能体');
     cy.get('[data-testid="historical-trend-figure"] [data-testid="result-context"]')
       .first()
-      .should('contain.text', '智能体')
-      .and('contain.text', '2025年3月1日')
+      .should('contain.text', '2025年3月1日')
       .and('not.contain.text', runDate);
   });
 

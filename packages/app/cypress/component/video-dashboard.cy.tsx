@@ -155,10 +155,8 @@ describe('Video hardware dashboard (retained fixture)', () => {
     cy.get('[data-testid="video-chart-card"]')
       .should('contain', 'Cost tier: Rent - 3 Year Commit')
       .and('contain', 'Videos per $1 TCO (Rent - 3 Year Commit)');
-    cy.get('[data-testid="video-tco-badge"]')
-      .first()
-      .should('contain', 'B200')
-      .and('contain', '3.70');
+    cy.get('[data-testid="video-tco-table"] thead th').eq(1).should('contain', 'B200');
+    cy.get('[data-testid="video-tco-badge"]').first().should('contain', '3.70');
   });
   it('never plots queued cells, even when a stale URL asks for them', () => {
     // C2/C4 exceed the single replica, so they stay in the evidence panel; the retired

@@ -391,7 +391,8 @@ describe('Fleet — Fleet Lifecycle', () => {
     });
   });
 
-  it('freezes the readout on click, and releases it on the next click', () => {
+  it('opens the slice details on click, and closes them on a second click', () => {
+    cy.document().then((doc) => (doc.activeElement as HTMLElement | null)?.blur());
     hoverPlot(0.4);
     readout()
       .invoke('text')
@@ -399,23 +400,20 @@ describe('Fleet — Fleet Lifecycle', () => {
         const frozenDate = /\d{2} \w{3} \d{4}/u.exec(hovered)?.[0];
         expect(frozenDate, 'a date in the hover readout').to.be.a('string');
         clickPlot(0.4);
-        readout()
-          .should('have.css', 'pointer-events', 'auto')
-          .and('contain.text', String(frozenDate));
-        hoverPlot(0.7);
-        readout().should('contain.text', String(frozenDate));
-        clickPlot(0.7);
-        readout().should('have.css', 'display', 'none');
+        cy.get('[data-testid="point-details-panel"]').should('contain.text', String(frozenDate));
+        clickPlot(0.4);
+        cy.get('[data-testid="point-details-panel"]').should('not.exist');
       });
   });
 
-  it('keeps config detail out of the hover readout, showing it only once frozen', () => {
+  it('keeps config detail out of the hover readout, showing it only in the details', () => {
     stepX().then((x) => {
       plotOverlay().trigger('mousemove', x, 40);
       readout().should('have.css', 'display', 'block').and('not.contain.text', 'Config');
       plotOverlay().click(x, 40);
-      readout().should('contain.text', 'Config');
-      plotOverlay().click(x, 40);
+      cy.get('[data-testid="point-details-panel"]').should('contain.text', 'Config');
+      cy.get('[data-testid="point-details-close"]').click();
+      cy.get('[data-testid="point-details-panel"]').should('not.exist');
     });
   });
 
@@ -423,7 +421,7 @@ describe('Fleet — Fleet Lifecycle', () => {
     stepX().then((x) => {
       plotOverlay().click(x, 40);
     });
-    readout()
+    cy.get('[data-testid="point-details-panel"]')
       .find('a')
       .should('have.length.greaterThan', 0)
       .first()
@@ -909,15 +907,14 @@ describe('Fleet — Fleet Lifecycle in Chinese', () => {
       hoverPlot(0.4);
       readout()
         .should('have.css', 'display', 'block')
-        .find('.font-semibold')
         .invoke('text')
-        .should('match', /^\d{4}年\d{1,2}月\d{1,2}日$/u)
-        .then((date) => {
+        .then((text) => {
+          const date = /\d{4}年\d{1,2}月\d{1,2}日/u.exec(text)?.[0];
+          expect(date, 'a Chinese date in the hover readout').to.be.a('string');
           clickPlot(0.4);
-          hoverPlot(0.7);
-          readout().should('have.css', 'pointer-events', 'auto').and('contain.text', date);
-          clickPlot(0.7);
-          readout().should('have.css', 'display', 'none');
+          cy.get('[data-testid="point-details-panel"]').should('contain.text', String(date));
+          clickPlot(0.4);
+          cy.get('[data-testid="point-details-panel"]').should('not.exist');
         });
       xAxisLayout().then((before) => {
         plotOverlay().then(($overlay) => {

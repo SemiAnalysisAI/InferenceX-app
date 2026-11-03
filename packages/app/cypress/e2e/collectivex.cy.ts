@@ -221,7 +221,7 @@ describe('CollectiveX neutral run view', () => {
     cy.get('[data-testid="collectivex-range-note"]').should('be.visible');
 
     cy.get('[data-testid="collectivex-explorer-chart"] .point').first().click({ force: true });
-    cy.get('[data-chart-tooltip]:visible')
+    cy.get('[data-testid="point-details-panel"]')
       .should('contain.text', 'Range across libraries')
       .and('contain.text', 'Median')
       .and('contain.text', '1 library at this point');
@@ -289,8 +289,8 @@ describe('CollectiveX neutral run view', () => {
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('have.length', 1);
     cy.get('[data-testid="collectivex-range-note"]').should('contain.text', 'best value');
     cy.get('[data-testid="collectivex-explorer-chart"] .point').first().click({ force: true });
-    cy.get('[data-chart-tooltip]:visible')
-      .should('contain.text', 'Best:')
+    cy.get('[data-testid="point-details-panel"]')
+      .should('contain.text', 'Best ·')
       .and('contain.text', '2 libraries at this point');
     cy.get('[data-testid="collectivex-explorer-chart"] svg').first().click(5, 5, { force: true });
     showView('Range by SKU');
@@ -396,15 +396,16 @@ describe('CollectiveX neutral run view', () => {
     cy.get('[data-testid="collectivex-explorer-chart"] .line-path').should('not.exist');
   });
 
-  it('pins a compact tooltip on point click', () => {
+  it('shows point details in the legend panel on point click', () => {
     showView('Series');
     cy.get('[data-testid="collectivex-explorer-chart"] .point').first().click({ force: true });
-    cy.get('[data-chart-tooltip]:visible')
-      .should('contain.text', 'Click elsewhere to dismiss')
-      .and('contain.text', 'Round trip (measured) p99:')
+    cy.get('[data-testid="point-details-panel"]')
+      .should('contain.text', 'Round trip')
       .and('contain.text', 'Latency p50 / p90 / p95 / p99')
       .and('not.contain.text', 'Expert CV')
       .and('not.contain.text', 'evidence=');
+    cy.get('[data-testid="point-details-close"]').click();
+    cy.get('[data-testid="point-details-panel"]').should('not.exist');
   });
 
   it('shows only the newest measured run when a newer incomplete run has no series', () => {
@@ -545,9 +546,8 @@ describe('CollectiveX neutral run view', () => {
       .and('contain.text', '延迟（µs）');
 
     cy.get('[data-testid="collectivex-explorer-chart"] .point').first().click({ force: true });
-    cy.get('[data-chart-tooltip]:visible')
-      .should('contain.text', '点击其他区域关闭')
-      .and('contain.text', '往返')
+    cy.get('[data-testid="point-details-panel"]')
+      .should('contain.text', '往返')
       .and('contain.text', '常规')
       .and('contain.text', '解码')
       .and('contain.text', '延迟 p50 / p90 / p95 / p99');
@@ -971,7 +971,7 @@ describe('CollectiveX swap_blocks', () => {
       });
     cy.get('@swapChart').find('.point').should('have.length', 2).last().click({ force: true });
     cy.get('body')
-      .should('contain.text', '32.768 GB/s')
+      .should('contain.text', '32.768p50 (GB/s)')
       .and('contain.text', 'Copied payload: 1 GiB');
     cy.get('[data-testid="swap-metric"]').contains('Latency').click();
     cy.get('@swapChart').should('contain.text', 'µs, log');
@@ -979,7 +979,9 @@ describe('CollectiveX swap_blocks', () => {
     cy.get('[data-testid="swap-layout"]').contains('Random').click();
     cy.get('[data-testid="swap-percentile"]').contains('p99').click();
     cy.get('@swapChart').find('.point').should('have.length', 1).click({ force: true });
-    cy.get('body').should('contain.text', '8.000 µs').and('contain.text', 'Copied payload: 4 KiB');
+    cy.get('body')
+      .should('contain.text', '8.000p99 (µs)')
+      .and('contain.text', 'Copied payload: 4 KiB');
     cy.get('[data-testid="swap-metric"]').contains('Bandwidth').click();
     cy.get('@swapChart').should('contain.text', 'GB/s').and('not.contain.text', 'µs, log');
   });

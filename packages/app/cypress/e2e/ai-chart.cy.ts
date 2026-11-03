@@ -261,7 +261,7 @@ describe('AI chart Chinese workflow', () => {
       }).as('zhOpenAi');
 
       cy.visit('/zh/ai-chart');
-      cy.get('input[placeholder="OpenAI API key"]').type('test-api-key', { log: false });
+      cy.get('input[placeholder="OpenAI API 密钥"]').type('test-api-key', { log: false });
       cy.get('textarea[placeholder="描述想查看的图表"]').type('对比 B200 和 MI355X 的每芯片吞吐量');
       cy.contains('button', '生成图表').click();
 
@@ -306,7 +306,7 @@ describe('AI chart Chinese workflow', () => {
       });
 
       cy.visit('/zh/ai-chart');
-      cy.get('input[placeholder="OpenAI API key"]').type('test-api-key', { log: false });
+      cy.get('input[placeholder="OpenAI API 密钥"]').type('test-api-key', { log: false });
       cy.get('textarea[placeholder="描述想查看的图表"]').type('生成散点图和折线图');
       cy.contains('button', '生成图表').click();
       cy.wait('@interactiveBenchmarks');
@@ -353,7 +353,7 @@ describe('AI chart Chinese workflow', () => {
       });
 
       cy.visit('/zh/ai-chart');
-      cy.get('input[placeholder="OpenAI API key"]').type('test-api-key', { log: false });
+      cy.get('input[placeholder="OpenAI API 密钥"]').type('test-api-key', { log: false });
       cy.get('textarea').type('生成两张吞吐量图表');
       cy.contains('button', '生成图表').click();
 
@@ -367,7 +367,7 @@ describe('AI chart Chinese workflow', () => {
   it('does not expose a provider error body or API key on the Chinese route', () => {
     cy.viewport(375, 844);
     cy.visit('/zh/ai-chart');
-    cy.get('input[placeholder="OpenAI API key"]').should('be.visible');
+    cy.get('input[placeholder="OpenAI API 密钥"]').should('be.visible');
     cy.get('textarea[placeholder="描述想查看的图表"]').should('be.visible');
     cy.contains('提示词示例').should('be.visible');
     cy.contains(`${Cypress.platform === 'darwin' ? '⌘' : 'Ctrl'}+Enter 生成图表`).should(
@@ -382,7 +382,7 @@ describe('AI chart Chinese workflow', () => {
       body: { error: { message: 'provider-internal-error sk-sensitive-example-key' } },
     }).as('failedProvider');
     cy.visit('/zh/ai-chart');
-    cy.get('input[placeholder="OpenAI API key"]').type('sk-sensitive-example-key', { log: false });
+    cy.get('input[placeholder="OpenAI API 密钥"]').type('sk-sensitive-example-key', { log: false });
     cy.get('textarea').type('对比吞吐量');
     cy.contains('button', '生成图表').click();
     cy.wait('@failedProvider');
@@ -392,7 +392,7 @@ describe('AI chart Chinese workflow', () => {
     cy.get('[data-testid="ai-chart-error"]').should('not.contain.text', 'sk-sensitive-example-key');
     cy.contains('button', '返回修改').click();
     cy.get('[data-testid="ai-chart-error"]').should('not.exist');
-    cy.get('input[placeholder="OpenAI API key"]').should('have.value', 'sk-sensitive-example-key');
+    cy.get('input[placeholder="OpenAI API 密钥"]').should('have.value', 'sk-sensitive-example-key');
     cy.get('textarea').should('have.value', '对比吞吐量');
   });
 });

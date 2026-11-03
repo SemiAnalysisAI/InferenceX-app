@@ -264,12 +264,15 @@ describe('EvalBarChartD3', () => {
       cy.get(tooltip).should('not.be.visible');
 
       cy.get(`${marker} .unofficial-eval-x`).click();
-      cy.get(tooltip)
+      cy.get(tooltip).should('not.be.visible');
+      cy.get('[data-testid="point-details-panel"]')
         .should('be.visible')
-        .and('have.css', 'pointer-events', 'auto')
         .and('contain.text', '0.9659')
-        .and('contain.text', 'Click elsewhere to dismiss');
-      cy.get(`${tooltip} a`).should('have.attr', 'href', run.url);
+        .and('contain.text', run.branch);
+      cy.get('[data-testid="point-details-panel"] a').should('have.attr', 'href', run.url);
+      cy.get('[data-testid="chart-pin-ring"]').should('exist');
+      cy.get('[data-testid="point-details-close"]').click();
+      cy.get('[data-testid="point-details-panel"]').should('not.exist');
 
       cy.get(marker)
         .invoke('attr', 'transform')

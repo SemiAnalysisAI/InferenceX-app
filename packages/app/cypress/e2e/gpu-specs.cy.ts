@@ -345,7 +345,7 @@ describe('GPU Specs Chinese route', () => {
     hoverGpuSpecsPointAndAssertTooltip(
       '[data-testid="gpu-specs-bar-d3-chart"] svg .bar',
       '[data-chart-tooltip="gpu-specs-bar-chart"]',
-      ['显存容量：'],
+      ['显存容量 (GB)'],
     );
     cy.get('[data-testid="gpu-specs-radar-view-btn"]').click({ force: true });
     cy.get('[data-testid="gpu-specs-radar-chart"] svg').should('contain.text', '显存容量');
@@ -353,7 +353,7 @@ describe('GPU Specs Chinese route', () => {
     hoverGpuSpecsPointAndAssertTooltip(
       '[data-testid="gpu-specs-radar-chart"] svg .radar-dot',
       '[data-chart-tooltip="gpu-radar-chart"]',
-      ['显存容量：'],
+      ['显存容量（'],
     );
   });
 

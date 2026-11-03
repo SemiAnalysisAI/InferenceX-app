@@ -105,7 +105,11 @@ describe('TCO Calculator', () => {
           title: 'Tokens per Provisioned All-in Megawatt',
           badges: ['All in power/chip', 'kW'],
         },
-        { metric: 'cost', title: 'Cost per Million', badges: ['TCO $/chip/hr', '$'] },
+        {
+          metric: 'cost',
+          title: 'Cost per Million',
+          badges: ['TCO', '$/chip/hr'],
+        },
       ] as const;
       for (const { metric, title, badges } of metrics) {
         cy.get(`[data-testid="calculator-metric-${metric}"]`)
@@ -691,10 +695,10 @@ describe('TCO Calculator Chinese route', () => {
       .first()
       .trigger('mouseenter', { force: true });
     cy.get('[data-chart-tooltip]:visible')
-      .should('contain.text', '吞吐量：')
-      .and('contain.text', '成本：');
+      .should('contain.text', 'tok/s/chip')
+      .and('contain.text', '并发数');
     cy.get('[data-testid="calculator-metric-power"]').click();
-    cy.get('[data-testid="calculator-cost-badges"]').should('contain.text', '单芯片整机功耗：');
+    cy.get('[data-testid="calculator-cost-badges"]').should('contain.text', '单芯片整机功耗');
     cy.contains('[role="tab"]:visible', '表格').click();
     cy.get('[data-testid="calculator-results-table"] thead')
       .should('contain.text', '芯片')

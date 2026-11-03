@@ -44,7 +44,7 @@ describe('Video hardware dashboard (E2E fixtures)', () => {
       'have.text',
       'Per participating GPU: B200 (4 of 8), H100 (4 of 8) reserved more boards than one video uses; the idle boards are not counted.',
     );
-    cy.get('[data-testid="video-tco-badge"]').first().should('contain', 'B200');
+    cy.get('[data-testid="video-tco-table"] thead th').eq(1).should('contain', 'B200');
     cy.get('[data-testid="video-replay"]').should('be.visible');
     // The campaign is frozen: model, workload and deployment are facts; only axes and tier select.
     cy.get('[data-testid="video-config-fact"]').should('have.length', 3);

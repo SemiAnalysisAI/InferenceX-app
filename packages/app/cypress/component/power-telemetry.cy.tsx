@@ -219,7 +219,8 @@ describe('PowerX telemetry interactions', () => {
     );
     cy.get('[data-testid="gpu-power-all-in-line"]').should('contain.text', '1710W');
     cy.get('circle.point').first().click({ force: true });
-    cy.get('[data-chart-tooltip]').should('contain.text', 'Chip 0');
+    cy.get('[data-testid="point-details-panel"]').should('contain.text', 'Chip 0');
+    cy.get('[data-testid="chart-pin-ring"]').should('exist');
   });
 
   it('shows a genuine missing point without offering an error retry', () => {

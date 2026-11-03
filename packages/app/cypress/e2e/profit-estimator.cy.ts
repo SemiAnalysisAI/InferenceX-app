@@ -425,11 +425,11 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
       scroller().scrollTo('right');
       chart().find('rect.bar-profit').last().should('be.visible');
       chart().find('rect.bar-profit').last().click({ scrollBehavior: false });
-      cy.get('[data-chart-tooltip="profit-estimator-chart"]')
-        .should('be.visible')
-        .and('contain', 'MI355X');
-      chartSvg().trigger('click', { force: true, scrollBehavior: false });
-      cy.get('[data-chart-tooltip="profit-estimator-chart"]').should('not.be.visible');
+      cy.get('[data-testid="point-details-panel"]').should('contain', 'MI355X');
+      cy.get('[data-testid="point-details-close"]').click({
+        scrollBehavior: false,
+      });
+      cy.get('[data-testid="point-details-panel"]').should('not.exist');
       cy.document().should((doc) => {
         expect(doc.documentElement.scrollWidth).to.be.at.most(390);
       });
@@ -585,7 +585,7 @@ describe('Profit estimator per GW', () => {
     );
     cy.get('[data-testid="result-context-utilization"]').should('have.text', '60%');
     cy.get('[data-testid="result-context-license-fee"]').should('have.text', '30%');
-    cy.get('[data-testid="profit-caption"]').should('contain.text', 'TCO $/chip/hr');
+    cy.get('[data-testid="profit-tco-badges"]').should('contain.text', '$/chip/hr');
     cy.get('[data-testid="profit-caption"] h2').should('contain.text', 'Kimi K3');
     cy.get('[data-testid="profit-selling-prices"]')
       .should('contain.text', 'Input: $3')
@@ -783,7 +783,7 @@ describe('Profit estimator per GW', () => {
     cy.get('[data-testid="result-context-cost-tier"]').should('contain.text', 'Custom');
     cy.get('[data-testid="profit-custom-costs"]').should('not.exist');
     cy.get('[data-testid="profit-tco-badge"] input').should('have.length', 4);
-    cy.get('[data-testid="profit-tco-source"]').should('not.exist');
+    cy.get('[data-testid="tco-prices-source"]').should('not.exist');
     chart()
       .find('rect.bar-tco')
       .its('length')
@@ -800,7 +800,7 @@ describe('Profit estimator per GW', () => {
     cy.get('button#profit-cost').click();
     cy.get('[data-testid="cost-provider-costh"]').click();
     cy.get('[data-testid="profit-custom-cost-gb300"]').should('have.value', '2.31');
-    cy.get('[data-testid="profit-tco-source"]').should('contain.text', 'TCO Model');
+    cy.get('[data-testid="tco-prices-source"]').should('contain.text', 'TCO Model');
     cy.get('[data-testid="result-context-cost-tier"]').should(
       'contain.text',
       'Owning at Large Hyperscaler Volume',
@@ -818,7 +818,7 @@ describe('Profit estimator per GW', () => {
     cy.get('[data-testid="result-context-cost-tier"]').should('contain.text', 'Custom');
     cy.get('[data-testid="profit-custom-cost-gb300"]').should('have.value', '4');
     cy.get('[data-testid="profit-custom-cost-mi355x"]').should('have.value', '1.5');
-    cy.get('[data-testid="profit-tco-source"]').should('not.exist');
+    cy.get('[data-testid="tco-prices-source"]').should('not.exist');
     cy.get('button#profit-cost').click();
     cy.get('[data-testid="cost-provider-costh"]').click();
     cy.get('[data-testid="profit-custom-cost-gb300"]').should('have.value', '2.31');
@@ -1665,7 +1665,7 @@ describe('Profit Estimator — responsive control panels', () => {
           .find('input')
           .should('have.length', 3);
         cy.get('[data-testid="profit-pricing-panel"] #profit-cost').should('not.exist');
-        cy.get('[data-testid="profit-caption"] [data-testid="profit-tco-badge"] input').should(
+        cy.get('[data-testid="profit-footer"] [data-testid="profit-tco-badge"] input').should(
           'have.length.greaterThan',
           0,
         );
@@ -1765,11 +1765,11 @@ describe('VR publication economics', () => {
           });
         cy.get('[data-testid="profit-cache-hit-selector"]').should(
           'contain.text',
-          'Theoretical roofline',
+          locale ? '理论上限' : 'Theoretical roofline',
         );
         assertCachePricing(0.97);
         cy.get('[data-testid="profit-cache-hit-selector"]').click();
-        cy.contains('[role="option"]', /^Actual$/).click();
+        cy.contains('[role="option"]', locale ? /^实测$/ : /^Actual$/).click();
         assertCachePricing(0.95);
       });
     }

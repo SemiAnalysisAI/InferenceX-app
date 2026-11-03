@@ -53,9 +53,14 @@ describe('Prefix Cache Reuse', () => {
       cy.get('[data-testid="cache-reuse-config-selector"]')
         .invoke('text')
         .then((config) => {
-          cy.get('[data-testid="cache-reuse-figure"] figcaption')
-            .should('contain.text', config.trim())
-            .and('contain.text', 'Source: SemiAnalysis InferenceX');
+          cy.get('[data-testid="cache-reuse-figure"] figcaption').should(
+            'contain.text',
+            config.trim(),
+          );
+          cy.get('[data-testid="cache-reuse-figure"] [data-testid="result-context"]').should(
+            'contain.text',
+            'SemiAnalysis InferenceX',
+          );
         });
     });
 

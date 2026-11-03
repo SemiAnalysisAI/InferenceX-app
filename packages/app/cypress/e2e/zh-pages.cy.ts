@@ -342,9 +342,11 @@ describe('Chinese (/zh) pages', () => {
       cy.get('[data-testid="submissions-chart-svg"] .proximity-overlay').click('center', {
         force: true,
       });
-      cy.get('[data-chart-tooltip]:visible')
-        .should('contain.text', '点击其他区域关闭')
-        .and('contain.text', '合计');
+      cy.get('[data-testid="point-details-panel"]:visible')
+        .should('have.attr', 'aria-label', '数据点详情')
+        .and('contain.text', '合计')
+        .find('[data-testid="point-details-close"]')
+        .should('have.attr', 'aria-label', '关闭数据点详情');
       cy.contains('th button', '投机解码').should('be.visible');
       cy.contains('th button', '数据点').click().parent('th').should('have.attr', 'aria-sort');
       cy.get('button[aria-label="展开配置详情"]').first().click();
