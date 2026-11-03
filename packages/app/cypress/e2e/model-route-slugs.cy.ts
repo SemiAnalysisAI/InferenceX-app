@@ -134,8 +134,8 @@ describe('GLM-5.3-Flash registration without published observations', () => {
       expect(sourceAvailability.length, 'nonempty source availability fixture').to.be.greaterThan(
         0,
       );
-      const flashAvailability = sourceAvailability.map((row) => ({ ...row, model: 'dsv4flash' }));
-      expect([...new Set(flashAvailability.map((row) => row.model))]).to.deep.equal(['dsv4flash']);
+      const flashAvailability = sourceAvailability.map((row) => ({ ...row, model: 'dsv41flash' }));
+      expect([...new Set(flashAvailability.map((row) => row.model))]).to.deep.equal(['dsv41flash']);
       cy.intercept('GET', '/api/v1/availability*', { body: flashAvailability });
       cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
         expect(
@@ -180,14 +180,14 @@ describe('Per-model dashboard routes', () => {
       cy.intercept('GET', '/api/v1/availability', {
         body: modelSelectionAvailability
           .filter((row) => row.model === 'dsv4')
-          .map((row) => ({ ...row, model: 'dsv4flash' })),
+          .map((row) => ({ ...row, model: 'dsv41flash' })),
       });
       cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
         expect(new URL(request.url).searchParams.get('model')).to.eq('DeepSeek-V4.1-Flash');
         request.reply({
           body: modelSelectionBenchmarks
             .filter((row) => row.model === 'dsv4')
-            .map((row) => ({ ...row, model: 'dsv4flash' })),
+            .map((row) => ({ ...row, model: 'dsv41flash' })),
         });
       });
       cy.visit(`${locale}/inference`, visitOptions);
