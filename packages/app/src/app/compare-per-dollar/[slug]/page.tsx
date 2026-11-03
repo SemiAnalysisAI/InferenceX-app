@@ -36,7 +36,7 @@ import {
   initialCompareBenchmarkRows,
 } from '@/lib/compare/compare-page-data.server';
 
-import { LazyComparePerDollarPageClient } from './lazy-page-client';
+import ComparePerDollarPageClient from './page-client';
 
 export const revalidate = 86400;
 
@@ -172,7 +172,7 @@ export async function renderPerDollarPage(slug: string, { scenarioSegment }: Sce
     <>
       <JsonLd data={jsonLd} />
       <JsonLd data={breadcrumbJsonLd} />
-      <LazyComparePerDollarPageClient
+      <ComparePerDollarPageClient
         a={parsed.a}
         b={parsed.b}
         slug={canonical}

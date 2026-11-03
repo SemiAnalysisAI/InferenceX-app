@@ -1,4 +1,7 @@
+import { CANVAS_POINT_LAYER_SELECTOR } from '@/lib/d3-chart/layers/canvas-points';
+
 import { expandLegendAdvanced } from '../support/legend-advanced';
+import { POINT_LABELS } from '../support/scatter-points';
 
 describe('Line Labels Toggle', () => {
   before(() => {
@@ -37,14 +40,12 @@ describe('Line Labels Toggle', () => {
 
     cy.get('[data-testid="scatter-graph"] [data-testid="d3-chart-svg"]').then(($svg) => {
       const svg = $svg[0];
-      const dots = svg.querySelectorAll('.dot-group');
-      const labels = svg.querySelectorAll('g.line-label');
-      expect(dots.length, 'scatter dot groups exist').to.be.greaterThan(0);
-      expect(labels.length, 'line labels exist').to.be.greaterThan(0);
+      const points = svg.querySelector(CANVAS_POINT_LAYER_SELECTOR);
+      const firstLabel = svg.querySelector('g.line-label');
+      expect(points, 'scatter point layer exists').to.not.equal(null);
+      expect(firstLabel, 'line labels exist').to.not.equal(null);
 
-      const lastDot = dots.item(dots.length - 1)!;
-      const firstLabel = labels.item(0)!;
-      const relation = lastDot.compareDocumentPosition(firstLabel);
+      const relation = points!.compareDocumentPosition(firstLabel!);
       expect(
         relation & Node.DOCUMENT_POSITION_FOLLOWING,
         'line label follows the scatter points in DOM order (foreground)',
@@ -76,13 +77,12 @@ describe('Line Labels Toggle', () => {
 
     cy.get('[data-testid="scatter-graph"] [data-testid="d3-chart-svg"]').then(($svg) => {
       const svg = $svg[0];
-      const dots = svg.querySelectorAll('.dot-group');
+      const points = svg.querySelector(CANVAS_POINT_LAYER_SELECTOR)!;
       const labels = svg.querySelectorAll('g.line-label');
       expect(labels.length, 'line labels still exist after zoom').to.be.greaterThan(0);
-      const lastDot = dots.item(dots.length - 1)!;
       const firstLabel = labels.item(0)!;
       expect(
-        lastDot.compareDocumentPosition(firstLabel) & Node.DOCUMENT_POSITION_FOLLOWING,
+        points.compareDocumentPosition(firstLabel) & Node.DOCUMENT_POSITION_FOLLOWING,
         'line label still follows the scatter points after zoom (foreground)',
       ).to.be.greaterThan(0);
     });
@@ -154,7 +154,7 @@ describe('Line Labels Toggle', () => {
     expandLegendAdvanced();
     cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
     cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
-    cy.get('[data-testid="scatter-graph"] .dot-group .point-label')
+    cy.get(`[data-testid="scatter-graph"] ${POINT_LABELS}`)
       .filter(':visible')
       .should('have.length.greaterThan', 0);
   });
@@ -169,7 +169,7 @@ describe('Line Labels Toggle', () => {
     expandLegendAdvanced();
     cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
     cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked');
-    cy.get('[data-testid="scatter-graph"] .dot-group .point-label')
+    cy.get(`[data-testid="scatter-graph"] ${POINT_LABELS}`)
       .filter(':visible')
       .should('have.length.greaterThan', 0);
   });

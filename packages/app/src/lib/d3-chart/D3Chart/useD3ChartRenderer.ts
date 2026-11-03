@@ -8,6 +8,12 @@ import {
   getTooltipContainerGeometry,
   invalidateTooltipGeometry,
 } from '../layers/scatter-points';
+import {
+  CANVAS_POINT_LAYER_SELECTOR,
+  canvasPointLayerOf,
+  type PointPositions,
+  type ScatterDatum,
+} from '../layers/canvas-points';
 import { DEFAULT_CHART_MARGIN, setupChartStructure } from '../chart-setup';
 import {
   raiseInOrder,
@@ -168,9 +174,10 @@ export function createZoomFrameBatcher(
 export interface TransitionGeometry {
   transforms: Map<SVGGElement, string>;
   paths: Map<SVGPathElement, string>;
+  points: PointPositions | null;
 }
 
-const RAISE_ORDER = ['.dot-group', '.point', '.line-label'] as const;
+const RAISE_ORDER = ['.dot-group', CANVAS_POINT_LAYER_SELECTOR, '.point', '.line-label'] as const;
 const LINE_LABEL_RAISE = ['.line-label'] as const;
 const TRANSITION_POINT_SELECTOR = '.dot-group';
 const TRANSITION_ROOFLINE_SELECTOR = '.roofline-path';
@@ -180,15 +187,27 @@ function isGeometryVisible(element: SVGElement): boolean {
   return element.style.opacity !== '0' && element.style.display !== 'none';
 }
 
-function metricGeometryVisibility<T>(layers: LayerConfig<T>[]): GeometryVisibility {
+function scatterOpacity<T>(layers: LayerConfig<T>[]) {
   const scatterLayer = layers.find((layer) => layer.type === 'scatter');
-  const getOpacity = scatterLayer?.type === 'scatter' ? scatterLayer.config.getOpacity : undefined;
+  return scatterLayer?.type === 'scatter' ? scatterLayer.config.getOpacity : undefined;
+}
+
+function metricGeometryVisibility<T>(layers: LayerConfig<T>[]): GeometryVisibility {
+  const getOpacity = scatterOpacity(layers);
   if (!getOpacity) return isGeometryVisible;
 
   return (element) =>
     element.matches('.dot-group')
       ? getOpacity(d3.select(element).datum() as Parameters<typeof getOpacity>[0]) > 0
       : isGeometryVisible(element);
+}
+
+function metricPointVisibility<T>(
+  layers: LayerConfig<T>[],
+): ((datum: ScatterDatum) => boolean) | null {
+  const getOpacity = scatterOpacity(layers);
+  if (!getOpacity) return null;
+  return (datum) => getOpacity(datum as Parameters<typeof getOpacity>[0]) > 0;
 }
 
 export function captureTransitionGeometry(
@@ -202,7 +221,11 @@ export function captureTransitionGeometry(
   group.selectAll<SVGPathElement, unknown>(TRANSITION_ROOFLINE_SELECTOR).each(function () {
     if (isGeometryVisible(this)) paths.set(this, this.getAttribute('d') || '');
   });
-  return { transforms, paths };
+  return {
+    transforms,
+    paths,
+    points: canvasPointLayerOf(group.node())?.capturePositions() ?? null,
+  };
 }
 
 export function animateTransitionGeometry(
@@ -210,8 +233,12 @@ export function animateTransitionGeometry(
   previous: TransitionGeometry | null,
   durationMs: number | undefined = 0,
   isVisible: GeometryVisibility = isGeometryVisible,
+  isPointVisible: ((datum: ScatterDatum) => boolean) | null = null,
 ): void {
   if (!previous || durationMs <= 0) return;
+  if (previous.points) {
+    canvasPointLayerOf(group.node())?.animateFrom(previous.points, durationMs, isPointVisible);
+  }
   group.selectAll<SVGGElement, unknown>(TRANSITION_POINT_SELECTOR).each(function () {
     if (!isVisible(this)) {
       d3.select(this).interrupt('data-update');
@@ -366,7 +393,15 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
             : transform.rescaleY(yScale);
         }
       }
-      renderExportChart(target, width, height, props, { xScale, yScale });
+      const exportProps = {
+        ...props,
+        layers: props.layers.map((layer) => {
+          if (layer.type !== 'scatter' || layer.renderer !== 'canvas') return layer;
+          const points = canvasPointLayerOf<(typeof layer.data)[number]>(source);
+          return points ? { ...layer, data: points.orderedLike(layer.data, layer.keyFn) } : layer;
+        }),
+      };
+      renderExportChart(target, width, height, exportProps, { xScale, yScale });
     });
   });
 
@@ -927,6 +962,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
       previousGeometry,
       transitionDuration,
       metricGeometryVisibility(layers),
+      metricPointVisibility(layers),
     );
     customLayerDisplayIdentitiesRef.current = customLayerDisplayIdentities(layers);
     lastDisplayIdentityRef.current = displayIdentity;

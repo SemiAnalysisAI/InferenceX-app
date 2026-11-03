@@ -2,16 +2,24 @@ import type { AvailabilityRow } from '@/lib/api/api';
 
 import { availabilityBody } from '../support/e2e';
 import { vrPublicationRows } from '../support/vr-publication-fixtures';
-import { assertTpuGb300Selected, interceptTpuLaunchData } from '../support/tpu-launch-fixtures';
+import {
+  assertTpuGb300Selected,
+  interceptTpuLaunchData,
+  tpuLaunchRows,
+} from '../support/tpu-launch-fixtures';
 
 const minimaxM3RubinRows = vrPublicationRows.map((row) => ({ ...row, model: 'minimaxm3' }));
 
-function interceptMinimaxM3RubinData(rows: typeof minimaxM3RubinRows = minimaxM3RubinRows): void {
+function interceptMinimaxM3RubinData(
+  rows: typeof minimaxM3RubinRows = minimaxM3RubinRows,
+  extraAvailability: readonly AvailabilityRow[] = [],
+): void {
   cy.fixture<AvailabilityRow[]>('api/availability.json').then((availability) => {
     cy.intercept('GET', '/api/v1/availability/compact', {
       body: availabilityBody([
         ...availability.filter((row) => row.model !== 'minimaxm3'),
         ...rows.map(({ metrics: _metrics, ...row }) => row),
+        ...extraAvailability,
       ]),
     });
   });
@@ -329,8 +337,11 @@ describe('landing model curation', () => {
             precision: 'fp8',
           })),
       ];
-      interceptMinimaxM3RubinData(rubinRows);
       interceptTpuLaunchData();
+      interceptMinimaxM3RubinData(
+        rubinRows,
+        tpuLaunchRows().map(({ metrics: _metrics, ...row }) => row),
+      );
       cy.visit(`${prefix}/compare`);
       cy.visit(`${prefix}${TPU_RESULTS_HREF}`);
       assertTpuView();

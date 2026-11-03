@@ -3,8 +3,9 @@ import { notFound } from 'next/navigation';
 
 import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
-import { LazyInferenceDashboard } from '@/components/inference/lazy-inference-dashboard';
-import { LazyInferencePageIntro } from '@/components/inference/lazy-inference-page-intro';
+import { InferenceProvider } from '@/components/inference/InferenceContext';
+import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
+import { InferencePageIntro } from '@/components/inference/inference-page-intro';
 import { zhAlternates, zhPath } from '@/lib/i18n/i18n';
 import { inferenceModelMetaZh } from '@/lib/routing/inference-model-meta';
 import {
@@ -43,8 +44,10 @@ export default async function ZhInferenceModelPage({ params }: Props) {
   if (!entry) notFound();
   return (
     <>
-      <LazyInferencePageIntro locale="zh" />
-      <LazyInferenceDashboard activeTab="inference" centerOnEnter />
+      <InferencePageIntro locale="zh" />
+      <InferenceProvider activeTab="inference">
+        <InferenceChartDisplay centerOnEnter />
+      </InferenceProvider>
     </>
   );
 }

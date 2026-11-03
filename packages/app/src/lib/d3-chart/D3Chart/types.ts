@@ -72,6 +72,7 @@ export interface ScatterLayerConfig<
   data: T[];
   config: ScatterPointConfig<T>;
   keyFn?: (d: T) => string;
+  renderer?: 'svg' | 'canvas';
 }
 
 export interface RadarLayerConfig<T> extends LayerBase {
@@ -186,7 +187,6 @@ export interface D3ChartHandle {
   getSvgElement: () => SVGSVGElement | null;
   getTooltipElement: () => HTMLDivElement | null;
   getScales: () => { xScale: BuiltScale; yScale: BuiltScale } | null;
-  refreshDataPositions: () => void;
 }
 
 export interface D3ChartProps<T = any> {

@@ -1,4 +1,5 @@
 import { availabilityBody } from '../support/e2e';
+import { expectHwKeyOpacity } from '../support/scatter-points';
 import {
   MODEL_SELECTION_DB_KEYS,
   modelSelectionAvailability,
@@ -198,7 +199,7 @@ describe('Per-model dashboard routes', () => {
       cy.visit(`${locale}/inference`, visitOptions);
       cy.location('pathname').should('eq', `${locale}/inference/kimi-k3`);
       cy.get('[data-testid="model-selector"]').should('contain.text', 'Kimi K3');
-      cy.get('[data-testid="scatter-graph"] svg .dot-group').should('have.length.greaterThan', 0);
+      cy.scatterPoints().should('have.length.greaterThan', 0);
     });
 
     it(`opens bare ${locale}/inference on Kimi K3 without dropping shared filters`, () => {
@@ -472,8 +473,8 @@ describe('Model-local manual legend selection', () => {
     selectModel(FLASH);
     expectSelection(['checkbox-b200_vllm', 'checkbox-gb300_vllm']);
     expectBestPerSku(true);
-    cy.get('.dot-group[data-hw-key="gb300_vllm"]').should('have.css', 'opacity', '1');
-    cy.get('.dot-group[data-hw-key="gb300_dynamo-sglang"]').should('have.css', 'opacity', '0');
+    expectHwKeyOpacity('gb300_vllm', 1);
+    expectHwKeyOpacity('gb300_dynamo-sglang', 0);
 
     selectModel(PRO);
     expectSelection(['checkbox-b200_vllm', 'checkbox-gb300_dynamo-sglang']);

@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 
-import { LazyHistoricalTrendsDashboard } from '@/components/trends/lazy-historical-trends-dashboard';
+import { InferenceProvider } from '@/components/inference/InferenceContext';
+import HistoricalTrendsDisplay from '@/components/trends/HistoricalTrendsDisplay';
 import { ZhTabIntro } from '@/components/zh/zh-tab-intro';
 import { MODEL_ROUTES, modelRoutePath, resolveModelRouteSlug } from '@/lib/routing/model-routes';
 import { modelTabCanonicalPath } from '@/lib/routing/tab-meta';
@@ -37,7 +38,9 @@ export default async function ZhHistoricalModelPage({ params }: Props) {
   const meta = MODEL_TAB_META_ZH.historical;
   return (
     <>
-      <LazyHistoricalTrendsDashboard />
+      <InferenceProvider activeTab="historical">
+        <HistoricalTrendsDisplay />
+      </InferenceProvider>
       <ZhTabIntro
         tab="historical"
         title={meta.title(resolved.route.seoName)}

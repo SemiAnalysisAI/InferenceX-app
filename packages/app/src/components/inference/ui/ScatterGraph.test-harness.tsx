@@ -6,6 +6,11 @@ import { setupChartStructure } from '@/lib/d3-chart/chart-setup';
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
 import type { BenchmarkPresenceSets } from '@/hooks/api/use-benchmark-presence';
 import { computeToggle } from '@/hooks/useTogglableSet';
+import {
+  CANVAS_POINT_LAYER_SELECTOR,
+  POINT_HIT_AREA_CLASS,
+  type CanvasPointLayerElement,
+} from '@/lib/d3-chart/layers/canvas-points';
 import type * as NextNavigation from 'next/navigation';
 
 vi.mock('@/lib/d3-chart/chart-setup', { spy: true });
@@ -206,10 +211,25 @@ export function mountChart(props?: Partial<Parameters<typeof ScatterGraph>[0]>) 
   };
 }
 
-export const dotGroups = (container: HTMLElement, hwKey?: string) =>
-  [...container.querySelectorAll<SVGGElement>('.dot-group')].filter(
-    (node) => !hwKey || node.dataset.hwKey === hwKey,
-  );
+export const scatterPoints = (container: HTMLElement, hwKey?: string) =>
+  (
+    container
+      .querySelector<CanvasPointLayerElement>(CANVAS_POINT_LAYER_SELECTOR)
+      ?.scatterPoints?.() ?? []
+  ).filter((entry) => !hwKey || entry.attrs['hw-key'] === hwKey);
+
+export function dispatchAtPoint(
+  container: HTMLElement,
+  type: 'click' | 'mousemove' | 'mouseleave',
+  target: { clientX: number; clientY: number },
+) {
+  const hitArea = container.querySelector(`.${POINT_HIT_AREA_CLASS}`)!;
+  act(() => {
+    hitArea.dispatchEvent(
+      new MouseEvent(type, { bubbles: true, clientX: target.clientX, clientY: target.clientY }),
+    );
+  });
+}
 
 export const rebuildCount = () => vi.mocked(setupChartStructure).mock.calls.length;
 

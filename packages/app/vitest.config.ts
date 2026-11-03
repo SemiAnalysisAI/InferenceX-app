@@ -20,6 +20,7 @@ export default defineConfig({
       exclude: [
         'src/lib/d3-chart/layers/scatter-points.ts',
         'src/lib/d3-chart/layers/test-helpers.ts',
+        'src/lib/d3-chart/layers/canvas-points-test-utils.ts',
         'src/lib/d3-chart/D3Chart/D3Chart.tsx',
         'src/lib/d3-chart/D3Chart/useD3ChartRenderer.ts',
         'src/lib/d3-chart/D3Chart/layer-renderer.ts',

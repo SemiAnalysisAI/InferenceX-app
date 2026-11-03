@@ -113,14 +113,16 @@ const visitHistoricalWithSetup = () => {
   cy.get('[data-testid="historical-trends-display"]').should('be.visible');
 };
 
-const asAgenticRowsOn = (rows: AvailabilityRow[], date: string) =>
-  availabilityBody(rows.map((row) => ({ ...row, benchmark_type: 'agentic_traces', date })));
+const asAgenticRowsOn = <Row extends object>(rows: Row[], date: string) =>
+  rows.map((row) => ({ ...row, benchmark_type: 'agentic_traces', date }));
 
 describe('Historical Trends AgentX P90 operating point', () => {
   it('labels P90 in English and Chinese while using the P90 rather than median curve', () => {
     const date = '2025-03-01';
     cy.fixture<AvailabilityRow[]>('api/availability.json').then((rows) => {
-      cy.intercept('GET', '**/api/v1/availability/compact', { body: asAgenticRowsOn(rows, date) });
+      cy.intercept('GET', '**/api/v1/availability/compact', {
+        body: availabilityBody(asAgenticRowsOn(rows, date)),
+      });
     });
     cy.fixture<BenchmarkRow[]>('api/benchmarks.json').then((rows) => {
       // Deliberately synthetic regression data: P90 and median must disagree.
@@ -328,10 +330,10 @@ describe('Historical Trends — Chinese route', () => {
     const runDate = '2025-03-01';
     cy.fixture<AvailabilityRow[]>('api/availability.json').then((rows) => {
       cy.intercept('GET', '**/api/v1/availability/compact', {
-        body: asAgenticRowsOn(rows, runDate),
+        body: availabilityBody(asAgenticRowsOn(rows, runDate)),
       }).as('agenticAvailability');
     });
-    cy.fixture('api/benchmarks.json').then((rows) => {
+    cy.fixture<BenchmarkRow[]>('api/benchmarks.json').then((rows) => {
       cy.intercept('GET', '**/api/v1/benchmarks?*', {
         body: asAgenticRowsOn(rows, runDate),
       }).as('agenticBenchmarks');

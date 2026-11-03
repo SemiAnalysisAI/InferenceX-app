@@ -4,6 +4,10 @@ import type { AvailabilityRow } from '@/lib/api/api';
 import { compactAvailability } from '@/lib/benchmarks/compact-availability';
 import { withSupplementalAvailability } from '@/lib/benchmarks/supplemental-benchmarks';
 
+import { registerScatterPointsQuery } from './scatter-points';
+
+registerScatterPointsQuery();
+
 let suppressLaunchModal = true;
 let suppressTelemetryTutorial = true;
 

@@ -34,7 +34,7 @@ import {
   initialCompareBenchmarkRows,
 } from '@/lib/compare/compare-page-data.server';
 
-import { LazyComparePageClient } from './lazy-page-client';
+import ComparePageClient from './page-client';
 
 export const revalidate = 86400;
 
@@ -192,7 +192,7 @@ async function CompareDetail({
     <>
       <JsonLd data={jsonLd} />
       <JsonLd data={breadcrumbJsonLd} />
-      <LazyComparePageClient
+      <ComparePageClient
         a={parsed.a}
         b={parsed.b}
         slug={canonical}

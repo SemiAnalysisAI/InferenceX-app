@@ -1,5 +1,5 @@
-import { LazyDashboardShell } from '@/components/dashboard/lazy-dashboard-shell';
+import { DashboardShell } from '@/components/dashboard/dashboard-shell';
 
 export default function ZhDashboardLayout({ children }: { children: React.ReactNode }) {
-  return <LazyDashboardShell>{children}</LazyDashboardShell>;
+  return <DashboardShell>{children}</DashboardShell>;
 }

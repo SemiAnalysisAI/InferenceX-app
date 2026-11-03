@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-import { LazyProfitEstimatorDisplay } from '@/components/calculator/lazy-calculator-displays';
+import ProfitEstimatorDisplay from '@/components/calculator/ProfitEstimatorDisplay';
 import {
   profitRouteInput,
   type ProfitRouteProps,
@@ -36,7 +36,7 @@ export default async function ZhProfitEstimatorModelPage({ params }: Props) {
   const meta = MODEL_TAB_META_ZH['profit-estimator'];
   return (
     <>
-      <LazyProfitEstimatorDisplay basis="chip-hour" routeModel={resolved.route.model} />
+      <ProfitEstimatorDisplay basis="chip-hour" routeModel={resolved.route.model} />
       <ZhTabIntro
         tab="profit-estimator"
         title={meta.title(resolved.route.seoName)}

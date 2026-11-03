@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 
-import { LazyHistoricalTrendsDashboard } from '@/components/trends/lazy-historical-trends-dashboard';
+import { InferenceProvider } from '@/components/inference/InferenceContext';
+import HistoricalTrendsDisplay from '@/components/trends/HistoricalTrendsDisplay';
 import { MODEL_ROUTES, modelRoutePath, resolveModelRouteSlug } from '@/lib/routing/model-routes';
 import { MODEL_TAB_META, modelTabMetadata } from '@/lib/routing/tab-meta';
 import { TabIntro } from '@/components/dashboard/tab-intro';
@@ -30,7 +31,9 @@ export default async function HistoricalModelPage({ params }: Props) {
   if (resolved.isAlias) permanentRedirect(modelRoutePath('historical', resolved.route.slug));
   return (
     <>
-      <LazyHistoricalTrendsDashboard />
+      <InferenceProvider activeTab="historical">
+        <HistoricalTrendsDisplay />
+      </InferenceProvider>
       <TabIntro
         tab="historical"
         title={MODEL_TAB_META.historical.title(resolved.route.seoName)}

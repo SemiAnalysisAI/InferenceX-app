@@ -28,33 +28,20 @@ describe('Custom User Values', () => {
           const val = parseFloat($input.val() as string);
           expect(val).to.be.greaterThan(0);
         });
-      cy.get('[data-testid="scatter-graph"]')
-        .first()
-        .find('svg .dot-group')
-        .should('have.length.greaterThan', 0);
+      cy.scatterPoints().should('have.length.greaterThan', 0);
     });
 
     it('re-prices the chart as a badge is edited', () => {
-      cy.get('[data-testid="scatter-graph"]')
-        .first()
-        .find('svg .dot-group')
-        .first()
-        .should(($el) => {
-          expect(($el[0] as any).__data__).to.not.equal(undefined);
-        })
-        .then(($el) => {
-          const initialY = ($el[0] as any).__data__.y;
+      cy.scatterPoints()
+        .should('have.length.greaterThan', 0)
+        .then((points) => {
+          const initialY = points[0].datum.y;
           cy.get('[data-testid="inference-tco-badge"] input[id^="cost-input-"]').each(($input) => {
             cy.wrap($input).clear().type('9999');
           });
-          cy.get('[data-testid="scatter-graph"]')
-            .first()
-            .find('svg .dot-group')
-            .first()
-            .should(($newEl) => {
-              const newY = ($newEl[0] as any).__data__.y;
-              expect(newY).to.not.equal(initialY);
-            });
+          cy.scatterPoints().should((next) => {
+            expect(next[0].datum.y).to.not.equal(initialY);
+          });
         });
     });
 
@@ -114,20 +101,10 @@ describe('Custom User Values', () => {
         });
 
       cy.get('[data-testid="custom-powers-calculate"]').click();
-      cy.get('[data-testid="scatter-graph"]')
-        .first()
-        .find('svg .dot-group')
-        .should('have.length.greaterThan', 0);
-
-      cy.get('[data-testid="scatter-graph"]')
-        .first()
-        .find('svg .dot-group')
-        .first()
-        .should(($el) => {
-          expect(($el[0] as any).__data__).to.not.equal(undefined);
-        })
-        .then(($el) => {
-          const initialY = ($el[0] as any).__data__.y;
+      cy.scatterPoints()
+        .should('have.length.greaterThan', 0)
+        .then((points) => {
+          const initialY = points[0].datum.y;
           cy.get('[data-testid="custom-powers-section"] input[id^="cost-input-"]').each(
             ($input) => {
               cy.wrap($input).clear().type('99999');
@@ -136,14 +113,9 @@ describe('Custom User Values', () => {
 
           cy.get('[data-testid="custom-powers-calculate"]').click();
 
-          cy.get('[data-testid="scatter-graph"]')
-            .first()
-            .find('svg .dot-group')
-            .first()
-            .should(($newEl) => {
-              const newY = ($newEl[0] as any).__data__.y;
-              expect(newY).to.not.equal(initialY);
-            });
+          cy.scatterPoints().should((next) => {
+            expect(next[0].datum.y).to.not.equal(initialY);
+          });
         });
     });
   });

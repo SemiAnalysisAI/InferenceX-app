@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
-import { LazyUnofficialRunProvider } from '@/providers/lazy-unofficial-run-provider';
+import { UnofficialRunProvider } from '@/providers/unofficial-run-provider';
 
 export default function ModelLayout({ children }: { children: ReactNode }) {
-  return <LazyUnofficialRunProvider>{children}</LazyUnofficialRunProvider>;
+  return <UnofficialRunProvider>{children}</UnofficialRunProvider>;
 }

@@ -162,7 +162,7 @@ describe('AgentX All in Measured chart and table', () => {
         },
       });
       cy.wait(['@agenticAvailability', '@agenticBenchmarks', '@agenticOverlay']);
-      cy.get('[data-testid="chart-figure"]').first().find('.dot-group').should('have.length', 2);
+      cy.scatterPoints('[data-testid="chart-figure"]:first').should('have.length', 2);
       cy.get('[data-testid="chart-figure"]')
         .first()
         .find('.unofficial-overlay-pt')

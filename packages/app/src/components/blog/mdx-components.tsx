@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { slugify } from '@/lib/blog/blog';
 import figureDimensions from '@/lib/blog/figure-dimensions.json';
 import type { Locale } from '@/lib/i18n/i18n';
+import { HardwareChart } from '@/components/blog/blog-hardware-chart-lazy';
 import { HeadingLink } from '@/components/blog/heading-link';
 import { ThemedFigureImage } from '@/components/blog/themed-figure-image';
 import { JsonLd } from '@/components/seo/json-ld';
@@ -212,6 +213,7 @@ export function createMdxComponents(
       </div>
     ),
     Blur,
+    HardwareChart,
     DashboardCTA: (props: { href?: string; children?: ReactNode }) => {
       const defaultHref =
         locale === 'zh'
