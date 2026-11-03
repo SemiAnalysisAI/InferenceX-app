@@ -37,30 +37,6 @@ describe('buildSupporterGroups', () => {
     ]);
   });
 
-  it('preserves static Other logos and appends unplaced quotes without duplicating a seeded org', () => {
-    const groups = buildSupporterGroups(
-      [quote('WEKA', 'weka.svg'), quote('Stanford', 'stanford.svg')],
-      [
-        {
-          id: 'other',
-          label: { en: 'Other', zh: '其他' },
-          logos: [
-            { label: 'TokenSpeed', logo: 'tokenspeed.webp' },
-            { label: 'WEKA', logo: 'weka.svg', quoteOrg: 'WEKA' },
-          ],
-        },
-        ...curated,
-      ],
-    );
-
-    expect(groups.map((group) => group.id)).toEqual(['labs', 'other']);
-    expect(groups[1].logos).toEqual([
-      { label: 'TokenSpeed', logo: 'tokenspeed.webp' },
-      { label: 'WEKA', logo: 'weka.svg', quoteOrg: 'WEKA' },
-      { label: 'Stanford', logo: 'stanford.svg', quoteOrg: 'Stanford' },
-    ]);
-  });
-
   it('omits Other when no remaining logos exist', () => {
     expect(buildSupporterGroups([quote('OpenAI', 'openai.svg')], curated)).toEqual(curated);
     expect(buildSupporterGroups([], [])).toEqual([]);

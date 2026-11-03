@@ -171,11 +171,11 @@ describe('QuotesContent', () => {
 
 describe('QuotesContent supporter logo wall', () => {
   const groupIds = [
+    'ai-accelerators',
     'chinese-frontier-labs',
     'us-frontier-labs',
     'hyperscalers-neoclouds',
     'open-source',
-    'ai-accelerators',
     'other',
   ];
 
@@ -184,6 +184,16 @@ describe('QuotesContent supporter logo wall', () => {
     cy.get('[data-testid="supporter-logo-wall"] h3').should('have.length', groupIds.length);
     for (const id of groupIds) cy.get(`[data-testid="supporter-group-${id}"]`).should('exist');
     cy.get('[data-testid="supporter-group-other"] h3').should('have.text', 'Other');
+    cy.get('[data-testid="supporter-logo-wall"] h3').should(($headings) => {
+      expect([...$headings].map((heading) => heading.textContent)).to.deep.equal([
+        'AI Accelerators',
+        'Chinese Frontier Labs',
+        'US Frontier Labs & NeoLabs',
+        'Hyperscalers & Neoclouds',
+        'Open Source',
+        'Other',
+      ]);
+    });
 
     cy.mount(<QuotesContent locale="zh" />);
     cy.get('[data-testid="supporter-group-other"] h3').should('have.text', '其他');
@@ -192,6 +202,10 @@ describe('QuotesContent supporter logo wall', () => {
       '中国前沿实验室',
     );
     cy.get('button[aria-label="查看 OpenAI 的评价"]').should('exist');
+    cy.get('[data-testid="supporter-group-us-frontier-labs"] h3').should(
+      'have.text',
+      '美国前沿实验室与 NeoLabs',
+    );
   });
 
   it('shows supporter logos in full color and loads each image', () => {
@@ -273,16 +287,32 @@ describe('QuotesContent supporter logo wall', () => {
         const top = Math.round(li.getBoundingClientRect().top);
         rows.set(top, (rows.get(top) ?? 0) + 1);
       }
-      expect([...rows.values()]).to.deep.equal([6, 6]);
+      expect([...rows.values()]).to.deep.equal([7, 7]);
     });
     cy.get('[data-testid="supporter-group-other"]').within(() => {
-      cy.get('img[alt="TokenSpeed"]').should('be.visible');
-      cy.get('img[alt="Periodic Labs"]').should('be.visible');
       cy.get('img[alt="Supermicro"]').should('be.visible');
       cy.get('li').should(($lis) => {
         const rows = new Set([...$lis].map((li) => Math.round(li.getBoundingClientRect().top)));
         expect(rows.size).to.be.greaterThan(1);
       });
     });
+    cy.get('[data-testid="supporter-logo-wall"] img[alt="TokenSpeed"]').should('not.exist');
+    cy.get('[data-testid="supporter-group-us-frontier-labs"]').within(() => {
+      for (const alt of ['Prime Intellect', 'Adaptive ML', 'Periodic Labs']) {
+        cy.get(`img[alt="${alt}"]`).should('be.visible');
+      }
+    });
+    cy.get('[data-testid="supporter-group-hyperscalers-neoclouds"]').within(() => {
+      for (const alt of ['Core42', 'Verda']) cy.get(`img[alt="${alt}"]`).should('be.visible');
+    });
+    cy.get('[data-testid="supporter-group-open-source"] img[alt="Red Hat"]').should('be.visible');
+    cy.get('[data-testid="supporter-logo-wall"]')
+      .find('[data-testid^="supporter-group-"]')
+      .first()
+      .should('have.attr', 'data-testid', 'supporter-group-ai-accelerators');
+    cy.get('[data-testid="supporter-group-ai-accelerators"] li')
+      .last()
+      .find('img')
+      .should('have.attr', 'alt', 'SambaNova');
   });
 });
