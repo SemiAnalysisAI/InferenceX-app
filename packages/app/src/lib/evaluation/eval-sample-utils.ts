@@ -11,9 +11,15 @@ export function extractDemonstrations(argumentsData: unknown): Demonstration[] |
   const genArgs = obj.gen_args_0;
   if (!genArgs || typeof genArgs !== 'object') return null;
   const argSlot = (genArgs as Record<string, unknown>).arg_0;
-  let serialized: string | null = null;
-  if (typeof argSlot === 'string') serialized = argSlot;
-  else if (Array.isArray(argSlot) && typeof argSlot[0] === 'string') serialized = argSlot[0];
+  if (typeof argSlot === 'string') return parseDemonstrations(argSlot);
+  if (Array.isArray(argSlot) && typeof argSlot[0] === 'string') {
+    return parseDemonstrations(argSlot[0]);
+  }
+  return null;
+}
+
+/** Few-shot pairs from lm-eval's serialized chat prompt (`gen_args_0.arg_0`). */
+export function parseDemonstrations(serialized: string | null): Demonstration[] | null {
   if (!serialized) return null;
 
   let parsed: unknown;

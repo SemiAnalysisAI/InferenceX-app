@@ -1,6 +1,11 @@
 import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
+import {
+  buildTokenLengthSketch,
+  mergeTokenLengthSketches,
+} from '@semianalysisai/inferencex-constants';
+
 import type { DbClient } from '../connection.js';
 import { REQUEST_TIMELINE_VERSION, type RequestTimeline } from '../etl/compute-request-timeline';
 import { gunzipRequestTimeline } from '../etl/request-timeline-codec';
@@ -8,9 +13,13 @@ import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
 
 import {
   _resetWriteBackWarned,
+  SEQUENCE_LENGTH_SKETCHES_VERSION,
+  sequenceLengthSketchColumns,
+  STATS_VERSION,
   writeBackRequestTimeline,
   writeBackTraceReplayJsonb,
 } from './agentic-shared';
+import { getResidentSequenceLengthSketches } from './resident-sequence-lengths';
 
 function mockSql(reject?: Error): {
   sql: DbClient;
@@ -32,21 +41,13 @@ afterEach(() => {
 describe('writeBackTraceReplayJsonb', () => {
   it('issues a fixed-column UPDATE binding the payload as ::jsonb + the id', () => {
     const { sql, calls } = mockSql();
-    writeBackTraceReplayJsonb(sql, 'chart_series', 870, { version: 12, foo: 'bar' });
+    writeBackTraceReplayJsonb(sql, 'aggregate_stats', 870, { version: 12, foo: 'bar' });
 
     expect(calls).toHaveLength(1);
-    expect(calls[0]!.text).toContain('update agentic_trace_replay set chart_series');
-    expect(calls[0]!.text).toContain('::jsonb where id');
-    expect(calls[0]!.values).toEqual([{ version: 12, foo: 'bar' }, 870]);
-  });
-
-  it('targets the requested column verbatim (no cross-talk between columns)', () => {
-    const cases: ('aggregate_stats' | 'chart_series')[] = ['aggregate_stats', 'chart_series'];
-    for (const column of cases) {
-      const { sql, calls } = mockSql();
-      writeBackTraceReplayJsonb(sql, column, 1, { v: 1 });
-      expect(calls[0]!.text).toContain(`update agentic_trace_replay set ${column}`);
-    }
+    expect(calls[0]!.text).toContain('update agentic_trace_replay set aggregate_stats');
+    expect(calls[0]!.text).toContain('sequence_length_sketches_version');
+    // Stats without current sequence-length sketches clear the compact columns.
+    expect(calls[0]!.values).toEqual([{ version: 12, foo: 'bar' }, null, null, 870]);
   });
 
   it('no-ops on a null/undefined payload (never overwrites good data with a hole)', () => {
@@ -60,15 +61,84 @@ describe('writeBackTraceReplayJsonb', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { sql } = mockSql(new Error('cannot execute UPDATE in a read-only transaction'));
 
-    expect(() => writeBackTraceReplayJsonb(sql, 'chart_series', 1, { v: 1 })).not.toThrow();
-    expect(() => writeBackTraceReplayJsonb(sql, 'chart_series', 2, { v: 1 })).not.toThrow();
+    expect(() => writeBackTraceReplayJsonb(sql, 'aggregate_stats', 1, { v: 1 })).not.toThrow();
+    expect(() => writeBackTraceReplayJsonb(sql, 'aggregate_stats', 2, { v: 1 })).not.toThrow();
 
     await new Promise((resolve) => {
       setTimeout(resolve, 0);
     });
 
     expect(warn).toHaveBeenCalledTimes(1);
-    expect(warn.mock.calls[0]![0]).toContain('could not persist chart_series');
+    expect(warn.mock.calls[0]![0]).toContain('could not persist aggregate_stats');
+  });
+});
+
+describe('writeBackTraceReplayJsonb sequence length sketches (PostgreSQL)', () => {
+  const sequenceLengths = {
+    isl: buildTokenLengthSketch([0, 900, 30_000]),
+    osl: buildTokenLengthSketch([40, 41]),
+  };
+
+  let db: PGlite;
+  let pg: PgliteSql;
+
+  async function storedVersion(): Promise<unknown> {
+    const [row] = await pg`
+      select sequence_length_sketches_version from agentic_trace_replay where id = 880
+    `;
+    return row?.sequence_length_sketches_version;
+  }
+
+  beforeAll(async () => {
+    db = await migratedPglite();
+    pg = pgliteSql(db);
+    const stale = sequenceLengthSketchColumns({
+      version: STATS_VERSION,
+      sequenceLengths: { isl: buildTokenLengthSketch([5]) },
+    });
+    await pg`
+      insert into agentic_trace_replay (id, aggregate_stats, sequence_length_sketches, sequence_length_sketches_version)
+      values (880, '{}'::jsonb, ${stale.sketches}, ${stale.version})
+    `;
+    await db.exec('set session_replication_role = replica');
+    await pg`
+      insert into benchmark_results
+        (id, workflow_run_id, config_id, benchmark_type, date, isl, osl, conc, metrics, trace_replay_id)
+      values (88, 1, 1, 'agentic_traces', '2026-01-01', 1, 1, 1, '{}'::jsonb, 880)
+    `;
+    await db.exec('set session_replication_role = origin');
+  }, 30_000);
+
+  afterAll(async () => {
+    await db?.close();
+  });
+
+  it('rewrites the compact sketches with current stats and clears them with stale ones', async () => {
+    writeBackTraceReplayJsonb(pg, 'aggregate_stats', 880, {
+      version: STATS_VERSION,
+      sequenceLengths,
+    });
+    await vi.waitFor(async () => {
+      expect(await storedVersion()).toBe(SEQUENCE_LENGTH_SKETCHES_VERSION);
+    });
+    await expect(getResidentSequenceLengthSketches(pg, [88])).resolves.toEqual({
+      isl: mergeTokenLengthSketches([sequenceLengths.isl]),
+      osl: mergeTokenLengthSketches([sequenceLengths.osl]),
+      coveredPoints: 1,
+      requestedPoints: 1,
+    });
+
+    writeBackTraceReplayJsonb(pg, 'aggregate_stats', 880, {
+      version: STATS_VERSION - 1,
+      sequenceLengths,
+    });
+    await vi.waitFor(async () => {
+      expect(await storedVersion()).toBeNull();
+    });
+    await expect(getResidentSequenceLengthSketches(pg, [88])).resolves.toMatchObject({
+      isl: null,
+      coveredPoints: 0,
+    });
   });
 });
 

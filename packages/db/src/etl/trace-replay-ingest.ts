@@ -5,11 +5,21 @@ import { createGzip, gzipSync } from 'node:zlib';
 import type postgres from 'postgres';
 
 import { PROFILE_INLINE_BYTES, writeTraceProfileChunks } from '../lib/trace-profile-storage';
+import {
+  SEQUENCE_LENGTH_SKETCHES_VERSION,
+  sequenceLengthSketchColumns,
+} from '../queries/agentic-shared.js';
+import {
+  REQUEST_CHART_DATA_VERSION,
+  requestChartDataFromTimelineGz,
+} from '../queries/request-chart-data.js';
 
 import { updateAtomKvCachePoolTokens } from './atom-kv-capacity.js';
+import { CHART_SERIES_SUMMARY_VERSION, encodeChartSeriesSummary } from './chart-series-summary.js';
 import { REQUEST_TIMELINE_VERSION } from './compute-request-timeline.js';
 import { computeTraceDerivedPayloads } from './compute-trace-derived.js';
 import { fullResponseMetricsFromGzip } from './full-response-interactivity.js';
+import { encodeRequestChartColumns } from './request-chart-columns.js';
 import { gzipRequestTimeline } from './request-timeline-codec.js';
 import type { ServerMetricsContext } from './server-metrics-adapters';
 
@@ -30,7 +40,9 @@ type TraceReplayUploadField =
   | 'server_metrics_json_gz'
   | 'aggregate_stats'
   | 'chart_series'
-  | 'request_timeline_gz';
+  | 'chart_series_summary_gz'
+  | 'request_timeline_gz'
+  | 'request_chart_data_gz';
 
 export interface TraceReplayIngestOptions {
   metricsContext?: ServerMetricsContext;
@@ -45,8 +57,14 @@ export interface PreparedTraceReplay {
   serverMetricsJsonGz: Buffer | null;
   serverMetricsJsonSize: number | null;
   aggregateStatsJson: Buffer | null;
+  /** `sequenceLengthSketchColumns` of the aggregate stats, null when they keep only the JSON. */
+  sequenceLengthSketches: Buffer | null;
   chartSeriesJson: Buffer | null;
+  /** `encodeChartSeriesSummary` of `chartSeriesJson`. */
+  chartSeriesSummaryGz: Buffer | null;
   requestTimelineGz: Buffer | null;
+  /** `encodeRequestChartColumns` of what the chart route derives from `requestTimelineGz`. */
+  requestChartDataGz: Buffer | null;
   chartWindows: number;
   timelineRequests: number;
   compressionMs: number;
@@ -173,6 +191,15 @@ export async function prepareTraceReplay(
   const { aggregateStats, chartSeries, requestTimeline, atomKvCacheBlocks } =
     await computeTraceDerivedPayloads(profile.data, metricsJson.data, metricsContext);
   const requestTimelineGz = requestTimeline ? await gzipRequestTimeline(requestTimeline) : null;
+  // Derived from the stored bytes, not the in-memory timeline, so the columns
+  // match what the chart route would parse out of `request_timeline_gz`.
+  const requestChartDataGz = requestTimelineGz
+    ? encodeRequestChartColumns(await requestChartDataFromTimelineGz(requestTimelineGz))
+    : null;
+  const chartSeriesJson = jsonBuffer(chartSeries);
+  const chartSeriesSummaryGz = chartSeriesJson
+    ? encodeChartSeriesSummary(chartSeriesJson.toString('utf8'))
+    : null;
   const computeMs = Date.now() - computeStart;
   const fullResponseMetrics = fullResponseMetricsFromGzip(profile.data);
 
@@ -184,8 +211,11 @@ export async function prepareTraceReplay(
     serverMetricsJsonGz: metricsJson.data,
     serverMetricsJsonSize: metricsJson.sourceSize,
     aggregateStatsJson: jsonBuffer(aggregateStats),
-    chartSeriesJson: jsonBuffer(chartSeries),
+    sequenceLengthSketches: sequenceLengthSketchColumns(aggregateStats).sketches,
+    chartSeriesJson,
+    chartSeriesSummaryGz,
     requestTimelineGz,
+    requestChartDataGz,
     chartWindows: chartSeries?.timeslicesCount ?? 0,
     timelineRequests: requestTimeline?.requests.length ?? 0,
     compressionMs,
@@ -240,8 +270,11 @@ export async function persistPreparedTraceReplay(
     serverMetricsJsonGz,
     serverMetricsJsonSize,
     aggregateStatsJson,
+    sequenceLengthSketches,
     chartSeriesJson,
+    chartSeriesSummaryGz,
     requestTimelineGz,
+    requestChartDataGz,
     timelineRequests,
     cacheHitRates,
     fullResponseMetrics,
@@ -278,7 +311,9 @@ export async function persistPreparedTraceReplay(
       ['server_metrics_json_gz', serverMetricsJsonGz],
       ['aggregate_stats', aggregateStatsJson],
       ['chart_series', chartSeriesJson],
+      ['chart_series_summary_gz', chartSeriesSummaryGz],
       ['request_timeline_gz', requestTimelineGz],
+      ['request_chart_data_gz', requestChartDataGz],
     ];
     for (const [field, payload] of payloads) {
       const uploadStart = Date.now();
@@ -300,9 +335,15 @@ export async function persistPreparedTraceReplay(
         server_metrics_json_uncompressed_size,
         aggregate_stats,
         chart_series,
+        chart_series_summary_gz,
+        chart_series_summary_version,
         request_timeline_gz,
         request_timeline_version,
-        request_count
+        request_count,
+        request_chart_data_gz,
+        request_chart_data_version,
+        sequence_length_sketches,
+        sequence_length_sketches_version
       )
       values (
         (
@@ -336,10 +377,24 @@ export async function persistPreparedTraceReplay(
         (
           select string_agg(data, ''::bytea order by part)
           from pg_temp.trace_replay_upload_parts
+          where field = 'chart_series_summary_gz'
+        ),
+        ${chartSeriesSummaryGz ? CHART_SERIES_SUMMARY_VERSION : null},
+        (
+          select string_agg(data, ''::bytea order by part)
+          from pg_temp.trace_replay_upload_parts
           where field = 'request_timeline_gz'
         ),
         ${requestTimelineGz ? REQUEST_TIMELINE_VERSION : null},
-        ${requestTimelineGz ? timelineRequests : null}
+        ${requestTimelineGz ? timelineRequests : null},
+        (
+          select string_agg(data, ''::bytea order by part)
+          from pg_temp.trace_replay_upload_parts
+          where field = 'request_chart_data_gz'
+        ),
+        ${requestChartDataGz ? REQUEST_CHART_DATA_VERSION : null},
+        ${sequenceLengthSketches},
+        ${sequenceLengthSketches ? SEQUENCE_LENGTH_SKETCHES_VERSION : null}
       )
       returning id
     `;

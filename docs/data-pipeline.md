@@ -23,8 +23,8 @@ there are no duplicated metric-specific columns on `benchmark_results` or
 `benchmark_results.date`, `workflow_runs.date`, and the `availability` table all store denormalized date values (derived from `workflow_runs.created_at`). This avoids JOINs in the hottest queries:
 
 - `getLatestBenchmarks` orders candidate line snapshots by `date`, `run_started_at`,
-  and workflow-run ID before applying the append-only curve rules. Keeping `date`
-  on each benchmark row avoids another join in that base-table scan.
+  and workflow-run ID before applying the append-only curve rules. The stored curve
+  lines (below) carry `date` from the benchmark rows.
 - `availability` is a separate denormalized table because the date-picker query (`SELECT DISTINCT model, date`) needs to be fast without scanning benchmark_results.
 
 ### Why a Materialized View (latest_benchmarks)
@@ -36,10 +36,31 @@ when every line both contain keeps its image; an AgentX curve spans AGG/disagg a
 offload lines that may run different images, matching InferenceX's append-only check. Point
 identity within that snapshot remains config, scenario, sequence, offload mode,
 recipe fingerprint, and concurrency. API routes use the view when no date filter is
-specified; date-filtered requests use the same `benchmark_curve_runs` view and
-`benchmark_curve_scope` function and compute the line images inline.
+specified. Date-filtered, run and history requests apply the same rules to the
+stored curve lines at read time.
 
 `REFRESH CONCURRENTLY` allows reads during refresh (no downtime). The trade-off is a brief window where the view is stale after ingest, which is acceptable because ingests are infrequent.
+
+### Stored Curve Lines (`benchmark_curve_run_lines`, migration 023)
+
+Every curve read starts from one row per workflow run, date and curve scope: its
+images, the image of each AGG/disagg and offload line (`line_images`), and the ids of
+the run's successful points in that scope (`point_ids`). Migration 023 stores these
+rows. Readers join them to `latest_workflow_runs`, so attempts, start times and
+`append_only` stay live. Statement-level triggers on `benchmark_results` (insert,
+update, delete, truncate) and `configs` (update) rebuild the rows of each run a
+statement touches, so every writer keeps them exact, manual SQL included. Updates
+that leave the line inputs unchanged (metrics, power audits, links) rebuild nothing.
+Readers rank a model's lines instead of aggregating every one of its result rows,
+then join the selected point ids to `benchmark_results` by primary key. The refresh
+of `latest_benchmarks` reads the same rows. `benchmark_curve_runs` keeps its
+migration 014 columns over the stored lines. Results break ORDER BY ties by point
+identity, so their bytes do not depend on the query plan.
+
+Apply migration 023 before deploying readers that use it, as with 016. To check the
+stored rows against the results, compare `benchmark_curve_run_lines` before and after
+`select refresh_benchmark_curve_run_lines(array(select id from workflow_runs))`,
+which rebuilds every run.
 
 ### Why Idempotent Ingestion
 
@@ -411,6 +432,24 @@ character slices, and the API returns at most 50 match contexts rather than tran
 complete file. The overlap preserves literal matches that cross a slice boundary. Files are
 processed sequentially so a multinode bundle cannot materialize every large log in one query.
 
+#### Block storage (migration 021)
+
+A TOAST-compressed text value decompresses from its start, so reading 1 MiB near the end of a
+700 MB log took 4-9 s. With migration 021 a file can also be stored in `server_log_blocks` as
+independently brotli-compressed blocks of 1 Mi code points (about 24x smaller than the text
+column), and a row in `server_log_block_files` marks the file as block-backed once all its blocks
+exist. Readers use the blocks for marked files and the text columns otherwise, with identical
+results: offsets still count code points, and search keeps the slice loop above, so matches and
+their context are clipped to each slice exactly as before. A chunk read touches only the blocks
+it overlaps (about 100 ms at any offset). Each block also stores a bloom filter of the
+case-folded 1-3 grams of its text plus the next 255 code points. Search asks PostgreSQL which
+blocks may hold every gram of the term (`get_bit`), skips slices without such blocks, and
+decompresses only the candidate blocks and the context around a match.
+
+`SERVER_LOG_BLOCKS=1` makes ingest write blocks next to the text columns.
+`bun run admin:db:compact-server-logs` (`--log-id`, `--limit`, `--dry-run`) converts
+existing files, reading each file's text in ranges of 64 blocks.
+
 ### Agentic Dataset Provenance
 
 AIPerf exports public-dataset provenance in `metadata.dataset`, including the Hugging Face dataset ID. InferenceX preserves that object as `dataset` on each agentic aggregate benchmark row. During benchmark ingest, `ingest-ci-run.ts` derives the dashboard slug from `hf_dataset_name` (for example, `semianalysisai/cc-traces-weka-062126` becomes `cc-traces-weka-062126`) and upserts `run_datasets` for the workflow run.
@@ -460,9 +499,14 @@ reads more TOAST chunks than one `substring()` slice needs.
 
 Ingest workers and the backfill stream the JSON text into gzip, so neither
 holds the serialized document. Readers pick a path from the scalar columns
-without detoasting a payload. A current gzip timeline is read in 16 MiB
-`substring()` slices (about 32 MiB each once Neon hex-encodes them) and
-concatenated. `request-timeline` returns the whole document, so it decompresses
+without detoasting a payload. A current gzip timeline is read in 4 MiB
+`substring()` slices, four in flight, each selected as base64 text (about
+5.6 MB on the wire instead of 8 MiB of bytea hex, and no bytea parsing in the
+Neon driver, whose parser calls the deprecated `Buffer()` constructor). Every
+slice re-checks the version and `octet_length`. On the fork, streaming a 52 MB
+timeline took 8.7 to 11.8 s in sequential 1 MiB hex reads and 2.3 to 2.8 s this
+way.
+`request-timeline` returns the whole document, so it decompresses
 and parses all of it. `request-chart-data` and `trace-histograms` need a few
 fields per request and follow the bounded decode convention of
 `etl/gzip-json-stream.ts`: a timeline of up to 16 MiB of JSON is parsed in one
@@ -474,6 +518,44 @@ read (the value changed during the read, corrupt gzip, or malformed JSON) is
 logged with its `trace_replay_id` and served as missing data. When no current
 timeline is stored, the slow path recomputes it from the profile and writes
 back only the gzip form.
+
+Both routes first try `request_chart_data_gz` (migration 024), the exact
+`request-chart-data` payload stored column by column
+(`etl/request-chart-columns.ts`). Dictionaries and header numbers are stored as
+is. Each tuple column is a varint stream: indices plainly, timings and lengths
+as zigzag deltas, and TTFT/TPOT as integer microseconds whose division by 1000
+reproduces the stored millisecond value bit for bit. A column whose values do
+not round-trip that way falls back to raw doubles, so decoding always returns
+the same JSON. Ingest and `db:backfill-request-chart-data` derive the columns
+from the stored gzip bytes through the same scan the routes use, and
+`request_chart_data_version` (the `REQUEST_CHART_DATA_VERSION` they were built
+with) must match. The columns are about a fifth of the timeline's size. Up to
+4 MiB they come back inline with the metadata query; larger ones use the same
+parallel slices. `trace-histograms` decodes only the ISL and OSL columns and
+reads up to four points at once. On the fork, the 52 MB timeline's chart data
+took 17.5 s to read and scan and 1.4 s from its 9.6 MB of columns. Its
+histogram took 14.5 s and 1.8 s. Every writer of `request_timeline_gz` writes or clears the
+columns, and the backfill writes only while the timeline's length and MD5 still
+match the bytes it read. Unreadable columns are logged and the route falls back
+to the timeline.
+
+`resident-sequence-lengths` merges the ISL and OSL token-length sketches of up to
+200 chart points per request. In `aggregate_stats.sequenceLengths` each sketch is
+a dense JSON count array, about 20 KB per trace row for the pair, so the route
+used to read about 4 MB from Neon to add up integers. Migration 026 adds
+`sequence_length_sketches`, the same pair as zlib-deflated varint runs of zero
+and nonzero bins (`etl/sequence-length-sketch-codec.ts`), about 1.3 KB per row.
+The route reads it as base64 when `sequence_length_sketches_version` (the
+`SEQUENCE_LENGTH_SKETCHES_VERSION` it was built with, which embeds
+`STATS_VERSION`) matches, and merges the counts straight from the bytes into one
+array per side. Other rows send their JSON sketches as before, and a payload
+that cannot be decoded is logged and replaced by its row's JSON. Only sketches
+that `mergeTokenLengthSketches` would merge, with integer fields up to 2^32, are
+encoded, so the merged result is the same JSON either way. Every writer of
+`aggregate_stats` (ingest, `db:backfill-aggregate-stats` and the route
+write-backs) writes or clears both columns in the same statement, and
+`db:backfill-sequence-length-sketches` fills existing rows, writing only while
+the MD5 of the `aggregate_stats` it read still matches.
 
 Rows ingested before migration 017 keep their JSONB timeline until it is
 converted, and readers fall back to it whenever `request_timeline_gz` is null.
@@ -548,6 +630,25 @@ charts do not consume. The Timeline view also virtualizes rows, so the number of
 SVG bar/link nodes is bounded by the scroll viewport rather than total request
 count.
 
+`trace-server-metrics` reads `chart_series_summary_gz` (migration 025), gzip
+JSON of exactly the series fields the route returns. That is the aggregate
+series, the per-worker KV overlay averaged from each source's ranks, and the
+source descriptors (`etl/chart-series-summary.ts`). `chart_series` repeats every
+series once per metric source, so deriving the payload read the whole JSONB.
+On the fork the largest point shipped 47 MB from Neon for a 6 MB response and
+took 2.5 s. Its summary is 1.2 MB, read inline as base64 in 129 ms. The summary
+is built from the series as jsonb returns it. Numbers keep their decimal value
+and object keys take jsonb's order (shorter keys first, then bytewise), so the
+response bytes match the derived ones (436 of 436 fork points, including the 40
+largest). `chart_series_summary_version` embeds `CHART_SERIES_VERSION`. Every
+writer of `chart_series` (ingest, `db:backfill-chart-series`, the route's
+self-heal) writes both columns in one statement, and
+`db:backfill-chart-series-summary` fills rows whose `chart_series` is current,
+writing only while its MD5 still matches the text it read. Rows without a
+current summary, or with one over 32 MiB, are derived from `chart_series` as
+before. A change to the overlay or the payload's series fields bumps
+`SUMMARY_FORMAT`.
+
 ### Schema Version Detection
 
 `mapBenchmarkRow()`, `mapEvalRow()`, and `mapAggEvalRow()` all use
@@ -615,7 +716,7 @@ Producers (`aggregate_power.py`) annotate every aggregate result row with two op
 
 `mapBenchmarkRow()` narrows them defensively (`extractPowerInvalidReasons` / `extractPowerAudit`): reason codes must match `/^[a-z][a-z0-9_]*$/` (≤ 64 chars, deduplicated, capped at 32), audit numerics must be finite (counts: non-negative safe integers), shas collapse to `null` unless a non-empty string ≤ 128 chars, and unknown audit keys are dropped. A failed `benchmark_outcome.status` is rejected as a performance point, retaining its original artifact as evidence. An empty result maps to `undefined`, so the dedicated `benchmark_results.power_invalid_reasons` / `power_audit` JSONB columns (migration 015, mirroring the `workers` precedent from migration 006) store SQL NULL — never `[]` or `{}`. Legacy artifacts without the fields flow through every layer as NULL/undefined.
 
-Reads are **permanently tolerant**: `queries/benchmarks.ts` selects the columns as `to_jsonb(br) -> 'power_invalid_reasons'` (and `lb` on the matview branch) rather than bare column references. A bare reference fails during query planning until the next ingest workflow applies the migration, because migrations run in the ingest workflows rather than at Vercel deploy. The key lookup degrades to NULL while the column is missing and is byte-identical once it exists, making deploy order irrelevant.
+`queries/benchmarks.ts` selects the columns directly. Its readers need migration 023, which runs after 015, so the columns always exist when those reads run.
 
 ### PowerX Telemetry Storage (`gpu_metric_*`, migration 016)
 
@@ -713,6 +814,26 @@ backfills; it rewrites only missing or stale rows (`--run-id ID --force` for one
 run). The format-version test fails when a transform file changes without updating
 the recorded version and fingerprint.
 
+#### Compressed sample blobs (`gpu_metric_sample_blobs`, migration 022)
+
+Each series can also store its samples as one brotli-compressed columnar blob
+(`packages/db/src/lib/gpu-sample-blob.ts`). `loadSeriesDetails` reads a series from
+its blob when the row's `format_version` is `GPU_SAMPLE_BLOB_FORMAT_VERSION` and its
+`ingested_at` equals the series' `ingested_at`, and from `gpu_metric_samples`
+otherwise, so a missing or stale blob is slower, never wrong. The encoder takes the
+rows as the SQL read returns them and refuses any value it cannot decode back
+identically (float4 values are rebuilt as the shortest decimal PostgreSQL prints),
+and every writer compares the decoded blob with those rows before storing it.
+`gpu_metric_samples` stays the source of truth. Edit samples only through ingest,
+which restamps `ingested_at`.
+
+Ingest writes the blob in the sample transaction when `GPU_SAMPLE_BLOBS=1`; leave it
+unset until migration 022 is applied on the target. Run
+`bun run admin:db:backfill-gpu-sample-blobs --yes` once after migration 022 and after
+bumping `GPU_SAMPLE_BLOB_FORMAT_VERSION` (`--run-id ID`, `--limit N` and `--force`
+narrow or redo it). `bun run admin:db:verify-gpu-sample-blobs --limit N` compares
+blob and row reads of N random points, row for row, and prints sizes and timings.
+
 ### Per-run ingest report
 
 `admin:db:ingest:ci` writes `INGEST_REPORT_OUTPUT` (JSON, `packages/db/src/etl/ingest-run-report.ts`)
@@ -725,6 +846,12 @@ files, purged points, missing siblings, telemetry not collected), `unmapped` and
 write or telemetry errors). For
 dispatched merge ingests it also sends `ingest-results-completed` to `BENCHMARK_REPO`, whose
 `ingest-results-callback` workflow comments the counts on the merged PR.
+
+A dispatched ingest whose artifacts come from the dispatching run first polls that run every 10 s
+until GitHub reports it completed, for at most 300 s, and then proceeds either way.
+`admin:db:prepare:ci` downloads the planned artifacts eight at a time, starting them in name order,
+and starts no new download after one fails its three attempts. `admin:db:verify` runs after cache
+invalidation, warmup and the PowerX check, so its whole-database counts never delay fresh data.
 
 ### PowerX publication receipts
 
@@ -758,7 +885,8 @@ ledger edits trigger the existing reviewed override workflow.
 ### Serving large request timelines
 
 The request-timeline API streams current-version `request_timeline_gz` directly
-in bounded 1 MiB database reads. It preserves every request and the existing JSON
-contract and CDN headers, without expanding the full document or putting it through
-the parsed-object Blob cache. Reads follow response backpressure and stop on
-cancellation. Legacy or stale timelines use the existing computation/cache path.
+in bounded 4 MiB database reads, four in flight. It preserves every request and
+the existing JSON contract and CDN headers, without expanding the full document
+or putting it through the parsed-object Blob cache. Reads stay at most four
+slices ahead of the response and stop on cancellation. Legacy or stale
+timelines use the existing computation/cache path.

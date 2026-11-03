@@ -352,6 +352,8 @@ const TRACE_REPLAY_PAYLOADS = [
   'server_metrics_csv',
   'server_metrics_json_gz',
   'request_timeline_gz',
+  'request_chart_data_gz',
+  'chart_series_summary_gz',
   'aggregate_stats',
   'chart_series',
   'request_timeline',
@@ -366,6 +368,8 @@ const BINARY_PAYLOADS: Record<string, true> = {
   server_metrics_csv: true,
   server_metrics_json_gz: true,
   request_timeline_gz: true,
+  request_chart_data_gz: true,
+  chart_series_summary_gz: true,
 };
 /** Matches `TRACE_REPLAY_UPLOAD_CHUNK_BYTES` and the 018 chunk-table check. */
 const PAYLOAD_CHUNK_BYTES = 4 * 1024 * 1024;

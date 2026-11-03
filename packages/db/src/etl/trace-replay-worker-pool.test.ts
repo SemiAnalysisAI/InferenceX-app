@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { gunzipSync } from 'node:zlib';
+import { gunzipSync, inflateSync } from 'node:zlib';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -100,10 +100,19 @@ function fingerprint(prepared: PreparedTraceReplay) {
       : null,
     serverMetricsJsonSize: prepared.serverMetricsJsonSize,
     aggregateStatsJson: sha256(prepared.aggregateStatsJson),
+    sequenceLengthSketchesRaw: prepared.sequenceLengthSketches
+      ? sha256(inflateSync(prepared.sequenceLengthSketches))
+      : null,
     chartSeriesJson: sha256(prepared.chartSeriesJson),
+    chartSeriesSummaryRaw: prepared.chartSeriesSummaryGz
+      ? sha256(gunzipSync(prepared.chartSeriesSummaryGz))
+      : null,
     requestTimelineGz: sha256(prepared.requestTimelineGz),
     requestTimelineRaw: prepared.requestTimelineGz
       ? sha256(gunzipSync(prepared.requestTimelineGz))
+      : null,
+    requestChartDataRaw: prepared.requestChartDataGz
+      ? sha256(gunzipSync(prepared.requestChartDataGz))
       : null,
     chartWindows: prepared.chartWindows,
     timelineRequests: prepared.timelineRequests,

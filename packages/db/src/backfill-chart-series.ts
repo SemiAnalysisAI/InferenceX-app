@@ -1,5 +1,9 @@
 import { hasNoSslFlag } from './cli-utils.js';
 import {
+  CHART_SERIES_SUMMARY_VERSION,
+  encodeChartSeriesSummary,
+} from './etl/chart-series-summary.js';
+import {
   CHART_SERIES_VERSION,
   computeChartSeries,
   type ChartSeries,
@@ -7,7 +11,6 @@ import {
 import { createAdminSql } from './etl/db-utils.js';
 import { cacheHitRatesFromChartSeries, writeCacheHitMetrics } from './etl/trace-replay-ingest.js';
 import {
-  jsonbParam,
   parseLimitForceFlags,
   parseRunIdFlag,
   requireBackfillPayload,
@@ -118,9 +121,12 @@ async function main(): Promise<void> {
         'hostKvCacheUsage',
       ]);
 
+      const json = JSON.stringify(series);
       await sql`
         update agentic_trace_replay
-        set chart_series = ${jsonbParam(sql, series)}
+        set chart_series = ${json}::jsonb,
+            chart_series_summary_gz = ${encodeChartSeriesSummary(json)},
+            chart_series_summary_version = ${CHART_SERIES_SUMMARY_VERSION}
         where id = ${id}
           and coalesce((chart_series->>'version')::int, -1) <= ${CHART_SERIES_VERSION}
       `;

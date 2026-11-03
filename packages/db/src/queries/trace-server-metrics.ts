@@ -3,13 +3,21 @@
  * KV utilization, prefix-cache hit rate, queue depth, prefill + decode TPS,
  * and per-source prompt-token counts.
  *
- * Backed by `agentic_trace_replay.chart_series` (pre-computed at ingest
- * time, see `etl/compute-chart-series.ts`). The fast path is a single SQL
- * row read; the slow path re-computes from `server_metrics_json_gz` and is
- * only taken when the column is missing or the stored
- * `CHART_SERIES_VERSION` is stale (the backfill script should drain that).
+ * Backed by `agentic_trace_replay.chart_series_summary_gz`, the route's
+ * series fields precomputed from `chart_series` at ingest (see
+ * `etl/chart-series-summary.ts`). Rows without a current summary derive it
+ * from `chart_series` in SQL and JS as before, and rows whose
+ * `CHART_SERIES_VERSION` is stale re-compute it from `server_metrics_json_gz`
+ * (the backfill scripts drain both).
  */
 
+import {
+  CHART_SERIES_SUMMARY_VERSION,
+  decodeChartSeriesSummary,
+  summarizeChartSeries,
+  type KvMetricSource,
+  type MetricSourceDescriptor,
+} from '../etl/chart-series-summary';
 import {
   CHART_SERIES_VERSION,
   computeChartSeries,
@@ -20,8 +28,9 @@ import {
 } from '../etl/compute-chart-series';
 
 import type { DbClient } from '../connection.js';
-import { writeBackTraceReplayJsonb } from './agentic-shared';
+import { writeBackChartSeries } from './agentic-shared';
 
+export type { MetricSourceDescriptor } from '../etl/chart-series-summary';
 export type {
   MetricSourceSeries,
   QueueDepthPoint,
@@ -34,9 +43,11 @@ export type {
 const POINT_META_VERSION = 6;
 export const TRACE_SERVER_METRICS_VERSION = CHART_SERIES_VERSION * 100 + POINT_META_VERSION;
 
-export interface MetricSourceDescriptor {
-  source: MetricSourceSeries['source'];
-}
+/**
+ * Summaries up to this size come back inline as base64 (about 43 MiB), under
+ * Neon's 64 MiB response cap. Larger ones take the `chart_series` path.
+ */
+const INLINE_SUMMARY_BYTES = 32 * 1024 * 1024;
 
 export interface PointMeta {
   id: number;
@@ -123,15 +134,11 @@ export interface TraceServerMetrics {
   metricSources: MetricSourceDescriptor[];
 }
 
-type ChartSeriesSummary = Omit<ChartSeries, 'metricSources'> & {
-  metricSources: MetricSourceDescriptor[];
-};
-
-type KvMetricSource = Pick<MetricSourceSeries, 'source' | 'kvCacheUsage' | 'kvCacheUsageByEngine'>;
-
 interface RawMetaRow extends PointMeta {
   trace_replay_id: number | null;
   has_blob: boolean;
+  /** Base64 `chart_series_summary_gz` when it is current; the other series columns are then empty. */
+  summary_gz: string | null;
   chart_series: Omit<ChartSeries, 'metricSources'> | null;
   metric_sources: KvMetricSource[];
   /** Derived from startup logs, plus allocated block counts for ATOM. */
@@ -183,148 +190,22 @@ function buildMeta(row: RawMetaRow): PointMeta {
   };
 }
 
-function merge(
-  meta: PointMeta,
-  series: Omit<ChartSeries, 'metricSources'>,
-  kvCachePoolTokens: number | null,
-  metricSources: MetricSourceDescriptor[],
-): TraceServerMetrics {
-  return {
-    meta,
-    kvCachePoolTokens,
-    startNs: series.startNs,
-    endNs: series.endNs,
-    durationS: series.durationS,
-    timeslicesCount: series.timeslicesCount,
-    kvCacheUsage: series.kvCacheUsage,
-    prefixCacheHitRate: series.prefixCacheHitRate,
-    queueDepth: series.queueDepth,
-    promptTokensBySource: series.promptTokensBySource,
-    prefillTps: series.prefillTps,
-    decodeTps: series.decodeTps,
-    // v2 chart_series rows pre-backfill don't have this field — default to []
-    prefixCacheHitsTps: series.prefixCacheHitsTps ?? [],
-    hostKvCacheUsage: series.hostKvCacheUsage ?? [],
-    // v8+ field; older chart_series rows lack it → omit per-engine overlay.
-    kvCacheUsageByEngine: series.kvCacheUsageByEngine ?? [],
-    // v9+ field; old rows are served without a source selector until backfilled.
-    metricSources,
-  };
-}
-
-/** Mean of several engine series, matched on scrape instant. */
-function meanOfEngines(engines: readonly { points: TimeSeriesPoint[] }[]): TimeSeriesPoint[] {
-  const active = engines.filter((engine) => engine.points.length > 0);
-  if (active.length === 0) return [];
-  if (active.length === 1) return active[0]!.points;
-  // Engines inside one worker are scraped together, so they share instants and
-  // a pointwise mean is exact. A `t` only some of them reported averages those,
-  // rather than counting the absent ones as zero.
-  const byT = new Map<number, { sum: number; n: number }>();
-  for (const engine of active) {
-    for (const point of engine.points) {
-      const at = byT.get(point.t);
-      if (at) {
-        at.sum += point.value;
-        at.n++;
-      } else {
-        byT.set(point.t, { sum: point.value, n: 1 });
-      }
-    }
-  }
-  return [...byT.entries()]
-    .toSorted((a, b) => a[0] - b[0])
-    .map(([t, { sum, n }]) => ({ t, value: sum / n }));
-}
-
-/**
- * All-endpoints KV overlay: one line per WORKER, averaged over the ranks it
- * owns.
- *
- * `chart_series.kvCacheUsageByEngine` is per rank, which stops being readable
- * on a PD-disaggregated run — 6 prefill workers at DP4 plus a decode worker is
- * 28 lines, and ranks inside one worker track each other closely, so the
- * comparison worth seeing is worker-vs-worker.
- *
- * Derived here rather than in the ETL because everything it needs is already
- * stored: each source carries its own per-rank breakdown, and this layer is
- * the last place that sees it before `metricSources` is trimmed to
- * descriptors. Keeping it out of `chart_series` means no version bump and no
- * backfill for what is a presentation choice.
- *
- * Returns null when collapsing would not help — a single worker, or a run with
- * no per-source data, keeps the per-rank overlay, which is exactly where rank
- * skew is the signal.
- */
-function collapseKvByWorker(
-  sources: readonly KvMetricSource[],
-): { engineLabel: string; points: TimeSeriesPoint[] }[] | null {
-  if (sources.length < 2) return null;
-  const entries = sources
-    .map((entry) => ({
-      source: entry.source,
-      // Single-pool workers intentionally omit the per-engine array because
-      // it would duplicate their aggregate line. Preserve that worker when a
-      // sibling with multiple ranks makes the all-endpoints collapse useful.
-      engines:
-        entry.kvCacheUsageByEngine?.length > 0
-          ? entry.kvCacheUsageByEngine
-          : entry.kvCacheUsage.length > 0
-            ? [{ points: entry.kvCacheUsage }]
-            : [],
-    }))
-    .filter((entry) => entry.engines.length > 0);
-  if (entries.length < 2) return null;
-  // Already one engine per worker — nothing to average, so leave the stored
-  // labels alone rather than relabelling for no gain.
-  const totalEngines = entries.reduce((sum, entry) => sum + entry.engines.length, 0);
-  if (totalEngines <= entries.length) return null;
-
-  const workersPerRole = new Map<string, number>();
-  for (const { source } of entries) {
-    workersPerRole.set(source.role, (workersPerRole.get(source.role) ?? 0) + 1);
-  }
-  const used = new Set<string>();
-  return entries.map(({ source, engines }, index) => {
-    const worker = source.workerId;
-    const short = worker && worker.length > 4 ? worker.slice(-4) : worker;
-    // Qualify by worker only when the role actually has several, so a lone
-    // decode worker reads "decode" rather than "decode 0842".
-    const base =
-      (workersPerRole.get(source.role) ?? 0) > 1 && short
-        ? `${source.role} ${short}`
-        : (source.role ?? short ?? `#${index}`);
-    let label = base;
-    for (let n = 2; used.has(label); n++) label = `${base} #${n}`;
-    used.add(label);
-    return { engineLabel: label, points: meanOfEngines(engines) };
-  });
-}
-
-function summarizeSeries(
-  series: Omit<ChartSeries, 'metricSources'>,
-  sources: readonly KvMetricSource[],
-): ChartSeriesSummary {
-  return {
-    ...series,
-    kvCacheUsageByEngine: collapseKvByWorker(sources) ?? series.kvCacheUsageByEngine ?? [],
-    metricSources: sources.map(({ source }) => ({ source })),
-  };
-}
-
 export async function getTraceServerMetrics(
   sql: DbClient,
   benchmarkResultId: number,
 ): Promise<TraceServerMetrics | null> {
+  // A current summary replaces both jsonb expressions, so `chart_series`
+  // (up to 14 MB compressed) is neither decompressed nor rebuilt.
   const rows = (await sql`
     select
       br.trace_replay_id,
       (atr.server_metrics_json_gz is not null) as has_blob,
+      case when summary.is_current then encode(atr.chart_series_summary_gz, 'base64') end as summary_gz,
       case
-        when atr.chart_series is null then null
+        when summary.is_current or atr.chart_series is null then null
         else atr.chart_series - 'metricSources'
       end as chart_series,
-      coalesce((
+      case when summary.is_current then '[]'::jsonb else coalesce((
         select jsonb_agg(jsonb_build_object(
           'source', metric_source->'source',
           'kvCacheUsage', coalesce(metric_source->'kvCacheUsage', '[]'::jsonb),
@@ -336,7 +217,7 @@ export async function getTraceServerMetrics(
         from jsonb_array_elements(
           coalesce(atr.chart_series->'metricSources', '[]'::jsonb)
         ) as metric_source
-      ), '[]'::jsonb) as metric_sources,
+      ), '[]'::jsonb) end as metric_sources,
       br.id, c.hardware, c.framework, c.model, c.precision, c.spec_method,
       c.disagg, c.is_multinode,
       c.prefill_tp, c.prefill_ep, c.prefill_dp_attention, c.prefill_num_workers,
@@ -359,6 +240,13 @@ export async function getTraceServerMetrics(
     join configs c on c.id = br.config_id
     join workflow_runs wr on wr.id = br.workflow_run_id
     left join agentic_trace_replay atr on atr.id = br.trace_replay_id
+    cross join lateral (
+      select coalesce(
+        atr.chart_series_summary_version = ${CHART_SERIES_SUMMARY_VERSION}
+          and octet_length(atr.chart_series_summary_gz) <= ${INLINE_SUMMARY_BYTES},
+        false
+      ) as is_current
+    ) summary
     where br.id = ${benchmarkResultId}
   `) as unknown as RawMetaRow[];
   const row = rows[0];
@@ -368,10 +256,19 @@ export async function getTraceServerMetrics(
   const kvCachePoolTokens =
     row.kv_cache_pool_tokens === null ? null : Number(row.kv_cache_pool_tokens);
 
-  // Fast path: pre-computed chart_series at the current version.
+  if (row.summary_gz !== null) {
+    return {
+      meta,
+      kvCachePoolTokens,
+      ...decodeChartSeriesSummary(Buffer.from(row.summary_gz, 'base64')),
+    };
+  }
   if (row.chart_series && Number(row.chart_series.version) === CHART_SERIES_VERSION) {
-    const summary = summarizeSeries(row.chart_series, row.metric_sources);
-    return merge(meta, summary, kvCachePoolTokens, summary.metricSources);
+    return {
+      meta,
+      kvCachePoolTokens,
+      ...summarizeChartSeries(row.chart_series, row.metric_sources),
+    };
   }
 
   // Slow path only: fetch the large raw blob after establishing that the
@@ -394,14 +291,13 @@ export async function getTraceServerMetrics(
   });
   if (!series) return null;
 
-  // Self-heal the stored chart_series so the next request takes the fast path
-  // instead of re-decompressing this (tens-of-MB) blob. `series` is complete
-  // and stamped at CHART_SERIES_VERSION here; fire-and-forget and best-effort
-  // (no-ops on a read-only replica). trace_replay_id is non-null on this path.
-  writeBackTraceReplayJsonb(sql, 'chart_series', row.trace_replay_id, series);
+  // Self-heal the stored chart_series and its summary so the next request
+  // takes the fast path instead of re-decompressing this (tens-of-MB) blob.
+  // `series` is complete and stamped at CHART_SERIES_VERSION here.
+  // Fire-and-forget and best-effort (no-ops on a read-only replica).
+  writeBackChartSeries(sql, row.trace_replay_id, series);
 
-  const summary = summarizeSeries(series, series.metricSources);
-  return merge(meta, summary, kvCachePoolTokens, summary.metricSources);
+  return { meta, kvCachePoolTokens, ...summarizeChartSeries(series, series.metricSources) };
 }
 
 interface RawMetricSourceRow {
@@ -454,6 +350,6 @@ export async function getTraceServerMetricSource(
     disagg: row.disagg,
   });
   if (!series) return null;
-  writeBackTraceReplayJsonb(sql, 'chart_series', row.trace_replay_id, series);
+  writeBackChartSeries(sql, row.trace_replay_id, series);
   return series.metricSources.find(({ source }) => source.id === sourceId) ?? null;
 }
