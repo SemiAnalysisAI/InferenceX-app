@@ -984,6 +984,19 @@ describe('GET /api/unofficial-run', () => {
     expect(body.benchmarks).toHaveLength(1);
   });
 
+  it('sends plain JSON without Vary so the CDN keeps one entry per run', async () => {
+    mockRunWithBenchmarks('completed');
+    const res = await GET(
+      new NextRequest('http://localhost/api/unofficial-run?runId=123', {
+        headers: { 'Accept-Encoding': 'gzip, deflate, br, zstd' },
+      }),
+    );
+    expect(res.headers.get('Content-Encoding')).toBeNull();
+    expect(res.headers.get('Vary')).toBeNull();
+    const body = await res.json();
+    expect(body.benchmarks).toHaveLength(1);
+  });
+
   it.each(['in_progress', 'queued', null])(
     'caches a %s run for 30 seconds only',
     async (status) => {
