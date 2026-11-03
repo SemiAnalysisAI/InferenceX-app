@@ -11,7 +11,7 @@ import {
   useInferenceDisplay,
   useInferenceFilters,
 } from '@/components/inference/InferenceContext';
-import { useGlobalFilterSelection } from '@/providers/GlobalFilterContext';
+import { useGlobalFilterActions, useGlobalFilterSelection } from '@/providers/GlobalFilterContext';
 import { useInterpolatedTrendData } from '@/components/inference/hooks/useInterpolatedTrendData';
 import type { TrendLineConfig } from '@/components/inference/types';
 import ChartControls from '@/components/inference/ui/ChartControls';
@@ -127,7 +127,12 @@ function historicalRunDate(date: string, locale: 'en' | 'zh'): string {
 export default function HistoricalTrendsDisplay() {
   const [chartView, setChartView] = useState<'line' | 'waterfall'>('line');
   const PerformanceChart = chartView === 'waterfall' ? ImprovementWaterfallChart : TrendChart;
-  const { tcoBasis } = useGlobalFilterSelection();
+  const { tcoBasis, chipBasis } = useGlobalFilterSelection();
+  const { setChipBasis } = useGlobalFilterActions();
+  const chipBasisControl = useMemo(
+    () => ({ value: chipBasis, onChange: setChipBasis, source: 'historical' }),
+    [chipBasis, setChipBasis],
+  );
   const locale = useLocale();
   const t = STRINGS[locale];
   const { graphs, loading, error, hardwareConfig, hwTypesWithData, availableDates } =
@@ -213,6 +218,7 @@ export default function HistoricalTrendsDisplay() {
     tokenRevenuePricing,
     enabled: hasInteractivityChart,
     tcoBasis,
+    chipBasis,
   });
 
   const activeHwKeys = useMemo(() => [...activeHwTypes], [activeHwTypes]);
@@ -493,6 +499,7 @@ export default function HistoricalTrendsDisplay() {
                       includeAllPowerThroughputMetrics={false}
                       includePowerThroughputCaveat={false}
                       tcoBasis={tcoBasis}
+                      chipBasis={chipBasisControl}
                     />
                     <UnofficialDomainNotice />
                   </>

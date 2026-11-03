@@ -17,6 +17,7 @@ export const VIEW_QUERY_PARAMS = {
     'unofficialrun',
   ],
   calculator: [
+    'chipBasis',
     'costProvider',
     'costType',
     'costcap',
@@ -75,6 +76,7 @@ export const VIEW_QUERY_PARAMS = {
   ],
   evaluation: ['unofficialrun', 'benchmark', 'date', 'format', 'gpus', 'model', 'precisions'],
   'first-token': [
+    'chipBasis',
     'caps',
     'costProvider',
     'costType',
@@ -124,6 +126,7 @@ export const VIEW_QUERY_PARAMS = {
   ],
   'gpu-specs': ['format', 'metric'],
   historical: [
+    'chipBasis',
     'chart',
     'deployment',
     'end',
@@ -142,6 +145,7 @@ export const VIEW_QUERY_PARAMS = {
     'vendors',
   ],
   inference: [
+    'chipBasis',
     'topologies',
     'allPoints',
     'best',

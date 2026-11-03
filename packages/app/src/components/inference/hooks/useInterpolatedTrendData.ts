@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+import { DEFAULT_CHIP_BASIS, type ChipBasis } from '@/lib/benchmarks/chip-basis';
 import { sequenceToIslOsl } from '@semianalysisai/inferencex-constants';
 
 import { resolveMetricConfigKey } from '@/components/inference/metric-registry';
@@ -35,6 +36,7 @@ interface UseInterpolatedTrendDataParams {
   tokenRevenuePricing?: TokenRevenuePricing | null;
   enabled: boolean;
   tcoBasis?: TcoBasis;
+  chipBasis?: ChipBasis;
 }
 
 interface UseInterpolatedTrendDataResult {
@@ -55,6 +57,7 @@ export function useInterpolatedTrendData({
   tokenRevenuePricing = NORMALIZED_TOKEN_REVENUE_PRICING,
   enabled,
   tcoBasis = DEFAULT_TCO_BASIS,
+  chipBasis = DEFAULT_CHIP_BASIS,
 }: UseInterpolatedTrendDataParams): UseInterpolatedTrendDataResult {
   const seqIslOsl = useMemo(() => sequenceToIslOsl(selectedSequence), [selectedSequence]);
 
@@ -80,6 +83,7 @@ export function useInterpolatedTrendData({
         requestedMetrics,
         tokenRevenuePricing,
         tcoBasis,
+        chipBasis,
       }),
     [
       allRows,
@@ -88,6 +92,7 @@ export function useInterpolatedTrendData({
       requestedMetrics,
       tokenRevenuePricing,
       tcoBasis,
+      chipBasis,
     ],
   );
 

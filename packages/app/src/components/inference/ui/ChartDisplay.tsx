@@ -39,7 +39,7 @@ import {
   useInferenceDisplay,
   useInferenceFilters,
 } from '@/components/inference/InferenceContext';
-import { useGlobalFilterSelection } from '@/providers/GlobalFilterContext';
+import { useGlobalFilterActions, useGlobalFilterSelection } from '@/providers/GlobalFilterContext';
 import type {
   AggDataEntry,
   ChartDefinition,
@@ -516,7 +516,12 @@ export default function ChartDisplay({
     activeOverlayHwTypes,
     localOfficialOverride,
   } = useUnofficialRun();
-  const { tcoBasis } = useGlobalFilterSelection();
+  const { tcoBasis, chipBasis } = useGlobalFilterSelection();
+  const { setChipBasis } = useGlobalFilterActions();
+  const chipBasisControl = useMemo(
+    () => ({ value: chipBasis, onChange: setChipBasis, source: 'inference' }),
+    [chipBasis, setChipBasis],
+  );
 
   const overlayDataByChartType = useMemo(() => {
     if (!unofficialRunInfo || !getOverlayData) {
@@ -524,12 +529,19 @@ export default function ChartDisplay({
     }
 
     const overlayTokenBasis = tokenBasisForMetric(selectedYAxisMetric, tokenBasis);
-    const e2eRaw = getOverlayData(selectedModel, selectedSequence, 'e2e', overlayTokenBasis);
+    const e2eRaw = getOverlayData(
+      selectedModel,
+      selectedSequence,
+      'e2e',
+      overlayTokenBasis,
+      chipBasis,
+    );
     const interactivityRaw = getOverlayData(
       selectedModel,
       selectedSequence,
       'interactivity',
       overlayTokenBasis,
+      chipBasis,
     );
 
     const getRunForRow = (row: InferenceData) => {
@@ -639,6 +651,7 @@ export default function ChartDisplay({
     tokenRevenuePricing,
     tcoBasis,
     tokenBasis,
+    chipBasis,
     compareGpuPair,
   ]);
 
@@ -1358,6 +1371,7 @@ export default function ChartDisplay({
                               activeHwKeys={captionHwKeys}
                               userCosts={userCosts}
                               renderCostBadges={renderInferenceTcoBadges}
+                              chipBasis={chipBasisControl}
                             />
                           )}
                           {powerXLayout &&

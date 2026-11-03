@@ -56,6 +56,10 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     'internal (default) or external. Applies the same configured owning/rental cost basis as the UI.',
     'internal（默认）或 external，使用与界面相同的自有或租赁成本口径。',
   ],
+  chipBasis: [
+    'pool (default) or total. Chips that divide disaggregated input and output throughput and every metric derived from them: pool uses prefill chips for input and decode chips for output; total uses every chip in the deployment, the basis aggregated configs and tput_per_gpu always use. Aggregated rows are identical under both.',
+    'pool（默认）或 total，指定分离式配置的输入、输出吞吐量及其派生指标所除的芯片数：pool 下输入按预填充芯片、输出按解码芯片计；total 按部署中的芯片总数计，与聚合配置及 tput_per_gpu 口径一致。聚合配置在两种口径下结果相同。',
+  ],
   unofficialrun: [
     'Up to eight comma-separated public CI run IDs. Surrounding whitespace and duplicates are removed; run indices follow the remaining order. Overlay sources remain separate from official data.',
     '最多八个公开 CI 运行 ID，以逗号分隔。去除各项首尾空白和重复 ID 后，按剩余顺序分配运行索引。叠加结果与官方数据分开。',

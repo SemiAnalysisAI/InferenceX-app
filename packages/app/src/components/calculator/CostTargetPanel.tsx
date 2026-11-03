@@ -60,6 +60,8 @@ const STRINGS = {
     note: 'Note:',
     disaggFleet:
       ' Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo TRTLLM) report input and output throughput per prefill chip and per decode chip rather than per chip overall, so the interactivity a cost ceiling permits inherits that per-pool basis on the Input and Output token types. On Total it is per chip overall for both kinds.',
+    disaggFleetTotal:
+      ' Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo TRTLLM) have their input and output throughput divided by every chip in the deployment, prefill plus decode, so the interactivity a cost ceiling permits is per chip overall for both kinds on every token type.',
     assumptions: (tier: string) =>
       `Assumes 100% utilization at the answering operating point and owned-datacenter economics at the ${tier} tier. Concurrent users, when shown, is re-based onto chips overall.`,
     source: 'Source: ',
@@ -87,6 +89,8 @@ const STRINGS = {
     note: '注：',
     disaggFleet:
       ' 分离式推理配置（如 MoRI SGLang、Dynamo TRTLLM）的输入与输出吞吐量分别按预填充芯片与解码芯片报告，而非按芯片总数，因此在「输入」与「输出」token 类型下，成本上限所允许的交互性沿用了上述按池计的口径。在「总计」口径下，两种部署方式均按芯片总数计。',
+    disaggFleetTotal:
+      ' 分离式推理配置（如 MoRI SGLang、Dynamo TRTLLM）的输入与输出吞吐量按部署中的芯片总数（预填充芯片 + 解码芯片）计算，因此在所有 token 类型下，成本上限所允许的交互性对两种部署方式均按芯片总数计。',
     assumptions: (tier: string) =>
       `假设在给出结果的运行点上利用率为 100%，并采用 ${tier} 层级的自有数据中心经济模型。如显示并发用户数，则已改按芯片总数计。`,
     source: '来源：',
@@ -126,7 +130,7 @@ export default function CostTargetPanel({
   mwInput,
   onMwInputChange,
 }: CostTargetPanelProps) {
-  const { tcoBasis } = useGlobalFilterSelection();
+  const { tcoBasis, chipBasis } = useGlobalFilterSelection();
   const locale = useLocale();
   const t = STRINGS[locale];
 
@@ -316,9 +320,16 @@ export default function CostTargetPanel({
                     analyticsPrefix="calculator_costcap_table"
                   />
                   {hasDisagg && (
-                    <p className="text-muted-foreground text-xs border-l-2 border-amber-500 pl-2 bg-amber-500/5 py-1">
+                    <p
+                      data-testid="calculator-costcap-disagg-note"
+                      className={`text-muted-foreground text-xs border-l-2 pl-2 py-1 ${
+                        chipBasis === 'total'
+                          ? 'border-sky-500 bg-sky-500/5'
+                          : 'border-amber-500 bg-amber-500/5'
+                      }`}
+                    >
                       <strong>{t.note}</strong>
-                      {t.disaggFleet}
+                      {chipBasis === 'total' ? t.disaggFleetTotal : t.disaggFleet}
                     </p>
                   )}
                   <p className="text-xs text-muted-foreground mt-3">

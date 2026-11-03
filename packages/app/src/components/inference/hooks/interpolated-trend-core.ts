@@ -5,6 +5,7 @@ import {
   reciprocalMetricAt,
   recoverReciprocalNumerator,
 } from '@/components/calculator/interpolation';
+import { DEFAULT_CHIP_BASIS, withChipBasis, type ChipBasis } from '@/lib/benchmarks/chip-basis';
 import {
   isBenchmarkMetricKey,
   tokenMetricTypeForConfigKey,
@@ -60,8 +61,9 @@ export function rowToLightweightPoint(
   requestedMetrics: readonly DerivedMetricKey[],
   tokenRevenuePricing: TokenRevenuePricing | null = NORMALIZED_TOKEN_REVENUE_PRICING,
   tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
+  chipBasis: ChipBasis = DEFAULT_CHIP_BASIS,
 ): InferenceData | null {
-  const entry = rowToAggDataEntry(row);
+  const entry = rowToAggDataEntry(withChipBasis(row, chipBasis));
   const hwKey = getHardwareKey(entry);
   // Historical rows predating explicit output-throughput telemetry used total
   // throughput as output throughput. Preserve that production fallback for
@@ -339,6 +341,8 @@ function extractMetric(point: InferenceData, metricKey: YAxisMetricKey): number 
 
 export interface GroupTrendRowsOptions {
   readonly tcoBasis?: TcoBasis;
+  /** Which chips divide disaggregated input/output throughput. Defaults to per pool. */
+  readonly chipBasis?: ChipBasis;
   readonly selectedPrecisions: readonly string[];
   readonly selectedYAxisMetric: string;
   readonly requestedMetrics: readonly DerivedMetricKey[];
@@ -381,6 +385,7 @@ export function groupTrendRowsByDate(
       requestedMetrics,
       tokenRevenuePricing,
       options.tcoBasis,
+      options.chipBasis,
     );
     if (!point) continue;
 

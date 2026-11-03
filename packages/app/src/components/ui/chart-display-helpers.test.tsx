@@ -1,11 +1,19 @@
 // @vitest-environment jsdom
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
 
+const mocks = vi.hoisted(() => ({ locale: 'en' as 'en' | 'zh', track: vi.fn() }));
+vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => mocks.locale }));
+vi.mock('@/lib/analytics/analytics', async (importOriginal) => ({
+  ...(await importOriginal<typeof analytics>()),
+  track: mocks.track,
+}));
+
 import { ChartShareActions, MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
+import type * as analytics from '@/lib/analytics/analytics';
 import { getGpuSpecs } from '@/lib/catalog/constants';
 
 let container: HTMLDivElement;
@@ -26,6 +34,8 @@ function getVisibleCaveatText() {
 }
 
 beforeEach(() => {
+  mocks.locale = 'en';
+  mocks.track.mockClear();
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -314,5 +324,83 @@ describe('MetricAssumptionNotes', () => {
       'calculate Joules per decode chip or per prefill chip',
     );
     expect(getVisibleCaveatText()).toContain('direct Joules per token comparison');
+  });
+});
+
+function control(value: 'pool' | 'total', onChange = vi.fn()) {
+  return { value, onChange, source: 'inference' };
+}
+
+describe('MetricAssumptionNotes — chip basis toggle', () => {
+  const visibleNote = () =>
+    [...container.querySelectorAll('div.max-h-40 p')].map((p) => p.textContent ?? '').join(' ');
+  const toggle = () => container.querySelector('[data-testid="chip-basis-toggle"]');
+
+  it.each([
+    'y_outputTputPerGpu',
+    'y_inputTputPerGpu',
+    'y_costhOutput',
+    'y_inputTokensPerDollarR',
+    'y_outputTputPerMw',
+    'y_jOutput',
+    'y_jInput',
+  ])('offers the toggle on %s, which divides input or output throughput', (metric) => {
+    renderUi(<MetricAssumptionNotes selectedYAxisMetric={metric} chipBasis={control('pool')} />);
+    expect(toggle()).not.toBeNull();
+    expect(visibleNote()).toContain('per decode chip or per prefill chip');
+  });
+
+  it.each(['y_tpPerGpu', 'y_costh', 'y_jTotal', 'y_tpPerMw'])(
+    'keeps the toggle off %s, which is per total chip already',
+    (metric) => {
+      renderUi(<MetricAssumptionNotes selectedYAxisMetric={metric} chipBasis={control('pool')} />);
+      expect(toggle()).toBeNull();
+    },
+  );
+
+  it('describes the total basis as apples-to-apples', () => {
+    renderUi(
+      <MetricAssumptionNotes
+        selectedYAxisMetric="y_outputTputPerGpu"
+        chipBasis={control('total')}
+      />,
+    );
+    expect(visibleNote()).toContain('per total chip count (prefill plus decode chips)');
+    expect(visibleNote()).toContain('the output throughput comparison is apples-to-apples');
+    expect(visibleNote()).not.toContain('not an apples-to-apples');
+  });
+
+  it('switches the basis and tracks the change', () => {
+    const onChange = vi.fn();
+    renderUi(
+      <MetricAssumptionNotes
+        selectedYAxisMetric="y_outputTputPerGpu"
+        chipBasis={control('pool', onChange)}
+      />,
+    );
+    const total = container.querySelector<HTMLButtonElement>('[data-testid="chip-basis-total"]');
+    act(() => total!.click());
+    expect(onChange).toHaveBeenCalledWith('total');
+    expect(mocks.track).toHaveBeenCalledWith('chip_basis_changed', {
+      basis: 'total',
+      source: 'inference',
+    });
+  });
+
+  it('renders Chinese copy for both bases', () => {
+    mocks.locale = 'zh';
+    renderUi(
+      <MetricAssumptionNotes
+        selectedYAxisMetric="y_outputTputPerGpu"
+        chipBasis={control('total')}
+      />,
+    );
+    expect(visibleNote()).toContain('按芯片总数（预填充芯片 + 解码芯片）计算');
+    expect(container.querySelector('[data-testid="chip-basis-pool"]')?.textContent).toBe(
+      '按预填充/解码芯片',
+    );
+    expect(container.querySelector('[data-testid="chip-basis-total"]')?.textContent).toBe(
+      '按芯片总数',
+    );
   });
 });

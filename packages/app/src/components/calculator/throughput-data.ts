@@ -1,5 +1,6 @@
 import { rowToSequence } from '@semianalysisai/inferencex-constants';
 
+import { DEFAULT_CHIP_BASIS, withChipBasis, type ChipBasis } from '@/lib/benchmarks/chip-basis';
 import type { AggDataEntry, HardwareConfig } from '@/components/inference/types';
 import type { BenchmarkRow } from '@/lib/api/api';
 import { rowToAggDataEntry } from '@/lib/benchmarks/benchmark-transform';
@@ -180,6 +181,8 @@ export function buildGpuGroups<M extends GroupMeta>(
     /** Token basis selected by the consumer; applies to official and overlay rows. */
     tokenType?: CostType;
     tcoBasis?: TcoBasis;
+    /** Which chips divide disaggregated input/output throughput. Defaults to per pool. */
+    chipBasis?: ChipBasis;
     /** Derive a row's group key + metadata. Return null to drop the row. */
     classify: (hwKey: string, row: BenchmarkRow) => { key: string; meta: M } | null;
   },
@@ -194,6 +197,7 @@ export function buildGpuGroups<M extends GroupMeta>(
     percentile = Percentile.P90,
     tokenType = 'total',
     tcoBasis = DEFAULT_TCO_BASIS,
+    chipBasis = DEFAULT_CHIP_BASIS,
     classify,
   } = options;
   const grouped: Record<string, GPUDataPoint[]> = {};
@@ -216,7 +220,10 @@ export function buildGpuGroups<M extends GroupMeta>(
 
     if (!hwConfigMap[hwKey]) hwConfigMap[hwKey] = { ...hwConfig, name: hwKey };
 
-    const m = row.metrics;
+    // Callers match `row` by identity (classify, sourceRow), so only the rates
+    // read the rescaled copy.
+    const ratedRow = withChipBasis(row, chipBasis);
+    const m = ratedRow.metrics;
     const tput = m.tput_per_gpu ?? 0;
     const outputTput = m.output_tput_per_gpu ?? tput;
     const inputTput = m.input_tput_per_gpu ?? 0;
@@ -226,7 +233,7 @@ export function buildGpuGroups<M extends GroupMeta>(
       Number.isFinite(m.theoretical_cache_hit_rate)
         ? Math.max(0, Math.min(1, m.theoretical_cache_hit_rate))
         : null;
-    const tokenShare = inputTokenShare(row, inputTput, outputTput);
+    const tokenShare = inputTokenShare(ratedRow, inputTput, outputTput);
     const specs = getGpuSpecs(hwKey, tcoBasis);
     const power = specs.power;
 

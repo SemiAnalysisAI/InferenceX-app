@@ -871,6 +871,60 @@ describe('rowToAggDataEntry — agentic measured power', () => {
   });
 });
 
+function chipBasisPoint(
+  row: BenchmarkRow,
+  tokenBasis?: 'total' | 'uncached',
+  chipBasis?: 'pool' | 'total',
+) {
+  return transformBenchmarkRows([row], 'median', undefined, tokenBasis, chipBasis).chartData[0][0];
+}
+
+describe('transformBenchmarkRows — chip basis', () => {
+  const disagg = (benchmark_type = 'single_turn') =>
+    makeRow({
+      hardware: 'gb300',
+      framework: 'dynamo-sglang',
+      disagg: true,
+      is_multinode: true,
+      num_prefill_gpu: 4,
+      num_decode_gpu: 12,
+      benchmark_type,
+      metrics: {
+        tput_per_gpu: 1000,
+        input_tput_per_gpu: 3600,
+        output_tput_per_gpu: 133,
+        median_intvty: 20,
+        median_e2el: 2,
+        theoretical_cache_hit_rate: 0.5,
+      },
+    });
+
+  it('defaults to the stored per-pool rates', () => {
+    const p = chipBasisPoint(disagg());
+    expect(p.outputTputPerGpu?.y).toBe(133);
+    expect(p.inputTputPerGpu?.y).toBe(3600);
+    expect(p.chip_basis).toBeUndefined();
+  });
+
+  it('divides input and output by every chip on the total basis, leaving total throughput', () => {
+    const p = chipBasisPoint(disagg(), 'total', 'total');
+    expect(p.outputTputPerGpu?.y).toBeCloseTo((133 * 12) / 16, 9);
+    expect(p.inputTputPerGpu?.y).toBeCloseTo(3600 / 4, 9);
+    expect(p.tpPerGpu?.y).toBe(1000);
+    expect(p.chip_basis).toBe('total');
+  });
+
+  it('removes the same uncached prefix from total throughput on either basis', () => {
+    const pool = chipBasisPoint(disagg('agentic_traces'), 'uncached', 'pool');
+    const total = chipBasisPoint(disagg('agentic_traces'), 'uncached', 'total');
+    // Prefix per total chip = input per prefill chip × 4/16 × hit rate.
+    expect(pool.tpPerGpu?.y).toBeCloseTo(1000 - 3600 * (4 / 16) * 0.5, 9);
+    expect(total.tpPerGpu?.y).toBeCloseTo(pool.tpPerGpu!.y, 9);
+    expect(pool.inputTputPerGpu?.y).toBeCloseTo(3600 * 0.5, 9);
+    expect(total.inputTputPerGpu?.y).toBeCloseTo(900 * 0.5, 9);
+  });
+});
+
 describe('applyUncachedTokenBasis', () => {
   const agenticEntry = (metrics: Record<string, number>) => {
     const entry = rowToAggDataEntry(

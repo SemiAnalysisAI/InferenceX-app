@@ -44,6 +44,7 @@ import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TcoBasisToggle, useShowsTcoBasisSelector } from '@/components/ui/tco-basis-toggle';
+import { ChipBasisNote } from '@/components/ui/chip-basis-note';
 import { lockedCostProviderOptions, useLockedTierDialog } from '@/components/ui/tco-model-dialog';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
@@ -115,7 +116,7 @@ const STRINGS = {
     costProviderPlaceholder: 'Cost provider',
     tokenTypeLabel: 'Token Type',
     tokenTypeTooltip:
-      'Whether cost is per million total, input, or output tokens. Disaggregated configs report input and output throughput per prefill and per decode chip, so their input- and output-basis costs are not per chip overall.',
+      'Whether cost is per million total, input, or output tokens. Disaggregated configs report input and output throughput per prefill and per decode chip unless the note below the chart switches them to every chip, so by default their input- and output-basis costs are not per chip overall.',
     tokenTypePlaceholder: 'Token type',
     minInteractivityLabel: (stat: string) => `Minimum ${stat} Interactivity (tok/s/user)`,
     minInteractivityTooltip: (stat: string) =>
@@ -140,6 +141,10 @@ const STRINGS = {
     captionSource: 'Source: SemiAnalysis InferenceX',
     unofficialRun: 'Unofficial run',
     note: 'Note:',
+    disaggCost:
+      ' Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo TRTLLM) report input and output throughput per prefill chip and per decode chip rather than per chip overall, so on the Input and Output token types a disaggregated config reads cheaper than it is.',
+    disaggCostTotal:
+      ' Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo TRTLLM) have their input and output throughput divided by every chip in the deployment, prefill plus decode, the same basis aggregated configs use, so $/M tok on the Input and Output token types compares like for like.',
     methodology: (ttftStat: string, ivStat: string) =>
       ` Cost is $ per million tokens at 100% utilization from the SemiAnalysis AI Cloud TCO Model. The ${ivStat} interactivity floor and the ${ttftStat} time-to-first-token cap are separate percentile statistics on the same row: a row that clears both did so on each measure, which does not mean every individual request did. Bars are measured rows, not interpolated frontier points, so a cheaper configuration can sit just outside a cap and only appear under the next one.`,
     source: 'Source: ',
@@ -167,7 +172,7 @@ const STRINGS = {
     costProviderPlaceholder: '计价方式',
     tokenTypeLabel: 'Token 类型',
     tokenTypeTooltip:
-      '成本按每百万总 token、输入 token 还是输出 token 计。分离式配置的输入、输出吞吐量分别按 prefill 芯片和 decode 芯片统计，因此其输入、输出口径的成本并非按全部芯片计。',
+      '成本按每百万总 token、输入 token 还是输出 token 计。分离式配置的输入、输出吞吐量默认分别按 prefill 芯片和 decode 芯片统计（可在图表下方的说明中切换为按全部芯片计），因此默认情况下其输入、输出口径的成本并非按全部芯片计。',
     tokenTypePlaceholder: 'Token 类型',
     minInteractivityLabel: (stat: string) => `${zhStatPhrase('交互性', stat, '最低')} (tok/s/user)`,
     minInteractivityTooltip: (stat: string) =>
@@ -192,6 +197,10 @@ const STRINGS = {
     captionSource: '来源：SemiAnalysis InferenceX',
     unofficialRun: '非官方运行',
     note: '注：',
+    disaggCost:
+      '分离式推理配置（如 MoRI SGLang、Dynamo TRTLLM）的输入与输出吞吐量分别按预填充芯片与解码芯片报告，而非按芯片总数，因此在「输入」与「输出」token 类型下，分离式配置显示的成本低于实际。',
+    disaggCostTotal:
+      '分离式推理配置（如 MoRI SGLang、Dynamo TRTLLM）的输入与输出吞吐量按部署中的芯片总数（预填充芯片 + 解码芯片）计算，与聚合配置口径一致，因此「输入」与「输出」token 类型下的 $/M tok 可以直接对比。',
     methodology: (ttftStat: string, ivStat: string) =>
       ` 成本为 100% 利用率下的每百万 token 成本，取自 SemiAnalysis AI Cloud TCO 模型。${zhStatPhrase('交互性', ivStat)}下限与${zhStatPhrase('首 token 延迟', ttftStat, '')}上限是同一数据行上两个独立的分位数统计：同时满足两者，表示该行在两项指标上分别达标，不代表每个请求都同时达标。柱形为实测数据行而非插值的前沿点，因此更便宜的配置可能刚好超出某一档上限，只出现在下一档中。`,
     source: '来源：',
@@ -253,12 +262,18 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
 
   const {
     tcoBasis,
+    chipBasis,
     selectedModel,
     effectiveSequence: selectedSequence,
     effectivePrecisions: selectedPrecisions,
   } = useGlobalFilterSelection();
   const showsTcoBasis = useShowsTcoBasisSelector();
-  const { setSelectedModel, setSelectedSequence, setSelectedPrecisions } = useGlobalFilterActions();
+  const { setSelectedModel, setSelectedSequence, setSelectedPrecisions, setChipBasis } =
+    useGlobalFilterActions();
+  const chipBasisControl = useMemo(
+    () => ({ value: chipBasis, onChange: setChipBasis, source: 'first_token' }),
+    [chipBasis, setChipBasis],
+  );
   const { selectedRunDate } = useGlobalFilterRun();
   const { availablePrecisions, availableSequences, availableModels } =
     useGlobalFilterAvailability();
@@ -304,6 +319,8 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
     true,
     costType,
     tcoBasis,
+    false,
+    chipBasis,
   );
 
   const isAgenticSequence = selectedSequence === Sequence.AgenticTraces;
@@ -948,6 +965,13 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
             )}
           </figure>
 
+          <ChipBasisNote
+            visible={costType !== 'total'}
+            testId="first-token-disagg-cost-note"
+            label={t.note}
+            text={chipBasis === 'total' ? t.disaggCostTotal : t.disaggCost}
+            chipBasis={chipBasisControl}
+          />
           <p className="mt-4 text-xs text-muted-foreground">
             <strong>{t.note}</strong>
             {t.methodology(statLabel, statLabel)} {t.source}

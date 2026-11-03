@@ -303,6 +303,56 @@ describe('GET /api/v1/views/inference', () => {
     expect(body.overlays[0]).not.toHaveProperty('observedPoints');
   });
 
+  it('applies chipBasis to official and unofficial disaggregated rows and rejects unknown values', async () => {
+    const row = makeRow({
+      hardware: 'gb200',
+      framework: 'trt',
+      disagg: true,
+      is_multinode: true,
+      num_prefill_gpu: 4,
+      num_decode_gpu: 12,
+      prefill_num_workers: 1,
+      decode_num_workers: 1,
+      metrics: { ...makeRow().metrics, output_tput_per_gpu: 160, input_tput_per_gpu: 1200 },
+    });
+    mockGetLatestBenchmarks.mockResolvedValue([row]);
+    mockUnofficialRun.mockImplementation(() =>
+      Response.json({
+        benchmarks: [{ ...row, id: 999, run_url: 'https://github.com/org/repo/actions/runs/999' }],
+        evaluations: [],
+      }),
+    );
+    const outputY = async (chipBasis?: string) => {
+      const query = chipBasis ? `&chipBasis=${chipBasis}` : '';
+      const response = await GET(
+        request(
+          `/api/v1/views/inference?model=DeepSeek-R1-0528&metric=outputTputPerGpu&unofficialrun=999${query}`,
+        ),
+      );
+      const body = await response.json();
+      return {
+        params: body.params,
+        official: body.series[0].points[0].y as number,
+        overlay: body.overlays[0].series[0].points[0].y as number,
+      };
+    };
+    const pool = await outputY();
+    expect(pool.params.chipBasis).toBe('pool');
+    expect(pool.official).toBe(160);
+    expect(pool.overlay).toBe(160);
+    const total = await outputY('total');
+    expect(total.params.chipBasis).toBe('total');
+    expect(total.official).toBeCloseTo((160 * 12) / 16, 9);
+    expect(total.overlay).toBeCloseTo((160 * 12) / 16, 9);
+
+    const invalid = await GET(
+      request('/api/v1/views/inference?model=DeepSeek-R1-0528&chipBasis=decode'),
+    );
+    expect(invalid.status).toBe(400);
+    const invalidBody = await invalid.json();
+    expect(invalidBody.param).toBe('chipBasis');
+  });
+
   it('resolves the fixed-sequence statistic and rejects unknown values', async () => {
     mockGetLatestBenchmarks.mockResolvedValue([
       makeRow({ metrics: { ...makeRow().metrics, mean_tpot: 0.025, mean_intvty: 99 } }),

@@ -892,7 +892,7 @@ describe('createChartDataPoint power-boundary fields', () => {
     expect(p.measuredJPerOutputToken).toEqual({ y: 10, roof: false });
   });
 
-  it('normalizes fixed-sequence disaggregated energy by all GPUs while jOutput stays per decode GPU', () => {
+  it('normalizes disaggregated energy by all GPUs while jOutput stays per decode GPU', () => {
     const p = boundaryPoint(
       entry({
         output_tput_per_gpu: 400,
@@ -916,8 +916,24 @@ describe('createChartDataPoint power-boundary fields', () => {
         num_decode_gpu: 4,
       }),
     );
-    expect(agentic.gpuProvisionedJPerOutputToken).toBeUndefined();
-    expect(agentic.utilityProvisionedJPerOutputToken).toBeUndefined();
+    expect(agentic.gpuProvisionedJPerOutputToken?.y).toBeCloseTo((700 * 8) / (400 * 4), 10);
+    expect(agentic.utilityProvisionedJPerOutputToken?.y).toBeCloseTo((700_000 * 8) / (400 * 4), 10);
+
+    const totalBasis = boundaryPoint(
+      entry({
+        output_tput_per_gpu: 200,
+        disagg: true,
+        chip_basis: 'total',
+        benchmark_type: 'single_turn',
+        num_prefill_gpu: 4,
+        num_decode_gpu: 4,
+      }),
+    );
+    expect(totalBasis.gpuProvisionedJPerOutputToken?.y).toBeCloseTo(
+      p.gpuProvisionedJPerOutputToken!.y,
+      10,
+    );
+    expect(totalBasis.jOutput?.y).toBeCloseTo(700_000 / 200, 10);
   });
 });
 

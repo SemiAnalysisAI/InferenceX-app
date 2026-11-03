@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { BenchmarkRow } from '@/lib/api/api';
 import { rowToAggDataEntry, transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
+import { withChipBasis } from '@/lib/benchmarks/chip-basis';
 import { buildDerivedChartFields, getHardwareKey } from '@/lib/charts/chart-utils';
 import { POWER_BASIS_FIELDS } from '@/lib/power/power-basis';
 import { SYSTEM_POWER_CATEGORIES } from '@/lib/power/system-power-model';
@@ -275,12 +276,32 @@ describe('J per total token at every power boundary', () => {
     expect(fields.utilityProvisionedJPerTotalToken?.y).toBeCloseTo(fields.jTotal!.y, 9);
   });
 
-  it('withholds provisioned J per total token where output energy is withheld', () => {
-    const { fields } = derive(disaggRow({ benchmark_type: 'agentic_traces' }));
-    expect(fields.jTotal).toBeDefined();
-    expect(fields.gpuProvisionedJPerOutputToken).toBeUndefined();
-    expect(fields.gpuProvisionedJPerTotalToken).toBeUndefined();
-    expect(fields.utilityProvisionedJPerTotalToken).toBeUndefined();
+  it('normalizes agentic disaggregated rows like fixed-sequence ones now both store per-pool rates', () => {
+    const agentic = derive(disaggRow({ benchmark_type: 'agentic_traces' })).fields;
+    const fixed = derive(disaggRow()).fields;
+    for (const key of [
+      'gpuProvisionedJPerOutputToken',
+      'gpuProvisionedJPerTotalToken',
+      'utilityProvisionedJPerTotalToken',
+    ] as const) {
+      expect(agentic[key]?.y, key).toBeGreaterThan(0);
+      expect(agentic[key]?.y, key).toBeCloseTo(fixed[key]!.y, 9);
+    }
+  });
+
+  it('keeps every provisioned power boundary independent of the chip basis', () => {
+    const pool = derive(disaggRow()).fields;
+    const total = derive(withChipBasis(disaggRow(), 'total')).fields;
+    expect(total.jOutput?.y).toBeCloseTo((pool.jOutput!.y * 16) / 8, 9);
+    for (const key of [
+      'gpuProvisionedJPerOutputToken',
+      'gpuProvisionedJPerTotalToken',
+      'utilityProvisionedJPerOutputToken',
+      'utilityProvisionedJPerTotalToken',
+    ] as const) {
+      expect(total[key]?.y, key).toBeGreaterThan(0);
+      expect(total[key]?.y, key).toBeCloseTo(pool[key]!.y, 9);
+    }
   });
 
   it.each(['power_valid', 'avg_power_w'])(

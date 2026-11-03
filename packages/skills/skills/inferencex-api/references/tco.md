@@ -91,9 +91,11 @@ USD per million output tokens =
   USD/GPU-hour × 1,000,000 / (output tokens/second/GPU × 3,600)
 ```
 
-The feed preserves the producer's output-throughput denominator. Fixed-sequence
-results can divide output throughput by decode GPUs and total throughput by
-prefill plus decode GPUs; AgentX uses a different path. Ratios between fields
+The feed preserves the stored output-throughput denominator. Disaggregated
+fixed-sequence and AgentX rows divide output throughput by decode GPUs, input
+throughput by prefill GPUs, and total throughput by prefill plus decode GPUs.
+Dashboard views accept `chipBasis=total` to divide input and output by every GPU
+instead; see [dashboard views](dashboard-views.md#disaggregated-chip-basis). Ratios between fields
 alone establish neither physical GPU membership nor a universal `2×` correction.
 Keep the rate estimate on the reported basis. A whole-deployment conversion or
 fleet winner requires the exact producer semantics, verified pool membership,

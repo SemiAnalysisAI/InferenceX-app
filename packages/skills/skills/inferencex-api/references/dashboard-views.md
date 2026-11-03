@@ -60,6 +60,27 @@ below the graph, including eligible unofficial overlays. PNG captions retain the
 selected basis as text. This placement is presentation-only; it adds no API
 parameter and changes no defaults, returned values or visibility rules.
 
+## Disaggregated chip basis
+
+`chipBasis` chooses which chips divide a disaggregated configuration's input and
+output throughput in the `inference`, `historical`, `calculator`, and
+`first-token` views. `pool` (the default, matching stored rows) divides input by
+prefill chips and output by decode chips; `total` divides both by every chip in
+the deployment, the basis aggregated configurations and `tput_per_gpu` always use.
+Every metric derived from those rates follows the basis: input/output tok/s/chip,
+input/output $/M tok and tokens per $1, input/output tok/s/MW, J/input and
+J/output token, and the calculator's Input and Output token types. Total
+throughput, total-token cost, measured and provisioned power boundaries, and
+aggregated rows are identical under both. Responses echo the resolved
+`params.chipBasis`; other views reject the parameter. The dashboard exposes the
+same choice as a toggle in the disaggregated-config note below the chart and
+stores it in the share URL as `g_chips=total`. It applies to unofficial-run
+overlays as well.
+
+Stored raw rows (`/api/v1/benchmarks`) keep the per-pool basis for fixed-sequence
+and AgentX runs alike. AgentX disaggregated rows ingested before this change
+divided all three rates by every chip; they were backfilled to the per-pool basis.
+
 ## Historical editorial articles
 
 The GLM-5.3 article at

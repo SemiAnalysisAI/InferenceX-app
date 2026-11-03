@@ -35,6 +35,7 @@ import type {
 import type { DerivedAgenticMetricMap } from '@/hooks/api/use-derived-agentic-metrics';
 import { fetchOpenRouterPricing } from '@/hooks/api/use-openrouter-pricing';
 import type { TcoBasis } from '@/lib/catalog/constants';
+import type { ChipBasis } from '@/lib/benchmarks/chip-basis';
 import {
   getOpenRouterModelId,
   isBestPerSkuDefaultOff,
@@ -64,6 +65,7 @@ import {
   parseRunIdParam,
   parseSequenceParam,
   parseTcoBasisParam,
+  parseChipBasisParam,
   parseVendorsParam,
   resolveModelParam,
 } from '@/lib/views-api/params';
@@ -144,6 +146,7 @@ interface InferenceViewParams {
   readonly optimal: boolean;
   readonly best: boolean;
   readonly tcoBasis: TcoBasis;
+  readonly chipBasis: ChipBasis;
   readonly power: readonly ('certified' | 'legacy')[];
   readonly topologies: readonly string[];
   readonly allPoints: boolean;
@@ -203,6 +206,7 @@ function buildView(
     optimal: params.optimal,
     best: params.best,
     tcoBasis: params.tcoBasis,
+    chipBasis: params.chipBasis,
     allPoints: params.allPoints,
     userCosts: params.userCosts,
     userPowers: params.userPowers,
@@ -368,6 +372,7 @@ export function GET(request: NextRequest) {
         'Equal-service, role-share, power-fit, power-breakdown and headroom panels require format=json',
       );
     const tcoBasis = parseTcoBasisParam(search.get('tcoBasis'));
+    const chipBasis = parseChipBasisParam(search.get('chipBasis'));
     const power = parseListParam(search.get('power'), 'power', POWER_TIER_ORDER);
     // Topology keys are opaque values returned by this view, not case-folded names.
     const topologies = [
@@ -416,6 +421,7 @@ export function GET(request: NextRequest) {
       optimal,
       best,
       tcoBasis,
+      chipBasis,
       power,
       topologies,
       allPoints,
@@ -601,6 +607,7 @@ export function GET(request: NextRequest) {
       best,
       format,
       tcoBasis,
+      chipBasis,
       power,
       allPoints,
       userCosts,

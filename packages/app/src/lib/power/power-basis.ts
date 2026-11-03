@@ -181,6 +181,7 @@ type PowerBasisEntry = Pick<
   | 'output_tput_per_gpu'
   | 'disagg'
   | 'benchmark_type'
+  | 'chip_basis'
   | 'num_prefill_gpu'
   | 'num_decode_gpu'
   | 'avg_power_w'
@@ -197,18 +198,24 @@ interface PowerBasisNormalization {
 export function powerBasisNormalization(
   entry: Pick<
     PowerBasisEntry,
-    'output_tput_per_gpu' | 'disagg' | 'benchmark_type' | 'num_prefill_gpu' | 'num_decode_gpu'
+    | 'output_tput_per_gpu'
+    | 'disagg'
+    | 'benchmark_type'
+    | 'chip_basis'
+    | 'num_prefill_gpu'
+    | 'num_decode_gpu'
   >,
 ): PowerBasisNormalization {
   const perGpu = entry.output_tput_per_gpu;
   const unavailable = { allocatedGpus: null, totalOutputTokPerSec: null };
   if (!isPositive(perGpu)) return unavailable;
   if (!entry.disagg) return { allocatedGpus: 1, totalOutputTokPerSec: perGpu };
-  if (entry.benchmark_type !== 'single_turn') return unavailable;
   const prefill = entry.num_prefill_gpu;
   const decode = entry.num_decode_gpu;
   if (!count(prefill) || !count(decode)) return unavailable;
-  return { allocatedGpus: prefill + decode, totalOutputTokPerSec: perGpu * decode };
+  // Output is per decode chip on the stored basis, per deployment chip once rescaled.
+  const outputChips = entry.chip_basis === 'total' ? prefill + decode : decode;
+  return { allocatedGpus: prefill + decode, totalOutputTokPerSec: perGpu * outputChips };
 }
 
 function provisionedGpuSecondsPerToken(

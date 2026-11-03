@@ -24,6 +24,13 @@ import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
 import { resolvePowerTier } from '@/lib/power/power-tier';
 import { modelSystemPower } from '@/lib/power/modeled-system-power';
 import type { BenchmarkRow } from '@/lib/api/api';
+import {
+  DEFAULT_CHIP_BASIS,
+  inputTputPerTotalChip,
+  withChipBasis,
+  type ChipBasis,
+  type ChipBasisRow,
+} from '@/lib/benchmarks/chip-basis';
 
 /**
  * Producer schema version whose unprefixed `joules_per_*` fields are documented
@@ -83,7 +90,7 @@ function applyAgenticMetricAliases(raw: Record<string, number>): Record<string, 
 }
 
 /** Convert a DB benchmark row to an AggDataEntry. */
-export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
+export function rowToAggDataEntry(row: ChipBasisRow): AggDataEntry {
   const isAgentic = row.benchmark_type === 'agentic_traces';
   const m = isAgentic ? applyAgenticMetricAliases(row.metrics) : row.metrics;
   // Non-disaggregated multinode artifacts historically stored their one
@@ -285,6 +292,7 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     disagg: row.disagg,
     num_prefill_gpu: row.num_prefill_gpu,
     num_decode_gpu: row.num_decode_gpu,
+    chip_basis: row.chip_basis,
     spec_decoding: row.spec_method,
     ep: aggregateEp,
     // Pipeline parallelism has no configs-table column — the ingest mapper
@@ -362,8 +370,10 @@ export function applyUncachedTokenBasis(entry: AggDataEntry): boolean {
     return false;
   }
   const totalTput = entry.tput_per_gpu;
-  const prefixTput = entry.input_tput_per_gpu * rate;
-  entry.input_tput_per_gpu -= prefixTput;
+  // A disaggregated per-pool row reports input per prefill chip; the prefix
+  // removed from the per-total-chip `tput_per_gpu` must use the same denominator.
+  const prefixTput = (inputTputPerTotalChip(entry) ?? 0) * rate;
+  entry.input_tput_per_gpu -= entry.input_tput_per_gpu * rate;
   entry.tput_per_gpu = Math.max(0, totalTput - prefixTput);
   const inputScale = rate < 1 ? 1 / (1 - rate) : undefined;
   const scaleInputJoules = (joules: number | undefined) =>
@@ -458,12 +468,15 @@ export function mergeRunScopedRows(
  *   full set (median/p90/p99/p99.9) so this mainly affects that scenario.
  * @param tokenBasis Whether token-rate metrics count cached prompt prefix
  *   tokens; see {@link TokenBasis}.
+ * @param chipBasis Which chips divide disaggregated input/output throughput;
+ *   see {@link ChipBasis}.
  */
 export function transformBenchmarkRows(
   rows: BenchmarkRow[],
   percentile = 'median',
   tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
   tokenBasis: TokenBasis = 'total',
+  chipBasis: ChipBasis = DEFAULT_CHIP_BASIS,
 ): {
   chartData: InferenceData[][];
   hardwareConfig: HardwareConfig;
@@ -474,7 +487,7 @@ export function transformBenchmarkRows(
   const entriesByHw = new Map<string, AggDataEntry[]>();
   const prepared: PreparedEntry[] = [];
   for (const row of rows) {
-    const entry = rowToAggDataEntry(row);
+    const entry = rowToAggDataEntry(withChipBasis(row, chipBasis));
     if (tokenBasis === 'uncached' && !applyUncachedTokenBasis(entry)) continue;
     const hwKey = getHardwareKey(entry);
     entry.hwKey = hwKey;

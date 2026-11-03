@@ -60,6 +60,7 @@ import {
   type TokenBasis,
 } from '@/lib/benchmarks/benchmark-transform';
 import { remapInferencePoint } from '@/lib/charts/chart-utils';
+import { DEFAULT_CHIP_BASIS, type ChipBasis } from '@/lib/benchmarks/chip-basis';
 import { DEFAULT_TCO_BASIS, getModelSortIndex, type TcoBasis } from '@/lib/catalog/constants';
 import { Sequence, type Model } from '@/lib/catalog/data-mappings';
 import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/shared/utils';
@@ -136,6 +137,7 @@ export function useChartData(
   fixedSequenceStatistic: FixedSequenceStatistic = 'median',
   tokenBasis: TokenBasis = 'total',
   prefetchLatestRows = false,
+  chipBasis: ChipBasis = DEFAULT_CHIP_BASIS,
 ) {
   const queryDate = asOfRunId
     ? (selectedRunDate ?? '')
@@ -285,8 +287,8 @@ export function useChartData(
         chartData: [] as InferenceData[][],
         hardwareConfig: {} as HardwareConfig,
       };
-    return transformBenchmarkRows(rows, selectedPercentile, tcoBasis, tokenBasis);
-  }, [rows, selectedPercentile, tcoBasis, tokenBasis]);
+    return transformBenchmarkRows(rows, selectedPercentile, tcoBasis, tokenBasis, chipBasis);
+  }, [rows, selectedPercentile, tcoBasis, tokenBasis, chipBasis]);
 
   const prevHardwareConfigRef = useRef<{ key: string; config: HardwareConfig }>({
     key: '',

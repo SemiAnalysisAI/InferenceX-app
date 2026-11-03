@@ -245,6 +245,38 @@ describe('GET /api/v1/views/historical', () => {
     expect(body.hwKeysWithData.length).toBe(2);
   });
 
+  it('applies chipBasis to disaggregated trend lines and rejects unknown values', async () => {
+    mockGetAllBenchmarksForHistory.mockResolvedValue(
+      curve('2026-02-01', 'gb200', 'dynamo-trt').map((row) => ({
+        ...row,
+        disagg: true,
+        is_multinode: true,
+        num_prefill_gpu: 4,
+        num_decode_gpu: 12,
+      })),
+    );
+    const value = async (chipBasis: string) => {
+      const res = await GET(
+        request(
+          `/api/v1/views/historical?model=DeepSeek-R1-0528&metric=outputTputPerGpu&target=35&extendToDate=2026-02-01&chipBasis=${chipBasis}`,
+        ),
+      );
+      const body = await res.json();
+      expect(body.params.chipBasis).toBe(chipBasis);
+      return body.series[0].points[0].value as number;
+    };
+    const pool = await value('pool');
+    expect(pool).toBeCloseTo(300, 6);
+    expect(await value('total')).toBeCloseTo((pool * 12) / 16, 6);
+
+    const invalid = await GET(
+      request('/api/v1/views/historical?model=DeepSeek-R1-0528&chipBasis=decode'),
+    );
+    expect(invalid.status).toBe(400);
+    const invalidBody = await invalid.json();
+    expect(invalidBody.param).toBe('chipBasis');
+  });
+
   it('extends shorter lines to the explicit end date with a synthetic point', async () => {
     const bodyRes = await GET(
       request(
