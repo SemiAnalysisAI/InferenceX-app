@@ -48,6 +48,7 @@ import {
   resultsMetricLabel,
   resultsPointKey,
 } from './results-chart';
+import VideoDeploymentDetail from './VideoDeploymentDetail';
 import VideoResultsChart from './VideoResultsChart';
 import VideoResultsTable from './VideoResultsTable';
 import VideoResultsClips from './VideoResultsClips';
@@ -199,10 +200,15 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
   );
   const [historyOpen, setHistoryOpen] = useState(false);
   const [labels, setLabels] = useState(true);
+  // True while the open detail entry was pushed by this page, so Back can pop it.
+  const pushedDetail = useRef(false);
+  const overviewScroll = useRef(0);
+  const pendingAnchor = useRef<string | null>(null);
   useEffect(() => {
     const read = () => {
       const next = parseResultsState(location.search);
       latest.current = next;
+      if (next.point === null) pushedDetail.current = false;
       setState(next);
       const params = new URLSearchParams(location.search);
       if (
@@ -249,8 +255,21 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
   );
   const openPoint = useCallback(
     (key: string, source: 'popover' | 'table') => {
+      overviewScroll.current = window.scrollY;
+      pushedDetail.current = true;
       commit({ ...latest.current, point: key }, 'push');
       track('video_results_detail_opened', { source });
+    },
+    [commit],
+  );
+  const closeDetail = useCallback(
+    (anchor: string | null = null) => {
+      pendingAnchor.current = anchor;
+      track('video_results_detail_closed');
+      if (pushedDetail.current) {
+        pushedDetail.current = false;
+        history.back();
+      } else commit({ ...latest.current, point: null }, 'replace');
     },
     [commit],
   );
@@ -318,6 +337,23 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
     [projection],
   );
   const hidden = useMemo(() => new Set(state.hidden), [state.hidden]);
+  const detailCell =
+    state.point === null
+      ? undefined
+      : deploymentCells.find((cell) => resultsPointKey(cell) === state.point);
+  const detailHardware = detailCell?.point.hardwareKey ?? null;
+  const shownDetail = useRef<string | null>(null);
+  useEffect(() => {
+    const previous = shownDetail.current;
+    shownDetail.current = detailHardware;
+    if (detailHardware !== null && previous === null) window.scrollTo({ top: 0 });
+    if (detailHardware === null && previous !== null) {
+      const anchor = pendingAnchor.current && document.querySelector(`#${pendingAnchor.current}`);
+      pendingAnchor.current = null;
+      if (anchor) anchor.scrollIntoView();
+      else window.scrollTo({ top: overviewScroll.current });
+    }
+  }, [detailHardware]);
   const { resolveColor, getCssColor } = useThemeColors({
     highContrast: false,
     activeKeys: roster,
@@ -482,6 +518,38 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
       <div className="pb-4">{children}</div>
     </details>
   );
+
+  if (detailCell)
+    return (
+      <div
+        className={`${styles.page} mx-auto w-full min-w-0 max-w-7xl py-4`}
+        data-testid="video-results"
+      >
+        <VideoDeploymentDetail
+          cell={detailCell}
+          siblings={deploymentCells
+            .filter(
+              (cell) =>
+                cell.point.hardwareKey === detailCell.point.hardwareKey &&
+                cell.overlay === detailCell.overlay,
+            )
+            .toSorted((a, b) => (a.point.participating ?? 0) - (b.point.participating ?? 0))}
+          gpuCounts={options.gpuCounts}
+          workloadLabel={resolvedWorkload?.label ?? detailCell.point.workload}
+          state={state}
+          color={color(detailCell)}
+          notMeasured={s.notMeasured}
+          onBack={() => closeDetail()}
+          onSelect={(cell) => {
+            commit({ ...latest.current, point: resultsPointKey(cell) }, 'replace');
+            track('video_results_detail_deployment_changed', {
+              gpus: cell.point.participating ?? 0,
+            });
+          }}
+          onPsnr={() => closeDetail('comparison-clips')}
+        />
+      </div>
+    );
 
   return (
     <div
