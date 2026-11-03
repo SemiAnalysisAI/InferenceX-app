@@ -159,7 +159,7 @@ function visibleVisualizations(op: ComparisonOp, baseline: string | null): VizDe
   return VISUALIZATIONS.filter((v) => v.ops.includes(op) && (baseline || !v.needsBaseline));
 }
 
-const CONTROL_LABELS = ['Workload', 'Metric', 'Baseline'] as const;
+const CONTROL_LABELS = ['Workload', 'Devices', 'Metric', 'Baseline'] as const;
 
 /**
  * Loading state laid out like the loaded dashboard (controls card, then the card grid with
@@ -175,7 +175,7 @@ function ComparisonSkeleton({ op }: { op: ComparisonOp }) {
       aria-label="Loading results…"
     >
       <Card className="relative z-10 py-4 md:py-5">
-        <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
           {CONTROL_LABELS.map((label) => (
             <div key={label} className="min-w-0 space-y-1.5">
               <Label>{label}</Label>

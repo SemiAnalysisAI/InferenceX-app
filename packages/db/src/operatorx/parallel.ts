@@ -31,7 +31,8 @@ export function wellFormedSplit(args: Args): boolean {
  * so every spelling of one split is the same case.
  */
 export function canonicalArgs(args: Args): Args {
-  if (!('parallel' in args)) return args;
+  // a malformed split stays as written, so its counts come out null rather than one device's
+  if (!('parallel' in args) || !wellFormedSplit(args)) return args;
   const { parallel: _, ...rest } = args;
   const split = Object.fromEntries(
     AXES.flatMap((name) => (axis(args, name) > 1 ? [[name, axis(args, name)]] : [])),
