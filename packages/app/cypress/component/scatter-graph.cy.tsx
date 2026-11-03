@@ -1,5 +1,8 @@
 import { useReducer, useState } from 'react';
-import { GlobalFilterSelectionContext } from '@/providers/GlobalFilterContext';
+import {
+  GlobalFilterActionsContext,
+  GlobalFilterSelectionContext,
+} from '@/providers/GlobalFilterContext';
 import { InferenceContextsProvider } from '@/components/inference/InferenceContext';
 import { overlaySelectionReducer, UnofficialRunContext } from '@/providers/unofficial-run-provider';
 import ScatterGraph from '@/components/inference/ui/ScatterGraph';
@@ -2206,7 +2209,8 @@ describe('ChartDisplay engine comparison guard', () => {
   it('keeps official table rows synchronized with legend state after a scope change', () => {
     const chartDefinition = createMockChartDefinition({ chartType: 'interactivity' });
     const baseInference = createMockInferenceContextValues();
-    const baseGlobalFilters = createMockGlobalFilterContexts().selection;
+    const { selection: baseGlobalFilters, actions: globalFilterActions } =
+      createMockGlobalFilterContexts();
 
     function OfficialRowsScopeHarness() {
       const [secondScope, setSecondScope] = useState(false);
@@ -2244,23 +2248,28 @@ describe('ChartDisplay engine comparison guard', () => {
 
       return (
         <GlobalFilterSelectionContext.Provider value={globalFilters}>
-          <InferenceContextsProvider
-            data={inference}
-            filters={inference}
-            display={inference}
-            actions={inference}
-          >
-            <button data-testid="change-official-table-scope" onClick={() => setSecondScope(true)}>
-              Change scope
-            </button>
-            <button
-              data-testid="select-official-vllm"
-              onClick={() => setActiveKeys(new Set(['h100_vllm']))}
+          <GlobalFilterActionsContext.Provider value={globalFilterActions}>
+            <InferenceContextsProvider
+              data={inference}
+              filters={inference}
+              display={inference}
+              actions={inference}
             >
-              Select vLLM
-            </button>
-            <ChartDisplay />
-          </InferenceContextsProvider>
+              <button
+                data-testid="change-official-table-scope"
+                onClick={() => setSecondScope(true)}
+              >
+                Change scope
+              </button>
+              <button
+                data-testid="select-official-vllm"
+                onClick={() => setActiveKeys(new Set(['h100_vllm']))}
+              >
+                Select vLLM
+              </button>
+              <ChartDisplay />
+            </InferenceContextsProvider>
+          </GlobalFilterActionsContext.Provider>
         </GlobalFilterSelectionContext.Provider>
       );
     }
@@ -2536,7 +2545,8 @@ describe('ChartDisplay engine comparison guard', () => {
       isNonMainBranch: true,
     };
     const baseInference = createMockInferenceContextValues();
-    const baseGlobalFilters = createMockGlobalFilterContexts().selection;
+    const { selection: baseGlobalFilters, actions: globalFilterActions } =
+      createMockGlobalFilterContexts();
     const baseUnofficial = createMockUnofficialRunContext();
 
     function OverlayScopeHarness() {
@@ -2623,40 +2633,45 @@ describe('ChartDisplay engine comparison guard', () => {
 
       return (
         <GlobalFilterSelectionContext.Provider value={globalFilters}>
-          <UnofficialRunContext.Provider value={unofficial}>
-            <InferenceContextsProvider
-              data={inference}
-              filters={inference}
-              display={inference}
-              actions={inference}
-            >
-              <button data-testid="change-overlay-scope" onClick={() => setSecondScope(true)}>
-                Change scope
-              </button>
-              <button data-testid="load-official-scope" onClick={() => setSecondScopeLoaded(true)}>
-                Load official scope
-              </button>
-              <button
-                data-testid="clear-overlay-scope"
-                onClick={() =>
-                  dispatchSelection({
-                    type: 'selection',
-                    official: selection.localOfficialOverride ?? new Set(officialKeys),
-                    overlay: new Set(),
-                  })
-                }
+          <GlobalFilterActionsContext.Provider value={globalFilterActions}>
+            <UnofficialRunContext.Provider value={unofficial}>
+              <InferenceContextsProvider
+                data={inference}
+                filters={inference}
+                display={inference}
+                actions={inference}
               >
-                Clear overlays
-              </button>
-              <button
-                data-testid="rerender-overlay-scope"
-                onClick={() => setRenderVersion((version) => version + 1)}
-              >
-                Rerender
-              </button>
-              <ChartDisplay />
-            </InferenceContextsProvider>
-          </UnofficialRunContext.Provider>
+                <button data-testid="change-overlay-scope" onClick={() => setSecondScope(true)}>
+                  Change scope
+                </button>
+                <button
+                  data-testid="load-official-scope"
+                  onClick={() => setSecondScopeLoaded(true)}
+                >
+                  Load official scope
+                </button>
+                <button
+                  data-testid="clear-overlay-scope"
+                  onClick={() =>
+                    dispatchSelection({
+                      type: 'selection',
+                      official: selection.localOfficialOverride ?? new Set(officialKeys),
+                      overlay: new Set(),
+                    })
+                  }
+                >
+                  Clear overlays
+                </button>
+                <button
+                  data-testid="rerender-overlay-scope"
+                  onClick={() => setRenderVersion((version) => version + 1)}
+                >
+                  Rerender
+                </button>
+                <ChartDisplay />
+              </InferenceContextsProvider>
+            </UnofficialRunContext.Provider>
+          </GlobalFilterActionsContext.Provider>
         </GlobalFilterSelectionContext.Provider>
       );
     }
