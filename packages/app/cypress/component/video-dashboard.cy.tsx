@@ -321,6 +321,9 @@ describe('VideoGenX results', () => {
       win.dispatchEvent(new win.PopStateEvent('popstate'));
     });
     costRow('b200').filter('[data-overlay="true"]').should('exist');
+    costRow('b200').should('have.length', 2);
+    cy.get('#validity tbody tr[data-hardware="b200"]').should('have.length', 4);
+    cy.get('#validity details dl > div').filter(':contains("B200")').should('have.length', 2);
     cy.wait('@namedMedia');
     cy.get('[data-testid="video-results-clip"][data-hardware="b200"] video').should('not.exist');
     cy.get('[data-testid="video-results-sources"] summary').click();
@@ -332,9 +335,19 @@ describe('VideoGenX results', () => {
       .and('contain', 'No matching receipt')
       .find('a')
       .should('not.exist');
+    cy.get('[data-testid="results-hardware-b200"]').uncheck();
+    costRow('b200').should('not.exist');
+    cy.get('#validity tbody tr[data-hardware="b200"]').should('not.exist');
+    cy.get('#validity details dl > div').filter(':contains("B200")').should('not.exist');
+    cy.get('[data-testid="results-hardware-b200"]').check();
+    costRow('b200').should('have.length', 2);
     cy.get('[data-testid="results-overlay-dismiss"]').click();
     cy.get('[data-testid="video-results-clip"][data-hardware="b200"] video').should('exist');
     cy.get('@approvedMedia.all').should('have.length', 1);
+    costRow('b200').should('have.length', 1).and('have.attr', 'data-overlay', 'false');
+    costRow('b200', 'allocated').should('have.length', 1);
+    cy.get('#validity tbody tr[data-hardware="b200"]').should('have.length', 2);
+    cy.get('#validity details dl > div').filter(':contains("B200")').should('have.length', 1);
   });
 
   it('keeps matching summaries distinct and selects the exact source ID', () => {

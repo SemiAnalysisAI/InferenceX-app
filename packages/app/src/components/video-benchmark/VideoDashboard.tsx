@@ -664,7 +664,11 @@ export default function VideoDashboard() {
   const apiUrl = `/api/v1/views/video?view=overview&${resultsSearch(state)}`;
   const tableRows = (values: (c: ResultCell) => (string | number | null | undefined)[]) =>
     representatives.map((c) => (
-      <tr key={c.point.id} data-hardware={c.point.hardwareKey} data-overlay={c.overlay}>
+      <tr
+        key={`${c.overlay}:${c.point.id}`}
+        data-hardware={c.point.hardwareKey}
+        data-overlay={c.overlay}
+      >
         <td>
           <span className={`${styles.dot} mr-2`} style={{ background: color(c) }} />
           {cellLabel(c)}
@@ -875,7 +879,7 @@ export default function VideoDashboard() {
                   <dt>{s.workload}</dt>
                   <dd className="break-words">{cells[0]?.point.workload ?? '—'}</dd>
                   {representatives.map((c) => (
-                    <div key={c.point.id} className="contents">
+                    <div key={`${c.overlay}:${c.point.id}`} className="contents">
                       <dt>{cellLabel(c)}</dt>
                       <dd className="break-all font-mono text-2xs">
                         {c.evidence?.workloadHash ?? '—'}
@@ -1002,7 +1006,7 @@ export default function VideoDashboard() {
                                     : null) === mode,
                               )
                               .map((c) => (
-                                <div key={c.point.id} className="mb-2 min-w-40">
+                                <div key={`${c.overlay}:${c.point.id}`} className="mb-2 min-w-40">
                                   <span style={{ color: color(c) }}>{cellLabel(c)}</span>
                                   <div>
                                     P50 {n(c.deliveryP50)} · P90 {n(c.point.p90)} · P95 {n(c.p95)} s
@@ -1139,7 +1143,7 @@ export default function VideoDashboard() {
                   ? representatives.flatMap((c) =>
                       (['participating', 'allocated'] as const).map((b) => (
                         <tr
-                          key={`${c.point.id}-${b}`}
+                          key={`${c.overlay}:${c.point.id}:${b}`}
                           data-hardware={c.point.hardwareKey}
                           data-basis={b}
                           data-overlay={c.overlay}
