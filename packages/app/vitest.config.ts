@@ -1,9 +1,15 @@
 import { defineConfig } from 'vitest/config';
 import path from 'path';
 
+import { EnvironmentGroupedSequencer } from './src/test/environment-grouped-sequencer';
+
 export default defineConfig({
   test: {
     environment: 'node',
+    isolate: false,
+    runner: 'src/test/file-isolation-runner.ts',
+    sequence: { sequencer: EnvironmentGroupedSequencer },
+    experimental: { fsModuleCache: true },
     setupFiles: ['src/test/setup-local-storage.ts'],
     // test:unit loads the root .env; extra source repos there must not change the lookups tests assert.
     env: { INFERENCEX_SOURCE_REPOS: '' },

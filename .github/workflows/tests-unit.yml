@@ -71,6 +71,13 @@ jobs:
             ${{ runner.os }}-tsc-${{ hashFiles('bun.lock') }}-
       - name: Typecheck
         run: bun run typecheck
+      - name: Cache Vitest module transforms
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules/.experimental-vitest-cache
+          key: ${{ runner.os }}-vitest-modules-${{ hashFiles('bun.lock') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-vitest-modules-${{ hashFiles('bun.lock') }}-
       - name: Unit tests
         run: bun run test:unit
         env:

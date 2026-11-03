@@ -14,6 +14,7 @@ import {
   prepareTrendRows,
   trendMetricDependencies,
   type TrendLinesResult,
+  type TrendRow,
 } from './interpolated-trend-core';
 import { compactTrendHistory, expandTrendHistory } from './trend-history-rows';
 
@@ -26,14 +27,14 @@ async function overWire(rows: readonly BenchmarkRow[]): Promise<BenchmarkRow[]> 
 const TARGETS = [5, 10, 20, 35, 50, 100, 200];
 
 function trendOutputs(
-  rows: readonly BenchmarkRow[],
+  preparedRows: readonly TrendRow[],
   metric: string,
   selectedPrecisions: readonly string[],
   tcoBasis: TcoBasis,
   tokenRevenuePricing: TokenRevenuePricing | null,
 ): TrendLinesResult[] {
   const trendMetricKey = resolveMetricConfigKey(metric).slice(2) as YAxisMetricKey;
-  const grouped = groupTrendRows(prepareTrendRows(rows), {
+  const grouped = groupTrendRows(preparedRows, {
     selectedPrecisions,
     selectedYAxisMetric: metric,
     requestedMetrics: trendMetricDependencies(trendMetricKey),
@@ -131,7 +132,8 @@ describe('compactTrendHistory', () => {
   });
 
   it('draws the same trend lines as the published rows for every metric', async () => {
-    const expanded = await overWire(fixtureRows);
+    const preparedRaw = prepareTrendRows(fixtureRows);
+    const preparedExpanded = prepareTrendRows(await overWire(fixtureRows));
     const openRouter: TokenRevenuePricing = {
       source: 'openrouter',
       inputPerMillion: 0.6,
@@ -147,8 +149,10 @@ describe('compactTrendHistory', () => {
       for (const precisions of [['fp4'], ['fp8'], ['fp4', 'fp8']]) {
         for (const tcoBasis of ['internal', 'external'] as const) {
           for (const pricing of pricings) {
-            const raw = trendOutputs(fixtureRows, metric, precisions, tcoBasis, pricing);
-            expect(trendOutputs(expanded, metric, precisions, tcoBasis, pricing)).toEqual(raw);
+            const raw = trendOutputs(preparedRaw, metric, precisions, tcoBasis, pricing);
+            expect(trendOutputs(preparedExpanded, metric, precisions, tcoBasis, pricing)).toEqual(
+              raw,
+            );
             for (const { trendLines } of raw) lines += trendLines.size;
           }
         }
@@ -176,13 +180,13 @@ describe('compactTrendHistory', () => {
         p90_itl: 0.01 * conc,
       })),
     ];
-    const raw = trendOutputs(rows, 'y_tpPerGpu', ['fp8'], 'internal', null);
+    const raw = trendOutputs(prepareTrendRows(rows), 'y_tpPerGpu', ['fp8'], 'internal', null);
     const dates = raw.flatMap(({ trendLines }) =>
       [...trendLines.values()].flat().flatMap((point) => (point.synthetic ? [] : [point.date])),
     );
     expect(new Set(dates)).toEqual(new Set(['2026-03-01', '2026-03-02']));
-    expect(trendOutputs(await overWire(rows), 'y_tpPerGpu', ['fp8'], 'internal', null)).toEqual(
-      raw,
-    );
+    expect(
+      trendOutputs(prepareTrendRows(await overWire(rows)), 'y_tpPerGpu', ['fp8'], 'internal', null),
+    ).toEqual(raw);
   });
 });
