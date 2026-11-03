@@ -3,6 +3,7 @@ import {
   type RequestRecord,
   type RequestTimeline,
 } from '../etl/compute-request-timeline';
+import { decodeRequestChartColumns } from '../etl/request-chart-columns';
 import {
   scanRequestTimelineGz,
   scanRequestTimelineText,
@@ -12,9 +13,11 @@ import {
 
 import type { DbClient } from '../connection.js';
 import {
+  REQUEST_TIMELINE_GZ_SLICE_BYTES,
   getRequestTimeline,
   legacyRequestTimelineText,
   logRequestTimelineReadFailure,
+  readBase64Slices,
   readRequestTimelineGz,
 } from './request-timeline';
 
@@ -51,6 +54,54 @@ interface RawChartMetaRow {
   gz_bytes: number | null;
   timeline_version: number | null;
   legacy_request_count: number | null;
+  /** octet_length(request_chart_data_gz) when it holds the current version. */
+  columns_bytes: number | null;
+  /** The current columns as base64 when they are small enough to inline. */
+  columns_inline: string | null;
+}
+
+/**
+ * Precomputed columns up to this size come back inline with the metadata
+ * query, so most points need one round trip. Larger ones are read in slices.
+ */
+export const INLINE_CHART_COLUMNS_BYTES = REQUEST_TIMELINE_GZ_SLICE_BYTES;
+
+/**
+ * Read a current `request_chart_data_gz` of `byteLength` bytes: decode the
+ * inline copy when the metadata query returned one, else read it in slices.
+ */
+export async function readRequestChartColumns(
+  sql: DbClient,
+  traceReplayId: number,
+  byteLength: number,
+  inline: string | null,
+): Promise<Buffer> {
+  if (inline !== null) return Buffer.from(inline, 'base64');
+  const slices: Buffer[] = [];
+  const reads = readBase64Slices(
+    byteLength,
+    REQUEST_TIMELINE_GZ_SLICE_BYTES,
+    async (from, length) => {
+      const [row] = await sql`
+      select encode(substring(request_chart_data_gz from ${from}::int for ${length}::int), 'base64') as slice
+      from agentic_trace_replay
+      where id = ${traceReplayId}
+        and request_chart_data_version = ${REQUEST_CHART_DATA_VERSION}
+        and octet_length(request_chart_data_gz) = ${byteLength}
+    `;
+      return row;
+    },
+  );
+  for await (const slice of reads) slices.push(slice);
+  return Buffer.concat(slices, byteLength);
+}
+
+export function logRequestChartColumnsReadFailure(traceReplayId: number, error: unknown): void {
+  console.error(
+    `[request chart data] could not read the precomputed columns for trace_replay_id=${traceReplayId}: ${
+      error instanceof Error ? error.message : String(error)
+    }`,
+  );
 }
 
 interface RawProjectedChartRow {
@@ -206,13 +257,15 @@ async function projectLegacyRequestChartData(
   );
 }
 
-async function scanStoredRequestChartData(
-  sql: DbClient,
-  traceReplayId: number,
-  gzBytes: number | null,
-): Promise<RequestChartDataWire | null> {
+/**
+ * Build chart data from scanned timeline requests, coercing each field the
+ * same way whether the source was gzip JSON or legacy JSONB text.
+ */
+async function scanRequestChartData(
+  scan: (onRequest: (request: ScannedRequest) => void) => Promise<RequestTimelineHeader>,
+): Promise<RequestChartDataWire> {
   const encoder = createRequestChartEncoder();
-  const addRequest = (request: ScannedRequest): void => {
+  const header = await scan((request) => {
     encoder.add({
       cid: String(request.cid),
       phase: String(request.phase),
@@ -224,31 +277,43 @@ async function scanStoredRequestChartData(
       osl: nullableNumber(request.osl),
       cancelled: request.cancelled === true,
     });
-  };
-  let header: RequestTimelineHeader;
-  try {
-    header =
-      gzBytes === null
-        ? await scanRequestTimelineText(
-            legacyRequestTimelineText(sql, traceReplayId),
-            CHART_REQUEST_FIELDS,
-            addRequest,
-          )
-        : await scanRequestTimelineGz(
-            await readRequestTimelineGz(sql, traceReplayId, gzBytes),
-            CHART_REQUEST_FIELDS,
-            addRequest,
-          );
-  } catch (error) {
-    logRequestTimelineReadFailure(traceReplayId, error);
-    return null;
-  }
+  });
   return encoder.finish({
     version: Number(header.version),
     startNs: Number(header.startNs ?? 0),
     endNs: Number(header.endNs ?? 0),
     durationS: Number(header.durationS ?? 0),
   });
+}
+
+/** Chart data of a stored `request_timeline_gz`, as served by the route. */
+export function requestChartDataFromTimelineGz(gz: Buffer): Promise<RequestChartDataWire> {
+  return scanRequestChartData((onRequest) =>
+    scanRequestTimelineGz(gz, CHART_REQUEST_FIELDS, onRequest),
+  );
+}
+
+async function scanStoredRequestChartData(
+  sql: DbClient,
+  traceReplayId: number,
+  gzBytes: number | null,
+): Promise<RequestChartDataWire | null> {
+  try {
+    return gzBytes === null
+      ? await scanRequestChartData((onRequest) =>
+          scanRequestTimelineText(
+            legacyRequestTimelineText(sql, traceReplayId),
+            CHART_REQUEST_FIELDS,
+            onRequest,
+          ),
+        )
+      : await requestChartDataFromTimelineGz(
+          await readRequestTimelineGz(sql, traceReplayId, gzBytes),
+        );
+  } catch (error) {
+    logRequestTimelineReadFailure(traceReplayId, error);
+    return null;
+  }
 }
 
 export async function getRequestChartData(
@@ -269,13 +334,39 @@ export async function getRequestChartData(
         when atr.request_timeline_gz is null
           and jsonb_typeof(atr.request_timeline->'requests') = 'array'
           then jsonb_array_length(atr.request_timeline->'requests')
-      end as legacy_request_count
+      end as legacy_request_count,
+      case
+        when atr.request_chart_data_version = ${REQUEST_CHART_DATA_VERSION}
+          then octet_length(atr.request_chart_data_gz)
+      end as columns_bytes,
+      case
+        when atr.request_chart_data_version = ${REQUEST_CHART_DATA_VERSION}
+          and octet_length(atr.request_chart_data_gz) <= ${INLINE_CHART_COLUMNS_BYTES}
+          then encode(atr.request_chart_data_gz, 'base64')
+      end as columns_inline
     from benchmark_results br
     join agentic_trace_replay atr on atr.id = br.trace_replay_id
     where br.id = ${benchmarkResultId}
   `) as unknown as RawChartMetaRow[];
   const row = rows[0];
   if (!row) return null;
+
+  // Precomputed columns hold exactly what the timeline scan below would
+  // produce. A copy that cannot be read falls back to that scan.
+  if (row.columns_bytes !== null) {
+    try {
+      return decodeRequestChartColumns(
+        await readRequestChartColumns(
+          sql,
+          row.trace_replay_id,
+          Number(row.columns_bytes),
+          row.columns_inline,
+        ),
+      );
+    } catch (error) {
+      logRequestChartColumnsReadFailure(row.trace_replay_id, error);
+    }
+  }
 
   if (Number(row.timeline_version) === REQUEST_TIMELINE_VERSION) {
     const gzBytes = row.gz_bytes === null ? null : Number(row.gz_bytes);

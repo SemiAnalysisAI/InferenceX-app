@@ -48,9 +48,13 @@ function sliceServingSql(
     const text = strings.join('?');
     texts.push(text);
     if (text.includes('substring(request_timeline_gz')) {
-      const [from, length] = values as [number, number];
+      const [from, length] = values as number[];
+      const byteLength = values[4];
       ranges.push([from, length]);
-      return Promise.resolve([{ slice: stored.subarray(from - 1, from - 1 + length) }]);
+      // The SQL guard: no row once the stored length differs from the expected one.
+      if (byteLength !== stored.length) return Promise.resolve([]);
+      const slice = stored.subarray(from - 1, from - 1 + length).toString('base64');
+      return Promise.resolve([{ slice }]);
     }
     return Promise.resolve(meta ? [meta] : []);
   }) as unknown as DbClient;
@@ -113,12 +117,15 @@ describe('readRequestTimelineGz', () => {
 
     expect(gz.equals(stored)).toBe(true);
     expect(ranges).toEqual(
-      Array.from({ length: Math.ceil(stored.length / 64) }, (_, index) => [index * 64 + 1, 64]),
+      Array.from({ length: Math.ceil(stored.length / 64) }, (_, index) => [
+        index * 64 + 1,
+        Math.min(64, stored.length - index * 64),
+      ]),
     );
     expect(gunzipRequestTimeline(gz)).toEqual(gzipTimeline);
   });
 
-  it('never requests more than 16 MiB per query for a multi-slice value', async () => {
+  it('never requests more than one slice per query for a multi-slice value', async () => {
     const stored = Buffer.alloc(2 * REQUEST_TIMELINE_GZ_SLICE_BYTES + 123);
     for (let index = 0; index < stored.length; index += 4096) stored[index] = index % 251;
     const { sql, ranges } = sliceServingSql(stored);
@@ -128,23 +135,46 @@ describe('readRequestTimelineGz', () => {
     expect(ranges).toEqual([
       [1, REQUEST_TIMELINE_GZ_SLICE_BYTES],
       [REQUEST_TIMELINE_GZ_SLICE_BYTES + 1, REQUEST_TIMELINE_GZ_SLICE_BYTES],
-      [2 * REQUEST_TIMELINE_GZ_SLICE_BYTES + 1, REQUEST_TIMELINE_GZ_SLICE_BYTES],
+      [2 * REQUEST_TIMELINE_GZ_SLICE_BYTES + 1, 123],
     ]);
     expect(gz.equals(stored)).toBe(true);
   });
 
-  it('rejects when the stored value shrinks between slices', async () => {
+  it('keeps at most four reads in flight and reassembles them in order', async () => {
+    const stored = Buffer.from(Array.from({ length: 100 }, (_, index) => index));
+    const waiting: (() => void)[] = [];
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const sql = ((_strings: TemplateStringsArray, ...values: unknown[]) => {
+      const [from, length] = values as number[];
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      const { promise, resolve } = Promise.withResolvers<{ slice: string }[]>();
+      waiting.push(() => {
+        inFlight -= 1;
+        resolve([{ slice: stored.subarray(from - 1, from - 1 + length).toString('base64') }]);
+      });
+      return promise;
+    }) as unknown as DbClient;
+
+    const read = readRequestTimelineGz(sql, 870, stored.length, 10);
+    // Answer the newest query first so completion order differs from byte order.
+    const answerNewest = async (): Promise<void> => {
+      await vi.waitFor(() => expect(waiting.length).toBeGreaterThan(0));
+      waiting.pop()?.();
+    };
+    for (let answered = 0; answered < stored.length / 10; answered++) await answerNewest();
+
+    await expect(read).resolves.toEqual(stored);
+    expect(maxInFlight).toBe(4);
+  });
+
+  it('rejects when the stored value changes length between slices', async () => {
     const { sql } = sliceServingSql(Buffer.alloc(60, 7));
 
     await expect(readRequestTimelineGz(sql, 870, 100, 40)).rejects.toThrow(
-      'ended after 60 of 100 bytes',
+      'Stored value changed or ended at byte 0 of 100',
     );
-  });
-
-  it('rejects when the stored value grows between slices', async () => {
-    const { sql } = sliceServingSql(Buffer.alloc(100, 7));
-
-    await expect(readRequestTimelineGz(sql, 870, 90, 40)).rejects.toThrow('grew past 90 bytes');
   });
 });
 
