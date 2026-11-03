@@ -1,6 +1,6 @@
 import type { DbClient } from '../connection.js';
 import type { PowerAudit, WorkerPower } from '../etl/benchmark-mapper.js';
-import { withStoredPerPoolBasis } from '../etl/disagg-throughput.js';
+import { withStoredPerPoolBasis } from '../etl/disagg-throughput';
 export type { PowerAudit, WorkerPower } from '../etl/benchmark-mapper.js';
 
 /**
