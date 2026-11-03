@@ -11,6 +11,7 @@ import { RouteTransition } from '@/components/motion/route-transition';
 import { ModelFeatureBoundary } from '@/components/model-feature-boundary';
 import { JsonLd } from '@/components/seo/json-ld';
 import { AutumnLeaves } from '@/components/effects/autumn-leaves';
+import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import { EasterEggThemeLazy } from '@/components/effects/easter-egg-theme-lazy';
 import { APP_THEMES } from '@/lib/themes/themes';
 import { ThemeProvider } from '@/components/ui/theme-provider';
@@ -198,6 +199,7 @@ export default function RootLayout({
             >
               <PostHogPageView />
               <Header />
+              <UnofficialDomainNotice />
               <EasterEggThemeLazy />
               <div className="grow flex flex-col">
                 <ModelFeatureBoundary>
