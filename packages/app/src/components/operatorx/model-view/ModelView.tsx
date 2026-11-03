@@ -50,6 +50,7 @@ import {
 } from '../compare/hardware';
 import { METRICS, metricById } from '../compare/metrics';
 import { buildModel, caseRefs, type ComparisonModel } from '../compare/model';
+import { slices } from '../compare/slices';
 import { metricVsSize } from '../viz/metric-vs-size';
 import { roofline } from '../viz/roofline';
 import {
@@ -691,42 +692,33 @@ function BlockRows({
   );
 }
 
-/** The dim each op sweeps with the token count; every other dim is fixed within one shape. */
+/** The dim each op sweeps with the token count. */
 const SIZE_DIM: Partial<Record<string, string>> = { gemm: 'm', moe: 'tokens', attention: 'tokens' };
 
-interface ShapeFamily {
-  key: string;
-  label: string;
-  indices: number[];
-}
-
 /**
- * A slot's cases grouped by their fixed dims: one shape swept over the token count each. A
- * layer runs at several shard sizes across serving configs (one per tensor-parallel degree),
- * so a slot can hold more than one.
+ * A slot's cases as the shapes Metric vs size sweeps (`sliceKey`): one shape over the token
+ * count each. A layer runs at several shard sizes across serving configs (one per
+ * tensor-parallel degree), so a slot can hold more than one. Largest shard first: the lowest
+ * tensor-parallel degree.
  */
-function shapeFamilies(view: ComparisonView, indices: number[], op: string): ShapeFamily[] {
+function shapeFamilies(
+  view: ComparisonView,
+  indices: number[],
+  op: ComparisonOp,
+): [string, number[]][] {
   const size = SIZE_DIM[op] ?? 'tokens';
-  const families = new Map<string, ShapeFamily>();
-  for (const i of indices) {
-    const fixed = Object.entries(view.cases[i].dims).filter(([k]) => k !== size);
-    const key = JSON.stringify(fixed);
-    const family = families.get(key) ?? {
-      key,
-      label: fixed.map(([k, v]) => `${k} ${v}`).join(' · '),
-      indices: [],
-    };
-    family.indices.push(i);
-    families.set(key, family);
-  }
-  // largest shard first: the lowest tensor-parallel degree
-  const volume = (f: ShapeFamily) =>
-    Object.entries(view.cases[f.indices[0]].dims)
+  const volume = (i: number) =>
+    Object.entries(view.cases[i].dims)
       .filter(([k]) => k !== size)
       .reduce((t, [, v]) => t * v, 1);
-  return [...families.values()].sort(
-    (a, b) => volume(b) - volume(a) || a.label.localeCompare(b.label),
-  );
+  return [
+    ...slices(
+      op,
+      indices.map((i) => view.cases[i]),
+    ),
+  ]
+    .map(([key, at]): [string, number[]] => [key, at.map((j) => indices[j])])
+    .sort(([ka, a], [kb, b]) => volume(b[0]) - volume(a[0]) || ka.localeCompare(kb));
 }
 
 /** One shape of one slot: size sweep and roofline, each point opening its kernel timeline. */
@@ -749,15 +741,17 @@ function SlotDetail({
     setFamily(null);
   }
   const families = useMemo(
-    () => (data?.model ? shapeFamilies(data.model.view, data.indices, data.slot.op) : []),
+    () =>
+      data?.model ? shapeFamilies(data.model.view, data.indices, data.slot.op as ComparisonOp) : [],
     [data],
   );
-  const family = families.find((f) => f.key === pickedFamily) ?? families[0];
+  const [familyKey, familyIndices] = families.find(([k]) => k === pickedFamily) ??
+    families[0] ?? [null, []];
   const queryClient = useQueryClient();
   const sub = useMemo(() => {
-    if (!data?.model || !family) return null;
+    if (!data?.model || familyKey === null) return null;
     const { model, slot } = data;
-    const view = subView(model.view, family.indices);
+    const view = subView(model.view, familyIndices);
     const measured = measuredHardware([view]).filter((hw) => model.available.includes(hw));
     const op = slot.op as ComparisonOp;
     return {
@@ -784,44 +778,44 @@ function SlotDetail({
         },
       ),
     };
-  }, [data, family, queryClient]);
+  }, [data, familyKey, familyIndices, queryClient]);
   return (
     <Dialog open={data !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         className="flex max-h-[94vh] w-[min(96vw,72rem)] max-w-[min(96vw,72rem)] flex-col gap-4 overflow-y-auto p-4 sm:p-6"
         data-testid="operatorx-model-slot-detail"
       >
-        {data && sub && family && (
+        {data && sub && familyKey !== null && (
           <>
             <DialogHeader>
               <DialogTitle className="font-mono">{data.slot.label}</DialogTitle>
               <DialogDescription>
-                {data.block.label} · {modelName} · <span className="font-mono">{family.label}</span>{' '}
-                · {family.indices.length.toLocaleString()}{' '}
-                {family.indices.length === 1 ? 'size' : 'sizes'} of{' '}
+                {data.block.label} · {modelName} · {familyIndices.length.toLocaleString()}{' '}
+                {familyIndices.length === 1 ? 'size' : 'sizes'} of{' '}
                 <span className="font-mono">{SIZE_DIM[data.slot.op] ?? 'tokens'}</span>
               </DialogDescription>
             </DialogHeader>
-            {families.length > 1 && (
-              <div className="space-y-1.5" data-testid="operatorx-model-slot-shapes">
-                <SegmentedToggle
-                  value={family.key}
-                  onValueChange={(key) => {
-                    track('operatorx_model_shape_selected', { op: data.slot.op });
-                    setInspected(null);
-                    setFamily(key);
-                  }}
-                  ariaLabel="Shape"
-                  variant={families.length > 4 ? 'select' : 'segments'}
-                  className="font-mono"
-                  options={families.map((f) => ({ value: f.key, label: f.label }))}
-                />
+            {/* One picker for both charts: Metric vs size gets this one shape only */}
+            <div className="space-y-1.5" data-testid="operatorx-model-slot-shapes">
+              <SearchableSelect
+                size="sm"
+                searchable={families.length > 8}
+                value={familyKey}
+                onValueChange={(key) => {
+                  track('operatorx_model_shape_selected', { op: data.slot.op });
+                  setInspected(null);
+                  setFamily(key);
+                }}
+                triggerAriaLabel="Shape"
+                groups={[{ label: '', options: families.map(([k]) => ({ value: k, label: k })) }]}
+              />
+              {families.length > 1 && (
                 <p className="text-xs text-muted-foreground">
-                  This layer runs at {families.length} shard sizes across the serving configs, one
-                  per tensor-parallel degree. Each is one shape swept over the token count.
+                  This layer runs at {families.length} shapes across the serving configs, mostly one
+                  shard size per tensor-parallel degree. Each is swept over the token count.
                 </p>
-              </div>
-            )}
+              )}
+            </div>
             <div className="space-y-6">
               <section className="space-y-2">
                 <h3 className="text-sm font-semibold">{roofline.title}</h3>
