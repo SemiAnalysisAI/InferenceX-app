@@ -639,29 +639,33 @@ export function cachedJsonBytes(
 interface EncodedJson {
   readonly digest: string;
   readonly brotliQuality: number;
-  readonly brotli: Uint8Array;
+  readonly body: Uint8Array;
 }
+
+const IDENTITY_BODY = 0;
 
 const compressAsync = promisify(brotliCompress);
 
-async function encodeJson(data: unknown): Promise<EncodedJson> {
+async function encodeJson(data: unknown, compression: JsonCompression): Promise<EncodedJson> {
   const bytes = new TextEncoder().encode(JSON.stringify(data));
+  const digest = entityDigest(bytes);
+  if (compression === 'cdn') return { digest, brotliQuality: IDENTITY_BODY, body: bytes };
   const brotliQuality = brotliQualityFor(bytes.byteLength);
-  const brotli = await compressAsync(bytes, {
+  const body = await compressAsync(bytes, {
     params: {
       [zlibConstants.BROTLI_PARAM_QUALITY]: brotliQuality,
       [zlibConstants.BROTLI_PARAM_MODE]: zlibConstants.BROTLI_MODE_TEXT,
       [zlibConstants.BROTLI_PARAM_SIZE_HINT]: bytes.byteLength,
     },
   });
-  return { digest: entityDigest(bytes), brotliQuality, brotli };
+  return { digest, brotliQuality, body };
 }
 
-function storedEncodedJson({ digest, brotliQuality, brotli }: EncodedJson): Uint8Array {
-  const stored = new Uint8Array(1 + ENTITY_DIGEST_CHARS + brotli.byteLength);
+function storedEncodedJson({ digest, brotliQuality, body }: EncodedJson): Uint8Array {
+  const stored = new Uint8Array(1 + ENTITY_DIGEST_CHARS + body.byteLength);
   stored[0] = brotliQuality;
   new TextEncoder().encodeInto(digest, stored.subarray(1, 1 + ENTITY_DIGEST_CHARS));
-  stored.set(brotli, 1 + ENTITY_DIGEST_CHARS);
+  stored.set(body, 1 + ENTITY_DIGEST_CHARS);
   return stored;
 }
 
@@ -669,7 +673,7 @@ function readEncodedJson(stored: Uint8Array): EncodedJson {
   return {
     brotliQuality: stored[0],
     digest: new TextDecoder().decode(stored.subarray(1, 1 + ENTITY_DIGEST_CHARS)),
-    brotli: stored.subarray(1 + ENTITY_DIGEST_CHARS),
+    body: stored.subarray(1 + ENTITY_DIGEST_CHARS),
   };
 }
 
@@ -684,12 +688,17 @@ function encodedJsonResponse(
     notModified,
   } = jsonValidation(request, encoded.digest, options, encoded.brotliQuality);
   if (notModified) return notModified;
-  if (encoding === 'br') {
-    return new Response(identityBody(encoded.brotli), {
-      headers: { 'Content-Type': 'application/json', 'Content-Encoding': 'br', ...cacheHeaders },
+  const storedCoding = encoded.brotliQuality === IDENTITY_BODY ? 'identity' : 'br';
+  if (encoding === storedCoding) {
+    return new Response(identityBody(encoded.body), {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(encoding === 'br' ? { 'Content-Encoding': 'br' } : {}),
+        ...cacheHeaders,
+      },
     });
   }
-  const bytes = brotliDecompressSync(encoded.brotli);
+  const bytes = brotliDecompressSync(encoded.body);
   if (encoding === 'identity') {
     return new Response(identityBody(bytes), {
       headers: { 'Content-Type': 'application/json', ...cacheHeaders },
@@ -705,12 +714,14 @@ export function cachedJsonResponse<Args extends unknown[]>(
   keyPrefix: string,
   options?: CachedJsonOptions,
 ): (request: Request, ...args: Args) => Promise<Response> {
+  const compression = options?.compression ?? 'origin';
+  const suffix = compression === 'cdn' ? 'response.json' : 'response.br';
   const inflight = new Map<string, Promise<EncodedJson>>();
   const fill = async (path: string, args: Args): Promise<EncodedJson> => {
     const stored = await blobGetBytes(path);
     if (stored !== null && stored.byteLength > 1 + ENTITY_DIGEST_CHARS)
       return readEncodedJson(stored);
-    const encoded = await encodeJson(await load(...args));
+    const encoded = await encodeJson(await load(...args), compression);
     try {
       await blobSetBytes(path, storedEncodedJson(encoded));
     } catch (error) {
@@ -725,7 +736,7 @@ export function cachedJsonResponse<Args extends unknown[]>(
   return async (request: Request, ...args: Args): Promise<Response> => {
     if (!blobEnabled()) return cachedJson(request, await load(...args), options);
     blobGeneration ??= cachedQuery(() => Promise.resolve(randomUUID()), 'blob-generation');
-    const path = `generation/${await blobGeneration()}/${blobKeyForArgs(keyPrefix, args)}.response.br`;
+    const path = `generation/${await blobGeneration()}/${blobKeyForArgs(keyPrefix, args)}.${suffix}`;
     let flight = inflight.get(path);
     if (!flight) {
       flight = fill(path, args).finally(() => inflight.delete(path));

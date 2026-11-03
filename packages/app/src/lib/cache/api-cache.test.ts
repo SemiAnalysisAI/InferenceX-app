@@ -807,14 +807,20 @@ describe('cachedJsonResponse', () => {
     );
   });
 
-  it('decodes a stored body to plain JSON without Vary when the CDN compresses', async () => {
+  it('stores the plain JSON body and serves it unchanged when the CDN compresses', async () => {
     const data = { label: '基准测试', rows: [1, 2, 3] };
     const options = { compression: 'cdn' } as const;
     mockBlobGetBytes.mockResolvedValueOnce(null);
     const respond = cachedJsonResponse(() => Promise.resolve(data), 'cdn', options);
     const request = () => apiRequest({ 'Accept-Encoding': 'gzip, deflate, br, zstd' });
-    await respond(request());
-    mockBlobGetBytes.mockResolvedValueOnce(storedBytes());
+    await sameResponse(await respond(request()), cachedJson(request(), data, options));
+    expect(mockBlobSetBytes).toHaveBeenCalledWith(
+      expect.stringMatching(/^generation\/g1\/cdn:v2:.+\.response\.json$/u),
+      expect.any(Uint8Array),
+    );
+    const stored = storedBytes();
+    expect(Buffer.from(stored.subarray(33)).toString('utf8')).toBe(JSON.stringify(data));
+    mockBlobGetBytes.mockResolvedValueOnce(stored);
 
     await sameResponse(await respond(request()), cachedJson(request(), data, options));
   });
