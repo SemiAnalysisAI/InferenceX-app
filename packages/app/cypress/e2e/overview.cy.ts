@@ -3,7 +3,6 @@ import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-con
 const MODEL_LABELS = [
   'Muse Spark Open 816B',
   'DeepSeek V4.1 Flash 552B',
-  'Kimi K3 2.8T',
   'MiniMax M3.1 Flash 428B',
   'GLM5.2/GLM5.3',
   'Qwen3.5 397B',
@@ -19,7 +18,7 @@ const PLATFORM_HEADERS = [
 ];
 
 const SINGLE_TURN = 'single_turn_8k1k';
-const MATRIX_ROWS = 8;
+const MATRIX_ROWS = 7;
 const AGENTX = 'agentx';
 const AGENTX_LABEL = 'Long Context Multi-Turn Realistic Agentic Scenario (AgentX)';
 const AGENTX_LABEL_ZH = '长上下文、多轮交互的真实智能体场景（AgentX）';
@@ -380,7 +379,7 @@ describe('Overview page', () => {
     cy.go('back');
     cy.location('search').should('eq', '');
     cy.go('back');
-    cy.location('pathname').should('eq', '/inference/kimi-k3');
+    cy.location('pathname').should('eq', '/inference/deepseek-v41-flash');
   });
 
   it('warms a hovered option and derives the reference without a request', () => {
@@ -1166,7 +1165,7 @@ describe('Overview page', () => {
     for (const label of MODEL_LABELS) {
       cy.get('[data-testid="overview-desktop-matrix"]').should('contain.text', label);
     }
-    for (const model of ['DeepSeek-V4.1-Flash', 'Kimi-K3', 'GLM-5.2']) {
+    for (const model of ['DeepSeek-V4.1-Flash', 'GLM-5.2']) {
       desktopModel(model).within(() => {
         expectAgentxScenario(AGENTX_LABEL);
       });

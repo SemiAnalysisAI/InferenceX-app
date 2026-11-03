@@ -19,7 +19,7 @@ function interceptMinimaxM3RubinData(rows: typeof minimaxM3RubinRows = minimaxM3
   });
 }
 
-const TARGET = '/inference/kimi-k3';
+const TARGET = '/inference/deepseek-v41-flash';
 
 describe('Muse Spark Open results', () => {
   beforeEach(() => {
@@ -111,7 +111,7 @@ describe('landing model curation', () => {
       cy.get('[data-testid="compare-agentx-primary"]').within(() => {
         cy.get('[data-testid^="compare-agentx-model-"]').should(($links) => {
           expect([...$links].map((link) => link.getAttribute('href'))).to.deep.eq(
-            ['muse-spark-open', 'deepseek-v41-flash'].map((slug) => `${prefix}/inference/${slug}`),
+            ['deepseek-v41-flash', 'muse-spark-open'].map((slug) => `${prefix}/inference/${slug}`),
           );
         });
         cy.get('[data-testid="compare-agentx-model-muse-spark-open"]')
@@ -135,7 +135,7 @@ describe('landing model curation', () => {
           .next('nav')
           .find('[data-testid^="compare-agentx-model-"]')
           .first()
-          .should('have.attr', 'data-testid', 'compare-agentx-model-muse-spark-open');
+          .should('have.attr', 'data-testid', 'compare-agentx-model-deepseek-v41-flash');
         cy.get('[data-testid="landing-minimax-m31-flash-results-link"]')
           .should('contain.text', 'MiniMax M3.1 Flash')
           .and('contain.text', 'AgentX')
@@ -196,7 +196,7 @@ describe('landing model curation', () => {
           .next('nav')
           .find('[data-testid^="compare-agentx-model-"]')
           .first()
-          .should('have.attr', 'data-testid', 'compare-agentx-model-muse-spark-open');
+          .should('have.attr', 'data-testid', 'compare-agentx-model-deepseek-v41-flash');
       });
 
       cy.visit(`${prefix}/compare`);
@@ -373,7 +373,7 @@ describe('landing → full dashboard navigation', () => {
   it('commits exactly one navigation and one history entry on a cold dashboard load', () => {
     const writes: HistoryWrite[] = [];
 
-    cy.intercept({ url: /\/inference\/kimi-k3/ }, (req) => {
+    cy.intercept({ url: /\/inference\/deepseek-v41-flash/ }, (req) => {
       if (req.headers['next-router-prefetch']) {
         req.reply({ statusCode: 404, body: '' });
         return;

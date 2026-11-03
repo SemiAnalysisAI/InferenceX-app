@@ -183,8 +183,8 @@ describe('First-load navigation', () => {
 
   it('navigates to dashboard from the header with one click', () => {
     cy.get('[data-testid="nav-link-dashboard"]').click();
-    cy.location('pathname').should('eq', '/inference/kimi-k3');
-    cy.get('[data-testid="model-selector"]').should('contain.text', 'Kimi K3');
+    cy.location('pathname').should('eq', '/inference/deepseek-v41-flash');
+    cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek V4.1 Flash');
   });
 
   it('navigates to comparisons from the footer with one click', () => {
@@ -211,7 +211,7 @@ describe('First-load navigation', () => {
         .and('have.attr', 'href', '/profit-estimator-per-gigawatt');
       cy.get('[data-testid="compare-agentx-dashboard-link"]')
         .should('have.text', 'Dashboard')
-        .and('have.attr', 'href', '/inference/kimi-k3');
+        .and('have.attr', 'href', '/inference/deepseek-v41-flash');
       cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
       cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 2);
       for (const hidden of ['minimax-m3', 'kimi-k3', 'glm-5-3']) {
