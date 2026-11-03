@@ -69,7 +69,15 @@ describe('OperatorX useful FLOPs and bytes', () => {
     const split = v41Flash(256, { dp: 8, ep: 8 });
     const node = v41Flash(256 * 8);
     expect(usefulFlops('moe', split)).toBeCloseTo(usefulFlops('moe', node)! / 8, 3);
-    expect(usefulBytes('moe', split)).toBeCloseTo(usefulBytes('moe', node)! / 8, 3);
+    // Router and shared-expert weights are replicated per dp group (vLLM's DeepseekV2MoE), so
+    // each device still reads them whole; only routed-expert weights and activations spread.
+    const sharedWeights =
+      usefulBytes('moe', v41Flash(8))! - usefulBytes('moe', { ...v41Flash(8), shared: undefined })!;
+    const replicated = 5120 * 384 * 2 + sharedWeights;
+    expect(usefulBytes('moe', split)).toBeCloseTo(
+      usefulBytes('moe', node)! / 8 + (replicated * 7) / 8,
+      3,
+    );
   });
 
   it('keeps the measured B300 EP8/TP8 case under the 8 TB/s bandwidth roof', () => {
@@ -83,7 +91,9 @@ describe('OperatorX useful FLOPs and bytes', () => {
 
   it('divides tensor-parallel GEMM counts by tp', () => {
     expect(usefulFlops('gemm', gemm({ tp: 4 }))).toBe(usefulFlops('gemm', gemm())! / 4);
-    expect(usefulBytes('gemm', gemm({ tp: 4 }))).toBe(usefulBytes('gemm', gemm())! / 4);
+    // B is split over K, so each device reads 1/tp of A and B but writes a full partial C.
+    const c = 128 * 4096 * 2;
+    expect(usefulBytes('gemm', gemm({ tp: 4 }))).toBe((usefulBytes('gemm', gemm())! - c) / 4 + c);
   });
 
   it.each<Record<string, unknown>>([{ tp: 0 }, { tp: 2.5 }, { dp: -1 }, { tp: '2' }])(

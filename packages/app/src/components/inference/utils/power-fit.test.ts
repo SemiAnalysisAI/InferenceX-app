@@ -58,6 +58,8 @@ describe('buildPowerFits', () => {
     const gb200 = ladder([100, 300, 500], () => 0, {
       hwKey: 'gb200_dynamo-sglang',
       disagg: true,
+      prefill_num_workers: 1,
+      decode_num_workers: 1,
       num_prefill_gpu: 4,
       num_decode_gpu: 4,
     }).map((entry) => ({

@@ -24,8 +24,37 @@ describe('matched original H100 and B200 artifacts', () => {
       expect(body.overlayCells).to.have.length(2);
       const cells = body.overlayCells;
       expect(body.clipQuality.status).to.equal('ready');
-      expect(body.clipQuality.groups).to.have.length(20);
-      for (const group of body.clipQuality.groups) {
+      const original = body.clipQuality.groups.filter(
+        (group: { scope: string }) => group.scope === 'ci',
+      );
+      const diagnostics = body.clipQuality.groups.filter(
+        (group: { scope: string }) => group.scope === 'matched-noise-diagnostic',
+      );
+      expect(original).to.have.length(20);
+      expect(diagnostics).to.have.length(1);
+      expect(body.clipQuality.groups).to.have.length(21);
+      expect(diagnostics[0].take).to.equal(null);
+      expect(diagnostics[0].clips).to.have.length(1);
+      const diagnostic = diagnostics[0].clips[0];
+      expect(diagnostic.hardware).to.equal('h100');
+      expect(diagnostic.pointId).to.equal(null);
+      expect(diagnostic.slotId).to.equal(null);
+      expect(diagnostic.quality.psnrDb).to.equal(13.231470416302734);
+      expect(diagnostic.quality.comparedFrames).to.equal(124);
+      expect(diagnostic.quality.releaseQualified).to.equal(false);
+      expect(diagnostic.quality.candidate.run_id).not.to.equal(run);
+      for (const url of [diagnostic.quality.candidate.url, diagnostic.quality.reference.url]) {
+        cy.request({
+          url,
+          headers: { Range: 'bytes=0-31' },
+          encoding: 'binary',
+        }).then(({ status, headers, body: bytes }) => {
+          expect(status).to.equal(206);
+          expect(headers['content-range']).to.match(/^bytes 0-31\/\d+$/);
+          expect(bytes).to.have.length(32);
+        });
+      }
+      for (const group of original) {
         expect(group.clips).to.have.length(2);
         expect(
           new Set(
@@ -86,12 +115,41 @@ describe('matched original H100 and B200 artifacts', () => {
   for (const [width, path] of [
     [1440, '/video'],
     [390, '/video'],
+    [320, '/video'],
+    [1440, '/zh/video'],
+    [390, '/zh/video'],
     [320, '/zh/video'],
   ] as const) {
     it(`plays and scrubs both matching original videos at ${width}px ${path}`, () => {
       cy.viewport(width, 900);
       cy.visit(`${path}?${selection}`);
       cy.get('[data-testid="results-overlay"]').should('contain', run);
+      cy.get('[data-testid="video-results-case"]').should(
+        'contain',
+        path.startsWith('/zh') ? '相同初始噪声重跑' : 'Matched-noise rerun',
+      );
+      cy.get('[data-testid="video-results-clip"]').should('have.length', 2);
+      cy.get('[data-testid="video-results-clip"] video').should('have.length', 1);
+      cy.get('[data-hardware="b200"] video').should('not.exist');
+      cy.get('[data-hardware="h100"]').should('contain', '13.23 dB');
+      cy.get('[data-testid="video-results-clip"][data-hardware="h100"]')
+        .find('dd')
+        .then(($values) => {
+          expect([...$values].map((value) => value.textContent?.trim())).to.deep.equal([
+            '—',
+            '13.23 dB',
+            '—',
+            '—',
+            '—',
+          ]);
+        });
+      expectNoPageOverflow();
+      cy.get('[data-testid="video-results-clips"]').screenshot(
+        `matched-noise-${width}-${path.startsWith('/zh') ? 'zh' : 'en'}`,
+        { overwrite: true },
+      );
+      cy.get('[data-testid="video-results-case"]').click();
+      cy.contains('[role="option"]', /ceramic-wheel · (?:take 1|第 1 次)$/).click();
       cy.get('[data-testid="video-results-clip"]').should('have.length', 2);
       cy.get('[data-testid="video-results-reference"]').should('contain', 'Diffusers');
       cy.get('[data-hardware="b200"]').should('contain', '26.18 dB');
@@ -155,9 +213,10 @@ describe('matched original H100 and B200 artifacts', () => {
     cy.request(overview).then(({ body }) => {
       cy.visit(`/video?${selection}`);
       for (const group of body.clipQuality.groups) {
+        if (group.scope !== 'ci') continue;
         const caseId = group.clips[0].caseId;
         cy.get('[data-testid="video-results-case"]').click();
-        cy.contains('[role="option"]', caseId).click();
+        cy.contains('[role="option"]', `${caseId} · take ${group.take}`).click();
         cy.get('[data-testid="video-results-prompt"]').should('contain', group.prompt);
         for (const clip of group.clips) {
           cy.get(`[data-testid="video-results-clip"][data-hardware="${clip.hardware}"]`)

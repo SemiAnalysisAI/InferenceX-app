@@ -123,6 +123,8 @@ describe('equal-service comparison', () => {
     const pd = point({
       hwKey: 'gb200',
       disagg: true,
+      prefill_num_workers: 1,
+      decode_num_workers: 1,
       physicalChips: 8,
       num_prefill_gpu: 4,
       num_decode_gpu: 4,

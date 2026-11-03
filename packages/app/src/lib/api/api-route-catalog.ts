@@ -67,7 +67,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-calculator-view',
-    sourceSha256: '3d28ca187d502472c5754d0d29276ab9d717f08c8948db6900b83079323bebe5',
+    sourceSha256: '9262546d652a4dc4ba7ee03425891d072f020ba181202b6e2cab1e48a95018e0',
   },
   {
     source: 'src/app/api/v1/views/collectivex/route.ts',
@@ -139,7 +139,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-historical-view',
-    sourceSha256: 'd2f7768ffee4a60618ac4f9add87bbe571cc668424eb8d9f257d78fe82a546fb',
+    sourceSha256: '13b54a14adedb3725f74a5d973e588bcd9ee7a9ecd91383ea066774fea9b5683',
   },
   {
     source: 'src/app/api/v1/views/inference/route.ts',
@@ -147,7 +147,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-inference-view',
-    sourceSha256: '18d6658379e045492907836358cf5c29a1d901af6189498b519266c249244674',
+    sourceSha256: 'e61587be769b322f974fc275534e2abab57b4a936725379bda4da1cf5dea068f',
   },
   {
     source: 'src/app/api/v1/views/options/route.ts',
@@ -212,6 +212,14 @@ export const apiRouteCatalog = [
     classification: 'published-read',
     operationId: 'get-video-view',
     sourceSha256: 'f250c6e333c2c533930c193606144e6dd6f7aebb001341412bb34ccbdb275105',
+  },
+  {
+    source: 'src/app/api/v1/views/operatorx/route.ts',
+    path: '/api/v1/views/operatorx',
+    method: 'GET',
+    classification: 'published-read',
+    operationId: 'get-operatorx-view',
+    sourceSha256: 'f4218a9564b96efd3e212cd50ec5a85cbf233db9145c91b3debcbcf7cd423ad8',
   },
   // Agentic Workload Explorer page backend (frozen ProxyTrace snapshot).
   {
@@ -562,7 +570,7 @@ export const apiRouteCatalog = [
       en: 'OperatorX page backend; comparisons include hardware references, defaults, optional distribution quantiles and per-hardware or shared-cohort roofline median/best summaries with resolved controls.',
       zh: 'OperatorX 页面后端；对比结果包含硬件参考值和默认设置，并可按需返回分布分位数及基于各硬件自身用例或共同用例的 roofline 中位数与最佳值汇总，同时附带实际生效的参数。',
     },
-    sourceSha256: 'a80b749f58ba741aa7ac5ec6654b1290e1afb8f00e38f1411eb965a9db3e36f4',
+    sourceSha256: '733e41ed3e2ba2cc0ef394439b09f850e06c310c6b611c7a2507dfb221cb6dad',
   },
   {
     source: 'src/app/api/v1/operatorx/timelines/route.ts',
@@ -573,7 +581,7 @@ export const apiRouteCatalog = [
       en: 'OperatorX page backend; serves the case drill-down kernel timelines in the page’s own compact shape.',
       zh: 'OperatorX 页面后端；以页面自身的紧凑结构提供用例详情的 kernel 时间线。',
     },
-    sourceSha256: 'c41b25c899b181bd5d687c795d12b74b8b279bbf55ee7e7b4c77f6d46abeff26',
+    sourceSha256: 'eaaf5647360300c025a65f5e4896ca3799aea85905a32f7e6258cea517620342',
   },
 
   {
@@ -1227,7 +1235,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/operatorx/visualization.ts',
-    sourceSha256: '254d065ad3363fe986310bedd5b7db2802df08f2f769e2a6a850da38b6025c41',
+    sourceSha256: '9f6ae09fc42219d2a18206dfa865517441cf113c4a9ce3e10f961cfd6240f504',
     reviewArea: {
       en: 'OperatorX workload-resolved chart defaults and shared shape grouping used by UI and comparison API.',
       zh: 'OperatorX 按工作负载确定的图表默认值及形状分组，由 UI 与对比 API 共用。',
@@ -1235,7 +1243,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/operatorx/compare.ts',
-    sourceSha256: '1f0631a7d4a62fbaf7132f604ead59a6e4c524c1f05cdf5762308f8e2bed12f8',
+    sourceSha256: '1d20161803067adbabaf94f43be63467d8afb28c7fa3385b8815c180d56d82a0',
     reviewArea: {
       en: 'OperatorX page-owned comparison: workload filtering and optional hardware normalization references; excluded from published OpenAPI.',
       zh: 'OperatorX 页面专属对比：workload 筛选及可选的硬件归一化参考值；不纳入公开 OpenAPI。',
@@ -1243,7 +1251,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/operatorx/roofline-summary.ts',
-    sourceSha256: '47d966e7aa7934cea6daefed5e8a37f6cdd888f0ee8a1e428cad990624380b69',
+    sourceSha256: '3de17956e01ad89e1890140b35a8e7bbfc069e9e60fc22d09b45f121f050aeee',
     reviewArea: {
       en: 'OperatorX per-hardware and shared compute-bound cohorts, median/best throughput, precision and normalized values shared by the roofline bars and API.',
       zh: 'OperatorX 的各硬件自身及共同计算受限用例、吞吐量中位数与最佳值、精度及归一化数值，由 roofline 柱状图与 API 共用。',
@@ -1259,7 +1267,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/operatorx/service.ts',
-    sourceSha256: 'f14a3caf1bb3bd3f23d8fe4b9f71ae58a1842c26da3fd545ec67572e33d9808f',
+    sourceSha256: '8be8dbf750d00e5cf9ffc92bc6c58c80fc8e94c43744162f450a9d7cfb780840',
     reviewArea: {
       en: 'OperatorX bulk compact reads, revision-keyed shared Blob comparisons, raw fallback, partial/revision cache exclusion and bounded timeline reads.',
       zh: 'OperatorX 批量精简读取、按 revision 共享 Blob 对比缓存、原始数据回退、部分失败或 revision 变更时不缓存，以及时间线限流并行读取规则。',
@@ -1267,7 +1275,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/operatorx/comparison-cache.ts',
-    sourceSha256: '82db8cd90b176c6f86328f64504f9417cd748788319dec43532d84d33a9b81f5',
+    sourceSha256: 'f3119d7400cd6502e37be933385f2c235abc30472f7d0eef0044721f1cf6befb',
     reviewArea: {
       en: 'Versioned ingest-time OperatorX projections and newest-first merge preserving statuses, source ordering and timeline provenance.',
       zh: 'OperatorX 写入时生成的版本化对比数据及最新优先合并规则，保留状态、来源顺序和时间线归属。',
@@ -1275,7 +1283,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/operatorx.ts',
-    sourceSha256: '134980fa91bf9ffb21659527f3834f10971afd2cc3b7d738673bb93dcb0b6c0e',
+    sourceSha256: '10fa17540b17e49996417e2b2339efa085daff66d42ddb2f8d9af40fb8427977',
     reviewArea: {
       en: 'OperatorX raw and compact reads, atomic projection writes and revision-guarded backfill.',
       zh: 'OperatorX 原始及精简数据读取、事务内写入和按 revision 校验的 backfill。',
@@ -1364,7 +1372,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/inference/utils/equal-service-comparison.ts',
-    sourceSha256: '5d044897542c1067bff7fc3fed59669e813b6ab6b9eaf1a7ebe2f89db6645256',
+    sourceSha256: '616e2fc8b2e7bc2887390d77122a47981dc72ad78c767d8e4d954d01c40622eb',
     reviewArea: {
       en: 'Source-scoped equal-service interpolation, comparator-relative changes, endpoint provenance, prefill share projection and role points.',
       zh: '按完整来源限定的同等服务插值、相对基准变化、端点来源、prefill 占比视图以及各角色数据点。',
@@ -1380,7 +1388,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/inference/utils/power-fit.ts',
-    sourceSha256: '4e2e566d2ccfe495af23d40b83b56d7ec329792f472e6391250eb04aa269bf60',
+    sourceSha256: 'e2a2ac73954895d5af800633d989cc83ca46909e238e93cc353b1c36f44fda1a',
     reviewArea: {
       en: 'Per-source least-squares power fit on output per allocated GPU: intercept, marginal J/token, R², fitted range and registry TDP.',
       zh: '按来源对每个已分配 GPU 的输出做最小二乘功耗拟合：截距、边际 J/token、R²、拟合范围与注册表 TDP。',
@@ -1404,7 +1412,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/benchmarks/benchmark-transform.ts',
-    sourceSha256: '4a59ccf2b1190d8165e45a54aee212814282f39f3271041221abe9ff7be7a68f',
+    sourceSha256: 'ac11e6cd116976c976294533c271990932dc4ede1f1bb2c4a64028ebf523a731',
     reviewArea: {
       en: 'Raw benchmark means and derived reciprocal mean-TPOT interactivity used by Dashboard and read-only views.',
       zh: '仪表板和只读视图共用的原始 benchmark 均值与 mean TPOT 倒数形式的 interactivity。',
@@ -1666,7 +1674,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/inference/hooks/interpolated-trend-core.ts',
-    sourceSha256: '231c59a712838f58eabce02767abcdfbc48defcd5e6bc1ad9c8c939ee308cf95',
+    sourceSha256: '4c8afca48834b3998c78422e04c6c5bd7357844a1fac816e7f838f06a8df0d61',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1693,7 +1701,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/calculator/throughput-data.ts',
-    sourceSha256: '9dbf3e828140b50023724ce129e25db90ce358ceed1e4051871d43a62ec267ef',
+    sourceSha256: '5646735ab4b3bd614b3ced464d44ecedb47a2097d3ea4140991375f02b2ea6cc',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1711,7 +1719,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/calculator-extensions.ts',
-    sourceSha256: 'e2e3ecf4e5f5e0561d81c3eceee1b5d497011e3cd9a1182328cce6ec721ca7f9',
+    sourceSha256: '8204200a643c6ed136ccc0f0b63937ccea1ccb9e09cc34198281f170795ff084',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1720,7 +1728,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/source.ts',
-    sourceSha256: '4d2a0b9d81ea157923b2ca38a94133d037316f5b4623e52a322ecf0222eedc95',
+    sourceSha256: '851f3b926dc08c52b2c8a32d9fc7fe18e12288e04167977d1efa3734e96217c8',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1738,7 +1746,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/series.ts',
-    sourceSha256: '56d51db6c3d6b49417692ad822076d57935439ea21a907e19f72cb48a9cb6c80',
+    sourceSha256: 'c858c8dd58f50167459afda9ca1ab662bb76daae8f1892847e7e65ac526c1b13',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1747,7 +1755,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/registry.ts',
-    sourceSha256: '187517ced095ce52a10b37cc42947c97350414ab97b93bd97be28e72c9f9fceb',
+    sourceSha256: 'd1aecf9e584320d55b11de717e69df5cb909d1c88e339f68bb89661ccdcfd2c5',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1756,7 +1764,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/params.ts',
-    sourceSha256: '00dd4d4b6bd360e4ce7ea26027bd60a01693901f380ed772e212897dc6202a64',
+    sourceSha256: '21f92834ef015f770573923da19085fdb92a4cff9115c5e106b8c7e632cfed46',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1781,7 +1789,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/cache/api-cache.ts',
-    sourceSha256: '3c4790f16dafceee25010f62a85735c8a0a079a14b02e3f4523c87ed4b5a0e7d',
+    sourceSha256: '0749d8dc17fa65f3b4a0f2959012e914427dc632cc8ad340e67fde9a949ee51c',
     reviewArea: {
       en: 'Public CDN tags, cache lifetimes, Blob key dimensions, and purge behavior.',
       zh: '公开 CDN 标签、缓存时长、Blob 键维度和清除行为。',
@@ -1951,7 +1959,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/benchmarks.ts',
-    sourceSha256: '8e9a09b505a8d01ca0660116d87692ac3c8ad57a5bf80bbde7fb041bf90acf22',
+    sourceSha256: '3c1c7bf08d1b7bb137391d68cd134e95a61b266611aee7ef3dd323714a61bb1d',
     reviewArea: {
       en: 'Benchmark row fields and latest, exact-run, history, and TCO query semantics.',
       zh: '基准行字段以及最新、精确运行、历史和 TCO 查询语义。',

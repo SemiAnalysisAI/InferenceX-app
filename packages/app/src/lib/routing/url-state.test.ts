@@ -35,6 +35,11 @@ describe('PARAM_DEFAULTS', () => {
     expect(PARAM_DEFAULTS.g_tco).toBe('internal');
   });
 
+  it('defaults the chip basis to per pool so only the total basis is share-link state', async () => {
+    const { PARAM_DEFAULTS } = await import('@/lib/routing/url-state');
+    expect(PARAM_DEFAULTS.g_chips).toBe('pool');
+  });
+
   it('has an EMPTY default for i_seq so the selected scenario is always written', async () => {
     const { PARAM_DEFAULTS } = await import('@/lib/routing/url-state');
     expect(PARAM_DEFAULTS.i_seq).toBe('');

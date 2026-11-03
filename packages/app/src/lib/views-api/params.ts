@@ -15,6 +15,7 @@ import {
 } from '@/components/inference/utils/quickFilters';
 import { COMPARE_MODEL_ALIASES, COMPARE_MODEL_SLUGS } from '@/lib/compare/compare-slug';
 import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/catalog/constants';
+import { DEFAULT_CHIP_BASIS, type ChipBasis } from '@/lib/benchmarks/chip-basis';
 import {
   Percentile,
   PRECISION_OPTIONS,
@@ -283,6 +284,7 @@ export const CALCULATOR_MODE_TO_INTERNAL: Record<CalculatorModeParam, Calculator
 export const CALCULATOR_DEFAULT_TARGET = 35;
 
 export const TCO_BASIS_VALUES = ['internal', 'external'] as const satisfies readonly TcoBasis[];
+export const CHIP_BASIS_VALUES = ['pool', 'total'] as const satisfies readonly ChipBasis[];
 export const COST_PROVIDER_VALUES = ['costh', 'costr'] as const satisfies readonly CostProvider[];
 export const COST_TYPE_VALUES = ['total', 'input', 'output'] as const satisfies readonly CostType[];
 export const DEFAULT_COST_PROVIDER: CostProvider = 'costh';
@@ -290,6 +292,11 @@ export const DEFAULT_COST_TYPE: CostType = 'total';
 
 export function parseTcoBasisParam(value: string | null, param = 'tcoBasis'): TcoBasis {
   return parseEnumParam(value, param, TCO_BASIS_VALUES, DEFAULT_TCO_BASIS);
+}
+
+/** Which chips divide disaggregated input/output throughput; see `ChipBasis`. */
+export function parseChipBasisParam(value: string | null, param = 'chipBasis'): ChipBasis {
+  return parseEnumParam(value, param, CHIP_BASIS_VALUES, DEFAULT_CHIP_BASIS);
 }
 
 export function parseCostProviderParam(value: string | null, param = 'costProvider'): CostProvider {

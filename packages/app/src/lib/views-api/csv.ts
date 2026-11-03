@@ -24,6 +24,9 @@ export function toCsv(
   return `${lines.join('\r\n')}\r\n`;
 }
 
-export function csvResponse(rows: readonly Readonly<Record<string, unknown>>[]): Response {
-  return cachedText(toCsv(rows), 'text/csv; charset=utf-8');
+export function csvResponse(
+  rows: readonly Readonly<Record<string, unknown>>[],
+  options?: { tag?: string; cacheControl?: string },
+): Response {
+  return cachedText(toCsv(rows), 'text/csv; charset=utf-8', options);
 }

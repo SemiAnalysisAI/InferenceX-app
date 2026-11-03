@@ -58,6 +58,7 @@ import {
 import { resolveEffectiveSequence } from '@/lib/benchmarks/default-sequence';
 import type { AvailabilityRow, WorkflowInfoResponse } from '@/lib/api/api';
 import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/catalog/constants';
+import { DEFAULT_CHIP_BASIS, type ChipBasis } from '@/lib/benchmarks/chip-basis';
 
 const RUNDATE_RE = /^\d{4}-\d{2}-\d{2}$/u;
 const RUNID_RE = /^[A-Za-z0-9_-]{1,64}$/u;
@@ -69,6 +70,8 @@ export interface GlobalFilterSelectionContextType {
   selectedSequence: Sequence;
   selectedPrecisions: string[];
   tcoBasis: TcoBasis;
+  /** Which chips divide disaggregated input/output throughput. */
+  chipBasis: ChipBasis;
   effectiveSequence: Sequence;
   sequenceResolved: boolean;
   effectivePrecisions: string[];
@@ -84,6 +87,7 @@ export interface ModelSelectionOptions {
 
 export interface GlobalFilterActionsContextType {
   setTcoBasis: (basis: TcoBasis) => void;
+  setChipBasis: (basis: ChipBasis) => void;
   setSelectedModel: (model: Model, options?: ModelSelectionOptions) => void;
   setSelectedSequence: (sequence: Sequence) => void;
   setSelectedPrecisions: (precisions: string[]) => void;
@@ -217,6 +221,7 @@ export function GlobalFilterProvider({
   initialPrecisions,
   initialRunDate,
   initialRunId,
+  initialChipBasis,
 }: {
   children: ReactNode;
   initialModel?: Model;
@@ -224,6 +229,8 @@ export function GlobalFilterProvider({
   initialPrecisions?: string[];
   initialRunDate?: string;
   initialRunId?: string;
+  /** Starting chip basis for surfaces without URL state, such as embeds. */
+  initialChipBasis?: ChipBasis;
 }) {
   const { getUrlParam, setUrlParams } = useUrlState();
 
@@ -293,6 +300,7 @@ export function GlobalFilterProvider({
 
   const [requestedRunId, setRequestedRunId] = useState<string>(() => initialRunId ?? '');
   const [tcoBasis, setTcoBasis] = useState<TcoBasis>(DEFAULT_TCO_BASIS);
+  const [chipBasis, setChipBasis] = useState<ChipBasis>(initialChipBasis ?? DEFAULT_CHIP_BASIS);
 
   useIsomorphicLayoutEffect(() => {
     refreshUrlParams();
@@ -348,6 +356,13 @@ export function GlobalFilterProvider({
       applyIfMatches('g_runid', RUNID_RE, setRequestedRunId);
     }
     setTcoBasis(getUrlParam('g_tco') === 'external' ? 'external' : DEFAULT_TCO_BASIS);
+    // Profit-estimator routes carry no g_chips segment; keep the session's basis
+    // there instead of resetting it, and apply it again on return.
+    // Embeds resolve their own basis server-side (`initialChipBasis`); the URL must
+    // not override it on the client.
+    if (initialChipBasis === undefined && hasExplicitUrlParam('g_chips')) {
+      setChipBasis(getUrlParam('g_chips') === 'total' ? 'total' : DEFAULT_CHIP_BASIS);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
@@ -541,6 +556,7 @@ export function GlobalFilterProvider({
       g_model: selectedModel,
       ...getRequestedRunUrlParams(requestedRunDate, requestedRunId),
       g_tco: tcoBasis,
+      g_chips: chipBasis,
       i_seq: sequenceResolved ? effectiveSequence : undefined,
       i_prec: precisionExplicit ? effectivePrecisions.join(',') : undefined,
     });
@@ -556,6 +572,7 @@ export function GlobalFilterProvider({
     requestedRunDate,
     requestedRunId,
     tcoBasis,
+    chipBasis,
     effectiveSequence,
     sequenceResolved,
     effectivePrecisions,
@@ -569,6 +586,7 @@ export function GlobalFilterProvider({
       selectedSequence,
       selectedPrecisions,
       tcoBasis,
+      chipBasis,
       effectiveSequence,
       sequenceResolved,
       effectivePrecisions,
@@ -578,6 +596,7 @@ export function GlobalFilterProvider({
       selectedSequence,
       selectedPrecisions,
       tcoBasis,
+      chipBasis,
       effectiveSequence,
       sequenceResolved,
       effectivePrecisions,
@@ -587,6 +606,7 @@ export function GlobalFilterProvider({
   const actionsValue = useMemo<GlobalFilterActionsContextType>(
     () => ({
       setTcoBasis,
+      setChipBasis,
       setSelectedModel: selectModel,
       setSelectedSequence,
       setSelectedPrecisions,

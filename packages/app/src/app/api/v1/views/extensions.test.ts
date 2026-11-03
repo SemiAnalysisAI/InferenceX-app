@@ -860,6 +860,7 @@ describe('new dashboard projections', () => {
       'caps=2,Infinity',
       'caps=2,',
       'costProvider=costn',
+      'chipBasis=decode',
       'surprise=true',
       'runId=0',
       'date=2026-02-30',
@@ -877,6 +878,23 @@ describe('new dashboard projections', () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.params.caps).toEqual([0.5, 2, 5]);
+  });
+  it('echoes the first-token chip basis and keeps it off views without the control', async () => {
+    for (const chipBasis of ['pool', 'total']) {
+      const response = await first(
+        req('first-token', `model=DeepSeek-V4-Pro&costType=output&chipBasis=${chipBasis}`),
+      );
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.params.chipBasis).toBe(chipBasis);
+    }
+    const defaulted = await first(req('first-token', 'model=DeepSeek-V4-Pro'));
+    const defaultedBody = await defaulted.json();
+    expect(defaultedBody.params.chipBasis).toBe('pool');
+    const profitResponse = await profit(
+      req('profit-estimator', 'model=DeepSeek-V4-Pro&chipBasis=total'),
+    );
+    expect(profitResponse.status).toBe(400);
   });
   it('empty submission history is a successful empty view', async () => {
     const result = await submissions(

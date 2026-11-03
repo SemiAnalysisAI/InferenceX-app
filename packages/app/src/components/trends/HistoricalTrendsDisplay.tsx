@@ -1,5 +1,6 @@
 'use client';
 
+import { CHIP_BASIS_METRICS, chipBasisCsvNote } from '@/lib/benchmarks/chip-basis';
 import { track } from '@/lib/analytics/analytics';
 import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -11,7 +12,7 @@ import {
   useInferenceDisplay,
   useInferenceFilters,
 } from '@/components/inference/InferenceContext';
-import { useGlobalFilterSelection } from '@/providers/GlobalFilterContext';
+import { useGlobalFilterActions, useGlobalFilterSelection } from '@/providers/GlobalFilterContext';
 import { useInterpolatedTrendData } from '@/components/inference/hooks/useInterpolatedTrendData';
 import type { TrendLineConfig } from '@/components/inference/types';
 import ChartControls from '@/components/inference/ui/ChartControls';
@@ -127,7 +128,12 @@ function historicalRunDate(date: string, locale: 'en' | 'zh'): string {
 export default function HistoricalTrendsDisplay() {
   const [chartView, setChartView] = useState<'line' | 'waterfall'>('line');
   const PerformanceChart = chartView === 'waterfall' ? ImprovementWaterfallChart : TrendChart;
-  const { tcoBasis } = useGlobalFilterSelection();
+  const { tcoBasis, chipBasis } = useGlobalFilterSelection();
+  const { setChipBasis } = useGlobalFilterActions();
+  const chipBasisControl = useMemo(
+    () => ({ value: chipBasis, onChange: setChipBasis, source: 'historical' }),
+    [chipBasis, setChipBasis],
+  );
   const locale = useLocale();
   const t = STRINGS[locale];
   const { graphs, loading, error, hardwareConfig, hwTypesWithData, availableDates } =
@@ -213,6 +219,7 @@ export default function HistoricalTrendsDisplay() {
     tokenRevenuePricing,
     enabled: hasInteractivityChart,
     tcoBasis,
+    chipBasis,
   });
 
   const activeHwKeys = useMemo(() => [...activeHwTypes], [activeHwTypes]);
@@ -445,7 +452,14 @@ export default function HistoricalTrendsDisplay() {
                   targetInteractivity,
                   isAgentic ? 'p90' : 'median',
                 );
-                exportToCsv(`InferenceX_historical_${selectedModel}`, headers, rows);
+                exportToCsv(
+                  `InferenceX_historical_${selectedModel}`,
+                  headers,
+                  rows,
+                  CHIP_BASIS_METRICS.has(selectedYAxisMetric)
+                    ? [chipBasisCsvNote(chipBasis, locale)]
+                    : [],
+                );
               }}
             />
             <Card>
@@ -493,6 +507,7 @@ export default function HistoricalTrendsDisplay() {
                       includeAllPowerThroughputMetrics={false}
                       includePowerThroughputCaveat={false}
                       tcoBasis={tcoBasis}
+                      chipBasis={chipBasisControl}
                     />
                     <UnofficialDomainNotice />
                   </>

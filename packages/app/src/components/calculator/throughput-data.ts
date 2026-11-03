@@ -1,5 +1,12 @@
 import { rowToSequence } from '@semianalysisai/inferencex-constants';
 
+import {
+  DEFAULT_CHIP_BASIS,
+  measuredInputShare,
+  withChipBasis,
+  type ChipBasis,
+  type ChipBasisRow,
+} from '@/lib/benchmarks/chip-basis';
 import type { AggDataEntry, HardwareConfig } from '@/components/inference/types';
 import type { BenchmarkRow } from '@/lib/api/api';
 import { rowToAggDataEntry } from '@/lib/benchmarks/benchmark-transform';
@@ -125,28 +132,25 @@ function firstTokenSeconds(
 /**
  * Fraction of a config's tokens that are input tokens.
  *
- * The obvious formula — `input / (input + output)` off the per-GPU rates — is
- * wrong for disaggregated runs, and wrong by a lot. Those rows report
- * `input_tput_per_gpu` per *prefill* chip and `output_tput_per_gpu` per *decode*
- * chip, while `tput_per_gpu` is per chip overall. Across production history the
- * two rates sum to between 1.0x and 16.1x the total, exactly tracking
- * `(prefill + decode) x (isl/prefill + osl/decode) / (isl + osl)`. Aggregated
- * rows sum to 1.0000x on all 937 of them.
+ * Disaggregated rows report `input_tput_per_gpu` per *prefill* chip and
+ * `output_tput_per_gpu` per *decode* chip, while `tput_per_gpu` is per chip
+ * overall, so `input / (input + output)` off the stored rates is wrong for them.
+ * `measuredInputShare` first puts the rates on one denominator (every
+ * deployment chip), which also keeps the mix independent of the chip-basis
+ * toggle, and accepts rows still carrying raw per-total producer rates.
  *
- * So: trust the measured rates when they are self-consistent, and fall back to
- * the structural mix when they are not. For a fixed sequence the structural mix
- * is exactly ISL:OSL — every request has that shape, so no config can change it.
+ * Then: trust the measured rates when they are self-consistent, and fall back to
+ * the structural mix when they are not (a legacy row without a real prefill/decode
+ * split, or missing rates). For a fixed sequence the structural mix is ISL:OSL.
  * For agentic traces it is the run's own prompt:generation token counts.
  *
  * Returns null when nothing in the row pins the mix down.
  */
-function inputTokenShare(row: BenchmarkRow, inputTput: number, outputTput: number): number | null {
-  const tput = row.metrics.tput_per_gpu ?? 0;
-  const sum = inputTput + outputTput;
+function inputTokenShare(row: ChipBasisRow): number | null {
   // Self-consistent: the rates share the denominator `tput_per_gpu` uses, so the
-  // split they imply is the measured one. 1% covers float noise, not a
-  // prefill/decode mismatch (the smallest of those in production is 1.63x).
-  if (tput > 0 && sum > 0 && Math.abs(sum / tput - 1) <= 0.01) return inputTput / sum;
+  // split they imply is the measured one. 1% covers float noise.
+  const measured = measuredInputShare({ ...row, ...row.metrics }, 0.01);
+  if (measured !== null) return measured;
 
   const { isl, osl } = row;
   if (typeof isl === 'number' && typeof osl === 'number' && isl + osl > 0) {
@@ -180,6 +184,8 @@ export function buildGpuGroups<M extends GroupMeta>(
     /** Token basis selected by the consumer; applies to official and overlay rows. */
     tokenType?: CostType;
     tcoBasis?: TcoBasis;
+    /** Which chips divide disaggregated input/output throughput. Defaults to per pool. */
+    chipBasis?: ChipBasis;
     /** Derive a row's group key + metadata. Return null to drop the row. */
     classify: (hwKey: string, row: BenchmarkRow) => { key: string; meta: M } | null;
   },
@@ -194,6 +200,7 @@ export function buildGpuGroups<M extends GroupMeta>(
     percentile = Percentile.P90,
     tokenType = 'total',
     tcoBasis = DEFAULT_TCO_BASIS,
+    chipBasis = DEFAULT_CHIP_BASIS,
     classify,
   } = options;
   const grouped: Record<string, GPUDataPoint[]> = {};
@@ -216,7 +223,10 @@ export function buildGpuGroups<M extends GroupMeta>(
 
     if (!hwConfigMap[hwKey]) hwConfigMap[hwKey] = { ...hwConfig, name: hwKey };
 
-    const m = row.metrics;
+    // Callers match `row` by identity (classify, sourceRow), so only the rates
+    // read the rescaled copy.
+    const ratedRow = withChipBasis(row, chipBasis);
+    const m = ratedRow.metrics;
     const tput = m.tput_per_gpu ?? 0;
     const outputTput = m.output_tput_per_gpu ?? tput;
     const inputTput = m.input_tput_per_gpu ?? 0;
@@ -226,7 +236,7 @@ export function buildGpuGroups<M extends GroupMeta>(
       Number.isFinite(m.theoretical_cache_hit_rate)
         ? Math.max(0, Math.min(1, m.theoretical_cache_hit_rate))
         : null;
-    const tokenShare = inputTokenShare(row, inputTput, outputTput);
+    const tokenShare = inputTokenShare(ratedRow);
     const specs = getGpuSpecs(hwKey, tcoBasis);
     const power = specs.power;
 

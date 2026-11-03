@@ -17,6 +17,7 @@ import { DB_MODEL_TO_DISPLAY, rowToSequence } from '@semianalysisai/inferencex-c
 import type { BenchmarkRow, EvalRow } from '@/lib/api/api';
 import { benchmarkCurveDate } from '@/lib/benchmarks/benchmark-run-selection';
 import { transformBenchmarkRows, type TokenBasis } from '@/lib/benchmarks/benchmark-transform';
+import { DEFAULT_CHIP_BASIS, type ChipBasis } from '@/lib/benchmarks/chip-basis';
 import { normalizeEvalHardwareKey } from '@/lib/charts/chart-utils';
 import { notifyClientSearchChange } from '@/lib/routing/client-navigation';
 import { setProfitRouteUnofficialRuns } from '@/lib/routing/profit-estimator-routes';
@@ -97,6 +98,7 @@ export interface UnofficialRunContextType {
     sequence: Sequence,
     chartType: 'e2e' | 'interactivity',
     tokenBasis?: TokenBasis,
+    chipBasis?: ChipBasis,
   ) => {
     data: InferenceData[];
     hardwareConfig: HardwareConfig;
@@ -128,6 +130,7 @@ export function useOverlayScopeReconciliation(input: OverlayScopeInput | null): 
 export function buildChartData(
   benchmarks: BenchmarkRow[],
   tokenBasis: TokenBasis = 'total',
+  chipBasis: ChipBasis = DEFAULT_CHIP_BASIS,
 ): UnofficialChartData {
   const groups = new Map<string, BenchmarkRow[]>();
   for (const row of benchmarks) {
@@ -152,6 +155,7 @@ export function buildChartData(
       'median',
       'external',
       tokenBasis,
+      chipBasis,
     );
     const e2eIdx = (chartDefinitions as ChartDefinition[]).findIndex((d) => d.chartType === 'e2e');
     const interactivityIdx = (chartDefinitions as ChartDefinition[]).findIndex(
@@ -416,6 +420,12 @@ export function UnofficialRunProvider({
     () => (unofficialBenchmarkRows ? buildChartData(unofficialBenchmarkRows) : null),
     [unofficialBenchmarkRows],
   );
+  // Non-default token and chip bases are built on first request and kept per row set.
+  const overlayVariantCache = useMemo(
+    () => new Map<string, UnofficialChartData>(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [unofficialBenchmarkRows],
+  );
   const unofficialUncachedChartData = useMemo(
     () => (unofficialBenchmarkRows ? buildChartData(unofficialBenchmarkRows, 'uncached') : null),
     [unofficialBenchmarkRows],
@@ -493,14 +503,28 @@ export function UnofficialRunProvider({
       sequence: Sequence,
       chartType: 'e2e' | 'interactivity',
       tokenBasis: TokenBasis = 'total',
+      chipBasis: ChipBasis = DEFAULT_CHIP_BASIS,
     ) => {
-      const source = tokenBasis === 'uncached' ? unofficialUncachedChartData : unofficialChartData;
+      let source = tokenBasis === 'uncached' ? unofficialUncachedChartData : unofficialChartData;
+      if (chipBasis !== DEFAULT_CHIP_BASIS && unofficialBenchmarkRows) {
+        const key = `${tokenBasis}:${chipBasis}`;
+        source = overlayVariantCache.get(key) ?? null;
+        if (!source) {
+          source = buildChartData(unofficialBenchmarkRows, tokenBasis, chipBasis);
+          overlayVariantCache.set(key, source);
+        }
+      }
       const chartGroup = source?.[`${model}_${sequence}`];
       if (!chartGroup) return null;
       const dataForChart = chartType === 'e2e' ? chartGroup.e2e : chartGroup.interactivity;
       return { data: dataForChart.data, hardwareConfig: dataForChart.gpus };
     },
-    [unofficialChartData, unofficialUncachedChartData],
+    [
+      unofficialChartData,
+      unofficialUncachedChartData,
+      unofficialBenchmarkRows,
+      overlayVariantCache,
+    ],
   );
 
   const resetOverlaySelection = useCallback(() => {

@@ -68,6 +68,11 @@ using `?model=DeepSeek-V4-Pro&target=24` (P90 is the default). Dashboard segment
 `runId`, `precisions`, `gpus`, and `unofficialrun`; `power` maps to `powerBasis`,
 and `dates`, `start`, and `end` keep their names.
 
+The `inference`, `historical`, `calculator`, and `first-token` views accept
+`chipBasis=pool` (default) or `chipBasis=total`, matching the dashboard's
+disaggregated throughput toggle (`g_chips`). See
+[dashboard views](skills/inferencex-api/references/dashboard-views.md#disaggregated-chip-basis).
+
 Both profit estimators and their read-only APIs default to `theoretical`, displayed
 as “Theroticial Roofline”. This uses trace-derived infinite-cache reuse, with the
 measured rate as a fallback when unavailable. Choose `cacheHitMode=actual` in the

@@ -155,6 +155,10 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     'internal (default) or external. Applies the same configured owning/rental cost basis as the UI.',
     'internal（默认）或 external，使用与界面相同的自有或租赁成本口径。',
   ],
+  chipBasis: [
+    'pool (default) or total. Chips that divide disaggregated input and output throughput and every metric derived from them: pool uses prefill chips for input and decode chips for output; total uses every chip in the deployment, the basis aggregated configs and tput_per_gpu always use. Aggregated rows are identical under both.',
+    'pool（默认）或 total，指定分离式配置的输入、输出吞吐量及其派生指标所除的芯片数：pool 下输入按预填充芯片、输出按解码芯片计；total 按部署中的芯片总数计，与聚合配置及 tput_per_gpu 口径一致。聚合配置在两种口径下结果相同。',
+  ],
   unofficialrun: [
     'Up to eight comma-separated public CI run IDs. Surrounding whitespace and duplicates are removed; run indices follow the remaining order. Overlay sources remain separate from official data.',
     '最多八个公开 CI 运行 ID，以逗号分隔。去除各项首尾空白和重复 ID 后，按剩余顺序分配运行索引。叠加结果与官方数据分开。',
@@ -334,28 +338,15 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
   swapLayout: ['contiguous (default) or random.', 'contiguous（默认）或 random。'],
   swapMetric: ['bandwidth (default) or latency.', 'bandwidth（默认）或 latency。'],
   swapPercentile: ['p50 (default), p95 or p99.', 'p50（默认）、p95 或 p99。'],
-  operator: [
-    'gemm, attention_mha, attention_mla or moe_gemm; default first available operator.',
-    'gemm、attention_mha、attention_mla 或 moe_gemm；默认首个可用算子。',
-  ],
-  shape: [
-    'Exact OperatorX shape key from response options.',
-    '响应 options 中的 OperatorX 形状键。',
-  ],
   backend: ['Backend filter; omit for all.', '后端筛选；省略时选择全部。'],
-  cluster: ['OperatorX cluster filter; omit for all.', 'OperatorX 集群筛选；省略时选择全部。'],
   sku: ['CollectiveX chip SKU filter; default all.', 'CollectiveX 芯片 SKU 筛选，默认 all。'],
-  status: [
-    'OperatorX status: ok (default), unsupported, error, missing or all.',
-    'OperatorX 状态：ok（默认）、unsupported、error、missing 或 all。',
-  ],
   page: [
-    'OperatorX zero-based table page; video one-based CI discovery page (view=discovery). Video dashboard/compare read at most the first five published history pages.',
-    'OperatorX 表格页码从 0 开始；视频 CI 发现页码从 1 开始（view=discovery）。视频 dashboard/compare 最多读取前五页已发布历史。',
+    'Video one-based CI discovery page (view=discovery). Video dashboard/compare read at most the first five published history pages.',
+    '视频 CI 发现页码从 1 开始（view=discovery）。视频 dashboard/compare 最多读取前五页已发布历史。',
   ],
   metric: [
-    'View-specific metric key. OperatorX: tflops or latency; GPU metrics: power, temperature, clocks, utilization or available AMD metrics.',
-    '各视图对应的指标键。OperatorX 支持 tflops、latency；GPU 指标支持功耗、温度、时钟、利用率及可用 AMD 指标。',
+    'View-specific metric key. GPU metrics: power, temperature, clocks, utilization or available AMD metrics.',
+    '各视图对应的指标键。GPU 指标支持功耗、温度、时钟、利用率及可用 AMD 指标。',
   ],
   artifact: [
     'GPU metric artifact name, or <artifact>/<file> for multi-file artifacts, as returned in artifacts[]. For video, a numeric artifact ID paired with run.',

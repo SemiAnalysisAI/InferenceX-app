@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import type { BenchmarkRow } from '@/lib/api/api';
 import { rowToAggDataEntry, transformBenchmarkRows } from '@/lib/benchmarks/benchmark-transform';
+import { withChipBasis } from '@/lib/benchmarks/chip-basis';
 import { buildDerivedChartFields, getHardwareKey } from '@/lib/charts/chart-utils';
-import { POWER_BASIS_FIELDS } from '@/lib/power/power-basis';
+import { POWER_BASIS_FIELDS, powerBasisNormalization } from '@/lib/power/power-basis';
 import { SYSTEM_POWER_CATEGORIES } from '@/lib/power/system-power-model';
 import { Sequence } from '@/lib/catalog/data-mappings';
 import { buildInferenceSeries } from '@/lib/views-api/series';
@@ -237,6 +238,8 @@ function disaggRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
   return row({
     disagg: true,
     is_multinode: true,
+    prefill_num_workers: 1,
+    decode_num_workers: 1,
     workers: [
       { role: 'prefill', worker_idx: 0, num_gpus: 8, hosts: ['prefill-node'], avg_power_w: 300 },
       { role: 'decode', worker_idx: 0, num_gpus: 8, hosts: ['decode-node'], avg_power_w: 700 },
@@ -275,12 +278,32 @@ describe('J per total token at every power boundary', () => {
     expect(fields.utilityProvisionedJPerTotalToken?.y).toBeCloseTo(fields.jTotal!.y, 9);
   });
 
-  it('withholds provisioned J per total token where output energy is withheld', () => {
-    const { fields } = derive(disaggRow({ benchmark_type: 'agentic_traces' }));
-    expect(fields.jTotal).toBeDefined();
-    expect(fields.gpuProvisionedJPerOutputToken).toBeUndefined();
-    expect(fields.gpuProvisionedJPerTotalToken).toBeUndefined();
-    expect(fields.utilityProvisionedJPerTotalToken).toBeUndefined();
+  it('normalizes agentic disaggregated rows like fixed-sequence ones now both store per-pool rates', () => {
+    const agentic = derive(disaggRow({ benchmark_type: 'agentic_traces' })).fields;
+    const fixed = derive(disaggRow()).fields;
+    for (const key of [
+      'gpuProvisionedJPerOutputToken',
+      'gpuProvisionedJPerTotalToken',
+      'utilityProvisionedJPerTotalToken',
+    ] as const) {
+      expect(agentic[key]?.y, key).toBeGreaterThan(0);
+      expect(agentic[key]?.y, key).toBeCloseTo(fixed[key]!.y, 9);
+    }
+  });
+
+  it('keeps every provisioned power boundary independent of the chip basis', () => {
+    const pool = derive(disaggRow()).fields;
+    const total = derive(withChipBasis(disaggRow(), 'total')).fields;
+    expect(total.jOutput?.y).toBeCloseTo((pool.jOutput!.y * 16) / 8, 9);
+    for (const key of [
+      'gpuProvisionedJPerOutputToken',
+      'gpuProvisionedJPerTotalToken',
+      'utilityProvisionedJPerOutputToken',
+      'utilityProvisionedJPerTotalToken',
+    ] as const) {
+      expect(total[key]?.y, key).toBeGreaterThan(0);
+      expect(total[key]?.y, key).toBeCloseTo(pool[key]!.y, 9);
+    }
   });
 
   it.each(['power_valid', 'avg_power_w'])(
@@ -311,5 +334,54 @@ describe('J per total token at every power boundary', () => {
       ['it-modeled', official.itModeledJPerTotalToken?.y],
       ['utility-modeled', official.utilityModeledJPerTotalToken?.y],
     ]);
+  });
+});
+
+describe('powerBasisNormalization — legacy unsplit disaggregated rows', () => {
+  // Both pool fields hold the whole deployment (8) with no workers. The hidden
+  // split is 1 prefill + 7 decode chips; 7200 tok/s total at ISL:OSL 8192:1024.
+  const legacy = () =>
+    row({
+      disagg: true,
+      is_multinode: false,
+      prefill_num_workers: 0,
+      decode_num_workers: 0,
+      num_prefill_gpu: 8,
+      num_decode_gpu: 8,
+      isl: 8192,
+      osl: 1024,
+      metrics: {
+        ...row().metrics,
+        tput_per_gpu: 900,
+        input_tput_per_gpu: 6400,
+        output_tput_per_gpu: 800 / 7,
+      },
+    });
+
+  it.each(['pool', 'total'] as const)(
+    'allocates the deployment once and recovers its output on the %s basis',
+    (basis) => {
+      const entry = rowToAggDataEntry(withChipBasis(legacy(), basis));
+      expect(entry.physicalChips).toBe(8);
+      const { allocatedGpus, totalOutputTokPerSec } = powerBasisNormalization(entry);
+      expect(allocatedGpus).toBe(8);
+      expect(totalOutputTokPerSec).toBeCloseTo(800, 9);
+    },
+  );
+
+  it('withholds the normalization when the pool share is undetermined', () => {
+    const entry = rowToAggDataEntry(legacy());
+    expect(
+      powerBasisNormalization({
+        ...entry,
+        input_tput_per_gpu: 600,
+        output_tput_per_gpu: 600,
+        isl: null,
+        osl: null,
+      }),
+    ).toEqual({
+      allocatedGpus: null,
+      totalOutputTokPerSec: null,
+    });
   });
 });

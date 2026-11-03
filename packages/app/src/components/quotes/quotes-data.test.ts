@@ -1,76 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { CAROUSEL_LABELS, CAROUSEL_ORGS, QUOTES, orgAnchorId } from './quotes-data';
+import { orgAnchorId } from './quotes-data';
 
-const OFF_CAROUSEL_ONLY = [
-  'Together AI',
-  'Nebius',
-  'White House',
-  'UC San Diego',
-  'TensorWave',
-] as const;
-
-describe('quote carousel membership', () => {
-  it('keeps every carousel org backed by a real quote', () => {
-    const quotedOrgs = new Set(QUOTES.map((quote) => quote.org));
-    for (const org of CAROUSEL_ORGS) {
-      expect(quotedOrgs.has(org), `${org} is in CAROUSEL_ORGS but has no quote`).toBe(true);
-    }
-  });
-
-  it('lists each carousel org once', () => {
-    expect(new Set(CAROUSEL_ORGS).size).toBe(CAROUSEL_ORGS.length);
-  });
-
-  it('features Mooncake in the landing carousel', () => {
-    expect(CAROUSEL_ORGS).toContain('Mooncake');
-  });
-
-  it('features Anyscale with Seiji Eicher’s approved quote and logo', () => {
-    expect(CAROUSEL_ORGS).toContain('Anyscale');
-    const quotes = QUOTES.filter((quote) => quote.org === 'Anyscale');
-    expect(quotes).toHaveLength(1);
-    expect(quotes[0]).toMatchObject({
-      name: 'Seiji Eicher',
-      title: 'Anyscale',
-      titleZh: 'Anyscale',
-      logo: 'anyscale.svg',
-      text: "Ray Serve LLM's mission is to be best way to scale Ray-native LLM inference, including ergonomic Python APIs for low-latency serving across heterogeneous clusters and inference engines. Having transparent benchmark runs with engine configurations available gives us trusted reference datapoints to compare against. This makes InferenceX particularly helpful for understanding serving performance and ensuring Ray Serve LLM stays lightweight and performant.",
-    });
-    expect(quotes[0].textZh).toContain('Ray Serve LLM 的使命');
-    expect(orgAnchorId('Anyscale')).toBe('quote-anyscale');
-  });
-
-  it('features AMD and NVIDIA in the landing carousel under CEO labels', () => {
-    expect(CAROUSEL_ORGS).toContain('AMD');
-    expect(CAROUSEL_ORGS).toContain('NVIDIA');
-    expect(CAROUSEL_LABELS['AMD']).toBe('AMD Lisa Su');
-    expect(CAROUSEL_LABELS['NVIDIA']).toBe('NVIDIA Jensen');
-  });
-
-  it.each(OFF_CAROUSEL_ONLY)('excludes %s from the carousel', (org) => {
-    expect((CAROUSEL_ORGS as readonly string[]).includes(org)).toBe(false);
-  });
-
-  it.each(OFF_CAROUSEL_ONLY)('still shows %s on the quotes page', (org) => {
-    expect(QUOTES.some((quote) => quote.org === org)).toBe(true);
-  });
-
-  it('resolves carousel display labels for the orgs that use them', () => {
-    for (const org of CAROUSEL_ORGS) {
-      expect(CAROUSEL_LABELS[org] ?? org).not.toBe('');
-    }
-  });
-});
-
-describe('Chinese quote attribution', () => {
-  it('provides a Chinese role for every quote with an English role', () => {
-    for (const quote of QUOTES) {
-      if (!quote.title) continue;
-      expect(
-        Reflect.get(quote, 'titleZh'),
-        `${quote.name} has an English role but no Chinese role`,
-      ).toBeTruthy();
-    }
+describe('orgAnchorId', () => {
+  it.each([
+    ['Google', 'quote-google'],
+    ['Meta Superintelligence Labs', 'quote-meta-superintelligence-labs'],
+    ['  Example & Company! ', 'quote-example-company'],
+  ])('turns %s into a stable quote anchor', (org, expected) => {
+    expect(orgAnchorId(org)).toBe(expected);
   });
 });

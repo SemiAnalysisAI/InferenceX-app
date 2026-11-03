@@ -24,7 +24,9 @@ describe('original H100 artifact through the local development replay', () => {
     cy.contains('button', 'MiniMaxAI/MiniMax-H3 · 1344×768 · 5 s · 24 fps · 49 steps').click({
       scrollBehavior: 'center',
     });
-    cy.contains('[role="group"] button', /^4$/).click({ scrollBehavior: 'center' });
+    cy.contains('[role="group"] button', /^4$/).click({
+      scrollBehavior: 'center',
+    });
     cy.location('search').should('include', 'r_gpus=4');
     cy.get('[data-testid="results-power-trace"] circle').should('have.length', 1478);
     cy.get('@consoleError').should('not.be.calledWithMatch', /Cannot update a component/);
@@ -34,8 +36,12 @@ describe('original H100 artifact through the local development replay', () => {
     cy.request('/api/video-runs?format=history&page=1').then(({ status, headers, body }) => {
       expect(status).to.equal(200);
       expect(headers['x-videogenx-replay'], 'explicit replay must be active').to.equal('1');
-      expect(body.entries).to.have.length(1);
-      const entry = body.entries[0];
+      const entries = body.entries.filter(
+        (entry: { runId: string; artifact: { id: number } }) =>
+          entry.runId === run && entry.artifact.id === artifact,
+      );
+      expect(entries).to.have.length(1);
+      const entry = entries[0];
       expect(entry.runId).to.equal(run);
       expect(entry.artifact.id).to.equal(artifact);
       expect(entry.approved).to.equal(false);
@@ -72,6 +78,11 @@ describe('original H100 artifact through the local development replay', () => {
         );
         const asset = body.sources[0].assets.find(([path]: [string]) => path.endsWith('.mp4'));
         expect(asset, 'verified original MP4').not.to.equal(undefined);
+        cy.request({ method: 'HEAD', url: asset[1].url }).then((response) => {
+          expect(response.status).to.equal(200);
+          expect(Number(response.headers['content-length'])).to.be.greaterThan(32);
+          expect(response.headers['accept-ranges']).to.equal('bytes');
+        });
         cy.request({
           url: asset[1].url,
           headers: { Range: 'bytes=0-31' },
@@ -112,6 +123,7 @@ describe('original H100 artifact through the local development replay', () => {
     [1440, '/video'],
     [390, '/video'],
     [320, '/video'],
+    [1440, '/zh/video'],
     [390, '/zh/video'],
     [320, '/zh/video'],
   ] as const) {

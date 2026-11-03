@@ -277,8 +277,14 @@ export function InferenceProvider({
   const isActive =
     activeTab === 'inference' || activeTab === 'historical' || activeTab === 'compare';
 
-  const { selectedModel, effectiveSequence, sequenceResolved, effectivePrecisions, tcoBasis } =
-    useGlobalFilterSelection();
+  const {
+    selectedModel,
+    effectiveSequence,
+    sequenceResolved,
+    effectivePrecisions,
+    tcoBasis,
+    chipBasis,
+  } = useGlobalFilterSelection();
   const {
     setSelectedModel,
     setSelectedSequence,
@@ -745,6 +751,7 @@ export function InferenceProvider({
     fixedSequenceStatistic,
     tokenBasisForMetric(selectedYAxisMetric, tokenBasis),
     isActive && !sequenceResolved && !effectiveRunDate && !seedRows,
+    chipBasis,
   );
 
   const dbModelKeys = useMemo<string[]>(
