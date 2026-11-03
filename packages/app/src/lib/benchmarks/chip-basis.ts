@@ -157,16 +157,25 @@ export function measuredInputShare(
 ): number | null {
   const total = row.tput_per_gpu ?? 0;
   if (!(total > 0)) return null;
-  const converted = perTotalChipRates(row);
-  for (const rates of [
-    converted,
-    { input: row.input_tput_per_gpu, output: row.output_tput_per_gpu },
-  ]) {
-    const input = rates.input ?? 0;
-    const sum = input + (rates.output ?? 0);
-    if (sum > 0 && Math.abs(sum / total - 1) <= tolerance) return input / sum;
+  if (row.disagg && row.chip_basis !== 'total') {
+    const converted = exactPerTotalChipRates(row);
+    const share = converted
+      ? inputShareWithin(converted.input, converted.output, total, tolerance)
+      : null;
+    if (share !== null) return share;
   }
-  return null;
+  return inputShareWithin(row.input_tput_per_gpu, row.output_tput_per_gpu, total, tolerance);
+}
+
+function inputShareWithin(
+  rawInput: number | undefined,
+  rawOutput: number | undefined,
+  total: number,
+  tolerance: number,
+): number | null {
+  const input = rawInput ?? 0;
+  const sum = input + (rawOutput ?? 0);
+  return sum > 0 && Math.abs(sum / total - 1) <= tolerance ? input / sum : null;
 }
 
 /** Per-total-chip input throughput, so it adds up with `tput_per_gpu`. */
