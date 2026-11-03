@@ -10,7 +10,7 @@ import {
 import { revalidateTag, unstable_cache } from 'next/cache';
 import { workAsyncStorage } from 'next/dist/server/app-render/work-async-storage.external';
 import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
-import { blobEnabled, blobGet, blobPurge, blobSet } from './blob-cache';
+import { CONTENT_BLOB_KEY_PREFIX, blobEnabled, blobGet, blobPurge, blobSet } from './blob-cache';
 
 /**
  * CollectiveX data lives in its own database and gets its own cache scope:
@@ -300,7 +300,12 @@ export function cachedDerivedData<T, Args extends unknown[]>(
 export async function purgeAll({
   immediate = false,
 }: { immediate?: boolean } = {}): Promise<number> {
-  const deleted = await blobPurge('', [`${OPERATORX_CACHE_SCOPE}/`]);
+  const deleted = await blobPurge(
+    '',
+    immediate
+      ? [`${OPERATORX_CACHE_SCOPE}/`]
+      : [`${OPERATORX_CACHE_SCOPE}/`, CONTENT_BLOB_KEY_PREFIX],
+  );
   const stale = immediate ? { expire: 0 } : 'max';
   revalidateTag(cacheTag(), { expire: 0 });
   revalidateTag(pageCacheTag(), stale);
@@ -531,7 +536,14 @@ export function notModifiedJson(
  * gets a bodiless 304.
  */
 export function cachedJson<T>(request: Request, data: T, options?: CachedJsonOptions): Response {
-  const bytes = new TextEncoder().encode(JSON.stringify(data));
+  return cachedJsonBytes(request, new TextEncoder().encode(JSON.stringify(data)), options);
+}
+
+export function cachedJsonBytes(
+  request: Request,
+  bytes: Uint8Array,
+  options?: CachedJsonOptions,
+): Response {
   const brotliQuality = options?.version ? BROTLI_QUALITY : brotliQualityFor(bytes.byteLength);
   const {
     encoding,

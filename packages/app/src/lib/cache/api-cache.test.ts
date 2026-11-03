@@ -27,6 +27,7 @@ vi.mock('@semianalysisai/inferencex-db/connection', () => ({
 }));
 
 vi.mock('./blob-cache', () => ({
+  CONTENT_BLOB_KEY_PREFIX: 'content/',
   blobEnabled: vi.fn(() => true),
   blobGet: vi.fn(),
   blobSet: vi.fn(),
@@ -462,8 +463,16 @@ describe('purgeAll', () => {
 
     await purgeAll();
 
-    expect(mockBlobPurge).toHaveBeenCalledWith('', ['operatorx/']);
+    expect(mockBlobPurge).toHaveBeenCalledWith('', ['operatorx/', 'content/']);
     expect(mockRevalidateTag).not.toHaveBeenCalledWith('operatorx', expect.anything());
+  });
+
+  it('keeps content-addressed blobs except when purging immediately', async () => {
+    mockBlobPurge.mockResolvedValue(0);
+
+    await purgeAll({ immediate: true });
+
+    expect(mockBlobPurge).toHaveBeenCalledWith('', ['operatorx/']);
   });
 
   it('returns 0 when no blobs were deleted', async () => {

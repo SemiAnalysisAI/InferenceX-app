@@ -61,12 +61,16 @@ export async function getEvalSamples(
                end
              end as fewshot_source,
              es.passed, es.score, es.metrics
-      from eval_samples es
+      from (
+        select es.doc_id, es.prompt, es.target, es.response, es.passed, es.score, es.metrics,
+               es.data
+        from eval_samples es
+        where es.eval_result_id = ${evalResultId}
+          ${passedFilter}
+        order by es.doc_id
+        limit ${limit} offset ${offset}
+      ) es
       left join lateral jsonb_to_record(es.data) as d(resps jsonb, arguments jsonb) on true
-      where es.eval_result_id = ${evalResultId}
-        ${passedFilter}
-      order by es.doc_id
-      limit ${limit} offset ${offset}
     ) page on true
     order by page.doc_id
   `) as unknown as EvalSamplesPageRow[];

@@ -137,6 +137,12 @@ export async function readRequestTimelineGz(
   return Buffer.concat(slices, byteLength);
 }
 
+export interface StoredRequestTimelineGz {
+  sha256: string | null;
+  byteLength: number;
+  chunks: AsyncGenerator<Buffer>;
+}
+
 /**
  * Stream the exact stored JSON gzip without expanding the full request array.
  * Return null for legacy/stale rows so callers retain the existing fallback.
@@ -145,9 +151,12 @@ export async function getStoredRequestTimelineGz(
   sql: DbClient,
   benchmarkResultId: number,
   sliceBytes = REQUEST_TIMELINE_GZ_SLICE_BYTES,
-): Promise<AsyncGenerator<Buffer> | null> {
+): Promise<StoredRequestTimelineGz | null> {
   const [row] = await sql`
-    select atr.id as trace_replay_id, octet_length(atr.request_timeline_gz) as gz_bytes
+    select
+      atr.id as trace_replay_id,
+      octet_length(atr.request_timeline_gz) as gz_bytes,
+      encode(atr.request_timeline_sha256, 'hex') as sha256
     from benchmark_results br
     join agentic_trace_replay atr on atr.id = br.trace_replay_id
     where br.id = ${benchmarkResultId}
@@ -155,9 +164,38 @@ export async function getStoredRequestTimelineGz(
       and atr.request_timeline_gz is not null
   `;
   if (!row) return null;
-  const size = Number(row.gz_bytes);
-  if (!Number.isSafeInteger(size) || size <= 0) throw new Error('Invalid stored timeline size');
-  return requestTimelineGzSlices(sql, Number(row.trace_replay_id), size, sliceBytes);
+  const byteLength = Number(row.gz_bytes);
+  if (!Number.isSafeInteger(byteLength) || byteLength <= 0) {
+    throw new Error('Invalid stored timeline size');
+  }
+  return {
+    sha256: typeof row.sha256 === 'string' ? row.sha256 : null,
+    byteLength,
+    chunks: requestTimelineGzSlices(sql, Number(row.trace_replay_id), byteLength, sliceBytes),
+  };
+}
+
+export async function getCurrentRequestTimelineSha256s(
+  sql: DbClient,
+  benchmarkResultIds: readonly number[],
+): Promise<Map<number, string | null>> {
+  const rows = await sql`
+    select
+      br.id as benchmark_result_id,
+      case
+        when atr.request_timeline_version = ${REQUEST_TIMELINE_VERSION}
+          then encode(atr.request_timeline_sha256, 'hex')
+      end as sha256
+    from benchmark_results br
+    join agentic_trace_replay atr on atr.id = br.trace_replay_id
+    where br.id = any(${benchmarkResultIds}::bigint[])
+  `;
+  return new Map(
+    rows.map((row) => [
+      Number(row.benchmark_result_id),
+      typeof row.sha256 === 'string' ? row.sha256 : null,
+    ]),
+  );
 }
 
 /**

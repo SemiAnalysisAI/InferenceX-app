@@ -940,7 +940,7 @@ export const apiRouteCatalog = [
       en: 'Agentic point-detail BFF with a compact dictionary-encoded request projection coupled to the chart implementation.',
       zh: '智能体数据点详情页专用 BFF；其字典编码的精简请求投影与图表实现紧密耦合。',
     },
-    sourceSha256: 'f96ebd3ebf149bc6d800c363a493aa84da905807cbf963ced90467161a58434d',
+    sourceSha256: '0e9511a09e917d6264ce4d9cc1e3d318ca9f409798c874f39ee159baa8c118c8',
   },
   {
     source: 'src/app/api/v1/request-timeline/route.ts',
@@ -948,7 +948,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-request-timeline',
-    sourceSha256: '9f0ae9edc79d4658ee9f8c8b4e05667468f977786105b80df852ad4744249b97',
+    sourceSha256: '046a7e5819338a3c5a0da91ff3d570cf94260aefa269c7efe20cbb3d4e8e0755',
   },
   {
     source: 'src/app/api/v1/resident-sequence-lengths/route.ts',
@@ -1015,7 +1015,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-trace-histograms',
-    sourceSha256: '8fe52f2c2cef13a89f8d1d5ce70be89d0353da3f059afaabe1a392ee369af13d',
+    sourceSha256: '4d0b5d7759227096701164709b1406aaa84c29fbf84ef0fc0d0770c8f1ab6bfb',
   },
   {
     source: 'src/app/api/v1/trace-server-metric-source/route.ts',
@@ -1667,7 +1667,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/cache/api-cache.ts',
-    sourceSha256: '7728a9c696d4e44218614bcf260135fe3c75f2610a0a32da6e4d5ba994ef12b4',
+    sourceSha256: '85b22058bc879453f69b89bf204a3cb5c34108dc9365d83d4549a4978dc83548',
     reviewArea: {
       en: 'Public CDN tags, cache lifetimes, Blob key dimensions, and purge behavior.',
       zh: '公开 CDN 标签、缓存时长、Blob 键维度和清除行为。',
@@ -1675,7 +1675,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/cache/blob-cache.ts',
-    sourceSha256: '1d899f2a916a59d7160502bf96dd7dd9956c7957a994b4c1f17217be9bddb2bf',
+    sourceSha256: '4a5c58891a913628411b39e9fc640577e9c124b90d83e350f541693ba73c9c82',
     reviewArea: {
       en: 'Blob cache read, write, prefix migration, and purge behavior.',
       zh: 'Blob 缓存读取、写入、前缀迁移和清除行为。',
@@ -1906,7 +1906,7 @@ export const apiContractSourceDigests = [
     // stored timeline it cannot read. It returns the same RequestTimeline
     // document; current stored gzip can also stream directly with unchanged
     // CDN headers, bypassing the parsed-object Blob cache to bound memory.
-    sourceSha256: 'a3c11f6e794c8b4db2b9a043ef872d473f9f59c698acd65767c95f650fbaa0a5',
+    sourceSha256: '86e27e59309ec99b5cc72064a317aa787deaf817d76a6593c88de83d8dc7dbc5',
     reviewArea: {
       en: 'Request timeline metadata, request event records, units, and nullable timings.',
       zh: '请求时间线元数据、请求事件记录、单位和可空计时字段。',

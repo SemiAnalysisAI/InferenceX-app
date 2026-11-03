@@ -36,6 +36,7 @@
     "db:backfill-full-response-interactivity": "bun --env-file=../../.env src/backfill-full-response-interactivity.ts",
     "db:backfill-request-chart-data": "bun --env-file=../../.env src/backfill-request-chart-data.ts",
     "db:backfill-request-timeline": "bun --env-file=../../.env src/backfill-request-timeline.ts",
+    "db:backfill-request-timeline-sha256": "bun --env-file=../../.env src/backfill-request-timeline-sha256.ts",
     "db:backfill-runtime-metadata": "bun --env-file=../../.env src/backfill-runtime-metadata.ts",
     "db:backfill-sequence-length-sketches": "bun --env-file=../../.env src/backfill-sequence-length-sketches.ts",
     "db:backfill-server-log-files": "bun --env-file=../../.env src/backfill-server-log-files.ts",

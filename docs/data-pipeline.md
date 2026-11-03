@@ -890,3 +890,37 @@ the existing JSON contract and CDN headers, without expanding the full document
 or putting it through the parsed-object Blob cache. Reads stay at most four
 slices ahead of the response and stop on cancellation. Legacy or stale
 timelines use the existing computation/cache path.
+
+Migration 027 adds `request_timeline_sha256`. A row trigger sets it to
+`sha256(request_timeline_gz)` on every insert and on every update that names
+either column, so no writer can store a wrong digest and setting it to null
+recomputes it. `db:backfill-request-timeline-sha256` does exactly that for rows
+written before the migration (4,723 fork rows in 293 s).
+
+The digest names immutable copies in Vercel Blob under
+`$BLOB_CACHE_PREFIX/content/` (`lib/cache/content-blob.ts`).
+`request-timeline` keys the stored gzip bytes themselves.
+`request-chart-data` keys the gzip of its JSON by `REQUEST_CHART_DATA_VERSION`
+and the timeline digest, and `trace-histograms` keys it by its version and every
+requested point's `id:digest`. A route reads only the digest (one Neon round
+trip, about 45 ms on the fork), checks the public Blob URL with a HEAD request,
+and answers a client that accepts gzip with a CDN-cacheable `307` to it. The
+function never touches the bytes. Before the copy exists the route serves the
+response as before and stores the copy after responding. A streamed timeline is
+hashed on the way through, and its multipart upload completes only when the
+bytes match the digest, so a rewrite mid-read or a cancelled response leaves no
+blob. Chart and histogram responses are stored only when they come from current
+digests, and histograms only when no point was dropped.
+
+The redirect target holds the same body bytes (the stored gzip, or gzip of the
+same JSON) but is served as `Content-Type: application/gzip` without
+`Content-Encoding`, with no ETag. `useByIdQuery` decodes such bodies with
+`DecompressionStream` (`lib/api/gzip-json-response.ts`). Clients whose
+Accept-Encoding excludes gzip are never redirected. A results purge keeps the
+`content/` subtree because its keys change with the data, and an immediate purge
+deletes it too.
+
+On the fork, deciding the redirect took 45 to 50 ms for the 2, 10 and 147 MB
+timelines, which streamed in 401, 964 and 9,743 ms (medians of five,
+interleaved). Chart data and histograms of the 10 MB timeline took 2,960 and
+2,699 ms to compute against 43 ms for the digest.

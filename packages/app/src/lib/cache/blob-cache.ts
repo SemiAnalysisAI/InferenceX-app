@@ -3,6 +3,8 @@ import { brotliCompress, brotliDecompress, constants as zlibConstants } from 'no
 
 import { BlobServiceRateLimited, del, get, list, put } from '@vercel/blob';
 
+import { GZIP_JSON_CONTENT_TYPE } from '@/lib/api/gzip-json-response';
+
 /** Each deleted blob counts as one operation toward Blob's per-minute rate limit. */
 const PURGE_BATCH_SIZE = 100;
 /** Rate-limit waits one purge may spend; three 60 s waits fit the 300 s function limit. */
@@ -19,6 +21,36 @@ export function blobEnabled(): boolean {
 
 function getPrefix(): string {
   return `${process.env.BLOB_CACHE_PREFIX}/`;
+}
+
+export const CONTENT_BLOB_KEY_PREFIX = 'content/';
+const CONTENT_BLOB_MAX_AGE_SECONDS = 365 * 24 * 60 * 60;
+
+export function contentBlobUrl(key: string): string | null {
+  if (!blobEnabled()) return null;
+  const storeId = process.env.BLOB_READ_WRITE_TOKEN?.split('_')[3];
+  return storeId
+    ? `https://${storeId}.public.blob.vercel-storage.com/${getPrefix()}${CONTENT_BLOB_KEY_PREFIX}${key}`
+    : null;
+}
+
+export async function putContentBlob(
+  key: string,
+  body: Buffer | ReadableStream<Uint8Array>,
+): Promise<void> {
+  try {
+    await put(`${getPrefix()}${CONTENT_BLOB_KEY_PREFIX}${key}`, body, {
+      access: 'public',
+      addRandomSuffix: false,
+      allowOverwrite: false,
+      cacheControlMaxAge: CONTENT_BLOB_MAX_AGE_SECONDS,
+      contentType: GZIP_JSON_CONTENT_TYPE,
+      multipart: body instanceof ReadableStream,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('already exists')) return;
+    throw error;
+  }
 }
 
 export async function blobGet(key: string): Promise<string | null> {

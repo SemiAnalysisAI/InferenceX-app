@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-query';
 
 import { ApiRequestError } from '@/lib/api/api-request-error';
+import { readJsonResponse } from '@/lib/api/gzip-json-response';
 
 const STALE_TIME_MS = 5 * 60 * 1000;
 
@@ -160,7 +161,7 @@ export function useByIdQuery<T, TSelected = T>(
       if (validator && res.status === 304) return previous as T;
       if (res.status === 404) return null;
       if (!res.ok) throw new ApiRequestError(`${endpoint} ${res.status}`, res.status, url);
-      const data = (await res.json()) as T;
+      const data = (await readJsonResponse(res)) as T;
       const etag = res.headers.get('ETag');
       const dataObject = asObject(data);
       if (revalidate && etag && dataObject) payloadValidators.set(dataObject, etag);
