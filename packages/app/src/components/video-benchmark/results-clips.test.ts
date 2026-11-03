@@ -67,12 +67,26 @@ describe('results clip matching', () => {
     f.stored.quality[0].candidate.artifact_id = 8;
     expect(publishedResultsSide(f.stored, point).quality.size).toBe(0);
   });
-  it('matches a recorded take without shifting after an earlier missing record', () => {
+  it('groups exact seeds and workloads by recorded take without shifting missing records', () => {
     const later = record({ slotId: 'measurement-r002-c001', seconds: 121 });
-    const groups = resultsClipGroups([side('b200', [record(), later]), side('h200', [later])]);
+    const groups = resultsClipGroups([
+      side('b200', [record(), later]),
+      side('h200', [later]),
+      side('mi355x', [record({ seed: 12 })]),
+      side('gb200', [record()], 'other-workload'),
+      side('h100', [record()], ''),
+    ]);
+    expect(groups).toHaveLength(4);
     expect(groups[0].take).toBe(2);
     expect([...groups[0].clips.keys()]).toEqual(['b200', 'h200']);
     expect(groups[0].clips.get('h200')?.record.seconds).toBe(121);
+    expect(groups.slice(1).every((group) => group.clips.size === 1)).toBe(true);
+    expect(
+      groups
+        .slice(1)
+        .flatMap((group) => [...group.clips.keys()])
+        .sort(),
+    ).toEqual(['b200', 'gb200', 'mi355x']);
   });
   it('never pairs a case ID without known prompt and seed, failed media or an unknown take', () => {
     const records = [
@@ -84,16 +98,6 @@ describe('results clip matching', () => {
       record({ mediaPath: null }),
     ];
     expect(resultsClipGroups([side('h200', records)])).toEqual([]);
-  });
-  it('keeps changed seeds, workloads and generations in separate groups', () => {
-    const groups = resultsClipGroups([
-      side('b200', [record()]),
-      side('h200', [record({ seed: 12 })]),
-      side('mi355x', [record()], 'other-workload'),
-    ]);
-    expect(groups).toHaveLength(3);
-    expect(groups.every((group) => group.clips.size === 1)).toBe(true);
-    expect(resultsClipGroups([side('b200', [record()], '')])).toEqual([]);
   });
 });
 

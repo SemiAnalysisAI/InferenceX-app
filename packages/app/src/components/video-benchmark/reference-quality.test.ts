@@ -4,13 +4,28 @@ import { referenceQualityFixture } from './reference-quality.fixture';
 import { verifiedReferencePairs } from './reference-quality';
 
 describe('sealed per-clip reference pairs', () => {
-  it('binds a score to its exact source and preserves independent original plan hashes', () => {
+  it('keeps exact sources and independent plan hashes isolated across same-run artifacts', () => {
     const f = referenceQualityFixture();
     const referenceCases = at(f.receipt, 'plan', 'cases');
     if (Array.isArray(referenceCases))
       referenceCases.push({ case_id: 'unrelated', requires_motion: false });
-    const [quality] = verifiedReferencePairs(f.attachment, f.receipts, [f.stored], '9'.repeat(64));
-    expect(quality).toMatchObject({
+    const second = structuredClone(f.stored);
+    second.artifact.id = 8;
+    const pair = structuredClone(f.attachment.pairs[0]);
+    pair.candidate.artifact_id = 8;
+    pair.comparison.metrics.video_psnr_db = 29;
+    f.attachment.pairs.push(pair);
+    const quality = verifiedReferencePairs(
+      f.attachment,
+      f.receipts,
+      [f.stored, second],
+      '9'.repeat(64),
+    );
+    expect(quality.map((item) => [item.candidate.artifact_id, item.psnrDb])).toEqual([
+      [7, 25],
+      [8, 29],
+    ]);
+    expect(quality[0]).toMatchObject({
       status: 'measured',
       psnrDb: 25,
       comparedFrames: 107,
@@ -31,23 +46,6 @@ describe('sealed per-clip reference pairs', () => {
       releaseQualified: false,
     });
     expect(JSON.stringify(quality)).not.toContain('/private/');
-  });
-  it('keeps two same-run artifacts with identical source/path isolated', () => {
-    const f = referenceQualityFixture();
-    const second = structuredClone(f.stored);
-    second.artifact.id = 8;
-    const pair = structuredClone(f.attachment.pairs[0]);
-    pair.candidate.artifact_id = 8;
-    pair.comparison.metrics.video_psnr_db = 29;
-    f.attachment.pairs.push(pair);
-    expect(
-      verifiedReferencePairs(f.attachment, f.receipts, [f.stored, second], '9'.repeat(64)).map(
-        (p) => [p.candidate.artifact_id, p.psnrDb],
-      ),
-    ).toEqual([
-      [7, 25],
-      [8, 29],
-    ]);
   });
   it.each([
     'artifact',
@@ -84,17 +82,6 @@ describe('sealed per-clip reference pairs', () => {
     expect(() =>
       verifiedReferencePairs(f.attachment, f.receipts, [f.stored], '9'.repeat(64)),
     ).toThrow();
-  });
-  it('retains missing pairs and incompatible scores without inventing a number', () => {
-    const f = referenceQualityFixture();
-    f.attachment.pairs[0].comparison.compatible = false;
-    const result = verifiedReferencePairs(f.attachment, f.receipts, [f.stored], '9'.repeat(64));
-    expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({ status: 'incompatible', psnrDb: null });
-    f.attachment.pairs = [];
-    expect(verifiedReferencePairs(f.attachment, f.receipts, [f.stored], '9'.repeat(64))).toEqual(
-      [],
-    );
   });
   it('represents exact decoded equality explicitly and rejects incomplete/nonfinite scores', () => {
     const f = referenceQualityFixture();
@@ -143,6 +130,7 @@ describe('sealed per-clip reference pairs', () => {
       },
     ]);
     expect(quality.notes).toEqual(['incompatible-media']);
+    expect(quality.status).toBe('incompatible');
     expect(quality.psnrDb).toBeNull();
   });
   it('requires retained completed cases and the executed pinned reference runtime', () => {

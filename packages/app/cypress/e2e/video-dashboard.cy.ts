@@ -49,9 +49,16 @@ describe('VideoGenX results routes', () => {
   });
 
   it('preserves the selected published overlay through filtering and dismisses it explicitly', () => {
-    cy.visit('/video?unofficialrun=34342452354');
+    cy.visit('/video?unofficialrun=34342452354&other=1');
     cy.get('[data-testid="results-overlay"]').should('contain', '34342452354');
     cy.get('[data-testid="results-overlay-dismiss"]').should('be.visible');
+    cy.get('[data-testid="results-workload"]').click('left');
+    cy.get('[data-select-option]').last().click();
+    cy.location('search').then((search) => {
+      const selected = new URLSearchParams(search).get('r_workload');
+      expect(selected).not.to.equal(null);
+      cy.wrap(selected).as('selectedWorkload');
+    });
     cy.get('[data-testid="results-cost-table"] [data-hardware="h200"]').should('exist');
     cy.get('[data-testid="results-hardware-h200"]').uncheck();
     cy.get('[data-testid="results-cost-table"] [data-hardware="h200"]').should('not.exist');
@@ -63,11 +70,19 @@ describe('VideoGenX results routes', () => {
     cy.get('[data-testid="results-hardware-h200"]').check();
     cy.get('[data-testid="results-cost-table"] [data-hardware="h200"]').should('exist');
     cy.get('[data-testid="results-overlay-dismiss"]').click();
-    cy.location('search').should((search) => {
-      const params = new URLSearchParams(search);
-      expect(params.has('unofficialrun')).to.equal(false);
-      expect(params.has('unofficialruns')).to.equal(false);
+    cy.get<string>('@selectedWorkload').then((selected) => {
+      cy.location('search').should((search) => {
+        const params = new URLSearchParams(search);
+        expect(params.get('r_workload')).to.equal(selected);
+        expect(params.get('other')).to.equal('1');
+        expect(params.has('unofficialrun')).to.equal(false);
+        expect(params.has('unofficialruns')).to.equal(false);
+      });
     });
-    cy.get('[data-testid="results-cost-table"] [data-hardware="h200"]').should('exist');
+    cy.get('[data-testid="results-cost-table"] [data-hardware="h200"]').should(
+      'have.attr',
+      'data-overlay',
+      'false',
+    );
   });
 });

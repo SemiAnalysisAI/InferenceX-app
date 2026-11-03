@@ -470,16 +470,23 @@ describe('H3 video performance history', () => {
     const entry = videoHistoryEntry(servingArtifact(), '2026-09-09T00:00:00Z');
     cy.intercept('GET', '/api/video-runs?format=history&page=1', {
       schemaVersion: 1,
-      entries: [entry],
+      entries: [
+        entry,
+        videoHistoryEntry(servingArtifact(124, 41, 'NVIDIA B200'), '2026-09-09T00:00:00Z'),
+      ],
       nextPage: null,
     }).as('history');
-    cy.visit('/video');
+    cy.visit('/zh/video?history-hardware=NVIDIA%20H200');
     cy.wait('@history');
-    cy.get('[data-testid="video-history"]').should('not.exist');
-    cy.contains('summary', 'Performance history').click();
-    cy.get('[data-testid="video-history"] h1').should('contain', 'Performance history');
-    cy.get('[data-testid="video-history-observation"]').should('have.length', 3);
-    cy.get('[aria-label="Client concurrency"]').click();
+    cy.contains('summary', '性能历史').parent('details').should('have.attr', 'open');
+    cy.get('[data-testid="video-history"] h1').should('contain', '性能历史');
+    cy.get('[data-testid="video-history-observation"]')
+      .should('have.length', 3)
+      .each(($observation) => {
+        expect($observation).to.contain('NVIDIA H200').and.not.contain('NVIDIA B200');
+      });
+    cy.get('head meta[name="robots"]').should('have.attr', 'content', 'noindex, nofollow');
+    cy.get('[aria-label="客户端并发数"]').click();
     cy.contains('[role="option"]', 'C2').click();
     cy.get('[data-testid="video-history-observation"]')
       .should('have.length', 1)
@@ -489,9 +496,15 @@ describe('H3 video performance history', () => {
       .should('have.length', 1)
       .and('contain', 'C2')
       .and('contain', '240 / —');
-    cy.location('search').should('contain', 'history-concurrency=2');
+    cy.location('search').should((search) => {
+      const params = new URLSearchParams(search);
+      expect(params.get('history-concurrency')).to.equal('2');
+      expect(params.get('history-hardware')).to.equal('NVIDIA H200');
+    });
     cy.window().then((win) => {
-      win.history.pushState(null, '', '/video?history-concurrency=4');
+      const next = new URL(win.location.href);
+      next.searchParams.set('history-concurrency', '4');
+      win.history.pushState(null, '', next);
     });
     cy.reload();
     cy.get('[data-testid="video-history-observation"]')
@@ -520,25 +533,6 @@ describe('H3 video performance history', () => {
     );
     cy.get('[data-testid="tab-trigger-hidden"]').click();
     cy.contains('a', 'Video').should('have.attr', 'href', '/video');
-    cy.get('head meta[name="robots"]').should('have.attr', 'content', 'noindex, nofollow');
-  });
-  it('renders the Chinese history section for a history deep link', () => {
-    cy.intercept('GET', '/api/video-runs?format=history&page=1', {
-      schemaVersion: 1,
-      entries: [
-        videoHistoryEntry(servingArtifact(), '2026-09-09T00:00:00Z'),
-        videoHistoryEntry(servingArtifact(124, 41, 'NVIDIA B200'), '2026-09-09T00:00:00Z'),
-      ],
-      nextPage: null,
-    });
-    cy.visit('/zh/video?history-hardware=NVIDIA%20H200');
-    cy.contains('summary', '性能历史').parent('details').should('have.attr', 'open');
-    cy.get('[data-testid="video-history"] h1').should('contain', '性能历史');
-    cy.get('[data-testid="video-history-observation"]')
-      .should('have.length', 3)
-      .each(($observation) => {
-        expect($observation).to.contain('NVIDIA H200').and.not.contain('NVIDIA B200');
-      });
     cy.get('head meta[name="robots"]').should('have.attr', 'content', 'noindex, nofollow');
   });
 });

@@ -26,16 +26,11 @@ describe('sealed results detail projection', () => {
     expect(detail.peakPowerW).toBe(1201);
     expect(detail.mode).toBeNull();
     expect(detail.gpuMemoryMiB).toBeNull();
-  });
-
-  it('withholds trace and peak values when any sealed power sidecar dissents', async () => {
-    const bundle = await read();
-    const cell = servingCells(bundle)[0];
     assign(bundle.documents.get('gpu/c1/aggregate.json')!, 'power_valid', 0);
-    const detail = resultsEvidence(bundle, cell);
-    expect(detail.powerValid).toBe(false);
-    expect(detail.powerSeries).toEqual([]);
-    expect(detail.peakPowerW).toBeNull();
-    expect(detail.workloadHash).toBe(at(cell.run, 'plan_sha256'));
+    const invalid = resultsEvidence(bundle, cell);
+    expect(invalid.powerValid).toBe(false);
+    expect(invalid.powerSeries).toEqual([]);
+    expect(invalid.peakPowerW).toBeNull();
+    expect(invalid.workloadHash).toBe(at(cell.run, 'plan_sha256'));
   });
 });

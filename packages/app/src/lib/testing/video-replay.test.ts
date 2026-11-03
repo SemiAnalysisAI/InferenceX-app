@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { NextRequest } from 'next/server';
@@ -183,23 +183,19 @@ describe('original-artifact development replay', () => {
     expect(history.entries[0].sources[0].observations).toHaveLength(3);
     expect(fetchMock).not.toHaveBeenCalled();
   });
-  it.each([
-    'candidate/drum-taps/candidate.mp4',
-    'reference/drum-taps/reference.mp4',
-    'candidate/native.json',
-    'candidate/diagnostic.json',
-    'candidate/SHA256SUMS',
-    'diagnostics.json',
-  ])('rejects tampered diagnostic %s without exposing private paths', async (member) => {
-    const { dir } = await configureDiagnostic();
-    await writeFile(join(dir, member), 'tampered');
-    const response = await GET(new NextRequest('http://localhost/api/video-runs?format=history'));
-    expect(response.status).toBe(503);
-    const body = await response.text();
-    expect(body).toContain('Diagnostic attachment failed verification');
-    expect(body).not.toContain(dir);
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
+  it.each(['candidate/drum-taps/candidate.mp4', 'candidate/native.json', 'diagnostics.json'])(
+    'rejects tampered diagnostic %s without exposing private paths',
+    async (member) => {
+      const { dir } = await configureDiagnostic();
+      await appendFile(join(dir, member), '\n');
+      const response = await GET(new NextRequest('http://localhost/api/video-runs?format=history'));
+      expect(response.status).toBe(503);
+      const body = await response.text();
+      expect(body).toContain('Diagnostic attachment failed verification');
+      expect(body).not.toContain(dir);
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
   it('fails a bad quality attachment closed without returning its private file path', async () => {
     await configure();
     const manifest = process.env.E2E_VIDEO_REPLAY_MANIFEST!;

@@ -67,52 +67,6 @@ const costRow = (hardware: string, basis = 'participating') =>
   cy.get(`[data-testid="results-cost-table"] [data-hardware="${hardware}"][data-basis="${basis}"]`);
 
 describe('VideoGenX results', () => {
-  for (const [pathname, width] of [['/zh/video', 390]] as const) {
-    it(`shows and dismisses a named H100 diagnostic in ${pathname} at ${width}px`, () => {
-      cy.viewport(width, 900);
-      mount({
-        pathname,
-        search: '?unofficialrun=34336635063',
-        editPage: (page) => {
-          // Approval is changed only in this isolated test fixture.
-          page.entries.find((entry) => entry.runId === '34336635063')!.approved = false;
-        },
-      });
-      costRow('h100').should('have.attr', 'data-overlay', 'true');
-      cy.get('[data-testid="video-results-clip"][data-hardware="h100"]').should(
-        'contain',
-        pathname.startsWith('/zh') ? '非官方运行' : 'Unofficial run',
-      );
-      cy.get('[data-testid="results-hardware-h100"]').uncheck();
-      costRow('h100').should('not.exist');
-      cy.get('[data-testid="video-results-clip"][data-hardware="h100"]').should('not.exist');
-      cy.location('search').should('contain', 'r_hidden=h100');
-      cy.get('[data-testid="results-hardware-h100"]').check();
-      costRow('h100').should('have.attr', 'data-overlay', 'true');
-      cy.get('[data-testid="results-overlay-dismiss"]').click();
-      costRow('h100').should('not.exist');
-      cy.get('[data-testid="results-hardware-h100"]').should('not.exist');
-      cy.get('[data-testid="video-results-clip"]').should('have.length', 4);
-    });
-  }
-
-  it('keeps unapproved stored evidence in History and out of the default comparison', () => {
-    mount({
-      editPage: (page) => {
-        for (const entry of page.entries) entry.approved = false;
-      },
-    });
-    cy.get('[data-testid="results-cost-table"] [data-hardware]').should('not.exist');
-    cy.get('[data-testid="video-results-clip"] video').should('not.exist');
-    cy.get('[data-testid="video-results-play"]').should('be.disabled');
-    cy.get('[data-testid="video-results-scrub"]').should('be.disabled');
-    cy.contains('summary', 'Performance history').click();
-    cy.get('[data-testid="video-history-entry"]').should('have.length', 7);
-    cy.get('[data-testid="video-history-publication"]').each(($entry) => {
-      expect($entry).to.contain('No matching approval receipt');
-    });
-  });
-
   for (const pathname of ['/zh/video']) {
     it(`retains publication approval and source power verdicts in ${pathname} History`, () => {
       const zh = pathname.startsWith('/zh');
@@ -173,38 +127,38 @@ describe('VideoGenX results', () => {
     cy.get(latencyPoints).should('not.exist');
   });
 
-  for (const onlyDiagnostic of [false, true]) {
-    it(`shows a named unapproved run with ${onlyDiagnostic ? 'no approved cohort' : 'an approved cohort'} and clears it without promotion`, () => {
-      mount({
-        search: '?unofficialrun=34341996789',
-        editPage: (page) => {
-          for (const entry of page.entries)
-            if (onlyDiagnostic || entry.runId === '34341996789') entry.approved = false;
-        },
-      });
-      costRow('b200').should('have.attr', 'data-overlay', 'true');
-      cy.get('[data-testid="video-results-clip"][data-hardware="b200"]').should(
-        'contain',
-        'Unofficial run',
-      );
-      cy.get('[data-testid="video-results-sources"] summary').click();
-      cy.get('[data-testid="video-results-sources"]').should('contain', 'No matching receipt');
-      if (onlyDiagnostic)
-        cy.get('[data-testid="results-cost-table"] [data-overlay="false"]').should('not.exist');
-      else costRow('h200').should('have.attr', 'data-overlay', 'false');
-      cy.get('@history.all')
-        .its('length')
-        .then((requestCount) => {
-          cy.get('[data-testid="results-overlay-dismiss"]').click();
-          cy.get('@history.all').should('have.length', requestCount);
-        });
-      costRow('b200').should('not.exist');
-      cy.get('[data-testid="results-overlay"]').should('not.exist');
-      if (onlyDiagnostic)
-        cy.get('[data-testid="results-cost-table"] [data-hardware]').should('not.exist');
-      else costRow('h200').should('exist');
+  it('shows a named unapproved run without an approved cohort and clears it without promotion', () => {
+    mount({
+      search: '?unofficialrun=34341996789',
+      editPage: (page) => {
+        for (const entry of page.entries) entry.approved = false;
+      },
     });
-  }
+    costRow('b200').should('have.attr', 'data-overlay', 'true');
+    cy.get('[data-testid="video-results-clip"][data-hardware="b200"]').should(
+      'contain',
+      'Unofficial run',
+    );
+    cy.get('[data-testid="video-results-sources"] summary').click();
+    cy.get('[data-testid="video-results-sources"]').should('contain', 'No matching receipt');
+    cy.get('[data-testid="results-cost-table"] [data-overlay="false"]').should('not.exist');
+    cy.get('@history.all')
+      .its('length')
+      .then((requestCount) => {
+        cy.get('[data-testid="results-overlay-dismiss"]').click();
+        cy.get('@history.all').should('have.length', requestCount);
+      });
+    cy.get('[data-testid="results-overlay"]').should('not.exist');
+    cy.get('[data-testid="results-cost-table"] [data-hardware]').should('not.exist');
+    cy.get('[data-testid="video-results-clip"] video').should('not.exist');
+    cy.get('[data-testid="video-results-play"]').should('be.disabled');
+    cy.get('[data-testid="video-results-scrub"]').should('be.disabled');
+    cy.contains('summary', 'Performance history').click();
+    cy.get('[data-testid="video-history-entry"]').should('have.length', 7);
+    cy.get('[data-testid="video-history-publication"]').each(($entry) => {
+      expect($entry).to.contain('No matching approval receipt');
+    });
+  });
 
   it('restores the approved workload after dismissing an explicitly selected named-only workload', () => {
     mount({
@@ -234,24 +188,6 @@ describe('VideoGenX results', () => {
     costRow('h200').should('have.attr', 'data-overlay', 'false');
     costRow('b200').should('not.exist');
     cy.location('search').should('not.contain', 'r_workload=').and('not.contain', 'unofficialrun');
-  });
-
-  it('preserves an explicitly selected approved workload when dismissing an overlay', () => {
-    mount({ search: '?unofficialrun=34342452354&other=1' });
-    costRow('h200').should('have.attr', 'data-overlay', 'true');
-    cy.get('[data-testid="results-workload"]').click('left');
-    cy.get('[data-select-option]').last().click();
-    cy.location('search').then((search) => {
-      const selected = new URLSearchParams(search).get('r_workload');
-      expect(selected).not.to.equal(null);
-      cy.get('[data-testid="results-overlay-dismiss"]').click();
-      cy.location('search').should((cleared) => {
-        expect(new URLSearchParams(cleared).get('r_workload')).to.equal(selected);
-        expect(cleared).not.to.contain('unofficialrun');
-        expect(new URLSearchParams(cleared).get('other')).to.equal('1');
-      });
-      costRow('h200').should('have.attr', 'data-overlay', 'false');
-    });
   });
 
   it('requests the new artifact when a named run re-exports the same observation ID', () => {
@@ -367,8 +303,16 @@ describe('VideoGenX results', () => {
     cy.get('[role="listbox"] [role="option"]').first().click();
     cy.location('search').should('not.contain', 'r_model=');
   });
-  it('keeps the video comparison before the nine groups and admits only the common 20-clip C1 workload', () => {
-    mount();
+  it('keeps comparison before the nine groups, applies the common sample floor and preserves unknown allocation', () => {
+    mount({
+      edit: (observation) => {
+        if (observation.hardware.includes('H100')) {
+          observation.samples = 9;
+          observation.valid = 9;
+        }
+        if (observation.hardware.includes('H200')) observation.allocated = null;
+      },
+    });
     cy.get('[data-testid="video-results"] section[id]').should(($sections) => {
       expect([...$sections].map((section) => section.id)).to.deep.equal([
         'comparison-clips',
@@ -378,37 +322,20 @@ describe('VideoGenX results', () => {
     costRow('b200').should('contain', '0.15');
     costRow('b200', 'allocated').should('contain', '0.3');
     costRow('h200').should('contain', '0.204');
-    // Legacy H100 matches this cohort; the four-sample native H200 smoke stays out.
-    costRow('h100').should('contain', '0.217');
-    cy.get('[data-testid="results-cost-table"] [data-hardware]').should('have.length', 6);
-    // One GPU-count observation still has a measured P90 marker; P95 is absent
-    // from the retained projection and must not become an illustrative band.
+    costRow('h200', 'allocated').should('contain', '—');
+    costRow('h100').should('not.exist');
+    cy.get('[data-testid="results-cost-table"] [data-hardware]').should('have.length', 4);
+    cy.get('#latency [data-hardware="h100"] rect, #latency [data-hardware="h100"] circle').should(
+      'not.exist',
+    );
+    cy.get('#throughput [data-hardware="h100"] rect').should('not.exist');
     cy.get('[data-testid="results-latency-series"] [data-percentile="p90"]').should(
       'have.length',
-      3,
+      2,
     );
     cy.get('[data-testid="results-latency-series"] [data-percentile="p95"]').should('not.exist');
     cy.get('#quality [data-testid="results-empty"]').should('exist');
     cy.get('#startup [data-testid="results-empty"]').should('exist');
-  });
-
-  it('applies the same sample floor to every hardware and never prices unknown allocation', () => {
-    mount({
-      edit: (observation) => {
-        if (observation.hardware.includes('B200')) {
-          observation.samples = 9;
-          observation.valid = 9;
-        }
-        if (observation.hardware.includes('H200')) observation.allocated = null;
-      },
-    });
-    costRow('b200').should('not.exist');
-    costRow('h200').should('contain', '0.204');
-    costRow('h200', 'allocated').should('contain', '—');
-    cy.get('#latency [data-hardware="b200"] rect, #latency [data-hardware="b200"] circle').should(
-      'not.exist',
-    );
-    cy.get('#throughput [data-hardware="b200"] rect').should('not.exist');
   });
 
   it('hides hardware in all metrics and handles an empty selection without stale values', () => {

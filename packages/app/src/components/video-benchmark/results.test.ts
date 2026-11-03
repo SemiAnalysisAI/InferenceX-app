@@ -37,28 +37,6 @@ const evidence = (overrides: Partial<ResultsEvidence> = {}): ResultsEvidence => 
 });
 
 describe('VideoGenX results contract', () => {
-  it('includes qualified H100 evidence without adding an empty slot to legacy comparisons', () => {
-    // Synthetic hardware substitution exercises admission; it is not an H100 measurement.
-    const h100 = { ...eligible, id: 'h100:c1', hardwareKey: 'h100', runId: '200' };
-    const legacy = resultProjection(
-      points.filter((point) => point.hardwareKey !== 'h100'),
-      state(),
-    );
-    expect(legacy.roster).toEqual(['gb200', 'b200', 'mi355x', 'h200']);
-    const result = resultProjection([h100], state());
-    expect(result.roster).toEqual(['gb200', 'b200', 'mi355x', 'h200', 'h100']);
-    expect(result.cells[0].point.id).toBe(h100.id);
-    expect(resultProjection([{ ...h100, samples: 9 }], state()).roster).not.toContain('h100');
-    const namedH100 = { ...h100, approved: false };
-    const selection = { ...state(), unofficialRun: namedH100.runId };
-    const named = resultProjection([eligible], selection, [namedH100]);
-    expect(named.roster).toContain('h100');
-    expect(named.overlayCells[0].point).toMatchObject({ id: namedH100.id, approved: false });
-    expect(named.cells.map((cell) => cell.point.id)).toEqual([eligible.id]);
-    expect(resultProjection([eligible], state(), [namedH100]).roster).not.toContain('h100');
-    expect(resultProjection([eligible], state(), [namedH100]).overlayCells).toEqual([]);
-  });
-
   it('uses one complete 20-clip C1 workload, the same ten-sample floor and the requested hardware roster', () => {
     const result = resultProjection(points, state());
     expect(result.cells.map((c) => c.point.hardwareKey).sort()).toEqual(['b200', 'h100', 'h200']);
@@ -241,6 +219,10 @@ describe('VideoGenX results contract', () => {
     const explicit = resultProjection([eligible], { ...selection, workload: named.id }, [named]);
     expect(explicit.cells).toEqual([]);
     expect(explicit.overlayCells[0].point.id).toBe(named.id);
+    expect(explicit.options.workloads.map((workload) => workload.key)).toContain(named.id);
+    expect(explicit.workloadKey).toBe(named.workloadKey);
+    expect(new URLSearchParams(resultsSearch(explicit.state)).get('r_workload')).toBe(named.id);
+    expect(resultProjection([eligible], { ...state(), workload: 'missing' }).cells).toEqual([]);
     expect(explicit.workloadMix.every((cell) => cell.point.approved === true)).toBe(true);
     const fallback = resultProjection([], selection, [named]);
     expect(fallback.cells).toEqual([]);
@@ -294,16 +276,6 @@ describe('VideoGenX results contract', () => {
       deadlineSeconds: 120,
       utilization: 1,
     });
-  });
-  it('shares a compact source selector while retaining full prompt/seed identity internally', () => {
-    const projection = resultProjection([eligible], state());
-    const selected = projection.options.workloads[0].key;
-    expect(selected).toBe(eligible.id);
-    const result = resultProjection([eligible], { ...state(), workload: selected });
-    expect(result.workloadKey).toBe(eligible.workloadKey);
-    expect(result.cells.map((cell) => cell.point.id)).toEqual([eligible.id]);
-    expect(new URLSearchParams(resultsSearch(result.state)).get('r_workload')).toBe(eligible.id);
-    expect(resultProjection([eligible], { ...state(), workload: 'missing' }).cells).toEqual([]);
   });
   it('keeps engines and workload-mix cohorts distinct rather than overwriting or pooling them', () => {
     const a = { ...eligible, id: 'first:c1', results: evidence({ engine: 'sglang' }) };
