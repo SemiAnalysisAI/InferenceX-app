@@ -113,7 +113,7 @@ describe('next.config custom routes', () => {
 
   it.each([
     '/images/post/figure.png',
-    '/brand/left-pattern-full.svg',
+    '/brand/logo-color.webp',
     '/logos/nvidia.svg',
     '/whitepaper/amd-mi355x-32b-revenue-per-gigawatt-kimi-k3/cover.webp',
     '/whitepaper/amd-mi355x-32b-revenue-per-gigawatt-kimi-k3/pdf/summary.pdf',

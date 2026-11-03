@@ -91,7 +91,7 @@ describe('ResultContext', () => {
     });
     const text = container.textContent ?? '';
     expect(text).toContain('Precision: FP8');
-    expect(text).toContain('Cost Tier: Owning at Large Hyperscaler Volume');
+    expect(text).toContain('Cost tier: Owning at Large Hyperscaler Volume');
     expect(text).toContain('Updated: 2026-09-01');
     expect(text).toContain('Source: SemiAnalysis InferenceX™');
     expect(text).not.toContain('Model:');
@@ -115,11 +115,40 @@ describe('ResultContext', () => {
       );
     });
     const dd = container.querySelector('[data-testid="result-context-cost-tier"]');
-    expect(container.textContent).toContain('Cost Tier:');
+    expect(container.textContent).toContain('Cost tier:');
     expect(dd?.querySelector('.no-export [data-testid="tier-control"]')).not.toBeNull();
     expect(dd?.querySelector('.export-only')?.textContent).toBe('Rent - 3 Year Commit');
     expect(dd?.querySelector('.export-only')?.classList.contains('hidden')).toBe(true);
     expect(container.textContent).toContain('Updated: 2026-09-01');
+  });
+
+  it('lays out the chart footer as a controls row and one meta line', () => {
+    const container = document.createElement('div');
+    act(() => {
+      createRoot(container).render(
+        <ResultContext
+          locale="en"
+          layout="footer"
+          costTier="Rent - 3 Year Commit"
+          costTierControl={<button data-testid="tier-control">Rent - 3 Year Commit</button>}
+          date="2026-09-01"
+          source="SemiAnalysis InferenceX™"
+          controlsEnd={<table data-testid="prices" />}
+          markers={<span>KV offload on</span>}
+          metaEnd={<span>Prices: model</span>}
+        />,
+      );
+    });
+    const dt = container.querySelector('[data-testid="result-context-cost-tier"]')?.previousSibling
+      ?.previousSibling as HTMLElement;
+    expect(dt.querySelector('.sr-only')?.textContent).toBe('Cost tier');
+    expect(dt.querySelector('.export-only.hidden')?.textContent).toBe('Cost tier:');
+    expect(container.querySelector('[data-testid="prices"]')).not.toBeNull();
+    expect(container.textContent).toContain('Updated 2026-09-01');
+    expect(container.querySelector('[data-testid="result-context-markers"]')?.textContent).toBe(
+      'KV offload on',
+    );
+    expect(container.textContent).toContain('Prices: model');
   });
 
   it('shows utilization and the model license fee when given, in both locales', () => {
@@ -128,7 +157,7 @@ describe('ResultContext', () => {
       createRoot(en).render(<ResultContext locale="en" utilization="60%" licenseFee="30%" />);
     });
     expect(en.textContent).toContain('Utilization: 60%');
-    expect(en.textContent).toContain('Model License Fee Assumption: 30%');
+    expect(en.textContent).toContain('Model license fee assumption: 30%');
     expect(en.querySelector('[data-testid="result-context-license-fee"]')?.textContent).toBe('30%');
     const zh = document.createElement('div');
     act(() => {
@@ -155,7 +184,7 @@ describe('ResultContext', () => {
     });
     expect(container.querySelector('label[for="util"]')?.textContent).toBe('Utilization:');
     expect(container.querySelector('label[for="fee"]')?.textContent).toBe(
-      'Model License Fee Assumption:',
+      'Model license fee assumption:',
     );
     const util = container.querySelector('[data-testid="result-context-utilization"]');
     expect(util?.querySelector('.no-export [data-testid="util-control"]')).not.toBeNull();

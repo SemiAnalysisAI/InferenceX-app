@@ -1,0 +1,72 @@
+export interface ChartTooltipShellOptions {
+  /** Pinned tooltips allow text selection. Omit for tooltips that never pin. */
+  pinned?: boolean;
+  /** CSS border shorthand. Defaults to the theme hairline. */
+  border?: string;
+  minWidth?: number;
+  /** Caps the width, and never wider than the viewport minus a gutter. */
+  maxWidth?: number;
+  /** Lets links and buttons inside the tooltip take the pointer. */
+  interactive?: boolean;
+  /** Caps the height and scrolls long content inside the card. */
+  scrollable?: boolean;
+}
+
+/**
+ * Inline style for the opaque card around D3 chart tooltip HTML. The chart tooltip element itself
+ * is transparent, so content without this surface shows the chart through it. The mobile sheet
+ * strips it.
+ */
+export function chartTooltipShellStyle(options: ChartTooltipShellOptions = {}): string {
+  const {
+    pinned,
+    border = '1px solid var(--border)',
+    minWidth,
+    maxWidth,
+    interactive,
+    scrollable,
+  } = options;
+  const styles = [
+    'background: var(--popover)',
+    'color: var(--popover-foreground)',
+    `border: ${border}`,
+    'border-radius: 8px',
+    'padding: 12px',
+    'box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1)',
+    'box-sizing: border-box',
+  ];
+  if (minWidth !== undefined) styles.push(`min-width: ${minWidth}px`);
+  if (maxWidth !== undefined) styles.push(`max-width: min(${maxWidth}px, calc(100vw - 16px))`);
+  if (scrollable) {
+    styles.push(
+      'max-height: min(70vh, calc(100dvh - 16px))',
+      'overflow-x: hidden',
+      'overflow-y: auto',
+      'overscroll-behavior: contain',
+    );
+  }
+  if (interactive) styles.push('pointer-events: auto');
+  if (pinned !== undefined) styles.push(`user-select: ${pinned ? 'text' : 'none'}`);
+  return styles.join('; ');
+}
+
+/** Wraps D3 chart tooltip HTML in the shared card. */
+export function chartTooltipShell(body: string, options?: ChartTooltipShellOptions): string {
+  return `<div style="${chartTooltipShellStyle(options)}">${body}</div>`;
+}
+
+/**
+ * Tooltip heading in the foreground color, with an optional series dot. `label` must already be
+ * escaped by the caller.
+ */
+export function chartTooltipTitle(label: string, color?: string): string {
+  const dot = color
+    ? `<span style="width: 8px; height: 8px; border-radius: 9999px; background: ${color}; flex-shrink: 0;"></span>`
+    : '';
+  return `<div style="display: flex; align-items: center; gap: 6px; color: var(--foreground); font-size: 12px; font-weight: 600; margin-bottom: 8px;">${dot}${label}</div>`;
+}
+
+/** The muted hint at the top of a pinned tooltip, such as "Click elsewhere to dismiss". */
+export function chartTooltipDismiss(text: string): string {
+  return `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px;">${text}</div>`;
+}

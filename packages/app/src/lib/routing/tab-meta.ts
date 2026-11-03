@@ -123,6 +123,33 @@ export const TAB_META: Record<DashboardRouteKey, { title: string; description: s
   },
 };
 
+/**
+ * On-page h1 for each tab, in sentence case. `TAB_META[tab].title` stays the SEO `<title>`
+ * (Title Case for search results); this is what readers see on the page.
+ */
+export const TAB_HEADING: Record<DashboardRouteKey, string> = {
+  powerx: 'PowerX: measured GPU power and energy per token',
+  inference: 'Agentic inference benchmarks',
+  evaluation: 'LLM evaluation results',
+  historical: 'Historical inference trends',
+  calculator: 'Throughput & TCO calculator',
+  fleet: 'Fleet lifecycle economics',
+  'first-token': 'First-token limits',
+  'cache-reuse': 'Prefix cache reuse',
+  'profit-estimator': 'Inference profit estimator',
+  'profit-estimator-per-gigawatt': 'Inference profit estimator per gigawatt',
+  reliability: 'Provider reliability metrics',
+  'gpu-specs': 'Chip specifications & comparison',
+  operatorx: 'OperatorX GEMM, attention and MoE benchmarks',
+  collectivex: 'CollectiveX communication benchmarks',
+  'agentic-workload-explorer': 'Agentic workload explorer',
+  'ai-chart': 'Chart generation from a prompt',
+  submissions: 'Benchmark submissions',
+  'current-inferencex-image': 'Current InferenceX image',
+  video: 'H3 video benchmark',
+  feedback: 'User feedback',
+};
+
 export const TAB_INTRO: Record<DashboardRouteKey, string> = {
   powerx:
     'PowerX shows measured GPU power, energy per output token and power timelines for every InferenceX benchmark point. GPU power is measured; the rest of the server and facility PUE are modeled.',
@@ -157,7 +184,7 @@ export const TAB_INTRO: Record<DashboardRouteKey, string> = {
   submissions:
     'Every benchmark configuration submitted to InferenceX, with submission history, activity trends and datapoint volume by chip vendor.',
   'ai-chart':
-    'AI-powered chart generation turns a natural-language description into a chart built from InferenceX benchmark data.',
+    'Describe a comparison in plain language and get a chart built from InferenceX benchmark data.',
   'current-inferencex-image':
     'The Docker image tags InferenceX currently runs, listed per model, chip SKU and config and compared against the latest upstream vLLM and SGLang releases to spot outdated images.',
   video:
@@ -179,12 +206,15 @@ export const MODEL_TAB_META: Record<
   ModelRouteTab,
   {
     title: (seoName: string) => string;
+    /** On-page h1, sentence case. `title` stays the SEO `<title>`. */
+    heading: (seoName: string) => string;
     description: (seoName: string) => string;
     intro: (seoName: string) => string;
   }
 > = {
   historical: {
     title: (seoName) => `${seoName} Historical Inference Trends`,
+    heading: (seoName) => `${seoName} historical inference trends`,
     description: (seoName) =>
       `Track ${seoName} inference performance over time: latency, throughput and cost gains per chip and provider from historical benchmark data.`,
     intro: (seoName) =>
@@ -192,6 +222,7 @@ export const MODEL_TAB_META: Record<
   },
   calculator: {
     title: (seoName) => `${seoName} Throughput & TCO Calculator`,
+    heading: (seoName) => `${seoName} throughput & TCO calculator`,
     description: (seoName) =>
       `Calculate ${seoName} inference throughput and total cost of ownership, and compare chip cost-efficiency across hardware configurations.`,
     intro: (seoName) =>
@@ -199,6 +230,7 @@ export const MODEL_TAB_META: Record<
   },
   'profit-estimator': {
     title: (seoName) => `${seoName} Inference Profit Estimator`,
+    heading: (seoName) => `${seoName} inference profit estimator`,
     description: (seoName) =>
       `Estimate what one chip-hour of ${seoName} agentic inference earns, split into compute (TCO $/chip/hr), model license fee and operator profit.`,
     intro: (seoName) =>
@@ -206,6 +238,7 @@ export const MODEL_TAB_META: Record<
   },
   'profit-estimator-per-gigawatt': {
     title: (seoName) => `${seoName} Profit Estimator per GigaWatt`,
+    heading: (seoName) => `${seoName} profit estimator per gigawatt`,
     description: (seoName) =>
       `Estimate what one gigawatt-year of ${seoName} agentic inference earns per chip, split into compute expense (TCO), license fee and operator profit.`,
     intro: (seoName) =>

@@ -96,7 +96,7 @@ export function TcoModelDialog({ tier, onClose, source }: TcoModelDialogProps) {
     <Dialog open={tier !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-xl" data-testid="tco-model-dialog">
         <DialogHeader>
-          <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
             <Lock aria-hidden="true" className="size-3.5" />
             SemiAnalysis
           </div>

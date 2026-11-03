@@ -414,7 +414,7 @@ function localized(locale: Locale, en: string, zh?: string): string {
 const RENDERER_STRINGS = {
   en: {
     explore: 'Explore',
-    maybeLater: 'Maybe Later',
+    maybeLater: 'Maybe later',
     close: 'Close',
     dismissBanner: 'Dismiss launch banner',
   },
@@ -436,7 +436,7 @@ function ToastRenderer({
   return (
     <BottomToast
       testId={content.testId}
-      icon={<Icon className={content.iconClassName} />}
+      icon={<Icon />}
       title={localized(locale, content.title, content.titleZh)}
       description={localized(locale, content.description, content.descriptionZh)}
       action={
@@ -470,6 +470,10 @@ function ModalRenderer({
   const titleId = `${idPrefix}-title`;
   const descriptionId = `${idPrefix}-description`;
   const centered = content.centered;
+  // Two equal-weight choices with no dismiss button: neither is the primary action.
+  const equalChoice = Boolean(
+    centered && content.hideDismissButton && content.primaryAction && content.secondaryAction,
+  );
   const dialogRef = useRef<HTMLDivElement>(null);
   const onDismissRef = useRef(onDismiss);
   onDismissRef.current = onDismiss;
@@ -532,14 +536,14 @@ function ModalRenderer({
       aria-describedby={descriptionId}
       className={
         centered
-          ? `relative z-50 w-[calc(100vw-2rem)] max-w-md rounded-xl border bg-background p-6 shadow-lg sm:p-8 ${content.containerClassName ?? ''}`
-          : `fixed bottom-4 right-4 z-50 w-[calc(100vw-2rem)] max-w-md rounded-lg border bg-background p-6 shadow-lg ${content.containerClassName ?? ''}`
+          ? 'relative z-50 w-[calc(100vw-2rem)] max-w-md rounded-xl border border-border/30 bg-card p-6 shadow-lg sm:p-8'
+          : 'fixed bottom-4 right-4 z-50 w-[calc(100vw-2rem)] max-w-md rounded-xl border border-border/30 bg-card p-6 shadow-lg'
       }
     >
       <button
         type="button"
         onClick={onDismiss}
-        className={`absolute rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none ${centered ? 'right-2 top-2 flex size-9 items-center justify-center focus-visible:ring-2 focus-visible:ring-ring' : 'right-4 top-4'}`}
+        className={`absolute flex size-9 items-center justify-center rounded-md opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${centered ? 'right-2 top-2' : 'right-3 top-5'}`}
         aria-label={rs.close}
       >
         <X className={centered ? 'size-5' : 'size-4'} />
@@ -551,7 +555,7 @@ function ModalRenderer({
           <div className={centered ? 'text-center' : 'space-y-1.5 pr-6'}>
             {centered && (
               <div className="mb-5 flex min-h-5 items-center justify-center gap-2">
-                <Icon className={`size-6 shrink-0 ${content.iconClassName ?? ''}`} />
+                <Icon className="size-6 shrink-0 text-muted-foreground" />
                 {content.badge && (
                   <NewBadge data-new-badge="launch-modal" flashing>
                     {localized(locale, content.badge, content.badgeZh)}
@@ -567,7 +571,7 @@ function ModalRenderer({
                   : 'flex items-center gap-2 text-lg font-semibold'
               }
             >
-              {!centered && <Icon className={`size-5 shrink-0 ${content.iconClassName ?? ''}`} />}
+              {!centered && <Icon className="size-5 shrink-0 text-muted-foreground" />}
               {localized(locale, content.title, content.titleZh)}
               {!centered && content.badge && (
                 <NewBadge data-new-badge="launch-modal" className="ml-1" flashing>
@@ -584,10 +588,7 @@ function ModalRenderer({
           </div>
           <div
             className={
-              centered &&
-              content.hideDismissButton &&
-              content.primaryAction &&
-              content.secondaryAction
+              equalChoice
                 ? 'grid grid-cols-2 gap-3'
                 : `flex flex-row flex-wrap gap-2 ${centered ? 'justify-center' : 'justify-end'}`
             }
@@ -600,17 +601,18 @@ function ModalRenderer({
               >
                 {localized(
                   locale,
-                  content.dismissLabel ?? 'Maybe Later',
+                  content.dismissLabel ?? rs.maybeLater,
                   content.dismissLabelZh ?? rs.maybeLater,
                 )}
               </Button>
             )}
             {content.primaryAction && (
               <Button
+                variant={equalChoice ? 'outline' : 'default'}
                 onClick={() => onAction(content.primaryAction)}
                 data-modal-primary=""
                 data-testid={content.testId ? `${content.testId}-action` : undefined}
-                className={`${centered ? 'min-h-11 [&_img]:size-5' : ''} ${content.actionClassName ?? ''}`}
+                className={centered ? 'min-h-11 [&_img]:size-5' : undefined}
               >
                 {content.primaryAction.icon}
                 {localized(locale, content.primaryAction.label, content.primaryAction.labelZh)}
@@ -618,9 +620,10 @@ function ModalRenderer({
             )}
             {content.secondaryAction && (
               <Button
+                variant={equalChoice ? 'outline' : 'default'}
                 onClick={() => onAction(content.secondaryAction)}
                 data-testid={content.testId ? `${content.testId}-secondary-action` : undefined}
-                className={`${centered ? 'min-h-11 [&_img]:size-5' : ''} ${content.actionClassName ?? ''}`}
+                className={centered ? 'min-h-11 [&_img]:size-5' : undefined}
               >
                 {content.secondaryAction.icon}
                 {localized(locale, content.secondaryAction.label, content.secondaryAction.labelZh)}
@@ -667,7 +670,7 @@ function CoachMarkRenderer({
   return (
     <CoachMark
       anchor={anchor}
-      icon={<Icon className={content.iconClassName} />}
+      icon={<Icon />}
       title={localized(locale, content.title, content.titleZh)}
       description={localized(locale, content.description, content.descriptionZh)}
       onDismiss={onDismiss}
@@ -715,16 +718,13 @@ export function BannerRenderer({
       <a
         href={href}
         onClick={handleClick}
-        className="group relative flex items-center gap-3 overflow-hidden rounded-xl border border-brand/40 bg-gradient-to-r from-brand/10 via-brand/5 to-transparent px-4 py-3 transition-all duration-200 hover:border-brand/70 hover:shadow-lg hover:shadow-brand/10"
+        className="group flex items-center gap-3 rounded-xl border border-border/30 bg-card px-4 py-3 transition-colors hover:bg-muted/40"
         data-testid={content.testId}
       >
-        <div className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-r from-transparent via-brand/10 to-transparent" />
-        <span className="relative flex size-8 shrink-0 items-center justify-center rounded-full bg-brand/15 text-brand">
-          <Icon className="size-4 animate-pulse" />
-        </span>
-        <div className="relative flex flex-1 flex-col sm:flex-row sm:items-center sm:gap-3 min-w-0">
+        <Icon className="size-4 shrink-0 text-muted-foreground" />
+        <div className="flex flex-1 flex-col sm:flex-row sm:items-center sm:gap-3 min-w-0">
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold leading-snug break-words">
+            <p className="text-sm font-medium leading-snug break-words">
               <span className="align-middle">
                 {localized(locale, content.title, content.titleZh)}
               </span>
@@ -738,7 +738,7 @@ export function BannerRenderer({
               {localized(locale, content.description, content.descriptionZh)}
             </p>
           </div>
-          <span className="hidden sm:inline-flex items-center gap-1 text-xs font-medium text-brand shrink-0 group-hover:translate-x-0.5 transition-transform duration-200">
+          <span className="hidden sm:inline-flex items-center gap-1 text-xs font-medium text-brand shrink-0">
             {localized(locale, content.linkLabel ?? rs.explore, content.linkLabelZh)}
             <ArrowRight className="size-3.5" />
           </span>
@@ -746,7 +746,7 @@ export function BannerRenderer({
         <button
           type="button"
           onClick={handleDismiss}
-          className="relative ml-1 rounded-md p-1 text-muted-foreground opacity-70 transition-opacity hover:opacity-100 focus:outline-none"
+          className="ml-1 rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           aria-label={rs.dismissBanner}
           data-testid={content.testId ? `${content.testId}-dismiss` : undefined}
         >

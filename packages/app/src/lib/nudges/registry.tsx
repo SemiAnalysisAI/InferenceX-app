@@ -1,12 +1,12 @@
 import {
   ArrowRight,
   BookOpen,
+  Cpu,
   Download,
   MessageSquareText,
   Palette,
   ShieldCheck,
   SlidersHorizontal,
-  Sparkles,
   Star,
 } from 'lucide-react';
 import { GITHUB_OWNER, GITHUB_REPO } from '@semianalysisai/inferencex-constants';
@@ -73,14 +73,13 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     id: 'reproducibility',
     type: 'toast',
     trigger: { type: 'timer', delayMs: 1500 },
-    dismissal: { type: 'session' },
-    storageKey: 'inferencex-reproducibility-nudge-shown',
+    dismissal: { type: 'permanent' },
+    storageKey: 'inferencex-reproducibility-nudge-dismissed',
     conditions: [{ check: notPhoneWidthPowerX }],
     priority: 10,
     scope: 'dashboard',
     content: {
       icon: ShieldCheck,
-      iconClassName: 'text-brand',
       title: 'Every result is reproducible',
       titleZh: '每项结果均可复现',
       description:
@@ -118,11 +117,10 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     scope: 'dashboard',
     content: {
       icon: Star,
-      iconClassName: 'text-yellow-500 fill-yellow-500',
       title: 'Finding us useful?',
       titleZh: '觉得有用吗？',
-      description: 'Help the project grow so we can add more benchmarks! Star us on GitHub.',
-      descriptionZh: '帮助项目成长，让我们可以添加更多基准测试！在 GitHub 上为我们加星。',
+      description: 'Help the project grow so we can add more benchmarks. Star us on GitHub.',
+      descriptionZh: '帮助项目成长，让我们可以添加更多基准测试。在 GitHub 上为我们加星。',
       action: {
         label: 'Star on GitHub',
         labelZh: '在 GitHub 上加星',
@@ -155,12 +153,11 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     scope: 'dashboard',
     content: {
       icon: Download,
-      iconClassName: 'text-blue-500',
       title: 'Need the data?',
       titleZh: '需要数据？',
       description:
-        'Use the download button on any chart to export as PNG or CSV — no need to copy from tooltips.',
-      descriptionZh: '使用任意图表上的下载按钮导出 PNG 或 CSV——无需从提示框中复制。',
+        'Use the download button on any chart to export PNG or CSV instead of copying from tooltips.',
+      descriptionZh: '使用任意图表上的下载按钮导出 PNG 或 CSV，无需从提示框中复制。',
       testId: 'export-nudge',
     },
     analytics: {
@@ -179,14 +176,13 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     scope: 'dashboard',
     content: {
       icon: Palette,
-      iconClassName: 'text-purple-500',
-      title: 'Try Gradient Labels',
+      title: 'Try gradient labels',
       titleZh: '试试渐变标签',
       description:
         'Gradient labels color-code data points by parallelism level, making it easier to spot performance patterns at a glance.',
       descriptionZh: '渐变标签按并行度对数据点进行颜色编码，让您一目了然地发现性能模式。',
       action: {
-        label: 'Enable Gradient Labels',
+        label: 'Enable gradient labels',
         labelZh: '启用渐变标签',
         onClick: (eventDetail?: unknown) => {
           const detail = eventDetail as { enableGradient?: () => void } | undefined;
@@ -216,13 +212,12 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     scope: 'dashboard',
     content: {
       icon: SlidersHorizontal,
-      iconClassName: 'text-brand',
       title: 'Too much on the chart?',
       titleZh: '图表太拥挤？',
       description:
-        'Use the legend filters on the right to focus — toggle NVIDIA vs AMD vendors, disaggregated vs aggregated (disagg/agg) serving, precision (FP8/FP4), and more to compare just what you care about.',
+        'Filter the legend on the right by vendor (NVIDIA or AMD), disaggregated or aggregated serving (disagg/agg), precision (FP8/FP4) and more to compare only what you care about.',
       descriptionZh:
-        '使用右侧图例筛选器聚焦对比——切换 NVIDIA 与 AMD 厂商、分离式与聚合式 (disagg/agg) 服务模式、精度 (FP8/FP4) 等，只查看您关心的内容。',
+        '使用右侧图例按厂商 (NVIDIA 或 AMD)、分离式或聚合式服务 (disagg/agg)、精度 (FP8/FP4) 等筛选，只对比您关心的内容。',
       testId: 'filter-hint-nudge',
     },
     analytics: {
@@ -246,7 +241,6 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     scope: 'evaluation',
     content: {
       icon: MessageSquareText,
-      iconClassName: 'text-brand',
       title: "See the model's actual answers",
       titleZh: '查看模型的实际回答',
       description:
@@ -270,12 +264,11 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     scope: 'landing',
     content: {
       icon: GoogleIcon,
-      title: 'TPUv7 prelimary results across multiple models',
+      title: 'TPUv7 preliminary results across multiple models',
       titleZh: 'TPUv7 多模型初步结果',
-      description: 'AgentX Preview Submissions',
+      description: 'AgentX preview submissions',
       descriptionZh: 'AgentX 预览版提交结果',
       testId: 'launch-modal',
-      containerClassName: 'border-brand/40',
       centered: true,
       badge: 'New',
       badgeZh: '最新',
@@ -314,11 +307,10 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     renderOnInitialLoad: true,
     variant: 'ubenchx',
     content: {
-      icon: Sparkles,
-      iconClassName: 'text-brand',
-      title: 'Huawei Ascend 950PR Microbenchmarks',
+      icon: Cpu,
+      title: 'Huawei Ascend 950PR microbenchmarks',
       titleZh: 'Huawei Ascend 950PR 微基准测试',
-      description: 'Cycle Level Core memory-access MicroBenchmarks (Beta)',
+      description: 'Cycle-level core memory-access microbenchmarks (beta)',
       descriptionZh: '周期级核心访存微基准测试（Beta）',
       testId: 'launch-banner',
       badge: 'New',
@@ -351,11 +343,10 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     renderOnInitialLoad: true,
     variant: 'operatorx',
     content: {
-      icon: Sparkles,
-      iconClassName: 'text-brand',
-      title: 'Huawei Ascend 950PR Microbenchmarks',
+      icon: Cpu,
+      title: 'Huawei Ascend 950PR microbenchmarks',
       titleZh: 'Huawei Ascend 950PR 微基准测试',
-      description: '950PR GEMM FLOPs and Max FLOPS utilization',
+      description: '950PR GEMM FLOPs and max FLOPS utilization',
       descriptionZh: '950PR GEMM FLOPs 与最大 FLOPS 利用率',
       testId: 'launch-banner',
       badge: 'New',
@@ -388,15 +379,13 @@ export const NUDGE_REGISTRY: NudgeDefinition[] = [
     scope: 'agentic-detail',
     content: {
       icon: BookOpen,
-      iconClassName: 'text-brand',
       title: 'New to these charts?',
       titleZh: '第一次看这些图表？',
       description:
-        'The telemetry tutorial explains every chart on this page — the sequence-length distributions, the cache and queue series, the request timeline, and the per-conversation flamegraph.',
+        'The telemetry tutorial explains every chart on this page: the sequence-length distributions, the cache and queue series, the request timeline and the per-conversation flamegraph.',
       descriptionZh:
-        '遥测数据教程会讲解本页的每一张图表——序列长度分布、cache 与队列相关曲线、请求时间线，以及单会话火焰图。',
+        '遥测数据教程会讲解本页的每一张图表，包括序列长度分布、cache 与队列相关曲线、请求时间线以及单会话火焰图。',
       testId: 'telemetry-tutorial-modal',
-      containerClassName: 'border-brand/40',
       dismissLabel: 'Not now',
       dismissLabelZh: '暂不需要',
       primaryAction: {

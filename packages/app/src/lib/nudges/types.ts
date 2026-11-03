@@ -58,7 +58,6 @@ export interface NudgeAnchor {
 
 export interface NudgeContent {
   icon: ComponentType<{ className?: string }>;
-  iconClassName?: string;
   title: string;
   titleZh?: string;
   description: string;
@@ -73,9 +72,7 @@ export interface NudgeContent {
   hideDismissButton?: boolean;
   primaryAction?: NudgeAction;
   secondaryAction?: NudgeAction;
-  containerClassName?: string;
   centered?: boolean;
-  actionClassName?: string;
   badge?: string;
   badgeZh?: string;
 

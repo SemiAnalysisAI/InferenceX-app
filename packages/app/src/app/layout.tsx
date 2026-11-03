@@ -11,7 +11,6 @@ import { RouteTransition } from '@/components/motion/route-transition';
 import { ModelFeatureBoundary } from '@/components/model-feature-boundary';
 import { JsonLd } from '@/components/seo/json-ld';
 import { AutumnLeaves } from '@/components/effects/autumn-leaves';
-import { CircuitBackground } from '@/components/effects/circuit-background';
 import { EasterEggThemeLazy } from '@/components/effects/easter-egg-theme-lazy';
 import { APP_THEMES } from '@/lib/themes/themes';
 import { ThemeProvider } from '@/components/ui/theme-provider';
@@ -186,7 +185,6 @@ export default function RootLayout({
           suppressHydrationWarning
           dangerouslySetInnerHTML={{ __html: landingBannerPrepaintScript }}
         />
-        <CircuitBackground />
         <AutumnLeaves />
         <PostHogProvider>
           <JsonLd data={jsonLd} />

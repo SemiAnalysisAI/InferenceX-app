@@ -5,15 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
 
-const mocks = vi.hoisted(() => ({ locale: 'en' as 'en' | 'zh', track: vi.fn() }));
-vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => mocks.locale }));
-vi.mock('@/lib/analytics/analytics', async (importOriginal) => ({
-  ...(await importOriginal<typeof analytics>()),
-  track: mocks.track,
-}));
-
-import { ChartShareActions, MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
-import type * as analytics from '@/lib/analytics/analytics';
+import {
+  ChartShareActions,
+  MetricAssumptionNotes,
+  metricCostAssumptions,
+} from '@/components/ui/chart-display-helpers';
 import { getGpuSpecs } from '@/lib/catalog/constants';
 
 let container: HTMLDivElement;
@@ -28,7 +24,7 @@ function getVisibleText() {
 }
 
 function getVisibleCaveatText() {
-  return [...container.querySelectorAll('div.max-h-20 p')]
+  return [...container.querySelectorAll('[data-disagg-caveat]:not([aria-hidden]) p')]
     .map((element) => element.textContent ?? '')
     .join(' ');
 }
@@ -55,20 +51,6 @@ describe('ChartShareActions', () => {
     expect(trigger?.textContent).toContain('Share');
   });
 });
-
-const renderCostBadges = ({
-  label,
-  values,
-  blankedBases,
-}: {
-  label: string;
-  values: Record<string, number>;
-  blankedBases?: string[];
-}) => (
-  <div data-testid="editable" data-blanked={(blankedBases ?? []).join(',')}>
-    {label} {Object.keys(values).join(',')}
-  </div>
-);
 
 describe('MetricAssumptionNotes', () => {
   it('shows power source badges and the per-MW disaggregation caveat for inference metrics', () => {
@@ -197,10 +179,10 @@ describe('MetricAssumptionNotes', () => {
     );
 
     expect(getVisibleText()).toContain('TCO $/chip/hr:');
-    expect(getVisibleText()).toContain('H200:');
-    expect(getVisibleText()).toContain('GB300:');
-    expect(getVisibleText()).not.toContain('H100:');
-    expect(getVisibleText()).not.toContain('MI300X:');
+    expect(getVisibleText()).toContain('H200 ');
+    expect(getVisibleText()).toContain('GB300 ');
+    expect(getVisibleText()).not.toContain('H100 ');
+    expect(getVisibleText()).not.toContain('MI300X ');
   });
 
   it('narrows the power badges to the active legend selection', () => {
@@ -209,16 +191,16 @@ describe('MetricAssumptionNotes', () => {
     );
 
     expect(getVisibleText()).toContain('All in Power/Chip:');
-    expect(getVisibleText()).toContain('MI300X:');
-    expect(getVisibleText()).not.toContain('H100:');
-    expect(getVisibleText()).not.toContain('H200:');
+    expect(getVisibleText()).toContain('MI300X ');
+    expect(getVisibleText()).not.toContain('H100 ');
+    expect(getVisibleText()).not.toContain('H200 ');
   });
 
   it('falls back to every registry GPU when the selection is empty or unrecognized', () => {
     renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_tokensPerDollarH" activeHwKeys={[]} />);
 
-    expect(getVisibleText()).toContain('H100:');
-    expect(getVisibleText()).toContain('MI300X:');
+    expect(getVisibleText()).toContain('H100 ');
+    expect(getVisibleText()).toContain('MI300X ');
 
     renderUi(
       <MetricAssumptionNotes
@@ -227,34 +209,42 @@ describe('MetricAssumptionNotes', () => {
       />,
     );
 
-    expect(getVisibleText()).toContain('H100:');
-    expect(getVisibleText()).toContain('MI300X:');
+    expect(getVisibleText()).toContain('H100 ');
+    expect(getVisibleText()).toContain('MI300X ');
   });
 
-  it('hands the TCO badges to the caller-supplied renderer for tiered and custom cost metrics', () => {
-    renderUi(
-      <MetricAssumptionNotes
-        selectedYAxisMetric="y_costh"
-        activeHwKeys={['gb300_dynamo-sglang']}
-        renderCostBadges={renderCostBadges}
-      />,
-    );
-    expect(container.querySelector('[data-testid="editable"]')?.textContent).toBe(
-      'TCO $/chip/hr: gb300',
-    );
-    expect(container.querySelector(`a[href="${TCO_SOURCE_URL}"]`)).not.toBeNull();
-
-    renderUi(
-      <MetricAssumptionNotes
-        selectedYAxisMetric="y_costUser"
-        activeHwKeys={['gb300_dynamo-sglang', 'mi355x_vllm']}
-        renderCostBadges={renderCostBadges}
-      />,
-    );
-    expect(container.querySelector('[data-testid="editable"]')?.textContent).toBe(
-      'TCO $/chip/hr: gb300,mi355x',
-    );
+  it('leaves the TCO values and their source to the caller when omitCostValues is set', () => {
+    renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_costhOutput" omitCostValues />);
+    expect(getVisibleText()).not.toContain('TCO $/chip/hr:');
     expect(container.querySelector(`a[href="${TCO_SOURCE_URL}"]`)).toBeNull();
+    expect(getVisibleCaveatText()).toContain(
+      'calculate cost per million tokens per decode chip or per prefill chip',
+    );
+  });
+
+  it('describes which cost values a metric quotes and whether they are editable', () => {
+    expect(metricCostAssumptions('y_tpPerMw', 'external', null)).toBeNull();
+    expect(metricCostAssumptions('y_costh', 'external', null)).toMatchObject({
+      editable: true,
+      custom: false,
+      blankedBases: [],
+    });
+    expect(metricCostAssumptions('y_costhOutput', 'external', null)).toMatchObject({
+      editable: false,
+      custom: false,
+    });
+    expect(
+      metricCostAssumptions('y_costUser', 'external', {
+        gb300: undefined,
+        mi355x: 0.75,
+        b200: undefined,
+      }),
+    ).toEqual({
+      values: { mi355x: 0.75 },
+      blankedBases: ['gb300', 'b200'],
+      editable: true,
+      custom: true,
+    });
   });
 
   it("quotes the reader's own prices on the custom tier and the hyperscaler price before any exist", () => {
@@ -265,24 +255,9 @@ describe('MetricAssumptionNotes', () => {
         userCosts={{ gb300: 9.5, mi355x: 0.75, b200: undefined }}
       />,
     );
-    expect(getVisibleText()).toContain('GB300: 9.5');
-    expect(getVisibleText()).toContain('MI355X: 0.75');
-    expect(getVisibleText()).not.toContain('B200:');
-
-    renderUi(
-      <MetricAssumptionNotes
-        selectedYAxisMetric="y_costUser"
-        activeHwKeys={['gb300_x']}
-        userCosts={{ gb300: undefined, mi355x: 0.75, b200: undefined }}
-        renderCostBadges={renderCostBadges}
-      />,
-    );
-    expect(container.querySelector('[data-testid="editable"]')?.textContent?.trim()).toBe(
-      'TCO $/chip/hr:',
-    );
-    expect(container.querySelector<HTMLElement>('[data-testid="editable"]')?.dataset.blanked).toBe(
-      'gb300,b200',
-    );
+    expect(getVisibleText()).toContain('GB300 9.5');
+    expect(getVisibleText()).toContain('MI355X 0.75');
+    expect(getVisibleText()).not.toContain('B200 ');
 
     renderUi(
       <MetricAssumptionNotes
@@ -291,7 +266,7 @@ describe('MetricAssumptionNotes', () => {
         userCosts={null}
       />,
     );
-    expect(getVisibleText()).toContain(`GB300: ${getGpuSpecs('gb300').costh}`);
+    expect(getVisibleText()).toContain(`GB300 ${getGpuSpecs('gb300').costh}`);
 
     renderUi(
       <MetricAssumptionNotes
@@ -300,13 +275,13 @@ describe('MetricAssumptionNotes', () => {
         userCosts={{ gb300: 9.5 }}
       />,
     );
-    expect(getVisibleText()).toContain(`GB300: ${getGpuSpecs('gb300').costr}`);
+    expect(getVisibleText()).toContain(`GB300 ${getGpuSpecs('gb300').costr}`);
   });
 
-  it('falls back to read-only TCO badges without a renderer', () => {
+  it('quotes read-only custom TCO values without a source link', () => {
     renderUi(<MetricAssumptionNotes selectedYAxisMetric="y_costUser" activeHwKeys={['gb300_x']} />);
     expect(getVisibleText()).toContain('TCO $/chip/hr:');
-    expect(getVisibleText()).toContain('GB300:');
+    expect(getVisibleText()).toContain('GB300 ');
     expect(container.querySelector('input')).toBeNull();
     expect(container.querySelector(`a[href="${TCO_SOURCE_URL}"]`)).toBeNull();
   });

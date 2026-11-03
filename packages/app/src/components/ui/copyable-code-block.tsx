@@ -12,14 +12,14 @@ const STRINGS = {
     copy: 'Copy',
     copied: 'Copied',
     failed: 'Could not copy. Select the code to copy it manually.',
-    scroll: 'Scroll to inspect the full example.',
+    scroll: 'Scroll to inspect the full example',
   },
   zh: {
     code: '代码',
     copy: '复制',
     copied: '已复制',
     failed: '复制失败。请选中代码后手动复制。',
-    scroll: '滚动查看完整示例。',
+    scroll: '滚动查看完整示例',
   },
 } as const;
 

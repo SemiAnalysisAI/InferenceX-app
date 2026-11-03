@@ -15,7 +15,7 @@ html.orange-chicken:not([data-inferencex-embed]) {
   --ring: #9b3510;
 }
 
-html.orange-chicken:not([data-inferencex-embed]) :is(.circuit-bg, .autumn-leaves) {
+html.orange-chicken:not([data-inferencex-embed]) .autumn-leaves {
   display: none;
 }
 

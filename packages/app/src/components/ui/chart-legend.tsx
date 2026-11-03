@@ -169,22 +169,22 @@ export default function ChartLegend({
 
   const outerClasses = isSidebar
     ? cn(
-        'px-2 py-3 rounded-md border bg-background text-sm flex flex-col w-full',
+        'relative px-2 py-3 rounded-lg border bg-background text-sm flex flex-col w-full',
         isLegendExpanded
-          ? 'border-border/60 max-h-96 lg:max-h-[575px] legend-container sidebar-legend'
+          ? 'border-border/30 max-h-96 lg:max-h-[575px] legend-container sidebar-legend'
           : 'border-transparent no-export',
       )
     : grouped
       ? cn(
-          'py-1 px-2 md:py-1 rounded-sm border text-sm top-0 right-0 bg-accent transition-all md:flex md:flex-col legend-container',
+          'py-1 px-2 rounded-lg border text-sm top-0 right-0 transition-colors md:flex md:flex-col legend-container',
           isLegendExpanded
-            ? 'md:max-w-none md:w-auto md:min-w-fit'
+            ? 'border-border/30 bg-card md:max-w-none md:w-auto md:min-w-fit'
             : 'md:max-w-40 bg-transparent border-transparent px-1',
         )
       : cn(
-          'mt-4 md:pt-8 md:p-2 rounded-sm border md:absolute text-sm top-0 right-0 bg-accent transition-all md:flex md:flex-col legend-container',
+          'mt-4 md:pt-8 md:p-2 rounded-lg border md:absolute text-sm top-0 right-0 transition-colors md:flex md:flex-col legend-container',
           isLegendExpanded
-            ? 'md:max-w-none md:w-auto md:min-w-fit'
+            ? 'border-border/30 bg-card md:max-w-none md:w-auto md:min-w-fit'
             : 'md:max-w-40 bg-transparent border-transparent',
         );
 
@@ -200,10 +200,14 @@ export default function ChartLegend({
 
   const hasSidebarControls =
     isSidebar && (keyIndicators || (switches && switches.length > 0) || hasAtomFootnote);
+  const hasActions = Boolean(actions && actions.length > 0);
+  const toggleBesideFirstItem =
+    isSidebar && !readOnly && collapsible && isLegendExpanded && !hasActions;
   const scrollClasses = isSidebar
     ? cn(
         'overflow-y-auto flex-initial min-h-0 space-y-0.5',
-        hasSidebarControls && 'border-b border-border pb-2',
+        hasSidebarControls && 'border-b border-border/50 pb-2',
+        toggleBesideFirstItem && '[&>:first-child]:pr-8',
       )
     : grouped
       ? 'flex gap-x-4 flex-wrap flex-row md:block md:overflow-y-auto md:flex-1 md:min-h-0'
@@ -237,27 +241,37 @@ export default function ChartLegend({
     ) : null;
 
   const LegendToggleIcon = isLegendExpanded ? PanelRightClose : PanelRightOpen;
+  const toggleButton = collapsible ? (
+    <button
+      type="button"
+      data-testid={isLegendExpanded ? 'legend-close-button' : 'legend-open-button'}
+      onClick={toggleLegendOpen}
+      aria-expanded={isLegendExpanded}
+      aria-label={isLegendExpanded ? t.hideLegend : t.showLegend}
+      title={isLegendExpanded ? t.hideLegend : t.showLegend}
+      className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
+    >
+      <LegendToggleIcon size={16} aria-hidden="true" />
+    </button>
+  ) : null;
   const panelHeader =
     isSidebar && !readOnly ? (
-      <div
-        data-testid="legend-toolbar"
-        className="-mx-1 -mt-1 pb-1 no-export flex shrink-0 items-start gap-1"
-      >
-        <div className="min-w-0 flex-1">{isLegendExpanded && actionElements}</div>
-        {collapsible && (
-          <button
-            type="button"
-            data-testid={isLegendExpanded ? 'legend-close-button' : 'legend-open-button'}
-            onClick={toggleLegendOpen}
-            aria-expanded={isLegendExpanded}
-            aria-label={isLegendExpanded ? t.hideLegend : t.showLegend}
-            title={isLegendExpanded ? t.hideLegend : t.showLegend}
-            className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
-          >
-            <LegendToggleIcon size={16} aria-hidden="true" />
-          </button>
-        )}
-      </div>
+      toggleBesideFirstItem ? (
+        <div
+          data-testid="legend-toolbar"
+          className="no-export absolute right-1 top-1.5 z-10 rounded-md bg-background"
+        >
+          {toggleButton}
+        </div>
+      ) : (
+        <div
+          data-testid="legend-toolbar"
+          className="-mx-1 -mt-1 pb-1 no-export flex shrink-0 items-start gap-1"
+        >
+          <div className="min-w-0 flex-1">{isLegendExpanded && actionElements}</div>
+          {toggleButton}
+        </div>
+      )
     ) : null;
 
   const standardSwitches = switches?.filter((sw) => !sw.advanced) ?? [];
@@ -325,7 +339,7 @@ export default function ChartLegend({
               <div
                 id={advancedControlsId}
                 data-testid="legend-advanced-controls"
-                className="ml-1 pl-3 border-l border-border"
+                className="ml-1 pl-3 border-l border-border/50"
               >
                 {renderSwitches(advancedSwitches)}
               </div>

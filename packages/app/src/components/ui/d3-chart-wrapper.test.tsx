@@ -19,12 +19,10 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 let container: HTMLDivElement;
 let root: Root;
 
-const EN_MOUSE =
-  'Shift+Scroll to zoom • Drag to pan • Double-click to reset • Click a point to pin tooltip';
-const EN_TOUCH =
-  'Pinch to zoom • Two-finger drag to pan • Double-tap to reset • Tap a point to pin tooltip';
-const ZH_MOUSE = '按住 Shift 滚动以缩放 · 拖动以平移 · 双击以重置 · 点击数据点固定提示框';
-const ZH_TOUCH = '双指捏合以缩放 · 双指拖动以平移 · 双击以重置 · 点按数据点固定提示框';
+const EN_MOUSE = 'Shift+Scroll to zoom · Drag to pan · Double-click to reset';
+const EN_TOUCH = 'Pinch to zoom · Two-finger drag to pan · Double-tap to reset';
+const ZH_MOUSE = '按住 Shift 滚动以缩放 · 拖动以平移 · 双击以重置';
+const ZH_TOUCH = '双指捏合以缩放 · 双指拖动以平移 · 双击以重置';
 
 function stubTouchPrimary(matches: boolean) {
   vi.stubGlobal(
@@ -81,16 +79,14 @@ describe('D3ChartWrapper default interaction guidance', () => {
   it('preserves the exact English instructions', () => {
     renderWrapper();
     expect(container.textContent).toContain(
-      'Shift+Scroll to zoom • Drag to pan • Double-click to reset • Click a point to pin tooltip',
+      'Shift+Scroll to zoom · Drag to pan · Double-click to reset',
     );
   });
 
   it('uses natural Chinese instructions on Chinese routes', () => {
     mocks.locale = 'zh';
     renderWrapper();
-    expect(container.textContent).toContain(
-      '按住 Shift 滚动以缩放 · 拖动以平移 · 双击以重置 · 点击数据点固定提示框',
-    );
+    expect(container.textContent).toContain('按住 Shift 滚动以缩放 · 拖动以平移 · 双击以重置');
     expect(container.textContent).not.toContain('Double-click to reset');
   });
 

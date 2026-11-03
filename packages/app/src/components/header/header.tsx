@@ -9,7 +9,6 @@ import { analyticsPlacement, placementFor } from '@/lib/analytics/placement';
 import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import { ModeToggle } from '@/components/ui/mode-toggle';
 import { HEADER_ACTION_STYLE } from '@/components/ui/control-styles';
-import { NewBadge } from '@/components/ui/new-badge';
 import { HaloTogglesLazy } from '@/components/halo/halo-toggles-lazy';
 import { MinecraftTogglesLazy } from '@/components/minecraft/minecraft-toggles-lazy';
 import { navigateInApp } from '@/lib/routing/client-navigation';
@@ -34,10 +33,6 @@ interface NavLink {
   label: string;
   testId: string;
   event: string;
-  badge?: {
-    en: string;
-    zh: string;
-  };
 }
 
 const NAV_LINKS: readonly NavLink[] = [
@@ -47,7 +42,6 @@ const NAV_LINKS: readonly NavLink[] = [
     label: 'AgentX',
     testId: 'nav-link-agentx',
     event: 'header_agentx_clicked',
-    badge: { en: 'NEW', zh: '新' },
   },
   {
     href: '/overview',
@@ -131,14 +125,12 @@ export const Header = () => {
     ? NAV_LINKS.map((link) => ({
         ...link,
         label: NAV_LABELS_ZH[link.href] ?? link.label,
-        badgeLabel: link.badge?.zh,
         displayHref: hasZhSibling(link.href)
           ? zhPath(link.path ?? link.href)
           : (link.path ?? link.href),
       }))
     : NAV_LINKS.map((link) => ({
         ...link,
-        badgeLabel: link.badge?.en,
         displayHref: link.path ?? link.href,
       }));
 
@@ -175,7 +167,7 @@ export const Header = () => {
     <header
       data-testid="header"
       {...analyticsPlacement('header')}
-      className="vt-site-header sticky top-0 z-50 border-b border-border/40 mb-4 bg-background/95 supports-[backdrop-filter]:bg-background/80 backdrop-blur-md"
+      className="vt-site-header sticky top-0 z-50 border-b border-border/30 mb-4 bg-background/95 supports-[backdrop-filter]:bg-background/80 backdrop-blur-md"
     >
       <div className="container mx-auto px-4 lg:px-8">
         <div className="flex h-14 items-center gap-2 sm:gap-6">
@@ -186,10 +178,10 @@ export const Header = () => {
           >
             <InferenceXWordmark />
             <span className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground">
-              by
+              {isZh ? '来自' : 'by'}
               <Image
                 src="/brand/logo-color.webp"
-                alt="SemiAnalysis logo"
+                alt={isZh ? 'SemiAnalysis 标志' : 'SemiAnalysis logo'}
                 width={64}
                 height={27}
                 className="inline h-auto lg:w-20"
@@ -201,7 +193,7 @@ export const Header = () => {
             className="hidden min-w-0 items-center gap-1 overflow-hidden xl:flex"
             {...analyticsPlacement('header_desktop')}
           >
-            {navLinks.map(({ href, displayHref, label, badgeLabel, testId, event }) => (
+            {navLinks.map(({ href, displayHref, label, testId, event }) => (
               <IntentPrefetchLink
                 key={href}
                 data-testid={testId}
@@ -211,8 +203,8 @@ export const Header = () => {
                 className={cn(
                   'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
                   isActive(pathname, href)
-                    ? 'text-brand bg-brand/10'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+                    ? 'text-foreground bg-muted/60'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/40',
                 )}
                 onClick={(e) => {
                   track(event, { placement: placementFor(e.currentTarget) });
@@ -226,11 +218,6 @@ export const Header = () => {
                 }}
               >
                 <span>{label}</span>
-                {badgeLabel && (
-                  <NewBadge data-nav-badge="agentx" data-new-badge="agentx-nav">
-                    {badgeLabel}
-                  </NewBadge>
-                )}
               </IntentPrefetchLink>
             ))}
           </nav>
@@ -262,7 +249,7 @@ export const Header = () => {
                   viewBox="0 0 20 20"
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth="1"
+                  strokeWidth="1.75"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   aria-hidden
@@ -312,19 +299,19 @@ export const Header = () => {
                 <div
                   data-testid="mobile-menu"
                   {...analyticsPlacement('header_mobile')}
-                  className="motion-pop-in fixed inset-x-3 top-[3.75rem] z-50 flex max-h-[calc(100dvh-4.5rem)] flex-col overflow-y-auto overscroll-contain rounded-xl border border-border bg-background p-1.5 shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:min-w-40 sm:rounded-lg"
+                  className="motion-pop-in fixed inset-x-3 top-[3.75rem] z-50 flex max-h-[calc(100dvh-4.5rem)] flex-col overflow-y-auto overscroll-contain rounded-xl border border-border/30 bg-popover p-1.5 shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:min-w-40 sm:rounded-md sm:p-1"
                 >
-                  {navLinks.map(({ href, displayHref, label, badgeLabel, event }) => (
+                  {navLinks.map(({ href, displayHref, label, event }) => (
                     <IntentPrefetchLink
                       key={href}
                       href={displayHref}
                       prefetch={isActive(pathname, href) ? false : undefined}
                       aria-current={isActive(pathname, href) ? 'page' : undefined}
                       className={cn(
-                        'flex items-center min-h-12 px-4 rounded-lg text-base font-medium transition-colors sm:min-h-11 sm:px-3 sm:rounded-md sm:text-sm',
+                        'flex items-center min-h-12 px-4 rounded-md text-base font-medium transition-colors sm:min-h-11 sm:px-3 sm:rounded-sm sm:text-sm',
                         isActive(pathname, href)
-                          ? 'text-brand bg-brand/10'
-                          : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+                          ? 'text-foreground bg-muted/60'
+                          : 'text-muted-foreground hover:text-foreground hover:bg-muted/40',
                       )}
                       onClick={(e) => {
                         track(event, { placement: placementFor(e.currentTarget) });
@@ -338,18 +325,9 @@ export const Header = () => {
                       }}
                     >
                       <span>{label}</span>
-                      {badgeLabel && (
-                        <NewBadge
-                          data-nav-badge="agentx"
-                          data-new-badge="agentx-nav"
-                          className="ml-1.5"
-                        >
-                          {badgeLabel}
-                        </NewBadge>
-                      )}
                     </IntentPrefetchLink>
                   ))}
-                  <span className="mt-1 flex items-center gap-2 border-t border-border/60 px-3 pt-2 pb-1 sm:hidden">
+                  <span className="mt-1 flex items-center gap-2 border-t border-border/30 px-3 pt-2 pb-1 empty:hidden sm:hidden">
                     <MinecraftTogglesLazy />
                     <HaloTogglesLazy />
                   </span>

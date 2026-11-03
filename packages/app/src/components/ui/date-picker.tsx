@@ -37,11 +37,11 @@ const STRINGS = {
     latest: 'Latest',
     previousDate: 'Previous available date',
     nextDate: 'Next available date',
-    runDate: 'Run Date:',
-    title: 'Select a Run Date',
-    description: 'Select a run date to view the performance data for that run.',
+    runDate: 'Run date:',
+    title: 'Select a run date',
+    description: 'Select a run date to view the performance data for that run',
     checking: 'Checking available dates...',
-    goToLatest: 'Go to Latest',
+    goToLatest: 'Go to latest',
     cancel: 'Cancel',
     applying: 'Applying...',
     apply: 'Apply',
@@ -55,7 +55,7 @@ const STRINGS = {
     nextDate: '下一个可用日期',
     runDate: '运行日期：',
     title: '选择运行日期',
-    description: '选择运行日期以查看该次运行的性能数据。',
+    description: '选择运行日期以查看该次运行的性能数据',
     checking: '正在检查可用日期...',
     goToLatest: '前往最新日期',
     cancel: '取消',
@@ -246,10 +246,9 @@ export function DatePicker({
   const previousButton = (
     <Button
       variant={label ? 'outline' : 'ghost'}
-      size="icon"
+      size={label ? 'icon' : 'icon-xs'}
       onClick={handleGoPrevious}
       disabled={!canGoPrevious() || Boolean(isCheckingAvailableDates)}
-      className={label ? undefined : 'size-11 md:size-8'}
       suppressHydrationWarning
       aria-label={t.previousDate}
     >
@@ -260,10 +259,9 @@ export function DatePicker({
   const nextButton = (
     <Button
       variant={label ? 'outline' : 'ghost'}
-      size="icon"
+      size={label ? 'icon' : 'icon-xs'}
       onClick={handleGoNext}
       disabled={!canGoNext() || Boolean(isCheckingAvailableDates)}
-      className={label ? undefined : 'size-11 md:size-8'}
       aria-label={t.nextDate}
     >
       <ChevronRight className="size-4" />
@@ -288,6 +286,7 @@ export function DatePicker({
         ) : (
           <Button
             variant="outline"
+            size="sm"
             className="min-w-0 flex-1 overflow-hidden px-3 sm:min-w-[200px] sm:flex-none"
           >
             <Calendar className="mr-0 hidden size-4 sm:block" />
@@ -313,7 +312,7 @@ export function DatePicker({
             isCheckingAvailableDates={isCheckingAvailableDates}
           />
           {isCheckingAvailableDates && (
-            <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-md">
+            <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10 rounded-md">
               <div className="flex flex-col items-center gap-2">
                 <Loader2 className="size-6 animate-spin text-primary" />
                 <p className="text-sm text-muted-foreground">{t.checking}</p>
@@ -321,7 +320,7 @@ export function DatePicker({
             </div>
           )}
         </div>
-        {error && <p className="text-md text-center text-red-500">{error}</p>}
+        {error && <p className="text-sm text-center text-destructive">{error}</p>}
         <div className="flex justify-between items-center gap-2 sm:flex-row flex-col-reverse sm:space-x-2">
           <Button
             variant="outline"

@@ -35,17 +35,17 @@ export function UnofficialBanner({
     <div
       data-slot="unofficial-banner"
       className={cn(
-        'min-w-0 border-red-500/60 bg-red-600 px-4 py-3 text-white md:px-6',
-        attached ? 'rounded-b-xl border-t' : 'rounded-xl border',
+        'min-w-0 border-destructive/30 bg-destructive/10 px-4 py-3 text-foreground md:px-6',
+        attached ? 'mt-3 rounded-lg border' : 'rounded-xl border',
       )}
     >
       <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap text-sm font-semibold">
-            <AlertTriangle aria-hidden className="size-4 shrink-0" />
-            NON-OFFICIAL
+          <span className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap text-sm font-medium">
+            <AlertTriangle aria-hidden className="size-4 shrink-0 text-destructive" />
+            Non-official
           </span>
-          <span className="text-xs text-white/90">
+          <span className="text-xs text-muted-foreground">
             {multiple ? `Viewing ${runs.length} runs` : 'Viewing data from branch'}
           </span>
         </div>
@@ -66,7 +66,7 @@ export function UnofficialBanner({
               track('unofficial_banner_dismissed_all', { count: runs.length });
               onDismissAll();
             }}
-            className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-md px-3 text-xs transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current sm:ml-auto sm:min-h-8"
+            className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-md px-3 text-xs transition-colors hover:bg-destructive/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current sm:ml-auto sm:min-h-8"
             aria-label="Dismiss all unofficial runs"
           >
             <X className="size-3" />
@@ -90,10 +90,10 @@ function RunChip({
   onDismiss?: () => void;
 }) {
   return (
-    <span className="inline-flex min-w-0 max-w-full items-center gap-2 rounded-md border border-white/20 bg-red-950/25 pl-2 text-xs font-mono">
+    <span className="inline-flex min-w-0 max-w-full items-center gap-2 rounded-md border border-border/40 bg-card pl-2 text-xs font-mono">
       <span
         aria-hidden
-        className="inline-block size-2 shrink-0 rounded-full border border-white/40"
+        className="inline-block size-2 shrink-0 rounded-full"
         style={{ backgroundColor: color }}
       />
       <a
@@ -114,7 +114,7 @@ function RunChip({
             track('unofficial_banner_run_dismissed', { branch: run.branch });
             onDismiss();
           }}
-          className="inline-flex size-11 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current sm:size-7"
+          className="inline-flex size-11 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-destructive/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current sm:size-7"
           aria-label={`Dismiss ${run.branch}`}
         >
           <X className="size-3" />

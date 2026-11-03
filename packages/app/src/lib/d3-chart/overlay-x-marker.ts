@@ -1,10 +1,13 @@
 import * as d3 from 'd3';
 import { invalidateTooltipGeometry } from '@/lib/d3-chart/layers/scatter-points';
 import { installTouchInputTracking, isTouchCompatMouseEvent } from '@/lib/d3-chart/touch-input';
+import { showPinRing } from '@/lib/d3-chart/pin-ring';
 
 export interface OverlayTooltipHandle<T> {
   isPinned: () => boolean;
   pinTooltip: (data: T, isOverlay: boolean) => void;
+  getPinnedPoint?: () => unknown;
+  dismissTooltip?: () => void;
 }
 
 export interface OverlayRulerLifecycle<T> {
@@ -24,6 +27,7 @@ export interface OverlayXMarkerOptions<T> {
   position: (event: PointerEvent | MouseEvent) => { left: number; top: number };
   rulers?: OverlayRulerLifecycle<T>;
   onClick?: (data: T) => void;
+  panel?: boolean;
 }
 
 export function xMarkerPath(size: number, armScale = 1): string {
@@ -54,7 +58,7 @@ export function attachOverlayXMarkerHandlers<T>(
 
   points
     .on('mouseenter', function (event, data) {
-      if (options.handle?.isPinned()) return;
+      if (options.handle?.isPinned() && !options.panel) return;
       if (isTouchCompatMouseEvent(event)) return;
       d3.select(this)
         .select(options.markerSelector)
@@ -69,12 +73,12 @@ export function attachOverlayXMarkerHandlers<T>(
       options.rulers?.show(data, this);
     })
     .on('mousemove', (event) => {
-      if (options.handle?.isPinned()) return;
+      if (options.handle?.isPinned() && !options.panel) return;
       if (isTouchCompatMouseEvent(event)) return;
       positionTooltip(event);
     })
     .on('mouseleave', function () {
-      if (options.handle?.isPinned()) return;
+      if (options.handle?.isPinned() && !options.panel) return;
       d3.select(this)
         .select(options.markerSelector)
         .attr('d', options.normalPath)
@@ -84,6 +88,20 @@ export function attachOverlayXMarkerHandlers<T>(
     })
     .on('click', function (event, data) {
       event.stopPropagation();
+      if (options.panel) {
+        options.tooltip.style('opacity', 0).style('display', 'none');
+        options.rulers?.hide();
+        if (options.handle?.getPinnedPoint?.() === data) {
+          options.handle.dismissTooltip?.();
+          return;
+        }
+        const position = overlayMarkerPosition(this);
+        const host = this.ownerSVGElement?.querySelector('.ruler-group')?.parentElement;
+        if (position && host) showPinRing(host, position.x, position.y);
+        options.handle?.pinTooltip(data, true);
+        options.onClick?.(data);
+        return;
+      }
       options.tooltip
         .html(options.content(data, true))
         .style('opacity', 1)

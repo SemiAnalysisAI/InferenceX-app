@@ -1,6 +1,5 @@
-import { Card } from '@/components/ui/card';
 import type { DashboardRouteKey } from '@/lib/routing/dashboard-routes';
-import { TAB_INTRO, TAB_META } from '@/lib/routing/tab-meta';
+import { TAB_HEADING, TAB_INTRO } from '@/lib/routing/tab-meta';
 
 export function TabIntro({
   tab,
@@ -12,11 +11,9 @@ export function TabIntro({
   intro?: string;
 }) {
   return (
-    <Card data-testid="tab-intro">
-      <h1 className="text-xl lg:text-2xl font-bold tracking-tight">
-        {title ?? TAB_META[tab].title}
-      </h1>
+    <header data-testid="tab-intro" className="py-2">
+      <h1 className="text-xl font-semibold lg:text-2xl">{title ?? TAB_HEADING[tab]}</h1>
       <p className="mt-2 text-sm lg:text-base text-muted-foreground">{intro ?? TAB_INTRO[tab]}</p>
-    </Card>
+    </header>
   );
 }

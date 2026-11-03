@@ -11,7 +11,6 @@ import {
 import { track } from '@/lib/analytics/analytics';
 import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
 import { buildShareUrl } from '@/lib/routing/url-state';
-import { cn } from '@/lib/shared/utils';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { GlobalFilterSelectionContext } from '@/providers/GlobalFilterContext';
 
@@ -96,11 +95,9 @@ export function ShareButton({ className }: { className?: string } = {}) {
       <PopoverTrigger asChild>
         <Button
           data-testid="share-button"
-          size="sm"
-          className={cn(
-            'h-11 gap-1.5 bg-brand text-primary-foreground hover:bg-brand/90 text-xs font-medium md:h-8',
-            className,
-          )}
+          size="xs"
+          variant="outline"
+          className={className}
           title={t.title}
         >
           <Share2 className="size-3.5" />
@@ -119,7 +116,7 @@ export function ShareButton({ className }: { className?: string } = {}) {
       >
         <div className="space-y-3">
           <div>
-            <h4 className="text-sm font-semibold">{t.title}</h4>
+            <h4 className="text-sm font-medium">{t.title}</h4>
             <p className="text-muted-foreground text-xs mt-0.5">{t.description}</p>
           </div>
           <div className="flex items-center gap-1.5">
@@ -130,13 +127,13 @@ export function ShareButton({ className }: { className?: string } = {}) {
               value={url}
               aria-label={t.inputLabel}
               onFocus={(event) => event.currentTarget.select()}
-              className="border-input bg-background h-8 flex-1 min-w-0 rounded-md border px-2 font-mono text-xs outline-none"
+              className="border-input bg-background h-11 flex-1 min-w-0 rounded-md border px-2 font-mono text-xs outline-none md:h-8"
             />
             <Button
               data-testid="share-copy-button"
-              size="sm"
+              size="xs"
               variant="outline"
-              className="h-8 gap-1.5 text-xs shrink-0"
+              className="shrink-0"
               onClick={handleCopy}
             >
               {copied ? (

@@ -9,6 +9,11 @@ export const ZH_LANG_TAG = 'zh-CN';
 
 export const ZH_OG_LOCALE = 'zh_CN';
 
+/** BCP 47 tag for `Intl` / `toLocale*String` formatting in the given site locale. */
+export function localeTag(locale: Locale): 'en-US' | typeof ZH_LANG_TAG {
+  return locale === 'zh' ? ZH_LANG_TAG : 'en-US';
+}
+
 export function zhPath(enPath: string): string {
   return enPath === '/' ? ZH_PREFIX : `${ZH_PREFIX}${enPath}`;
 }

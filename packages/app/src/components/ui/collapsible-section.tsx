@@ -50,7 +50,7 @@ export function CollapsibleSection({
             className={cn('size-5 transition-transform duration-200', open && 'rotate-180')}
           />
         </button>
-        {(open ? titleWhenOpen : true) && <h2 className="text-lg font-semibold">{title}</h2>}
+        {(open ? titleWhenOpen : true) && <h2 className="text-lg font-medium">{title}</h2>}
       </div>
       {open && <div id={bodyId}>{children}</div>}
     </div>

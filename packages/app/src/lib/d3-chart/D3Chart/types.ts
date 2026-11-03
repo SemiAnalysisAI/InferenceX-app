@@ -158,6 +158,7 @@ export interface TooltipConfig<T = any> {
   attachToLayer?: number;
   proximityHover?: boolean;
   getDataX?: (d: T) => number;
+  details?: (d: T, isOverlay: boolean, close: () => void) => React.ReactNode;
 }
 
 export interface RenderContext {

@@ -3,6 +3,7 @@
 import { X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { Button } from '@/components/ui/button';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 
@@ -164,14 +165,14 @@ export function BottomToast({
             }
           : undefined
       }
-      className={`fixed inset-x-0 bottom-0 z-50 touch-pan-y transition-all duration-300 ease-out sm:inset-x-auto sm:right-6 sm:bottom-6 sm:max-w-sm ${
+      className={`fixed inset-x-0 bottom-0 z-50 touch-pan-y transition-[transform,opacity] duration-300 ease-out sm:inset-x-auto sm:right-6 sm:bottom-6 sm:max-w-xs ${
         animate ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
       }`}
     >
-      <div className="relative grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-x-2 rounded-t-xl border-t border-border bg-card px-3 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] shadow-[0_-8px_24px_-12px_rgb(0_0_0/0.35)] sm:grid-cols-[auto_minmax(0,1fr)] sm:items-start sm:gap-x-3 sm:rounded-lg sm:border sm:p-4 sm:shadow-lg">
-        <div className="shrink-0 [&_svg]:h-3.5 [&_svg]:w-3.5 sm:mt-0.5">{icon}</div>
+      <div className="relative grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-x-2 rounded-t-xl border-t border-border/30 bg-card px-3 pt-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] shadow-sm sm:grid-cols-[auto_minmax(0,1fr)] sm:items-start sm:gap-x-2 sm:rounded-xl sm:border sm:p-3 sm:shadow-md">
+        <div className="shrink-0 text-muted-foreground [&_svg]:size-4 sm:mt-0.5">{icon}</div>
 
-        <div className="flex min-w-0 flex-col gap-0.5 sm:gap-2 sm:pr-4">
+        <div className="flex min-w-0 flex-col gap-0.5 sm:gap-1 sm:pr-6">
           <p className="truncate text-sm font-medium text-foreground sm:whitespace-normal">
             {title}
           </p>
@@ -181,20 +182,22 @@ export function BottomToast({
         </div>
 
         {action && (
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="xs"
             onClick={handleAction}
-            className="flex min-h-9 shrink-0 items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium whitespace-nowrap text-primary-foreground transition-colors hover:bg-primary/90 sm:col-start-2 sm:mt-2 sm:min-h-0 sm:justify-self-end"
+            className="sm:col-start-2 sm:mt-2 sm:h-8 sm:justify-self-end"
           >
             {action.icon}
             {action.label}
-          </button>
+          </Button>
         )}
 
         <button
           type="button"
           onClick={dismiss}
-          className={`inline-flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground sm:absolute sm:top-2 sm:right-2 sm:size-auto ${
+          className={`inline-flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground sm:absolute sm:top-1.5 sm:right-1.5 sm:size-7 ${
             action ? '' : 'col-start-4 sm:col-start-auto'
           }`}
           aria-label={locale === 'zh' ? '关闭' : 'Dismiss'}

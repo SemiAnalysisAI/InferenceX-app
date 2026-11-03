@@ -177,7 +177,7 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
               : isLegendExpanded
                 ? 'whitespace-nowrap'
                 : 'whitespace-normal',
-            sidebarMode && !isActive && 'opacity-40',
+            sidebarMode && !isActive && 'opacity-50',
           )}
         >
           {label}

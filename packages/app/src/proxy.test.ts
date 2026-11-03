@@ -250,7 +250,7 @@ describe('proxy matcher', () => {
     '/_next/image?url=%2Fimages%2Fa.png&w=1200&q=75',
     '/favicon.ico',
     '/images/post/figure.png',
-    '/brand/left-pattern-full.svg',
+    '/brand/logo-color.webp',
     '/ingest/e/',
   ])('skips %s', (url) => {
     expect(unstable_doesMiddlewareMatch({ config, url })).toBe(false);

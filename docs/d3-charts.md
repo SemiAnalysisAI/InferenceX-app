@@ -99,6 +99,8 @@ Tooltips are built as HTML template literal strings, injected via D3's `.html()`
 
 HTML strings bypass React entirely. D3 writes them into a tooltip div that is portaled to `document.body` and positioned with `position: fixed`. This keeps tooltip updates at <1ms per frame.
 
+Wrap tooltip HTML with `chartTooltipShell(body, options)` from `src/lib/d3-chart/tooltip-shell.ts` (or put `chartTooltipShellStyle(options)` on your own wrapper) instead of writing the popover background, border, radius, padding and shadow inline. Options cover pinned text selection, a custom border, min and max width, pointer events for links, and scrolling for long content. `chartTooltipTitle(label, color?)` renders the heading with a series dot, and `chartTooltipDismiss(text)` renders the pinned hint.
+
 ## Pareto Front Direction
 
 The metric registry declares whether higher or lower values are preferable. Chart definitions derive the concrete corner from that polarity and the chart's x-axis direction, which keeps the choice in data rather than rendering code.

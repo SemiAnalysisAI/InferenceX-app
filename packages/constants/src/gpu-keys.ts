@@ -136,6 +136,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     vendor: 'Google',
     arch: 'Ironwood',
     label: 'TPU7x',
+    badgeLabel: 'TPU7x',
     sort: 11,
     tdp: 980,
     power: 1.207,

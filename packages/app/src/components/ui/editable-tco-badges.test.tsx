@@ -51,7 +51,7 @@ describe('EditableTcoBadges', () => {
     expect(inputs[0].type).toBe('number');
     expect(inputs[0].getAttribute('aria-label')).toBe('GB300 $/chip/hr');
     expect(inputs[0].id).toBe('cost-input-gb300');
-    expect(container.querySelector('label[for="cost-input-gb300"]')?.textContent).toBe('GB300:');
+    expect(container.querySelector('label[for="cost-input-gb300"]')?.textContent).toBe('GB300');
     expect(inputs[1].value).toBe('');
     expect(container.querySelector('[data-testid="badges"]')?.textContent).toContain(
       'TCO $/chip/hr:',

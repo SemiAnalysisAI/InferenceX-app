@@ -6,10 +6,10 @@ import { cn } from '@/lib/shared/utils';
 const headingVariants = cva('text-foreground', {
   variants: {
     level: {
-      display: 'text-4xl font-bold tracking-heading text-balance md:text-5xl',
-      page: 'text-2xl lg:text-4xl font-bold tracking-tight',
-      section: 'text-xl font-semibold',
-      card: 'text-base font-semibold',
+      display: 'text-4xl font-semibold tracking-heading text-balance md:text-5xl',
+      page: 'text-2xl font-semibold lg:text-4xl lg:tracking-heading',
+      section: 'text-xl font-medium',
+      card: 'text-base font-medium',
       label: 'text-sm font-medium',
     },
   },

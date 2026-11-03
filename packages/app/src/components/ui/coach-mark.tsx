@@ -221,8 +221,6 @@ export function CoachMark({
             fill="none"
             stroke="var(--brand)"
             strokeWidth={2}
-            className="animate-ping"
-            style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
           />
         </svg>
       )}
@@ -234,7 +232,7 @@ export function CoachMark({
         aria-modal="false"
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
-        className={`pointer-events-auto absolute w-72 rounded-lg border border-brand/50 bg-card p-4 shadow-lg transition-opacity duration-200 ${
+        className={`pointer-events-auto absolute w-72 rounded-xl border border-border/30 bg-card p-4 shadow-lg transition-opacity duration-200 ${
           visible ? 'opacity-100' : 'opacity-0'
         }`}
         style={{
@@ -246,16 +244,16 @@ export function CoachMark({
         <button
           type="button"
           onClick={handleDismiss}
-          className="absolute right-2 top-2 rounded-sm text-muted-foreground transition-colors hover:text-foreground focus:outline-none"
+          className="absolute right-2 top-2 rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           aria-label={strings.close}
           data-testid={testId ? `${testId}-dismiss` : undefined}
         >
           <X className="size-3.5" />
         </button>
         <div className="flex items-start gap-3 pr-4">
-          <span className="mt-0.5 shrink-0 [&_svg]:size-4">{icon}</span>
+          <span className="mt-0.5 shrink-0 text-muted-foreground [&_svg]:size-4">{icon}</span>
           <div className="flex flex-col gap-1">
-            <p id={titleId} className="text-sm font-semibold text-foreground">
+            <p id={titleId} className="text-sm font-medium text-foreground">
               {title}
             </p>
             <p id={descriptionId} className="text-xs text-muted-foreground">
