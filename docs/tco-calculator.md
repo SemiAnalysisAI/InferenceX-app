@@ -209,9 +209,10 @@ The history response is ~8.6 MB per model. `useHistoricalBest` gates the fetch
 on a facility power budget being set, and requests `view=calculator` to trim it
 to the calculator's metric allowlist (~24% smaller).
 
-**That trim must stay opt-in.** `CALCULATOR_METRIC_KEYS` excludes the
-measured-power metrics Historical Trends plots, so applying it to every history
-response would silently blank those charts.
+**That trim must stay opt-in.** The default response is the published contract,
+and `CALCULATOR_METRIC_KEYS` excludes measured-power metrics other readers use.
+Historical Trends reads its own compact form, `/api/v1/benchmarks/history/trends`,
+which keeps every key a trend reads.
 
 ### Lifecycle math (`lifecycle.ts`)
 

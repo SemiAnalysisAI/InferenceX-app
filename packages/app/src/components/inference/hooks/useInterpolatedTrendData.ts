@@ -14,8 +14,10 @@ import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/catalog/constants';
 import { Sequence, type Model } from '@/lib/catalog/data-mappings';
 
 import {
-  buildTrendLines,
-  groupTrendRowsByDate,
+  buildTrendCurves,
+  evaluateTrendCurves,
+  groupTrendRows,
+  prepareTrendRows,
   trendMetricDependencies,
 } from './interpolated-trend-core';
 export {
@@ -63,18 +65,21 @@ export function useInterpolatedTrendData({
     isLoading,
     error,
     refetch,
-  } = useBenchmarkHistory(
-    enabled ? selectedModel : '',
-    seqIslOsl?.isl ?? 0,
-    seqIslOsl?.osl ?? 0,
-    selectedSequence === Sequence.AgenticTraces ? { benchmarkType: 'agentic_traces' } : undefined,
-  );
+  } = useBenchmarkHistory(enabled ? selectedModel : '', seqIslOsl?.isl ?? 0, seqIslOsl?.osl ?? 0, {
+    ...(selectedSequence === Sequence.AgenticTraces
+      ? { benchmarkType: 'agentic_traces' as const }
+      : {}),
+    view: 'trends',
+  });
   const trendMetricKey = resolveMetricConfigKey(selectedYAxisMetric).slice(2) as YAxisMetricKey;
   const requestedMetrics = useMemo(() => trendMetricDependencies(trendMetricKey), [trendMetricKey]);
 
+  // Row preparation does not depend on the metric, precision or pricing controls.
+  const trendRows = useMemo(() => prepareTrendRows(allRows ?? []), [allRows]);
+
   const dateGroupedData = useMemo(
     () =>
-      groupTrendRowsByDate(allRows ?? [], {
+      groupTrendRows(trendRows, {
         selectedPrecisions,
         selectedYAxisMetric,
         requestedMetrics,
@@ -82,7 +87,7 @@ export function useInterpolatedTrendData({
         tcoBasis,
       }),
     [
-      allRows,
+      trendRows,
       selectedPrecisions,
       selectedYAxisMetric,
       requestedMetrics,
@@ -91,15 +96,19 @@ export function useInterpolatedTrendData({
     ],
   );
 
+  const trendCurves = useMemo(
+    () => buildTrendCurves(dateGroupedData, { trendMetricKey, tokenRevenuePricing }),
+    [dateGroupedData, trendMetricKey, tokenRevenuePricing],
+  );
+
+  // Moving the target only re-evaluates the prebuilt curves.
   const { trendLines, hwKeysWithData } = useMemo(
     () =>
-      buildTrendLines(dateGroupedData, {
+      evaluateTrendCurves(trendCurves, {
         targetInteractivity,
-        trendMetricKey,
-        tokenRevenuePricing,
         extendToDate: new Date().toISOString().slice(0, 10),
       }),
-    [dateGroupedData, targetInteractivity, trendMetricKey, tokenRevenuePricing],
+    [trendCurves, targetInteractivity],
   );
 
   const [progress, setProgress] = useState(0);

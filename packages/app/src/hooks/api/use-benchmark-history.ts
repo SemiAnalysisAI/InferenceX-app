@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { fetchBenchmarkHistory } from '@/lib/api/api';
+import { fetchBenchmarkHistory, fetchTrendHistory } from '@/lib/api/api';
 import { withSupplementalBenchmarkHistory } from '@/lib/benchmarks/supplemental-benchmarks';
 
 export function useBenchmarkHistory(
@@ -9,7 +9,8 @@ export function useBenchmarkHistory(
   osl: number,
   options?: {
     benchmarkType?: 'agentic_traces';
-    view?: 'calculator';
+    /** `trends` loads only what Historical Trends reads (`/api/v1/benchmarks/history/trends`). */
+    view?: 'calculator' | 'trends';
     enabled?: boolean;
   },
 ) {
@@ -18,7 +19,9 @@ export function useBenchmarkHistory(
     queryKey: ['benchmark-history', model, isl, osl, benchmarkType ?? 'fixed', view ?? 'full'],
     queryFn: async ({ signal }) =>
       withSupplementalBenchmarkHistory(
-        await fetchBenchmarkHistory(model, isl, osl, signal, benchmarkType, view),
+        await (view === 'trends'
+          ? fetchTrendHistory(model, isl, osl, signal, benchmarkType)
+          : fetchBenchmarkHistory(model, isl, osl, signal, benchmarkType, view)),
         { model, isl, osl, benchmarkType },
       ),
     enabled:
