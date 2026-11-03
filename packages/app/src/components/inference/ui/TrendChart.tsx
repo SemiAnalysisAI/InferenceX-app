@@ -10,11 +10,8 @@ import {
   type ZoomContext,
   type ScaleConfig,
 } from '@/lib/d3-chart/D3Chart';
-import {
-  chartTooltipDismiss,
-  chartTooltipShell,
-  chartTooltipTitle,
-} from '@/lib/d3-chart/tooltip-shell';
+import { axisLabelUnit, chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
+import { ChartPointDetails } from '@/components/ui/chart-point-details';
 import {
   applyHoverState,
   applyNormalState,
@@ -22,7 +19,8 @@ import {
   getShapeKeyForPrecision,
   logTickFormat,
 } from '@/lib/charts/chart-rendering';
-import { getChartWatermark } from '@/lib/catalog/data-mappings';
+import { type Precision, getChartWatermark, getPrecisionLabel } from '@/lib/catalog/data-mappings';
+import { updateRepoUrl } from '@/lib/shared/utils';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 import type { TrendDataPoint, TrendLineConfig } from '../types';
@@ -35,24 +33,35 @@ export interface TrendChartProps {
   chartId?: string;
   legendElement?: React.ReactNode;
   caption?: React.ReactNode;
+  footer?: React.ReactNode;
   selectedPrecisions?: readonly string[];
   lowerIsBetter?: boolean;
 }
 
-const CHART_MARGIN = { top: 20, right: 30, bottom: 50, left: 60 };
+const CHART_MARGIN = { top: 20, right: 30, bottom: 64, left: 60 };
 
 const STRINGS = {
   en: {
-    dismiss: 'Click elsewhere to dismiss',
     noData: 'No historical data found for the tracked configurations',
     instructions: 'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset',
     aria: 'Historical performance trend chart',
+    date: 'Date',
+    interpolatedAt: (target: number) => `Interpolated at ${target} tok/s/user`,
+    target: 'Target interactivity',
+    precision: 'Precision',
+    sourceDates: 'Source run dates',
+    run: (id: number) => `Run ${id}`,
   },
   zh: {
-    dismiss: '点击其他区域关闭',
     noData: '当前追踪的配置暂无历史数据',
     instructions: 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置',
     aria: '历史性能趋势图表',
+    date: '日期',
+    interpolatedAt: (target: number) => `插值于 ${target} tok/s/user`,
+    target: '目标交互性',
+    precision: '精度',
+    sourceDates: '来源运行日期',
+    run: (id: number) => `运行 ${id}`,
   },
 } as const;
 
@@ -76,6 +85,7 @@ const TrendChart = React.memo(
     chartId = 'trend',
     legendElement,
     caption,
+    footer,
     selectedPrecisions,
   }: TrendChartProps) => {
     const locale = useLocale();
@@ -256,16 +266,47 @@ const TrendChart = React.memo(
     const tooltipConfig = useMemo(
       () => ({
         rulerType: 'crosshair' as const,
-        content: (d: PreparedPoint, isPinned: boolean) =>
-          chartTooltipShell(
-            `<div class="text-xs">
-            ${isPinned ? chartTooltipDismiss(t.dismiss) : ''}
-            ${chartTooltipTitle(getPointConfig(d)?.label ?? '', getPointConfig(d)?.color ?? '#888')}
-            <div class="text-muted-foreground">${locale === 'zh' ? dateFormatter.format(new Date(d.raw.date)) : d.raw.date}</div>
-            <div class="mt-1 font-medium">${yLabel}: ${formatLargeNumber(d.value)}</div>
-          </div>`,
-            { pinned: isPinned, minWidth: 160 },
-          ),
+        content: (d: PreparedPoint) => {
+          const config = getPointConfig(d);
+          return chartHoverCard(
+            {
+              title: config?.label ?? '',
+              subtitle: locale === 'zh' ? dateFormatter.format(new Date(d.raw.date)) : d.raw.date,
+              color: config?.color ?? '#888',
+              metrics: [{ value: formatLargeNumber(d.value), label: axisLabelUnit(yLabel) }],
+              summary: t.interpolatedAt(d.raw.x),
+            },
+            { pinned: false },
+          );
+        },
+        details: (d: PreparedPoint, _isOverlay: boolean, close: () => void) => {
+          const config = getPointConfig(d);
+          const sources = d.raw.sources ?? [];
+          const sourceDates = [...new Set(sources.map((source) => source.date))].toSorted();
+          const runs = [...new Map(sources.map((source) => [source.runId, source])).values()];
+          return (
+            <ChartPointDetails
+              title={config?.label ?? ''}
+              color={config?.color ?? '#888'}
+              date={locale === 'zh' ? dateFormatter.format(new Date(d.raw.date)) : d.raw.date}
+              metrics={[{ value: formatLargeNumber(d.value), label: yLabel }]}
+              rows={[
+                { label: t.precision, value: getPrecisionLabel(d.precision as Precision) },
+                { label: t.target, value: `${d.raw.x} tok/s/user` },
+                ...(sourceDates.some((date) => date !== d.raw.date)
+                  ? [{ label: t.sourceDates, value: sourceDates.join(', '), wide: true }]
+                  : []),
+              ]}
+              links={runs.map((source) => ({
+                action: `run-${source.runId}`,
+                label: t.run(source.runId),
+                href: updateRepoUrl(source.runUrl),
+                external: true,
+              }))}
+              onClose={close}
+            />
+          );
+        },
         getRulerX: (d: PreparedPoint, xScale: any) => xScale(d.x),
         getRulerY: (d: PreparedPoint, yScale: any) => yScale(d.y),
         onHoverStart: (sel: d3.Selection<any, PreparedPoint, any, any>, d: PreparedPoint) =>
@@ -285,11 +326,12 @@ const TrendChart = React.memo(
         },
         attachToLayer: 1,
       }),
-      [dateFormatter, getPointConfig, locale, selectedPrecisions, t.dismiss, yLabel],
+      [dateFormatter, getPointConfig, locale, selectedPrecisions, t, yLabel],
     );
 
     const xAxisConfig = useMemo(
       () => ({
+        label: t.date,
         tickFormat: ((value: d3.AxisDomain) =>
           locale === 'zh'
             ? axisDateFormatter.format(new Date(Number(value)))
@@ -299,7 +341,7 @@ const TrendChart = React.memo(
           g.selectAll('.tick text').attr('transform', 'rotate(-30)').attr('text-anchor', 'end');
         },
       }),
-      [axisDateFormatter, locale],
+      [axisDateFormatter, locale, t.date],
     );
 
     const yAxisConfig = useMemo(
@@ -351,6 +393,7 @@ const TrendChart = React.memo(
           onExportRender={onRender}
           legendElement={legendElement}
           caption={caption}
+          footer={footer}
         />
       </div>
     );

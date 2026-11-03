@@ -1,5 +1,7 @@
 'use client';
 
+import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
+
 import { CHIP_BASIS_METRICS, chipBasisCsvNote } from '@/lib/benchmarks/chip-basis';
 import { track } from '@/lib/analytics/analytics';
 import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
@@ -22,12 +24,20 @@ import { TcoBasisCaption } from '@/components/inference/ui/TcoBasisCaption';
 import TrendChart from '@/components/inference/ui/TrendChart';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
-import { ChartShareActions, MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
+import {
+  ChartShareActions,
+  MetricAssumptionNotes,
+  PricesSourceLink,
+  metricCostAssumptions,
+} from '@/components/ui/chart-display-helpers';
+import { ChipBasisCaption } from '@/components/ui/chip-basis-toggle';
 import { ControlPanel } from '@/components/ui/control-panel';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Heading } from '@/components/ui/heading';
 import { ResultContext } from '@/components/ui/result-context';
+import { TcoPriceTable, plottedChipBases } from '@/components/ui/editable-tco-badges';
+import { ModelLogo } from '@/components/ui/model-logo';
 import { exportToCsv } from '@/lib/export/csv-export';
 import { historicalTrendToCsv } from '@/lib/export/csv-export-helpers';
 import ChartLegend from '@/components/ui/chart-legend';
@@ -142,6 +152,10 @@ export default function HistoricalTrendsDisplay() {
   const chipBasisControl = useMemo(
     () => ({ value: chipBasis, onChange: setChipBasis, source: 'historical' }),
     [chipBasis, setChipBasis],
+  );
+  const readOnlyChipBasisControl = useMemo(
+    () => ({ ...chipBasisControl, readOnly: true }),
+    [chipBasisControl],
   );
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -474,46 +488,92 @@ export default function HistoricalTrendsDisplay() {
                   <>
                     <div className="md:pr-96">
                       <Heading as="h2" level="card">
+                        <ModelLogo
+                          model={selectedModel as Model}
+                          className="mr-2 size-6 align-[-0.3em]"
+                        />
+                        {getModelLabel(selectedModel as Model)}{' '}
+                        {getSequenceLabel(selectedSequence as Sequence, locale)}{' '}
                         {t.captionTitle(currentYTitle, targetInteractivity, isAgentic)}
                       </Heading>
+                    </div>
+                    {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}
+                    {showsVeraRubinPreview && <VeraRubinOfficialPreviewNotice />}
+                    {showsTpuv7Preview && <Tpuv7OfficialPreviewNotice />}
+                  </>
+                }
+                footer={(() => {
+                  const costAssumptions = metricCostAssumptions(
+                    selectedYAxisMetric,
+                    tcoBasis,
+                    null,
+                  );
+                  const costBases = costAssumptions
+                    ? plottedChipBases(
+                        lineConfigs.map((config) => config.hwKey),
+                        (base) => base in costAssumptions.values,
+                      )
+                    : [];
+                  return (
+                    <div className="mt-3">
                       <ResultContext
                         locale={locale}
-                        model={getModelLabel(selectedModel as Model)}
-                        workload={getSequenceLabel(selectedSequence as Sequence, locale)}
-                        precision={selectedPrecisions
-                          .map((prec: string) => getPrecisionLabel(prec as Precision))
-                          .join(', ')}
-                        metric={currentYLabel}
+                        layout="footer"
                         costTier={(() => {
                           const tier = metricCostTier(
                             selectedYAxisMetric.replace(/^y_/u, '') as MetricKey,
                           );
                           return tier ? costTierOptionLabel(tier, locale) : undefined;
                         })()}
-                        costTierControl={<CostTierSelector allowCustom={false} />}
+                        costTierControl={<CostTierSelector allowCustom={false} footer />}
                         tcoBasis={
-                          <TcoBasisCaption hardwareKeys={activeHwTypes} source="historical" />
+                          <TcoBasisCaption
+                            hardwareKeys={activeHwTypes}
+                            source="historical"
+                            footer
+                          />
                         }
-                        target={`${isAgentic ? 'P90 ' : ''}${targetInteractivity} tok/s/user`}
+                        chipBasis={
+                          CHIP_BASIS_METRICS.has(selectedYAxisMetric) ? (
+                            <ChipBasisCaption control={chipBasisControl} />
+                          ) : undefined
+                        }
                         date={
                           selectedRunDate ? historicalRunDate(selectedRunDate, locale) : undefined
                         }
                         source="SemiAnalysis InferenceX™"
+                        controlsEnd={
+                          costAssumptions && costBases.length > 0 ? (
+                            <TcoPriceTable
+                              items={costBases.map((base) => ({
+                                base,
+                                label: HW_REGISTRY[base]?.badgeLabel ?? base.toUpperCase(),
+                                value: String(costAssumptions.values[base]),
+                              }))}
+                              testId="historical-tco-prices"
+                              cellTestId="historical-tco-price"
+                              inputIdPrefix="historical-cost-input"
+                            />
+                          ) : undefined
+                        }
+                        metaEnd={
+                          costAssumptions && !costAssumptions.custom ? (
+                            <PricesSourceLink />
+                          ) : undefined
+                        }
+                      />
+                      <MetricAssumptionNotes
+                        selectedYAxisMetric={selectedYAxisMetric}
+                        activeHwKeys={activeHwTypes}
+                        includeAllPowerThroughputMetrics={false}
+                        includePowerThroughputCaveat={false}
+                        tcoBasis={tcoBasis}
+                        omitCostValues
+                        chipBasis={readOnlyChipBasisControl}
                       />
                     </div>
-                    {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}
-                    {showsVeraRubinPreview && <VeraRubinOfficialPreviewNotice />}
-                    {showsTpuv7Preview && <Tpuv7OfficialPreviewNotice />}
-                    <MetricAssumptionNotes
-                      selectedYAxisMetric={selectedYAxisMetric}
-                      activeHwKeys={activeHwTypes}
-                      includeAllPowerThroughputMetrics={false}
-                      includePowerThroughputCaveat={false}
-                      tcoBasis={tcoBasis}
-                      chipBasis={chipBasisControl}
-                    />
-                  </>
-                }
+                  );
+                })()}
                 trendLines={trendLines}
                 lineConfigs={lineConfigs}
                 yLabel={currentYLabel}

@@ -8,7 +8,7 @@ import { ChartButtons } from '@/components/ui/chart-buttons';
 import { Heading } from '@/components/ui/heading';
 import { exportToCsv } from '@/lib/export/csv-export';
 import { useLocale } from '@/lib/i18n/use-locale';
-import { escapeHtml } from '@/lib/shared/utils';
+import { axisLabelUnit } from '@/lib/d3-chart/tooltip-shell';
 import type { AggDataEntry, InferenceData } from '../types';
 import {
   getRolePoints,
@@ -27,6 +27,7 @@ const STRINGS = {
     empty: 'No validated prefill/decode telemetry is available for these filters.',
     panelEmpty: 'These observations do not report this role figure',
     roles: { prefill: 'Prefill', decode: 'Decode', total: 'Prefill + decode' },
+    conc: (n: number) => `conc ${n}`,
     panels: {
       power: {
         title: 'Mean GPU power by role',
@@ -62,6 +63,7 @@ const STRINGS = {
     empty: '当前筛选条件下没有经过验证的预填充 / 解码遥测数据。',
     panelEmpty: '这些观测值没有报告该角色指标',
     roles: { prefill: '预填充', decode: '解码', total: '预填充 + 解码' },
+    conc: (n: number) => `并发 ${n}`,
     panels: {
       power: {
         title: '各角色的平均 GPU 功耗',
@@ -181,11 +183,16 @@ export default function PowerRoleGroup({
                 x: point.x,
                 y,
                 key: point.sourceKey,
-                tooltip: [
-                  `<strong>${escapeHtml(label(point.sourceKey))}</strong>`,
-                  `${escapeHtml(xLabel)}: ${value(point.x)} · c${point.point.conc}`,
-                  `${t.roles[role]}: ${value(y)} ${copy.units[role]}`,
-                ].join('<br/>'),
+                tooltip: {
+                  title: label(point.sourceKey),
+                  subtitle: t.roles[role],
+                  color: colorOf(point.sourceKey),
+                  metrics: [
+                    { value: value(y), label: copy.units[role] },
+                    { value: value(point.x), label: axisLabelUnit(xLabel) },
+                  ],
+                  summary: t.conc(point.point.conc),
+                },
               },
             ];
       }),

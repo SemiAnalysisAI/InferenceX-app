@@ -2,13 +2,15 @@
 
 import * as d3 from 'd3';
 import { Pin } from 'lucide-react';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useInferenceAnalyticsContext } from '@/components/inference/InferenceContext';
 import { track } from '@/lib/analytics/analytics';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
+import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
+import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
@@ -59,6 +61,7 @@ const STRINGS = {
     comparedAt: (x: string, slider: string) =>
       `Compared at ${x} tok/s/user · slider at ${slider} tok/s/user`,
     legend: 'Power layers',
+    ofTotal: 'of total',
     bands: {
       gpu: 'GPU',
       measuredCpu: 'Grace CPU',
@@ -101,6 +104,7 @@ const STRINGS = {
     comparedAt: (x: string, slider: string) =>
       `对比点 ${x} tok/s/user · 滑块位于 ${slider} tok/s/user`,
     legend: '功耗分层',
+    ofTotal: '占总功耗',
     bands: {
       gpu: 'GPU',
       measuredCpu: 'Grace CPU',
@@ -257,13 +261,15 @@ export default function PowerChipCompare({
   const bands = POWER_BANDS.filter((band) =>
     rows.some((row) => bandWattsPerGpu(row.entry, band) > 0),
   );
-  /** A segment's hover text: the layer, its watts and, when it folds several parts, each part. */
-  const segmentTitle = (entry: (typeof rows)[number]['entry'], band: PowerBand) => {
-    const parts = bandPartsAt(entry, band);
-    const head = `${t.bands[band]}: ${watts(bandWattsPerGpu(entry, band))} W`;
-    if (parts.length <= 1) return head;
-    return `${head} · ${parts.map((part) => `${t.categories[part.category]} ${watts(part.watts)} W`).join(' · ')}`;
-  };
+  const [segmentHover, setSegmentHover] = useState<{
+    x: number;
+    y: number;
+    label: string;
+    color: string;
+    band: PowerBand;
+    point: (typeof rows)[number]['entry'];
+  } | null>(null);
+  const hoveredParts = segmentHover ? bandPartsAt(segmentHover.point, segmentHover.band) : [];
   // No chip in this selection has a whole-system model: say so instead of leaving a gap.
   if (series.length === 0 || value === null) {
     return (
@@ -427,12 +433,29 @@ export default function PowerChipCompare({
                 return (
                   <span
                     key={band}
-                    title={segmentTitle(point, band)}
                     data-testid="power-chip-compare-segment"
                     data-band={band}
                     data-emphasis={powerLayerEmphasis(band, layers.highlight)}
-                    onMouseEnter={() => layers.hover(bandTarget(band))}
-                    onMouseLeave={() => layers.hover(null)}
+                    onMouseEnter={(event) => {
+                      layers.hover(bandTarget(band));
+                      setSegmentHover({
+                        x: event.clientX,
+                        y: event.clientY,
+                        label: entry.label,
+                        color,
+                        band,
+                        point,
+                      });
+                    }}
+                    onMouseMove={(event) =>
+                      setSegmentHover(
+                        (prev) => prev && { ...prev, x: event.clientX, y: event.clientY },
+                      )
+                    }
+                    onMouseLeave={() => {
+                      layers.hover(null);
+                      setSegmentHover(null);
+                    }}
                     className="flex h-full items-center justify-center border-r border-background/70 text-2xs font-medium tabular-nums text-foreground last:border-r-0"
                     style={{
                       width: `${(w / point.totalWattsPerGpu) * 100}%`,
@@ -538,6 +561,42 @@ export default function PowerChipCompare({
             );
           })}
         </ol>
+      )}
+      {segmentHover && (
+        <FloatingTooltip
+          x={segmentHover.x}
+          y={segmentHover.y}
+          data-testid="power-chip-compare-hover-card"
+        >
+          <ChartHoverCardBody
+            title={segmentHover.label}
+            subtitle={`${t.bands[segmentHover.band]} · ${
+              MEASURED_POWER_BANDS.has(segmentHover.band) ? t.measured : t.modeled
+            }`}
+            color={segmentHover.color}
+            metrics={[
+              {
+                value: watts(bandWattsPerGpu(segmentHover.point, segmentHover.band)),
+                label: 'W/GPU',
+              },
+              {
+                value: pct(
+                  bandWattsPerGpu(segmentHover.point, segmentHover.band) /
+                    segmentHover.point.totalWattsPerGpu,
+                ),
+                label: t.ofTotal,
+              },
+            ]}
+            summary={[
+              ...(hoveredParts.length > 1
+                ? hoveredParts.map(
+                    (part) => `${t.categories[part.category]} ${watts(part.watts)} W`,
+                  )
+                : []),
+              t.at(segmentHover.point.concurrency, rate(segmentHover.point.interactivity)),
+            ].join(' · ')}
+          />
+        </FloatingTooltip>
       )}
       {/* A chip picked in the drill-down's Hardware select may have no bar near this
           interactivity; its drill-down then follows the list instead of vanishing. */}

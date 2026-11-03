@@ -7,7 +7,10 @@ import { workflowInfoQueryOptions } from '@/hooks/api/use-workflow-info';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { CHART_TYPE } from '@/lib/d3-chart/typography';
+import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
+import { axisLabelUnit } from '@/lib/d3-chart/tooltip-shell';
 import { formatLargeNumber } from '@/lib/charts/chart-rendering';
+import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
 import type { TrendChartProps } from './TrendChart';
 import {
   buildImprovementWaterfall,
@@ -34,6 +37,8 @@ const STRINGS = {
     aria: 'Performance improvement waterfall',
     method:
       'Record improvements at fixed interactivity. Regressions and recoveries are omitted. Links identify source-curve runs and matching changelogs, not isolated PR effects. Linear scale.',
+    vsPrevious: 'vs previous best',
+    vsBaseline: 'vs baseline',
   },
   zh: {
     series: '瀑布图配置',
@@ -52,6 +57,8 @@ const STRINGS = {
     aria: '性能提升瀑布图',
     method:
       '展示固定交互速率下刷新最佳纪录的变化，不含性能回退及恢复。链接指向源曲线的运行记录及匹配的变更日志，不代表单个 PR 的独立效果。使用线性坐标。',
+    vsPrevious: '较此前最佳',
+    vsBaseline: '相对基线',
   },
 } as const;
 
@@ -61,6 +68,7 @@ export default function ImprovementWaterfallChart({
   yLabel,
   chartId = 'historical-trend',
   caption,
+  footer,
   legendElement,
   lowerIsBetter = false,
 }: TrendChartProps) {
@@ -68,6 +76,7 @@ export default function ImprovementWaterfallChart({
   const t = STRINGS[locale];
   const plotRef = useRef<HTMLDivElement>(null);
   const [plotWidth, setPlotWidth] = useState(1000);
+  const [hover, setHover] = useState<{ index: number; x: number; y: number } | null>(null);
   useEffect(() => {
     const element = plotRef.current;
     if (!element) return;
@@ -116,6 +125,7 @@ export default function ImprovementWaterfallChart({
   const first = steps[0]?.to ?? 0;
   const best = steps.at(-1)?.to ?? 0;
   const ratio = first > 0 && best > 0 ? (lowerIsBetter ? first / best : best / first) : 1;
+  const hovered = hover ? steps[hover.index] : undefined;
 
   return (
     <div id={chartId} className="min-w-0 p-4" data-testid="improvement-waterfall">
@@ -208,6 +218,10 @@ export default function ImprovementWaterfallChart({
                         data-kind={step.kind}
                         data-from={step.from}
                         data-to={step.to}
+                        onPointerMove={(event) =>
+                          setHover({ index, x: event.clientX, y: event.clientY })
+                        }
+                        onPointerLeave={() => setHover(null)}
                       >
                         {index < steps.length - 1 && (
                           <line
@@ -225,9 +239,7 @@ export default function ImprovementWaterfallChart({
                           width={barWidth}
                           height={Math.max(1, Math.abs(y(step.from) - y(step.to)))}
                           fill={color}
-                        >
-                          <title>{`${t[step.kind]} · ${step.date}: ${number(step.to)} (${step.delta >= 0 ? '+' : '−'}${number(Math.abs(step.delta))})`}</title>
-                        </rect>
+                        />
                         <text
                           x={x + barWidth / 2}
                           y={top - 10}
@@ -354,12 +366,36 @@ export default function ImprovementWaterfallChart({
               </div>
             </div>
           )}
+          {hover && hovered && (
+            <FloatingTooltip x={hover.x} y={hover.y} data-testid="waterfall-hover-card">
+              <ChartHoverCardBody
+                title={config?.label ?? ''}
+                subtitle={hovered.date}
+                color={config?.color}
+                metrics={[
+                  { value: number(hovered.to), label: axisLabelUnit(yLabel) },
+                  ...(hovered.kind === 'gain'
+                    ? [
+                        {
+                          value: `${hovered.delta >= 0 ? '+' : '−'}${number(Math.abs(hovered.delta))}`,
+                          label: t.vsPrevious,
+                        },
+                      ]
+                    : hovered.kind === 'best'
+                      ? [{ value: `${ratio.toFixed(2)}×`, label: t.vsBaseline }]
+                      : []),
+                ]}
+                summary={t[hovered.kind]}
+              />
+            </FloatingTooltip>
+          )}
           {steps.length === 2 && <p className="mt-2 text-sm text-muted-foreground">{t.noGain}</p>}
           {excludedCount > 0 && (
             <p className="mt-2 text-sm text-muted-foreground">
               {excludedCount} {t.excluded}
             </p>
           )}
+          {footer}
           {legendElement && (
             <details className="no-export mt-4" data-testid="waterfall-controls">
               <summary className="w-fit cursor-pointer rounded-sm text-sm text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-4">

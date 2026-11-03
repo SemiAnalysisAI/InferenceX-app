@@ -32,7 +32,7 @@ import { track } from '@/lib/analytics/analytics';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type { CustomLayerConfig, LayerConfig } from '@/lib/d3-chart/D3Chart/types';
-import { chartTooltipShellStyle } from '@/lib/d3-chart/tooltip-shell';
+import { axisLabelUnit, chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { CHART_TYPE } from '@/lib/d3-chart/typography';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { exportToCsv } from '@/lib/export/csv-export';
@@ -342,15 +342,28 @@ function tooltipHtml(
     t.note(SYSTEM_POWER_MODEL_REVISION.slice(0, 7)),
   ]
     .filter(Boolean)
-    .map((note) => `<div class="mt-1 max-w-64 text-muted-foreground">${escapeHtml(note!)}</div>`)
+    .map(
+      (note) =>
+        `<div class="mt-1 text-2xs leading-[14px] text-muted-foreground">${escapeHtml(note!)}</div>`,
+    )
     .join('');
-  return `<div class="text-xs" style="${chartTooltipShellStyle()}" data-testid="power-breakdown-tooltip">
-    <div class="font-semibold">${escapeHtml(series.label)} · ${escapeHtml(column.label)}</div>
-    <div class="text-muted-foreground">${escapeHtml(xLabel)}: ${interactivityFormat(entry.interactivity)}</div>
-    ${entry.configLabel ? `<div class="mb-1 max-w-72 text-muted-foreground">${escapeHtml(entry.configLabel)}</div>` : ''}
-    <table><tbody>${rows}
-      <tr class="border-t font-semibold"><td class="pr-2 pt-1">${escapeHtml(totalLabel)}</td><td></td><td class="pr-2 pt-1 text-right tabular-nums">${watts(entry.totalWattsPerGpu)} W</td><td></td></tr>
-    </tbody></table>${notes}</div>`;
+  return `<div data-testid="power-breakdown-tooltip">${chartHoverCard(
+    {
+      title: series.label,
+      subtitle: column.label,
+      color,
+      metrics: [
+        {
+          value: watts(entry.totalWattsPerGpu),
+          label: `${totalLabel} · ${axisLabelUnit(t.yAxis)}`,
+        },
+        { value: interactivityFormat(entry.interactivity), label: axisLabelUnit(xLabel) },
+      ],
+      body: `<table class="text-xs"><tbody>${rows}</tbody></table>${notes}`,
+      summary: entry.configLabel || undefined,
+    },
+    { pinned: false, maxWidth: 360 },
+  )}</div>`;
 }
 
 interface CursorLabel {

@@ -67,8 +67,14 @@ export function XAxisModeSelector({ className }: { className?: string } = {}) {
 
   return (
     <TooltipProvider delayDuration={0}>
-      <div className="flex w-full gap-3">
-        <div className={cn('flex min-w-0 flex-1 flex-col space-y-1.5', className)}>
+      <div className="flex w-full flex-wrap gap-3">
+        <div
+          className={cn(
+            'flex min-w-36 flex-1 flex-col space-y-1.5',
+            isAgentic ? 'max-w-72' : 'max-w-44',
+            className,
+          )}
+        >
           <LabelWithTooltip htmlFor="x-axis-mode-select" label={t.label} tooltip={t.help} />
           <SearchableSelect
             value={value}
@@ -113,9 +119,9 @@ export function XAxisModeSelector({ className }: { className?: string } = {}) {
         {/* The server cannot tell whether the sequence is agentic, so the statistic picker
             waits for mount. Hold its half until then so the X-axis picker does not shrink
             under the pointer when it appears. */}
-        {!mounted && <div aria-hidden="true" className="min-w-0 flex-1" />}
+        {!mounted && <div aria-hidden="true" className="min-w-36 max-w-44 flex-1" />}
         {mounted && !isAgentic && (
-          <div className="flex min-w-0 flex-1 flex-col space-y-1.5">
+          <div className="flex min-w-36 max-w-44 flex-1 flex-col space-y-1.5">
             <LabelWithTooltip
               htmlFor="fixed-sequence-statistic-select"
               label={t.statistic}
