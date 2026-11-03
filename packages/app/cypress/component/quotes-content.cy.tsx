@@ -96,7 +96,9 @@ describe('QuotesContent', () => {
       cy.window().then((win) => {
         cy.stub(win.Element.prototype, 'scrollIntoView').as('googleScroll');
       });
-      cy.get('[data-testid="supporter-logo-wall"] img[alt="Google"]').closest('button').click();
+      cy.get('[data-testid="supporter-group-us-frontier-labs"] img[alt="Google"]')
+        .closest('button')
+        .click();
       cy.get('@googleScroll').should((stub) => {
         const calls = (stub as unknown as { getCalls: () => { thisValue: Element }[] }).getCalls();
         expect(calls.some((call) => call.thisValue.id === 'quote-google')).to.equal(true);
@@ -187,11 +189,11 @@ describe('QuotesContent supporter logo wall', () => {
   });
 
   const groupIds = [
+    'ai-accelerators',
     'chinese-frontier-labs',
-    'us-labs',
-    'hyperscalers-clouds',
+    'us-frontier-labs',
+    'hyperscalers-neoclouds',
     'open-source',
-    'silicon-neoclouds-academia',
     'other',
   ];
 
@@ -199,13 +201,13 @@ describe('QuotesContent supporter logo wall', () => {
     cy.mount(<QuotesContent />);
     cy.get('[data-testid="supporter-logo-wall"] h3').should('have.length', groupIds.length);
     for (const id of groupIds) cy.get(`[data-testid="supporter-group-${id}"]`).should('exist');
-    cy.get('[data-testid="supporter-logo-wall"] h3').then(($headings) => {
+    cy.get('[data-testid="supporter-logo-wall"] h3').should(($headings) => {
       expect([...$headings].map((heading) => heading.textContent)).to.deep.equal([
+        'AI Accelerators',
         'Chinese Frontier Labs',
-        'US Labs',
-        'Hyperscalers and Clouds',
+        'US Frontier Labs & NeoLabs',
+        'Hyperscalers & Neoclouds',
         'Open Source',
-        'Silicon, Neoclouds and Academia',
         'Other',
       ]);
     });
@@ -217,6 +219,10 @@ describe('QuotesContent supporter logo wall', () => {
       '中国前沿实验室',
     );
     cy.get('button[aria-label="查看 OpenAI 的评价"]').should('exist');
+    cy.get('[data-testid="supporter-group-us-frontier-labs"] h3').should(
+      'have.text',
+      '美国前沿实验室与 NeoLabs',
+    );
   });
 
   it('shows supporter logos in full color and loads each image', () => {
@@ -273,7 +279,7 @@ describe('QuotesContent supporter logo wall', () => {
   it('stacks the group label above a wrapping row on phones', () => {
     cy.viewport(393, 852);
     cy.mount(<QuotesContent />);
-    cy.get('[data-testid="supporter-group-silicon-neoclouds-academia"]').within(() => {
+    cy.get('[data-testid="supporter-group-hyperscalers-neoclouds"]').within(() => {
       cy.get('h3').then(($label) => {
         const label = $label[0].getBoundingClientRect();
         cy.get('li').each(($li) => {
@@ -286,6 +292,46 @@ describe('QuotesContent supporter logo wall', () => {
         const rows = new Set([...$lis].map((li) => Math.round(li.getBoundingClientRect().top)));
         expect(rows.size, 'rows of logos').to.be.greaterThan(1);
       });
+    });
+  });
+
+  it('lays out cloud providers in two desktop rows and preserves the requested groups', () => {
+    cy.viewport(1568, 1000);
+    cy.mount(<QuotesContent />);
+    cy.get('[data-testid="supporter-group-hyperscalers-neoclouds"] li').should(($lis) => {
+      const rows = new Map<number, number>();
+      for (const li of $lis) {
+        const top = Math.round(li.getBoundingClientRect().top);
+        rows.set(top, (rows.get(top) ?? 0) + 1);
+      }
+      expect([...rows.values()]).to.deep.equal([8, 7]);
+    });
+    cy.get('[data-testid="supporter-group-other"]').within(() => {
+      cy.get('img[alt="Supermicro"]').should('be.visible');
+      cy.get('img[alt="Baseten"]').should('be.visible');
+    });
+    cy.get('[data-testid="supporter-group-us-frontier-labs"]').within(() => {
+      for (const alt of ['Prime Intellect', 'Adaptive ML', 'Periodic Labs']) {
+        cy.get(`img[alt="${alt}"]`).should('be.visible');
+      }
+    });
+    cy.get('[data-testid="supporter-group-hyperscalers-neoclouds"]').within(() => {
+      for (const alt of ['Core42', 'Verda', 'Vultr']) {
+        cy.get(`img[alt="${alt}"]`).should('be.visible');
+      }
+    });
+    cy.get('[data-testid="supporter-group-open-source"] img[alt="Red Hat"]').should('be.visible');
+    cy.get('[data-testid="supporter-logo-wall"]')
+      .find('[data-testid^="supporter-group-"]')
+      .first()
+      .should('have.attr', 'data-testid', 'supporter-group-ai-accelerators');
+    cy.get('[data-testid="supporter-group-ai-accelerators"] img').should(($logos) => {
+      expect([...$logos].map((logo) => logo.getAttribute('alt'))).to.deep.equal([
+        'Google',
+        'AMD',
+        'NVIDIA',
+        'SambaNova',
+      ]);
     });
   });
 });
