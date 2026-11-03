@@ -131,45 +131,27 @@ interface RecursiveBenchmarkPlan {
   pointIdentity: SqlPiece;
   pointOrder: SqlPiece;
   metricsExpression: SqlPiece;
+  /** Ends with the point identity so ties never fall back to plan order. */
   resultOrder: SqlPiece;
 }
 
 // An AgentX curve spans AGG/disagg and offload lines that may run different images, so
 // append-only runs inherit only while every shared line keeps its image, as InferenceX's
 // append-only check requires. `line_images` is NULL when a line has a missing or second
-// image. Computed inline so reads do not depend on migration 020.
+// image. Lines come from the table migration 023 maintains; run metadata stays live.
 function curveRunBase(modelKeys: string[], runLineFilter: SqlPiece): SqlPiece {
   return sqlPiece`
-    run_line_images AS (
-      SELECT workflow_run_id, date, curve_scope,
-        CASE
-          WHEN bool_and(image IS NOT NULL)
-            AND count(DISTINCT jsonb_build_array(line, image)) = count(DISTINCT line)
-          THEN jsonb_object_agg(line, image)
-        END AS line_images
-      FROM (
-        SELECT br.workflow_run_id, br.date, br.image,
-          benchmark_curve_scope(c.model, c.hardware, c.framework, c.precision,
-            br.benchmark_type, br.isl, br.osl, c.spec_method, c.disagg, br.offload_mode) AS curve_scope,
-          jsonb_build_array(c.disagg, coalesce(br.offload_mode, 'off'))::text AS line
-        FROM benchmark_results br
-        JOIN configs c ON c.id = br.config_id
-        WHERE br.error IS NULL AND c.model = ANY(${modelKeys})
-      ) points
-      GROUP BY workflow_run_id, date, curve_scope
-    ), run_lines AS (
-      SELECT benchmark_curve_runs.*, run_line_images.line_images
-      FROM benchmark_curve_runs
-      JOIN run_line_images USING (workflow_run_id, date, curve_scope)
-      WHERE model = ANY(${modelKeys})
-        ${runLineFilter}
-    ), ranked_runs AS (
-      SELECT run_lines.*,
+    ranked_runs AS (
+      SELECT l.curve_scope, l.workflow_run_id, l.date, l.line_images, l.point_ids,
+        wr.run_started_at, wr.github_run_id, wr.append_only,
         row_number() OVER (
-          PARTITION BY curve_scope
-          ORDER BY date DESC, run_started_at DESC NULLS LAST, workflow_run_id DESC
+          PARTITION BY l.curve_scope
+          ORDER BY l.date DESC, wr.run_started_at DESC NULLS LAST, l.workflow_run_id DESC
         ) AS run_rank
-      FROM run_lines
+      FROM benchmark_curve_run_lines l
+      JOIN latest_workflow_runs wr ON wr.id = l.workflow_run_id
+      WHERE l.model = ANY(${modelKeys})
+        ${runLineFilter}
     )`;
 }
 
@@ -193,16 +175,12 @@ const CURVE_RECURSION = sqlPiece`
       WHERE current.chain_images ->> older_line.key <> older_line.value
     )`;
 
+// Each line lists its points, so DISTINCT ON sorts ids and keys only and the
+// wide columns are read once per selected point.
 const CURVE_POINT_SOURCE = sqlPiece`
   FROM curve_runs cr
-  JOIN benchmark_results br ON br.workflow_run_id = cr.workflow_run_id
-  JOIN configs point_c
-    ON point_c.id = br.config_id
-    AND benchmark_curve_scope(
-      point_c.model, point_c.hardware, point_c.framework, point_c.precision,
-      br.benchmark_type, br.isl, br.osl, point_c.spec_method, point_c.disagg, br.offload_mode
-    ) = cr.curve_scope
-  WHERE br.error IS NULL`;
+  CROSS JOIN LATERAL unnest(cr.point_ids) AS point(id)
+  JOIN benchmark_results br ON br.id = point.id`;
 
 function executeRecursiveBenchmarkQuery(
   sql: DbClient,
@@ -217,7 +195,7 @@ function executeRecursiveBenchmarkQuery(
     ), selected_points AS (
       SELECT DISTINCT ON (
         ${plan.pointIdentity}
-      ) br.*, cr.snapshot_date, cr.snapshot_workflow_run_id
+      ) br.id, cr.snapshot_date, cr.snapshot_workflow_run_id
       ${CURVE_POINT_SOURCE}
       ORDER BY
         ${plan.pointOrder}
@@ -250,22 +228,20 @@ function executeRecursiveBenchmarkQuery(
       br.recipe_fingerprint,
       ${plan.metricsExpression},
       br.workers,
-      -- A bare br.power_* reference fails during query planning until the next
-      -- ingest applies migration 015. The jsonb lookup returns NULL before the
-      -- migration and the stored value afterward, making deploy order safe.
-      to_jsonb(br) -> 'power_invalid_reasons' AS power_invalid_reasons,
-      to_jsonb(br) -> 'power_audit' AS power_audit,
+      br.power_invalid_reasons,
+      br.power_audit,
       br.date::text,
       br.workflow_run_id,
       wr.run_started_at::text,
       CASE WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url,
-      br.snapshot_date::text AS curve_date,
-      br.snapshot_workflow_run_id AS curve_workflow_run_id,
+      sp.snapshot_date::text AS curve_date,
+      sp.snapshot_workflow_run_id AS curve_workflow_run_id,
       snapshot_wr.run_started_at::text AS curve_run_started_at
-    FROM selected_points br
+    FROM selected_points sp
+    JOIN benchmark_results br ON br.id = sp.id
     JOIN configs c ON c.id = br.config_id
     JOIN latest_workflow_runs wr ON wr.id = br.workflow_run_id
-    JOIN latest_workflow_runs snapshot_wr ON snapshot_wr.id = br.snapshot_workflow_run_id
+    JOIN latest_workflow_runs snapshot_wr ON snapshot_wr.id = sp.snapshot_workflow_run_id
     ORDER BY ${plan.resultOrder}
   `;
   return executeSqlPiece(sql, query);
@@ -322,7 +298,8 @@ function queryRecursiveBenchmarks(
         pointIdentity,
         pointOrder,
         metricsExpression: rawMetrics,
-        resultOrder: sqlPiece`br.config_id, br.conc, br.isl, br.osl`,
+        resultOrder: sqlPiece`br.config_id, br.conc, br.isl, br.osl,
+          br.benchmark_type, br.offload_mode, br.recipe_fingerprint`,
       });
     }
     case 'run': {
@@ -341,14 +318,15 @@ function queryRecursiveBenchmarks(
         pointIdentity,
         pointOrder,
         metricsExpression: rawMetrics,
-        resultOrder: sqlPiece`br.config_id, br.conc, br.isl, br.osl, br.offload_mode`,
+        resultOrder: sqlPiece`br.config_id, br.conc, br.isl, br.osl, br.offload_mode,
+          br.benchmark_type, br.recipe_fingerprint`,
       });
     }
     case 'history': {
       const runLineFilter =
         variant.benchmarkType === 'agentic_traces'
-          ? sqlPiece`AND benchmark_type = 'agentic_traces'`
-          : sqlPiece`AND isl = ${variant.isl} AND osl = ${variant.osl}`;
+          ? sqlPiece`AND l.benchmark_type = 'agentic_traces'`
+          : sqlPiece`AND l.isl = ${variant.isl} AND l.osl = ${variant.osl}`;
       const seed = sqlPiece`
         curve_runs AS (
           SELECT
@@ -369,7 +347,8 @@ function queryRecursiveBenchmarks(
           br.config_id, br.benchmark_type, br.isl, br.osl, br.offload_mode,
           br.recipe_fingerprint, br.conc, cr.run_rank`,
         metricsExpression: sqlPiece`br.metrics - '{std_ttft,std_tpot,std_e2el,std_intvty,std_itl,mean_ttft,mean_tpot,mean_e2el,mean_intvty,mean_itl}'::text[] AS metrics`,
-        resultOrder: sqlPiece`br.snapshot_date, c.id, br.conc`,
+        resultOrder: sqlPiece`sp.snapshot_date, c.id, br.conc, sp.snapshot_workflow_run_id,
+          br.benchmark_type, br.isl, br.osl, br.offload_mode, br.recipe_fingerprint`,
       });
     }
   }
@@ -447,10 +426,8 @@ export async function getLatestBenchmarks(
       lb.recipe_fingerprint,
       lb.metrics,
       lb.workers,
-      -- latest_benchmarks lacks these fields until migration 015 recreates it;
-      -- the jsonb lookup keeps reads safe during that deploy window.
-      to_jsonb(lb) -> 'power_invalid_reasons' AS power_invalid_reasons,
-      to_jsonb(lb) -> 'power_audit' AS power_audit,
+      lb.power_invalid_reasons,
+      lb.power_audit,
       lb.date::text,
       lb.workflow_run_id,
       wr.run_started_at::text,
@@ -463,7 +440,8 @@ export async function getLatestBenchmarks(
     JOIN latest_workflow_runs wr ON wr.id = lb.workflow_run_id
     JOIN latest_workflow_runs snapshot_wr ON snapshot_wr.id = lb.snapshot_workflow_run_id
     WHERE c.model = ANY(${modelKeys})
-    ORDER BY lb.config_id, lb.conc, lb.isl, lb.osl, lb.date DESC
+    ORDER BY lb.config_id, lb.conc, lb.isl, lb.osl, lb.date DESC,
+      lb.benchmark_type, lb.offload_mode, lb.recipe_fingerprint
   `;
   return rows as unknown as BenchmarkRow[];
 }

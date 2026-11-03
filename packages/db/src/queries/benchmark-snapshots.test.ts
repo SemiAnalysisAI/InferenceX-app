@@ -125,8 +125,10 @@ beforeAll(async () => {
   for (const name of migrations.filter((filename) => filename < '014_'))
     await db.exec(readFileSync(new URL(name, dir), 'utf8'));
   await seed();
-  const legacyRows = await getLatestBenchmarks(sql, 'glm5.2');
-  legacyCount = legacyRows.length;
+  // Readers need migration 023, so count the pre-014 view's rows directly.
+  const [legacy] = await sql`SELECT count(*)::int AS count FROM latest_benchmarks lb
+    JOIN configs c ON c.id = lb.config_id WHERE c.model = 'glm5.2'`;
+  legacyCount = Number(legacy.count);
   for (const name of migrations.filter((filename) => filename >= '014_'))
     await db.exec(readFileSync(new URL(name, dir), 'utf8'));
   const retained = await db.query<{ count: number }>(
@@ -157,7 +159,7 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
       power_audit = '{"expected_gpu_count":16}'::jsonb WHERE id IN (1, 2)`;
     await db.exec(
       readFileSync(
-        new URL('../../migrations/020_append_only_line_images.sql', import.meta.url),
+        new URL('../../migrations/023_benchmark_curve_run_lines.sql', import.meta.url),
         'utf8',
       ),
     );
@@ -526,6 +528,42 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
     await addRun(21, { date: '2026-09-20', githubId: 20, attempt: 2 });
     await addPoint(20, 21, 2, 1400, { image: 'trt:rc27' });
     await expectSameCurve('newer attempt supersedes the older attempt');
+  });
+  it('keeps every point of a run whose rows carry different dates', async () => {
+    await addRun(12);
+    await addPoint(8, 12, 1, 1, { offload: 'off' });
+    await addPoint(9, 12, 1, 2, { offload: 'off' });
+    await sql`UPDATE benchmark_results SET date = '2026-09-11' WHERE id = 9`;
+    await db.exec('REFRESH MATERIALIZED VIEW latest_benchmarks');
+    expect(ids(await getLatestBenchmarks(sql, 'glm5.2'))).toEqual([8, 9]);
+    expect(ids(await getLatestBenchmarks(sql, 'glm5.2', '2026-09-12'))).toEqual([8, 9]);
+    expect(ids(await getBenchmarksForRun(sql, 'glm5.2', 12))).toEqual([8, 9]);
+  });
+  it('keeps stored curve lines equal to a full rebuild after every kind of write', async () => {
+    const lines = () => sql`SELECT * FROM benchmark_curve_run_lines
+      ORDER BY workflow_run_id, date, curve_scope::text`;
+    const expectRebuilt = async (write: string) => {
+      const maintained = await lines();
+      await sql`SELECT refresh_benchmark_curve_run_lines(array(SELECT id FROM workflow_runs))`;
+      expect(maintained, write).toEqual(await lines());
+    };
+    await expectRebuilt('inserts');
+    expect(await lines()).toHaveLength(2);
+    await sql`UPDATE benchmark_results SET image = 'trt:rc27' WHERE id = 3`;
+    await expectRebuilt('image change');
+    await sql`UPDATE benchmark_results SET error = 'failed' WHERE id = 4`;
+    await expectRebuilt('point marked failed');
+    await sql`UPDATE benchmark_results SET offload_mode = 'off' WHERE id = 5`;
+    await expectRebuilt('offload change');
+    await addRun(12);
+    await sql`UPDATE benchmark_results SET workflow_run_id = 12 WHERE id = 6`;
+    await expectRebuilt('point moved to another run');
+    await sql`UPDATE configs SET precision = 'fp8' WHERE id = 1`;
+    await expectRebuilt('config change');
+    await sql`DELETE FROM benchmark_results WHERE id = 7`;
+    await expectRebuilt('delete');
+    await sql`TRUNCATE benchmark_results CASCADE`;
+    expect(await lines()).toEqual([]);
   });
 });
 
