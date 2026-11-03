@@ -16,6 +16,7 @@ export interface SupporterGroup {
   id: string;
   label: Record<Locale, string>;
   logos: WallLogo[];
+  desktopColumns?: number;
 }
 
 /**
@@ -37,8 +38,8 @@ export const CURATED_SUPPORTER_GROUPS: SupporterGroup[] = [
     ],
   },
   {
-    id: 'us-labs',
-    label: { en: 'US labs', zh: '美国实验室' },
+    id: 'us-frontier-labs',
+    label: { en: 'US frontier labs', zh: '美国前沿实验室' },
     logos: [
       { label: 'OpenAI', logo: 'openai.svg', quoteOrg: 'OpenAI' },
       {
@@ -47,14 +48,12 @@ export const CURATED_SUPPORTER_GROUPS: SupporterGroup[] = [
         quoteOrg: 'Meta Superintelligence Labs',
       },
       { label: 'Google', logo: 'google-color.svg', quoteOrg: 'Google' },
-      { label: 'Periodic Labs', logo: 'periodic-labs.png', quoteOrg: 'Periodic Labs' },
-      { label: 'Prime Intellect', logo: 'prime-intellect.svg', quoteOrg: 'Prime Intellect' },
-      { label: 'Adaptive ML', logo: 'adaptive-ml.svg', quoteOrg: 'Adaptive ML' },
     ],
   },
   {
-    id: 'hyperscalers-clouds',
-    label: { en: 'Hyperscalers and clouds', zh: '超大规模云厂商与云平台' },
+    id: 'hyperscalers-neoclouds',
+    label: { en: 'Hyperscalers & Neoclouds', zh: '超大规模云厂商与 Neocloud' },
+    desktopColumns: 6,
     logos: [
       { label: 'Microsoft', logo: 'microsoft.svg', quoteOrg: 'Microsoft' },
       { label: 'Google Cloud', logo: 'google-color.svg' },
@@ -64,8 +63,10 @@ export const CURATED_SUPPORTER_GROUPS: SupporterGroup[] = [
       { label: 'Together AI', logo: 'together-ai.svg', quoteOrg: 'Together AI' },
       { label: 'Lambda', logo: 'lambda.svg', quoteOrg: 'Lambda' },
       { label: 'Crusoe', logo: 'crusoe.svg', quoteOrg: 'Crusoe' },
-      { label: 'Baseten', logo: 'baseten.svg', quoteOrg: 'Baseten' },
-      { label: 'Vultr', logo: 'vultr.svg', quoteOrg: 'Vultr' },
+      { label: 'GMI Cloud', logo: 'gmi-cloud.svg', quoteOrg: 'GMI Cloud' },
+      { label: 'TensorWave', logo: 'tensorwave.svg', quoteOrg: 'TensorWave' },
+      { label: 'Voltage Park', logo: 'voltage-park.svg', quoteOrg: 'Voltage Park' },
+      { label: 'Firmus', logo: 'firmus.svg', quoteOrg: 'Firmus' },
     ],
   },
   {
@@ -74,10 +75,9 @@ export const CURATED_SUPPORTER_GROUPS: SupporterGroup[] = [
     logos: [
       { label: 'SGLang', logo: 'sglang.webp', quoteOrg: 'SGLang' },
       { label: 'vLLM', logo: 'vllm.svg', quoteOrg: 'vLLM' },
-      { label: 'TokenSpeed', logo: 'tokenspeed.webp' },
       { label: 'PyTorch Foundation', logo: 'pytorch.svg', quoteOrg: 'PyTorch Foundation' },
       { label: 'Hugging Face', logo: 'huggingface.svg', quoteOrg: 'Hugging Face' },
-      { label: 'Mooncake', logo: 'kvcache-ai.svg', quoteOrg: 'Mooncake' },
+      { label: 'KVCache.AI', logo: 'kvcache-ai.svg', quoteOrg: 'Mooncake' },
       { label: 'LMCache', logo: 'lmcache.webp', quoteOrg: 'LMCache' },
       { label: 'GPU Mode', logo: 'gpu-mode.png', quoteOrg: 'GPU Mode' },
       { label: 'TileRT', logo: 'tilert.webp', quoteOrg: 'TileRT' },
@@ -85,20 +85,19 @@ export const CURATED_SUPPORTER_GROUPS: SupporterGroup[] = [
     ],
   },
   {
-    id: 'silicon-neoclouds-academia',
-    label: { en: 'Silicon, neoclouds and academia', zh: '芯片、neocloud 与学术机构' },
+    id: 'ai-accelerators',
+    label: { en: 'AI accelerators', zh: 'AI 加速器' },
     logos: [
       { label: 'NVIDIA', logo: 'nvidia-color.svg', quoteOrg: 'NVIDIA' },
       { label: 'AMD', logo: 'amd.svg', quoteOrg: 'AMD' },
       { label: 'SambaNova', logo: 'sambanova.webp', quoteOrg: 'SambaNova' },
-      { label: 'Supermicro', logo: 'supermicro.svg', quoteOrg: 'Supermicro' },
-      { label: 'TensorWave', logo: 'tensorwave.svg', quoteOrg: 'TensorWave' },
-      { label: 'GMI Cloud', logo: 'gmi-cloud.svg', quoteOrg: 'GMI Cloud' },
-      { label: 'Voltage Park', logo: 'voltage-park.svg', quoteOrg: 'Voltage Park' },
-      { label: 'Firmus', logo: 'firmus.svg', quoteOrg: 'Firmus' },
-      { label: 'Stanford', logo: 'stanford.svg', quoteOrg: 'Stanford' },
-      { label: 'UC Berkeley', logo: 'sky-berkeley.webp', quoteOrg: 'UC Berkeley' },
+      { label: 'Google', logo: 'google-color.svg' },
     ],
+  },
+  {
+    id: 'other',
+    label: { en: 'Other', zh: '其他' },
+    logos: [{ label: 'TokenSpeed', logo: 'tokenspeed.webp' }],
   },
 ];
 
@@ -110,15 +109,16 @@ export function buildSupporterGroups(
   curated: readonly SupporterGroup[] = CURATED_SUPPORTER_GROUPS,
 ): SupporterGroup[] {
   const placed = new Set(curated.flatMap((g) => g.logos.flatMap((l) => l.quoteOrg ?? [])));
-  const other: WallLogo[] = [];
+  const groups = curated.filter((g) => g.id !== 'other');
+  const other: WallLogo[] = [...(curated.find((g) => g.id === 'other')?.logos ?? [])];
   for (const q of quotes) {
     if (!q.logo || placed.has(q.org)) continue;
     placed.add(q.org);
     other.push({ label: q.org, logo: q.logo, quoteOrg: q.org });
   }
   return other.length > 0
-    ? [...curated, { id: 'other', label: OTHER_GROUP_LABEL, logos: other }]
-    : [...curated];
+    ? [...groups, { id: 'other', label: OTHER_GROUP_LABEL, logos: other }]
+    : [...groups];
 }
 
 export const SUPPORTER_GROUPS = buildSupporterGroups();

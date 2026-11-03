@@ -96,7 +96,9 @@ describe('QuotesContent', () => {
       cy.window().then((win) => {
         cy.stub(win.Element.prototype, 'scrollIntoView').as('googleScroll');
       });
-      cy.get('[data-testid="supporter-logo-wall"] img[alt="Google"]').closest('button').click();
+      cy.get('[data-testid="supporter-group-us-frontier-labs"] img[alt="Google"]')
+        .closest('button')
+        .click();
       cy.get('@googleScroll').should((stub) => {
         const calls = (stub as unknown as { getCalls: () => { thisValue: Element }[] }).getCalls();
         expect(calls.some((call) => call.thisValue.id === 'quote-google')).to.equal(true);
@@ -170,10 +172,10 @@ describe('QuotesContent', () => {
 describe('QuotesContent supporter logo wall', () => {
   const groupIds = [
     'chinese-frontier-labs',
-    'us-labs',
-    'hyperscalers-clouds',
+    'us-frontier-labs',
+    'hyperscalers-neoclouds',
     'open-source',
-    'silicon-neoclouds-academia',
+    'ai-accelerators',
     'other',
   ];
 
@@ -246,7 +248,7 @@ describe('QuotesContent supporter logo wall', () => {
   it('stacks the group label above a wrapping row on phones', () => {
     cy.viewport(393, 852);
     cy.mount(<QuotesContent />);
-    cy.get('[data-testid="supporter-group-silicon-neoclouds-academia"]').within(() => {
+    cy.get('[data-testid="supporter-group-hyperscalers-neoclouds"]').within(() => {
       cy.get('h3').then(($label) => {
         const label = $label[0].getBoundingClientRect();
         cy.get('li').each(($li) => {
@@ -258,6 +260,28 @@ describe('QuotesContent supporter logo wall', () => {
       cy.get('li').then(($lis) => {
         const rows = new Set([...$lis].map((li) => Math.round(li.getBoundingClientRect().top)));
         expect(rows.size, 'rows of logos').to.be.greaterThan(1);
+      });
+    });
+  });
+
+  it('lays out cloud providers in two desktop rows and wraps the remaining supporters', () => {
+    cy.viewport(1568, 1000);
+    cy.mount(<QuotesContent />);
+    cy.get('[data-testid="supporter-group-hyperscalers-neoclouds"] li').should(($lis) => {
+      const rows = new Map<number, number>();
+      for (const li of $lis) {
+        const top = Math.round(li.getBoundingClientRect().top);
+        rows.set(top, (rows.get(top) ?? 0) + 1);
+      }
+      expect([...rows.values()]).to.deep.equal([6, 6]);
+    });
+    cy.get('[data-testid="supporter-group-other"]').within(() => {
+      cy.get('img[alt="TokenSpeed"]').should('be.visible');
+      cy.get('img[alt="Periodic Labs"]').should('be.visible');
+      cy.get('img[alt="Supermicro"]').should('be.visible');
+      cy.get('li').should(($lis) => {
+        const rows = new Set([...$lis].map((li) => Math.round(li.getBoundingClientRect().top)));
+        expect(rows.size).to.be.greaterThan(1);
       });
     });
   });
