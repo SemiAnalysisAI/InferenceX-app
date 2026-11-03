@@ -35,7 +35,7 @@ function placedLayer(points: Datum[]) {
   return { ...mounted, frames };
 }
 
-function labelAnchors(svg: SVGSVGElement) {
+function labelAnchors(svg: Element) {
   return [...svg.querySelectorAll<SVGGElement>('.point-label-anchor')];
 }
 

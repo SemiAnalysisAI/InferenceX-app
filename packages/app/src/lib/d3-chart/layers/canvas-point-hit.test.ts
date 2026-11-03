@@ -75,7 +75,9 @@ describe('PointHitGrid at the plot edges', () => {
         size + 0.25,
       ];
       for (const visibleFirst of [true, false]) {
-        const interactive = Uint8Array.from(xs, (_, index) => (index % 2 === 0) === visibleFirst);
+        const interactive = Uint8Array.from(xs, (_, index) =>
+          (index % 2 === 0) === visibleFirst ? 1 : 0,
+        );
         const grid = new PointHitGrid(RADIUS);
         grid.build(xs, ys, interactive, count, width, height);
         for (const y of around(height)) {
