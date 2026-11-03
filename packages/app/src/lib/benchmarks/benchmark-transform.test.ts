@@ -956,6 +956,19 @@ describe('transformBenchmarkRows — chip basis', () => {
     expect(pool.inputTputPerGpu?.y).toBeCloseTo(3600 * 0.5, 9);
     expect(total.inputTputPerGpu?.y).toBeCloseTo(900 * 0.5, 9);
   });
+
+  it('keeps the chart point key order on both bases', () => {
+    const row = disagg();
+    row.metrics.total_generation_tokens = 4096;
+    for (const basis of ['pool', 'total'] as const) {
+      const keys = Object.keys(chipBasisPoint(row, 'total', basis));
+      expect(keys.indexOf('chip_basis'), basis).toBe(keys.indexOf('num_decode_gpu') + 1);
+      expect(keys.indexOf('total_generation_tokens'), basis).toBe(
+        keys.indexOf('total_prompt_tokens') + 1,
+      );
+    }
+    expect(rowToAggDataEntry(row).total_generation_tokens).toBe(4096);
+  });
 });
 
 describe('applyUncachedTokenBasis', () => {

@@ -334,6 +334,7 @@ export function rowToAggDataEntry(
     disagg: row.disagg,
     num_prefill_gpu: row.num_prefill_gpu,
     num_decode_gpu: row.num_decode_gpu,
+    chip_basis: row.chip_basis,
     spec_decoding: row.spec_method,
     ep: aggregateEp,
     // Pipeline parallelism has no configs-table column — the ingest mapper
@@ -386,9 +387,9 @@ export function rowToAggDataEntry(
     num_requests_total: m.num_requests_total,
     num_requests_successful: m.num_requests_successful,
     total_prompt_tokens: m.total_prompt_tokens,
-    total_generation_tokens: m.total_generation_tokens,
   };
-  if (row.chip_basis) entry.chip_basis = row.chip_basis;
+  // oxlint-disable-next-line unicorn/no-immediate-mutation -- V8 gives a 128-property literal a map per object
+  entry.total_generation_tokens = m.total_generation_tokens;
   return entry;
 }
 
