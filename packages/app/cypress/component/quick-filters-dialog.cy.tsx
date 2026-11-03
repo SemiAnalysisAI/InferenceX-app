@@ -29,7 +29,10 @@ describe('QuickFiltersDialog', () => {
           { inference: { availableQuickFilters } },
         );
         const explanations = [
-          ['best-per-sku', locale === 'zh' ? '共同实测范围' : 'shared measured range'],
+          [
+            'best-per-sku',
+            locale === 'zh' ? '所有候选曲线实测到的完整区间' : 'full range any candidate measured',
+          ],
           ['vendor', locale === 'zh' ? '芯片制造商' : 'company that makes the chip'],
           ['framework', 'Dynamo vLLM'],
           ['deployment', locale === 'zh' ? '不同的 worker' : 'across workers'],
