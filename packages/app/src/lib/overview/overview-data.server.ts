@@ -12,8 +12,8 @@ import type { Model } from '@/lib/catalog/data-mappings';
 import {
   applyOverviewHardwareRowScope,
   applyOverviewRowScope,
-  assembleOverviewHistoricalPageData,
-  assembleOverviewPageData,
+  buildOverviewCube,
+  buildOverviewHistoricalCube,
   OVERVIEW_DEFAULT_COMPARISON_MODE,
   OVERVIEW_DEFAULT_HARDWARE_ROW_SCOPE,
   OVERVIEW_DEFAULT_MODEL_SCOPE,
@@ -23,7 +23,9 @@ import {
   overviewHistoricalWindow,
   overviewModelsForScope,
   overviewSnapshotDate,
+  sliceOverviewCube,
   type OverviewComparisonMode,
+  type OverviewCube,
   type OverviewEngineScope,
   type OverviewHardwareRowScope,
   type OverviewModelScope,
@@ -48,31 +50,18 @@ async function loadRowsByModel(
   return Object.fromEntries(entries);
 }
 
-async function buildOverviewPageData(
-  tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
-  engineScope: OverviewEngineScope = 'community',
-  comparisonMode: OverviewComparisonMode = OVERVIEW_DEFAULT_COMPARISON_MODE,
-  referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
-  modelScope: OverviewModelScope = OVERVIEW_DEFAULT_MODEL_SCOPE,
-  rowScope: OverviewRowScope = OVERVIEW_DEFAULT_ROW_SCOPE,
-  hardwareRowScope: OverviewHardwareRowScope = OVERVIEW_DEFAULT_HARDWARE_ROW_SCOPE,
-): Promise<OverviewPageData> {
-  const scopeRows = (data: OverviewPageData): OverviewPageData =>
-    applyOverviewHardwareRowScope(applyOverviewRowScope(data, rowScope), hardwareRowScope);
+/** Null when a history mode has no current snapshot to anchor its window. */
+async function buildOverviewCubeForScope(
+  engineScope: OverviewEngineScope,
+  comparisonMode: OverviewComparisonMode,
+  modelScope: OverviewModelScope,
+): Promise<OverviewCube | null> {
   const models = overviewModelsForScope(modelScope);
   const currentRowsByModel = FIXTURES_MODE
     ? loadFixture<Record<string, BenchmarkRow[]>>('overview-rows')
     : await loadRowsByModel(models, getCachedBenchmarks);
   if (comparisonMode === 'hardware') {
-    return scopeRows(
-      assembleOverviewPageData(
-        currentRowsByModel,
-        tier,
-        engineScope,
-        referenceHardware,
-        modelScope,
-      ),
-    );
+    return buildOverviewCube(currentRowsByModel, engineScope, modelScope);
   }
 
   const snapshotRows =
@@ -85,21 +74,7 @@ async function buildOverviewPageData(
         )
       : currentRowsByModel;
   const snapshotDate = overviewSnapshotDate(snapshotRows, engineScope);
-  if (snapshotDate === null) {
-    return {
-      models: [],
-      tier,
-      engineScope,
-      comparisonMode,
-      referenceHardware,
-      modelScope,
-      rowScope,
-      hardwareRowScope,
-      unchangedRowCount: 0,
-      emptyRowCount: 0,
-      historicalWindow: null,
-    };
-  }
+  if (snapshotDate === null) return null;
 
   const window = overviewHistoricalWindow(snapshotDate, comparisonMode);
   const unboundedBaselineRows = FIXTURES_MODE
@@ -116,22 +91,20 @@ async function buildOverviewPageData(
     ]),
   );
 
-  return scopeRows(
-    assembleOverviewHistoricalPageData(
-      currentRowsByModel,
-      baselineRowsByModel,
-      window,
-      tier,
-      engineScope,
-      referenceHardware,
-      modelScope,
-    ),
+  return buildOverviewHistoricalCube(
+    currentRowsByModel,
+    baselineRowsByModel,
+    window,
+    engineScope,
+    modelScope,
   );
 }
 
-const getCachedOverviewPageData = cachedDerivedData(buildOverviewPageData, 'overview-page-v2');
+// Tier, reference and the row scopes only slice a cube, so 20 cached cubes
+// serve every selector combination.
+const getCachedOverviewCube = cachedDerivedData(buildOverviewCubeForScope, 'overview-cube-v1');
 
-export function getOverviewPageData(
+export async function getOverviewPageData(
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
   engineScope: OverviewEngineScope = 'community',
   comparisonMode: OverviewComparisonMode = OVERVIEW_DEFAULT_COMPARISON_MODE,
@@ -140,14 +113,25 @@ export function getOverviewPageData(
   rowScope: OverviewRowScope = OVERVIEW_DEFAULT_ROW_SCOPE,
   hardwareRowScope: OverviewHardwareRowScope = OVERVIEW_DEFAULT_HARDWARE_ROW_SCOPE,
 ): Promise<OverviewPageData> {
-  const loader = FIXTURES_MODE ? buildOverviewPageData : getCachedOverviewPageData;
-  return loader(
-    tier,
-    engineScope,
-    comparisonMode,
-    referenceHardware,
-    modelScope,
-    rowScope,
+  const loader = FIXTURES_MODE ? buildOverviewCubeForScope : getCachedOverviewCube;
+  const cube = await loader(engineScope, comparisonMode, modelScope);
+  if (cube === null) {
+    return {
+      models: [],
+      tier,
+      engineScope,
+      comparisonMode,
+      referenceHardware,
+      modelScope,
+      rowScope,
+      hardwareRowScope,
+      unchangedRowCount: 0,
+      emptyRowCount: 0,
+      historicalWindow: null,
+    };
+  }
+  return applyOverviewHardwareRowScope(
+    applyOverviewRowScope(sliceOverviewCube(cube, tier, referenceHardware), rowScope),
     hardwareRowScope,
   );
 }
