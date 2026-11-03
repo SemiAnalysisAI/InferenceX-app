@@ -1,5 +1,10 @@
 import { useCallback } from 'react';
-import { type QueryClient, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  type QueryClient,
+  replaceEqualDeep,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 
 import { ApiRequestError } from '@/lib/api/api-request-error';
 
@@ -114,12 +119,32 @@ export function useBulkIdsQuery<T>(
   return useQuery(bulkIdsQueryOptions(useQueryClient(), endpoint, ids, enabled, fetchByIds));
 }
 
+/** ETag each revalidated payload object was served with. */
+const payloadValidators = new WeakMap<object, string>();
+
+const asObject = (value: unknown): object | undefined =>
+  typeof value === 'object' && value !== null ? value : undefined;
+
+/** Structural sharing that moves the new payload's ETag onto the object the cache keeps. */
+function shareValidated(previous: unknown, next: unknown): unknown {
+  const shared = replaceEqualDeep(previous, next);
+  const nextObject = asObject(next);
+  const validator = nextObject && payloadValidators.get(nextObject);
+  const sharedObject = asObject(shared);
+  if (validator && sharedObject) payloadValidators.set(sharedObject, validator);
+  return shared;
+}
+
+/**
+ * `revalidate` asks the server on every mount and window focus and sends the cached
+ * payload's ETag, so an unchanged payload comes back as a bodiless 304 and is reused.
+ */
 export function useByIdQuery<T, TSelected = T>(
   endpoint: string,
   id: number | null,
   enabled: boolean,
   select?: (data: T) => TSelected,
-  freshness?: { staleTime: number; refetchOnWindowFocus: boolean },
+  revalidate = false,
 ) {
   const selectNullable = useCallback(
     (data: T | null): TSelected | null =>
@@ -129,17 +154,28 @@ export function useByIdQuery<T, TSelected = T>(
 
   return useQuery({
     queryKey: [endpoint, id] as const,
-    queryFn: async ({ signal }): Promise<T | null> => {
+    queryFn: async ({ signal, client, queryKey }): Promise<T | null> => {
       if (!id) return null;
       const url = `/api/v1/${endpoint}?id=${id}`;
-      const res = await fetch(url, { signal });
+      const previous = revalidate ? asObject(client.getQueryData(queryKey)) : undefined;
+      const validator = previous && payloadValidators.get(previous);
+      const res = await fetch(
+        url,
+        validator ? { signal, headers: { 'If-None-Match': validator } } : { signal },
+      );
+      if (validator && res.status === 304) return previous as T;
       if (res.status === 404) return null;
       if (!res.ok) throw new ApiRequestError(`${endpoint} ${res.status}`, res.status, url);
-      return (await res.json()) as T;
+      const data = (await res.json()) as T;
+      const etag = res.headers.get('ETag');
+      const dataObject = asObject(data);
+      if (revalidate && etag && dataObject) payloadValidators.set(dataObject, etag);
+      return data;
     },
     enabled,
-    staleTime: STALE_TIME_MS,
-    ...freshness,
+    ...(revalidate
+      ? { staleTime: 0, refetchOnWindowFocus: true, structuralSharing: shareValidated }
+      : { staleTime: STALE_TIME_MS }),
     select: selectNullable,
   });
 }

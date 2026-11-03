@@ -6,13 +6,16 @@ import {
   type GpuMetricsPointPayload,
 } from '@semianalysisai/inferencex-db/queries/gpu-metrics';
 
-import { cachedQuery } from '@/lib/cache/api-cache';
-
-import { idQueryRoute } from '../id-routes';
+import { PUBLIC_API_ERRORS, publicApiError } from '@/lib/api/public-api-errors';
+import { cachedJson, cachedQuery, notModifiedJson } from '@/lib/cache/api-cache';
 
 export const dynamic = 'force-dynamic';
 
 export const CACHE_KEY_PREFIX = 'gpu-metrics-point-v2';
+
+// The revision is not in the URL, so no shared cache may keep the payload. Browsers
+// keep it and revalidate on every use against the live revision.
+const CACHE_CONTROL = 'private, no-cache';
 
 const getCachedGpuMetricsForPoint = cachedQuery(
   (id: number, _revision: string): Promise<GpuMetricsPointPayload | null> =>
@@ -20,6 +23,31 @@ const getCachedGpuMetricsForPoint = cachedQuery(
   CACHE_KEY_PREFIX,
   { blobOnly: true },
 );
+
+async function handleGet(request: NextRequest): Promise<Response> {
+  const id = Number(request.nextUrl.searchParams.get('id'));
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    return publicApiError(PUBLIC_API_ERRORS.idRequired, 400);
+  }
+  try {
+    const revision = await getGpuMetricsPointRevision(getDb(), id);
+    if (revision === null) return publicApiError(PUBLIC_API_ERRORS.notFound, 404);
+    // The ETag names the same (prefix, id, revision) as the Blob key, so a request
+    // already holding that payload is answered before it is loaded or serialized.
+    const cacheOptions = {
+      cacheControl: CACHE_CONTROL,
+      version: JSON.stringify([CACHE_KEY_PREFIX, id, revision]),
+    };
+    const notModified = notModifiedJson(request, cacheOptions);
+    if (notModified) return notModified;
+    const data = await getCachedGpuMetricsForPoint(id, revision);
+    if (!data) return publicApiError(PUBLIC_API_ERRORS.notFound, 404);
+    return cachedJson(request, data, cacheOptions);
+  } catch (error) {
+    console.error('Error fetching gpu metrics point:', error);
+    return publicApiError(PUBLIC_API_ERRORS.internal, 500);
+  }
+}
 
 /**
  * GET /api/v1/gpu-metrics-point?id=N
@@ -30,17 +58,9 @@ const getCachedGpuMetricsForPoint = cachedQuery(
  * run predates migration 016 and the artifacts have expired, or the job
  * uploaded no gpu_metrics artifact).
  */
-const handleGet = idQueryRoute({
-  logLabel: 'gpu metrics point',
-  fetch: async (id) => {
-    const revision = await getGpuMetricsPointRevision(getDb(), id);
-    return revision === null ? null : getCachedGpuMetricsForPoint(id, revision);
-  },
-});
-
 export async function GET(request: NextRequest): Promise<Response> {
   const response = await handleGet(request);
   // The live revision check must run even when a point used to be missing.
-  response.headers.set('Cache-Control', 'no-store');
+  if (!response.headers.has('ETag')) response.headers.set('Cache-Control', 'no-store');
   return response;
 }
