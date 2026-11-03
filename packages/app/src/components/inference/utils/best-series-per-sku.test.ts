@@ -49,7 +49,7 @@ describe('bestSeriesPerSku', () => {
     expect([...selected].toSorted()).toEqual(['b200_trt', 'h200_vllm']);
   });
 
-  it('uses only the shared measured domain instead of rewarding wider coverage', () => {
+  it('credits a curve for the measured range a narrower rival does not reach', () => {
     const selected = bestSeriesPerSku(
       [
         point('B200-8', 'b200_wide', 8, 70),
@@ -61,7 +61,55 @@ describe('bestSeriesPerSku', () => {
       'upper_left',
     );
 
+    expect(selected).toEqual(new Set(['b200_wide']));
+  });
+
+  it('keeps a narrower curve that dominates across nearly all of the range', () => {
+    const selected = bestSeriesPerSku(
+      [
+        point('B200-8', 'b200_wide', 10, 50),
+        point('B200-8', 'b200_wide', 21, 40),
+        point('B200-8', 'b200_narrow', 10, 100),
+        point('B200-8', 'b200_narrow', 20, 80),
+      ],
+      'upper_left',
+    );
+
     expect(selected).toEqual(new Set(['b200_narrow']));
+  });
+
+  it('does not let a short disaggregated preview win on the window it shares (Kimi-K3 MI355X)', () => {
+    // Production AgentX tok/$ frontiers at P90 interactivity, 2026-11-03.
+    const curves: Record<string, [number, number][]> = {
+      mi355x_atom: [
+        [20.68, 41_957_024],
+        [23.55, 41_033_453],
+        [57.01, 21_632_136],
+        [120.34, 6_907_136],
+        [151.52, 3_890_458],
+      ],
+      mi355x_vllm: [
+        [20.49, 38_127_175],
+        [33.36, 34_216_505],
+        [43.33, 29_759_666],
+        [59.59, 21_268_858],
+        [82.03, 15_543_627],
+        [142.05, 6_860_835],
+        [211.86, 4_606_312],
+      ],
+      'mi355x_vllm-disagg': [
+        [46.69, 26_117_604],
+        [74.24, 19_113_307],
+        [98.62, 13_334_689],
+        [110.13, 10_431_906],
+        [131.41, 4_281_518],
+      ],
+    };
+    const rows = Object.entries(curves).flatMap(([hwKey, points]) =>
+      points.map(([x, y]) => point('mi355x', hwKey, x, y)),
+    );
+
+    expect(bestSeriesPerSku(rows, 'upper_left')).toEqual(new Set(['mi355x_vllm']));
   });
 
   it('does not let a singleton preview displace a complete curve', () => {

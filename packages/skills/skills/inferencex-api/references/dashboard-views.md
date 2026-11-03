@@ -193,6 +193,10 @@ Best per SKU ranks only points in the selected precisions. For example,
 FP4 configuration cannot displace it. The dashboard applies the same scope to
 both official and unofficial-overlay selections.
 
+Within a SKU, each candidate is scored relative to the best curve across the
+combined measured x-range of all candidates and earns nothing where it has no
+measurement, so a short curve cannot win on the window it shares with a wider one.
+
 Qwen3.5 defaults to `xmode=e2e` and excludes MI300X, MI325X, H100, and H200
 when `gpus` is omitted. An explicit `xmode` or `gpus` overrides its model default;
 use `gpus=` to include all hardware.

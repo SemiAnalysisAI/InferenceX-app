@@ -4,7 +4,7 @@ import { isFrontierEligible, paretoFrontForDirection } from '@/lib/charts/chart-
 
 type Direction = 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
 
-const SAMPLE_COUNT = 9;
+const SAMPLE_COUNT = 65;
 const MIN_CURVE_FRONTIER_POINTS = 2;
 
 export function baseSku(point: Pick<InferenceData, 'hw' | 'hwKey'>): string {
@@ -77,29 +77,14 @@ export function bestSeriesPerSku(
       continue;
     }
 
-    const commonMin = Math.max(...scoringPool.map((candidate) => candidate.minX));
-    const commonMax = Math.min(...scoringPool.map((candidate) => candidate.maxX));
-    const hasCommonDomain = commonMin <= commonMax;
-
-    const score = (candidate: ScoredSeries): number => {
-      const xs = candidate.points.map((point) => point.x);
-      const ys = candidate.points.map((point) => point.y);
-      if (!hasCommonDomain) {
-        return higherYIsBetter ? Math.max(...ys) : -Math.min(...ys);
-      }
-      const slopes = monotoneSlopes(xs, ys);
-      let total = 0;
-      for (let index = 0; index < SAMPLE_COUNT; index++) {
-        const fraction = index / (SAMPLE_COUNT - 1);
-        const x = commonMin + (commonMax - commonMin) * fraction;
-        total += hermiteInterpolate(xs, ys, slopes, x);
-      }
-      const mean = total / SAMPLE_COUNT;
-      return higherYIsBetter ? mean : -mean;
-    };
+    const scores = scoringPool.every(
+      (candidate) => candidate.points.length < MIN_CURVE_FRONTIER_POINTS,
+    )
+      ? peakScores(scoringPool, higherYIsBetter)
+      : coverageScores(scoringPool, higherYIsBetter);
 
     const winner = scoringPool
-      .map((candidate) => ({ candidate, score: score(candidate) }))
+      .map((candidate, index) => ({ candidate, score: scores[index] }))
       .toSorted((a, b) => b.score - a.score || a.candidate.key.localeCompare(b.candidate.key))[0];
     selected.add(winner.candidate.key);
   }
@@ -120,4 +105,49 @@ export function withUnrankedSkus(
     if (!rankedSkus.has(baseSku(point))) selected.add(String(point.hwKey));
   }
   return selected;
+}
+
+/** Singleton previews have no curve, so the best single value decides. */
+function peakScores(pool: readonly ScoredSeries[], higherYIsBetter: boolean): number[] {
+  return pool.map((candidate) => {
+    const ys = candidate.points.map((point) => point.y);
+    return higherYIsBetter ? Math.max(...ys) : -Math.min(...ys);
+  });
+}
+
+/**
+ * Samples the union of every candidate's measured x-range. At each sample a
+ * candidate scores its value relative to the best candidate there (1 = best)
+ * and 0 where it has no measurement, so a curve that covers more of the chart
+ * is not judged only on the sliver it shares with a short preview.
+ */
+function coverageScores(pool: readonly ScoredSeries[], higherYIsBetter: boolean): number[] {
+  const unionMin = Math.min(...pool.map((candidate) => candidate.minX));
+  const unionMax = Math.max(...pool.map((candidate) => candidate.maxX));
+  const curves = pool.map((candidate) => {
+    const xs = candidate.points.map((point) => point.x);
+    const ys = candidate.points.map((point) => point.y);
+    return { candidate, xs, ys, slopes: monotoneSlopes(xs, ys) };
+  });
+  const totals = pool.map(() => 0);
+  for (let index = 0; index < SAMPLE_COUNT; index++) {
+    const x = unionMin + ((unionMax - unionMin) * index) / (SAMPLE_COUNT - 1);
+    const values = curves.map(({ candidate, xs, ys, slopes }) =>
+      x >= candidate.minX && x <= candidate.maxX ? hermiteInterpolate(xs, ys, slopes, x) : null,
+    );
+    const measured = values.filter((value): value is number => value !== null);
+    if (measured.length === 0) continue;
+    const best = higherYIsBetter ? Math.max(...measured) : Math.min(...measured);
+    values.forEach((value, candidateIndex) => {
+      if (value === null) return;
+      totals[candidateIndex] += relativeToBest(value, best, higherYIsBetter);
+    });
+  }
+  return totals;
+}
+
+function relativeToBest(value: number, best: number, higherYIsBetter: boolean): number {
+  if (value === best) return 1;
+  if (higherYIsBetter) return best > 0 && value > 0 ? value / best : 0;
+  return value > 0 && best > 0 ? best / value : 0;
 }
