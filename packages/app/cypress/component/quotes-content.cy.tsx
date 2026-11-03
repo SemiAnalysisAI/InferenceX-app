@@ -168,6 +168,24 @@ describe('QuotesContent', () => {
 });
 
 describe('QuotesContent supporter logo wall', () => {
+  it('omits TokenSpeed while retaining the SGLang and vLLM logos in both locales', () => {
+    for (const locale of ['en', 'zh'] as const) {
+      cy.mount(<QuotesContent locale={locale} />);
+      cy.get('[data-testid="supporter-logo-wall"]').within(() => {
+        cy.get('img[alt="TokenSpeed"]').should('not.exist');
+        cy.get('[data-testid="supporter-group-open-source"]').within(() => {
+          for (const org of ['SGLang', 'vLLM']) {
+            cy.get(`img[alt="${org}"]`)
+              .should('be.visible')
+              .and(($logo) => {
+                expect(($logo[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
+              });
+          }
+        });
+      });
+    }
+  });
+
   const groupIds = [
     'chinese-frontier-labs',
     'us-labs',
