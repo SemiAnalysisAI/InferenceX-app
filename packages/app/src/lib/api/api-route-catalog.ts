@@ -1459,7 +1459,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/benchmarks/benchmark-transform.ts',
-    sourceSha256: 'af6d9a99fda33241eb681f41db6b69b46446a72d763142c1f10b932e53039953',
+    sourceSha256: '5d78614421b50082a3b90c7724d3f710549fd807d2209ea7a9c9bd0e41deafaa',
     reviewArea: {
       en: 'Raw benchmark means and derived reciprocal mean-TPOT interactivity used by Dashboard and read-only views.',
       zh: '仪表板和只读视图共用的原始 benchmark 均值与 mean TPOT 倒数形式的 interactivity。',
@@ -1552,7 +1552,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/inference/hooks/interpolated-trend-core.ts',
-    sourceSha256: '2af339d3b390466a7ce22d3b45a73e4c9c8d6abe1538ed69481978a9e56a49ae',
+    sourceSha256: 'cb204dcc96622ac599d3862b1429a3cbffa9124f648bc8799fab570267967631',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1624,7 +1624,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/series.ts',
-    sourceSha256: '56d51db6c3d6b49417692ad822076d57935439ea21a907e19f72cb48a9cb6c80',
+    sourceSha256: '8a96ab6c930f78e5874ee2baa769651fcf7150829d6a205842a16f9cf9f000a3',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',

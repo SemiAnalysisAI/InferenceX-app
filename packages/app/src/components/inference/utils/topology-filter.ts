@@ -8,49 +8,34 @@ function topologyValue(value: number | boolean | undefined) {
 }
 
 export function pointTopologyKey(point: InferenceData): string {
-  const fields: [string, number | boolean | undefined][] = [
-    ['GPU', point.physicalChips ?? point.tp],
-    ['DP', point.dp],
-    ['TP', point.decode_tp],
-    ['EP', point.decode_ep ?? point.ep],
-    ['PP', point.decode_pp ?? point.pp],
-    [
-      'DCP',
-      point.disagg
-        ? point.decode_dcp_size
-        : (meaningfulParallelismSize(point.prefill_dcp_size, point.decode_dcp_size) ??
-          point.decode_dcp_size ??
-          point.prefill_dcp_size),
-    ],
-    [
-      'PCP',
-      point.disagg
-        ? point.decode_pcp_size
-        : (meaningfulParallelismSize(point.prefill_pcp_size, point.decode_pcp_size) ??
-          point.decode_pcp_size ??
-          point.prefill_pcp_size),
-    ],
-    ['DPA', point.decode_dp_attention ?? point.dp_attention],
-  ];
-  if (point.disagg)
-    fields.push(
-      ['P-GPU', point.num_prefill_gpu],
-      ['D-GPU', point.num_decode_gpu],
-      ['P-workers', point.prefill_num_workers],
-      ['D-workers', point.decode_num_workers],
-      ['P-TP', point.prefill_tp],
-      ['P-EP', point.prefill_ep],
-      ['P-PP', point.prefill_pp],
-      ['P-DCP', point.prefill_dcp_size],
-      ['P-PCP', point.prefill_pcp_size],
-      ['P-DPA', point.prefill_dp_attention],
-    );
+  const dcpSize = point.disagg
+    ? point.decode_dcp_size
+    : (meaningfulParallelismSize(point.prefill_dcp_size, point.decode_dcp_size) ??
+      point.decode_dcp_size ??
+      point.prefill_dcp_size);
+  const pcpSize = point.disagg
+    ? point.decode_pcp_size
+    : (meaningfulParallelismSize(point.prefill_pcp_size, point.decode_pcp_size) ??
+      point.decode_pcp_size ??
+      point.prefill_pcp_size);
   const mode = point.disagg ? 'PD' : point.is_multinode ? 'Multi' : 'Single';
-  return [
-    mode,
-    ...fields.map(([key, v]) => `${key}=${topologyValue(v)}`),
-    `offload=${point.offload_mode ?? '?'}`,
-  ].join('|');
+  let key =
+    `${mode}|GPU=${topologyValue(point.physicalChips ?? point.tp)}` +
+    `|DP=${topologyValue(point.dp)}|TP=${topologyValue(point.decode_tp)}` +
+    `|EP=${topologyValue(point.decode_ep ?? point.ep)}` +
+    `|PP=${topologyValue(point.decode_pp ?? point.pp)}` +
+    `|DCP=${topologyValue(dcpSize)}|PCP=${topologyValue(pcpSize)}` +
+    `|DPA=${topologyValue(point.decode_dp_attention ?? point.dp_attention)}`;
+  if (point.disagg)
+    key +=
+      `|P-GPU=${topologyValue(point.num_prefill_gpu)}|D-GPU=${topologyValue(point.num_decode_gpu)}` +
+      `|P-workers=${topologyValue(point.prefill_num_workers)}` +
+      `|D-workers=${topologyValue(point.decode_num_workers)}` +
+      `|P-TP=${topologyValue(point.prefill_tp)}|P-EP=${topologyValue(point.prefill_ep)}` +
+      `|P-PP=${topologyValue(point.prefill_pp)}|P-DCP=${topologyValue(point.prefill_dcp_size)}` +
+      `|P-PCP=${topologyValue(point.prefill_pcp_size)}` +
+      `|P-DPA=${topologyValue(point.prefill_dp_attention)}`;
+  return `${key}|offload=${point.offload_mode ?? '?'}`;
 }
 
 export function topologyLabel(

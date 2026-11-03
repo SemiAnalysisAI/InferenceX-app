@@ -26,11 +26,7 @@ import {
 } from '@/lib/catalog/constants';
 import { getVendor, type Vendor } from '@/lib/charts/dynamic-colors';
 import type { Locale } from '@/lib/i18n/i18n';
-import {
-  buildPowerBasisChartFields,
-  POWER_BASIS_FIELD_KEYS,
-  type PowerBasisChartFields,
-} from '@/lib/power/power-basis';
+import { POWER_BASIS_FIELD_KEYS, writePowerBasisChartFields } from '@/lib/power/power-basis';
 import { reconstructedRoleEnergy } from '@/components/inference/utils/role-energy';
 
 const BANNED_HUE_TEST: Record<Vendor, ((hue: number) => boolean) | null> = {
@@ -153,7 +149,12 @@ export const Y_AXIS_METRICS = ['y', ...BENCHMARK_METRIC_CONFIG_KEYS] as const;
 
 export type YAxisMetric = (typeof Y_AXIS_METRICS)[number];
 
-export const getHardwareKey = (entry: AggDataEntry): string => {
+export type HardwareKeyFields = Pick<
+  AggDataEntry,
+  'hw' | 'framework' | 'disagg' | 'benchmark_type' | 'mtp' | 'spec_decoding'
+>;
+
+export const getHardwareKey = (entry: HardwareKeyFields): string => {
   const dash = entry.hw.indexOf('-');
   let normalizedHwName = dash === -1 ? entry.hw : entry.hw.slice(0, dash);
   if (entry.framework) {
@@ -237,7 +238,11 @@ export function buildAvailabilityHwKey(
 export type DerivedMetricKey = BenchmarkMetricKey | 'reconstructedPrefillJPerOutputToken';
 export type DerivedChartFields = Pick<InferenceData, DerivedMetricKey>;
 
-const chartMetric = (y: number): { y: number; roof: boolean } => ({ y, roof: false });
+const UNROOFED_METRIC = { y: 0, roof: false };
+
+export function chartMetric(y: number): { y: number; roof: boolean } {
+  return { ...UNROOFED_METRIC, y };
+}
 
 export function buildDerivedChartFields(
   entry: AggDataEntry,
@@ -259,8 +264,48 @@ export function buildDerivedChartFields(
   tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
   specs: GpuSpecs = getGpuSpecs(currentHwKey, tcoBasis),
 ): Partial<DerivedChartFields> {
+  const fields: Partial<DerivedChartFields> = {};
+  writeDerivedChartFields(fields, entry, requestedMetrics, specs);
+  return fields;
+}
+
+export function writeDerivedChartFields(
+  fields: Partial<DerivedChartFields>,
+  entry: AggDataEntry,
+  requestedMetrics: readonly DerivedMetricKey[] | undefined,
+  specs: GpuSpecs,
+): void {
   const wants = (key: DerivedMetricKey) =>
     requestedMetrics === undefined || requestedMetrics.includes(key);
+  writeThroughputChartFields(fields, entry, wants, specs);
+  let wantsMeasured = requestedMetrics === undefined;
+  let wantsPowerBasis = requestedMetrics === undefined;
+  for (const key of requestedMetrics ?? []) {
+    if (Object.hasOwn(MEASURED_POWER_FIELD_KEYS, key)) wantsMeasured = true;
+    if (Object.hasOwn(POWER_BASIS_FIELD_KEYS, key)) wantsPowerBasis = true;
+  }
+  if (wantsMeasured) writeMeasuredPowerChartFields(fields, entry, specs.tdp, wants);
+  if (wantsPowerBasis) writePowerBasisChartFields(fields, entry, specs, wants);
+}
+
+export type ThroughputChartInput = Pick<
+  AggDataEntry,
+  'tput_per_gpu' | 'output_tput_per_gpu' | 'input_tput_per_gpu'
+>;
+
+export function requestsPowerChartFields(requestedMetrics: readonly DerivedMetricKey[]): boolean {
+  return requestedMetrics.some(
+    (key) =>
+      Object.hasOwn(MEASURED_POWER_FIELD_KEYS, key) || Object.hasOwn(POWER_BASIS_FIELD_KEYS, key),
+  );
+}
+
+export function writeThroughputChartFields(
+  fields: Partial<DerivedChartFields>,
+  entry: ThroughputChartInput,
+  wants: (key: DerivedMetricKey) => boolean,
+  specs: GpuSpecs,
+): void {
   const hardwarePower = specs.power;
   const tputPerGpu = entry.tput_per_gpu ?? 0;
   const outputTputPerGpu = entry.output_tput_per_gpu ?? 0;
@@ -271,7 +316,6 @@ export function buildDerivedChartFields(
   const millionTokensPerHour = tokensPerHour / 1_000_000;
   const millionOutputTokensPerHour = outputTokensPerHour / 1_000_000;
   const millionInputTokensPerHour = inputTokensPerHour / 1_000_000;
-  const fields: Partial<DerivedChartFields> = {};
 
   if (wants('tpPerGpu')) fields.tpPerGpu = chartMetric(tputPerGpu);
   if (wants('outputTputPerGpu') && outputTputPerGpu) {
@@ -356,35 +400,6 @@ export function buildDerivedChartFields(
   if (hardwarePower > 0 && wants('jInput') && inputTputPerGpu) {
     fields.jInput = chartMetric(hardwarePower ? (hardwarePower * 1000) / inputTputPerGpu : 0);
   }
-
-  let wantsMeasured = requestedMetrics === undefined;
-  let wantsPowerBasis = requestedMetrics === undefined;
-  for (const key of requestedMetrics ?? []) {
-    if (Object.hasOwn(MEASURED_POWER_FIELD_KEYS, key)) wantsMeasured = true;
-    if (Object.hasOwn(POWER_BASIS_FIELD_KEYS, key)) wantsPowerBasis = true;
-  }
-
-  if (wantsMeasured) {
-    const measured = buildMeasuredPowerChartFields(entry, specs.tdp);
-    for (const [key, value] of Object.entries(measured) as [
-      keyof MeasuredPowerChartFields,
-      { y: number; roof: boolean },
-    ][]) {
-      if (wants(key)) fields[key] = value;
-    }
-  }
-
-  if (wantsPowerBasis) {
-    const powerBasis = buildPowerBasisChartFields(entry, specs);
-    for (const [key, value] of Object.entries(powerBasis) as [
-      keyof PowerBasisChartFields,
-      { y: number; roof: boolean },
-    ][]) {
-      if (wants(key)) fields[key] = value;
-    }
-  }
-
-  return fields;
 }
 
 export function deploymentChipCount(
@@ -399,7 +414,7 @@ export function deploymentChipCount(
           : entry.num_prefill_gpu > 0
             ? entry.num_prefill_gpu
             : 0,
-        currentHwKey.split('_')[0] === 'tpuv7' &&
+        (currentHwKey === 'tpuv7' || currentHwKey.startsWith('tpuv7_')) &&
           (entry.num_decode_gpu > 0 || entry.num_prefill_gpu > 0)
           ? 0
           : entry.tp * (entry.pp && entry.pp > 1 ? entry.pp : 1),
@@ -412,10 +427,10 @@ export function createChartDataPoint(
   xKey: keyof AggDataEntry,
   yKey: keyof AggDataEntry,
   currentHwKey: string,
-  derivedFields: DerivedChartFields = buildDerivedChartFields(entry, currentHwKey),
+  specs: GpuSpecs = getGpuSpecs(currentHwKey),
 ): InferenceData {
   const physicalChips = deploymentChipCount(entry, currentHwKey);
-  return {
+  const point: Omit<InferenceData, keyof DerivedChartFields> & Partial<DerivedChartFields> = {
     ...entry,
     date,
     x: (entry[xKey] ?? 0) as number,
@@ -443,8 +458,9 @@ export function createChartDataPoint(
     disagg: entry.disagg || undefined,
     num_prefill_gpu: entry.disagg ? entry.num_prefill_gpu : undefined,
     num_decode_gpu: entry.disagg ? entry.num_decode_gpu : undefined,
-    ...derivedFields,
   };
+  writeDerivedChartFields(point, entry, undefined, specs);
+  return point as InferenceData;
 }
 
 const MEASURED_POWER_FIELD_KEYS = {
@@ -469,42 +485,61 @@ type MeasuredPowerChartFields = Partial<
   Pick<InferenceData, keyof typeof MEASURED_POWER_FIELD_KEYS>
 >;
 
-function buildMeasuredPowerChartFields(
+function writeMeasuredPowerChartFields(
+  fields: MeasuredPowerChartFields,
   entry: AggDataEntry,
   tdpWatts: number,
-): MeasuredPowerChartFields {
-  const roleEnergy = reconstructedRoleEnergy(entry);
-  const fields: MeasuredPowerChartFields = {};
+  wants: (key: DerivedMetricKey) => boolean,
+): void {
   if (typeof entry.avg_power_w === 'number') {
-    fields.measuredAvgPower = chartMetric(entry.avg_power_w);
-    fields.measuredPowerTimeline = chartMetric(entry.avg_power_w);
+    if (wants('measuredAvgPower')) fields.measuredAvgPower = chartMetric(entry.avg_power_w);
+    if (wants('measuredPowerTimeline'))
+      fields.measuredPowerTimeline = chartMetric(entry.avg_power_w);
   }
-  if (typeof entry.p75_power_w === 'number' && Number.isFinite(entry.p75_power_w))
+  if (
+    typeof entry.p75_power_w === 'number' &&
+    Number.isFinite(entry.p75_power_w) &&
+    wants('measuredP75Power')
+  )
     fields.measuredP75Power = chartMetric(entry.p75_power_w);
-  if (typeof entry.p90_power_w === 'number' && Number.isFinite(entry.p90_power_w))
+  if (
+    typeof entry.p90_power_w === 'number' &&
+    Number.isFinite(entry.p90_power_w) &&
+    wants('measuredP90Power')
+  )
     fields.measuredP90Power = chartMetric(entry.p90_power_w);
-  if (typeof entry.prefill_avg_power_w === 'number')
+  if (typeof entry.prefill_avg_power_w === 'number' && wants('measuredPrefillAvgPower'))
     fields.measuredPrefillAvgPower = chartMetric(entry.prefill_avg_power_w);
-  if (typeof entry.decode_avg_power_w === 'number')
+  if (typeof entry.decode_avg_power_w === 'number' && wants('measuredDecodeAvgPower'))
     fields.measuredDecodeAvgPower = chartMetric(entry.decode_avg_power_w);
-  if (typeof entry.joules_per_output_token === 'number')
+  if (typeof entry.joules_per_output_token === 'number' && wants('measuredJPerOutputToken'))
     fields.measuredJPerOutputToken = chartMetric(entry.joules_per_output_token);
-  if (typeof entry.joules_per_total_token === 'number')
+  if (typeof entry.joules_per_total_token === 'number' && wants('measuredJPerTotalToken'))
     fields.measuredJPerTotalToken = chartMetric(entry.joules_per_total_token);
-  if (typeof entry.joules_per_input_token === 'number')
+  if (typeof entry.joules_per_input_token === 'number' && wants('measuredJPerInputToken'))
     fields.measuredJPerInputToken = chartMetric(entry.joules_per_input_token);
-  if (typeof entry.prefill_joules_per_input_token === 'number')
+  if (
+    typeof entry.prefill_joules_per_input_token === 'number' &&
+    wants('measuredPrefillJPerInputToken')
+  )
     fields.measuredPrefillJPerInputToken = chartMetric(entry.prefill_joules_per_input_token);
-  if (typeof entry.decode_joules_per_output_token === 'number')
+  if (
+    typeof entry.decode_joules_per_output_token === 'number' &&
+    wants('measuredDecodeJPerOutputToken')
+  )
     fields.measuredDecodeJPerOutputToken = chartMetric(entry.decode_joules_per_output_token);
-  if (roleEnergy) fields.reconstructedPrefillJPerOutputToken = chartMetric(roleEnergy.prefill);
-  if (typeof entry.joules_per_successful_query === 'number') {
-    fields.measuredJPerSuccessfulQuery = chartMetric(entry.joules_per_successful_query);
-    fields.measuredWhPerSuccessfulQuery = chartMetric(entry.joules_per_successful_query / 3600);
+  if (wants('reconstructedPrefillJPerOutputToken')) {
+    const roleEnergy = reconstructedRoleEnergy(entry);
+    if (roleEnergy) fields.reconstructedPrefillJPerOutputToken = chartMetric(roleEnergy.prefill);
   }
-  if (typeof entry.avg_power_w === 'number' && tdpWatts > 0)
+  if (typeof entry.joules_per_successful_query === 'number') {
+    if (wants('measuredJPerSuccessfulQuery'))
+      fields.measuredJPerSuccessfulQuery = chartMetric(entry.joules_per_successful_query);
+    if (wants('measuredWhPerSuccessfulQuery'))
+      fields.measuredWhPerSuccessfulQuery = chartMetric(entry.joules_per_successful_query / 3600);
+  }
+  if (typeof entry.avg_power_w === 'number' && tdpWatts > 0 && wants('measuredPowerPercentTdp'))
     fields.measuredPowerPercentTdp = chartMetric((entry.avg_power_w / tdpWatts) * 100);
-  return fields;
 }
 export function remapInferencePoint(
   point: InferenceData,

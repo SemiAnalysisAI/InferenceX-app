@@ -262,24 +262,27 @@ export function modeledItWattsPerGpu(
 
 export type PowerBasisChartFields = Partial<Pick<InferenceData, PowerBasisFieldKey>>;
 
-export function buildPowerBasisChartFields(
+export function writePowerBasisChartFields(
+  fields: PowerBasisChartFields,
   entry: PowerBasisEntry,
   specs: { tdp?: number; power?: number },
-): PowerBasisChartFields {
+  wants: (key: PowerBasisFieldKey) => boolean,
+): void {
+  const { gpuSecondsPerOutputToken, gpuSecondsPerTotalToken } =
+    provisionedGpuSecondsPerToken(entry);
   const values = computePowerBasisFields({
     tdpWatts: specs.tdp ?? null,
     utilityWatts: isPositive(specs.power) ? specs.power * 1000 : null,
-    ...provisionedGpuSecondsPerToken(entry),
+    gpuSecondsPerOutputToken,
+    gpuSecondsPerTotalToken,
     measuredWatts: entry.avg_power_w ?? null,
     measuredJPerOutputToken: entry.joules_per_output_token ?? null,
     measuredJPerTotalToken: entry.joules_per_total_token ?? null,
     modeledItWattsPerGpu: modeledItWattsPerGpu(entry),
     modeledFacilityWattsPerGpu: modeledFacilityWattsPerGpu(entry),
   });
-  const fields: PowerBasisChartFields = {};
   for (const key of Object.keys(values) as PowerBasisFieldKey[]) {
     const y = values[key];
-    if (y !== null) fields[key] = { y, roof: false };
+    if (y !== null && wants(key)) fields[key] = { y, roof: false };
   }
-  return fields;
 }

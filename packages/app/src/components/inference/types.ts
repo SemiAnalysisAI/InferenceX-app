@@ -527,7 +527,7 @@ export interface TrendDataPoint {
   value: number;
   x: number;
   synthetic?: boolean;
-  sources?: TrendSource[];
+  sources?: readonly TrendSource[];
   /** False when a legacy fallback would make a waterfall comparison ambiguous. */
   waterfallEligible?: boolean;
 }

@@ -403,6 +403,62 @@ describe('buildInferenceSeries', () => {
     );
   });
 
+  it('orders observed points by each GPU first row, before precision scoping', () => {
+    const rows = [
+      makeRow({ precision: 'bf16', conc: 4 }),
+      makeRow({ hardware: 'mi300x', framework: 'vllm', conc: 32 }),
+      makeRow({ conc: 16 }),
+    ];
+    const result = buildInferenceSeries(rows, BASE_OPTIONS);
+    expect(result.observedPoints.map((point) => point.hwKey)).toEqual(['h200_trt', 'mi300x_vllm']);
+  });
+
+  it('builds one frontier per run date for configs of one GPU', () => {
+    const rows = [
+      makeRow({ conc: 16, metrics: metrics({ median_intvty: 40, tput_per_gpu: 200 }) }),
+      makeRow({
+        conc: 8,
+        offload_mode: 'cpu',
+        date: '2026-02-01',
+        metrics: metrics({ median_intvty: 30, tput_per_gpu: 100 }),
+      }),
+    ];
+    const result = buildInferenceSeries(rows, BASE_OPTIONS);
+    expect(result.series.flatMap((entry) => entry.points.map((point) => point.frontier))).toEqual([
+      true,
+      true,
+    ]);
+  });
+
+  it('builds one frontier per precision for configs of one GPU', () => {
+    const rows = [
+      makeRow({ conc: 16, metrics: metrics({ median_intvty: 40, tput_per_gpu: 200 }) }),
+      makeRow({
+        conc: 8,
+        precision: 'fp4',
+        metrics: metrics({ median_intvty: 30, tput_per_gpu: 100 }),
+      }),
+    ];
+    const result = buildInferenceSeries(rows, { ...BASE_OPTIONS, precisions: ['fp4', 'fp8'] });
+    expect(result.series.flatMap((entry) => entry.points.map((point) => point.frontier))).toEqual([
+      true,
+      true,
+    ]);
+  });
+
+  it('ships the selected metric first, then the throughput bases', () => {
+    const result = buildInferenceSeries(fixtureRows(), {
+      ...BASE_OPTIONS,
+      metricConfigKey: 'y_costh',
+    });
+    expect(Object.keys(result.series[0].points[0].metrics)).toEqual([
+      'costh',
+      'tpPerGpu',
+      'outputTputPerGpu',
+      'inputTputPerGpu',
+    ]);
+  });
+
   describe.each(['interactivity', 'e2e'] as const)('measured power on %s', (xmode) => {
     it.each([
       'y_measuredAvgPower',

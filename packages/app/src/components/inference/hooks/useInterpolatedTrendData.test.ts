@@ -15,7 +15,12 @@ import { SUPPLEMENTAL_BENCHMARK_ROWS } from '@/lib/benchmarks/supplemental-bench
 import interactivityCases from '../../../../../skills/test/fixtures/agentic-interactivity.json';
 import { agenticP90Interactivity } from '../../../../../skills/skills/inferencex-api/scripts/agentic-interactivity.mjs';
 import { rowToAggDataEntry } from '@/lib/benchmarks/benchmark-transform';
-import { buildTrendLines, groupTrendRowsByDate } from './interpolated-trend-core';
+import {
+  buildTrendLines,
+  groupTrendRows,
+  groupTrendRowsByDate,
+  prepareTrendRows,
+} from './interpolated-trend-core';
 
 function makePoint(overrides: Partial<InferenceData> = {}): InferenceData {
   return {
@@ -147,6 +152,48 @@ describe('rowToLightweightPoint', () => {
     expect(point?.outputTokensPerDollarH?.y).toBeGreaterThan(0);
   });
 
+  it('derives only the requested trend metrics', () => {
+    const point = rowToLightweightPoint(makeBenchmarkRow(), ['tpPerGpu', 'costh'])!;
+    expect(point.tpPerGpu).toEqual({ y: 400, roof: false });
+    expect(point.costh).toBeDefined();
+    expect(point.tokensPerDollarH).toBeUndefined();
+    expect(point.tpPerMw).toBeUndefined();
+    expect(point.tokenRevenuePerGpuHour).toBeUndefined();
+  });
+
+  it.each(['single_turn', 'agentic_traces'] as const)(
+    'keeps the legacy output-throughput fallback for %s power boundaries',
+    (benchmarkType) => {
+      const point = rowToLightweightPoint(
+        makeBenchmarkRow({
+          benchmark_type: benchmarkType,
+          metrics: { tput_per_gpu: 400, median_intvty: 20, p90_itl: 0.05 },
+        }),
+        ['gpuProvisionedJPerOutputToken'],
+      );
+      expect(point?.gpuProvisionedJPerOutputToken?.y).toBeGreaterThan(0);
+    },
+  );
+
+  it('skips rows whose hardware is not in the registry', () => {
+    expect(
+      rowToLightweightPoint(makeBenchmarkRow({ hardware: 'nonexistent-chip' }), ['tpPerGpu']),
+    ).toBeNull();
+  });
+
+  it('counts physical chips from the populated topology side, as the full entry does', () => {
+    const row = makeBenchmarkRow({
+      prefill_tp: 8,
+      decode_tp: 0,
+      decode_ep: 0,
+      prefill_num_workers: 1,
+      num_prefill_gpu: 4,
+      num_decode_gpu: 0,
+    });
+    expect(rowToLightweightPoint(row, ['tpPerGpu'])?.physicalChips).toBe(8);
+    expect(rowToAggDataEntry(row).physicalChips).toBe(8);
+  });
+
   it('applies OpenRouter input and output prices to historical points', () => {
     const point = rowToLightweightPoint(
       makeBenchmarkRow({
@@ -194,6 +241,16 @@ describe('rowToLightweightPoint', () => {
     expect(point?.tokenRevenuePerGpuHour?.y).toBeCloseTo(8.2944, 10);
   });
 
+  it('leaves token revenue off when split pricing meets an unknown token mix', () => {
+    const point = rowToLightweightPoint(
+      makeBenchmarkRow({ isl: null, osl: null }),
+      ['tokenRevenuePerGpuHour'],
+      { source: 'openrouter', inputPerMillion: 1, outputPerMillion: 3 },
+    )!;
+    expect(point.y).toBe(400);
+    expect(Object.hasOwn(point, 'tokenRevenuePerGpuHour')).toBe(false);
+  });
+
   it('derives infrastructure total tokens per dollar from throughput and hourly cost', () => {
     const point = rowToLightweightPoint(makeBenchmarkRow(), [
       'tokensPerDollarH',
@@ -204,6 +261,88 @@ describe('rowToLightweightPoint', () => {
 
     expect(point!.tokensPerDollarH!.y * point!.costh!.y).toBeCloseTo(1_000_000, 8);
     expect(point!.tokensPerDollarR!.y * point!.costr!.y).toBeCloseTo(1_000_000, 8);
+  });
+});
+
+function groupedPoints(rows: BenchmarkRow[], selectedPrecisions: string[]): InferenceData[] {
+  return [
+    ...groupTrendRowsByDate(rows, {
+      selectedPrecisions,
+      selectedYAxisMetric: 'y_tpPerGpu',
+      requestedMetrics: ['tpPerGpu'],
+    }).values(),
+  ].flatMap((groups) => [...groups.values()].flat());
+}
+
+describe('groupTrendRowsByDate row preparation', () => {
+  it('gives every point the run source of its own row', () => {
+    const runUrl = 'https://github.com/org/repo/actions/runs/777';
+    const rows = [
+      makeBenchmarkRow({ run_url: runUrl, precision: 'fp4' }),
+      makeBenchmarkRow({ run_url: runUrl }),
+      makeBenchmarkRow({ run_url: runUrl, model: 'dsr1-0528' }),
+      makeBenchmarkRow({ run_url: runUrl, model: 'dsr1-0528', date: '2026-03-02' }),
+    ];
+    expect(
+      groupedPoints(rows, ['fp4', 'fp8']).map(({ trendSource }) => [
+        trendSource?.precision,
+        trendSource?.model,
+        trendSource?.date,
+      ]),
+    ).toEqual([
+      ['fp4', 'dsr1', '2026-03-01'],
+      ['fp8', 'dsr1', '2026-03-01'],
+      ['fp8', 'dsr1-0528', '2026-03-01'],
+      ['fp8', 'dsr1-0528', '2026-03-02'],
+    ]);
+  });
+
+  it('resolves the hardware key per benchmark type for otherwise identical configs', () => {
+    const metrics = { tput_per_gpu: 400, median_intvty: 20, p90_itl: 0.05 };
+    const rows = [
+      makeBenchmarkRow({ spec_method: 'mtp', metrics }),
+      makeBenchmarkRow({ spec_method: 'mtp', benchmark_type: 'agentic_traces', metrics }),
+    ];
+    expect(groupedPoints(rows, ['fp8']).at(-1)?.hwKey).toBe('h200_trt');
+  });
+
+  it('keys groups and run ids by each row hardware, framework, precision and run', () => {
+    const rows = [
+      makeBenchmarkRow({ precision: 'fp4', run_url: 'https://github.com/org/repo/actions/runs/1' }),
+      makeBenchmarkRow({ run_url: 'https://github.com/org/repo/actions/runs/1' }),
+      makeBenchmarkRow({
+        framework: 'vllm',
+        run_url: 'https://github.com/org/repo/actions/runs/2',
+      }),
+    ];
+    const grouped = groupTrendRowsByDate(rows, {
+      selectedPrecisions: ['fp4', 'fp8'],
+      selectedYAxisMetric: 'y_tpPerGpu',
+      requestedMetrics: ['tpPerGpu'],
+    });
+    const groups = grouped.get('2026-03-01')!;
+    expect([...groups.keys()]).toEqual(['h200_trt__fp4', 'h200_trt__fp8', 'h200_vllm__fp8']);
+    expect([...groups.values()].flat().map((point) => point.trendSource?.runId)).toEqual([1, 1, 2]);
+  });
+
+  it('keeps the fields of one metric change out of the next', () => {
+    const prepared = prepareTrendRows([makeBenchmarkRow()]);
+    const options = { selectedPrecisions: ['fp8'], selectedYAxisMetric: 'y_tpPerGpu' };
+    const [costPoint] = groupTrendRows(prepared, {
+      ...options,
+      requestedMetrics: ['tpPerGpu', 'costh'],
+    })
+      .get('2026-03-01')!
+      .get('h200_trt')!;
+    const [throughputPoint] = groupTrendRows(prepared, {
+      ...options,
+      requestedMetrics: ['tpPerGpu'],
+    })
+      .get('2026-03-01')!
+      .get('h200_trt')!;
+
+    expect(costPoint.costh).toBeDefined();
+    expect(throughputPoint.costh).toBeUndefined();
   });
 });
 
@@ -266,6 +405,22 @@ describe('rowSupportsTrendMetric', () => {
     expect(rowSupportsTrendMetric(julyRubin, 'y_outputTputPerGpu')).toBe(true);
     expect(rowSupportsTrendMetric(julyRubin, 'y_tpPerGpu')).toBe(false);
     expect(rowSupportsTrendMetric(julyRubin, 'y_inputTputPerGpu')).toBe(false);
+  });
+
+  it('drops the July Vera Rubin snapshot from total-token trend groups only', () => {
+    const julyRubin = SUPPLEMENTAL_BENCHMARK_ROWS.find((row) => row.hardware === 'vr200')!;
+    const options = {
+      selectedPrecisions: [julyRubin.precision],
+      requestedMetrics: ['tpPerGpu' as const],
+    };
+
+    expect(
+      groupTrendRowsByDate([julyRubin], { ...options, selectedYAxisMetric: 'y_tpPerGpu' }).size,
+    ).toBe(0);
+    expect(
+      groupTrendRowsByDate([julyRubin], { ...options, selectedYAxisMetric: 'y_outputTputPerGpu' })
+        .size,
+    ).toBe(1);
   });
 
   it('leaves a future Vera Rubin snapshot unrestricted without capability metadata', () => {
@@ -501,6 +656,27 @@ describe('interpolateMetricAtInteractivity', () => {
     expect(result).toBeNull();
   });
 
+  it('returns null when a frontier point lacks the metric', () => {
+    const points = [
+      makePoint({ x: 20, tpPerGpu: { y: 800, roof: false }, tpPerMw: { y: 40, roof: false } }),
+      makePoint({ x: 60, tpPerGpu: { y: 400, roof: false }, tpPerMw: undefined }),
+    ];
+    expect(interpolateMetricAtInteractivity(points, 40, 'tpPerMw')).toBeNull();
+  });
+
+  it('returns null when a frontier point lacks the throughput a cost is derived from', () => {
+    const points = [
+      makePoint({
+        x: 20,
+        tpPerGpu: { y: 800, roof: false },
+        outputTputPerGpu: { y: 700, roof: false },
+        costhOutput: { y: 1, roof: false },
+      }),
+      makePoint({ x: 60, tpPerGpu: { y: 400, roof: false }, costhOutput: { y: 2, roof: false } }),
+    ];
+    expect(interpolateMetricAtInteractivity(points, 40, 'costhOutput')).toBeNull();
+  });
+
   it('handles two frontier points at close x values', () => {
     const points = [
       makePoint({ x: 50, tpPerGpu: { y: 900, roof: false } }),
@@ -603,6 +779,19 @@ function trendLinesAt15(rows: BenchmarkRow[]) {
   ).trendLines;
 }
 
+function costhOutputWaterfallEligibility(rows: BenchmarkRow[]): (boolean | undefined)[] {
+  return [
+    ...buildTrendLines(
+      groupTrendRowsByDate(rows, {
+        selectedPrecisions: ['fp8'],
+        selectedYAxisMetric: 'y_costhOutput',
+        requestedMetrics: trendMetricDependencies('costhOutput'),
+      }),
+      { targetInteractivity: 15, trendMetricKey: 'costhOutput' },
+    ).trendLines.values(),
+  ].flatMap((line) => line.map((point) => point.waterfallEligible));
+}
+
 describe('buildTrendLines', () => {
   const RUN = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123';
   const sweep = (date: string) => [
@@ -631,5 +820,36 @@ describe('buildTrendLines', () => {
     expect(line[0].sources).toEqual([
       expect.objectContaining({ runId: 123, runUrl: `${RUN}/attempts/1` }),
     ]);
+  });
+
+  it('orders lines by their first bucket with a value, in the order the rows list dates', () => {
+    const early = sweep('2026-03-01');
+    const earlyH100 = early.map((row) => ({ ...row, hardware: 'h100' }));
+    const lateH100 = sweep('2026-03-05').map((row) => ({ ...row, hardware: 'h100' }));
+    const outOfRange = makeBenchmarkRow({
+      date: '2026-03-05',
+      hardware: 'h100',
+      metrics: { tput_per_gpu: 400, median_intvty: 50 },
+    });
+
+    expect([...trendLinesAt15([...lateH100, ...early, ...earlyH100]).keys()]).toEqual([
+      'h100_trt',
+      'h200_trt',
+    ]);
+    expect([...trendLinesAt15([outOfRange, ...early, ...earlyH100]).keys()]).toEqual([
+      'h200_trt',
+      'h100_trt',
+    ]);
+  });
+
+  it('keeps output-metric points from legacy rows out of the waterfall', () => {
+    const legacy = sweep('2026-03-01');
+    const measured = legacy.map((row) => ({
+      ...row,
+      metrics: { ...row.metrics, output_tput_per_gpu: row.metrics.tput_per_gpu },
+    }));
+
+    expect(costhOutputWaterfallEligibility(legacy)).toEqual([false]);
+    expect(costhOutputWaterfallEligibility(measured)).toEqual([true]);
   });
 });

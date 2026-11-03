@@ -7,6 +7,7 @@ import { dedupeAgenticHistoryRuns } from '@/lib/benchmarks/benchmark-run-selecti
 
 import {
   applyUncachedTokenBasis,
+  benchmarkRowPhysicalChips,
   mergeRunScopedRows,
   rowToAggDataEntry,
   transformBenchmarkRows,
@@ -133,6 +134,15 @@ describe('rowToAggDataEntry', () => {
       expect(historical.hardwareConfig['mi355x_mori-sglang'].suffix).toBe('(MoRI SGLang)');
     },
   );
+
+  it('labels a hardware key from every contributing run, not only its first row', () => {
+    const run_url =
+      'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34926284365/attempts/1';
+    const umbp = makeRow({ hardware: 'mi355x', framework: 'mori-sglang', run_url });
+    const plain = { ...umbp, run_url: run_url.replace('34926284365', '34926284364') };
+    const { hardwareConfig } = transformBenchmarkRows([plain, umbp]);
+    expect(hardwareConfig['mi355x_mori-sglang'].suffix).toBe('(MoRI SGLang / MoRI UMBP SGLang)');
+  });
 
   it.each(['p75_power_w', 'p90_power_w'] as const)(
     'only exposes %s from validated schema-2 rows, including overlays without DB IDs',
@@ -305,6 +315,27 @@ describe('rowToAggDataEntry', () => {
     expect(entry.decode_tp).toBe(8);
     expect(entry.decode_ep).toBe(1);
     expect(entry.decode_pp).toBe(2);
+  });
+
+  it('selects the prefill-shaped topology when only the decode TP is zero', () => {
+    const entry = rowToAggDataEntry(
+      makeRow({ disagg: false, prefill_tp: 8, decode_tp: 0, decode_ep: 1, num_decode_gpu: 8 }),
+    );
+    expect(entry.tp).toBe(8);
+  });
+
+  it('counts physical chips from the populated topology side, as the full entry does', () => {
+    const row = makeRow({
+      disagg: false,
+      prefill_tp: 8,
+      decode_tp: 0,
+      decode_ep: 0,
+      prefill_num_workers: 1,
+      num_prefill_gpu: 4,
+      num_decode_gpu: 0,
+    });
+    expect(benchmarkRowPhysicalChips(row)).toBe(8);
+    expect(rowToAggDataEntry(row).physicalChips).toBe(8);
   });
 
   it('surfaces pipeline parallelism from the metrics JSONB', () => {

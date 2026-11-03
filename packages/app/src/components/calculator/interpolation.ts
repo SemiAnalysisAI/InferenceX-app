@@ -72,8 +72,7 @@ export function monotoneSlopes(xs: number[], ys: number[]): number[] {
     s.push(hi === 0 ? 0 : (ys[i + 1] - ys[i]) / hi);
   }
 
-  const m: number[] = [];
-  for (let i = 0; i < n; i++) m.push(0);
+  const m = xs.map(() => 0);
   for (let i = 1; i < n - 1; i++) {
     const s0 = s[i - 1];
     const s1 = s[i];

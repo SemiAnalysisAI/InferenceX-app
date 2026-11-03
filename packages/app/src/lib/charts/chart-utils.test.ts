@@ -15,6 +15,7 @@ import {
   normalizeEvalHardwareKey,
   createChartDataPoint,
   buildDerivedChartFields,
+  deploymentChipCount,
   paretoFrontUpperRight,
   paretoFrontLowerRight,
   paretoFrontLowerLeft,
@@ -750,6 +751,46 @@ describe('buildDerivedChartFields', () => {
     expect(historicalFields.tpPerGpu).toEqual({ y: 1000, roof: false });
     expect(historicalFields.measuredJPerTotalToken).toBeUndefined();
     expect(Object.keys(historicalFields)).toEqual(['tpPerGpu']);
+  });
+
+  it('emits exactly the requested measured and power-boundary key', () => {
+    const measured = entry({
+      output_tput_per_gpu: 600,
+      avg_power_w: 500,
+      joules_per_successful_query: 7200,
+      disagg: true,
+      num_prefill_gpu: 2,
+      num_decode_gpu: 4,
+      benchmark_type: 'single_turn',
+      power_valid: 1,
+      power_metric_schema_version: 2,
+      joules_per_input_token: 0.5,
+      joules_per_output_token: 2,
+      prefill_joules_per_input_token: 0.4,
+      decode_joules_per_output_token: 1.5,
+    });
+    const full = buildDerivedChartFields(measured, 'h100');
+    for (const key of [
+      'measuredAvgPower',
+      'measuredPowerTimeline',
+      'measuredJPerSuccessfulQuery',
+      'measuredWhPerSuccessfulQuery',
+      'reconstructedPrefillJPerOutputToken',
+      'gpuProvisionedJPerOutputToken',
+      'gpuProvisionedJPerTotalToken',
+    ] as const) {
+      expect(full[key]).toBeDefined();
+      expect(buildDerivedChartFields(measured, 'h100', [key])).toEqual({ [key]: full[key] });
+    }
+  });
+});
+
+describe('deploymentChipCount', () => {
+  it('counts TPU v7 deployments by allocated chips, keyed on the exact tpuv7 base', () => {
+    const topology = { disagg: false, num_prefill_gpu: 0, num_decode_gpu: 4, tp: 8, pp: 1 };
+    expect(deploymentChipCount(topology, 'tpuv7')).toBe(4);
+    expect(deploymentChipCount(topology, 'tpuv7_vllm')).toBe(4);
+    expect(deploymentChipCount(topology, 'tpuv7x_vllm')).toBe(8);
   });
 });
 

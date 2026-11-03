@@ -12,13 +12,16 @@ import type {
   InferenceData,
 } from '@/components/inference/types';
 import {
-  buildDerivedChartFields,
   createChartDataPoint,
   deploymentChipCount,
   getHardwareKey,
-  type DerivedChartFields,
 } from '@/lib/charts/chart-utils';
-import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/catalog/constants';
+import {
+  DEFAULT_TCO_BASIS,
+  getGpuSpecs,
+  type GpuSpecs,
+  type TcoBasis,
+} from '@/lib/catalog/constants';
 import { getInferenceHardwareConfig } from '@/lib/benchmarks/inference-labels';
 import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
 import { resolvePowerTier } from '@/lib/power/power-tier';
@@ -97,39 +100,54 @@ export interface AggDataEntryOptions {
   modelPower?: boolean;
 }
 
-/** Convert a DB benchmark row to an AggDataEntry. */
+function aggregateUsesPrefill(row: BenchmarkRow): boolean {
+  return (
+    !row.disagg &&
+    (row.decode_tp <= 0 ||
+      row.decode_ep <= 0 ||
+      (row.decode_num_workers <= 0 &&
+        row.num_decode_gpu <= 0 &&
+        (row.prefill_num_workers > 0 || row.num_prefill_gpu > 0)))
+  );
+}
+
+function aggregatePipelineParallel(
+  row: BenchmarkRow,
+  m: Record<string, number>,
+  usesPrefill: boolean,
+): number | undefined {
+  return !row.disagg && (m.prefill_pp !== undefined || m.decode_pp !== undefined)
+    ? Math.max(m.prefill_pp ?? 1, m.decode_pp ?? 1)
+    : usesPrefill
+      ? m.prefill_pp
+      : m.decode_pp;
+}
+
+export function benchmarkRowPhysicalChips(row: BenchmarkRow): number {
+  const usesPrefill = aggregateUsesPrefill(row);
+  return deploymentChipCount(
+    {
+      disagg: row.disagg,
+      num_prefill_gpu: row.num_prefill_gpu,
+      num_decode_gpu: row.num_decode_gpu,
+      tp: usesPrefill ? row.prefill_tp : row.decode_tp,
+      pp: aggregatePipelineParallel(row, row.metrics, usesPrefill),
+    },
+    row.hardware,
+  );
+}
+
 export function rowToAggDataEntry(
   row: BenchmarkRow,
   { modelPower = true }: AggDataEntryOptions = {},
 ): AggDataEntry {
   const isAgentic = row.benchmark_type === 'agentic_traces';
   const m = isAgentic ? applyAgenticMetricAliases(row.metrics) : row.metrics;
-  // Non-disaggregated multinode artifacts historically stored their one
-  // aggregate engine topology in the prefill-shaped fields and left the
-  // decode-shaped fields at zero. Those names are only a transport/schema
-  // detail: aggregate serving has one TP/PP/EP topology. Select the populated
-  // side once and expose it through the canonical chart fields.
-  const aggregateUsesPrefill =
-    !row.disagg &&
-    (row.decode_tp <= 0 ||
-      row.decode_ep <= 0 ||
-      (row.decode_num_workers <= 0 &&
-        row.num_decode_gpu <= 0 &&
-        (row.prefill_num_workers > 0 || row.num_prefill_gpu > 0)));
-  const aggregateTp = aggregateUsesPrefill ? row.prefill_tp : row.decode_tp;
-  const aggregateEp = aggregateUsesPrefill ? row.prefill_ep : row.decode_ep;
-  // A few historical aggregate rows mirrored TP/EP into both schema halves
-  // before PP was mirrored. Since there is only one engine, prefer whichever
-  // side carries the meaningful (>1) PP value.
-  const aggregatePp =
-    !row.disagg && (m.prefill_pp !== undefined || m.decode_pp !== undefined)
-      ? Math.max(m.prefill_pp ?? 1, m.decode_pp ?? 1)
-      : aggregateUsesPrefill
-        ? m.prefill_pp
-        : m.decode_pp;
-  const aggregateDpAttention = aggregateUsesPrefill
-    ? row.prefill_dp_attention
-    : row.decode_dp_attention;
+  const usesPrefill = aggregateUsesPrefill(row);
+  const aggregateTp = usesPrefill ? row.prefill_tp : row.decode_tp;
+  const aggregateEp = usesPrefill ? row.prefill_ep : row.decode_ep;
+  const aggregatePp = aggregatePipelineParallel(row, m, usesPrefill);
+  const aggregateDpAttention = usesPrefill ? row.prefill_dp_attention : row.decode_dp_attention;
   // An explicit invalid verdict is authoritative. Legacy rows without the
   // verdict remain eligible so historical single-node measurements do not
   // disappear. Unversioned disaggregated joules are withheld because their
@@ -397,13 +415,6 @@ export function applyUncachedTokenBasis(entry: AggDataEntry): boolean {
   return true;
 }
 
-interface PreparedEntry {
-  entry: AggDataEntry;
-  hwKey: string;
-  date: string;
-  derivedFields: DerivedChartFields;
-}
-
 /**
  * Rewrite a chart x-axis key to use a different latency percentile prefix
  * (`median_` → `p99_` etc). Only touches keys that start with a known
@@ -469,7 +480,8 @@ export function mergeRunScopedRows(
  * Transform raw BenchmarkRow[] into chart-ready InferenceData[][] and HardwareConfig.
  * Returns one InferenceData[] per chart definition (e2e, interactivity).
  *
- * Converts rows to AggDataEntry once, then reuses for each chart definition.
+ * Converts each row to AggDataEntry once and builds its points for every chart definition
+ * right away, so the entry dies with its row.
  *
  * @param percentile Optional latency percentile for the chart x-axis
  *   (default 'median'). Swaps `median_intvty`/`median_e2el` in the chart
@@ -487,58 +499,88 @@ export function transformBenchmarkRows(
   chartData: InferenceData[][];
   hardwareConfig: HardwareConfig;
 } {
-  const gpuConfig: HardwareConfig = {};
-
-  // Phase 1: Convert rows once + resolve hardware keys.
-  const entriesByHw = new Map<string, AggDataEntry[]>();
-  const prepared: PreparedEntry[] = [];
+  const axes = (chartDefinitions as ChartDefinition[]).map((chartDef) => ({
+    xKey: withPercentile(chartDef.x, percentile) as keyof AggDataEntry,
+    yKey: chartDef.y as keyof AggDataEntry,
+  }));
+  const specsByHw = new Map<string, GpuSpecs>();
+  const pointsByHw: Record<string, InferenceData[][]> = {};
   for (const row of rows) {
     const entry = rowToAggDataEntry(row);
     if (tokenBasis === 'uncached' && !applyUncachedTokenBasis(entry)) continue;
     const hwKey = getHardwareKey(entry);
     entry.hwKey = hwKey;
-
-    const entries = entriesByHw.get(hwKey) ?? [];
-    entries.push(entry);
-    entriesByHw.set(hwKey, entries);
-
-    prepared.push({
-      entry,
-      hwKey,
-      date: row.date,
-      derivedFields: buildDerivedChartFields(entry, hwKey, undefined, tcoBasis),
-    });
+    let specs = specsByHw.get(hwKey);
+    if (!specs) {
+      specs = getGpuSpecs(hwKey, tcoBasis);
+      specsByHw.set(hwKey, specs);
+    }
+    let charts = pointsByHw[hwKey];
+    if (!charts) {
+      charts = axes.map(() => Array.of<InferenceData>());
+      pointsByHw[hwKey] = charts;
+    }
+    const point = createChartDataPoint(entry.date, entry, axes[0].xKey, axes[0].yKey, hwKey, specs);
+    charts[0].push(point);
+    for (let chart = 1; chart < axes.length; chart++) {
+      const { xKey, yKey } = axes[chart];
+      charts[chart].push({
+        ...point,
+        x: (entry[xKey] ?? 0) as number,
+        y: (entry[yKey] ?? 0) as number,
+      });
+    }
   }
 
-  // Labels depend on contributing runs, not only on the canonical hardware key.
-  for (const [hwKey, entries] of entriesByHw) {
+  const gpuConfig: HardwareConfig = {};
+  const chartData = axes.map((): InferenceData[] => []);
+  for (const [hwKey, charts] of Object.entries(pointsByHw)) {
     gpuConfig[hwKey] = {
-      ...getInferenceHardwareConfig(hwKey, entries[0].model, entries),
+      ...getInferenceHardwareConfig(hwKey, charts[0][0].model, charts[0]),
       name: hwKey,
     };
+    for (let chart = 0; chart < axes.length; chart++) {
+      for (const point of charts[chart]) chartData[chart].push(point);
+    }
   }
 
-  // Phase 2: Build chart data per chart definition (reusing prepared entries)
-  const chartData = (chartDefinitions as ChartDefinition[]).map((chartDef) => {
-    const xKey = withPercentile(chartDef.x, percentile);
-    const groupedByHw: Record<string, InferenceData[]> = {};
-
-    for (const { entry, hwKey, date, derivedFields } of prepared) {
-      const dataPoint = createChartDataPoint(
-        date,
-        entry,
-        xKey as keyof AggDataEntry,
-        chartDef.y as keyof AggDataEntry,
-        hwKey,
-        derivedFields,
-      );
-
-      if (!groupedByHw[hwKey]) groupedByHw[hwKey] = [];
-      groupedByHw[hwKey].push(dataPoint);
-    }
-
-    return Object.values(groupedByHw).flat();
-  });
-
   return { chartData, hardwareConfig: gpuConfig };
+}
+
+export function transformChartRowsForPrecisions(
+  rows: readonly BenchmarkRow[],
+  chartIndex: number,
+  precisions: ReadonlySet<string>,
+  percentile = 'median',
+  tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
+): InferenceData[] {
+  const chartDef = (chartDefinitions as ChartDefinition[])[chartIndex];
+  const xKey = withPercentile(chartDef.x, percentile) as keyof AggDataEntry;
+  const yKey = chartDef.y as keyof AggDataEntry;
+  const pointsByHw: Record<string, InferenceData[]> = {};
+  const specsByHw = new Map<string, GpuSpecs>();
+  for (const row of rows) {
+    const hwKey = getHardwareKey({
+      hw: row.hardware,
+      framework: row.framework,
+      disagg: row.disagg,
+      benchmark_type: row.benchmark_type,
+      spec_decoding: row.spec_method,
+    });
+    let points = pointsByHw[hwKey];
+    if (!points) {
+      points = [];
+      pointsByHw[hwKey] = points;
+    }
+    if (!precisions.has(row.precision)) continue;
+    let specs = specsByHw.get(hwKey);
+    if (!specs) {
+      specs = getGpuSpecs(hwKey, tcoBasis);
+      specsByHw.set(hwKey, specs);
+    }
+    const entry = rowToAggDataEntry(row);
+    entry.hwKey = hwKey;
+    points.push(createChartDataPoint(entry.date, entry, xKey, yKey, hwKey, specs));
+  }
+  return Object.values(pointsByHw).flat();
 }
