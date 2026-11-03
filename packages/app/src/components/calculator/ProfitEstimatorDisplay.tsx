@@ -4,12 +4,7 @@ import { TcoBasisToggle, useShowsTcoBasisSelector } from '@/components/ui/tco-ba
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import {
-  DISPLAY_MODEL_TO_DB,
-  HW_REGISTRY,
-  TCO_SOURCE_TITLE,
-  TCO_SOURCE_URL,
-} from '@semianalysisai/inferencex-constants';
+import { DISPLAY_MODEL_TO_DB, HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 import { Info, Plus, X } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { isDarkTheme } from '@/lib/themes/themes';
@@ -42,13 +37,13 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import ChartLegendItem from '@/components/ui/chart-legend-item';
-import { ChartShareActions } from '@/components/ui/chart-display-helpers';
+import { ChartShareActions, PricesSourceLink } from '@/components/ui/chart-display-helpers';
 import { ModelSelector } from '@/components/ui/chart-selectors';
 import { ControlPanel } from '@/components/ui/control-panel';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
-import { EditableTcoBadges } from '@/components/ui/editable-tco-badges';
+import { TcoPriceTable } from '@/components/ui/editable-tco-badges';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Heading } from '@/components/ui/heading';
 import { Input } from '@/components/ui/input';
@@ -253,7 +248,6 @@ const STRINGS = {
     sellingPriceLabel: 'Selling price per million tokens',
     sellingPrices: (input: string, cached: string, output: string, source: string) =>
       `Input: $${input} · Cached input: $${cached} · Output: $${output} (${source})`,
-    tcoBadgesLabel: 'TCO $/chip/hr:',
     sourceLabel: 'Source:',
     formulaTitle: {
       'gw-year': 'Revenue per gigawatt formula',
@@ -371,7 +365,6 @@ const STRINGS = {
     sellingPriceLabel: '每百万 token 售价',
     sellingPrices: (input: string, cached: string, output: string, source: string) =>
       `输入：$${input} · 缓存输入：$${cached} · 输出：$${output}（${source}）`,
-    tcoBadgesLabel: 'TCO $/chip/hr：',
     sourceLabel: '来源：',
     formulaTitle: {
       'gw-year': '每吉瓦收入公式',
@@ -877,6 +870,20 @@ function ProfitEstimatorInner({
     },
     [costProvider, enterCustomCosts],
   );
+  const handleCustomCostReset = useCallback(() => {
+    setCustomCosts((prev) => {
+      const next = { ...prev };
+      for (const base of customCostBases) {
+        next[base] = String(getGpuSpecs(base, tcoBasis)[CUSTOM_COST_SEED]);
+      }
+      return next;
+    });
+    setCostProvider(CUSTOM_COST_SEED);
+    track('profit_cost_provider_changed', {
+      provider: CUSTOM_COST_SEED,
+      via: 'tco_reset',
+    });
+  }, [customCostBases, tcoBasis]);
   const handleCustomCostCommit = useCallback((base: string, raw: string) => {
     track('profit_custom_cost_set', { gpu: base, value: raw });
   }, []);
@@ -1146,8 +1153,19 @@ function ProfitEstimatorInner({
         label: HW_REGISTRY[base]?.badgeLabel ?? base.toUpperCase(),
         value:
           costProvider === 'custom' ? (customCosts[base] ?? '') : String(costPerGpuHourFor(base)),
+        overridden:
+          costProvider === 'custom' &&
+          parseCustomCostInput(customCosts[base]) !== getGpuSpecs(base, tcoBasis)[CUSTOM_COST_SEED],
       }));
-  }, [legendHwKeys, visibleHwKeys, availableHwKeys, costPerGpuHourFor, costProvider, customCosts]);
+  }, [
+    legendHwKeys,
+    visibleHwKeys,
+    availableHwKeys,
+    costPerGpuHourFor,
+    costProvider,
+    customCosts,
+    tcoBasis,
+  ]);
 
   const costProviderControl = (
     <span className="inline-flex items-center gap-0.5" data-testid="profit-cost-selector">
@@ -1272,19 +1290,6 @@ function ProfitEstimatorInner({
             {t.powerLabel}: {t.powerOptions[powerBasis]}
           </p>
         )}
-        <ResultContext
-          locale={locale}
-          costTier={costTier}
-          costTierControl={costProviderControl}
-          utilization={`${assumptions.utilizationPct}%`}
-          utilizationControl={utilizationControl}
-          utilizationControlId="profit-utilization"
-          licenseFee={`${assumptions.labCutPct}%`}
-          licenseFeeControl={labCutControl}
-          licenseFeeControlId="profit-lab-cut"
-          date={selectedRunDate}
-          source="SemiAnalysis InferenceX™"
-        />
         {historyActive && (
           <p className="mb-2 text-xs text-muted-foreground" data-testid="profit-history-note">
             {t.historyNote(
@@ -1293,78 +1298,84 @@ function ProfitEstimatorInner({
             {historyMissing.length > 0 && <> · {t.historyNoData(historyMissing.join(', '))}</>}
           </p>
         )}
-        <EditableTcoBadges
-          label={t.tcoBadgesLabel}
-          items={tcoBadges}
-          onChange={handleCustomCostChange}
-          onCommit={handleCustomCostCommit}
-          inputLabel={t.customCostLabel}
-          testId="profit-tco-badges"
-          badgeTestId="profit-tco-badge"
-          inputIdPrefix="profit-custom-cost"
-          className="text-xs"
-        />
-        {costProvider !== 'custom' && (
-          <p className="mb-2 text-xs text-muted-foreground" data-testid="profit-tco-source">
-            {t.sourceLabel}{' '}
-            <Link target="_blank" className="underline hover:text-foreground" href={TCO_SOURCE_URL}>
-              {TCO_SOURCE_TITLE}
-              <ExternalLinkIcon />
-            </Link>
-          </p>
-        )}
-        <p className="mb-2 text-xs text-muted-foreground" data-testid="profit-selling-prices">
-          <span className="font-medium text-foreground">{t.sellingPriceLabel}:</span>{' '}
-          {t.sellingPrices(
-            formatTokenPrice(pricing.inputPerMillion),
-            formatTokenPrice(cachedInputPricePerMillion(pricing)),
-            formatTokenPrice(pricing.outputPerMillion),
-            priceSourceLabel,
-          )}
-          {effectivePriceSource === 'list' && listPricing && (
-            <>
-              {' '}
-              <Link
-                target="_blank"
-                className="underline hover:text-foreground"
-                href={listPricing.sourceUrl}
-                data-testid="profit-list-price-source"
-              >
-                {t.sourceLabel} {listPricing.vendor}
-                <ExternalLinkIcon />
-              </Link>
-            </>
-          )}
-        </p>
       </div>
     );
   }, [
     pricing,
     powerBasis,
     powerControlsEnabled,
-    hardwareConfig,
-    effectivePriceSource,
-    listPricing,
     selectedModel,
     locale,
     percentileLabel,
     targetValue,
-    costTier,
-    costProvider,
-    assumptions.utilizationPct,
-    assumptions.labCutPct,
     basis,
-    selectedRunDate,
-    tcoBadges,
-    costProviderControl,
-    handleCustomCostChange,
-    handleCustomCostCommit,
-    priceSourceLabel,
     t,
     historyActive,
     history.comparisonDates,
+    historyEntryLabel,
     historyMissing,
   ]);
+
+  const footer = pricing ? (
+    <div className="mt-3" data-testid="profit-footer">
+      <ResultContext
+        locale={locale}
+        layout="footer"
+        costTier={costTier}
+        costTierControl={costProviderControl}
+        utilization={`${assumptions.utilizationPct}%`}
+        utilizationControl={utilizationControl}
+        utilizationControlId="profit-utilization"
+        licenseFee={`${assumptions.labCutPct}%`}
+        licenseFeeControl={labCutControl}
+        licenseFeeControlId="profit-lab-cut"
+        controlsEnd={
+          tcoBadges.length > 0 ? (
+            <TcoPriceTable
+              items={tcoBadges}
+              editable
+              onChange={handleCustomCostChange}
+              onCommit={handleCustomCostCommit}
+              inputLabel={t.customCostLabel}
+              onReset={
+                tcoBadges.some((item) => item.overridden) ? handleCustomCostReset : undefined
+              }
+              resetTestId="profit-tco-reset"
+              testId="profit-tco-badges"
+              cellTestId="profit-tco-badge"
+              inputIdPrefix="profit-custom-cost"
+            />
+          ) : undefined
+        }
+        date={selectedRunDate}
+        source="SemiAnalysis InferenceX™"
+        metaEnd={costProvider === 'custom' ? undefined : <PricesSourceLink />}
+      />
+      <p className="mb-2 text-xs text-muted-foreground" data-testid="profit-selling-prices">
+        <span className="font-medium text-foreground">{t.sellingPriceLabel}:</span>{' '}
+        {t.sellingPrices(
+          formatTokenPrice(pricing.inputPerMillion),
+          formatTokenPrice(cachedInputPricePerMillion(pricing)),
+          formatTokenPrice(pricing.outputPerMillion),
+          priceSourceLabel,
+        )}
+        {effectivePriceSource === 'list' && listPricing && (
+          <>
+            {' '}
+            <Link
+              target="_blank"
+              className="underline hover:text-foreground"
+              href={listPricing.sourceUrl}
+              data-testid="profit-list-price-source"
+            >
+              {t.sourceLabel} {listPricing.vendor}
+              <ExternalLinkIcon />
+            </Link>
+          </>
+        )}
+      </p>
+    </div>
+  ) : null;
 
   const exportFileName =
     basis === 'gw-year'
@@ -1818,6 +1829,7 @@ function ProfitEstimatorInner({
                 colorResolver={colorForRow}
                 assumptions={assumptions}
                 caption={caption}
+                footer={footer}
               />
               <div className="mt-1">
                 <InfoFold

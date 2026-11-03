@@ -6,6 +6,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useResponsiveChartDimensions } from '@/hooks/useResponsiveChartDimensions';
 
 import type { HardwareConfig } from '@/components/inference/types';
+import {
+  ChartPointDetails,
+  type ChartPointDetailsProps,
+} from '@/components/ui/chart-point-details';
 import { track } from '@/lib/analytics/analytics';
 import { getHardwareConfig } from '@/lib/catalog/constants';
 import { getChartWatermark } from '@/lib/catalog/data-mappings';
@@ -16,11 +20,11 @@ import type {
   RenderContext,
   ScaleConfig,
 } from '@/lib/d3-chart/D3Chart/types';
-import { chartTooltipDismiss, chartTooltipShellStyle } from '@/lib/d3-chart/tooltip-shell';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import type { Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
-import { escapeHtml, getDisplayLabel } from '@/lib/shared/utils';
+import { getDisplayLabel } from '@/lib/shared/utils';
 import { getAxisVendorIcon } from '@/lib/catalog/vendor-logos';
 
 import {
@@ -195,7 +199,6 @@ const STRINGS = {
     utilization: 'Utilization',
     labCutShare: 'License fee share',
     ofRevenue: 'of revenue',
-    dismiss: 'Click anywhere to dismiss',
     runDate: 'Run date',
     powerBasis: 'Power basis',
     powerBasisLabels: {
@@ -230,7 +233,6 @@ const STRINGS = {
     utilization: '利用率',
     labCutShare: '许可费比例',
     ofRevenue: '（占收入）',
-    dismiss: '点击任意位置关闭',
     runDate: '运行日期',
     powerBasis: '功耗口径',
     powerBasisLabels: {
@@ -472,56 +474,81 @@ function formatPct(value: number): string {
   return `${(value * 100).toFixed(1)}%`;
 }
 
+export function profitPointDetails(
+  row: ProfitEstimatorRow,
+  hardwareConfig: HardwareConfig,
+  assumptions: ProfitEstimatorAssumptions,
+  locale: Locale,
+): Omit<ChartPointDetailsProps, 'onClose'> & { summary: string } {
+  const t = STRINGS[locale];
+  const usd = (value: number) => formatProfitUsd(value, assumptions.basis);
+  const config = hardwareConfig[row.hwKey] || getHardwareConfig(row.hwKey);
+  const operatorMargin = row.revenue > 0 ? row.profit / row.revenue : Number.NaN;
+  const date = row.dateLabel ?? row.date;
+  return {
+    title: config ? getDisplayLabel(config) : row.hwKey,
+    subtitle: [row.precision?.toUpperCase(), row.powerLabel].filter(Boolean).join(' · '),
+    date: date ? `${t.runDate} ${date}` : undefined,
+    metrics: [
+      { value: usd(row.profit), label: row.profit >= 0 ? t.profit : t.loss },
+      {
+        value: Number.isFinite(operatorMargin) ? formatPct(operatorMargin) : '—',
+        label: t.marginPct,
+      },
+    ],
+    summary: `${t.revenue} ${usd(row.revenue)} · ${t.tco} ${usd(row.tco)}`,
+    rows: [
+      ...(row.powerSource
+        ? [
+            {
+              label: t.powerBasis,
+              value: powerBasisLabel(row.powerSource, locale),
+              wide: true,
+            },
+          ]
+        : []),
+      {
+        label: `${t.revenue} (${t.utilization} ${assumptions.utilizationPct}%)`,
+        value: usd(row.revenue),
+      },
+      { label: t.tco, value: usd(row.tco) },
+      { label: t.grossMargin, value: usd(row.grossMargin) },
+      {
+        label: `${t.labCut} (${assumptions.labCutPct}% ${t.ofRevenue})`,
+        value: usd(row.labCut),
+      },
+      ...(assumptions.basis === 'gw-year'
+        ? [
+            {
+              label: t.revenuePerGpuHour,
+              value: `$${row.revenuePerGpuHour.toFixed(2)}/GPU/hr`,
+            },
+          ]
+        : []),
+    ],
+  };
+}
+
 export function generateProfitTooltipHTML(
   row: ProfitEstimatorRow,
   hardwareConfig: HardwareConfig,
   assumptions: ProfitEstimatorAssumptions,
   locale: Locale,
-  isPinned: boolean,
-  skuColor = 'var(--foreground)',
+  skuColor?: string,
 ): string {
-  const t = STRINGS[locale];
-  const usd = (value: number) => formatProfitUsd(value, assumptions.basis);
-  const colon = locale === 'zh' ? '：' : ':';
-  const label = escapeHtml(splitHistoryLabel(rowLabel(row, hardwareConfig))[0]);
-  const line = (name: string, value: string, color?: string, opacity = 1) =>
-    `<div style="display:flex; justify-content:space-between; gap:16px; color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><span>${
-      color
-        ? `<span style="display:inline-block; width:8px; height:8px; border-radius:2px; background:${color}; opacity:${opacity}; box-shadow: inset 0 0 0 1px ${color}; margin-right:6px; vertical-align:middle;"></span>`
-        : ''
-    }${name}${colon}</span><strong style="color: var(--foreground); font-variant-numeric: tabular-nums;">${value}</strong></div>`;
-
-  const operatorMargin = row.revenue > 0 ? row.profit / row.revenue : Number.NaN;
-  const profitLine =
-    row.profit >= 0
-      ? line(t.profit, usd(row.profit), skuColor)
-      : line(t.loss, usd(row.profit), LOSS_FILL);
-  const labCutLine = line(
-    `${t.labCut} (${assumptions.labCutPct}% ${t.ofRevenue})`,
-    usd(row.labCut),
-    skuColor,
-    LAB_CUT_OPACITY,
+  const { title, subtitle, date, metrics, summary } = profitPointDetails(
+    row,
+    hardwareConfig,
+    assumptions,
+    locale,
   );
-  return `
-    <div style="${chartTooltipShellStyle({ pinned: isPinned, minWidth: 260, maxWidth: 340, interactive: true })}">
-      ${isPinned ? chartTooltipDismiss(t.dismiss) : ''}
-      <div style="color: var(--foreground); font-size: 13px; font-weight: 600; margin-bottom: 8px;">${label}</div>
-      ${row.date ? line(t.runDate, escapeHtml(row.dateLabel ?? row.date)) : ''}
-      ${row.powerSource ? line(t.powerBasis, escapeHtml(powerBasisLabel(row.powerSource, locale))) : ''}
-      ${line(`${t.revenue} (${t.utilization} ${assumptions.utilizationPct}%)`, usd(row.revenue))}
-      ${line(t.tco, usd(row.tco), skuColor, TCO_OPACITY)}
-      ${line(t.grossMargin, usd(row.grossMargin))}
-      ${labCutLine}
-      ${profitLine}
-      ${line(t.marginPct, Number.isFinite(operatorMargin) ? formatPct(operatorMargin) : '—')}
-      ${
-        assumptions.basis === 'gw-year'
-          ? `<div style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px;">
-        ${line(t.revenuePerGpuHour, `$${row.revenuePerGpuHour.toFixed(2)}/GPU/hr`)}
-      </div>`
-          : ''
-      }
-    </div>`;
+  return chartHoverCard({
+    title,
+    subtitle: [subtitle, date].filter(Boolean).join(' · '),
+    color: skuColor,
+    metrics: [...metrics],
+    summary,
+  });
 }
 
 interface ProfitEstimatorChartProps {
@@ -531,6 +558,7 @@ interface ProfitEstimatorChartProps {
   assumptions: ProfitEstimatorAssumptions;
   legendElement?: React.ReactNode;
   caption?: React.ReactNode;
+  footer?: React.ReactNode;
 }
 
 export default function ProfitEstimatorChart({
@@ -540,6 +568,7 @@ export default function ProfitEstimatorChart({
   assumptions,
   legendElement,
   caption,
+  footer,
 }: ProfitEstimatorChartProps) {
   const chartRef = useRef<D3ChartHandle>(null);
   const { dimensions, setContainerRef } = useResponsiveChartDimensions({ height: CHART_HEIGHT });
@@ -590,6 +619,7 @@ export default function ProfitEstimatorChart({
   const tooltipStateRef = useRef({ hardwareConfig, assumptions, locale });
   tooltipStateRef.current = { hardwareConfig, assumptions, locale };
   const hoveredBarXRef = useRef(0);
+  const hoveredBarYRef = useRef(0);
 
   const layers = useMemo<LayerConfig<ProfitSegment>[]>(() => {
     const stackLayer: LayerConfig<ProfitSegment> = {
@@ -815,18 +845,30 @@ export default function ProfitEstimatorChart({
   const tooltip = useMemo(
     () => ({
       rulerType: 'vertical' as const,
-      content: (segment: ProfitSegment, isPinned: boolean) => {
+      content: (segment: ProfitSegment) => {
         const state = tooltipStateRef.current;
         return generateProfitTooltipHTML(
           segment.row,
           state.hardwareConfig,
           state.assumptions,
           state.locale,
-          isPinned,
           colorResolver(segment.row),
         );
       },
+      details: (segment: ProfitSegment, _isOverlay: boolean, close: () => void) => {
+        const state = tooltipStateRef.current;
+        const { summary: _summary, ...details } = profitPointDetails(
+          segment.row,
+          state.hardwareConfig,
+          state.assumptions,
+          state.locale,
+        );
+        return (
+          <ChartPointDetails {...details} color={colorResolver(segment.row)} onClose={close} />
+        );
+      },
       getRulerX: () => hoveredBarXRef.current,
+      getRulerY: () => hoveredBarYRef.current,
       onHoverStart: (
         selection: d3.Selection<SVGRectElement, ProfitSegment, SVGGElement, unknown>,
         segment: ProfitSegment,
@@ -834,6 +876,7 @@ export default function ProfitEstimatorChart({
         hoveredBarXRef.current =
           Number.parseFloat(selection.attr('x') || '0') +
           Number.parseFloat(selection.attr('width') || '0') / 2;
+        hoveredBarYRef.current = Number.parseFloat(selection.attr('y') || '0');
         const svgEl = chartRef.current?.getSvgElement();
         if (!svgEl) return;
         d3.select(svgEl)
@@ -1016,6 +1059,7 @@ export default function ProfitEstimatorChart({
         instructions=""
         legendElement={legendElement}
         caption={caption}
+        footer={footer}
         scrollablePlot={{
           minWidth: chartWidth,
           label: t.scrollHint,

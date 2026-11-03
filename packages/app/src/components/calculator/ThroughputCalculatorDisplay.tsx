@@ -11,11 +11,7 @@ import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { useCallback, useMemo, useState } from 'react';
 
-import {
-  HW_REGISTRY,
-  TCO_SOURCE_TITLE,
-  TCO_SOURCE_URL,
-} from '@semianalysisai/inferencex-constants';
+import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 
 import CalculatorTable from '@/components/calculator/CalculatorTable';
 import CostTargetPanel from '@/components/calculator/CostTargetPanel';
@@ -32,7 +28,7 @@ import { Card } from '@/components/ui/card';
 import { cn, getDisplayLabel } from '@/lib/shared/utils';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import ChartLegend from '@/components/ui/chart-legend';
-import { ChartShareActions } from '@/components/ui/chart-display-helpers';
+import { ChartShareActions, PricesSourceLink } from '@/components/ui/chart-display-helpers';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { Heading } from '@/components/ui/heading';
 import {
@@ -63,6 +59,9 @@ import { lockedCostProviderOptions, useLockedTierDialog } from '@/components/ui/
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { TcoBasisToggle, useShowsTcoBasisSelector } from '@/components/ui/tco-basis-toggle';
 import { ChipBasisNote } from '@/components/ui/chip-basis-note';
+import { ChipBasisCaption } from '@/components/ui/chip-basis-toggle';
+import { plottedChipBases, TcoPriceTable } from '@/components/ui/editable-tco-badges';
+import { ResultContext } from '@/components/ui/result-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Percentile,
@@ -234,10 +233,8 @@ const STRINGS = {
     totalTokens: 'Total tokens',
     inputTokens: 'Input tokens',
     outputTokens: 'Output tokens',
-    allInPower: 'All in power/chip: ',
-    tcoPerHr: 'TCO $/chip/hr: ',
+    allInPower: 'All in power/chip',
     source: 'Source: ',
-    updated: ' · Updated: ',
     note: 'Note:',
     disaggCost:
       ' Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo TRTLLM) report input and output throughput per prefill chip and per decode chip rather than per chip overall, and $/M tok is derived from those rates — so on the Input and Output token types a disaggregated config reads cheaper than it is, by a median 2× and up to 18× across run history. Total-token cost is unaffected: it comes from throughput per chip overall, which both kinds report on the same basis. The Fleet Lifecycle page deliberately differs — it derives its per-token-type figures from that total, so everything there is on one denominator.',
@@ -301,10 +298,8 @@ const STRINGS = {
     totalTokens: '总 token',
     inputTokens: '输入 token',
     outputTokens: '输出 token',
-    allInPower: '单芯片整机功耗：',
-    tcoPerHr: 'TCO $/chip/hr：',
+    allInPower: '单芯片整机功耗',
     source: '来源：',
-    updated: ' · 更新于：',
     note: '注意：',
     disaggCost:
       '分离式推理配置（如 MoRI SGLang、Dynamo TRTLLM）的输入与输出吞吐量分别按预填充芯片与解码芯片报告，而非按芯片总数，而 $/M tok 由这些速率推导。因此在「输入」与「输出」token 类型下，分离式配置显示的成本低于实际，中位数仅为实际值的 1/2，在运行历史中最低可至 1/18。总计口径的成本不受影响：它来自按芯片总数计的吞吐量，两种部署方式在该口径上一致。「集群生命周期」页面与此有意不同：它由该总量推导各 token 类型的数值，因此那里的所有数字都在同一分母上。',
@@ -410,6 +405,10 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   const chipBasisControl = useMemo(
     () => ({ value: chipBasis, onChange: setChipBasis, source: 'calculator' }),
     [chipBasis, setChipBasis],
+  );
+  const readOnlyChipBasisControl = useMemo(
+    () => ({ ...chipBasisControl, readOnly: true }),
+    [chipBasisControl],
   );
   const { selectedRunDate, selectedRunId } = useGlobalFilterRun();
   const { availablePrecisions, availableSequences, availableModels } =
@@ -1293,126 +1292,94 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                     const captionContent = (
                       <>
                         {chartHeading}
-                        <p className="mb-2 text-sm text-muted-foreground">
-                          {getModelLabel(selectedModel)} ·{' '}
-                          {selectedPrecisions
-                            .map((p) => getPrecisionLabel(p as Precision))
-                            .join(', ')}{' '}
-                          · {getSequenceLabel(selectedSequence, locale)} · {t.source}SemiAnalysis
-                          InferenceX™
-                          {selectedRunDate && (
-                            <>
-                              {t.updated}
-                              {selectedRunDate}
-                            </>
-                          )}
-                        </p>
                         {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}
                         {showsVeraRubinPreview && <VeraRubinOfficialPreviewNotice />}
                         {showsTpuv7Preview && <Tpuv7OfficialPreviewNotice />}
-                        {barMetric === 'power' && barResults.length > 0 && (
-                          <>
-                            <p
-                              className="mb-1 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs text-muted-foreground tabular-nums"
-                              data-testid="calculator-cost-badges"
-                            >
-                              <span>{t.allInPower}</span>
-                              {Object.entries(HW_REGISTRY)
-                                .filter(([base]) =>
-                                  barResults.some((r) => r.hwKey.split('_')[0] === base),
-                                )
-                                .map(([base, specs]) => (
-                                  <span key={base} className="whitespace-nowrap">
-                                    {specs.badgeLabel ?? base.toUpperCase()}{' '}
-                                    <span className="font-medium text-foreground">
-                                      {specs.power}kW
-                                    </span>
-                                  </span>
-                                ))}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {t.source}
-                              <Link
-                                target="_blank"
-                                className="underline hover:text-foreground"
-                                href="https://semianalysis.com/datacenter-industry-model/"
-                              >
-                                SemiAnalysis Datacenter Industry Model
-                                <ExternalLinkIcon />
-                              </Link>
-                            </p>
-                          </>
-                        )}
-                        {barMetric === 'cost' && barResults.length > 0 && (
-                          <>
-                            <p
-                              className="mb-1 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs text-muted-foreground tabular-nums"
-                              data-testid="calculator-cost-badges"
-                            >
-                              <span>{t.tcoPerHr}</span>
-                              {Object.entries(HW_REGISTRY)
-                                .filter(([base]) =>
-                                  barResults.some((r) => r.hwKey.split('_')[0] === base),
-                                )
-                                .map(([base, specs]) => (
-                                  <span key={base} className="whitespace-nowrap">
-                                    {specs.badgeLabel ?? base.toUpperCase()}{' '}
-                                    <span className="font-medium text-foreground">
-                                      ${getGpuSpecs(base, tcoBasis)[costProvider].toFixed(2)}/hr
-                                    </span>
-                                  </span>
-                                ))}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {t.source}
-                              <Link
-                                target="_blank"
-                                className="underline hover:text-foreground"
-                                href={TCO_SOURCE_URL}
-                              >
-                                {TCO_SOURCE_TITLE}
-                                <ExternalLinkIcon />
-                              </Link>
-                            </p>
-                          </>
-                        )}
-                        <div
-                          className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${
-                            barMetric === 'cost' && costType !== 'total'
-                              ? 'grid-rows-[1fr] opacity-100'
-                              : 'grid-rows-[0fr] opacity-0'
-                          }`}
-                        >
-                          <div className="min-h-0 overflow-hidden">
-                            <p
-                              data-testid="calculator-disagg-cost-note"
-                              className="mt-2 text-xs text-muted-foreground"
-                            >
-                              <span className="font-medium text-foreground">{t.note}</span>
-                              {t.disaggCost}
-                            </p>
-                          </div>
-                        </div>
-                        <div
-                          className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${
-                            barMetric === 'throughput' || barMetric === 'power'
-                              ? 'grid-rows-[1fr] opacity-100'
-                              : 'grid-rows-[0fr] opacity-0'
-                          }`}
-                        >
-                          <div className="min-h-0 overflow-hidden">
-                            <p className="mt-2 text-xs text-muted-foreground">
-                              <span className="font-medium text-foreground">{t.note}</span>
-                              {t.disaggThroughput}
-                            </p>
-                          </div>
-                        </div>
                       </>
+                    );
+                    const plottedBases = plottedChipBases(
+                      barResults.map((r) => r.hwKey),
+                      (base) => base in HW_REGISTRY,
+                    );
+                    const priceTable =
+                      plottedBases.length > 0 && barMetric !== 'throughput' ? (
+                        <TcoPriceTable
+                          header={barMetric === 'power' ? 'kW' : undefined}
+                          rowLabel={barMetric === 'power' ? t.allInPower : undefined}
+                          items={plottedBases.map((base) => {
+                            const specs = HW_REGISTRY[base as keyof typeof HW_REGISTRY];
+                            return {
+                              base,
+                              label: specs.badgeLabel ?? base.toUpperCase(),
+                              value:
+                                barMetric === 'power'
+                                  ? String(specs.power)
+                                  : getGpuSpecs(base, tcoBasis)[costProvider].toFixed(2),
+                            };
+                          })}
+                          testId="calculator-cost-badges"
+                          cellTestId="calculator-cost-badge"
+                          inputIdPrefix="calculator-cost"
+                        />
+                      ) : undefined;
+                    const footerContent = (
+                      <div className="mt-3">
+                        <ResultContext
+                          locale={locale}
+                          layout="footer"
+                          chipBasis={
+                            costType === 'total' ? undefined : (
+                              <ChipBasisCaption control={chipBasisControl} />
+                            )
+                          }
+                          controlsEnd={priceTable}
+                          date={selectedRunDate}
+                          source={`${getModelLabel(selectedModel)} · ${selectedPrecisions
+                            .map((p) => getPrecisionLabel(p as Precision))
+                            .join(
+                              ', ',
+                            )} · ${getSequenceLabel(selectedSequence, locale)} · SemiAnalysis InferenceX™`}
+                          metaEnd={
+                            barMetric === 'cost' && plottedBases.length > 0 ? (
+                              <PricesSourceLink />
+                            ) : barMetric === 'power' && plottedBases.length > 0 ? (
+                              <span>
+                                {t.source}
+                                <Link
+                                  target="_blank"
+                                  className="text-brand hover:underline"
+                                  href="https://semianalysis.com/datacenter-industry-model/"
+                                >
+                                  SemiAnalysis Datacenter Industry Model
+                                  <ExternalLinkIcon />
+                                </Link>
+                              </span>
+                            ) : undefined
+                          }
+                        />
+                        <ChipBasisNote
+                          visible={barMetric === 'cost' && costType !== 'total'}
+                          testId="calculator-disagg-cost-note"
+                          label={t.note}
+                          text={chipBasis === 'total' ? t.disaggCostTotal : t.disaggCost}
+                          chipBasis={readOnlyChipBasisControl}
+                        />
+                        <ChipBasisNote
+                          visible={barMetric === 'throughput' || barMetric === 'power'}
+                          testId="calculator-disagg-throughput-note"
+                          label={t.note}
+                          text={
+                            chipBasis === 'total' ? t.disaggThroughputTotal : t.disaggThroughput
+                          }
+                          chipBasis={readOnlyChipBasisControl}
+                        />
+                      </div>
                     );
 
                     return viewMode === 'chart' ? (
                       <ThroughputBarChart
                         caption={captionContent}
+                        footer={footerContent}
                         results={barResults}
                         hardwareConfig={hardwareConfig}
                         mode={mode}
@@ -1470,6 +1437,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                           costType={costType}
                           hardwareConfig={hardwareConfig}
                         />
+                        {footerContent}
                       </>
                     );
                   })()}

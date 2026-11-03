@@ -5,6 +5,7 @@ import { splitLabel } from '@/lib/d3-chart/axis-labels';
 import type { InterpolatedResult } from './types';
 import {
   generateTooltipHTML,
+  getThroughputPointDetails,
   getResultLabel,
   getCostForType,
   getCostProviderLabel,
@@ -515,25 +516,41 @@ describe('getResultLabel', () => {
   });
 });
 
-describe('generateTooltipHTML overlay treatment', () => {
+const throughputDetails = (
+  result: InterpolatedResult,
+  runUrl?: string,
+  locale: 'en' | 'zh' = 'en',
+) =>
+  getThroughputPointDetails(
+    result,
+    {},
+    'interactivity_to_throughput',
+    'throughput',
+    'total',
+    runUrl,
+    locale,
+  );
+
+describe('getThroughputPointDetails', () => {
   const officialRunUrl = 'https://github.com/org/repo/actions/runs/999';
   const overlayRunUrl = 'https://github.com/org/repo/actions/runs/111';
 
-  it('omits the unofficial header for official bars', () => {
-    const html = generateTooltipHTML(
-      makeResult({ hwKey: 'b300' }),
-      {},
-      'interactivity_to_throughput',
-      'throughput',
-      'total',
-      officialRunUrl,
-    );
-    expect(html).not.toContain('Unofficial run');
-    expect(html).toContain(officialRunUrl);
+  it('omits the unofficial warning for official bars and links the official run', () => {
+    const d = throughputDetails(makeResult({ hwKey: 'b300' }), officialRunUrl);
+    expect(d.warning).toBeUndefined();
+    expect(d.links).toEqual([
+      {
+        action: 'run',
+        label: 'View raw result on GitHub',
+        href: officialRunUrl,
+        external: true,
+      },
+    ]);
+    expect(generateTooltipHTML(d, 'red')).not.toContain('Unofficial run');
   });
 
-  it('adds the unofficial header, branch, and run link for overlay bars', () => {
-    const html = generateTooltipHTML(
+  it('adds the unofficial warning, branch, and overlay run link for overlay bars', () => {
+    const d = throughputDetails(
       makeResult({
         hwKey: 'b300',
         isOverlay: true,
@@ -541,20 +558,23 @@ describe('generateTooltipHTML overlay treatment', () => {
         runLabel: 'feat/my-branch',
         runUrl: overlayRunUrl,
       }),
-      {},
-      'interactivity_to_throughput',
-      'throughput',
-      'total',
       officialRunUrl,
     );
-    expect(html).toContain('Unofficial run');
-    expect(html).toContain('feat/my-branch');
-    expect(html).toContain(overlayRunUrl);
-    expect(html).not.toContain(officialRunUrl);
+    expect(d.warning).toBe('Unofficial run');
+    expect(d.rows).toContainEqual({
+      label: 'Branch',
+      value: 'feat/my-branch',
+      wide: true,
+    });
+    expect(d.links[0]).toMatchObject({
+      label: 'View workflow run',
+      href: overlayRunUrl,
+    });
+    expect(generateTooltipHTML(d, 'red')).toContain('Unofficial run');
   });
 
-  it('localizes the overlay strings when Chinese strings are supplied', () => {
-    const html = generateTooltipHTML(
+  it('localizes the overlay strings in Chinese', () => {
+    const d = throughputDetails(
       makeResult({
         hwKey: 'b300',
         isOverlay: true,
@@ -562,74 +582,43 @@ describe('generateTooltipHTML overlay treatment', () => {
         runLabel: 'feat/my-branch',
         runUrl: overlayRunUrl,
       }),
-      {},
-      'interactivity_to_throughput',
-      'throughput',
-      'total',
       undefined,
-      false,
-      {
-        unofficialRun: '非官方运行',
-        branch: '分支：',
-        dismiss: '点击其他区域关闭',
-        viewRun: '查看工作流运行',
-        clamped: '超出实测范围——显示最接近的数据点',
-        parallelism: '并行策略：',
-        cost: '成本：',
-        concurrency: '并发数：',
-        precision: '精度：',
-        disaggregated: '分离式：',
-        yes: '是',
-      },
-    );
-    expect(html).toContain('非官方运行');
-    expect(html).toContain('分支：');
-    expect(html).toContain('查看工作流运行');
-    expect(html).not.toContain('Unofficial run');
-  });
-
-  it('localizes the complete Chinese tooltip including raw link and parallelism values', () => {
-    const html = generateTooltipHTML(
-      makeResult({
-        hwKey: 'b300',
-        nearestPoints: [
-          {
-            tp: 4,
-            ep: 2,
-            dp_attention: true,
-            precision: 'fp8',
-          } as InterpolatedResult['nearestPoints'][number],
-        ],
-      }),
-      {},
-      'interactivity_to_throughput',
-      'throughput',
-      'total',
-      officialRunUrl,
-      false,
-      {
-        unofficialRun: '非官方运行',
-        branch: '分支：',
-        dismiss: '点击其他区域关闭',
-        viewRun: '查看工作流运行',
-        clamped: '超出实测范围——显示最接近的数据点',
-        parallelism: '并行策略：',
-        cost: '成本：',
-        concurrency: '并发数：',
-        precision: '精度：',
-        disaggregated: '分离式：',
-        yes: '是',
-      },
       'zh',
     );
-    expect(html).toContain('<strong>吞吐量：</strong>');
-    expect(html).toContain('<strong>DPA：</strong> 是');
-    expect(html).toContain('在 GitHub 查看原始结果');
-    expect(html).not.toContain('View raw result on GitHub');
+    expect(d.warning).toBe('非官方运行');
+    expect(d.rows).toContainEqual({
+      label: '分支',
+      value: 'feat/my-branch',
+      wide: true,
+    });
+    expect(d.links[0]?.label).toBe('查看工作流运行');
   });
 
-  it('preserves the existing English DPA value in official tooltips', () => {
-    const html = generateTooltipHTML(
+  it('localizes parallelism and the raw link in Chinese', () => {
+    const d = throughputDetails(
+      makeResult({
+        hwKey: 'b300',
+        nearestPoints: [
+          {
+            tp: 4,
+            ep: 2,
+            dp_attention: true,
+            precision: 'fp8',
+          } as InterpolatedResult['nearestPoints'][number],
+        ],
+      }),
+      officialRunUrl,
+      'zh',
+    );
+    expect(d.rows).toContainEqual({
+      label: '并行策略',
+      value: 'TP 4 · EP 2 · DPA 是',
+    });
+    expect(d.links[0]?.label).toBe('在 GitHub 查看原始结果');
+  });
+
+  it('keeps the English DPA value as True and puts the plotted metric first', () => {
+    const d = throughputDetails(
       makeResult({
         nearestPoints: [
           {
@@ -640,15 +629,14 @@ describe('generateTooltipHTML overlay treatment', () => {
           } as InterpolatedResult['nearestPoints'][number],
         ],
       }),
-      {},
-      'interactivity_to_throughput',
-      'throughput',
-      'total',
       officialRunUrl,
     );
-
-    expect(html).toContain('<strong>DPA:</strong> True');
-    expect(html).not.toContain('<strong>DPA:</strong> Yes');
+    expect(d.rows).toContainEqual({
+      label: 'Parallelism',
+      value: 'TP 4 · EP 2 · DPA True',
+    });
+    expect(d.metrics[0]).toEqual({ value: '500.0', label: 'tok/s/chip' });
+    expect(d.subtitle).toBe('FP8');
   });
 });
 

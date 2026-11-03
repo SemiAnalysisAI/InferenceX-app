@@ -7,6 +7,12 @@ import * as d3 from 'd3';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import type { HardwareConfig } from '@/components/inference/types';
+import {
+  ChartPointDetails,
+  type ChartPointDetailsLink,
+  type ChartPointDetailsMetric,
+  type ChartPointDetailsRow,
+} from '@/components/ui/chart-point-details';
 import { getHardwareConfig } from '@/lib/catalog/constants';
 import { twoRowYAxisLabels } from '@/lib/d3-chart/axis-labels';
 import { contrastColors } from '@/lib/d3-chart/contrast-colors';
@@ -17,14 +23,14 @@ import type {
   HorizontalBarLayerConfig,
   RenderContext,
 } from '@/lib/d3-chart/D3Chart/types';
-import { chartTooltipDismiss, chartTooltipShellStyle } from '@/lib/d3-chart/tooltip-shell';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { computeLeftMargin, measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { getChartWatermark } from '@/lib/catalog/data-mappings';
 import type { Locale } from '@/lib/i18n/i18n';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
-import { escapeHtml, getDisplayLabel } from '@/lib/shared/utils';
+import { getDisplayLabel } from '@/lib/shared/utils';
 
 import type {
   BarMetric,
@@ -37,33 +43,33 @@ import type {
 const OVERLAY_STRINGS = {
   en: {
     unofficialRun: 'Unofficial run',
-    branch: 'Branch:',
-    dismiss: 'Click elsewhere to dismiss',
+    branch: 'Branch',
     viewRun: 'View workflow run',
+    viewRaw: 'View raw result on GitHub',
     clamped: 'Outside measured range — showing nearest data point',
-    parallelism: 'Parallelism:',
-    cost: 'Cost:',
-    concurrency: 'Concurrency:',
-    precision: 'Precision:',
-    disaggregated: 'Disaggregated:',
+    parallelism: 'Parallelism',
+    cost: 'Cost',
+    concurrency: 'Concurrency',
+    precision: 'Precision',
+    disaggregated: 'Disaggregated',
     yes: 'Yes',
+    dpaTrue: 'True',
   },
   zh: {
     unofficialRun: '非官方运行',
-    branch: '分支：',
-    dismiss: '点击其他区域关闭',
+    branch: '分支',
     viewRun: '查看工作流运行',
+    viewRaw: '在 GitHub 查看原始结果',
     clamped: '超出实测范围——显示最接近的数据点',
-    parallelism: '并行策略：',
-    cost: '成本：',
-    concurrency: '并发数：',
-    precision: '精度：',
-    disaggregated: '分离式：',
+    parallelism: '并行策略',
+    cost: '成本',
+    concurrency: '并发数',
+    precision: '精度',
+    disaggregated: '分离式',
     yes: '是',
+    dpaTrue: '是',
   },
 } as const;
-
-export type OverlayTooltipStrings = (typeof OVERLAY_STRINGS)[keyof typeof OVERLAY_STRINGS];
 
 interface ThroughputBarChartProps {
   results: InterpolatedResult[];
@@ -79,6 +85,7 @@ interface ThroughputBarChartProps {
   onBarSelect: (resultKey: string) => void;
   legendElement?: React.ReactNode;
   caption?: React.ReactNode;
+  footer?: React.ReactNode;
   colorResolver?: (hwKey: string) => string;
 }
 
@@ -268,118 +275,102 @@ export function getResultLabel(d: InterpolatedResult, hardwareConfig: HardwareCo
   return parts.length > 0 ? `${baseName} (${parts.join(' · ')})` : baseName;
 }
 
-export function generateTooltipHTML(
+export interface ThroughputPointDetails {
+  title: string;
+  note?: string;
+  subtitle: string;
+  warning?: string;
+  metrics: ChartPointDetailsMetric[];
+  summary: string;
+  rows: ChartPointDetailsRow[];
+  links: ChartPointDetailsLink<'run'>[];
+}
+
+function parallelismLabel(d: InterpolatedResult, dpaValue: string): string {
+  const nearest = d.nearestPoints[0];
+  const tp = nearest?.tp ?? 0;
+  const ep = nearest?.ep;
+  const dpa = nearest?.dp_attention ? ` · DPA ${dpaValue}` : '';
+  if (ep !== null && ep !== undefined && ep > 1 && tp === ep) {
+    return `${nearest?.dp_attention ? 'DEP' : 'TEP'}${tp}`;
+  }
+  if (ep !== null && ep !== undefined && ep > 1) return `TP ${tp} · EP ${ep}${dpa}`;
+  return `TP ${tp}${dpa}`;
+}
+
+export function getThroughputPointDetails(
   d: InterpolatedResult,
   hardwareConfig: HardwareConfig,
   mode: CalculatorMode,
   barMetric: BarMetric,
   costType: CostType,
   runUrl?: string,
-  isPinned?: boolean,
-  overlayStrings: OverlayTooltipStrings = OVERLAY_STRINGS.en,
   locale: Locale = 'en',
-): string {
-  const label = escapeHtml(getResultLabel(d, hardwareConfig));
+): ThroughputPointDetails {
+  const t = OVERLAY_STRINGS[locale];
+  const config = hardwareConfig[d.hwKey] || getHardwareConfig(d.hwKey);
   const costLabel = getCostTypeLabel(costType);
-  const costValue = getCostForType(d, costType);
-
-  const tokenTypePrefix = costType === 'input' ? 'Input ' : costType === 'output' ? 'Output ' : '';
-  const zhTokenTypePrefix = costType === 'input' ? '输入' : costType === 'output' ? '输出' : '';
-  const labelColon = locale === 'zh' ? '：' : ':';
-  const dpaValue = locale === 'zh' ? overlayStrings.yes : 'True';
-  const metricName =
-    barMetric === 'power'
-      ? 'tok/s/MW'
-      : barMetric === 'cost'
-        ? locale === 'zh'
-          ? '成本'
-          : 'Cost'
-        : mode === 'interactivity_to_throughput'
-          ? locale === 'zh'
-            ? `${zhTokenTypePrefix}吞吐量`
-            : `${tokenTypePrefix}Throughput`
-          : locale === 'zh'
-            ? '交互性'
-            : 'Interactivity';
-  const metricUnit =
-    barMetric === 'power'
-      ? 'tok/s/MW'
-      : barMetric === 'cost'
-        ? costLabel
-        : mode === 'interactivity_to_throughput'
-          ? 'tok/s/chip'
-          : 'tok/s/user';
-  const metricValue = getMetricValue(d, barMetric, costType);
-
-  const nearest = d.nearestPoints[0];
-  const tp = nearest?.tp ?? 0;
-  const ep = nearest?.ep;
-  const dpAttn = nearest?.dp_attention;
-  const precision = nearest?.precision ?? '';
-  const disagg = nearest?.disagg;
-
-  let parallelismHtml: string;
-  if (ep !== null && ep !== undefined && ep > 1 && tp === ep) {
-    parallelismHtml = `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${overlayStrings.parallelism}</strong> ${dpAttn ? 'DEP' : 'TEP'}${tp}</div>`;
-  } else if (ep !== null && ep !== undefined && ep > 1) {
-    parallelismHtml = `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>TP${labelColon}</strong> ${tp}, <strong>EP${labelColon}</strong> ${ep}${dpAttn ? `, <strong>DPA${labelColon}</strong> ${dpaValue}` : ''}</div>`;
-  } else {
-    parallelismHtml = `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>TP${labelColon}</strong> ${tp}${dpAttn ? `, <strong>DPA${labelColon}</strong> ${dpaValue}` : ''}</div>`;
-  }
-
-  const metricDisplay =
-    barMetric === 'cost'
-      ? `$${metricValue.toFixed(3)}${metricUnit}`
-      : `${metricValue.toFixed(barMetric === 'power' ? 0 : 1)} ${metricUnit}`;
-
+  const precision = d.nearestPoints[0]?.precision ?? d.precision ?? '';
+  const throughput = {
+    value: fixed(getThroughputForType(d, costType), 1),
+    label: mode === 'interactivity_to_throughput' ? 'tok/s/chip' : 'tok/s/user',
+  };
+  const cost = {
+    value: `$${getCostForType(d, costType).toFixed(3)}`,
+    label: costLabel,
+  };
+  const power = {
+    value: fixed(getTpPerMwForType(d, costType), 0),
+    label: 'tok/s/MW',
+  };
+  const parallelism = parallelismLabel(d, t.dpaTrue);
   const effectiveRunUrl = d.isOverlay ? d.runUrl : runUrl;
-  const runLinkLabel = d.isOverlay
-    ? overlayStrings.viewRun
-    : locale === 'zh'
-      ? '在 GitHub 查看原始结果'
-      : 'View raw result on GitHub';
-  const runLinkHtml = effectiveRunUrl
-    ? `<div style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px;"><a href="${escapeHtml(effectiveRunUrl)}" target="_blank" rel="noopener noreferrer" style="color: var(--brand); font-size: 11px; text-decoration: underline; cursor: pointer;">${runLinkLabel} &#8599;</a></div>`
-    : '';
+  return {
+    title: config ? getDisplayLabel(config) : d.hwKey,
+    subtitle: precision.toUpperCase(),
+    warning: d.isOverlay ? t.unofficialRun : undefined,
+    metrics:
+      barMetric === 'cost'
+        ? [cost, throughput]
+        : barMetric === 'power'
+          ? [power, cost]
+          : [throughput, cost],
+    summary: [parallelism, `${t.concurrency} ~${d.concurrency}`].join(' · '),
+    rows: [
+      ...(d.isOverlay && d.runLabel ? [{ label: t.branch, value: d.runLabel, wide: true }] : []),
+      { label: t.cost, value: `${cost.value}${costLabel}` },
+      { label: 'tok/s/MW', value: power.value },
+      { label: t.concurrency, value: `~${d.concurrency}` },
+      ...(precision ? [{ label: t.precision, value: precision.toUpperCase() }] : []),
+      { label: t.parallelism, value: parallelism },
+      ...(d.nearestPoints[0]?.disagg ? [{ label: t.disaggregated, value: t.yes }] : []),
+    ],
+    links: effectiveRunUrl
+      ? [
+          {
+            action: 'run',
+            label: d.isOverlay ? t.viewRun : t.viewRaw,
+            href: effectiveRunUrl,
+            external: true,
+          },
+        ]
+      : [],
+    note: d.clamped ? t.clamped : undefined,
+  };
+}
 
-  const clampedHtml = d.clamped
-    ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 4px;">${overlayStrings.clamped}</div>`
-    : '';
-
-  const overlayBranchHtml =
-    d.isOverlay && d.runLabel
-      ? `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${overlayStrings.branch}</strong> ${escapeHtml(d.runLabel)}</div>`
-      : '';
-  const overlayHeaderHtml = d.isOverlay
-    ? `<div style="color: var(--destructive, #ef4444); font-size: 11px; font-weight: 600; margin-bottom: 4px;">${overlayStrings.unofficialRun}</div>${overlayBranchHtml}`
-    : '';
-
-  return `
-    <div style="${chartTooltipShellStyle({ pinned: isPinned, maxWidth: 320, interactive: true })}">
-      ${isPinned ? chartTooltipDismiss(overlayStrings.dismiss) : ''}
-      ${overlayHeaderHtml}
-      <div style="color: var(--foreground); font-size: 13px; font-weight: 600; margin-bottom: 8px;">
-        ${label}
-      </div>
-      ${clampedHtml}
-      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <strong>${metricName}${labelColon}</strong> ${metricDisplay}
-      </div>
-      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <strong>${overlayStrings.cost}</strong> $${costValue.toFixed(3)}${costLabel}
-      </div>
-      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <strong>tok/s/MW:</strong> ${getTpPerMwForType(d, costType).toFixed(0)}
-      </div>
-      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <strong>${overlayStrings.concurrency}</strong> ~${d.concurrency}
-      </div>
-      ${precision ? `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${overlayStrings.precision}</strong> ${escapeHtml(precision.toUpperCase())}</div>` : ''}
-      ${parallelismHtml}
-      ${disagg ? `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${overlayStrings.disaggregated}</strong> ${overlayStrings.yes}</div>` : ''}
-      ${runLinkHtml}
-    </div>
-  `;
+export function generateTooltipHTML(details: ThroughputPointDetails, color: string): string {
+  return chartHoverCard(
+    {
+      title: details.title,
+      subtitle: details.subtitle,
+      color,
+      metrics: details.metrics,
+      summary: details.note ? `${details.summary} · ${details.note}` : details.summary,
+      warning: details.warning,
+    },
+    { border: details.warning ? '2px solid #dc2626' : undefined },
+  );
 }
 
 const getLabel = getResultLabel;
@@ -457,6 +448,7 @@ export default function ThroughputBarChart({
   onBarSelect,
   legendElement,
   caption,
+  footer,
   colorResolver,
 }: ThroughputBarChartProps) {
   const chartRef = useRef<D3ChartHandle>(null);
@@ -648,27 +640,59 @@ export default function ThroughputBarChart({
     return [barLayer, labelLayer];
   }, [sortedResults, barMetric, costType, mode, maxBarValue, paletteIdentity, resolveBarColor]);
 
-  const tooltipStateRef = useRef({ hardwareConfig, mode, barMetric, costType, runUrl, locale });
-  tooltipStateRef.current = { hardwareConfig, mode, barMetric, costType, runUrl, locale };
+  const tooltipStateRef = useRef({
+    hardwareConfig,
+    mode,
+    barMetric,
+    costType,
+    runUrl,
+    locale,
+    resolveBarColor,
+  });
+  tooltipStateRef.current = {
+    hardwareConfig,
+    mode,
+    barMetric,
+    costType,
+    runUrl,
+    locale,
+    resolveBarColor,
+  };
 
-  const tooltip = useMemo(
-    () => ({
+  const tooltip = useMemo(() => {
+    const pointDetails = (datum: InterpolatedResult) => {
+      const state = tooltipStateRef.current;
+      return getThroughputPointDetails(
+        datum,
+        state.hardwareConfig,
+        state.mode,
+        state.barMetric,
+        state.costType,
+        state.runUrl,
+        state.locale,
+      );
+    };
+    return {
       rulerType: 'vertical' as const,
-      content: (datum: InterpolatedResult, isPinned: boolean) => {
-        const state = tooltipStateRef.current;
-        return generateTooltipHTML(
-          datum,
-          state.hardwareConfig,
-          state.mode,
-          state.barMetric,
-          state.costType,
-          state.runUrl,
-          isPinned,
-          OVERLAY_STRINGS[state.locale],
-          state.locale,
+      content: (datum: InterpolatedResult) =>
+        generateTooltipHTML(pointDetails(datum), tooltipStateRef.current.resolveBarColor(datum)),
+      details: (datum: InterpolatedResult, _isOverlay: boolean, close: () => void) => {
+        const { note, summary: _summary, ...details } = pointDetails(datum);
+        return (
+          <ChartPointDetails
+            {...details}
+            date={note}
+            color={tooltipStateRef.current.resolveBarColor(datum)}
+            onClose={close}
+            onAction={(_action, event) => event.stopPropagation()}
+          />
         );
       },
       getRulerX: () => hoveredBarXRef.current,
+      getRulerY: (datum: InterpolatedResult, yScale: unknown) => {
+        const band = yScale as d3.ScaleBand<string>;
+        return (band(datum.resultKey) ?? 0) + band.bandwidth() / 2;
+      },
       onHoverStart: (
         selection: d3.Selection<SVGRectElement, InterpolatedResult, SVGGElement, unknown>,
       ) => {
@@ -696,9 +720,8 @@ export default function ThroughputBarChart({
         track('calculator_bar_selected', { gpu: datum.hwKey, precision: datum.precision });
       },
       attachToLayer: 0,
-    }),
-    [],
-  );
+    };
+  }, []);
 
   const yAxisConfig = useMemo(() => {
     const labelMap = new Map(sortedResults.map((r) => [r.resultKey, getLabel(r, hardwareConfig)]));
@@ -728,7 +751,7 @@ export default function ThroughputBarChart({
       const { layout, width, height } = ctx;
       let xLabelEl = layout.g.select<SVGTextElement>('.x-axis-label-calc');
       if (xLabelEl.empty()) {
-        xLabelEl = layout.g.append('text').attr('class', 'x-axis-label-calc');
+        xLabelEl = layout.g.append('text').attr('class', 'x-axis-label x-axis-label-calc');
       }
       xLabelEl
         .attr('x', width / 2)
@@ -791,14 +814,15 @@ export default function ThroughputBarChart({
       zoom={zoomConfig}
       instructions={
         locale === 'zh'
-          ? 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置 · 点击柱形进行选择'
-          : 'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset · Click a bar to select'
+          ? 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置'
+          : 'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset'
       }
       tooltip={tooltip}
       onRender={onRender}
       onExportRender={onRender}
       legendElement={legendElement}
       caption={caption}
+      footer={footer}
     />
   );
 }

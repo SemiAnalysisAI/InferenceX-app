@@ -10,6 +10,7 @@ import {
   revenueLabelStyle,
   contrastingTextColor,
   generateProfitTooltipHTML,
+  profitPointDetails,
   estimateTextWidth,
   lossLabelStyle,
   lossLabelText,
@@ -205,69 +206,63 @@ describe('splitHistoryLabel', () => {
   });
 });
 
-describe('generateProfitTooltipHTML', () => {
+describe('profitPointDetails', () => {
   const assumptions = { utilizationPct: 60, labCutPct: 30, basis: 'gw-year' } as const;
+  const text = (details: ReturnType<typeof profitPointDetails>) =>
+    JSON.stringify(details) + generateProfitTooltipHTML(row(), hardwareConfig, assumptions, 'en');
 
   it('lists revenue, TCO, license fee, and profit with the configured percentages', () => {
-    const html = generateProfitTooltipHTML(row(), hardwareConfig, assumptions, 'en', false);
-    expect(html).toContain('$1.0k');
-    expect(html).toContain('$400');
-    expect(html).toContain('30%');
-    expect(html).toContain('60%');
-    expect(html).toContain('Profit');
+    const details = profitPointDetails(row(), hardwareConfig, assumptions, 'en');
+    expect(details.metrics[0]).toEqual({ value: '$420', label: 'Profit' });
+    const all = text(details);
+    expect(all).toContain('$1.0k');
+    expect(all).toContain('$400');
+    expect(all).toContain('30%');
+    expect(all).toContain('60%');
   });
 
-  it('adds a run-date line for a compare-history bar and keeps the date out of the title', () => {
-    const html = generateProfitTooltipHTML(
+  it('puts the run date of a compare-history bar in the date line, not the title', () => {
+    const details = profitPointDetails(
       row({ date: '2026-06-14' }),
       hardwareConfig,
       assumptions,
       'en',
-      false,
     );
-    expect(html).toContain('Run date');
-    expect(html).toContain('2026-06-14');
-    expect(html).not.toContain('H200 • 2026-06-14');
-    expect(
-      generateProfitTooltipHTML(row(), hardwareConfig, assumptions, 'en', false),
-    ).not.toContain('Run date');
+    expect(details.date).toBe('Run date 2026-06-14');
+    expect(details.title).not.toContain('2026-06-14');
+    expect(profitPointDetails(row(), hardwareConfig, assumptions, 'en').date).toBeUndefined();
   });
 
   it('labels a negative result as a loss and still lists the license fee, which is a share of revenue', () => {
-    const html = generateProfitTooltipHTML(
+    const details = profitPointDetails(
       row({ revenue: 300, tco: 400, grossMargin: -100, labCut: 90, profit: -190 }),
       hardwareConfig,
       assumptions,
       'en',
-      false,
     );
-    expect(html).toContain('Loss');
-    expect(html).toContain('-$190');
-    expect(html).toContain('Model license fee');
-    expect(html).toContain('$90');
+    expect(details.metrics[0]).toEqual({ value: '-$190', label: 'Loss' });
+    expect(JSON.stringify(details.rows)).toContain('Model license fee');
+    expect(JSON.stringify(details.rows)).toContain('$90');
   });
 
-  it('formats cents and drops the GPU-hours footer on the chip-hour basis', () => {
-    const html = generateProfitTooltipHTML(
+  it('formats cents and drops the GPU-hour row on the chip-hour basis', () => {
+    const details = profitPointDetails(
       row({ revenue: 2.16, tco: 1.73, grossMargin: 0.43, labCut: 0.648, profit: -0.218 }),
       hardwareConfig,
       { ...assumptions, basis: 'chip-hour' },
       'en',
-      false,
     );
-    expect(html).toContain('$2.16');
-    expect(html).toContain('-$0.22');
-    expect(html).not.toContain('/GPU/hr');
-    const perGw = generateProfitTooltipHTML(row(), hardwareConfig, assumptions, 'en', false);
-    expect(perGw).toContain('/GPU/hr');
-    expect(perGw).not.toContain('GPU-hours');
+    expect(details.summary).toContain('$2.16');
+    expect(details.metrics[0]?.value).toBe('-$0.22');
+    expect(JSON.stringify(details)).not.toContain('/GPU/hr');
+    const perGw = profitPointDetails(row(), hardwareConfig, assumptions, 'en');
+    expect(JSON.stringify(perGw)).toContain('/GPU/hr');
   });
 
-  it('renders Chinese copy and the pin hint when requested', () => {
-    const pinned = generateProfitTooltipHTML(row(), hardwareConfig, assumptions, 'zh', true);
-    const hover = generateProfitTooltipHTML(row(), hardwareConfig, assumptions, 'zh', false);
-    expect(pinned).toContain('利润');
-    expect(pinned).not.toBe(hover);
+  it('renders Chinese copy', () => {
+    const details = profitPointDetails(row(), hardwareConfig, assumptions, 'zh');
+    expect(details.metrics[0]?.label).toBe('利润');
+    expect(generateProfitTooltipHTML(row(), hardwareConfig, assumptions, 'zh')).toContain('利润');
   });
 
   it('escapes HTML in the hardware label', () => {
@@ -276,7 +271,6 @@ describe('generateProfitTooltipHTML', () => {
       hardwareConfig,
       assumptions,
       'en',
-      false,
     );
     expect(html).not.toContain('<img>');
     expect(html).toContain('&lt;img&gt;');

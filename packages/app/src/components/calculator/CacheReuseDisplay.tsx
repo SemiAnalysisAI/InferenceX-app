@@ -33,6 +33,7 @@ import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Heading } from '@/components/ui/heading';
+import { ResultContext } from '@/components/ui/result-context';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -86,7 +87,8 @@ const STRINGS = {
       'Fixed-sequence runs record no prefix-cache tiers, so there is nothing to stack here. Switch the scenario to AgentX.',
     noTiers:
       'None of the measured rows for this configuration reported a prefix-cache tier. Try another configuration or run date.',
-    captionSource: 'Source: SemiAnalysis InferenceX',
+    source: 'SemiAnalysis InferenceX™',
+    sourceWithOverlays: 'SemiAnalysis InferenceX™ + unofficial overlays',
     unofficialRun: 'Unofficial run',
     colSeries: 'Series',
     colConcurrency: 'Concurrency',
@@ -116,7 +118,8 @@ const STRINGS = {
     noData: '当前选择没有实测数据。请尝试其他模型、工作负载或精度。',
     noTiersFixed: '固定序列的运行不记录前缀缓存层级，此处没有可堆叠的数据。请将场景切换为 AgentX。',
     noTiers: '该配置的实测数据行均未上报前缀缓存层级。请尝试其他配置或运行日期。',
-    captionSource: '来源：SemiAnalysis InferenceX',
+    source: 'SemiAnalysis InferenceX™',
+    sourceWithOverlays: 'SemiAnalysis InferenceX™ + 非官方 overlays',
     unofficialRun: '非官方运行',
     colSeries: '系列',
     colConcurrency: '并发数',
@@ -503,13 +506,24 @@ function CacheReuseInner() {
         <p className="text-sm text-muted-foreground mb-2">
           {getModelLabel(selectedModel)} · {getSequenceLabel(selectedSequence, locale)}
           {selectedConfig ? ` · ${selectedConfig.label}` : ''}
-          {plottedRecipeLabel ? ` · ${plottedRecipeLabel}` : ''} · {t.captionSource}
+          {plottedRecipeLabel ? ` · ${plottedRecipeLabel}` : ''}
         </p>
       </div>
       {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}
       {showsVeraRubinPreview && <VeraRubinOfficialPreviewNotice />}
       {showsTpuv7Preview && <Tpuv7OfficialPreviewNotice />}
     </>
+  );
+
+  const footer = (
+    <div className="mt-3">
+      <ResultContext
+        locale={locale}
+        layout="footer"
+        date={selectedRunDate}
+        source={isUnofficialRun ? t.sourceWithOverlays : t.source}
+      />
+    </div>
   );
 
   const legendElement = (
@@ -689,6 +703,7 @@ function CacheReuseInner() {
                 runInfoByIndex={runInfoByIndex}
                 legendElement={legendElement}
                 caption={caption}
+                footer={footer}
               />
             ) : (
               <>
@@ -696,6 +711,7 @@ function CacheReuseInner() {
                 <EmptyState bare className="h-48 px-6" data-testid="cache-reuse-no-tiers">
                   {isAgenticSequence ? t.noTiers : t.noTiersFixed}
                 </EmptyState>
+                {footer}
               </>
             )}
           </figure>

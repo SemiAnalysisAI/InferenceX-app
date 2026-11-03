@@ -31,6 +31,7 @@ import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { Heading } from '@/components/ui/heading';
+import { ResultContext } from '@/components/ui/result-context';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { track } from '@/lib/analytics/analytics';
@@ -237,7 +238,7 @@ const STRINGS = {
     tipSinceFirst: 'Since first run',
     tipRunLink: 'Open run',
     chartInstructions:
-      'Hover to read every chip at that date · Click to freeze the readout, click again to release · Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset',
+      'Hover to read every chip at that date · Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset',
     assumptions: (tier: string, chips: string, release: string) =>
       `Anchored at the ${release} release. Fleet sized by facility power at ${chips}; cost = chips × ${tier} $/chip/hr, flat for the whole window. Revenue is priced on the selected token type and reduced by the availability haircut. Price, ramp, MTBI, recovery and horizon are your assumptions. The throughput steps are not.`,
     source: 'Source: ',
@@ -364,7 +365,7 @@ const STRINGS = {
     tipSinceFirst: '相比首次运行',
     tipRunLink: '查看运行',
     chartInstructions:
-      '悬停可读取该日期下所有芯片的数值 · 点击可冻结读数，再次点击解除 · Shift+滚轮 横向缩放 · 拖动平移 · 双击重置',
+      '悬停可读取该日期下所有芯片的数值 · Shift+滚轮 横向缩放 · 拖动平移 · 双击重置',
     assumptions: (tier: string, chips: string, release: string) =>
       `以 ${release} 发布日期为起点。集群规模按 ${chips} 的设施功率测算；成本 = 芯片数 × ${tier} $/chip/hr，在整个测算期内保持不变。收入按所选 token 类型计价，并扣除可用性折损。价格、爬坡期、平均中断间隔、恢复时间与测算期为你的假设。吞吐量台阶不是假设。`,
     source: '来源：',
@@ -899,12 +900,40 @@ export default function FleetLifecycle({
         {getModelLabel(selectedModel)} · {getSequenceLabel(selectedSequence, locale)} ·{' '}
         {t.captionTarget(targetValue)}
         {mw ? ` · ${mw} MW` : ''}
-        {captionPrices === null ? '' : ` · ${captionPrices}`} · {t.source}SemiAnalysis
       </p>
       {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}
       {showsVeraRubinPreview && <VeraRubinOfficialPreviewNotice />}
       {showsTpuv7Preview && <Tpuv7OfficialPreviewNotice />}
     </>
+  );
+
+  const footer = (
+    <div className="mt-3">
+      <ResultContext
+        locale={locale}
+        layout="footer"
+        source="SemiAnalysis InferenceX™"
+        costBasis={captionPrices ?? undefined}
+        metaEnd={
+          <span>
+            {t.source}
+            <Link
+              target="_blank"
+              className="text-brand hover:underline"
+              href="https://semianalysis.com/datacenter-industry-model/"
+            >
+              SemiAnalysis Datacenter Industry Model
+              <ExternalLinkIcon />
+            </Link>
+            {' & '}
+            <Link target="_blank" className="text-brand hover:underline" href={TCO_SOURCE_URL}>
+              {TCO_SOURCE_TITLE}
+              <ExternalLinkIcon />
+            </Link>
+          </span>
+        }
+      />
+    </div>
   );
 
   const columns = useMemo<DataTableColumn<LifecycleRow>[]>(
@@ -1232,6 +1261,7 @@ export default function FleetLifecycle({
                   analyticsPrefix="calculator_lifecycle_table"
                   searchable={false}
                 />
+                {footer}
               </>
             ) : (
               <FleetLifecycleChart
@@ -1250,6 +1280,7 @@ export default function FleetLifecycle({
                           : t.chartY
                 }
                 caption={caption}
+                footer={footer}
                 breakEvenLabel={t.chartBreakEven}
                 instructions={t.chartInstructions}
                 labels={{
@@ -1340,22 +1371,6 @@ export default function FleetLifecycle({
               `${mw} MW`,
               anchorDate ?? '—',
             )}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {t.source}
-            <Link
-              target="_blank"
-              className="underline hover:text-foreground"
-              href="https://semianalysis.com/datacenter-industry-model/"
-            >
-              SemiAnalysis Datacenter Industry Model
-              <ExternalLinkIcon />
-            </Link>
-            {' & '}
-            <Link target="_blank" className="underline hover:text-foreground" href={TCO_SOURCE_URL}>
-              {TCO_SOURCE_TITLE}
-              <ExternalLinkIcon />
-            </Link>
           </p>
         </div>
       </>
