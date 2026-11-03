@@ -6,6 +6,7 @@ import { useTheme } from 'next-themes';
 import {
   type CSSProperties,
   type ReactNode,
+  memo,
   useCallback,
   useEffect,
   useMemo,
@@ -57,6 +58,7 @@ import {
   type FlowNode,
   type Fold,
   type LayerBlock,
+  measuredRoles,
   modelLayers,
   type OpSlot,
   slotCases,
@@ -238,7 +240,7 @@ const gridRow = (first: number, last: number) => `${first + 2} / ${last + 3}`;
 type Line = [number, number, number, number, boolean];
 
 /** Arrows between a block's boxes: straight down, or down, across and down. */
-function FlowEdges({ block, at }: { block: LayerBlock; at: Map<string, Box> }) {
+const FlowEdges = memo(({ block, at }: { block: LayerBlock; at: Map<string, Box> }) => {
   const marker = `operatorx-arrow-${block.id}`;
   const lines: Line[] = [];
   const hits = (seg: Line, skip: Box[]) =>
@@ -318,7 +320,7 @@ function FlowEdges({ block, at }: { block: LayerBlock; at: Map<string, Box> }) {
       ))}
     </svg>
   );
-}
+});
 
 /**
  * Each unfolded fused op of a block with the boxes it runs, and how many unfolded ops it
@@ -366,280 +368,418 @@ function FoldButton({
   );
 }
 
-function BlockRows({
-  block,
-  slots,
-  tokens,
-  lanes,
-  isDark,
-  onOpen,
-  onFold,
-}: {
-  block: LayerBlock;
-  slots: SlotData[];
-  tokens: number;
-  /** GPUs shown, which sets the height of a row of bars. */
-  lanes: number;
-  isDark: boolean;
-  onOpen: (data: SlotData) => void;
-  /** Unfolds a fused op, or folds it back. */
-  onFold: (key: string) => void;
-}) {
-  const [hovered, setHovered] = useState<string | null>(null);
-  const c = BLOCK_COLORS[block.kind];
-  const { rows, at } = boxes(block, Math.max(barsHeight(lanes), 40));
-  return (
-    <div
-      className={`grid ${ROW_GRID} gap-x-4`}
-      style={{
-        gridTemplateRows: [HEADER_PX, ...rows, ...(block.fold ? [FOLD_PX] : [])]
-          .map((h) => `${h}px`)
-          .join(' '),
-      }}
-      data-testid={`operatorx-model-block-${block.id}`}
-    >
-      <div
-        className="rounded-lg border"
-        style={{
-          gridColumn: 1,
-          gridRow: '1 / -1',
-          background: isDark ? c.dark : c.light,
-          borderColor: c.stroke,
-        }}
+const SlotRow = memo(
+  ({
+    data,
+    tokens,
+    lit,
+    onOpen,
+    onHover,
+  }: {
+    data: SlotData;
+    tokens: number;
+    lit: boolean;
+    onOpen: (data: SlotData) => void;
+    onHover: (slot: string | null) => void;
+  }) => {
+    const measured = data.indices.length > 0;
+    const values = data.model ? gpuValues(data.model, data.atSize) : [];
+    const target = (
+      <button
+        type="button"
+        disabled={!measured}
+        onClick={() => onOpen(data)}
+        onMouseEnter={() => onHover(data.slot.id)}
+        onMouseLeave={() => onHover(null)}
+        onFocus={() => onHover(data.slot.id)}
+        onBlur={() => onHover(null)}
+        className={`rounded-md ${measured ? 'cursor-pointer' : 'cursor-default'} ${lit && measured ? 'bg-muted/60' : ''}`}
+        style={{ gridColumn: '1 / -1', gridRow: gridRow(data.first, data.last) }}
+        aria-label={data.slot.label}
+        data-testid={`operatorx-model-slot-${data.slot.id}`}
       />
-      <div className="flex items-baseline gap-2 px-3 pt-2" style={{ gridColumn: 1, gridRow: 1 }}>
-        <span className="text-sm font-semibold">{block.label}</span>
-        {block.repeat && block.repeat > 1 && (
-          <span className="text-xs text-muted-foreground tabular-nums">×{block.repeat}</span>
+    );
+    return (
+      <div className="contents">
+        {measured ? (
+          <TooltipRoot delayDuration={150}>
+            <TooltipTrigger asChild>{target}</TooltipTrigger>
+            <TooltipContent side="top" align="center" className="w-80">
+              <SlotTooltip data={data} tokens={tokens} />
+            </TooltipContent>
+          </TooltipRoot>
+        ) : (
+          target
         )}
-      </div>
-      {slots.map((data) => {
-        const measured = data.indices.length > 0;
-        const values = data.model ? gpuValues(data.model, data.atSize) : [];
-        const target = (
-          <button
-            type="button"
-            disabled={!measured}
-            onClick={() => onOpen(data)}
-            onMouseEnter={() => setHovered(data.slot.id)}
-            onMouseLeave={() => setHovered(null)}
-            onFocus={() => setHovered(data.slot.id)}
-            onBlur={() => setHovered(null)}
-            className={`rounded-md ${measured ? 'cursor-pointer' : 'cursor-default'} ${hovered === data.slot.id && measured ? 'bg-muted/60' : ''}`}
-            style={{ gridColumn: '1 / -1', gridRow: gridRow(data.first, data.last) }}
-            aria-label={data.slot.label}
-            data-testid={`operatorx-model-slot-${data.slot.id}`}
-          />
-        );
-        return (
-          <div key={data.slot.id} className="contents">
-            {measured ? (
-              <TooltipRoot delayDuration={150}>
-                <TooltipTrigger asChild>{target}</TooltipTrigger>
-                <TooltipContent side="top" align="center" className="w-80">
-                  <SlotTooltip data={data} tokens={tokens} />
-                </TooltipContent>
-              </TooltipRoot>
-            ) : (
-              target
-            )}
-            <div
-              className="pointer-events-none relative z-[2] flex items-center"
-              style={{ gridColumn: 2, gridRow: gridRow(data.bar, data.bar) }}
-            >
-              {measured && data.model ? (
-                <div className="w-full">
-                  <OpBars
-                    model={data.model}
-                    values={values}
-                    empty={
-                      data.atSize.length > 0 ? 'No results at this size' : 'No shapes at this size'
-                    }
-                  />
-                </div>
-              ) : (
-                <span className="text-xs text-muted-foreground">No results yet</span>
-              )}
+        <div
+          className="pointer-events-none relative z-[2] flex items-center"
+          style={{ gridColumn: 2, gridRow: gridRow(data.bar, data.bar) }}
+        >
+          {measured && data.model ? (
+            <div className="w-full">
+              <OpBars
+                model={data.model}
+                values={values}
+                empty={
+                  data.atSize.length > 0 ? 'No results at this size' : 'No shapes at this size'
+                }
+              />
             </div>
+          ) : (
+            <span className="text-xs text-muted-foreground">No results yet</span>
+          )}
+        </div>
+      </div>
+    );
+  },
+);
+
+const BlockDiagram = memo(
+  ({
+    block,
+    at,
+    hovered,
+    stroke,
+    onFold,
+  }: {
+    block: LayerBlock;
+    at: Map<string, Box>;
+    hovered: string | null;
+    stroke: string;
+    onFold: (key: string) => void;
+  }) => (
+    <div
+      className="pointer-events-none relative z-[1]"
+      style={{ gridColumn: 1, gridRow: '1 / -1' }}
+    >
+      <FlowEdges block={block} at={at} />
+      {block.nodes.map((n) => {
+        const box = at.get(n.id)!;
+        const measured = n.slots.length > 0;
+        const lit = hovered !== null && n.slots.includes(hovered);
+        return (
+          <div
+            key={n.id}
+            title={n.title}
+            className={`absolute flex items-center justify-center overflow-hidden rounded border bg-card px-1.5 text-center leading-tight ${measured ? 'font-mono text-2xs text-foreground' : 'border-dashed text-2xs text-muted-foreground'} ${lit ? 'ring-2 ring-primary/60' : ''}`}
+            style={{
+              left: pct(box.left),
+              width: pct(box.width),
+              top: box.top,
+              height: box.bottom - box.top,
+              borderColor: measured ? stroke : undefined,
+            }}
+            data-testid={`operatorx-model-node-${n.id}`}
+          >
+            <span className="line-clamp-2 break-words">{breakable(n.label)}</span>
           </div>
         );
       })}
-      <div
-        className="pointer-events-none relative z-[1]"
-        style={{ gridColumn: 1, gridRow: '1 / -1' }}
-      >
-        <FlowEdges block={block} at={at} />
-        {block.nodes.map((n) => {
-          const box = at.get(n.id)!;
-          const measured = n.slots.length > 0;
-          const lit = hovered !== null && n.slots.includes(hovered);
-          return (
+      {block.nodes.map((n) => {
+        if (!n.fold) return null;
+        const box = at.get(n.id)!;
+        return (
+          <FoldButton
+            key={`${n.id}:fold`}
+            fold={n.fold}
+            onFold={onFold}
+            className="absolute -translate-x-1/2"
+            style={{ left: pct(box.left + box.width / 2), top: box.bottom - 7 }}
+            testId={`operatorx-model-fold-${n.id}`}
+          />
+        );
+      })}
+      {outlines(block.nodes).map(({ fold, members, depth }) => {
+        // The ops an unfolded fused op runs, outlined together with one chevron; an
+        // outer fold's outline sits a step outside the ones it holds.
+        const rects = members.map((n) => at.get(n.id)!);
+        const pad = 4 + 4 * depth;
+        const left = Math.min(...rects.map((o) => o.left));
+        const right = Math.max(...rects.map((o) => o.left + o.width));
+        const top = Math.min(...rects.map((o) => o.top)) - pad;
+        const bottom = Math.max(...rects.map((o) => o.bottom)) + pad;
+        return (
+          <div key={`${fold.key}:fold`} className="contents">
             <div
-              key={n.id}
-              title={n.title}
-              className={`absolute flex items-center justify-center overflow-hidden rounded border bg-card px-1.5 text-center leading-tight ${measured ? 'font-mono text-2xs text-foreground' : 'border-dashed text-2xs text-muted-foreground'} ${lit ? 'ring-2 ring-primary/60' : ''}`}
+              className="absolute rounded-md border border-dashed border-muted-foreground/40"
               style={{
-                left: pct(box.left),
-                width: pct(box.width),
-                top: box.top,
-                height: box.bottom - box.top,
-                borderColor: measured ? c.stroke : undefined,
+                left: `calc(${pct(left)} - ${pad}px)`,
+                width: `calc(${pct(right - left)} + ${2 * pad}px)`,
+                top,
+                height: bottom - top,
               }}
-              data-testid={`operatorx-model-node-${n.id}`}
-            >
-              <span className="line-clamp-2 break-words">{breakable(n.label)}</span>
-            </div>
-          );
-        })}
-        {block.nodes.map((n) => {
-          if (!n.fold) return null;
-          const box = at.get(n.id)!;
-          return (
+            />
             <FoldButton
-              key={`${n.id}:fold`}
-              fold={n.fold}
+              fold={fold}
               onFold={onFold}
               className="absolute -translate-x-1/2"
-              style={{ left: pct(box.left + box.width / 2), top: box.bottom - 7 }}
-              testId={`operatorx-model-fold-${n.id}`}
+              style={{ left: pct((left + right) / 2), top: bottom - 7 }}
+              testId={`operatorx-model-fold-${fold.key}`}
             />
-          );
-        })}
-        {outlines(block.nodes).map(({ fold, members, depth }) => {
-          // The ops an unfolded fused op runs, outlined together with one chevron; an
-          // outer fold's outline sits a step outside the ones it holds.
-          const rects = members.map((n) => at.get(n.id)!);
-          const pad = 4 + 4 * depth;
-          const left = Math.min(...rects.map((o) => o.left));
-          const right = Math.max(...rects.map((o) => o.left + o.width));
-          const top = Math.min(...rects.map((o) => o.top)) - pad;
-          const bottom = Math.max(...rects.map((o) => o.bottom)) + pad;
-          return (
-            <div key={`${fold.key}:fold`} className="contents">
-              <div
-                className="absolute rounded-md border border-dashed border-muted-foreground/40"
-                style={{
-                  left: `calc(${pct(left)} - ${pad}px)`,
-                  width: `calc(${pct(right - left)} + ${2 * pad}px)`,
-                  top,
-                  height: bottom - top,
-                }}
-              />
-              <FoldButton
-                fold={fold}
-                onFold={onFold}
-                className="absolute -translate-x-1/2"
-                style={{ left: pct((left + right) / 2), top: bottom - 7 }}
-                testId={`operatorx-model-fold-${fold.key}`}
-              />
-            </div>
-          );
-        })}
-      </div>
-      {block.fold && (
-        <button
-          type="button"
-          onClick={() => onFold(block.fold!.key)}
-          className="relative z-[2] flex items-center justify-center rounded-b-lg text-muted-foreground hover:bg-muted/40 hover:text-foreground"
-          style={{ gridColumn: 1, gridRow: -2 }}
-          aria-expanded
-          aria-label="Fold into the fused op"
-          data-testid={`operatorx-model-fold-${block.id}`}
-        >
-          <ChevronUp className="size-3.5" />
-        </button>
-      )}
+          </div>
+        );
+      })}
     </div>
-  );
-}
+  ),
+);
+
+const BlockRows = memo(
+  ({
+    block,
+    slots,
+    tokens,
+    lanes,
+    isDark,
+    onOpen,
+    onFold,
+  }: {
+    block: LayerBlock;
+    slots: SlotData[];
+    tokens: number;
+    /** GPUs shown, which sets the height of a row of bars. */
+    lanes: number;
+    isDark: boolean;
+    onOpen: (data: SlotData) => void;
+    /** Unfolds a fused op, or folds it back. */
+    onFold: (key: string) => void;
+  }) => {
+    const [hovered, setHovered] = useState<string | null>(null);
+    const c = BLOCK_COLORS[block.kind];
+    const { rows, at } = useMemo(
+      () => boxes(block, Math.max(barsHeight(lanes), 40)),
+      [block, lanes],
+    );
+    return (
+      <div
+        className={`grid ${ROW_GRID} gap-x-4`}
+        style={{
+          gridTemplateRows: [HEADER_PX, ...rows, ...(block.fold ? [FOLD_PX] : [])]
+            .map((h) => `${h}px`)
+            .join(' '),
+        }}
+        data-testid={`operatorx-model-block-${block.id}`}
+      >
+        <div
+          className="rounded-lg border"
+          style={{
+            gridColumn: 1,
+            gridRow: '1 / -1',
+            background: isDark ? c.dark : c.light,
+            borderColor: c.stroke,
+          }}
+        />
+        <div className="flex items-baseline gap-2 px-3 pt-2" style={{ gridColumn: 1, gridRow: 1 }}>
+          <span className="text-sm font-semibold">{block.label}</span>
+          {block.repeat && block.repeat > 1 && (
+            <span className="text-xs text-muted-foreground tabular-nums">×{block.repeat}</span>
+          )}
+        </div>
+        {slots.map((data) => (
+          <SlotRow
+            key={data.slot.id}
+            data={data}
+            tokens={tokens}
+            lit={hovered === data.slot.id}
+            onOpen={onOpen}
+            onHover={setHovered}
+          />
+        ))}
+        <BlockDiagram block={block} at={at} hovered={hovered} stroke={c.stroke} onFold={onFold} />
+        {block.fold && (
+          <button
+            type="button"
+            onClick={() => onFold(block.fold!.key)}
+            className="relative z-[2] flex items-center justify-center rounded-b-lg text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+            style={{ gridColumn: 1, gridRow: -2 }}
+            aria-expanded
+            aria-label="Fold into the fused op"
+            data-testid={`operatorx-model-fold-${block.id}`}
+          >
+            <ChevronUp className="size-3.5" />
+          </button>
+        )}
+      </div>
+    );
+  },
+);
+
+const ModelControls = memo(
+  ({
+    requested,
+    modelOptions,
+    split,
+    splits,
+    metric,
+    precision,
+    precisions,
+    onPrecision,
+  }: {
+    requested: string;
+    modelOptions: string[];
+    split: string;
+    splits: { key: string; label: string; cases: number }[];
+    metric: string;
+    precision: ComputePrecision | null;
+    precisions: ComputePrecision[];
+    onPrecision: (precision: ComputePrecision) => void;
+  }) => (
+    <Card className="relative z-10 py-4 md:py-5">
+      <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+        <ControlGroup label="Model" htmlFor="operatorx-model">
+          <SearchableSelect
+            triggerId="operatorx-model"
+            value={requested}
+            onValueChange={(v) => {
+              track('operatorx_model_selected', { model: v });
+              setParam('model', v);
+            }}
+            groups={[{ label: '', options: modelOptions.map((m) => ({ value: m, label: m })) }]}
+          />
+        </ControlGroup>
+        <ControlGroup label="Devices" htmlFor="operatorx-model-parallel">
+          <SearchableSelect
+            triggerId="operatorx-model-parallel"
+            value={split || ONE_DEVICE}
+            onValueChange={(v) => {
+              track('operatorx_parallel_selected', { op: 'model', parallel: v });
+              setParallel(v);
+            }}
+            searchable={false}
+            groups={[
+              {
+                label: '',
+                options: splits.map((o) => ({
+                  value: o.key || ONE_DEVICE,
+                  label: `${o.label} (${o.cases})`,
+                })),
+              },
+            ]}
+          />
+        </ControlGroup>
+        <ControlGroup label="Metric" htmlFor="operatorx-metric">
+          <SearchableSelect
+            triggerId="operatorx-metric"
+            value={metric}
+            onValueChange={(v) => {
+              track('operatorx_metric_selected', { op: 'model', metric: v });
+              setParam('metric', v);
+            }}
+            searchable={false}
+            groups={[
+              {
+                label: '',
+                options: METRICS.map((m) => ({ value: m.id, label: `${m.label} (${m.unit})` })),
+              },
+            ]}
+          />
+        </ControlGroup>
+        <ControlGroup label="Precision" htmlFor="operatorx-model-precision">
+          {precision && (
+            <SegmentedToggle
+              value={precision}
+              onValueChange={(v) => {
+                track('operatorx_model_precision_selected', { precision: v });
+                onPrecision(v);
+              }}
+              ariaLabel="Compute precision"
+              options={precisions.map((p) => ({ value: p, label: p }))}
+            />
+          )}
+        </ControlGroup>
+      </div>
+    </Card>
+  ),
+);
 
 /** Every shape of one slot: size sweep and roofline, each point opening its kernel timeline. */
-function SlotDetail({
-  data,
-  modelName,
-  onClose,
-}: {
-  data: SlotData | null;
-  modelName: string;
-  onClose: () => void;
-}) {
-  const [inspected, setInspected] = useState<number | null>(null);
-  // A case opened for one op never carries over to the next op shown
-  const [inspectedFor, setInspectedFor] = useState(data);
-  if (inspectedFor !== data) {
-    setInspectedFor(data);
-    setInspected(null);
-  }
-  const queryClient = useQueryClient();
-  const sub = useMemo(() => {
-    if (!data?.model) return null;
-    const { model, indices, slot } = data;
-    const view = subView(model.view, indices);
-    const measured = measuredHardware([view]).filter((hw) => model.available.includes(hw));
-    const op = slot.op as ComparisonOp;
-    return {
-      op,
-      model: buildModel(
-        view,
-        model.metric,
-        {
-          // only the GPUs that measured this op's shapes
-          hardware: model.hardware.filter((hw) => measured.includes(hw)),
-          available: measured,
-          toggle: model.toggle,
-        },
-        model.colors,
-        null,
-        {
-          inspect: setInspected,
-          preview: (i) =>
-            prefetchOperatorXTimelines(
-              queryClient,
-              op,
-              caseRefs(view, model.hardware, i).map((r) => r.ref),
-            ),
-        },
-      ),
-    };
-  }, [data, queryClient]);
-  return (
-    <Dialog open={data !== null} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent
-        className="flex max-h-[94vh] w-[min(96vw,72rem)] max-w-[min(96vw,72rem)] flex-col gap-4 overflow-y-auto p-4 sm:p-6"
-        data-testid="operatorx-model-slot-detail"
-      >
-        {data && sub && (
-          <>
-            <DialogHeader>
-              <DialogTitle className="font-mono">{data.slot.label}</DialogTitle>
-              <DialogDescription>
-                {data.block.label} · {modelName} · {data.indices.length.toLocaleString()} shapes
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-6">
-              <section className="space-y-2">
-                <h3 className="text-sm font-semibold">{roofline.title}</h3>
-                <roofline.Component model={sub.model} />
-              </section>
-              <section className="space-y-2">
-                <h3 className="text-sm font-semibold">{metricVsSize.title}</h3>
-                <metricVsSize.Component model={sub.model} />
-              </section>
-            </div>
-            <CaseDetail
-              op={sub.op}
-              view={sub.model.view}
-              hardware={sub.model.hardware}
-              colors={sub.model.colors}
-              caseIndex={inspected}
-              onClose={() => setInspected(null)}
-            />
-          </>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
-}
+const SlotDetail = memo(
+  ({
+    data,
+    modelName,
+    onClose,
+  }: {
+    data: SlotData | null;
+    modelName: string;
+    onClose: () => void;
+  }) => {
+    const [inspected, setInspected] = useState<number | null>(null);
+    // A case opened for one op never carries over to the next op shown
+    const [inspectedFor, setInspectedFor] = useState(data);
+    if (inspectedFor !== data) {
+      setInspectedFor(data);
+      setInspected(null);
+    }
+    const queryClient = useQueryClient();
+    const sub = useMemo(() => {
+      if (!data?.model) return null;
+      const { model, indices, slot } = data;
+      const view = subView(model.view, indices);
+      const measured = measuredHardware([view]).filter((hw) => model.available.includes(hw));
+      const op = slot.op as ComparisonOp;
+      return {
+        op,
+        model: buildModel(
+          view,
+          model.metric,
+          {
+            // only the GPUs that measured this op's shapes
+            hardware: model.hardware.filter((hw) => measured.includes(hw)),
+            available: measured,
+            toggle: model.toggle,
+          },
+          model.colors,
+          null,
+          {
+            inspect: setInspected,
+            preview: (i) =>
+              prefetchOperatorXTimelines(
+                queryClient,
+                op,
+                caseRefs(view, model.hardware, i).map((r) => r.ref),
+              ),
+          },
+        ),
+      };
+    }, [data, queryClient]);
+    return (
+      <Dialog open={data !== null} onOpenChange={(open) => !open && onClose()}>
+        <DialogContent
+          className="flex max-h-[94vh] w-[min(96vw,72rem)] max-w-[min(96vw,72rem)] flex-col gap-4 overflow-y-auto p-4 sm:p-6"
+          data-testid="operatorx-model-slot-detail"
+        >
+          {data && sub && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="font-mono">{data.slot.label}</DialogTitle>
+                <DialogDescription>
+                  {data.block.label} · {modelName} · {data.indices.length.toLocaleString()} shapes
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-6">
+                <section className="space-y-2">
+                  <h3 className="text-sm font-semibold">{roofline.title}</h3>
+                  <roofline.Component model={sub.model} />
+                </section>
+                <section className="space-y-2">
+                  <h3 className="text-sm font-semibold">{metricVsSize.title}</h3>
+                  <metricVsSize.Component model={sub.model} />
+                </section>
+              </div>
+              <CaseDetail
+                op={sub.op}
+                view={sub.model.view}
+                hardware={sub.model.hardware}
+                colors={sub.model.colors}
+                caseIndex={inspected}
+                onClose={() => setInspected(null)}
+              />
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    );
+  },
+);
 
 /** A model top down, each op beside a per-GPU sweep of its OperatorX results. */
 export function ModelView() {
@@ -696,14 +836,20 @@ export function ModelView() {
       ),
     [views, isDark],
   );
-  const hardware = picked ? available.filter((h) => picked.includes(h)) : available;
+  const hardware = useMemo(
+    () => (picked ? available.filter((h) => picked.includes(h)) : available),
+    [picked, available],
+  );
   const precisionCounts = useMemo(() => {
     const m = new Map<ComputePrecision, number>();
     for (const v of atSplitViews)
       for (const c of v.cases) m.set(c.computePrecision, (m.get(c.computePrecision) ?? 0) + 1);
     return m;
   }, [atSplitViews]);
-  const precisions = PRECISIONS.filter((p) => precisionCounts.has(p));
+  const precisions = useMemo(
+    () => PRECISIONS.filter((p) => precisionCounts.has(p)),
+    [precisionCounts],
+  );
   const precision =
     pickedPrecision && precisions.includes(pickedPrecision)
       ? pickedPrecision
@@ -714,17 +860,11 @@ export function ModelView() {
   const arch = architecture(requested);
   // Fused ops the reader unfolded.
   const [openFolds, setOpenFolds] = useState<ReadonlySet<string>>(new Set());
+  const present = useMemo(() => measuredRoles(gemmView, requested), [gemmView, requested]);
+  const hasMoe = (moe.data?.cases.length ?? 0) > 0;
   const blocks = useMemo(
-    () =>
-      modelLayers(
-        arch,
-        gemmView,
-        attentionView,
-        requested,
-        (moe.data?.cases.length ?? 0) > 0,
-        openFolds,
-      ),
-    [arch, gemmView, attentionView, moe.data, requested, openFolds],
+    () => modelLayers(arch, present, attentionView, requested, hasMoe, openFolds),
+    [arch, present, attentionView, requested, hasMoe, openFolds],
   );
 
   // The legends are the one GPU control, as on the op tabs
@@ -752,11 +892,17 @@ export function ModelView() {
         : null;
     return { gemm: build(gemmView), moe: build(moeView), attention: build(attentionView) };
   }, [gemmView, moeView, attentionView, metric, hardware, available, colors, toggle]);
+  const slotIndices = useMemo(() => {
+    const opViews = { gemm: gemmView, moe: moeView, attention: attentionView };
+    return blocks.map((block) =>
+      block.spans.map(({ slot }) => slotCases(opViews[slot.op], slot, requested, precision)),
+    );
+  }, [blocks, gemmView, moeView, attentionView, requested, precision]);
   const resolved = useMemo(
     () =>
-      blocks.map((block) => ({
+      blocks.map((block, b) => ({
         block,
-        slots: block.spans.map(({ slot, first, last, bar }) => {
+        slots: block.spans.map(({ slot, first, last, bar }, s) => {
           const model = models[slot.op];
           return {
             slot,
@@ -765,11 +911,11 @@ export function ModelView() {
             bar,
             block,
             model,
-            indices: slotCases(model?.view, slot, requested, precision),
+            indices: model ? slotIndices[b][s] : [],
           };
         }),
       })),
-    [blocks, models, requested, precision],
+    [blocks, models, slotIndices],
   );
   const bins = useMemo(() => {
     const out = new Set<number>();
@@ -801,6 +947,25 @@ export function ModelView() {
     [resolved, bin],
   );
   const tokens = bin === null ? DEFAULT_TOKENS : binTokens(bin);
+  const openSlot = useCallback(
+    (data: SlotData) => {
+      track('operatorx_model_op_opened', { model: requested, op: data.slot.op });
+      setOpen(data);
+    },
+    [requested],
+  );
+  const toggleFold = useCallback(
+    (key: string) => {
+      track('operatorx_model_fold_toggled', { model: requested, enabled: !openFolds.has(key) });
+      setOpenFolds((prev) => {
+        const next = new Set(prev);
+        if (!next.delete(key)) next.add(key);
+        return next;
+      });
+    },
+    [requested, openFolds],
+  );
+  const closeSlot = useCallback(() => setOpen(null), []);
 
   const error = gemm.error ?? moe.error ?? attention.error;
   if (error)
@@ -833,71 +998,16 @@ export function ModelView() {
   return (
     <TooltipProvider>
       <div className="flex flex-col gap-4" data-testid="operatorx-model-view">
-        <Card className="relative z-10 py-4 md:py-5">
-          <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
-            <ControlGroup label="Model" htmlFor="operatorx-model">
-              <SearchableSelect
-                triggerId="operatorx-model"
-                value={requested}
-                onValueChange={(v) => {
-                  track('operatorx_model_selected', { model: v });
-                  setParam('model', v);
-                }}
-                groups={[{ label: '', options: modelOptions.map((m) => ({ value: m, label: m })) }]}
-              />
-            </ControlGroup>
-            <ControlGroup label="Devices" htmlFor="operatorx-model-parallel">
-              <SearchableSelect
-                triggerId="operatorx-model-parallel"
-                value={split || ONE_DEVICE}
-                onValueChange={(v) => {
-                  track('operatorx_parallel_selected', { op: 'model', parallel: v });
-                  setParallel(v);
-                }}
-                searchable={false}
-                groups={[
-                  {
-                    label: '',
-                    options: splits.map((o) => ({
-                      value: o.key || ONE_DEVICE,
-                      label: `${o.label} (${o.cases})`,
-                    })),
-                  },
-                ]}
-              />
-            </ControlGroup>
-            <ControlGroup label="Metric" htmlFor="operatorx-metric">
-              <SearchableSelect
-                triggerId="operatorx-metric"
-                value={metric.id}
-                onValueChange={(v) => {
-                  track('operatorx_metric_selected', { op: 'model', metric: v });
-                  setParam('metric', v);
-                }}
-                searchable={false}
-                groups={[
-                  {
-                    label: '',
-                    options: METRICS.map((m) => ({ value: m.id, label: `${m.label} (${m.unit})` })),
-                  },
-                ]}
-              />
-            </ControlGroup>
-            <ControlGroup label="Precision" htmlFor="operatorx-model-precision">
-              {precision && (
-                <SegmentedToggle
-                  value={precision}
-                  onValueChange={(v) => {
-                    track('operatorx_model_precision_selected', { precision: v });
-                    setPrecision(v);
-                  }}
-                  ariaLabel="Compute precision"
-                  options={precisions.map((p) => ({ value: p, label: p }))}
-                />
-              )}
-            </ControlGroup>
-          </div>
-        </Card>
+        <ModelControls
+          requested={requested}
+          modelOptions={modelOptions}
+          split={split}
+          splits={splits}
+          metric={metric.id}
+          precision={precision}
+          precisions={precisions}
+          onPrecision={setPrecision}
+        />
         {/* Too narrow for the diagram beside its bars: the card scrolls sideways, not the page */}
         <Card className="gap-3 max-md:overflow-x-auto" data-testid="operatorx-model-diagram">
           <div className="flex flex-col gap-3 max-md:min-w-[36rem]">
@@ -942,28 +1052,15 @@ export function ModelView() {
                     tokens={tokens}
                     lanes={hardware.length}
                     isDark={isDark}
-                    onOpen={(data) => {
-                      track('operatorx_model_op_opened', { model: requested, op: data.slot.op });
-                      setOpen(data);
-                    }}
-                    onFold={(key) => {
-                      track('operatorx_model_fold_toggled', {
-                        model: requested,
-                        enabled: !openFolds.has(key),
-                      });
-                      setOpenFolds((prev) => {
-                        const next = new Set(prev);
-                        if (!next.delete(key)) next.add(key);
-                        return next;
-                      });
-                    }}
+                    onOpen={openSlot}
+                    onFold={toggleFold}
                   />
                 </div>
               ))}
             </div>
           </div>
         </Card>
-        <SlotDetail data={open} modelName={requested} onClose={() => setOpen(null)} />
+        <SlotDetail data={open} modelName={requested} onClose={closeSlot} />
       </div>
     </TooltipProvider>
   );
