@@ -99,7 +99,7 @@ export const CURATED_SUPPORTER_GROUPS: SupporterGroup[] = [
       { label: 'Baseten', logo: 'baseten.svg', quoteOrg: 'Baseten' },
       { label: 'Crusoe', logo: 'crusoe.svg', quoteOrg: 'Crusoe' },
       { label: 'Tensormesh', logo: 'tensormesh.svg', quoteOrg: 'Tensormesh' },
-      { label: 'Morph LLM', logo: 'morph.svg', quoteOrg: 'Morph LLM' },
+      { label: 'Morph', logo: 'morph.svg', quoteOrg: 'Morph' },
       { label: 'Doubleword', logo: 'doubleword.png', quoteOrg: 'Doubleword' },
     ],
   },

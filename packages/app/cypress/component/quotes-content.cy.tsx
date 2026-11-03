@@ -363,7 +363,7 @@ describe('QuotesContent supporter logo wall', () => {
       'Baseten',
       'Crusoe',
       'Tensormesh',
-      'Morph LLM',
+      'Morph',
       'Doubleword',
     ];
     for (const locale of ['en', 'zh'] as const) {
@@ -392,19 +392,19 @@ describe('QuotesContent supporter logo wall', () => {
         });
       }
       cy.get('#quote-together-ai').should('contain.text', 'Tri Dao');
-      cy.get('#quote-morph-llm').within(() => {
+      cy.get('#quote-morph').within(() => {
         cy.get('p').should(
           'have.text',
           locale === 'en'
             ? "“When you own your hardware, every serving decision shows up directly in your margins. InferenceX's open, reproducible benchmarks show how different accelerators and inference engines actually perform on real workloads, so smaller providers like us can make infra decisions with the same data as the biggest players. Nobody else shows acceptance length like these guys.”"
             : '“硬件是自己买的，每一项推理服务决策都会直接影响利润率。InferenceX 的开放、可复现基准测试展示了不同加速器和推理引擎在真实工作负载下的实际表现，让我们这样规模较小的服务商也能用和行业巨头一样的数据来做基础设施决策。还没有谁能像他们这样展示 acceptance length。”',
         );
-        cy.get('footer').should('contain.text', 'Nicholas Khami').and('contain.text', 'Morph LLM');
-        cy.get('img[alt="Morph LLM"]:visible').should(($logo) => {
+        cy.get('footer').should('contain.text', 'Nicholas Khami').and('contain.text', 'Morph');
+        cy.get('img[alt="Morph"]:visible').should(($logo) => {
           expect(($logo[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
         });
       });
-      cy.get('[data-testid="supporter-group-other"] img[alt="Morph LLM"]').should('not.exist');
+      cy.get('[data-testid="supporter-group-other"] img[alt="Morph"]').should('not.exist');
       cy.get('@providerScroll').then((stub) => {
         (stub as unknown as { restore: () => void }).restore();
       });
@@ -415,7 +415,7 @@ describe('QuotesContent supporter logo wall', () => {
     for (const locale of ['en', 'zh'] as const) {
       cy.mount(<IntroSection locale={locale} />);
       cy.get('[data-testid="intro-section"]').should('not.contain.text', 'Morph');
-      cy.get('a[href$="#quote-morph-llm"]').should('not.exist');
+      cy.get('a[href$="#quote-morph"]').should('not.exist');
       cy.get('a[href$="#quote-google"]').should('exist');
     }
   });
@@ -432,12 +432,12 @@ describe('QuotesContent supporter logo wall', () => {
           );
           for (const section of [
             '[data-testid="supporter-group-managed-inference-providers"]',
-            '#quote-morph-llm',
+            '#quote-morph',
           ]) {
-            cy.get(`${section} img[alt="Morph LLM"]:visible`)
+            cy.get(`${section} img[alt="Morph"]:visible`)
               .should('have.length', 1)
               .and('have.attr', 'src', '/logos/morph.svg');
-            cy.get(`${section} img[alt="Morph LLM"]:visible`).should(($images) => {
+            cy.get(`${section} img[alt="Morph"]:visible`).should(($images) => {
               const image = $images[0] as HTMLImageElement;
               expect(image.naturalWidth).to.equal(174);
               expect(image.naturalHeight).to.equal(48);
@@ -449,7 +449,7 @@ describe('QuotesContent supporter logo wall', () => {
               expect(rect.right).to.be.at.most(width);
             });
           }
-          cy.get('#quote-morph-llm').should('contain.text', 'Nicholas Khami');
+          cy.get('#quote-morph').should('contain.text', 'Nicholas Khami');
         }
       });
     }

@@ -591,9 +591,9 @@ export const QUOTES: Quote[] = [
     textZh:
       '硬件是自己买的，每一项推理服务决策都会直接影响利润率。InferenceX 的开放、可复现基准测试展示了不同加速器和推理引擎在真实工作负载下的实际表现，让我们这样规模较小的服务商也能用和行业巨头一样的数据来做基础设施决策。还没有谁能像他们这样展示 acceptance length。',
     name: 'Nicholas Khami',
-    title: 'Morph LLM',
-    titleZh: 'Morph LLM',
-    org: 'Morph LLM',
+    title: 'Morph',
+    titleZh: 'Morph',
+    org: 'Morph',
     logo: 'morph.svg',
   },
   {
