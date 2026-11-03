@@ -392,6 +392,26 @@ describe('OperatorX progressive rendering', { testIsolation: true }, () => {
       .find('svg')
       .should('exist');
   });
+
+  it('toggles a GPU from a lower legend without scrolling the page', () => {
+    cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', gemm).as('comparison');
+    cy.visit('/operatorx');
+    cy.wait('@comparison');
+    cy.get('[data-testid="operatorx-viz-metric-vs-size"]')
+      .scrollIntoView()
+      .should('have.attr', 'aria-busy', 'false');
+    cy.window().then((win) => {
+      const before = win.scrollY;
+      cy.get('[data-testid="operatorx-viz-metric-vs-size"] li label')
+        .first()
+        .click({ scrollBehavior: false });
+      cy.get('[data-testid="operatorx-viz-metric-vs-size"] li input')
+        .first()
+        .should('not.be.checked')
+        .and('have.focus');
+      cy.window().its('scrollY').should('eq', before);
+    });
+  });
 });
 
 const operatorPoints = () =>

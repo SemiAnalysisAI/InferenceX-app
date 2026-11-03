@@ -42,6 +42,8 @@ export interface CommonLegendItemProps {
   section?: string;
   /** Why enabling this inactive item is blocked; shown as its tooltip with a not-allowed cursor. */
   blockedReason?: string;
+  /** Prefixes the checkbox id so several legends for the same items on one page do not share ids. */
+  idScope?: string;
 }
 
 const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
@@ -64,10 +66,11 @@ const ChartLegendItem: React.FC<CommonLegendItemProps> = ({
   hideAriaLabel,
   showPointsAriaLabel,
   blockedReason,
+  idScope,
 }) => {
   const locale = useLocale();
   const t = STRINGS[locale];
-  const id = `checkbox-${hw || name}`;
+  const id = `checkbox-${idScope ? `${idScope}-` : ''}${hw || name}`;
   const isLongText = (label ?? '').length > 8;
   const canRemove = isActive && Boolean(onRemove);
   const isBlocked = !isActive && Boolean(blockedReason);
