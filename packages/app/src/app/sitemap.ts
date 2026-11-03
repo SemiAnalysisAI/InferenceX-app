@@ -75,14 +75,16 @@ function localizedPair(
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  // One availability read feeds every slug list. Route handlers get no React cache to dedupe it.
+  const availabilityRead = getCachedAvailability();
   const [compareSlugs, precisionSlugs, specDecodeSlugs, datasets, runEntries, availability] =
     await Promise.all([
-      getAllComparableCompareSlugs(),
-      getAllComparablePrecisionSlugs(),
-      getAllComparableSpecDecodeSlugs(),
+      availabilityRead.then(getAllComparableCompareSlugs),
+      availabilityRead.then(getAllComparablePrecisionSlugs),
+      availabilityRead.then(getAllComparableSpecDecodeSlugs),
       FIXTURES_MODE ? Promise.resolve([]) : getCachedDatasets(),
       getAvailableRunEntries(),
-      getCachedAvailability(),
+      availabilityRead,
     ]);
   const dataDates = dataLastModified(availability);
   const latestData = dataDates.latest;

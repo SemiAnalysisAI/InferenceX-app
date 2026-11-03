@@ -16,7 +16,7 @@ import {
   precisionDisplayLabel,
 } from '@/lib/compare/compare-variant-slug';
 
-export const revalidate = 3600;
+export const revalidate = 86400;
 
 const DESCRIPTION =
   '数值精度如何影响芯片推理性能？在同一芯片上直接对比 FP4、FP8、BF16、INT4 等精度格式在 DeepSeek、Kimi、MiniMax、GLM、Qwen 等模型上的推理表现。';

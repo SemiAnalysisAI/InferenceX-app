@@ -1,4 +1,5 @@
 import { GPU_KEYS, SPEC_METHOD_KEYS } from '@semianalysisai/inferencex-constants';
+import type { AvailabilityRow } from '@semianalysisai/inferencex-db/queries/workflow-info';
 
 import { COMPARE_MODEL_SLUGS } from '@/lib/compare/compare-slug';
 import { buildDbKeyToSlugMap, getCachedAvailability } from '@/lib/compare/compare-availability';
@@ -21,8 +22,11 @@ export interface SpecDecodePair {
   method: string;
 }
 
-export async function getPrecisionPairsByModelSlug(): Promise<Map<string, PrecisionPair[]>> {
-  const rows = await getCachedAvailability();
+/** Pass `availability` when the caller already read it (the sitemap reads it once). */
+export async function getPrecisionPairsByModelSlug(
+  availability?: readonly AvailabilityRow[],
+): Promise<Map<string, PrecisionPair[]>> {
+  const rows = availability ?? (await getCachedAvailability());
   const dbKeyToSlug = buildDbKeyToSlugMap();
 
   const precByModelGpu = new Map<string, Set<string>>();
@@ -73,10 +77,10 @@ export async function getPrecisionPairsByModelSlug(): Promise<Map<string, Precis
   return out;
 }
 
-export async function getAllComparablePrecisionSlugs(): Promise<
-  { modelSlug: string; gpu: string; precA: string; precB: string }[]
-> {
-  const byModel = await getPrecisionPairsByModelSlug();
+export async function getAllComparablePrecisionSlugs(
+  availability?: readonly AvailabilityRow[],
+): Promise<{ modelSlug: string; gpu: string; precA: string; precB: string }[]> {
+  const byModel = await getPrecisionPairsByModelSlug(availability);
   const result: { modelSlug: string; gpu: string; precA: string; precB: string }[] = [];
   for (const [modelSlug, pairs] of byModel.entries()) {
     for (const p of pairs) {
@@ -86,8 +90,11 @@ export async function getAllComparablePrecisionSlugs(): Promise<
   return result;
 }
 
-export async function getSpecDecodePairsByModelSlug(): Promise<Map<string, SpecDecodePair[]>> {
-  const rows = await getCachedAvailability();
+/** Pass `availability` when the caller already read it (the sitemap reads it once). */
+export async function getSpecDecodePairsByModelSlug(
+  availability?: readonly AvailabilityRow[],
+): Promise<Map<string, SpecDecodePair[]>> {
+  const rows = availability ?? (await getCachedAvailability());
   const dbKeyToSlug = buildDbKeyToSlugMap();
 
   const methodsByModelGpuPrec = new Map<string, Set<string>>();
@@ -140,10 +147,10 @@ export async function getSpecDecodePairsByModelSlug(): Promise<Map<string, SpecD
   return out;
 }
 
-export async function getAllComparableSpecDecodeSlugs(): Promise<
-  { modelSlug: string; gpu: string; precision: string; method: string }[]
-> {
-  const byModel = await getSpecDecodePairsByModelSlug();
+export async function getAllComparableSpecDecodeSlugs(
+  availability?: readonly AvailabilityRow[],
+): Promise<{ modelSlug: string; gpu: string; precision: string; method: string }[]> {
+  const byModel = await getSpecDecodePairsByModelSlug(availability);
   const result: { modelSlug: string; gpu: string; precision: string; method: string }[] = [];
   for (const [modelSlug, pairs] of byModel.entries()) {
     for (const p of pairs) {

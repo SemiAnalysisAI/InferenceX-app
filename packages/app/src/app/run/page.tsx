@@ -11,7 +11,7 @@ import { PUBLIC_INFERENCE_MODEL_SLUGS } from '@/lib/routing/inference-model-slug
 import { runPageHeading, type RunPageEntry } from '@/lib/live-seo/run-pages';
 import { getAvailableRunEntries } from '@/lib/live-seo/run-rankings-data.server';
 
-export const revalidate = 3600;
+export const revalidate = 86400;
 
 const title = 'Run Any Model on Any GPU: Measured Results';
 const description =

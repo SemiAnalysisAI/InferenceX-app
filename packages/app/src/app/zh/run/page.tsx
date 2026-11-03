@@ -12,7 +12,7 @@ import type { RunPageEntry } from '@/lib/live-seo/run-pages';
 import { runPageHeadingZh } from '@/lib/live-seo/run-pages-zh';
 import { getAvailableRunEntries } from '@/lib/live-seo/run-rankings-data.server';
 
-export const revalidate = 3600;
+export const revalidate = 86400;
 
 const title = '任意模型在任意 GPU 上的实测结果';
 const description =

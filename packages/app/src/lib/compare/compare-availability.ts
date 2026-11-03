@@ -27,8 +27,7 @@ export function buildDbKeyToSlugMap(): Map<string, string> {
   return dbKeyToSlug;
 }
 
-async function getHardwareByModelSlug(): Promise<Map<string, Set<string>>> {
-  const rows = await getCachedAvailability();
+function hardwareByModelSlug(rows: readonly AvailabilityRow[]): Map<string, Set<string>> {
   const dbKeyToSlug = buildDbKeyToSlugMap();
   const out = new Map<string, Set<string>>();
   for (const m of COMPARE_MODEL_SLUGS) out.set(m.slug, new Set());
@@ -40,8 +39,11 @@ async function getHardwareByModelSlug(): Promise<Map<string, Set<string>>> {
   return out;
 }
 
-export async function getComparablePairsByModelSlug(): Promise<Map<string, ComparePair[]>> {
-  const hwByModel = await getHardwareByModelSlug();
+/** Pass `rows` when the caller already read availability (the sitemap reads it once). */
+export async function getComparablePairsByModelSlug(
+  rows?: readonly AvailabilityRow[],
+): Promise<Map<string, ComparePair[]>> {
+  const hwByModel = hardwareByModelSlug(rows ?? (await getCachedAvailability()));
   const allPairs = allCanonicalComparePairs();
   const out = new Map<string, ComparePair[]>();
   for (const m of COMPARE_MODEL_SLUGS) {
@@ -54,10 +56,10 @@ export async function getComparablePairsByModelSlug(): Promise<Map<string, Compa
   return out;
 }
 
-export async function getAllComparableCompareSlugs(): Promise<
-  { modelSlug: string; a: string; b: string }[]
-> {
-  const byModel = await getComparablePairsByModelSlug();
+export async function getAllComparableCompareSlugs(
+  rows?: readonly AvailabilityRow[],
+): Promise<{ modelSlug: string; a: string; b: string }[]> {
+  const byModel = await getComparablePairsByModelSlug(rows);
   const out: { modelSlug: string; a: string; b: string }[] = [];
   for (const [modelSlug, pairs] of byModel.entries()) {
     for (const p of pairs) out.push({ modelSlug, a: p.a, b: p.b });

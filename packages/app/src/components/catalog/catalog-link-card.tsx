@@ -1,8 +1,8 @@
 'use client';
 
-import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
 
+import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';
 import { track } from '@/lib/analytics/analytics';
 import type { Locale } from '@/lib/i18n/i18n';
 
@@ -25,8 +25,10 @@ export function CatalogLinkCard({
   locale,
   event,
 }: CatalogLinkCardProps) {
+  // Index pages list many cards whose targets render on their first request, so viewport
+  // prefetch would render every visible one. Prefetch on hover, focus or touch instead.
   return (
-    <Link
+    <IntentPrefetchLink
       href={href}
       className="group flex min-h-14 items-center justify-between gap-4 rounded-lg border border-border/50 bg-background/30 px-4 py-3 transition-[border-color,background-color,box-shadow] hover:border-brand/45 hover:bg-brand/5 hover:shadow-sm focus-visible:outline-none"
       onClick={() => track(event, { slug, locale })}
@@ -50,6 +52,6 @@ export function CatalogLinkCard({
         aria-hidden="true"
         className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-brand"
       />
-    </Link>
+    </IntentPrefetchLink>
   );
 }

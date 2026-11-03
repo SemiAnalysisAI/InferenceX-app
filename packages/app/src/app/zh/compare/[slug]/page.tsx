@@ -35,7 +35,7 @@ import { CompareDetailRouteSkeleton } from '@/components/motion/route-skeletons'
 
 import ComparePageClient from '../../../compare/[slug]/page-client';
 
-export const revalidate = 3600;
+export const revalidate = 86400;
 
 export function generateStaticParams(): { slug: string }[] {
   return [];

@@ -71,9 +71,11 @@ and the repository root `.vercelignore` assumes that layout. It defines no cron 
 `/logos`, `/decorative`, `/whitepaper`, favicons and `og-image.png`):
 `public, max-age=86400, stale-while-revalidate=604800`. File names there are reused across
 deploys, so they are not marked immutable. Optimized images (`/_next/image`) are served as
-WebP with a one-day `minimumCacheTTL`. `src/proxy.ts` runs only for API routes,
-embed pages, legacy Inference power links, and compare share links with query state; its
-`config.matcher` must stay a static literal.
+WebP with a one-day `minimumCacheTTL`. `src/proxy.ts` runs only for API requests from the
+`inferencex-cli` and `inferencex-skill` user agents, embed pages, legacy Inference power links,
+gated saved model selections, model-route aliases and retired profit percentiles, and compare
+share links with query state. Its `config.matcher` must stay a static literal, so its list of model
+aliases has to change whenever `COMPARE_MODEL_ALIASES` does (`proxy.test.ts` checks this).
 
 `patches/next@16.3.3.patch` (root `patchedDependencies`) fixes the self-hosted image optimizer
 used by `next start`, including CI. Unpatched, Next reads a local source image through a mocked

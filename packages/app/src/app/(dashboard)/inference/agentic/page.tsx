@@ -24,7 +24,8 @@ export const metadata: Metadata = {
   }),
 };
 
-export const dynamic = 'force-dynamic';
+// The catalog read is cached under the ingest-purged page tag, so new runs regenerate the page.
+export const revalidate = 86400;
 
 const jsonLd = {
   '@context': 'https://schema.org',
