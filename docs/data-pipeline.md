@@ -530,6 +530,12 @@ minus TTFT, then divides by `output_sequence_length - 1`. The same helper powers
 the one-time `db:backfill-full-response-interactivity` data migration, keeping
 historical rows and newly ingested rows on one definition.
 
+### Disaggregated Throughput Basis
+
+Disaggregated rows store `input_tput_per_gpu` per prefill chip, `output_tput_per_gpu` per decode chip, and `tput_per_gpu` per deployment chip. The fixed-sequence producer writes that basis directly. The AgentX producer divides all three by every chip, so `etl/disagg-throughput.ts` moves multinode agentic disaggregated rows to the per-pool basis at ingest and copies the producer's rates to `input_tput_per_total_gpu` / `output_tput_per_total_gpu`.
+
+`admin:db:backfill-agentic-disagg-throughput` applies the same change to stored rows, then refreshes `latest_benchmarks`; run `admin:cache:invalidate <origin> --immediate` afterwards. The benchmark queries apply it on read too, so the app is correct before the backfill and on public-DB copies, whose sync never updates existing rows. Raw SQL readers such as the MCP server see the per-pool basis only after the backfill. A row holding either per-total key is never rescaled twice.
+
 ### Agentic Point-Detail Payloads
 
 The point-detail page deliberately splits its immutable trace data by use case.

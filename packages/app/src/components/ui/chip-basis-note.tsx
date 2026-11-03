@@ -21,18 +21,21 @@ export function ChipBasisNote({
   text,
   chipBasis,
   testId,
+  showToggle = true,
 }: {
   visible: boolean;
   label: string;
   text: string;
   chipBasis: ChipBasisControl;
   testId?: string;
+  /** False where the current selection does not depend on the basis. */
+  showToggle?: boolean;
 }) {
   const totalBasis = chipBasis.value === 'total';
   return (
     <div
       className={`overflow-hidden transition-all duration-200 ease-in-out ${
-        visible ? 'max-h-48 opacity-100' : 'max-h-0 opacity-0'
+        visible ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
       }`}
     >
       <div
@@ -46,7 +49,7 @@ export function ChipBasisNote({
           <strong>{label}</strong>
           {text}
         </p>
-        {visible && (
+        {visible && showToggle && (
           <ChipBasisToggle
             value={chipBasis.value}
             onValueChange={chipBasis.onChange}

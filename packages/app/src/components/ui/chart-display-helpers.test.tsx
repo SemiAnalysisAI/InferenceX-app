@@ -76,7 +76,9 @@ describe('MetricAssumptionNotes', () => {
 
     expect(getVisibleText()).toContain('All in Power/Chip:');
     expect(getVisibleText()).toContain('SemiAnalysis Datacenter Industry Model');
-    expect(getVisibleCaveatText()).toContain('calculate power per decode chip or per prefill chip');
+    expect(getVisibleCaveatText()).toContain(
+      'calculate throughput per MW per decode chip or per prefill chip',
+    );
   });
 
   it('hides the disaggregation caveat for the total per-MW metric', () => {
@@ -85,7 +87,7 @@ describe('MetricAssumptionNotes', () => {
     expect(getVisibleText()).toContain('All in Power/Chip:');
     expect(getVisibleText()).toContain('SemiAnalysis Datacenter Industry Model');
     expect(getVisibleCaveatText()).not.toContain(
-      'calculate power per decode chip or per prefill chip',
+      'calculate throughput per MW per decode chip or per prefill chip',
     );
   });
 
@@ -95,7 +97,7 @@ describe('MetricAssumptionNotes', () => {
       renderUi(<MetricAssumptionNotes selectedYAxisMetric={metric} />);
 
       expect(getVisibleCaveatText()).toContain(
-        'calculate power per decode chip or per prefill chip',
+        'calculate throughput per MW per decode chip or per prefill chip',
       );
     },
   );
@@ -111,7 +113,7 @@ describe('MetricAssumptionNotes', () => {
 
     expect(getVisibleText()).not.toContain('SemiAnalysis Datacenter Industry Model');
     expect(getVisibleCaveatText()).not.toContain(
-      'calculate power per decode chip or per prefill chip',
+      'calculate throughput per MW per decode chip or per prefill chip',
     );
 
     renderUi(
@@ -124,7 +126,7 @@ describe('MetricAssumptionNotes', () => {
 
     expect(getVisibleText()).toContain('SemiAnalysis Datacenter Industry Model');
     expect(getVisibleCaveatText()).not.toContain(
-      'calculate power per decode chip or per prefill chip',
+      'calculate throughput per MW per decode chip or per prefill chip',
     );
   });
 
@@ -333,7 +335,7 @@ function control(value: 'pool' | 'total', onChange = vi.fn()) {
 
 describe('MetricAssumptionNotes — chip basis toggle', () => {
   const visibleNote = () =>
-    [...container.querySelectorAll('div.max-h-40 p')].map((p) => p.textContent ?? '').join(' ');
+    [...container.querySelectorAll('div.max-h-96 p')].map((p) => p.textContent ?? '').join(' ');
   const toggle = () => container.querySelector('[data-testid="chip-basis-toggle"]');
 
   it.each([

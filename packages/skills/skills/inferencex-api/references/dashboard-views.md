@@ -74,8 +74,12 @@ throughput, total-token cost, measured and provisioned power boundaries, and
 aggregated rows are identical under both. Responses echo the resolved
 `params.chipBasis`; other views reject the parameter. The dashboard exposes the
 same choice as a toggle in the disaggregated-config note below the chart and
-stores it in the share URL as `g_chips=total`. It applies to unofficial-run
-overlays as well.
+stores it in the share URL as `g_chips=total`; on the total basis, chart titles and
+axis labels add "(All Chips)". It applies to unofficial-run overlays and to every
+page that embeds the inference chart (PowerX and the comparison pages). The
+`compare` view and comparison-page tables stay on the stored per-pool basis.
+Token revenue and the measured input/output token mix are identical under both
+bases.
 
 Stored raw rows (`/api/v1/benchmarks`) keep the per-pool basis for fixed-sequence
 and AgentX runs alike. The AgentX producer divides all three rates by every chip; ingest and a

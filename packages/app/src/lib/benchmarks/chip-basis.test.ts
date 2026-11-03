@@ -3,10 +3,13 @@ import { describe, expect, it } from 'vitest';
 import type { BenchmarkRow } from '@/lib/api/api';
 
 import {
+  CHIP_BASIS_METRICS,
   inputTputPerTotalChip,
+  perTotalChipRates,
   rowsWithChipBasis,
   totalChipFactors,
   withChipBasis,
+  withTotalChipQualifier,
 } from './chip-basis';
 
 function row(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
@@ -49,6 +52,10 @@ describe('totalChipFactors', () => {
 
   it.each([
     ['aggregated rows', { disagg: false }],
+    [
+      'legacy rows without a real prefill/decode split',
+      { prefill_num_workers: 0, decode_num_workers: 0, num_prefill_gpu: 72, num_decode_gpu: 72 },
+    ],
     ['a missing prefill pool', { num_prefill_gpu: 0 }],
     ['a missing decode pool', { num_decode_gpu: 0 }],
   ])('leaves %s alone', (_label, overrides) => {
@@ -100,6 +107,8 @@ describe('inputTputPerTotalChip', () => {
     expect(
       inputTputPerTotalChip({
         disagg: true,
+        prefill_num_workers: 1,
+        decode_num_workers: 1,
         num_prefill_gpu: 4,
         num_decode_gpu: 12,
         input_tput_per_gpu: 3600,
@@ -118,5 +127,38 @@ describe('inputTputPerTotalChip', () => {
       }),
     ).toBe(900);
     expect(inputTputPerTotalChip({ disagg: false, input_tput_per_gpu: 900 })).toBe(900);
+  });
+});
+
+describe('perTotalChipRates', () => {
+  it('returns the same per-deployment-chip rates for a row on either basis', () => {
+    const pool = row();
+    expect(perTotalChipRates({ ...pool, ...pool.metrics })).toEqual({
+      input: 900,
+      output: (133 * 12) / 16,
+    });
+    const total = withChipBasis(pool, 'total');
+    expect(perTotalChipRates({ ...total, ...total.metrics })).toEqual({
+      input: 900,
+      output: (133 * 12) / 16,
+    });
+  });
+});
+
+describe('withTotalChipQualifier', () => {
+  it('names the denominator in both languages', () => {
+    expect(withTotalChipQualifier('Output Token Throughput per Chip', 'en')).toBe(
+      'Output Token Throughput per Chip (All Chips)',
+    );
+    expect(withTotalChipQualifier('每芯片输出 token 吞吐量', 'zh')).toBe(
+      '每芯片输出 token 吞吐量（按芯片总数）',
+    );
+    expect(withTotalChipQualifier(undefined, 'en')).toBeUndefined();
+  });
+
+  it('covers every metric whose caveat offers the toggle', () => {
+    for (const key of CHIP_BASIS_METRICS) expect(key.startsWith('y_')).toBe(true);
+    expect(CHIP_BASIS_METRICS.has('y_tpPerGpu')).toBe(false);
+    expect(CHIP_BASIS_METRICS.has('y_tokenRevenuePerGpuHour')).toBe(false);
   });
 });

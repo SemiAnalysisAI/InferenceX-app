@@ -106,6 +106,7 @@ const NOUN_ZH: Record<string, string> = {
   'input throughput': '输入吞吐量',
   'output throughput': '输出吞吐量',
   power: '功耗',
+  'throughput per MW': '每 MW 吞吐量',
   Joules: '能耗',
   'Joules per token': '每 token 能耗',
 };
@@ -162,7 +163,7 @@ function DisaggCaveat({
       className={`overflow-hidden transition-all duration-200 ease-in-out ${
         visible
           ? chipBasis
-            ? 'max-h-40 opacity-100'
+            ? 'max-h-96 opacity-100'
             : 'max-h-20 opacity-100'
           : 'max-h-0 opacity-0'
       }`}
@@ -336,10 +337,10 @@ export function MetricAssumptionNotes({
         locale={locale}
         chipBasis={chipBasis}
       />
-      {includePowerThroughputCaveat && (
+      {(includePowerThroughputCaveat || chipBasis) && (
         <DisaggCaveat
           visible={PER_TOKEN_TYPE_POWER_METRICS.has(selectedYAxisMetric)}
-          calculationNoun="power"
+          calculationNoun="throughput per MW"
           locale={locale}
           chipBasis={chipBasis}
         />

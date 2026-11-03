@@ -59,3 +59,41 @@ export function perPoolThroughputPatch(
     output_tput_per_total_gpu: output,
   };
 }
+
+interface StoredBenchmarkRow {
+  benchmark_type: string;
+  disagg: boolean;
+  is_multinode: boolean;
+  num_prefill_gpu: number;
+  num_decode_gpu: number;
+  metrics: Record<string, number>;
+}
+
+/**
+ * Whether a row is one the agentic producer divided by every chip. Only multinode
+ * runs carry separate prefill and decode chip counts; the single-node fallback sets
+ * both pool sizes to the whole deployment, which would double the rates.
+ */
+export function isPerTotalAgenticCandidate(row: {
+  benchmark_type?: string;
+  disagg?: boolean;
+  is_multinode?: boolean;
+}): boolean {
+  return (
+    row.benchmark_type === 'agentic_traces' && row.disagg === true && row.is_multinode === true
+  );
+}
+
+/**
+ * Puts agentic disaggregated rows that predate the per-pool ingest on the per-pool
+ * basis as they are read, exactly as the backfill would store them, so readers never
+ * depend on the backfill having run (including public-DB copies, whose sync never
+ * updates existing rows). Rows already rescaled are returned unchanged.
+ */
+export function withStoredPerPoolBasis<T extends StoredBenchmarkRow>(rows: T[]): T[] {
+  return rows.map((row) => {
+    if (!isPerTotalAgenticCandidate(row)) return row;
+    const patch = perPoolThroughputPatch(row.metrics, row.num_prefill_gpu, row.num_decode_gpu);
+    return patch ? { ...row, metrics: { ...row.metrics, ...patch } } : row;
+  });
+}

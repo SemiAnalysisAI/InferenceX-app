@@ -199,6 +199,8 @@ describe('buildChartData', () => {
         framework: 'dynamo-sglang',
         disagg: true,
         is_multinode: true,
+        prefill_num_workers: 1,
+        decode_num_workers: 1,
         num_prefill_gpu: 4,
         num_decode_gpu: 12,
         isl: 1024,

@@ -28,6 +28,7 @@ async function main(): Promise<void> {
     join configs c on c.id = br.config_id
     where br.benchmark_type = 'agentic_traces'
       and c.disagg
+      and c.is_multinode
     order by br.id
   `;
   const patches = rows.flatMap((row) => {
@@ -54,7 +55,9 @@ async function main(): Promise<void> {
   });
   console.log(`  Rescaled ${patches.length} row(s).`);
   await refreshLatestBenchmarks(sql);
-  console.log('  Invalidate API cache after the backfill: bun run admin:cache:invalidate');
+  console.log(
+    '  Invalidate the API cache after the backfill: bun run admin:cache:invalidate <origin> --immediate',
+  );
 }
 
 runBackfillMain('backfill-agentic-disagg-throughput', sql, main);

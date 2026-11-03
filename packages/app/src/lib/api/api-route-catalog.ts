@@ -1621,7 +1621,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/calculator/throughput-data.ts',
-    sourceSha256: '871a573bd0b408a2848c36111dec8939e787e3d3c3baae247105a19c3c9030e4',
+    sourceSha256: '9015f88f84f45c2fa47ef8e869f0630c59ca415e6b2cca01cb516fd9b83844da',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1879,7 +1879,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/benchmarks.ts',
-    sourceSha256: '8e9a09b505a8d01ca0660116d87692ac3c8ad57a5bf80bbde7fb041bf90acf22',
+    sourceSha256: 'e2825508c7603344580a8277dc7477051a7d4b58a8283a9562e24cfe9407bd69',
     reviewArea: {
       en: 'Benchmark row fields and latest, exact-run, history, and TCO query semantics.',
       zh: '基准行字段以及最新、精确运行、历史和 TCO 查询语义。',

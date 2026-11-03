@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { perPoolThroughputPatch } from './disagg-throughput';
+import { perPoolThroughputPatch, withStoredPerPoolBasis } from './disagg-throughput';
 
 describe('perPoolThroughputPatch', () => {
   const perTotal = { tput_per_gpu: 1000, input_tput_per_gpu: 900, output_tput_per_gpu: 100 };
@@ -68,5 +68,51 @@ describe('perPoolThroughputPatch', () => {
     ['non-finite output', { ...perTotal, output_tput_per_gpu: Number.NaN }, 4, 12],
   ])('returns null for %s', (_label, metrics, p, d) => {
     expect(perPoolThroughputPatch(metrics, p, d)).toBeNull();
+  });
+});
+
+function stored(overrides: Record<string, unknown> = {}) {
+  return {
+    benchmark_type: 'agentic_traces',
+    disagg: true,
+    is_multinode: true,
+    num_prefill_gpu: 4,
+    num_decode_gpu: 12,
+    metrics: { tput_per_gpu: 1000, input_tput_per_gpu: 900, output_tput_per_gpu: 100 } as Record<
+      string,
+      number
+    >,
+    ...overrides,
+  };
+}
+
+describe('withStoredPerPoolBasis', () => {
+  it('reads an unbackfilled agentic row exactly as the backfill would store it', () => {
+    const row = stored();
+    const [read] = withStoredPerPoolBasis([row]);
+    expect(read.metrics).toEqual({ ...row.metrics, ...perPoolThroughputPatch(row.metrics, 4, 12) });
+    expect(row.metrics.input_tput_per_gpu).toBe(900);
+  });
+
+  it('returns backfilled rows unchanged', () => {
+    const backfilled = stored({
+      metrics: {
+        tput_per_gpu: 1000,
+        input_tput_per_gpu: 3600,
+        output_tput_per_gpu: 133.33,
+        input_tput_per_total_gpu: 900,
+        output_tput_per_total_gpu: 100,
+      },
+    });
+    expect(withStoredPerPoolBasis([backfilled])[0]).toBe(backfilled);
+  });
+
+  it.each([
+    ['fixed-sequence rows', { benchmark_type: 'single_turn' }],
+    ['aggregated rows', { disagg: false }],
+    ['single-node rows, whose pool sizes are both the whole deployment', { is_multinode: false }],
+  ])('leaves %s alone', (_label, overrides) => {
+    const row = stored(overrides);
+    expect(withStoredPerPoolBasis([row])[0]).toBe(row);
   });
 });

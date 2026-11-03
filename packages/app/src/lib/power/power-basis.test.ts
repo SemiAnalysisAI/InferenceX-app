@@ -238,6 +238,8 @@ function disaggRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
   return row({
     disagg: true,
     is_multinode: true,
+    prefill_num_workers: 1,
+    decode_num_workers: 1,
     workers: [
       { role: 'prefill', worker_idx: 0, num_gpus: 8, hosts: ['prefill-node'], avg_power_w: 300 },
       { role: 'decode', worker_idx: 0, num_gpus: 8, hosts: ['decode-node'], avg_power_w: 700 },

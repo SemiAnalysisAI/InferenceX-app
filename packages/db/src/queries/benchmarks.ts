@@ -1,5 +1,6 @@
 import type { DbClient } from '../connection.js';
 import type { PowerAudit, WorkerPower } from '../etl/benchmark-mapper.js';
+import { withStoredPerPoolBasis } from '../etl/disagg-throughput.js';
 export type { PowerAudit, WorkerPower } from '../etl/benchmark-mapper.js';
 
 /**
@@ -414,7 +415,7 @@ export async function getLatestBenchmarks(
       exact: exact ?? false,
       asOfRunId: !exact && asOfRunId ? Number(asOfRunId) : undefined,
     });
-    return rows as unknown as BenchmarkRow[];
+    return withStoredPerPoolBasis(rows as unknown as BenchmarkRow[]);
   }
 
   // No date filter: use materialized view for instant lookups
@@ -465,7 +466,7 @@ export async function getLatestBenchmarks(
     WHERE c.model = ANY(${modelKeys})
     ORDER BY lb.config_id, lb.conc, lb.isl, lb.osl, lb.date DESC
   `;
-  return rows as unknown as BenchmarkRow[];
+  return withStoredPerPoolBasis(rows as unknown as BenchmarkRow[]);
 }
 
 /**
@@ -484,7 +485,7 @@ export async function getBenchmarksForRun(
     kind: 'run',
     githubRunId: Number(githubRunId),
   });
-  return rows as unknown as BenchmarkRow[];
+  return withStoredPerPoolBasis(rows as unknown as BenchmarkRow[]);
 }
 
 /** Fetch every logical curve snapshot across time for historical views. */
@@ -502,5 +503,5 @@ export async function getAllBenchmarksForHistory(
     osl,
     benchmarkType,
   });
-  return rows as unknown as BenchmarkRow[];
+  return withStoredPerPoolBasis(rows as unknown as BenchmarkRow[]);
 }

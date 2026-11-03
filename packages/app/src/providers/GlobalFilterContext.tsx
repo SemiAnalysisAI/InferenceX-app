@@ -353,7 +353,11 @@ export function GlobalFilterProvider({
       applyIfMatches('g_runid', RUNID_RE, setRequestedRunId);
     }
     setTcoBasis(getUrlParam('g_tco') === 'external' ? 'external' : DEFAULT_TCO_BASIS);
-    setChipBasis(getUrlParam('g_chips') === 'total' ? 'total' : DEFAULT_CHIP_BASIS);
+    // Profit-estimator routes carry no g_chips segment; keep the session's basis
+    // there instead of resetting it, and apply it again on return.
+    if (hasExplicitUrlParam('g_chips')) {
+      setChipBasis(getUrlParam('g_chips') === 'total' ? 'total' : DEFAULT_CHIP_BASIS);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 

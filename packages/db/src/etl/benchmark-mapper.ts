@@ -204,7 +204,7 @@ export function mapBenchmarkRow(
   let metrics = captureNumericMetrics(row);
   normalizePowerContractMetrics(row, metrics);
   if (isAgentic) metrics = preferFullResponseMetrics(metrics);
-  if (isAgentic && topology.disagg) {
+  if (isAgentic && topology.disagg && topology.isMultinode) {
     const perPool = perPoolThroughputPatch(metrics, topology.numPrefillGpu, topology.numDecodeGpu);
     if (perPool) Object.assign(metrics, perPool);
   }

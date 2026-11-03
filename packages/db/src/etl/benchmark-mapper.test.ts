@@ -1714,6 +1714,15 @@ describe('mapBenchmarkRow — v3 agentic nested agg schema', () => {
       expect(m).not.toHaveProperty('input_tput_per_total_gpu');
     });
 
+    it('leaves single-node agentic disaggregated rows alone', () => {
+      const m = mapBenchmarkRow(
+        makeV3AgenticRow({ ...disaggOverrides, is_multinode: false }),
+        createSkipTracker(),
+      )!.metrics;
+      expect(m.input_tput_per_gpu).toBeCloseTo(8995.035, 3);
+      expect(m).not.toHaveProperty('input_tput_per_total_gpu');
+    });
+
     it('does not touch fixed-sequence disaggregated rows', () => {
       const m = mapBenchmarkRow(
         makeV1Row({
