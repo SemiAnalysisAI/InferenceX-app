@@ -10,7 +10,7 @@ import type { Locale } from '@/lib/i18n/i18n';
 import type { ModelPage } from '@/lib/catalog/model-pages';
 import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
-import { LazyEmbeddedModelDashboard } from './lazy-embedded-model-dashboard';
+import EmbeddedModelDashboard from './EmbeddedModelDashboard';
 import ModelArchitectureInline from './ModelArchitectureInline';
 import ModelDeveloperLogo from './ModelDeveloperLogo';
 import {
@@ -156,10 +156,7 @@ export default async function ModelDetailContent({
               {t.openDashboard}
             </Link>
           </div>
-          <LazyEmbeddedModelDashboard
-            displayName={entry.displayName}
-            sequence={scenario.sequence}
-          />
+          <EmbeddedModelDashboard displayName={entry.displayName} sequence={scenario.sequence} />
         </Card>
       </div>
     </main>

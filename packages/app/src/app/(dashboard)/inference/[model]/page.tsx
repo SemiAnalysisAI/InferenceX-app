@@ -3,8 +3,9 @@ import { notFound } from 'next/navigation';
 
 import { SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
-import { LazyInferencePageIntro } from '@/components/inference/lazy-inference-page-intro';
-import { LazyInferenceDashboard } from '@/components/inference/lazy-inference-dashboard';
+import { InferencePageIntro } from '@/components/inference/inference-page-intro';
+import { InferenceProvider } from '@/components/inference/InferenceContext';
+import InferenceChartDisplay from '@/components/inference/ui/ChartDisplay';
 import { enAlternates } from '@/lib/i18n/i18n';
 import { inferenceModelMeta } from '@/lib/routing/inference-model-meta';
 import {
@@ -43,8 +44,10 @@ export default async function InferenceModelPage({ params }: Props) {
   if (!entry) notFound();
   return (
     <>
-      <LazyInferencePageIntro locale="en" />
-      <LazyInferenceDashboard activeTab="inference" centerOnEnter />
+      <InferencePageIntro locale="en" />
+      <InferenceProvider activeTab="inference">
+        <InferenceChartDisplay centerOnEnter />
+      </InferenceProvider>
     </>
   );
 }

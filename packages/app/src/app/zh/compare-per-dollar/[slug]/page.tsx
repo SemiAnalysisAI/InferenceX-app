@@ -27,7 +27,7 @@ import { compareSocialImages } from '@/lib/compare/compare-meta';
 import { perDollarMetaDescriptionZh, perDollarMetaTitleZh } from '@/lib/compare/compare-meta-zh';
 import { socialMetadata } from '@/lib/seo/social-metadata';
 
-import { LazyComparePerDollarPageClient } from '../../../compare-per-dollar/[slug]/lazy-page-client';
+import ComparePerDollarPageClient from '../../../compare-per-dollar/[slug]/page-client';
 
 export const revalidate = 86400;
 
@@ -165,7 +165,7 @@ export async function renderPerDollarPageZh(slug: string, { scenarioSegment }: S
     <>
       <JsonLd data={jsonLd} />
       <JsonLd data={breadcrumbJsonLd} />
-      <LazyComparePerDollarPageClient
+      <ComparePerDollarPageClient
         a={parsed.a}
         b={parsed.b}
         slug={canonical}

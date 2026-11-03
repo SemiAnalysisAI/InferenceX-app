@@ -41,9 +41,8 @@ replacing a figure, run `bun run blog:figure-dimensions` from `packages/app` and
 updated file. `figure-dimensions.test.ts` fails when a figure has no recorded size. Only the
 first figure on a page loads eagerly with high fetch priority; the rest are lazy.
 
-`HardwareChart` is available only on hardware pages, which add it to the shared MDX component map
-when they call `compileBlogMdx`. It loads with `next/dynamic`, so blog posts ship neither the
-chart loader nor the dashboard bundle.
+`HardwareChart` is loaded with `next/dynamic`, so pages that never render it do not download the
+dashboard bundle.
 
 ### Scheduled Publishing (`publishDate`)
 

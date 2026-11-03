@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-import { LazyFirstTokenLimitsDisplay } from '@/components/calculator/lazy-calculator-displays';
+import FirstTokenLimitsDisplay from '@/components/calculator/FirstTokenLimitsDisplay';
 import { tabMetadata } from '@/lib/routing/tab-meta';
 import { TabIntro } from '@/components/dashboard/tab-intro';
 
@@ -9,7 +9,7 @@ export const metadata: Metadata = tabMetadata('first-token');
 export default function FirstTokenPage() {
   return (
     <>
-      <LazyFirstTokenLimitsDisplay />
+      <FirstTokenLimitsDisplay />
       <TabIntro tab="first-token" />
     </>
   );

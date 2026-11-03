@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 
-import { LazyThroughputCalculatorDisplay } from '@/components/calculator/lazy-calculator-displays';
+import ThroughputCalculatorDisplay from '@/components/calculator/ThroughputCalculatorDisplay';
 import { MODEL_ROUTES, modelRoutePath, resolveModelRouteSlug } from '@/lib/routing/model-routes';
 import { MODEL_TAB_META, modelTabMetadata } from '@/lib/routing/tab-meta';
 import { TabIntro } from '@/components/dashboard/tab-intro';
@@ -30,7 +30,7 @@ export default async function CalculatorModelPage({ params }: Props) {
   }
   return (
     <>
-      <LazyThroughputCalculatorDisplay routeModel={resolved.route.model} />
+      <ThroughputCalculatorDisplay routeModel={resolved.route.model} />
       <TabIntro
         tab="calculator"
         title={MODEL_TAB_META.calculator.title(resolved.route.seoName)}

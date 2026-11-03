@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-import { LazyFeedbackViewer } from '@/components/feedback-viewer/lazy-feedback-viewer';
+import FeedbackViewer from '@/components/feedback-viewer/FeedbackViewer';
 import { tabMetadata } from '@/lib/routing/tab-meta';
 import { TabIntro } from '@/components/dashboard/tab-intro';
 
@@ -10,7 +10,7 @@ export const metadata: Metadata = { ...meta, robots: { index: false, follow: fal
 export default function FeedbackPage() {
   return (
     <>
-      <LazyFeedbackViewer />
+      <FeedbackViewer />
       <TabIntro tab="feedback" />
     </>
   );

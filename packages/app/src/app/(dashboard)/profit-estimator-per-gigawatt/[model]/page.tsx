@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-import { LazyProfitEstimatorDisplay } from '@/components/calculator/lazy-calculator-displays';
+import ProfitEstimatorDisplay from '@/components/calculator/ProfitEstimatorDisplay';
 import {
   profitRouteInput,
   type ProfitRouteProps,
@@ -34,7 +34,7 @@ export default async function ProfitEstimatorModelPage({ params }: Props) {
   const resolved = await profitRouteInput('profit-estimator-per-gigawatt', false, params);
   return (
     <>
-      <LazyProfitEstimatorDisplay basis="gw-year" routeModel={resolved.route.model} />
+      <ProfitEstimatorDisplay basis="gw-year" routeModel={resolved.route.model} />
       <TabIntro
         tab="profit-estimator-per-gigawatt"
         title={MODEL_TAB_META['profit-estimator-per-gigawatt'].title(resolved.route.seoName)}

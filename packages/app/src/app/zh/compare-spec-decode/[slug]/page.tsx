@@ -34,7 +34,7 @@ import { compareSocialImages } from '@/lib/compare/compare-meta';
 import { specDecodeMetaDescriptionZh, specDecodeMetaTitleZh } from '@/lib/compare/compare-meta-zh';
 import { socialMetadata } from '@/lib/seo/social-metadata';
 
-import { LazyCompareSpecDecodePageClient } from '../../../compare-spec-decode/[slug]/lazy-page-client';
+import CompareSpecDecodePageClient from '../../../compare-spec-decode/[slug]/page-client';
 
 export const revalidate = 3600;
 
@@ -195,7 +195,7 @@ export async function renderSpecDecodePageZh(slug: string, { scenarioSegment }: 
     <>
       <JsonLd data={jsonLd} />
       <JsonLd data={breadcrumbJsonLd} />
-      <LazyCompareSpecDecodePageClient
+      <CompareSpecDecodePageClient
         gpu={parsed.gpu}
         method={parsed.method}
         slug={canonical}

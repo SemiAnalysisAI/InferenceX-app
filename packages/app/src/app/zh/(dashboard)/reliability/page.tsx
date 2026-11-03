@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
-import { LazyReliabilityDashboard } from '@/components/reliability/lazy-reliability-dashboard';
+import { ReliabilityProvider } from '@/components/reliability/ReliabilityContext';
+import ReliabilityChartDisplay from '@/components/reliability/ui/ChartDisplay';
 import { ZhTabIntro } from '@/components/zh/zh-tab-intro';
 import { tabMetadataZh } from '@/lib/routing/tab-meta-zh';
 
@@ -9,7 +10,9 @@ export const metadata: Metadata = tabMetadataZh('reliability');
 export default function ZhReliabilityPage() {
   return (
     <>
-      <LazyReliabilityDashboard />
+      <ReliabilityProvider>
+        <ReliabilityChartDisplay />
+      </ReliabilityProvider>
       <ZhTabIntro tab="reliability" />
     </>
   );
