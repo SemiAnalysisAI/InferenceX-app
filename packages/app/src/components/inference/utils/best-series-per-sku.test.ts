@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { InferenceData } from '@/components/inference/types';
 
-import { baseSku, bestSeriesPerSku, withUnrankedSkus } from './best-series-per-sku';
+import { baseSku, bestSeriesPerSku, hypervolume, withUnrankedSkus } from './best-series-per-sku';
 
 function point(hw: string, hwKey: string, x: number, y: number): InferenceData {
   return { hw, hwKey, x, y } as InferenceData;
@@ -110,6 +110,65 @@ describe('bestSeriesPerSku', () => {
     );
 
     expect(bestSeriesPerSku(rows, 'upper_left')).toEqual(new Set(['mi355x_vllm']));
+  });
+
+  it('keeps a large lead where values are high over a long tail of small leads (DeepSeek-V4-Pro GB200)', () => {
+    // Production AgentX tok/$ frontiers at P90 interactivity, 2026-11-03. Dynamo SGLang leads
+    // over more of the axis, but Dynamo vLLM roughly doubles it between 80 and 105 tok/s/user.
+    const curves: Record<string, [number, number][]> = {
+      'gb200_dynamo-sglang': [
+        [55.46, 140_744_522],
+        [65.45, 124_912_721],
+        [77.58, 102_921_402],
+        [120.48, 54_271_086],
+        [137.55, 50_479_877],
+        [151.06, 34_442_724],
+        [239.81, 7_570_912],
+        [287.36, 4_787_344],
+      ],
+      'gb200_dynamo-vllm': [
+        [80.52, 204_225_994],
+        [93.9, 164_837_221],
+        [95.79, 164_643_739],
+        [104.6, 74_816_632],
+        [119.19, 46_391_493],
+        [141.04, 24_066_238],
+        [178.89, 7_029_949],
+        [255.75, 4_056_408],
+      ],
+    };
+    const rows = Object.entries(curves).flatMap(([hwKey, points]) =>
+      points.map(([x, y]) => point('GB200-NVL72', hwKey, x, y)),
+    );
+
+    expect(bestSeriesPerSku(rows, 'upper_left')).toEqual(new Set(['gb200_dynamo-vllm']));
+  });
+
+  it('ranks a lower-is-better metric exactly like its reciprocal', () => {
+    const tokensPerDollar = [
+      point('B200-8', 'b200_steady', 10, 900),
+      point('B200-8', 'b200_steady', 40, 500),
+      point('B200-8', 'b200_steady', 80, 200),
+      point('B200-8', 'b200_peaky', 10, 1_400),
+      point('B200-8', 'b200_peaky', 30, 400),
+      point('B200-8', 'b200_peaky', 90, 150),
+      point('B200-8', 'b200_short', 50, 600),
+      point('B200-8', 'b200_short', 60, 450),
+    ];
+    const dollarsPerMillion = tokensPerDollar.map((row) => ({ ...row, y: 1e6 / row.y }));
+
+    const higher = bestSeriesPerSku(tokensPerDollar, 'upper_left');
+    expect(bestSeriesPerSku(dollarsPerMillion, 'lower_right')).toEqual(higher);
+    // Areas: short 60·450 + 50·150 = 34,500; steady 32,000; peaky 31,000.
+    expect(higher).toEqual(new Set(['b200_short']));
+    const steady = tokensPerDollar.filter((row) => row.hwKey === 'b200_steady');
+    expect(hypervolume(steady, 'upper_left')).toBe(32_000);
+    expect(
+      hypervolume(
+        steady.map((row) => ({ ...row, y: 1 / row.y })),
+        'lower_right',
+      ),
+    ).toBe(32_000);
   });
 
   it('does not let a singleton preview displace a complete curve', () => {

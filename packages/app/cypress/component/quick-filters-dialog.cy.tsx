@@ -31,7 +31,9 @@ describe('QuickFiltersDialog', () => {
         const explanations = [
           [
             'best-per-sku',
-            locale === 'zh' ? '所有候选曲线实测到的完整区间' : 'full range any candidate measured',
+            locale === 'zh'
+              ? 'Pareto 前沿在图表中所覆盖的面积'
+              : 'chart area its measured Pareto frontier dominates',
           ],
           ['vendor', locale === 'zh' ? '芯片制造商' : 'company that makes the chip'],
           ['framework', 'Dynamo vLLM'],
