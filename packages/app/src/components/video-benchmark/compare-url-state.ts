@@ -76,18 +76,3 @@ export function resolveCompareSelection(
   }
   return { baseline, candidate, caseIndex: selection.caseIndex };
 }
-
-/** Returns a new URL with defaults omitted; the input URL is not mutated. */
-export function writeVideoCompareSelection(
-  url: URL,
-  resolved: VideoCompareSelection,
-  defaults: ComparePair,
-): URL {
-  const out = new URL(url);
-  const set = (key: string, value: string | null) =>
-    value === null ? out.searchParams.delete(key) : out.searchParams.set(key, value);
-  set('v_base', resolved.baseline === defaults.baseline ? null : resolved.baseline);
-  set('v_cand', resolved.candidate === defaults.candidate ? null : resolved.candidate);
-  set('v_case', resolved.caseIndex > 0 ? String(resolved.caseIndex) : null);
-  return out;
-}

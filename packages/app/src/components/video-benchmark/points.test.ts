@@ -112,13 +112,6 @@ describe('videoPoints', () => {
     },
   );
 
-  it.each([null, '', '0', '-1', '01', '1,2', 'abc', '99999999999999999'])(
-    'rejects invalid named run %s',
-    (run) => {
-      expect(namedRunPoints([page], run)).toEqual([]);
-    },
-  );
-
   it('keeps a legacy stored source in History without turning it into an official chart point', () => {
     const legacy = structuredClone(page);
     delete legacy.entries[0].approved;

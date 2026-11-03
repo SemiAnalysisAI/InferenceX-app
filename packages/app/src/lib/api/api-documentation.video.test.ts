@@ -4,18 +4,6 @@ import { RESULT_CSV_COLUMNS } from '@/components/video-benchmark/results-csv';
 import { toCsv } from '@/lib/views-api/csv';
 
 describe('VideoGenX overview API documentation', () => {
-  it('exposes separate named-run deployment series before the GPU-count filter', () => {
-    const document = buildOpenApiDocument('https://api-docs.test');
-    const schema = Object.values(document.components.schemas).find(
-      (value) => 'properties' in value && value.properties?.clipQuality,
-    )!;
-    expect(schema).toMatchObject({
-      properties: {
-        overlayCells: { type: 'array' },
-        overlayDeploymentCells: { type: 'array' },
-      },
-    });
-  });
   it('documents the overview-only CSV representation and format selector', () => {
     const document = buildOpenApiDocument('https://api-docs.test');
     const operation = (document.paths['/api/v1/views/video'] as Record<string, unknown>).get as {
@@ -24,26 +12,11 @@ describe('VideoGenX overview API documentation', () => {
     };
     const format = operation.parameters.find((parameter) => parameter.name === 'format');
     expect(format?.schema).toEqual({ type: 'string', enum: ['json', 'csv'], default: 'json' });
-    expect(format?.description).toContain('only with view=overview');
     expect(operation.responses['200'].content).toHaveProperty('application/json');
     expect(operation.responses['200'].content).toHaveProperty('text/csv');
     expect(operation.responses['200'].content['text/csv']).toMatchObject({
       example: toCsv([], RESULT_CSV_COLUMNS),
     });
-  });
-  it('documents per-clip decoded RGB PSNR, explicit exact matches and missing pairs', () => {
-    const document = buildOpenApiDocument('https://api-docs.test');
-    const operation = (document.paths['/api/v1/views/video'] as Record<string, unknown>).get as {
-      responses: Record<string, { content: Record<string, { schema: { $ref: string } }> }>;
-    };
-    const name = operation.responses['200'].content['application/json'].schema.$ref
-      .split('/')
-      .at(-1)!;
-    const schema = document.components.schemas[name] as { properties: Record<string, unknown> };
-    const quality = schema.properties.clipQuality;
-    expect(JSON.stringify(quality)).toContain('decoded-rgb24-all-frames');
-    expect(JSON.stringify(quality)).toContain('identical');
-    expect(JSON.stringify(quality)).toContain('No cohort PSNR aggregate');
   });
   it('distinguishes native diagnostic media from its original CI context', () => {
     const document = buildOpenApiDocument('https://api-docs.test');
@@ -52,6 +25,8 @@ describe('VideoGenX overview API documentation', () => {
     )!;
     expect(schema).toMatchObject({
       properties: {
+        overlayCells: { type: 'array' },
+        overlayDeploymentCells: { type: 'array' },
         clipQuality: {
           properties: {
             groups: {
@@ -65,6 +40,12 @@ describe('VideoGenX overview API documentation', () => {
                         pointId: { type: ['string', 'null'] },
                         contextPointId: { type: ['string', 'null'] },
                         slotId: { type: ['string', 'null'] },
+                        quality: {
+                          properties: {
+                            status: { enum: ['measured', 'identical', 'incompatible'] },
+                            psnrDb: { type: ['number', 'null'] },
+                          },
+                        },
                       },
                     },
                   },

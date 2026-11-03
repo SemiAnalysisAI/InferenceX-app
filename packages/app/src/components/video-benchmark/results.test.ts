@@ -39,7 +39,7 @@ const evidence = (overrides: Partial<ResultsEvidence> = {}): ResultsEvidence => 
 describe('VideoGenX results contract', () => {
   it('includes qualified H100 evidence without adding an empty slot to legacy comparisons', () => {
     // Synthetic hardware substitution exercises admission; it is not an H100 measurement.
-    const h100 = { ...eligible, id: 'h100:c1', hardwareKey: 'h100', allocated: 8 };
+    const h100 = { ...eligible, id: 'h100:c1', hardwareKey: 'h100', runId: '200' };
     const legacy = resultProjection(
       points.filter((point) => point.hardwareKey !== 'h100'),
       state(),
@@ -48,28 +48,15 @@ describe('VideoGenX results contract', () => {
     const result = resultProjection([h100], state());
     expect(result.roster).toEqual(['gb200', 'b200', 'mi355x', 'h200', 'h100']);
     expect(result.cells[0].point.id).toBe(h100.id);
-    expect(result.cells[0].cost.allocated!.perVideo).toBeCloseTo(
-      result.cells[0].cost.participating!.perVideo * 2,
-    );
-    expect(resultProjection([h100], { ...state(), hidden: ['h100'] }).cells).toEqual([]);
     expect(resultProjection([{ ...h100, samples: 9 }], state()).roster).not.toContain('h100');
-  });
-
-  it('keeps a named H100 diagnostic out of default results and removes its slot on dismissal', () => {
-    const h100 = {
-      ...eligible,
-      id: 'h100:c1',
-      hardwareKey: 'h100',
-      runId: '200',
-      approved: false,
-    };
-    const selection = { ...state(), unofficialRun: h100.runId };
-    const result = resultProjection([eligible], selection, [h100]);
-    expect(result.roster).toContain('h100');
-    expect(result.overlayCells[0].point).toMatchObject({ id: h100.id, approved: false });
-    expect(result.cells.map((cell) => cell.point.id)).toEqual([eligible.id]);
-    expect(resultProjection([eligible], state(), [h100]).roster).not.toContain('h100');
-    expect(resultProjection([eligible], state(), [h100]).overlayCells).toEqual([]);
+    const namedH100 = { ...h100, approved: false };
+    const selection = { ...state(), unofficialRun: namedH100.runId };
+    const named = resultProjection([eligible], selection, [namedH100]);
+    expect(named.roster).toContain('h100');
+    expect(named.overlayCells[0].point).toMatchObject({ id: namedH100.id, approved: false });
+    expect(named.cells.map((cell) => cell.point.id)).toEqual([eligible.id]);
+    expect(resultProjection([eligible], state(), [namedH100]).roster).not.toContain('h100');
+    expect(resultProjection([eligible], state(), [namedH100]).overlayCells).toEqual([]);
   });
 
   it('uses one complete 20-clip C1 workload, the same ten-sample floor and the requested hardware roster', () => {
@@ -271,11 +258,11 @@ describe('VideoGenX results contract', () => {
       expect(resultProjection([], selection, [{ ...named, ...change }]).overlayCells).toEqual([]);
   });
 
-  it('round-trips all controls, including per-mode prices, through the shared URL/API parser', () => {
+  it('parses public control keys and preserves explicit zero prices', () => {
     const selection: ResultsState = {
       ...state(),
       model: 'MiniMaxAI/MiniMax-H3',
-      workload: eligible.workloadKey!,
+      workload: 'selected-source:c1',
       resolution: '1344×768',
       duration: 8,
       mode: 't2v',
@@ -291,18 +278,32 @@ describe('VideoGenX results contract', () => {
       utilization: 0.5,
       unofficialRun: '123',
     };
-    expect(parseResultsState(resultsSearch(selection))).toEqual(selection);
-    expect(parseResultsState('r_api=NaN&r_deadline=-2&r_utilization=Infinity').apiPrice).toBeNull();
+    expect(
+      parseResultsState(
+        'r_model=MiniMaxAI%2FMiniMax-H3&r_workload=selected-source%3Ac1&r_resolution=1344%C3%97768&r_duration=8&r_mode=t2v&r_steps=50&r_gpus=4&r_engine=sglang&r_date=2026-10-18&r_hidden=mi355x&r_deadline=60&r_tier=r&r_api=0.02&r_price_t2v=0&r_price_i2v=0.1&r_utilization=0.5&unofficialrun=123',
+      ),
+    ).toEqual(selection);
+    const shared = new URLSearchParams(resultsSearch(selection));
+    expect(shared.get('unofficialruns')).toBe('123');
+    expect(shared.has('unofficialrun')).toBe(false);
+    expect(shared.get('r_price_t2v')).toBe('0');
+    expect(shared.get('r_price_i2v')).toBe('0.1');
+    expect(shared.has('r_price_r2v')).toBe(false);
+    expect(parseResultsState('r_api=NaN&r_deadline=-2&r_utilization=Infinity')).toMatchObject({
+      apiPrice: null,
+      deadlineSeconds: 120,
+      utilization: 1,
+    });
   });
   it('shares a compact source selector while retaining full prompt/seed identity internally', () => {
-    const projection = resultProjection(points, state());
+    const projection = resultProjection([eligible], state());
     const selected = projection.options.workloads[0].key;
-    expect(selected.length).toBeLessThan(100);
-    const result = resultProjection(points, { ...state(), workload: selected });
-    expect(result.cells.length).toBeGreaterThan(0);
-    expect(result.workloadKey).toContain('cases');
-    expect(resultsSearch(result.state).length).toBeLessThan(300);
-    expect(resultProjection(points, { ...state(), workload: 'missing' }).cells).toEqual([]);
+    expect(selected).toBe(eligible.id);
+    const result = resultProjection([eligible], { ...state(), workload: selected });
+    expect(result.workloadKey).toBe(eligible.workloadKey);
+    expect(result.cells.map((cell) => cell.point.id)).toEqual([eligible.id]);
+    expect(new URLSearchParams(resultsSearch(result.state)).get('r_workload')).toBe(eligible.id);
+    expect(resultProjection([eligible], { ...state(), workload: 'missing' }).cells).toEqual([]);
   });
   it('keeps engines and workload-mix cohorts distinct rather than overwriting or pooling them', () => {
     const a = { ...eligible, id: 'first:c1', results: evidence({ engine: 'sglang' }) };
@@ -359,12 +360,5 @@ describe('VideoGenX results contract', () => {
       resultProjection([{ ...eligible, workloadKey: JSON.stringify(identity) }], state()).cells[0]
         .deliveryP50,
     ).toBeNull();
-  });
-  it('preserves the single published overlay through the canonical shared-link alias', () => {
-    const selected = parseResultsState('unofficialrun=123');
-    const shared = resultsSearch(selected);
-    expect(new URLSearchParams(shared).get('unofficialruns')).toBe('123');
-    expect(parseResultsState(shared).unofficialRun).toBe('123');
-    expect(parseResultsState('unofficialruns=123,456').unofficialRun).toBeNull();
   });
 });

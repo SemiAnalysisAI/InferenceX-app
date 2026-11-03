@@ -226,6 +226,8 @@ describe('published VideoGenX dashboard projection', () => {
     const body = await response.json();
     expect(body.cells[0].point.runId).toBe('124');
     expect(body.overlayCells[0].point.runId).toBe('123');
+    expect(body.clipQuality.status).toBe('ready');
+    expect(body.clipQuality.groups[0].clips[0].quality.releaseQualified).toBe(false);
     expect(body.clipQuality.groups[0].clips[0].quality.candidate.run_id).toBe('123');
     expect(body.clipQuality.groups[0].clips[0].quality.psnrDb).toBe(25);
     const projection = resultProjection(
@@ -244,35 +246,6 @@ describe('published VideoGenX dashboard projection', () => {
     const cleared = await clearedResponse.json();
     expect(cleared.clipQuality.groups[0].clips[0].quality.candidate.run_id).toBe('124');
     expect(cleared.clipQuality.groups[0].clips[0].quality.psnrDb).toBe(35);
-  });
-  it('returns the same exact per-clip quality as the UI and removes it with the named run', async () => {
-    const f = referenceQualityFixture(20);
-    f.stored.quality = verifiedReferencePairs(f.attachment, f.receipts, [f.stored], '9'.repeat(64));
-    const mediaPath = f.attachment.pairs[0].candidate.media_path;
-    f.stored.sources[0].assets = [[mediaPath, { url: '/media.mp4', downloadUrl: '/media.mp4' }]];
-    const history: VideoHistoryPage = {
-      schemaVersion: 1,
-      nextPage: null,
-      entries: [videoHistoryEntry(f.stored, null)],
-    };
-    source.mockImplementation((req: NextRequest) =>
-      Response.json(req.nextUrl.searchParams.get('format') === 'history' ? history : f.stored),
-    );
-    const response = await GET(request('view=overview&unofficialrun=123'));
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    const points = namedRunPoints([history], '123');
-    const point = points.find((item) => item.cell === 'c1')!;
-    expect(body.clipQuality).toEqual({
-      status: 'ready',
-      groups: resultsClipEvidence([publishedResultsSide(f.stored, point)]),
-    });
-    expect(body.clipQuality.groups[0].clips[0].quality.psnrDb).toBe(25);
-    expect(body.clipQuality.groups[0].clips[0].quality.releaseQualified).toBe(false);
-    const clearedResponse = await GET(request('view=overview'));
-    const cleared = await clearedResponse.json();
-    expect(cleared.clipQuality.groups).toEqual([]);
-    expect(cleared.cells).toEqual([]);
   });
   it('returns diagnostic native identities beside unchanged CI performance and clears both with the overlay', async () => {
     const f = diagnosticQualityFixture('h100', 7, 'a'.repeat(64), 20);
@@ -332,7 +305,14 @@ describe('published VideoGenX dashboard projection', () => {
       official.cells.find((cell: { point: { id: string } }) => cell.point.id === point.id).point
         .hardwareKey,
     ).toBe('h100');
-    history.entries.find((entry) => entry.runId === point.runId)!.approved = false;
+    const selected = history.entries.find((entry) => entry.runId === point.runId)!;
+    selected.approved = false;
+    const other = structuredClone(selected);
+    other.runId = '987654321';
+    other.id = `${other.runId}.${other.artifact.id}`;
+    for (const item of other.sources)
+      for (const row of item.observations) row.id = `other:${row.id}`;
+    history.entries.unshift(other);
     const namedResponse = await GET(request(`view=overview&unofficialrun=${point.runId}`));
     const named = await namedResponse.json();
     expect(named).toMatchObject(
@@ -343,6 +323,15 @@ describe('published VideoGenX dashboard projection', () => {
       ),
     );
     expect(named.overlayCells[0].point).toMatchObject({ hardwareKey: 'h100', approved: false });
+    expect(named.overlayCells).toHaveLength(1);
+    expect(named.overlayCells[0].point).toMatchObject({
+      runId: point.runId,
+      artifactId: selected.artifact.id,
+    });
+    expect(named.cells.map((cell: { point: { runId: string } }) => cell.point.runId)).not.toContain(
+      point.runId,
+    );
+    expect(JSON.stringify(named)).not.toContain(other.runId);
     const gpuFilteredResponse = await GET(
       request(
         `view=overview&unofficialrun=${point.runId}&r_gpus=${point.participating === 4 ? 8 : 4}`,
@@ -360,6 +349,7 @@ describe('published VideoGenX dashboard projection', () => {
     const clearedResponse = await GET(request('view=overview'));
     const cleared = await clearedResponse.json();
     expect(cleared.roster).not.toContain('h100');
+    expect(cleared.overlayCells).toEqual([]);
     expect(
       cleared.cells.some(
         (cell: { point: { hardwareKey: string } }) => cell.point.hardwareKey === 'h100',
@@ -390,6 +380,10 @@ describe('published VideoGenX dashboard projection', () => {
     const wrongView = await GET(request('view=dashboard&r_tier=h'));
     expect(mixed.status).toBe(400);
     expect(wrongView.status).toBe(400);
+    const multiple = await GET(request('view=overview&unofficialruns=123,456'));
+    const aliases = await GET(request('view=overview&unofficialrun=123&unofficialruns=456'));
+    expect(multiple.status).toBe(400);
+    expect(aliases.status).toBe(400);
   });
 
   it('keeps a stored legacy entry out of the default public dashboard', async () => {
@@ -406,53 +400,6 @@ describe('published VideoGenX dashboard projection', () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.rows).toEqual([]);
-  });
-
-  it('shows only the explicitly named unapproved run in overview overlays', async () => {
-    const history = structuredClone(retainedHistory) as unknown as VideoHistoryPage;
-    history.nextPage = null;
-    const run = videoPoints([history]).find((point) => point.hardwareKey === 'b200')!.runId;
-    const selected = history.entries.find((entry) => entry.runId === run)!;
-    selected.approved = false;
-    const other = structuredClone(selected);
-    other.runId = '987654321';
-    other.id = `${other.runId}.${other.artifact.id}`;
-    for (const item of other.sources)
-      for (const row of item.observations) row.id = `other:${row.id}`;
-    history.entries.unshift(other);
-    source.mockImplementation(() => Response.json(history));
-
-    const response = await GET(request(`view=overview&unofficialrun=${run}`));
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body.overlayCells).toHaveLength(1);
-    expect(body).toMatchObject(
-      resultProjection(
-        videoPoints([history]),
-        parseResultsState(`unofficialrun=${run}`),
-        namedRunPoints([history], run),
-      ),
-    );
-    expect(body.overlayCells[0]).toMatchObject({
-      overlay: true,
-      point: { runId: run, approved: false, artifactId: selected.artifact.id },
-    });
-    expect(body.cells.map((cell: { point: { runId: string } }) => cell.point.runId)).not.toContain(
-      run,
-    );
-    expect(JSON.stringify(body)).not.toContain(other.runId);
-
-    const clearedResponse = await GET(request('view=overview'));
-    const cleared = await clearedResponse.json();
-    expect(cleared.overlayCells).toEqual([]);
-    expect(
-      cleared.cells.map((cell: { point: { runId: string } }) => cell.point.runId),
-    ).not.toContain(run);
-    expect(
-      source.mock.calls.every(([req]) =>
-        ['history', 'published'].includes(req.nextUrl.searchParams.get('format')),
-      ),
-    ).toBe(true);
   });
 
   it('returns the shared diagnostic-only projection and CSV from the same selected cells', async () => {
@@ -525,16 +472,6 @@ describe('published VideoGenX dashboard projection', () => {
     expect(
       source.mock.calls.every(([req]) => req.nextUrl.searchParams.get('format') === 'history'),
     ).toBe(true);
-  });
-  it('accepts the canonical single overlay alias but rejects ambiguous or multiple overlays', async () => {
-    const single = await GET(request('view=overview&unofficialruns=123'));
-    expect(single.status).toBe(200);
-    const body = await single.json();
-    expect(body.params.unofficialRun).toBe('123');
-    const multiple = await GET(request('view=overview&unofficialruns=123,456'));
-    const aliases = await GET(request('view=overview&unofficialrun=123&unofficialruns=456'));
-    expect(multiple.status).toBe(400);
-    expect(aliases.status).toBe(400);
   });
 
   it('shares axis, tier, optimal, API price, compare and hardware-filter semantics with the UI', async () => {

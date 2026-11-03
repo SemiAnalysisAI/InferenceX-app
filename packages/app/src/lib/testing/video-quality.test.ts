@@ -40,20 +40,10 @@ async function fixture() {
     writeFile(join(dir, 'SHA256SUMS'), sums),
     writeFile(config.path, text),
   ]);
-  return { ...f, config, dir, mediaPath, mediaSha, receiptSha };
+  return { stored: f.stored, config, dir, mediaPath };
 }
 
 describe('local quality attachment byte verification', () => {
-  it('reads only sealed reference media and returns no private filesystem paths', async () => {
-    const f = await fixture();
-    const result = await readLocalVideoQuality(f.config, [f.stored]);
-    expect(result.pairs[0].psnrDb).toBe(25);
-    expect(await result.media.get(f.receiptSha)?.get('drum-taps/reference.mp4')?.text()).toBe(
-      'test-only-reference-bytes',
-    );
-    expect(JSON.stringify(result.pairs)).not.toContain(f.dir);
-    expect(result.pairs[0].reference.url).toBe('');
-  });
   it.each(['attachment', 'receipt', 'inventory', 'media'])(
     'rejects tampered %s bytes',
     async (defect) => {

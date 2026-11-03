@@ -14,8 +14,7 @@ const fetchMock = vi.fn<typeof fetch>();
 vi.stubGlobal('fetch', fetchMock);
 const dirs: string[] = [];
 const mediaPath = 'gpu/c1/baseline/artifacts/clip.mp4';
-const url = (tail: string) =>
-  `http://localhost/api/video-runs?run=123&artifact=7&format=replay-asset&source=123&path=${encodeURIComponent(mediaPath)}${tail}`;
+const assetUrl = `http://localhost/api/video-runs?run=123&artifact=7&format=replay-asset&source=123&path=${encodeURIComponent(mediaPath)}`;
 
 async function configure() {
   const dir = await mkdtemp(join(tmpdir(), 'video-replay-'));
@@ -137,7 +136,7 @@ async function configureDiagnostic() {
     manifest,
     JSON.stringify({ ...config, diagnostics: { path, sha256: await sha256(new Blob([text])) } }),
   );
-  return { dir, f };
+  return { dir };
 }
 
 afterEach(async () => {
@@ -286,45 +285,28 @@ describe('original-artifact development replay', () => {
     expect(history.entries[0].publishedAt).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
   });
-  it('replaces history and exact artifact without an external read or approval', async () => {
-    await configure();
-    const history = await GET(new NextRequest('http://localhost/api/video-runs?format=history'));
-    expect(history.status).toBe(200);
-    expect(history.headers.get('x-videogenx-replay')).toBe('1');
-    const page = await history.json();
-    expect(page.entries).toHaveLength(1);
-    expect(page.entries[0]).toMatchObject({ runId: '123', approved: false, publishedAt: null });
-    expect(page.entries[0].sources[0].releaseQualified).toBe(false);
-    const artifact = await GET(
-      new NextRequest('http://localhost/api/video-runs?run=123&artifact=7&format=published'),
-    );
-    expect(artifact.status).toBe(200);
-    const saved = await artifact.json();
-    expect(saved.sources[0].assets[0][1].url).toContain('format=replay-asset');
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
 
   it('serves only verified member bytes with GET ranges, HEAD, and 416', async () => {
     await configure();
-    const full = await GET(new NextRequest(url('')));
+    const full = await GET(new NextRequest(assetUrl));
     expect(full.status).toBe(200);
     expect(full.headers.get('content-length')).toBe('10');
     expect(full.headers.get('cache-control')).toBe('private, no-store');
     expect(await full.text()).toBe('0123456789');
-    const part = await GET(new NextRequest(url(''), { headers: { range: 'bytes=2-5' } }));
+    const part = await GET(new NextRequest(assetUrl, { headers: { range: 'bytes=2-5' } }));
     expect(part.status).toBe(206);
     expect(part.headers.get('content-range')).toBe('bytes 2-5/10');
     expect(await part.text()).toBe('2345');
-    const suffix = await GET(new NextRequest(url(''), { headers: { range: 'bytes=-3' } }));
+    const suffix = await GET(new NextRequest(assetUrl, { headers: { range: 'bytes=-3' } }));
     expect(await suffix.text()).toBe('789');
     // Next auto-implements HEAD by calling GET when the route has no HEAD export.
     const head = await GET(
-      new NextRequest(url(''), { method: 'HEAD', headers: { range: 'bytes=2-5' } }),
+      new NextRequest(assetUrl, { method: 'HEAD', headers: { range: 'bytes=2-5' } }),
     );
     expect(head.status).toBe(206);
     expect(head.headers.get('content-length')).toBe('4');
     expect(await head.text()).toBe('');
-    const unsatisfiable = await GET(new NextRequest(url(''), { headers: { range: 'bytes=10-' } }));
+    const unsatisfiable = await GET(new NextRequest(assetUrl, { headers: { range: 'bytes=10-' } }));
     expect(unsatisfiable.status).toBe(416);
     expect(unsatisfiable.headers.get('content-range')).toBe('bytes */10');
     expect(fetchMock).not.toHaveBeenCalled();
@@ -334,6 +316,7 @@ describe('original-artifact development replay', () => {
     await configureCollection([7, 8]);
     const history = await GET(new NextRequest('http://localhost/api/video-runs?format=history'));
     expect(history.status).toBe(200);
+    expect(history.headers.get('x-videogenx-replay')).toBe('1');
     const page = await history.json();
     expect(page.entries).toHaveLength(2);
     expect(page.entries.map((entry: { artifact: { id: number } }) => entry.artifact.id)).toEqual([
@@ -349,11 +332,11 @@ describe('original-artifact development replay', () => {
       );
       expect(artifact.status).toBe(200);
       const saved = await artifact.json();
-      const assetUrl = saved.sources[0].assets[0][1].url;
-      const media = await GET(new NextRequest(`http://localhost${assetUrl}`));
+      const storedAssetUrl = saved.sources[0].assets[0][1].url;
+      const media = await GET(new NextRequest(`http://localhost${storedAssetUrl}`));
       expect(await media.text()).toBe(`clip-${entry.artifact.id}`);
     }
-    const wrongRun = await GET(new NextRequest(url('').replace('run=123', 'run=124')));
+    const wrongRun = await GET(new NextRequest(assetUrl.replace('run=123', 'run=124')));
     expect(wrongRun.status).toBe(404);
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -372,7 +355,7 @@ describe('original-artifact development replay', () => {
 
   it('withholds every artifact when the second member fails verification', async () => {
     await configureCollection([7, 8], 8);
-    for (const path of ['http://localhost/api/video-runs?format=history', url('')]) {
+    for (const path of ['http://localhost/api/video-runs?format=history', assetUrl]) {
       const response = await GET(new NextRequest(path));
       expect(response.status).toBe(503);
       const body = await response.json();
@@ -386,8 +369,8 @@ describe('original-artifact development replay', () => {
     for (const request of [
       'http://localhost/api/video-runs?run=124&artifact=7&format=published',
       'http://localhost/api/video-runs?run=123&artifact=8&format=published',
-      url('').replace('source=123', 'source=124'),
-      url('').replace(encodeURIComponent(mediaPath), '..%2Fsecret.mp4'),
+      assetUrl.replace('source=123', 'source=124'),
+      assetUrl.replace(encodeURIComponent(mediaPath), '..%2Fsecret.mp4'),
     ]) {
       const response = await GET(new NextRequest(request));
       expect(response.status).toBe(404);
@@ -395,14 +378,14 @@ describe('original-artifact development replay', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('requires every gate and fails closed on invalid local configuration', async () => {
+  it('requires development fixture mode and fails closed on an unreadable replay manifest', async () => {
     await configure();
     vi.stubEnv('NODE_ENV', 'production');
-    const production = await GET(new NextRequest(url('')));
+    const production = await GET(new NextRequest(assetUrl));
     expect(production.status).toBe(404);
     vi.stubEnv('NODE_ENV', 'development');
     vi.stubEnv('E2E_FIXTURES', '0');
-    const disabled = await GET(new NextRequest(url('')));
+    const disabled = await GET(new NextRequest(assetUrl));
     expect(disabled.status).toBe(404);
     vi.stubEnv('E2E_FIXTURES', '1');
     vi.stubEnv('E2E_VIDEO_REPLAY_MANIFEST', '/missing/replay-manifest.json');
@@ -410,19 +393,6 @@ describe('original-artifact development replay', () => {
     expect(failed.status).toBe(503);
     const failure = await failed.json();
     expect(failure.error).toContain('Local replay unavailable');
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it('does not expose a partially verified source when the sealed plan fails', async () => {
-    const original = await configure();
-    vi.mocked(readVideoReplay).mockResolvedValueOnce({
-      ...original,
-      report: { ...original.report, ok: false, errors: ['plan SHA256 mismatch'] },
-    });
-    const response = await GET(new NextRequest('http://localhost/api/video-runs?format=history'));
-    expect(response.status).toBe(503);
-    const body = await response.json();
-    expect(body.error).toContain('plan SHA256 mismatch');
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

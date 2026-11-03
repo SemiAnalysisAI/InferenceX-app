@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import history from '../../../cypress/fixtures/api/video-history.json';
 import type { CaseRecord } from './compare';
 import { videoHistoryEntry, type VideoHistoryPage } from './history';
-import { namedRunPoints, videoPoints } from './points';
+import { namedRunPoints } from './points';
 import {
   absoluteFrameDifference,
   publishedResultsSide,
@@ -10,8 +9,6 @@ import {
   resultsClipReference,
   type ResultsClipSide,
 } from './results-clips';
-import { servingFixture } from './serving.fixture';
-import type { StoredArtifact } from './stored';
 import { referenceQualityFixture } from './reference-quality.fixture';
 import { verifiedReferencePairs } from './reference-quality';
 
@@ -43,42 +40,9 @@ const side = (
   ),
 });
 
-function fixture() {
-  const point = videoPoints([history as unknown as VideoHistoryPage]).find(
-    (p) => p.hardwareKey === 'h200' && p.concurrency === 1,
-  )!;
-  const data = servingFixture(point.runId);
-  data.documents.set('manifest.json', data.manifest);
-  data.documents.set('ci.json', data.ci);
-  data.checksums.set('manifest.json', point.id.split(':')[0]);
-  const saved: StoredArtifact = {
-    storageVersion: 1,
-    runId: point.runId,
-    artifact: {
-      id: point.artifactId,
-      name: 'h3-video',
-      expired: false,
-      size_in_bytes: 1,
-      stored: true,
-    },
-    sources: [
-      {
-        id: point.runId,
-        documents: [...data.documents],
-        checksums: [...data.checksums],
-        assets: [],
-        texts: [],
-      },
-    ],
-  };
-  return { point, saved };
-}
-
 describe('results clip matching', () => {
   it('uses only explicit exact-bound reference pairs and hides the reference with its hardware', () => {
     const f = referenceQualityFixture();
-    f.stored.quality = verifiedReferencePairs(f.attachment, f.receipts, [f.stored], '9'.repeat(64));
-    f.stored.quality[0].reference.url = '/reference.mp4';
     const path = f.attachment.pairs[0].candidate.media_path;
     f.stored.sources[0].assets = [[path, { url: '/candidate.mp4', downloadUrl: '/candidate.mp4' }]];
     const page: VideoHistoryPage = {
@@ -87,6 +51,15 @@ describe('results clip matching', () => {
       entries: [videoHistoryEntry(f.stored, null)],
     };
     const point = namedRunPoints([page], '123').find((item) => item.cell === 'c1')!;
+    expect(publishedResultsSide(f.stored, point).quality.size).toBe(0);
+    expect(() => publishedResultsSide(f.stored, { ...point, id: `missing:${point.cell}` })).toThrow(
+      'Selected observation is not published',
+    );
+    expect(() => publishedResultsSide({ ...f.stored, runId: 'other' }, point)).toThrow(
+      'Stored artifact identity mismatch',
+    );
+    f.stored.quality = verifiedReferencePairs(f.attachment, f.receipts, [f.stored], '9'.repeat(64));
+    f.stored.quality[0].reference.url = '/reference.mp4';
     const [group] = resultsClipGroups([publishedResultsSide(f.stored, point)]);
     expect(group.clips.get('h200')?.quality?.psnrDb).toBe(25);
     expect(resultsClipReference(group, new Set())?.url).toBe('/reference.mp4');
@@ -121,18 +94,6 @@ describe('results clip matching', () => {
     expect(groups).toHaveLength(3);
     expect(groups.every((group) => group.clips.size === 1)).toBe(true);
     expect(resultsClipGroups([side('b200', [record()], '')])).toEqual([]);
-  });
-  it('accepts only the selected manifest and never infers a quality reference from H200 steps', () => {
-    const { point, saved } = fixture();
-    expect(publishedResultsSide(saved, point).quality.size).toBe(0);
-    const other = { ...point, id: `missing:${point.cell}` };
-    expect(() => publishedResultsSide(saved, other)).toThrow(
-      'Selected observation is not published',
-    );
-    expect(publishedResultsSide(saved, { ...point, hardwareKey: 'b200' }).quality.size).toBe(0);
-    expect(() => publishedResultsSide({ ...saved, runId: 'other' }, point)).toThrow(
-      'Stored artifact identity mismatch',
-    );
   });
 });
 

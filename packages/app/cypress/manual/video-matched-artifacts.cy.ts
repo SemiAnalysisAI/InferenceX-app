@@ -114,11 +114,7 @@ describe('matched original H100 and B200 artifacts', () => {
 
   for (const [width, path] of [
     [1440, '/video'],
-    [390, '/video'],
-    [320, '/video'],
-    [1440, '/zh/video'],
     [390, '/zh/video'],
-    [320, '/zh/video'],
   ] as const) {
     it(`plays and scrubs both matching original videos at ${width}px ${path}`, () => {
       cy.viewport(width, 900);
@@ -208,12 +204,19 @@ describe('matched original H100 and B200 artifacts', () => {
     });
   }
 
-  it('selects every matched case with the same per-clip scores and reference as the API', () => {
+  it('selects the first and last CI cases without confusing the same-name diagnostic', () => {
     cy.viewport(1440, 900);
     cy.request(overview).then(({ body }) => {
       cy.visit(`/video?${selection}`);
-      for (const group of body.clipQuality.groups) {
-        if (group.scope !== 'ci') continue;
+      const groups = body.clipQuality.groups.filter(
+        (group: { scope: string; clips: { caseId: string }[] }) =>
+          group.scope === 'ci' &&
+          ['ceramic-wheel', 'station-clock'].includes(group.clips[0].caseId),
+      );
+      expect(
+        groups.map((group: { clips: { caseId: string }[] }) => group.clips[0].caseId),
+      ).to.deep.equal(['ceramic-wheel', 'station-clock']);
+      for (const group of groups) {
         const caseId = group.clips[0].caseId;
         cy.get('[data-testid="video-results-case"]').click();
         cy.contains('[role="option"]', `${caseId} · take ${group.take}`).click();

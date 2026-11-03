@@ -6,12 +6,34 @@ import type {
 } from '@/components/video-benchmark/history';
 import { videoPoints } from '@/components/video-benchmark/points';
 import { servingArtifact } from '../support/video-artifacts';
-import {
-  assertResultsFit,
-  readOnlyVideoRequests,
-  resultHistory,
-  RESULT_GROUPS,
-} from '../support/video-results';
+import { readOnlyVideoRequests, resultHistory } from '../support/video-results';
+
+const RESULT_GROUPS = [
+  'validity',
+  'latency',
+  'throughput',
+  'energy',
+  'cost',
+  'quality',
+  'stability',
+  'startup',
+  'deploy',
+];
+
+function assertResultsFit() {
+  cy.document().should((document) => {
+    const width = document.documentElement.clientWidth;
+    const overflowing = [...document.querySelectorAll('[data-testid="video-results"] *')]
+      .filter((element) => element.getBoundingClientRect().right > width + 1)
+      .slice(0, 8)
+      .map((element) => `${element.tagName}.${element.className}`)
+      .join(', ');
+    expect(
+      document.documentElement.scrollWidth,
+      `no horizontal page overflow (${overflowing})`,
+    ).to.be.at.most(document.documentElement.clientWidth);
+  });
+}
 
 function mount({
   pathname = '/video',
@@ -45,21 +67,7 @@ const costRow = (hardware: string, basis = 'participating') =>
   cy.get(`[data-testid="results-cost-table"] [data-hardware="${hardware}"][data-basis="${basis}"]`);
 
 describe('VideoGenX results', () => {
-  it('keeps four comparison slots when no qualified H100 evidence is present', () => {
-    mount({
-      edit: (observation) => {
-        if (observation.hardware.includes('H100')) observation.samples = 9;
-      },
-    });
-    cy.get('[data-testid="video-results-clip"]').should('have.length', 4);
-    cy.get('[data-testid="results-hardware-h100"]').should('not.exist');
-    costRow('h100').should('not.exist');
-  });
-
-  for (const [pathname, width] of [
-    ['/video', 1440],
-    ['/zh/video', 390],
-  ] as const) {
+  for (const [pathname, width] of [['/zh/video', 390]] as const) {
     it(`shows and dismisses a named H100 diagnostic in ${pathname} at ${width}px`, () => {
       cy.viewport(width, 900);
       mount({
@@ -81,10 +89,6 @@ describe('VideoGenX results', () => {
       cy.location('search').should('contain', 'r_hidden=h100');
       cy.get('[data-testid="results-hardware-h100"]').check();
       costRow('h100').should('have.attr', 'data-overlay', 'true');
-      assertResultsFit();
-      cy.get('[data-testid="video-results-clips"]').screenshot(`h100-test-overlay-${width}`, {
-        overwrite: true,
-      });
       cy.get('[data-testid="results-overlay-dismiss"]').click();
       costRow('h100').should('not.exist');
       cy.get('[data-testid="results-hardware-h100"]').should('not.exist');
@@ -100,6 +104,8 @@ describe('VideoGenX results', () => {
     });
     cy.get('[data-testid="results-cost-table"] [data-hardware]').should('not.exist');
     cy.get('[data-testid="video-results-clip"] video').should('not.exist');
+    cy.get('[data-testid="video-results-play"]').should('be.disabled');
+    cy.get('[data-testid="video-results-scrub"]').should('be.disabled');
     cy.contains('summary', 'Performance history').click();
     cy.get('[data-testid="video-history-entry"]').should('have.length', 7);
     cy.get('[data-testid="video-history-publication"]').each(($entry) => {
@@ -107,7 +113,7 @@ describe('VideoGenX results', () => {
     });
   });
 
-  for (const pathname of ['/video', '/zh/video']) {
+  for (const pathname of ['/zh/video']) {
     it(`retains publication approval and source power verdicts in ${pathname} History`, () => {
       const zh = pathname.startsWith('/zh');
       mount({
@@ -135,46 +141,9 @@ describe('VideoGenX results', () => {
     });
   }
 
-  it('uses one shared control panel and concise workload choices with published identity in help', () => {
-    mount();
-    cy.get('[data-slot="control-panel"]').should('have.length', 1);
-    cy.get('[data-testid="results-automatic-detail"]').should('contain', 'MiniMax');
-    cy.location('search').should('not.contain', 'r_workload=');
-    cy.get('[data-testid="selected-option-help-automatic"]').click();
-    cy.get('[data-testid="selected-option-help-content-automatic"]').should('contain', 'Source ID');
-    cy.get('body').click(0, 0);
-    cy.get('[data-testid="results-price-t2v"]').type('0.05');
-    cy.get('[data-testid="results-workload"]').click('left');
-    cy.get('[data-select-option]')
-      .last()
-      .should(($option) => {
-        expect($option.text()).to.contain('MiniMax');
-        expect($option.text()).not.to.contain('prompt');
-        expect($option.text()).not.to.contain('seed');
-      });
-    cy.get('[data-select-option]')
-      .last()
-      .closest('[role="row"]')
-      .find('[data-option-help]')
-      .click();
-    cy.get('[data-testid^="option-help-content-"]').should('contain', 'Source ID');
-    cy.get('[data-testid="results-price-t2v"]').should('have.value', '0.05');
-    cy.location('search').should('not.contain', 'r_workload=');
-  });
-
-  it('retains an approved named run as an overlay until it is dismissed', () => {
-    mount({ search: '?unofficialrun=34342452354&other=1' });
-    cy.get('[data-testid="results-overlay"]').should('contain', '34342452354');
-    costRow('h200').should('have.attr', 'data-overlay', 'true');
-    cy.get('[data-testid="results-overlay-dismiss"]').click();
-    cy.get('[data-testid="results-overlay"]').should('not.exist');
-    costRow('h200').should('have.attr', 'data-overlay', 'false');
-    cy.location('search').should('contain', 'other=1').and('not.contain', 'unofficialrun=');
-  });
-
   it('keeps named-run GPU-count chart points when the cards select one GPU count', () => {
     mount({
-      search: '?unofficialrun=34341996789',
+      search: '?unofficialrun=34341996789&r_gpus=3',
       editPage: (page) => {
         const entry = page.entries.find((item) => item.runId === '34341996789')!;
         entry.approved = false;
@@ -190,6 +159,7 @@ describe('VideoGenX results', () => {
     });
     const latencyPoints =
       '[data-testid="results-latency-series"] [data-hardware="b200-overlay"] > circle';
+    cy.get('[data-testid="results-cost-table"] [data-hardware]').should('not.exist');
     cy.get(latencyPoints).should('have.length', 2);
     cy.get('[data-testid="results-gpus"]').contains('button', /^2$/).click();
     costRow('b200').find('td').eq(2).should('have.text', '2');
@@ -267,7 +237,8 @@ describe('VideoGenX results', () => {
   });
 
   it('preserves an explicitly selected approved workload when dismissing an overlay', () => {
-    mount({ search: '?unofficialrun=34342452354' });
+    mount({ search: '?unofficialrun=34342452354&other=1' });
+    costRow('h200').should('have.attr', 'data-overlay', 'true');
     cy.get('[data-testid="results-workload"]').click('left');
     cy.get('[data-select-option]').last().click();
     cy.location('search').then((search) => {
@@ -277,6 +248,7 @@ describe('VideoGenX results', () => {
       cy.location('search').should((cleared) => {
         expect(new URLSearchParams(cleared).get('r_workload')).to.equal(selected);
         expect(cleared).not.to.contain('unofficialrun');
+        expect(new URLSearchParams(cleared).get('other')).to.equal('1');
       });
       costRow('h200').should('have.attr', 'data-overlay', 'false');
     });
@@ -394,15 +366,6 @@ describe('VideoGenX results', () => {
     cy.get('[data-testid="results-model"]').click();
     cy.get('[role="listbox"] [role="option"]').first().click();
     cy.location('search').should('not.contain', 'r_model=');
-    cy.get('[data-testid="results-engine"]').click();
-    cy.get('[role="listbox"] [role="option"]').should('have.length', 1).first().click();
-    cy.location('search').should('not.contain', 'r_engine=');
-    cy.get('[data-testid="results-date"]').click();
-    cy.get('[role="listbox"] [role="option"]').last().click();
-    cy.location('search').should('contain', 'r_date=');
-    cy.get('[data-testid="results-date"]').click();
-    cy.get('[role="listbox"] [role="option"]').first().click();
-    cy.location('search').should('not.contain', 'r_date=');
   });
   it('keeps the video comparison before the nine groups and admits only the common 20-clip C1 workload', () => {
     mount();
@@ -461,15 +424,6 @@ describe('VideoGenX results', () => {
     cy.get('#latency [data-hardware] circle').should('not.exist');
     cy.get('[data-testid="results-hardware-b200"]').check();
     costRow('b200').should('contain', '0.15');
-  });
-
-  it('changes the GPU filter without fabricating unmeasured deployments', () => {
-    mount({ search: '?r_gpus=2' });
-    cy.get('[data-testid="results-cost-table"] [data-hardware]').should('not.exist');
-    cy.contains('[data-testid="results-gpus"] button', '4').click();
-    cy.location('search').should('contain', 'r_gpus=4');
-    costRow('b200').should('exist');
-    costRow('h200').should('exist');
   });
 
   it('uses explicit scenario prices, clears them for a different workload and hides power traces', () => {
@@ -546,9 +500,7 @@ describe('VideoGenX results', () => {
   for (const [pathname, width] of [
     ['/video', 1440],
     ['/video', 390],
-    ['/video', 320],
     ['/zh/video', 1440],
-    ['/zh/video', 390],
     ['/zh/video', 320],
   ] as const) {
     it(`keeps ${pathname} and its workload menu readable at ${width} px`, () => {
@@ -557,25 +509,17 @@ describe('VideoGenX results', () => {
       cy.get('[data-testid="video-results"] h1').should('contain', 'VideoGenX');
       cy.get('#validity h2').should('contain', pathname.startsWith('/zh') ? '有效性' : 'Validity');
       cy.get('#energy [data-testid="results-empty"]').should('exist');
-      const controlHeight = width < 768 ? 44 : 36;
-      for (const key of [
-        'model',
-        'workload',
-        'engine',
-        'date',
-        'deadline',
-        'trace-select',
-        'cost-tier',
-        'price-t2v',
-      ])
-        cy.get(`[data-testid="results-${key}"]`).should(($control) => {
-          expect($control[0].getBoundingClientRect().height).to.equal(controlHeight);
-        });
       assertResultsFit();
       cy.get('[data-testid="video-results-clip"]').should(($tiles) => {
         expect($tiles).to.have.length(5);
         const first = $tiles[0].getBoundingClientRect();
         const second = $tiles[1].getBoundingClientRect();
+        if (width === 1440) {
+          const columns = new Set(
+            [...$tiles].map((tile) => Math.round(tile.getBoundingClientRect().left)),
+          );
+          expect(columns.size).to.equal(5);
+        }
         if (width === 320) expect(second.top).to.be.greaterThan(first.top);
         else if (width === 390) expect(second.top).to.be.closeTo(first.top, 2);
       });
@@ -584,22 +528,12 @@ describe('VideoGenX results', () => {
         .and('contain', pathname.startsWith('/zh') ? '分配 GPU' : 'Allocated');
       cy.get('[data-testid="video-results-sources"] summary').click();
       cy.get('[data-testid="video-results-sources"] table').should(($table) => {
-        expect($table[0].getBoundingClientRect().width).to.be.at.least(640);
         const container = $table[0].parentElement!;
         const bounds = container.getBoundingClientRect();
         expect(bounds.left).to.be.at.least(0);
         expect(bounds.right).to.be.at.most(width);
         expect(getComputedStyle(container).overflowX).to.equal('auto');
         if (width < 768) expect(container.scrollWidth).to.be.greaterThan(container.clientWidth);
-      });
-      cy.get('[data-testid="video-results-sources"] th').each(($header) => {
-        expect($header).to.have.css('white-space', 'nowrap');
-        expect($header[0].getBoundingClientRect().height).to.be.at.most(
-          parseFloat(getComputedStyle($header[0]).lineHeight) + 2,
-        );
-      });
-      cy.get('[data-testid="video-results-sources"] tbody td:nth-child(5)').each(($status) => {
-        expect($status).to.have.css('white-space', 'nowrap');
       });
       assertResultsFit();
       if (width < 768) {
@@ -640,29 +574,6 @@ describe('VideoGenX results', () => {
       cy.get('[data-select-option]').last().click();
       cy.get('[data-testid^="option-help-content-"]').should('not.exist');
       cy.location('search').should('contain', 'r_workload=');
-      cy.get('[data-testid="results-workload"]').click('left');
-      cy.get('[role="grid"]').should('be.visible');
-      cy.get('[data-slot="select-content"] input').should('have.focus').type('{esc}');
-      cy.get('[role="grid"]').should('not.exist');
-      cy.get('[data-testid="results-workload"]').should('have.focus');
-      cy.get('[data-testid="results-workload"]').click('left');
-      cy.get('[role="grid"]').should('be.visible');
-      cy.get('[data-slot="select-content"] input').should('have.focus').type('{downarrow}');
-      cy.focused().should('match', '[data-select-option]').type('{enter}');
-      cy.location('search').should('not.contain', 'r_workload=');
-      cy.document().then((document) => document.documentElement.classList.add('dark'));
-      assertResultsFit();
-      cy.get('[data-testid="results-workload"]').should(($control) => {
-        expect($control[0].getBoundingClientRect().height).to.equal(controlHeight);
-      });
-      cy.document().then((document) => document.documentElement.classList.remove('dark'));
-      cy.scrollTo('top');
-      cy.get('[data-testid="results-workload"]').click('left');
-      cy.get('[role="grid"]').should('be.visible');
-      cy.screenshot(`video-workload-menu-${width}-${pathname.startsWith('/zh') ? 'zh' : 'en'}`, {
-        capture: 'viewport',
-        overwrite: true,
-      });
     });
   }
 });

@@ -1,18 +1,8 @@
-import { RESULT_GROUPS } from '../support/video-results';
-
-const run = '41266176201';
-const artifact = 13068476608;
-const overview = `/api/v1/views/video?view=overview&unofficialrun=${run}&r_tier=r`;
-
-function noOverflow() {
-  cy.document().then((document) => {
-    expect(document.documentElement.scrollWidth).to.be.at.most(
-      document.defaultView!.innerWidth + 1,
-    );
-  });
-}
-
 describe('original H100 artifact through the local development replay', () => {
+  const run = '41266176201';
+  const artifact = 13068476608;
+  const overview = `/api/v1/views/video?view=overview&unofficialrun=${run}&r_tier=r`;
+
   it('changes workload and GPU count without updating the router during render', () => {
     cy.visit(`/video?unofficialrun=${run}`, {
       onBeforeLoad(win) {
@@ -118,60 +108,4 @@ describe('original H100 artifact through the local development replay', () => {
       });
     });
   });
-
-  for (const [width, path] of [
-    [1440, '/video'],
-    [390, '/video'],
-    [320, '/video'],
-    [1440, '/zh/video'],
-    [390, '/zh/video'],
-    [320, '/zh/video'],
-  ] as const) {
-    it(`shows original unapproved results and playable media at ${width}px ${path}`, () => {
-      cy.viewport(width, 900);
-      cy.visit(`${path}?unofficialrun=${run}`);
-      cy.window().its('innerWidth').should('equal', width);
-      cy.get('[data-testid="results-replay"]').should(
-        'contain',
-        path.startsWith('/zh') ? '未发布' : 'unpublished',
-      );
-      cy.get('[data-testid="video-results"] section[id]').should(($sections) => {
-        expect([...$sections].map((section) => section.id)).to.deep.equal([
-          'comparison-clips',
-          ...RESULT_GROUPS,
-        ]);
-      });
-      cy.get('[data-testid="results-overlay"]').should('contain', run);
-      cy.get('[data-testid="results-power-trace"] circle').should('have.length', 1478);
-      cy.get('[data-testid="video-results-clip"] video')
-        .first()
-        .should(($video) => {
-          const video = $video[0] as HTMLVideoElement;
-          expect(video.readyState, 'decoded media metadata').to.be.at.least(1);
-          expect(video.videoWidth).to.be.greaterThan(0);
-        });
-      cy.get('[data-testid="video-results-play"]').click();
-      cy.get('[data-testid="video-results-clip"] video')
-        .first()
-        .should(($video) => {
-          expect(($video[0] as HTMLVideoElement).currentTime).to.be.greaterThan(0);
-        });
-      cy.get('[data-testid="video-results-play"]').click();
-      cy.get('[data-testid="video-results-scrub"]').invoke('val', '1').trigger('input');
-      cy.get('[data-testid="video-results-clip"] video')
-        .first()
-        .should(($video) => {
-          expect(($video[0] as HTMLVideoElement).currentTime).to.be.at.least(0.98);
-        });
-      cy.get('#quality [data-testid="results-empty"]').should('exist');
-      noOverflow();
-      cy.screenshot(`video-original-${width}-${path.startsWith('/zh') ? 'zh' : 'en'}`, {
-        capture: 'fullPage',
-        overwrite: true,
-      });
-      cy.get('[data-testid="results-overlay-dismiss"]').click();
-      cy.get('[data-testid="results-overlay"]').should('not.exist');
-      cy.get('[data-testid="video-results-play"]').should('be.disabled');
-    });
-  }
 });

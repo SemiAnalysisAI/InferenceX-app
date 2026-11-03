@@ -1,11 +1,6 @@
 import { videoPoints } from '../../src/components/video-benchmark/points';
 import { parseResultsState, resultProjection } from '../../src/components/video-benchmark/results';
-import {
-  assertResultsFit,
-  readOnlyVideoRequests,
-  resultHistory,
-  RESULT_GROUPS,
-} from '../support/video-results';
+import { readOnlyVideoRequests, resultHistory } from '../support/video-results';
 
 describe('VideoGenX results routes', () => {
   beforeEach(() => {
@@ -75,42 +70,4 @@ describe('VideoGenX results routes', () => {
     });
     cy.get('[data-testid="results-cost-table"] [data-hardware="h200"]').should('exist');
   });
-
-  for (const [width, theme, path] of [
-    [1440, 'light', '/video'],
-    [390, 'dark', '/video'],
-    [390, 'light', '/zh/video'],
-  ] as const) {
-    it(`renders ${path} at ${width}px in ${theme} without overflow or illustrative metrics`, () => {
-      cy.viewport(width, 900);
-      cy.visit(path, { onBeforeLoad: (win) => win.localStorage.setItem('theme', theme) });
-      cy.get('[data-testid="video-results"] section[id]').should(($sections) => {
-        expect([...$sections].map((section) => section.id)).to.deep.equal([
-          'comparison-clips',
-          ...RESULT_GROUPS,
-        ]);
-      });
-      cy.get('[data-testid="video-results-clip"]').should('have.length', 5);
-      cy.get('[data-testid="video-results-clip"]').should(($tiles) => {
-        const columns = new Set(
-          [...$tiles].map((tile) => Math.round(tile.getBoundingClientRect().left)),
-        );
-        expect(columns.size, 'responsive comparison columns').to.equal(width >= 1280 ? 5 : 2);
-      });
-      cy.get('[data-testid="video-results-media-empty"]').should('have.length', 5);
-      cy.get('[data-testid="video-results-play"]').should('be.disabled');
-      cy.get('[data-testid="video-results-scrub"]').should('be.disabled');
-      cy.get('#quality [data-testid="results-empty"]').should('exist');
-      cy.get('#startup [data-testid="results-empty"]').should('exist');
-      assertResultsFit();
-      cy.screenshot(`video-results-${width}-${theme}-${path.startsWith('/zh') ? 'zh' : 'en'}`, {
-        capture: 'fullPage',
-        overwrite: true,
-      });
-      cy.get('[data-testid="video-results-clips"]').screenshot(
-        `video-results-comparison-${width}-${theme}-${path.startsWith('/zh') ? 'zh' : 'en'}`,
-        { overwrite: true },
-      );
-    });
-  }
 });

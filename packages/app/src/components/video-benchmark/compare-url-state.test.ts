@@ -5,7 +5,6 @@ import {
   defaultComparePair,
   readVideoCompareSelection,
   resolveCompareSelection,
-  writeVideoCompareSelection,
 } from './compare-url-state';
 import type { VideoHistoryPage } from './history';
 import { videoPoints } from './points';
@@ -76,34 +75,5 @@ describe('video compare URL selection', () => {
     expect(
       keys(resolveCompareSelection({ baseline: 'b200', candidate: 'b200', caseIndex: 0 }, twoFast)),
     ).toEqual(['b200', 'h200']);
-  });
-  it('writes only non-default params, keeps unrelated params and leaves the input alone', () => {
-    const defaults = defaultComparePair(points);
-    const url = new URL('https://x.test/video?v_tier=r&run=1');
-    const out = writeVideoCompareSelection(
-      url,
-      { baseline: 'h100', candidate: 'h200', caseIndex: 2 },
-      defaults,
-    );
-    expect(out.searchParams.get('v_tier')).toBe('r');
-    expect(out.searchParams.get('run')).toBe('1');
-    expect(out.searchParams.has('v_base')).toBe(false);
-    expect(out.searchParams.get('v_cand')).toBe('h200');
-    expect(out.searchParams.get('v_case')).toBe('2');
-    expect(url.searchParams.has('v_cand')).toBe(false);
-    const swapped = writeVideoCompareSelection(
-      out,
-      { baseline: 'b200', candidate: 'h100', caseIndex: 0 },
-      defaults,
-    );
-    expect(swapped.searchParams.get('v_base')).toBe('b200');
-    expect(swapped.searchParams.get('v_cand')).toBe('h100');
-    expect(swapped.searchParams.has('v_case')).toBe(false);
-    const reset = writeVideoCompareSelection(
-      swapped,
-      { baseline: 'h100', candidate: 'b200', caseIndex: 0 },
-      defaults,
-    );
-    expect([...reset.searchParams.keys()]).toEqual(['v_tier', 'run']);
   });
 });

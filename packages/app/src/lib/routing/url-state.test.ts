@@ -1074,10 +1074,16 @@ describe('VideoGenX results share state', () => {
     vi.resetModules();
     const { location } = setupWindow('?r_range=last-month', '/reliability');
     const { buildShareUrl } = await import('@/lib/routing/url-state');
-    location.pathname = '/video';
-    location.search = '?r_gpus=4';
+    location.pathname = '/zh/video';
+    location.search =
+      '?r_workload=source%3Ac1&r_gpus=4&r_deadline=60&r_price_t2v=0.08&unofficialrun=123';
     const url = new URL(buildShareUrl());
+    expect(url.pathname).toBe('/zh/video');
+    expect(url.searchParams.get('r_workload')).toBe('source:c1');
     expect(url.searchParams.get('r_gpus')).toBe('4');
+    expect(url.searchParams.get('r_deadline')).toBe('60');
+    expect(url.searchParams.get('r_price_t2v')).toBe('0.08');
+    expect(url.searchParams.get('unofficialruns')).toBe('123');
     expect(url.searchParams.has('r_range')).toBe(false);
   });
 
@@ -1085,15 +1091,5 @@ describe('VideoGenX results share state', () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
-  });
-  it('shares the live configuration and published overlay', async () => {
-    vi.resetModules();
-    setupWindow('?r_gpus=4&r_workload=source-cell&r_price_t2v=0.08&unofficialrun=123', '/zh/video');
-    const { buildShareUrl } = await import('@/lib/routing/url-state');
-    const url = new URL(buildShareUrl());
-    expect(url.searchParams.get('r_gpus')).toBe('4');
-    expect(url.searchParams.get('r_workload')).toBe('source-cell');
-    expect(url.searchParams.get('r_price_t2v')).toBe('0.08');
-    expect(url.searchParams.get('unofficialruns')).toBe('123');
   });
 });
