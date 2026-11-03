@@ -275,22 +275,38 @@ describe('VideoGenX results contract', () => {
       apiPrices: { t2v: 0, i2v: 0.1, r2v: null },
       utilization: 0.5,
       unofficialRun: '123',
+      xMetric: 'p90',
+      yMetric: 'kjPerClip',
+      costBasis: 'allocated',
+      optimal: false,
+      point: '123:selected-source:c1',
     };
     expect(
       parseResultsState(
-        'r_model=MiniMaxAI%2FMiniMax-H3&r_workload=selected-source%3Ac1&r_resolution=1344%C3%97768&r_duration=8&r_mode=t2v&r_steps=50&r_gpus=4&r_engine=sglang&r_date=2026-10-18&r_hidden=mi355x&r_deadline=60&r_tier=r&r_api=0.02&r_price_t2v=0&r_price_i2v=0.1&r_utilization=0.5&unofficialrun=123',
+        'r_model=MiniMaxAI%2FMiniMax-H3&r_workload=selected-source%3Ac1&r_resolution=1344%C3%97768&r_duration=8&r_mode=t2v&r_steps=50&r_gpus=4&r_engine=sglang&r_date=2026-10-18&r_hidden=mi355x&r_deadline=60&r_tier=r&r_api=0.02&r_price_t2v=0&r_price_i2v=0.1&r_utilization=0.5&unofficialrun=123&r_x=p90&r_y=kjPerClip&r_basis=allocated&r_optimal=0&r_point=123%3Aselected-source%3Ac1',
       ),
     ).toEqual(selection);
+    expect(parseResultsState(resultsSearch(selection))).toEqual(selection);
+    expect(parseResultsState(resultsSearch(state()))).toEqual(state());
     const shared = new URLSearchParams(resultsSearch(selection));
     expect(shared.get('unofficialruns')).toBe('123');
     expect(shared.has('unofficialrun')).toBe(false);
     expect(shared.get('r_price_t2v')).toBe('0');
     expect(shared.get('r_price_i2v')).toBe('0.1');
     expect(shared.has('r_price_r2v')).toBe(false);
-    expect(parseResultsState('r_api=NaN&r_deadline=-2&r_utilization=Infinity')).toMatchObject({
+    expect(
+      parseResultsState(
+        'r_api=NaN&r_deadline=-2&r_utilization=Infinity&r_x=p95&r_y=toString&r_basis=both&r_optimal=no&r_point=',
+      ),
+    ).toMatchObject({
       apiPrice: null,
       deadlineSeconds: 120,
       utilization: 1,
+      xMetric: 'p50',
+      yMetric: 'videoSecondsPerDollar',
+      costBasis: 'participating',
+      optimal: true,
+      point: null,
     });
   });
   it('keeps engines and workload-mix cohorts distinct rather than overwriting or pooling them', () => {

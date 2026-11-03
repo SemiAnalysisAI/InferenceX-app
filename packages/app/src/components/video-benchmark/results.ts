@@ -3,6 +3,13 @@ import { costPerGpuHour, type CostTier } from './hardware';
 import { metricValue, type VideoPoint } from './metrics';
 import { DASHBOARD_SAMPLE_FLOOR, latestVideoCells } from './points';
 import type { ResultsEvidence } from './results-evidence';
+import {
+  isResultsXMetric,
+  isResultsYMetric,
+  type CostBasis,
+  type ResultsXMetric,
+  type ResultsYMetric,
+} from './results-chart';
 
 export const RESULTS_HARDWARE = ['gb200', 'b200', 'mi355x', 'h200', 'h100'] as const;
 
@@ -29,6 +36,12 @@ export interface ResultsState {
   apiPrices: Record<VideoMode, number | null>;
   utilization: number;
   unofficialRun: string | null;
+  xMetric: ResultsXMetric;
+  yMetric: ResultsYMetric;
+  costBasis: CostBasis;
+  optimal: boolean;
+  /** `resultsPointKey` of the deployment whose detail view is open. */
+  point: string | null;
 }
 export const DEFAULT_RESULTS_STATE: ResultsState = {
   model: null,
@@ -47,6 +60,11 @@ export const DEFAULT_RESULTS_STATE: ResultsState = {
   apiPrices: { t2v: null, i2v: null, r2v: null },
   utilization: 1,
   unofficialRun: null,
+  xMetric: 'p50',
+  yMetric: 'videoSecondsPerDollar',
+  costBasis: 'participating',
+  optimal: true,
+  point: null,
 };
 const finite = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
 const positive = (n: unknown): n is number => finite(n) && n > 0;
@@ -68,6 +86,11 @@ export const RESULTS_QUERY_PARAMS = [
   'r_price_i2v',
   'r_price_r2v',
   'r_utilization',
+  'r_x',
+  'r_y',
+  'r_basis',
+  'r_optimal',
+  'r_point',
   'unofficialrun',
   'unofficialruns',
 ] as const;
@@ -75,6 +98,8 @@ export const RESULTS_QUERY_PARAMS = [
 export function parseResultsState(search: string | URLSearchParams): ResultsState {
   const s = typeof search === 'string' ? new URLSearchParams(search) : search;
   const overlay = s.get('unofficialruns') ?? s.get('unofficialrun');
+  const x = s.get('r_x'),
+    y = s.get('r_y');
   const numeric = (key: string, fallback: number | null, allowZero = false) => {
     if (!s.has(key) || s.get(key)?.trim() === '') return fallback;
     const n = Number(s.get(key));
@@ -101,6 +126,11 @@ export function parseResultsState(search: string | URLSearchParams): ResultsStat
     },
     utilization: Math.min(numeric('r_utilization', 1, true)!, 1),
     unofficialRun: /^[1-9]\d*$/u.test(overlay ?? '') ? overlay : null,
+    xMetric: isResultsXMetric(x) ? x : DEFAULT_RESULTS_STATE.xMetric,
+    yMetric: isResultsYMetric(y) ? y : DEFAULT_RESULTS_STATE.yMetric,
+    costBasis: s.get('r_basis') === 'allocated' ? 'allocated' : 'participating',
+    optimal: s.get('r_optimal') !== '0',
+    point: s.get('r_point') || null,
   };
 }
 
@@ -124,6 +154,11 @@ export function resultsSearch(state: ResultsState): string {
     r_price_i2v: state.apiPrices.i2v,
     r_price_r2v: state.apiPrices.r2v,
     r_utilization: state.utilization,
+    r_x: state.xMetric,
+    r_y: state.yMetric,
+    r_basis: state.costBasis,
+    r_optimal: state.optimal ? 1 : 0,
+    r_point: state.point,
     unofficialruns: state.unofficialRun,
   };
   for (const [key, value] of Object.entries(fields)) if (value !== null) s.set(key, String(value));

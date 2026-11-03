@@ -459,8 +459,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     'ubenchX 测试选择：mem-bw、sm-l2-distance、tpc-skyline、core-memory-profiles 或 all（默认），决定返回哪种基准测试数据。',
   ],
   view: [
-    'Video overview (nine groups, r_* selectors), dashboard (default without run/artifact), compare (published matched cases), or legacy discovery/results/tradeoff. run/artifact defaults to results. Selector families cannot be mixed.',
-    '视频 overview（九组指标，使用 r_* 参数）、dashboard（未指定 run/artifact 时默认）、compare（已发布匹配用例），或原有 discovery/results/tradeoff。指定 run/artifact 时默认 results。不同视图的参数不能混用。',
+    'Video overview (chart, results table, deployment detail; r_* selectors), dashboard (default without run/artifact), compare (published matched cases), or legacy discovery/results/tradeoff. run/artifact defaults to results. Selector families cannot be mixed.',
+    '视频 overview（图表、结果表格和部署详情，使用 r_* 参数）、dashboard（未指定 run/artifact 时默认）、compare（已发布匹配用例），或原有 discovery/results/tradeoff。指定 run/artifact 时默认 results。不同视图的参数不能混用。',
   ],
   r_model: [
     'Exact model identifier; omitted selects the best-covered eligible workload.',
@@ -484,8 +484,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
   ],
   r_steps: ['Recorded denoising step count.', '记录的去噪步数。'],
   r_gpus: [
-    'Participating GPU count for cards and tables. deploymentCells and overlayDeploymentCells retain the official and named-run GPU-count series before this filter.',
-    '卡片和表格使用的参与计算 GPU 数。deploymentCells 和 overlayDeploymentCells 分别保留正式结果及指定运行在此筛选前的 GPU 数序列。',
+    'Participating GPU count for the results table and clips. deploymentCells and overlayDeploymentCells retain the official and named-run GPU-count series before this filter.',
+    '结果表格和视频对比使用的参与计算 GPU 数。deploymentCells 和 overlayDeploymentCells 分别保留正式结果及指定运行在此筛选前的 GPU 数序列。',
   ],
   r_engine: [
     'Recorded engine name, separate from runtime revision.',
@@ -496,8 +496,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '记录的执行日期，格式 YYYY-MM-DD；不以发布日期替代。',
   ],
   r_hidden: [
-    'Comma-separated hardware keys hidden from all overview groups and clips.',
-    '以逗号分隔的隐藏硬件键，作用于全部概览指标组和视频。',
+    'Comma-separated hardware keys hidden from the overview chart, table, deployment detail and clips.',
+    '以逗号分隔的隐藏硬件键，作用于概览图表、表格、部署详情和视频。',
   ],
   r_deadline: [
     'Delivery deadline seconds, default 120. Attainment divides on-time valid clips by valid clips; goodput divides by measured wall time.',
@@ -526,6 +526,26 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
   r_utilization: [
     'Modelled utilization 0–1, default 1. Revenue scales; reserved GPU hourly cost does not.',
     '估算利用率，范围 0–1，默认 1。收入随利用率变化，预留 GPU 每小时成本不变。',
+  ],
+  r_x: [
+    'Chart x metric: p50 (default) or p90 per-clip latency. Presentation only; echoed in params without changing returned cells.',
+    '图表 X 轴指标：单条视频 p50（默认）或 p90 延迟。仅影响展示，在 params 中返回，不改变返回的 cells。',
+  ],
+  r_y: [
+    'Chart y metric: videoSecondsPerDollar (default), videosPerGpuHour or kjPerClip. Presentation only; invalid values use the default.',
+    '图表 Y 轴指标：videoSecondsPerDollar（默认）、videosPerGpuHour 或 kjPerClip。仅影响展示；无效值使用默认值。',
+  ],
+  r_basis: [
+    'GPU cost basis the chart and table plot: participating (default) or allocated. Both bases are always returned.',
+    '图表和表格使用的 GPU 成本口径：participating（默认）或 allocated。响应始终同时返回两种口径。',
+  ],
+  r_optimal: [
+    'Optimal Only: 0 also plots dominated deployments; any other value plots each hardware frontier only. Presentation only.',
+    'Optimal Only：为 0 时同时绘制被支配的部署，其他值只绘制各硬件的前沿部署。仅影响展示。',
+  ],
+  r_point: [
+    'Open deployment detail as runId:pointId. Unknown or filtered-out keys show the overview. Presentation only.',
+    '打开的部署详情，格式为 runId:pointId。未知或已被筛除的键回退到概览页。仅影响展示。',
   ],
   v_x: [
     'Dashboard X metric: p90Latency (default) or p50Latency, in seconds. Invalid values use the UI default.',
@@ -770,8 +790,8 @@ const NEW_VIEWS = {
 } as const;
 
 const RESULTS_OVERVIEW_NOTES = {
-  en: 'view=overview shares resultProjection with the nine-group UI, admits one canonical 20-clip C1 workload with ten valid samples per hardware, and returns measured metrics plus separately labelled participating/allocated cost and modelled profit. Missing allocation remains null. point.videoSecondsPerHour carries validated decoded output seconds per measurement wall hour from valid measured requests, excluding warmup. Video-second throughput, both per-video-second cost bases and modelled revenue use this output rate. Missing valid output durations or older History without this optional field leave these metrics and profit null; requested durationSeconds remains workload/filter metadata and is never a fallback. Default points require publication approval. unofficialrun selects only the exact stored run into overlayCells (selected GPU count) and overlayDeploymentCells (all matching GPU counts) with its actual approval, excluding it from official cells, deployments and workload mix. Approved cohorts retain default preference; named-only workloads require explicit selection or no matching approved cohort. Clearing never promotes unapproved evidence. Dismissal retains a workload selector only if it remains in the approved choices. The overview returns JSON by default; format=csv returns selected official and named cells with source identities, units and both GPU cost bases as a private no-store download. duration_s is the requested plan duration; video_seconds_per_s beside clips_per_s is validated decoded output seconds per wall second. Missing values are empty CSV cells. Missing quality, stage timing, memory and startup evidence stays null. Play/pause, scrub, difference rendering, theme and expand controls are presentation-only; media uses the published-only read path. ',
-  zh: 'view=overview 与九组指标界面共用 resultProjection，只准入同一份计划 20 条视频的 C1 工作负载，各硬件统一至少 10 个有效样本。响应包含实测指标及分别标注的参与/已分配 GPU 成本和估算利润；分配证据缺失时保留 null。point.videoSecondsPerHour 表示有效测量请求每小时生成的实际解码视频秒数，排除 warmup；视频秒吞吐量、两种 GPU 口径的每视频秒成本及估算收入共用此输出速率。有效输出时长不完整或旧 History 缺少此可选字段时，这些指标及利润均为 null；durationSeconds 保留计划请求时长，仅用于工作负载身份与筛选，不作替代。默认数据点须有发布批准。unofficialrun 只把指定的已存储运行放入 overlayCells（所选 GPU 数）和 overlayDeploymentCells（所有匹配的 GPU 数），保留其实际批准状态，并将其排除在正式结果、部署和工作负载构成之外。默认优先选择有已批准结果的工作负载；仅由指定运行提供的工作负载须明确选择，或在没有匹配的已批准结果时作为回退。清除叠加运行后也不会把未批准数据转为正式结果。移除时，工作负载选择仅在已批准选项中仍然有效时保留。overview 默认返回 JSON；format=csv 导出当前筛选的正式及指定运行数据点，包含来源标识、单位和两种 GPU 成本口径。duration_s 保留计划请求时长；紧邻 clips_per_s 的 video_seconds_per_s 为每测量秒生成的有效解码视频秒数。CSV 响应设置 Cache-Control: private, no-store；缺失值以空单元格表示。质量、阶段计时、内存和启动证据缺失时保留 null。播放、拖动、差异显示、主题和展开控件只影响展示；媒体使用只读已发布路径。',
+  en: 'view=overview shares resultProjection with the /video results UI, admits one canonical 20-clip C1 workload with ten valid samples per hardware, and returns measured metrics plus separately labelled participating/allocated cost and modelled profit. Missing allocation remains null. point.videoSecondsPerHour carries validated decoded output seconds per measurement wall hour from valid measured requests, excluding warmup. Video-second throughput, both per-video-second cost bases and modelled revenue use this output rate. Missing valid output durations or older History without this optional field leave these metrics and profit null; requested durationSeconds remains workload/filter metadata and is never a fallback. Default points require publication approval. unofficialrun selects only the exact stored run into overlayCells (selected GPU count) and overlayDeploymentCells (all matching GPU counts) with its actual approval, excluding it from official cells, deployments and workload mix. Approved cohorts retain default preference; named-only workloads require explicit selection or no matching approved cohort. Clearing never promotes unapproved evidence. Dismissal retains a workload selector only if it remains in the approved choices. The overview returns JSON by default; format=csv returns selected official and named cells with source identities, units and both GPU cost bases as a private no-store download. duration_s is the requested plan duration; video_seconds_per_s beside clips_per_s is validated decoded output seconds per wall second. Missing values are empty CSV cells. Missing quality, stage timing, memory and startup evidence stays null. Play/pause, scrub, difference rendering, theme and expand controls are presentation-only; media uses the published-only read path. ',
+  zh: 'view=overview 与 /video 结果页共用 resultProjection，只准入同一份计划 20 条视频的 C1 工作负载，各硬件统一至少 10 个有效样本。响应包含实测指标及分别标注的参与/已分配 GPU 成本和估算利润；分配证据缺失时保留 null。point.videoSecondsPerHour 表示有效测量请求每小时生成的实际解码视频秒数，排除 warmup；视频秒吞吐量、两种 GPU 口径的每视频秒成本及估算收入共用此输出速率。有效输出时长不完整或旧 History 缺少此可选字段时，这些指标及利润均为 null；durationSeconds 保留计划请求时长，仅用于工作负载身份与筛选，不作替代。默认数据点须有发布批准。unofficialrun 只把指定的已存储运行放入 overlayCells（所选 GPU 数）和 overlayDeploymentCells（所有匹配的 GPU 数），保留其实际批准状态，并将其排除在正式结果、部署和工作负载构成之外。默认优先选择有已批准结果的工作负载；仅由指定运行提供的工作负载须明确选择，或在没有匹配的已批准结果时作为回退。清除叠加运行后也不会把未批准数据转为正式结果。移除时，工作负载选择仅在已批准选项中仍然有效时保留。overview 默认返回 JSON；format=csv 导出当前筛选的正式及指定运行数据点，包含来源标识、单位和两种 GPU 成本口径。duration_s 保留计划请求时长；紧邻 clips_per_s 的 video_seconds_per_s 为每测量秒生成的有效解码视频秒数。CSV 响应设置 Cache-Control: private, no-store；缺失值以空单元格表示。质量、阶段计时、内存和启动证据缺失时保留 null。播放、拖动、差异显示、主题和展开控件只影响展示；媒体使用只读已发布路径。',
 };
 
 export const operations: ApiOperation[] = Object.entries(NEW_VIEWS).map(
