@@ -4,18 +4,12 @@ import { notFound, permanentRedirect } from 'next/navigation';
 import { InferenceProvider } from '@/components/inference/InferenceContext';
 import HistoricalTrendsDisplay from '@/components/trends/HistoricalTrendsDisplay';
 import { ZhTabIntro } from '@/components/zh/zh-tab-intro';
-import {
-  MODEL_ROUTES,
-  modelRoutePath,
-  pathWithSearchParams,
-  resolveModelRouteSlug,
-} from '@/lib/routing/model-routes';
+import { MODEL_ROUTES, modelRoutePath, resolveModelRouteSlug } from '@/lib/routing/model-routes';
 import { modelTabCanonicalPath } from '@/lib/routing/tab-meta';
 import { MODEL_TAB_META_ZH, modelTabMetadataZh } from '@/lib/routing/tab-meta-zh';
 
 interface Props {
   params: Promise<{ model: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 export function generateStaticParams() {
@@ -33,18 +27,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   );
 }
 
-export default async function ZhHistoricalModelPage({ params, searchParams }: Props) {
+export default async function ZhHistoricalModelPage({ params }: Props) {
   const { model } = await params;
   const resolved = resolveModelRouteSlug(model);
   if (!resolved) notFound();
-  if (resolved.isAlias) {
-    permanentRedirect(
-      pathWithSearchParams(
-        `/zh${modelRoutePath('historical', resolved.route.slug)}`,
-        await searchParams,
-      ),
-    );
-  }
+  // Prerendered route: reading searchParams here throws DYNAMIC_SERVER_USAGE. next.config
+  // redirects known aliases with their query; this only catches other casings.
+  if (resolved.isAlias)
+    permanentRedirect(`/zh${modelRoutePath('historical', resolved.route.slug)}`);
   const meta = MODEL_TAB_META_ZH.historical;
   return (
     <>

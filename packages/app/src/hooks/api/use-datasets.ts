@@ -92,13 +92,14 @@ export function useDatasets() {
   });
 }
 
-export function useDataset(slug: string | null) {
+export function useDataset(slug: string | null, initialData?: DatasetDetail) {
   return useQuery({
     queryKey: ['dataset', slug] as const,
     queryFn: ({ signal }) =>
       fetchJsonOr404<DatasetDetail>(`/api/v1/datasets/${slug}`, 'dataset', signal),
     enabled: Boolean(slug),
     staleTime: DAY,
+    initialData,
   });
 }
 

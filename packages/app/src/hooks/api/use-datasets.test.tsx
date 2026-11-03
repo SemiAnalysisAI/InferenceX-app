@@ -4,7 +4,7 @@ import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { useDatasetConversations } from './use-datasets';
+import { type DatasetDetail, useDataset, useDatasetConversations } from './use-datasets';
 
 function ConversationProbe({ search }: { search: string }) {
   useDatasetConversations({ slug: 'trace', search });
@@ -67,5 +67,24 @@ describe('useDatasetConversations cache lifecycle', () => {
 
     act(() => root.unmount());
     client.clear();
+  });
+});
+
+describe('useDataset server seed', () => {
+  it('renders the server-resolved record without fetching it again', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const record = { slug: 'trace', label: 'Trace dataset', chart_data: {} } as DatasetDetail;
+    let seen: DatasetDetail | null | undefined;
+    function Probe() {
+      seen = useDataset('trace', record).data;
+      return null;
+    }
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const root = createRoot(document.createElement('div'));
+    act(() => root.render(createElement(QueryClientProvider, { client }, createElement(Probe))));
+    await flushQueries();
+    expect(seen).toBe(record);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    act(() => root.unmount());
   });
 });

@@ -17,6 +17,7 @@ import {
   useDataset,
   useDatasetConversations,
   type ConversationSort,
+  type DatasetDetail as DatasetDetailRecord,
 } from '@/hooks/api/use-datasets';
 import { track } from '@/lib/analytics/analytics';
 import { useSearchTracking } from '@/lib/analytics/use-search-tracking';
@@ -131,8 +132,15 @@ const STRINGS = {
   },
 } as const;
 
-export function DatasetDetail({ slug }: { slug: string }) {
-  const { data: dataset, isLoading, isError, refetch } = useDataset(slug);
+export function DatasetDetail({
+  slug,
+  initialDataset,
+}: {
+  slug: string;
+  /** The record the server page already resolved, so the heading and summary render on the server. */
+  initialDataset?: DatasetDetailRecord;
+}) {
+  const { data: dataset, isLoading, isError, refetch } = useDataset(slug, initialDataset);
   const [searchInput, setSearchInput] = useState('');
   useSearchTracking('datasets_conversations_searched', searchInput, { slug });
   const [{ search, sort, page }, setConversationQuery] = useState({
