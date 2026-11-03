@@ -2,6 +2,7 @@ import fs from 'node:fs';
 
 import type postgres from 'postgres';
 
+import { storeGpuSampleBlob } from '../queries/gpu-sample-blobs.js';
 import { sha256Hex } from './benchmark-artifacts.js';
 import type { Sql } from './db-utils.js';
 
@@ -286,6 +287,13 @@ export function upsertGpuMetricSeries(
           seriesId,
           series.samples.slice(offset, offset + SAMPLE_BATCH_SIZE),
         );
+      }
+      // Opt-in until migration 022 is applied wherever ingest runs.
+      if (process.env.GPU_SAMPLE_BLOBS === '1') {
+        const blob = await storeGpuSampleBlob(tx, seriesId);
+        if (blob.status === 'skipped') {
+          console.warn(`    gpu_metric_sample_blobs ${seriesId}: ${blob.reason}; reads use rows`);
+        }
       }
     }
 
