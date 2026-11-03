@@ -1,5 +1,6 @@
 import { QuotesContent } from '@/components/quotes/quotes-content';
 import { QUOTES } from '@/components/quotes/quotes-data';
+import { IntroSection } from '@/components/landing/intro-section';
 
 function orgAnchorId(org: string): string {
   const slug = org
@@ -353,8 +354,16 @@ describe('QuotesContent supporter logo wall', () => {
     });
   });
 
-  it('links the six managed providers to their existing quotes in both locales', () => {
-    const providers = ['Together AI', 'GMI Cloud', 'Nebius', 'Baseten', 'Crusoe', 'Tensormesh'];
+  it('links the managed providers to their quotes in both locales', () => {
+    const providers = [
+      'Together AI',
+      'GMI Cloud',
+      'Nebius',
+      'Baseten',
+      'Crusoe',
+      'Tensormesh',
+      'Morph LLM',
+    ];
     for (const locale of ['en', 'zh'] as const) {
       cy.viewport(375, 812);
       cy.mount(<QuotesContent locale={locale} />);
@@ -381,9 +390,31 @@ describe('QuotesContent supporter logo wall', () => {
         });
       }
       cy.get('#quote-together-ai').should('contain.text', 'Tri Dao');
+      cy.get('#quote-morph-llm').within(() => {
+        cy.get('p').should(
+          'have.text',
+          locale === 'en'
+            ? "“When you own your hardware, every serving decision shows up directly in your margins. InferenceX's open, reproducible benchmarks show how different accelerators and inference engines actually perform on real workloads, so smaller providers like us can make infra decisions with the same data as the biggest players. Nobody else shows acceptance length like these guys.”"
+            : '“硬件是自己买的，每一项推理服务决策都会直接影响利润率。InferenceX 的开放、可复现基准测试展示了不同加速器和推理引擎在真实工作负载下的实际表现，让我们这样规模较小的服务商也能用和行业巨头一样的数据来做基础设施决策。还没有谁能像他们这样展示 acceptance length。”',
+        );
+        cy.get('footer').should('contain.text', 'Nicholas Khami').and('contain.text', 'Morph LLM');
+        cy.get('img[alt="Morph LLM"]').should(($logo) => {
+          expect(($logo[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
+        });
+      });
+      cy.get('[data-testid="supporter-group-other"] img[alt="Morph LLM"]').should('not.exist');
       cy.get('@providerScroll').then((stub) => {
         (stub as unknown as { restore: () => void }).restore();
       });
+    }
+  });
+
+  it('keeps Morph off the landing supporter strip in both locales', () => {
+    for (const locale of ['en', 'zh'] as const) {
+      cy.mount(<IntroSection locale={locale} />);
+      cy.get('[data-testid="intro-section"]').should('not.contain.text', 'Morph');
+      cy.get('a[href$="#quote-morph-llm"]').should('not.exist');
+      cy.get('a[href$="#quote-google"]').should('exist');
     }
   });
 });
