@@ -304,7 +304,7 @@ function rowIndex(comparison: Pick<Comparison, 'rows'>): RowIndex {
   }
   const cases = new Map<string, { seen: Uint8Array; count: number }>();
   let lastModel: string | null = null;
-  let last = { seen: new Uint8Array(0), count: 0 };
+  let last: { seen: Uint8Array; count: number } = { seen: new Uint8Array(0), count: 0 };
   for (let i = 0; i < rows.length; i++)
     for (const s of rows[i].sources) {
       if (s.model !== lastModel) {
