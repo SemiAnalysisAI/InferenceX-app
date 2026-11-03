@@ -31,7 +31,6 @@ import { Label } from '@/components/ui/label';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
-import { Switch } from '@/components/ui/switch';
 import {
   TooltipContent,
   TooltipProvider,
@@ -173,67 +172,77 @@ function SizeControls({
   onSweep: (enabled: boolean) => void;
 }) {
   const range: [number, number] = [bins[0], bins.at(-1)!];
+  // One step past the largest size: every size at once, as line charts.
+  const all = bins.length;
+  // Where the thumb sits at the largest size; the 16px is the range thumb's width.
+  const last = bins.length > 1 ? (bins.length - 1) / bins.length : 0;
+  const lastAt = `calc(${last * 100}% + ${(0.5 - last) * 16}px)`;
   return (
     <div className="space-y-1">
-      <div className="flex items-baseline gap-2 text-xs">
-        <label htmlFor="operatorx-model-tokens" className="flex items-baseline gap-2">
-          <span className="text-muted-foreground">Tokens</span>
-          <span className="font-semibold tabular-nums">
-            {sweep
-              ? `${formatTokens(binTokens(range[0]))}–${formatTokens(binTokens(range[1]))}`
-              : `≈ ${formatTokens(binTokens(bin))}`}
-          </span>
-        </label>
-        <div className="ml-auto flex items-center gap-1.5 self-center">
-          <Switch
-            id="operatorx-model-sweep"
-            checked={sweep}
-            onCheckedChange={onSweep}
-            data-testid="operatorx-model-sweep"
-          />
-          <Label
-            htmlFor="operatorx-model-sweep"
-            className="text-xs font-normal text-muted-foreground"
-          >
-            All token counts
-          </Label>
-        </div>
+      <label htmlFor="operatorx-model-tokens" className="flex items-baseline gap-2 text-xs">
+        <span className="text-muted-foreground">Tokens</span>
+        <span className="font-semibold tabular-nums">
+          {sweep
+            ? `All · ${formatTokens(binTokens(range[0]))}–${formatTokens(binTokens(range[1]))}`
+            : `≈ ${formatTokens(binTokens(bin))}`}
+        </span>
+      </label>
+      <div className="relative">
+        <input
+          id="operatorx-model-tokens"
+          type="range"
+          min={0}
+          max={all}
+          step={1}
+          value={sweep ? all : bins.indexOf(bin)}
+          aria-valuetext={sweep ? 'All token counts' : `${formatTokens(binTokens(bin))} tokens`}
+          onChange={(e) => {
+            const at = Number(e.target.value);
+            if (at === all) {
+              if (!sweep) onSweep(true);
+              return;
+            }
+            if (sweep) onSweep(false);
+            onChange(bins[at]);
+          }}
+          className="relative w-full accent-primary"
+          data-testid="operatorx-model-tokens"
+        />
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute top-1/2 h-3 w-px -translate-y-1/2 bg-muted-foreground/60"
+          style={{ left: lastAt }}
+          data-testid="operatorx-model-tokens-notch"
+        />
       </div>
-      {sweep ? (
+      <div className="relative h-4 text-2xs text-muted-foreground tabular-nums">
+        <span className="absolute left-0">{formatTokens(binTokens(range[0]))}</span>
+        {bins.length > 1 && (
+          <span className="absolute -translate-x-full pr-1" style={{ left: lastAt }}>
+            {formatTokens(binTokens(range[1]))}
+          </span>
+        )}
+        <span className={`absolute right-0 ${sweep ? 'font-semibold text-foreground' : ''}`}>
+          All
+        </span>
+      </div>
+      {sweep && (
         // Aligned with the charts' plot area, which leaves room for the value labels.
         <div
           className="relative mr-[4.5rem] h-6 border-t border-border/60 text-2xs text-muted-foreground tabular-nums"
           data-testid="operatorx-model-token-axis"
         >
-          {tokenMarks(range).map((m, i, all) => (
+          {tokenMarks(range).map((m, i, every) => (
             <span
               key={m.tokens}
               // too narrow for the inner powers of ten on phones: the ends only
-              className={`absolute top-1 whitespace-nowrap ${i === 0 ? '' : i === all.length - 1 ? '-translate-x-full' : '-translate-x-1/2 max-md:hidden'}`}
+              className={`absolute top-1 whitespace-nowrap ${i === 0 ? '' : i === every.length - 1 ? '-translate-x-full' : '-translate-x-1/2 max-md:hidden'}`}
               style={{ left: `${m.pct}%` }}
             >
               {formatTokens(m.tokens)}
             </span>
           ))}
         </div>
-      ) : (
-        <>
-          <input
-            id="operatorx-model-tokens"
-            type="range"
-            min={0}
-            max={bins.length - 1}
-            step={1}
-            value={bins.indexOf(bin)}
-            onChange={(e) => onChange(bins[Number(e.target.value)])}
-            className="w-full accent-primary"
-            data-testid="operatorx-model-tokens"
-          />
-          <div className="flex justify-between text-2xs text-muted-foreground tabular-nums">
-            <span>{formatTokens(binTokens(range[0]))}</span>
-            <span>{formatTokens(binTokens(range[1]))}</span>
-          </div>
-        </>
       )}
     </div>
   );
@@ -496,7 +505,7 @@ function BlockRows({
   block: LayerBlock;
   slots: SlotData[];
   tokens: number;
-  /** With "All token counts" on, the size bins the line charts span; else null. */
+  /** With the slider on All, the size bins the line charts span; else null. */
   range: [number, number] | null;
   /** GPUs shown, which sets the height of a row of bars. */
   lanes: number;
@@ -682,7 +691,45 @@ function BlockRows({
   );
 }
 
-/** Every shape of one slot: size sweep and roofline, each point opening its kernel timeline. */
+/** The dim each op sweeps with the token count; every other dim is fixed within one shape. */
+const SIZE_DIM: Partial<Record<string, string>> = { gemm: 'm', moe: 'tokens', attention: 'tokens' };
+
+interface ShapeFamily {
+  key: string;
+  label: string;
+  indices: number[];
+}
+
+/**
+ * A slot's cases grouped by their fixed dims: one shape swept over the token count each. A
+ * layer runs at several shard sizes across serving configs (one per tensor-parallel degree),
+ * so a slot can hold more than one.
+ */
+function shapeFamilies(view: ComparisonView, indices: number[], op: string): ShapeFamily[] {
+  const size = SIZE_DIM[op] ?? 'tokens';
+  const families = new Map<string, ShapeFamily>();
+  for (const i of indices) {
+    const fixed = Object.entries(view.cases[i].dims).filter(([k]) => k !== size);
+    const key = JSON.stringify(fixed);
+    const family = families.get(key) ?? {
+      key,
+      label: fixed.map(([k, v]) => `${k} ${v}`).join(' · '),
+      indices: [],
+    };
+    family.indices.push(i);
+    families.set(key, family);
+  }
+  // largest shard first: the lowest tensor-parallel degree
+  const volume = (f: ShapeFamily) =>
+    Object.entries(view.cases[f.indices[0]].dims)
+      .filter(([k]) => k !== size)
+      .reduce((t, [, v]) => t * v, 1);
+  return [...families.values()].sort(
+    (a, b) => volume(b) - volume(a) || a.label.localeCompare(b.label),
+  );
+}
+
+/** One shape of one slot: size sweep and roofline, each point opening its kernel timeline. */
 function SlotDetail({
   data,
   modelName,
@@ -693,17 +740,24 @@ function SlotDetail({
   onClose: () => void;
 }) {
   const [inspected, setInspected] = useState<number | null>(null);
-  // A case opened for one op never carries over to the next op shown
+  const [pickedFamily, setFamily] = useState<string | null>(null);
+  // A case or shape opened for one op never carries over to the next op shown
   const [inspectedFor, setInspectedFor] = useState(data);
   if (inspectedFor !== data) {
     setInspectedFor(data);
     setInspected(null);
+    setFamily(null);
   }
+  const families = useMemo(
+    () => (data?.model ? shapeFamilies(data.model.view, data.indices, data.slot.op) : []),
+    [data],
+  );
+  const family = families.find((f) => f.key === pickedFamily) ?? families[0];
   const queryClient = useQueryClient();
   const sub = useMemo(() => {
-    if (!data?.model) return null;
-    const { model, indices, slot } = data;
-    const view = subView(model.view, indices);
+    if (!data?.model || !family) return null;
+    const { model, slot } = data;
+    const view = subView(model.view, family.indices);
     const measured = measuredHardware([view]).filter((hw) => model.available.includes(hw));
     const op = slot.op as ComparisonOp;
     return {
@@ -730,21 +784,44 @@ function SlotDetail({
         },
       ),
     };
-  }, [data, queryClient]);
+  }, [data, family, queryClient]);
   return (
     <Dialog open={data !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         className="flex max-h-[94vh] w-[min(96vw,72rem)] max-w-[min(96vw,72rem)] flex-col gap-4 overflow-y-auto p-4 sm:p-6"
         data-testid="operatorx-model-slot-detail"
       >
-        {data && sub && (
+        {data && sub && family && (
           <>
             <DialogHeader>
               <DialogTitle className="font-mono">{data.slot.label}</DialogTitle>
               <DialogDescription>
-                {data.block.label} · {modelName} · {data.indices.length.toLocaleString()} shapes
+                {data.block.label} · {modelName} · <span className="font-mono">{family.label}</span>{' '}
+                · {family.indices.length.toLocaleString()}{' '}
+                {family.indices.length === 1 ? 'size' : 'sizes'} of{' '}
+                <span className="font-mono">{SIZE_DIM[data.slot.op] ?? 'tokens'}</span>
               </DialogDescription>
             </DialogHeader>
+            {families.length > 1 && (
+              <div className="space-y-1.5" data-testid="operatorx-model-slot-shapes">
+                <SegmentedToggle
+                  value={family.key}
+                  onValueChange={(key) => {
+                    track('operatorx_model_shape_selected', { op: data.slot.op });
+                    setInspected(null);
+                    setFamily(key);
+                  }}
+                  ariaLabel="Shape"
+                  variant={families.length > 4 ? 'select' : 'segments'}
+                  className="font-mono"
+                  options={families.map((f) => ({ value: f.key, label: f.label }))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  This layer runs at {families.length} shard sizes across the serving configs, one
+                  per tensor-parallel degree. Each is one shape swept over the token count.
+                </p>
+              </div>
+            )}
             <div className="space-y-6">
               <section className="space-y-2">
                 <h3 className="text-sm font-semibold">{roofline.title}</h3>

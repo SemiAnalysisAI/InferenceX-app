@@ -315,18 +315,28 @@ dispatch/combine，以及注意力的 dcp 合并。注意力自身的张量并�
 
 Beside each measured op, Model View shows one row per selected GPU at the token count
 the slider picks (half-octave size bins; each value is the GPU's median over the op's
-cases in that bin). **All token counts** replaces the slider with a shared token axis
-and each row's bars with line charts: one line per GPU over every size bin the slider
-covers, log tokens across and log metric up, scaled to the row, with the row's largest
-and smallest values beside it. A GPU measured at one size shows as a dot. The tooltip
-then gives each GPU's range across sizes. Clicking an op still opens its detail.
+cases in that bin). The slider has one more step past the largest size, **All**: there
+a shared token axis appears under it and each row's bars become line charts: one line
+per GPU over every size bin, log tokens across and log metric up, scaled to the row,
+with the row's largest and smallest values beside it. A GPU measured at one size shows
+as a dot. The tooltip then gives each GPU's range across sizes. Sliding back to a size
+restores the bars.
+
+Clicking an op opens its detail for one shape swept over the token count (`m` for GEMM,
+`tokens` for MoE and attention). A layer runs at several shard sizes across the serving
+configs, one per tensor-parallel degree (DeepSeek-R1 `o_proj` has `k` 16384, 4096, 2048
+and 1024), so the detail picks one, largest first, and lists the others to switch to.
 
 中文：Model View 在每个已测量算子旁，按滑块选择的 token 数为每个所选 GPU 显示一行
-（按半个倍频程分组；数值为该 GPU 在该组内各用例的中位数）。开启 **All token counts**
-后，滑块换成共享的 token 坐标轴，各行的柱形换成折线图：每个 GPU 一条线，覆盖滑块范围内
-的全部规模分组，横轴为对数 token 数，纵轴为对数指标并按行缩放，旁边标出该行的最大值和
-最小值。只在一个规模上测量的 GPU 显示为一个点。此时提示框给出每个 GPU 在各规模上的取值
-范围。点击算子仍会打开其详情。
+（按半个倍频程分组；数值为该 GPU 在该组内各用例的中位数）。滑块在最大规模之后还有一档
+**All**：拖到这一档时，滑块下方出现共享的 token 坐标轴，各行的柱形换成折线图：每个 GPU
+一条线，覆盖全部规模分组，横轴为对数 token 数，纵轴为对数指标并按行缩放，旁边标出该行的
+最大值和最小值。只在一个规模上测量的 GPU 显示为一个点。此时提示框给出每个 GPU 在各规模上
+的取值范围。拖回任一规模即恢复柱形。
+
+点击算子打开其详情，只显示一个形状随 token 数（GEMM 为 `m`，MoE 和注意力为 `tokens`）
+变化的数据。同一层在不同服务配置中按张量并行度切分为不同大小（如 DeepSeek-R1 `o_proj` 的
+`k` 为 16384、4096、2048 和 1024），因此详情默认显示最大的一种，并可切换到其他切分。
 
 ## Data API
 
