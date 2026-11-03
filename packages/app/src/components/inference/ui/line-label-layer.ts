@@ -2,6 +2,7 @@ import * as d3 from 'd3';
 
 import { pointNearestX } from '@/components/inference/ui/line-label-anchor';
 import { setAttrIfChanged, setStyleIfChanged } from '@/lib/d3-chart/chart-update';
+import { childPointLabel } from '@/lib/d3-chart/layers/scatter-points';
 import { plotClipSize } from '@/lib/d3-chart/plot-bounds';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 
@@ -494,7 +495,7 @@ export function placePointLabels(
   const avoidCollisions = options.avoidCollisions ?? true;
   interface LabelInfo {
     element: SVGTextElement;
-    tspans: SVGTSpanElement[];
+    tspans: Element[];
     centerX: number;
     centerY: number;
     width: number;
@@ -509,7 +510,7 @@ export function placePointLabels(
   const padding = 2;
 
   zoomGroup.selectAll<SVGGElement, unknown>('.dot-group').each(function () {
-    const label = this.querySelector<SVGTextElement>('.point-label');
+    const label = childPointLabel(this);
     if (!label) return;
     const placementHidden = label.hasAttribute(PLACEMENT_HIDDEN_ATTR);
     const release = () => {
@@ -526,7 +527,10 @@ export function placePointLabels(
       release();
       return;
     }
-    const tspans = [...label.querySelectorAll<SVGTSpanElement>('tspan')];
+    const tspans: Element[] = [];
+    for (let tspan = label.firstElementChild; tspan; tspan = tspan.nextElementSibling) {
+      tspans.push(tspan);
+    }
     const transform = this.getAttribute('transform') ?? '';
     const match = transform.match(/translate\((?<tx>[^,]+),(?<ty>[^)]+)\)/u);
     if (tspans.length === 0 || !match) {

@@ -101,6 +101,7 @@ interface CachedQueryOptions {
   revisioned?: boolean;
   /** Cache tag for the unstable_cache path (default 'db'). */
   tag?: string;
+  shareDecodedResult?: boolean;
 }
 
 // Blob argument encoding is explicitly versioned. v1 used `args.join(':')`,
@@ -197,6 +198,19 @@ function unpackCachedEntry<T>(entry: CachedEntry<T>): T {
   ) as T;
 }
 
+function lastDecodedEntryUnpacker<T>(): (args: unknown[], entry: CachedEntry<T>) => T {
+  const lastDecodedByArgs = new Map<string, { brotli: string; value: T }>();
+  return (args, entry) => {
+    if (!('brotli' in entry)) return entry.value;
+    const argsKey = JSON.stringify(args);
+    const last = lastDecodedByArgs.get(argsKey);
+    if (last?.brotli === entry.brotli) return last.value;
+    const value = unpackCachedEntry<T>(entry);
+    lastDecodedByArgs.set(argsKey, { brotli: entry.brotli, value });
+    return value;
+  };
+}
+
 let blobGeneration: (() => Promise<string>) | undefined;
 
 /**
@@ -255,12 +269,15 @@ export function cachedQuery<T, Args extends unknown[]>(
 
   const packed = (...args: Args): Promise<CachedEntry<T>> => fn(...args).then(packCachedEntry);
   const fnSource = fn.toString();
+  const unpack = options?.shareDecodedResult
+    ? lastDecodedEntryUnpacker<T>()
+    : (_args: Args, entry: CachedEntry<T>) => unpackCachedEntry(entry);
 
   if (options?.tag) {
     const tagged = unstable_cache(packed, [cacheKey(keyPrefix), fnSource], {
       tags: [options.tag],
     });
-    return async (...args: Args): Promise<T> => unpackCachedEntry(await tagged(...args));
+    return async (...args: Args): Promise<T> => unpack(args, await tagged(...args));
   }
 
   // Route handlers need an expired entry to refetch before they answer, or the
@@ -274,7 +291,8 @@ export function cachedQuery<T, Args extends unknown[]>(
     tags: [pageCacheTag()],
   });
   return async (...args: Args): Promise<T> =>
-    unpackCachedEntry(
+    unpack(
+      args,
       await (workAsyncStorage.getStore()?.isStaticGeneration
         ? pageCached(...args)
         : routeCached(...args)),
@@ -292,8 +310,9 @@ export function cachedQuery<T, Args extends unknown[]>(
 export function cachedDerivedData<T, Args extends unknown[]>(
   fn: (...args: Args) => Promise<T>,
   keyPrefix: string,
+  options?: Pick<CachedQueryOptions, 'shareDecodedResult'>,
 ): (...args: Args) => Promise<T> {
-  return cachedQuery(fn, `derived:${keyPrefix}`);
+  return cachedQuery(fn, `derived:${keyPrefix}`, options);
 }
 
 /**

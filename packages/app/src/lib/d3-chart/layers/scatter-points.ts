@@ -122,19 +122,32 @@ export function renderScatterPoints<T extends { precision: string; x: number; y:
   return points;
 }
 
+const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
+
+function isPointLabel(element: Element): element is SVGTextElement {
+  return element.localName === 'text' && element.classList.contains('point-label');
+}
+
+export function childPointLabel(group: Element): SVGTextElement | null {
+  for (let child = group.firstElementChild; child; child = child.nextElementSibling) {
+    if (isPointLabel(child)) return child;
+  }
+  return null;
+}
+
 export function syncPointLabel(
   group: SVGGElement,
   text: string,
   foreground: string,
   hideLabels: boolean | undefined,
 ): void {
-  const existing = group.querySelector<SVGTextElement>(':scope > .point-label');
+  const existing = childPointLabel(group);
   if (hideLabels) {
     existing?.remove();
     return;
   }
-  const element =
-    existing ?? group.ownerDocument.createElementNS('http://www.w3.org/2000/svg', 'text');
+  const { ownerDocument } = group;
+  const element = existing ?? ownerDocument.createElementNS(SVG_NAMESPACE, 'text');
   const lines = text.split('\n');
   const firstDy = `${-(0.8 + (lines.length - 1) * 1.1)}em`;
   setAttrIfChanged(element, 'class', 'point-label');
@@ -145,15 +158,22 @@ export function syncPointLabel(
   setAttrIfChanged(element, 'pointer-events', 'none');
   setStyleIfChanged(element, 'display', '');
   setStyleIfChanged(element, 'opacity', '1');
-  d3.select(element)
-    .selectAll<SVGTSpanElement, string>('tspan')
-    .data(lines)
-    .join('tspan')
-    .each(function (line, index) {
-      setAttrIfChanged(this, 'x', '0');
-      setAttrIfChanged(this, 'dy', index === 0 ? firstDy : '1.1em');
-      setTextIfChanged(this, line);
-    });
+  let tspan = element.firstElementChild;
+  for (const [index, line] of lines.entries()) {
+    if (!tspan) {
+      tspan = ownerDocument.createElementNS(SVG_NAMESPACE, 'tspan');
+      element.append(tspan);
+    }
+    setAttrIfChanged(tspan, 'x', '0');
+    setAttrIfChanged(tspan, 'dy', index === 0 ? firstDy : '1.1em');
+    setTextIfChanged(tspan, line);
+    tspan = tspan.nextElementSibling;
+  }
+  while (tspan) {
+    const extra = tspan;
+    tspan = tspan.nextElementSibling;
+    extra.remove();
+  }
   if (existing) return;
   const anchor = pointLabelAnchor(group);
   if (anchor) anchor.before(element);

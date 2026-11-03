@@ -99,7 +99,9 @@ async function buildOverviewCubeForScope(
   );
 }
 
-const getCachedOverviewCube = cachedDerivedData(buildOverviewCubeForScope, 'overview-cube-v1');
+const getCachedOverviewCube = cachedDerivedData(buildOverviewCubeForScope, 'overview-cube-v1', {
+  shareDecodedResult: true,
+});
 
 export async function getOverviewPageData(
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,

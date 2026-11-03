@@ -392,6 +392,22 @@ describe('syncPointLabel', () => {
     expect(group.querySelector('.point-label')!.textContent).toBe('TP4');
   });
 
+  it('matches a freshly built label after its line count grows and shrinks', () => {
+    const freshLabel = (text: string) => {
+      const group = makePointGroup();
+      syncPointLabel(group, text, '#fff', false);
+      return group.querySelector('.point-label')!.outerHTML;
+    };
+    const group = makePointGroup();
+    syncPointLabel(group, 'TP8', '#fff', false);
+
+    for (const text of ['TP8\nEP4\nC=4', 'TP4\nEP2', 'TP2']) {
+      syncPointLabel(group, text, '#fff', false);
+      expect(group.querySelectorAll('.point-label')).toHaveLength(1);
+      expect(group.querySelector('.point-label')!.outerHTML).toBe(freshLabel(text));
+    }
+  });
+
   it('keeps no label in the DOM while hidden', () => {
     const group = makePointGroup();
     syncPointLabel(group, 'TP8', '#fff', true);
