@@ -11,17 +11,15 @@ import {
   ensureCanvasPointLayer,
   type PointPointerHandlers,
 } from './canvas-points';
-
-interface Datum {
-  id: string;
-  precision: string;
-  x: number;
-  y: number;
-  visible?: boolean;
-}
-
-const key = (datum: Datum) => datum.id;
-const identity = d3.scaleLinear().domain([0, 100]).range([0, 100]);
+import {
+  config,
+  type Datum,
+  identity,
+  installFrames,
+  installRecordingContext,
+  key,
+  mountLayer,
+} from './canvas-points-test-utils';
 
 function seeded(seed: number) {
   let state = seed;
@@ -57,20 +55,6 @@ function d3Order(previous: string[], next: string[]): string[] {
     .nodes()
     .map((node) => node.dataset.index!);
 }
-
-function mountLayer() {
-  const svg = d3.create('svg:svg');
-  const zoomGroup = svg.append('g').attr('class', 'zoom-group').node()!;
-  document.body.append(svg.node()!);
-  const layer = ensureCanvasPointLayer<Datum>(zoomGroup);
-  return { svg: svg.node()!, zoomGroup, layer };
-}
-
-const config = {
-  getColor: (d: Datum) => (d.id.startsWith('a') ? 'red' : 'blue'),
-  getOpacity: (d: Datum) => (d.visible === false ? 0 : 1),
-  getPointerEvents: (d: Datum) => (d.visible === false ? 'none' : 'auto'),
-};
 
 describe('joinedDrawOrder', () => {
   it('matches the DOM order of a keyed d3 join, duplicates included', () => {
@@ -386,49 +370,3 @@ describe('CanvasPointLayer', () => {
     svg.remove();
   });
 });
-
-function installFrames() {
-  let callback: FrameRequestCallback | null = null;
-  vi.stubGlobal('requestAnimationFrame', (next: FrameRequestCallback) => {
-    callback = next;
-    return 1;
-  });
-  return {
-    run(time: number) {
-      const current = callback;
-      callback = null;
-      current?.(time);
-    },
-    pending: () => callback !== null,
-  };
-}
-
-function installRecordingContext(): unknown[][] {
-  const calls: unknown[][] = [];
-  const context = new Proxy(
-    {},
-    {
-      get:
-        (_target, property) =>
-        (...args: unknown[]) => {
-          calls.push([String(property), ...args]);
-        },
-      set: (_target, property, value) => {
-        calls.push([`set:${String(property)}`, value]);
-        return true;
-      },
-    },
-  );
-  vi.stubGlobal(
-    'Path2D',
-    class {
-      arc() {}
-      rect() {}
-      addPath() {}
-    },
-  );
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
-    context as unknown as CanvasRenderingContext2D,
-  );
-  return calls;
-}
