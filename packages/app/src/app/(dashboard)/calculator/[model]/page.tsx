@@ -33,7 +33,7 @@ export default async function CalculatorModelPage({ params }: Props) {
       <ThroughputCalculatorDisplay routeModel={resolved.route.model} />
       <TabIntro
         tab="calculator"
-        title={MODEL_TAB_META.calculator.title(resolved.route.seoName)}
+        title={MODEL_TAB_META.calculator.heading(resolved.route.seoName)}
         intro={MODEL_TAB_META.calculator.intro(resolved.route.seoName)}
       />
     </>

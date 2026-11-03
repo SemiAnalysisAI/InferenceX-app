@@ -41,7 +41,7 @@ export function ActiveQuickFilters() {
     <section
       aria-label={t.active}
       data-testid="active-quick-filters"
-      className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 bg-muted/20 p-3"
+      className="flex flex-wrap items-center gap-2"
     >
       <span className="text-xs font-medium text-muted-foreground">{t.active}</span>
       {filters.map(({ category, value, categoryLabel, label }) => (

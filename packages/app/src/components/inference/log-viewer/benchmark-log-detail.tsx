@@ -31,7 +31,7 @@ export function BenchmarkLogDetail({ id }: { id: number }) {
   const inferenceHref = isZhPathname(pathname) ? `${ZH_PREFIX}/inference` : '/inference';
 
   return (
-    <main className="container mx-auto flex flex-col gap-4 px-4 py-6 lg:px-8">
+    <main className="flex flex-col gap-4 py-6">
       <nav className="flex items-center gap-2" aria-label={t.title}>
         <button
           type="button"
@@ -56,7 +56,7 @@ export function BenchmarkLogDetail({ id }: { id: number }) {
       </nav>
 
       <header>
-        <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+        <p className="text-xs font-medium text-muted-foreground">
           {t.eyebrow} · #{id}
         </p>
         <h1 className="mt-1 text-xl font-semibold text-foreground">{t.title}</h1>

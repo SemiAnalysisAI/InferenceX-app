@@ -164,9 +164,12 @@ describe('ScatterGraph toggle decoration', () => {
     presenceState.current = { trace: new IdBitset([42, 1]), log: new IdBitset([]) };
     rerender();
     expect(rebuildCount()).toBe(buildsAfterMount);
-    expect(container.querySelector('.canvas-point-layer')).toBe(layer);
-    expect(scatterPoints(container)[0].attrs['has-trace']).toBe('true');
-    dispatchAtPoint(container, 'click', target);
+    expect(container.querySelector<SVGGElement>('.dot-group')).toBe(originalDot);
+    for (let click = 0; click < 2; click++) {
+      act(() =>
+        dot.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 20, clientY: 20 })),
+      );
+    }
 
     expect(document.querySelector('[data-action="view-charts"]')?.getAttribute('href')).toBe(
       '/inference/agentic/42',

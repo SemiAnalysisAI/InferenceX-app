@@ -5,6 +5,7 @@ import type { RequestRecord } from '@/hooks/api/use-request-timeline';
 import { formatDuration, formatTickLabel } from './timeline-format';
 import { cursorStatsAt, type SortedRequestTimes } from './timeline-cursor-stats';
 import { requestSourceLabel, shortenWid, type RequestTimelineRow } from './timeline-rows';
+import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 const TOOLTIP_STRINGS = {
@@ -54,10 +55,12 @@ export function TimelineTooltip({ data, linkable }: { data: TooltipData; linkabl
   const totalMs = (req.end - req.start) / 1e6;
   const queueMs = (req.start - req.credit) / 1e6;
   return (
-    <div
+    <FloatingTooltip
+      x={data.x}
+      y={data.y}
       data-testid="request-timeline-tooltip"
-      className="fixed z-50 pointer-events-none rounded-md border border-border bg-card p-2.5 shadow-lg text-2xs"
-      style={{ left: data.x + 12, top: data.y - 10, maxWidth: 280 }}
+      className="text-2xs"
+      style={{ maxWidth: 280 }}
     >
       <div className="flex items-center gap-2 font-medium text-foreground">
         <span className="inline-block w-2 h-2 rounded-sm" style={{ backgroundColor: row.color }} />
@@ -111,7 +114,7 @@ export function TimelineTooltip({ data, linkable }: { data: TooltipData; linkabl
         {t.started} {formatTickLabel(req.start)}
       </div>
       {linkable && <div className="mt-1 text-3xs font-medium text-primary">{t.link}</div>}
-    </div>
+    </FloatingTooltip>
   );
 }
 
@@ -136,15 +139,14 @@ export function CursorPopover({
   const t = cursor.tNs;
   const { running, waiting, completed, inflight } = cursorStatsAt(times, t);
   const tSec = t / 1e9;
-  const wantLeft = cursor.clientX + 14;
-  const left =
-    typeof window === 'undefined' || wantLeft + 220 < window.innerWidth
-      ? wantLeft
-      : cursor.clientX - 220;
   return (
-    <div
-      className="fixed z-40 pointer-events-none rounded-md border border-border bg-card/95 backdrop-blur p-2 shadow-lg text-2xs font-mono"
-      style={{ left, top: cursor.clientY - 60, minWidth: 180 }}
+    <FloatingTooltip
+      x={cursor.clientX}
+      y={cursor.clientY}
+      offset={14}
+      placement="above"
+      className="text-2xs font-mono"
+      style={{ minWidth: 180 }}
     >
       <div className="flex justify-between gap-3 text-foreground">
         <span className="text-muted-foreground">t =</span>
@@ -162,9 +164,9 @@ export function CursorPopover({
         <span>{copy.completed}</span>
         <span className="text-foreground text-right tabular-nums">{completed}</span>
       </div>
-      <div className="mt-1 pt-1 border-t border-border/40 text-[9px] text-muted-foreground">
+      <div className="mt-1 pt-1 border-t border-border/40 text-3xs text-muted-foreground">
         {copy.relative((dataStart / 1e9).toFixed(0))}
       </div>
-    </div>
+    </FloatingTooltip>
   );
 }

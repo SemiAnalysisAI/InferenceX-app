@@ -40,24 +40,24 @@ interface CostTargetPanelProps {
 const STRINGS = {
   en: {
     toggleSection: 'Expand or fold this section',
-    costCapTitle: 'Interactivity Within a Cost Target',
+    costCapTitle: 'Interactivity within a cost target',
     costCapDescription:
       'Set a cost ceiling per million tokens and find the highest interactivity each chip can serve without exceeding it.',
-    costCapLabel: 'Cost Target ($/M tok)',
+    costCapLabel: 'Cost target ($/M tok)',
     costCapTooltip:
       'Maximum acceptable cost per million tokens (at the selected pricing tier and token type). The answer is the highest interactivity whose interpolated cost stays at or below this ceiling.',
     costCapPlaceholder: 'e.g. 0.50',
-    mwLabel: 'Facility Power (MW)',
+    mwLabel: 'Facility power (MW)',
     mwTooltip:
       'Optional facility power budget in megawatts. When set, the answer is also expressed as concurrent users on a fleet sized to this budget, using all-in power per chip (host, networking, cooling) from the SemiAnalysis Datacenter Industry Model, not bare TDP.',
     mwPlaceholder: 'e.g. 10',
     colGpu: 'Chip',
-    colMaxInteractivity: 'Max Interactivity (tok/s/user)',
+    colMaxInteractivity: 'Max interactivity (tok/s/user)',
     colTputAtIv: 'Throughput (tok/s/chip)',
-    colUsers: 'Concurrent Users',
+    colUsers: 'Concurrent users',
     notReachable: 'Not reachable',
-    costCapEmpty: 'Enter a cost target to find the serveable interactivity per chip.',
-    costCapNoGpus: 'No chips are visible to evaluate — enable hardware in the chart legend.',
+    costCapEmpty: 'Enter a cost target to find the serveable interactivity per chip',
+    costCapNoGpus: 'No chips are visible to evaluate. Enable hardware in the chart legend.',
     note: 'Note:',
     disaggFleet:
       ' Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo TRTLLM) report input and output throughput per prefill chip and per decode chip rather than per chip overall, so the interactivity a cost ceiling permits inherits that per-pool basis on the Input and Output token types. On Total it is per chip overall for both kinds.',
@@ -85,7 +85,7 @@ const STRINGS = {
     colTputAtIv: '吞吐量 (tok/s/chip)',
     colUsers: '并发用户数',
     notReachable: '无法达到',
-    costCapEmpty: '输入成本上限，以查看每款芯片可服务的交互性。',
+    costCapEmpty: '输入成本上限，以查看每款芯片可服务的交互性',
     costCapNoGpus: '当前无可见芯片可评估。请在图表图例中启用硬件。',
     note: '注：',
     disaggFleet:
@@ -325,38 +325,34 @@ export default function CostTargetPanel({
                     testId="calculator-costcap-table"
                     analyticsPrefix="calculator_costcap_table"
                   />
-                  <ChipBasisNote
-                    visible={hasDisagg}
-                    testId="calculator-costcap-disagg-note"
-                    label={t.note}
-                    text={chipBasis === 'total' ? t.disaggFleetTotal : t.disaggFleet}
-                    chipBasis={chipBasisControl}
-                    showToggle={costType !== 'total'}
-                  />
+                  {hasDisagg && (
+                    <p className="text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">{t.note}</span>
+                      {t.disaggFleet}
+                    </p>
+                  )}
                   <p className="text-xs text-muted-foreground mt-3">
                     {t.assumptions(getCostProviderLabel(costProvider))}
                   </p>
-                  <p className="text-muted-foreground mt-1">
-                    <small>
-                      {t.source}
-                      <Link
-                        target="_blank"
-                        className="underline hover:text-foreground"
-                        href="https://semianalysis.com/datacenter-industry-model/"
-                      >
-                        SemiAnalysis Datacenter Industry Model
-                        <ExternalLinkIcon />
-                      </Link>
-                      {' & '}
-                      <Link
-                        target="_blank"
-                        className="underline hover:text-foreground"
-                        href="https://semianalysis.com/ai-cloud-tco-model/"
-                      >
-                        SemiAnalysis Market July 2026 Pricing Surveys & AI Cloud TCO Model
-                        <ExternalLinkIcon />
-                      </Link>
-                    </small>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {t.source}
+                    <Link
+                      target="_blank"
+                      className="underline hover:text-foreground"
+                      href="https://semianalysis.com/datacenter-industry-model/"
+                    >
+                      SemiAnalysis Datacenter Industry Model
+                      <ExternalLinkIcon />
+                    </Link>
+                    {' & '}
+                    <Link
+                      target="_blank"
+                      className="underline hover:text-foreground"
+                      href="https://semianalysis.com/ai-cloud-tco-model/"
+                    >
+                      SemiAnalysis Market July 2026 Pricing Surveys & AI Cloud TCO Model
+                      <ExternalLinkIcon />
+                    </Link>
                   </p>
                 </>
               ) : (

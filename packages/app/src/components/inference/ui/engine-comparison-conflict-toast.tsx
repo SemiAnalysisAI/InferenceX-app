@@ -129,7 +129,7 @@ export function EngineComparisonConflictToast({ detail, onDismiss, onCompare }: 
     <BottomToast
       key={seq}
       testId="engine-comparison-conflict-toast"
-      icon={<AlertTriangle className="text-amber-500" />}
+      icon={<AlertTriangle className="text-warning" />}
       title={
         onCompare
           ? locale === 'zh'

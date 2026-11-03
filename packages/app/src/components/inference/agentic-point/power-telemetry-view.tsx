@@ -23,6 +23,7 @@ import {
 } from '@/components/gpu-power/types';
 import { Card } from '@/components/ui/card';
 import ChartLegend from '@/components/ui/chart-legend';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Label } from '@/components/ui/label';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import {
@@ -43,7 +44,7 @@ import { useLocale } from '@/lib/i18n/use-locale';
 const STRINGS = {
   en: {
     loading: 'Loading PowerX telemetry…',
-    error: 'Failed to load PowerX telemetry.',
+    error: 'Failed to load PowerX telemetry',
     missing:
       'No PowerX telemetry is stored for benchmark point #{id}. Telemetry may not have been collected or ingested.',
     series: 'Telemetry series',
@@ -66,14 +67,14 @@ const STRINGS = {
     overlayNone: 'None',
     overlayLoading: 'Loading server metrics…',
     overlayError: 'Server metrics failed to load; overlays are unavailable.',
-    overlayUnavailable: 'This point has no server-metric series to overlay.',
+    overlayUnavailable: 'This point has no server-metric series to overlay',
     overlayAligned: 'The overlay is aligned to the telemetry by wall-clock timestamps.',
     overlayRelative:
       'The trace has no wall-clock timestamps, so the overlay and the telemetry are both aligned at their own t=0.',
   },
   zh: {
     loading: '正在加载 PowerX 遥测数据……',
-    error: 'PowerX 遥测数据加载失败。',
+    error: 'PowerX 遥测数据加载失败',
     missing: '基准测试数据点 #{id} 没有存储的 PowerX 遥测数据。遥测数据可能尚未采集或入库。',
     series: '遥测序列',
     metric: '指标',
@@ -95,7 +96,7 @@ const STRINGS = {
     overlayNone: '无',
     overlayLoading: '正在加载服务端指标……',
     overlayError: '服务端指标加载失败，无法叠加显示。',
-    overlayUnavailable: '该数据点没有可叠加的服务端指标序列。',
+    overlayUnavailable: '该数据点没有可叠加的服务端指标序列',
     overlayAligned: '叠加曲线已按绝对时间戳与遥测数据对齐。',
     overlayRelative: 'trace 缺少绝对时间戳，因此叠加曲线与遥测数据均从各自的 t=0 开始对齐。',
   },
@@ -217,14 +218,7 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
   if (!enabled) return null;
 
   if (query.isLoading) {
-    return (
-      <div
-        className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground"
-        data-testid="power-telemetry-loading"
-      >
-        {t.loading}
-      </div>
-    );
+    return <EmptyState data-testid="power-telemetry-loading">{t.loading}</EmptyState>;
   }
   if (query.isError && !query.data) {
     return (
@@ -238,12 +232,9 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
   }
   if (!selectedSeries) {
     return (
-      <div
-        className="rounded-lg border border-border/40 bg-card/40 p-4 text-sm text-muted-foreground"
-        data-testid="power-telemetry-missing"
-      >
+      <EmptyState data-testid="power-telemetry-missing">
         {t.missing.replace('{id}', String(id))}
-      </div>
+      </EmptyState>
     );
   }
 
@@ -305,7 +296,11 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
                   setSeriesSelection({ id, seriesId: Number(value) });
                 }}
               >
-                <SelectTrigger id="power-telemetry-series-select" className="w-full truncate">
+                <SelectTrigger
+                  id="power-telemetry-series-select"
+                  size="sm"
+                  className="w-full truncate"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -330,6 +325,7 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
               <SelectTrigger
                 id="power-telemetry-metric-select"
                 data-testid="power-telemetry-metric-select"
+                size="sm"
                 className="w-full sm:w-56"
               >
                 <SelectValue />
@@ -366,6 +362,7 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
                 <SelectTrigger
                   id="power-telemetry-overlay"
                   data-testid="power-telemetry-overlay-select"
+                  size="sm"
                   className="w-full sm:w-64"
                 >
                   <SelectValue />

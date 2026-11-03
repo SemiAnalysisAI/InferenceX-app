@@ -38,6 +38,7 @@ import {
 import { ControlPanel } from '@/components/ui/control-panel';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
+import { EmptyState } from '@/components/ui/empty-state';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Heading } from '@/components/ui/heading';
 import { Input } from '@/components/ui/input';
@@ -99,34 +100,34 @@ const COST_PROVIDER_OPTIONS: {
 ];
 
 const COST_TYPE_OPTIONS: { value: CostType; label: string; labelZh: string }[] = [
-  { value: 'total', label: 'Total Tokens', labelZh: '总 Token' },
-  { value: 'input', label: 'Input Tokens', labelZh: '输入 Token' },
-  { value: 'output', label: 'Output Tokens', labelZh: '输出 Token' },
+  { value: 'total', label: 'Total tokens', labelZh: '总 Token' },
+  { value: 'input', label: 'Input tokens', labelZh: '输入 Token' },
+  { value: 'output', label: 'Output tokens', labelZh: '输出 Token' },
 ];
 
 const STRINGS = {
   en: {
-    title: 'First-Token Limits',
+    title: 'First-token limits',
     description:
       'Which chip wins depends on how long a user may wait for the first token. For each cap on time to first token, this reads the measured configurations that also clear the interactivity floor and keeps the cheapest one per vendor. Measured rows only: no interpolation, and every bar links to the run behind it.',
-    benchmarkGroup: 'Benchmark Config',
-    chartGroup: 'Chart Config',
-    costProviderLabel: 'Cost Provider',
+    benchmarkGroup: 'Benchmark config',
+    chartGroup: 'Chart config',
+    costProviderLabel: 'Cost provider',
     costProviderTooltip:
       'The pricing tier the bars are costed at. Owning at large hyperscaler purchasing volume (e.g. AWS/GCP) or renting on a 3-year commit. Locked rental terms (on demand through 2 year commit) are published in the SemiAnalysis AI Cloud TCO Model.',
     costProviderPlaceholder: 'Cost provider',
-    tokenTypeLabel: 'Token Type',
+    tokenTypeLabel: 'Token type',
     tokenTypeTooltip:
       'Whether cost is per million total, input, or output tokens. Disaggregated configs report input and output throughput per prefill and per decode chip unless the note below the chart switches them to every chip, so by default their input- and output-basis costs are not per chip overall.',
     tokenTypePlaceholder: 'Token type',
-    minInteractivityLabel: (stat: string) => `Minimum ${stat} Interactivity (tok/s/user)`,
+    minInteractivityLabel: (stat: string) => `Minimum ${stat} interactivity (tok/s/user)`,
     minInteractivityTooltip: (stat: string) =>
       `Only rows whose ${stat} interactivity is at or above this floor are eligible. Set it to the streaming speed the workload needs; a cap on first-token wait is then applied on top.`,
-    capsLabel: 'TTFT Caps (s, comma-separated)',
+    capsLabel: 'TTFT caps (s, comma-separated)',
     capsTooltip:
       'The ladder of maximum first-token waits to compare, in seconds. Each cap gets its own group of bars. Up to eight values.',
     capsPlaceholder: formatFirstTokenCaps(DEFAULT_FIRST_TOKEN_CAPS),
-    highContrast: 'High Contrast',
+    highContrast: 'High contrast',
     errorLoading: 'Error loading data. Please try a different selection.',
     noData:
       'No measured data for the current selection. Try another model, workload, or precision.',
@@ -605,7 +606,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
               href={r.runUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-primary underline underline-offset-2"
+              className="text-brand underline underline-offset-2"
               onClick={() => track('first_token_run_link_clicked')}
             >
               {t.viewRun}
@@ -671,14 +672,20 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
 
   const caption = (
     <>
-      <Heading as="h2" level="card">
-        {t.title}
-      </Heading>
-      <p className="text-sm text-muted-foreground mb-2">
-        {getModelLabel(selectedModel)} • {getSequenceLabel(selectedSequence, locale)} •{' '}
-        {t.captionFloor(minInteractivity, statLabel)} • {getCostProviderLabel(costProvider, locale)}{' '}
-        • {t.captionRows(result.qualifyingRows, result.measuredRows)} • {t.captionSource}
-      </p>
+      <div className="md:pr-12">
+        <Heading as="h2" level="card">
+          {t.title}
+        </Heading>
+        <p className="text-sm text-muted-foreground mb-2">
+          {getModelLabel(selectedModel)} · {getSequenceLabel(selectedSequence, locale)} ·{' '}
+          {t.captionFloor(minInteractivity, statLabel)} ·{' '}
+          {getCostProviderLabel(costProvider, locale)} ·{' '}
+          {t.captionRows(result.qualifyingRows, result.measuredRows)} · {t.captionSource}
+        </p>
+      </div>
+      {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}
+      {showsVeraRubinPreview && <VeraRubinOfficialPreviewNotice />}
+      {showsTpuv7Preview && <Tpuv7OfficialPreviewNotice />}
     </>
   );
 
@@ -708,13 +715,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
 
   if (!loading && error) {
     console.error(error);
-    return (
-      <Card>
-        <div className="flex items-center justify-center h-64 text-muted-foreground">
-          {t.errorLoading}
-        </div>
-      </Card>
-    );
+    return <EmptyState className="h-64">{t.errorLoading}</EmptyState>;
   }
 
   return (
@@ -892,7 +893,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
                 {showsTcoBasis && (
                   <div className="flex min-w-0 max-w-48 flex-col space-y-1.5">
                     <LabelWithTooltip
-                      label={locale === 'zh' ? 'TCO 口径' : 'TCO Basis'}
+                      label={locale === 'zh' ? 'TCO 口径' : 'TCO basis'}
                       tooltip={
                         locale === 'zh'
                           ? '外部客户价格或内部持有成本；目前仅影响 TPUv7。'
@@ -915,19 +916,14 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
       )}
 
       {!loading && !hasAnyData && (
-        <Card>
-          <div
-            className="flex items-center justify-center h-64 text-muted-foreground text-center px-6"
-            data-testid="first-token-no-data"
-          >
-            {t.noData}
-          </div>
-        </Card>
+        <EmptyState className="h-64" data-testid="first-token-no-data">
+          {t.noData}
+        </EmptyState>
       )}
 
       {!loading && hasAnyData && (
         <Card>
-          <figure data-testid="first-token-figure" className="relative rounded-lg">
+          <figure data-testid="first-token-figure" className="relative min-w-0">
             <ChartButtons
               chartId="first-token-limits"
               analyticsPrefix="first_token"
@@ -937,13 +933,11 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
                 precisions: selectedPrecisions,
                 gpuCount: visibleHwKeys.size,
               })}
+              className="md:absolute md:right-0 md:top-0 md:z-10 md:mb-0"
               hideZoomReset
               onExportCsv={handleExportCsv}
               exportFileName={`InferenceX_first_token_limits_${selectedModel}`}
             />
-            {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}
-            {showsVeraRubinPreview && <VeraRubinOfficialPreviewNotice />}
-            {showsTpuv7Preview && <Tpuv7OfficialPreviewNotice />}
             {hasBars ? (
               <FirstTokenLimitsChart
                 result={result}
@@ -981,7 +975,7 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
             chipBasis={chipBasisControl}
           />
           <p className="mt-4 text-xs text-muted-foreground">
-            <strong>{t.note}</strong>
+            <span className="font-medium text-foreground">{t.note}</span>
             {t.methodology(statLabel, statLabel)} {t.source}
             <a
               href={TCO_SOURCE_URL}

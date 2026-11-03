@@ -186,7 +186,7 @@ describe('renderKnownIssueAnnotations', () => {
     renderKnownIssueAnnotations(g, defs, baseOptions({ annotations: [gb300Annotation] }));
 
     expect(g.selectAll('[data-testid="known-issue-annotation"]').nodes()).toHaveLength(1);
-    expect(defs.selectAll('marker').nodes()).toHaveLength(1);
+    expect(defs.selectAll('marker').nodes()).toHaveLength(2);
   });
 
   it('fires the click callback with the annotation', () => {

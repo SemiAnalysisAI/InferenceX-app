@@ -9,21 +9,24 @@ import {
 } from '@/lib/power/power-basis';
 import { escapeHtml } from '@/lib/shared/utils';
 
-/** One color per basis tag, the same in both themes so a pill reads the same everywhere. */
-const POWER_BASIS_TAG_COLORS: Record<PowerBasisTag, { bg: string; fg: string }> = {
-  gpu: { bg: 'var(--muted)', fg: 'var(--foreground)' },
-  it: { bg: '#0b86d1', fg: '#ffffff' },
-  facility: { bg: '#7c5ce0', fg: '#ffffff' },
+/**
+ * Neutral in both themes and in the tutorial's provenance grammar. The measured GPU tag is a
+ * solid muted step, the modeled IT and facility tags are hairline outlines.
+ */
+const POWER_BASIS_TAG_STYLE: Record<PowerBasisTag, { bg: string; fg: string; border: string }> = {
+  gpu: { bg: 'var(--muted)', fg: 'var(--foreground)', border: 'transparent' },
+  it: { bg: 'transparent', fg: 'var(--muted-foreground)', border: 'var(--border)' },
+  facility: { bg: 'transparent', fg: 'var(--muted-foreground)', border: 'var(--border)' },
 };
 
-// No font-size: the pill inherits its line's size (the tooltip keeps every line at 11px).
+// No font-size: the tag inherits its line's size (the tooltip keeps every line at 11px).
 const PILL_STYLE =
-  'display:inline-block;margin-left:0.3em;padding:0 0.4em;border-radius:999px;font-weight:600;line-height:1.35;vertical-align:baseline;white-space:nowrap;';
+  'display:inline-block;margin-left:0.3em;padding:0 0.4em;border-radius:calc(var(--radius) - 4px);border:1px solid;font-weight:500;line-height:1.35;vertical-align:baseline;white-space:nowrap;';
 
-/** The pill as an HTML string, for the D3 tooltips that build markup by hand. */
+/** The tag as an HTML string, for the D3 tooltips that build markup by hand. */
 export function powerBasisPillHtml(tag: PowerBasisTag, locale: Locale): string {
-  const { bg, fg } = POWER_BASIS_TAG_COLORS[tag];
-  return `<span data-testid="power-basis-pill" data-basis="${tag}" title="${escapeHtml(POWER_BASIS_TAG_TITLES[tag][locale])}" style="${PILL_STYLE}background:${bg};color:${fg}">${escapeHtml(POWER_BASIS_TAG_LABELS[tag][locale])}</span>`;
+  const { bg, fg, border } = POWER_BASIS_TAG_STYLE[tag];
+  return `<span data-testid="power-basis-pill" data-basis="${tag}" title="${escapeHtml(POWER_BASIS_TAG_TITLES[tag][locale])}" style="${PILL_STYLE}background:${bg};color:${fg};border-color:${border}">${escapeHtml(POWER_BASIS_TAG_LABELS[tag][locale])}</span>`;
 }
 
 /**
@@ -33,14 +36,14 @@ export function powerBasisPillHtml(tag: PowerBasisTag, locale: Locale): string {
  */
 export function PowerBasisPill({ tag, className }: { tag: PowerBasisTag; className?: string }) {
   const locale = useLocale();
-  const { bg, fg } = POWER_BASIS_TAG_COLORS[tag];
+  const { bg, fg, border } = POWER_BASIS_TAG_STYLE[tag];
   return (
     <span
       data-testid="power-basis-pill"
       data-basis={tag}
       title={POWER_BASIS_TAG_TITLES[tag][locale]}
-      className={`ml-1 inline-block rounded-full px-1.5 align-baseline text-2xs leading-snug font-semibold whitespace-nowrap ${className ?? ''}`}
-      style={{ background: bg, color: fg }}
+      className={`ml-1 inline-block rounded-sm border px-1.5 align-baseline text-2xs leading-snug font-medium whitespace-nowrap ${className ?? ''}`}
+      style={{ background: bg, color: fg, borderColor: border }}
     >
       {POWER_BASIS_TAG_LABELS[tag][locale]}
     </span>

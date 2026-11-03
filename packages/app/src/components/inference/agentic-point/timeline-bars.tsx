@@ -94,6 +94,7 @@ export const TimelineBars = memo(
 
         {ticks.map((t) => {
           const x = (t - vStart) * scale;
+          const nearRightEdge = x > CHART_WIDTH - PADDING_RIGHT - 56;
           return (
             <g key={t}>
               <line
@@ -102,14 +103,15 @@ export const TimelineBars = memo(
                 x2={x}
                 y2={viewportHeight}
                 stroke="currentColor"
-                opacity={0.08}
+                opacity={0.12}
                 strokeDasharray="2 4"
               />
               <text
-                x={x + 2}
+                x={nearRightEdge ? x - 2 : x + 2}
+                textAnchor={nearRightEdge ? 'end' : 'start'}
                 y={HEADER_HEIGHT - 6}
                 fill="currentColor"
-                opacity={0.55}
+                opacity={0.7}
                 fontSize={9}
                 fontFamily="ui-monospace, SFMono-Regular, monospace"
               >

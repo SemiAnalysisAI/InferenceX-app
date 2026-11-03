@@ -13,6 +13,7 @@ import {
   type RenderContext,
   type ZoomContext,
 } from '@/lib/d3-chart/D3Chart';
+import { chartTooltipDismiss, chartTooltipShellStyle } from '@/lib/d3-chart/tooltip-shell';
 import type { SubmissionVolumeRow } from '@/lib/submissions/submissions-types';
 
 import {
@@ -98,8 +99,8 @@ function generateTooltipContent(d: ChartPoint, isPinned: boolean, locale: Locale
   const numberLocale = locale === 'zh' ? 'zh-CN' : 'en-US';
   const dateStr = formatSubmissionDate(d.date, locale);
   return `
-    <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); min-width: 160px; user-select: ${isPinned ? 'text' : 'none'};">
-      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
+    <div style="${chartTooltipShellStyle({ pinned: isPinned, minWidth: 160 })}">
+      ${isPinned ? chartTooltipDismiss(t.dismiss) : ''}
       <div style="color: var(--foreground); font-size: 12px; font-weight: 600; margin-bottom: 8px;">${dateStr}</div>
       <div style="display: flex; align-items: center; gap: 6px; color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
         <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${NVIDIA_COLOR};"></span>
@@ -123,9 +124,8 @@ const SUBMISSIONS_STRINGS = {
     dismiss: 'Click elsewhere to dismiss',
     markerLine1: 'Switched to',
     markerLine2: 'on-change runs',
-    noData: 'No submission data to display.',
-    instructions:
-      'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset · Click a point to pin tooltip',
+    noData: 'No submission data to display',
+    instructions: 'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset',
     aria: 'Benchmark submission activity chart',
     yAxis: 'Datapoints',
   },
@@ -135,8 +135,8 @@ const SUBMISSIONS_STRINGS = {
     dismiss: '点击其他区域关闭',
     markerLine1: '自此改为',
     markerLine2: '仅在变更时运行',
-    noData: '暂无可显示的提交数据。',
-    instructions: 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
+    noData: '暂无可显示的提交数据',
+    instructions: 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置',
     aria: '基准测试提交活动图表',
     yAxis: '数据点数量',
   },

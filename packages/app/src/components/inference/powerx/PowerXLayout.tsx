@@ -246,10 +246,9 @@ export function PowerXViewTabs({
               onSelectionChange(selectPowerXView(value, selection));
             }}
             className={cn(
-              '-mb-px inline-flex min-h-11 shrink-0 items-center gap-1.5 border-b-2 border-transparent px-3 text-sm font-semibold whitespace-nowrap text-muted-foreground transition-colors hover:border-muted-foreground/30 md:min-h-9',
+              '-mb-px inline-flex min-h-11 shrink-0 items-center gap-1.5 border-b-2 border-transparent px-3 text-sm font-medium whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground md:min-h-9',
               'max-md:mb-0 max-md:min-h-12 max-md:justify-center max-md:rounded-md max-md:border max-md:bg-muted/30 max-md:px-2',
-              selected &&
-                'border-secondary text-secondary max-md:bg-secondary/10 dark:border-primary dark:text-primary dark:max-md:bg-primary/10',
+              selected && 'border-brand text-foreground max-md:bg-muted',
             )}
           >
             {t.views[value]}
@@ -283,9 +282,9 @@ function Field({
   );
 }
 
-/** A segmented toggle that fills its Chart Config cell with equal segments and wraps rather than overflows. */
-const CELL_TOGGLE_CLASS = 'w-full';
-const CELL_SEGMENT_CLASS = 'min-w-max flex-1 justify-center whitespace-nowrap';
+/** A segmented toggle at its natural width inside a Chart config cell; it wraps rather than overflows. */
+const CELL_TOGGLE_CLASS = 'self-start';
+const CELL_SEGMENT_CLASS = 'whitespace-nowrap';
 
 /** Count, Per and Show as for the Energy and Power draw views. */
 export function PowerXCountControls({
@@ -498,7 +497,7 @@ export function PowerXChartConfig({
             setMoreOpen((open) => !open);
             track('powerx_more_toggled', { enabled: !moreOpen, changed });
           }}
-          className="col-span-full flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 rounded-md border border-border/70 bg-muted/10 px-3 text-left text-sm font-medium text-foreground"
+          className="col-span-full flex min-h-11 w-full cursor-pointer items-center justify-between gap-3 rounded-md border border-border/30 bg-muted/40 px-3 text-left text-sm font-medium text-foreground transition-colors hover:bg-muted/60"
         >
           <span>{changed > 0 ? t.moreChanged(changed) : t.more}</span>
           <ChevronDown
@@ -541,7 +540,8 @@ export function PowerXSplitBy({
         role="group"
         testId="powerx-split"
         size="default"
-        buttonClassName="whitespace-nowrap"
+        className={CELL_TOGGLE_CLASS}
+        buttonClassName={CELL_SEGMENT_CLASS}
         onValueChange={(value) =>
           onSelectionChange({
             metric: VIEW_METRICS.where.gpu,

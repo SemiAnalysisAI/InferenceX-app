@@ -42,10 +42,10 @@ const WORKFLOW_STRINGS = {
     nextRun: 'Next run',
     changelog: 'Changelog',
     description: 'Description',
-    updatedConfigs: 'Updated Configs',
-    gitCommit: 'Git Commit',
-    noChangelog: 'No changelog data available.',
-    trackingHistory: 'This date predates changelog tracking.',
+    updatedConfigs: 'Updated configs',
+    gitCommit: 'Git commit',
+    noChangelog: 'No changelog data available',
+    trackingHistory: 'This date predates changelog tracking',
   },
   zh: {
     conclusions: { success: '运行成功', failure: '运行失败', cancelled: '运行已取消' },
@@ -59,9 +59,9 @@ const WORKFLOW_STRINGS = {
     changelog: '变更日志',
     description: '说明',
     updatedConfigs: '已更新配置',
-    gitCommit: 'Git Commit',
-    noChangelog: '暂无变更日志数据。',
-    trackingHistory: '该日期早于变更日志开始记录的时间。',
+    gitCommit: 'Git commit',
+    noChangelog: '暂无变更日志数据',
+    trackingHistory: '该日期早于变更日志开始记录的时间',
   },
 } as const;
 
@@ -94,12 +94,12 @@ function RunConclusionDot({ conclusion, locale }: { conclusion: string | null; l
   if (!conclusion) return null;
   const color =
     conclusion === 'success'
-      ? 'bg-green-500'
+      ? 'bg-success'
       : conclusion === 'failure'
-        ? 'bg-red-500'
+        ? 'bg-destructive'
         : conclusion === 'cancelled'
-          ? 'bg-yellow-500'
-          : 'bg-gray-400';
+          ? 'bg-warning'
+          : 'bg-muted-foreground';
   const label = WORKFLOW_STRINGS[locale].conclusions[conclusion as 'success'] ?? conclusion;
   return (
     <span
@@ -196,7 +196,7 @@ export default function WorkflowInfoDisplay() {
           className="-my-1.5 h-8 px-2"
           data-testid="run-changelog-trigger"
         >
-          <strong>{t.changelog}</strong>
+          <span className="font-medium">{t.changelog}</span>
           <ChevronDownIcon />
         </Button>
       </PopoverTrigger>
@@ -212,9 +212,9 @@ export default function WorkflowInfoDisplay() {
                 <div key={index}>
                   {index > 0 && <hr className="my-3" />}
                   <div className="flex flex-col gap-2 text-xs line-break-words">
-                    <div className="text-xs font-bold">{t.description}</div>
+                    <div className="text-xs font-medium">{t.description}</div>
                     {formatChangelogDescription(entry.description)}
-                    <div className="text-xs font-bold">{t.updatedConfigs}</div>
+                    <div className="text-xs font-medium">{t.updatedConfigs}</div>
                     <ul className="list-disc pl-4">
                       {entry.config_keys.map((key: string) => (
                         <li key={key}>{formatConfigKeys(key)}</li>
@@ -236,7 +236,7 @@ export default function WorkflowInfoDisplay() {
             </>
           ) : (
             <div className="flex flex-col gap-2 text-xs">
-              <div className="text-xs font-bold">{t.description}</div>
+              <div className="text-xs font-medium">{t.description}</div>
               <span className="text-muted-foreground">{t.noChangelog}</span>
               <span className="text-muted-foreground">{t.trackingHistory}</span>
             </div>

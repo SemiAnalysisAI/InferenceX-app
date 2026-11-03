@@ -36,7 +36,7 @@ export default async function HistoricalModelPage({ params }: Props) {
       </InferenceProvider>
       <TabIntro
         tab="historical"
-        title={MODEL_TAB_META.historical.title(resolved.route.seoName)}
+        title={MODEL_TAB_META.historical.heading(resolved.route.seoName)}
         intro={MODEL_TAB_META.historical.intro(resolved.route.seoName)}
       />
     </>

@@ -16,6 +16,7 @@ import type {
   RenderContext,
   ScaleConfig,
 } from '@/lib/d3-chart/D3Chart/types';
+import { chartTooltipDismiss, chartTooltipShellStyle } from '@/lib/d3-chart/tooltip-shell';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import type { Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -184,9 +185,9 @@ const STRINGS = {
     },
     revenue: 'Revenue',
     revenuePerGpuHour: 'Revenue per GPU-hour',
-    tco: 'Compute Expense',
-    grossMargin: 'Gross Margin',
-    labCut: 'Model License Fee',
+    tco: 'Compute expense',
+    grossMargin: 'Gross margin',
+    labCut: 'Model license fee',
     profit: 'Profit',
     loss: 'Loss',
     marginPct: 'Margin',
@@ -204,8 +205,8 @@ const STRINGS = {
       'nvl72-tray-modeled-cpu':
         'measured GPU board; Grace CPU and memory, tray networking, storage, fans and conversion, NVSwitch trays and power shelves modeled',
     },
-    noData: 'No SKU can be priced for the current selection.',
-    scrollHint: 'Scroll horizontally to view the full chart.',
+    noData: 'No SKU can be priced for the current selection',
+    scrollHint: 'Scroll horizontally to view the full chart',
   },
   zh: {
     yAxisModeled: '每吉瓦设施总功耗对应的年收入（美元）',
@@ -239,8 +240,8 @@ const STRINGS = {
       'nvl72-tray-modeled-cpu':
         '实测 GPU 板卡功耗；Grace CPU 和内存、tray 内网络、存储、风扇和电源转换，以及 NVSwitch tray 和电源架由模型估算',
     },
-    noData: '当前选择下没有可定价的 SKU。',
-    scrollHint: '横向滚动查看完整图表。',
+    noData: '当前选择下没有可定价的 SKU',
+    scrollHint: '横向滚动查看完整图表',
   },
 } as const;
 
@@ -502,8 +503,8 @@ export function generateProfitTooltipHTML(
     LAB_CUT_OPACITY,
   );
   return `
-    <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); min-width: 260px; max-width: 340px; pointer-events: auto; user-select: ${isPinned ? 'text' : 'none'};">
-      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
+    <div style="${chartTooltipShellStyle({ pinned: isPinned, minWidth: 260, maxWidth: 340, interactive: true })}">
+      ${isPinned ? chartTooltipDismiss(t.dismiss) : ''}
       <div style="color: var(--foreground); font-size: 13px; font-weight: 600; margin-bottom: 8px;">${label}</div>
       ${row.date ? line(t.runDate, escapeHtml(row.dateLabel ?? row.date)) : ''}
       ${row.powerSource ? line(t.powerBasis, escapeHtml(powerBasisLabel(row.powerSource, locale))) : ''}
@@ -752,7 +753,7 @@ export default function ProfitEstimatorChart({
           .attr('y', revenueBaselineY)
           .attr('text-anchor', 'middle')
           .attr('font-size', px(revenueStyle.fontPx))
-          .attr('font-weight', '700')
+          .attr('font-weight', '600')
           .style('fill', 'var(--foreground)');
         revenueText
           .selectAll<SVGTSpanElement, ProfitSegment>('tspan')
@@ -773,7 +774,7 @@ export default function ProfitEstimatorChart({
           .attr('x', (d) => (xScale(d.row.resultKey) ?? 0) + bandwidth / 2)
           .attr('dy', (d) => (d.sub ? '1.2em' : '0'))
           .attr('font-size', (d) => (d.sub ? px(CHART_TYPE.annotation) : null))
-          .attr('font-weight', (d) => (d.sub ? '500' : '700'))
+          .attr('font-weight', (d) => (d.sub ? '500' : '600'))
           .style('fill', (d) =>
             d.sub
               ? d.row.profit < 0

@@ -30,15 +30,14 @@ import {
 
 const STRINGS = {
   en: {
-    empty: 'No Chip metrics data to display.',
-    instructions:
-      'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset · Click a point to pin tooltip',
+    empty: 'No chip metrics data to display',
+    instructions: 'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset',
     seconds: 'Time (s)',
     dismiss: 'Click elsewhere to dismiss',
     chip: 'Chip',
     power: 'Power',
     temp: 'Temp',
-    utilization: 'Chip Util',
+    utilization: 'Chip util',
     rollingSuffix: (windowS: number) => `${windowS} s rolling avg`,
     meanChips: 'Mean of visible chips',
     meanCount: (n: number) => `${n} chips`,
@@ -46,8 +45,8 @@ const STRINGS = {
     allIn: 'All-in provisioned',
   },
   zh: {
-    empty: '暂无可显示的芯片指标数据。',
-    instructions: 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
+    empty: '暂无可显示的芯片指标数据',
+    instructions: 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置',
     seconds: '时间（秒）',
     dismiss: '点击其他区域关闭',
     chip: '芯片',
@@ -329,7 +328,7 @@ const GpuMetricsChart = React.memo(
 
     if (allPoints.length === 0) {
       return (
-        <div className="flex items-center justify-center min-h-[600px]">
+        <div className="flex min-h-150 items-center justify-center">
           <p className="text-muted-foreground text-sm">{t.empty}</p>
         </div>
       );
@@ -481,7 +480,7 @@ const GpuMetricsChart = React.memo(
                   } ${overlay.unit}</div>`
                 : '';
             return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 160px; user-select: ${isPinned ? 'text' : 'none'}">
-              ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
+              ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px;">${t.dismiss}</div>` : ''}
               <div class="font-semibold mb-1" style="color: ${color}">${title}</div>
               <div class="text-muted-foreground">${d.seconds.toFixed(1)}${locale === 'zh' ? ' 秒' : 's'}</div>
               <div class="mt-1 font-medium">${getGpuMetricLabel(metricConfig, locale)}${sep} ${d.value.toFixed(1)} ${metricConfig.unit}</div>

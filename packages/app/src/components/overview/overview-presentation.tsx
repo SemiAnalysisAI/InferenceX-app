@@ -11,6 +11,7 @@ import {
   useState,
 } from 'react';
 
+import { buttonVariants } from '@/components/ui/button';
 import { track } from '@/lib/analytics/analytics';
 import { notifyClientSearchChange } from '@/lib/routing/client-navigation';
 import {
@@ -246,7 +247,7 @@ export function OverviewPresentToggle({ strings }: { strings: OverviewStrings })
       aria-pressed={presenting}
       aria-label={presenting ? strings.presentExitAria : strings.presentEnterAria}
       title={strings.presentShortcutHint}
-      className="inline-flex min-h-11 items-center gap-x-1.5 rounded-md border border-border/60 px-3 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none"
+      className={buttonVariants({ variant: 'outline', size: 'xs' })}
     >
       <svg
         aria-hidden="true"

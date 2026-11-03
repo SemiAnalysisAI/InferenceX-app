@@ -14,6 +14,7 @@ import {
   overlayMarkerPosition,
   xMarkerPath,
 } from '@/lib/d3-chart/overlay-x-marker';
+import { chartTooltipDismiss, chartTooltipShellStyle } from '@/lib/d3-chart/tooltip-shell';
 import { computeLeftMargin } from '@/lib/d3-chart/dynamic-margins';
 
 import { useEvaluation } from '@/components/evaluation/EvaluationContext';
@@ -28,6 +29,7 @@ import {
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { Locale } from '@/lib/i18n/i18n';
 import ChartLegend from '@/components/ui/chart-legend';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   useOverlayScopeReconciliation,
@@ -63,7 +65,7 @@ export const formatEvaluationEmptyStateDate = (dateStr: string, locale: Locale) 
 const runLinkHTML = (runUrl: string | undefined, locale: Locale) =>
   runUrl
     ? `<div style="font-size: 11px; margin-top: 4px;">
-        <a href="${runUrl}" target="_blank" rel="noopener noreferrer" style="color: var(--muted-foreground); text-decoration: underline; cursor: pointer;">${locale === 'zh' ? 'GitHub Actions 运行记录' : 'GitHub Actions Run'}</a>
+        <a href="${runUrl}" target="_blank" rel="noopener noreferrer" style="color: var(--muted-foreground); text-decoration: underline; cursor: pointer;">${locale === 'zh' ? 'GitHub Actions 运行记录' : 'GitHub Actions run'}</a>
       </div>`
     : '';
 
@@ -76,17 +78,17 @@ const fmtSideTooltip = (tp: number, ep: number, dpa: boolean, nw: number, locale
 const EVALUATION_TOOLTIP_STRINGS = {
   en: {
     dismiss: 'Click elsewhere to dismiss',
-    unofficial: '✕ UNOFFICIAL RUN',
+    unofficial: '✕ Unofficial run',
     branch: 'Branch',
     date: 'Date',
-    meanScore: 'Mean Score',
-    minScore: 'Min Score',
-    maxScore: 'Max Score',
+    meanScore: 'Mean score',
+    minScore: 'Min score',
+    maxScore: 'Max score',
     concurrency: 'Concurrency',
     precision: 'Precision',
-    tensorParallelism: 'Tensor Parallelism',
-    expertParallelism: 'Expert Parallelism',
-    dataParallelAttention: 'Data Parallel Attention',
+    tensorParallelism: 'Tensor parallelism',
+    expertParallelism: 'Expert parallelism',
+    dataParallelAttention: 'Data parallel attention',
     multinode: 'Multinode',
     prefill: 'Prefill',
     decode: 'Decode',
@@ -159,13 +161,13 @@ export const generateEvaluationTooltipContent = (
   const t = EVALUATION_TOOLTIP_STRINGS[locale];
   const minScore = data.minScore ?? data.score;
   const maxScore = data.maxScore ?? data.score;
-  const border = unofficialBranch ? '2px solid #dc2626' : '1px solid var(--border)';
+  const border = unofficialBranch ? '2px solid #dc2626' : undefined;
   return `
-    <div style="background: var(--popover); border: ${border}; border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); user-select: ${isPinned ? 'text' : 'none'};">
-      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
+    <div style="${chartTooltipShellStyle({ pinned: isPinned, border })}">
+      ${isPinned ? chartTooltipDismiss(t.dismiss) : ''}
       ${
         unofficialBranch
-          ? `<div style="color: #dc2626; font-size: 10px; font-weight: 700; margin-bottom: 4px; text-transform: uppercase;">${t.unofficial}</div>
+          ? `<div style="color: #dc2626; font-size: 11px; font-weight: 600; margin-bottom: 4px;">${t.unofficial}</div>
       ${row(t.branch, unofficialBranch)}`
           : ''
       }
@@ -286,24 +288,24 @@ function updateUnofficialScoreLabels(
 
 const EVAL_STRINGS = {
   en: {
-    showLabels: 'Show Labels',
-    highContrast: 'High Contrast',
+    showLabels: 'Show labels',
+    highContrast: 'High contrast',
     resetFilter: 'Reset filter',
     score: 'Score',
-    unofficialTitle: (branch: string) => `UNOFFICIAL: ${branch}`,
-    unofficialRun: 'UNOFFICIAL RUN',
+    unofficialTitle: (branch: string) => `Unofficial: ${branch}`,
+    unofficialRun: 'Unofficial run',
     branch: 'Branch',
     viewWorkflow: 'View workflow run',
     prefill: 'prefill',
     decode: 'decode',
     slots: 'slots',
     dpaValues: 'DPA true/false',
-    loadError: 'Failed to load eval data.',
-    modelEmpty: 'No evaluation data is available for this model.',
-    dateEmpty: (date: string) => `No evaluation data available for ${date}.`,
-    tryDate: 'Try selecting a different date.',
-    combinationEmpty: 'No evaluation data available for selected model and benchmark combination.',
-    tryCombination: 'Try selecting a different combination.',
+    loadError: 'Failed to load eval data',
+    modelEmpty: 'No evaluation data is available for this model',
+    dateEmpty: (date: string) => `No evaluation data available for ${date}`,
+    tryDate: 'Try selecting a different date',
+    combinationEmpty: 'No evaluation data available for selected model and benchmark combination',
+    tryCombination: 'Try selecting a different combination',
   },
   zh: {
     showLabels: '显示标签',
@@ -318,12 +320,12 @@ const EVAL_STRINGS = {
     decode: '解码',
     slots: '字段顺序',
     dpaValues: 'DPA 是/否',
-    loadError: '评估数据加载失败。',
-    modelEmpty: '该模型暂无评估数据。',
-    dateEmpty: (date: string) => `${date} 暂无评估数据。`,
-    tryDate: '请尝试选择其他日期。',
-    combinationEmpty: '所选模型与基准测试组合暂无评估数据。',
-    tryCombination: '请尝试选择其他组合。',
+    loadError: '评估数据加载失败',
+    modelEmpty: '该模型暂无评估数据',
+    dateEmpty: (date: string) => `${date} 暂无评估数据`,
+    tryDate: '请尝试选择其他日期',
+    combinationEmpty: '所选模型与基准测试组合暂无评估数据',
+    tryCombination: '请尝试选择其他组合',
   },
 } as const;
 
@@ -607,7 +609,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
                 onClick: () => {},
                 tooltip: (
                   <div className="font-normal text-xs">
-                    <div className="text-red-500 font-semibold">{legendT.unofficialRun}</div>
+                    <div className="font-medium text-destructive">{legendT.unofficialRun}</div>
                     <div>
                       {legendT.branch}: {branch}
                     </div>
@@ -677,7 +679,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
   );
 
   const parallelismKey = hasDisaggConfigs ? (
-    <div className="mt-2 px-1 pr-2 text-3xs text-muted-foreground/80 leading-tight no-export">
+    <div className="mt-2 px-1 pr-2 text-3xs text-muted-foreground leading-tight no-export">
       <div>
         <span className="font-mono">P(·/·/·/·)</span> {legendT.prefill}
         <span className="mx-1">·</span>
@@ -1193,8 +1195,8 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
     const hasNoEvalDataForDate =
       hasSelections && availableDates.length > 0 && !availableDates.includes(selectedRunDate);
     return (
-      <div className="flex items-center justify-center h-100 text-muted-foreground">
-        <div className="text-center">
+      <EmptyState bare className="h-100">
+        <div>
           {blockingState === 'data-error' ? (
             legendT.loadError
           ) : hasSelections && !modelHasEvalData ? (
@@ -1213,7 +1215,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
             </>
           )}
         </div>
-      </div>
+      </EmptyState>
     );
   }
 

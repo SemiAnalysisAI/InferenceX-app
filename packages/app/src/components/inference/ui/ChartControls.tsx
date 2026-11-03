@@ -82,39 +82,39 @@ import { DEFAULT_Y_AXIS_METRIC } from '@/lib/routing/url-state';
 
 const STRINGS = {
   en: {
-    measuredPower: 'Measured Power',
-    measuredEnergy: 'Measured Energy',
+    measuredPower: 'Measured power',
+    measuredEnergy: 'Measured energy',
     measuredGroup: 'Measured',
-    benchmarkControls: 'Benchmark Config',
-    chartControls: 'Chart Config',
+    benchmarkControls: 'Benchmark config',
+    chartControls: 'Chart config',
     compareHistory: 'Compare history',
-    yAxisMetric: 'Y-Axis Metric',
+    yAxisMetric: 'Y-axis metric',
     yAxisMetricTooltip:
       "The performance metric displayed on the chart's Y-axis. Options include throughput, token revenue per GPU hour, cost per million tokens, tokens per $1 TCO, and custom user-defined values.",
-    xAxisMetric: 'X-Axis Metric',
+    xAxisMetric: 'X-axis metric',
     xAxisMetricTooltip:
       "The latency metric displayed on the chart's X-axis: P90 Time To First Token.",
-    xAxisScale: 'X-Axis Scale',
+    xAxisScale: 'X-axis scale',
     xAxisScaleTooltip:
       'The scale type for the X-axis. Auto automatically chooses between linear and logarithmic based on the data range. Linear uses a linear scale. Logarithmic uses a log scale for better visualization of wide-ranging values.',
     scaleAuto: 'Auto',
     scaleLinear: 'Linear',
     scaleLog: 'Logarithmic',
-    gpuConfig: 'Chip Config',
+    gpuConfig: 'Chip config',
     gpuConfigTooltip:
       'Select up to 4 chip configurations to compare their historical performance over time. This allows for tracking how software updates may affect specific hardware.',
-    gpuConfigPlaceholder: 'Select Chip Config',
-    comparisonDateRange: 'Comparison Date Range',
+    gpuConfigPlaceholder: 'Select chip config',
+    comparisonDateRange: 'Comparison date range',
     comparisonDateRangeTooltip:
       'Select the start and end dates for the historical comparison. The chart will show performance data for the selected chip configs across this time range.',
     dateRangePlaceholder: 'Select date range',
-    revenuePriceSource: 'Token Price Source',
+    revenuePriceSource: 'Token price source',
     revenuePriceSourceTooltip:
       'Choose the token sale prices used for revenue. For Agentic traces, measured cache hits use a separate cached-input price. Normalized pricing uses $1/M uncached input and output plus $0.10/M cached input. OpenRouter uses the selected model’s current public prices, falling back to 10% of its input price when no cache-read price is published.',
     normalizedPrice: 'Normalized ($1/M uncached + output, $0.10/M cached)',
     openRouterPrice: 'OpenRouter current pricing',
     openRouterLoading: 'Loading OpenRouter pricing…',
-    openRouterUnavailable: 'OpenRouter pricing is unavailable for this model.',
+    openRouterUnavailable: 'OpenRouter pricing is unavailable for this model',
     openRouterSummary: (input: string, cached: string | null, output: string) =>
       cached === null
         ? `Input $${input}/M tok · Output $${output}/M tok`
@@ -155,7 +155,7 @@ const STRINGS = {
     normalizedPrice: '标准化（未缓存输入和输出 $1/百万，缓存输入 $0.10/百万）',
     openRouterPrice: 'OpenRouter 当前价格',
     openRouterLoading: '正在加载 OpenRouter 价格…',
-    openRouterUnavailable: 'OpenRouter 暂无该模型的价格。',
+    openRouterUnavailable: 'OpenRouter 暂无该模型的价格',
     openRouterSummary: (input: string, cached: string | null, output: string) =>
       cached === null
         ? `输入 $${input}/百万 token · 输出 $${output}/百万 token`
@@ -477,21 +477,17 @@ export default function ChartControls({
     tcoSource === 'inference' &&
     selectedSequence === Sequence.AgenticTraces &&
     countsInputTokens(selectedYAxisMetric);
-  // Chart Config columns: the X-Axis Metric column is 11rem, or 18rem on agentic traces
-  // where its options are longer, and the rest of the row shares what is left. PowerX
-  // keeps the same first column and splits the rest in two, so its Count toggle (two
-  // cells) and then Per or Show as, Scope, Power statistic and Rated boundaries (one
-  // cell each) flow left to right in rows of three. Below sm every cell is a row.
+  // Chart Config columns: PowerX keeps an X-Axis Metric column of 11rem, or 18rem on agentic
+  // traces where its options are longer, and splits the rest in two, so its Count toggle (two
+  // cells) and then Per or Show as, Scope, Power statistic and Rated boundaries (one cell
+  // each) flow left to right in rows of three. Elsewhere the X and Y pickers share the row
+  // evenly. Below sm every cell is a row.
   const xAxisWide = selectedSequence === Sequence.AgenticTraces;
   const chartConfigGridClass = powerXSurface
     ? xAxisWide
       ? 'sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)_minmax(0,1fr)]'
       : 'sm:grid-cols-[11rem_minmax(0,1fr)_minmax(0,1fr)]'
-    : showXAxisMode
-      ? xAxisWide
-        ? 'sm:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]'
-        : 'sm:grid-cols-[11rem_minmax(0,1fr)]'
-      : 'sm:grid-cols-2';
+    : 'sm:grid-cols-2';
 
   const benchmarkSelectors = (
     <>
@@ -521,16 +517,28 @@ export default function ChartControls({
     </>
   );
 
+  // Wide screens pack the groups into two rows: what is measured (benchmark config) beside how
+  // it is plotted (chart config), then which run beside compare history. PowerX gives chart
+  // config its own row because it holds up to six cells.
+  const spans = powerXSurface
+    ? {
+        benchmark: 'lg:col-span-12',
+        chart: 'lg:col-span-12',
+        run: 'lg:col-span-8',
+        history: 'lg:col-span-4',
+      }
+    : {
+        benchmark: 'lg:col-span-12 xl:col-span-6',
+        chart: 'lg:col-span-6',
+        run: 'lg:col-span-6',
+        history: 'lg:col-span-6',
+      };
+
   return (
     <TooltipProvider delayDuration={0}>
-      <div className="grid min-w-0 items-start gap-3 lg:grid-cols-3">
-        <ControlPanel
-          legend={t.benchmarkControls}
-          className={hideGpuComparison ? 'lg:col-span-2' : 'lg:col-span-3'}
-        >
-          <div
-            className={`grid min-w-0 grid-cols-2 items-start gap-3 ${scenarioInFooter ? 'md:grid-cols-3' : 'md:grid-cols-4'}`}
-          >
+      <div className="grid min-w-0 items-start gap-x-6 gap-y-4 lg:grid-cols-12">
+        <ControlPanel legend={t.benchmarkControls} className={spans.benchmark}>
+          <div className="grid min-w-0 grid-cols-2 items-start gap-3 md:grid-cols-4">
             <div className="min-w-0 col-span-2">
               <ModelSelector
                 value={selectedModel}
@@ -561,15 +569,12 @@ export default function ChartControls({
           <ControlPanel
             legend={t.chartControls}
             data-testid="inference-chart-configuration"
-            className={showXAxisMode ? 'lg:col-span-2' : undefined}
+            className={spans.chart}
           >
             <div className={`grid min-w-0 items-start gap-3 ${chartConfigGridClass}`}>
               {powerXSurface && powerXControls
                 ? powerXControls({
-                    // The More fold is one column: the cell fills it like Count and Per do.
-                    xAxisSelector: showXAxisMode ? (
-                      <XAxisModeSelector className="max-md:max-w-none" />
-                    ) : null,
+                    xAxisSelector: showXAxisMode ? <XAxisModeSelector /> : null,
                     xAxisChanged: showXAxisMode && selectedXAxisMode !== defaultXAxisMode,
                   })
                 : showXAxisMode && <XAxisModeSelector />}
@@ -741,8 +746,9 @@ export default function ChartControls({
             </div>
           </ControlPanel>
 
+          {runContext && <div className={`min-w-0 ${spans.run}`}>{runContext}</div>}
           {!hideGpuComparison && (
-            <ControlPanel legend={t.compareHistory}>
+            <ControlPanel legend={t.compareHistory} className={spans.history}>
               <div className="grid min-w-0 gap-3">
                 <div className="flex min-w-0 flex-col space-y-1.5">
                   <LabelWithTooltip
@@ -786,7 +792,6 @@ export default function ChartControls({
               </div>
             </ControlPanel>
           )}
-          {runContext && <div className="min-w-0 md:mt-1 lg:col-span-3">{runContext}</div>}
         </MobileControlSection>
       </div>
     </TooltipProvider>

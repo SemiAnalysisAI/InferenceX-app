@@ -6,7 +6,7 @@ import { MobileControlSection } from '@/components/ui/mobile-control-section';
 import { track } from '@/lib/analytics/analytics';
 import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
 import Link from 'next/link';
-import { BarChart3, Table2 } from 'lucide-react';
+import { BarChart3, ChevronDownIcon, Table2 } from 'lucide-react';
 import { useFeatureGate } from '@/lib/runtime/use-feature-gate';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { useCallback, useMemo, useState } from 'react';
@@ -28,9 +28,8 @@ import {
   useGlobalFilterSelection,
   useGlobalFilterWorkflow,
 } from '@/providers/GlobalFilterContext';
-import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { CollapsibleSection } from '@/components/ui/collapsible-section';
+import { cn, getDisplayLabel } from '@/lib/shared/utils';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import ChartLegend from '@/components/ui/chart-legend';
 import { ChartShareActions } from '@/components/ui/chart-display-helpers';
@@ -45,7 +44,6 @@ import {
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Input } from '@/components/ui/input';
 import { LabelWithTooltip } from '@/components/ui/label-with-tooltip';
-import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import {
   includesJalapenoResult,
   includesVeraRubinResult,
@@ -80,7 +78,6 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { useUrlState } from '@/hooks/useUrlState';
 import { useOpenDropdown } from '@/hooks/useOpenDropdown';
 
-import { getDisplayLabel } from '@/lib/shared/utils';
 import { exportToCsv } from '@/lib/export/csv-export';
 import { calculatorChartToCsv } from '@/lib/export/csv-export-helpers';
 
@@ -114,10 +111,17 @@ const COST_PROVIDER_OPTIONS: {
 ];
 
 const COST_TYPE_OPTIONS: { value: CostType; label: string }[] = [
-  { value: 'total', label: 'Total Tokens' },
-  { value: 'input', label: 'Input Tokens' },
-  { value: 'output', label: 'Output Tokens' },
+  { value: 'total', label: 'Total tokens' },
+  { value: 'input', label: 'Input tokens' },
+  { value: 'output', label: 'Output tokens' },
 ];
+
+/** Desktop column count matching the rendered selectors, so the row has no empty column. */
+const CONTROL_GRID_COLS: Record<number, string> = {
+  6: 'lg:grid-cols-6',
+  7: 'lg:grid-cols-7',
+  8: 'lg:grid-cols-8',
+};
 
 const BAR_METRIC_OPTIONS: { value: BarMetric; label: string }[] = [
   { value: 'throughput', label: 'Throughput' },
@@ -189,31 +193,31 @@ const CALCULATOR_VIEW_MODE_OPTIONS: SegmentedToggleOption<CalculatorViewMode>[] 
 
 const STRINGS = {
   en: {
-    title: 'TCO Calculator',
+    title: 'TCO calculator',
     benchmarkGroup: 'Configuration & economics',
     comparisonGroup: 'Comparison target',
     secondaryControls: 'More comparison settings',
     changed: 'changed',
     description:
       'Set a target interactivity (tokens/sec/user) and compare the throughput and cost across all chips. Values are interpolated from real benchmark data.',
-    costProviderLabel: 'Cost Provider',
+    costProviderLabel: 'Cost provider',
     costProviderTooltip:
       'The pricing tier used to calculate cost per million tokens. Owning at large hyperscaler purchasing volume (e.g. AWS/GCP) or renting on a 3-year commit. Locked rental terms (on demand through 2 year commit) are published in the SemiAnalysis AI Cloud TCO Model.',
     costProviderPlaceholder: 'Cost provider',
-    tokenTypeLabel: 'Token Type',
+    tokenTypeLabel: 'Token type',
     tokenTypeTooltip:
       'Whether to show costs for total tokens, input tokens only, or output tokens only.',
     tokenTypePlaceholder: 'Token type',
-    tcoBasisLabel: 'TCO Basis',
+    tcoBasisLabel: 'TCO basis',
     tcoBasisTooltip:
       'Choose External customer pricing or Internal owner cost. Internal only changes hardware with a separate owner cost, currently TPUv7.',
     metricLabel: 'Metric',
     metricTooltip:
       'The comparison metric shown in the chart. Throughput (tok/s/chip), power efficiency (tok/s/MW), or cost per million tokens.',
-    targetLabel: 'Target Interactivity (tok/s/user)',
+    targetLabel: 'Target interactivity (tok/s/user)',
     targetTooltip:
       'The interactivity operating point used for interpolation. Adjust the slider to compare chip throughput, cost, and power efficiency at different interactivity levels.',
-    targetAgenticLabel: (percentile: string) => `Target ${percentile} Interactivity (tok/s/user)`,
+    targetAgenticLabel: (percentile: string) => `Target ${percentile} interactivity (tok/s/user)`,
     targetAgenticTooltip: (percentile: string) =>
       `The ${percentile} interactivity operating point used for agentic workload interpolation. Adjust the slider to compare chip throughput, cost, and power efficiency.`,
     metricThroughput: 'Throughput',
@@ -225,15 +229,15 @@ const STRINGS = {
     errorLoading: 'Error loading data. Please try a different selection.',
     clickToCompare: 'selected. Click another bar to compare.',
     clearSelection: 'Clear selection',
-    highContrast: 'High Contrast',
+    highContrast: 'High contrast',
     resetFilter: 'Reset filter',
-    totalTokens: 'Total Tokens',
-    inputTokens: 'Input Tokens',
-    outputTokens: 'Output Tokens',
-    allInPower: 'All in Power/Chip: ',
+    totalTokens: 'Total tokens',
+    inputTokens: 'Input tokens',
+    outputTokens: 'Output tokens',
+    allInPower: 'All in power/chip: ',
     tcoPerHr: 'TCO $/chip/hr: ',
     source: 'Source: ',
-    updated: ' • Updated: ',
+    updated: ' · Updated: ',
     note: 'Note:',
     disaggCost:
       ' Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo TRTLLM) report input and output throughput per prefill chip and per decode chip rather than per chip overall, and $/M tok is derived from those rates — so on the Input and Output token types a disaggregated config reads cheaper than it is, by a median 2× and up to 18× across run history. Total-token cost is unaffected: it comes from throughput per chip overall, which both kinds report on the same basis. The Fleet Lifecycle page deliberately differs — it derives its per-token-type figures from that total, so everything there is on one denominator.',
@@ -245,14 +249,14 @@ const STRINGS = {
       ' Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo TRTLLM) report input and output throughput per prefill chip and per decode chip rather than per chip overall — divided by fewer chips, so on the Input and Output token types a disaggregated config reads faster per chip than it is, by a median 2× and up to 18× on input and 7× on output. Total throughput is unaffected: both kinds report it per chip overall. The Fleet Lifecycle page deliberately differs — it derives its per-token-type figures from that total, so everything there is on one denominator.',
     fleetMoved:
       'Fleet Lifecycle has its own page: a fixed fleet sized against a power budget, projected across its life with every measured config improvement.',
-    fleetMovedLink: 'Open Fleet Lifecycle',
+    fleetMovedLink: 'Open fleet lifecycle',
     compMetricThroughput: 'throughput',
     compMetricCost: 'cost efficiency',
     compMetricPower: 'tok/s/MW',
     hideSkuAboveConfigLimitLabel: 'Hide if target exceeds config range',
     hideSkuAboveConfigLimitHelp:
       'When enabled, SKUs whose measured interactivity range ends below the target are hidden instead of being projected from the max edge.',
-    unofficialRun: 'UNOFFICIAL RUN',
+    unofficialRun: 'Unofficial run',
     branch: 'Branch',
     viewRun: 'View workflow run',
   },
@@ -300,7 +304,7 @@ const STRINGS = {
     allInPower: '单芯片整机功耗：',
     tcoPerHr: 'TCO $/chip/hr：',
     source: '来源：',
-    updated: ' • 更新于：',
+    updated: ' · 更新于：',
     note: '注意：',
     disaggCost:
       '分离式推理配置（如 MoRI SGLang、Dynamo TRTLLM）的输入与输出吞吐量分别按预填充芯片与解码芯片报告，而非按芯片总数，而 $/M tok 由这些速率推导。因此在「输入」与「输出」token 类型下，分离式配置显示的成本低于实际，中位数仅为实际值的 1/2，在运行历史中最低可至 1/18。总计口径的成本不受影响：它来自按芯片总数计的吞吐量，两种部署方式在该口径上一致。「集群生命周期」页面与此有意不同：它由该总量推导各 token 类型的数值，因此那里的所有数字都在同一分母上。',
@@ -428,6 +432,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
   const [highContrast, setHighContrast] = useState(false);
   const [viewMode, setViewMode] = useState<CalculatorViewMode>('chart');
+  const [chartOpen, setChartOpen] = useState(true);
   const [hideSkuAboveConfigLimit, setHideSkuAboveConfigLimit] = useState(true);
   const comparisonSettingsCount =
     (barMetric === 'throughput' ? 0 : 1) + (hideSkuAboveConfigLimit === true ? 0 : 1);
@@ -855,7 +860,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
           onClick: () => {},
           tooltip: (
             <div className="font-normal text-xs">
-              <div className="text-red-500 font-semibold">{t.unofficialRun}</div>
+              <div className="font-medium text-destructive">{t.unofficialRun}</div>
               <div>
                 {t.branch}: {branch}
               </div>
@@ -921,6 +926,32 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     ? (withTotalChipQualifier(baseChartTitle, locale) ?? baseChartTitle)
     : baseChartTitle;
 
+  const chartHeading = (
+    <div className="flex min-w-0 items-center gap-1 md:pr-64">
+      <button
+        type="button"
+        aria-expanded={chartOpen}
+        aria-controls="calculator-chart-body"
+        aria-label={t.toggleSection}
+        title={t.toggleSection}
+        data-testid="calculator-chart-collapse"
+        onClick={() => {
+          const next = !chartOpen;
+          setChartOpen(next);
+          track('calculator_section_toggled', { section: 'chart', enabled: next });
+        }}
+        className="no-export -ml-1.5 inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+      >
+        <ChevronDownIcon
+          className={cn('size-5 transition-transform duration-200', chartOpen && 'rotate-180')}
+        />
+      </button>
+      <Heading as="h2" level="card">
+        {chartTitle}
+      </Heading>
+    </div>
+  );
+
   if (!loading && error) {
     console.error(error);
     return (
@@ -950,13 +981,9 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
               <ControlPanel
                 legend={t.benchmarkGroup}
                 className={`md:grid-cols-2 ${
-                  showsTcoBasis
-                    ? isAgenticSequence
-                      ? 'lg:grid-cols-10'
-                      : 'lg:grid-cols-9'
-                    : isAgenticSequence
-                      ? 'lg:grid-cols-8'
-                      : 'lg:grid-cols-7'
+                  CONTROL_GRID_COLS[
+                    6 + (isAgenticSequence && featureGateUnlocked ? 1 : 0) + (showsTcoBasis ? 1 : 0)
+                  ]
                 }`}
               >
                 <ModelSelector
@@ -1064,7 +1091,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                   </div>
                 </div>
                 {showsTcoBasis && (
-                  <div className="flex min-w-0 w-full max-w-48 flex-col gap-1.5 lg:col-span-2">
+                  <div className="flex min-w-0 flex-col gap-1.5 lg:col-span-1">
                     <LabelWithTooltip label={t.tcoBasisLabel} tooltip={t.tcoBasisTooltip} />
                     <TcoBasisToggle source="calculator" className="md:h-9" />
                   </div>
@@ -1089,7 +1116,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                         onValueChange={handleBarMetricChange}
                         className="items-stretch gap-0 overflow-hidden md:h-9 md:p-0"
                         buttonClassName="rounded-none px-3"
-                        activeButtonClassName="bg-primary text-primary-foreground"
+                        activeButtonClassName="bg-primary text-foreground dark:text-primary-foreground"
                         inactiveButtonClassName="bg-background text-muted-foreground hover:bg-muted"
                         options={BAR_METRIC_OPTIONS.map((opt) => ({
                           value: opt.value,
@@ -1164,7 +1191,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                         [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
                           />
                           <div
-                            className="relative h-4 text-xs text-muted-foreground"
+                            className="relative h-4 text-xs tabular-nums text-muted-foreground"
                             style={{ marginLeft: 8, marginRight: 8 }}
                           >
                             {Array.from({ length: 6 }, (_, i) => (
@@ -1226,41 +1253,38 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
       )}
 
       <section data-testid="calculator-chart-section">
-        <CollapsibleSection
-          title={chartTitle}
-          titleWhenOpen={false}
-          toggleLabel={t.toggleSection}
-          testId="calculator-chart-collapse"
-          onToggle={(open) =>
-            track('calculator_section_toggled', { section: 'chart', enabled: open })
-          }
-        >
-          <figure data-testid="calculator-figure" className="relative rounded-lg">
-            <ChartButtons
-              chartId="calculator-chart"
-              analyticsPrefix="calculator"
-              analyticsContext={selectionAnalyticsContext({
-                model: selectedModel,
-                sequence: selectedSequence,
-                precisions: selectedPrecisions,
-                gpuCount: visibleHwKeys.size,
-              })}
-              zoomResetEvent="d3chart_zoom_reset_calculator-chart"
-              onExportCsv={handleExportCsv}
-              setIsLegendExpanded={setIsLegendExpanded}
-              exportFileName={`InferenceX_calculator_${selectedModel}`}
-              leadingControls={
-                <SegmentedToggle
-                  value={viewMode}
-                  options={viewModeOptions}
-                  onValueChange={handleViewModeChange}
-                  ariaLabel={t.viewModeAria}
-                  testId="calculator-view-toggle"
-                  className="shrink-0"
-                />
-              }
-            />
-            <Card>
+        {chartOpen ? (
+          <figure
+            id="calculator-chart-body"
+            data-testid="calculator-figure"
+            className="relative min-w-0"
+          >
+            <Card className="relative">
+              <ChartButtons
+                className="md:absolute md:right-6 md:top-6 md:z-10 md:mb-0"
+                chartId="calculator-chart"
+                analyticsPrefix="calculator"
+                analyticsContext={selectionAnalyticsContext({
+                  model: selectedModel,
+                  sequence: selectedSequence,
+                  precisions: selectedPrecisions,
+                  gpuCount: visibleHwKeys.size,
+                })}
+                zoomResetEvent="d3chart_zoom_reset_calculator-chart"
+                onExportCsv={handleExportCsv}
+                setIsLegendExpanded={setIsLegendExpanded}
+                exportFileName={`InferenceX_calculator_${selectedModel}`}
+                leadingControls={
+                  <SegmentedToggle
+                    value={viewMode}
+                    options={viewModeOptions}
+                    onValueChange={handleViewModeChange}
+                    ariaLabel={t.viewModeAria}
+                    testId="calculator-view-toggle"
+                    className="shrink-0"
+                  />
+                }
+              />
               {loading ? (
                 <Skeleton className="h-125 w-full" />
               ) : (
@@ -1268,15 +1292,13 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                   {(() => {
                     const captionContent = (
                       <>
-                        <Heading as="h2" level="card">
-                          {chartTitle}
-                        </Heading>
-                        <p className="text-sm text-muted-foreground mb-2">
-                          {getModelLabel(selectedModel)} •{' '}
+                        {chartHeading}
+                        <p className="mb-2 text-sm text-muted-foreground">
+                          {getModelLabel(selectedModel)} ·{' '}
                           {selectedPrecisions
                             .map((p) => getPrecisionLabel(p as Precision))
                             .join(', ')}{' '}
-                          • {getSequenceLabel(selectedSequence, locale)} • {t.source}SemiAnalysis
+                          · {getSequenceLabel(selectedSequence, locale)} · {t.source}SemiAnalysis
                           InferenceX™
                           {selectedRunDate && (
                             <>
@@ -1291,87 +1313,100 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                         {barMetric === 'power' && barResults.length > 0 && (
                           <>
                             <p
-                              className="text-muted-foreground mb-2 flex flex-wrap gap-2 items-center"
+                              className="mb-1 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs text-muted-foreground tabular-nums"
                               data-testid="calculator-cost-badges"
                             >
-                              {t.allInPower}
+                              <span>{t.allInPower}</span>
                               {Object.entries(HW_REGISTRY)
                                 .filter(([base]) =>
                                   barResults.some((r) => r.hwKey.split('_')[0] === base),
                                 )
                                 .map(([base, specs]) => (
-                                  <Badge key={base} variant="outline">
-                                    {specs.badgeLabel ?? base.toUpperCase()}: {specs.power}kW
-                                  </Badge>
+                                  <span key={base} className="whitespace-nowrap">
+                                    {specs.badgeLabel ?? base.toUpperCase()}{' '}
+                                    <span className="font-medium text-foreground">
+                                      {specs.power}kW
+                                    </span>
+                                  </span>
                                 ))}
                             </p>
-                            <p className="text-muted-foreground">
-                              <small>
-                                {t.source}
-                                <Link
-                                  target="_blank"
-                                  className="underline hover:text-foreground"
-                                  href="https://semianalysis.com/datacenter-industry-model/"
-                                >
-                                  SemiAnalysis Datacenter Industry Model
-                                  <ExternalLinkIcon />
-                                </Link>
-                              </small>
+                            <p className="text-xs text-muted-foreground">
+                              {t.source}
+                              <Link
+                                target="_blank"
+                                className="underline hover:text-foreground"
+                                href="https://semianalysis.com/datacenter-industry-model/"
+                              >
+                                SemiAnalysis Datacenter Industry Model
+                                <ExternalLinkIcon />
+                              </Link>
                             </p>
                           </>
                         )}
                         {barMetric === 'cost' && barResults.length > 0 && (
                           <>
                             <p
-                              className="text-muted-foreground mb-2 flex flex-wrap gap-2 items-center"
+                              className="mb-1 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs text-muted-foreground tabular-nums"
                               data-testid="calculator-cost-badges"
                             >
-                              {t.tcoPerHr}
+                              <span>{t.tcoPerHr}</span>
                               {Object.entries(HW_REGISTRY)
                                 .filter(([base]) =>
                                   barResults.some((r) => r.hwKey.split('_')[0] === base),
                                 )
                                 .map(([base, specs]) => (
-                                  <Badge key={base} variant="outline">
-                                    {specs.badgeLabel ?? base.toUpperCase()}: $
-                                    {getGpuSpecs(base, tcoBasis)[costProvider].toFixed(2)}
-                                    /hr
-                                  </Badge>
+                                  <span key={base} className="whitespace-nowrap">
+                                    {specs.badgeLabel ?? base.toUpperCase()}{' '}
+                                    <span className="font-medium text-foreground">
+                                      ${getGpuSpecs(base, tcoBasis)[costProvider].toFixed(2)}/hr
+                                    </span>
+                                  </span>
                                 ))}
                             </p>
-                            <p className="text-muted-foreground">
-                              <small>
-                                {t.source}
-                                <Link
-                                  target="_blank"
-                                  className="underline hover:text-foreground"
-                                  href={TCO_SOURCE_URL}
-                                >
-                                  {TCO_SOURCE_TITLE}
-                                  <ExternalLinkIcon />
-                                </Link>
-                              </small>
+                            <p className="text-xs text-muted-foreground">
+                              {t.source}
+                              <Link
+                                target="_blank"
+                                className="underline hover:text-foreground"
+                                href={TCO_SOURCE_URL}
+                              >
+                                {TCO_SOURCE_TITLE}
+                                <ExternalLinkIcon />
+                              </Link>
                             </p>
                           </>
                         )}
-                        <ChipBasisNote
-                          visible={barMetric === 'cost' && costType !== 'total'}
-                          testId="calculator-disagg-cost-note"
-                          label={t.note}
-                          text={chipBasis === 'total' ? t.disaggCostTotal : t.disaggCost}
-                          chipBasis={chipBasisControl}
-                        />
-                        <ChipBasisNote
-                          visible={barMetric === 'throughput' || barMetric === 'power'}
-                          testId="calculator-disagg-throughput-note"
-                          showToggle={costType !== 'total'}
-                          label={t.note}
-                          text={
-                            chipBasis === 'total' ? t.disaggThroughputTotal : t.disaggThroughput
-                          }
-                          chipBasis={chipBasisControl}
-                        />
-                        <UnofficialDomainNotice />
+                        <div
+                          className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${
+                            barMetric === 'cost' && costType !== 'total'
+                              ? 'grid-rows-[1fr] opacity-100'
+                              : 'grid-rows-[0fr] opacity-0'
+                          }`}
+                        >
+                          <div className="min-h-0 overflow-hidden">
+                            <p
+                              data-testid="calculator-disagg-cost-note"
+                              className="mt-2 text-xs text-muted-foreground"
+                            >
+                              <span className="font-medium text-foreground">{t.note}</span>
+                              {t.disaggCost}
+                            </p>
+                          </div>
+                        </div>
+                        <div
+                          className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${
+                            barMetric === 'throughput' || barMetric === 'power'
+                              ? 'grid-rows-[1fr] opacity-100'
+                              : 'grid-rows-[0fr] opacity-0'
+                          }`}
+                        >
+                          <div className="min-h-0 overflow-hidden">
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              <span className="font-medium text-foreground">{t.note}</span>
+                              {t.disaggThroughput}
+                            </p>
+                          </div>
+                        </div>
                       </>
                     );
 
@@ -1442,7 +1477,9 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
               )}
             </Card>
           </figure>
-        </CollapsibleSection>
+        ) : (
+          <Card>{chartHeading}</Card>
+        )}
       </section>
 
       {viewMode === 'chart' && selectedBars.size > 0 && (
@@ -1488,18 +1525,16 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
 
       {!loading && hasData && (
         <section data-testid="calculator-fleet-pointer">
-          <Card>
-            <p className="text-sm text-muted-foreground">
-              {t.fleetMoved}{' '}
-              <Link
-                href={localePath('/fleet', locale)}
-                className="underline hover:text-foreground"
-                data-testid="calculator-fleet-pointer-link"
-              >
-                {t.fleetMovedLink}
-              </Link>
-            </p>
-          </Card>
+          <p className="text-sm text-muted-foreground">
+            {t.fleetMoved}{' '}
+            <Link
+              href={localePath('/fleet', locale)}
+              className="underline hover:text-foreground"
+              data-testid="calculator-fleet-pointer-link"
+            >
+              {t.fleetMovedLink}
+            </Link>
+          </p>
         </section>
       )}
       {tcoModelDialog}

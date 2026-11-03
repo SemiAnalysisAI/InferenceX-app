@@ -31,7 +31,7 @@ import { Label } from '@/components/ui/label';
 
 const STRINGS = {
   en: {
-    title: 'Quick Filters',
+    title: 'Quick filters',
     description:
       'Narrow the chart by chip vendor, serving framework, deployment mode, speculative decoding, and power-measurement status. Selecting none in a group shows all.',
     agenticDescription:
@@ -53,10 +53,10 @@ const STRINGS = {
     singleNode: 'Single-node',
     multiNode: 'Multi-node',
     disaggregated: 'Disaggregated',
-    specDecoding: 'Spec Decoding',
+    specDecoding: 'Spec decoding',
     specHelp:
       'MTP groups runs with speculative decoding enabled, including methods such as EAGLE. STP groups standard decoding without speculative decoding. Available only for fixed-sequence benchmarks.',
-    power: 'Measured Power',
+    power: 'Measured power',
     topology: 'Topology',
     topologyHelp:
       'Keep one GPU allocation and parallelism configuration across its observed concurrency sweep. This does not match software versions or fill missing measurements.',
@@ -318,11 +318,11 @@ export function QuickFiltersDialog({
       >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <ListFilter className="size-4 text-brand" />
+            <ListFilter className="size-4 text-muted-foreground" />
             {t.title}
             {selectedCount > 0 && (
               <span
-                className="rounded-full bg-brand/10 px-2 py-0.5 text-2xs font-medium text-brand"
+                className="text-xs font-normal tabular-nums text-muted-foreground"
                 data-testid="quick-filters-selected-count"
               >
                 {selectedCount} {t.selected}
@@ -398,9 +398,9 @@ export function QuickFiltersDialog({
                       disabled={disabled}
                       title={disabled ? t.noData : undefined}
                       className={cn(
-                        'rounded-full font-normal',
+                        'font-normal',
                         group.key === 'topology' &&
-                          'h-auto min-h-9 max-w-full whitespace-normal break-words rounded-lg py-2 text-left md:h-auto',
+                          'h-auto min-h-9 max-w-full whitespace-normal break-words py-2 text-left md:h-auto',
                         active && 'bg-brand hover:bg-brand/90',
                       )}
                       data-testid={`quick-filter-${group.key}-${option.value}`}

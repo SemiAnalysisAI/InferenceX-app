@@ -23,15 +23,13 @@ import type { Locale } from '@/lib/i18n/i18n';
 
 const COMPARISON_CHANGELOG_STRINGS = {
   en: {
-    gitCommit: 'Git Commit',
-    workflowRun: 'Workflow Run',
+    gitCommit: 'Git commit',
+    workflowRun: 'Workflow run',
     label: (count: number) =>
-      `Config Changelog (${count} date${count === 1 ? '' : 's'} with changes)`,
-    loading: 'Config Changelog (loading...)',
-    deferred: 'Config Changelog',
-    loadingBody: 'Loading changelog…',
+      `Config changelog (${count} date${count === 1 ? '' : 's'} with changes)`,
+    loading: 'Config changelog (loading…)',
     emptyLabel: (count: number) =>
-      `Config Changelog (${count} date${count === 1 ? '' : 's'} queried — no matching changelog data)`,
+      `Config changelog (${count} date${count === 1 ? '' : 's'} queried, no matching changelog data)`,
     addAll: 'Add all to chart',
     empty:
       'No config changelog data matching the selected chips and precisions for this date range. Changelog tracking began Dec 30, 2025.',
@@ -41,11 +39,11 @@ const COMPARISON_CHANGELOG_STRINGS = {
     noRunNotes: 'No changelog notes for this run',
     firstRun: 'First benchmark run for this configuration',
     beforeTracking: 'No changelog data (tracking began Dec 30, 2025)',
-    unchanged: 'No config changes — same configuration as previous run',
-    initial: 'Initial configuration — no changelog entry recorded',
+    unchanged: 'No config changes, same configuration as previous run',
+    initial: 'Initial configuration, no changelog entry recorded',
   },
   zh: {
-    gitCommit: 'Git Commit',
+    gitCommit: 'Git commit',
     workflowRun: '工作流运行记录',
     label: (count: number) => `配置变更日志（${count} 个日期有变更）`,
     loading: '配置变更日志（加载中……）',
@@ -292,8 +290,8 @@ export default function ComparisonChangelog({
         : t.emptyLabel(totalDatesQueried);
 
   return (
-    <div className="rounded-lg border border-border/50 bg-muted/30 overflow-hidden transition-all">
-      <div className="flex items-center justify-between gap-2 px-4 py-2">
+    <div className="border-t border-border/30 pt-2">
+      <div className="flex items-center justify-between gap-2 py-1">
         <button
           type="button"
           onClick={handleToggle}
@@ -328,41 +326,97 @@ export default function ComparisonChangelog({
       </div>
 
       <div
-        className={`overflow-hidden transition-all duration-200 ease-in-out ${
-          isExpanded ? 'max-h-1000 opacity-100' : 'max-h-0 opacity-0'
+        className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${
+          isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
         }`}
       >
-        <div className="px-4 pt-2 pb-4 flex flex-col gap-3">
-          {filteredChangelogs.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              {loading || deferred ? t.loadingBody : t.empty}
-            </p>
-          ) : (
-            filteredChangelogs.map((item) => {
-              const runs = runMetaFor(item);
+        <div className="min-h-0 overflow-hidden">
+          <div className="flex flex-col gap-3 pt-2 pl-6">
+            {filteredChangelogs.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{t.empty}</p>
+            ) : (
+              filteredChangelogs.map((item) => {
+                const runs = runMetaFor(item);
 
-              if (runs.length > 1) {
-                return runs.map((run, idx) => {
-                  const entry = makeRunComparisonEntry(item.date, run.runId);
-                  const onChart = selectedDates.includes(entry);
-                  const gpuLabel = gpuLabelsFor(run.entries);
-                  return (
-                    <div key={entry} className="flex flex-col gap-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-semibold">
-                          {formatComparisonDate(item.date, locale)}
-                          {gpuLabel ? ` ${gpuLabel}` : ''} #{idx + 1}
-                        </span>
-                        <span className="text-muted-foreground">&mdash;</span>
-                        {renderRunLinks(locale, run.headRef, run.runUrl)}
-                        {onChart ? (
+                if (runs.length > 1) {
+                  return runs.map((run, idx) => {
+                    const entry = makeRunComparisonEntry(item.date, run.runId);
+                    const onChart = selectedDates.includes(entry);
+                    const gpuLabel = gpuLabelsFor(run.entries);
+                    return (
+                      <div key={entry} className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-medium tabular-nums">
+                            {formatComparisonDate(item.date, locale)}
+                            {gpuLabel ? ` ${gpuLabel}` : ''} #{idx + 1}
+                          </span>
+                          <span className="text-muted-foreground">·</span>
+                          {renderRunLinks(locale, run.headRef, run.runUrl)}
+                          {onChart ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onRemoveDate(entry);
+                                track(`${analyticsSection}_changelog_remove_run`, {
+                                  date: item.date,
+                                  run: run.runId,
+                                });
+                              }}
+                              className="text-xs font-medium text-muted-foreground hover:text-destructive transition-colors flex items-center gap-0.5"
+                            >
+                              <Minus className="size-3" />
+                              {t.remove}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onAddDate(entry);
+                                track(`${analyticsSection}_changelog_add_run`, {
+                                  date: item.date,
+                                  run: run.runId,
+                                });
+                              }}
+                              className="text-xs font-medium text-brand hover:text-brand/80 transition-colors flex items-center gap-0.5"
+                            >
+                              <Plus className="size-3" />
+                              {t.add}
+                            </button>
+                          )}
+                        </div>
+                        {run.entries.length > 0 ? (
+                          run.entries.map((e, i) => renderDescription(e, i))
+                        ) : (
+                          <span className="text-sm text-muted-foreground pl-5">{t.noRunNotes}</span>
+                        )}
+                      </div>
+                    );
+                  });
+                }
+
+                const { headRef, runUrl } = runs[0] ?? {};
+                const dateGpuLabel = gpuLabelsFor(item.entries);
+                return (
+                  <div key={item.date} className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium tabular-nums">
+                        {formatComparisonDate(item.date, locale)}
+                        {dateGpuLabel ? ` ${dateGpuLabel}` : ''}
+                      </span>
+                      {item.entries.length > 0 && (headRef || runUrl) && (
+                        <>
+                          <span className="text-muted-foreground">·</span>
+                          {renderRunLinks(locale, headRef, runUrl)}
+                        </>
+                      )}
+                      {datesOnChart.has(item.date) ? (
+                        selectedDates.includes(item.date) ? (
                           <button
                             type="button"
                             onClick={() => {
-                              onRemoveDate(entry);
-                              track(`${analyticsSection}_changelog_remove_run`, {
+                              onRemoveDate(item.date);
+                              track(`${analyticsSection}_changelog_remove_date`, {
                                 date: item.date,
-                                run: run.runId,
                               });
                             }}
                             className="text-xs font-medium text-muted-foreground hover:text-destructive transition-colors flex items-center gap-0.5"
@@ -371,101 +425,45 @@ export default function ComparisonChangelog({
                             {t.remove}
                           </button>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onAddDate(entry);
-                              track(`${analyticsSection}_changelog_add_run`, {
-                                date: item.date,
-                                run: run.runId,
-                              });
-                            }}
-                            className="text-xs font-medium text-brand hover:text-brand/80 transition-colors flex items-center gap-0.5"
-                          >
-                            <Plus className="size-3" />
-                            {t.add}
-                          </button>
-                        )}
-                      </div>
-                      {run.entries.length > 0 ? (
-                        run.entries.map((e, i) => renderDescription(e, i))
+                          <span className="text-xs text-muted-foreground flex items-center gap-0.5">
+                            <Lock className="size-3" />
+                            {t.onChart}
+                          </span>
+                        )
                       ) : (
-                        <span className="text-sm text-muted-foreground italic pl-5">
-                          {t.noRunNotes}
-                        </span>
-                      )}
-                    </div>
-                  );
-                });
-              }
-
-              const { headRef, runUrl } = runs[0] ?? {};
-              const dateGpuLabel = gpuLabelsFor(item.entries);
-              return (
-                <div key={item.date} className="flex flex-col gap-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-semibold">
-                      {formatComparisonDate(item.date, locale)}
-                      {dateGpuLabel ? ` ${dateGpuLabel}` : ''}
-                    </span>
-                    {item.entries.length > 0 && (headRef || runUrl) && (
-                      <>
-                        <span className="text-muted-foreground">&mdash;</span>
-                        {renderRunLinks(locale, headRef, runUrl)}
-                      </>
-                    )}
-                    {datesOnChart.has(item.date) ? (
-                      selectedDates.includes(item.date) ? (
                         <button
                           type="button"
                           onClick={() => {
-                            onRemoveDate(item.date);
-                            track(`${analyticsSection}_changelog_remove_date`, { date: item.date });
+                            onAddDate(item.date);
+                            track(`${analyticsSection}_changelog_add_date`, { date: item.date });
                           }}
-                          className="text-xs font-medium text-muted-foreground hover:text-destructive transition-colors flex items-center gap-0.5"
+                          className="text-xs font-medium text-brand hover:text-brand/80 transition-colors flex items-center gap-0.5"
                         >
-                          <Minus className="size-3" />
-                          {t.remove}
+                          <Plus className="size-3" />
+                          {t.add}
                         </button>
-                      ) : (
-                        <span className="text-xs text-muted-foreground flex items-center gap-0.5">
-                          <Lock className="size-3" />
-                          {t.onChart}
-                        </span>
-                      )
+                      )}
+                    </div>
+                    {item.entries.length > 0 ? (
+                      item.entries.map((entry, entryIndex) => renderDescription(entry, entryIndex))
                     ) : (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onAddDate(item.date);
-                          track(`${analyticsSection}_changelog_add_date`, { date: item.date });
-                        }}
-                        className="text-xs font-medium text-brand hover:text-brand/80 transition-colors flex items-center gap-0.5"
-                      >
-                        <Plus className="size-3" />
-                        {t.add}
-                      </button>
+                      <span className="text-sm text-muted-foreground pl-5">
+                        {item.date === firstAvailableDate
+                          ? t.firstRun
+                          : item.date < '2025-12-30'
+                            ? t.beforeTracking
+                            : filteredChangelogs.some(
+                                  (c) => c.date < item.date && c.entries.length > 0,
+                                )
+                              ? t.unchanged
+                              : t.initial}
+                      </span>
                     )}
                   </div>
-                  {item.entries.length > 0 ? (
-                    item.entries.map((entry, entryIndex) => renderDescription(entry, entryIndex))
-                  ) : (
-                    <span className="text-sm text-muted-foreground italic pl-5">
-                      {item.date === firstAvailableDate
-                        ? t.firstRun
-                        : item.date < '2025-12-30'
-                          ? t.beforeTracking
-                          : filteredChangelogs.some(
-                                (c) => c.date < item.date && c.entries.length > 0,
-                              )
-                            ? t.unchanged
-                            : t.initial}
-                    </span>
-                  )}
-                </div>
-              );
-            })
-          )}
+                );
+              })
+            )}
+          </div>
         </div>
       </div>
     </div>

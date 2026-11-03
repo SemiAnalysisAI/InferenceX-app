@@ -111,11 +111,11 @@ describe('PointSummary', () => {
       }),
     );
 
-    expect(html).toContain('Offload Type');
+    expect(html).toContain('Offload type');
     expect(html).toContain('DRAM');
-    expect(html).toContain('KV Offload Engine');
+    expect(html).toContain('KV offload engine');
     expect(html).toContain('LMCache 0.5.1');
-    expect(html).toContain('KV Transfer Engine');
+    expect(html).toContain('KV transfer engine');
     expect(html).toContain('Mooncake');
     expect(html).toContain('Router');
     expect(html).toContain('vLLM Router 0.1.14');

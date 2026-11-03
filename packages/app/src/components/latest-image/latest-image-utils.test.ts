@@ -24,11 +24,6 @@ import {
   sequenceOptionsForModel,
 } from './latest-image-utils';
 
-const lightnessOf = (s: string) =>
-  Number(s.match(/oklch\((?<lightness>[\d.]+)/u)?.groups?.lightness ?? Number.NaN);
-const alphaOf = (s: string) =>
-  Number(s.match(/\/ (?<alpha>[\d.]+)\)/u)?.groups?.alpha ?? Number.NaN);
-
 describe('daysSince', () => {
   it('returns 0 for today', () => {
     const today = new Date('2026-05-27T12:34:56Z');
@@ -71,17 +66,20 @@ describe('isStaleAgentx', () => {
   });
 });
 
+const colorShareAt = (days: number) =>
+  Number(
+    (ageColorStyle(days)!.color as string).match(
+      /color-mix\(in oklch, var\(--destructive\) (?<pct>[\d.]+)%, var\(--foreground\)\)/u,
+    )?.groups?.pct ?? Number.NaN,
+  );
+
 describe('ageColorStyle', () => {
   it('returns undefined for 0-day rows so the muted-foreground class wins', () => {
     expect(ageColorStyle(0)).toBeUndefined();
   });
 
-  it('returns an oklch color for 1d and ramps toward darker red at AGE_MAX_RED_DAYS', () => {
-    const oneDay = ageColorStyle(1);
-    const maxDay = ageColorStyle(AGE_MAX_RED_DAYS);
-    expect(oneDay?.color).toMatch(/^oklch\(/u);
-    expect(maxDay?.color).toMatch(/^oklch\(/u);
-    expect(lightnessOf(maxDay!.color as string)).toBeLessThan(lightnessOf(oneDay!.color as string));
+  it('ramps the destructive share of the text color up with age', () => {
+    expect(colorShareAt(AGE_MAX_RED_DAYS)).toBeGreaterThan(colorShareAt(1));
   });
 
   it('clamps anything past AGE_MAX_RED_DAYS to the same color (no extrapolation past the ramp)', () => {
@@ -91,20 +89,28 @@ describe('ageColorStyle', () => {
   });
 });
 
+const mixAt = (days: number) =>
+  Number(
+    (ageRowStyle(days)!.backgroundColor as string).match(
+      /color-mix\(in oklch, var\(--destructive\) (?<pct>[\d.]+)%, transparent\)/u,
+    )?.groups?.pct ?? Number.NaN,
+  );
+
 describe('ageRowStyle', () => {
   it('returns undefined for 0-day rows', () => {
     expect(ageRowStyle(0)).toBeUndefined();
   });
 
-  it('returns a low-alpha oklch background that ramps from ~0.04 to ~0.28', () => {
-    const oneDay = ageRowStyle(1);
-    const maxDay = ageRowStyle(AGE_MAX_RED_DAYS);
-    const a1 = alphaOf(oneDay!.backgroundColor as string);
-    const aMax = alphaOf(maxDay!.backgroundColor as string);
-    expect(a1).toBeGreaterThan(0);
-    expect(a1).toBeLessThan(0.1);
-    expect(aMax).toBeGreaterThan(0.2);
-    expect(aMax).toBeLessThanOrEqual(0.3);
+  it('returns a faint destructive tint that ramps up with age and stays bounded', () => {
+    const m1 = mixAt(1);
+    const mMid = mixAt(AGE_MAX_RED_DAYS / 2);
+    const mMax = mixAt(AGE_MAX_RED_DAYS);
+    expect(m1).toBeGreaterThan(0);
+    expect(m1).toBeLessThan(5);
+    expect(mMid).toBeGreaterThan(m1);
+    expect(mMax).toBeGreaterThan(mMid);
+    expect(mMax).toBeGreaterThan(10);
+    expect(mMax).toBeLessThanOrEqual(15);
   });
 
   it('clamps past AGE_MAX_RED_DAYS so a 1y-old row looks identical to a 60d row', () => {

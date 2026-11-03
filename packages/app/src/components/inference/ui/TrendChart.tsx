@@ -11,6 +11,11 @@ import {
   type ScaleConfig,
 } from '@/lib/d3-chart/D3Chart';
 import {
+  chartTooltipDismiss,
+  chartTooltipShell,
+  chartTooltipTitle,
+} from '@/lib/d3-chart/tooltip-shell';
+import {
   applyHoverState,
   applyNormalState,
   formatLargeNumber,
@@ -39,13 +44,13 @@ const CHART_MARGIN = { top: 20, right: 30, bottom: 50, left: 60 };
 const STRINGS = {
   en: {
     dismiss: 'Click elsewhere to dismiss',
-    noData: 'No historical data found for the tracked configurations.',
+    noData: 'No historical data found for the tracked configurations',
     instructions: 'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset',
     aria: 'Historical performance trend chart',
   },
   zh: {
     dismiss: '点击其他区域关闭',
-    noData: '当前追踪的配置暂无历史数据。',
+    noData: '当前追踪的配置暂无历史数据',
     instructions: 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置',
     aria: '历史性能趋势图表',
   },
@@ -252,12 +257,15 @@ const TrendChart = React.memo(
       () => ({
         rulerType: 'crosshair' as const,
         content: (d: PreparedPoint, isPinned: boolean) =>
-          `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 160px; user-select: ${isPinned ? 'text' : 'none'};">
-            ${isPinned ? `<div class="text-muted-foreground text-3xs mb-1 italic">${t.dismiss}</div>` : ''}
-            <div class="font-semibold mb-1" style="color: ${getPointConfig(d)?.color ?? '#888'}">${getPointConfig(d)?.label ?? ''}</div>
+          chartTooltipShell(
+            `<div class="text-xs">
+            ${isPinned ? chartTooltipDismiss(t.dismiss) : ''}
+            ${chartTooltipTitle(getPointConfig(d)?.label ?? '', getPointConfig(d)?.color ?? '#888')}
             <div class="text-muted-foreground">${locale === 'zh' ? dateFormatter.format(new Date(d.raw.date)) : d.raw.date}</div>
             <div class="mt-1 font-medium">${yLabel}: ${formatLargeNumber(d.value)}</div>
           </div>`,
+            { pinned: isPinned, minWidth: 160 },
+          ),
         getRulerX: (d: PreparedPoint, xScale: any) => xScale(d.x),
         getRulerY: (d: PreparedPoint, yScale: any) => yScale(d.y),
         onHoverStart: (sel: d3.Selection<any, PreparedPoint, any, any>, d: PreparedPoint) =>

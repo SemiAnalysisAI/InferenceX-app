@@ -99,9 +99,9 @@ export function OverviewTierSlider({
     <nav
       data-testid="overview-tier-switcher"
       aria-label={label}
-      className="flex min-w-0 items-center gap-3 text-xs"
+      className="flex min-w-0 items-start gap-3 text-xs"
     >
-      <span className="shrink-0 text-muted-foreground">{label}</span>
+      <span className="shrink-0 pt-1 text-muted-foreground">{label}</span>
       <div className="w-[min(18rem,calc(100vw-8.5rem))] min-w-0 pt-1">
         <div className="relative h-4">
           <input
@@ -178,7 +178,7 @@ export function OverviewTierSlider({
           ))}
         </div>
       </div>
-      <span className="shrink-0 text-muted-foreground">{unit}</span>
+      <span className="shrink-0 pt-1 text-muted-foreground">{unit}</span>
     </nav>
   );
 }

@@ -27,7 +27,7 @@ const STRINGS = {
     selectRunDate: 'Select run date',
     changelog: 'Changelog',
     newResultsOn: 'New results on',
-    noNewResults: 'No new results for this model on this date.',
+    noNewResults: 'No new results for this model on this date',
     secondaryControls: 'More run controls',
     changed: 'changed',
   },
@@ -41,7 +41,7 @@ const STRINGS = {
     selectRunDate: '选择运行日期',
     changelog: '变更记录',
     newResultsOn: '新结果 ·',
-    noNewResults: '该日期该模型无新结果。',
+    noNewResults: '该日期该模型无新结果',
     secondaryControls: '更多运行设置',
     changed: '项已更改',
   },
@@ -155,8 +155,8 @@ export default function EvaluationChartControls() {
 
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="ghost" className="self-start sm:self-auto">
-                    <strong>{t.changelog}</strong>
+                  <Button variant="ghost" size="sm" className="self-start sm:self-auto">
+                    <span className="font-medium">{t.changelog}</span>
                     <ChevronDownIcon />
                   </Button>
                 </PopoverTrigger>
@@ -165,13 +165,13 @@ export default function EvaluationChartControls() {
                   className="max-h-[min(32rem,calc(100vh-1.5rem))] w-[min(400px,calc(100vw-1.5rem))] overflow-y-auto"
                 >
                   <div className="flex min-w-0 flex-col gap-3">
-                    <div className="text-xs font-bold">
+                    <div className="text-xs font-medium tabular-nums">
                       {t.newResultsOn} {selectedRunDate}
                     </div>
                     {changelogEntries.length > 0 ? (
                       changelogEntries.map((entry) => (
                         <div key={entry.benchmark} className="flex min-w-0 flex-col gap-1 text-xs">
-                          <div className="font-semibold">{entry.benchmark.toUpperCase()}</div>
+                          <div className="font-medium">{entry.benchmark.toUpperCase()}</div>
                           <ul className="list-disc break-words pl-4 [overflow-wrap:anywhere]">
                             {entry.configs.map((config) => (
                               <li key={config} className="break-words [overflow-wrap:anywhere]">

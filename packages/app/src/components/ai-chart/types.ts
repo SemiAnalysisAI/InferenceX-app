@@ -149,7 +149,7 @@ export function validateSpec(raw: Record<string, unknown>, locale: Locale = 'en'
         ? raw.title.slice(0, 200)
         : locale === 'zh'
           ? 'AI 生成的图表'
-          : 'AI Generated Chart',
+          : 'AI-generated chart',
     description: typeof raw.description === 'string' ? raw.description.slice(0, 500) : '',
   };
 }

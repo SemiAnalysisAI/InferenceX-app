@@ -16,6 +16,7 @@ import {
 } from '@/lib/d3-chart/D3Chart';
 import { computeLeftMargin } from '@/lib/d3-chart/dynamic-margins';
 import { twoRowYAxisLabels } from '@/lib/d3-chart/axis-labels';
+import { chartTooltipShell, chartTooltipTitle } from '@/lib/d3-chart/tooltip-shell';
 
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
@@ -42,10 +43,9 @@ const STRINGS = {
   en: {
     interactivityAxis: 'Interactivity (tok/s/user)',
     interactivity: 'Interactivity',
-    instructions:
-      'Shift+Scroll to zoom · Drag to pan · Double-click to reset · Click a point to pin tooltip',
-    summary: 'AI Summary',
-    noData: 'No data matched this chart specification.',
+    instructions: 'Shift+Scroll to zoom · Drag to pan · Double-click to reset',
+    summary: 'AI summary',
+    noData: 'No data matched this chart specification',
     chartAria: {
       bar: 'AI-generated bar chart',
       scatter: 'AI-generated scatter chart',
@@ -56,9 +56,9 @@ const STRINGS = {
   zh: {
     interactivityAxis: '交互性（tok/s/user）',
     interactivity: '交互性',
-    instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
+    instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置',
     summary: 'AI 总结',
-    noData: '当前图表配置没有匹配的数据。',
+    noData: '当前图表配置没有匹配的数据',
     chartAria: {
       bar: 'AI 生成的条形图',
       scatter: 'AI 生成的散点图',
@@ -119,15 +119,12 @@ function BarChart({ data, spec }: { data: AiChartBarPoint[]; spec: AiChartSpec }
     () => ({
       rulerType: 'none',
       content: (d) =>
-        sanitize(`<div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
-          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
-            <span style="width: 10px; height: 10px; border-radius: 2px; background: ${d.color};"></span>
-            <span style="color: var(--foreground); font-size: 12px; font-weight: 600;">${d.label}</span>
-          </div>
+        sanitize(
+          chartTooltipShell(`${chartTooltipTitle(d.label, d.color)}
           <div style="color: var(--muted-foreground); font-size: 11px;">
             <strong>${spec.yAxisLabel}:</strong> ${d.value.toLocaleString(numberLocale, { maximumFractionDigits: 2 })}
-          </div>
-        </div>`),
+          </div>`),
+        ),
     }),
     [numberLocale, spec.yAxisLabel],
   );
@@ -200,18 +197,15 @@ function ScatterChart({
       content: (d) => {
         const hwKey = d.hwKey ?? '';
         const color = colorMap[hwKey] ?? '#888';
-        return sanitize(`<div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
-          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
-            <span style="width: 10px; height: 10px; border-radius: 2px; background: ${color};"></span>
-            <span style="color: var(--foreground); font-size: 12px; font-weight: 600;">${hwKey}</span>
-          </div>
+        return sanitize(
+          chartTooltipShell(`${chartTooltipTitle(hwKey, color)}
           <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 2px;">
             <strong>${t.interactivity}:</strong> ${d.x.toFixed(1)} tok/s/user
           </div>
           <div style="color: var(--muted-foreground); font-size: 11px;">
             <strong>${spec.yAxisLabel}:</strong> ${d.y.toLocaleString(numberLocale, { maximumFractionDigits: 2 })}
-          </div>
-        </div>`);
+          </div>`),
+        );
       },
     }),
     [colorMap, numberLocale, spec.yAxisLabel, t.interactivity],
@@ -324,18 +318,15 @@ function LineChart({
         const label = config
           ? `${config.label}${config.suffix ? ` ${config.suffix}` : ''}`
           : d.hwKey;
-        return sanitize(`<div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
-          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
-            <span style="width: 10px; height: 10px; border-radius: 2px; background: ${color};"></span>
-            <span style="color: var(--foreground); font-size: 12px; font-weight: 600;">${label}</span>
-          </div>
+        return sanitize(
+          chartTooltipShell(`${chartTooltipTitle(label, color)}
           <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 2px;">
             <strong>${t.interactivity}:</strong> ${d.x.toFixed(1)} tok/s/user
           </div>
           <div style="color: var(--muted-foreground); font-size: 11px;">
             <strong>${spec.yAxisLabel}:</strong> ${d.y.toLocaleString(numberLocale, { maximumFractionDigits: 2 })}
-          </div>
-        </div>`);
+          </div>`),
+        );
       },
       getRulerX: (d, xS) => (xS as any)(d.x),
       getRulerY: (d, yS) => (yS as any)(d.y),
@@ -411,13 +402,10 @@ function RadarChart({
           })
           .filter(Boolean)
           .join('');
-        return sanitize(`<div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
-          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
-            <span style="width: 10px; height: 10px; border-radius: 2px; background: ${d.color};"></span>
-            <span style="color: var(--foreground); font-size: 12px; font-weight: 600;">${d.label}</span>
-          </div>
-          <div style="color: var(--muted-foreground); font-size: 11px;">${metricRows}</div>
-        </div>`);
+        return sanitize(
+          chartTooltipShell(`${chartTooltipTitle(d.label, d.color)}
+          <div style="color: var(--muted-foreground); font-size: 11px;">${metricRows}</div>`),
+        );
       },
     }),
     [axes, numberLocale],
@@ -481,7 +469,7 @@ export default function AiChartResult({ charts, summary }: AiChartResultProps) {
           Object.keys(chart.lineData).length > 0 ||
           chart.radarData.length > 0;
         return (
-          <figure key={i} className="relative rounded-lg">
+          <figure key={i} className="relative">
             <ChartButtons
               chartId={chartId}
               analyticsPrefix="ai_chart"

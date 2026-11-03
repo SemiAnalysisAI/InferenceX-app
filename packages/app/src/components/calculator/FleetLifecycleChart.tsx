@@ -14,6 +14,7 @@ import {
   type RenderContext,
   type ScaleConfig,
 } from '@/lib/d3-chart/D3Chart';
+import { chartTooltipShellStyle } from '@/lib/d3-chart/tooltip-shell';
 import { escapeHtml } from '@/lib/shared/utils';
 import { useLocale } from '@/lib/i18n/use-locale';
 
@@ -468,7 +469,7 @@ const FleetLifecycleChart = React.memo(
                   const links = info.runUrls
                     .map(
                       (url, i) =>
-                        `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="text-primary underline mr-2">${escapeHtml(labels.runLink)}${
+                        `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="text-brand underline mr-2">${escapeHtml(labels.runLink)}${
                           info.runUrls.length > 1 ? ` ${i + 1}` : ''
                         }</a>`,
                     )
@@ -483,7 +484,7 @@ const FleetLifecycleChart = React.memo(
                 .join('')
             : '';
 
-          return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 240px; user-select: ${isPinned ? 'text' : 'none'};">
+          return `<div class="text-xs" style="${chartTooltipShellStyle({ pinned: isPinned, minWidth: 240 })}">
             <div class="font-semibold mb-1">${escapeHtml(sliceDate(new Date(d.x)))}</div>
             ${
               rows

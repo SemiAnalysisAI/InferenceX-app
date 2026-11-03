@@ -25,7 +25,7 @@ const STRINGS = {
   en: {
     title: 'Prefill and decode roles',
     empty: 'No validated prefill/decode telemetry is available for these filters.',
-    panelEmpty: 'These observations do not report this role figure.',
+    panelEmpty: 'These observations do not report this role figure',
     roles: { prefill: 'Prefill', decode: 'Decode', total: 'Prefill + decode' },
     panels: {
       power: {
@@ -60,7 +60,7 @@ const STRINGS = {
   zh: {
     title: '预填充与解码角色',
     empty: '当前筛选条件下没有经过验证的预填充 / 解码遥测数据。',
-    panelEmpty: '这些观测值没有报告该角色指标。',
+    panelEmpty: '这些观测值没有报告该角色指标',
     roles: { prefill: '预填充', decode: '解码', total: '预填充 + 解码' },
     panels: {
       power: {

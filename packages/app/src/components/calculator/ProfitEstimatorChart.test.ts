@@ -243,7 +243,7 @@ describe('generateProfitTooltipHTML', () => {
     );
     expect(html).toContain('Loss');
     expect(html).toContain('-$190');
-    expect(html).toContain('Model License Fee');
+    expect(html).toContain('Model license fee');
     expect(html).toContain('$90');
   });
 
@@ -284,17 +284,17 @@ describe('generateProfitTooltipHTML', () => {
 });
 
 const SEGMENT_WORDS = {
-  tco: 'Compute Expense',
-  labCut: 'Model License Fee',
+  tco: 'Compute expense',
+  labCut: 'Model license fee',
   profit: 'Profit',
   loss: 'Loss',
 };
 
 describe('segmentLabelLines', () => {
   it('names the segment and its amount when the rectangle is tall enough', () => {
-    expect(segmentLabelLines('tco', row(), 40, SEGMENT_WORDS)).toEqual(['Compute Expense', '$400']);
+    expect(segmentLabelLines('tco', row(), 40, SEGMENT_WORDS)).toEqual(['Compute expense', '$400']);
     expect(segmentLabelLines('labCut', row(), 40, SEGMENT_WORDS)).toEqual([
-      'Model License Fee',
+      'Model license fee',
       '$180',
     ]);
     expect(segmentLabelLines('profit', row(), 40, SEGMENT_WORDS)).toEqual(['Profit', '$420']);
@@ -315,7 +315,7 @@ describe('segmentLabelLines', () => {
 
   it('drops the name, then the amount, when the bar is too narrow (phones)', () => {
     expect(segmentLabelLines('tco', row(), 40, SEGMENT_WORDS, 200)).toEqual([
-      'Compute Expense',
+      'Compute expense',
       '$400',
     ]);
     expect(segmentLabelLines('tco', row(), 40, SEGMENT_WORDS, 60)).toEqual(['$400']);

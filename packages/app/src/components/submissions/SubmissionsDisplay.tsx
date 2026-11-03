@@ -4,12 +4,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { track, trackOncePerPageview } from '@/lib/analytics/analytics';
 import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { ChartButtons } from '@/components/ui/chart-buttons';
+import { ChartSection } from '@/components/ui/chart-section';
 import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Heading } from '@/components/ui/heading';
+import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
+import { Stat } from '@/components/ui/stat';
 import { exportToCsv } from '@/lib/export/csv-export';
 import { submissionsVolumeToCsv } from '@/lib/export/csv-export-helpers';
 import { useSubmissions } from '@/hooks/api/use-submissions';
@@ -23,42 +25,40 @@ const CHART_ID = 'submissions-chart';
 
 const STRINGS = {
   en: {
-    heading: 'Benchmark Submissions',
+    heading: 'Benchmark submissions',
     description:
-      'All benchmark configurations submitted to InferenceX. View submission history, activity trends, and datapoint volumes.',
+      'All benchmark configurations submitted to InferenceX, with submission history, activity trends and datapoint volumes',
     modeWeekly: 'Weekly',
     modeCumulative: 'Cumulative',
-    loadingChart: 'Loading chart data...',
-    loadingTable: 'Loading submissions...',
-    errorText: 'Failed to load submission data.',
-    retry: 'Retry',
-    noChartData: 'No submission activity data is available.',
-    noTableData: 'No submission records are available.',
+    loadingChart: 'Loading chart data…',
+    loadingTable: 'Loading submissions…',
+    errorText: 'Failed to load submission data',
+    noChartData: 'No submission activity data is available',
+    noTableData: 'No submission records are available',
     chartModeAria: 'Chart mode',
-    chartCaption: 'Submission Activity',
+    chartCaption: 'Submission activity',
     chartSource: 'Source: SemiAnalysis InferenceX™',
-    statDatapoints: 'Datapoints Generated',
-    statConfigs: 'Distinct Configurations',
-    statModels: 'Unique Models',
-    statHardware: 'Unique Hardware',
+    statDatapoints: 'Datapoints generated',
+    statConfigs: 'Distinct configurations',
+    statModels: 'Unique models',
+    statHardware: 'Unique hardware',
     subtitleResults: 'results',
     subtitleTested: 'tested',
     subtitleLLMs: 'LLMs',
     subtitleSKUs: 'SKUs',
     tableCaption: 'Submission records',
-    tableHint: 'Search, sort, or expand a row to inspect the exact benchmark configuration.',
+    tableHint: 'Search, sort, or expand a row to inspect the exact benchmark configuration',
   },
   zh: {
     heading: '基准测试提交',
-    description: '所有提交至 InferenceX 的基准测试配置。查看提交历史、活动趋势和数据点数量。',
+    description: '所有提交至 InferenceX 的基准测试配置，包括提交历史、活动趋势和数据点数量',
     modeWeekly: '按周',
     modeCumulative: '累计',
     loadingChart: '正在加载图表数据……',
     loadingTable: '正在加载提交记录……',
-    errorText: '加载提交数据失败。',
-    retry: '重试',
-    noChartData: '暂无提交活动数据。',
-    noTableData: '暂无提交记录。',
+    errorText: '加载提交数据失败',
+    noChartData: '暂无提交活动数据',
+    noTableData: '暂无提交记录',
     chartModeAria: '图表模式',
     chartCaption: '提交活动',
     chartSource: '数据来源：SemiAnalysis InferenceX™',
@@ -71,7 +71,7 @@ const STRINGS = {
     subtitleLLMs: '个 LLM',
     subtitleSKUs: '种 SKU',
     tableCaption: '提交记录',
-    tableHint: '可搜索、排序，或展开行查看完整的基准测试配置。',
+    tableHint: '可搜索、排序，或展开行查看完整的基准测试配置',
   },
 } as const;
 
@@ -112,22 +112,12 @@ export default function SubmissionsDisplay() {
 
   if (error) {
     return (
-      <Card>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-destructive text-sm">{t.errorText}</p>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              track('submissions_retry_clicked');
-              void refetch();
-            }}
-          >
-            {t.retry}
-          </Button>
-        </div>
-      </Card>
+      <RetryableQueryError
+        message={t.errorText}
+        analyticsEvent="submissions_retry_clicked"
+        onRetry={refetch}
+        testId="submissions-error"
+      />
     );
   }
 
@@ -140,80 +130,73 @@ export default function SubmissionsDisplay() {
             description={t.description}
             actions={<ChartShareActions />}
           />
+          {stats && (
+            <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-border/30 pt-4 md:grid-cols-4">
+              {[
+                {
+                  label: t.statDatapoints,
+                  value: stats.totalDatapoints,
+                  subtitle: t.subtitleResults,
+                },
+                { label: t.statConfigs, value: stats.totalConfigs, subtitle: t.subtitleTested },
+                { label: t.statModels, value: stats.uniqueModels, subtitle: t.subtitleLLMs },
+                { label: t.statHardware, value: stats.uniqueGpus, subtitle: t.subtitleSKUs },
+              ]
+                .toSorted((a, b) => b.value - a.value)
+                .map((s) => (
+                  <Stat
+                    key={s.label}
+                    size="lg"
+                    label={s.label}
+                    value={s.value.toLocaleString(numberLocale)}
+                    detail={s.subtitle}
+                  />
+                ))}
+            </dl>
+          )}
         </Card>
       </section>
 
-      {stats && (
-        <section>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {[
-              {
-                label: t.statDatapoints,
-                value: stats.totalDatapoints,
-                subtitle: t.subtitleResults,
-              },
-              { label: t.statConfigs, value: stats.totalConfigs, subtitle: t.subtitleTested },
-              { label: t.statModels, value: stats.uniqueModels, subtitle: t.subtitleLLMs },
-              { label: t.statHardware, value: stats.uniqueGpus, subtitle: t.subtitleSKUs },
-            ]
-              .toSorted((a, b) => b.value - a.value)
-              .map((s) => (
-                <StatCard
-                  key={s.label}
-                  label={s.label}
-                  value={s.value.toLocaleString(numberLocale)}
-                  subtitle={s.subtitle}
-                />
-              ))}
-          </div>
-        </section>
-      )}
-
-      <section>
-        <figure className="relative rounded-lg">
-          <ChartButtons
-            chartId={CHART_ID}
-            analyticsPrefix="submissions"
-            zoomResetEvent={`d3chart_zoom_reset_${CHART_ID}`}
-            onExportCsv={handleExportCsv}
-            exportFileName="InferenceX_submissions"
-            leadingControls={
-              <SegmentedToggle
-                value={chartMode}
-                options={chartModeOptions}
-                onValueChange={handleModeChange}
-                ariaLabel={t.chartModeAria}
-                testId="submissions-mode-toggle"
-                className="shrink-0"
-              />
+      <ChartSection
+        chartId={CHART_ID}
+        analyticsPrefix="submissions"
+        zoomResetEvent={`d3chart_zoom_reset_${CHART_ID}`}
+        onExportCsv={handleExportCsv}
+        exportFileName="InferenceX_submissions"
+        leadingControls={
+          <SegmentedToggle
+            value={chartMode}
+            options={chartModeOptions}
+            onValueChange={handleModeChange}
+            ariaLabel={t.chartModeAria}
+            testId="submissions-mode-toggle"
+            className="shrink-0"
+          />
+        }
+      >
+        {isLoading ? (
+          <EmptyState bare role="status" className="h-150">
+            {t.loadingChart}
+          </EmptyState>
+        ) : data?.volume && data.volume.length > 0 ? (
+          <SubmissionsChart
+            volume={data.volume}
+            mode={chartMode}
+            caption={
+              <div className="md:pr-72">
+                <Heading as="h3" level="card">
+                  {t.chartCaption}
+                </Heading>
+                <p className="text-sm text-muted-foreground">{t.chartSource}</p>
+              </div>
             }
           />
-          <Card>
-            {isLoading ? (
-              <div className="h-[600px] flex items-center justify-center text-muted-foreground text-sm">
-                {t.loadingChart}
-              </div>
-            ) : data?.volume && data.volume.length > 0 ? (
-              <SubmissionsChart
-                volume={data.volume}
-                mode={chartMode}
-                caption={
-                  <>
-                    <Heading as="h3" level="card">
-                      {t.chartCaption}
-                    </Heading>
-                    <p className="text-sm text-muted-foreground">{t.chartSource}</p>
-                  </>
-                }
-              />
-            ) : (
-              <div className="h-[600px] flex items-center justify-center text-muted-foreground text-sm">
-                {t.noChartData}
-              </div>
-            )}
-          </Card>
-        </figure>
-      </section>
+        ) : (
+          <EmptyState bare className="h-150">
+            {t.noChartData}
+          </EmptyState>
+        )}
+      </ChartSection>
 
       <section>
         <Card>
@@ -224,30 +207,18 @@ export default function SubmissionsDisplay() {
             <p className="mt-1 text-sm text-muted-foreground">{t.tableHint}</p>
           </div>
           {isLoading ? (
-            <div className="h-32 flex items-center justify-center text-muted-foreground text-sm">
+            <EmptyState bare role="status" className="h-32">
               {t.loadingTable}
-            </div>
+            </EmptyState>
           ) : data?.summary && data.summary.length > 0 ? (
             <SubmissionsTable data={data.summary} />
           ) : (
-            <div className="h-32 flex items-center justify-center text-muted-foreground text-sm">
+            <EmptyState bare className="h-32">
               {t.noTableData}
-            </div>
+            </EmptyState>
           )}
         </Card>
       </section>
     </div>
-  );
-}
-
-function StatCard({ label, value, subtitle }: { label: string; value: string; subtitle?: string }) {
-  return (
-    <Card className="p-4">
-      <p className="text-sm font-medium text-muted-foreground">{label}</p>
-      <p className="text-2xl font-bold tabular-nums">
-        {value}{' '}
-        {subtitle && <span className="text-sm font-normal text-muted-foreground">{subtitle}</span>}
-      </p>
-    </Card>
   );
 }

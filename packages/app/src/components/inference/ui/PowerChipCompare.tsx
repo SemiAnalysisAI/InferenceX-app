@@ -70,7 +70,7 @@ const STRINGS = {
     perGpu: 'W per GPU, all-in',
     perGpuIt: 'W per GPU, IT (no PUE)',
     itSubtotal: (watts: string) => `IT ${watts} W`,
-    empty: 'No chip has a benchmark point near this interactivity.',
+    empty: 'No chip has a benchmark point near this interactivity',
     noModel: (labels: string) =>
       `Not shown: ${labels}. Its GPU power is measured, but there is no whole-system model for this setup yet.`,
     categories: {
@@ -112,7 +112,7 @@ const STRINGS = {
     perGpu: '每 GPU 整体功耗（W）',
     perGpuIt: '每 GPU IT 功耗（W，不含 PUE）',
     itSubtotal: (watts: string) => `IT ${watts} W`,
-    empty: '没有芯片在该交互性附近有基准测试点。',
+    empty: '没有芯片在该交互性附近有基准测试点',
     noModel: (labels: string) => `未显示：${labels}。其 GPU 功耗为实测，但该配置暂无整机功耗模型。`,
     categories: {
       gpu: 'GPU',
@@ -270,10 +270,7 @@ export default function PowerChipCompare({
       <section className="min-w-0 space-y-3" data-testid="power-chip-compare">
         <p className="py-4 text-sm text-muted-foreground">{t.empty}</p>
         {unmodeled.length > 0 && (
-          <p
-            className="rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground"
-            data-testid="power-chip-compare-unmodeled"
-          >
+          <p className="text-xs text-muted-foreground" data-testid="power-chip-compare-unmodeled">
             {t.noModel(unmodeled.join(', '))}
           </p>
         )}
@@ -531,7 +528,7 @@ export default function PowerChipCompare({
                 </button>
                 {expanded && (
                   <div
-                    className="mt-1.5 mb-3 rounded-md border border-border/60 p-3"
+                    className="mt-1.5 mb-3 rounded-lg border border-border/30 p-3"
                     data-testid="power-chip-compare-drilldown"
                   >
                     {renderExpanded(entry.key)}
@@ -546,7 +543,7 @@ export default function PowerChipCompare({
           interactivity; its drill-down then follows the list instead of vanishing. */}
       {expandedKey !== null && !rows.some((row) => row.series.key === expandedKey) && (
         <div
-          className="rounded-md border border-border/60 p-3"
+          className="rounded-lg border border-border/30 p-3"
           data-testid="power-chip-compare-drilldown"
         >
           {renderExpanded(expandedKey)}
@@ -561,10 +558,7 @@ export default function PowerChipCompare({
         {FACILITY_PUE_NOTE[locale]}
       </p>
       {unmodeled.length > 0 && (
-        <p
-          className="rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground"
-          data-testid="power-chip-compare-unmodeled"
-        >
+        <p className="text-xs text-muted-foreground" data-testid="power-chip-compare-unmodeled">
           {t.noModel(unmodeled.join(', '))}
         </p>
       )}

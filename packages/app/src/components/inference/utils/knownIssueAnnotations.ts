@@ -36,11 +36,13 @@ export interface AnnotationRenderOptions {
   mutedForeground: string;
   rightInset?: number;
   onLinkClick?: (annotation: KnownIssueAnnotation) => void;
+  /** Group that holds the arrows, so they sit below its line labels. Defaults to the annotation layer. */
+  arrowParent?: d3.Selection<SVGGElement, unknown, null, undefined>;
 }
 
 export type KnownIssueLayerOptions = Omit<
   AnnotationRenderOptions,
-  'width' | 'height' | 'xScale' | 'yScale' | 'rightInset'
+  'width' | 'height' | 'xScale' | 'yScale' | 'rightInset' | 'arrowParent'
 >;
 
 export function createKnownIssueLayer(
@@ -55,6 +57,7 @@ export function createKnownIssueLayer(
       height: ctx.height,
       xScale,
       yScale,
+      arrowParent: ctx.layout.zoomGroup,
       rightInset:
         options.annotations.length === 0
           ? 0
@@ -162,28 +165,45 @@ export function renderKnownIssueAnnotations(
   const { chartId, width, height, xScale, yScale, annotations } = opts;
 
   g.selectAll('.known-issue-annotations').remove();
+  opts.arrowParent?.selectAll('.known-issue-arrows').remove();
   defs.selectAll(`[id^="known-issue-arrowhead-${chartId}"]`).remove();
   if (annotations.length === 0) return;
 
   const layer = g.append('g').attr('class', 'known-issue-annotations');
-  const arrowGroup = layer.append('g').attr('class', 'known-issue-arrows');
+  const arrowGroup = (opts.arrowParent ?? layer)
+    .insert('g', '.line-label')
+    .attr('class', 'known-issue-arrows');
 
   let yCursor = BOX_TOP;
   annotations.forEach((annotation, index) => {
     const { issue, preview, label, color, points } = annotation;
     const markerId = `known-issue-arrowhead-${chartId}-${index}`;
-    defs
-      .append('marker')
-      .attr('id', markerId)
-      .attr('viewBox', '0 0 10 10')
-      .attr('refX', 8)
-      .attr('refY', 5)
-      .attr('markerWidth', 7)
-      .attr('markerHeight', 7)
-      .attr('orient', 'auto')
-      .append('path')
-      .attr('d', 'M 0 0 L 10 5 L 0 10 z')
-      .attr('fill', color);
+    const outlineMarkerId = `${markerId}-outline`;
+    for (const [id, isOutline] of [
+      [markerId, false],
+      [outlineMarkerId, true],
+    ] as const) {
+      const head = defs
+        .append('marker')
+        .attr('id', id)
+        .attr('viewBox', '0 0 10 10')
+        .attr('refX', 8)
+        .attr('refY', 5)
+        .attr('markerUnits', 'userSpaceOnUse')
+        .attr('markerWidth', 12.25)
+        .attr('markerHeight', 12.25)
+        .attr('orient', 'auto')
+        .style('overflow', 'visible')
+        .append('path')
+        .attr('d', 'M 0 0 L 10 5 L 0 10 z')
+        .attr('fill', isOutline ? 'var(--background)' : color);
+      if (isOutline) {
+        head
+          .attr('stroke', 'var(--background)')
+          .attr('stroke-width', 1.65)
+          .attr('stroke-linejoin', 'round');
+      }
+    }
 
     const anchor = layer
       .append(issue === undefined ? 'g' : 'a')
@@ -291,10 +311,21 @@ export function renderKnownIssueAnnotations(
         const endY = target.py - (dy / len) * ARROW_STANDOFF;
         const midX = (startX + endX) / 2 + (dy > 0 ? -dx * 0.12 : dx * 0.12);
         const midY = (bottomY + endY) / 2;
+        const d = `M ${startX} ${bottomY + 2} Q ${midX} ${midY} ${endX} ${endY}`;
+        arrowGroup
+          .append('path')
+          .attr('class', 'known-issue-arrow-outline')
+          .attr('d', d)
+          .attr('fill', 'none')
+          .attr('stroke', 'var(--background)')
+          .attr('stroke-width', 3.75)
+          .attr('stroke-linecap', 'round')
+          .attr('marker-end', `url(#${outlineMarkerId})`)
+          .attr('pointer-events', 'none');
         arrowGroup
           .append('path')
           .attr('class', 'known-issue-arrow')
-          .attr('d', `M ${startX} ${bottomY + 2} Q ${midX} ${midY} ${endX} ${endY}`)
+          .attr('d', d)
           .attr('fill', 'none')
           .attr('stroke', color)
           .attr('stroke-width', 1.75)

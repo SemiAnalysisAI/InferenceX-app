@@ -13,7 +13,6 @@ import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import { ChartSection } from '@/components/ui/chart-section';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { Heading } from '@/components/ui/heading';
-import { UnofficialDomainNotice } from '@/components/ui/unofficial-domain-notice';
 import { ResultContext } from '@/components/ui/result-context';
 import { type SegmentedToggleOption, SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
@@ -44,17 +43,14 @@ export const EVALUATION_DISPLAY_STRINGS = {
     chartView: 'Chart',
     tableView: 'Table',
     viewModeAria: 'View mode',
-    heading: 'Accuracy Evals',
+    heading: 'Accuracy evals',
     description:
-      'Benchmark results showing model quality versus throughput trade-offs across different chips, quantization levels, and inference configurations.',
-    captionHeading: 'Evaluation Score by Hardware Configuration',
+      'Benchmark results showing model quality versus throughput trade-offs across different chips, quantization levels, and inference configurations',
+    captionHeading: 'Evaluation score by hardware configuration',
     scoreMetric: 'Score',
-    sourceUnofficial: 'Source: UNOFFICIAL',
-    sourceOfficial: 'Source: SemiAnalysis InferenceX™',
-    updated: 'Updated:',
-    queryError: 'Failed to load evaluation data.',
-    availabilityError: 'Failed to load filter availability data.',
-    combinedError: 'Failed to load evaluation and filter availability data.',
+    queryError: 'Failed to load evaluation data',
+    availabilityError: 'Failed to load filter availability data',
+    combinedError: 'Failed to load evaluation and filter availability data',
     tableLoading: 'Loading evaluation data…',
   },
   zh: {
@@ -62,15 +58,12 @@ export const EVALUATION_DISPLAY_STRINGS = {
     tableView: '表格',
     viewModeAria: '视图模式',
     heading: '准确率评估',
-    description: '基准测试结果展示不同芯片、量化精度和推理配置下，模型质量与吞吐量之间的权衡。',
+    description: '基准测试结果展示不同芯片、量化精度和推理配置下，模型质量与吞吐量之间的权衡',
     captionHeading: '各硬件配置的评估得分',
     scoreMetric: '得分',
-    sourceUnofficial: '来源：非官方',
-    sourceOfficial: '来源：SemiAnalysis InferenceX™',
-    updated: '更新时间：',
-    queryError: '评估数据加载失败。',
-    availabilityError: '筛选项可用性数据加载失败。',
-    combinedError: '评估数据与筛选项可用性数据均加载失败。',
+    queryError: '评估数据加载失败',
+    availabilityError: '筛选项可用性数据加载失败',
+    combinedError: '评估数据与筛选项可用性数据均加载失败',
     tableLoading: '正在加载评估数据……',
   },
 };
@@ -150,25 +143,26 @@ export default function EvaluationChartDisplay() {
 
   const caption = (
     <>
-      <Heading as="h3" level="card">
-        {t.captionHeading}
-      </Heading>
-      <ResultContext
-        locale={locale}
-        model={selectedModel ?? '—'}
-        workload={selectedBenchmark?.toUpperCase() ?? '—'}
-        precision={selectedPrecisions.map((p) => getPrecisionLabel(p as Precision)).join(', ')}
-        metric={t.scoreMetric}
-        date={selectedRunDate ? evaluationCaptionDate(selectedRunDate, locale) : undefined}
-        source={
-          isUnofficialRun
-            ? locale === 'zh'
-              ? 'SemiAnalysis InferenceX™ + 非官方 overlays'
-              : 'SemiAnalysis InferenceX™ + UNOFFICIAL overlays'
-            : 'SemiAnalysis InferenceX™'
-        }
-      />
-      <UnofficialDomainNotice />
+      <div className="md:pr-72">
+        <Heading as="h3" level="card">
+          {t.captionHeading}
+        </Heading>
+        <ResultContext
+          locale={locale}
+          model={selectedModel ?? '—'}
+          workload={selectedBenchmark?.toUpperCase() ?? '—'}
+          precision={selectedPrecisions.map((p) => getPrecisionLabel(p as Precision)).join(', ')}
+          metric={t.scoreMetric}
+          date={selectedRunDate ? evaluationCaptionDate(selectedRunDate, locale) : undefined}
+          source={
+            isUnofficialRun
+              ? locale === 'zh'
+                ? 'SemiAnalysis InferenceX™ + 非官方 overlays'
+                : 'SemiAnalysis InferenceX™ + unofficial overlays'
+              : 'SemiAnalysis InferenceX™'
+          }
+        />
+      </div>
     </>
   );
 

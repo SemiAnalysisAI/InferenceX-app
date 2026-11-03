@@ -21,8 +21,8 @@ import {
   VeraRubinOfficialPreviewNotice,
   Tpuv7OfficialPreviewNotice,
 } from '@/components/ui/official-preview-notice';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { ControlPanel } from '@/components/ui/control-panel';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
@@ -114,7 +114,7 @@ const LIFECYCLE_VIEW_OPTIONS: SegmentedToggleOption<LifecycleView>[] = [
 
 const STRINGS = {
   en: {
-    title: 'Fleet Lifecycle',
+    title: 'Fleet lifecycle',
     fleetSizingGroup: 'Fleet sizing',
     assumptionsGroup: 'Fleet economics & assumptions',
     viewChart: 'Chart',
@@ -127,20 +127,20 @@ const STRINGS = {
       'A fixed fleet, from the day the model shipped. The chips never change. The software serving them does, so each rollout is a config that beat every config before it, climbing from what the fleet already served to its own numbers. The gap to the cost line is the return on that work.',
     tooSmall:
       'This power budget is too small to power a single chip of the shown hardware. Try a larger value.',
-    mwLabel: 'Facility Power (MW)',
+    mwLabel: 'Facility power (MW)',
     mwTooltip:
       'Total facility power budget in megawatts. Chip count uses all-in power per chip (host, networking, cooling) from the SemiAnalysis Datacenter Industry Model, not bare TDP.',
     mwPlaceholder: 'e.g. 10',
     colChips: 'Chips',
-    colUsers: 'Concurrent Users now',
-    needMw: 'Enter a facility power budget to project lifecycle economics.',
+    colUsers: 'Concurrent users now',
+    needMw: 'Enter a facility power budget to project lifecycle economics',
     noReleaseDate:
       'No release date is on file for this model, so the timeline is anchored to its first benchmark run instead.',
     loading: 'Loading run history…',
     errorPrefix: 'Could not load run history: ',
     noneMeasured:
       'No chip was measured at this interactivity on any run date. Move the target interactivity slider into a measured range. The ranges each chip has been measured over are listed below.',
-    priceLabel: 'Token Price: input, output ($/M tok)',
+    priceLabel: 'Input, output price ($/M tok)',
     priceInputLabel: 'Input token price, $ per million',
     outputPriceInputLabel: 'Output token price, $ per million',
     priceTooltip:
@@ -163,9 +163,9 @@ const STRINGS = {
     singleRung:
       'Every chip here has been measured on a single run date, so each line is one config held flat. The staircase this section exists to show needs several dates per config, and agentic trace history does not go back far enough yet. The levels are measured; the absence of steps is a gap in the history, not a finding about the hardware.',
     colChip: 'Chip',
-    colConfigNow: 'Config Now',
-    colFirst: 'First Run',
-    colLatest: 'Latest Best',
+    colConfigNow: 'Config now',
+    colFirst: 'First run',
+    colLatest: 'Latest best',
     colSteps: 'Improvements',
     colGain: 'Gain',
     inputTokenPrefix: 'input ',
@@ -186,7 +186,7 @@ const STRINGS = {
     colCost: 'Cost $/day',
     colMargin: 'Margin $/day',
     colPayback: 'Payback',
-    colLifetime: 'Cumulative Margin',
+    colLifetime: 'Cumulative margin',
     colAvailability: 'Availability',
     never: 'Never',
     monthsSuffix: 'mo',
@@ -211,19 +211,19 @@ const STRINGS = {
       " One line per chip, not per software config: at any moment it follows whichever framework, precision and speculative-decoding combination was ahead, so the config serving the fleet changes along the line and each step names the one that took over. Legend entries still filter configs, which removes them from candidacy. Each step is a measured run date whose interpolated throughput at the target beat every earlier date; a sweep that failed to beat the incumbent is not a step, because the fleet kept serving the config it already had. A config does not take effect the instant a sweep finds it, so each one rolls out over the ramp window, climbing from what the fleet already served to its own numbers. Power and $/chip/hr are today's values from the TCO model, and cost is flat throughout because no config moves either term. It is the same silicon either way. Reads outside a run's measured interactivity range are excluded rather than clamped.",
     overlayExempt:
       ' Unofficial runs loaded via a run link are not shown here because the run-history API serves ingested official results only.',
-    metricLabel: 'Y Axis',
+    metricLabel: 'Y axis',
     metricTooltip:
       'What to plot. Margin is the per-day revenue minus the flat fleet cost, so the break-even rule shows which side of it a fleet is on. Margin/MW and Revenue/MW divide their daily rates by provisioned power. Revenue drops the cost term, which makes rollouts easier to compare across chips of very different cost, but a chip being higher no longer means it is more profitable. Cumulative Revenue is the running total taken in since launch, not a rate; it compounds that caveat, because the largest area under a revenue curve may still never have covered its cost.',
     metricMargin: 'Margin',
     metricMarginPerMw: 'Margin/MW',
     metricRevenue: 'Revenue',
     metricRevenuePerMw: 'Revenue/MW',
-    metricCumulativeRevenue: 'Cum. Revenue',
+    metricCumulativeRevenue: 'Cum. revenue',
     chartY: 'Margin ($/day)',
     chartYMarginPerMw: 'Margin ($/MW/day)',
     chartYRevenue: 'Revenue ($/day)',
     chartYRevenuePerMw: 'Revenue ($/MW/day)',
-    chartYCumulativeRevenue: 'Cumulative Revenue ($)',
+    chartYCumulativeRevenue: 'Cumulative revenue ($)',
     chartBreakEven: 'break-even',
     tipDate: 'Measured',
     tipConfig: 'Config',
@@ -261,13 +261,13 @@ const STRINGS = {
     mwPlaceholder: '如 10',
     colChips: '芯片数',
     colUsers: '当前并发用户数',
-    needMw: '输入设施功率预算，以测算生命周期经济性。',
+    needMw: '输入设施功率预算，以测算生命周期经济性',
     noReleaseDate: '该模型暂无发布日期记录，时间轴改以其首次基准测试运行为起点。',
     loading: '正在加载运行历史……',
     errorPrefix: '无法加载运行历史：',
     noneMeasured:
       '在任何运行日期下都没有芯片在该交互性下被实测过。请将目标交互性滑块移入已实测区间。各芯片的实测区间见下方列表。',
-    priceLabel: 'Token 价格：输入、输出 ($/M tok)',
+    priceLabel: '输入、输出价格 ($/M tok)',
     priceInputLabel: '输入 token 价格，$/百万',
     outputPriceInputLabel: '输出 token 价格，$/百万',
     priceTooltip:
@@ -892,15 +892,18 @@ export default function FleetLifecycle({
 
   const caption = (
     <>
-      <Heading as="h2" level="card">
+      <Heading as="h2" level="card" className="md:pr-64">
         {t.title}
       </Heading>
       <p className="text-sm text-muted-foreground mb-2">
-        {getModelLabel(selectedModel)} • {getSequenceLabel(selectedSequence, locale)} •{' '}
+        {getModelLabel(selectedModel)} · {getSequenceLabel(selectedSequence, locale)} ·{' '}
         {t.captionTarget(targetValue)}
-        {mw ? ` • ${mw} MW` : ''}
-        {captionPrices === null ? '' : ` • ${captionPrices}`} • {t.source}SemiAnalysis
+        {mw ? ` · ${mw} MW` : ''}
+        {captionPrices === null ? '' : ` · ${captionPrices}`} · {t.source}SemiAnalysis
       </p>
+      {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}
+      {showsVeraRubinPreview && <VeraRubinOfficialPreviewNotice />}
+      {showsTpuv7Preview && <Tpuv7OfficialPreviewNotice />}
     </>
   );
 
@@ -1065,6 +1068,107 @@ export default function FleetLifecycle({
     },
   ];
 
+  const showAssumptions = Boolean(mw) && !historical.error && !historical.loading;
+  const assumptionsPanel = (
+    <ControlPanel
+      legend={t.assumptionsGroup}
+      className="items-end sm:grid-cols-2 lg:col-span-9 xl:col-span-10 xl:grid-cols-4"
+    >
+      <div className="flex flex-col space-y-1.5">
+        <LabelWithTooltip
+          htmlFor="calc-lifecycle-price"
+          label={t.priceLabel}
+          tooltip={t.priceTooltip}
+        />
+        <div className="flex items-center gap-2">
+          <Input
+            id="calc-lifecycle-price"
+            data-testid="calc-lifecycle-price-input"
+            type="number"
+            min={0}
+            step="any"
+            value={priceInput}
+            onChange={handlePriceChange}
+            aria-label={t.priceInputLabel}
+            className="w-24"
+          />
+          <Input
+            id="calc-lifecycle-output-price"
+            data-testid="calc-lifecycle-output-price-input"
+            type="number"
+            min={0}
+            step="any"
+            value={outputPriceInput}
+            onChange={handleOutputPriceChange}
+            aria-label={t.outputPriceInputLabel}
+            className="w-24"
+          />
+          {priceEdited.current && breakEven !== null && (
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
+              onClick={handlePriceReset}
+              data-testid="calc-lifecycle-price-reset"
+              className="shrink-0 text-muted-foreground hover:text-foreground"
+            >
+              {t.priceReset}
+            </Button>
+          )}
+        </div>
+      </div>
+      <div className="flex flex-col space-y-1.5 sm:col-span-2">
+        <LabelWithTooltip label={t.metricLabel} tooltip={t.metricTooltip} />
+        <SegmentedToggle<LifecycleMetric>
+          value={yMetric}
+          onValueChange={handleMetricChange}
+          ariaLabel={t.metricLabel}
+          size="default"
+          className="self-start"
+          testId="calc-lifecycle-metric"
+          options={[
+            { value: 'margin', label: t.metricMargin, testId: 'calc-lifecycle-metric-margin' },
+            {
+              value: 'marginPerMw',
+              label: t.metricMarginPerMw,
+              testId: 'calc-lifecycle-metric-margin-per-mw',
+            },
+            {
+              value: 'revenue',
+              label: t.metricRevenue,
+              testId: 'calc-lifecycle-metric-revenue',
+            },
+            {
+              value: 'revenuePerMw',
+              label: t.metricRevenuePerMw,
+              testId: 'calc-lifecycle-metric-revenue-per-mw',
+            },
+            {
+              value: 'cumulativeRevenue',
+              label: t.metricCumulativeRevenue,
+              testId: 'calc-lifecycle-metric-cumulative-revenue',
+            },
+          ]}
+        />
+      </div>
+      {assumptionInputs.map((input) => (
+        <div key={input.id} className="flex flex-col space-y-1.5">
+          <LabelWithTooltip htmlFor={input.id} label={input.label} tooltip={input.tooltip} />
+          <Input
+            id={input.id}
+            data-testid={`${input.id}-input`}
+            type="number"
+            min={0}
+            step={input.id === 'calc-lifecycle-ramp' ? 0.25 : 'any'}
+            value={input.value}
+            onChange={input.onChange}
+            className="w-32"
+          />
+        </div>
+      ))}
+    </ControlPanel>
+  );
+
   const body = () => {
     if (!mw) {
       return (
@@ -1091,102 +1195,10 @@ export default function FleetLifecycle({
 
     return (
       <>
-        <ControlPanel legend={t.assumptionsGroup} className="sm:grid-cols-2 xl:grid-cols-3">
-          <div className="flex flex-col space-y-1.5">
-            <LabelWithTooltip
-              htmlFor="calc-lifecycle-price"
-              label={t.priceLabel}
-              tooltip={t.priceTooltip}
-            />
-            <div className="flex items-center gap-2">
-              <Input
-                id="calc-lifecycle-price"
-                data-testid="calc-lifecycle-price-input"
-                type="number"
-                min={0}
-                step="any"
-                value={priceInput}
-                onChange={handlePriceChange}
-                aria-label={t.priceInputLabel}
-                className="w-24"
-              />
-              <Input
-                id="calc-lifecycle-output-price"
-                data-testid="calc-lifecycle-output-price-input"
-                type="number"
-                min={0}
-                step="any"
-                value={outputPriceInput}
-                onChange={handleOutputPriceChange}
-                aria-label={t.outputPriceInputLabel}
-                className="w-24"
-              />
-              {priceEdited.current && breakEven !== null && (
-                <Button
-                  type="button"
-                  variant="link"
-                  size="sm"
-                  onClick={handlePriceReset}
-                  data-testid="calc-lifecycle-price-reset"
-                  className="shrink-0 text-muted-foreground hover:text-foreground"
-                >
-                  {t.priceReset}
-                </Button>
-              )}
-            </div>
-          </div>
-          <div className="flex flex-col space-y-1.5">
-            <LabelWithTooltip label={t.metricLabel} tooltip={t.metricTooltip} />
-            <SegmentedToggle<LifecycleMetric>
-              value={yMetric}
-              onValueChange={handleMetricChange}
-              ariaLabel={t.metricLabel}
-              testId="calc-lifecycle-metric"
-              options={[
-                { value: 'margin', label: t.metricMargin, testId: 'calc-lifecycle-metric-margin' },
-                {
-                  value: 'marginPerMw',
-                  label: t.metricMarginPerMw,
-                  testId: 'calc-lifecycle-metric-margin-per-mw',
-                },
-                {
-                  value: 'revenue',
-                  label: t.metricRevenue,
-                  testId: 'calc-lifecycle-metric-revenue',
-                },
-                {
-                  value: 'revenuePerMw',
-                  label: t.metricRevenuePerMw,
-                  testId: 'calc-lifecycle-metric-revenue-per-mw',
-                },
-                {
-                  value: 'cumulativeRevenue',
-                  label: t.metricCumulativeRevenue,
-                  testId: 'calc-lifecycle-metric-cumulative-revenue',
-                },
-              ]}
-            />
-          </div>
-          {assumptionInputs.map((input) => (
-            <div key={input.id} className="flex flex-col space-y-1.5">
-              <LabelWithTooltip htmlFor={input.id} label={input.label} tooltip={input.tooltip} />
-              <Input
-                id={input.id}
-                data-testid={`${input.id}-input`}
-                type="number"
-                min={0}
-                step={input.id === 'calc-lifecycle-ramp' ? 0.25 : 'any'}
-                value={input.value}
-                onChange={input.onChange}
-                className="w-32"
-              />
-            </div>
-          ))}
-        </ControlPanel>
-
         {rows.length > 0 && Number.isFinite(anchorMs) ? (
-          <figure data-testid="calculator-lifecycle-figure" className="relative rounded-lg">
+          <figure data-testid="calculator-lifecycle-figure" className="relative min-w-0">
             <ChartButtons
+              className="md:absolute md:right-0 md:top-0 md:z-10 md:mb-0"
               chartId="fleet-lifecycle"
               analyticsPrefix="calculator_lifecycle"
               analyticsContext={selectionAnalyticsContext({
@@ -1210,9 +1222,6 @@ export default function FleetLifecycle({
                 />
               }
             />
-            {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}
-            {showsVeraRubinPreview && <VeraRubinOfficialPreviewNotice />}
-            {showsTpuv7Preview && <Tpuv7OfficialPreviewNotice />}
             {view === 'table' ? (
               <>
                 <figcaption>{caption}</figcaption>
@@ -1270,7 +1279,8 @@ export default function FleetLifecycle({
             className="text-xs text-muted-foreground"
             data-testid="calculator-lifecycle-unmeasured"
           >
-            <strong>{t.unmeasuredTitle}.</strong> {t.unmeasuredIntro}
+            <span className="font-medium text-foreground">{t.unmeasuredTitle}.</span>{' '}
+            {t.unmeasuredIntro}
             <ul className="mt-1 list-disc pl-5">
               {visibleUnmeasured.map((u) => (
                 <li key={u.hwKey}>
@@ -1287,17 +1297,17 @@ export default function FleetLifecycle({
             className="text-muted-foreground text-xs"
             data-testid="calculator-lifecycle-unplottable"
           >
-            <strong>{t.note}</strong>{' '}
+            <span className="font-medium text-foreground">{t.note}</span>{' '}
             {t.unplottable(unplottable.map((gpu) => getLabel(gpu, hardwareConfig)).join(', '))}
           </p>
         )}
 
         {allSingleRung && (
           <p
-            className="text-muted-foreground text-xs border-l-2 border-amber-500 pl-2 bg-amber-500/5 py-1"
+            className="text-xs text-muted-foreground"
             data-testid="calculator-lifecycle-single-rung"
           >
-            <strong>{t.note}</strong> {t.singleRung}
+            <span className="font-medium text-foreground">{t.note}</span> {t.singleRung}
           </p>
         )}
 
@@ -1306,19 +1316,19 @@ export default function FleetLifecycle({
             className="text-muted-foreground text-xs"
             data-testid="calculator-lifecycle-no-release"
           >
-            <strong>{t.note}</strong> {t.noReleaseDate}
+            <span className="font-medium text-foreground">{t.note}</span> {t.noReleaseDate}
           </p>
         )}
 
         {hasDisagg && (
-          <p className="text-muted-foreground text-xs border-l-2 border-amber-500 pl-2 bg-amber-500/5 py-1">
-            <strong>{t.note}</strong>
+          <p className="text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">{t.note}</span>
             {t.disagg}
           </p>
         )}
 
-        <p className="text-muted-foreground text-xs border-l-2 border-border pl-2 py-1">
-          <strong>{t.note}</strong>
+        <p className="text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">{t.note}</span>
           {t.hybrid}
           {t.overlayExempt}
         </p>
@@ -1331,27 +1341,21 @@ export default function FleetLifecycle({
               anchorDate ?? '—',
             )}
           </p>
-          <p className="text-muted-foreground mt-1">
-            <small>
-              {t.source}
-              <Link
-                target="_blank"
-                className="underline hover:text-foreground"
-                href="https://semianalysis.com/datacenter-industry-model/"
-              >
-                SemiAnalysis Datacenter Industry Model
-                <ExternalLinkIcon />
-              </Link>
-              {' & '}
-              <Link
-                target="_blank"
-                className="underline hover:text-foreground"
-                href={TCO_SOURCE_URL}
-              >
-                {TCO_SOURCE_TITLE}
-                <ExternalLinkIcon />
-              </Link>
-            </small>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {t.source}
+            <Link
+              target="_blank"
+              className="underline hover:text-foreground"
+              href="https://semianalysis.com/datacenter-industry-model/"
+            >
+              SemiAnalysis Datacenter Industry Model
+              <ExternalLinkIcon />
+            </Link>
+            {' & '}
+            <Link target="_blank" className="underline hover:text-foreground" href={TCO_SOURCE_URL}>
+              {TCO_SOURCE_TITLE}
+              <ExternalLinkIcon />
+            </Link>
           </p>
         </div>
       </>
@@ -1361,10 +1365,10 @@ export default function FleetLifecycle({
   return (
     <TooltipProvider delayDuration={0}>
       <section data-testid="calculator-lifecycle-section">
-        <Card>
-          <div className="flex flex-col gap-4">
-            <DashboardSectionHeader title={t.title} description={t.description} />
-            <ControlPanel legend={t.fleetSizingGroup} className="sm:max-w-md">
+        <Card className="gap-4">
+          <DashboardSectionHeader title={t.title} description={t.description} />
+          <div className="grid min-w-0 items-start gap-x-6 gap-y-4 lg:grid-cols-12">
+            <ControlPanel legend={t.fleetSizingGroup} className="lg:col-span-3 xl:col-span-2">
               <div className="flex min-w-0 flex-col space-y-1.5">
                 <LabelWithTooltip htmlFor="calc-fleet-mw" label={t.mwLabel} tooltip={t.mwTooltip} />
                 <Input
@@ -1381,8 +1385,9 @@ export default function FleetLifecycle({
                 />
               </div>
             </ControlPanel>
-            {body()}
+            {showAssumptions && assumptionsPanel}
           </div>
+          {body()}
         </Card>
       </section>
     </TooltipProvider>

@@ -31,6 +31,11 @@ import { getModelSortIndex } from '@/lib/catalog/constants';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type { LayerConfig, RenderContext, ZoomContext } from '@/lib/d3-chart/D3Chart/types';
 import { lttbDownsample } from '@/lib/d3-chart/downsample';
+import {
+  chartTooltipDismiss,
+  chartTooltipShell,
+  chartTooltipTitle,
+} from '@/lib/d3-chart/tooltip-shell';
 import { CHART_FONT_SANS, CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { overlayRunColor, overlayRunIndex } from '@/lib/charts/overlay-run-style';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -127,7 +132,7 @@ const STRINGS = {
       `${runs} run${runs === 1 ? '' : 's'} · this can take up to a minute`,
     loadingMore: (runs: number) => `Loading ${runs} more run${runs === 1 ? '' : 's'}…`,
     errorTitle: 'GPU telemetry failed to load',
-    errorDetail: 'The run errors are listed below the chart.',
+    errorDetail: 'The run errors are listed below the chart',
     emptyTitle: 'No telemetry to show',
     loadError: (runId: string, message: string) => `Run ${runId}: ${message}`,
     noTraces:
@@ -137,8 +142,7 @@ const STRINGS = {
     droppedRuns: (runs: number) =>
       `Telemetry from ${runs} more run${runs === 1 ? '' : 's'} was not loaded (limit ${POWER_TIMELINE_MAX_RUNS} runs per chart).`,
     telemetry: 'Telemetry',
-    instructions:
-      'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset · Click a point to pin tooltip',
+    instructions: 'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset',
     dismiss: 'Click elsewhere to dismiss',
     phase: {
       before: 'Before window (startup / warmup)',
@@ -202,7 +206,7 @@ const STRINGS = {
     loadingDetail: (runs: number) => `${runs} 个运行 · 可能需要约一分钟`,
     loadingMore: (runs: number) => `正在加载另外 ${runs} 个运行……`,
     errorTitle: 'GPU 遥测数据加载失败',
-    errorDetail: '各运行的错误信息列在图表下方。',
+    errorDetail: '各运行的错误信息列在图表下方',
     emptyTitle: '暂无可显示的遥测数据',
     loadError: (runId: string, message: string) => `运行 ${runId}：${message}`,
     noTraces: '当前可见硬件没有遥测曲线。请在图例中启用一个系列或选择其他日期。',
@@ -210,7 +214,7 @@ const STRINGS = {
     droppedRuns: (runs: number) =>
       `另有 ${runs} 个运行的遥测数据未加载（每张图表最多 ${POWER_TIMELINE_MAX_RUNS} 个运行）。`,
     telemetry: '遥测来源',
-    instructions: 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
+    instructions: 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置',
     dismiss: '点击其他区域关闭',
     phase: {
       before: '测量窗口之前（启动 / warmup）',
@@ -408,7 +412,7 @@ function PowerTimelineStatusPanel({
         role="status"
         aria-live="polite"
       >
-        <p className="inline-flex items-center gap-2 rounded-full border bg-background/95 px-3 py-1 text-xs text-muted-foreground shadow-sm">
+        <p className="inline-flex items-center gap-2 rounded-md border border-border/30 bg-card px-3 py-1 text-xs text-muted-foreground">
           <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
           {t.loadingMore(status.runs)}
         </p>
@@ -1488,11 +1492,15 @@ export default function PowerTimeline({
               : ''
           }</div>
         <div class="text-muted-foreground">${t.gpus(sample.gpuCount)} · ${t.min} ${sample.min.toFixed(1)} W · ${t.max} ${sample.max.toFixed(1)} W</div>`;
-      return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 210px; user-select: ${isPinned ? 'text' : 'none'}">
-        ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
-        <div class="font-semibold mb-1" style="color: ${sample.color}">${seriesLabel(point)} · ${traceConfigLabel(point)}${
-          overlayInfo ? ` · ✕ ${overlayInfo.branch || `run ${overlayInfo.id}`}` : ''
-        }</div>
+      return chartTooltipShell(
+        `<div class="text-xs">
+        ${isPinned ? chartTooltipDismiss(t.dismiss) : ''}
+        ${chartTooltipTitle(
+          `${seriesLabel(point)} · ${traceConfigLabel(point)}${
+            overlayInfo ? ` · ✕ ${overlayInfo.branch || `run ${overlayInfo.id}`}` : ''
+          }`,
+          sample.color,
+        )}
         <div class="text-muted-foreground">${time}</div>
         ${readings}
         <div class="text-muted-foreground">${t.phase[sample.phase]}</div>
@@ -1501,7 +1509,9 @@ export default function PowerTimeline({
             ? `<div class="text-muted-foreground">${t.validated}${colon} ${validated.toFixed(1)} W</div>`
             : ''
         }
-      </div>`;
+      </div>`,
+        { pinned: isPinned, minWidth: 210 },
+      );
     },
     [unofficialRunInfos, xMode, t, locale, seriesLabel],
   );
@@ -1528,7 +1538,7 @@ export default function PowerTimeline({
                 onClick: () => {},
                 tooltip: (
                   <div className="font-normal text-xs">
-                    <div className="text-red-500 font-semibold">{t.unofficialRun}</div>
+                    <div className="font-medium text-destructive">{t.unofficialRun}</div>
                     <div>
                       {t.branch}: {branch}
                     </div>
@@ -1918,7 +1928,7 @@ export default function PowerTimeline({
       >
         {focusedTrace && (
           <p
-            className="inline-flex items-center gap-2 self-start rounded-full border px-2 py-0.5"
+            className="inline-flex items-center gap-2 self-start rounded-md border border-border/30 px-2 py-0.5"
             data-testid="power-timeline-focus"
           >
             <span>

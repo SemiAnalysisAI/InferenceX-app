@@ -75,9 +75,10 @@ import type {
 import { comparisonEntryLabel } from '@/components/inference/utils/comparisonEntry';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
 import {
-  generateGPUGraphTooltipContent,
-  generateOverlayTooltipContent,
+  buildPointDetails,
+  generatePointHoverCard,
 } from '@/components/inference/utils/tooltipUtils';
+import { PointDetailsPanel } from '@/components/inference/ui/PointDetailsPanel';
 import { useComparisonSeries } from '@/components/inference/hooks/useComparisonSeries';
 import { usePowerTraceAction } from '@/components/inference/hooks/usePowerTraceAction';
 import { pointLabelText } from '@/components/inference/ui/point-label';
@@ -163,35 +164,35 @@ function labelTextFor(
   numbering: Map<string, number>,
   showFrameworkLabel: boolean,
 ): string {
-  return `${hardwareLabelFor(pts, showFrameworkLabel)} • ${comparisonEntryLabel(String(pts[0].date), numbering)}`;
+  return `${hardwareLabelFor(pts, showFrameworkLabel)} · ${comparisonEntryLabel(String(pts[0].date), numbering)}`;
 }
 
 const GPU_STRINGS = {
   en: {
-    logScale: 'Log Scale',
-    highContrast: 'High Contrast',
-    optimalOnly: 'Optimal Only',
+    logScale: 'Log scale',
+    highContrast: 'High contrast',
+    optimalOnly: 'Optimal only',
     powerBoundaryInfo:
       'Show only points on the upper measured power boundary. Turn off to show all measurements; the boundary stays the same. This is a power-load boundary, not an energy-efficiency frontier.',
     labels: '# of GPUs Label',
-    parallelismLabels: 'Parallelism Labels',
+    parallelismLabels: 'Parallelism labels',
     concurrencyLabels: '# Concurrent Sessions',
-    lineLabels: 'Line Labels',
-    frameworkLabel: 'Framework Line Label',
-    offloadingLabel: 'Offloading Label',
-    perfRuler: 'Perf Ruler',
+    lineLabels: 'Line labels',
+    frameworkLabel: 'Framework line label',
+    offloadingLabel: 'Offloading label',
+    perfRuler: 'Perf ruler',
     perfRulerInfo:
       'Click two curves to place a vertical ruler, then drag it to measure the ratio of their Y-axis values at any x value — across dates of the same chip config or across chip configs. Repeat to add more rulers (up to 8); hover a ruler and click × to delete it. Turning the toggle off clears all rulers.',
     resetFilter: 'Reset filter',
     clearPerfRulers: (count: number) => `Clear rulers (${count})`,
-    quickFilters: (count: number) => (count > 0 ? `Quick Filters (${count})` : 'Quick Filters'),
+    quickFilters: (count: number) => (count > 0 ? `Quick filters (${count})` : 'Quick filters'),
     noData: 'No data available',
     noDataHint: 'Please change the model, sequence, precision, date range or chip selection.',
     noRoleEnergyDataHint:
       'This dataset does not report role-level prefill/decode energy. Choose a different model, scenario, precision, date, or measured-energy metric.',
     noMeasuredDataHint:
       'No measured GPU power is reported for this selection. Choose other chip configs, or a different model, scenario, precision or date.',
-    unofficialTitle: (branch: string) => `UNOFFICIAL: ${branch}`,
+    unofficialTitle: (branch: string) => `Unofficial: ${branch}`,
   },
   zh: {
     logScale: '对数缩放',
@@ -1092,7 +1093,30 @@ const GPUGraph = React.memo(
       });
     }, [overlayPoints, overlaySeriesId, overlayRunOf, unofficialRunInfos, legendT]);
 
-    const attachPowerTraceAction = usePowerTraceAction(chartRef);
+    const openPowerTrace = usePowerTraceAction(chartRef);
+
+    const pointDetails = useCallback(
+      (d: InferenceData, isOverlay: boolean) =>
+        buildPointDetails({
+          data: d,
+          xLabel,
+          yLabel,
+          selectedYAxisMetric,
+          hardwareConfig,
+          overlayData: isOverlay ? (overlayData ?? undefined) : undefined,
+          comparisonDate: !isOverlay,
+          showPowerTelemetry: showPowerTelemetryRef.current,
+          runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
+          hasTrace: isPersistedBenchmarkId(d.id)
+            ? traceAvailabilityRef.current?.[d.id] === true
+            : false,
+          hasLog: isPersistedBenchmarkId(d.id)
+            ? logAvailabilityRef.current?.[d.id] === true
+            : false,
+          locale,
+        }),
+      [xLabel, yLabel, selectedYAxisMetric, hardwareConfig, overlayData, locale],
+    );
     const overlayPointsLayer: CustomLayerConfig = useMemo(() => {
       const updateLabels = (zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>) => {
         zoomGroup
@@ -1170,19 +1194,9 @@ const GPUGraph = React.memo(
             hoverPath: xMarkerPath(7, 0.7),
             tooltip,
             handle: chartRef.current,
-            content: (point, pinned) =>
-              overlayData
-                ? generateOverlayTooltipContent({
-                    data: point,
-                    isPinned: pinned,
-                    xLabel,
-                    yLabel,
-                    selectedYAxisMetric,
-                    hardwareConfig: overlayData.hardwareConfig,
-                    overlayData,
-                    locale,
-                  })
-                : '',
+            panel: true,
+            content: (point) =>
+              overlayData ? generatePointHoverCard(pointDetails(point, true), getColor(point)) : '',
             position: (event) => {
               const [mouseX, mouseY] = d3.pointer(event, container);
               return computeTooltipPosition(mouseX, mouseY, tooltip, container);
@@ -1218,7 +1232,6 @@ const GPUGraph = React.memo(
                 y: point.y,
                 overlay: true,
               });
-              attachPowerTraceAction(ctx.tooltipElement, point, true);
             },
           });
         },
@@ -1240,11 +1253,8 @@ const GPUGraph = React.memo(
       pointLabelsVisible,
       useAdvancedLabels,
       showConcurrencyLabels,
-      xLabel,
-      yLabel,
-      selectedYAxisMetric,
-      locale,
-      attachPowerTraceAction,
+      pointDetails,
+      getColor,
     ]);
 
     const handleLegendHover = useCallback(
@@ -1433,25 +1443,48 @@ const GPUGraph = React.memo(
         }}
         tooltip={{
           rulerType: 'crosshair',
-          content: (d: InferenceData, isPinned: boolean) =>
-            generateGPUGraphTooltipContent({
-              data: d,
-              isPinned,
-              xLabel,
-              yLabel,
-              selectedYAxisMetric,
-              hardwareConfig,
-              showPowerTelemetry: showPowerTelemetryRef.current,
-              runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
-              hasTrace:
-                d.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(d.id)
-                  ? presenceRef.current?.trace.has(d.id) === true
-                  : false,
-              hasLog: isPersistedBenchmarkId(d.id)
-                ? presenceRef.current?.log.has(d.id) === true
-                : false,
-              locale,
-            }),
+          content: (d: InferenceData) =>
+            generatePointHoverCard(pointDetails(d, false), getColor(d)),
+          details: (d: InferenceData, isOverlay: boolean, close: () => void) => (
+            <PointDetailsPanel
+              details={pointDetails(d, isOverlay)}
+              color={getColor(d)}
+              onClose={close}
+              onAction={(action, event) => {
+                event.stopPropagation();
+                if (action === 'view-power-trace') {
+                  openPowerTrace(event, d, isOverlay);
+                } else if (action === 'view-charts') {
+                  if (!ephemeralUrlState) rememberChartStateInUrl();
+                  track('gpu_timeseries_view_charts_opened', {
+                    id: d.id,
+                    gpu: String(d.hwKey),
+                    conc: d.conc,
+                  });
+                } else if (action === 'view-power-telemetry') {
+                  setPowerTelemetryPoint(d);
+                  chartRef.current?.dismissTooltip();
+                  track('inference_power_telemetry_opened', {
+                    id: d.id,
+                    gpu: d.hwKey,
+                    conc: d.conc,
+                  });
+                } else if (action === 'view-logs' && typeof d.id === 'number') {
+                  if (d.benchmark_type !== 'agentic_traces') {
+                    event.preventDefault();
+                    setFixedLogPointId(d.id);
+                    chartRef.current?.dismissTooltip();
+                  }
+                  track('gpu_timeseries_view_logs_opened', {
+                    id: d.id,
+                    gpu: String(d.hwKey),
+                    conc: d.conc,
+                    benchmark_type: d.benchmark_type ?? 'single_turn',
+                  });
+                }
+              }}
+            />
+          ),
           getRulerX: (d, xScale) => (xScale as d3.ScaleLinear<number, number>)(d.x),
           getRulerY: (d, yScale) => (yScale as d3.ScaleLinear<number, number>)(d.y),
           onHoverStart: (sel, d) =>
@@ -1482,58 +1515,6 @@ const GPUGraph = React.memo(
               gpu: String(d.hwKey),
               x: d.x,
               y: d.y,
-            });
-            const tooltipEl = chartRef.current?.getTooltipElement();
-            if (!tooltipEl) return;
-            const viewBtn = tooltipEl.querySelector('[data-action="view-charts"]');
-            if (viewBtn && isPersistedBenchmarkId(d.id)) {
-              viewBtn.addEventListener('click', (event) => {
-                event.stopPropagation();
-                if (!ephemeralUrlState) rememberChartStateInUrl();
-                track('gpu_timeseries_view_charts_opened', {
-                  id: d.id,
-                  gpu: String(d.hwKey),
-                  conc: d.conc,
-                });
-              });
-            }
-            const powerBtn = tooltipEl.querySelector('[data-action="view-power-telemetry"]');
-            if (powerBtn && isPersistedBenchmarkId(d.id)) {
-              powerBtn.addEventListener('click', (event) => {
-                event.stopPropagation();
-                setPowerTelemetryPoint(d);
-                chartRef.current?.dismissTooltip();
-                track('inference_power_telemetry_opened', {
-                  id: d.id,
-                  gpu: d.hwKey,
-                  conc: d.conc,
-                });
-              });
-            }
-            const logsBtn = tooltipEl.querySelector('[data-action="view-logs"]');
-            if (logsBtn && typeof d.id === 'number') {
-              logsBtn.addEventListener('click', (event) => {
-                event.stopPropagation();
-                if (d.benchmark_type !== 'agentic_traces') {
-                  event.preventDefault();
-                  setFixedLogPointId(d.id!);
-                  chartRef.current?.dismissTooltip();
-                }
-                track('gpu_timeseries_view_logs_opened', {
-                  id: d.id,
-                  gpu: String(d.hwKey),
-                  conc: d.conc,
-                  benchmark_type: d.benchmark_type ?? 'single_turn',
-                });
-              });
-            }
-            attachPowerTraceAction(tooltipEl, d, false);
-            requestAnimationFrame(() => {
-              const pinnedTooltip = chartRef.current?.getTooltipElement();
-              if (!pinnedTooltip || chartRef.current?.getPinnedPoint() !== d) return;
-              pinnedTooltip.style.opacity = '1';
-              pinnedTooltip.style.display = 'block';
-              pinnedTooltip.style.pointerEvents = 'auto';
             });
           },
           attachToLayer: 1,

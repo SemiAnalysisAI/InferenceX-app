@@ -4,6 +4,7 @@ import * as d3 from 'd3';
 
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type { CustomLayerConfig, LayerConfig } from '@/lib/d3-chart/D3Chart/types';
+import { chartTooltipShell } from '@/lib/d3-chart/tooltip-shell';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 
 export interface PanelMarker {
@@ -157,7 +158,7 @@ export function PowerPanelPlot({
             tooltip: {
               rulerType: 'none' as const,
               content: (point: PanelMarker) =>
-                `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md">${point.tooltip ?? ''}</div>`,
+                chartTooltipShell(`<div class="text-xs">${point.tooltip ?? ''}</div>`),
               attachToLayer: 2,
             },
           }

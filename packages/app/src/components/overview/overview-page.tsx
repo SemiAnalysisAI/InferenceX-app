@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
 
 import { Card } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { OVERVIEW_HISTORY_WINDOW_DAYS, type OverviewPageData } from '@/lib/overview/overview-data';
 import { overviewHref } from '@/lib/overview/overview-links';
@@ -121,7 +122,7 @@ function OverviewPageBody({ locale }: { locale: OverviewLocale }) {
               >
                 <span
                   data-testid="overview-scope-metric"
-                  className="text-base font-semibold text-foreground"
+                  className="text-base font-medium text-foreground"
                 >
                   {strings.scopeMetric}
                 </span>{' '}
@@ -307,13 +308,9 @@ function OverviewMatrixSection({ locale }: { locale: OverviewLocale }) {
       <>
         <OverviewControlRow locale={locale} />
         <OverviewMatrixCard>
-          <p
-            role="status"
-            data-testid="overview-empty-state"
-            className="px-6 py-12 text-center text-sm text-muted-foreground"
-          >
+          <EmptyState bare role="status" data-testid="overview-empty-state" className="px-6 py-12">
             {strings.emptyState}
-          </p>
+          </EmptyState>
         </OverviewMatrixCard>
       </>
     );

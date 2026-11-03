@@ -143,9 +143,11 @@ import type {
   PowerVariant,
 } from '@/components/inference/types';
 import {
-  generateOverlayTooltipContent,
-  generateTooltipContent,
+  buildPointDetails,
+  generatePointHoverCard,
+  type PointDetailAction,
 } from '@/components/inference/utils/tooltipUtils';
+import { PointDetailsPanel } from '@/components/inference/ui/PointDetailsPanel';
 import { usePowerTraceAction } from '@/components/inference/hooks/usePowerTraceAction';
 import { describeEngineComparisonConflict } from '@/components/inference/ui/engine-comparison-conflict-toast';
 import { ScatterEmptyState } from '@/components/inference/ui/ScatterEmptyState';
@@ -459,28 +461,28 @@ const pointCountEn = (count: number) => `${count} ${count === 1 ? 'point' : 'poi
 
 const SCATTER_STRINGS = {
   en: {
-    logScale: 'Log Scale',
-    optimalOnly: 'Optimal Only',
-    paretoFrontier: 'Pareto Frontier',
+    logScale: 'Log scale',
+    optimalOnly: 'Optimal only',
+    paretoFrontier: 'Pareto frontier',
     paretoFrontierInfo:
       'Dotted line connecting the best visible results, with green shading beyond it. Switch off and on again for a sunny butterfly castle background; repeat to return to green.',
     optimalInfo: 'Optimal points form the Pareto frontier for the selected axes.',
     powerBoundaryInfo:
       'Show only points on the upper measured power boundary. Turn off to show all measurements; the boundary stays the same. This is a power-load boundary, not an energy-efficiency frontier.',
     labels: '# of GPUs Label',
-    highContrast: 'High Contrast',
-    parallelismLabels: 'Parallelism Labels',
+    highContrast: 'High contrast',
+    parallelismLabels: 'Parallelism labels',
     concurrencyLabels: '# Concurrent Sessions',
-    gradientLabels: 'Gradient Labels',
-    lineLabels: 'Line Labels',
-    frameworkLabel: 'Framework Line Label',
-    offloadingLabel: 'Offloading Label',
-    perfRuler: 'Perf Ruler',
+    gradientLabels: 'Gradient labels',
+    lineLabels: 'Line labels',
+    frameworkLabel: 'Framework line label',
+    offloadingLabel: 'Offloading label',
+    perfRuler: 'Perf ruler',
     perfRulerInfo:
       'Click two curves to place a vertical ruler, then drag it to measure the ratio of their Y-axis values at any x value. Repeat to add more rulers (up to 8); hover a ruler and click × to delete it. Turning the toggle off clears all rulers.',
     resetFilter: 'Reset filter',
     clearPerfRulers: (count: number) => `Clear rulers (${count})`,
-    quickFilters: (count: number) => (count > 0 ? `Quick Filters (${count})` : 'Quick Filters'),
+    quickFilters: (count: number) => (count > 0 ? `Quick filters (${count})` : 'Quick filters'),
     overflowMixed: (count: number) => `${pointCountEn(count)} clipped`,
     overflowCost: (count: number, limit: number) => `${pointCountEn(count)} > $${limit}/Mtok`,
     overflowLatency: (count: number, limit: number) => `${pointCountEn(count)} > ${limit}s TTFT`,
@@ -490,8 +492,8 @@ const SCATTER_STRINGS = {
       'This dataset does not report role-level prefill/decode energy. Choose a different model, scenario, precision, date, or measured-energy metric.',
     noMeasuredDataHint:
       'No measured GPU power is reported for this selection. Choose other chip configs, or a different model, scenario, precision or date.',
-    unofficialTitle: (branch: string) => `UNOFFICIAL: ${branch}`,
-    unofficialRun: 'UNOFFICIAL RUN',
+    unofficialTitle: (branch: string) => `Unofficial: ${branch}`,
+    unofficialRun: 'Unofficial run',
     branch: 'Branch',
     viewWorkflow: 'View workflow run',
   },
@@ -642,9 +644,7 @@ const ScatterGraph = React.memo(
     // PowerX names the measured boundaries the way its Count control does.
     const powerXSurface = usePowerXSurface();
     const powerLabelStyle: PowerBasisLabelStyle = powerXSurface ? 'count' : 'basis';
-    // PowerX on a touch-primary device: the pinned point sheet says Tap, not Click.
     const touchPrimary = useIsCoarsePointer();
-    const touchCopy = powerXSurface && touchPrimary;
     // PowerX, Power draw as % of TDP: shade each chip's headroom from its P90 draw to 100 %.
     const headroomShading = powerXSurface && selectedYAxisMetric === POWER_PERCENT_TDP_METRIC;
     const featureGateUnlocked = useFeatureGate();
@@ -1234,7 +1234,7 @@ const ScatterGraph = React.memo(
     const [fixedLogPointId, setFixedLogPointId] = useState<number | null>(null);
     const [powerTelemetryPoint, setPowerTelemetryPoint] = useState<InferenceData | null>(null);
 
-    const attachPowerTraceAction = usePowerTraceAction(chartRef);
+    const openPowerTrace = usePowerTraceAction(chartRef);
 
     const [pointsTableTarget, setPointsTableTarget] = useState<LegendPointsTarget | null>(null);
     const [quickFiltersOpen, setQuickFiltersOpen] = useState(false);
@@ -2259,30 +2259,83 @@ const ScatterGraph = React.memo(
       [zoomResetEventName, eventPrefix, xScaleConfig._isLog, yScaleConfig.type, pointLabelsVisible],
     );
 
-    const tooltipConfig = useMemo(
-      () => ({
-        rulerType: 'crosshair' as const,
-        content: (d: InferenceData, isPinned: boolean) =>
-          generateTooltipContent({
-            data: d,
-            isPinned,
-            xLabel,
-            yLabel,
-            selectedYAxisMetric,
-            hardwareConfig,
-            showPowerTelemetry: interactionRef.current.showPowerTelemetry,
-            runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
-            hasTrace:
-              d.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(d.id)
-                ? (interactionRef.current.presence?.trace.has(d.id) ?? false)
-                : false,
-            hasLog: isPersistedBenchmarkId(d.id)
-              ? (interactionRef.current.presence?.log.has(d.id) ?? false)
+    const pointDetails = useCallback(
+      (d: InferenceData, isOverlay: boolean) =>
+        buildPointDetails({
+          data: d,
+          xLabel,
+          yLabel,
+          selectedYAxisMetric,
+          hardwareConfig,
+          overlayData: isOverlay ? (overlayData ?? undefined) : undefined,
+          showPowerTelemetry: interactionRef.current.showPowerTelemetry,
+          runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
+          hasTrace:
+            d.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(d.id)
+              ? (interactionRef.current.traceAvailability?.[d.id] ?? false)
               : false,
-            locale,
-            powerLabelStyle,
-            touch: touchCopy,
-          }),
+          hasLog: isPersistedBenchmarkId(d.id)
+            ? (interactionRef.current.logAvailability?.[d.id] ?? false)
+            : false,
+          locale,
+          powerLabelStyle,
+        }),
+      [xLabel, yLabel, selectedYAxisMetric, hardwareConfig, overlayData, locale, powerLabelStyle],
+    );
+
+    const pointColor = useCallback(
+      (d: InferenceData, isOverlay: boolean) =>
+        isOverlay
+          ? overlayRunColor(overlayRunIndex(d.run_url ?? null, runIndexByUrl))
+          : interactionRef.current.getCssColor(
+              interactionRef.current.resolveColor(String(d.hwKey)),
+            ),
+      [runIndexByUrl],
+    );
+
+    const tooltipConfig = useMemo(() => {
+      const onAction = (
+        action: PointDetailAction,
+        event: React.MouseEvent<HTMLElement>,
+        d: InferenceData,
+        isOverlay: boolean,
+      ) => {
+        event.stopPropagation();
+        if (action === 'view-power-trace') {
+          openPowerTrace(event, d, isOverlay);
+        } else if (action === 'view-charts') {
+          if (!ephemeralUrlState) rememberChartStateInUrl();
+          track('latency_view_charts_opened', { id: d.id, gpu: String(d.hwKey), conc: d.conc });
+        } else if (action === 'view-power-telemetry') {
+          setPowerTelemetryPoint(d);
+          chartRef.current?.dismissTooltip();
+          track('inference_power_telemetry_opened', { id: d.id, gpu: d.hwKey, conc: d.conc });
+        } else if (action === 'view-logs' && typeof d.id === 'number') {
+          if (d.benchmark_type !== 'agentic_traces') {
+            event.preventDefault();
+            setFixedLogPointId(d.id);
+            chartRef.current?.dismissTooltip();
+          }
+          track('latency_view_logs_opened', {
+            id: d.id,
+            gpu: String(d.hwKey),
+            conc: d.conc,
+            benchmark_type: d.benchmark_type ?? 'single_turn',
+          });
+        }
+      };
+      return {
+        rulerType: 'crosshair' as const,
+        content: (d: InferenceData) =>
+          generatePointHoverCard(pointDetails(d, false), pointColor(d, false)),
+        details: (d: InferenceData, isOverlay: boolean, close: () => void) => (
+          <PointDetailsPanel
+            details={pointDetails(d, isOverlay)}
+            color={pointColor(d, isOverlay)}
+            onClose={close}
+            onAction={(action, event) => onAction(action, event, d, isOverlay)}
+          />
+        ),
         getRulerX: (d: InferenceData, xScale: any) => (xScale as ContinuousScale)(d.x),
         getRulerY: (d: InferenceData, yScale: any) => (yScale as ContinuousScale)(d.y),
         onHoverStart: (_sel: d3.Selection<any, InferenceData, any, any>, d: InferenceData) => {
@@ -2307,62 +2360,10 @@ const ScatterGraph = React.memo(
             return;
           }
           track('latency_data_point_clicked', { gpu: String(d.hwKey), x: d.x, y: d.y });
-          const tooltipEl = chartRef.current?.getTooltipElement();
-          if (!tooltipEl) return;
-
-          const viewBtn = tooltipEl.querySelector('[data-action="view-charts"]');
-          if (viewBtn && isPersistedBenchmarkId(d.id)) {
-            viewBtn.addEventListener('click', (btnEvent) => {
-              btnEvent.stopPropagation();
-              if (!ephemeralUrlState) rememberChartStateInUrl();
-              track('latency_view_charts_opened', {
-                id: d.id,
-                gpu: String(d.hwKey),
-                conc: d.conc,
-              });
-            });
-          }
-          const powerBtn = tooltipEl.querySelector('[data-action="view-power-telemetry"]');
-          if (powerBtn && isPersistedBenchmarkId(d.id)) {
-            powerBtn.addEventListener('click', (event) => {
-              event.stopPropagation();
-              setPowerTelemetryPoint(d);
-              chartRef.current?.dismissTooltip();
-              track('inference_power_telemetry_opened', { id: d.id, gpu: d.hwKey, conc: d.conc });
-            });
-          }
-          const logsBtn = tooltipEl.querySelector('[data-action="view-logs"]');
-          if (logsBtn && typeof d.id === 'number') {
-            logsBtn.addEventListener('click', (btnEvent) => {
-              btnEvent.stopPropagation();
-              if (d.benchmark_type !== 'agentic_traces') {
-                btnEvent.preventDefault();
-                setFixedLogPointId(d.id!);
-                chartRef.current?.dismissTooltip();
-              }
-              track('latency_view_logs_opened', {
-                id: d.id,
-                gpu: String(d.hwKey),
-                conc: d.conc,
-                benchmark_type: d.benchmark_type ?? 'single_turn',
-              });
-            });
-          }
-          attachPowerTraceAction(tooltipEl, d, false);
         },
         attachToLayer: 1,
-      }),
-      [
-        attachPowerTraceAction,
-        xLabel,
-        yLabel,
-        selectedYAxisMetric,
-        hardwareConfig,
-        locale,
-        powerLabelStyle,
-        touchCopy,
-      ],
-    );
+      };
+    }, [pointDetails, pointColor, openPowerTrace]);
 
     const layers = useMemo((): LayerConfig<InferenceData>[] => {
       const wattsAxis = metricPlotsWatts(selectedYAxisMetric);
@@ -3209,19 +3210,9 @@ const ScatterGraph = React.memo(
                 hoverPath: xMarkerPath(7, 0.7),
                 tooltip,
                 handle: chartRef.current,
-                content: (point, pinned) =>
-                  generateOverlayTooltipContent({
-                    data: point,
-                    isPinned: pinned,
-                    xLabel,
-                    yLabel,
-                    selectedYAxisMetric,
-                    hardwareConfig: overlayData.hardwareConfig,
-                    overlayData,
-                    locale,
-                    powerLabelStyle,
-                    touch: touchCopy,
-                  }),
+                panel: true,
+                content: (point) =>
+                  generatePointHoverCard(pointDetails(point, true), pointColor(point, true)),
                 position: (event) => {
                   const [mouseX, mouseY] = d3.pointer(event, container);
                   return computeTooltipPosition(mouseX, mouseY, tooltip, container);
@@ -3249,7 +3240,6 @@ const ScatterGraph = React.memo(
                     y: point.y,
                     overlay: true,
                   });
-                  attachPowerTraceAction(ctx.tooltipElement, point, true);
                 },
               });
             },
@@ -3795,7 +3785,8 @@ const ScatterGraph = React.memo(
       locale,
       powerLabelStyle,
       drawPerfRuler,
-      attachPowerTraceAction,
+      pointDetails,
+      pointColor,
       touchScrub,
     ]);
 
@@ -4277,7 +4268,7 @@ const ScatterGraph = React.memo(
                           },
                           tooltip: (
                             <div className="font-normal text-xs">
-                              <div className="text-red-500 font-semibold">
+                              <div className="font-medium text-destructive">
                                 {legendT.unofficialRun}
                               </div>
                               <div>

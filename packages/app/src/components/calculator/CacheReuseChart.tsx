@@ -8,6 +8,7 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { getHardwareConfig } from '@/lib/catalog/constants';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
+import { chartTooltipDismiss, chartTooltipShellStyle } from '@/lib/d3-chart/tooltip-shell';
 import type { CustomLayerConfig, D3ChartHandle, RenderContext } from '@/lib/d3-chart/D3Chart/types';
 import { getChartWatermark } from '@/lib/catalog/data-mappings';
 import type { Locale } from '@/lib/i18n/i18n';
@@ -43,7 +44,7 @@ export const CACHE_REUSE_STRINGS = {
     ceiling: 'Theoretical ceiling',
     noTiers: 'No cache tiers reported',
     instructions: 'Hover a bar for the breakdown · Click to pin its tooltip',
-    unofficialRun: 'UNOFFICIAL RUN',
+    unofficialRun: 'Unofficial run',
     branch: 'Branch:',
     dismiss: 'Click elsewhere to dismiss',
     concurrency: 'Concurrency:',
@@ -142,7 +143,7 @@ export function generateCacheReuseTooltipHTML(
   const runLink = runUrl
     ? `<div style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px;"><a href="${escapeHtml(
         runUrl,
-      )}" target="_blank" rel="noopener noreferrer" style="color: var(--primary); font-size: 11px; text-decoration: underline; cursor: pointer;">${
+      )}" target="_blank" rel="noopener noreferrer" style="color: var(--brand); font-size: 11px; text-decoration: underline; cursor: pointer;">${
         isOverlay ? t.viewRun : t.viewOfficial
       } &#8599;</a></div>`
     : '';
@@ -165,8 +166,8 @@ export function generateCacheReuseTooltipHTML(
       : '';
 
   return `
-    <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); max-width: 320px; pointer-events: auto; user-select: ${options.isPinned ? 'text' : 'none'};">
-      ${options.isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
+    <div style="${chartTooltipShellStyle({ pinned: options.isPinned, maxWidth: 320, interactive: true })}">
+      ${options.isPinned ? chartTooltipDismiss(t.dismiss) : ''}
       ${overlayHeader}
       <div style="color: var(--foreground); font-size: 13px; font-weight: 600; margin-bottom: 8px;">${label}</div>
       ${row(`<strong>${t.concurrency}</strong> ${point.concurrency}`)}

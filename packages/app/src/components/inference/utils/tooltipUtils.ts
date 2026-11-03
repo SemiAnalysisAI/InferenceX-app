@@ -1,4 +1,3 @@
-import { formatNumber, getDisplayLabel } from '@/lib/shared/utils';
 import { getPointHardwareConfig } from '@/lib/benchmarks/inference-labels';
 import { specMethodDisplayLabel } from '@/lib/compare/compare-variant-slug';
 import { agenticDetailHref } from '@/lib/agentx/agentic-detail-link';
@@ -8,6 +7,7 @@ import type { Locale } from '@/lib/i18n/i18n';
 import type { PowerBasisLabelStyle } from '@/lib/power/power-basis';
 import { isKvOffloadEnabled } from '@/lib/benchmarks/kv-offload';
 import { chartStateHref } from '@/lib/routing/url-state';
+import { chartTooltipShellStyle, chartTooltipTitle } from '@/lib/d3-chart/tooltip-shell';
 import type {
   SystemPowerUnit,
   SystemPowerUnsupportedReason,
@@ -42,7 +42,6 @@ import {
 
 export interface TooltipConfig {
   data: InferenceData;
-  isPinned: boolean;
   xLabel: string;
   yLabel: string;
   selectedYAxisMetric: string;
@@ -54,12 +53,8 @@ export interface TooltipConfig {
   locale?: Locale;
   /** PowerX names boundaries the way its Count control does (GPU only, Whole system). */
   powerLabelStyle?: PowerBasisLabelStyle;
-  /** The viewer is on a touch-primary device: the pinned hint says Tap, not Click. */
-  touch?: boolean;
-}
-
-export interface OverlayTooltipConfig extends TooltipConfig {
-  overlayData: OverlayData;
+  overlayData?: OverlayData;
+  comparisonDate?: boolean;
 }
 
 const asBool = (v: boolean | string | undefined): boolean | undefined =>
@@ -97,13 +92,6 @@ export const getPointLabel = (d: InferenceData): string => {
   return label;
 };
 
-const runLinkHTML = (runUrl: string | undefined, locale: Locale, hardware: string) =>
-  runUrl && !hardware.startsWith('tpu')
-    ? `<div style="font-size: 11px; margin-top: 4px;">
-        <a href="${runUrl}" target="_blank" rel="noopener noreferrer" style="color: var(--muted-foreground); text-decoration: underline; cursor: pointer;">${locale === 'zh' ? 'GitHub Actions 运行记录' : 'GitHub Actions Run'}</a>
-      </div>`
-    : '';
-
 const labelColon = (label: string) => (/[\u4E00-\u9FFF]/u.test(label) ? '：' : ':');
 
 const tooltipLine = (label: string, value: string | number) =>
@@ -128,38 +116,29 @@ export const fmt = (v: number): string => {
 
 const TOOLTIP_STRINGS = {
   en: {
-    dismiss: 'Click elsewhere to dismiss',
-    dismissTouch: 'Tap elsewhere to dismiss',
-    unofficialRun: '✕ UNOFFICIAL RUN',
-    date: 'Date',
+    unofficialRun: '✕ Unofficial run',
     dataFrom: (d: string) => `(data from ${d})`,
-    image: 'Image',
     branch: 'Branch',
-    chipConfig: 'Chip Config',
-    totalChips: 'Total Chips',
+    totalChips: 'Total chips',
     concurrency: 'Concurrency',
-    precision: 'Precision',
     inputTputPerChip: 'Input Token Throughput per Chip',
     outputTputPerChip: 'Output Token Throughput per Chip',
-    powerData: 'Power Measurement',
+    powerData: 'Power measurement',
     powerCertified: 'Validated (current PowerX method)',
     powerLegacy: 'Historical (not validated under the current method)',
     powerWithheld: 'Measured power withheld',
     series: 'Series',
     roleEnergyShare: 'Share of request energy',
+    run: 'GitHub Actions run',
+    conc: (n: number) => `conc ${n}`,
+    chips: (n: number) => `${n} chip${n === 1 ? '' : 's'}`,
   },
   zh: {
-    dismiss: '点击其他区域关闭',
-    dismissTouch: '点按其他区域关闭',
     unofficialRun: '✕ 非官方运行',
-    date: '日期',
     dataFrom: (d: string) => `（数据来自 ${d}）`,
-    image: '镜像',
     branch: '分支',
-    chipConfig: '芯片配置',
     totalChips: '芯片总数',
     concurrency: '并发数',
-    precision: '精度',
     inputTputPerChip: '每芯片输入 token 吞吐量',
     outputTputPerChip: '每芯片输出 token 吞吐量',
     powerData: '功耗测量',
@@ -168,19 +147,31 @@ const TOOLTIP_STRINGS = {
     powerWithheld: '实测功耗未采信',
     series: '系列',
     roleEnergyShare: '在请求能耗中的占比',
+    run: 'GitHub Actions 运行记录',
+    conc: (n: number) => `并发 ${n}`,
+    chips: (n: number) => `${n} 个芯片`,
   },
 } as const;
 
-const powerVariantHTML = (
+export interface PointDetailRow {
+  label: string;
+  value: string;
+  wide?: boolean;
+}
+
+const row = (label: string, value: string | number, wide = false): PointDetailRow =>
+  wide ? { label, value: String(value), wide } : { label, value: String(value) };
+
+const powerVariantRows = (
   d: InferenceData,
   selectedYAxisMetric: string,
   locale: Locale,
   labelStyle?: PowerBasisLabelStyle,
-): string => {
+): PointDetailRow[] => {
   const variant = d.powerVariant;
-  if (!variant) return '';
+  if (!variant) return [];
   const t = TOOLTIP_STRINGS[locale];
-  let html = tooltipLine(t.series, powerVariantLabel(variant, locale, labelStyle));
+  const rows = [row(t.series, powerVariantLabel(variant, locale, labelStyle))];
   if (
     variant.kind === 'role' &&
     variant.id !== 'all' &&
@@ -189,16 +180,20 @@ const powerVariantHTML = (
     const energy = reconstructedRoleEnergy(d);
     if (energy) {
       const share = variant.id === 'prefill' ? energy.prefillShare : 100 - energy.prefillShare;
-      html += tooltipLine(t.roleEnergyShare, `${share.toFixed(1)}%`);
+      rows.push(row(t.roleEnergyShare, `${share.toFixed(1)}%`));
     }
   }
-  return html;
+  return rows;
 };
 
-const powerTierHTML = (d: InferenceData, selectedYAxisMetric: string, locale: Locale): string => {
-  if (!isMeasuredEnergyConfigKey(selectedYAxisMetric) || !d.power_tier) return '';
+const powerTierRows = (
+  d: InferenceData,
+  selectedYAxisMetric: string,
+  locale: Locale,
+): PointDetailRow[] => {
+  if (!isMeasuredEnergyConfigKey(selectedYAxisMetric) || !d.power_tier) return [];
   const t = TOOLTIP_STRINGS[locale];
-  return tooltipLine(t.powerData, d.power_tier === 'certified' ? t.powerCertified : t.powerLegacy);
+  return [row(t.powerData, d.power_tier === 'certified' ? t.powerCertified : t.powerLegacy, true)];
 };
 
 const escapeHtml = (s: string): string =>
@@ -363,7 +358,6 @@ export const formatMetricValue = fmtY;
 const modeledSystemPowerHTML = (
   d: InferenceData,
   selectedYAxisMetric: string,
-  isPinned: boolean,
   locale: Locale,
 ): string => {
   const estimate = d.modeledSystemPower;
@@ -376,7 +370,7 @@ const modeledSystemPowerHTML = (
   }
   const t = SYSTEM_POWER_STRINGS[locale];
   if (estimate.status === 'unsupported') {
-    if (!isPinned || estimate.reason === 'workload') return '';
+    if (estimate.reason === 'workload') return '';
     return tooltipLine(t.unavailable, t.reasons[estimate.reason]);
   }
   const u = t.units[estimate.unit];
@@ -386,26 +380,20 @@ const modeledSystemPowerHTML = (
     ${estimate.unit === 'nvl72-tray' && estimate.measuredGraceSocketWatts !== null ? tooltipLine(t.graceSocket, `${fmtWatts(estimate.measuredGraceSocketWatts)} W/socket`) : ''}
     ${tooltipLine(t.itPerGpu, `${fmtWatts(estimate.itWattsPerGpu)} W/GPU${powerBasisPillHtml('it', locale)}`)}
     ${tooltipLine(t.facilityPerGpu, `${fmtWatts(estimate.deploymentFacilityWatts / estimate.gpuCount)} W/GPU${powerBasisPillHtml('facility', locale)}`)}
-    ${
-      isPinned
-        ? `
-      <details data-testid="tooltip-power-model-details" style="margin-top: 2px;">
-      <summary style="cursor: pointer; color: var(--muted-foreground);">${t.details}</summary>
-      ${tooltipLine(t.state, `${t.workloads[estimate.operatingState.workload]} · ${t.scaleOut(estimate.operatingState.scaleOut)}`)}
-      ${tooltipLine(t.deploymentIt, `${fmtWatts(estimate.deploymentItWatts)} W`)}
-      ${tooltipLine(`${t.facility} (PUE ${fmt(estimate.pue)})`, `${fmtWatts(estimate.deploymentFacilityWatts)} W`)}
-      <div style="color: var(--muted-foreground); margin-bottom: 4px;">${u.topology(estimate.chassisCount, estimate.gpuCount, estimate.modeledGpuCount)}${estimate.chassisBasis === 'extrapolated' ? `<br/>${u.extrapolation}` : ''}${estimate.topologyBasis === 'uniform-hosts' ? `<br/>${u.uniformHosts}` : ''}<br/>${estimate.unit === 'nvl72-tray' && estimate.cpuBasis === 'modeled' ? t.units['nvl72-tray'].modeledCpuAssumptions : u.assumptions}<br/>${u.network}<br/>${u.normalization}<br/>${u.boundary}</div>
-      </details>
-      ${tooltipLine(t.model, `<a href="${escapeHtml(SYSTEM_POWER_MODEL_SOURCE_URL)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${escapeHtml(estimate.hardware)} · ${escapeHtml(estimate.modelRevision.slice(0, 12))}</a>`)}
-    `
-        : ''
-    }
+    <details data-testid="tooltip-power-model-details" style="margin-top: 2px;">
+    <summary style="cursor: pointer; color: var(--muted-foreground);">${t.details}</summary>
+    ${tooltipLine(t.state, `${t.workloads[estimate.operatingState.workload]} · ${t.scaleOut(estimate.operatingState.scaleOut)}`)}
+    ${tooltipLine(t.deploymentIt, `${fmtWatts(estimate.deploymentItWatts)} W`)}
+    ${tooltipLine(`${t.facility} (PUE ${fmt(estimate.pue)})`, `${fmtWatts(estimate.deploymentFacilityWatts)} W`)}
+    <div style="color: var(--muted-foreground); margin-bottom: 4px;">${u.topology(estimate.chassisCount, estimate.gpuCount, estimate.modeledGpuCount)}${estimate.chassisBasis === 'extrapolated' ? `<br/>${u.extrapolation}` : ''}${estimate.topologyBasis === 'uniform-hosts' ? `<br/>${u.uniformHosts}` : ''}<br/>${estimate.unit === 'nvl72-tray' && estimate.cpuBasis === 'modeled' ? t.units['nvl72-tray'].modeledCpuAssumptions : u.assumptions}<br/>${u.network}<br/>${u.normalization}<br/>${u.boundary}</div>
+    </details>
+    ${tooltipLine(t.model, `<a href="${escapeHtml(SYSTEM_POWER_MODEL_SOURCE_URL)}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">${escapeHtml(estimate.hardware)} · ${escapeHtml(estimate.modelRevision.slice(0, 12))}</a>`)}
   </div>`;
 };
 
 const WORKER_POWER_STRINGS = {
   en: {
-    heading: 'Measured Worker Power',
+    heading: 'Measured worker power',
     chips: 'chips',
     more: (n: number) => `+${n} more workers`,
   },
@@ -418,8 +406,8 @@ const WORKER_POWER_STRINGS = {
 
 const WORKER_ROWS_LIMIT = 8;
 
-const generateWorkerPowerHTML = (d: InferenceData, isPinned: boolean, locale: Locale): string => {
-  if (!isPinned || !Array.isArray(d.workers) || d.workers.length === 0) return '';
+const workerPowerHTML = (d: InferenceData, locale: Locale): string => {
+  if (!Array.isArray(d.workers) || d.workers.length === 0) return '';
   const t = WORKER_POWER_STRINGS[locale];
   const rows = d.workers.slice(0, WORKER_ROWS_LIMIT).map((w) => {
     const parts = [
@@ -449,14 +437,14 @@ const generateWorkerPowerHTML = (d: InferenceData, isPinned: boolean, locale: Lo
 
 const CACHE_STRINGS = {
   en: {
-    offloadType: 'Offload Type',
-    offloadBackend: 'KV Offload Engine',
-    transferEngine: 'KV Transfer Engine',
+    offloadType: 'Offload type',
+    offloadBackend: 'KV offload engine',
+    transferEngine: 'KV transfer engine',
     router: 'Router',
-    gpuHitRate: 'Chip Cache Hit Rate',
-    cpuHitRate: 'CPU Cache Hit Rate',
-    combinedHitRate: 'Combined Chip + CPU Cache Hit Rate',
-    theoreticalHitRate: 'Theoretical Cache Hit Rate',
+    gpuHitRate: 'Chip cache hit rate',
+    cpuHitRate: 'CPU cache hit rate',
+    combinedHitRate: 'Combined chip + CPU cache hit rate',
+    theoreticalHitRate: 'Theoretical cache hit rate',
     legacyEnabled: 'Enabled (legacy data)',
     legacyDisabled: 'Disabled (legacy data)',
   },
@@ -474,29 +462,29 @@ const CACHE_STRINGS = {
   },
 } as const;
 
-const generateCacheMetadataHTML = (d: InferenceData, locale: Locale): string => {
+const cacheRows = (d: InferenceData, locale: Locale): PointDetailRow[] => {
   const t = CACHE_STRINGS[locale];
-  const parts: string[] = [];
+  const rows: PointDetailRow[] = [];
   const offloadType = d.kv_offloading?.trim();
   if (offloadType && offloadType.toLowerCase() !== 'none') {
-    parts.push(tooltipLine(t.offloadType, offloadTypeLabel(offloadType)));
+    rows.push(row(t.offloadType, offloadTypeLabel(offloadType)));
   } else if (!offloadType && d.benchmark_type === 'agentic_traces' && d.offload_mode) {
     const enabled = d.offload_mode.toLowerCase() === 'on';
-    parts.push(tooltipLine(t.offloadType, enabled ? t.legacyEnabled : t.legacyDisabled));
+    rows.push(row(t.offloadType, enabled ? t.legacyEnabled : t.legacyDisabled));
   }
   if (d.kv_offload_backend) {
-    parts.push(
-      tooltipLine(
+    rows.push(
+      row(
         t.offloadBackend,
         versionedComponentLabel(d.kv_offload_backend, d.kv_offload_backend_version)!,
       ),
     );
   }
   if (d.kv_p2p_transfer) {
-    parts.push(tooltipLine(t.transferEngine, cacheImplementationLabel(d.kv_p2p_transfer)));
+    rows.push(row(t.transferEngine, cacheImplementationLabel(d.kv_p2p_transfer)));
   }
   if (d.router_name) {
-    parts.push(tooltipLine(t.router, versionedComponentLabel(d.router_name, d.router_version)!));
+    rows.push(row(t.router, versionedComponentLabel(d.router_name, d.router_version)!));
   }
 
   const gpuHit = formatPct(d.server_gpu_cache_hit_rate);
@@ -504,19 +492,19 @@ const generateCacheMetadataHTML = (d: InferenceData, locale: Locale): string => 
   const theoreticalHit = formatPct(d.theoretical_cache_hit_rate);
   const offloadEnabled = isKvOffloadEnabled(d);
   const combinedHit = offloadEnabled && frameworkFamily(d.framework) === 'trt';
-  if (gpuHit) parts.push(tooltipLine(combinedHit ? t.combinedHitRate : t.gpuHitRate, gpuHit));
-  if (cpuHit && offloadEnabled && !combinedHit) parts.push(tooltipLine(t.cpuHitRate, cpuHit));
-  if (theoreticalHit) parts.push(tooltipLine(t.theoreticalHitRate, theoreticalHit));
-  return parts.join('');
+  if (gpuHit) rows.push(row(combinedHit ? t.combinedHitRate : t.gpuHitRate, gpuHit));
+  if (cpuHit && offloadEnabled && !combinedHit) rows.push(row(t.cpuHitRate, cpuHit));
+  if (theoreticalHit) rows.push(row(t.theoreticalHitRate, theoreticalHit));
+  return rows;
 };
 
 const AGENTIC_STRINGS = {
   en: {
-    speculativeDecoding: 'Speculative Decoding',
+    speculativeDecoding: 'Speculative decoding',
     off: 'Off',
     requests: 'Requests',
-    promptTokens: 'Prompt Tokens',
-    generatedTokens: 'Generated Tokens',
+    promptTokens: 'Prompt tokens',
+    generatedTokens: 'Generated tokens',
   },
   zh: {
     speculativeDecoding: '投机解码',
@@ -527,14 +515,20 @@ const AGENTIC_STRINGS = {
   },
 } as const;
 
-const generateAgenticHTML = (d: InferenceData, locale: Locale): string => {
-  if (d.benchmark_type !== 'agentic_traces') return '';
+const compactNumber = (value: number, locale: Locale): string =>
+  new Intl.NumberFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(value);
+
+const agenticRows = (d: InferenceData, locale: Locale): PointDetailRow[] => {
+  if (d.benchmark_type !== 'agentic_traces') return [];
 
   const t = AGENTIC_STRINGS[locale];
-  const parts: string[] = [];
+  const rows: PointDetailRow[] = [];
   const specMethod = d.spec_decoding ?? 'none';
-  parts.push(
-    tooltipLine(
+  rows.push(
+    row(
       t.speculativeDecoding,
       specMethod === 'none' || specMethod === ''
         ? t.off
@@ -547,22 +541,19 @@ const generateAgenticHTML = (d: InferenceData, locale: Locale): string => {
       d.num_requests_total > 0
         ? ` (${((d.num_requests_successful / d.num_requests_total) * 100).toFixed(0)}%)`
         : '';
-    parts.push(
-      tooltipLine(
-        t.requests,
-        `${d.num_requests_successful} / ${d.num_requests_total}${successPct}`,
-      ),
+    rows.push(
+      row(t.requests, `${d.num_requests_successful} / ${d.num_requests_total}${successPct}`),
     );
   }
 
   if (d.total_prompt_tokens !== undefined) {
-    parts.push(tooltipLine(t.promptTokens, formatNumber(d.total_prompt_tokens)));
+    rows.push(row(t.promptTokens, compactNumber(d.total_prompt_tokens, locale)));
   }
   if (d.total_generation_tokens !== undefined) {
-    parts.push(tooltipLine(t.generatedTokens, formatNumber(d.total_generation_tokens)));
+    rows.push(row(t.generatedTokens, compactNumber(d.total_generation_tokens, locale)));
   }
 
-  return parts.join('');
+  return rows;
 };
 
 const ACTION_STRINGS = {
@@ -580,32 +571,18 @@ const ACTION_STRINGS = {
   },
 } as const;
 
-type TooltipAction = 'view-charts' | 'view-logs' | 'view-power-trace';
+export type PointDetailAction =
+  | 'run'
+  | 'view-charts'
+  | 'view-logs'
+  | 'view-power-telemetry'
+  | 'view-power-trace';
 
-const pointDetailActionLink = (action: TooltipAction, href: string, label: string) =>
-  `<a data-action="${action}" href="${href}" style="
-    display: block; width: 100%; padding: 4px 8px; font-size: 11px; font-weight: 500;
-    border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
-    background: var(--accent); color: var(--accent-foreground); text-align: center; text-decoration: none;
-  ">${label} &rarr;</a>`;
-
-export const tooltipShellStyle = (opts: { isPinned: boolean; border?: string }): string => {
-  const border = opts.border ?? '1px solid var(--border)';
-  return [
-    'background: var(--popover)',
-    `border: ${border}`,
-    'border-radius: 8px',
-    'padding: 12px',
-    'box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1)',
-    `user-select: ${opts.isPinned ? 'text' : 'none'}`,
-    'max-width: min(320px, calc(100vw - 16px))',
-    'max-height: min(70vh, calc(100dvh - 16px))',
-    'overflow-x: hidden',
-    'overflow-y: auto',
-    'overscroll-behavior: contain',
-    'box-sizing: border-box',
-  ].join('; ');
-};
+export interface PointDetailLink {
+  action: PointDetailAction;
+  label: string;
+  href?: string;
+}
 
 export const showsPowerTraceAction = (
   point: Pick<InferenceData, 'power_audit' | 'run_url'>,
@@ -615,31 +592,30 @@ export const showsPowerTraceAction = (
   getMeasuredMetricConfig(selectedYAxisMetric) !== undefined &&
   traceKeyForPoint(point) !== null;
 
-const powerTraceHref = (): string =>
-  typeof window === 'undefined' ? '#' : chartStateHref({ i_metric: POWER_TIMELINE_METRIC_KEY });
-
-interface ViewActionsInput {
-  isPinned: boolean;
+interface PointLinksInput {
+  point: InferenceData;
+  runUrl?: string;
   hasTraceData: boolean;
   hasLogData: boolean;
-  point: InferenceData;
-  powerTraceMetric?: string;
+  powerTraceMetric: string;
   showPowerTelemetry?: boolean;
   locale: Locale;
 }
 
-const viewActionsHTML = ({
-  isPinned,
+const pointLinks = ({
+  point,
+  runUrl,
   hasTraceData,
   hasLogData,
-  point,
   powerTraceMetric,
   showPowerTelemetry,
   locale,
-}: ViewActionsInput): string => {
-  if (!isPinned) return '';
+}: PointLinksInput): PointDetailLink[] => {
   const t = ACTION_STRINGS[locale];
-  const actions: string[] = [];
+  const links: PointDetailLink[] = [];
+  if (runUrl && !String(point.hwKey).startsWith('tpu')) {
+    links.push({ action: 'run', label: TOOLTIP_STRINGS[locale].run, href: runUrl });
+  }
   const pointId = point.id;
   const isAgentic = point.benchmark_type === 'agentic_traces';
   const showCharts = isAgentic && hasTraceData;
@@ -647,38 +623,37 @@ const viewActionsHTML = ({
     const prefix = locale === 'zh' ? '/zh' : '';
     const agenticHref = agenticDetailHref(pointId, locale);
     if (showCharts) {
-      actions.push(pointDetailActionLink('view-charts', agenticHref, t.charts));
+      links.push({ action: 'view-charts', label: t.charts, href: agenticHref });
     }
     if (hasLogData) {
       const logHref = isAgentic
         ? `${agenticHref}${agenticHref.includes('?') ? '&' : '?'}view=logs`
         : `${prefix}/inference/logs/${pointId}`;
-      actions.push(pointDetailActionLink('view-logs', logHref, t.logs));
+      links.push({ action: 'view-logs', label: t.logs, href: logHref });
     }
   }
   if (showPowerTelemetry && isPersistedBenchmarkId(pointId)) {
-    actions.push(
-      `<button type="button" data-action="view-power-telemetry" class="w-full rounded-md border border-border bg-accent px-2 py-1 text-xs font-medium text-accent-foreground cursor-pointer">${t.powerTelemetry} &rarr;</button>`,
-    );
+    links.push({ action: 'view-power-telemetry', label: t.powerTelemetry });
   }
-  if (powerTraceMetric !== undefined && showsPowerTraceAction(point, powerTraceMetric)) {
-    actions.push(pointDetailActionLink('view-power-trace', powerTraceHref(), t.powerTrace));
+  if (showsPowerTraceAction(point, powerTraceMetric)) {
+    links.push({
+      action: 'view-power-trace',
+      label: t.powerTrace,
+      href:
+        typeof window === 'undefined'
+          ? '#'
+          : chartStateHref({ i_metric: POWER_TIMELINE_METRIC_KEY }),
+    });
   }
-  if (actions.length === 0) return '';
-  return `<div style="display: grid; gap: 6px; margin-top: 8px;">${actions.join('')}</div>`;
+  return links;
 };
 
 const shortenSha = (image: string) =>
   image.replaceAll(/(?<shaPrefix>sha256:[a-f0-9]{7})[a-f0-9]+/giu, '$<shaPrefix>…');
 
-const imageTooltipLine = (image: string, label: string) =>
-  `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <strong>${label}${labelColon(label)}</strong> <span style="display: inline-block; vertical-align: top; overflow-wrap: anywhere;">${shortenSha(image.trim()).replace(/\s+/u, '<br />')}</span>
-      </div>`;
-
 const PARALLELISM_STRINGS = {
   en: {
-    strategy: 'Parallelism Strategy',
+    strategy: 'Parallelism strategy',
     deployment: 'Deployment',
     singleNode: 'Single-node aggregate',
     multiNode: 'Multi-node aggregate',
@@ -687,13 +662,13 @@ const PARALLELISM_STRINGS = {
     prefill: 'Prefill',
     decode: 'Decode',
     gpusUnit: 'Chips',
-    tensorParallelism: 'Tensor Parallelism',
-    dataParallelism: 'Data Parallelism',
-    expertParallelism: 'Expert Parallelism',
-    pipelineParallelism: 'Pipeline Parallelism',
-    decodeContextParallelism: 'Decode Context Parallelism (DCP)',
-    prefillContextParallelism: 'Prefill Context Parallelism (PCP)',
-    dpAttention: 'DP Attention',
+    tensorParallelism: 'Tensor parallelism',
+    dataParallelism: 'Data parallelism',
+    expertParallelism: 'Expert parallelism',
+    pipelineParallelism: 'Pipeline parallelism',
+    decodeContextParallelism: 'Decode context parallelism (DCP)',
+    prefillContextParallelism: 'Prefill context parallelism (PCP)',
+    dpAttention: 'DP attention',
     yes: 'True',
     no: 'False',
     workers: 'Workers',
@@ -729,22 +704,21 @@ const contextParallelismParts = (dcp?: number, pcp?: number, dwdp?: number): str
   return parts.length > 0 ? `${parts.join(', ')}, ` : '';
 };
 
-const generateParallelismHTML = (d: InferenceData, locale: Locale = 'en'): string => {
+const parallelismRows = (d: InferenceData, locale: Locale): PointDetailRow[] => {
   const t = PARALLELISM_STRINGS[locale];
   const deployment = d.disagg ? t.disaggregated : d.is_multinode ? t.multiNode : t.singleNode;
   const aggregateDcp = meaningfulParallelismSize(d.prefill_dcp_size, d.decode_dcp_size);
   const aggregatePcp = meaningfulParallelismSize(d.prefill_pcp_size, d.decode_pcp_size);
+  const rows = [row(t.deployment, deployment)];
   if (
     (d.ep === null || d.ep === undefined) &&
     (d.prefill_ep === null || d.prefill_ep === undefined) &&
     !(d.prefill_dwdp_size && d.prefill_dwdp_size > 1)
   ) {
-    return (
-      tooltipLine(t.deployment, deployment) +
-      tooltipLine(t.strategy, t.gpuCount(d.physicalChips ?? d.tp)) +
-      (aggregateDcp ? tooltipLine(t.decodeContextParallelism, aggregateDcp) : '') +
-      (aggregatePcp ? tooltipLine(t.prefillContextParallelism, aggregatePcp) : '')
-    );
+    rows.push(row(t.strategy, t.gpuCount(d.physicalChips ?? d.tp)));
+    if (aggregateDcp) rows.push(row(t.decodeContextParallelism, aggregateDcp));
+    if (aggregatePcp) rows.push(row(t.prefillContextParallelism, aggregatePcp));
+    return rows;
   }
 
   if (d.is_multinode && d.disagg) {
@@ -764,212 +738,144 @@ const generateParallelismHTML = (d: InferenceData, locale: Locale = 'en'): strin
       d.prefill_dwdp_size,
     );
     const decodeContext = contextParallelismParts(d.decode_dcp_size, d.decode_pcp_size);
-    return `
-      ${tooltipLine(t.deployment, deployment)}
-      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <strong>${t.prefill}${labelColon(t.prefill)}</strong> ${d.num_prefill_gpu ?? '?'} ${t.gpusUnit}, TP: ${ptp}, ${ppp > 1 ? `PP: ${ppp}, ` : ''}${prefillContext}EP: ${pep}, DPA: ${pdpa ? t.yes : t.no}, ${t.workers}: ${pw}
-      </div>
-      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <strong>${t.decode}${labelColon(t.decode)}</strong> ${d.num_decode_gpu ?? '?'} ${t.gpusUnit}, TP: ${dtp}, ${dpp > 1 ? `PP: ${dpp}, ` : ''}${decodeContext}EP: ${dep}, DPA: ${ddpa ? t.yes : t.no}, ${t.workers}: ${dw}
-      </div>`;
+    rows.push(
+      row(
+        t.prefill,
+        `${d.num_prefill_gpu ?? '?'} ${t.gpusUnit}, TP: ${ptp}, ${ppp > 1 ? `PP: ${ppp}, ` : ''}${prefillContext}EP: ${pep}, DPA: ${pdpa ? t.yes : t.no}, ${t.workers}: ${pw}`,
+        true,
+      ),
+      row(
+        t.decode,
+        `${d.num_decode_gpu ?? '?'} ${t.gpusUnit}, TP: ${dtp}, ${dpp > 1 ? `PP: ${dpp}, ` : ''}${decodeContext}EP: ${dep}, DPA: ${ddpa ? t.yes : t.no}, ${t.workers}: ${dw}`,
+        true,
+      ),
+    );
+    return rows;
   }
 
-  return `
-    ${tooltipLine(t.deployment, deployment)}
-    ${tooltipLine(t.tensorParallelism, d.decode_tp ?? d.tp)}
-    ${d.prefill_dwdp_size && d.prefill_dwdp_size > 1 ? tooltipLine('DWDP', d.prefill_dwdp_size) + tooltipLine(t.workers, d.prefill_num_workers ?? 1) : ''}
-    ${d.dp === undefined ? '' : tooltipLine(t.dataParallelism, d.dp)}
-    ${d.pp !== null && d.pp !== undefined && d.pp > 1 ? tooltipLine(t.pipelineParallelism, d.pp) : ''}
-    ${aggregateDcp ? tooltipLine(t.decodeContextParallelism, aggregateDcp) : ''}
-    ${aggregatePcp ? tooltipLine(t.prefillContextParallelism, aggregatePcp) : ''}
-    ${d.ep !== null && d.ep !== undefined ? tooltipLine(t.expertParallelism, d.ep) : ''}
-    ${tooltipLine(t.dpAttention, d.dp_attention ? t.yes : t.no)}`;
+  rows.push(row(t.tensorParallelism, d.decode_tp ?? d.tp));
+  if (d.prefill_dwdp_size && d.prefill_dwdp_size > 1) {
+    rows.push(row('DWDP', d.prefill_dwdp_size), row(t.workers, d.prefill_num_workers ?? 1));
+  }
+  if (d.dp !== undefined) rows.push(row(t.dataParallelism, d.dp));
+  if (d.pp !== null && d.pp !== undefined && d.pp > 1) {
+    rows.push(row(t.pipelineParallelism, d.pp));
+  }
+  if (aggregateDcp) rows.push(row(t.decodeContextParallelism, aggregateDcp));
+  if (aggregatePcp) rows.push(row(t.prefillContextParallelism, aggregatePcp));
+  if (d.ep !== null && d.ep !== undefined) rows.push(row(t.expertParallelism, d.ep));
+  rows.push(row(t.dpAttention, d.dp_attention ? t.yes : t.no));
+  return rows;
 };
 
 const POWER_REASON_CODE_RE = /^[a-z][a-z0-9_]*$/u;
 
-const powerWithheldHTML = (d: InferenceData, locale: Locale): string => {
-  if (!Array.isArray(d.power_invalid_reasons) || d.power_invalid_reasons.length === 0) return '';
+const powerWithheldRows = (d: InferenceData, locale: Locale): PointDetailRow[] => {
+  if (!Array.isArray(d.power_invalid_reasons) || d.power_invalid_reasons.length === 0) return [];
   const codes = d.power_invalid_reasons
     .filter(
       (code) => typeof code === 'string' && code.length <= 64 && POWER_REASON_CODE_RE.test(code),
     )
     .map((code) => code.replaceAll('_', ' '));
-  if (codes.length === 0) return '';
-  return tooltipLine(TOOLTIP_STRINGS[locale].powerWithheld, codes.join(', '));
+  if (codes.length === 0) return [];
+  return [row(TOOLTIP_STRINGS[locale].powerWithheld, codes.join(', '), true)];
 };
 
-export const generateTooltipContent = (config: TooltipConfig): string => {
-  const {
-    data: d,
-    isPinned,
-    xLabel,
-    yLabel,
-    selectedYAxisMetric,
-    hardwareConfig,
-    runUrl,
-    hasTrace,
-  } = config;
+export interface PointDetailMetric {
+  value: string;
+  label: string;
+}
+
+export interface PointDetails {
+  title: string;
+  subtitle: string;
+  unofficial?: string;
+  date: string;
+  metrics: [PointDetailMetric, PointDetailMetric];
+  summary: string;
+  rows: PointDetailRow[];
+  image?: string;
+  powerHtml: string;
+  links: PointDetailLink[];
+}
+
+const axisUnit = (label: string): string =>
+  /[(（](?<unit>[^()（）]+)[)）]\s*$/u.exec(label)?.groups?.unit ?? label;
+
+export const buildPointDetails = (config: TooltipConfig): PointDetails => {
+  const { data: d, xLabel, yLabel, selectedYAxisMetric, overlayData } = config;
   const locale = config.locale ?? 'en';
   const t = TOOLTIP_STRINGS[locale];
-
-  return `
-    <div style="${tooltipShellStyle({ isPinned })}">
-      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${config.touch ? t.dismissTouch : t.dismiss}</div>` : ''}
-      <div style="color: var(--foreground); font-size: 12px; font-weight: 600; margin-bottom: 8px;">
-        ${hardwareConfig[d.hwKey] ? getDisplayLabel(getPointHardwareConfig(d, hardwareConfig[d.hwKey])) : d.hwKey}
-      </div>
-      ${tooltipLine(t.date, formatTooltipDate(d.actualDate ?? d.date, locale))}
-      ${
-        d?.image
-          ? `
-      ${imageTooltipLine(d.image, t.image)}`
-          : ''
-      }
-      ${tooltipLine(xLabel, fmt(d.x))}
-      ${tooltipLine(yLabel, fmtY(d.y, selectedYAxisMetric))}
-      ${
-        selectedYAxisMetric === 'y_tpPerGpu' && d['inputTputPerGpu']
-          ? `
-          ${tooltipLine(t.inputTputPerChip, `${fmt(d['inputTputPerGpu'].y)}`)}`
-          : ''
-      }
-      ${
-        selectedYAxisMetric === 'y_tpPerGpu' && d['outputTputPerGpu']
-          ? `
-          ${tooltipLine(t.outputTputPerChip, `${fmt(d['outputTputPerGpu'].y)}`)}`
-          : ''
-      }
-      ${powerTierHTML(d, selectedYAxisMetric, locale)}
-      ${powerVariantHTML(d, selectedYAxisMetric, locale, config.powerLabelStyle)}
-      ${modeledSystemPowerHTML(d, selectedYAxisMetric, isPinned, locale)}
-      ${tooltipLine(t.totalChips, d.physicalChips ?? d.tp)}
-      ${generateParallelismHTML(d, locale)}
-      ${tooltipLine(t.concurrency, `${d.conc}`)}
-      ${tooltipLine(t.precision, `${d.precision.toUpperCase()}`)}
-      ${generateCacheMetadataHTML(d, locale)}
-      ${powerWithheldHTML(d, locale)}
-      ${generateAgenticHTML(d, locale)}
-      ${generateWorkerPowerHTML(d, isPinned, locale)}
-      ${runLinkHTML(runUrl, locale, d.hwKey)}
-      ${viewActionsHTML({
-        isPinned,
-        hasTraceData: Boolean(hasTrace),
-        hasLogData: Boolean(config.hasLog),
-        point: d,
-        showPowerTelemetry: config.showPowerTelemetry,
-        powerTraceMetric: selectedYAxisMetric,
-        locale,
-      })}
-    </div>
-  `;
+  const hwEntry = (overlayData?.hardwareConfig ?? config.hardwareConfig)[d.hwKey];
+  const hw = hwEntry ? getPointHardwareConfig(d, hwEntry) : null;
+  const engines = hw?.suffix?.replace(/^\((?<inner>.*)\)$/u, '$<inner>').replaceAll(', ', ' · ');
+  const chips = d.physicalChips ?? d.tp;
+  const ownDate = formatTooltipDate(d.actualDate ?? d.date, locale);
+  const tputRows =
+    selectedYAxisMetric === 'y_tpPerGpu'
+      ? [
+          ...(d['inputTputPerGpu'] ? [row(t.inputTputPerChip, fmt(d['inputTputPerGpu'].y))] : []),
+          ...(d['outputTputPerGpu']
+            ? [row(t.outputTputPerChip, fmt(d['outputTputPerGpu'].y))]
+            : []),
+        ]
+      : [];
+  return {
+    title: hw?.label ?? String(d.hwKey),
+    subtitle: [engines, d.precision.toUpperCase()].filter(Boolean).join(' · '),
+    unofficial: overlayData ? t.unofficialRun : undefined,
+    date:
+      config.comparisonDate && d.actualDate && d.actualDate !== d.date
+        ? `${formatTooltipDate(d.date, locale)} ${t.dataFrom(ownDate)}`
+        : config.comparisonDate
+          ? formatTooltipDate(d.date, locale)
+          : ownDate,
+    metrics: [
+      { value: fmtY(d.y, selectedYAxisMetric), label: yLabel },
+      { value: fmt(d.x), label: xLabel },
+    ],
+    summary: [getPointLabel(d), t.conc(d.conc), t.chips(chips)].join(' · '),
+    rows: [
+      ...(overlayData
+        ? [row(t.branch, overlayData.getRunForRow?.(d)?.branch ?? overlayData.label)]
+        : []),
+      ...tputRows,
+      ...powerTierRows(d, selectedYAxisMetric, locale),
+      ...powerVariantRows(d, selectedYAxisMetric, locale, config.powerLabelStyle),
+      row(t.totalChips, chips),
+      ...parallelismRows(d, locale),
+      row(t.concurrency, d.conc),
+      ...cacheRows(d, locale),
+      ...powerWithheldRows(d, locale),
+      ...agenticRows(d, locale),
+    ],
+    image: d.image ? shortenSha(d.image.trim()).replace(/\s+/u, '\n') : undefined,
+    powerHtml: modeledSystemPowerHTML(d, selectedYAxisMetric, locale) + workerPowerHTML(d, locale),
+    links: pointLinks({
+      point: d,
+      runUrl: overlayData ? undefined : config.runUrl,
+      hasTraceData: Boolean(config.hasTrace),
+      hasLogData: Boolean(config.hasLog),
+      powerTraceMetric: selectedYAxisMetric,
+      showPowerTelemetry: config.showPowerTelemetry,
+      locale,
+    }),
+  };
 };
 
-export const generateOverlayTooltipContent = (config: OverlayTooltipConfig): string => {
-  const { data: d, isPinned, xLabel, yLabel, selectedYAxisMetric, overlayData } = config;
-  const locale = config.locale ?? 'en';
-  const t = TOOLTIP_STRINGS[locale];
-  const hwConfig = overlayData.hardwareConfig[d.hwKey];
-  const perRow = overlayData.getRunForRow?.(d);
-  const branch = perRow?.branch ?? overlayData.label;
-
+export const generatePointHoverCard = (details: PointDetails, color: string): string => {
+  const metrics = details.metrics
+    .map(
+      (metric) =>
+        `<div style="min-width: 0;"><div style="font-size: 17px; font-weight: 600; line-height: 1.2; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--foreground);">${metric.value}</div><div style="font-size: 11px; line-height: 14px; color: var(--muted-foreground);">${escapeHtml(axisUnit(metric.label))}</div></div>`,
+    )
+    .join('');
   return `
-    <div style="${tooltipShellStyle({ isPinned, border: '2px solid #dc2626' })}">
-      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${config.touch ? t.dismissTouch : t.dismiss}</div>` : ''}
-      <div style="color: #dc2626; font-size: 10px; font-weight: 700; margin-bottom: 4px; text-transform: uppercase;">
-        ${t.unofficialRun}
-      </div>
-      <div style="color: var(--foreground); font-size: 12px; font-weight: 600; margin-bottom: 8px;">
-        ${hwConfig ? getDisplayLabel(getPointHardwareConfig(d, hwConfig)) : d.hwKey}
-      </div>
-      ${tooltipLine(t.branch, `${branch}`)}
-      ${tooltipLine(t.date, formatTooltipDate(d.actualDate ?? d.date, locale))}
-      ${tooltipLine(xLabel, fmt(d.x))}
-      ${tooltipLine(yLabel, fmtY(d.y, selectedYAxisMetric))}
-      ${powerTierHTML(d, selectedYAxisMetric, locale)}
-      ${powerVariantHTML(d, selectedYAxisMetric, locale, config.powerLabelStyle)}
-      ${modeledSystemPowerHTML(d, selectedYAxisMetric, isPinned, locale)}
-      ${tooltipLine(t.totalChips, d.physicalChips ?? d.tp)}
-      ${generateParallelismHTML(d, locale)}
-      ${tooltipLine(t.concurrency, `${d.conc}`)}
-      ${tooltipLine(t.precision, `${d.precision.toUpperCase()}`)}
-      ${generateCacheMetadataHTML(d, locale)}
-      ${powerWithheldHTML(d, locale)}
-      ${generateAgenticHTML(d, locale)}
-      ${generateWorkerPowerHTML(d, isPinned, locale)}
-      ${viewActionsHTML({
-        isPinned,
-        hasTraceData: false,
-        hasLogData: false,
-        point: d,
-        powerTraceMetric: selectedYAxisMetric,
-        locale,
-      })}
-    </div>
-  `;
-};
-
-export const generateGPUGraphTooltipContent = (config: TooltipConfig): string => {
-  const {
-    data: d,
-    isPinned,
-    xLabel,
-    yLabel,
-    selectedYAxisMetric,
-    hardwareConfig,
-    runUrl,
-    hasTrace,
-    hasLog,
-  } = config;
-  const locale = config.locale ?? 'en';
-  const t = TOOLTIP_STRINGS[locale];
-
-  return `
-    <div style="${tooltipShellStyle({ isPinned })}">
-      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${config.touch ? t.dismissTouch : t.dismiss}</div>` : ''}
-      ${tooltipLine(t.date, `${formatTooltipDate(d.date, locale)}${d.actualDate && d.actualDate !== d.date ? ` <span style="opacity: 0.7">${t.dataFrom(formatTooltipDate(d.actualDate, locale))}</span>` : ''}`)}
-      ${tooltipLine(t.chipConfig, `${hardwareConfig[d.hwKey] ? getDisplayLabel(getPointHardwareConfig(d, hardwareConfig[d.hwKey])) : d.hwKey}`)}
-      ${
-        d?.image
-          ? `
-      ${imageTooltipLine(d.image, t.image)}`
-          : ''
-      }
-      ${tooltipLine(xLabel, fmt(d.x))}
-      ${tooltipLine(yLabel, fmtY(d.y, selectedYAxisMetric))}
-      ${
-        selectedYAxisMetric === 'y_tpPerGpu' && d['inputTputPerGpu']
-          ? `
-          ${tooltipLine(t.inputTputPerChip, `${fmt(d['inputTputPerGpu'].y)}`)}`
-          : ''
-      }
-      ${
-        selectedYAxisMetric === 'y_tpPerGpu' && d['outputTputPerGpu']
-          ? `
-          ${tooltipLine(t.outputTputPerChip, `${fmt(d['outputTputPerGpu'].y)}`)}`
-          : ''
-      }
-      ${powerTierHTML(d, selectedYAxisMetric, locale)}
-      ${powerVariantHTML(d, selectedYAxisMetric, locale, config.powerLabelStyle)}
-      ${modeledSystemPowerHTML(d, selectedYAxisMetric, isPinned, locale)}
-      ${tooltipLine(t.totalChips, d.physicalChips ?? d.tp)}
-      ${generateParallelismHTML(d, locale)}
-      ${tooltipLine(t.concurrency, `${d.conc}`)}
-      ${tooltipLine(t.precision, `${d.precision.toUpperCase()}`)}
-      ${generateCacheMetadataHTML(d, locale)}
-      ${powerWithheldHTML(d, locale)}
-      ${generateAgenticHTML(d, locale)}
-      ${generateWorkerPowerHTML(d, isPinned, locale)}
-      ${runLinkHTML(runUrl, locale, d.hwKey)}
-      ${viewActionsHTML({
-        isPinned,
-        hasTraceData: Boolean(hasTrace),
-        hasLogData: Boolean(hasLog),
-        point: d,
-        showPowerTelemetry: config.showPowerTelemetry,
-        powerTraceMetric: selectedYAxisMetric,
-        locale,
-      })}
+    <div style="${chartTooltipShellStyle({ pinned: false, maxWidth: 280, border: details.unofficial ? '2px solid #dc2626' : undefined })}">
+      ${details.unofficial ? `<div style="color: #dc2626; font-size: 11px; font-weight: 600; margin-bottom: 4px;">${details.unofficial}</div>` : ''}
+      ${chartTooltipTitle(`${escapeHtml(details.title)} <span style="font-weight: 400; color: var(--muted-foreground);">${escapeHtml(details.subtitle)}</span>`, color)}
+      <div style="display: flex; gap: 20px;">${metrics}</div>
+      <div style="margin-top: 6px; font-size: 11px; line-height: 14px; color: var(--muted-foreground); font-variant-numeric: tabular-nums;">${escapeHtml(details.summary)}</div>
     </div>
   `;
 };

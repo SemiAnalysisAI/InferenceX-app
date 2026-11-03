@@ -2,6 +2,7 @@
 
 import { Download } from 'lucide-react';
 import { useMemo } from 'react';
+import { Button } from '@/components/ui/button';
 
 import type { InferenceData } from '@/components/inference/types';
 import { track } from '@/lib/analytics/analytics';
@@ -119,15 +120,17 @@ export function PowerXHeadroomTable({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-medium">{t.title}</h3>
         {rows.length > 0 && (
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="xs"
             onClick={exportCsv}
             data-testid="powerx-headroom-csv"
-            className="no-export inline-flex min-h-11 items-center gap-1 rounded-md border border-border/60 px-3 text-xs font-medium text-foreground hover:bg-muted md:min-h-8"
+            className="no-export"
           >
-            <Download className="size-3.5" aria-hidden />
+            <Download aria-hidden />
             {t.download}
-          </button>
+          </Button>
         )}
       </div>
       {example && (
@@ -155,7 +158,7 @@ export function PowerXHeadroomTable({
             className="w-full min-w-[52rem] text-left text-xs tabular-nums"
             data-testid="powerx-headroom-table"
           >
-            <thead className="sticky top-0 bg-background">
+            <thead className="sticky top-0 bg-card">
               <tr>
                 <th rowSpan={2} className="p-2 align-bottom">
                   {t.chip}
@@ -214,16 +217,16 @@ export function PowerXHeadroomTable({
 function HeadroomGroupHeaders({ t }: { t: Strings }) {
   return (
     <>
-      <th className="border-l border-border/60 p-2 font-normal whitespace-nowrap">
+      <th className="border-l border-border/60 p-2 text-right font-normal whitespace-nowrap">
         {t.avg}
         <PowerBasisPill tag="gpu" />
       </th>
-      <th className="p-2 font-normal whitespace-nowrap">
+      <th className="p-2 text-right font-normal whitespace-nowrap">
         {t.p90}
         <PowerBasisPill tag="gpu" />
       </th>
-      <th className="p-2 font-normal whitespace-nowrap">{t.pct}</th>
-      <th className="p-2 font-normal whitespace-nowrap">{t.headroom}</th>
+      <th className="p-2 text-right font-normal whitespace-nowrap">{t.pct}</th>
+      <th className="p-2 text-right font-normal whitespace-nowrap">{t.headroom}</th>
     </>
   );
 }
@@ -241,7 +244,7 @@ function HeadroomCells({
   headroom: string;
   muted?: boolean;
 }) {
-  const cls = `p-2 align-top ${muted ? 'text-muted-foreground/60' : ''}`;
+  const cls = `p-2 text-right align-top ${muted ? 'text-muted-foreground/60' : ''}`;
   return (
     <>
       <td className={`border-l border-border/60 ${cls}`}>{avg}</td>

@@ -1,5 +1,7 @@
 'use client';
 
+import { EmptyState } from '@/components/ui/empty-state';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 import {
@@ -29,7 +31,11 @@ export const PERCENTILE_COLORS = {
 } as const;
 
 export const fmtCount = (n: number): string =>
-  n >= 10000 ? new Intl.NumberFormat('en-US').format(Math.round(n)) : String(Math.round(n));
+  n >= 1000
+    ? new Intl.NumberFormat('en-US').format(Math.round(n))
+    : n < 10
+      ? String(Number(n.toFixed(1)))
+      : String(Math.round(n));
 
 export const fmtSeconds = (s: number): string => {
   if (s < 60) return `${Math.round(s)}s`;
@@ -50,29 +56,14 @@ export function ChartEmpty({
 }) {
   const locale = useLocale();
   return (
-    <div
-      data-testid="agentic-chart-empty"
-      className="grid w-full place-items-center text-xs text-muted-foreground"
-      style={{ aspectRatio: `${width} / ${height}` }}
-    >
+    <EmptyState bare className="text-xs" style={{ height }}>
       {message ?? (locale === 'zh' ? '暂无数据' : 'No data')}
-    </div>
+    </EmptyState>
   );
 }
 
-/**
- * Loading placeholder with the chart's own aspect ratio. Charts scale their viewBox to the
- * card width, so a fixed pixel height would shift the cards below once the chart draws.
- */
-export function ChartSkeleton({ size = 'inline' }: { size?: keyof typeof CHART_SIZES }) {
-  const { width, height } = CHART_SIZES[size];
-  return (
-    <div
-      data-testid="agentic-chart-skeleton"
-      className="w-full rounded-md bg-muted/30 animate-pulse"
-      style={{ aspectRatio: `${width} / ${height}` }}
-    />
-  );
+export function ChartSkeleton() {
+  return <Skeleton className="h-65 bg-muted/30" />;
 }
 
 export type LegendSwatch = 'line' | 'dashed-line' | 'area';

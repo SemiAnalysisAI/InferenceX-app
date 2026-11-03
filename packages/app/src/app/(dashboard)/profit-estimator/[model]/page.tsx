@@ -33,7 +33,7 @@ export default async function ProfitEstimatorModelPage({ params }: Props) {
       <ProfitEstimatorDisplay basis="chip-hour" routeModel={resolved.route.model} />
       <TabIntro
         tab="profit-estimator"
-        title={MODEL_TAB_META['profit-estimator'].title(resolved.route.seoName)}
+        title={MODEL_TAB_META['profit-estimator'].heading(resolved.route.seoName)}
         intro={MODEL_TAB_META['profit-estimator'].intro(resolved.route.seoName)}
       />
     </>

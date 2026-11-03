@@ -10,6 +10,7 @@ import { D3Chart, type LayerConfig } from '@/lib/d3-chart/D3Chart';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { twoRowYAxisLabels } from '@/lib/d3-chart/axis-labels';
 import { computeLeftMargin, measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
+import { chartTooltipDismiss, chartTooltipShellStyle } from '@/lib/d3-chart/tooltip-shell';
 
 import { useReliabilityContext } from '@/components/reliability/ReliabilityContext';
 import type { ModelSuccessRateData } from '@/components/reliability/types';
@@ -18,6 +19,7 @@ import { type Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
 import ChartLegend from '@/components/ui/chart-legend';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 
 type ChartItem = ModelSuccessRateData & { modelLabel: string };
 
@@ -26,9 +28,9 @@ const BASE_MARGIN = { top: 24, right: 24, bottom: 40 };
 const TOOLTIP_STRINGS = {
   en: {
     dismiss: 'Click elsewhere to dismiss',
-    successRate: 'Success Rate:',
+    successRate: 'Success rate:',
     successful: 'Successful:',
-    totalRuns: 'Total Runs:',
+    totalRuns: 'Total runs:',
   },
   zh: {
     dismiss: '点击其他区域关闭',
@@ -46,8 +48,8 @@ const generateReliabilityTooltipContent = (
   const t = TOOLTIP_STRINGS[locale];
   const modelLabel = getHardwareConfig(data.model).label;
   return `
-    <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); user-select: ${isPinned ? 'text' : 'none'};">
-      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
+    <div style="${chartTooltipShellStyle({ pinned: isPinned })}">
+      ${isPinned ? chartTooltipDismiss(t.dismiss) : ''}
       <div style="color: var(--foreground); font-size: 12px; font-weight: 600; margin-bottom: 8px;">${modelLabel}</div>
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${t.successRate}</strong> ${data.successRate.toFixed(2)}%</div>
       <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${t.successful}</strong> ${data.n_success}</div>
@@ -101,13 +103,13 @@ function positionLabelPairs(
 
 const RELIABILITY_STRINGS = {
   en: {
-    highContrast: 'High Contrast',
+    highContrast: 'High contrast',
     resetFilter: 'Reset filter',
-    xAxis: 'Success Rate (%)',
+    xAxis: 'Success rate (%)',
     loading: 'Loading reliability data…',
-    loadError: 'Failed to load reliability data.',
+    loadError: 'Failed to load reliability data',
     retry: 'Retry',
-    noData: 'No reliability data available for this date range.',
+    noData: 'No reliability data available for this date range',
     instructions:
       'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset · Hover for details',
     runCount: (success: number, total: number) => `${success}/${total} runs`,
@@ -117,9 +119,9 @@ const RELIABILITY_STRINGS = {
     resetFilter: '重置筛选',
     xAxis: '成功率（%）',
     loading: '正在加载可靠性数据……',
-    loadError: '可靠性数据加载失败。',
+    loadError: '可靠性数据加载失败',
     retry: '重试',
-    noData: '所选时间范围内暂无可靠性数据。',
+    noData: '所选时间范围内暂无可靠性数据',
     instructions: 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置 · 悬停查看详情',
     runCount: (success: number, total: number) => `${success}/${total} 次运行`,
   },
@@ -377,30 +379,29 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
   const isEmpty = loading || error || chartData.length === 0;
 
   const emptyOverlay = isEmpty ? (
-    <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-background/60 backdrop-blur-[2px] z-10">
+    <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-background/80">
       {error ? (
-        <div
+        <EmptyState
           data-testid="reliability-error"
           role="alert"
-          className="flex flex-col items-center gap-2 rounded-md border border-border bg-background/90 px-4 py-3 shadow-sm"
+          action={
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                track('reliability_retry_clicked');
+                void refetch();
+              }}
+            >
+              {legendT.retry}
+            </Button>
+          }
         >
-          <p className="text-sm font-medium text-muted-foreground">{legendT.loadError}</p>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              track('reliability_retry_clicked');
-              void refetch();
-            }}
-          >
-            {legendT.retry}
-          </Button>
-        </div>
+          {legendT.loadError}
+        </EmptyState>
       ) : (
-        <p className="rounded-md border border-border bg-background/90 px-4 py-2 text-sm font-medium text-muted-foreground shadow-sm">
-          {loading ? legendT.loading : legendT.noData}
-        </p>
+        <EmptyState role="status">{loading ? legendT.loading : legendT.noData}</EmptyState>
       )}
     </div>
   ) : null;

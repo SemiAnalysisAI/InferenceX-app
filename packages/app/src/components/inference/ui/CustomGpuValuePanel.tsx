@@ -61,7 +61,7 @@ const PANEL_CONFIG: Record<
   }
 > = {
   powers: {
-    title: 'Custom Chip Powers',
+    title: 'Custom chip powers',
     titleZh: '自定义芯片功耗',
     description:
       'Enter your own Token Throughput per All in Utility MW (tok/s/MW) values for each chip. These values will be used to calculate custom power metrics.',

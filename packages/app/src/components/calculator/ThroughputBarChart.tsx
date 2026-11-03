@@ -17,6 +17,7 @@ import type {
   HorizontalBarLayerConfig,
   RenderContext,
 } from '@/lib/d3-chart/D3Chart/types';
+import { chartTooltipDismiss, chartTooltipShellStyle } from '@/lib/d3-chart/tooltip-shell';
 import { computeLeftMargin, measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
 import { useIsMobileViewport } from '@/hooks/useMediaQuery';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
@@ -35,7 +36,7 @@ import type {
 
 const OVERLAY_STRINGS = {
   en: {
-    unofficialRun: 'UNOFFICIAL RUN',
+    unofficialRun: 'Unofficial run',
     branch: 'Branch:',
     dismiss: 'Click elsewhere to dismiss',
     viewRun: 'View workflow run',
@@ -144,6 +145,9 @@ export function getMetricLabel(
   }
 }
 
+const fixed = (value: number, digits: number) =>
+  value.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+
 export function getValueLabel(
   d: InterpolatedResult,
   barMetric: BarMetric,
@@ -152,15 +156,15 @@ export function getValueLabel(
 ): string {
   switch (barMetric) {
     case 'power': {
-      return `${getTpPerMwForType(d, costType).toFixed(0)} tok/s/MW`;
+      return `${fixed(getTpPerMwForType(d, costType), 0)} tok/s/MW`;
     }
     case 'cost': {
       return `$${getCostForType(d, costType).toFixed(3)}${getCostTypeLabel(costType)}`;
     }
     default: {
       return mode === 'interactivity_to_throughput'
-        ? `${getThroughputForType(d, costType).toFixed(1)} tok/s/chip`
-        : `${getThroughputForType(d, costType).toFixed(1)} tok/s/user`;
+        ? `${fixed(getThroughputForType(d, costType), 1)} tok/s/chip`
+        : `${fixed(getThroughputForType(d, costType), 1)} tok/s/user`;
     }
   }
 }
@@ -335,11 +339,11 @@ export function generateTooltipHTML(
       ? '在 GitHub 查看原始结果'
       : 'View raw result on GitHub';
   const runLinkHtml = effectiveRunUrl
-    ? `<div style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px;"><a href="${escapeHtml(effectiveRunUrl)}" target="_blank" rel="noopener noreferrer" style="color: var(--primary); font-size: 11px; text-decoration: underline; cursor: pointer;">${runLinkLabel} &#8599;</a></div>`
+    ? `<div style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 8px;"><a href="${escapeHtml(effectiveRunUrl)}" target="_blank" rel="noopener noreferrer" style="color: var(--brand); font-size: 11px; text-decoration: underline; cursor: pointer;">${runLinkLabel} &#8599;</a></div>`
     : '';
 
   const clampedHtml = d.clamped
-    ? `<div style="color: var(--muted-foreground); font-size: 10px; font-style: italic; margin-bottom: 4px;">${overlayStrings.clamped}</div>`
+    ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 4px;">${overlayStrings.clamped}</div>`
     : '';
 
   const overlayBranchHtml =
@@ -351,8 +355,8 @@ export function generateTooltipHTML(
     : '';
 
   return `
-    <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); max-width: 320px; pointer-events: auto; user-select: ${isPinned ? 'text' : 'none'};">
-      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${overlayStrings.dismiss}</div>` : ''}
+    <div style="${chartTooltipShellStyle({ pinned: isPinned, maxWidth: 320, interactive: true })}">
+      ${isPinned ? chartTooltipDismiss(overlayStrings.dismiss) : ''}
       ${overlayHeaderHtml}
       <div style="color: var(--foreground); font-size: 13px; font-weight: 600; margin-bottom: 8px;">
         ${label}
@@ -554,7 +558,7 @@ export default function ThroughputBarChart({
       axes: 'x' as const,
       scaleExtent: [0.1, 1] as [number, number],
       rescaleX: (xScale: ContinuousScale, transform: d3.ZoomTransform) =>
-        xScale.copy().domain([0, maxBarValue / transform.k]) as ContinuousScale,
+        xScale.copy().domain([0, xScale.domain()[1] / transform.k]) as ContinuousScale,
       customTransformStorage: (transform: d3.ZoomTransform) => d3.zoomIdentity.scale(transform.k),
     }),
     [maxBarValue],
@@ -610,8 +614,8 @@ export default function ThroughputBarChart({
           .text((d) => {
             if (barMetric === 'cost') {
               return mode === 'interactivity_to_throughput'
-                ? `${getThroughputForType(d, costType).toFixed(1)} tok/s/chip`
-                : `${getThroughputForType(d, costType).toFixed(1)} tok/s/user`;
+                ? `${fixed(getThroughputForType(d, costType), 1)} tok/s/chip`
+                : `${fixed(getThroughputForType(d, costType), 1)} tok/s/user`;
             }
             const costLbl = getCostTypeLabel(costType);
             return `$${getCostForType(d, costType).toFixed(3)}${costLbl}`;
@@ -624,7 +628,7 @@ export default function ThroughputBarChart({
         const baseXScale = ctx.xScale as d3.ScaleLinear<number, number>;
         const svgNode = ctx.layout.svg.node();
         const transform = svgNode ? d3.zoomTransform(svgNode) : d3.zoomIdentity;
-        const currentXScale = baseXScale.copy().domain([0, maxBarValue / transform.k]);
+        const currentXScale = baseXScale.copy().domain([0, baseXScale.domain()[1] / transform.k]);
         positionLabelPairs(
           zoomGroup,
           currentXScale,

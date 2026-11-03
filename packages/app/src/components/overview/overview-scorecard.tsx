@@ -2,6 +2,8 @@
 
 import { type ComponentPropsWithoutRef, useEffect, useRef } from 'react';
 
+import { buttonVariants } from '@/components/ui/button';
+import { SEGMENTED_CONTAINER_STYLE, SEGMENT_RADIUS_STYLE } from '@/components/ui/control-styles';
 import { ModelLogo } from '@/components/ui/model-logo';
 import {
   OVERVIEW_DEFAULT_HISTORY_WINDOW,
@@ -97,7 +99,7 @@ function missingReasonCopy(platform: OverviewPlatformResult, strings: OverviewSt
 }
 
 const RAW_SOURCE_LINK_CLASS =
-  'inline-flex min-h-11 items-center rounded-sm underline decoration-dotted underline-offset-4 hover:decoration-solid focus-visible:outline-none';
+  'inline-flex min-h-11 items-center rounded-sm underline decoration-dotted underline-offset-4 hover:decoration-solid focus-visible:outline-none xl:min-h-0';
 
 function CellMissing({ hardware, reason }: { hardware: string; reason: string }) {
   return (
@@ -108,7 +110,7 @@ function CellMissing({ hardware, reason }: { hardware: string; reason: string })
     >
       <span>{'—'}</span>
       {reason === '' ? null : (
-        <div className="min-w-0 text-2xs leading-tight font-normal text-muted-foreground/70">
+        <div className="min-w-0 text-2xs leading-tight font-normal text-muted-foreground">
           {reason}
         </div>
       )}
@@ -119,18 +121,18 @@ function CellMissing({ hardware, reason }: { hardware: string; reason: string })
 const COST_DELTA_NEUTRAL_BAND = 0.05;
 const COST_DELTA_SATURATION = 0.5;
 const COST_DELTA_CLASS = {
-  cheaper: 'text-emerald-900 dark:text-emerald-200',
-  pricier: 'text-red-900 dark:text-red-200',
+  cheaper: 'text-success',
+  pricier: 'text-destructive',
   even: 'text-muted-foreground',
   'no-baseline': 'text-muted-foreground',
 } as const;
-const COST_DELTA_HUE = {
-  cheaper: '16 185 129',
-  pricier: '239 68 68',
-  even: '148 163 184',
-  'no-baseline': '148 163 184',
+const COST_DELTA_TOKEN = {
+  cheaper: '--success',
+  pricier: '--destructive',
+  even: '--muted-foreground',
+  'no-baseline': '--muted-foreground',
 } as const;
-const COST_DELTA_NEUTRAL_ALPHA = '0.10';
+const COST_DELTA_NEUTRAL_ALPHA = 0.1;
 
 type CostDeltaPolarity = keyof typeof COST_DELTA_CLASS;
 
@@ -212,9 +214,9 @@ function comparisonAria(
       );
 }
 
-function costDeltaAlpha(pct: number): string {
+function costDeltaAlpha(pct: number): number {
   const strength = Math.min(Math.abs(pct), COST_DELTA_SATURATION) / COST_DELTA_SATURATION;
-  return (0.08 + strength * 0.32).toFixed(2);
+  return 0.08 + strength * 0.24;
 }
 
 export function costDeltaCellStyle(
@@ -234,7 +236,10 @@ export function costDeltaCellStyle(
   const polarity = comparisonPolarity(comparison);
   const alpha =
     pct === null || polarity === 'even' ? COST_DELTA_NEUTRAL_ALPHA : costDeltaAlpha(pct);
-  return { backgroundColor: `rgb(${COST_DELTA_HUE[polarity]} / ${alpha})` };
+  const mix = Math.round(alpha * 100);
+  return {
+    backgroundColor: `color-mix(in oklch, var(${COST_DELTA_TOKEN[polarity]}) ${mix}%, transparent)`,
+  };
 }
 
 function CostDeltaBadge({
@@ -271,7 +276,7 @@ function CostDeltaBadge({
       data-cost-polarity={polarity}
       data-history-status={comparisonMode === 'hardware' ? undefined : status}
       title={aria}
-      className={`inline-flex translate-y-px items-center whitespace-nowrap rounded-sm px-1 py-0.5 text-3xs font-semibold tabular-nums ${
+      className={`inline-flex items-center whitespace-nowrap rounded-sm px-1 py-0.5 text-xs font-medium tabular-nums ${
         phoneRow ? 'col-start-2 justify-self-start' : 'xl:col-start-2 xl:justify-self-end'
       } ${COST_DELTA_CLASS[polarity]}`}
     >
@@ -410,7 +415,7 @@ function CellValue({
         )}
       </div>
       {member.precision === null ? null : (
-        <div className="min-w-0 text-2xs leading-tight font-normal uppercase tracking-wider text-foreground/80">
+        <div className="min-w-0 text-2xs leading-tight font-normal text-muted-foreground">
           {config === null ? (
             member.precision.toUpperCase()
           ) : phoneRow && stackPrefix !== null && decodeLabel !== null ? (
@@ -481,7 +486,7 @@ function ModelName({ model, strings }: { model: OverviewModelSummary; strings: O
             data-testid="overview-model-category-badge"
             data-category={model.category}
             title={strings.categoryBadgeTitle}
-            className="ml-1.5 inline-block rounded-sm border border-border/60 px-1 py-px align-middle text-3xs font-medium uppercase tracking-wide text-muted-foreground"
+            className="ml-1.5 inline-block rounded-sm border border-border/60 px-1 align-middle text-3xs font-medium text-muted-foreground"
           >
             {badge}
             <span className="sr-only normal-case">{strings.categoryBadgeTitle}</span>
@@ -541,15 +546,15 @@ export function DesktopOverviewMatrix({
           ))}
         </colgroup>
         <thead className="sticky top-14 z-10 bg-card">
-          <tr className="border-b border-border/50 text-sm uppercase tracking-wider text-muted-foreground">
-            <th scope="col" className="bg-card px-4 py-2 text-left font-semibold lg:px-6">
+          <tr className="border-b border-border/50 text-xs text-muted-foreground">
+            <th scope="col" className="bg-card px-4 py-2 text-left font-medium lg:px-6">
               {strings.modelHeader}
             </th>
             {platforms.map((platform) => (
               <th
                 key={platform.hardware}
                 scope="col"
-                className={`px-3 py-2 text-left font-semibold ${comparisonMode === 'hardware' && platform.hardware === referenceHardware ? 'bg-muted' : 'bg-card'}`}
+                className={`px-3 py-2 text-left font-medium ${comparisonMode === 'hardware' && platform.hardware === referenceHardware ? 'bg-muted' : 'bg-card'}`}
               >
                 {comparisonMode === 'hardware' && platform.hardware === referenceHardware
                   ? `${platform.hardwareLabel} · ${strings.referenceHeader}`
@@ -656,11 +661,11 @@ export function MobileOverviewList({
                       referenceHardware,
                       referenceCost,
                     )}
-                    className="grid min-w-0 grid-cols-[4.25rem_minmax(0,1fr)] gap-x-3 border-b border-border/30 py-1.5 last:border-b-0"
+                    className="grid min-w-0 grid-cols-[4.25rem_minmax(0,1fr)] items-baseline gap-x-3 border-b border-border/30 py-1.5 last:border-b-0"
                   >
                     <span
                       data-testid="overview-mobile-hardware"
-                      className="pt-0.5 text-xs font-medium text-muted-foreground"
+                      className="text-xs font-medium text-muted-foreground"
                     >
                       {platform.hardwareLabel}
                     </span>
@@ -687,7 +692,7 @@ export function MobileOverviewList({
                     model.modelLabel,
                     strings.scenarioLabels[model.scenario],
                   )}
-                  className="min-h-11 w-full justify-between"
+                  className="min-h-11 w-full justify-between text-sm"
                 >
                   {strings.detailLink}
                 </OverviewDetailLink>
@@ -778,8 +783,7 @@ export function OverviewEngineScopeSwitcher({
   strings: OverviewStrings;
 }) {
   const options: OverviewEngineScope[] = ['community', 'all'];
-  const optionClass =
-    'inline-flex min-h-11 w-full items-center rounded-md border border-border/60 px-3 py-1.5 text-left leading-snug focus-visible:outline-none sm:w-auto';
+  const optionClass = `inline-flex min-h-11 min-w-0 items-center ${SEGMENT_RADIUS_STYLE} px-2 py-1 text-left text-sm font-medium leading-snug focus-visible:outline-none md:min-h-6 md:py-0.5`;
   return (
     <nav
       data-testid="overview-engine-scope-switcher"
@@ -787,7 +791,7 @@ export function OverviewEngineScopeSwitcher({
       className="flex min-w-0 flex-col items-start gap-1 text-xs sm:flex-row sm:items-center sm:gap-2"
     >
       <span className="shrink-0 text-muted-foreground">{strings.engineScopeNavLabel}</span>
-      <div className="flex w-full min-w-0 flex-col gap-1 sm:w-auto sm:flex-row">
+      <div className={SEGMENTED_CONTAINER_STYLE}>
         {options.map((option) =>
           option === engineScope ? (
             <ActiveSwitcherOption
@@ -795,7 +799,7 @@ export function OverviewEngineScopeSwitcher({
               control="engine"
               data-overview-engine-scope={option}
               aria-current="true"
-              className={`${optionClass} bg-muted font-semibold text-foreground`}
+              className={`${optionClass} bg-muted font-medium text-foreground dark:bg-input`}
             >
               {strings.engineScopeOptions[option]}
             </ActiveSwitcherOption>
@@ -868,9 +872,9 @@ export function OverviewComparisonSwitcher({
     href: overviewHref(locale, tier, engineScope, window, referenceHardware, modelScope),
   }));
   const optionClass =
-    'relative inline-flex min-h-11 min-w-[130px] items-center justify-center whitespace-nowrap border-b-2 px-4 py-2 text-sm font-semibold transition-colors duration-200 focus-visible:outline-none sm:min-w-[140px]';
+    'relative inline-flex min-h-11 min-w-32 items-center justify-center whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium transition-colors duration-200 focus-visible:outline-none sm:min-w-36';
   const inactiveOptionClass =
-    'border-transparent text-muted-foreground hover:border-muted-foreground/30';
+    'border-transparent text-muted-foreground hover:border-muted-foreground/30 hover:text-foreground';
   return (
     <nav
       data-testid="overview-comparison-switcher"
@@ -882,7 +886,7 @@ export function OverviewComparisonSwitcher({
           control="comparison"
           data-overview-comparison="hardware"
           aria-current="true"
-          className={`${optionClass} border-sky-800 text-sky-800 dark:border-primary dark:text-primary`}
+          className={`${optionClass} border-brand text-foreground`}
         >
           <span className="inline-flex items-center gap-0.5">
             <span>{locale === 'zh' ? '对比 ' : 'vs '}</span>
@@ -936,7 +940,7 @@ export function OverviewComparisonSwitcher({
           control="comparison"
           data-overview-comparison={comparisonMode}
           aria-current="true"
-          className={`${optionClass} border-sky-800 text-sky-800 dark:border-primary dark:text-primary`}
+          className={`${optionClass} border-brand text-foreground`}
         >
           <span className="inline-flex items-center gap-0.5">
             <span>{locale === 'zh' ? '对比 ' : 'vs '}</span>
@@ -954,15 +958,11 @@ export function OverviewComparisonSwitcher({
 
 type OverviewScopeToggleVariant = 'section' | 'toolbar';
 
-const SCOPE_CHIP_CLASS =
-  'inline-flex min-h-11 items-center whitespace-nowrap rounded-md border border-border/60 px-3 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground';
+const SCOPE_CHIP_CLASS = buttonVariants({ variant: 'outline', size: 'xs' });
 
 function ScopeChipCount({ count }: { count: number }) {
   return (
-    <span
-      aria-hidden="true"
-      className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-muted px-1.5 py-0.5 text-3xs leading-none tabular-nums"
-    >
+    <span aria-hidden="true" className="tabular-nums text-muted-foreground">
       {count}
     </span>
   );

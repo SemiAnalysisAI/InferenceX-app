@@ -66,7 +66,7 @@ const REPLAY_STRINGS = {
   en: {
     heading: 'Replay over time',
     loading: 'Loading benchmark history…',
-    loadError: 'Failed to load benchmark history.',
+    loadError: 'Failed to load benchmark history',
     insufficient:
       'Not enough history yet to replay this chart — at least two distinct benchmark dates are required.',
     dates: (count: number) => `${count} dates`,
@@ -81,7 +81,7 @@ const REPLAY_STRINGS = {
     fixedAxes: 'Fixed axes',
     fixedAxesTitle:
       'Keep the axes fixed across the whole run so you can see the frontier improve over time, or let them refit to each frame.',
-    chromiumRequired: 'MP4 export requires a Chromium-based browser (Chrome, Edge).',
+    chromiumRequired: 'MP4 export requires a Chromium-based browser (Chrome, Edge)',
     webCodecsRequired:
       'MP4 export needs WebCodecs (Chrome, Edge, or Chromium). Your browser does not support it.',
     exporting: 'Exporting…',
@@ -89,13 +89,13 @@ const REPLAY_STRINGS = {
     exportMp4: 'Export MP4',
     cancel: 'Cancel',
     exportFailed: 'MP4 export failed:',
-    fallbackError: 'Export failed.',
+    fallbackError: 'Export failed',
     dismiss: 'Dismiss',
   },
   zh: {
     heading: '按时间回放',
     loading: '正在加载基准测试历史……',
-    loadError: '基准测试历史加载失败。',
+    loadError: '基准测试历史加载失败',
     insufficient: '历史数据不足，暂时无法回放该图表——至少需要两个不同的基准测试日期。',
     dates: (count: number) => `${count} 个日期`,
     configs: (count: number) => `${count} 个配置`,
@@ -109,14 +109,14 @@ const REPLAY_STRINGS = {
     fixedAxes: '固定坐标轴',
     fixedAxesTitle:
       '在整次运行中固定坐标轴，以观察 Pareto 前沿随时间改善；也可关闭，让坐标轴随每一帧重新拟合。',
-    chromiumRequired: 'MP4 导出需要基于 Chromium 的浏览器（Chrome、Edge）。',
+    chromiumRequired: 'MP4 导出需要基于 Chromium 的浏览器（Chrome、Edge）',
     webCodecsRequired: 'MP4 导出需要 WebCodecs（Chrome、Edge 或 Chromium），当前浏览器不支持。',
     exporting: '正在导出……',
     exportingProgress: (percent: number) => `正在导出 ${percent}%`,
     exportMp4: '导出 MP4',
     cancel: '取消',
     exportFailed: 'MP4 导出失败：',
-    fallbackError: '导出失败。',
+    fallbackError: '导出失败',
     dismiss: '关闭',
   },
 } as const;
@@ -632,8 +632,8 @@ function ReplayPanelContent({
         <h3 className="text-base font-semibold">{t.heading}</h3>
         <p className="text-xs text-muted-foreground">
           {formatReplayDate(timeline.dates[0], locale)} →{' '}
-          {formatReplayDate(timeline.dates.at(-1) ?? '', locale)} • {t.dates(timeline.dates.length)}{' '}
-          • {t.configs(timeline.configs.length)}
+          {formatReplayDate(timeline.dates.at(-1) ?? '', locale)} · {t.dates(timeline.dates.length)}{' '}
+          · {t.configs(timeline.configs.length)}
         </p>
       </div>
 

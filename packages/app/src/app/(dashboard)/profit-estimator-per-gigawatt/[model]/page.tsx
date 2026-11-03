@@ -37,7 +37,7 @@ export default async function ProfitEstimatorModelPage({ params }: Props) {
       <ProfitEstimatorDisplay basis="gw-year" routeModel={resolved.route.model} />
       <TabIntro
         tab="profit-estimator-per-gigawatt"
-        title={MODEL_TAB_META['profit-estimator-per-gigawatt'].title(resolved.route.seoName)}
+        title={MODEL_TAB_META['profit-estimator-per-gigawatt'].heading(resolved.route.seoName)}
         intro={MODEL_TAB_META['profit-estimator-per-gigawatt'].intro(resolved.route.seoName)}
       />
     </>

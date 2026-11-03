@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import EvalSamplesDrawer from '@/components/evaluation/ui/EvalSamplesDrawer';
 import type { EvaluationChartData } from '@/components/evaluation/types';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
+import { Button } from '@/components/ui/button';
 import { type DataTableColumn, DataTable } from '@/components/ui/data-table';
 import { track } from '@/lib/analytics/analytics';
 import { notifyClientSearchChange } from '@/lib/routing/client-navigation';
@@ -32,7 +33,7 @@ export const EVALUATION_TABLE_STRINGS = {
     prefill: 'prefill',
     decode: 'decode',
     chip: 'Chip',
-    physicalChips: 'Physical Chips',
+    physicalChips: 'Physical chips',
     slots: 'slots',
     dpaValues: 'DPA true/false',
   },
@@ -130,16 +131,17 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
         cell: (row) => {
           const canOpen = row.evalResultId > 0 || (row.evalResultId <= 0 && Boolean(row.runUrl));
           return canOpen ? (
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="2xs"
               onClick={() => openDrawer(row)}
-              className="inline-flex items-center gap-1 rounded-md border border-brand/30 bg-brand/10 px-2 py-1 text-xs font-medium text-brand hover:border-brand/50 hover:bg-brand/20 transition-colors whitespace-nowrap"
               aria-label={t.promptsAriaLabel(row.configLabel)}
               title={t.promptsTitle}
             >
-              <MessageSquareText className="size-3.5" />
+              <MessageSquareText />
               <span className="hidden sm:inline">{t.prompts}</span>
-            </button>
+            </Button>
           ) : null;
         },
         className: 'whitespace-nowrap',
@@ -155,7 +157,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
               {row.configLabel}
               {isUnofficial && (
                 <span
-                  className="inline-flex items-center gap-1 rounded-sm border border-red-600/50 bg-red-600/10 px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-red-700 dark:text-red-400"
+                  className="inline-flex items-center gap-1 rounded-md border border-destructive/30 bg-destructive/10 px-1 py-0.5 text-2xs font-medium text-destructive"
                   title={t.unofficialTitle}
                 >
                   <span
@@ -250,7 +252,7 @@ export default function EvaluationTable({ data }: EvaluationTableProps) {
   return (
     <>
       {hasDisaggConfigs && (
-        <div className="mt-2 mb-2 text-2xs text-muted-foreground/80 leading-tight">
+        <div className="mt-2 mb-2 text-2xs text-muted-foreground leading-tight">
           <div>
             <span className="font-mono">P(·/·/·/·)</span> {t.prefill}
             <span className="mx-1">·</span>

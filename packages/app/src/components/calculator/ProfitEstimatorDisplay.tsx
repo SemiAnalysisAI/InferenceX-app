@@ -46,6 +46,7 @@ import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import { ModelSelector } from '@/components/ui/chart-selectors';
 import { ControlPanel } from '@/components/ui/control-panel';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
+import { EmptyState } from '@/components/ui/empty-state';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { EditableTcoBadges } from '@/components/ui/editable-tco-badges';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
@@ -187,11 +188,11 @@ function priceSourceOptions(
 const STRINGS = {
   en: {
     title: {
-      'gw-year': 'Revenue & Profit Estimator per GigaWatt (Beta)',
-      'chip-hour': 'Revenue & Profit Estimator (Beta)',
+      'gw-year': 'Revenue & profit estimator per gigawatt (Beta)',
+      'chip-hour': 'Revenue & profit estimator (Beta)',
     },
-    benchmarkGroup: 'Benchmark Config',
-    powerLabel: 'Power Estimation',
+    benchmarkGroup: 'Benchmark config',
+    powerLabel: 'Power estimation',
     powerTooltip:
       'All in Measured uses the best power-valid curve at the selected target. Compare both uses that same curve for both bars when available. Pricing, utilization and unit costs stay the same.',
     powerOptions: {
@@ -207,33 +208,33 @@ const STRINGS = {
     powerPreview: `${ALL_IN_MEASURED_NOTE.en} Host power follows the AgentX workload state, including whether KV cache offload is on.`,
     powerDetails: `GPU power is interpolated between the same throughput points. Includes PUE ${AIR_COOLED_SYSTEM_PUE} (air-cooled chassis) or ${LIQUID_COOLED_RACK_PUE} (liquid-cooled NVL72) and 10% headroom. Aggregate multinode hosts use the measured deployment mean. NVL72 trays share one modeled rack equally and use measured Grace-socket power when the run has validated socket telemetry (otherwise modeled Grace power); the two are not interpolated together. Full-chassis extrapolation fills an eight-GPU server with replicas of the measured 1/2/4-GPU workload at the same per-GPU power and throughput; it does not measure a partly idle server.`,
     csvPowerHeaders: ['Power basis', 'Power model revision'],
-    pricingGroup: 'Pricing Config',
-    costProviderLabel: 'Cost Provider',
+    pricingGroup: 'Pricing config',
+    costProviderLabel: 'Cost provider',
     costProviderTooltip:
       'The TCO tier used for the compute-expense segment: owning at large hyperscaler purchasing volume (e.g. AWS/GCP) or renting on a 3-year commit, in $/GPU/hr from the SemiAnalysis AI Cloud TCO Model. Custom lets you type your own $/GPU/hr per chip. Locked rental terms (on demand through 2 year commit) are published in the TCO model.',
     customCostLabel: (gpu: string) => `${gpu} $/GPU/hr`,
     costProviderPlaceholder: 'Cost provider',
-    priceSourceLabel: 'Token Price',
+    priceSourceLabel: 'Token price',
     priceSourceTooltip:
       "Where the sale price per million tokens comes from. OpenRouter reads the public catalog price for this model; the lab's list price is its published API rate, offered where third-party hosts undercut it; Custom lets you type your own input and output prices.",
     priceSourcePlaceholder: 'Token price',
     inputPriceLabel: 'Input $/M tok',
     outputPriceLabel: 'Output $/M tok',
     cachedPriceLabel: 'Cached input $/M tok',
-    targetAgenticLabel: (percentile: string) => `Target ${percentile} Interactivity (tok/s/user)`,
+    targetAgenticLabel: (percentile: string) => `Target ${percentile} interactivity (tok/s/user)`,
     targetAgenticTooltip: (percentile: string) =>
       `The ${percentile} interactivity operating point used for agentic workload interpolation.`,
-    cacheHitLabel: 'Cache Hit Rates',
+    cacheHitLabel: 'Cache hit rates',
     cacheHitTooltip:
-      'Which cache hit rate to use for cached-input pricing. Actual uses the server-measured rate from the benchmark run. Theroticial Roofline (default) uses the infinite-cache rate computed from the trace, representing the maximum reuse potential with unbounded cache capacity.',
+      'Which cache hit rate to use for cached-input pricing. Actual uses the server-measured rate from the benchmark run. Theoretical roofline (default) uses the infinite-cache rate computed from the trace, representing the maximum reuse potential with unbounded cache capacity.',
     cacheHitOptions: {
       actual: 'Actual',
-      theoretical: 'Theroticial Roofline',
+      theoretical: 'Theoretical roofline',
     } satisfies Record<CacheHitMode, string>,
     utilizationLabel: 'Utilization (%)',
     utilizationTooltip:
       'Utilization % factors in the swings & dips of token traffic throughout day & night in addition to efficiency losses of scaling out large scale deployments.',
-    labCutLabel: 'Model License Fee (%)',
+    labCutLabel: 'Model license fee (%)',
     labCutTooltip:
       'Share of revenue paid to the model lab as a license fee on every token sold. It is owed even when compute alone exceeds revenue, so the operator can show a loss.',
     errorLoading: 'Error loading data. Please try a different selection.',
@@ -241,22 +242,22 @@ const STRINGS = {
     pricingLoading: 'Loading OpenRouter pricing…',
     pricingUnavailable: (modelId: string | null) =>
       modelId
-        ? `OpenRouter has no price for ${modelId}. Switch Token Price to Custom to enter one.`
-        : 'This model has no OpenRouter listing. Switch Token Price to Custom to enter a price.',
+        ? `OpenRouter has no price for ${modelId}. Switch Token price to Custom to enter one.`
+        : 'This model has no OpenRouter listing. Switch Token price to Custom to enter a price.',
     chartTitle: {
       'gw-year': (model: string, workload: string, percentile: string, target: number) =>
-        `${model} ${workload} Revenue & Profit Estimates per GigaWatt Per Year at ${percentile} ${target} tok/s/user Interactivity (Beta)`,
+        `${model} ${workload} revenue & profit estimates per gigawatt per year at ${percentile} ${target} tok/s/user interactivity (Beta)`,
       'chip-hour': (model: string, workload: string, percentile: string, target: number) =>
-        `${model} ${workload} Revenue & Profit Estimates per Chip per Hour at ${percentile} ${target} tok/s/user Interactivity (Beta)`,
+        `${model} ${workload} revenue & profit estimates per chip per hour at ${percentile} ${target} tok/s/user interactivity (Beta)`,
     },
-    sellingPriceLabel: 'Selling Price per Million Tokens',
+    sellingPriceLabel: 'Selling price per million tokens',
     sellingPrices: (input: string, cached: string, output: string, source: string) =>
-      `Input: $${input} · Cached Input: $${cached} · Output: $${output} (${source})`,
+      `Input: $${input} · Cached input: $${cached} · Output: $${output} (${source})`,
     tcoBadgesLabel: 'TCO $/chip/hr:',
     sourceLabel: 'Source:',
     formulaTitle: {
-      'gw-year': 'Revenue per GigaWatt Formula',
-      'chip-hour': 'Revenue per Chip-Hour Formula',
+      'gw-year': 'Revenue per gigawatt formula',
+      'chip-hour': 'Revenue per chip-hour formula',
     },
     formulaToggle: 'Toggle formula notes',
     captionFormula: {
@@ -291,16 +292,16 @@ const STRINGS = {
       ],
     },
     compareHistory: 'Compare history',
-    gpuConfig: 'Chip Config',
+    gpuConfig: 'Chip config',
     gpuConfigTooltip: `Select up to ${PROFIT_HISTORY_MAX_GPUS} chip configurations to compare how their estimated revenue and profit have moved over time. Each config is priced again on every compared date (the ends of the date range, plus any date or run added from the Config Changelog below) using the run measured then, so software updates show up as a change in the bar.`,
-    gpuConfigPlaceholder: 'Select Chip Config',
-    comparisonDateRange: 'Comparison Date Range',
+    gpuConfigPlaceholder: 'Select chip config',
+    comparisonDateRange: 'Comparison date range',
     comparisonDateRangeTooltip:
       'Select the start and end dates for the historical comparison. The chart adds a bar for each selected chip config at both dates, next to its bar for the run date shown above. Dates in between can be added one at a time from the Config Changelog.',
     dateRangePlaceholder: 'Select date range',
     historyNote: (dates: string) =>
-      `Compare history: lighter bars are the same chip configs priced on ${dates}, using the same target, prices, and TCO tier.`,
-    historyNoData: (entries: string) => `No estimate at the target on ${entries}.`,
+      `Compare history: lighter bars are the same chip configs priced on ${dates}, using the same target, prices, and TCO tier`,
+    historyNoData: (entries: string) => `No estimate at the target on ${entries}`,
     csvDateHeader: 'Run date',
   },
   zh: {
@@ -343,10 +344,10 @@ const STRINGS = {
       `用于智能体工作负载插值的 ${percentile} 交互性操作点。`,
     cacheHitLabel: 'Cache 命中率',
     cacheHitTooltip:
-      '缓存输入定价使用的 cache 命中率。Actual 使用基准测试运行中服务端实测的命中率。Theroticial Roofline（默认）使用 trace 计算的无限缓存理论命中率，代表缓存容量无限时的最大复用潜力。',
+      '缓存输入定价所用的 cache 命中率。“实测”使用基准测试运行中服务端实测的命中率。“理论上限”（默认）使用由 trace 计算的无限缓存命中率，代表缓存容量不受限时的最大复用潜力。',
     cacheHitOptions: {
-      actual: 'Actual',
-      theoretical: 'Theroticial Roofline',
+      actual: '实测',
+      theoretical: '理论上限',
     } satisfies Record<CacheHitMode, string>,
     utilizationLabel: '利用率 (%)',
     utilizationTooltip:
@@ -417,8 +418,8 @@ const STRINGS = {
       '选择历史对比的起止日期。图表会在上方所示运行日期的柱形旁，为所选芯片配置在这两个日期各增加一根柱形。范围内的其他日期可在配置变更日志中逐个添加。',
     dateRangePlaceholder: '选择日期范围',
     historyNote: (dates: string) =>
-      `对比历史趋势：较浅的柱形为同一芯片配置在 ${dates} 的估价，目标、价格与 TCO 层级保持一致。`,
-    historyNoData: (entries: string) => `${entries} 在目标交互性下无法估算。`,
+      `对比历史趋势：较浅的柱形为同一芯片配置在 ${dates} 的估价，目标、价格与 TCO 层级保持一致`,
+    historyNoData: (entries: string) => `${entries} 在目标交互性下无法估算`,
     csvDateHeader: '运行日期',
   },
 } as const;
@@ -1289,7 +1290,7 @@ function ProfitEstimatorInner({
             {t.historyNote(
               history.comparisonDates.map(historyEntryLabel).join(locale === 'zh' ? '、' : ', '),
             )}
-            {historyMissing.length > 0 && <> {t.historyNoData(historyMissing.join(', '))}</>}
+            {historyMissing.length > 0 && <> · {t.historyNoData(historyMissing.join(', '))}</>}
           </p>
         )}
         <EditableTcoBadges
@@ -1305,17 +1306,11 @@ function ProfitEstimatorInner({
         />
         {costProvider !== 'custom' && (
           <p className="mb-2 text-xs text-muted-foreground" data-testid="profit-tco-source">
-            <small>
-              {t.sourceLabel}{' '}
-              <Link
-                target="_blank"
-                className="underline hover:text-foreground"
-                href={TCO_SOURCE_URL}
-              >
-                {TCO_SOURCE_TITLE}
-                <ExternalLinkIcon />
-              </Link>
-            </small>
+            {t.sourceLabel}{' '}
+            <Link target="_blank" className="underline hover:text-foreground" href={TCO_SOURCE_URL}>
+              {TCO_SOURCE_TITLE}
+              <ExternalLinkIcon />
+            </Link>
           </p>
         )}
         <p className="mb-2 text-xs text-muted-foreground" data-testid="profit-selling-prices">
@@ -1432,13 +1427,7 @@ function ProfitEstimatorInner({
 
   if (!loading && error) {
     console.error(error);
-    return (
-      <Card>
-        <div className="flex items-center justify-center h-64 text-muted-foreground">
-          {t.errorLoading}
-        </div>
-      </Card>
-    );
+    return <EmptyState className="h-64">{t.errorLoading}</EmptyState>;
   }
 
   return (
@@ -1449,13 +1438,16 @@ function ProfitEstimatorInner({
             <DashboardSectionHeader title={t.title[basis]} actions={<ChartShareActions />} />
 
             <TooltipProvider delayDuration={0}>
-              <div className="grid min-w-0 items-start gap-4 xl:grid-cols-4">
+              <div className="grid min-w-0 items-start gap-x-6 gap-y-4 xl:grid-cols-12">
                 <ControlPanel
                   legend={t.benchmarkGroup}
                   data-testid="profit-benchmark-panel"
                   className={cn(
-                    'grid-cols-1 items-end md:grid-cols-3 xl:[&_label]:min-h-10 xl:[&_label]:items-start',
-                    effectivePriceSource === 'custom' ? 'xl:col-span-4' : 'xl:col-span-3',
+                    'grid-cols-1 items-end md:grid-cols-3 xl:[&_label]:min-h-10 xl:[&_label]:items-end',
+                    // Four benchmark columns fit only on a full row; beside the pricing panel a
+                    // fourth column wraps the target label to three lines and the rows misalign.
+                    powerControlsEnabled && effectivePriceSource === 'custom' && 'xl:grid-cols-4',
+                    effectivePriceSource === 'custom' ? 'xl:col-span-12' : 'xl:col-span-8',
                   )}
                 >
                   <div className="min-w-0">
@@ -1560,8 +1552,10 @@ function ProfitEstimatorInner({
                   legend={t.pricingGroup}
                   data-testid="profit-pricing-panel"
                   className={cn(
-                    'grid-cols-1 items-end xl:[&_label]:min-h-10 xl:[&_label]:items-start',
-                    effectivePriceSource === 'custom' && 'xl:col-span-4 xl:grid-cols-4',
+                    'grid-cols-1 items-end xl:[&_label]:min-h-10 xl:[&_label]:items-end',
+                    effectivePriceSource === 'custom'
+                      ? 'xl:col-span-12 xl:grid-cols-4'
+                      : cn('xl:col-span-4', showsTcoBasis && 'sm:grid-cols-2'),
                   )}
                 >
                   <div className="flex min-w-0 flex-col space-y-1.5">
@@ -1674,7 +1668,7 @@ function ProfitEstimatorInner({
                   {showsTcoBasis && (
                     <div className="flex min-w-0 max-w-48 flex-col space-y-1.5">
                       <LabelWithTooltip
-                        label={locale === 'zh' ? 'TCO 口径' : 'TCO Basis'}
+                        label={locale === 'zh' ? 'TCO 口径' : 'TCO basis'}
                         tooltip={
                           locale === 'zh'
                             ? '外部客户价格或内部持有成本；目前仅影响 TPUv7。'
@@ -1761,7 +1755,7 @@ function ProfitEstimatorInner({
             {!loading && legendItems.length > 0 && (
               <div
                 data-testid="profit-legend"
-                className="flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-border pt-3"
+                className="flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-border/30 pt-3"
               >
                 <ul className="flex flex-wrap items-center gap-x-4 gap-y-1">
                   {legendItems.map((item) => (
@@ -1796,14 +1790,14 @@ function ProfitEstimatorInner({
         <Card>
           {pricingNotice && (
             <div
-              className="mb-3 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
+              className="mb-3 rounded-md border border-border/30 bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
               data-testid="profit-pricing-notice"
             >
               {pricingNotice}
             </div>
           )}
           {pricing ? (
-            <figure data-testid="profit-figure" className="relative rounded-lg">
+            <figure data-testid="profit-figure" className="relative min-w-0">
               <ChartButtons
                 chartId="profit-estimator-chart"
                 analyticsPrefix="profit_estimator"

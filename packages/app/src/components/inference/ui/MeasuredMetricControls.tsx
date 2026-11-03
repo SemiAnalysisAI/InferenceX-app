@@ -56,7 +56,7 @@ const STRINGS = {
     compareHelp:
       'Compare power boundaries or prefill and decode on the same benchmark points. Boundaries are available for average W/chip and for J per output token or all tokens. Prefill vs decode uses a common output-token denominator, so it is available for average W/chip and J per output token.',
     compareNone: 'Off',
-    compareBoundaries: 'GPU only + Whole system',
+    compareBoundaries: 'GPU only + whole system',
     compareAll: 'All five boundaries (incl. rated)',
     compareRoles: 'Prefill vs decode',
   },
@@ -255,8 +255,8 @@ export function MeasuredMetricControls({
               <SegmentedToggle
                 role="group"
                 size="default"
-                className="w-full"
-                buttonClassName="min-w-max flex-auto justify-center"
+                className="self-start"
+                buttonClassName="whitespace-nowrap"
                 ariaLabel={t.statistic}
                 value={config.statistic}
                 onValueChange={(statistic) => change({ statistic })}

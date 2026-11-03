@@ -136,7 +136,7 @@ describe('evaluation chart locale presentation', () => {
     expect(html).toContain('<strong>平均得分：</strong>');
     expect(html).toContain('<strong>并发数：</strong>');
     expect(html).toContain('GitHub Actions 运行记录');
-    expect(html).not.toContain('Mean Score');
+    expect(html).not.toContain('Mean score');
     expect(html).not.toContain('Concurrency');
   });
 });

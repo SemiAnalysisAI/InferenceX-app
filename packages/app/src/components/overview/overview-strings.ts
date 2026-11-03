@@ -4,7 +4,7 @@ export type OverviewLocale = 'en' | 'zh';
 
 export const OVERVIEW_STRINGS = {
   en: {
-    title: 'Agentic Inference Costs',
+    title: 'Agentic inference costs',
     scopeMetric: 'Hyperscaler cost',
     scopeDirection: '↓ Lower is better',
     scopeAria: 'Hyperscaler cost per one million total tokens. Lower is better.',
@@ -14,8 +14,8 @@ export const OVERVIEW_STRINGS = {
     tierUnit: 'tok/s/user',
     engineScopeNavLabel: 'Engine scope',
     engineScopeOptions: {
-      all: 'All Platforms',
-      community: 'Open Source Community Engines (vLLM/SGLang)',
+      all: 'All platforms',
+      community: 'Open-source community engines (vLLM/SGLang)',
     },
     comparisonNavLabel: 'Compare',
     comparisonOptions: {
@@ -34,10 +34,10 @@ export const OVERVIEW_STRINGS = {
       'Cost per million total tokens from each platform’s best observed serving envelope for the scenario shown with each model.',
     historyCaption: (days: number) =>
       `Current cost and change versus the latest validated platform result ${days}–${days * 2} days earlier.`,
-    modelHeader: 'Model · Scenario',
+    modelHeader: 'Model · scenario',
     scenarioLabels: {
       single_turn_8k1k: '8K/1K',
-      agentx: 'Long Context Multi-Turn Realistic Agentic Scenario (AgentX)',
+      agentx: 'Long-context multi-turn realistic agentic scenario (AgentX)',
     },
     scenarioLabelsShort: {
       single_turn_8k1k: '8K/1K',
@@ -109,7 +109,7 @@ export const OVERVIEW_STRINGS = {
     loadingStatus: 'Loading the selected comparison…',
     navigationError:
       'Could not load the selected comparison. Showing the last successfully loaded data.',
-    emptyState: 'No overview results match this selection.',
+    emptyState: 'No overview results match this selection',
   },
   zh: {
     title: '智能体推理成本',
@@ -208,7 +208,7 @@ export const OVERVIEW_STRINGS = {
     categoryBadgeTitle: '目前已不再对该模型进行持续基准测试。',
     loadingStatus: '正在加载所选对比…',
     navigationError: '无法加载所选对比，当前显示的是上次成功加载的数据。',
-    emptyState: '没有符合当前筛选条件的总览结果。',
+    emptyState: '没有符合当前筛选条件的总览结果',
   },
 } as const;
 

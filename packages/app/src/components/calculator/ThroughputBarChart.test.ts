@@ -225,7 +225,7 @@ describe('getValueLabel', () => {
   it('formats total power metric value', () => {
     const result = makeResult({ tpPerMw: 1234 });
     expect(getValueLabel(result, 'power', 'interactivity_to_throughput', 'total')).toBe(
-      '1234 tok/s/MW',
+      '1,234 tok/s/MW',
     );
   });
 
@@ -528,7 +528,7 @@ describe('generateTooltipHTML overlay treatment', () => {
       'total',
       officialRunUrl,
     );
-    expect(html).not.toContain('UNOFFICIAL RUN');
+    expect(html).not.toContain('Unofficial run');
     expect(html).toContain(officialRunUrl);
   });
 
@@ -547,7 +547,7 @@ describe('generateTooltipHTML overlay treatment', () => {
       'total',
       officialRunUrl,
     );
-    expect(html).toContain('UNOFFICIAL RUN');
+    expect(html).toContain('Unofficial run');
     expect(html).toContain('feat/my-branch');
     expect(html).toContain(overlayRunUrl);
     expect(html).not.toContain(officialRunUrl);
@@ -585,7 +585,7 @@ describe('generateTooltipHTML overlay treatment', () => {
     expect(html).toContain('非官方运行');
     expect(html).toContain('分支：');
     expect(html).toContain('查看工作流运行');
-    expect(html).not.toContain('UNOFFICIAL RUN');
+    expect(html).not.toContain('Unofficial run');
   });
 
   it('localizes the complete Chinese tooltip including raw link and parallelism values', () => {
