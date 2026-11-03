@@ -434,13 +434,14 @@ describe('QuotesContent supporter logo wall', () => {
           ]) {
             cy.get(`${section} img[alt="Morph LLM"]:visible`)
               .should('have.length', 1)
-              .and('have.attr', 'src', `/logos/${dark ? 'morph-dark.svg' : 'morph.svg'}`);
+              .and('have.attr', 'src', '/logos/morph.svg');
             cy.get(`${section} img[alt="Morph LLM"]:visible`).should(($images) => {
               const image = $images[0] as HTMLImageElement;
               expect(image.naturalWidth).to.equal(174);
               expect(image.naturalHeight).to.equal(48);
               expect(getComputedStyle(image).filter).to.equal('none');
               expect(getComputedStyle(image).opacity).to.equal('1');
+              expect(getComputedStyle(image).backgroundColor).to.equal('rgb(10, 10, 10)');
               const rect = image.getBoundingClientRect();
               expect(rect.left).to.be.at.least(0);
               expect(rect.right).to.be.at.most(width);
