@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { InferenceData } from '@/components/inference/types';
 
-import { baseSku, bestSeriesPerSku, withUnrankedSkus } from './best-series-per-sku';
+import { baseSku, bestSeriesPerSku, hypervolume, withUnrankedSkus } from './best-series-per-sku';
 
 function point(hw: string, hwKey: string, x: number, y: number): InferenceData {
   return { hw, hwKey, x, y } as InferenceData;
@@ -49,7 +49,7 @@ describe('bestSeriesPerSku', () => {
     expect([...selected].toSorted()).toEqual(['b200_trt', 'h200_vllm']);
   });
 
-  it('uses only the shared measured domain instead of rewarding wider coverage', () => {
+  it('credits a curve for the measured range a narrower rival does not reach', () => {
     const selected = bestSeriesPerSku(
       [
         point('B200-8', 'b200_wide', 8, 70),
@@ -61,7 +61,114 @@ describe('bestSeriesPerSku', () => {
       'upper_left',
     );
 
+    expect(selected).toEqual(new Set(['b200_wide']));
+  });
+
+  it('keeps a narrower curve that dominates across nearly all of the range', () => {
+    const selected = bestSeriesPerSku(
+      [
+        point('B200-8', 'b200_wide', 10, 50),
+        point('B200-8', 'b200_wide', 21, 40),
+        point('B200-8', 'b200_narrow', 10, 100),
+        point('B200-8', 'b200_narrow', 20, 80),
+      ],
+      'upper_left',
+    );
+
     expect(selected).toEqual(new Set(['b200_narrow']));
+  });
+
+  it('does not let a short disaggregated preview win on the window it shares (Kimi-K3 MI355X)', () => {
+    // Production AgentX tok/$ frontiers at P90 interactivity, 2026-11-03.
+    const curves: Record<string, [number, number][]> = {
+      mi355x_atom: [
+        [20.68, 41_957_024],
+        [23.55, 41_033_453],
+        [57.01, 21_632_136],
+        [120.34, 6_907_136],
+        [151.52, 3_890_458],
+      ],
+      mi355x_vllm: [
+        [20.49, 38_127_175],
+        [33.36, 34_216_505],
+        [43.33, 29_759_666],
+        [59.59, 21_268_858],
+        [82.03, 15_543_627],
+        [142.05, 6_860_835],
+        [211.86, 4_606_312],
+      ],
+      'mi355x_vllm-disagg': [
+        [46.69, 26_117_604],
+        [74.24, 19_113_307],
+        [98.62, 13_334_689],
+        [110.13, 10_431_906],
+        [131.41, 4_281_518],
+      ],
+    };
+    const rows = Object.entries(curves).flatMap(([hwKey, points]) =>
+      points.map(([x, y]) => point('mi355x', hwKey, x, y)),
+    );
+
+    expect(bestSeriesPerSku(rows, 'upper_left')).toEqual(new Set(['mi355x_vllm']));
+  });
+
+  it('keeps a large lead where values are high over a long tail of small leads (DeepSeek-V4-Pro GB200)', () => {
+    // Production AgentX tok/$ frontiers at P90 interactivity, 2026-11-03. Dynamo SGLang leads
+    // over more of the axis, but Dynamo vLLM roughly doubles it between 80 and 105 tok/s/user.
+    const curves: Record<string, [number, number][]> = {
+      'gb200_dynamo-sglang': [
+        [55.46, 140_744_522],
+        [65.45, 124_912_721],
+        [77.58, 102_921_402],
+        [120.48, 54_271_086],
+        [137.55, 50_479_877],
+        [151.06, 34_442_724],
+        [239.81, 7_570_912],
+        [287.36, 4_787_344],
+      ],
+      'gb200_dynamo-vllm': [
+        [80.52, 204_225_994],
+        [93.9, 164_837_221],
+        [95.79, 164_643_739],
+        [104.6, 74_816_632],
+        [119.19, 46_391_493],
+        [141.04, 24_066_238],
+        [178.89, 7_029_949],
+        [255.75, 4_056_408],
+      ],
+    };
+    const rows = Object.entries(curves).flatMap(([hwKey, points]) =>
+      points.map(([x, y]) => point('GB200-NVL72', hwKey, x, y)),
+    );
+
+    expect(bestSeriesPerSku(rows, 'upper_left')).toEqual(new Set(['gb200_dynamo-vllm']));
+  });
+
+  it('ranks a lower-is-better metric exactly like its reciprocal', () => {
+    const tokensPerDollar = [
+      point('B200-8', 'b200_steady', 10, 900),
+      point('B200-8', 'b200_steady', 40, 500),
+      point('B200-8', 'b200_steady', 80, 200),
+      point('B200-8', 'b200_peaky', 10, 1_400),
+      point('B200-8', 'b200_peaky', 30, 400),
+      point('B200-8', 'b200_peaky', 90, 150),
+      point('B200-8', 'b200_short', 50, 600),
+      point('B200-8', 'b200_short', 60, 450),
+    ];
+    const dollarsPerMillion = tokensPerDollar.map((row) => ({ ...row, y: 1e6 / row.y }));
+
+    const higher = bestSeriesPerSku(tokensPerDollar, 'upper_left');
+    expect(bestSeriesPerSku(dollarsPerMillion, 'lower_right')).toEqual(higher);
+    // Areas: short 60·450 + 50·150 = 34,500; steady 32,000; peaky 31,000.
+    expect(higher).toEqual(new Set(['b200_short']));
+    const steady = tokensPerDollar.filter((row) => row.hwKey === 'b200_steady');
+    expect(hypervolume(steady, 'upper_left')).toBe(32_000);
+    expect(
+      hypervolume(
+        steady.map((row) => ({ ...row, y: 1 / row.y })),
+        'lower_right',
+      ),
+    ).toBe(32_000);
   });
 
   it('does not let a singleton preview displace a complete curve', () => {

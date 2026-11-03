@@ -1,10 +1,12 @@
-import { hermiteInterpolate, monotoneSlopes } from '@/components/calculator/interpolation';
 import type { InferenceData } from '@/components/inference/types';
-import { isFrontierEligible, paretoFrontForDirection } from '@/lib/charts/chart-utils';
+import {
+  isFrontierEligible,
+  paretoFrontForDirection,
+  paretoMaximizesX,
+} from '@/lib/charts/chart-utils';
 
 type Direction = 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
 
-const SAMPLE_COUNT = 9;
 const MIN_CURVE_FRONTIER_POINTS = 2;
 
 export function baseSku(point: Pick<InferenceData, 'hw' | 'hwKey'>): string {
@@ -15,8 +17,6 @@ export function baseSku(point: Pick<InferenceData, 'hw' | 'hwKey'>): string {
 interface ScoredSeries {
   key: string;
   points: InferenceData[];
-  minX: number;
-  maxX: number;
 }
 
 export function bestSeriesPerSku(
@@ -43,17 +43,11 @@ export function bestSeriesPerSku(
   }
 
   const selected = new Set(featured);
-  const higherYIsBetter = direction.startsWith('upper');
 
   for (const series of bySku.values()) {
     const candidates: ScoredSeries[] = [...series.entries()].map(([key, rows]) => {
       const frontier = paretoFrontForDirection(direction)([...rows]).toSorted((a, b) => a.x - b.x);
-      return {
-        key,
-        points: frontier,
-        minX: frontier[0]?.x ?? Infinity,
-        maxX: frontier.at(-1)?.x ?? -Infinity,
-      };
+      return { key, points: frontier };
     });
     const usable = candidates.filter((candidate) => candidate.points.length > 0);
     if (usable.length === 0) continue;
@@ -77,29 +71,10 @@ export function bestSeriesPerSku(
       continue;
     }
 
-    const commonMin = Math.max(...scoringPool.map((candidate) => candidate.minX));
-    const commonMax = Math.min(...scoringPool.map((candidate) => candidate.maxX));
-    const hasCommonDomain = commonMin <= commonMax;
-
-    const score = (candidate: ScoredSeries): number => {
-      const xs = candidate.points.map((point) => point.x);
-      const ys = candidate.points.map((point) => point.y);
-      if (!hasCommonDomain) {
-        return higherYIsBetter ? Math.max(...ys) : -Math.min(...ys);
-      }
-      const slopes = monotoneSlopes(xs, ys);
-      let total = 0;
-      for (let index = 0; index < SAMPLE_COUNT; index++) {
-        const fraction = index / (SAMPLE_COUNT - 1);
-        const x = commonMin + (commonMax - commonMin) * fraction;
-        total += hermiteInterpolate(xs, ys, slopes, x);
-      }
-      const mean = total / SAMPLE_COUNT;
-      return higherYIsBetter ? mean : -mean;
-    };
+    const scores = scoringPool.map((candidate) => hypervolume(candidate.points, direction));
 
     const winner = scoringPool
-      .map((candidate) => ({ candidate, score: score(candidate) }))
+      .map((candidate, index) => ({ candidate, score: scores[index] }))
       .toSorted((a, b) => b.score - a.score || a.candidate.key.localeCompare(b.candidate.key))[0];
     selected.add(winner.candidate.key);
   }
@@ -120,4 +95,31 @@ export function withUnrankedSkus(
     if (!rankedSkus.has(baseSku(point))) selected.add(String(point.hwKey));
   }
   return selected;
+}
+
+/**
+ * Area of the chart a frontier dominates, measured from the origin after
+ * mapping every lower-is-better axis to its reciprocal (cost → tokens per $,
+ * latency → requests per second). A large lead where values are high outweighs
+ * a long tail of small leads, missing coverage earns nothing, and reciprocal
+ * metrics such as $/M tok and tok/$ rank identically.
+ */
+export function hypervolume(points: readonly InferenceData[], direction: Direction): number {
+  const maximizeX = paretoMaximizesX(direction);
+  const maximizeY = direction.startsWith('upper');
+  const mapped = points
+    .map((point) => ({
+      u: maximizeX ? point.x : 1 / point.x,
+      v: maximizeY ? point.y : 1 / point.y,
+    }))
+    .filter(({ u, v }) => Number.isFinite(u) && Number.isFinite(v) && u > 0 && v > 0)
+    .toSorted((a, b) => b.u - a.u);
+  let area = 0;
+  let coveredV = 0;
+  for (const { u, v } of mapped) {
+    if (v <= coveredV) continue;
+    area += u * (v - coveredV);
+    coveredV = v;
+  }
+  return area;
 }
