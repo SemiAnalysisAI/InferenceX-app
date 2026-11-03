@@ -1,5 +1,5 @@
 'use client';
-import { CHIP_BASIS_METRICS, chipBasisCsvNote } from '@/lib/benchmarks/chip-basis';
+import { chipBasisCsvNote } from '@/lib/benchmarks/chip-basis';
 import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 import { track } from '@/lib/analytics/analytics';
 import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
@@ -1092,9 +1092,9 @@ export default function ChartDisplay({
             `InferenceX_${selectedModel}_${graph.chartDefinition.chartType}`,
             headers,
             rows,
-            CHIP_BASIS_METRICS.has(selectedYAxisMetric)
-              ? [...issueNotes, chipBasisCsvNote(chipBasis, locale)]
-              : issueNotes,
+            // The fixed input/output throughput columns follow the chip basis on
+            // every metric, not just the plotted one.
+            [...issueNotes, chipBasisCsvNote(chipBasis, locale)],
           );
         }}
       />

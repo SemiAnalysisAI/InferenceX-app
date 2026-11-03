@@ -75,9 +75,10 @@ function stored(overrides: Record<string, unknown> = {}) {
   return {
     benchmark_type: 'agentic_traces',
     disagg: true,
-    is_multinode: true,
     num_prefill_gpu: 4,
     num_decode_gpu: 12,
+    prefill_num_workers: 1,
+    decode_num_workers: 1,
     metrics: { tput_per_gpu: 1000, input_tput_per_gpu: 900, output_tput_per_gpu: 100 } as Record<
       string,
       number
@@ -110,9 +111,17 @@ describe('withStoredPerPoolBasis', () => {
   it.each([
     ['fixed-sequence rows', { benchmark_type: 'single_turn' }],
     ['aggregated rows', { disagg: false }],
-    ['single-node rows, whose pool sizes are both the whole deployment', { is_multinode: false }],
+    [
+      'rows mirroring the whole deployment into both pool fields',
+      { num_prefill_gpu: 8, num_decode_gpu: 8, prefill_num_workers: 0, decode_num_workers: 0 },
+    ],
   ])('leaves %s alone', (_label, overrides) => {
     const row = stored(overrides);
     expect(withStoredPerPoolBasis([row])[0]).toBe(row);
+  });
+
+  it('rescales any real split, single-node or multinode', () => {
+    const noWorkers = stored({ prefill_num_workers: 0, decode_num_workers: 0 });
+    expect(withStoredPerPoolBasis([noWorkers])[0].metrics.input_tput_per_gpu).toBeCloseTo(3600, 9);
   });
 });

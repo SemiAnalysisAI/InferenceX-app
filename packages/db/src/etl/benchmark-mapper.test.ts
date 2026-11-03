@@ -1714,9 +1714,24 @@ describe('mapBenchmarkRow — v3 agentic nested agg schema', () => {
       expect(m).not.toHaveProperty('input_tput_per_total_gpu');
     });
 
-    it('leaves single-node agentic disaggregated rows alone', () => {
+    it('rescales single-node agentic rows that record a real split', () => {
       const m = mapBenchmarkRow(
         makeV3AgenticRow({ ...disaggOverrides, is_multinode: false }),
+        createSkipTracker(),
+      )!.metrics;
+      expect(m.input_tput_per_gpu).toBeCloseTo((8995.035 * 36) / 4, 2);
+      expect(m.input_tput_per_total_gpu).toBeCloseTo(8995.035, 3);
+    });
+
+    it('leaves agentic rows that mirror the deployment into both pool fields alone', () => {
+      const m = mapBenchmarkRow(
+        makeV3AgenticRow({
+          ...disaggOverrides,
+          prefill_num_workers: 0,
+          decode_num_workers: 0,
+          num_prefill_gpu: 8,
+          num_decode_gpu: 8,
+        }),
         createSkipTracker(),
       )!.metrics;
       expect(m.input_tput_per_gpu).toBeCloseTo(8995.035, 3);

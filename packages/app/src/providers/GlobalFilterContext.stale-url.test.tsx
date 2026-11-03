@@ -174,3 +174,43 @@ describe('GlobalFilterProvider stale g_rundate snapshot', () => {
     expect(observedRunDate).toBe(STALE_RUN_DATE);
   });
 });
+
+describe('GlobalFilterProvider chip basis', () => {
+  let observedChipBasis: string | undefined;
+  const ChipBasisProbe = memo(() => {
+    observedChipBasis = useGlobalFilterSelection().chipBasis;
+    return null;
+  });
+  const mount = (initialChipBasis?: 'pool' | 'total') => {
+    container = document.createElement('div');
+    root = createRoot(container);
+    act(() =>
+      root?.render(
+        <GlobalFilterProvider initialModel={Model.Kimi_K3} initialChipBasis={initialChipBasis}>
+          <ChipBasisProbe />
+        </GlobalFilterProvider>,
+      ),
+    );
+  };
+
+  beforeEach(() => {
+    mocks.hasExplicitUrlParam.mockImplementation((key: string) => key === 'g_chips');
+    mocks.getUrlParam.mockImplementation((key: string) => (key === 'g_chips' ? 'pool' : undefined));
+  });
+  afterEach(() => {
+    mocks.getUrlParam.mockImplementation((key: string) => (key === 'i_seq' ? '8k/1k' : undefined));
+  });
+
+  it('applies g_chips from the URL on dashboard pages', () => {
+    mocks.getUrlParam.mockImplementation((key: string) =>
+      key === 'g_chips' ? 'total' : undefined,
+    );
+    mount();
+    expect(observedChipBasis).toBe('total');
+  });
+
+  it('keeps an embed’s server-resolved basis over the URL', () => {
+    mount('total');
+    expect(observedChipBasis).toBe('total');
+  });
+});

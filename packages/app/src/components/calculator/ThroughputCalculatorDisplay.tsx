@@ -1,6 +1,6 @@
 'use client';
 
-import { chipBasisCsvNote } from '@/lib/benchmarks/chip-basis';
+import { chipBasisCsvNote, withTotalChipQualifier } from '@/lib/benchmarks/chip-basis';
 import { ControlPanel } from '@/components/ui/control-panel';
 import { MobileControlSection } from '@/components/ui/mobile-control-section';
 import { track } from '@/lib/analytics/analytics';
@@ -893,7 +893,9 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     resolveColor,
   ]);
 
-  const chartTitle =
+  // Input/Output values follow the chip basis; name the denominator on the total basis.
+  const totalChipBasis = chipBasis === 'total' && costType !== 'total';
+  const baseChartTitle =
     locale === 'zh'
       ? getChartTitleZh(
           barMetric,
@@ -911,6 +913,9 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
           costProvider,
           isAgenticSequence ? selectedPercentile : undefined,
         );
+  const chartTitle = totalChipBasis
+    ? (withTotalChipQualifier(baseChartTitle, locale) ?? baseChartTitle)
+    : baseChartTitle;
 
   if (!loading && error) {
     console.error(error);
@@ -1375,6 +1380,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                         targetValue={targetValue}
                         barMetric={barMetric}
                         costType={costType}
+                        totalChipBasis={totalChipBasis}
                         runUrl={runUrl}
                         selectedBars={selectedBars}
                         onBarSelect={handleBarSelect}

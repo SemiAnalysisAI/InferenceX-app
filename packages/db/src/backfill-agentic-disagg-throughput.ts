@@ -7,31 +7,36 @@
  */
 import { hasNoSslFlag } from './cli-utils.js';
 import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils.js';
-import { perPoolThroughputPatch } from './etl/disagg-throughput.js';
+import { isPerTotalAgenticCandidate, perPoolThroughputPatch } from './etl/disagg-throughput.js';
 import { confirmProceed, jsonbParam, runBackfillMain } from './lib/backfill-runner.js';
 
 const sql = createAdminSql({ noSsl: hasNoSslFlag(), max: 1, onnotice: () => {} });
 
 interface CandidateRow {
   id: number;
+  benchmark_type: string;
   metrics: Record<string, unknown>;
+  disagg: boolean;
   num_prefill_gpu: number;
   num_decode_gpu: number;
+  prefill_num_workers: number;
+  decode_num_workers: number;
 }
 
 async function main(): Promise<void> {
   console.log('=== backfill-agentic-disagg-throughput ===');
 
   const rows = await sql<CandidateRow[]>`
-    select br.id, br.metrics, c.num_prefill_gpu, c.num_decode_gpu
+    select br.id, br.benchmark_type, br.metrics, c.disagg,
+      c.num_prefill_gpu, c.num_decode_gpu, c.prefill_num_workers, c.decode_num_workers
     from benchmark_results br
     join configs c on c.id = br.config_id
     where br.benchmark_type = 'agentic_traces'
       and c.disagg
-      and c.is_multinode
     order by br.id
   `;
   const patches = rows.flatMap((row) => {
+    if (!isPerTotalAgenticCandidate(row)) return [];
     const patch = perPoolThroughputPatch(row.metrics, row.num_prefill_gpu, row.num_decode_gpu);
     return patch ? [{ id: row.id, patch }] : [];
   });

@@ -27,33 +27,40 @@ function chipCount(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }
 
-/** Whether a disaggregated row records its real prefill and decode pool sizes. */
+/**
+ * Whether a disaggregated row records its real prefill and decode pool sizes:
+ * worker counts are present, or the two pool fields differ. Only the legacy shape
+ * (no workers, the whole deployment mirrored in both fields) is treated as unsplit.
+ */
 export function hasPoolSplit(row: ChipCounts): boolean {
+  if (row.disagg !== true || !chipCount(row.num_prefill_gpu) || !chipCount(row.num_decode_gpu)) {
+    return false;
+  }
   return (
-    row.disagg === true &&
-    chipCount(row.prefill_num_workers) &&
-    chipCount(row.decode_num_workers) &&
-    chipCount(row.num_prefill_gpu) &&
-    chipCount(row.num_decode_gpu)
+    (chipCount(row.prefill_num_workers) && chipCount(row.decode_num_workers)) ||
+    row.num_prefill_gpu !== row.num_decode_gpu
   );
 }
 
 /**
- * Legacy Dynamo rows (Oct–Nov 2025) carry `disagg: true` with no workers and both
- * pool sizes set to the whole deployment N. Their rates are still per pool (input
- * per prefill chip, output per decode chip), but the real pool sizes were never
- * stored, so they convert through the token mix instead of the pool sizes.
+ * Legacy Dynamo rows (2025-09-29 to 2025-12-05) carry `disagg: true` with no
+ * workers and both pool sizes set to the whole deployment N. Some carry rates per
+ * deployment chip (most of October 2025), later ones per pool with the real pool
+ * sizes never stored; `exactPerTotalChipRates` tells them apart from the rates.
  */
 function isUnsplitDisagg(row: ChipCounts): boolean {
-  return row.disagg === true && !hasPoolSplit(row);
+  return (
+    row.disagg === true &&
+    !hasPoolSplit(row) &&
+    chipCount(row.num_prefill_gpu) &&
+    row.num_prefill_gpu === row.num_decode_gpu
+  );
 }
 
 /** Every chip in a disaggregated deployment, or undefined when unknown. */
 export function disaggDeploymentChips(row: ChipCounts): number | undefined {
   if (hasPoolSplit(row)) return row.num_prefill_gpu! + row.num_decode_gpu!;
-  if (!isUnsplitDisagg(row)) return undefined;
-  const chips = Math.max(row.num_prefill_gpu ?? 0, row.num_decode_gpu ?? 0);
-  return chips > 0 ? chips : undefined;
+  return isUnsplitDisagg(row) ? row.num_prefill_gpu : undefined;
 }
 
 /**
@@ -83,10 +90,14 @@ const RAW_SUM_TOLERANCE = 0.01;
 
 /**
  * Input and output throughput per deployment chip, or null when a row's
- * denominator cannot be pinned down (an unsplit legacy row without ISL/OSL).
- * Rows split into pools rescale by the pool sizes; unsplit legacy rows, all
- * fixed-sequence, split `tput_per_gpu` by ISL:OSL, which every request shares;
- * rows whose raw rates already add up to `tput_per_gpu` are returned as they are.
+ * denominator cannot be pinned down.
+ *
+ * Rows split into pools rescale by the pool sizes. Unsplit legacy rows record
+ * neither pool size, so they are read from the rates themselves: rows whose input
+ * and output already add up to `tput_per_gpu` are per deployment chip; otherwise
+ * the prefill share p of the deployment solves `T = input × p + output × (1 − p)`
+ * exactly. ISL:OSL is a fallback for the degenerate input = output case. A legacy
+ * row with only one rate cannot be told apart and is returned as stored.
  */
 export function exactPerTotalChipRates(row: RateRow): { input?: number; output?: number } | null {
   const raw = { input: row.input_tput_per_gpu, output: row.output_tput_per_gpu };
@@ -98,17 +109,22 @@ export function exactPerTotalChipRates(row: RateRow): { input?: number; output?:
       output: scaleRate(raw.output, factors.output),
     };
   }
+  if (!isUnsplitDisagg(row)) return null;
+  const { input, output } = raw;
+  if (typeof input !== 'number' || typeof output !== 'number') return raw;
   const total = row.tput_per_gpu;
   if (!(typeof total === 'number' && total > 0)) return null;
-  const rawSum = (raw.input ?? 0) + (raw.output ?? 0);
-  if (rawSum > 0 && Math.abs(rawSum / total - 1) <= RAW_SUM_TOLERANCE) return raw;
+  if (Math.abs((input + output) / total - 1) <= RAW_SUM_TOLERANCE) return raw;
+  if (input !== output) {
+    const prefillShare = (total - output) / (input - output);
+    if (prefillShare > 0 && prefillShare < 1) {
+      return { input: input * prefillShare, output: output * (1 - prefillShare) };
+    }
+  }
   const { isl, osl } = row;
   if (typeof isl !== 'number' || typeof osl !== 'number' || !(isl + osl > 0)) return null;
   const share = isl / (isl + osl);
-  return {
-    input: raw.input === undefined ? undefined : total * share,
-    output: raw.output === undefined ? undefined : total * (1 - share),
-  };
+  return { input: total * share, output: total * (1 - share) };
 }
 
 /**

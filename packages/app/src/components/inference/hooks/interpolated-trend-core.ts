@@ -111,6 +111,14 @@ export function rowToLightweightPoint(
     tput_per_gpu: entry.tput_per_gpu,
     input_tput_per_gpu: entry.input_tput_per_gpu,
     output_tput_per_gpu: entry.output_tput_per_gpu,
+    // Pool sizes and basis let the token mix (token revenue) read per-pool rates
+    // on the deployment basis, identically under both chip bases.
+    disagg: entry.disagg,
+    num_prefill_gpu: entry.num_prefill_gpu,
+    num_decode_gpu: entry.num_decode_gpu,
+    prefill_num_workers: entry.prefill_num_workers,
+    decode_num_workers: entry.decode_num_workers,
+    chip_basis: entry.chip_basis,
     isl: entry.isl,
     osl: entry.osl,
     total_prompt_tokens: entry.total_prompt_tokens,

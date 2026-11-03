@@ -72,6 +72,39 @@ function makeBenchmarkRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
 }
 
 describe('rowToLightweightPoint', () => {
+  it('prices token revenue from the measured mix identically on both chip bases', () => {
+    // 4 prefill + 16 decode chips; measured mix 51% input at ISL:OSL 1:1.
+    const total = 3816.2;
+    const row = makeBenchmarkRow({
+      hardware: 'gb200',
+      framework: 'dynamo-trt',
+      disagg: true,
+      is_multinode: true,
+      prefill_num_workers: 1,
+      decode_num_workers: 1,
+      num_prefill_gpu: 4,
+      num_decode_gpu: 16,
+      isl: 1024,
+      osl: 1024,
+      metrics: {
+        tput_per_gpu: total,
+        input_tput_per_gpu: (total * 0.51 * 20) / 4,
+        output_tput_per_gpu: (total * 0.49 * 20) / 16,
+        median_intvty: 50,
+      },
+    });
+    const revenue = (basis: 'pool' | 'total') =>
+      rowToLightweightPoint(
+        row,
+        ['tokenRevenuePerGpuHour'],
+        { source: 'normalized', inputPerMillion: 1, outputPerMillion: 10 },
+        undefined,
+        basis,
+      )?.tokenRevenuePerGpuHour?.y;
+    expect(revenue('pool')).toBeGreaterThan(0);
+    expect(revenue('total')).toBeCloseTo(revenue('pool')!, 9);
+  });
+
   it('reads AgentX interactivity at P90 and fixed-sequence interactivity at the median', () => {
     // The drifted artifact p90_intvty (99) must lose to 1/p90_itl, as on the AgentX charts.
     const metrics = { tput_per_gpu: 400, median_intvty: 50, p90_intvty: 99, p90_itl: 0.05 };

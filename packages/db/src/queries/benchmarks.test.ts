@@ -153,3 +153,47 @@ describe('power audit provenance reads (tolerant to a not-yet-applied migration 
     expect(text).not.toMatch(/\b(?:br|lb)\.power_(?:invalid_reasons|audit)\b/u);
   });
 });
+
+describe('stored per-pool basis on read', () => {
+  // An agentic disaggregated row the backfill has not reached yet: the producer
+  // divided input and output by all 16 chips.
+  const unbackfilled = {
+    benchmark_type: 'agentic_traces',
+    disagg: true,
+    num_prefill_gpu: 4,
+    num_decode_gpu: 12,
+    prefill_num_workers: 1,
+    decode_num_workers: 3,
+    metrics: { tput_per_gpu: 1000, input_tput_per_gpu: 900, output_tput_per_gpu: 100 },
+  };
+  const sqlReturning = () =>
+    vi.fn(() => Promise.resolve([structuredClone(unbackfilled)])) as unknown as Parameters<
+      typeof getBenchmarksForRun
+    >[0];
+
+  it.each([
+    [
+      'latest (materialized view)',
+      (sql: Parameters<typeof getLatestBenchmarks>[0]) => getLatestBenchmarks(sql, 'dsv4'),
+    ],
+    [
+      'latest (dated)',
+      (sql: Parameters<typeof getLatestBenchmarks>[0]) =>
+        getLatestBenchmarks(sql, 'dsv4', '2026-08-01'),
+    ],
+    [
+      'exact run',
+      (sql: Parameters<typeof getLatestBenchmarks>[0]) => getBenchmarksForRun(sql, 'dsv4', 123),
+    ],
+    [
+      'history',
+      (sql: Parameters<typeof getLatestBenchmarks>[0]) =>
+        getAllBenchmarksForHistory(sql, 'dsv4', null, null, 'agentic_traces'),
+    ],
+  ])('rescales unbackfilled agentic rows on the %s path', async (_label, read) => {
+    const [row] = await read(sqlReturning());
+    expect(row!.metrics.input_tput_per_gpu).toBeCloseTo(3600, 9);
+    expect(row!.metrics.output_tput_per_gpu).toBeCloseTo((100 * 16) / 12, 9);
+    expect(row!.metrics.input_tput_per_total_gpu).toBe(900);
+  });
+});

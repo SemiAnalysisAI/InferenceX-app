@@ -369,9 +369,17 @@ describe('powerBasisNormalization — legacy unsplit disaggregated rows', () => 
     },
   );
 
-  it('withholds the normalization when the token mix is unknown', () => {
+  it('withholds the normalization when the pool share is undetermined', () => {
     const entry = rowToAggDataEntry(legacy());
-    expect(powerBasisNormalization({ ...entry, isl: null, osl: null })).toEqual({
+    expect(
+      powerBasisNormalization({
+        ...entry,
+        input_tput_per_gpu: 600,
+        output_tput_per_gpu: 600,
+        isl: null,
+        osl: null,
+      }),
+    ).toEqual({
       allocatedGpus: null,
       totalOutputTokPerSec: null,
     });

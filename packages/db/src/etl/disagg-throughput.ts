@@ -63,25 +63,45 @@ export function perPoolThroughputPatch(
 interface StoredBenchmarkRow {
   benchmark_type: string;
   disagg: boolean;
-  is_multinode: boolean;
   num_prefill_gpu: number;
   num_decode_gpu: number;
+  prefill_num_workers: number;
+  decode_num_workers: number;
   metrics: Record<string, number>;
 }
 
-/**
- * Whether a row is one the agentic producer divided by every chip. Only multinode
- * runs carry separate prefill and decode chip counts; the single-node fallback sets
- * both pool sizes to the whole deployment, which would double the rates.
- */
-export function isPerTotalAgenticCandidate(row: {
-  benchmark_type?: string;
+interface PoolFields {
   disagg?: boolean;
-  is_multinode?: boolean;
-}): boolean {
+  num_prefill_gpu?: number;
+  num_decode_gpu?: number;
+  prefill_num_workers?: number;
+  decode_num_workers?: number;
+}
+
+/**
+ * Whether a disaggregated row records its real prefill and decode pool sizes:
+ * worker counts are present, or the two pool fields differ. Mirrors `hasPoolSplit`
+ * in the app (`packages/app/src/lib/benchmarks/chip-basis.ts`), which reads the
+ * rescaled rows; the two must agree on which rows are per pool.
+ */
+export function hasRealPoolSplit(row: PoolFields): boolean {
+  if (row.disagg !== true || !positive(row.num_prefill_gpu) || !positive(row.num_decode_gpu)) {
+    return false;
+  }
   return (
-    row.benchmark_type === 'agentic_traces' && row.disagg === true && row.is_multinode === true
+    (positive(row.prefill_num_workers) && positive(row.decode_num_workers)) ||
+    row.num_prefill_gpu !== row.num_decode_gpu
   );
+}
+
+/**
+ * Whether a row is one the agentic producer divided by every chip and that has
+ * real pool sizes to rescale by. Rows that mirror the whole deployment into both
+ * pool fields (single-node fallbacks) are left per total; rescaling them by N/N
+ * would double the rates.
+ */
+export function isPerTotalAgenticCandidate(row: PoolFields & { benchmark_type?: string }): boolean {
+  return row.benchmark_type === 'agentic_traces' && hasRealPoolSplit(row);
 }
 
 /**
