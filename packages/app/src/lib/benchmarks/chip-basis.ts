@@ -37,8 +37,8 @@ export function hasPoolSplit(row: ChipCounts): boolean {
     return false;
   }
   return (
-    (chipCount(row.prefill_num_workers) && chipCount(row.decode_num_workers)) ||
-    row.num_prefill_gpu !== row.num_decode_gpu
+    row.num_prefill_gpu !== row.num_decode_gpu ||
+    (chipCount(row.prefill_num_workers) && chipCount(row.decode_num_workers))
   );
 }
 
@@ -61,20 +61,6 @@ function isUnsplitDisagg(row: ChipCounts): boolean {
 export function disaggDeploymentChips(row: ChipCounts): number | undefined {
   if (hasPoolSplit(row)) return row.num_prefill_gpu! + row.num_decode_gpu!;
   return isUnsplitDisagg(row) ? row.num_prefill_gpu : undefined;
-}
-
-/**
- * Multipliers that take per-pool input and output rates to per-total-chip rates,
- * or null for rows without a real prefill/decode split.
- */
-export function totalChipFactors(row: ChipCounts): { input: number; output: number } | null {
-  if (!hasPoolSplit(row)) return null;
-  const chips = row.num_prefill_gpu! + row.num_decode_gpu!;
-  return { input: row.num_prefill_gpu! / chips, output: row.num_decode_gpu! / chips };
-}
-
-function scaleRate(value: number | undefined, factor: number | undefined): number | undefined {
-  return typeof value === 'number' && factor !== undefined ? value * factor : value;
 }
 
 type RateRow = ChipCounts & {
@@ -100,21 +86,21 @@ const RAW_SUM_TOLERANCE = 0.01;
  * row with only one rate cannot be told apart and is returned as stored.
  */
 export function exactPerTotalChipRates(row: RateRow): { input?: number; output?: number } | null {
-  const raw = { input: row.input_tput_per_gpu, output: row.output_tput_per_gpu };
-  if (row.chip_basis === 'total' || !row.disagg) return raw;
-  const factors = totalChipFactors(row);
-  if (factors) {
+  const input = row.input_tput_per_gpu;
+  const output = row.output_tput_per_gpu;
+  if (row.chip_basis === 'total' || !row.disagg) return { input, output };
+  if (hasPoolSplit(row)) {
+    const chips = row.num_prefill_gpu! + row.num_decode_gpu!;
     return {
-      input: scaleRate(raw.input, factors.input),
-      output: scaleRate(raw.output, factors.output),
+      input: typeof input === 'number' ? input * (row.num_prefill_gpu! / chips) : input,
+      output: typeof output === 'number' ? output * (row.num_decode_gpu! / chips) : output,
     };
   }
   if (!isUnsplitDisagg(row)) return null;
-  const { input, output } = raw;
-  if (typeof input !== 'number' || typeof output !== 'number') return raw;
+  if (typeof input !== 'number' || typeof output !== 'number') return { input, output };
   const total = row.tput_per_gpu;
   if (!(typeof total === 'number' && total > 0)) return null;
-  if (Math.abs((input + output) / total - 1) <= RAW_SUM_TOLERANCE) return raw;
+  if (Math.abs((input + output) / total - 1) <= RAW_SUM_TOLERANCE) return { input, output };
   if (input !== output) {
     const prefillShare = (total - output) / (input - output);
     if (prefillShare > 0 && prefillShare < 1) {
@@ -194,9 +180,21 @@ export function withChipBasis<T extends BenchmarkRow>(
   basis: ChipBasis,
 ): ChipBasisRow<T> {
   if (basis === 'pool' || row.chip_basis === 'total' || !row.disagg) return row;
-  const rates = exactPerTotalChipRates({ ...row, ...row.metrics, chip_basis: undefined });
+  const stored = row.metrics;
+  const rates = exactPerTotalChipRates({
+    disagg: row.disagg,
+    num_prefill_gpu: row.num_prefill_gpu,
+    num_decode_gpu: row.num_decode_gpu,
+    prefill_num_workers: row.prefill_num_workers,
+    decode_num_workers: row.decode_num_workers,
+    isl: row.isl,
+    osl: row.osl,
+    tput_per_gpu: stored.tput_per_gpu,
+    input_tput_per_gpu: stored.input_tput_per_gpu,
+    output_tput_per_gpu: stored.output_tput_per_gpu,
+  });
   if (!rates) return row;
-  const metrics = { ...row.metrics };
+  const metrics = { ...stored };
   if (typeof rates.input === 'number') metrics.input_tput_per_gpu = rates.input;
   if (typeof rates.output === 'number') metrics.output_tput_per_gpu = rates.output;
   return { ...row, metrics, chip_basis: 'total' };

@@ -30,6 +30,7 @@ import type { BenchmarkRow } from '@/lib/api/api';
 import {
   DEFAULT_CHIP_BASIS,
   inputTputPerTotalChip,
+  rowsWithChipBasis,
   withChipBasis,
   type ChipBasis,
   type ChipBasisRow,
@@ -523,8 +524,8 @@ export function transformBenchmarkRows(
   }));
   const specsByHw = new Map<string, GpuSpecs>();
   const pointsByHw: Record<string, InferenceData[][]> = {};
-  for (const row of rows) {
-    const entry = rowToAggDataEntry(withChipBasis(row, chipBasis));
+  for (const row of rowsWithChipBasis(rows, chipBasis)) {
+    const entry = rowToAggDataEntry(row);
     if (tokenBasis === 'uncached' && !applyUncachedTokenBasis(entry)) continue;
     const hwKey = getHardwareKey(entry);
     entry.hwKey = hwKey;
