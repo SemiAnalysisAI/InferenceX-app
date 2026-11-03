@@ -4,6 +4,7 @@ import { afterEach, beforeEach, vi } from 'vitest';
 
 import { setupChartStructure } from '@/lib/d3-chart/chart-setup';
 import type { ChartDefinition, InferenceData } from '@/components/inference/types';
+import type { BenchmarkPresenceSets } from '@/hooks/api/use-benchmark-presence';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import type * as NextNavigation from 'next/navigation';
 
@@ -22,20 +23,17 @@ declare global {
   var __scatterLegendState: { current: Record<string, any> | null };
   var __scatterInferenceState: { current: Record<string, unknown> };
   var __scatterOverlayState: { current: Record<string, unknown> };
-  var __scatterTraceAvailabilityState: { current: Record<number, boolean> | undefined };
-  var __scatterLogAvailabilityState: { current: Record<number, boolean> | undefined };
+  var __scatterPresenceState: {
+    current: BenchmarkPresenceSets | undefined;
+    enabled: boolean | undefined;
+  };
   var __scatterPathnameState: { value: string };
 }
-const availabilityIdsGlobal = vi.hoisted(() => ({
-  traceIds: [] as number[],
-  logIds: [] as number[],
-}));
 vi.hoisted(() => {
   globalThis.__scatterLegendState = { current: null };
   globalThis.__scatterInferenceState = { current: {} };
   globalThis.__scatterOverlayState = { current: {} };
-  globalThis.__scatterTraceAvailabilityState = { current: undefined };
-  globalThis.__scatterLogAvailabilityState = { current: undefined };
+  globalThis.__scatterPresenceState = { current: undefined, enabled: undefined };
 });
 
 vi.mock('@/components/ui/chart-legend', () => ({
@@ -56,20 +54,12 @@ vi.mock('@/providers/unofficial-run-provider', () => ({
 
 export const legendState = globalThis.__scatterLegendState;
 export const inferenceState = globalThis.__scatterInferenceState;
-export const logAvailabilityState = globalThis.__scatterLogAvailabilityState;
 export const overlayState = globalThis.__scatterOverlayState;
-export const traceAvailabilityState = globalThis.__scatterTraceAvailabilityState;
-export const availabilityState = availabilityIdsGlobal;
-vi.mock('@/hooks/api/use-trace-availability', () => ({
-  useTraceAvailability: (ids: number[]) => {
-    availabilityIdsGlobal.traceIds = ids ?? [];
-    return { data: globalThis.__scatterTraceAvailabilityState.current, isPending: false };
-  },
-}));
-vi.mock('@/hooks/api/use-log-availability', () => ({
-  useLogAvailability: (ids: number[]) => {
-    availabilityIdsGlobal.logIds = ids ?? [];
-    return { data: globalThis.__scatterLogAvailabilityState.current, isPending: false };
+export const presenceState = globalThis.__scatterPresenceState;
+vi.mock('@/hooks/api/use-benchmark-presence', () => ({
+  useBenchmarkPresence: (enabled: boolean) => {
+    globalThis.__scatterPresenceState.enabled = enabled;
+    return { data: globalThis.__scatterPresenceState.current, isPending: false };
   },
 }));
 
@@ -261,10 +251,8 @@ beforeEach(() => {
   inferenceState.current = baseInferenceState();
   overlayState.current = baseOverlayState();
   legendState.current = null;
-  traceAvailabilityState.current = undefined;
-  logAvailabilityState.current = undefined;
-  availabilityState.traceIds = [];
-  availabilityState.logIds = [];
+  presenceState.current = undefined;
+  presenceState.enabled = undefined;
   vi.mocked(setupChartStructure).mockClear();
 });
 

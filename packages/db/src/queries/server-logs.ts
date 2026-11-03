@@ -1,7 +1,10 @@
 import type { DbClient } from '../connection.js';
-
-/** Map of `benchmark_results.id` → true for each id with a linked log bundle. */
-export type ServerLogAvailabilityMap = Record<number, true>;
+import { readServerLogBlocks } from '../server-log-blocks';
+import {
+  type BlockSearchFile,
+  readBlockSearchIndexes,
+  searchBlockFile,
+} from './server-log-block-search';
 
 export interface ServerLogChunk {
   fileName: string;
@@ -32,12 +35,102 @@ const isPreLogFilesSchema = (error: unknown): boolean => {
 export const escapePostgresRegexLiteral = (value: string): string =>
   value.replaceAll(/[\\^$.*+?()[\]{}|]/gu, String.raw`\$&`);
 
+interface BlockBackedFile {
+  logId: string;
+  fileName: string;
+  charCount: number;
+}
+
+/**
+ * Code points [offset, offset + length) of the file a request names, in one
+ * query, when the file is stored as blocks. Resolves the file the same way the
+ * text readers do (primary stream first). Null sends the caller to the text
+ * columns: no such file, no block marker, or tables older than migration 021.
+ */
+async function readBlockBacked(
+  sql: DbClient,
+  benchmarkResultId: number,
+  requestedFile: string | null = null,
+  offset = 0,
+  length = Number.MAX_SAFE_INTEGER,
+): Promise<{ file: BlockBackedFile; text: string } | null> {
+  let rows: {
+    log_id: string;
+    file_name: string;
+    file_chars: number | string;
+    char_offset: number | string | null;
+    char_count: number | null;
+    ascii: boolean | null;
+    data: Uint8Array | null;
+  }[];
+  try {
+    rows = (await sql`
+      with selected_log as (
+        select sl.id as server_log_id, sl.file_name, 0 as priority
+        from benchmark_results br
+        join server_logs sl on sl.id = br.server_log_id
+        where br.id = ${benchmarkResultId}
+          and (${requestedFile}::text is null or sl.file_name = ${requestedFile})
+        union all
+        select slf.server_log_id, slf.file_name, 1 as priority
+        from benchmark_results br
+        join server_log_files slf on slf.server_log_id = br.server_log_id
+        where br.id = ${benchmarkResultId}
+          and ${requestedFile}::text is not null
+          and slf.file_name = ${requestedFile}
+        order by priority
+        limit 1
+      ), target as (
+        select s.server_log_id, s.file_name, m.char_count as file_chars
+        from selected_log s
+        join server_log_block_files m
+          on m.server_log_id = s.server_log_id and m.file_name = s.file_name
+      )
+      select t.server_log_id::text as log_id, t.file_name, t.file_chars,
+             b.char_offset, b.char_count, b.ascii, b.data
+      from target t
+      left join server_log_blocks b
+        on b.server_log_id = t.server_log_id
+        and b.file_name = t.file_name
+        and b.char_offset < least(${offset}::bigint + ${length}::bigint, t.file_chars)
+        and b.char_offset + b.char_count > ${offset}::bigint
+      order by b.block_index
+    `) as typeof rows;
+  } catch (error) {
+    if (isPreLogFilesSchema(error)) return null;
+    throw error;
+  }
+  const first = rows[0];
+  if (!first) return null;
+  const file = {
+    logId: first.log_id,
+    fileName: first.file_name,
+    charCount: Number(first.file_chars),
+  };
+  const end = Math.min(offset + length, file.charCount);
+  const blocks = rows.flatMap((row) =>
+    row.data === null
+      ? []
+      : [
+          {
+            charOffset: Number(row.char_offset),
+            charCount: Number(row.char_count),
+            ascii: row.ascii === true,
+            data: row.data,
+          },
+        ],
+  );
+  return { file, text: offset >= end ? '' : readServerLogBlocks(blocks, offset, end - offset) };
+}
+
 /** Fetch a complete log file. Omit fileName for the primary/legacy stream. */
 export async function getServerLog(
   sql: DbClient,
   benchmarkResultId: number,
   fileName?: string,
 ): Promise<string | null> {
+  const block = await readBlockBacked(sql, benchmarkResultId, fileName);
+  if (block) return block.text;
   try {
     const requestedFile = fileName ?? null;
     const rows = (await sql`
@@ -118,6 +211,17 @@ export async function getServerLogChunk(
   limit: number,
   fileName?: string,
 ): Promise<ServerLogChunk | null> {
+  const block = await readBlockBacked(sql, benchmarkResultId, fileName, offset, limit);
+  if (block) {
+    // Same values as the text path: `has_more` is "a character exists after the range".
+    const charCount = Math.max(0, Math.min(limit, block.file.charCount - offset));
+    return {
+      fileName: block.file.fileName,
+      serverLog: block.text,
+      offset,
+      nextOffset: offset + limit < block.file.charCount ? offset + charCount : null,
+    };
+  }
   try {
     const requestedFile = fileName ?? null;
     const rows = (await sql`
@@ -194,6 +298,21 @@ export async function getServerLogChunk(
   }
 }
 
+/**
+ * PostgreSQL's case-insensitive regex on an escaped literal: each needle
+ * character matches itself, its lowercase or its uppercase. Not Unicode case
+ * folding, which would also match U+212A KELVIN SIGN to `k`.
+ */
+function caseInsensitiveLiteral(term: string): RegExp {
+  const classes = [...term].map((ch) => {
+    const variants = new Set(
+      [ch, ch.toLowerCase(), ch.toUpperCase()].filter((v) => [...v].length === 1),
+    );
+    return `[${[...variants].map((v) => v.replaceAll(/[\\\]^[-]/gu, String.raw`\$&`)).join('')}]`;
+  });
+  return new RegExp(classes.join(''), 'u');
+}
+
 /** Search every stored file without transferring complete logs out of PostgreSQL. */
 export async function searchServerLogs(
   sql: DbClient,
@@ -215,9 +334,31 @@ export async function searchServerLogs(
     const searchLength = [...searchTerm].length;
     const overlap = Math.min(Math.max(0, searchLength - 1), 255);
     const searchPattern = escapePostgresRegexLiteral(searchTerm);
+    const blockPattern = caseInsensitiveLiteral(searchTerm);
     const fileNames = (await getServerLogFileNames(sql, benchmarkResultId)) ?? [];
     const matches: ServerLogSearchMatch[] = [];
+    let blockFiles = new Map<string, BlockSearchFile>();
+    try {
+      blockFiles = await readBlockSearchIndexes(sql, benchmarkResultId, fileNames, searchTerm);
+    } catch (error) {
+      if (!isPreLogFilesSchema(error)) throw error;
+    }
     for (const [fileIndex, fileName] of fileNames.entries()) {
+      const blockFile = blockFiles.get(fileName);
+      if (blockFile) {
+        await searchBlockFile(
+          sql,
+          blockFile,
+          blockPattern,
+          searchLength,
+          chunkSize,
+          overlap,
+          matches,
+          limit,
+        );
+        if (matches.length > limit) break;
+        continue;
+      }
       let offset = 0;
       while (matches.length <= limit) {
         const rows = (fileIndex === 0
@@ -347,23 +488,4 @@ export async function searchServerLogs(
     }
     return { matches: matches.slice(0, limit), truncated: matches.length > limit };
   }
-}
-
-/** Lightweight bulk lookup used to decide whether a point exposes "View logs". */
-export async function getServerLogAvailability(
-  sql: DbClient,
-  benchmarkResultIds: number[],
-): Promise<ServerLogAvailabilityMap> {
-  if (benchmarkResultIds.length === 0) return {};
-
-  const rows = (await sql`
-    select br.id
-    from benchmark_results br
-    where br.id = any(${benchmarkResultIds}::bigint[])
-      and br.server_log_id is not null
-  `) as { id: number }[];
-
-  const result: ServerLogAvailabilityMap = {};
-  for (const row of rows) result[Number(row.id)] = true;
-  return result;
 }

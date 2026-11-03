@@ -1,17 +1,31 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, type Mock, vi } from 'vitest';
 
 import type { DbClient } from '../connection.js';
 import {
   escapePostgresRegexLiteral,
-  getServerLogAvailability,
   getServerLogChunk,
   getServerLogFileNames,
   searchServerLogs,
 } from './server-logs.js';
+import {
+  countCodePoints,
+  encodeServerLogBlocks,
+  SERVER_LOG_BLOCK_CHARS,
+} from '../server-log-blocks';
+
+// Text-path client: block-storage probes find no block marker and never reach `call`.
+function withoutBlockStorage(call: Mock): DbClient {
+  return ((strings: TemplateStringsArray, ...values: unknown[]) =>
+    strings.join('').includes('server_log_block_files')
+      ? Promise.resolve([])
+      : call(strings, ...values)) as unknown as DbClient;
+}
 
 function mockSql(rows: unknown[]) {
-  const sql = vi.fn(() => Promise.resolve(rows)) as unknown as DbClient;
-  return { sql, call: sql as unknown as ReturnType<typeof vi.fn> };
+  const call = vi.fn((_strings: TemplateStringsArray, ..._values: unknown[]) =>
+    Promise.resolve(rows),
+  );
+  return { sql: withoutBlockStorage(call), call };
 }
 
 describe('getServerLogChunk', () => {
@@ -72,6 +86,165 @@ describe('getServerLogChunk', () => {
   });
 });
 
+describe('block-backed files', () => {
+  // Two astral code points per line so code points and UTF-16 units diverge, spanning 3 blocks.
+  const line = 'INFO step 😀 tok/s 🚀\n';
+  const text = line.repeat(Math.ceil((2.5 * SERVER_LOG_BLOCK_CHARS) / [...line].length));
+  const chars = [...text];
+  const blocks = encodeServerLogBlocks(text);
+  // Answers the block query like PostgreSQL: the marker row joined to the overlapping blocks.
+  const sql = ((strings: TemplateStringsArray, ...values: unknown[]) => {
+    if (!strings.join('').includes('server_log_block_files')) return Promise.resolve([]);
+    const [offset, length] = values.slice(-3) as number[];
+    const end = Math.min(offset + length, chars.length);
+    return Promise.resolve(
+      blocks
+        .filter((b) => b.charOffset < end && b.charOffset + b.charCount > offset)
+        .map((b) => ({
+          log_id: '7',
+          file_name: 'frontend.out',
+          file_chars: chars.length,
+          char_offset: b.charOffset,
+          char_count: b.charCount,
+          ascii: b.ascii,
+          data: b.data,
+        })),
+    );
+  }) as unknown as DbClient;
+
+  it('reads a chunk across a block boundary in code points', async () => {
+    const offset = SERVER_LOG_BLOCK_CHARS - 5;
+    await expect(getServerLogChunk(sql, 42, offset, 40, 'frontend.out')).resolves.toEqual({
+      fileName: 'frontend.out',
+      serverLog: chars.slice(offset, offset + 40).join(''),
+      offset,
+      nextOffset: offset + 40,
+    });
+  });
+
+  it('ends at the last code point with no continuation', async () => {
+    const offset = chars.length - 10;
+    await expect(getServerLogChunk(sql, 42, offset, 64, 'frontend.out')).resolves.toEqual({
+      fileName: 'frontend.out',
+      serverLog: chars.slice(offset).join(''),
+      offset,
+      nextOffset: null,
+    });
+  });
+});
+
+describe('searchServerLogs on a block-backed file', () => {
+  const chunk = 16 * 1024 * 1024;
+  // Astral characters only in the prefix, so code point = unit - (astral units before it) after it.
+  const prefix = '😀Ready ready😀READY x ';
+  const tail = 'ready! é READY';
+  // 'zebra' straddles the first block boundary. The prefix's last 'ready' ends at code
+  // point 18, so the tail's 'ready' starts 2 before the end of the chunk from there.
+  const straddle = SERVER_LOG_BLOCK_CHARS - 2 - [...prefix].length;
+  const filler = `${'x'.repeat(straddle)}zebra${'x'.repeat(chunk - 10 - straddle)}`;
+  const text = prefix + filler + tail;
+  const blocks = encodeServerLogBlocks(text);
+  const total = [...prefix].length + filler.length + [...tail].length;
+  const fetched: number[] = [];
+  // Answers like PostgreSQL: file names, the block index with each bloom verdict
+  // (`get_bit` reads bit n % 8 of byte n / 8), and block data by index.
+  const sql = ((strings: TemplateStringsArray, ...values: unknown[]) => {
+    const query = strings.join('');
+    if (query.includes('block_index = any')) {
+      const wanted = values[2] as number[];
+      fetched.push(...wanted);
+      return Promise.resolve(
+        blocks
+          .filter((b) => wanted.includes(b.blockIndex))
+          .map((b) => ({ block_index: b.blockIndex, data: b.data })),
+      );
+    }
+    if (!query.includes('server_log_block_files'))
+      return Promise.resolve([{ file_name: 'frontend.out' }]);
+    const groups = values[3] as number[];
+    const bits = values[5] as number[];
+    return Promise.resolve(
+      blocks.map((b) => ({
+        file_name: 'frontend.out',
+        log_id: '7',
+        file_chars: total,
+        block_index: b.blockIndex,
+        char_offset: b.charOffset,
+        char_count: b.charCount,
+        ascii: b.ascii,
+        candidate: groups.every((group) =>
+          bits.some(
+            (bit, i) => groups[i] === group && ((b.bloom[bit >>> 3] >> (bit & 7)) & 1) === 1,
+          ),
+        ),
+      })),
+    );
+  }) as unknown as DbClient;
+
+  // The SQL loop: search a chunk-sized window, restart after each match, else advance by
+  // the chunk minus the overlap. Before/after text is clipped to the current chunk.
+  function sqlLoop(term: string, limit: number) {
+    const chars = [...prefix];
+    const unit = (point: number) =>
+      point <= chars.length
+        ? chars.slice(0, point).join('').length
+        : prefix.length + point - chars.length;
+    const slice = (from: number, to: number) => text.slice(unit(from), unit(to));
+    const len = [...term].length;
+    const overlap = Math.min(len - 1, 255);
+    const matches = [];
+    let offset = 0;
+    while (matches.length <= limit) {
+      const end = Math.min(offset + chunk, total);
+      const index = slice(offset, end).toLowerCase().indexOf(term.toLowerCase());
+      if (index !== -1) {
+        const at = offset + countCodePoints(slice(offset, end).slice(0, index));
+        matches.push({
+          fileName: 'frontend.out',
+          offset: at,
+          before: slice(Math.max(offset, at - 120), at),
+          match: slice(at, at + len),
+          after: slice(at + len, Math.min(at + len + 120, end)),
+        });
+        offset = at + len;
+        continue;
+      }
+      if (offset + chunk >= total) break;
+      offset += end - offset - overlap;
+    }
+    return { matches: matches.slice(0, limit), truncated: matches.length > limit };
+  }
+
+  it('matches the SQL loop, clipping context to each chunk', async () => {
+    const expected = sqlLoop('ready', 50);
+    expect(expected.matches.length).toBe(5);
+    // The fourth match straddles the first chunk's end, so the SQL loop finds it in the next
+    // chunk and its before text starts at that chunk.
+    expect(expected.matches[3].before.length).toBeLessThan(120);
+    await expect(searchServerLogs(sql, 42, 'ready', 50)).resolves.toEqual(expected);
+  });
+
+  it('stops at the limit and reports truncation', async () => {
+    await expect(searchServerLogs(sql, 42, 'ready', 2)).resolves.toEqual(sqlLoop('ready', 2));
+  });
+
+  it('reads only the blocks whose bloom holds the term', async () => {
+    fetched.length = 0;
+    const expected = sqlLoop('é ready', 50);
+    expect(expected.matches).toHaveLength(1);
+    await expect(searchServerLogs(sql, 42, 'é ready', 50)).resolves.toEqual(expected);
+    // The term starts 16 code points into the last of 17 blocks, inside the previous block's
+    // lookahead.
+    expect(fetched).toEqual([15, 16]);
+  });
+
+  it('finds a term across a block boundary', async () => {
+    const expected = sqlLoop('zebra', 50);
+    expect(expected.matches.map((m) => m.offset)).toEqual([SERVER_LOG_BLOCK_CHARS - 2]);
+    await expect(searchServerLogs(sql, 42, 'ZEBRA', 50)).resolves.toEqual(expected);
+  });
+});
+
 describe('getServerLogFileNames', () => {
   it('returns primary and additional filenames in query order', async () => {
     const { sql } = mockSql([
@@ -120,7 +293,7 @@ describe('searchServerLogs', () => {
           has_more: true,
         },
       ]);
-    const sql = call as unknown as DbClient;
+    const sql = withoutBlockStorage(call);
 
     await expect(searchServerLogs(sql, 42, 'ready', 1)).resolves.toEqual({
       matches: [
@@ -153,7 +326,7 @@ describe('searchServerLogs', () => {
           has_more: false,
         },
       ]);
-    const sql = call as unknown as DbClient;
+    const sql = withoutBlockStorage(call);
     await expect(searchServerLogs(sql, 42, 'missing', 50)).resolves.toEqual({
       matches: [],
       truncated: false,
@@ -187,7 +360,7 @@ describe('searchServerLogs', () => {
         },
       ])
       .mockResolvedValueOnce([]);
-    const sql = call as unknown as DbClient;
+    const sql = withoutBlockStorage(call);
 
     await expect(searchServerLogs(sql, 42, 'ready', 50)).resolves.toEqual({
       matches: [
@@ -201,21 +374,5 @@ describe('searchServerLogs', () => {
       ],
       truncated: false,
     });
-  });
-});
-
-describe('getServerLogAvailability', () => {
-  it('returns an id-keyed presence map', async () => {
-    const { sql } = mockSql([{ id: 9 }, { id: 4 }]);
-    await expect(getServerLogAvailability(sql, [4, 9, 12])).resolves.toEqual({
-      4: true,
-      9: true,
-    });
-  });
-
-  it('does not query for an empty id set', async () => {
-    const { sql, call } = mockSql([]);
-    await expect(getServerLogAvailability(sql, [])).resolves.toEqual({});
-    expect(call).not.toHaveBeenCalled();
   });
 });

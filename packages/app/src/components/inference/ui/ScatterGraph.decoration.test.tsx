@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { InferenceData } from '@/components/inference/types';
 import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
+import { IdBitset } from '@/lib/benchmarks/benchmark-presence';
 
 import {
   POINTS,
@@ -14,8 +15,7 @@ import {
   mountChart,
   point,
   rebuildCount,
-  traceAvailabilityState,
-  availabilityState,
+  presenceState,
 } from './ScatterGraph.test-harness';
 import { pointLabelText } from './point-label';
 
@@ -65,21 +65,19 @@ describe('ScatterGraph toggle decoration', () => {
     unmount();
   });
 
-  it('checks log availability for fixed-sequence and agentic official points', () => {
+  it('requests presence only when a persisted point is shown, fixed-sequence included', () => {
+    const unpersisted = mountChart();
+    expect(presenceState.enabled).toBe(false);
+    unpersisted.unmount();
+
     const fixed = {
       ...point('h100', 'fp8', 10, 100, 1),
       id: 96255,
       benchmark_type: 'single_turn',
     } as InferenceData;
-    const agentic = {
-      ...point('h100', 'fp8', 20, 200, 2),
-      id: 206885,
-      benchmark_type: 'agentic_traces',
-    } as InferenceData;
-    const { unmount } = mountChart({ data: [fixed, agentic] });
+    const { unmount } = mountChart({ data: [fixed] });
 
-    expect(availabilityState.logIds).toEqual([96255, 206885]);
-    expect(availabilityState.traceIds).toEqual([206885]);
+    expect(presenceState.enabled).toBe(true);
     unmount();
   });
 
@@ -159,7 +157,7 @@ describe('ScatterGraph toggle decoration', () => {
     );
     expect(document.querySelector('[data-action="view-charts"]')).toBeNull();
 
-    traceAvailabilityState.current = { 42: true };
+    presenceState.current = { trace: new IdBitset([42, 1]), log: new IdBitset([]) };
     rerender();
     expect(rebuildCount()).toBe(buildsAfterMount);
     expect(container.querySelector<SVGGElement>('.dot-group')).toBe(originalDot);
@@ -226,7 +224,8 @@ describe('ScatterGraph toggle decoration', () => {
       showPointLabels: false,
     };
     rerender();
-    expect(label?.style.display).toBe('none');
+    expect(label?.isConnected).toBe(false);
+    expect(container.querySelector('.point-label')).toBeNull();
     unmount();
   });
 
@@ -314,6 +313,24 @@ describe('ScatterGraph toggle decoration', () => {
     expect(b200Roofline!.style.opacity).toBe('0');
 
     expect(rebuildCount()).toBe(buildsAfterMount);
+    unmount();
+  });
+
+  it('clears the Pareto fade from every faded mark when the frontier is turned off', () => {
+    inferenceState.current = { ...baseInferenceState(), showParetoFrontier: true };
+    // The extra h100 point dominates both b200 points, so b200 leaves the frontier.
+    const { container, rerender, unmount } = mountChart({
+      data: [...POINTS, point('h100', 'fp8', 70, 300, 2)],
+    });
+    const faded = () =>
+      [...container.querySelectorAll<SVGElement>('svg *')].filter(
+        (node) => node.style.filter !== '',
+      );
+    expect(faded().length).toBeGreaterThan(0);
+
+    inferenceState.current = { ...inferenceState.current, showParetoFrontier: false };
+    rerender();
+    expect(faded()).toEqual([]);
     unmount();
   });
 

@@ -21,8 +21,7 @@ import {
   useInferenceFilters,
 } from '@/components/inference/InferenceContext';
 import { usePerfRulerStore } from '@/components/inference/perf-ruler-store';
-import { useTraceAvailability } from '@/hooks/api/use-trace-availability';
-import { useLogAvailability } from '@/hooks/api/use-log-availability';
+import { useBenchmarkPresence } from '@/hooks/api/use-benchmark-presence';
 import { computeToggle } from '@/hooks/useTogglableSet';
 import {
   avoidPointLabelCollisions,
@@ -71,7 +70,7 @@ import type {
   ZoomContext,
 } from '@/lib/d3-chart/D3Chart/types';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
-import { raiseInOrder, setAttrIfChanged } from '@/lib/d3-chart/chart-update';
+import { raiseInOrder, setAttrIfChanged, setStyleIfChanged } from '@/lib/d3-chart/chart-update';
 import {
   computeTooltipPosition,
   syncPointLabel,
@@ -149,7 +148,6 @@ import {
   generateTooltipContent,
 } from '@/components/inference/utils/tooltipUtils';
 import { usePowerTraceAction } from '@/components/inference/hooks/usePowerTraceAction';
-import { QuickFiltersDialog } from '@/components/inference/ui/QuickFiltersDialog';
 import { describeEngineComparisonConflict } from '@/components/inference/ui/engine-comparison-conflict-toast';
 import { ScatterEmptyState } from '@/components/inference/ui/ScatterEmptyState';
 import { ALL_IN_MEASURED_EMPTY, type PowerBasisLabelStyle } from '@/lib/power/power-basis';
@@ -172,8 +170,6 @@ import {
   powerVariantLabel,
   powerVariantsInData,
 } from '@/components/inference/utils/power-compare';
-import FrontierPointsPanel from '@/components/inference/ui/FrontierPointsPanel';
-import LegendPointsDialog from '@/components/inference/ui/LegendPointsDialog';
 import { renderOffloadHalo } from '@/components/inference/utils/offload-halo';
 import {
   isAllInMeasuredConfigKey,
@@ -227,6 +223,22 @@ const FixedSequenceLogDialog = dynamic(
     ),
   { ssr: false },
 );
+
+// Closed or toggled-off until the reader asks for them, so they load after the chart instead of
+// with it.
+const QuickFiltersDialog = dynamic(
+  () =>
+    import('@/components/inference/ui/QuickFiltersDialog').then(
+      (module) => module.QuickFiltersDialog,
+    ),
+  { ssr: false },
+);
+const LegendPointsDialog = dynamic(() => import('@/components/inference/ui/LegendPointsDialog'), {
+  ssr: false,
+});
+const FrontierPointsPanel = dynamic(() => import('@/components/inference/ui/FrontierPointsPanel'), {
+  ssr: false,
+});
 
 const formatChangelogDescription = (desc: string | string[]): React.JSX.Element => {
   if (typeof desc === 'string') {
@@ -293,7 +305,6 @@ const VARIANT_DASH_BY_ID = new Map<string, string>(
 );
 
 const LINE_LABEL_RAISE = ['.line-label'] as const;
-const POINT_DECORATION_RAISE = ['.offload-halo'] as const;
 
 function syncGradientStop(this: SVGStopElement, stop: { offset: number; color: string }): void {
   setAttrIfChanged(this, 'offset', `${(stop.offset * 100).toFixed(2)}%`);
@@ -1201,21 +1212,12 @@ const ScatterGraph = React.memo(
     );
 
     const pointsData = useMemo(() => Object.values(groupedData).flat(), [groupedData]);
-    const agenticIds = useMemo(() => {
-      const ids: number[] = [];
-      for (const p of pointsData) {
-        if (p.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(p.id)) ids.push(p.id);
-      }
-      return ids;
-    }, [pointsData]);
-    const { data: traceAvailability, isPending: isTraceAvailabilityPending } =
-      useTraceAvailability(agenticIds);
-
-    const persistedPointIds = useMemo(
-      () => pointsData.flatMap((point) => (isPersistedBenchmarkId(point.id) ? [point.id] : [])),
+    const hasPersistedPoint = useMemo(
+      () => pointsData.some((point) => isPersistedBenchmarkId(point.id)),
       [pointsData],
     );
-    const { data: persistedLogAvailability } = useLogAvailability(persistedPointIds);
+    const { data: presence, isPending: isPresencePending } =
+      useBenchmarkPresence(hasPersistedPoint);
     const [fixedLogPointId, setFixedLogPointId] = useState<number | null>(null);
     const [powerTelemetryPoint, setPowerTelemetryPoint] = useState<InferenceData | null>(null);
 
@@ -1568,17 +1570,23 @@ const ScatterGraph = React.memo(
     const applyParetoFadeRef = useRef<(group: RenderContext['layout']['zoomGroup']) => void>(
       () => {},
     );
+    // Zoom groups that may carry a fade filter; an inactive fade skips the rest.
+    const [fadedZoomGroups] = useState(() => new WeakSet<SVGGElement>());
     applyParetoFadeRef.current = (zoomGroup) => {
+      const node = zoomGroup.node();
+      if (!node) return;
+      const active = showParetoFrontier && frontierHwKeys.size > 0;
+      if (!active && !fadedZoomGroups.has(node)) return;
       zoomGroup
         .selectAll<SVGElement, { hwKey?: string; points?: InferenceData[] }>(
           '.dot-group, .roofline-path, .unofficial-overlay-pt, .overlay-roofline-path, .overflow-continuation, .parallelism-label, .line-label',
         )
         .style('filter', function (d) {
           const hw = this.dataset.hwKey ?? d?.hwKey ?? d?.points?.[0]?.hwKey;
-          return showParetoFrontier && frontierHwKeys.size > 0 && hw && !frontierHwKeys.has(hw)
-            ? 'opacity(0.2)'
-            : null;
+          return active && hw && !frontierHwKeys.has(hw) ? 'opacity(0.2)' : null;
         });
+      if (active) fadedZoomGroups.add(node);
+      else fadedZoomGroups.delete(node);
     };
     const paretoHighlightLayer = useMemo<CustomLayerConfig>(() => {
       const render: NonNullable<CustomLayerConfig['render']> = (zoomGroup, ctx) => {
@@ -1770,8 +1778,7 @@ const ScatterGraph = React.memo(
       getCssColor,
       resolveColor,
       knownIssueAnnotations,
-      traceAvailability,
-      logAvailability: persistedLogAvailability,
+      presence,
       showPowerTelemetry,
     });
     interactionRef.current = {
@@ -1784,8 +1791,7 @@ const ScatterGraph = React.memo(
       getCssColor,
       resolveColor,
       knownIssueAnnotations,
-      traceAvailability,
-      logAvailability: persistedLogAvailability,
+      presence,
       showPowerTelemetry,
     };
 
@@ -2132,11 +2138,14 @@ const ScatterGraph = React.memo(
           variantId === null
             ? String(d.hwKey) === hwKey
             : (powerVariantId(d.powerVariant) || powerCompareBaseId) === variantId;
-        root
-          .selectAll<SVGGElement, InferenceData>('.dot-group')
-          .style('opacity', (d) =>
-            isPointVisible(d) ? (matchesPoint(d) ? pointOpacityForVariant(d) : 0.15) : 0,
-          );
+        root.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (d) {
+          const opacity = isPointVisible(d)
+            ? matchesPoint(d)
+              ? pointOpacityForVariant(d)
+              : 0.15
+            : 0;
+          setStyleIfChanged(this, 'opacity', String(opacity));
+        });
         root
           .selectAll<SVGElement, unknown>('.roofline-path, .official-overflow-continuation')
           .style('opacity', function () {
@@ -2160,9 +2169,13 @@ const ScatterGraph = React.memo(
       const svg = chartRef.current?.getSvgElement?.();
       if (!svg) return;
       const root = d3.select(svg);
-      root
-        .selectAll<SVGGElement, InferenceData>('.dot-group')
-        .style('opacity', (d) => (isPointVisible(d) ? pointOpacityForVariant(d) : 0));
+      root.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (d) {
+        setStyleIfChanged(
+          this,
+          'opacity',
+          String(isPointVisible(d) ? pointOpacityForVariant(d) : 0),
+        );
+      });
       root
         .selectAll<SVGElement, unknown>('.roofline-path, .official-overflow-continuation')
         .style('opacity', function () {
@@ -2248,10 +2261,10 @@ const ScatterGraph = React.memo(
             runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
             hasTrace:
               d.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(d.id)
-                ? (interactionRef.current.traceAvailability?.[d.id] ?? false)
+                ? (interactionRef.current.presence?.trace.has(d.id) ?? false)
                 : false,
             hasLog: isPersistedBenchmarkId(d.id)
-              ? (interactionRef.current.logAvailability?.[d.id] ?? false)
+              ? (interactionRef.current.presence?.log.has(d.id) ?? false)
               : false,
             locale,
             powerLabelStyle,
@@ -3797,11 +3810,16 @@ const ScatterGraph = React.memo(
       (ctx: RenderContext) => {
         const { zoomGroup } = ctx.layout;
 
-        zoomGroup.selectAll('.dot-group').style('transition', 'opacity 150ms ease');
+        // Only this pass sets a dot's transition, so a dot that has one is already current.
+        zoomGroup.selectAll<SVGGElement, unknown>('.dot-group').each(function () {
+          if (this.style.getPropertyValue('transition') === '') {
+            this.style.setProperty('transition', 'opacity 150ms ease');
+          }
+        });
 
         syncOffloadHalos(zoomGroup);
 
-        avoidPointLabelCollisions(zoomGroup);
+        if (pointLabelsVisible) avoidPointLabelCollisions(zoomGroup);
 
         if (xScaleConfig._isLog) {
           const xScale = (ctx.renderedXScale ?? ctx.xScale) as d3.ScaleLogarithmic<number, number>;
@@ -3818,6 +3836,7 @@ const ScatterGraph = React.memo(
       },
       [
         syncOffloadHalos,
+        pointLabelsVisible,
         hardwareConfig,
         xScaleConfig._isLog,
         yScaleConfig.type,
@@ -3842,20 +3861,20 @@ const ScatterGraph = React.memo(
       const ir = interactionRef.current;
 
       zoomGroup.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (d) {
-        const point = d3.select(this);
         const visible = ir.isPointVisible(d);
-        point
-          .style('opacity', visible ? pointOpacityForVariant(d) : 0)
-          .style('pointer-events', visible ? 'auto' : 'none');
+        setStyleIfChanged(this, 'opacity', String(visible ? pointOpacityForVariant(d) : 0));
+        setStyleIfChanged(this, 'pointer-events', visible ? 'auto' : 'none');
         const color =
           (showGradientLabels && gradientColorByPoint.get(d)) ||
           ir.getCssColor(ir.resolveColor(d.hwKey as string));
         syncPointShape(
-          point as unknown as d3.Selection<SVGGElement, unknown, null, undefined>,
+          d3.select<SVGGElement, unknown>(this),
           getShapeKeyForPrecision(d.precision, ir.selectedPrecisions),
           color,
         );
-        raiseInOrder(point, POINT_DECORATION_RAISE);
+        // Keep the offload halo above a re-created shape.
+        const halo = this.querySelector(':scope > .offload-halo');
+        if (halo?.nextSibling) this.append(halo);
       });
 
       zoomGroup.selectAll<SVGGElement, InferenceData>('.unofficial-overlay-pt').each(function (d) {
@@ -3937,17 +3956,22 @@ const ScatterGraph = React.memo(
       display.zoomGroup.selectAll<SVGGElement, InferenceData>('.dot-group').each(function (d) {
         const pointId = isPersistedBenchmarkId(d.id) ? d.id : null;
         const persistedAgenticPoint = d.benchmark_type === 'agentic_traces' && pointId !== null;
-        d3.select(this)
-          .attr(
-            'data-has-trace',
-            pointId !== null && traceAvailability?.[pointId] === true ? 'true' : null,
-          )
-          .attr(
+        if (persistedAgenticPoint && presence?.trace.has(pointId) === true) {
+          setAttrIfChanged(this, 'data-has-trace', 'true');
+        } else {
+          delete this.dataset.hasTrace;
+        }
+        if (persistedAgenticPoint) {
+          setAttrIfChanged(
+            this,
             'data-trace-availability',
-            persistedAgenticPoint ? (isTraceAvailabilityPending ? 'pending' : 'resolved') : null,
+            isPresencePending ? 'pending' : 'resolved',
           );
+        } else {
+          delete this.dataset.traceAvailability;
+        }
       });
-    }, [getDisplaySelection, dataIdentity, traceAvailability, isTraceAvailabilityPending]);
+    }, [getDisplaySelection, dataIdentity, presence, isPresencePending]);
 
     useLayoutEffect(() => {
       const visibilityChanged = lastPointLabelsVisibleRef.current !== pointLabelsVisible;

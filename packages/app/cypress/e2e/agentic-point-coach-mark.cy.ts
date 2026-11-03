@@ -1,5 +1,10 @@
-import { interceptDerivedAgenticMetrics, unlockAgenticGate } from '../support/e2e';
 import {
+  interceptBenchmarkPresence,
+  interceptDerivedAgenticMetrics,
+  unlockAgenticGate,
+} from '../support/e2e';
+import {
+  AGENTIC_FIXTURE_FIRST_ID,
   OVERLAY_RUN_BRANCH,
   OVERLAY_RUN_ID,
   interceptOverlayRun,
@@ -24,9 +29,8 @@ beforeEach(() => {
   cy.clearAllSessionStorage();
   interceptOverlayRun();
   interceptDerivedAgenticMetrics();
-  cy.intercept('GET', '/api/v1/trace-availability?ids=*', (request) => {
-    const ids = new URL(request.url).searchParams.get('ids')?.split(',').filter(Boolean) ?? [];
-    request.reply({ body: Object.fromEntries(ids.map((id) => [id, true])) });
+  interceptBenchmarkPresence({
+    trace: Array.from({ length: 1000 }, (_, index) => AGENTIC_FIXTURE_FIRST_ID + index),
   });
 });
 
