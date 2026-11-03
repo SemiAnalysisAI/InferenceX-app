@@ -1478,7 +1478,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/benchmarks/benchmark-transform.ts',
-    sourceSha256: 'fc02a01b5516cb0828c9739e51649dfd62d60a5aeac180c2bd875b5cc5ef2a44',
+    sourceSha256: '71b4a5a9f53f4fe87b62d5594d362947dd49f82f76914395a6c57f719ec95d6f',
     reviewArea: {
       en: 'Raw benchmark means and derived reciprocal mean-TPOT interactivity used by Dashboard and read-only views.',
       zh: '仪表板和只读视图共用的原始 benchmark 均值与 mean TPOT 倒数形式的 interactivity。',
