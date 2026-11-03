@@ -7,7 +7,7 @@ export class PollaraNICCard extends ScaleOutNICCard {
   static override readonly typeName: string = 'PollaraNICCard';
   static override readonly bandwidth_gbps: number = 400;
   static override readonly idle_power_w: number = 34.5;
-  static override readonly active_power_w: number = 39;
+  static override readonly active_power_w: number = 34.5;
 
   constructor({ provenance = POLLARA_NIC_BASELINE, ...fields }: ScaleOutNICCardFields) {
     super({ provenance, ...fields });
