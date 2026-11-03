@@ -67,6 +67,33 @@ export function perTotalChipRates(row: RateRow): { input?: number; output?: numb
   };
 }
 
+/**
+ * Measured input share of a row's tokens: input / (input + output) once the two
+ * rates are on the per-deployment-chip basis `tput_per_gpu` uses, so the result
+ * never follows the chip-basis toggle. Rows still carrying raw per-total producer
+ * rates (fixtures, artifacts read before ingest) already add up and are accepted
+ * as they are; a genuine per-pool row's raw rates sum to at least
+ * `1 + min(p, d) / max(p, d)` times the total and cannot pass. Returns null when
+ * neither reading adds up within `tolerance`.
+ */
+export function measuredInputShare(
+  row: RateRow & { tput_per_gpu?: number },
+  tolerance: number,
+): number | null {
+  const total = row.tput_per_gpu ?? 0;
+  if (!(total > 0)) return null;
+  const converted = perTotalChipRates(row);
+  for (const rates of [
+    converted,
+    { input: row.input_tput_per_gpu, output: row.output_tput_per_gpu },
+  ]) {
+    const input = rates.input ?? 0;
+    const sum = input + (rates.output ?? 0);
+    if (sum > 0 && Math.abs(sum / total - 1) <= tolerance) return input / sum;
+  }
+  return null;
+}
+
 /** Per-total-chip input throughput, so it adds up with `tput_per_gpu`. */
 export function inputTputPerTotalChip(row: RateRow): number | undefined {
   return perTotalChipRates(row).input;

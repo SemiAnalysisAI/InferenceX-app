@@ -5,6 +5,7 @@ import type { BenchmarkRow } from '@/lib/api/api';
 import {
   CHIP_BASIS_METRICS,
   inputTputPerTotalChip,
+  measuredInputShare,
   perTotalChipRates,
   rowsWithChipBasis,
   totalChipFactors,
@@ -160,5 +161,48 @@ describe('withTotalChipQualifier', () => {
     for (const key of CHIP_BASIS_METRICS) expect(key.startsWith('y_')).toBe(true);
     expect(CHIP_BASIS_METRICS.has('y_tpPerGpu')).toBe(false);
     expect(CHIP_BASIS_METRICS.has('y_tokenRevenuePerGpuHour')).toBe(false);
+  });
+});
+
+describe('measuredInputShare', () => {
+  const split = {
+    disagg: true,
+    num_prefill_gpu: 4,
+    num_decode_gpu: 12,
+    prefill_num_workers: 1,
+    decode_num_workers: 1,
+    tput_per_gpu: 1000,
+  };
+
+  it('reads per-pool rates on the per-deployment-chip basis', () => {
+    // 3600 per prefill chip × 4/16 = 900; 133.33 per decode chip × 12/16 = 100.
+    expect(
+      measuredInputShare(
+        { ...split, input_tput_per_gpu: 3600, output_tput_per_gpu: 400 / 3 },
+        0.01,
+      ),
+    ).toBeCloseTo(0.9, 9);
+  });
+
+  it('gives the same share for the same row on the total basis', () => {
+    expect(
+      measuredInputShare(
+        { ...split, chip_basis: 'total', input_tput_per_gpu: 900, output_tput_per_gpu: 100 },
+        0.01,
+      ),
+    ).toBeCloseTo(0.9, 9);
+  });
+
+  it('accepts rows that still carry raw per-total producer rates', () => {
+    expect(
+      measuredInputShare({ ...split, input_tput_per_gpu: 900, output_tput_per_gpu: 100 }, 0.01),
+    ).toBeCloseTo(0.9, 9);
+  });
+
+  it('returns null when neither reading adds up', () => {
+    expect(
+      measuredInputShare({ ...split, input_tput_per_gpu: 500, output_tput_per_gpu: 100 }, 0.01),
+    ).toBeNull();
+    expect(measuredInputShare({ ...split, tput_per_gpu: 0 }, 0.01)).toBeNull();
   });
 });

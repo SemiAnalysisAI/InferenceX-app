@@ -1879,7 +1879,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/benchmarks.ts',
-    sourceSha256: 'e2825508c7603344580a8277dc7477051a7d4b58a8283a9562e24cfe9407bd69',
+    sourceSha256: '3c1c7bf08d1b7bb137391d68cd134e95a61b266611aee7ef3dd323714a61bb1d',
     reviewArea: {
       en: 'Benchmark row fields and latest, exact-run, history, and TCO query semantics.',
       zh: '基准行字段以及最新、精确运行、历史和 TCO 查询语义。',

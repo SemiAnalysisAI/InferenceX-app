@@ -1,5 +1,5 @@
 import type { InferenceData, TokenRevenuePricing } from './types';
-import { perTotalChipRates } from '@/lib/benchmarks/chip-basis';
+import { measuredInputShare } from '@/lib/benchmarks/chip-basis';
 import {
   DEFAULT_CACHED_INPUT_PRICE_RATIO,
   pricingCacheHitRate,
@@ -28,16 +28,9 @@ export function cachedInputPricePerMillion(pricing: TokenRevenuePricing): number
 }
 
 export function inputTokenShareForRevenue(point: InferenceData): number | null {
-  const total = point.tput_per_gpu ?? 0;
   // Per deployment chip on either chip basis, so the mix never follows the toggle.
-  const rates = perTotalChipRates(point);
-  const input = rates.input ?? 0;
-  const output = rates.output ?? 0;
-  const sum = input + output;
-
-  if (total > 0 && sum > 0 && Math.abs(sum / total - 1) <= RATE_SUM_RELATIVE_TOLERANCE) {
-    return input / sum;
-  }
+  const measured = measuredInputShare(point, RATE_SUM_RELATIVE_TOLERANCE);
+  if (measured !== null) return measured;
 
   const { isl, osl } = point;
   if (typeof isl === 'number' && typeof osl === 'number' && isl + osl > 0) {

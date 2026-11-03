@@ -2,7 +2,7 @@ import { rowToSequence } from '@semianalysisai/inferencex-constants';
 
 import {
   DEFAULT_CHIP_BASIS,
-  perTotalChipRates,
+  measuredInputShare,
   withChipBasis,
   type ChipBasis,
   type ChipBasisRow,
@@ -135,9 +135,9 @@ function firstTokenSeconds(
  * Disaggregated rows report `input_tput_per_gpu` per *prefill* chip and
  * `output_tput_per_gpu` per *decode* chip, while `tput_per_gpu` is per chip
  * overall, so `input / (input + output)` off the stored rates is wrong for them.
- * The rates are first put on one denominator (every deployment chip) with
- * `perTotalChipRates`, which also keeps the mix independent of the chip-basis
- * toggle.
+ * `measuredInputShare` first puts the rates on one denominator (every
+ * deployment chip), which also keeps the mix independent of the chip-basis
+ * toggle, and accepts rows still carrying raw per-total producer rates.
  *
  * Then: trust the measured rates when they are self-consistent, and fall back to
  * the structural mix when they are not (a legacy row without a real prefill/decode
@@ -147,14 +147,10 @@ function firstTokenSeconds(
  * Returns null when nothing in the row pins the mix down.
  */
 function inputTokenShare(row: ChipBasisRow): number | null {
-  const tput = row.metrics.tput_per_gpu ?? 0;
-  const rates = perTotalChipRates({ ...row, ...row.metrics });
-  const inputTput = rates.input ?? 0;
-  const outputTput = rates.output ?? 0;
-  const sum = inputTput + outputTput;
   // Self-consistent: the rates share the denominator `tput_per_gpu` uses, so the
   // split they imply is the measured one. 1% covers float noise.
-  if (tput > 0 && sum > 0 && Math.abs(sum / tput - 1) <= 0.01) return inputTput / sum;
+  const measured = measuredInputShare({ ...row, ...row.metrics }, 0.01);
+  if (measured !== null) return measured;
 
   const { isl, osl } = row;
   if (typeof isl === 'number' && typeof osl === 'number' && isl + osl > 0) {
