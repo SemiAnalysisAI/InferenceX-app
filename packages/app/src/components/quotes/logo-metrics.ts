@@ -42,6 +42,7 @@ export const LOGO_METRICS: Record<string, LogoMetrics> = {
   'microsoft.svg': { ratio: 1, aspect: 1, fill: 1 },
   'minimax-color.svg': { ratio: 1, aspect: 1.19, fill: 0.84 },
   'moonshot-ai.svg': { ratio: 1, aspect: 1, fill: 1, invertInDark: true },
+  'morph.svg': { ratio: 1, aspect: 1.222, fill: 0.75 },
   'nebius.svg': { ratio: 3.639, aspect: 3.62, fill: 1 },
   'nvidia-color.svg': { ratio: 1, aspect: 1.51, fill: 0.66 },
   'openai.svg': { ratio: 0.985, aspect: 0.99, fill: 1, invertInDark: true },
