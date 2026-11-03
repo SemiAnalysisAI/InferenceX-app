@@ -26,7 +26,7 @@ export interface SupporterGroup {
 export const CURATED_SUPPORTER_GROUPS: SupporterGroup[] = [
   {
     id: 'chinese-frontier-labs',
-    label: { en: 'Chinese frontier labs', zh: '中国前沿实验室' },
+    label: { en: 'Chinese Frontier Labs', zh: '中国前沿实验室' },
     logos: [
       { label: 'DeepSeek', logo: 'deepseek-color.svg' },
       { label: 'Kimi', logo: 'kimi-color.svg' },
@@ -38,7 +38,7 @@ export const CURATED_SUPPORTER_GROUPS: SupporterGroup[] = [
   },
   {
     id: 'us-labs',
-    label: { en: 'US labs', zh: '美国实验室' },
+    label: { en: 'US Labs', zh: '美国实验室' },
     logos: [
       { label: 'OpenAI', logo: 'openai.svg', quoteOrg: 'OpenAI' },
       {
@@ -54,7 +54,7 @@ export const CURATED_SUPPORTER_GROUPS: SupporterGroup[] = [
   },
   {
     id: 'hyperscalers-clouds',
-    label: { en: 'Hyperscalers and clouds', zh: '超大规模云厂商与云平台' },
+    label: { en: 'Hyperscalers and Clouds', zh: '超大规模云厂商与云平台' },
     logos: [
       { label: 'Microsoft', logo: 'microsoft.svg', quoteOrg: 'Microsoft' },
       { label: 'Google Cloud', logo: 'google-color.svg' },
@@ -70,7 +70,7 @@ export const CURATED_SUPPORTER_GROUPS: SupporterGroup[] = [
   },
   {
     id: 'open-source',
-    label: { en: 'Open source', zh: '开源项目' },
+    label: { en: 'Open Source', zh: '开源项目' },
     logos: [
       { label: 'SGLang', logo: 'sglang.webp', quoteOrg: 'SGLang' },
       { label: 'vLLM', logo: 'vllm.svg', quoteOrg: 'vLLM' },
@@ -86,7 +86,7 @@ export const CURATED_SUPPORTER_GROUPS: SupporterGroup[] = [
   },
   {
     id: 'silicon-neoclouds-academia',
-    label: { en: 'Silicon, neoclouds and academia', zh: '芯片、neocloud 与学术机构' },
+    label: { en: 'Silicon, Neoclouds and Academia', zh: '芯片、neocloud 与学术机构' },
     logos: [
       { label: 'NVIDIA', logo: 'nvidia-color.svg', quoteOrg: 'NVIDIA' },
       { label: 'AMD', logo: 'amd.svg', quoteOrg: 'AMD' },
