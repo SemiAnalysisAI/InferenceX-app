@@ -120,6 +120,13 @@ export const COMPARE_MODEL_SLUGS: CompareModelSlug[] = [
     seoName: 'Qwen3.8-27B Eager',
   },
   {
+    slug: 'mimo-v26-flash',
+    displayName: 'MiMo-V2.6-Flash',
+    dbKeys: ['mimov2.6flash'],
+    label: 'MiMo V2.6 Flash 309B',
+    seoName: 'MiMo V2.6 Flash',
+  },
+  {
     slug: 'qwen-3-5',
     displayName: 'Qwen-3.5-397B-A17B',
     dbKeys: ['qwen3.5'],

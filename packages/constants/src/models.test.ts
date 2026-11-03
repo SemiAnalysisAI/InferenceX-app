@@ -57,6 +57,10 @@ describe('DB_MODEL_TO_DISPLAY / DISPLAY_MODEL_TO_DB consistency', () => {
     expect(DISPLAY_MODEL_TO_DB['MiniMax-M3']).not.toContain('minimaxm31flash');
   });
 
+  it('keeps mimov2.6flash in its own MiMo-V2.6-Flash display bucket', () => {
+    expect(DISPLAY_MODEL_TO_DB['MiMo-V2.6-Flash']).toEqual(['mimov2.6flash']);
+  });
+
   it('keeps kimik3 out of the grouped Kimi-K2.5 display bucket', () => {
     expect(DISPLAY_MODEL_TO_DB['Kimi-K3']).toEqual(['kimik3']);
     expect(DISPLAY_MODEL_TO_DB['Kimi-K2.5']).not.toContain('kimik3');

@@ -47,6 +47,8 @@ export const MODEL_SPEC_METHOD_LABELS: Record<string, Record<string, string>> = 
   'MiniMax-M3': { mtp: 'M3 EAGLE' },
   'Kimi-K3': { mtp: 'DSpark' },
   'MiniMax-M3.1-Flash': { mtp: 'DSpark' },
+  // AgentX rows from the checkpoint's own dflash/ drafter (InferenceX#4742).
+  'MiMo-V2.6-Flash': { draft_model: 'DFlash' },
 };
 
 export function resolveFrameworkPartLabel(model: string | undefined, part: string): string {

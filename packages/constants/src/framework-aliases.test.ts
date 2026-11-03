@@ -36,6 +36,11 @@ describe('MODEL_SPEC_METHOD_LABELS', () => {
   it('maps Kimi-K3 mtp to "DSpark"', () => {
     expect(MODEL_SPEC_METHOD_LABELS['Kimi-K3']?.mtp).toBe('DSpark');
   });
+
+  it('maps MiMo-V2.6-Flash draft_model to "DFlash"', () => {
+    expect(MODEL_SPEC_METHOD_LABELS['MiMo-V2.6-Flash']?.draft_model).toBe('DFlash');
+    expect(resolveFrameworkPartLabel('MiMo-V2.6-Flash', 'draft_model')).toBe('DFlash');
+  });
 });
 
 describe('resolveFrameworkPartLabel', () => {

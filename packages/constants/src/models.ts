@@ -48,6 +48,9 @@ export const DB_MODEL_TO_DISPLAY: Record<string, string> = {
   // 16B decode active), not a V4-Pro point release, so it gets its own bucket.
   dsv41flash: 'DeepSeek-V4.1-Flash',
   musespark: 'Muse-Spark-Open',
+  // Xiaomi's 309B/15B MoE (MiMoV2 architecture, 1M context); the RL checkpoint
+  // ships MXFP4 routed experts and a DFlash drafter.
+  'mimov2.6flash': 'MiMo-V2.6-Flash',
 };
 
 /**
@@ -145,6 +148,9 @@ export const MODEL_RELEASE_DATES: Record<string, string> = {
   // "Init" commit 03:37Z), the same day as the vLLM day-0 blog post.
   // sweep: 2026-10-23 — day zero.
   'MiniMax-M3.1-Flash': '2026-10-23',
+  // MIT weights published at XiaomiMiMo/MiMo-V2.6-Flash-RL on 2026-09-21 UTC
+  // (HF "initial commit" 15:39Z). sweep: 2026-10-19.
+  'MiMo-V2.6-Flash': '2026-09-21',
   // Weights published on Hugging Face 2026-07-27 under the Kimi K3 License,
   // eleven days after the 2026-07-16 product launch; the gap was to let vLLM,
   // NVIDIA and AMD prepare day-zero support. sweep: 2026-07-27 — day zero.

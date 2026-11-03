@@ -275,6 +275,7 @@ describe('compareModelSeoName', () => {
     'glm-5-3': 'GLM-5.3',
     'minimax-m3': 'MiniMax M3',
     'minimax-m31-flash': 'MiniMax M3.1 Flash',
+    'mimo-v26-flash': 'MiMo V2.6 Flash',
     'minimax-m27': 'MiniMax M2.7',
     'qwen-3-8-flash-next': 'Qwen3.8-Flash-Next',
     'qwen-3-8-27b': 'Qwen3.8-27B',

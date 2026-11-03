@@ -23,6 +23,11 @@ export const MODEL_PAGE_ZH = {
       'MiniMax 的多模态 MoE 模型，总参数量 428B、每个 token 激活 23B，60 层均采用稀疏注意力，前 3 层使用稠密 FFN，并内置 DSpark 投机解码。',
     releaseDate: '2026 年 10 月 23 日',
   },
+  'mimo-v26-flash': {
+    description:
+      '小米的多模态 MoE 模型，总参数量 309B、每个 token 激活 15B，包含 39 层滑动窗口注意力和 9 层全局注意力，支持 1M token 上下文，并附带 DFlash draft 模型。',
+    releaseDate: '2026 年 9 月 21 日',
+  },
   'qwen-3-8-27b': {
     description:
       'Qwen 的 27B 稠密视觉语言模型，包含 48 层 Gated DeltaNet 和 16 层 Gated Attention，原生上下文为 262K token。',
