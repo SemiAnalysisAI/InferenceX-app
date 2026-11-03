@@ -27,8 +27,13 @@ describe('QuotesContent', () => {
     }
   });
 
-  it('renders one jump button per unique org logo', () => {
-    cy.get('button[aria-label^="Jump to"]').should('have.length', uniqueOrgsWithLogo.length);
+  it('provides a jump button for every quoted organization with a logo', () => {
+    cy.get('button[aria-label^="Jump to"]').should(($buttons) => {
+      const labels = new Set([...$buttons].map((button) => button.getAttribute('aria-label')));
+      expect([...labels].sort()).to.deep.equal(
+        uniqueOrgsWithLogo.map((org) => `Jump to ${org}’s quote`).sort(),
+      );
+    });
   });
 
   it('renders the Mooncake team quote with the KVCache.AI identity', () => {
@@ -193,6 +198,7 @@ describe('QuotesContent supporter logo wall', () => {
     'chinese-frontier-labs',
     'us-frontier-labs',
     'hyperscalers-neoclouds',
+    'managed-inference-providers',
     'open-source',
     'other',
   ];
@@ -207,6 +213,7 @@ describe('QuotesContent supporter logo wall', () => {
         'Chinese Frontier Labs',
         'US Frontier Labs & NeoLabs',
         'Hyperscalers & Neoclouds',
+        'Managed Inference Providers',
         'Open Source',
         'Other',
       ]);
@@ -222,6 +229,10 @@ describe('QuotesContent supporter logo wall', () => {
     cy.get('[data-testid="supporter-group-us-frontier-labs"] h3').should(
       'have.text',
       '美国前沿实验室与 NeoLabs',
+    );
+    cy.get('[data-testid="supporter-group-managed-inference-providers"] h3').should(
+      'have.text',
+      '托管推理服务商',
     );
   });
 
@@ -250,9 +261,10 @@ describe('QuotesContent supporter logo wall', () => {
   it('renders logos without a quote as static tiles', () => {
     cy.mount(<QuotesContent />);
     cy.get('[data-testid="supporter-group-chinese-frontier-labs"]')
-      .find('img[alt="DeepSeek"]')
+      .find('img[alt="Kimi"]')
       .closest('button')
       .should('not.exist');
+    cy.get('[data-testid="supporter-logo-wall"] img[alt="DeepSeek"]').should('not.exist');
   });
 
   it('shows logos bare, with square marks taller than wordmarks', () => {
@@ -308,7 +320,9 @@ describe('QuotesContent supporter logo wall', () => {
     });
     cy.get('[data-testid="supporter-group-other"]').within(() => {
       cy.get('img[alt="Supermicro"]').should('be.visible');
-      cy.get('img[alt="Baseten"]').should('be.visible');
+      cy.get('img[alt="Baseten"]').should('not.exist');
+      cy.get('img[alt="Tensormesh"]').should('not.exist');
+      cy.get('img[alt="EmbeddedLLM"]').should('not.exist');
     });
     cy.get('[data-testid="supporter-group-us-frontier-labs"]').within(() => {
       for (const alt of ['Prime Intellect', 'Adaptive ML', 'Periodic Labs']) {
@@ -321,6 +335,9 @@ describe('QuotesContent supporter logo wall', () => {
       }
     });
     cy.get('[data-testid="supporter-group-open-source"] img[alt="Red Hat"]').should('be.visible');
+    cy.get('[data-testid="supporter-group-open-source"] img[alt="EmbeddedLLM"]').should(
+      'be.visible',
+    );
     cy.get('[data-testid="supporter-logo-wall"]')
       .find('[data-testid^="supporter-group-"]')
       .first()
@@ -333,5 +350,39 @@ describe('QuotesContent supporter logo wall', () => {
         'SambaNova',
       ]);
     });
+  });
+
+  it('links the six managed providers to their existing quotes in both locales', () => {
+    const providers = ['Together AI', 'GMI Cloud', 'Nebius', 'Baseten', 'Crusoe', 'Tensormesh'];
+    for (const locale of ['en', 'zh'] as const) {
+      cy.viewport(375, 812);
+      cy.mount(<QuotesContent locale={locale} />);
+      const group = '[data-testid="supporter-group-managed-inference-providers"]';
+      cy.get(group).scrollIntoView();
+      cy.window().then((win) => {
+        cy.stub(win.Element.prototype, 'scrollIntoView').as('providerScroll');
+      });
+      cy.get(`${group} img`).should(($logos) => {
+        expect([...$logos].map((logo) => logo.getAttribute('alt'))).to.deep.equal(providers);
+        for (const logo of $logos) {
+          const bounds = logo.getBoundingClientRect();
+          expect(bounds.left).to.be.at.least(0);
+          expect(bounds.right).to.be.at.most(375);
+        }
+      });
+      for (const org of providers) {
+        cy.get(`${group} img[alt="${org}"]`).closest('button').click();
+        cy.get('@providerScroll').should((stub) => {
+          const calls = (
+            stub as unknown as { getCalls: () => { thisValue: Element }[] }
+          ).getCalls();
+          expect(calls.at(-1)?.thisValue.id).to.equal(orgAnchorId(org));
+        });
+      }
+      cy.get('#quote-together-ai').should('contain.text', 'Tri Dao');
+      cy.get('@providerScroll').then((stub) => {
+        (stub as unknown as { restore: () => void }).restore();
+      });
+    }
   });
 });

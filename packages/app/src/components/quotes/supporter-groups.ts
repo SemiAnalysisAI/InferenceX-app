@@ -39,7 +39,6 @@ export const CURATED_SUPPORTER_GROUPS: SupporterGroup[] = [
     id: 'chinese-frontier-labs',
     label: { en: 'Chinese Frontier Labs', zh: '中国前沿实验室' },
     logos: [
-      { label: 'DeepSeek', logo: 'deepseek-color.svg' },
       { label: 'Kimi', logo: 'kimi-color.svg' },
       { label: 'Moonshot AI', logo: 'moonshot-ai.svg', quoteOrg: 'Moonshot AI' },
       { label: 'Alibaba Qwen', logo: 'qwen-color.svg', quoteOrg: 'Alibaba Qwen' },
@@ -86,8 +85,21 @@ export const CURATED_SUPPORTER_GROUPS: SupporterGroup[] = [
     ],
   },
   {
+    id: 'managed-inference-providers',
+    label: { en: 'Managed Inference Providers', zh: '托管推理服务商' },
+    logos: [
+      { label: 'Together AI', logo: 'together-ai.svg', quoteOrg: 'Together AI' },
+      { label: 'GMI Cloud', logo: 'gmi-cloud.svg', quoteOrg: 'GMI Cloud' },
+      { label: 'Nebius', logo: 'nebius.svg', quoteOrg: 'Nebius' },
+      { label: 'Baseten', logo: 'baseten.svg', quoteOrg: 'Baseten' },
+      { label: 'Crusoe', logo: 'crusoe.svg', quoteOrg: 'Crusoe' },
+      { label: 'Tensormesh', logo: 'tensormesh.svg', quoteOrg: 'Tensormesh' },
+    ],
+  },
+  {
     id: 'open-source',
     label: { en: 'Open Source', zh: '开源项目' },
+    desktopColumns: 6,
     logos: [
       { label: 'SGLang', logo: 'sglang.webp', quoteOrg: 'SGLang' },
       { label: 'vLLM', logo: 'vllm.svg', quoteOrg: 'vLLM' },
@@ -99,6 +111,7 @@ export const CURATED_SUPPORTER_GROUPS: SupporterGroup[] = [
       { label: 'TileRT', logo: 'tilert.webp', quoteOrg: 'TileRT' },
       { label: 'Anyscale', logo: 'anyscale.svg', quoteOrg: 'Anyscale' },
       { label: 'Red Hat', logo: 'redhat.svg', quoteOrg: 'Red Hat' },
+      { label: 'EmbeddedLLM', logo: 'embeddedllm.webp', quoteOrg: 'EmbeddedLLM' },
     ],
   },
 ];
