@@ -170,6 +170,24 @@ describe('QuotesContent', () => {
 });
 
 describe('QuotesContent supporter logo wall', () => {
+  it('omits TokenSpeed while retaining the SGLang and vLLM logos in both locales', () => {
+    for (const locale of ['en', 'zh'] as const) {
+      cy.mount(<QuotesContent locale={locale} />);
+      cy.get('[data-testid="supporter-logo-wall"]').within(() => {
+        cy.get('img[alt="TokenSpeed"]').should('not.exist');
+        cy.get('[data-testid="supporter-group-open-source"]').within(() => {
+          for (const org of ['SGLang', 'vLLM']) {
+            cy.get(`img[alt="${org}"]`)
+              .should('be.visible')
+              .and(($logo) => {
+                expect(($logo[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
+              });
+          }
+        });
+      });
+    }
+  });
+
   const groupIds = [
     'ai-accelerators',
     'chinese-frontier-labs',
@@ -183,7 +201,6 @@ describe('QuotesContent supporter logo wall', () => {
     cy.mount(<QuotesContent />);
     cy.get('[data-testid="supporter-logo-wall"] h3').should('have.length', groupIds.length);
     for (const id of groupIds) cy.get(`[data-testid="supporter-group-${id}"]`).should('exist');
-    cy.get('[data-testid="supporter-group-other"] h3').should('have.text', 'Other');
     cy.get('[data-testid="supporter-logo-wall"] h3').should(($headings) => {
       expect([...$headings].map((heading) => heading.textContent)).to.deep.equal([
         'AI Accelerators',
@@ -293,7 +310,6 @@ describe('QuotesContent supporter logo wall', () => {
       cy.get('img[alt="Supermicro"]').should('be.visible');
       cy.get('img[alt="Baseten"]').should('be.visible');
     });
-    cy.get('[data-testid="supporter-logo-wall"] img[alt="TokenSpeed"]').should('not.exist');
     cy.get('[data-testid="supporter-group-us-frontier-labs"]').within(() => {
       for (const alt of ['Prime Intellect', 'Adaptive ML', 'Periodic Labs']) {
         cy.get(`img[alt="${alt}"]`).should('be.visible');

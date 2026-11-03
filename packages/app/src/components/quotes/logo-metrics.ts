@@ -60,7 +60,6 @@ export const LOGO_METRICS: Record<string, LogoMetrics> = {
   'tensorwave.svg': { ratio: 10.062, aspect: 10.02, fill: 1, invertInDark: true },
   'tilert.webp': { ratio: 3.083, aspect: 3.08, fill: 1, invertInDark: true },
   'together-ai.svg': { ratio: 4.348, aspect: 5.46, fill: 0.75, invertInDark: true },
-  'tokenspeed.webp': { ratio: 6.74, aspect: 6.86, fill: 0.98, invertInDark: true },
   'uc-san-diego.svg': { ratio: 4.318, aspect: 5.36, fill: 0.81, invertInDark: true },
   'verda.svg': { ratio: 4.412, aspect: 4.57, fill: 0.96, invertInDark: true },
   'vllm.svg': { ratio: 1, aspect: 0.96, fill: 0.75 },
