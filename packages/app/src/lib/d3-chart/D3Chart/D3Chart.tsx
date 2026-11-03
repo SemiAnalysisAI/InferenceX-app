@@ -140,6 +140,7 @@ function D3ChartInner<T>(
       zoomTransformRef,
       isPinned,
       pinTooltip,
+      pinnedPointRef,
       dismissTooltip,
       hideTooltipElements,
       createRulers,

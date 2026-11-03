@@ -7,7 +7,7 @@ import type { Locale } from '@/lib/i18n/i18n';
 import type { PowerBasisLabelStyle } from '@/lib/power/power-basis';
 import { isKvOffloadEnabled } from '@/lib/benchmarks/kv-offload';
 import { chartStateHref } from '@/lib/routing/url-state';
-import { chartTooltipShellStyle, chartTooltipTitle } from '@/lib/d3-chart/tooltip-shell';
+import { axisLabelUnit, chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import type {
   SystemPowerUnit,
   SystemPowerUnsupportedReason,
@@ -799,9 +799,6 @@ export interface PointDetails {
   links: PointDetailLink[];
 }
 
-const axisUnit = (label: string): string =>
-  /[(（](?<unit>[^()（）]+)[)）]\s*$/u.exec(label)?.groups?.unit ?? label;
-
 export const buildPointDetails = (config: TooltipConfig): PointDetails => {
   const { data: d, xLabel, yLabel, selectedYAxisMetric, overlayData } = config;
   const locale = config.locale ?? 'en';
@@ -863,19 +860,18 @@ export const buildPointDetails = (config: TooltipConfig): PointDetails => {
   };
 };
 
-export const generatePointHoverCard = (details: PointDetails, color: string): string => {
-  const metrics = details.metrics
-    .map(
-      (metric) =>
-        `<div style="min-width: 0;"><div style="font-size: 17px; font-weight: 600; line-height: 1.2; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--foreground);">${metric.value}</div><div style="font-size: 11px; line-height: 14px; color: var(--muted-foreground);">${escapeHtml(axisUnit(metric.label))}</div></div>`,
-    )
-    .join('');
-  return `
-    <div style="${chartTooltipShellStyle({ pinned: false, maxWidth: 280, border: details.unofficial ? '2px solid #dc2626' : undefined })}">
-      ${details.unofficial ? `<div style="color: #dc2626; font-size: 11px; font-weight: 600; margin-bottom: 4px;">${details.unofficial}</div>` : ''}
-      ${chartTooltipTitle(`${escapeHtml(details.title)} <span style="font-weight: 400; color: var(--muted-foreground);">${escapeHtml(details.subtitle)}</span>`, color)}
-      <div style="display: flex; gap: 20px;">${metrics}</div>
-      <div style="margin-top: 6px; font-size: 11px; line-height: 14px; color: var(--muted-foreground); font-variant-numeric: tabular-nums;">${escapeHtml(details.summary)}</div>
-    </div>
-  `;
-};
+export const generatePointHoverCard = (details: PointDetails, color: string): string =>
+  chartHoverCard(
+    {
+      title: details.title,
+      subtitle: details.subtitle,
+      color,
+      metrics: details.metrics.map((metric) => ({
+        value: metric.value,
+        label: axisLabelUnit(metric.label),
+      })),
+      summary: details.summary,
+      warning: details.unofficial,
+    },
+    { pinned: false, border: details.unofficial ? '2px solid #dc2626' : undefined },
+  );

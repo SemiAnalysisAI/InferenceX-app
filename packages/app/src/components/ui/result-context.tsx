@@ -166,7 +166,13 @@ export function ResultContext({
     const singleDate = !hasRange && !(dates && dates.length > 1);
     return (
       <div data-testid="result-context" className="mb-2 text-xs text-muted-foreground">
-        {(costTier || tcoBasis || controlsEnd) && (
+        {(scenario ||
+          costTier ||
+          utilization ||
+          licenseFee ||
+          tcoBasis ||
+          chipBasis ||
+          controlsEnd) && (
           <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-2">
             <dl className="contents">
               {precision && (
@@ -181,6 +187,26 @@ export function ResultContext({
                   value={costTier}
                   control={costTierControl}
                   testId="result-context-cost-tier"
+                  hideLabel
+                />
+              )}
+              {utilization && (
+                <CaptionField
+                  label={labels.utilization}
+                  value={utilization}
+                  control={utilizationControl}
+                  controlId={utilizationControlId}
+                  testId="result-context-utilization"
+                  hideLabel
+                />
+              )}
+              {licenseFee && (
+                <CaptionField
+                  label={labels.licenseFee}
+                  value={licenseFee}
+                  control={licenseFeeControl}
+                  controlId={licenseFeeControlId}
+                  testId="result-context-license-fee"
                   hideLabel
                 />
               )}

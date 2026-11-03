@@ -193,10 +193,18 @@ export function D3ChartWrapper({
   useEffect(() => {
     if (!hasDetails) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onDetailsCloseRef.current?.();
+      if (event.key !== 'Escape') return;
+      if (
+        event.target instanceof Element &&
+        event.target.closest('[data-radix-popper-content-wrapper]')
+      ) {
+        return;
+      }
+      event.preventDefault();
+      onDetailsCloseRef.current?.();
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   }, [hasDetails]);
 
   const legendSlotRef = useRef<HTMLDivElement>(null);
@@ -241,7 +249,7 @@ export function D3ChartWrapper({
 
   const plot = (
     <div
-      className="flex flex-col lg:flex-row w-full"
+      className={cn('flex flex-col w-full', legendElement && 'lg:flex-row')}
       style={scrollablePlot ? { minWidth: scrollablePlot.minWidth } : undefined}
     >
       <div ref={setContainerRef} className="relative flex-1 min-w-0">
@@ -308,10 +316,14 @@ export function D3ChartWrapper({
           ref={legendSlotRef}
           data-slot="chart-legend-wrapper"
           className={cn(
-            'w-full lg:max-w-96 lg:shrink-0 lg:self-start relative mt-3 lg:mt-[var(--chart-legend-top)]',
-            hasDetails
-              ? 'lg:w-[var(--chart-legend-width)]'
-              : 'lg:w-auto lg:has-[.sidebar-legend]:w-fit lg:has-[.sidebar-legend]:min-w-48',
+            'relative mt-3 w-full',
+            legendElement
+              ? 'lg:max-w-96 lg:shrink-0 lg:self-start lg:mt-[var(--chart-legend-top)]'
+              : 'max-w-96',
+            legendElement &&
+              (hasDetails
+                ? 'lg:w-[var(--chart-legend-width)]'
+                : 'lg:w-auto lg:has-[.sidebar-legend]:w-fit lg:has-[.sidebar-legend]:min-w-48'),
           )}
           style={
             {

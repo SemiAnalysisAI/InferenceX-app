@@ -1,7 +1,7 @@
 'use client';
 
-import type { ReactNode } from 'react';
-
+import { getModelSortIndex } from '@/lib/catalog/constants';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
 
 export interface EditableTcoBadgeItem {
@@ -128,35 +128,66 @@ export function EditableTcoBadges({
 const TABLE_CELL =
   'whitespace-nowrap px-2.5 py-0.5 text-right [&+&]:border-l [&+&]:border-border/60';
 
+const TABLE_STRINGS = {
+  en: {
+    header: '$/chip/hr',
+    row: 'TCO',
+    reset: 'Reset',
+    input: (chip: string) => `${chip} $/chip/hr`,
+  },
+  zh: {
+    header: '$/芯片/小时',
+    row: 'TCO',
+    reset: '重置',
+    input: (name: string) => `${name} $/芯片/小时`,
+  },
+} as const;
+
+export function plottedChipBases(
+  hwKeys: Iterable<string>,
+  hasPrice: (base: string) => boolean,
+): string[] {
+  return [
+    ...new Set(
+      [...new Set(hwKeys)]
+        .toSorted((a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b))
+        .map((key) => key.split('_')[0]),
+    ),
+  ].filter(hasPrice);
+}
+
 export function TcoPriceTable({
   header,
   rowLabel,
   items,
-  editable,
+  editable = false,
   onChange,
   onCommit,
   inputLabel,
-  action,
+  onReset,
+  resetTestId,
   testId,
   cellTestId,
   inputIdPrefix,
   inputTestIdPrefix = inputIdPrefix,
   className,
 }: {
-  header: string;
-  rowLabel: string;
+  header?: string;
+  rowLabel?: string;
   items: readonly EditableTcoBadgeItem[];
-  editable: boolean;
-  onChange: (base: string, raw: string) => void;
+  editable?: boolean;
+  onChange?: (base: string, raw: string) => void;
   onCommit?: (base: string, raw: string) => void;
-  inputLabel: (chipLabel: string) => string;
-  action?: ReactNode;
+  inputLabel?: (chipLabel: string) => string;
+  onReset?: () => void;
+  resetTestId?: string;
   testId: string;
   cellTestId: string;
   inputIdPrefix: string;
   inputTestIdPrefix?: string;
   className?: string;
 }) {
+  const t = TABLE_STRINGS[useLocale()];
   return (
     <div className={cn('relative max-w-full', className)}>
       <div
@@ -170,7 +201,7 @@ export function TcoPriceTable({
                 scope="col"
                 className={cn(TABLE_CELL, 'border-b border-border/60 text-left font-normal')}
               >
-                {header}
+                {header ?? t.header}
               </th>
               {items.map(({ base, label }) => (
                 <th
@@ -192,7 +223,7 @@ export function TcoPriceTable({
           <tbody>
             <tr>
               <th scope="row" className={cn(TABLE_CELL, 'text-left font-normal')}>
-                {rowLabel}
+                {rowLabel ?? t.row}
               </th>
               {items.map(({ base, label, value, overridden }) => (
                 <td
@@ -205,11 +236,11 @@ export function TcoPriceTable({
                     <TcoCostInput
                       id={`${inputIdPrefix}-${base}`}
                       testId={`${inputTestIdPrefix}-${base}`}
-                      ariaLabel={inputLabel(label)}
+                      ariaLabel={(inputLabel ?? t.input)(label)}
                       value={value}
                       overridden={overridden}
                       className="text-right font-semibold"
-                      onChange={(raw) => onChange(base, raw)}
+                      onChange={(raw) => onChange?.(base, raw)}
                       onCommit={onCommit ? (raw) => onCommit(base, raw) : undefined}
                     />
                   ) : (
@@ -221,8 +252,17 @@ export function TcoPriceTable({
           </tbody>
         </table>
       </div>
-      {action && (
-        <div className="no-export mt-1 xl:absolute xl:top-full xl:left-0 xl:mt-0.5">{action}</div>
+      {onReset && (
+        <div className="no-export mt-1 xl:absolute xl:top-full xl:left-0 xl:mt-0.5">
+          <button
+            type="button"
+            data-testid={resetTestId}
+            className="cursor-pointer rounded-xs text-2xs leading-4 text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+            onClick={onReset}
+          >
+            {t.reset}
+          </button>
+        </div>
       )}
     </div>
   );

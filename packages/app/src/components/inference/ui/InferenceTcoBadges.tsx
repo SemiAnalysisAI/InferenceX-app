@@ -23,7 +23,6 @@ import {
 import { publishedCostsForTier } from '@/components/inference/published-costs';
 import { TcoPriceTable } from '@/components/ui/editable-tco-badges';
 import { track } from '@/lib/analytics/analytics';
-import { useLocale } from '@/lib/i18n/use-locale';
 
 function metricKeyOf(selectedYAxisMetric: string) {
   const key = selectedYAxisMetric.replace(/^y_/u, '');
@@ -36,11 +35,6 @@ export function parseInferenceCustomCost(raw: string): number | undefined {
   return Number.isFinite(value) && value >= 0 ? value : undefined;
 }
 
-const STRINGS = {
-  en: { header: '$/chip/hr', row: 'TCO', reset: 'Reset' },
-  zh: { header: '$/chip/hr', row: 'TCO', reset: '重置' },
-} as const;
-
 export function InferenceTcoBadges({
   bases,
   values,
@@ -52,8 +46,6 @@ export function InferenceTcoBadges({
   editable?: boolean;
   className?: string;
 }) {
-  const locale = useLocale();
-  const t = STRINGS[locale];
   const inputIdPrefix = useId();
   const { selectedYAxisMetric } = useInferenceDisplay();
   const { userCosts } = useInferenceFilters();
@@ -165,25 +157,12 @@ export function InferenceTcoBadges({
 
   return (
     <TcoPriceTable
-      header={t.header}
-      rowLabel={t.row}
       items={items}
       editable={editable}
       onChange={handleChange}
       onCommit={handleCommit}
-      inputLabel={(name) => (locale === 'zh' ? `${name} $/芯片/小时` : `${name} $/chip/hr`)}
-      action={
-        overriddenBases.size > 0 ? (
-          <button
-            type="button"
-            data-testid="inference-tco-reset"
-            className="cursor-pointer rounded-xs text-2xs leading-4 text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-ring"
-            onClick={handleReset}
-          >
-            {t.reset}
-          </button>
-        ) : undefined
-      }
+      onReset={overriddenBases.size > 0 ? handleReset : undefined}
+      resetTestId="inference-tco-reset"
       testId="inference-tco-badges"
       cellTestId="inference-tco-badge"
       inputIdPrefix={`cost-input-${inputIdPrefix}`}

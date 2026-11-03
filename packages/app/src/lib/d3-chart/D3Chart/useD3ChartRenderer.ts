@@ -22,6 +22,8 @@ import type { ChartLayout, ContinuousScale } from '../types';
 
 import { buildScale, isBandScale, type BuiltScale } from './scale-builders';
 import { isTouchCompatMouseEvent } from '../touch-input';
+import { overlayMarkerPosition } from '../overlay-x-marker';
+import { showPinRing } from '../pin-ring';
 import {
   renderLayer,
   updateLayerDecorationOnZoom,
@@ -52,6 +54,7 @@ interface RendererDeps {
   zoomTransformRef: React.MutableRefObject<d3.ZoomTransform>;
   isPinned: () => boolean;
   pinTooltip: (data: any, isOverlay?: boolean) => void;
+  pinnedPointRef: React.RefObject<unknown>;
   dismissTooltip: (clearPinnedPoint?: boolean) => void;
   hideTooltipElements: (
     tooltipRef: React.RefObject<HTMLDivElement | null>,
@@ -93,39 +96,26 @@ function gridVisibility(xAxis?: AxisConfig, yAxis?: AxisConfig): GridVisibility 
   return { x: xAxis?.grid ?? true, y: yAxis?.grid ?? true };
 }
 
-const ZOOM_REWRITES_LAYER: Record<LayerConfig['type'], boolean> = {
-  bar: true,
-  horizontalBar: true,
-  point: true,
-  errorBar: true,
-  line: true,
-  barLabel: true,
-  roofline: false,
-  scatter: false,
-  radar: false,
-  custom: false,
-};
-
-function rescaleForZoom(
+function zoomedScales(
   xScale: BuiltScale,
   yScale: BuiltScale,
-  zoomConfig: ZoomConfig | undefined,
   transform: d3.ZoomTransform,
+  zoomConfig: ZoomConfig | undefined,
 ): { xScale: BuiltScale; yScale: BuiltScale } {
-  const axes = zoomConfig?.axes ?? 'both';
-  let zoomedX = xScale;
-  let zoomedY = yScale;
-  if ((axes === 'x' || axes === 'both') && !isBandScale(xScale)) {
-    zoomedX = zoomConfig?.rescaleX
+  const zoomAxes = zoomConfig?.axes ?? 'both';
+  let currentXScale = xScale;
+  let currentYScale = yScale;
+  if ((zoomAxes === 'x' || zoomAxes === 'both') && !isBandScale(xScale)) {
+    currentXScale = zoomConfig?.rescaleX
       ? zoomConfig.rescaleX(xScale as ContinuousScale, transform)
       : transform.rescaleX(xScale as ContinuousScale);
   }
-  if ((axes === 'y' || axes === 'both') && !isBandScale(yScale)) {
-    zoomedY = zoomConfig?.rescaleY
+  if ((zoomAxes === 'y' || zoomAxes === 'both') && !isBandScale(yScale)) {
+    currentYScale = zoomConfig?.rescaleY
       ? zoomConfig.rescaleY(yScale as ContinuousScale, transform)
       : transform.rescaleY(yScale as ContinuousScale);
   }
-  return { xScale: zoomedX, yScale: zoomedY };
+  return { xScale: currentXScale, yScale: currentYScale };
 }
 
 export interface ZoomFrameBatcher {
@@ -323,6 +313,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
     zoomTransformRef,
     isPinned,
     pinTooltip,
+    pinnedPointRef,
     dismissTooltip,
     hideTooltipElements,
     createRulers,
@@ -333,6 +324,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
   const prevDataRef = useRef(data);
   const prevScalesRef = useRef({ xScaleConfig, yScaleConfig });
   const prevYAxisConfigRef = useRef(yAxisConfig);
+  const prevPlotRef = useRef({ layers, tooltipConfig });
   const zoomFrameBatcherRef = useRef<ZoomFrameBatcher | null>(null);
   if (zoomFrameBatcherRef.current === null) {
     zoomFrameBatcherRef.current = createZoomFrameBatcher(
@@ -436,8 +428,15 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
     const scalesChanged =
       xScaleConfig !== prevScalesRef.current.xScaleConfig ||
       yScaleConfig !== prevScalesRef.current.yScaleConfig;
+    const samePlot =
+      !dataChanged &&
+      !scalesChanged &&
+      layers === prevPlotRef.current.layers &&
+      tooltipConfig === prevPlotRef.current.tooltipConfig;
+    const keepPin = samePlot && Boolean(tooltipConfig?.details) && isPinned();
     prevDataRef.current = data;
     prevScalesRef.current = { xScaleConfig, yScaleConfig };
+    prevPlotRef.current = { layers, tooltipConfig };
     prevYAxisConfigRef.current = yAxisConfig;
 
     {
@@ -548,6 +547,8 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
           );
           const { rulerGroup, verticalRuler, horizontalRuler } = rulers;
           const containerEl = svgRef.current!.parentElement as HTMLDivElement;
+          const getDataX = tooltipConfig.getDataX;
+          const panel = Boolean(tooltipConfig.details);
           const sortedData = [...data].toSorted((a, b) => getDataX(a) - getDataX(b));
           const bisector = d3.bisector<T, number>((d) => getDataX(d)).center;
 
@@ -559,7 +560,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
             .attr('fill', 'none')
             .attr('pointer-events', 'all')
             .on('mousemove', (event: MouseEvent) => {
-              if (isPinned()) return;
+              if (isPinned() && !panel) return;
               if (isTouchCompatMouseEvent(event)) return;
               const [mx] = d3.pointer(event);
 
@@ -603,7 +604,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
               }
             })
             .on('mouseleave', () => {
-              if (isPinned()) return;
+              if (isPinned() && !panel) return;
               tooltip.style('opacity', 0).style('display', 'none');
               rulerGroup.style('display', 'none');
             })
@@ -625,6 +626,30 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
               if (!d) return;
 
               event.stopPropagation();
+              if (panel) {
+                tooltip.style('opacity', 0).style('display', 'none');
+                rulerGroup.style('display', 'none');
+                if (pinnedPointRef.current === d) {
+                  dismissTooltip();
+                  return;
+                }
+                let currentYScale = yScale;
+                if (svgRef.current && zoomConfig?.axes !== 'x' && !isBandScale(yScale)) {
+                  const t = d3.zoomTransform(svgRef.current);
+                  currentYScale = zoomConfig?.rescaleY
+                    ? (zoomConfig.rescaleY(yScale as ContinuousScale, t) as BuiltScale)
+                    : (t.rescaleY(yScale as any) as BuiltScale);
+                }
+                const px = tooltipConfig.getRulerX?.(d, currentXScale as any);
+                const py = tooltipConfig.getRulerY?.(d, currentYScale as any);
+                const host = rulerGroup.node()?.parentNode;
+                if (host instanceof Element && px !== undefined && py !== undefined) {
+                  showPinRing(host, px, py);
+                }
+                pinTooltip(d);
+                tooltipConfig.onPointClick?.(d);
+                return;
+              }
               const geometry = getTooltipContainerGeometry(containerEl);
               const cmx = event.clientX - geometry.bounds.left;
               const cmy = event.clientY - geometry.bounds.top;
@@ -679,6 +704,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
         }
       }
 
+      let replayingKeptPin = keepPin;
       if (zoomConfig?.enabled) {
         const zoomAxes = zoomConfig.axes ?? 'both';
 
@@ -713,7 +739,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
               const zoomRenderGroup = clipContent ? zoomLayout.zoomGroup : zoomLayout.g;
               const zoomBaseContext = currentCtx;
 
-              if (isPinned()) {
+              if (isPinned() && !replayingKeptPin) {
                 dismissTooltip(true);
                 hideTooltipElements(tooltipRef, svgRef);
               }
@@ -795,14 +821,43 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
           },
         );
 
+        replayingKeptPin = false;
         const restored = zoomTransformRef.current;
-        if (restored.k === 1 && restored.x === 0 && restored.y === 0 && isPinned()) {
+        if (restored.k === 1 && restored.x === 0 && restored.y === 0 && isPinned() && !keepPin) {
           dismissTooltip(true);
           tooltip.style('opacity', 0).style('display', 'none').style('pointer-events', 'none');
           renderGroup.select('.ruler-group').style('display', 'none');
         }
       }
       zoomFrameBatcherRef.current?.flush();
+
+      if (keepPin && tooltipConfig) {
+        const pinned = pinnedPointRef.current;
+        const marker = renderGroup
+          .selectAll<Element, unknown>('*')
+          .filter((d) => d === pinned)
+          .node();
+        let position = marker ? overlayMarkerPosition(marker) : null;
+        if (!position && tooltipConfig.getRulerX && tooltipConfig.getRulerY && svgRef.current) {
+          const zoomed = zoomedScales(xScale, yScale, d3.zoomTransform(svgRef.current), zoomConfig);
+          if (!isBandScale(zoomed.yScale)) {
+            position = {
+              x: tooltipConfig.getRulerX(
+                pinned as T,
+                zoomed.xScale as ContinuousScale | d3.ScaleBand<string>,
+              ),
+              y: tooltipConfig.getRulerY(pinned as T, zoomed.yScale as ContinuousScale),
+            };
+          }
+        }
+        const host = renderGroup.node();
+        if (position && host) {
+          showPinRing(host, position.x, position.y);
+        } else if (zoomConfig?.enabled) {
+          dismissTooltip(true);
+          hideTooltipElements(tooltipRef, svgRef);
+        }
+      }
 
       animateTransitionGeometry(renderGroup, previousGeometry, transitionDuration);
 
@@ -862,20 +917,13 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
       : buildScale({ type: 'linear', domain: [0, 1] }, [height, 0]);
     scalesRef.current = { xScale, yScale };
 
-    const transform = d3.zoomTransform(svgRef.current);
     const zoomAxes = zoomConfig?.axes ?? 'both';
-    let currentXScale = xScale;
-    let currentYScale = yScale;
-    if ((zoomAxes === 'x' || zoomAxes === 'both') && !isBandScale(xScale)) {
-      currentXScale = zoomConfig?.rescaleX
-        ? zoomConfig.rescaleX(xScale as ContinuousScale, transform)
-        : transform.rescaleX(xScale as ContinuousScale);
-    }
-    if ((zoomAxes === 'y' || zoomAxes === 'both') && !isBandScale(yScale)) {
-      currentYScale = zoomConfig?.rescaleY
-        ? zoomConfig.rescaleY(yScale as ContinuousScale, transform)
-        : transform.rescaleY(yScale as ContinuousScale);
-    }
+    const { xScale: currentXScale, yScale: currentYScale } = zoomedScales(
+      xScale,
+      yScale,
+      d3.zoomTransform(svgRef.current),
+      zoomConfig,
+    );
 
     if (hasScales) {
       const yIsStatic =

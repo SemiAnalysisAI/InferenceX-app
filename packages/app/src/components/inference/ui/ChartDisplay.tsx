@@ -123,11 +123,8 @@ import {
   type DerivedAgenticMetric,
 } from '@/hooks/api/use-derived-agentic-metrics';
 import { useResidentSequenceLengths } from '@/hooks/api/use-resident-sequence-lengths';
-import {
-  getHardwareConfig,
-  getModelSortIndex,
-  hardwareKeyMatchesAnyBase,
-} from '@/lib/catalog/constants';
+import { getHardwareConfig, hardwareKeyMatchesAnyBase } from '@/lib/catalog/constants';
+import { plottedChipBases } from '@/components/ui/editable-tco-badges';
 import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { PowerXTutorialCta } from '@/components/powerx/powerx-tutorial-cta';
@@ -1211,23 +1208,13 @@ export default function ChartDisplay({
               ? null
               : metricCostAssumptions(selectedYAxisMetric, tcoBasis, userCosts);
             const footerCostBases = costAssumptions
-              ? [
-                  ...new Set(
-                    [
-                      ...new Set([
-                        ...[
-                          ...selectedFooterRows.officialRows,
-                          ...selectedFooterRows.overlayRows,
-                        ].map((point) => String(point.hwKey)),
-                        ...costAssumptions.blankedBases,
-                      ]),
-                    ]
-                      .toSorted(
-                        (a, b) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
-                      )
-                      .map((key) => key.split('_')[0]),
-                  ),
-                ].filter(
+              ? plottedChipBases(
+                  [
+                    ...[...selectedFooterRows.officialRows, ...selectedFooterRows.overlayRows].map(
+                      (point) => String(point.hwKey),
+                    ),
+                    ...costAssumptions.blankedBases,
+                  ],
                   (base) =>
                     base in costAssumptions.values || costAssumptions.blankedBases.includes(base),
                 )

@@ -1,3 +1,5 @@
+import { escapeHtml } from '@/lib/shared/utils';
+
 export interface ChartTooltipShellOptions {
   /** Pinned tooltips allow text selection. Omit for tooltips that never pin. */
   pinned?: boolean;
@@ -70,3 +72,41 @@ export function chartTooltipTitle(label: string, color?: string): string {
 export function chartTooltipDismiss(text: string): string {
   return `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px;">${text}</div>`;
 }
+
+export interface ChartHoverCardMetric {
+  value: string;
+  label: string;
+}
+
+export interface ChartHoverCardContent {
+  title: string;
+  subtitle?: string;
+  color?: string;
+  metrics: ChartHoverCardMetric[];
+  summary?: string;
+  warning?: string;
+  body?: string;
+}
+
+/** Compact hover card. Title, subtitle, labels, summary and warning are escaped here. Metric values and body are inserted raw. */
+export function chartHoverCard(
+  { title, subtitle, color, metrics, summary, warning, body }: ChartHoverCardContent,
+  options: ChartTooltipShellOptions = {},
+): string {
+  const values = metrics
+    .map(
+      (m) =>
+        `<div style="min-width: 0;"><div style="font-size: 16px; font-weight: 600; line-height: 1.2; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--foreground);">${m.value}</div><div style="font-size: 11px; line-height: 14px; color: var(--muted-foreground);">${escapeHtml(m.label)}</div></div>`,
+    )
+    .join('');
+  const heading = subtitle
+    ? `<span style="min-width: 0;">${escapeHtml(title)} <span style="font-weight: 400; color: var(--muted-foreground);">${escapeHtml(subtitle)}</span></span>`
+    : escapeHtml(title);
+  return chartTooltipShell(
+    `${warning ? `<div style="color: #dc2626; font-size: 11px; font-weight: 600; margin-bottom: 4px;">${escapeHtml(warning)}</div>` : ''}${chartTooltipTitle(heading, color)}${values ? `<div style="display: flex; flex-wrap: wrap; gap: 4px 20px;">${values}</div>` : ''}${body ? `<div style="margin-top: 6px;">${body}</div>` : ''}${summary ? `<div style="margin-top: 6px; font-size: 11px; line-height: 14px; color: var(--muted-foreground); font-variant-numeric: tabular-nums;">${escapeHtml(summary)}</div>` : ''}`,
+    { maxWidth: 280, ...options },
+  );
+}
+
+export const axisLabelUnit = (label: string): string =>
+  /[(（](?<unit>[^()（）]+)[)）]\s*$/u.exec(label)?.groups?.unit ?? label;
