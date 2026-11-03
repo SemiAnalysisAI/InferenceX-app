@@ -1,5 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { promisify } from 'node:util';
 import {
+  brotliCompress,
   brotliCompressSync,
   brotliDecompressSync,
   constants as zlibConstants,
@@ -10,7 +12,15 @@ import {
 import { revalidateTag, unstable_cache } from 'next/cache';
 import { workAsyncStorage } from 'next/dist/server/app-render/work-async-storage.external';
 import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
-import { CONTENT_BLOB_KEY_PREFIX, blobEnabled, blobGet, blobPurge, blobSet } from './blob-cache';
+import {
+  CONTENT_BLOB_KEY_PREFIX,
+  blobEnabled,
+  blobGet,
+  blobGetBytes,
+  blobPurge,
+  blobSet,
+  blobSetBytes,
+} from './blob-cache';
 
 /**
  * CollectiveX data lives in its own database and gets its own cache scope:
@@ -418,9 +428,14 @@ export function negotiateEncoding(
   return best;
 }
 
-function entityTag(source: Uint8Array | string, coding: string): string {
-  const digest = createHash('sha256').update(source).digest('base64url').slice(0, 32);
+function entityTag(digest: string, coding: string): string {
   return coding === 'identity' ? `"${digest}"` : `"${digest}-${coding}"`;
+}
+
+const ENTITY_DIGEST_CHARS = 32;
+
+function entityDigest(source: Uint8Array | string): string {
+  return createHash('sha256').update(source).digest('base64url').slice(0, ENTITY_DIGEST_CHARS);
 }
 
 /** If-None-Match uses weak comparison (RFC 9110 §13.1.2). */
@@ -502,13 +517,13 @@ interface CachedJsonOptions {
 
 function jsonValidation(
   request: Request,
-  source: Uint8Array | string,
+  digest: string,
   options: CachedJsonOptions | undefined,
   brotliQuality = BROTLI_QUALITY,
 ) {
   const encoding = negotiateEncoding(request.headers.get('Accept-Encoding'));
   const etag = entityTag(
-    source,
+    digest,
     encoding === 'br' && brotliQuality !== BROTLI_QUALITY ? `br${brotliQuality}` : encoding,
   );
   const headers = {
@@ -526,7 +541,7 @@ export function notModifiedJson(
   request: Request,
   options: CachedJsonOptions & { version: string },
 ): Response | null {
-  return jsonValidation(request, options.version, options).notModified;
+  return jsonValidation(request, entityDigest(options.version), options).notModified;
 }
 
 /**
@@ -549,7 +564,7 @@ export function cachedJsonBytes(
     encoding,
     headers: cacheHeaders,
     notModified,
-  } = jsonValidation(request, options?.version ?? bytes, options, brotliQuality);
+  } = jsonValidation(request, entityDigest(options?.version ?? bytes), options, brotliQuality);
   if (notModified) return notModified;
   if (encoding === 'identity') {
     return new Response(identityBody(bytes), {
@@ -559,6 +574,100 @@ export function cachedJsonBytes(
   return new Response(compressedBody(bytes, encoding, brotliQuality), {
     headers: { 'Content-Type': 'application/json', 'Content-Encoding': encoding, ...cacheHeaders },
   });
+}
+
+interface EncodedJson {
+  readonly digest: string;
+  readonly brotliQuality: number;
+  readonly brotli: Uint8Array;
+}
+
+const compressAsync = promisify(brotliCompress);
+
+async function encodeJson(data: unknown): Promise<EncodedJson> {
+  const bytes = new TextEncoder().encode(JSON.stringify(data));
+  const brotliQuality = brotliQualityFor(bytes.byteLength);
+  const brotli = await compressAsync(bytes, {
+    params: {
+      [zlibConstants.BROTLI_PARAM_QUALITY]: brotliQuality,
+      [zlibConstants.BROTLI_PARAM_MODE]: zlibConstants.BROTLI_MODE_TEXT,
+      [zlibConstants.BROTLI_PARAM_SIZE_HINT]: bytes.byteLength,
+    },
+  });
+  return { digest: entityDigest(bytes), brotliQuality, brotli };
+}
+
+function storedEncodedJson({ digest, brotliQuality, brotli }: EncodedJson): Uint8Array {
+  const stored = new Uint8Array(1 + ENTITY_DIGEST_CHARS + brotli.byteLength);
+  stored[0] = brotliQuality;
+  new TextEncoder().encodeInto(digest, stored.subarray(1, 1 + ENTITY_DIGEST_CHARS));
+  stored.set(brotli, 1 + ENTITY_DIGEST_CHARS);
+  return stored;
+}
+
+function readEncodedJson(stored: Uint8Array): EncodedJson {
+  return {
+    brotliQuality: stored[0],
+    digest: new TextDecoder().decode(stored.subarray(1, 1 + ENTITY_DIGEST_CHARS)),
+    brotli: stored.subarray(1 + ENTITY_DIGEST_CHARS),
+  };
+}
+
+function encodedJsonResponse(request: Request, encoded: EncodedJson): Response {
+  const {
+    encoding,
+    headers: cacheHeaders,
+    notModified,
+  } = jsonValidation(request, encoded.digest, undefined, encoded.brotliQuality);
+  if (notModified) return notModified;
+  if (encoding === 'br') {
+    return new Response(identityBody(encoded.brotli), {
+      headers: { 'Content-Type': 'application/json', 'Content-Encoding': 'br', ...cacheHeaders },
+    });
+  }
+  const bytes = brotliDecompressSync(encoded.brotli);
+  if (encoding === 'identity') {
+    return new Response(identityBody(bytes), {
+      headers: { 'Content-Type': 'application/json', ...cacheHeaders },
+    });
+  }
+  return new Response(compressedBody(bytes, encoding, encoded.brotliQuality), {
+    headers: { 'Content-Type': 'application/json', 'Content-Encoding': encoding, ...cacheHeaders },
+  });
+}
+
+export function cachedJsonResponse<Args extends unknown[]>(
+  load: (...args: Args) => Promise<unknown>,
+  keyPrefix: string,
+): (request: Request, ...args: Args) => Promise<Response> {
+  const inflight = new Map<string, Promise<EncodedJson>>();
+  const fill = async (path: string, args: Args): Promise<EncodedJson> => {
+    const stored = await blobGetBytes(path);
+    if (stored !== null && stored.byteLength > 1 + ENTITY_DIGEST_CHARS)
+      return readEncodedJson(stored);
+    const encoded = await encodeJson(await load(...args));
+    try {
+      await blobSetBytes(path, storedEncodedJson(encoded));
+    } catch (error) {
+      console.warn(
+        `[blob cache] could not persist ${keyPrefix} response; serving it uncached. ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+    return encoded;
+  };
+  return async (request: Request, ...args: Args): Promise<Response> => {
+    if (!blobEnabled()) return cachedJson(request, await load(...args));
+    blobGeneration ??= cachedQuery(() => Promise.resolve(randomUUID()), 'blob-generation');
+    const path = `generation/${await blobGeneration()}/${blobKeyForArgs(keyPrefix, args)}.response.br`;
+    let flight = inflight.get(path);
+    if (!flight) {
+      flight = fill(path, args).finally(() => inflight.delete(path));
+      inflight.set(path, flight);
+    }
+    return encodedJsonResponse(request, await flight);
+  };
 }
 
 /** Isolated Blob key subtree for this deployment's OperatorX comparisons. */

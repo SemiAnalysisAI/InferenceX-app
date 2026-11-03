@@ -9,7 +9,7 @@ vi.mock('@vercel/blob', async (importOriginal) => ({
   put: vi.fn(),
 }));
 
-import { blobGet, blobSet, blobPurge } from './blob-cache';
+import { blobGet, blobGetBytes, blobSet, blobPurge } from './blob-cache';
 import {
   BlobServiceRateLimited,
   del,
@@ -106,6 +106,22 @@ describe('blobGet', () => {
     const body = brotliCompressSync(JSON.stringify({ rows: Array.from({ length: 5000 }, String) }));
     mockGet.mockResolvedValue(stored(body.subarray(0, -8)));
     expect(await blobGet('truncated')).toBeNull();
+  });
+});
+
+describe('blobGetBytes', () => {
+  it('returns the stored bytes unchanged from the exact key', async () => {
+    const body = new Uint8Array([9, 0, 255, 7]);
+    mockGet.mockResolvedValue(stored(body));
+    expect(await blobGetBytes('generation/g/k.response.br')).toEqual(body);
+    expect(mockGet).toHaveBeenCalledExactlyOnceWith('test-cache/generation/g/k.response.br', {
+      access: 'public',
+    });
+  });
+
+  it('treats a non-200 answer as a miss', async () => {
+    mockGet.mockResolvedValue({ statusCode: 304, stream: null } as unknown as GetBlobResult);
+    expect(await blobGetBytes('stale')).toBeNull();
   });
 });
 

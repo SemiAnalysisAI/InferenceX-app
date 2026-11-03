@@ -35,27 +35,32 @@ const isPreLogFilesSchema = (error: unknown): boolean => {
 export const escapePostgresRegexLiteral = (value: string): string =>
   value.replaceAll(/[\\^$.*+?()[\]{}|]/gu, String.raw`\$&`);
 
-interface BlockBackedFile {
-  logId: string;
+interface StoredLogRange {
   fileName: string;
-  charCount: number;
+  text: string;
+  nextOffset: number | null;
 }
 
-async function readBlockBacked(
+const MAX_TEXT_POSITION = 2_147_483_647;
+
+async function readStoredLogRange(
   sql: DbClient,
   benchmarkResultId: number,
-  requestedFile: string | null = null,
-  offset = 0,
-  length = Number.MAX_SAFE_INTEGER,
-): Promise<{ file: BlockBackedFile; text: string } | null> {
+  requestedFile: string | null,
+  offset: number,
+  length: number,
+): Promise<StoredLogRange | null | undefined> {
+  const wholeText = offset === 0 && length === Number.MAX_SAFE_INTEGER;
   let rows: {
-    log_id: string;
     file_name: string;
-    file_chars: number | string;
+    file_chars: number | string | null;
     char_offset: number | string | null;
     char_count: number | null;
     ascii: boolean | null;
     data: Uint8Array | null;
+    log_text: string;
+    text_chars: number | string | null;
+    has_more: boolean | null;
   }[];
   try {
     rows = (await sql`
@@ -75,33 +80,60 @@ async function readBlockBacked(
         order by priority
         limit 1
       ), target as (
-        select s.server_log_id, s.file_name, m.char_count as file_chars
+        select s.server_log_id, s.file_name, s.priority, m.char_count as file_chars
         from selected_log s
-        join server_log_block_files m
+        left join server_log_block_files m
           on m.server_log_id = s.server_log_id and m.file_name = s.file_name
+      ), text_range as (
+        select
+          case when ${wholeText}::boolean then src.body
+            else substring(src.body from ${offset + 1}::integer
+              for ${Math.min(length, MAX_TEXT_POSITION)}::integer) end as log_text,
+          case when ${wholeText}::boolean then false
+            else substring(src.body
+              from ${Math.min(offset + length + 1, MAX_TEXT_POSITION)}::integer for 1) <> '' end as has_more
+        from target t
+        cross join lateral (
+          select sl.server_log as body
+          from server_logs sl
+          where t.priority = 0 and sl.id = t.server_log_id
+          union all
+          select slf.log_text
+          from server_log_files slf
+          where t.priority = 1 and slf.server_log_id = t.server_log_id and slf.file_name = t.file_name
+        ) src
+        where t.file_chars is null
       )
-      select t.server_log_id::text as log_id, t.file_name, t.file_chars,
-             b.char_offset, b.char_count, b.ascii, b.data
+      select t.file_name, t.file_chars,
+             b.char_offset, b.char_count, b.ascii, b.data,
+             r.log_text,
+             case when ${wholeText}::boolean then null else char_length(r.log_text) end as text_chars,
+             r.has_more
       from target t
+      left join text_range r on true
       left join server_log_blocks b
-        on b.server_log_id = t.server_log_id
+        on t.file_chars is not null
+        and b.server_log_id = t.server_log_id
         and b.file_name = t.file_name
         and b.char_offset < least(${offset}::bigint + ${length}::bigint, t.file_chars)
         and b.char_offset + b.char_count > ${offset}::bigint
       order by b.block_index
     `) as typeof rows;
   } catch (error) {
-    if (isPreLogFilesSchema(error)) return null;
+    if (isPreLogFilesSchema(error)) return undefined;
     throw error;
   }
   const first = rows[0];
   if (!first) return null;
-  const file = {
-    logId: first.log_id,
-    fileName: first.file_name,
-    charCount: Number(first.file_chars),
-  };
-  const end = Math.min(offset + length, file.charCount);
+  if (first.file_chars === null) {
+    return {
+      fileName: first.file_name,
+      text: first.log_text,
+      nextOffset: first.has_more ? offset + Number(first.text_chars) : null,
+    };
+  }
+  const charCount = Number(first.file_chars);
+  const end = Math.min(offset + length, charCount);
   const blocks = rows.flatMap((row) =>
     row.data === null
       ? []
@@ -114,7 +146,14 @@ async function readBlockBacked(
           },
         ],
   );
-  return { file, text: offset >= end ? '' : readServerLogBlocks(blocks, offset, end - offset) };
+  return {
+    fileName: first.file_name,
+    text: offset >= end ? '' : readServerLogBlocks(blocks, offset, end - offset),
+    nextOffset:
+      offset + length < charCount
+        ? offset + Math.max(0, Math.min(length, charCount - offset))
+        : null,
+  };
 }
 
 /** Fetch a complete log file. Omit fileName for the primary/legacy stream. */
@@ -123,8 +162,14 @@ export async function getServerLog(
   benchmarkResultId: number,
   fileName?: string,
 ): Promise<string | null> {
-  const block = await readBlockBacked(sql, benchmarkResultId, fileName);
-  if (block) return block.text;
+  const stored = await readStoredLogRange(
+    sql,
+    benchmarkResultId,
+    fileName ?? null,
+    0,
+    Number.MAX_SAFE_INTEGER,
+  );
+  if (stored !== undefined) return stored?.text ?? null;
   try {
     const requestedFile = fileName ?? null;
     const rows = (await sql`
@@ -205,15 +250,16 @@ export async function getServerLogChunk(
   limit: number,
   fileName?: string,
 ): Promise<ServerLogChunk | null> {
-  const block = await readBlockBacked(sql, benchmarkResultId, fileName, offset, limit);
-  if (block) {
-    const charCount = Math.max(0, Math.min(limit, block.file.charCount - offset));
-    return {
-      fileName: block.file.fileName,
-      serverLog: block.text,
-      offset,
-      nextOffset: offset + limit < block.file.charCount ? offset + charCount : null,
-    };
+  const stored = await readStoredLogRange(sql, benchmarkResultId, fileName ?? null, offset, limit);
+  if (stored !== undefined) {
+    return stored === null
+      ? null
+      : {
+          fileName: stored.fileName,
+          serverLog: stored.text,
+          offset,
+          nextOffset: stored.nextOffset,
+        };
   }
   try {
     const requestedFile = fileName ?? null;

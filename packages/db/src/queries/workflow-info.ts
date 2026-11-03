@@ -150,32 +150,11 @@ export interface AvailabilityRow {
 }
 
 export async function getAvailabilityData(sql: DbClient): Promise<AvailabilityRow[]> {
-  const rows = await sql`
-    WITH live AS (
-      SELECT DISTINCT br.config_id, br.isl, br.osl, br.benchmark_type, br.date
-      FROM benchmark_results br
-      JOIN latest_workflow_runs wr ON wr.id = br.workflow_run_id
-      WHERE br.error IS NULL
-        AND wr.conclusion IS NOT NULL
-    )
-    SELECT a.model, a.isl, a.osl, a.precision, a.hardware, a.framework, a.spec_method, a.disagg, a.benchmark_type, a.date::text
-    FROM availability a
-    WHERE EXISTS (
-      SELECT 1
-      FROM live l
-      JOIN configs c ON c.id = l.config_id
-      WHERE c.model = a.model
-        AND c.hardware = a.hardware
-        AND c.framework = a.framework
-        AND c.precision = a.precision
-        AND l.isl IS NOT DISTINCT FROM a.isl
-        AND l.osl IS NOT DISTINCT FROM a.osl
-        AND l.benchmark_type = a.benchmark_type
-        AND l.date = a.date
-    )
-    ORDER BY a.date ASC
+  const [document] = await sql`
+    SELECT '[' || coalesce(string_agg(rows, ',' ORDER BY date), '') || ']' AS rows
+    FROM published_availability_dates
   `;
-  return rows as unknown as AvailabilityRow[];
+  return JSON.parse(String(document.rows)) as AvailabilityRow[];
 }
 
 export interface DateChangelogBundle {

@@ -21,7 +21,7 @@ import {
   listRunArtifacts,
 } from './lib/github-artifacts';
 import { pairServerLogArtifacts } from './lib/server-log-backfill';
-import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils';
+import { createAdminSql } from './etl/db-utils';
 import { materializePowerSeriesForRun } from './queries/gpu-power-series';
 import {
   applyChangelogBackfills,
@@ -1193,8 +1193,6 @@ async function main(): Promise<void> {
       }),
     );
   }
-
-  await refreshLatestBenchmarks(sql);
 
   console.log('\n=== ingest-ci-run complete ===');
   console.log('  Invalidate API cache: bun run admin:cache:invalidate');

@@ -35,7 +35,7 @@
 import type postgres from 'postgres';
 
 import { hasNoSslFlag } from './cli-utils.js';
-import { createAdminSql, refreshLatestBenchmarks, type Sql } from './etl/db-utils.js';
+import { createAdminSql, type Sql } from './etl/db-utils.js';
 import { confirmProceed, parseLimitForceFlags, runBackfillMain } from './lib/backfill-runner.js';
 import {
   configKey,
@@ -880,7 +880,6 @@ async function main(): Promise<void> {
     console.log('  availability skipped: rerun without --limit once every run syncs');
   }
   await syncDatasets();
-  if ((inserted.benchmark_results ?? 0) > 0) await refreshLatestBenchmarks(target);
 
   const totalSec = Math.round((Date.now() - t0) / 1000);
   console.log(`\n=== sync complete: ${ok} ok, ${failed} failed in ${totalSec}s ===`);

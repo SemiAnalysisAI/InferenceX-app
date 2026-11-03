@@ -3,6 +3,7 @@ import { describe, expect, it, type Mock, vi } from 'vitest';
 import type { DbClient } from '../connection.js';
 import {
   escapePostgresRegexLiteral,
+  getServerLog,
   getServerLogChunk,
   getServerLogFileNames,
   searchServerLogs,
@@ -24,14 +25,24 @@ function mockSql(rows: unknown[]) {
   const call = vi.fn((_strings: TemplateStringsArray, ..._values: unknown[]) =>
     Promise.resolve(rows),
   );
-  return { sql: withoutBlockStorage(call), call };
+  return { sql: call as unknown as DbClient, call };
 }
+
+const textRow = (fileName: string, logText: string, textChars: number, hasMore: boolean) => ({
+  file_name: fileName,
+  file_chars: null,
+  char_offset: null,
+  char_count: null,
+  ascii: null,
+  data: null,
+  log_text: logText,
+  text_chars: textChars,
+  has_more: hasMore,
+});
 
 describe('getServerLogChunk', () => {
   it('returns a bounded chunk and a continuation offset', async () => {
-    const { sql, call } = mockSql([
-      { file_name: 'results/server.log', log_text: 'abc', char_count: 3, has_more: true },
-    ]);
+    const { sql, call } = mockSql([textRow('results/server.log', 'abc', 3, true)]);
 
     await expect(getServerLogChunk(sql, 42, 10, 3)).resolves.toEqual({
       fileName: 'results/server.log',
@@ -47,9 +58,7 @@ describe('getServerLogChunk', () => {
   });
 
   it('marks an exact-size final chunk as complete', async () => {
-    const { sql } = mockSql([
-      { file_name: 'router.log', log_text: 'abc', char_count: 3, has_more: false },
-    ]);
+    const { sql } = mockSql([textRow('router.log', 'abc', 3, false)]);
     await expect(getServerLogChunk(sql, 42, 0, 3)).resolves.toEqual({
       fileName: 'router.log',
       serverLog: 'abc',
@@ -64,9 +73,7 @@ describe('getServerLogChunk', () => {
   });
 
   it('selects an additional file by its artifact-relative name', async () => {
-    const { sql, call } = mockSql([
-      { file_name: 'workers/decode.out', log_text: 'worker', char_count: 6, has_more: false },
-    ]);
+    const { sql, call } = mockSql([textRow('workers/decode.out', 'worker', 6, false)]);
     await expect(getServerLogChunk(sql, 42, 0, 64, 'workers/decode.out')).resolves.toMatchObject({
       fileName: 'workers/decode.out',
       serverLog: 'worker',
@@ -75,9 +82,7 @@ describe('getServerLogChunk', () => {
   });
 
   it('advances offsets in PostgreSQL characters instead of UTF-16 code units', async () => {
-    const { sql } = mockSql([
-      { file_name: 'unicode.log', log_text: 'a😀b', char_count: 3, has_more: true },
-    ]);
+    const { sql } = mockSql([textRow('unicode.log', 'a😀b', 3, true)]);
     await expect(getServerLogChunk(sql, 42, 5, 3, 'unicode.log')).resolves.toMatchObject({
       serverLog: 'a😀b',
       nextOffset: 8,
@@ -127,6 +132,18 @@ describe('block-backed files', () => {
       offset,
       nextOffset: null,
     });
+  });
+
+  it('has no continuation when the chunk ends exactly at the last code point', async () => {
+    const offset = chars.length - 10;
+    await expect(getServerLogChunk(sql, 42, offset, 10, 'frontend.out')).resolves.toMatchObject({
+      serverLog: chars.slice(offset).join(''),
+      nextOffset: null,
+    });
+  });
+
+  it('reads the whole file for a download', async () => {
+    await expect(getServerLog(sql, 42, 'frontend.out')).resolves.toBe(text);
   });
 });
 

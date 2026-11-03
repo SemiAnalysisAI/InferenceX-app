@@ -31,6 +31,8 @@ vi.mock('./blob-cache', () => ({
   blobEnabled: vi.fn(() => true),
   blobGet: vi.fn(),
   blobSet: vi.fn(),
+  blobGetBytes: vi.fn(),
+  blobSetBytes: vi.fn(),
   blobPurge: vi.fn(),
 }));
 
@@ -41,18 +43,21 @@ import {
   purgeAll,
   purgeCollectiveX,
   cachedJson,
+  cachedJsonResponse,
   cachedGzipJson,
   negotiateEncoding,
   notModifiedJson,
 } from './api-cache';
 import { revalidateTag, unstable_cache } from 'next/cache';
-import { blobEnabled, blobGet, blobSet, blobPurge } from './blob-cache';
+import { blobEnabled, blobGet, blobGetBytes, blobSet, blobSetBytes, blobPurge } from './blob-cache';
 
 const mockRevalidateTag = vi.mocked(revalidateTag);
 const mockUnstableCache = vi.mocked(unstable_cache);
 const mockBlobEnabled = vi.mocked(blobEnabled);
 const mockBlobGet = vi.mocked(blobGet);
 const mockBlobSet = vi.mocked(blobSet);
+const mockBlobGetBytes = vi.mocked(blobGetBytes);
+const mockBlobSetBytes = vi.mocked(blobSetBytes);
 const mockBlobPurge = vi.mocked(blobPurge);
 const originalCacheNamespace = process.env.CACHE_NAMESPACE;
 
@@ -713,6 +718,138 @@ describe('cachedJson', () => {
 
     expect(etag({ v: 1 }, 'rev-1')).toBe(etag({ v: 2 }, 'rev-1'));
     expect(etag({ v: 1 }, 'rev-2')).not.toBe(etag({ v: 1 }, 'rev-1'));
+  });
+});
+
+describe('cachedJsonResponse', () => {
+  const sameResponse = async (actual: Response, expected: Response) => {
+    expect(actual.status).toBe(expected.status);
+    expect([...actual.headers]).toEqual([...expected.headers]);
+    expect(await bodyText(actual)).toBe(await bodyText(expected));
+  };
+  const storedBytes = () => mockBlobSetBytes.mock.calls.at(-1)![1];
+
+  it.each([
+    ['br', numberedRows(10)],
+    ['gzip', numberedRows(10)],
+    ['identity', numberedRows(10)],
+    ['br', numberedRows(50_000)],
+    ['gzip', numberedRows(50_000)],
+  ] as const)(
+    'stores and then streams the %s response cachedJson sends',
+    async (acceptEncoding, data) => {
+      mockBlobGetBytes.mockResolvedValueOnce(null);
+      const load = vi.fn((_model: string) => Promise.resolve(data));
+      const respond = cachedJsonResponse(load, 'stored');
+      const request = () => apiRequest({ 'Accept-Encoding': acceptEncoding });
+
+      await sameResponse(await respond(request(), 'dsr1'), cachedJson(request(), data));
+      expect(mockBlobSetBytes).toHaveBeenCalledWith(
+        expect.stringMatching(/^generation\/g1\/stored:v2:.+\.response\.br$/u),
+        expect.any(Uint8Array),
+      );
+
+      mockBlobGetBytes.mockResolvedValueOnce(storedBytes());
+      await sameResponse(await respond(request(), 'dsr1'), cachedJson(request(), data));
+      expect(load).toHaveBeenCalledOnce();
+      expect(mockBlobGetBytes.mock.calls[1][0]).toBe(mockBlobGetBytes.mock.calls[0][0]);
+    },
+    30_000,
+  );
+
+  it('streams the stored brotli bytes unchanged', async () => {
+    mockBlobGetBytes.mockResolvedValueOnce(null);
+    const respond = cachedJsonResponse(() => Promise.resolve({ v: 1 }), 'raw');
+    await respond(apiRequest({ 'Accept-Encoding': 'br' }));
+    const stored = storedBytes();
+    mockBlobGetBytes.mockResolvedValueOnce(stored);
+
+    const res = await respond(apiRequest({ 'Accept-Encoding': 'br' }));
+
+    expect(Buffer.from(await res.arrayBuffer()).equals(Buffer.from(stored.subarray(33)))).toBe(
+      true,
+    );
+  });
+
+  it('answers a held ETag from the stored digest with a 304', async () => {
+    const data = { rows: [1, 2, 3] };
+    const etag = cachedJson(apiRequest({ 'Accept-Encoding': 'br' }), data).headers.get('ETag')!;
+    mockBlobGetBytes.mockResolvedValueOnce(null);
+    const respond = cachedJsonResponse(() => Promise.resolve(data), 'etag');
+    await respond(apiRequest());
+    mockBlobGetBytes.mockResolvedValueOnce(storedBytes());
+
+    const res = await respond(apiRequest({ 'Accept-Encoding': 'br', 'If-None-Match': etag }));
+
+    expect(res.status).toBe(304);
+    expect(res.headers.get('ETag')).toBe(etag);
+  });
+
+  it('keys entries by arguments and moves to new paths when a purge rolls the generation', async () => {
+    mockBlobGetBytes.mockResolvedValue(null);
+    const respond = cachedJsonResponse((model: string) => Promise.resolve([model]), 'keyed');
+
+    await respond(apiRequest(), 'a');
+    await respond(apiRequest(), 'b');
+    generation.value = 'g2';
+    await respond(apiRequest(), 'a');
+
+    const [a, b, rolled] = mockBlobGetBytes.mock.calls.map(([path]) => path);
+    expect(b).not.toBe(a);
+    expect(rolled).toBe(a.replace('generation/g1/', 'generation/g2/'));
+  });
+
+  it('runs one read and one load for concurrent misses', async () => {
+    const { promise: rows, resolve } = Promise.withResolvers<number[]>();
+    mockBlobGetBytes.mockResolvedValue(null);
+    const load = vi.fn(() => rows);
+    const respond = cachedJsonResponse(load, 'stampede');
+
+    const calls = [respond(apiRequest()), respond(apiRequest())];
+    await vi.waitFor(() => expect(load).toHaveBeenCalledOnce());
+    resolve([1, 2]);
+    const responses = await Promise.all(calls);
+
+    expect(mockBlobGetBytes).toHaveBeenCalledOnce();
+    expect(mockBlobSetBytes).toHaveBeenCalledOnce();
+    for (const res of responses) expect(JSON.parse(await bodyText(res))).toEqual([1, 2]);
+  });
+
+  it('forgets a failed load so the next request retries it', async () => {
+    mockBlobGetBytes.mockResolvedValue(null);
+    const load = vi
+      .fn<() => Promise<number[]>>()
+      .mockRejectedValueOnce(new Error('db down'))
+      .mockResolvedValueOnce([1]);
+    const respond = cachedJsonResponse(load, 'retry');
+
+    await expect(respond(apiRequest())).rejects.toThrow('db down');
+    expect(JSON.parse(await bodyText(await respond(apiRequest())))).toEqual([1]);
+  });
+
+  it('serves the response when the blob write fails', async () => {
+    mockBlobGetBytes.mockResolvedValue(null);
+    mockBlobSetBytes.mockRejectedValueOnce(new Error('blob down'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const respond = cachedJsonResponse(() => Promise.resolve({ ok: true }), 'write-fails');
+
+    const res = await respond(apiRequest({ 'Accept-Encoding': 'br' }));
+
+    expect(JSON.parse(await bodyText(res))).toEqual({ ok: true });
+    expect(warn).toHaveBeenCalledOnce();
+    warn.mockRestore();
+  });
+
+  it('loads and encodes directly when Blob is not configured', async () => {
+    mockBlobEnabled.mockReturnValueOnce(false);
+    const respond = cachedJsonResponse(() => Promise.resolve({ v: 1 }), 'no-blob');
+
+    await sameResponse(
+      await respond(apiRequest({ 'Accept-Encoding': 'br' })),
+      cachedJson(apiRequest({ 'Accept-Encoding': 'br' }), { v: 1 }),
+    );
+    expect(mockBlobGetBytes).not.toHaveBeenCalled();
+    expect(mockBlobSetBytes).not.toHaveBeenCalled();
   });
 });
 

@@ -19,6 +19,10 @@ vi.mock('@semianalysisai/inferencex-db/queries/benchmarks', () => ({
 vi.mock('@/lib/cache/api-cache', () => ({
   cachedQuery: (fn: (...args: any[]) => any) => fn,
   cachedJson: (_request: Request, data: unknown) => Response.json(data),
+  cachedJsonResponse:
+    (load: (...args: unknown[]) => Promise<unknown>) =>
+    async (_request: Request, ...args: unknown[]) =>
+      Response.json(await load(...args)),
 }));
 
 import { GET } from './route';

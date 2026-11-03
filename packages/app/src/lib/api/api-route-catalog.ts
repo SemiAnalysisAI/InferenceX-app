@@ -691,7 +691,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'list-benchmarks',
-    sourceSha256: '8734f1b37e5b51392e192f0ab6782f154173b00e8179618245110fe5d88d835a',
+    sourceSha256: 'eea582d7cc130a15477637bf6c319e53d80e9eb2d6eb42d2324e368541e04027',
   },
   {
     source: 'src/app/api/v1/benchmarks/history/route.ts',
@@ -1667,7 +1667,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/cache/api-cache.ts',
-    sourceSha256: '85b22058bc879453f69b89bf204a3cb5c34108dc9365d83d4549a4978dc83548',
+    sourceSha256: '3d9a01ec41ead60994c7ab194939fb6a886e2e890a1e3e68de1ef911353c5b88',
     reviewArea: {
       en: 'Public CDN tags, cache lifetimes, Blob key dimensions, and purge behavior.',
       zh: '公开 CDN 标签、缓存时长、Blob 键维度和清除行为。',
@@ -1675,7 +1675,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/cache/blob-cache.ts',
-    sourceSha256: '4a5c58891a913628411b39e9fc640577e9c124b90d83e350f541693ba73c9c82',
+    sourceSha256: '525de423c7a17e401044de360570b0a2e399a157e079dc79a04be4684d962465',
     reviewArea: {
       en: 'Blob cache read, write, prefix migration, and purge behavior.',
       zh: 'Blob 缓存读取、写入、前缀迁移和清除行为。',
@@ -1853,7 +1853,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/benchmarks.ts',
-    sourceSha256: 'af3dac299fcb53ff096c0c1a82305a79322adf315879c75339d8f58044fc3dde',
+    sourceSha256: 'f7a51faabb56604c1bb066cf06802811788eab360d17ca1bf2c6dc2d34bf8f60',
     reviewArea: {
       en: 'Benchmark row fields and latest, exact-run, history, and TCO query semantics.',
       zh: '基准行字段以及最新、精确运行、历史和 TCO 查询语义。',
@@ -1885,7 +1885,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/latest-images.ts',
-    sourceSha256: '8ae98eaa877d09b724837d6936aa324fce9c203d71b6e0fd94d4971b5b24d628',
+    sourceSha256: 'ea8a86775f1fd406ee1c33a636bb304e4ab886a809e1ba25e5fdae5a0af52318',
     reviewArea: {
       en: 'Latest runtime image row fields and per-configuration selection.',
       zh: '最新运行时镜像行字段和按配置选择逻辑。',
@@ -1914,7 +1914,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/server-logs.ts',
-    sourceSha256: '8f15c19d33075311e8258c1f7a8622796d2eabc44476bc2e89a1d18a135d25f0',
+    sourceSha256: '24b585079878ed53795890f8b29ecf8721193673a26d20559b840222989fa4b5',
     reviewArea: {
       en: 'Log filename discovery, selected-file reads, bounded chunk metadata, complete-file search, availability, and legacy-schema fallback.',
       zh: '日志文件名发现、指定文件读取、有界分块元数据、完整文件搜索、可用性以及旧版 schema 回退行为。',
@@ -1950,7 +1950,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/workflow-info.ts',
-    sourceSha256: '36567da71557d3bcef4de81676757cbb991c30863c3c3e43fd33dad79c27052d',
+    sourceSha256: '4825209f9df30095849595681634be0e259cb5f6641238939d1f607003993df4',
     reviewArea: {
       en: 'Availability rows plus workflow runs, changelogs, configurations, and run coverage responses.',
       zh: '可用配置行以及工作流运行、变更记录、配置和运行覆盖响应。',

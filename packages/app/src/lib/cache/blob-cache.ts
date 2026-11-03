@@ -53,12 +53,39 @@ export async function putContentBlob(
   }
 }
 
-export async function blobGet(key: string): Promise<string | null> {
+export async function blobGetBytes(key: string): Promise<Uint8Array | null> {
   if (!blobEnabled()) return null;
   try {
-    const result = await get(`${getPrefix()}${key}.json.br`, { access: 'public' });
+    const result = await get(`${getPrefix()}${key}`, { access: 'public' });
     if (result?.statusCode !== 200) return null;
-    const compressed = await new Response(result.stream).arrayBuffer();
+    return new Uint8Array(await new Response(result.stream).arrayBuffer());
+  } catch {
+    return null;
+  }
+}
+
+export async function blobSetBytes(key: string, bytes: Uint8Array): Promise<void> {
+  if (!blobEnabled()) return;
+  try {
+    await put(
+      `${getPrefix()}${key}`,
+      Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength),
+      {
+        access: 'public',
+        addRandomSuffix: false,
+        contentType: 'application/octet-stream',
+      },
+    );
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('already exists')) return;
+    throw error;
+  }
+}
+
+export async function blobGet(key: string): Promise<string | null> {
+  const compressed = await blobGetBytes(`${key}.json.br`);
+  if (compressed === null) return null;
+  try {
     const json = await decompress(compressed, { chunkSize: DECODE_CHUNK_BYTES });
     return json.toString('utf8');
   } catch {
@@ -75,16 +102,7 @@ export async function blobSet(key: string, json: string): Promise<void> {
       [zlibConstants.BROTLI_PARAM_SIZE_HINT]: Buffer.byteLength(json),
     },
   });
-  try {
-    await put(`${getPrefix()}${key}.json.br`, body, {
-      access: 'public',
-      addRandomSuffix: false,
-      contentType: 'application/octet-stream',
-    });
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('already exists')) return;
-    throw error;
-  }
+  await blobSetBytes(`${key}.json.br`, body);
 }
 
 /**

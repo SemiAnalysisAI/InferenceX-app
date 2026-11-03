@@ -28,7 +28,6 @@ async function reset(): Promise<void> {
 
   console.log('Dropping all tables...\n');
 
-  await sql`DROP MATERIALIZED VIEW IF EXISTS latest_benchmarks`;
   await sql`DROP VIEW IF EXISTS latest_workflow_runs`;
   await sql`DROP TABLE IF EXISTS
     ${sql(TABLE_NAMES.runDatasets)},

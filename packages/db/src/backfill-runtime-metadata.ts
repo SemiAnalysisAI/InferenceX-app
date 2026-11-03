@@ -4,7 +4,7 @@ import path from 'node:path';
 
 import { hasNoSslFlag, requireIngestRepo } from './cli-utils.js';
 import { mapBenchmarkRow } from './etl/benchmark-mapper.js';
-import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils.js';
+import { createAdminSql } from './etl/db-utils.js';
 import { createSkipTracker } from './etl/skip-tracker.js';
 import { downloadArtifact, listRunArtifacts } from './lib/github-artifacts.js';
 import { confirmProceed, runBackfillMain } from './lib/backfill-runner.js';
@@ -135,7 +135,6 @@ async function main(): Promise<void> {
     }
   }
 
-  await refreshLatestBenchmarks(sql);
   console.log(
     `  Rows: ${updated} updated, ${empty} without runtime metadata, ` +
       `${unmapped} unmapped, ${missing} missing DB match`,

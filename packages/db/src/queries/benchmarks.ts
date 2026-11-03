@@ -392,7 +392,6 @@ export async function getLatestBenchmarks(
     return rows as unknown as BenchmarkRow[];
   }
 
-  // No date filter: use materialized view for instant lookups
   const rows = await sql`
     SELECT
       lb.id,
@@ -428,14 +427,15 @@ export async function getLatestBenchmarks(
       lb.workflow_run_id,
       wr.run_started_at::text,
       CASE WHEN wr.html_url IS NOT NULL THEN wr.html_url || '/attempts/' || wr.run_attempt ELSE NULL END AS run_url,
-      lb.snapshot_date::text AS curve_date,
-      lb.snapshot_workflow_run_id AS curve_workflow_run_id,
+      p.snapshot_date::text AS curve_date,
+      p.snapshot_workflow_run_id AS curve_workflow_run_id,
       snapshot_wr.run_started_at::text AS curve_run_started_at
-    FROM latest_benchmarks lb
+    FROM latest_benchmark_points p
+    JOIN benchmark_results lb ON lb.id = p.id
     JOIN configs c ON c.id = lb.config_id
-    JOIN latest_workflow_runs wr ON wr.id = lb.workflow_run_id
-    JOIN latest_workflow_runs snapshot_wr ON snapshot_wr.id = lb.snapshot_workflow_run_id
-    WHERE c.model = ANY(${modelKeys})
+    JOIN workflow_runs wr ON wr.id = lb.workflow_run_id
+    JOIN workflow_runs snapshot_wr ON snapshot_wr.id = p.snapshot_workflow_run_id
+    WHERE p.model = ANY(${modelKeys}) AND c.model = ANY(${modelKeys})
     ORDER BY lb.config_id, lb.conc, lb.isl, lb.osl, lb.date DESC,
       lb.benchmark_type, lb.offload_mode, lb.recipe_fingerprint
   `;

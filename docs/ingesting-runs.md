@@ -152,7 +152,7 @@ After reviewing the preview:
 bun --env-file=../../.env src/apply-overrides.ts --run-id "$RUN" --allow-unregistered-run --yes
 ```
 
-The ingest refreshes `latest_benchmarks` itself. The dashboard can keep serving cached responses until the cache is invalidated. From the repo root, choose the option for the approved target:
+`latest_benchmarks` and availability are current as soon as each ingest transaction commits. The dashboard can keep serving cached responses until the cache is invalidated. From the repo root, choose the option for the approved target:
 
 - **Public dashboard:** Dispatch the Cache Refresh workflow, which invalidates and warms the site set in the `APP_URL` repository variable of the repository it runs in.
 

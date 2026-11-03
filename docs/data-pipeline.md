@@ -27,19 +27,42 @@ there are no duplicated metric-specific columns on `benchmark_results` or
   lines (below) carry `date` from the benchmark rows.
 - `availability` is a separate denormalized table because the date-picker query (`SELECT DISTINCT model, date`) needs to be fast without scanning benchmark_results.
 
-### Why a Materialized View (latest_benchmarks)
+### Maintained Latest State (`latest_benchmarks`, migration 028)
 
-Computing the newest logical curve from the full result table is expensive. The
-materialized view pre-computes the newest logical curve snapshot, including
+Computing the newest logical curve from the full result table is expensive, so it is
+kept up to date as results are written. The newest logical curve snapshot includes
 append-only history when applicable. An append-only run extends the run before it
 when every line both contain keeps its image; an AgentX curve spans AGG/disagg and
 offload lines that may run different images, matching InferenceX's append-only check. Point
 identity within that snapshot remains config, scenario, sequence, offload mode,
-recipe fingerprint, and concurrency. API routes use the view when no date filter is
+recipe fingerprint, and concurrency. API routes use it when no date filter is
 specified. Date-filtered, run and history requests apply the same rules to the
 stored curve lines at read time.
 
-`REFRESH CONCURRENTLY` allows reads during refresh (no downtime). The trade-off is a brief window where the view is stale after ingest, which is acceptable because ingests are infrequent.
+`latest_benchmark_points` holds the selected point ids with their snapshot identity,
+one curve scope at a time, and `latest_benchmarks` is a view joining them to
+`benchmark_results`, so it keeps every result column and shows metric backfills at
+once. `published_availability` holds the availability rows that a successful result
+of a concluded latest attempt supports, and `published_availability_dates` holds them
+as one JSON fragment per date, so `/api/v1/availability` reads a few hundred short
+rows instead of joining every result. Its rows are ordered by date, model, hardware,
+framework, precision, benchmark type, ISL, OSL, spec method and disagg.
+
+Statement triggers queue what a write can change: the curve scopes of the stored
+curve lines it rebuilds or of results whose concurrency or recipe changes, and the
+(model, ISL, OSL, benchmark type, date) keys of lines and availability rows it
+touches. Changes to a run's attempt, start time, `append_only` or conclusion queue
+every line of the GitHub run. A deferred trigger recomputes the queued scopes and
+keys once per transaction at commit, under one advisory lock, so concurrent writers
+publish one after another and each sees the others' committed rows. There is no
+refresh step: every writer, manual SQL included, leaves both exact when it commits.
+A run ingest publishes in about 20 ms of database time where
+`REFRESH MATERIALIZED VIEW CONCURRENTLY` took about half a second.
+
+To check the maintained points against a full recompute, compare
+`latest_benchmark_points` before and after
+`select refresh_latest_benchmark_points(array(select distinct curve_scope from benchmark_curve_run_lines))`
+inside a transaction that you roll back.
 
 ### Stored Curve Lines (`benchmark_curve_run_lines`, migration 023)
 
@@ -52,8 +75,8 @@ update, delete, truncate) and `configs` (update) rebuild the rows of each run a
 statement touches, so every writer keeps them exact, manual SQL included. Updates
 that leave the line inputs unchanged (metrics, power audits, links) rebuild nothing.
 Readers rank a model's lines instead of aggregating every one of its result rows,
-then join the selected point ids to `benchmark_results` by primary key. The refresh
-of `latest_benchmarks` reads the same rows. `benchmark_curve_runs` keeps its
+then join the selected point ids to `benchmark_results` by primary key. The maintained
+latest state reads the same rows. `benchmark_curve_runs` keeps its
 migration 014 columns over the stored lines. Results break ORDER BY ties by point
 identity, so their bytes do not depend on the query plan.
 
@@ -166,8 +189,8 @@ concurrency.
 
 `bun run admin:db:apply-overrides` previews every matching row and requires confirmation
 before deleting it in a transaction. It also removes unreferenced server logs and
-trace-replay sidecars, clears availability entries that no remaining successful row
-supports, and refreshes `latest_benchmarks`. The override remains in source control,
+trace-replay sidecars and clears availability entries that no remaining successful row
+supports. The override remains in source control,
 so future CI and GCS ingests skip the point instead of restoring it.
 
 CI ingests match the run attempt exactly. If a GCS backup cannot retrieve GitHub run
@@ -210,8 +233,8 @@ The standalone recovery command remains strict by default.
 Run `bun run admin:db:apply-overrides` to preview the exact rows, reasons, and patches;
 the command requires confirmation unless passed `--yes`. It fails before writing when a
 target is missing, when a point's desired identity already exists, or when registry
-validation finds an overlap or duplicate. Writes are verified against the declared state
-and `latest_benchmarks` is refreshed afterward. Merges to `master` run the same command in
+validation finds an overlap or duplicate. Writes are verified against the declared state.
+Merges to `master` run the same command in
 CI, followed by database verification, cache invalidation, and cache warmup.
 
 Point corrections are additionally applied before each CI or GCS benchmark insert. This
@@ -782,7 +805,7 @@ bun run admin:db:backfill-gpu-metrics --run RUN_ID --attempt ATTEMPT \
 After a parser fix, add `--force` to replace unchanged stored samples. GitHub recovery
 accepts only the current attempt; older or expired artifacts require retained original
 bytes through `admin:db:ingest:ci`. Never substitute another attempt's artifacts.
-Backfill may fill missing AgentX audits and refreshes `latest_benchmarks`, but those
+Backfill may fill missing AgentX audits, and those
 benchmark changes also need the app's API cache refreshed. With its `INVALIDATE_SECRET`:
 
 ```sh

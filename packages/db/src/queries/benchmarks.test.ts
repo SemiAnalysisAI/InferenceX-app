@@ -71,17 +71,17 @@ describe('append-only benchmark snapshots', () => {
     expect(values).toEqual([['dsv4'], '2026-08-01']);
   });
 
-  it('stamps latest materialized-view rows with a separate logical identity', async () => {
+  it('stamps maintained latest rows with a separate logical identity', async () => {
     const captured = captureSql();
 
     await getLatestBenchmarks(captured.sql, 'dsv4');
 
     const { text } = captured.query();
-    expect(text).toContain('FROM latest_benchmarks lb');
+    expect(text).toContain('FROM latest_benchmark_points p');
     expect(text).toContain('lb.date::text, lb.workflow_run_id');
-    expect(text).toContain('lb.snapshot_date::text AS curve_date');
+    expect(text).toContain('p.snapshot_date::text AS curve_date');
     expect(text).toContain('lb.recipe_fingerprint,');
-    expect(text).toContain('snapshot_wr.id = lb.snapshot_workflow_run_id');
+    expect(text).toContain('snapshot_wr.id = p.snapshot_workflow_run_id');
   });
 
   it('seeds every filtered sequence run as a distinct historical snapshot', async () => {
