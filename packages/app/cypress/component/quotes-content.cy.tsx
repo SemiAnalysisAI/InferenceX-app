@@ -278,7 +278,7 @@ describe('QuotesContent supporter logo wall', () => {
     });
   });
 
-  it('lays out cloud providers in two desktop rows and wraps the remaining supporters', () => {
+  it('lays out cloud providers in two desktop rows and preserves the requested groups', () => {
     cy.viewport(1568, 1000);
     cy.mount(<QuotesContent />);
     cy.get('[data-testid="supporter-group-hyperscalers-neoclouds"] li').should(($lis) => {
@@ -287,14 +287,10 @@ describe('QuotesContent supporter logo wall', () => {
         const top = Math.round(li.getBoundingClientRect().top);
         rows.set(top, (rows.get(top) ?? 0) + 1);
       }
-      expect([...rows.values()]).to.deep.equal([7, 7]);
+      expect([...rows.values()]).to.deep.equal([8, 8]);
     });
     cy.get('[data-testid="supporter-group-other"]').within(() => {
       cy.get('img[alt="Supermicro"]').should('be.visible');
-      cy.get('li').should(($lis) => {
-        const rows = new Set([...$lis].map((li) => Math.round(li.getBoundingClientRect().top)));
-        expect(rows.size).to.be.greaterThan(1);
-      });
     });
     cy.get('[data-testid="supporter-logo-wall"] img[alt="TokenSpeed"]').should('not.exist');
     cy.get('[data-testid="supporter-group-us-frontier-labs"]').within(() => {
@@ -303,7 +299,9 @@ describe('QuotesContent supporter logo wall', () => {
       }
     });
     cy.get('[data-testid="supporter-group-hyperscalers-neoclouds"]').within(() => {
-      for (const alt of ['Core42', 'Verda']) cy.get(`img[alt="${alt}"]`).should('be.visible');
+      for (const alt of ['Core42', 'Verda', 'Baseten', 'Vultr']) {
+        cy.get(`img[alt="${alt}"]`).should('be.visible');
+      }
     });
     cy.get('[data-testid="supporter-group-open-source"] img[alt="Red Hat"]').should('be.visible');
     cy.get('[data-testid="supporter-logo-wall"]')

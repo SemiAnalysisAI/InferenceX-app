@@ -66,7 +66,7 @@ export const CURATED_SUPPORTER_GROUPS: SupporterGroup[] = [
   {
     id: 'hyperscalers-neoclouds',
     label: { en: 'Hyperscalers & Neoclouds', zh: '超大规模云厂商与 Neocloud' },
-    desktopColumns: 7,
+    desktopColumns: 8,
     logos: [
       { label: 'Microsoft', logo: 'microsoft.svg', quoteOrg: 'Microsoft' },
       { label: 'Google Cloud', logo: 'google-color.svg' },
@@ -82,6 +82,8 @@ export const CURATED_SUPPORTER_GROUPS: SupporterGroup[] = [
       { label: 'Firmus', logo: 'firmus.svg', quoteOrg: 'Firmus' },
       { label: 'Core42', logo: 'core42.webp', quoteOrg: 'Core42' },
       { label: 'Verda', logo: 'verda.svg', quoteOrg: 'Verda' },
+      { label: 'Baseten', logo: 'baseten.svg', quoteOrg: 'Baseten' },
+      { label: 'Vultr', logo: 'vultr.svg', quoteOrg: 'Vultr' },
     ],
   },
   {
