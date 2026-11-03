@@ -40,32 +40,32 @@
   content: none;
 }
 
-.halloween-wordmark {
-  color: #b54708;
+.thanksgiving-wordmark {
+  color: #92400e;
   text-rendering: geometricPrecision;
   font-kerning: normal;
 }
 
-.halloween-wordmark-x {
-  color: #7e22ce;
+.thanksgiving-wordmark-x {
+  color: #b91c1c;
 }
 
-:is(.dark, .minecraft, .csgo, .gta, .doom, .halo) .halloween-wordmark {
-  color: #fb923c;
+:is(.dark, .minecraft, .csgo, .gta, .doom, .halo) .thanksgiving-wordmark {
+  color: #fbbf24;
 }
 
-:is(.dark, .minecraft, .csgo, .gta, .doom, .halo) .halloween-wordmark-x {
-  color: #c084fc;
+:is(.dark, .minecraft, .csgo, .gta, .doom, .halo) .thanksgiving-wordmark-x {
+  color: #f87171;
 }
 
-.halloween-wordmark-pumpkin {
+.thanksgiving-wordmark-turkey {
   font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
-  transform: rotate(12deg);
+  transform: rotate(8deg);
 }
 
 @media (forced-colors: active) {
-  .halloween-wordmark,
-  .halloween-wordmark-x {
+  .thanksgiving-wordmark,
+  .thanksgiving-wordmark-x {
     color: LinkText;
   }
 }
