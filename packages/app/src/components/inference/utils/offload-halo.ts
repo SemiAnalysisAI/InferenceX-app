@@ -14,9 +14,13 @@ export function renderOffloadHalo(
   stroke: string,
   enabled = true,
 ): void {
+  if (!enabled || point.offload_mode !== 'on') {
+    for (const halo of group.node()?.querySelectorAll('.offload-halo') ?? []) halo.remove();
+    return;
+  }
   group
     .selectAll<SVGCircleElement, boolean>('.offload-halo')
-    .data(enabled && point.offload_mode === 'on' ? [true] : [])
+    .data([true])
     .join('circle')
     .each(function () {
       setAttrIfChanged(this, 'class', 'offload-halo');

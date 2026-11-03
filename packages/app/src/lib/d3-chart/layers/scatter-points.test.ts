@@ -386,15 +386,56 @@ describe('syncPointLabel', () => {
     const group = makePointGroup();
     syncPointLabel(group, 'TP8', '#fff', false);
 
-    expect(recordMutations(group, () => syncPointLabel(group, 'TP4', '#fff', true))).toEqual([
-      'text.style',
-      'text.style',
+    expect(recordMutations(group, () => syncPointLabel(group, 'TP4', '#fff', false))).toEqual([
       'childList',
     ]);
-    const label = group.querySelector<SVGTextElement>('.point-label')!;
-    expect(label.style.display).toBe('none');
-    expect(label.style.opacity).toBe('0');
-    expect(label.textContent).toBe('TP4');
+    expect(group.querySelector('.point-label')!.textContent).toBe('TP4');
+  });
+
+  it('keeps no label in the DOM while hidden', () => {
+    const group = makePointGroup();
+    syncPointLabel(group, 'TP8', '#fff', true);
+    expect(group.querySelector('.point-label')).toBeNull();
+
+    syncPointLabel(group, 'TP8', '#fff', false);
+    syncPointLabel(group, 'TP8', '#fff', true);
+    expect(group.querySelector('.point-label')).toBeNull();
+  });
+
+  it('builds a late label in the stacking slot it would have had if built with its point', () => {
+    const shapes: { fp8: ShapeKey } = { fp8: 'circle' };
+    const config = (hideLabels: boolean) => ({
+      getColor: () => '#123456',
+      getShapeKey: (d: TestPoint) => (d.precision === 'fp8' ? shapes.fp8 : 'circle'),
+      getLabelText: (d: TestPoint) => `TP${d.tp}`,
+      foreground: '#fff',
+      hideLabels,
+    });
+    const eager = makeZoomGroup();
+    const late = makeZoomGroup();
+    renderScatterPoints(eager, POINTS, xScale, yScale, config(false), keyFn);
+    renderScatterPoints(late, POINTS, xScale, yScale, config(true), keyFn);
+    for (const group of [eager, late]) {
+      group
+        .selectAll<SVGGElement, TestPoint>('.dot-group')
+        .filter((d) => d.hwKey === 'mi300x')
+        .append('circle')
+        .attr('class', 'offload-halo');
+    }
+    shapes.fp8 = 'square';
+    renderScatterPoints(eager, POINTS, xScale, yScale, config(false), keyFn);
+    renderScatterPoints(late, POINTS, xScale, yScale, config(true), keyFn);
+    renderScatterPoints(late, POINTS, xScale, yScale, config(false), keyFn);
+
+    const childOrder = (group: d3.Selection<SVGGElement, unknown, null, undefined>) =>
+      group
+        .selectAll<SVGGElement, TestPoint>('.dot-group')
+        .nodes()
+        .map((node) =>
+          [...node.children].map((child) => child.getAttribute('class') ?? child.tagName),
+        );
+    expect(childOrder(late)).toEqual(childOrder(eager));
+    expect(childOrder(late)[0]).toEqual(['circle', 'point-label', 'visible-shape']);
   });
 });
 
@@ -436,9 +477,7 @@ describe('updateScatterPointsForDisplay', () => {
       'blue',
       'blue',
     ]);
-    expect(
-      points.map((p) => (p.querySelector('.point-label') as SVGTextElement).style.display),
-    ).toEqual(['none', 'none', 'none']);
+    expect(points.map((p) => p.querySelector('.point-label'))).toEqual([null, null, null]);
   });
 });
 

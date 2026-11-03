@@ -249,12 +249,12 @@ export function updateLayerForMetric<T>(
     });
   const getLabelText = layer.config.getLabelText;
   const foreground = layer.config.foreground;
-  if (getLabelText && foreground) {
+  if (getLabelText && foreground && !layer.config.hideLabels) {
     selection.each(function (datum) {
-      syncPointLabel(this, getLabelText(datum), foreground, layer.config.hideLabels);
+      syncPointLabel(this, getLabelText(datum), foreground, false);
     });
   } else {
-    selection.selectAll('.point-label').remove();
+    group.selectAll('.dot-group > .point-label').remove();
   }
   updateScatterPointsOnZoom(group, xScale as ContinuousScale, yScale as ContinuousScale);
   return selection;

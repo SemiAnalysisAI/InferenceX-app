@@ -12,6 +12,7 @@ import {
 import type { ContinuousScale } from '../types';
 import { setAttrIfChanged, setStyleIfChanged, setTextIfChanged } from '../chart-update';
 import { CHART_TYPE, px } from '../typography';
+import { pointLabelAnchor, replacedPointShapes } from './point-label-order';
 
 export interface ScatterPointConfig<T> {
   getColor: (d: T) => string;
@@ -52,6 +53,7 @@ export function syncPointShape(
       null,
       undefined
     >;
+    if (existing) replacedPointShapes.add(shape.node()!);
     applyNormalState(shape, shapeKey);
   } else {
     setAttrIfChanged(existing, 'fill', fill);
@@ -107,43 +109,45 @@ export function renderScatterPoints<T extends { precision: string; x: number; y:
     syncPointShape(g, shapeKey, config.getColor(d));
   });
 
-  if (config.getLabelText && config.foreground) {
+  if (config.getLabelText && config.foreground && !config.hideLabels) {
     const labelGetter = config.getLabelText;
     const foreground = config.foreground;
     points.each(function (d) {
-      syncPointLabel(this, labelGetter(d), foreground, config.hideLabels);
+      syncPointLabel(this, labelGetter(d), foreground, false);
     });
   } else {
-    points.selectAll('.point-label').remove();
+    zoomGroup.selectAll('.dot-group > .point-label').remove();
   }
 
   return points;
 }
 
+/** Builds or updates a point's label while visible; a hidden label is not kept in the DOM. */
 export function syncPointLabel(
   group: SVGGElement,
   text: string,
   foreground: string,
   hideLabels: boolean | undefined,
 ): void {
+  const existing = group.querySelector<SVGTextElement>(':scope > .point-label');
+  if (hideLabels) {
+    existing?.remove();
+    return;
+  }
+  // A new label is filled in while detached, so it lands as one DOM insertion.
+  const element =
+    existing ?? group.ownerDocument.createElementNS('http://www.w3.org/2000/svg', 'text');
   const lines = text.split('\n');
   const firstDy = `${-(0.8 + (lines.length - 1) * 1.1)}em`;
-  const label = d3
-    .select(group)
-    .selectAll<SVGTextElement, boolean>('.point-label')
-    .data([true])
-    .join('text');
-  const element = label.node();
-  if (!element) return;
   setAttrIfChanged(element, 'class', 'point-label');
   setAttrIfChanged(element, 'text-anchor', 'middle');
   setAttrIfChanged(element, 'fill', foreground);
   setAttrIfChanged(element, 'font-size', px(CHART_TYPE.dataLabel));
   setAttrIfChanged(element, 'font-weight', '700');
   setAttrIfChanged(element, 'pointer-events', 'none');
-  setStyleIfChanged(element, 'display', hideLabels ? 'none' : '');
-  setStyleIfChanged(element, 'opacity', hideLabels ? '0' : '1');
-  label
+  setStyleIfChanged(element, 'display', '');
+  setStyleIfChanged(element, 'opacity', '1');
+  d3.select(element)
     .selectAll<SVGTSpanElement, string>('tspan')
     .data(lines)
     .join('tspan')
@@ -152,6 +156,10 @@ export function syncPointLabel(
       setAttrIfChanged(this, 'dy', index === 0 ? firstDy : '1.1em');
       setTextIfChanged(this, line);
     });
+  if (existing) return;
+  const anchor = pointLabelAnchor(group);
+  if (anchor) anchor.before(element);
+  else group.append(element);
 }
 
 export function updateScatterPointsForDisplay<
@@ -176,12 +184,15 @@ export function updateScatterPointsForDisplay<
       config.getColor(d),
     );
   });
-  points.selectAll<SVGTextElement, unknown>('.point-label').each(function () {
-    if (config.foreground) setAttrIfChanged(this, 'fill', config.foreground);
-    else this.removeAttribute('fill');
-    setStyleIfChanged(this, 'display', config.hideLabels ? 'none' : '');
-    setStyleIfChanged(this, 'opacity', config.hideLabels ? '0' : '1');
-  });
+  if (config.getLabelText && config.foreground) {
+    const labelGetter = config.getLabelText;
+    const foreground = config.foreground;
+    points.each(function (d) {
+      syncPointLabel(this, labelGetter(d), foreground, config.hideLabels);
+    });
+  } else {
+    zoomGroup.selectAll('.dot-group > .point-label').remove();
+  }
 }
 
 export interface TooltipContainerGeometry {

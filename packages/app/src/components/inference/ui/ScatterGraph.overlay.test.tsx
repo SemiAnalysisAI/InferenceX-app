@@ -331,14 +331,13 @@ describe('ScatterGraph unofficial overlays', () => {
       } as unknown as Parameters<typeof ScatterGraph>[0]['overlayData'],
     });
     const buildsAfterMount = rebuildCount();
-    const officialLabel = container.querySelector<SVGTextElement>('.dot-group .point-label');
+    const officialLabel = () => container.querySelector<SVGTextElement>('.dot-group .point-label');
     const overlayLabel = container.querySelector<SVGTextElement>(
       '.unofficial-overlay-pt .overlay-label',
     );
 
-    expect(officialLabel).not.toBeNull();
+    expect(officialLabel()).toBeNull();
     expect(overlayLabel).not.toBeNull();
-    expect(officialLabel!.style.display).toBe('none');
     expect(overlayLabel!.style.display).toBe('none');
     const mutationRecords: MutationRecord[] = [];
     const observer = new MutationObserver((records) => mutationRecords.push(...records));
@@ -350,7 +349,7 @@ describe('ScatterGraph unofficial overlays', () => {
     };
     rerender();
 
-    expect(officialLabel!.style.display).toBe('');
+    expect(officialLabel()!.style.display).toBe('');
     expect(overlayLabel!.style.display).toBe('');
     mutationRecords.push(...observer.takeRecords());
     observer.disconnect();

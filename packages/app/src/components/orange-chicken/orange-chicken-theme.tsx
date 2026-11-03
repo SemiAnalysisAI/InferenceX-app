@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { isEmbedPathname } from '@/lib/embed/embed-route';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { pointLabelAnchor } from '@/lib/d3-chart/layers/point-label-order';
 import './orange-chicken-theme.css';
 
 const CHART_SELECTOR = '[data-orange-chicken-eligible="true"]';
@@ -98,9 +99,10 @@ function useChickenMarkers() {
           marker.setAttribute('focusable', 'false');
           marker.setAttribute('pointer-events', 'none');
           // Do not replace shapes, hit circles, data, transforms or event handlers.
-          // Being a child of the point inherits clipping, visibility and zoom.
-          const label = point.querySelector(':scope > text');
-          if (label) label.before(marker);
+          // Being a child of the point inherits clipping, visibility and zoom. The marker
+          // sits below the label, or below the slot a hidden (unbuilt) label would take.
+          const anchor = point.querySelector(':scope > text') ?? pointLabelAnchor(point);
+          if (anchor) anchor.before(marker);
           else point.append(marker);
           point.setAttribute(DECORATED_ATTRIBUTE, '');
           decorated.set(point, marker);

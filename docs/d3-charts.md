@@ -196,6 +196,14 @@ Every `setAttribute`, inline-style write, `textContent` assignment, and node mov
 
 Hot re-sync paths (data, metric, and display phases; zoom frames; point-label placement) therefore use the write-if-changed helpers in `src/lib/d3-chart/chart-update.ts`: `setAttrIfChanged`, `setStyleIfChanged`, `setTextIfChanged`, and `raiseInOrder` (sequential `.raise()` semantics, skipped when each parent's tail is already in that order). They compare against the live DOM, not a cache, so a label the placement pass moved is still restored correctly. Reads of attributes and inline styles never force layout. Initial enter-path construction can keep plain `.attr()` chains — new nodes produce one add record regardless. Tests for these paths assert a repeated pass emits zero mutation records.
 
+## Build Only What Is Visible
+
+Point labels default to off, so the scatter layer builds a `.point-label` only while labels are shown and removes it when they are hidden (`syncPointLabel`). Previously every point carried a hidden `text` and `tspan`, which is half of each point's subtree. A label built late takes the stacking slot it would have had if it had been built with its point. That slot is after the hit circle, the original shape and any theme marker, and before offload halos or shapes re-created for a new precision (`lib/d3-chart/layers/point-label-order.ts`). The orange-chicken marker uses the same slot when a point has no label. A new label is filled in while detached, so it lands as one DOM insertion.
+
+Other passes skip work that cannot change anything. A point without an offload halo skips the halo join. The Pareto fade does not walk the chart's marks while the frontier is off and no fade was applied to that zoom group. Point-label collision placement runs only while labels are visible. The dot `transition` style is written once per dot.
+
+A width change re-runs the data phase. `useResponsiveChartDimensions` applies the first change of a resize at once and collapses later changes into one per `RESIZE_COALESCE_MS` (100 ms), ending on the final width. A window or panel drag therefore renders about ten times a second instead of once per frame.
+
 ## Huawei series identity
 
 Huawei uses a shared amber/gold identity, separate from NVIDIA green, AMD red, Google blue and OpenAI purple. `HUAWEI_CHART_PALETTE` (including the `HUAWEI_CHART_COLORS` tokens) in `packages/constants/src/gpu-keys.ts` defines a darker amber for light canvases and a brighter gold for dark canvases. Both base colors exceed 4.5:1 contrast against the tested white and `#111214` reference backgrounds.
