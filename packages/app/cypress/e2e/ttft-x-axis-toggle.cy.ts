@@ -1,4 +1,5 @@
 import {
+  availabilityBody,
   interceptDerivedAgenticMetrics,
   unlockAgenticGate,
   openXAxisMenu,
@@ -79,7 +80,9 @@ const fixedSequenceBenchmarks = agenticBenchmarks.map((row, index) => ({
 }));
 
 const interceptAgenticData = () => {
-  cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability }).as('availability');
+  cy.intercept('GET', '/api/v1/availability/compact', {
+    body: availabilityBody(agenticAvailability),
+  }).as('availability');
   cy.intercept('GET', '/api/v1/benchmarks*', { body: agenticBenchmarks }).as('benchmarks');
 };
 
@@ -95,7 +98,9 @@ const otherModelBenchmarks = agenticBenchmarks.map((row, index) => ({
 }));
 
 const interceptFixedSequenceData = () => {
-  cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability }).as('availability');
+  cy.intercept('GET', '/api/v1/availability/compact', {
+    body: availabilityBody(agenticAvailability),
+  }).as('availability');
   cy.intercept('GET', '/api/v1/benchmarks*', { body: fixedSequenceBenchmarks }).as('benchmarks');
 };
 
@@ -470,9 +475,9 @@ describe('Default scenario', () => {
   });
 
   it('opens the Agentic scenario for another model with corresponding data', () => {
-    cy.intercept('GET', '/api/v1/availability', { body: otherModelAvailability }).as(
-      'availability',
-    );
+    cy.intercept('GET', '/api/v1/availability/compact', {
+      body: availabilityBody(otherModelAvailability),
+    }).as('availability');
     cy.intercept('GET', '/api/v1/benchmarks*', { body: otherModelBenchmarks }).as('benchmarks');
     cy.visit('/inference?g_model=DeepSeek-R1-0528', {
       onBeforeLoad(win) {
@@ -554,7 +559,9 @@ const overlayBenchmarkRow = {
 };
 
 const interceptAgenticDataWithOverlay = () => {
-  cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability }).as('availability');
+  cy.intercept('GET', '/api/v1/availability/compact', {
+    body: availabilityBody(agenticAvailability),
+  }).as('availability');
   cy.intercept('GET', '/api/v1/benchmarks*', {
     body: agenticBenchmarks.map((row) => ({ ...row, offload_mode: 'off' })),
   }).as('benchmarks');
@@ -623,8 +630,10 @@ describe('Measured prefill metrics preserve the selected x-axis', () => {
         median_ttft: [1, 4][index],
       },
     }));
-    cy.intercept('GET', '/api/v1/availability', {
-      body: [{ ...agenticAvailability[2], framework: 'dynamo-sglang', disagg: true }],
+    cy.intercept('GET', '/api/v1/availability/compact', {
+      body: availabilityBody([
+        { ...agenticAvailability[2], framework: 'dynamo-sglang', disagg: true },
+      ]),
     });
     cy.intercept('GET', '/api/v1/benchmarks*', { body: powerRows });
     cy.intercept('GET', '/api/unofficial-run*', {

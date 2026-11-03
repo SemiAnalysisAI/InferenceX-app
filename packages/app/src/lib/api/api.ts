@@ -9,6 +9,12 @@ import {
   type CollectiveXRunSummary,
   type CollectiveXVersion,
 } from '@/components/collectivex/types';
+import { type CompactEvalRows, expandEvalRows } from '@/components/evaluation/compact-rows';
+import {
+  type CompactTrendHistory,
+  expandTrendHistory,
+} from '@/components/inference/hooks/trend-history-rows';
+import type { CompactAvailability } from '@/lib/benchmarks/compact-availability';
 import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
 import type { EvalRow } from '@semianalysisai/inferencex-db/queries/evaluations';
 import type { ChangelogLinkRow } from '@semianalysisai/inferencex-db/collectivex/changelog';
@@ -135,6 +141,21 @@ export function fetchBenchmarkHistory(
   return fetchJson<BenchmarkRow[]>(`/api/v1/benchmarks/history?${params}`, signal);
 }
 
+/** `fetchBenchmarkHistory` rows with only what Historical Trends reads. */
+export async function fetchTrendHistory(
+  model: string,
+  isl: number,
+  osl: number,
+  signal?: AbortSignal,
+  benchmarkType?: 'agentic_traces',
+): Promise<BenchmarkRow[]> {
+  const params = new URLSearchParams({ model, isl: String(isl), osl: String(osl) });
+  if (benchmarkType) params.set('benchmarkType', benchmarkType);
+  return expandTrendHistory(
+    await fetchJson<CompactTrendHistory>(`/api/v1/benchmarks/history/trends?${params}`, signal),
+  );
+}
+
 export function fetchWorkflowInfo(
   date: string,
   signal?: AbortSignal,
@@ -143,6 +164,27 @@ export function fetchWorkflowInfo(
   const params = new URLSearchParams({ date });
   if (benchmarkType) params.set('benchmarkType', benchmarkType);
   return fetchJson<WorkflowInfoResponse>(`/api/v1/workflow-info?${params}`, signal);
+}
+
+export interface WorkflowChangelogDate {
+  date: string;
+  runs: WorkflowRunRow[];
+  changelogs: ChangelogRow[];
+  runConfigs: RunConfigRow[];
+}
+
+export function fetchWorkflowChangelogs(
+  from: string,
+  to: string,
+  signal?: AbortSignal,
+  benchmarkType?: 'agentic_traces',
+) {
+  const params = new URLSearchParams({ from, to });
+  if (benchmarkType) params.set('benchmarkType', benchmarkType);
+  return fetchJson<{ dates: WorkflowChangelogDate[] }>(
+    `/api/v1/workflow-changelogs?${params}`,
+    signal,
+  );
 }
 
 export interface AvailabilityRow {
@@ -158,16 +200,27 @@ export interface AvailabilityRow {
   date: string;
 }
 
-export function fetchAvailability(signal?: AbortSignal) {
-  return fetchJson<AvailabilityRow[]>('/api/v1/availability', signal);
+/** `/api/v1/availability` rows plus the supplemental datasets, as lines with date runs. */
+export function fetchDashboardAvailability(signal?: AbortSignal) {
+  return fetchJson<CompactAvailability>('/api/v1/availability/compact', signal);
 }
 
 export function fetchReliability(signal?: AbortSignal) {
   return fetchJson<ReliabilityRow[]>('/api/v1/reliability', signal);
 }
 
+/** `fetchReliability` rows summed per day and GPU: the `/reliability` dashboard's input. */
+export function fetchReliabilityDaily(signal?: AbortSignal) {
+  return fetchJson<ReliabilityRow[]>('/api/v1/reliability/daily', signal);
+}
+
 export function fetchEvaluations(signal?: AbortSignal) {
   return fetchJson<EvalRow[]>('/api/v1/evaluations', signal);
+}
+
+/** `fetchEvaluations` rows with only the metrics the `/evaluation` dashboard reads. */
+export async function fetchDashboardEvaluations(signal?: AbortSignal): Promise<EvalRow[]> {
+  return expandEvalRows(await fetchJson<CompactEvalRows>('/api/v1/evaluations/compact', signal));
 }
 
 export interface EvalSampleRow {

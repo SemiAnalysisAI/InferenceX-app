@@ -14,6 +14,8 @@ import {
 } from '@/components/collectivex/test-fixture';
 import type { CollectiveXDataset } from '@/components/collectivex/types';
 
+import { availabilityBody } from '../support/e2e';
+
 const SOURCE_SHA = 'c'.repeat(40);
 const dataset = makeCollectiveXDataset();
 const runId = dataset.run.run_id;
@@ -649,9 +651,9 @@ describe('CollectiveX availability states', () => {
     cy.get('[data-testid="collectivex-display"]').should('be.visible');
 
     let availabilityRequests = 0;
-    cy.intercept('GET', '/api/v1/availability', (request) => {
+    cy.intercept('GET', '/api/v1/availability/compact', (request) => {
       availabilityRequests += 1;
-      request.reply([]);
+      request.reply(availabilityBody([]));
     });
     installRuns();
     installRun();

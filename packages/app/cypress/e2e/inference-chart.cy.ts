@@ -1,3 +1,4 @@
+import type { AvailabilityRow } from '@/lib/api/api';
 import { buildStagedChartLinks } from '../../src/lib/benchmarks/staged-chart-links';
 import type { InferenceData } from '@/components/inference/types';
 import {
@@ -7,8 +8,10 @@ import {
   VR_LATEST_FIXTURE_RUN,
 } from '../support/vr-publication-fixtures';
 import {
+  availabilityBody,
   expectNoPageOverflow,
   unlockAgenticGate,
+  interceptBenchmarkPresence,
   interceptDerivedAgenticMetrics,
   selectXAxisMode,
 } from '../support/e2e';
@@ -77,14 +80,17 @@ const boundaryRows = (runUrl: string | null) =>
   }));
 
 function interceptMeasuredComparison(
-  official: object[] = measuredRows(null),
+  official: AvailabilityRow[] = measuredRows(null),
   overlay: object[] = measuredRows(OVERLAY_RUN_URL),
 ) {
-  cy.intercept('GET', '/api/v1/availability', { body: official.slice(0, 1) });
+  cy.intercept('GET', '/api/v1/availability/compact', {
+    body: availabilityBody(official.slice(0, 1)),
+  });
   cy.intercept('GET', '/api/v1/benchmarks*', { body: official });
   cy.intercept('GET', '/api/v1/workflow-info*', {
     body: { runs: [], changelogs: [], configs: [] },
   });
+  cy.intercept('GET', '/api/v1/workflow-changelogs*', { body: { dates: [] } });
   cy.intercept('GET', '/api/unofficial-run*', {
     body: {
       runInfos: [
@@ -130,7 +136,7 @@ function assertVisibleMeasuredValues(selector: string, expected: number[]) {
 
 describe('Inference Chart', () => {
   before(() => {
-    cy.intercept('GET', '/api/v1/availability').as('chartAvailability');
+    cy.intercept('GET', '/api/v1/availability/compact').as('chartAvailability');
     cy.intercept('GET', '/api/v1/benchmarks*').as('chartBenchmarks');
     cy.viewport(1440, 900);
     cy.window().then((win) => {
@@ -418,7 +424,7 @@ describe('Inference Chart', () => {
   });
 
   it('surfaces the error instead of an endless skeleton when availability fails', () => {
-    cy.intercept('GET', '/api/v1/availability*', { statusCode: 500, body: {} }).as(
+    cy.intercept('GET', '/api/v1/availability/compact', { statusCode: 500, body: {} }).as(
       'availabilityFailure',
     );
     cy.visit('/inference');
@@ -440,8 +446,8 @@ describe('Deprecated model source attribution', () => {
       ['MiniMax-M3.1-Flash', 'minimaxm31flash', false],
     ] as const) {
       const rows = b300Rows(null).map((row) => ({ ...row, model: dbKey }));
-      cy.intercept('GET', '/api/v1/availability', {
-        body: rows.map(({ metrics: _metrics, ...row }) => row),
+      cy.intercept('GET', '/api/v1/availability/compact', {
+        body: availabilityBody(rows.map(({ metrics: _metrics, ...row }) => row)),
       });
       cy.intercept('GET', '/api/v1/benchmarks*', { body: rows });
       cy.visit(`/inference?g_model=${display}&i_seq=agentic-traces`, {
@@ -459,8 +465,8 @@ describe('Deprecated model source attribution', () => {
     const model = 'minimaxm3';
     const officialRows = b300Rows(null).map((row) => ({ ...row, model }));
     const overlayRows = b300Rows(OVERLAY_RUN_URL).map((row) => ({ ...row, model }));
-    cy.intercept('GET', '/api/v1/availability', {
-      body: officialRows.map(({ metrics: _metrics, ...row }) => row),
+    cy.intercept('GET', '/api/v1/availability/compact', {
+      body: availabilityBody(officialRows.map(({ metrics: _metrics, ...row }) => row)),
     });
     cy.intercept('GET', '/api/v1/benchmarks*', { body: officialRows });
     cy.intercept('GET', '/api/unofficial-run*', {
@@ -645,11 +651,14 @@ describe('AgentX replaces a complete curve while preserving an unofficial compar
       run_started_at: '2026-09-01T21:32:27Z',
       run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/33219706372/attempts/2',
     };
-    cy.intercept('GET', '/api/v1/availability', { body: current.slice(0, 1) });
+    cy.intercept('GET', '/api/v1/availability/compact', {
+      body: availabilityBody(current.slice(0, 1)),
+    });
     cy.intercept('GET', '/api/v1/benchmarks*', { body: [old, ...current] });
     cy.intercept('GET', '/api/v1/workflow-info*', {
       body: { runs: [], changelogs: [], configs: [] },
     });
+    cy.intercept('GET', '/api/v1/workflow-changelogs*', { body: { dates: [] } });
     cy.intercept('GET', '/api/unofficial-run*', {
       body: {
         runInfos: [
@@ -699,7 +708,7 @@ describe('AgentX replaces a complete curve while preserving an unofficial compar
 });
 
 it('opens an old Inference power link on PowerX with the same metric', () => {
-  cy.intercept('GET', '/api/v1/availability').as('powerLinkAvailability');
+  cy.intercept('GET', '/api/v1/availability/compact').as('powerLinkAvailability');
   cy.intercept('GET', '/api/v1/benchmarks*').as('powerLinkBenchmarks');
   cy.viewport(1440, 900);
   cy.visit('/inference/qwen-3-5?i_seq=8k%2F1k&i_prec=fp8&i_metric=y_measuredPowerPercentTdp', {
@@ -1033,7 +1042,9 @@ describe('Staged Pareto deep links', () => {
       workflow_run_id: 42,
     }));
     const otherRows = b300Rows(null, 'b200');
-    cy.intercept('GET', '/api/v1/availability*', { body: [stagedRows[0], otherRows[0]] });
+    cy.intercept('GET', '/api/v1/availability/compact', {
+      body: availabilityBody([stagedRows[0]!, otherRows[0]!]),
+    });
     cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
       if (request.query['exactRun'] === 'true' && request.query['runId'] === runId) {
         request.alias = 'stagedSnapshot';
@@ -1060,8 +1071,8 @@ describe('Staged Pareto deep links', () => {
         runConfigs: [],
       },
     });
-    cy.intercept('GET', '/api/v1/trace-availability*', { body: {} });
-    cy.intercept('GET', '/api/v1/log-availability*', { body: {} });
+    cy.intercept('GET', '/api/v1/workflow-changelogs*', { body: { dates: [] } });
+    interceptBenchmarkPresence();
     const [link] = buildStagedChartLinks('http://localhost:3000', runId, [stagedRows[0]!]);
     const url = new URL(link!.url);
     cy.visit(`${url.pathname}${url.search}`, {
@@ -1129,14 +1140,15 @@ describe('Qwen3.5 chart defaults', () => {
   );
 
   beforeEach(() => {
-    cy.intercept('GET', '/api/v1/availability*', {
-      body: rows.map(({ metrics: _metrics, ...row }) => row),
+    cy.intercept('GET', '/api/v1/availability/compact', {
+      body: availabilityBody(rows.map(({ metrics: _metrics, ...row }) => row)),
     });
     cy.intercept('GET', '/api/v1/benchmarks*', { body: rows });
-    cy.intercept('GET', '/api/v1/trace-availability*', { body: {} });
+    interceptBenchmarkPresence();
     cy.intercept('GET', '/api/v1/workflow-info*', {
       body: { runs: [], changelogs: [], configs: [], runConfigs: [] },
     });
+    cy.intercept('GET', '/api/v1/workflow-changelogs*', { body: { dates: [] } });
     cy.viewport(1440, 1000);
   });
 
@@ -1211,8 +1223,8 @@ describe('Qwen3.5 chart defaults', () => {
         row,
         { ...row, id: row.id + 1000, precision: 'fp4' },
       ]);
-      cy.intercept('GET', '/api/v1/availability*', {
-        body: precisionRows.map(({ metrics: _metrics, ...row }) => row),
+      cy.intercept('GET', '/api/v1/availability/compact', {
+        body: availabilityBody(precisionRows.map(({ metrics: _metrics, ...row }) => row)),
       });
       cy.intercept('GET', '/api/v1/benchmarks*', { body: precisionRows });
       cy.visit(`${path}${path.includes('?') ? '&' : '?'}i_prec=fp8&i_xmode=ttft`, {

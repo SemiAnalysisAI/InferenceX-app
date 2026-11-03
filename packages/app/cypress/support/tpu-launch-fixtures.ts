@@ -1,3 +1,6 @@
+import type { AvailabilityRow } from '@/lib/api/api';
+
+import { availabilityBody } from './e2e';
 import { modelSelectionBenchmarks } from './model-selection-fixtures';
 
 const qwenAgenticRows = modelSelectionBenchmarks
@@ -36,9 +39,13 @@ export function interceptTpuLaunchData(
     model === 'Kimi-K3'
       ? qwenAgenticRows.map((row) => ({ ...row, model: 'kimik3' }))
       : qwenAgenticRows;
-  cy.intercept('GET', '/api/v1/availability*', (request) => {
-    request.on('response', (response) => {
-      response.body = [...response.body, ...rows.map(({ metrics: _metrics, ...row }) => row)];
+  // The fixture build serves this same file as the published availability.
+  cy.fixture<AvailabilityRow[]>('api/availability.json').then((availability) => {
+    cy.intercept('GET', '/api/v1/availability/compact', {
+      body: availabilityBody([
+        ...availability,
+        ...rows.map(({ metrics: _metrics, ...row }) => row),
+      ]),
     });
   });
   cy.intercept('GET', '/api/v1/benchmarks*', (request) => {

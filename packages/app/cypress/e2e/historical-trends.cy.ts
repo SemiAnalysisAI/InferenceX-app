@@ -1,10 +1,15 @@
-import type { BenchmarkRow } from '@/lib/api/api';
+import { compactTrendHistory } from '@/components/inference/hooks/trend-history-rows';
+import type { AvailabilityRow, BenchmarkRow } from '@/lib/api/api';
+
+import { availabilityBody } from '../support/e2e';
 
 describe('Historical improvement waterfall', () => {
   beforeEach(() => {
-    cy.intercept('GET', '**/api/v1/benchmarks/history?*', {
-      fixture: 'api/benchmarks-history.json',
-    }).as('waterfallHistory');
+    cy.fixture<BenchmarkRow[]>('api/benchmarks-history.json').then((rows) => {
+      cy.intercept('GET', '**/api/v1/benchmarks/history/trends?*', {
+        body: compactTrendHistory(rows),
+      }).as('waterfallHistory');
+    });
     cy.visit('/historical?g_model=DeepSeek-R1-0528');
     cy.wait('@waterfallHistory');
     cy.get('[data-testid="historical-trend-figure"] svg').should('be.visible');
@@ -108,14 +113,14 @@ const visitHistoricalWithSetup = () => {
   cy.get('[data-testid="historical-trends-display"]').should('be.visible');
 };
 
-const asAgenticRowsOn = (rows: Record<string, unknown>[], date: string) =>
-  rows.map((row) => ({ ...row, benchmark_type: 'agentic_traces', date }));
+const asAgenticRowsOn = (rows: AvailabilityRow[], date: string) =>
+  availabilityBody(rows.map((row) => ({ ...row, benchmark_type: 'agentic_traces', date })));
 
 describe('Historical Trends AgentX P90 operating point', () => {
   it('labels P90 in English and Chinese while using the P90 rather than median curve', () => {
     const date = '2025-03-01';
-    cy.fixture('api/availability.json').then((rows) => {
-      cy.intercept('GET', '**/api/v1/availability', asAgenticRowsOn(rows, date));
+    cy.fixture<AvailabilityRow[]>('api/availability.json').then((rows) => {
+      cy.intercept('GET', '**/api/v1/availability/compact', { body: asAgenticRowsOn(rows, date) });
     });
     cy.fixture<BenchmarkRow[]>('api/benchmarks.json').then((rows) => {
       // Deliberately synthetic regression data: P90 and median must disagree.
@@ -148,7 +153,9 @@ describe('Historical Trends AgentX P90 operating point', () => {
         },
       }));
       cy.intercept('GET', '**/api/v1/benchmarks?*', agentic).as('p90Benchmarks');
-      cy.intercept('GET', '**/api/v1/benchmarks/history?*', agentic).as('p90History');
+      cy.intercept('GET', '**/api/v1/benchmarks/history/trends?*', {
+        body: compactTrendHistory(agentic),
+      }).as('p90History');
     });
     for (const prefix of ['', '/zh']) {
       cy.visit(
@@ -178,7 +185,7 @@ describe('Historical Trends — Content & Interactions', () => {
         metrics: { ...row.metrics, prefill_joules_per_input_token: undefined },
       }));
       cy.intercept('GET', '**/api/v1/benchmarks?*', withoutRoleEnergy).as('benchmarks');
-      cy.intercept('GET', '**/api/v1/benchmarks/history?*').as('history');
+      cy.intercept('GET', '**/api/v1/benchmarks/history/trends?*').as('history');
       cy.visit('/historical?g_model=DeepSeek-R1-0528&i_metric=y_measuredPrefillJPerInputToken');
       cy.wait('@benchmarks');
       cy.wait('@history');
@@ -319,8 +326,8 @@ describe('Historical Trends — Chinese route', () => {
 
   it('localizes the Agentic sequence and run date in the chart caption', () => {
     const runDate = '2025-03-01';
-    cy.fixture('api/availability.json').then((rows) => {
-      cy.intercept('GET', '**/api/v1/availability', {
+    cy.fixture<AvailabilityRow[]>('api/availability.json').then((rows) => {
+      cy.intercept('GET', '**/api/v1/availability/compact', {
         body: asAgenticRowsOn(rows, runDate),
       }).as('agenticAvailability');
     });
@@ -381,14 +388,14 @@ describe('Historical Trends — Chinese route', () => {
     // The display is visible before its history request starts, so let the beforeEach page
     // finish that request; otherwise it consumes the first failure the stub below counts.
     cy.get('[data-testid="trend-chart-svg"] .dot-group').should('exist');
-    cy.fixture('api/benchmarks-history.json').then((historyRows) => {
+    cy.fixture<BenchmarkRow[]>('api/benchmarks-history.json').then((historyRows) => {
       let attempts = 0;
-      cy.intercept('GET', '**/api/v1/benchmarks/history?*', (request) => {
+      cy.intercept('GET', '**/api/v1/benchmarks/history/trends?*', (request) => {
         attempts += 1;
         request.reply(
           attempts <= 2
             ? { statusCode: 500, body: { error: 'secondary-history-internal-detail' } }
-            : { body: historyRows },
+            : { body: compactTrendHistory(historyRows) },
         );
       }).as('secondaryHistory');
 

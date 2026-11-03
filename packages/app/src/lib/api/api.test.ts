@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   fetchBenchmarks,
   fetchWorkflowInfo,
-  fetchAvailability,
+  fetchDashboardAvailability,
   fetchCollectiveXRun,
   fetchCollectiveXRunList,
   fetchReliability,
@@ -150,17 +150,15 @@ describe('simple read abort signals', () => {
   });
 });
 
-describe('fetchAvailability', () => {
-  it('fetches from /api/v1/availability', async () => {
-    const data = [
-      { model: 'dsr1', isl: 1024, osl: 1024, precision: 'fp8', date: '2026-03-01' },
-      { model: 'dsr1', isl: 1024, osl: 1024, precision: 'fp4', date: '2026-02-28' },
-    ];
-    mockOk(data);
-    const result = await fetchAvailability();
-    expect(mockFetch).toHaveBeenCalledWith('/api/v1/availability', expect.objectContaining({}));
-    expect(result).toHaveLength(2);
-    expect(result[0].model).toBe('dsr1');
+describe('fetchDashboardAvailability', () => {
+  it('fetches from /api/v1/availability/compact', async () => {
+    mockOk({ dates: ['2026-03-01'], models: ['dsr1'], lines: [] });
+    const result = await fetchDashboardAvailability();
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/v1/availability/compact',
+      expect.objectContaining({}),
+    );
+    expect(result.models).toEqual(['dsr1']);
   });
 });
 

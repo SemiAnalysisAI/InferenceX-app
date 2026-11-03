@@ -1,3 +1,5 @@
+import { availabilityBody } from './e2e';
+
 export const DEFAULT_MODEL_DB_KEY = 'dsv4';
 export const AGENTIC_DATE = '2026-07-19';
 export const OVERLAY_RUN_ID = '29682242847';
@@ -34,7 +36,9 @@ export const metricsFor = (intvty: number, tput: number, e2el: number): Record<s
 
 export const DOMINATED_CONFIG: [number, number, number, number] = [6, 60, 5000, 40];
 
-let idCursor = 900000;
+/** `b300Rows` numbers official rows upward from here. */
+export const AGENTIC_FIXTURE_FIRST_ID = 900000;
+let idCursor = AGENTIC_FIXTURE_FIRST_ID;
 export const b300Rows = (
   runUrl: string | null,
   hardware = 'b300',
@@ -87,7 +91,9 @@ export const interceptOverlayRun = ({
   overlayHardware?: string;
   overlayConfigs?: [number, number, number, number][];
 } = {}) => {
-  cy.intercept('GET', '/api/v1/availability', { body: availability }).as('availability');
+  cy.intercept('GET', '/api/v1/availability/compact', { body: availabilityBody(availability) }).as(
+    'availability',
+  );
   cy.intercept('GET', '/api/v1/benchmarks*', { body: b300Rows(null) }).as('benchmarks');
   cy.intercept('GET', '/api/unofficial-run*', {
     body: {
@@ -227,7 +233,9 @@ export const singleTurnAvailability = [
 ];
 
 export const interceptCalculatorOverlayRun = ({ runDelayMs }: { runDelayMs?: number } = {}) => {
-  cy.intercept('GET', '/api/v1/availability', { body: singleTurnAvailability }).as('availability');
+  cy.intercept('GET', '/api/v1/availability/compact', {
+    body: availabilityBody(singleTurnAvailability),
+  }).as('availability');
   cy.intercept('GET', '/api/v1/benchmarks*', {
     body: [
       ...singleTurnRows(null),
@@ -293,7 +301,9 @@ const runInfoFor = (id: string, branch: string, url: string) => ({
 });
 
 export const interceptCalculatorMultiRunOverlay = () => {
-  cy.intercept('GET', '/api/v1/availability', { body: singleTurnAvailability }).as('availability');
+  cy.intercept('GET', '/api/v1/availability/compact', {
+    body: availabilityBody(singleTurnAvailability),
+  }).as('availability');
   cy.intercept('GET', '/api/v1/benchmarks*', { body: singleTurnRows(null) }).as('benchmarks');
   cy.intercept('GET', '/api/unofficial-run*', {
     body: {

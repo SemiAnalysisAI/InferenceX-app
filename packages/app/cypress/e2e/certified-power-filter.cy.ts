@@ -1,3 +1,4 @@
+import { availabilityBody } from '../support/e2e';
 import { assertShareLinkParams } from '../support/share-link';
 
 const POWER_MODEL = 'dsv4';
@@ -82,7 +83,9 @@ function visitCertifiedPowerChart(
   benchmarks = powerBenchmarks,
   page: '/inference' | '/powerx' = '/powerx',
 ) {
-  cy.intercept('GET', '/api/v1/availability', { body: powerAvailability }).as('availability');
+  cy.intercept('GET', '/api/v1/availability/compact', {
+    body: availabilityBody(powerAvailability),
+  }).as('availability');
   cy.intercept('GET', '/api/v1/benchmarks*', { body: benchmarks }).as('benchmarks');
   cy.visit(`${page}?g_model=DeepSeek-V4-Pro&i_seq=8k/1k&i_prec=fp4${extraParams}`, {
     onBeforeLoad(win) {

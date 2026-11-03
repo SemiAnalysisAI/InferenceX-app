@@ -4,7 +4,7 @@ import {
   availability as agenticAvailability,
   b300Rows as agenticB300Rows,
 } from '../support/overlay-fixtures';
-import { unlockAgenticGate } from '../support/e2e';
+import { availabilityBody, unlockAgenticGate } from '../support/e2e';
 
 describe('TCO Calculator', () => {
   describe('tab navigation', () => {
@@ -437,7 +437,7 @@ describe('TCO Calculator', () => {
 
   describe('availability failure degradation', () => {
     it('keeps usable benchmark results visible when availability metadata fails', () => {
-      cy.intercept('GET', '/api/v1/availability*', {
+      cy.intercept('GET', '/api/v1/availability/compact', {
         statusCode: 503,
         body: { error: 'temporarily unavailable' },
       }).as('availabilityFailure');
@@ -457,11 +457,11 @@ describe('TCO Calculator', () => {
         ...row,
         hardware: 'b200',
       }));
-      cy.intercept('GET', '/api/v1/availability', {
-        body: [
+      cy.intercept('GET', '/api/v1/availability/compact', {
+        body: availabilityBody([
           ...agenticAvailability,
           ...agenticAvailability.map((row) => ({ ...row, hardware: 'b200' })),
-        ],
+        ]),
       }).as('agenticAvailability');
       cy.intercept('GET', '/api/v1/benchmarks*', { body: [...b300Rows, ...b200Rows] }).as(
         'agenticBenchmarks',

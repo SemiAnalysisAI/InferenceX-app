@@ -1,4 +1,4 @@
-import { unlockAgenticGate } from '../support/e2e';
+import { availabilityBody, unlockAgenticGate } from '../support/e2e';
 
 const MODEL = 'dsv4';
 const DATE = '2026-06-12';
@@ -91,7 +91,9 @@ const benchmarks = configs.flatMap((config) =>
 );
 
 function visitAgenticQuickFilters() {
-  cy.intercept('GET', '/api/v1/availability', { body: availability }).as('availability');
+  cy.intercept('GET', '/api/v1/availability/compact', { body: availabilityBody(availability) }).as(
+    'availability',
+  );
   cy.intercept('GET', '/api/v1/benchmarks*', { body: benchmarks }).as('benchmarks');
   cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4&i_spec=mtp', {
     onBeforeLoad(win) {

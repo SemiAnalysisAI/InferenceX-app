@@ -1,4 +1,8 @@
-import { interceptDerivedAgenticMetrics } from '../support/e2e';
+import {
+  availabilityBody,
+  interceptBenchmarkPresence,
+  interceptDerivedAgenticMetrics,
+} from '../support/e2e';
 
 const AGENTIC_DATE = '2026-06-12';
 const DEFAULT_MODEL_DB_KEY = 'dsv4';
@@ -122,16 +126,11 @@ function interceptDetailPage(): void {
 }
 
 function interceptChart(): void {
-  cy.intercept('GET', '/api/v1/availability', { body: availability }).as('availability');
+  cy.intercept('GET', '/api/v1/availability/compact', { body: availabilityBody(availability) }).as(
+    'availability',
+  );
   cy.intercept('GET', '/api/v1/benchmarks*', { body: benchmarks }).as('benchmarks');
-  cy.intercept('GET', '/api/v1/trace-availability*', (request) => {
-    const ids = new URL(request.url).searchParams.get('ids')?.split(',') ?? [];
-    request.reply({
-      body: Object.fromEntries(
-        ids.filter((id) => tracedIds.has(Number(id))).map((id) => [id, true]),
-      ),
-    });
-  });
+  interceptBenchmarkPresence({ trace: tracedIds });
   interceptDerivedAgenticMetrics();
   interceptDetailPage();
 }

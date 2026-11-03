@@ -1,15 +1,18 @@
+import type { AvailabilityRow } from '@/lib/api/api';
+
+import { availabilityBody } from '../support/e2e';
 import { vrPublicationRows } from '../support/vr-publication-fixtures';
 import { assertTpuGb300Selected, interceptTpuLaunchData } from '../support/tpu-launch-fixtures';
 
 const minimaxM3RubinRows = vrPublicationRows.map((row) => ({ ...row, model: 'minimaxm3' }));
 
 function interceptMinimaxM3RubinData(rows: typeof minimaxM3RubinRows = minimaxM3RubinRows): void {
-  cy.fixture('api/availability.json').then((availability) => {
-    cy.intercept('GET', '/api/v1/availability*', {
-      body: [
-        ...availability.filter((row: { model: string }) => row.model !== 'minimaxm3'),
+  cy.fixture<AvailabilityRow[]>('api/availability.json').then((availability) => {
+    cy.intercept('GET', '/api/v1/availability/compact', {
+      body: availabilityBody([
+        ...availability.filter((row) => row.model !== 'minimaxm3'),
         ...rows.map(({ metrics: _metrics, ...row }) => row),
-      ],
+      ]),
     });
   });
   cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
@@ -257,8 +260,8 @@ describe('landing model curation', () => {
 
     it(`opens GLM 5.3 Rubin AgentX results from ${prefix || '/'}`, () => {
       const rows = vrPublicationRows.map((row) => ({ ...row, model: 'glm5.2' }));
-      cy.intercept('GET', '/api/v1/availability*', {
-        body: rows.map(({ metrics: _metrics, ...row }) => row),
+      cy.intercept('GET', '/api/v1/availability/compact', {
+        body: availabilityBody(rows.map(({ metrics: _metrics, ...row }) => row)),
       });
       cy.intercept('GET', '/api/v1/benchmarks*', { body: rows });
       cy.visit(prefix || '/');

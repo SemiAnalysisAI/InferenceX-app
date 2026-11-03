@@ -2,7 +2,7 @@ import {
   availability as agenticAvailability,
   b300Rows as agenticB300Rows,
 } from '../support/overlay-fixtures';
-import { unlockAgenticGate } from '../support/e2e';
+import { availabilityBody, unlockAgenticGate } from '../support/e2e';
 
 type CsvCaptureWindow = Cypress.AUTWindow & {
   __capturedLifecycleCsvBlob?: Blob;
@@ -643,7 +643,9 @@ describe('Fleet — Fleet Lifecycle', () => {
 describe('Fleet — self-contained lifecycle regressions', () => {
   before(() => {
     const rows = agenticB300Rows(null);
-    cy.intercept('GET', '/api/v1/availability', { body: agenticAvailability });
+    cy.intercept('GET', '/api/v1/availability/compact', {
+      body: availabilityBody(agenticAvailability),
+    });
     cy.intercept('GET', '/api/v1/benchmarks/history*', { body: rows }).as('legacyPriceHistory');
     cy.intercept('GET', '/api/v1/benchmarks*', { body: rows }).as('legacyPriceBenchmarks');
     cy.visit('/fleet?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4&c_mw=10&c_price=7', {
@@ -736,12 +738,12 @@ describe('Fleet — Fleet Lifecycle with agentic traces', () => {
   before(() => {
     const b300Rows = agenticB300Rows(null);
     const b200Rows = b300Rows.map((row) => ({ ...row, hardware: 'b200' }));
-    cy.intercept('GET', '/api/v1/availability', {
-      body: [
+    cy.intercept('GET', '/api/v1/availability/compact', {
+      body: availabilityBody([
         ...agenticAvailability,
         ...agenticAvailability.map((row) => ({ ...row, hardware: 'b200' })),
         ...agenticAvailability.map((row) => ({ ...row, date: LATER_DATE })),
-      ],
+      ]),
     });
     cy.intercept('GET', '/api/v1/benchmarks/history*', { body: historyRows() }).as(
       'agenticHistory',

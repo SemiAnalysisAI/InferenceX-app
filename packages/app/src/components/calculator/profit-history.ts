@@ -1,5 +1,3 @@
-import { rowToSequence } from '@semianalysisai/inferencex-constants';
-
 import {
   comparisonEntryDate,
   comparisonEntryLabel,
@@ -7,9 +5,13 @@ import {
   parseComparisonEntry,
 } from '@/components/inference/utils/comparisonEntry';
 import { dataRunsForDate, type RunScope } from '@/components/inference/utils/runEnumeration';
-import type { AvailabilityRow, BenchmarkRow, RunConfigRow } from '@/lib/api/api';
+import type { BenchmarkRow, RunConfigRow } from '@/lib/api/api';
+import {
+  type AvailabilityIndex,
+  datesOfLines,
+  linesForModels,
+} from '@/lib/benchmarks/availability-index';
 import { dedupeAgenticHistoryRuns } from '@/lib/benchmarks/benchmark-run-selection';
-import { buildAvailabilityHwKey } from '@/lib/charts/chart-utils';
 import { getHardwareConfig, getModelSortIndex, isKnownGpu } from '@/lib/catalog/constants';
 import { type Percentile, Sequence } from '@/lib/catalog/data-mappings';
 import { getDisplayLabel } from '@/lib/shared/utils';
@@ -49,26 +51,17 @@ const byModelOrder = (a: string, b: string) =>
   getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b);
 
 export function profitHistoryChipOptions(
-  availabilityRows: readonly AvailabilityRow[] | undefined,
+  availability: AvailabilityIndex | undefined,
   dbModelKeys: readonly string[],
   precisions: readonly string[],
   displayModel?: string,
 ): { value: string; label: string }[] {
-  if (!availabilityRows) return [];
+  if (!availability) return [];
   const hwKeys = new Set<string>();
-  for (const r of availabilityRows) {
-    if (!dbModelKeys.includes(r.model)) continue;
-    if (rowToSequence(r) !== Sequence.AgenticTraces) continue;
-    if (!precisions.includes(r.precision)) continue;
-    if (!r.hardware) continue;
-    const hwKey = buildAvailabilityHwKey(
-      r.hardware,
-      r.framework,
-      r.spec_method,
-      r.disagg,
-      r.benchmark_type,
-    );
-    if (isKnownGpu(hwKey)) hwKeys.add(hwKey);
+  for (const line of linesForModels(availability, dbModelKeys)) {
+    if (line.sequence !== Sequence.AgenticTraces) continue;
+    if (!precisions.includes(line.precision)) continue;
+    if (line.hwKey !== null && isKnownGpu(line.hwKey)) hwKeys.add(line.hwKey);
   }
   return [...hwKeys].toSorted(byModelOrder).map((hw) => ({
     value: hw,
@@ -77,28 +70,22 @@ export function profitHistoryChipOptions(
 }
 
 export function profitHistoryAvailableDates(
-  availabilityRows: readonly AvailabilityRow[] | undefined,
+  availability: AvailabilityIndex | undefined,
   dbModelKeys: readonly string[],
   precisions: readonly string[],
   selectedGPUs: readonly string[],
 ): string[] {
-  if (!availabilityRows || selectedGPUs.length === 0) return [];
-  const dates = new Set<string>();
-  for (const r of availabilityRows) {
-    if (!dbModelKeys.includes(r.model)) continue;
-    if (rowToSequence(r) !== Sequence.AgenticTraces) continue;
-    if (!precisions.includes(r.precision)) continue;
-    if (!r.hardware) continue;
-    const hwKey = buildAvailabilityHwKey(
-      r.hardware,
-      r.framework,
-      r.spec_method,
-      r.disagg,
-      r.benchmark_type,
-    );
-    if (selectedGPUs.includes(hwKey)) dates.add(r.date);
-  }
-  return [...dates].toSorted();
+  if (!availability || selectedGPUs.length === 0) return [];
+  return datesOfLines(
+    availability,
+    linesForModels(availability, dbModelKeys).filter(
+      (line) =>
+        line.sequence === Sequence.AgenticTraces &&
+        precisions.includes(line.precision) &&
+        line.hwKey !== null &&
+        selectedGPUs.includes(line.hwKey),
+    ),
+  );
 }
 
 export interface ProfitHistoryDateRows {

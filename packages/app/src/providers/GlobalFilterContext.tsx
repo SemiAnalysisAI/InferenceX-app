@@ -14,7 +14,7 @@ import {
   useState,
 } from 'react';
 
-import { DISPLAY_MODEL_TO_DB, rowToSequence } from '@semianalysisai/inferencex-constants';
+import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 
 const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
@@ -56,7 +56,12 @@ import {
   resolveEffectivePrecisions,
 } from '@/lib/benchmarks/default-precisions';
 import { resolveEffectiveSequence } from '@/lib/benchmarks/default-sequence';
-import type { AvailabilityRow, WorkflowInfoResponse } from '@/lib/api/api';
+import type { WorkflowInfoResponse } from '@/lib/api/api';
+import {
+  type AvailabilityIndex,
+  datesOfLines,
+  linesForModels,
+} from '@/lib/benchmarks/availability-index';
 import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/catalog/constants';
 
 const RUNDATE_RE = /^\d{4}-\d{2}-\d{2}$/u;
@@ -103,7 +108,7 @@ export interface GlobalFilterAvailabilityContextType {
   availableSequences: Sequence[];
   availablePrecisions: string[];
   availableDates: string[];
-  availabilityRows: AvailabilityRow[] | undefined;
+  availability: AvailabilityIndex | undefined;
   availabilitySettled: boolean;
   availabilityError: string | null;
   availabilityIsError: boolean;
@@ -352,7 +357,7 @@ export function GlobalFilterProvider({
   }, [pathname]);
 
   const {
-    data: availabilityRows,
+    data: availability,
     error: availabilityQueryError,
     isError: availabilityIsError,
     isPending: availabilityPending,
@@ -370,9 +375,9 @@ export function GlobalFilterProvider({
     [selectedModel],
   );
 
-  const modelRows = useMemo(
-    () => availabilityRows?.filter((r) => dbModelKeys.includes(r.model)) ?? [],
-    [availabilityRows, dbModelKeys],
+  const modelLines = useMemo(
+    () => (availability ? linesForModels(availability, dbModelKeys) : []),
+    [availability, dbModelKeys],
   );
 
   const availableModels = useMemo(() => {
@@ -380,11 +385,11 @@ export function GlobalFilterProvider({
     return MODEL_OPTIONS.filter((m) => {
       if (!isModelVisible(m, featureGateUnlocked)) return false;
       if (unofficialModels.has(m)) return true;
-      if (!availabilityRows) return !modelRequiresObservations(m);
+      if (!availability) return !modelRequiresObservations(m);
       const keys = DISPLAY_MODEL_TO_DB[m] ?? [m];
-      return availabilityRows.some((r) => keys.includes(r.model));
+      return keys.some((key) => availability.linesByModel.has(key));
     });
-  }, [availabilityRows, unofficialAvailable, featureGateUnlocked]);
+  }, [availability, unofficialAvailable, featureGateUnlocked]);
 
   const lastAutoSwitchKeyRef = useRef<string>('');
   useEffect(() => {
@@ -404,19 +409,18 @@ export function GlobalFilterProvider({
     const unofficialSeqs = unofficialAvailable
       .filter((a) => a.model === selectedModel)
       .map((a) => a.sequence as Sequence);
-    const dbSeqs = modelRows.map((r) => rowToSequence(r)).filter((s): s is Sequence => s !== null);
+    const dbSeqs = modelLines.map((line) => line.sequence).filter((s): s is Sequence => s !== null);
     const merged = [...new Set([...dbSeqs, ...unofficialSeqs])].filter(
       (s) => !isSequenceHiddenForModel(selectedModel, s),
     );
     return merged.length > 0
       ? merged
       : SEQUENCE_OPTIONS.filter((sequence) => !isSequenceHiddenForModel(selectedModel, sequence));
-  }, [modelRows, unofficialAvailable, selectedModel]);
+  }, [modelLines, unofficialAvailable, selectedModel]);
 
   const availabilityLoaded = useMemo(
-    () =>
-      availabilityRows !== undefined || unofficialAvailable.some((a) => a.model === selectedModel),
-    [availabilityRows, unofficialAvailable, selectedModel],
+    () => availability !== undefined || unofficialAvailable.some((a) => a.model === selectedModel),
+    [availability, unofficialAvailable, selectedModel],
   );
 
   const resolvedSequence = useMemo(
@@ -432,22 +436,26 @@ export function GlobalFilterProvider({
   const sequenceResolved = resolvedSequence !== null;
   const effectiveSequence = resolvedSequence ?? APP_DEFAULT_SEQUENCE;
 
+  const sequenceLines = useMemo(
+    () => modelLines.filter((line) => line.sequence === effectiveSequence),
+    [modelLines, effectiveSequence],
+  );
+
   const availablePrecisions = useMemo(() => {
     const unofficialPrecs = unofficialAvailable
       .filter((a) => a.model === selectedModel && a.sequence === effectiveSequence)
       .flatMap((a) => a.precisions);
-    if (!availabilityRows) {
+    if (!availability) {
       return unofficialPrecs.length > 0 ? [...new Set(unofficialPrecs)].toSorted() : ['fp4'];
     }
-    const rows = modelRows.filter((r) => rowToSequence(r) === effectiveSequence);
-    const dbPrecs = rows.map((r) => r.precision);
+    const dbPrecs = sequenceLines.map((line) => line.precision);
     const merged = [...new Set([...dbPrecs, ...unofficialPrecs])].toSorted();
     return merged.length > 0 ? merged : ['fp4'];
-  }, [availabilityRows, modelRows, effectiveSequence, unofficialAvailable, selectedModel]);
+  }, [availability, sequenceLines, effectiveSequence, unofficialAvailable, selectedModel]);
 
   const precisionCurveCounts = useMemo(
-    () => countCurvesByPrecision(modelRows.filter((r) => rowToSequence(r) === effectiveSequence)),
-    [modelRows, effectiveSequence],
+    () => countCurvesByPrecision(sequenceLines),
+    [sequenceLines],
   );
 
   const unofficialPrecisionsForSelection = useMemo(
@@ -480,14 +488,10 @@ export function GlobalFilterProvider({
   );
 
   const availableDates = useMemo(() => {
-    if (!availabilityRows) return [];
-    const seqRows = modelRows.filter((r) => rowToSequence(r) === effectiveSequence);
-    const rows = seqRows.filter((r) => effectivePrecisions.includes(r.precision));
-    if (rows.length === 0) {
-      return [...new Set(seqRows.map((r) => r.date))].toSorted();
-    }
-    return [...new Set(rows.map((r) => r.date))].toSorted();
-  }, [availabilityRows, modelRows, effectiveSequence, effectivePrecisions]);
+    if (!availability) return [];
+    const lines = sequenceLines.filter((line) => effectivePrecisions.includes(line.precision));
+    return datesOfLines(availability, lines.length > 0 ? lines : sequenceLines);
+  }, [availability, sequenceLines, effectivePrecisions]);
 
   const setSelectedRunDateManual = useCallback((date: string) => {
     requestedRunDateExplicitRef.current = true;
@@ -618,7 +622,7 @@ export function GlobalFilterProvider({
       availableSequences,
       availablePrecisions,
       availableDates,
-      availabilityRows,
+      availability,
       availabilitySettled,
       availabilityError,
       availabilityIsError,
@@ -629,7 +633,7 @@ export function GlobalFilterProvider({
       availableSequences,
       availablePrecisions,
       availableDates,
-      availabilityRows,
+      availability,
       availabilitySettled,
       availabilityError,
       availabilityIsError,
