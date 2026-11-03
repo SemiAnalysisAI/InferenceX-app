@@ -213,7 +213,7 @@ export function rowToAggDataEntry(
   // fetch sites (guarded by isPersistedBenchmarkId) skip it cleanly rather than
   // emitting `?ids=NaN` or an `/inference/agentic/NaN` link.
   const numericId = typeof row.id === 'number' ? row.id : Number(row.id);
-  return {
+  const entry: AggDataEntry = {
     rawMetricKeys: Object.keys(m),
     id: isPersistedBenchmarkId(numericId) ? numericId : undefined,
     recipe_fingerprint: row.recipe_fingerprint ?? undefined,
@@ -333,7 +333,6 @@ export function rowToAggDataEntry(
     disagg: row.disagg,
     num_prefill_gpu: row.num_prefill_gpu,
     num_decode_gpu: row.num_decode_gpu,
-    chip_basis: row.chip_basis,
     spec_decoding: row.spec_method,
     ep: aggregateEp,
     // Pipeline parallelism has no configs-table column — the ingest mapper
@@ -388,6 +387,8 @@ export function rowToAggDataEntry(
     total_prompt_tokens: m.total_prompt_tokens,
     total_generation_tokens: m.total_generation_tokens,
   };
+  if (row.chip_basis) entry.chip_basis = row.chip_basis;
+  return entry;
 }
 
 /**
