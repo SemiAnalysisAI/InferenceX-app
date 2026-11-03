@@ -74,6 +74,53 @@ export interface HGXSystemChassisFields {
 
 type ChassisDefaults = Partial<HGXSystemChassisFields>;
 
+// Fan sizing reads only the frozen chassis at the fixed design state, so each chassis
+// sizes its fans once instead of on every estimate.
+const RESOLVED_FAN_POWER = new WeakMap<HGXSystemChassis, FanPower>();
+
+interface HostComponents {
+  groups: ComponentGroup[];
+  generic: PowerComponentBreakdown;
+}
+
+// Without measured CPU inputs the host components read only the frozen chassis and
+// the operating state (a few workload / scale-out pairs), so each pair is built once.
+const MODELED_HOSTS = new WeakMap<HGXSystemChassis, Map<string, HostComponents>>();
+
+function host_components(
+  chassis: HGXSystemChassis,
+  state: OperatingState,
+  cpu_and_dram_measured_power_per_socket: number | null,
+  cpu_measured_power_per_socket: number | null,
+): HostComponents {
+  const modeled =
+    cpu_and_dram_measured_power_per_socket === null && cpu_measured_power_per_socket === null;
+  const key = `${state.workload_state}/${state.using_scale_out}`;
+  let by_state = MODELED_HOSTS.get(chassis);
+  const cached = modeled ? by_state?.get(key) : undefined;
+  if (cached) return cached;
+  const groups = chassis._component_groups(
+    state,
+    cpu_and_dram_measured_power_per_socket,
+    cpu_measured_power_per_socket,
+  );
+  const host = {
+    groups,
+    generic: PowerComponentBreakdown.group(
+      'Generic components',
+      groups.map((group) => group.estimate_breakdown()),
+    ),
+  };
+  if (modeled) {
+    if (!by_state) {
+      by_state = new Map();
+      MODELED_HOSTS.set(chassis, by_state);
+    }
+    by_state.set(key, host);
+  }
+  return host;
+}
+
 export abstract class HGXSystemChassis extends GPUSystem {
   static override readonly typeName: string = 'HGXSystemChassis';
   static override readonly default_cooling: CoolingProfile = new CoolingProfile({ mode: 'air' });
@@ -203,20 +250,18 @@ export abstract class HGXSystemChassis extends GPUSystem {
     },
   ): PowerComponentBreakdown {
     const state = operating_state;
-    const groups = this._component_groups(
+    const { groups, generic } = host_components(
+      this,
       state,
       cpu_and_dram_measured_power_per_socket,
       cpu_measured_power_per_socket,
     );
-    const components = this._power_components([
-      ...system_components,
-      PowerComponentBreakdown.group(
-        'Generic components',
-        groups.map((group) => group.estimate_breakdown()),
-      ),
-    ]);
-    const configuration = this._configuration(state);
-    configuration.components = groups.map((group) => _profile_parameters(group));
+    const components = this._power_components([...system_components, generic]);
+    const configuration = () => {
+      const built = this._configuration(state);
+      built.components = groups.map((group) => _profile_parameters(group));
+      return built;
+    };
     return PowerComponentBreakdown.group(this.system_type, components, {
       provenance: this.provenance,
       details: [['gpu_count_per_system', this.gpu_count]],
@@ -232,6 +277,8 @@ export abstract class HGXSystemChassis extends GPUSystem {
   }
 
   get resolved_fan_power(): FanPower {
+    const cached = RESOLVED_FAN_POWER.get(this);
+    if (cached) return cached;
     if (this.ubb.gpu_tdp_w === null) {
       throw new ValueError('Automatic HGX fan sizing requires a GPU TDP on the UBB');
     }
@@ -242,12 +289,14 @@ export abstract class HGXSystemChassis extends GPUSystem {
         (group) => group.estimate_breakdown().power_w,
       ),
     ]);
-    return new NormalizedHGXFanPower({
+    const fan_power = new NormalizedHGXFanPower({
       gpu_tdp_w: board.gpu_tdp_w!,
       gpu_count: this.gpu_count,
       design_non_gpu_power_w: host_watts,
       policy: this.fan_policy,
     });
+    RESOLVED_FAN_POWER.set(this, fan_power);
+    return fan_power;
   }
 
   _power_components(components: readonly PowerComponentBreakdown[]): PowerComponentBreakdown[] {

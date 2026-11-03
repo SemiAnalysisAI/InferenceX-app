@@ -16,6 +16,18 @@ implementation equivalence, not empirical chassis calibration. Where upstream ra
 `ValueError` (for example above the modeled PSU or power-shelf capacity), the estimate is
 unavailable with `reason: 'model-domain'`. Any other error is a defect and propagates.
 
+Every chart row with valid power evaluates the model, so the evaluation is kept cheap
+without changing a single output bit. `system-power-model.ts` builds each upstream model
+once per system, workload and scale-out flag and reuses it. Inside the port, a system's
+`configuration` is built only when read, a quantity of 1 reuses the node instead of
+copying it, and HGX fan sizing, the modeled host components and each network group's
+share are built once per frozen system and operating state. `power-model-reuse.test.ts`
+checks that a reused model dumps exactly what a fresh one does. These port edits are
+performance only and need the same companion upstream PR as any other port change.
+Callers of `rowToAggDataEntry` that read no power field (calculator throughput groups,
+compare SSR tables, the overview AgentX tier reads, the historical hardware filter)
+pass `{ modelPower: false }` and get `modeledSystemPower` undefined.
+
 ## Operating state
 
 The upstream model takes a workload state and a scale-out flag. `modelSystemPower`
@@ -81,7 +93,9 @@ IT power adds the upstream model's board, CPU, DRAM, NIC, storage, PCIe switch,
 transceiver, fan, and PSU-loss estimates for the operating state, plus the
 chassis share of the scale-out switches. Facility power applies the system's
 PUE once, after IT power (1.3 for the air-cooled chassis, 1.1 for the liquid-cooled NVL72
-racks). Measured GPU power does not change. Cooling describes
+racks). Copy and labels quote these from `src/lib/power/facility-pue.ts`, which stays free of
+the model's class graph so pages that only print them do not ship the model;
+`system-power-model.test.ts` pins both values to `SYSTEMS`. Measured GPU power does not change. Cooling describes
 the modeled chassis, not verified benchmark-site cooling. These are model
 inputs, not measured CPU, DRAM, or network utilization.
 

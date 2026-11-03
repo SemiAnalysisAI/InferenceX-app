@@ -46,6 +46,10 @@ export abstract class ScaleOutNetworkingGear extends FrozenModel {
   }
 }
 
+// A group's breakdown reads only the frozen group and the operating state, which is
+// one of a few workload / scale-out pairs, so each pair is built once per group.
+const NETWORK_BREAKDOWNS = new WeakMap<NetworkGroup, Map<string, PowerComponentBreakdown>>();
+
 export class NetworkGroup extends FrozenModel {
   static override readonly typeName: string = 'NetworkGroup';
   readonly gear: ScaleOutNetworkingGear;
@@ -79,11 +83,19 @@ export class NetworkGroup extends FrozenModel {
   estimate_breakdown({
     operating_state = DEFAULT_OPERATING_STATE,
   }: { operating_state?: OperatingState } = {}): PowerComponentBreakdown {
+    const key = `${operating_state.workload_state}/${operating_state.using_scale_out}`;
+    let by_state = NETWORK_BREAKDOWNS.get(this);
+    if (!by_state) {
+      by_state = new Map();
+      NETWORK_BREAKDOWNS.set(this, by_state);
+    }
+    const cached = by_state.get(key);
+    if (cached) return cached;
     const result = this.gear
       .for_operating_state(operating_state)
       .estimate_breakdown()
       .scaled(this.quantity);
-    return new PowerComponentBreakdown({
+    const breakdown = new PowerComponentBreakdown({
       name: result.name,
       power_w: result.power_w,
       quantity: result.quantity,
@@ -92,6 +104,8 @@ export class NetworkGroup extends FrozenModel {
       details: [...result.details, ...this.details],
       configuration: result.configuration,
     });
+    by_state.set(key, breakdown);
+    return breakdown;
   }
 
   protected fields() {

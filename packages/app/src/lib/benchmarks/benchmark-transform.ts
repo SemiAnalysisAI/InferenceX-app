@@ -33,6 +33,17 @@ import type { BenchmarkRow } from '@/lib/api/api';
  */
 const WHOLE_DEPLOYMENT_ENERGY_SCHEMA_VERSION = 2;
 
+const AGENTIC_PERCENTILE_KEYS = ['mean', 'median', 'p75', 'p90', 'p95', 'p99', 'p99.9'].map(
+  (suffix) => ({
+    fullResponseItl: `${suffix}_full_response_itl`,
+    itl: `${suffix}_itl`,
+    ttlt: `${suffix}_ttlt`,
+    e2el: `${suffix}_e2el`,
+    tpot: `${suffix}_tpot`,
+    intvty: `${suffix}_intvty`,
+  }),
+);
+
 /**
  * Agentic trace-replay runs (`benchmark_type === 'agentic_traces'`) emit ttft/ttlt/itl
  * but not the intvty/e2el/tpot keys the chart pipeline expects. Bridge them here:
@@ -51,26 +62,26 @@ const WHOLE_DEPLOYMENT_ENERGY_SCHEMA_VERSION = 2;
  */
 function applyAgenticMetricAliases(raw: Record<string, number>): Record<string, number> {
   const m: Record<string, number> = { ...raw };
-  const hasFullResponseItl = ['mean', 'median', 'p75', 'p90', 'p95', 'p99', 'p99.9'].some(
-    (suffix) => typeof raw[`${suffix}_full_response_itl`] === 'number',
+  const hasFullResponseItl = AGENTIC_PERCENTILE_KEYS.some(
+    (keys) => typeof raw[keys.fullResponseItl] === 'number',
   );
-  for (const suffix of ['mean', 'median', 'p75', 'p90', 'p95', 'p99', 'p99.9']) {
-    const fullResponseItl = raw[`${suffix}_full_response_itl`];
+  for (const keys of AGENTIC_PERCENTILE_KEYS) {
+    const fullResponseItl = raw[keys.fullResponseItl];
     const itl =
       typeof fullResponseItl === 'number' && fullResponseItl > 0
         ? fullResponseItl
         : hasFullResponseItl
           ? undefined
-          : raw[`${suffix}_itl`];
-    const ttlt = raw[`${suffix}_ttlt`];
-    if (m[`${suffix}_e2el`] === undefined && ttlt !== undefined) m[`${suffix}_e2el`] = ttlt;
+          : raw[keys.itl];
+    const ttlt = raw[keys.ttlt];
+    if (m[keys.e2el] === undefined && ttlt !== undefined) m[keys.e2el] = ttlt;
     if (typeof itl === 'number' && itl > 0) {
-      m[`${suffix}_itl`] = itl;
-      if (m[`${suffix}_tpot`] === undefined) m[`${suffix}_tpot`] = itl;
-      m[`${suffix}_intvty`] = 1 / itl;
+      m[keys.itl] = itl;
+      if (m[keys.tpot] === undefined) m[keys.tpot] = itl;
+      m[keys.intvty] = 1 / itl;
     } else {
-      delete m[`${suffix}_itl`];
-      delete m[`${suffix}_intvty`];
+      delete m[keys.itl];
+      delete m[keys.intvty];
     }
   }
   if (typeof raw.std_full_response_itl === 'number') {
@@ -82,8 +93,19 @@ function applyAgenticMetricAliases(raw: Record<string, number>): Record<string, 
   return m;
 }
 
+export interface AggDataEntryOptions {
+  /**
+   * Evaluate the system power model (`modeledSystemPower`). Callers that read only
+   * topology, latency and throughput fields pass false and get it undefined.
+   */
+  modelPower?: boolean;
+}
+
 /** Convert a DB benchmark row to an AggDataEntry. */
-export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
+export function rowToAggDataEntry(
+  row: BenchmarkRow,
+  { modelPower = true }: AggDataEntryOptions = {},
+): AggDataEntry {
   const isAgentic = row.benchmark_type === 'agentic_traces';
   const m = isAgentic ? applyAgenticMetricAliases(row.metrics) : row.metrics;
   // Non-disaggregated multinode artifacts historically stored their one
@@ -199,9 +221,11 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
     p99_tpot: m.p99_tpot ?? 0,
     'p99.9_tpot': m['p99.9_tpot'] ?? 0,
     mean_intvty: m.mean_intvty ?? 0,
-    ...(typeof m.mean_tpot === 'number' && Number.isFinite(m.mean_tpot) && m.mean_tpot > 0
-      ? { mean_tpot_intvty: 1 / m.mean_tpot }
-      : {}),
+    // A mid-literal spread makes V8 define every later key at runtime (~19x slower per row).
+    mean_tpot_intvty:
+      typeof m.mean_tpot === 'number' && Number.isFinite(m.mean_tpot) && m.mean_tpot > 0
+        ? 1 / m.mean_tpot
+        : undefined,
     median_intvty: m.median_intvty ?? 0,
     std_intvty: m.std_intvty ?? 0,
     p75_intvty: m.p75_intvty ?? 0,
@@ -238,7 +262,7 @@ export function rowToAggDataEntry(row: BenchmarkRow): AggDataEntry {
         ? row.power_invalid_reasons
         : undefined,
     power_metric_schema_version: m.power_metric_schema_version,
-    modeledSystemPower: modelSystemPower(row),
+    modeledSystemPower: modelPower ? modelSystemPower(row) : undefined,
     power_tier: resolvePowerTier({
       powerValid: m.power_valid,
       wholeDeploymentSemantics: hasWholeDeploymentEnergySemantics,

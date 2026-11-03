@@ -168,6 +168,9 @@ export interface NormalizedHGXFanPowerFields {
   provenance?: Provenance;
 }
 
+// The curve reads only this frozen model, and every estimate reads it twice.
+const AFFINITY_CURVES = new WeakMap<NormalizedHGXFanPower, AffinityFanPower>();
+
 export class NormalizedHGXFanPower extends FanPower {
   static override readonly typeName: string = 'NormalizedHGXFanPower';
   readonly gpu_tdp_w: number;
@@ -202,7 +205,9 @@ export class NormalizedHGXFanPower extends FanPower {
   }
 
   get affinity_curve(): AffinityFanPower {
-    return new AffinityFanPower({
+    const cached = AFFINITY_CURVES.get(this);
+    if (cached) return cached;
+    const curve = new AffinityFanPower({
       electrical_nameplate_w: this.electrical_nameplate_w,
       full_cooling_load_w: this.full_cooling_load_w,
       min_pwm_frac: this.policy.min_pwm_frac,
@@ -211,6 +216,8 @@ export class NormalizedHGXFanPower extends FanPower {
       fan_complement: 'Normalized capacity sized from GPU TDP and host design watts',
       provenance: this.provenance,
     });
+    AFFINITY_CURVES.set(this, curve);
+    return curve;
   }
 
   estimate_w(non_fan_power_w: number): number {

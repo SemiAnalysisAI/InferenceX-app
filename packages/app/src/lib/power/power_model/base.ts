@@ -88,7 +88,11 @@ export function fsum(values: readonly number[]): number {
     let i = 0;
     for (const partial of partials) {
       let y = partial;
-      if (Math.abs(x) < Math.abs(y)) [x, y] = [y, x];
+      if (Math.abs(x) < Math.abs(y)) {
+        const larger = y;
+        y = x;
+        x = larger;
+      }
       const hi = x + y;
       const lo = y - (hi - x);
       if (lo !== 0) partials[i++] = lo;
@@ -358,6 +362,13 @@ export class Provenance extends FrozenModel {
   }
 }
 
+/** A configuration, or a pure function of frozen inputs that builds it on first read. */
+export type LazyConfiguration = JsonObject | null | (() => JsonObject);
+
+// Kept off the instance so breakdowns stay plain frozen data. Only system nodes carry
+// one, and most estimates never read it, so it is built on first read.
+const CONFIGURATIONS = new WeakMap<PowerComponentBreakdown, LazyConfiguration>();
+
 export interface PowerComponentBreakdownFields {
   name: string;
   power_w: number;
@@ -365,13 +376,13 @@ export interface PowerComponentBreakdownFields {
   children?: readonly PowerComponentBreakdown[];
   provenance?: Provenance | null;
   details?: Details;
-  configuration?: JsonObject | null;
+  configuration?: LazyConfiguration;
 }
 
 interface GroupOptions {
   provenance?: Provenance | null;
   details?: Details;
-  configuration?: JsonObject | null;
+  configuration?: LazyConfiguration;
 }
 
 export class PowerComponentBreakdown extends FrozenModel {
@@ -382,7 +393,6 @@ export class PowerComponentBreakdown extends FrozenModel {
   readonly children: readonly PowerComponentBreakdown[];
   readonly provenance: Provenance | null;
   readonly details: Details;
-  readonly configuration: JsonObject | null;
 
   constructor({
     name,
@@ -403,7 +413,7 @@ export class PowerComponentBreakdown extends FrozenModel {
     this.children = children;
     this.provenance = provenance;
     this.details = details;
-    this.configuration = configuration;
+    if (configuration !== null) CONFIGURATIONS.set(this, configuration);
     if (
       children.length > 0 &&
       !isclose(
@@ -415,6 +425,14 @@ export class PowerComponentBreakdown extends FrozenModel {
     ) {
       throw new ValidationError('Parent power must equal the sum of child power');
     }
+  }
+
+  get configuration(): JsonObject | null {
+    const configuration = CONFIGURATIONS.get(this) ?? null;
+    if (typeof configuration !== 'function') return configuration;
+    const built = configuration();
+    CONFIGURATIONS.set(this, built);
+    return built;
   }
 
   static group(
@@ -434,6 +452,8 @@ export class PowerComponentBreakdown extends FrozenModel {
 
   scaled(quantity: number): PowerComponentBreakdown {
     const count = validate_quantity(quantity);
+    // x * 1 === x exactly, so the copy would equal this frozen node field for field.
+    if (count === 1) return this;
     return new PowerComponentBreakdown({
       name: this.name,
       power_w: this.power_w * count,
@@ -441,7 +461,7 @@ export class PowerComponentBreakdown extends FrozenModel {
       children: this.children.map((child) => child.scaled(count)),
       provenance: this.provenance,
       details: this.details,
-      configuration: this.configuration,
+      configuration: CONFIGURATIONS.get(this) ?? null,
     });
   }
 

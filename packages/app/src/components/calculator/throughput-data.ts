@@ -205,7 +205,7 @@ export function buildGpuGroups<M extends GroupMeta>(
     if (!precisions.includes(row.precision)) continue;
     if (!supportsTokenMetric(row, tokenType)) continue;
 
-    const entry = rowToAggDataEntry(row);
+    const entry = rowToAggDataEntry(row, { modelPower: false });
     const hwKey = getHardwareKey(entry);
     const hwConfig = getHardwareConfig(hwKey, entry.model);
     if (!hwConfig) continue;
