@@ -956,7 +956,8 @@ const MODEL_SPECS: [RegExp, ModelSpec][] = [
             coreTitle: 'The top 16 blocks of 128 tokens plus the local block',
             blocks: 'Top-16 blocks',
           }),
-          types: [],
+          // no qsa results yet; binds them once measured
+          types: ['qsa'],
         },
       ],
     },
