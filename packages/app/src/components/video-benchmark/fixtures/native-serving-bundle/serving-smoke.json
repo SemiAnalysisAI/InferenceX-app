@@ -1,0 +1,315 @@
+{
+  "bundle_type": "h3_serving_smoke_matrix",
+  "cells": [
+    {
+      "aggregate": {
+        "path": "gpu/c1/aggregate.json",
+        "sha256": "d9efc377307bd6fd2b4379076f9b3d7ed6e231c60060ad9ef78ac1590c63e902"
+      },
+      "completion": {
+        "attempted": 4,
+        "completed": 4,
+        "failed": 0,
+        "not_started": 0,
+        "scheduled": 4,
+        "unfinished": 0,
+        "valid": 4
+      },
+      "concurrency": 1,
+      "metrics": {
+        "client_ready_p50_seconds": 118.0,
+        "latency_median_seconds": 119.0,
+        "measurement": {
+          "boundary": "submit_to_downloaded_media",
+          "concurrency": 1,
+          "end_monotonic_seconds": 160.0,
+          "start_monotonic_seconds": 100.0,
+          "wall_seconds": 60.0,
+          "warmup_runs": 1
+        },
+        "serving": {
+          "client_ready_latency_seconds": {
+            "p50": 118.0
+          },
+          "concurrency": 1,
+          "mode": "closed_loop"
+        },
+        "valid_clips_per_second": 0.06666666666666667
+      },
+      "power": {
+        "path": "gpu/c1/power.json",
+        "phases": {
+          "measurement": {
+            "aggregate": {
+              "avg_power_w": 1201.0,
+              "energy_j": 72001.0,
+              "joules_per_valid_clip": 18000.25,
+              "observed_peak_power_w": 1201.0
+            },
+            "attempted": 4,
+            "completed": 4,
+            "duration_seconds": 60.0,
+            "invalid_reasons": [],
+            "per_gpu": {
+              "GPU-11111111-1111-1111-1111-111111111111": {
+                "avg_power_w": 600.0,
+                "energy_j": 36000.0,
+                "observed_peak_power_w": 600.0
+              },
+              "GPU-22222222-2222-2222-2222-222222222222": {
+                "avg_power_w": 600.0166666666667,
+                "energy_j": 36001.0,
+                "observed_peak_power_w": 601.0
+              }
+            },
+            "status": "valid",
+            "valid": true,
+            "valid_clips": 4,
+            "valid_window_count": 1,
+            "window_count": 1
+          }
+        },
+        "sha256": "763232b739ae6aa6efad4b3e42c1b5fada11d45b95deb173802a8332a06ab677"
+      },
+      "receipt": {
+        "path": "gpu/c1/gpu-job.json",
+        "sha256": "29a424efce674a7ca0a786ce9a7c02949fbdaaa4cbb91c1bfbc5a67979b60bba"
+      },
+      "run": {
+        "path": "gpu/c1/baseline/run.json",
+        "sha256": "fee60ee8349f71bc43805a42ea61e1da79c727cbd9c4ada6fb930b9cdbbd939d"
+      },
+      "status": "complete",
+      "verified": true
+    },
+    {
+      "aggregate": {
+        "path": "gpu/c2/aggregate.json",
+        "sha256": "ff914c37e5170b78f28c832f07c08282b764b4ae85ce9e2570414b8ab661e9e0"
+      },
+      "completion": {
+        "attempted": 4,
+        "completed": 4,
+        "failed": 0,
+        "not_started": 0,
+        "scheduled": 4,
+        "unfinished": 0,
+        "valid": 4
+      },
+      "concurrency": 2,
+      "metrics": {
+        "client_ready_p50_seconds": 118.0,
+        "latency_median_seconds": 119.0,
+        "measurement": {
+          "boundary": "submit_to_downloaded_media",
+          "concurrency": 2,
+          "end_monotonic_seconds": 160.0,
+          "start_monotonic_seconds": 100.0,
+          "wall_seconds": 60.0,
+          "warmup_runs": 1
+        },
+        "serving": {
+          "client_ready_latency_seconds": {
+            "p50": 118.0
+          },
+          "concurrency": 2,
+          "mode": "closed_loop"
+        },
+        "valid_clips_per_second": 0.06666666666666667
+      },
+      "power": {
+        "path": "gpu/c2/power.json",
+        "phases": {
+          "measurement": {
+            "aggregate": {
+              "avg_power_w": 1201.0,
+              "energy_j": 72001.0,
+              "joules_per_valid_clip": 18000.25,
+              "observed_peak_power_w": 1201.0
+            },
+            "attempted": 4,
+            "completed": 4,
+            "duration_seconds": 60.0,
+            "invalid_reasons": [],
+            "per_gpu": {
+              "GPU-11111111-1111-1111-1111-111111111111": {
+                "avg_power_w": 600.0,
+                "energy_j": 36000.0,
+                "observed_peak_power_w": 600.0
+              },
+              "GPU-22222222-2222-2222-2222-222222222222": {
+                "avg_power_w": 600.0166666666667,
+                "energy_j": 36001.0,
+                "observed_peak_power_w": 601.0
+              }
+            },
+            "status": "valid",
+            "valid": true,
+            "valid_clips": 4,
+            "valid_window_count": 1,
+            "window_count": 1
+          }
+        },
+        "sha256": "763232b739ae6aa6efad4b3e42c1b5fada11d45b95deb173802a8332a06ab677"
+      },
+      "receipt": {
+        "path": "gpu/c2/gpu-job.json",
+        "sha256": "68a4d7292268b7551ef98af8b378a4b7a41e90d6a2b55db38c5775acb4cc0782"
+      },
+      "run": {
+        "path": "gpu/c2/baseline/run.json",
+        "sha256": "0a52c7c925c0e1bb1641dd973c596f67496db42859a8d2fca60c203821f09816"
+      },
+      "status": "complete",
+      "verified": true
+    },
+    {
+      "aggregate": {
+        "path": "gpu/c4/aggregate.json",
+        "sha256": "ff9e6e9ea7a4c052d61d8ed044d174fa56dfcdfe11642118fdf2ef4a1168cc19"
+      },
+      "completion": {
+        "attempted": 4,
+        "completed": 4,
+        "failed": 0,
+        "not_started": 0,
+        "scheduled": 4,
+        "unfinished": 0,
+        "valid": 4
+      },
+      "concurrency": 4,
+      "metrics": {
+        "client_ready_p50_seconds": 118.0,
+        "latency_median_seconds": 119.0,
+        "measurement": {
+          "boundary": "submit_to_downloaded_media",
+          "concurrency": 4,
+          "end_monotonic_seconds": 160.0,
+          "start_monotonic_seconds": 100.0,
+          "wall_seconds": 60.0,
+          "warmup_runs": 1
+        },
+        "serving": {
+          "client_ready_latency_seconds": {
+            "p50": 118.0
+          },
+          "concurrency": 4,
+          "mode": "closed_loop"
+        },
+        "valid_clips_per_second": 0.06666666666666667
+      },
+      "power": {
+        "path": "gpu/c4/power.json",
+        "phases": {
+          "measurement": {
+            "aggregate": {
+              "avg_power_w": 1201.0,
+              "energy_j": 72001.0,
+              "joules_per_valid_clip": 18000.25,
+              "observed_peak_power_w": 1201.0
+            },
+            "attempted": 4,
+            "completed": 4,
+            "duration_seconds": 60.0,
+            "invalid_reasons": [],
+            "per_gpu": {
+              "GPU-11111111-1111-1111-1111-111111111111": {
+                "avg_power_w": 600.0,
+                "energy_j": 36000.0,
+                "observed_peak_power_w": 600.0
+              },
+              "GPU-22222222-2222-2222-2222-222222222222": {
+                "avg_power_w": 600.0166666666667,
+                "energy_j": 36001.0,
+                "observed_peak_power_w": 601.0
+              }
+            },
+            "status": "valid",
+            "valid": true,
+            "valid_clips": 4,
+            "valid_window_count": 1,
+            "window_count": 1
+          }
+        },
+        "sha256": "763232b739ae6aa6efad4b3e42c1b5fada11d45b95deb173802a8332a06ab677"
+      },
+      "receipt": {
+        "path": "gpu/c4/gpu-job.json",
+        "sha256": "3e1510a484293e91da9be9c5026afd8cfc9caaa1ba6f67ba713edc38771e85f9"
+      },
+      "run": {
+        "path": "gpu/c4/baseline/run.json",
+        "sha256": "4a0cffaffc3636c2fd7931bfffe51174604d459e8338a2873843262075adf10d"
+      },
+      "status": "complete",
+      "verified": true
+    }
+  ],
+  "ci_accepted": false,
+  "completion": {
+    "attempted": 12,
+    "completed": 12,
+    "failed": 0,
+    "not_started": 0,
+    "scheduled": 12,
+    "unfinished": 0,
+    "valid": 12
+  },
+  "evidence_kind": "srt_slurm_h3_service",
+  "failures": [],
+  "finished_at": "2026-10-17T03:38:07.267054Z",
+  "gpu_uuids": [
+    "GPU-11111111-1111-1111-1111-111111111111",
+    "GPU-22222222-2222-2222-2222-222222222222"
+  ],
+  "plan": {
+    "cases": [
+      {
+        "case_id": "drum-taps",
+        "prompt": "A single continuous medium shot of a drummer tapping a snare drum three times in a quiet rehearsal room. The drumsticks visibly contact the drumhead on each tap. The three crisp snare hits and the natural room ambience are audible. The camera remains still. No music, speech, subtitles, or scene cuts.",
+        "requires_motion": true,
+        "requires_sound": true,
+        "seed": 11
+      }
+    ],
+    "generation": {
+      "aspect_ratio": "16:9",
+      "audio_channels": 2,
+      "audio_flow_shift": 3.0,
+      "audio_sample_rate_hz": 32000,
+      "duration_seconds": 4,
+      "flow_shift": 12.0,
+      "fps": 24,
+      "frame_count": 107,
+      "height": 768,
+      "num_inference_steps": 50,
+      "width": 1344
+    },
+    "model_id": "MiniMaxAI/MiniMax-H3",
+    "model_revision": "42ed227ee7df40d41602854ae760620d6eb651fe",
+    "plan_id": "h3-serving-2gpu-c124-v1",
+    "repetitions": 4,
+    "warmup_runs": 1
+  },
+  "power_verified": true,
+  "release_qualified": false,
+  "requests_per_configuration": 4,
+  "runtime": {
+    "python": "/usr/bin/python3",
+    "revision": "71de97b264b04dcd514cf904003028aefe9775c8",
+    "source": "/sgl-workspace/sglang",
+    "source_sha256": "e6069f8b948234075fdcfba23e459e2f56a45b11d0ba3ee5ecbb754e338deb13"
+  },
+  "scheduled": 12,
+  "schema_version": "1.0.0",
+  "server": {
+    "dit_cpu_offload": false,
+    "encoder_parallel": "auto",
+    "performance_mode": "speed",
+    "tp_size": 1,
+    "ulysses_degree": 2
+  },
+  "started_at": "2026-10-17T03:38:07.253472Z",
+  "status": "complete",
+  "warmup_per_configuration": 1
+}

@@ -281,10 +281,17 @@ describe('Chinese (/zh) pages', () => {
       });
     });
 
-    it('returns a noindex Chinese 404 for unknown /zh paths', () => {
+    it('renders a noindex Chinese 404 and returns home with an earlier server time origin', () => {
       const path = '/zh/this-route-does-not-exist';
       cy.request({ url: path, failOnStatusCode: false }).its('status').should('eq', 404);
-      cy.visit(path, { failOnStatusCode: false });
+      cy.visit(path, {
+        failOnStatusCode: false,
+        onBeforeLoad(win) {
+          Object.defineProperty(win.performance, 'timeOrigin', {
+            value: win.performance.timeOrigin + 60_000,
+          });
+        },
+      });
 
       cy.contains('h1', '404 - 页面不存在').should('be.visible');
       cy.contains('找不到该页面。').should('be.visible');
@@ -296,6 +303,9 @@ describe('Chinese (/zh) pages', () => {
       cy.document().then((doc) => {
         expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
       });
+      cy.contains('a[href="/zh"]', '返回首页').click();
+      cy.location('pathname').should('eq', '/zh');
+      cy.get('[data-testid="intro-section"]').should('contain.text', 'AI 加速器系统基准测试');
     });
   });
 

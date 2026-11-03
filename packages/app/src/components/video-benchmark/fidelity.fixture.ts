@@ -9,7 +9,11 @@ const asset = (id: string, path: string) => ({
   downloadUrl: `https://synthetic.public.blob.vercel-storage.com/${id}/${path}?download=1`,
 });
 
-export async function fidelityFixture({ pairs = 2, failedPairs = 1 } = {}) {
+export async function fidelityFixture({
+  pairs = 2,
+  failedPairs = 1,
+  nativeOriginals = false,
+} = {}) {
   const runId = '789';
   const artifact: CIArtifact = {
     id: 987,
@@ -26,6 +30,12 @@ export async function fidelityFixture({ pairs = 2, failedPairs = 1 } = {}) {
   for (const [index, role] of ROLES.entries()) {
     const id = String(101 + index);
     const original = servingFixture(id, `Synthetic ${role} GPU`, pairs);
+    const originalName = nativeOriginals
+      ? `h3-results-${id}-1-${'a'.repeat(64)}`
+      : `h3-video-${id}-1`;
+    const actionsHead = nativeOriginals
+      ? 'b'.repeat(40)
+      : text(at(original.manifest, 'git_commit'));
     const sourceFiles = new Map<string, Blob>();
     const sourceChecksums = new Map<string, string>();
     const save = async (path: string, value: Json | Blob) => {
@@ -65,8 +75,13 @@ export async function fidelityFixture({ pairs = 2, failedPairs = 1 } = {}) {
     const manifest = {
       ...object(original.manifest),
       evidence: { 'serving-smoke.json': matrixHash },
+      ...(nativeOriginals ? { artifact_name: originalName, ci: { head_sha: actionsHead } } : {}),
     };
-    const ci = { ...object(original.ci), site: { gpu_model: `Synthetic ${role} GPU` } };
+    const ci = {
+      ...object(original.ci),
+      site: { gpu_model: `Synthetic ${role} GPU` },
+      ...(nativeOriginals ? { artifact_name: originalName, ci: { head_sha: actionsHead } } : {}),
+    };
     await save('manifest.json', manifest);
     await save('ci.json', ci);
     const seal = new Blob([
@@ -76,16 +91,16 @@ export async function fidelityFixture({ pairs = 2, failedPairs = 1 } = {}) {
     const sealHash = await sha256(seal);
     const sourceArtifact = {
       id: 201 + index,
-      name: `h3-video-${id}-1`,
+      name: originalName,
       expired: false,
       size_in_bytes: 1,
       digest: `sha256:${sealHash}`,
-      workflow_run: { id: Number(id), head_sha: text(at(manifest, 'git_commit')) },
+      workflow_run: { id: Number(id), head_sha: actionsHead },
     };
     sourceArtifacts.push({
       ci: {
         databaseId: Number(id),
-        headSha: at(manifest, 'git_commit'),
+        headSha: actionsHead,
         runAttempt: 1,
         status: 'completed',
         conclusion: 'success',

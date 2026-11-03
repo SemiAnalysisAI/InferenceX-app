@@ -1,7 +1,9 @@
 import { NextRequest } from 'next/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { GET } from './route';
+import { GET, POST } from './route';
 import {
+  approveVideoPublication,
+  publishedVideoHistory,
   readStoredArtifact,
   storedArtifacts,
   storeVideoArtifact,
@@ -9,7 +11,11 @@ import {
 } from '@/lib/video/video-storage';
 
 vi.mock('@/lib/video/video-storage', () => ({
+  approveVideoPublication: vi.fn(),
   videoStorageEnabled: vi.fn(() => false),
+  publishedVideoHistory: vi.fn(() =>
+    Promise.resolve({ schemaVersion: 1, entries: [], nextPage: null }),
+  ),
   storedArtifacts: vi.fn(() => Promise.resolve([])),
   readStoredArtifact: vi.fn(),
   storeVideoArtifact: vi.fn(),
@@ -18,17 +24,53 @@ const fetchMock = vi.fn<typeof fetch>();
 vi.stubGlobal('fetch', fetchMock);
 const response = (body: unknown, status = 200) => Response.json(body, { status });
 const request = (query = '') => new NextRequest(`http://localhost/api/video-runs${query}`);
+const post = (body: unknown, secret = 'test-secret') =>
+  new Request('http://localhost/api/video-runs', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${secret}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
 afterEach(() => {
   fetchMock.mockReset();
   vi.mocked(videoStorageEnabled).mockReturnValue(false);
   vi.mocked(storedArtifacts).mockResolvedValue([]);
+  vi.mocked(publishedVideoHistory).mockClear();
   vi.mocked(readStoredArtifact).mockReset();
   vi.mocked(storeVideoArtifact).mockClear();
+  vi.mocked(approveVideoPublication).mockReset();
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
 
 describe('H3 CI artifact access', () => {
+  it('never serves synthetic History approval in production when fixture mode is set', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('E2E_FIXTURES', '1');
+    fetchMock.mockResolvedValueOnce(response({ private: false }));
+    const result = await GET(request('?format=history&page=1'));
+    expect(result.headers.get('x-videogenx-replay')).toBeNull();
+    expect(await result.json()).toEqual({ schemaVersion: 1, entries: [], nextPage: null });
+    expect(publishedVideoHistory).toHaveBeenCalledWith(1);
+  });
+
+  it('serves synthetic History only in development fixture mode', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('E2E_FIXTURES', '1');
+    const result = await GET(request('?format=history&page=1'));
+    expect(result.headers.get('x-videogenx-replay')).toBe('1');
+    const data = await result.json();
+    expect(data.entries.length).toBeGreaterThan(0);
+  });
+
+  it('discovers old published results without scanning unrelated recent Actions or publishing', async () => {
+    fetchMock.mockResolvedValueOnce(response({ private: false }));
+    const result = await GET(request('?format=history&page=2'));
+    expect(await result.json()).toEqual({ schemaVersion: 1, entries: [], nextPage: null });
+    expect(publishedVideoHistory).toHaveBeenCalledWith(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(storeVideoArtifact).not.toHaveBeenCalled();
+  });
+
   it('discovers benchmark runs without including branch-named unit jobs', async () => {
     fetchMock.mockResolvedValueOnce(response({ private: false })).mockResolvedValueOnce(
       response({
@@ -37,12 +79,13 @@ describe('H3 CI artifact access', () => {
           { id: 2, name: 'Test H3 Video', path: '.github/workflows/test-h3-video.yml' },
           { id: 3, name: 'H3 Video Smoke', path: '.github/workflows/h3-video.yml' },
           { id: 4, name: 'H3 retained-media fidelity', path: '.github/workflows/h3-fidelity.yml' },
+          { id: 5, name: 'InferenceX Sweep', path: '.github/workflows/run-sweep.yml' },
         ],
       }),
     );
     const result = await GET(request());
     const data = await result.json();
-    expect(data.runs.map((r: { id: number }) => r.id)).toEqual([1, 3, 4]);
+    expect(data.runs.map((r: { id: number }) => r.id)).toEqual([1, 3, 4, 5]);
     expect(result.headers.get('cache-control')).toContain('no-store');
   });
   it('refuses a private repository before reading any artifacts', async () => {
@@ -78,7 +121,7 @@ describe('H3 CI artifact access', () => {
       .mockResolvedValueOnce(response({ private: false }))
       .mockResolvedValueOnce(
         response({
-          name: 'h3-results-10-1',
+          name: 'h3-results-10-1-h3-sglang-h200-bf16',
           workflow_run: { id: 10 },
           size_in_bytes: 4,
           archive_download_url: 'https://evil.example',
@@ -117,6 +160,25 @@ describe('H3 CI artifact access', () => {
       run: { id: 10, conclusion: 'failure' },
       artifacts: [],
     });
+  });
+  it('discovers native row artifacts beyond the first run page without duplicating overlapping IDs', async () => {
+    const native = { id: 120, name: `h3-results-10-2-${'a'.repeat(64)}` };
+    fetchMock
+      .mockResolvedValueOnce(response({ private: false }))
+      .mockResolvedValueOnce(response({ id: 10, conclusion: 'failure' }))
+      .mockResolvedValueOnce(
+        response({
+          artifacts: Array.from({ length: 100 }, (_, id) => ({ id, name: 'unrelated' })),
+        }),
+      )
+      .mockResolvedValueOnce(
+        response({ artifacts: [native, native, { id: 121, name: 'h3-results-11-1' }] }),
+      );
+    const result = await GET(request('?run=10'));
+    const data = await result.json();
+    expect(data.artifacts).toEqual([native]);
+    expect(String(fetchMock.mock.calls[3][0])).toContain('artifacts?per_page=100&page=2');
+    expect(storeVideoArtifact).not.toHaveBeenCalled();
   });
   it('falls back to the CI ZIP when object storage is not configured', async () => {
     fetchMock.mockResolvedValueOnce(response({ private: false }));
@@ -277,14 +339,143 @@ describe('H3 published results in development', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('never publishes an uncached artifact through the production published-only mode', async () => {
-    vi.stubEnv('NODE_ENV', 'production');
+  it.each(['media', 'published'])(
+    'never publishes an uncached artifact through production format=%s',
+    async (format) => {
+      vi.stubEnv('NODE_ENV', 'production');
+      vi.mocked(videoStorageEnabled).mockReturnValue(true);
+      fetchMock.mockResolvedValueOnce(response({ private: false }));
+      const result = await GET(request(`?run=10&artifact=20&format=${format}`));
+      expect(result.status).toBe(204);
+      expect(storedArtifacts).toHaveBeenCalledWith('10');
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(storeVideoArtifact).not.toHaveBeenCalled();
+    },
+  );
+});
+
+describe('explicit H3 publication', () => {
+  const artifact = {
+    id: 20,
+    name: `h3-results-10-1-${'a'.repeat(64)}`,
+    expired: false,
+    size_in_bytes: 4,
+    digest: `sha256:${'b'.repeat(64)}`,
+    workflow_run: { id: 10, head_sha: 'c'.repeat(40) },
+  };
+  const saved = { storageVersion: 1 as const, runId: '10', artifact, sources: [{ id: '10' }] };
+  const receipt = {
+    version: 1,
+    runId: '10',
+    artifactId: 20,
+    artifactName: artifact.name,
+    artifactDigest: artifact.digest,
+    mergeRunId: '99',
+    sources: [{ id: '10', sha256: 'd'.repeat(64), checkoutSha: 'e'.repeat(40) }],
+  };
+  it('rejects a missing secret or bearer before any external read or write', async () => {
+    delete process.env.INVALIDATE_SECRET;
+    const missingSecret = await POST(post({ runId: '10', artifactId: '20', mergeRunId: null }));
+    expect(missingSecret.status).toBe(500);
+    vi.stubEnv('INVALIDATE_SECRET', 'test-secret');
+    const unauthorized = await POST(
+      post({ runId: '10', artifactId: '20', mergeRunId: null }, 'wrong'),
+    );
+    expect(unauthorized.status).toBe(401);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(storeVideoArtifact).not.toHaveBeenCalled();
+    expect(approveVideoPublication).not.toHaveBeenCalled();
+  });
+
+  it('rejects missing or malformed source, artifact and merge identities before external reads', async () => {
+    vi.stubEnv('INVALIDATE_SECRET', 'test-secret');
     vi.mocked(videoStorageEnabled).mockReturnValue(true);
-    fetchMock.mockResolvedValueOnce(response({ private: false }));
-    const result = await GET(request('?run=10&artifact=20&format=published'));
-    expect(result.status).toBe(204);
-    expect(storedArtifacts).toHaveBeenCalledWith('10');
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    for (const body of [
+      { artifactId: '20', mergeRunId: null },
+      { runId: '10', artifactId: '../20', mergeRunId: null },
+      { runId: '10', artifactId: '9007199254740993', mergeRunId: null },
+      { runId: '10', artifactId: '20' },
+      { runId: '10', artifactId: '20', mergeRunId: '0' },
+    ]) {
+      const result = await POST(post(body));
+      expect(result.status).toBe(400);
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(storeVideoArtifact).not.toHaveBeenCalled();
+  });
+
+  it('binds an authorized POST to exact run, artifact and merge identities', async () => {
+    vi.stubEnv('INVALIDATE_SECRET', 'test-secret');
+    vi.mocked(videoStorageEnabled).mockReturnValue(true);
+    vi.mocked(readStoredArtifact).mockResolvedValue(saved as never);
+    vi.mocked(approveVideoPublication).mockResolvedValue(receipt as never);
+    fetchMock
+      .mockResolvedValueOnce(response({ private: false }))
+      .mockResolvedValueOnce(response(artifact));
+    const result = await POST(post({ runId: '10', artifactId: '20', mergeRunId: '99' }));
+    expect(result.status).toBe(200);
+    expect(await result.json()).toEqual(receipt);
+    expect(readStoredArtifact).toHaveBeenCalledWith('10', artifact);
+    expect(approveVideoPublication).toHaveBeenCalledWith(
+      '10',
+      artifact,
+      saved,
+      '99',
+      expect.any(AbortSignal),
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(storeVideoArtifact).not.toHaveBeenCalled();
+  });
+
+  it('downloads only the named artifact on an authorized cold publication', async () => {
+    vi.stubEnv('INVALIDATE_SECRET', 'test-secret');
+    vi.mocked(videoStorageEnabled).mockReturnValue(true);
+    vi.mocked(readStoredArtifact)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(saved as never);
+    vi.mocked(approveVideoPublication).mockResolvedValue(receipt as never);
+    fetchMock
+      .mockResolvedValueOnce(response({ private: false }))
+      .mockResolvedValueOnce(response(artifact))
+      .mockResolvedValueOnce(new Response(new Uint8Array([80, 75, 3, 4])));
+    const result = await POST(post({ runId: '10', artifactId: '20', mergeRunId: '99' }));
+    expect(result.status).toBe(200);
+    expect(storeVideoArtifact).toHaveBeenCalledWith(
+      '10',
+      artifact,
+      expect.any(Blob),
+      expect.any(AbortSignal),
+    );
+    expect(String(fetchMock.mock.calls[2][0])).toContain('/actions/artifacts/20/zip');
+  });
+
+  it('rejects a different source before downloading or approving anything', async () => {
+    vi.stubEnv('INVALIDATE_SECRET', 'test-secret');
+    vi.mocked(videoStorageEnabled).mockReturnValue(true);
+    fetchMock
+      .mockResolvedValueOnce(response({ private: false }))
+      .mockResolvedValueOnce(response({ ...artifact, workflow_run: { id: 11 } }));
+    const result = await POST(post({ runId: '10', artifactId: '20', mergeRunId: '99' }));
+    expect(result.status).toBe(404);
+    expect(storeVideoArtifact).not.toHaveBeenCalled();
+    expect(approveVideoPublication).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps an existing index readable if approval storage fails', async () => {
+    vi.stubEnv('INVALIDATE_SECRET', 'test-secret');
+    vi.mocked(videoStorageEnabled).mockReturnValue(true);
+    vi.mocked(readStoredArtifact).mockResolvedValue(saved as never);
+    vi.mocked(storedArtifacts).mockResolvedValue([artifact]);
+    vi.mocked(approveVideoPublication).mockRejectedValue(new Error('approval storage failed'));
+    fetchMock
+      .mockResolvedValueOnce(response({ private: false }))
+      .mockResolvedValueOnce(response(artifact))
+      .mockResolvedValueOnce(response({ private: false }));
+    const failed = await POST(post({ runId: '10', artifactId: '20', mergeRunId: '99' }));
+    expect(failed.status).toBe(502);
+    const result = await GET(request('?run=10&artifact=20&format=media'));
+    expect(await result.json()).toEqual(saved);
     expect(storeVideoArtifact).not.toHaveBeenCalled();
   });
 });
