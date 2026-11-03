@@ -32,6 +32,7 @@ export const CURATED_SUPPORTER_GROUPS: SupporterGroup[] = [
       { label: 'Google', logo: 'google-color.svg' },
       { label: 'AMD', logo: 'amd.svg', quoteOrg: 'AMD' },
       { label: 'NVIDIA', logo: 'nvidia-color.svg', quoteOrg: 'NVIDIA' },
+      { label: 'OpenAI Jalapeño', logo: 'openai.svg', quoteOrg: 'OpenAI' },
       { label: 'SambaNova', logo: 'sambanova.webp', quoteOrg: 'SambaNova' },
     ],
   },
