@@ -2,7 +2,7 @@ import * as d3 from 'd3';
 
 import { pointNearestX } from '@/components/inference/ui/line-label-anchor';
 import { setAttrIfChanged, setStyleIfChanged } from '@/lib/d3-chart/chart-update';
-import { childPointLabel } from '@/lib/d3-chart/layers/scatter-points';
+import { POINT_LABEL_ANCHOR_CLASS } from '@/lib/d3-chart/layers/canvas-points';
 import { plotClipSize } from '@/lib/d3-chart/plot-bounds';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 
@@ -487,6 +487,8 @@ export interface PointLabelPlacementOptions {
   avoidCollisions?: boolean;
 }
 
+const POINT_LABEL_HOSTS = `.dot-group, .${POINT_LABEL_ANCHOR_CLASS}`;
+
 export function placePointLabels(
   zoomGroup: d3.Selection<SVGGElement, unknown, null, undefined>,
   options: PointLabelPlacementOptions = {},
@@ -509,8 +511,8 @@ export function placePointLabels(
   const lineHeight = 11;
   const padding = 2;
 
-  zoomGroup.selectAll<SVGGElement, unknown>('.dot-group').each(function () {
-    const label = childPointLabel(this);
+  zoomGroup.selectAll<SVGGElement, unknown>(POINT_LABEL_HOSTS).each(function () {
+    const label = this.querySelector<SVGTextElement>('.point-label');
     if (!label) return;
     const placementHidden = label.hasAttribute(PLACEMENT_HIDDEN_ATTR);
     const release = () => {

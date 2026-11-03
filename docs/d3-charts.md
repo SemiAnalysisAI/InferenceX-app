@@ -210,6 +210,18 @@ Other passes skip work that cannot change anything. A point without an offload h
 
 A width change re-runs the data phase. `useResponsiveChartDimensions` applies the first change of a resize at once and collapses later changes into one per `RESIZE_COALESCE_MS` (100 ms), ending on the final width. A window or panel drag therefore renders about ten times a second instead of once per frame.
 
+## Canvas Point Layer
+
+`ScatterGraph` draws its official points on one canvas instead of one SVG group per point (`renderer: 'canvas'` on the scatter layer, `lib/d3-chart/layers/canvas-points.ts`). Thousands of `.dot-group` subtrees were most of the chart's DOM, and every data, zoom and legend pass walked them. The layer keeps per-point state in typed arrays (positions, target and shown opacity, fade, shape, palette slot, halo slot) and repaints in one `requestAnimationFrame` after any change. Other charts, unofficial overlays, rooflines and line labels stay SVG.
+
+Everything a user sees matches the SVG it replaced. Points are drawn in the order a keyed d3 join would have left the DOM (`canvas-point-order.ts`, duplicates included), so overlapping points stack the same way. Opacity changes animate with the CSS `ease` curve over the same 150 ms, and coordinate transitions use the shared 300 ms cubic tween. The Pareto fade multiplies opacity by 0.2 like the `opacity(0.2)` filter. Offload halos are dashed strokes with the halo legend's radius and dash. Theme colours given as `var(--name)` resolve against the canvas's computed style, and a theme class change repaints every live layer.
+
+Pointer input goes through one transparent `.dot-hit-area` path, the union of the interactive points' hit circles, so the cursor and event targets still follow the points. A uniform grid (`canvas-point-hit.ts`) answers which point is under the pointer. The last drawn interactive point within the hit radius wins, as the topmost SVG circle did, and hidden points never match. Point labels remain SVG text in `.point-label-anchor` groups, built only for visible points, so collision placement and label CSS are unchanged.
+
+PNG and SVG export still render real `.dot-group` elements through the SVG scatter path, in the live draw order. The old export cloned the live groups, so their child order and style order carried the chart's history. `restoreExportOrder` reproduces that history from what the layer tracked. A point whose shape type changed while it lived has its shape after its label, and a point that was faded before its first transition write keeps `filter` ahead of `transition`. A repeated key stays the fresh group the SVG join would have re-created.
+
+Tests and Cypress read points from the layer element rather than the DOM. `.canvas-point-layer` exposes `scatterPoints()`, one snapshot per point with its datum, key, plot and client coordinates, opacity, interactivity, shape, colour, halo, fade, hover state, label and `data-*` attributes. `data-points-joined` counts joins that added points, so `.canvas-point-layer:not([data-points-joined="0"])` means points have rendered. Clicks and hovers are dispatched on `.dot-hit-area` at a point's `clientX`/`clientY` (`cypress/support/scatter-points.ts`).
+
 ## Huawei series identity
 
 Huawei uses a shared amber/gold identity, separate from NVIDIA green, AMD red, Google blue and OpenAI purple. `HUAWEI_CHART_PALETTE` (including the `HUAWEI_CHART_COLORS` tokens) in `packages/constants/src/gpu-keys.ts` defines a darker amber for light canvases and a brighter gold for dark canvases. Both base colors exceed 4.5:1 contrast against the tested white and `#111214` reference backgrounds.

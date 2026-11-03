@@ -1,8 +1,11 @@
 import { SUPPLEMENTAL_BENCHMARK_ROWS } from '../../src/lib/benchmarks/supplemental-benchmarks';
 import { OVERLAY_RUN_ID, OVERLAY_RUN_URL } from '../support/overlay-fixtures';
 import { servingArtifact, videoRun } from '../support/video-artifacts';
+import { expectHwKeyPoints, type ScatterPoint } from '../support/scatter-points';
 
 const datum = (el: Element) => (el as Element & { __data__: { x: number; y: number } }).__data__;
+const tpuDatum = (points: ScatterPoint[]) =>
+  points.find((point) => String(point.datum.hwKey).startsWith('tpuv7'))!.datum;
 
 describe('Chart Section Tabs — E2E', () => {
   before(() => {
@@ -345,7 +348,7 @@ describe('TPUv7 results', { testIsolation: true }, () => {
       cy.visit(`${locale}/inference?g_model=Qwen-3.5-397B-A17B&i_seq=8k/1k&i_prec=fp8`);
       cy.location('pathname').should('eq', `${locale}/inference`);
       cy.get('[data-testid="inference-chart-display"]').should('be.visible');
-      cy.get('.dot-group[data-hw-key^="tpuv7"]').should('have.length.at.least', 1);
+      expectHwKeyPoints('tpuv7', true);
       cy.location('href').then((href) => {
         const url = new URL(href);
         url.searchParams.set('g_model', 'Qwen-3.5-397B-A17B');
@@ -354,44 +357,35 @@ describe('TPUv7 results', { testIsolation: true }, () => {
         url.searchParams.set('i_metric', 'y_costh');
         cy.visit(url.toString());
       });
-      const dots = '.dot-group[data-hw-key^="tpuv7"]';
-
       cy.get('[data-testid="tco-basis-internal"]').should('have.attr', 'aria-pressed', 'true');
-      cy.get(dots)
-        .first()
-        .then(($point) => {
-          const internal = { ...datum($point[0]) };
-          cy.get('[data-testid="tco-basis-external"]').click();
-          cy.get(dots)
-            .first()
-            .should(($external) => {
-              expect(datum($external[0]).y).to.be.closeTo((internal.y * 1.21) / 1.03, 1e-8);
-              expect(datum($external[0]).x).to.equal(internal.x);
-            });
-          cy.get('[data-testid="share-button"]').first().click();
-          cy.get('[data-testid="share-url-input"]')
-            .invoke('val')
-            .should('include', 'g_tco=external')
-            .then((url) => cy.visit(String(url)));
-          cy.get('[data-testid="tco-basis-external"]').should('have.attr', 'aria-pressed', 'true');
-          cy.get(dots)
-            .first()
-            .should(($external) => {
-              expect(datum($external[0]).y).to.be.closeTo((internal.y * 1.21) / 1.03, 1e-8);
-            });
-          cy.get('[data-testid="tco-basis-toggle"]').scrollIntoView();
-          cy.screenshot(`tco-basis-${locale ? 'zh' : 'en'}-desktop`, { capture: 'viewport' });
-          cy.viewport(390, 844);
-          cy.get('[data-testid="inference-secondary-controls"] > button').click();
-          cy.get('[data-testid="tco-basis-toggle"]').scrollIntoView().should('be.visible');
-          cy.screenshot(`tco-basis-${locale ? 'zh' : 'en'}-mobile`, { capture: 'viewport' });
-          cy.get('[data-testid="tco-basis-internal"]').click();
-          cy.get(dots)
-            .first()
-            .should(($restored) => {
-              expect(datum($restored[0]).y).to.be.closeTo(internal.y, 1e-8);
-            });
+      expectHwKeyPoints('tpuv7', true);
+      cy.scatterPoints().then((initial) => {
+        const internal = { ...tpuDatum(initial) };
+        cy.get('[data-testid="tco-basis-external"]').click();
+        cy.scatterPoints().should((points) => {
+          expect(tpuDatum(points).y).to.be.closeTo((internal.y * 1.21) / 1.03, 1e-8);
+          expect(tpuDatum(points).x).to.equal(internal.x);
         });
+        cy.get('[data-testid="share-button"]').first().click();
+        cy.get('[data-testid="share-url-input"]')
+          .invoke('val')
+          .should('include', 'g_tco=external')
+          .then((url) => cy.visit(String(url)));
+        cy.get('[data-testid="tco-basis-external"]').should('have.attr', 'aria-pressed', 'true');
+        cy.scatterPoints().should((points) => {
+          expect(tpuDatum(points).y).to.be.closeTo((internal.y * 1.21) / 1.03, 1e-8);
+        });
+        cy.get('[data-testid="tco-basis-toggle"]').scrollIntoView();
+        cy.screenshot(`tco-basis-${locale ? 'zh' : 'en'}-desktop`, { capture: 'viewport' });
+        cy.viewport(390, 844);
+        cy.get('[data-testid="inference-secondary-controls"] > button').click();
+        cy.get('[data-testid="tco-basis-toggle"]').scrollIntoView().should('be.visible');
+        cy.screenshot(`tco-basis-${locale ? 'zh' : 'en'}-mobile`, { capture: 'viewport' });
+        cy.get('[data-testid="tco-basis-internal"]').click();
+        cy.scatterPoints().should((points) => {
+          expect(tpuDatum(points).y).to.be.closeTo(internal.y, 1e-8);
+        });
+      });
     });
   }
   it('reprices a TPU unofficial overlay without changing throughput', () => {

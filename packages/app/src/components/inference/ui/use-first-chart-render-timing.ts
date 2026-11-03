@@ -2,19 +2,26 @@ import { useEffect, type RefObject } from 'react';
 
 import { track } from '@/lib/analytics/analytics';
 import { getNavigationTiming } from '@/lib/analytics/navigation-timing';
+import {
+  CANVAS_POINT_LAYER_SELECTOR,
+  POINTS_JOINED_ATTRIBUTE,
+} from '@/lib/d3-chart/layers/canvas-points';
 
-/** Scatter points are drawn as `.dot-group` elements by the D3 scatter layer. */
-const DATA_POINT_SELECTOR = '.dot-group';
+const DATA_POINT_SELECTOR = `.dot-group, ${CANVAS_POINT_LAYER_SELECTOR}:not([${POINTS_JOINED_ATTRIBUTE}="0"])`;
 
 let reportedNavigation: { pathname: string; startedAt: number } | null = null;
 
 function addsDataPoint(records: MutationRecord[]): boolean {
-  return records.some((record) =>
-    [...record.addedNodes].some(
-      (node) =>
-        node instanceof Element &&
-        (node.matches(DATA_POINT_SELECTOR) || node.querySelector(DATA_POINT_SELECTOR) !== null),
-    ),
+  return records.some(
+    (record) =>
+      (record.type === 'attributes' &&
+        record.target instanceof Element &&
+        record.target.matches(DATA_POINT_SELECTOR)) ||
+      [...record.addedNodes].some(
+        (node) =>
+          node instanceof Element &&
+          (node.matches(DATA_POINT_SELECTOR) || node.querySelector(DATA_POINT_SELECTOR) !== null),
+      ),
   );
 }
 
@@ -50,7 +57,12 @@ export function useFirstChartRenderTiming(rootRef: RefObject<HTMLElement | null>
     const observer = new MutationObserver((records) => {
       if (addsDataPoint(records)) report();
     });
-    observer.observe(root, { childList: true, subtree: true });
+    observer.observe(root, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: [POINTS_JOINED_ATTRIBUTE],
+    });
     return () => observer.disconnect();
   }, [rootRef]);
 }

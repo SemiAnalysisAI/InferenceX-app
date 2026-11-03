@@ -2,6 +2,7 @@ import type { AvailabilityRow } from '@/lib/api/api';
 
 import { availabilityBody } from './e2e';
 import { modelSelectionBenchmarks } from './model-selection-fixtures';
+import { expectHwKeyOpacity } from './scatter-points';
 
 const qwenAgenticRows = modelSelectionBenchmarks
   .filter((row) => row.model === 'dsv4')
@@ -26,7 +27,7 @@ qwenAgenticRows.push(
 
 export function assertTpuGb300Selected() {
   cy.get('[data-testid="chart-legend"] #checkbox-gb300_dynamo-sglang').should('be.checked');
-  cy.get('.dot-group[data-hw-key="gb300_dynamo-sglang"]').should('have.css', 'opacity', '1');
+  expectHwKeyOpacity('gb300_dynamo-sglang', 1);
   cy.get('[data-testid="scatter-quick-filters"]').click();
   cy.get('[data-testid="quick-filter-best-per-sku"]').should('have.attr', 'data-state', 'checked');
   cy.get('body').type('{esc}');

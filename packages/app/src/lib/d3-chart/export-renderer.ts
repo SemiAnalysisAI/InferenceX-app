@@ -7,6 +7,7 @@ import type { BuiltScale } from './D3Chart/scale-builders';
 import type { D3ChartProps, RenderContext } from './D3Chart/types';
 import { getDomainAwareChartWatermark } from '@/lib/runtime/unofficial-domain';
 import type { ContinuousScale } from './types';
+import { CANVAS_POINT_LAYER_SELECTOR } from './layers/canvas-points';
 
 type ExportRenderer = (target: SVGSVGElement, width: number, height: number) => void;
 const renderers = new WeakMap<SVGSVGElement, ExportRenderer>();
@@ -101,7 +102,10 @@ export function renderExportChart<T>(
     tooltipElement: document.createElement('div'),
   };
   const group = clipContent ? layout.zoomGroup : layout.g;
-  for (const layer of layers) renderLayer(layer, group, xScale, yScale, layout, ctx);
+  for (const clone of group.node()?.querySelectorAll(CANVAS_POINT_LAYER_SELECTOR) ?? []) {
+    clone.remove();
+  }
+  for (const layer of layers) renderLayer(layer, group, xScale, yScale, layout, ctx, 'export');
   raiseInOrder(group, ['.dot-group', '.point', '.line-label']);
   props.onExportRender?.(ctx);
   namespaceExportIds(target);

@@ -1,4 +1,4 @@
-import type * as d3 from 'd3';
+import * as d3 from 'd3';
 
 import type { ChartLayout, ContinuousScale } from '../types';
 import { renderBars, updateBarsOnZoom } from '../layers/bars';
@@ -21,11 +21,37 @@ import {
   syncPointLabel,
   updateScatterPointsForDisplay,
   updateScatterPointsOnZoom,
+  type ScatterPointConfig,
 } from '../layers/scatter-points';
 import { renderRadar } from '../layers/radar';
+import {
+  canvasPointLayerOf,
+  ensureCanvasPointLayer,
+  type CanvasPointLayer,
+  type ScatterDatum,
+} from '../layers/canvas-points';
 
 import type { BuiltScale } from './scale-builders';
-import type { LayerConfig, RenderContext, ZoomContext } from './types';
+import type { LayerConfig, RenderContext, ScatterLayerConfig, ZoomContext } from './types';
+
+export type LayerSurface = 'screen' | 'export';
+
+function syncCanvasLabels<T extends ScatterDatum>(
+  points: CanvasPointLayer<T>,
+  { getLabelText, foreground, hideLabels }: ScatterPointConfig<T>,
+): void {
+  points.setLabels(
+    getLabelText && foreground && !hideLabels ? getLabelText : null,
+    foreground ?? '',
+  );
+}
+
+function canvasPointsFor<T extends ScatterDatum>(
+  layer: ScatterLayerConfig<T>,
+  group: d3.Selection<SVGGElement, unknown, null, undefined>,
+): CanvasPointLayer<T> | null {
+  return layer.renderer === 'canvas' ? canvasPointLayerOf<T>(group.node()) : null;
+}
 
 export function renderLayer<T>(
   layer: LayerConfig<T>,
@@ -34,6 +60,7 @@ export function renderLayer<T>(
   yScale: BuiltScale,
   layout: ChartLayout,
   ctx: RenderContext,
+  surface: LayerSurface = 'screen',
 ): d3.Selection<any, any, any, any> | null {
   const { width, height } = layout;
 
@@ -108,6 +135,14 @@ export function renderLayer<T>(
     }
 
     case 'scatter': {
+      if (layer.renderer === 'canvas' && surface === 'screen') {
+        const points = ensureCanvasPointLayer<(typeof layer.data)[number]>(group.node()!);
+        points.join(layer.data, layer.keyFn, width, height);
+        points.restyle(layer.config);
+        points.place(xScale as ContinuousScale, yScale as ContinuousScale);
+        syncCanvasLabels(points, layer.config);
+        return d3.select(points.element);
+      }
       return renderScatterPoints(
         group,
         layer.data,
@@ -164,7 +199,14 @@ export function updateLayerPositionOnZoom<T>(
       break;
     }
     case 'scatter': {
-      updateScatterPointsOnZoom(group, newXScale as ContinuousScale, newYScale as ContinuousScale);
+      const points = canvasPointsFor(layer, group);
+      if (points) points.place(newXScale as ContinuousScale, newYScale as ContinuousScale);
+      else
+        updateScatterPointsOnZoom(
+          group,
+          newXScale as ContinuousScale,
+          newYScale as ContinuousScale,
+        );
       break;
     }
     default: {
@@ -237,6 +279,13 @@ export function updateLayerForMetric<T>(
     return renderLayer(layer, group, xScale, yScale, layout, ctx);
   }
 
+  const points = canvasPointsFor(layer, group);
+  if (points) {
+    points.replaceData(layer.data, layer.keyFn);
+    syncCanvasLabels(points, layer.config);
+    points.place(xScale as ContinuousScale, yScale as ContinuousScale);
+    return d3.select(points.element);
+  }
   const keyFor = (datum: (typeof layer.data)[number], index: number): string =>
     layer.keyFn ? layer.keyFn(datum) : String(index);
   const nextByKey = new Map<string, (typeof layer.data)[number]>();
@@ -266,7 +315,13 @@ export function updateLayerForDisplay<T>(
   ctx: RenderContext,
 ): void {
   if (layer.type === 'scatter') {
-    updateScatterPointsForDisplay(group, layer.config);
+    const points = canvasPointsFor(layer, group);
+    if (points) {
+      points.restyle(layer.config);
+      syncCanvasLabels(points, layer.config);
+    } else {
+      updateScatterPointsForDisplay(group, layer.config);
+    }
     return;
   }
   if (layer.type === 'horizontalBar') {

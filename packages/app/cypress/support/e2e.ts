@@ -1,4 +1,5 @@
 import 'cypress-axe';
+import './scatter-points';
 
 import type { AvailabilityRow } from '@/lib/api/api';
 import { compactAvailability } from '@/lib/benchmarks/compact-availability';

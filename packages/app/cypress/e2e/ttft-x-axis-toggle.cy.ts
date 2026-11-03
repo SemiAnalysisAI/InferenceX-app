@@ -7,6 +7,7 @@ import {
 } from '../support/e2e';
 import { agenticMetrics, measuredPowerMetrics } from '../support/agentic-fixtures';
 import { expandLegendAdvanced } from '../support/legend-advanced';
+import { POINT_LABELS, pointsIn } from '../support/scatter-points';
 
 const DEFAULT_MODEL_DB_KEY = 'dsv4';
 const AGENTIC_DATE = '2026-06-12';
@@ -127,7 +128,7 @@ describe('Parallelism labels in standard controls', () => {
         .and('have.attr', 'data-state', 'unchecked')
         .click();
       cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'checked');
-      cy.get('[data-testid="scatter-graph"] .dot-group .point-label')
+      cy.get(`[data-testid="scatter-graph"] ${POINT_LABELS}`)
         .filter(':visible')
         .first()
         .find('tspan')
@@ -140,21 +141,21 @@ describe('Parallelism labels in standard controls', () => {
       expandLegendAdvanced();
       cy.get('label[for="scatter-point-labels"]').should('have.text', '# of GPUs Label');
       cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'unchecked').click();
-      cy.get('[data-testid="scatter-graph"] .dot-group .point-label')
+      cy.get(`[data-testid="scatter-graph"] ${POINT_LABELS}`)
         .filter(':visible')
         .first()
         .find('tspan')
         .should('have.length', 2);
       cy.get('#scatter-parallelism-labels').click();
       cy.get('#scatter-point-labels').should('have.attr', 'data-state', 'checked');
-      cy.get('[data-testid="scatter-graph"] .dot-group .point-label')
+      cy.get(`[data-testid="scatter-graph"] ${POINT_LABELS}`)
         .filter(':visible')
         .first()
         .invoke('text')
         .should('match', /^\d+$/);
       cy.get('#scatter-point-labels').click();
       cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
-      cy.get('[data-testid="scatter-graph"] .dot-group .point-label')
+      cy.get(`[data-testid="scatter-graph"] ${POINT_LABELS}`)
         .filter(':visible')
         .should('have.length', 0);
     });
@@ -260,11 +261,10 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('[data-testid="chart-notices-chart-0"] [data-testid="offload-halo-key"]')
       .should('be.visible')
       .and('contain.text', 'KV offload ON');
-    cy.get('#chart-0 .offload-halo').should('have.length.at.least', 1);
-    cy.get('#chart-0 .dot-group').then(($points) => {
-      cy.get('#chart-0 .offload-halo').should(($halos) => {
-        expect($halos.length).to.be.lessThan($points.length);
-      });
+    cy.scatterPoints('#chart-0').should((points) => {
+      const halos = points.filter((point) => point.halo !== null).length;
+      expect(halos).to.be.at.least(1);
+      expect(halos).to.be.lessThan(points.length);
     });
 
     cy.get('[data-testid="chart-notices-chart-0"] [data-testid="offload-halo-key"]').should(
@@ -275,8 +275,10 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('label[for="scatter-offloading-label"]').should('have.text', 'Offloading Label');
     cy.get('#scatter-offloading-label').should('have.attr', 'data-state', 'checked').click();
     cy.get('[data-testid="offload-halo-key"]').should('not.exist');
-    cy.get('#chart-0 .offload-halo').should('not.exist');
-    cy.get('#chart-0 .dot-group').should('have.length.at.least', 1);
+    cy.scatterPoints('#chart-0').should((points) => {
+      expect(points).to.have.length.at.least(1);
+      expect(points.filter((point) => point.halo !== null)).to.have.length(0);
+    });
     cy.get('[data-testid="share-button"]').click();
     cy.get('[data-testid="share-url-input"]')
       .invoke('val')
@@ -287,9 +289,13 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
         cy.visit(String(url));
       });
     expandLegendAdvanced();
-    cy.get('#chart-0 .offload-halo').should('not.exist');
+    cy.scatterPoints('#chart-0').should((points) => {
+      expect(points.filter((point) => point.halo !== null)).to.have.length(0);
+    });
     cy.get('#scatter-offloading-label').should('have.attr', 'data-state', 'unchecked').click();
-    cy.get('#chart-0 .offload-halo').should('have.length.at.least', 1);
+    cy.scatterPoints('#chart-0').should((points) => {
+      expect(points.filter((point) => point.halo !== null)).to.have.length.at.least(1);
+    });
     cy.get('[data-testid="chart-notices-chart-0"] [data-testid="offload-halo-key"]').should(
       'be.visible',
     );
@@ -586,16 +592,28 @@ const interceptAgenticDataWithOverlay = () => {
   }).as('unofficialRun');
 };
 
-const expectCoordinates = (selector: string, expected: number[]) => {
-  cy.get<SVGGElement & { __data__: { x: number } }>(`#chart-0 ${selector}`).should(($points) => {
-    expect($points.length).to.equal(expected.length);
-    expect(Array.from($points, (point) => point.__data__.x).sort((a, b) => a - b)).to.deep.equal(
+type CoordinateSource = 'scatter' | '.unofficial-overlay-pt';
+type BoundPoint = SVGGElement & { __data__: { x: number } };
+
+const renderedCoordinates = ($chart: JQuery<HTMLElement>, source: CoordinateSource) => {
+  if (source === 'scatter') {
+    return pointsIn($chart).map((point) => ({ value: point.datum.x, rendered: point.x }));
+  }
+  const elements = $chart.find(source).toArray() as unknown as BoundPoint[];
+  return elements.map((point) => ({
+    value: point.__data__.x,
+    rendered: Number(point.getAttribute('transform')?.match(/translate\((?<x>[^,]+),/u)?.groups?.x),
+  }));
+};
+
+const expectCoordinates = (source: CoordinateSource, expected: number[]) => {
+  cy.get('#chart-0').should(($chart) => {
+    const coordinates = renderedCoordinates($chart, source);
+    expect(coordinates.length).to.equal(expected.length);
+    expect(coordinates.map(({ value }) => value).sort((a, b) => a - b)).to.deep.equal(
       [...expected].sort((a, b) => a - b),
     );
-    const renderedXs = Array.from($points, (point) => {
-      const transform = point.getAttribute('transform');
-      return Number(transform?.match(/translate\((?<x>[^,]+),/u)?.groups?.x);
-    });
+    const renderedXs = coordinates.map(({ rendered }) => rendered);
     expect(renderedXs.every(Number.isFinite), 'finite rendered coordinates').to.equal(true);
     expect(new Set(renderedXs).size, 'points spread across x-axis').to.equal(expected.length);
   });
@@ -603,7 +621,7 @@ const expectCoordinates = (selector: string, expected: number[]) => {
 const expectInteractivity = () => {
   cy.get('#chart-0 .x-axis-label').should('have.text', 'Median Interactivity (tok/s/user)');
   cy.get('[data-testid="chart-figure"] h2').should('contain.text', 'vs. Median Interactivity');
-  expectCoordinates('.dot-group', [80, 40, 20]);
+  expectCoordinates('scatter', [80, 40, 20]);
   expectCoordinates('.unofficial-overlay-pt', [60, 30]);
 };
 
@@ -683,7 +701,7 @@ describe('Measured prefill metrics preserve the selected x-axis', () => {
       'contain.text',
       'vs. Median Time To First Token',
     );
-    expectCoordinates('.dot-group', [0.5, 2, 8]);
+    expectCoordinates('scatter', [0.5, 2, 8]);
     expectCoordinates('.unofficial-overlay-pt', [1, 4]);
 
     selectXAxisMode('interactivity', 'Interactivity');
@@ -702,7 +720,7 @@ describe('Measured prefill metrics preserve the selected x-axis', () => {
       'contain.text',
       'vs. Median Time To First Token',
     );
-    cy.get('#chart-0 .dot-group').should('not.exist');
+    cy.scatterPoints('#chart-0').should('have.length', 0);
     expectCoordinates('.unofficial-overlay-pt', [1, 4]);
   });
 });
@@ -742,6 +760,9 @@ describe('X-Axis Mode Toggle — overlay path (finding #8 regression guard)', ()
     cy.get('#scatter-offloading-label').click();
     cy.get('[data-testid="offload-halo-key"]').should('not.exist');
     cy.get('#chart-0 .offload-halo').should('not.exist');
+    cy.scatterPoints('#chart-0').should((points) => {
+      expect(points.filter((point) => point.halo !== null)).to.have.length(0);
+    });
     cy.get('#chart-0 .unofficial-overlay-pt').should('have.length.greaterThan', 0);
     cy.get('#scatter-offloading-label').click();
     cy.get('[data-testid="offload-halo-key"]').should('contain.text', 'KV offload ON');

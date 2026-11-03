@@ -1,4 +1,5 @@
 import { availabilityBody, unlockAgenticGate } from '../support/e2e';
+import { expectHwKeyPoints } from '../support/scatter-points';
 
 const MODEL = 'dsv4';
 const DATE = '2026-06-12';
@@ -109,8 +110,8 @@ describe('Agentic Quick Filters', () => {
   it('opens from the legend, omits spec decoding, and filters the rendered agentic points', () => {
     visitAgenticQuickFilters();
 
-    cy.get('.dot-group[data-hw-key^="b200"]').should('exist');
-    cy.get('.dot-group[data-hw-key^="mi300x"]').should('exist');
+    expectHwKeyPoints('b200', true);
+    expectHwKeyPoints('mi300x', true);
     cy.get('[data-testid="quick-filters-dialog"]').should('not.exist');
     cy.get('[data-testid="scatter-quick-filters"]').should('contain.text', 'Quick Filters').click();
     cy.get('[data-testid="quick-filters-dialog"]').should('be.visible');
@@ -120,8 +121,8 @@ describe('Agentic Quick Filters', () => {
     cy.contains('Spec Decoding').should('not.exist');
 
     cy.get('[data-testid="quick-filter-vendor-AMD"]').click();
-    cy.get('.dot-group[data-hw-key^="b200"]').should('not.exist');
-    cy.get('.dot-group[data-hw-key^="mi300x"]').should('exist');
+    expectHwKeyPoints('b200', false);
+    expectHwKeyPoints('mi300x', true);
     cy.get('[data-testid="quick-filters-selected-count"]').should('contain.text', '1 selected');
 
     cy.get('[data-testid="quick-filter-framework-vllm"]').click();
@@ -129,17 +130,17 @@ describe('Agentic Quick Filters', () => {
     cy.get('[data-testid="quick-filters-dialog"]').should('be.visible');
 
     cy.contains('button', 'Clear filters').click();
-    cy.get('.dot-group[data-hw-key^="b200"]').should('exist');
-    cy.get('.dot-group[data-hw-key^="mi300x"]').should('exist');
+    expectHwKeyPoints('b200', true);
+    expectHwKeyPoints('mi300x', true);
     cy.get('[data-testid="quick-filters-selected-count"]').should('not.exist');
 
     cy.get('[data-testid="quick-filter-vendor-AMD"]').click();
     cy.get('[data-testid="quick-filters-dialog"]').contains('button', 'Done').click();
 
-    cy.get('.dot-group[data-hw-key^="b200"]').should('not.exist');
+    expectHwKeyPoints('b200', false);
     cy.get('[data-testid="scatter-reset-filter"]').click();
-    cy.get('.dot-group[data-hw-key^="b200"]').should('exist');
-    cy.get('.dot-group[data-hw-key^="mi300x"]').should('exist');
+    expectHwKeyPoints('b200', true);
+    expectHwKeyPoints('mi300x', true);
 
     cy.get('[data-testid="scatter-quick-filters"]').click();
     cy.get('[data-testid="quick-filter-vendor-AMD"]').should('have.attr', 'aria-pressed', 'false');

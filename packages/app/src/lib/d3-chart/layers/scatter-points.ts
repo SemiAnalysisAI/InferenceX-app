@@ -21,12 +21,15 @@ export interface ScatterPointConfig<T> {
   hideLabels?: boolean;
   getLabelText?: (d: T) => string;
   foreground?: string;
-  dataAttrs?: Record<string, (d: T) => string>;
+  dataAttrs?: Record<string, (d: T) => string | null>;
   selectedPrecisions?: readonly string[];
   getShapeKey?: (d: T) => ShapeKey;
 }
 
-const resolveShapeKey = (precision: string, selectedPrecisions?: readonly string[]): ShapeKey =>
+export const resolveShapeKey = (
+  precision: string,
+  selectedPrecisions?: readonly string[],
+): ShapeKey =>
   selectedPrecisions && selectedPrecisions.length > 0
     ? getShapeKeyForPrecision(precision, selectedPrecisions)
     : 'circle';
