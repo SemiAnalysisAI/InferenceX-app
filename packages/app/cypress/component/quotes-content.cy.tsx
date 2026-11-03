@@ -199,7 +199,16 @@ describe('QuotesContent supporter logo wall', () => {
     cy.mount(<QuotesContent />);
     cy.get('[data-testid="supporter-logo-wall"] h3').should('have.length', groupIds.length);
     for (const id of groupIds) cy.get(`[data-testid="supporter-group-${id}"]`).should('exist');
-    cy.get('[data-testid="supporter-group-other"] h3').should('have.text', 'Other');
+    cy.get('[data-testid="supporter-logo-wall"] h3').then(($headings) => {
+      expect([...$headings].map((heading) => heading.textContent)).to.deep.equal([
+        'Chinese Frontier Labs',
+        'US Labs',
+        'Hyperscalers and Clouds',
+        'Open Source',
+        'Silicon, Neoclouds and Academia',
+        'Other',
+      ]);
+    });
 
     cy.mount(<QuotesContent locale="zh" />);
     cy.get('[data-testid="supporter-group-other"] h3').should('have.text', '其他');
