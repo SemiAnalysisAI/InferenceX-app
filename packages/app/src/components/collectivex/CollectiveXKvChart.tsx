@@ -4,11 +4,8 @@ import * as d3 from 'd3';
 import { useMemo, useRef } from 'react';
 
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
-import {
-  chartTooltipDismiss,
-  chartTooltipShell,
-  chartTooltipTitle,
-} from '@/lib/d3-chart/tooltip-shell';
+import { ChartPointDetails } from '@/components/ui/chart-point-details';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 import {
@@ -48,7 +45,6 @@ const STRINGS = {
           : `Burst completion latency p50 (ms${logScale ? ', log' : ''})`,
     noData: 'No measured KV rows match the selected direction',
     instructions: 'Shift+Scroll to zoom · Drag to pan · Double-click to reset',
-    dismiss: 'Click elsewhere to dismiss',
     point: (op: string, batch: number, isl: string) => `${op} · batch ${batch} · ISL ${isl}`,
     latency: 'Burst p50 / p95 / min / max',
     requestLatency: 'Per request p50 / p95',
@@ -74,7 +70,6 @@ const STRINGS = {
           : `突发完成延迟 p50（ms${logScale ? '，对数' : ''}）`,
     noData: '所选传输方向下暂无实测 KV 数据',
     instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置',
-    dismiss: '点击其他区域关闭',
     point: (op: string, batch: number, isl: string) => `${op} · batch ${batch} · ISL ${isl}`,
     latency: '突发 p50 / p95 / 最小值 / 最大值',
     requestLatency: '单请求 p50 / p95',
@@ -130,15 +125,6 @@ function highlightBands(root: Element | null, focusId: string | null): void {
 
 function formatMs(value: number): string {
   return value.toFixed(value >= 100 ? 0 : 2);
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
 }
 
 export function CollectiveXKvChart({
@@ -272,6 +258,80 @@ export function CollectiveXKvChart({
       </div>
     ) : undefined;
 
+  const describe = (point: CollectiveXKvChartPoint) => {
+    const { row } = point;
+    const format = (value: number) =>
+      selection.y === 'bandwidth'
+        ? `${value.toFixed(value >= 100 ? 0 : 2)} GB/s`
+        : `${value.toFixed(value >= 100 ? 0 : 2)} ms`;
+    const base = {
+      title: point.seriesLabel,
+      subtitle: t.point(row.op, row.batch, row.isl.toLocaleString(numberLocale)),
+      color: colors[point.colorKey] ?? '#888',
+    };
+    if (point.range) {
+      return {
+        ...base,
+        warning: undefined,
+        metrics: [
+          {
+            value: format(point.y),
+            label:
+              rangeMode === 'best' ? `${t.best} · ${point.range.members[0].label}` : t.rangeMedian,
+          },
+          {
+            value: `${format(point.range.lo)} – ${format(point.range.hi)}`,
+            label: t.rangeHeading,
+          },
+        ],
+        summary: t.rangeCount(point.range.members.length),
+        rows: point.range.members.map((member) => ({
+          label: member.label,
+          value: format(member.y),
+        })),
+        notes: [t.rangeCount(point.range.members.length)],
+      };
+    }
+    const kase = caseBySeries.get(point.seriesId);
+    const size = t.details(
+      row.descs.toLocaleString(numberLocale),
+      (row.req_bytes / 1e6).toFixed(1),
+    );
+    const verify = `${t.verify(row.verify_passed)}${row.verify_detail ? ` · ${row.verify_detail}` : ''}`;
+    return {
+      ...base,
+      warning: row.verify_passed ? undefined : verify,
+      metrics: [{ value: format(point.y), label: t.yAxis(selection, false) }],
+      summary: size,
+      rows: [
+        {
+          label: t.latency,
+          value: `${formatMs(row.latency_ms.p50)} / ${formatMs(row.latency_ms.p95)} / ${formatMs(row.latency_ms.min)} / ${formatMs(row.latency_ms.max)} ms`,
+          wide: true,
+        },
+        ...(row.request_ms
+          ? [
+              {
+                label: t.requestLatency,
+                value: `${formatMs(row.request_ms.p50)} / ${formatMs(row.request_ms.p95)} ms`,
+                wide: true,
+              },
+            ]
+          : []),
+      ],
+      notes: [
+        size,
+        ...(row.posted_bytes !== undefined && row.posted_bytes !== row.req_bytes
+          ? [t.posted((row.posted_bytes / 1e6).toFixed(1))]
+          : []),
+        ...(kase?.library_version && kase.maturity
+          ? [t.build(kase.library_version, t.maturity[kase.maturity])]
+          : []),
+        verify,
+      ],
+    };
+  };
+
   return (
     <div role="group" aria-label={t.aria}>
       <D3Chart<CollectiveXKvChartPoint>
@@ -337,57 +397,38 @@ export function CollectiveXKvChart({
           rulerType: 'crosshair',
           attachToLayer: 2,
           content: (point, isPinned) => {
-            const color = colors[point.colorKey] ?? '#888';
-            const { row } = point;
-            const format = (value: number) =>
-              selection.y === 'bandwidth'
-                ? `${value.toFixed(value >= 100 ? 0 : 2)} GB/s`
-                : `${value.toFixed(value >= 100 ? 0 : 2)} ms`;
-            const pinnedNote = isPinned ? chartTooltipDismiss(t.dismiss) : '';
-            const where = t.point(row.op, row.batch, row.isl.toLocaleString(numberLocale));
-            const shell = (body: string) =>
-              chartTooltipShell(
-                `<div class="text-xs">
-            ${pinnedNote}
-            ${chartTooltipTitle(escapeHtml(point.seriesLabel), color)}
-            ${body}
-          </div>`,
-                { pinned: isPinned, minWidth: 230, maxWidth: 380 },
-              );
-            if (point.range) {
-              const rows = point.range.members
-                .map(
-                  (member) =>
-                    `<span>${escapeHtml(member.label)}</span><span>${format(member.y)}</span>`,
-                )
-                .join('');
-              return shell(`<div>${where}</div>
-            ${
-              rangeMode === 'best'
-                ? `<div>${t.best}: <strong>${format(point.y)}</strong> · ${escapeHtml(point.range.members[0].label)}</div>`
-                : `<div>${t.rangeMedian}: <strong>${format(point.y)}</strong></div>`
-            }
-            <div>${t.rangeHeading}: ${format(point.range.lo)} – ${format(point.range.hi)}</div>
-            <div class="mt-1 text-muted-foreground">${t.rangeCount(point.range.members.length)}</div>
-            <div class="grid text-muted-foreground" style="grid-template-columns: max-content max-content; column-gap: 1.5rem">${rows}</div>`);
-            }
-            const kase = caseBySeries.get(point.seriesId);
-            const details = [
-              `<div>${where}: <strong>${format(point.y)}</strong></div>`,
-              `<div class="text-muted-foreground">${t.latency}: ${formatMs(row.latency_ms.p50)} / ${formatMs(row.latency_ms.p95)} / ${formatMs(row.latency_ms.min)} / ${formatMs(row.latency_ms.max)} ms</div>`,
-              row.request_ms
-                ? `<div class="text-muted-foreground">${t.requestLatency}: ${formatMs(row.request_ms.p50)} / ${formatMs(row.request_ms.p95)} ms</div>`
-                : '',
-              `<div class="text-muted-foreground">${t.details(row.descs.toLocaleString(numberLocale), (row.req_bytes / 1e6).toFixed(1))}</div>`,
-              row.posted_bytes !== undefined && row.posted_bytes !== row.req_bytes
-                ? `<div class="text-muted-foreground">${t.posted((row.posted_bytes / 1e6).toFixed(1))}</div>`
-                : '',
-              kase?.library_version && kase.maturity
-                ? `<div class="text-muted-foreground">${escapeHtml(t.build(kase.library_version, t.maturity[kase.maturity]))}</div>`
-                : '',
-              `<div class="text-muted-foreground">${t.verify(row.verify_passed)}${row.verify_detail ? ` · ${escapeHtml(row.verify_detail)}` : ''}</div>`,
-            ];
-            return shell(details.filter(Boolean).join('\n            '));
+            const card = describe(point);
+            return chartHoverCard(
+              {
+                title: card.title,
+                subtitle: card.subtitle,
+                color: card.color,
+                metrics: card.metrics,
+                summary: card.summary,
+                warning: card.warning,
+              },
+              { pinned: isPinned },
+            );
+          },
+          details: (point, _isOverlay, close) => {
+            const card = describe(point);
+            return (
+              <ChartPointDetails
+                title={card.title}
+                subtitle={card.subtitle}
+                color={card.color}
+                warning={card.warning}
+                metrics={card.metrics}
+                rows={card.rows}
+                onClose={close}
+              >
+                {card.notes.map((note) => (
+                  <p key={note} className="mt-2 text-muted-foreground">
+                    {note}
+                  </p>
+                ))}
+              </ChartPointDetails>
+            );
           },
           getRulerX: (point, scale) =>
             (scale as d3.ScaleLinear<number, number> | d3.ScaleLogarithmic<number, number>)(

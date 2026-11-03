@@ -34,6 +34,7 @@ import { TOKEN_SERIES_COLORS } from '@/components/agentic-workload-explorer/seri
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 import { ChartActions, Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
+import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
 import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
 
 const STRINGS = {
@@ -400,16 +401,13 @@ function CacheEfficiencyHeatmap({ t }: { t: Strings }) {
 
             {hoveredCell && (
               <FloatingTooltip x={hoveredCell.x} y={hoveredCell.y} placement="above">
-                <div className="text-3xs font-mono font-medium text-foreground">
-                  {hoveredCell.day}
-                </div>
-                <div className="text-3xs font-mono text-muted-foreground">
-                  {t.efficiency}: {hoveredCell.efficiency.toFixed(1)}%
-                </div>
-                <div className="text-3xs font-mono text-muted-foreground">
-                  {t.cacheReadHeatmap}: {formatNumber(hoveredCell.cacheRead)} · {t.inputHeatmap}:{' '}
-                  {formatNumber(hoveredCell.inputTokens)}
-                </div>
+                <ChartHoverCardBody
+                  title={hoveredCell.day}
+                  metrics={[
+                    { value: `${hoveredCell.efficiency.toFixed(1)}%`, label: t.efficiency },
+                  ]}
+                  summary={`${t.cacheReadHeatmap}: ${formatNumber(hoveredCell.cacheRead)} · ${t.inputHeatmap}: ${formatNumber(hoveredCell.inputTokens)}`}
+                />
               </FloatingTooltip>
             )}
           </div>

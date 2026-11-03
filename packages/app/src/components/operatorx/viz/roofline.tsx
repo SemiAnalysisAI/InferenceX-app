@@ -9,16 +9,17 @@ import { Label } from '@/components/ui/label';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { Switch } from '@/components/ui/switch';
 import { track } from '@/lib/analytics/analytics';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { rooflineSummary } from '@/lib/operatorx/roofline-summary';
 
 import { EmptyChart } from '../charts/empty';
-import { OpxChart, esc, HardwareLegend, tooltipHtml } from '../charts/kit';
+import { OpxChart, HardwareLegend } from '../charts/kit';
 import { formatCompact } from '../charts/scales';
 import { hardwareLabel, peakBandwidthTBs, peakTflops } from '../compare/hardware';
 import { type RooflineBound, rooflineBound, ridgeShare } from '../compare/roofline-bound';
 import type { ComparisonModel } from '../compare/model';
-import { originRows } from '../compare/slices';
+import { originText } from '../compare/slices';
 import type { VizDefinition } from './types';
 import { RooflineBars } from './roofline-bars';
 
@@ -35,7 +36,12 @@ const STRINGS = {
     shareAxis: 'Share of peak compute (%)',
     tflopsAxis: 'Achieved TFLOPS',
     share: (pct: string, what: 'compute' | 'bandwidth') => ` · ${pct}% of peak ${what}`,
-    inspect: 'Click for kernel timeline',
+    effective: (ai: string) => ` · ${ai} effective`,
+    stage: { compute: 'compute', memory: 'memory', link: 'link' },
+    bound: (stage: string) => `${stage}-bound`,
+    ofRoofline: (pct: string) => `${pct}% of roofline`,
+    listSeparator: ', ',
+    aside: (text: string) => ` (${text})`,
   },
   zh: {
     sharedOnly: '仅共同用例',
@@ -48,7 +54,12 @@ const STRINGS = {
     tflopsAxis: '实测 TFLOPS',
     share: (pct: string, what: 'compute' | 'bandwidth') =>
       ` · ${what === 'compute' ? '计算' : '带宽'}峰值的 ${pct}%`,
-    inspect: '点击查看 kernel 时间线',
+    effective: (ai: string) => ` · 有效 ${ai}`,
+    stage: { compute: '计算', memory: '访存', link: '互联' },
+    bound: (stage: string) => `${stage}受限`,
+    ofRoofline: (pct: string) => `达到 roofline 的 ${pct}%`,
+    listSeparator: '，',
+    aside: (text: string) => `（${text}）`,
   },
 };
 
@@ -67,19 +78,13 @@ const SHARED = 'shared';
 const ratio = (v: number) => String(Number(v.toPrecision(2)));
 
 /** `37% of roofline (88 µs · compute 41%, memory 59%)`. */
-function boundRow(b: RooflineBound, us: number): string {
-  const parts = (
-    [
-      ['compute', b.compute],
-      ['memory', b.memory],
-      ['link', b.link],
-    ] as const
-  ).filter(([, t]) => t > 0);
+function boundText(b: RooflineBound, us: number, strings: Strings): string {
+  const parts = (['compute', 'memory', 'link'] as const).filter((stage) => b[stage] > 0);
   const split =
     parts.length > 1
-      ? ` · ${parts.map(([name, t]) => `${name} ${ratio((t / b.us) * 100)}%`).join(', ')}`
-      : ` · ${parts[0]?.[0] ?? 'compute'}-bound`;
-  return `<strong>${ratio((b.us / us) * 100)}% of roofline</strong> (${ratio(b.us)} µs${split})`;
+      ? ` · ${parts.map((stage) => `${strings.stage[stage]} ${ratio((b[stage] / b.us) * 100)}%`).join(strings.listSeparator)}`
+      : ` · ${strings.bound(strings.stage[parts[0] ?? 'compute'])}`;
+  return `${strings.ofRoofline(ratio((b.us / us) * 100))}${strings.aside(`${ratio(b.us)} µs${split}`)}`;
 }
 
 export function Roofline({
@@ -290,18 +295,22 @@ export function Roofline({
                 const bw = peakBandwidthTBs(p.hw);
                 const c = view.cases[p.i];
                 const tbs = c.bytes! / (p.us * 1e6);
-                return tooltipHtml({
+                return chartHoverCard({
                   title: hardwareLabel(p.hw),
+                  subtitle: `${c.shape} · ${c.precision}`,
                   color: model.colors[p.hw],
-                  rows: [
-                    esc(`${view.cases[p.i].shape} · ${view.cases[p.i].precision}`),
-                    ...originRows(view, p.i, locale),
-                    `<strong>${p.tflops.toFixed(1)} TFLOPS</strong>${share(p.tflops, peak, 'compute')}`,
-                    `<strong>${tbs.toFixed(2)} TB/s</strong>${share(tbs, bw, 'bandwidth')}`,
-                    `${(c.flops! / c.bytes!).toFixed(0)} FLOP/byte${composite ? ` · ${p.ai.toFixed(0)} effective` : ''}`,
-                    ...(p.bound ? [boundRow(p.bound, p.us)] : []),
+                  metrics: [
+                    {
+                      value: p.tflops.toFixed(1),
+                      label: `TFLOPS${share(p.tflops, peak, 'compute')}`,
+                    },
+                    { value: tbs.toFixed(2), label: `TB/s${share(tbs, bw, 'bandwidth')}` },
                   ],
-                  footer: strings.inspect,
+                  summary: [
+                    originText(view, p.i, locale),
+                    `${(c.flops! / c.bytes!).toFixed(0)} FLOP/byte${composite ? strings.effective(p.ai.toFixed(0)) : ''}`,
+                    ...(p.bound ? [boundText(p.bound, p.us, strings)] : []),
+                  ].join(' · '),
                 });
               },
             }}

@@ -7,7 +7,7 @@ import { select, type Selection, type ScaleLinear, type ScaleBand } from 'd3';
 
 import { contrastColors } from '@/lib/d3-chart/contrast-colors';
 import { measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
-import { chartTooltipShell, chartTooltipTitle } from '@/lib/d3-chart/tooltip-shell';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { GPU_SPECS, GPU_CHART_METRICS } from '@/lib/catalog/gpu-specs';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -225,16 +225,13 @@ export function GpuSpecsBarChart({
   const tooltip = useMemo(
     () => ({
       rulerType: 'vertical' as const,
-      content: (d: ChartDatum) => {
-        const vendorColor = d.vendor === 'nvidia' ? NVIDIA_BAR_COLOR : AMD_BAR_COLOR;
-        const vendorLabel = d.vendor === 'nvidia' ? 'NVIDIA' : 'AMD';
-        return chartTooltipShell(
-          `${chartTooltipTitle(`${d.name} <span style="font-size: 10px; font-weight: 500; color: var(--muted-foreground);">${vendorLabel}</span>`, vendorColor)}
-          <div style="color: var(--muted-foreground); font-size: 11px;">
-            <strong>${metricLabel}${locale === 'zh' ? '：' : ':'}</strong> ${formatValue(d.value)} ${unit}
-          </div>`,
-        );
-      },
+      content: (d: ChartDatum) =>
+        chartHoverCard({
+          title: d.name,
+          subtitle: d.vendor === 'nvidia' ? 'NVIDIA' : 'AMD',
+          color: d.vendor === 'nvidia' ? NVIDIA_BAR_COLOR : AMD_BAR_COLOR,
+          metrics: [{ value: formatValue(d.value), label: xAxisLabel }],
+        }),
       getRulerX: (d: ChartDatum, xs: any) => (xs as ScaleLinear<number, number>)(d.value),
       getRulerY: (d: ChartDatum, ys: any) => {
         const bandScale = ys as ScaleBand<string>;
@@ -248,7 +245,7 @@ export function GpuSpecsBarChart({
       },
       attachToLayer: 0,
     }),
-    [locale, metric, metricLabel, unit],
+    [xAxisLabel],
   );
 
   const layers = useMemo(() => [barLayer, labelLayer], [barLayer, labelLayer]);

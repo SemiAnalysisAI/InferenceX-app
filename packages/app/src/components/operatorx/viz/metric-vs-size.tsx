@@ -6,14 +6,15 @@ import { useMemo, useState } from 'react';
 
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { track } from '@/lib/analytics/analytics';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 import { EmptyChart } from '../charts/empty';
-import { OpxChart, esc, HardwareLegend, tooltipHtml } from '../charts/kit';
+import { OpxChart, HardwareLegend } from '../charts/kit';
 import { formatCompact, valueScale } from '../charts/scales';
 import { hardwareLabel } from '../compare/hardware';
 import type { ComparisonModel } from '../compare/model';
-import { originRows, rankedSlices } from '../compare/slices';
+import { originText, rankedSlices } from '../compare/slices';
 import type { VizDefinition } from './types';
 
 const STRINGS = {
@@ -22,14 +23,12 @@ const STRINGS = {
     tokens: 'Tokens',
     shape: 'Shape',
     axis: (label: string, unit: string) => `${label} (${unit})`,
-    inspect: 'Click for kernel timeline',
   },
   zh: {
     empty: '没有包含多个尺寸的形状',
     tokens: 'Token 数',
     shape: '形状',
     axis: (label: string, unit: string) => `${label}（${unit}）`,
-    inspect: '点击查看 kernel 时间线',
   },
 };
 
@@ -143,15 +142,15 @@ function MetricVsSize({ model }: { model: ComparisonModel }) {
           rulerType: 'crosshair',
           attachToLayer: 1,
           content: (p) =>
-            tooltipHtml({
+            chartHoverCard({
               title: hardwareLabel(p.hw),
+              subtitle: view.cases[p.i].shape,
               color: model.colors[p.hw],
-              rows: [
-                esc(view.cases[p.i].shape),
-                ...originRows(view, p.i, locale),
-                `<strong>${metric.format(p.y)}</strong>`,
+              metrics: [
+                { value: metric.format(p.y), label: metric.label[locale] },
+                { value: formatCompact(p.x), label: strings.tokens },
               ],
-              footer: strings.inspect,
+              summary: originText(view, p.i, locale),
             }),
           getRulerX: (p, s) => (s as d3.ScaleLogarithmic<number, number>)(p.x),
           getRulerY: (p, s) => s(p.y),

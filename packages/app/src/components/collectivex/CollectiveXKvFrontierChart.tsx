@@ -4,11 +4,8 @@ import * as d3 from 'd3';
 import { useMemo } from 'react';
 
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
-import {
-  chartTooltipDismiss,
-  chartTooltipShell,
-  chartTooltipTitle,
-} from '@/lib/d3-chart/tooltip-shell';
+import { ChartPointDetails } from '@/components/ui/chart-point-details';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 import {
@@ -42,12 +39,11 @@ const STRINGS = {
     xAxis: (logScale: boolean) => `Sequence length (ISL tokens${logScale ? ', log' : ''})`,
     yAxis: (op: CollectiveXKvFrontierSelection['op'], logScale: boolean) =>
       `Aggregate ${op} bandwidth at p50 (GB/s${logScale ? ', log' : ''})`,
-    dismiss: 'Click elsewhere to dismiss',
     skuFrontier: 'SKU-wide best at this ISL',
     backendFrontier: 'backend best at this ISL',
     dominated: 'below the envelope',
-    pointContext: (row: CollectiveXKvFrontierPoint['row'], tier: string) =>
-      `${row.op} · batch ${row.batch} · ISL ${row.isl.toLocaleString('en-US')} · <strong>${tier}</strong>`,
+    pointContext: (row: CollectiveXKvFrontierPoint['row']) =>
+      `${row.op} · batch ${row.batch} · ISL ${row.isl.toLocaleString('en-US')}`,
     pointMetrics: (point: CollectiveXKvFrontierPoint) => {
       const aggregate = `Aggregate ${point.y.toFixed(point.y >= 100 ? 0 : 2)} GB/s`;
       const req = point.row.request_ms;
@@ -69,12 +65,11 @@ const STRINGS = {
     xAxis: (logScale: boolean) => `序列长度（ISL token${logScale ? '，对数' : ''}）`,
     yAxis: (op: CollectiveXKvFrontierSelection['op'], logScale: boolean) =>
       `p50 聚合 ${op} 带宽（GB/s${logScale ? '，对数' : ''}）`,
-    dismiss: '点击其他位置关闭',
     skuFrontier: '该 ISL 下 SKU 级最优',
     backendFrontier: '该 ISL 下后端最优',
     dominated: '低于包络线',
-    pointContext: (row: CollectiveXKvFrontierPoint['row'], tier: string) =>
-      `${row.op} · batch ${row.batch} · ISL ${row.isl.toLocaleString('en-US')} · <strong>${tier}</strong>`,
+    pointContext: (row: CollectiveXKvFrontierPoint['row']) =>
+      `${row.op} · batch ${row.batch} · ISL ${row.isl.toLocaleString('en-US')}`,
     pointMetrics: (point: CollectiveXKvFrontierPoint) => {
       const aggregate = `聚合带宽 ${point.y.toFixed(point.y >= 100 ? 0 : 2)} GB/s`;
       const req = point.row.request_ms;
@@ -104,15 +99,6 @@ function formatCompact(value: number): string {
   if (value >= 10) return value.toFixed(0);
   if (value >= 1) return value.toFixed(1);
   return value.toFixed(2);
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
 }
 
 export function CollectiveXKvFrontierChart({
@@ -184,6 +170,47 @@ export function CollectiveXKvFrontierChart({
       </div>
     ) : undefined;
 
+  const describe = (point: CollectiveXKvFrontierPoint) => {
+    const { row } = point;
+    const tier = point.onSkuFrontier
+      ? strings.skuFrontier
+      : point.onSeriesFrontier
+        ? strings.backendFrontier
+        : strings.dominated;
+    const ceilingAtIsl = showWireCeilings
+      ? ceilings.get(point.seriesId)?.find((ceiling) => ceiling.x === row.isl)
+      : undefined;
+    const fraction = ceilingAtIsl && ceilingAtIsl.y > 0 ? point.y / ceilingAtIsl.y : null;
+    const verify = strings.verify(row.verify_passed);
+    return {
+      title: point.seriesLabel,
+      subtitle: tier,
+      color: colors[point.colorKey] ?? '#888',
+      warning: row.verify_passed ? undefined : verify,
+      metrics: [
+        {
+          value: point.y.toFixed(point.y >= 100 ? 0 : 2),
+          label: strings.yAxis(selection.op, false),
+        },
+      ],
+      summary: strings.pointContext(row),
+      notes: [
+        strings.pointContext(row),
+        strings.pointMetrics(point),
+        strings.latency(point),
+        ...(ceilingAtIsl && fraction !== null
+          ? [
+              strings.ceiling(
+                ceilingAtIsl.y,
+                fraction < 0.001 ? '<0.1%' : `${(fraction * 100).toFixed(1)}%`,
+              ),
+            ]
+          : []),
+        verify,
+      ],
+    };
+  };
+
   return (
     <D3Chart<CollectiveXKvFrontierPoint>
       chartId={chartId}
@@ -252,33 +279,36 @@ export function CollectiveXKvFrontierChart({
         rulerType: 'crosshair',
         attachToLayer: 1,
         content: (point, isPinned) => {
-          const color = colors[point.colorKey] ?? '#888';
-          const { row } = point;
-          const tier = point.onSkuFrontier
-            ? strings.skuFrontier
-            : point.onSeriesFrontier
-              ? strings.backendFrontier
-              : strings.dominated;
-          const ceilingAtIsl = showWireCeilings
-            ? ceilings.get(point.seriesId)?.find((ceiling) => ceiling.x === row.isl)
-            : undefined;
-          let ceilingLine = '';
-          if (ceilingAtIsl && ceilingAtIsl.y > 0) {
-            const fraction = point.y / ceilingAtIsl.y;
-            const share = fraction < 0.001 ? '<0.1%' : `${(fraction * 100).toFixed(1)}%`;
-            ceilingLine = `<div class="text-muted-foreground">${strings.ceiling(ceilingAtIsl.y, share)}</div>`;
-          }
-          return chartTooltipShell(
-            `<div class="text-xs">
-            ${isPinned ? chartTooltipDismiss(strings.dismiss) : ''}
-            ${chartTooltipTitle(escapeHtml(point.seriesLabel), color)}
-            <div>${strings.pointContext(row, tier)}</div>
-            <div>${strings.pointMetrics(point)}</div>
-            <div class="text-muted-foreground">${strings.latency(point)}</div>
-            ${ceilingLine}
-            <div class="text-muted-foreground">${strings.verify(row.verify_passed)}</div>
-          </div>`,
-            { pinned: isPinned, minWidth: 230, maxWidth: 380 },
+          const card = describe(point);
+          return chartHoverCard(
+            {
+              title: card.title,
+              subtitle: card.subtitle,
+              color: card.color,
+              warning: card.warning,
+              metrics: card.metrics,
+              summary: card.summary,
+            },
+            { pinned: isPinned },
+          );
+        },
+        details: (point, _isOverlay, close) => {
+          const card = describe(point);
+          return (
+            <ChartPointDetails
+              title={card.title}
+              subtitle={card.subtitle}
+              color={card.color}
+              warning={card.warning}
+              metrics={card.metrics}
+              onClose={close}
+            >
+              {card.notes.map((note) => (
+                <p key={note} className="mt-2 text-muted-foreground">
+                  {note}
+                </p>
+              ))}
+            </ChartPointDetails>
           );
         },
         getRulerX: (point, scale) =>

@@ -21,6 +21,7 @@ import type {
 import { compareSplits, parallelLabel } from '@semianalysisai/inferencex-db/operatorx/parallel';
 import { BLOCK_COLORS } from '@/components/inference/ui/model-architecture-diagram-renderer';
 import { Card } from '@/components/ui/card';
+import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
 import {
   Dialog,
   DialogContent,
@@ -85,6 +86,53 @@ import { DEFAULT_MODEL, ModelViewLoading } from './shell';
 
 const PRECISIONS: ComputePrecision[] = ['fp4', 'fp8', 'bf16'];
 const ROW_GRID = 'grid-cols-[minmax(16rem,28rem)_minmax(0,1fr)]';
+
+const STRINGS = {
+  en: {
+    loading: 'Loading results…',
+    empty: 'No results yet',
+    model: 'Model',
+    devices: 'Devices',
+    metric: 'Metric',
+    precision: 'Precision',
+    computePrecision: 'Compute precision',
+    oneDevice: '1 GPU',
+    split: (label: string, cases: number) => `${label} (${cases})`,
+    metricOption: (label: string, unit: string) => `${label} (${unit})`,
+    tokens: 'Tokens',
+    or: 'or',
+    shapes: (n: number) => `${n.toLocaleString()} ${n === 1 ? 'shape' : 'shapes'}`,
+    atSize: (shapes: string, tokens: string, metric: string) =>
+      `${shapes} at ≈ ${tokens} tokens · median ${metric.toLowerCase()}`,
+    measured: (n: number) => `${n} measured`,
+    noResultsAtSize: 'No results at this size',
+    noShapesAtSize: 'No shapes at this size',
+    fold: 'Fold into the fused op',
+    unfold: 'Unfold into the ops it runs',
+  },
+  zh: {
+    loading: '正在加载结果…',
+    empty: '暂无结果',
+    model: '模型',
+    devices: '设备',
+    metric: '指标',
+    precision: '精度',
+    computePrecision: '计算精度',
+    oneDevice: '单 GPU',
+    split: (label: string, cases: number) => `${label}（${cases}）`,
+    metricOption: (label: string, unit: string) => `${label}（${unit}）`,
+    tokens: 'Token 数',
+    or: '或',
+    shapes: (n: number) => `${n.toLocaleString()} 个形状`,
+    atSize: (shapes: string, tokens: string, metric: string) =>
+      `≈ ${tokens} token 时共 ${shapes} · ${metric}中位数`,
+    measured: (n: number) => `${n} 个已实测`,
+    noResultsAtSize: '此尺寸下暂无结果',
+    noShapesAtSize: '此尺寸下没有形状',
+    fold: '折叠为融合 op',
+    unfold: '展开为其运行的各个 op',
+  },
+};
 
 function setParam(key: string, value: string) {
   const params = new URLSearchParams(window.location.search);
@@ -299,29 +347,20 @@ function SlotTooltip({ data, tokens, sweep }: { data: SlotData; tokens: number; 
     );
   const rows = gpuValues(model, atSize);
   return (
-    <div className="space-y-1.5 text-xs">
-      <div className="font-semibold">
-        {slot.label} <span className="font-normal text-muted-foreground">· {block.label}</span>
-      </div>
-      <div className="text-muted-foreground">
-        {atSize.length.toLocaleString()} {atSize.length === 1 ? 'shape' : 'shapes'} at ≈{' '}
-        {formatTokens(tokens)} tokens · median {model.metric.label.toLowerCase()}
-      </div>
-      <ul className="space-y-0.5">
-        {rows.map((r) => (
-          <li key={r.hardware} className="flex items-center gap-2 tabular-nums">
-            <span
-              className="inline-block size-2 rounded-full"
-              style={{ background: model.colors[r.hardware] }}
-            />
-            <span className="w-14">{hardwareLabel(r.hardware)}</span>
-            <strong>{model.metric.format(r.value)}</strong>
-            <span className="text-muted-foreground">{r.measured} measured</span>
-          </li>
-        ))}
-      </ul>
-      <div className="text-muted-foreground">Click for every shape and its kernel timeline</div>
-    </div>
+    <ChartHoverCardBody
+      title={diagramText(slot.label, locale)}
+      subtitle={diagramText(block.label, locale)}
+      metrics={rows.map((r) => ({
+        value: model.metric.format(r.value),
+        label: `${hardwareLabel(r.hardware)} · ${strings.measured(r.measured)}`,
+        color: model.colors[r.hardware],
+      }))}
+      summary={strings.atSize(
+        strings.shapes(atSize.length),
+        formatTokens(tokens),
+        model.metric.label[locale],
+      )}
+    />
   );
 }
 
@@ -539,18 +578,54 @@ const SlotRow = memo(
         ) : (
           target
         )}
-        <div
-          className="pointer-events-none relative z-[2] flex items-center"
-          style={{ gridColumn: 2, gridRow: gridRow(data.bar, data.bar) }}
-        >
-          {measured && data.model && range ? (
-            <div className="w-full">
-              <OpSweep
-                model={data.model}
-                series={gpuSweep(data.model, data.indices)}
-                range={range}
-                empty="No results on these GPUs"
-              />
+      </div>
+      {slots.map((data) => {
+        const measured = data.indices.length > 0;
+        const values = data.model ? gpuValues(data.model, data.atSize) : [];
+        const target = (
+          <button
+            type="button"
+            disabled={!measured}
+            onClick={() => onOpen(data)}
+            onMouseEnter={() => setHovered(data.slot.id)}
+            onMouseLeave={() => setHovered(null)}
+            onFocus={() => setHovered(data.slot.id)}
+            onBlur={() => setHovered(null)}
+            className={`rounded-md ${measured ? 'cursor-pointer' : 'cursor-default'} ${hovered === data.slot.id && measured ? 'bg-muted/60' : ''}`}
+            style={{ gridColumn: '1 / -1', gridRow: gridRow(data.first, data.last) }}
+            aria-label={diagramText(data.slot.label, locale)}
+            data-testid={`operatorx-model-slot-${data.slot.id}`}
+          />
+        );
+        return (
+          <div key={data.slot.id} className="contents">
+            {measured ? (
+              <TooltipRoot delayDuration={150}>
+                <TooltipTrigger asChild>{target}</TooltipTrigger>
+                <TooltipContent side="top" align="center">
+                  <SlotTooltip data={data} tokens={tokens} />
+                </TooltipContent>
+              </TooltipRoot>
+            ) : (
+              target
+            )}
+            <div
+              className="pointer-events-none relative z-[2] flex items-center"
+              style={{ gridColumn: 2, gridRow: gridRow(data.bar, data.bar) }}
+            >
+              {measured && data.model ? (
+                <div className="w-full">
+                  <OpBars
+                    model={data.model}
+                    values={values}
+                    empty={
+                      data.atSize.length > 0 ? strings.noResultsAtSize : strings.noShapesAtSize
+                    }
+                  />
+                </div>
+              ) : (
+                <span className="text-xs text-muted-foreground">{strings.empty}</span>
+              )}
             </div>
           ) : measured && data.model ? (
             <div className="w-full">

@@ -10,7 +10,7 @@ import { D3Chart } from '@/lib/d3-chart/D3Chart';
 import type { LayerConfig } from '@/lib/d3-chart/D3Chart/types';
 import type { RadarDot } from '@/lib/d3-chart/layers/radar';
 import { useLocale } from '@/lib/i18n/use-locale';
-import { chartTooltipShell, chartTooltipTitle } from '@/lib/d3-chart/tooltip-shell';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import ChartLegend from '@/components/ui/chart-legend';
 import { EmptyState } from '@/components/ui/empty-state';
 
@@ -156,13 +156,20 @@ export function GpuSpecsRadarChart({ caption }: GpuSpecsRadarChartProps) {
         const { item, axisIndex } = dot;
         const metric = metrics[axisIndex];
         const rawValue = metric.getValue(item.gpu);
-        const vendorLabel = item.gpu.vendor === 'nvidia' ? 'NVIDIA' : 'AMD';
-        return chartTooltipShell(
-          `${chartTooltipTitle(`${item.gpu.name} <span style="font-size: 10px; font-weight: 500; color: var(--muted-foreground);">${vendorLabel}</span>`, dot.color)}
-          <div style="color: var(--muted-foreground); font-size: 11px;">
-            <strong>${locale === 'zh' ? metric.labelZh : metric.label}${locale === 'zh' ? '：' : ':'}</strong> ${rawValue === null ? '—' : rawValue.toLocaleString(locale === 'zh' ? 'zh-CN' : 'en-US')} ${locale === 'zh' ? metric.unitZh : metric.unit}
-          </div>`,
-        );
+        const zh = locale === 'zh';
+        return chartHoverCard({
+          title: item.gpu.name,
+          subtitle: item.gpu.vendor === 'nvidia' ? 'NVIDIA' : 'AMD',
+          color: dot.color,
+          metrics: [
+            {
+              value: rawValue === null ? '—' : rawValue.toLocaleString(zh ? 'zh-CN' : 'en-US'),
+              label: zh
+                ? `${metric.labelZh}（${metric.unitZh}）`
+                : `${metric.label} (${metric.unit})`,
+            },
+          ],
+        });
       },
       onHoverStart: (sel: d3.Selection<any, RadarDot<NormalizedGpu>, any, any>) => {
         sel.attr('r', 5.5);

@@ -18,11 +18,7 @@ import {
 } from '@/components/ui/select';
 import { track } from '@/lib/analytics/analytics';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
-import {
-  chartTooltipDismiss,
-  chartTooltipShell,
-  chartTooltipTitle,
-} from '@/lib/d3-chart/tooltip-shell';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { Locale } from '@/lib/i18n/i18n';
 
@@ -73,12 +69,12 @@ const STRINGS = {
     driver: 'Driver',
     container: 'Container',
     instructions: 'Shift+Scroll to zoom · Drag to pan · Double-click to reset',
-    dismiss: 'Click elsewhere to dismiss',
     tooltipSize: 'Size',
     tooltipLatency: 'Latency',
     tooltipBandwidth: 'Bandwidth',
     tooltipMbu: 'MBU',
     tooltipPeak: 'Bandwidth reference',
+    withUnit: (label: string, unit: string) => `${label} (${unit})`,
     aria: 'ubenchX device-memory copy bandwidth charts',
   },
   zh: {
@@ -107,12 +103,12 @@ const STRINGS = {
     driver: '驱动',
     container: '容器',
     instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置',
-    dismiss: '点击其他区域关闭',
     tooltipSize: '大小',
     tooltipLatency: '延迟',
     tooltipBandwidth: '带宽',
     tooltipMbu: 'MBU',
     tooltipPeak: '带宽参考值',
+    withUnit: (label: string, unit: string) => `${label}（${unit}）`,
     aria: 'ubenchX 显存拷贝带宽图表',
   },
 } as const;
@@ -164,24 +160,33 @@ function paddedDomain(values: number[]): [number, number] {
   return min === max ? [min / 2, max * 2] : [min / 1.2, max * 1.2];
 }
 
-const tooltipLine = (label: string, value: string) =>
-  `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${label}:</strong> ${value}</div>`;
-
 function formatTooltip(
   point: ChartPoint,
   isPinned: boolean,
   t: (typeof STRINGS)[Locale],
   colors: Record<string, string>,
 ): string {
-  const color = colors[point.gpuKey] ?? '#888';
-  return chartTooltipShell(
-    `${isPinned ? chartTooltipDismiss(t.dismiss) : ''}
-      ${chartTooltipTitle(point.gpuKey, color)}
-      ${tooltipLine(t.tooltipSize, point.sizeLabel)}
-      ${tooltipLine(UBENCHX_RUNS[point.gpuKey].metadata.protocol ? t.amortized : t.tooltipLatency, `${point.timeMs.toFixed(4)} ms`)}
-      ${tooltipLine(t.tooltipBandwidth, `${(point.bandwidthGbps / 1000).toFixed(3)} TB/s`)}
-      ${tooltipLine(t.tooltipMbu, `${point.mbuPercent.toFixed(1)}%`)}
-      ${tooltipLine(t.tooltipPeak, `${point.peakBandwidthGbps / 1000} TB/s`)}`,
+  return chartHoverCard(
+    {
+      title: point.gpuKey,
+      subtitle: point.sizeLabel,
+      color: colors[point.gpuKey] ?? '#888',
+      metrics: [
+        {
+          value: point.timeMs.toFixed(4),
+          label: t.withUnit(
+            UBENCHX_RUNS[point.gpuKey].metadata.protocol ? t.amortized : t.tooltipLatency,
+            'ms',
+          ),
+        },
+        {
+          value: (point.bandwidthGbps / 1000).toFixed(3),
+          label: t.withUnit(t.tooltipBandwidth, 'TB/s'),
+        },
+        { value: `${point.mbuPercent.toFixed(1)}%`, label: t.tooltipMbu },
+      ],
+      summary: `${t.tooltipPeak} ${point.peakBandwidthGbps / 1000} TB/s`,
+    },
     { pinned: isPinned },
   );
 }

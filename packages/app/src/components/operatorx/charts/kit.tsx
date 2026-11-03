@@ -4,8 +4,6 @@ import { useId, useRef, useState } from 'react';
 
 import ChartLegend from '@/components/ui/chart-legend';
 import { D3Chart, type D3ChartHandle, type D3ChartProps } from '@/lib/d3-chart/D3Chart';
-import { chartTooltipShell, chartTooltipTitle } from '@/lib/d3-chart/tooltip-shell';
-import { escapeHtml } from '@/lib/shared/utils';
 
 import { hardwareLabel } from '../compare/hardware';
 import type { ComparisonModel } from '../compare/model';
@@ -55,29 +53,6 @@ export function OpxChart<T>({
     </div>
   );
 }
-
-export function tooltipHtml({
-  title,
-  color,
-  rows,
-  footer,
-}: {
-  title: string;
-  color?: string;
-  rows: string[];
-  footer?: string;
-}): string {
-  return chartTooltipShell(
-    `<div class="text-xs">
-    ${chartTooltipTitle(escapeHtml(title), color)}
-    ${rows.map((r) => `<div>${r}</div>`).join('')}
-    ${footer ? `<div class="mt-1 text-muted-foreground">${escapeHtml(footer)}</div>` : ''}
-  </div>`,
-    { minWidth: 180, maxWidth: 360 },
-  );
-}
-
-export const esc = escapeHtml;
 
 export function HardwareLegend({
   model,

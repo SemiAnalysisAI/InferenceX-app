@@ -22,6 +22,7 @@ import { SectionHeader } from '@/components/agentic-workload-explorer/section-he
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 import { ChartActions, Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
+import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
 import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Stat } from '@/components/ui/stat';
@@ -2332,32 +2333,21 @@ function PieChartSection({
           </div>
 
           {hoveredSlice && (
-            <FloatingTooltip
-              x={tooltipPos.x}
-              y={tooltipPos.y}
-              offset={16}
-              className="max-w-60 text-2xs font-mono"
-            >
-              <div className="font-medium mb-1">
-                {hoveredSlice.label}: {hoveredSlice.count.toLocaleString()} (
-                {(hoveredSlice.fraction * 100).toFixed(1)}%)
-              </div>
-              {hoveredSlice.items && (
-                <div className="space-y-0.5 border-t border-border/20 pt-1 mt-1">
-                  {hoveredSlice.items.map((item) => (
-                    <div
-                      key={item.toolName}
-                      className="flex justify-between gap-3 text-muted-foreground"
-                    >
-                      <span>{item.toolName}</span>
-                      <span className="tabular-nums">
-                        {Number(item.count).toLocaleString()} (
-                        {((Number(item.count) / totalToolCalls) * 100).toFixed(2)}%)
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
+            <FloatingTooltip x={tooltipPos.x} y={tooltipPos.y} offset={16}>
+              <ChartHoverCardBody
+                title={hoveredSlice.label}
+                color={hoveredSlice.color}
+                metrics={[
+                  { value: hoveredSlice.count.toLocaleString(), label: t.callsUnit },
+                  { value: `${(hoveredSlice.fraction * 100).toFixed(1)}%`, label: t.colShare },
+                ]}
+                summary={hoveredSlice.items
+                  ?.map(
+                    (item) =>
+                      `${item.toolName} ${Number(item.count).toLocaleString()} (${((Number(item.count) / totalToolCalls) * 100).toFixed(2)}%)`,
+                  )
+                  .join(' · ')}
+              />
             </FloatingTooltip>
           )}
         </div>

@@ -3,9 +3,10 @@
 import { color, type ScaleBand, type ScaleContinuousNumeric } from 'd3';
 
 import type { CustomLayerConfig } from '@/lib/d3-chart/D3Chart';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { RooflineSummary, RooflineSummaryBar } from '@/lib/operatorx/roofline-summary';
-import { OpxChart, esc, tooltipHtml } from '../charts/kit';
+import { OpxChart } from '../charts/kit';
 import { EmptyChart } from '../charts/empty';
 import { hardwareLabel } from '../compare/hardware';
 import type { ComparisonModel } from '../compare/model';
@@ -23,7 +24,6 @@ const STRINGS = {
     cases: 'cases',
     absolute: 'Achieved throughput (TFLOPS)',
     normalized: 'Share of peak compute (%)',
-    inspect: 'Click for the best case’s kernel timeline',
   },
   zh: {
     title: '中位数（填充）与最佳值（轮廓）',
@@ -37,7 +37,6 @@ const STRINGS = {
     cases: '个用例',
     absolute: '实测吞吐量（TFLOPS）',
     normalized: '计算峰值占比（%）',
-    inspect: '点击查看最佳用例的 kernel 时间线',
   },
 };
 
@@ -214,15 +213,14 @@ export function RooflineBars({
             attachToLayer: 0,
             rulerType: 'none',
             content: (d) =>
-              tooltipHtml({
+              chartHoverCard({
                 title: hardwareLabel(d.hardware),
                 color: model.colors[d.hardware],
-                rows: [
-                  esc(`${strings.median}: ${format(d.median)}`),
-                  esc(`${strings.best}: ${format(d.best)}`),
-                  esc(`${d.n} ${strings.cases}`),
+                metrics: [
+                  { value: format(d.median), label: strings.median },
+                  { value: format(d.best), label: strings.best },
                 ],
-                footer: strings.inspect,
+                summary: `${d.n} ${strings.cases}`,
               }),
           }}
         />

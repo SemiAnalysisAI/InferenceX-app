@@ -3,6 +3,7 @@
 import { useMemo, useState, useRef, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
+import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
 import {
   formatDuration,
   formatInteractivity,
@@ -743,137 +744,111 @@ export function TokenFlamegraph({ rows, sessionId }: { rows: StatRow[]; sessionI
         </svg>
 
         {tooltip && (
-          <FloatingTooltip x={tooltip.x} y={tooltip.y} placement="above" className="space-y-1">
-            <div className="text-2xs font-mono font-medium text-foreground">{tooltip.label}</div>
-            {tooltip.isClassifierLike && (
-              <div className="text-xs text-warning font-medium">{t.classifierLikeSignature}</div>
-            )}
-            <div className="text-3xs font-mono text-muted-foreground space-y-0.5">
-              {tooltip.mode === 'ratio' ? (
-                <>
-                  {tooltip.ratio === null ? (
-                    <div>{t.noHashChain}</div>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="w-2 h-2 rounded-sm inline-block"
-                        style={{ backgroundColor: ratioColor(tooltip.ratio) }}
-                      />
-                      <span className="text-foreground">
-                        {t.hashProviderLabel}{' '}
-                        <span className="font-medium">{tooltip.ratio.toFixed(3)}</span>{' '}
-                        <span className="text-muted-foreground">
-                          ({((tooltip.ratio - 1) * 100).toFixed(1)}%)
-                        </span>
-                      </span>
-                    </div>
-                  )}
-                  {tooltip.hashTokenCount !== null && (
-                    <div>
-                      {t.hashTokens} {formatNumber(tooltip.hashTokenCount)}
-                    </div>
-                  )}
-                  {tooltip.providerInputTotal !== null && (
-                    <div>
-                      {t.providerInput} {formatNumber(tooltip.providerInputTotal)}{' '}
-                      <span className="text-muted-foreground">{t.providerInputDetail}</span>
-                    </div>
-                  )}
-                  {tooltip.hashBlocks !== null && (
-                    <div>
-                      {t.hashBlocksLabel} {formatNumber(tooltip.cachedHashBlocks ?? 0)} /{' '}
-                      {formatNumber(tooltip.hashBlocks)} {t.cachedSuffix}
-                    </div>
-                  )}
-                  <div className="pt-1 border-t border-border/20">
-                    {t.output} {formatNumber(tooltip.output)} &middot; ${tooltip.cost.toFixed(4)}
-                  </div>
-                </>
-              ) : (
-                <>
-                  {tooltip.mode === 'api' && (
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="w-2 h-2 rounded-sm inline-block"
-                        style={{ backgroundColor: COLORS.input }}
-                      />
-                      <span>
-                        {t.apiLegend.input}: {formatNumber(tooltip.input)}
-                      </span>
-                    </div>
-                  )}
-                  {tooltip.cacheRead > 0 && (
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="w-2 h-2 rounded-sm inline-block"
-                        style={{ backgroundColor: COLORS.cacheRead }}
-                      />
-                      <span>
-                        {tooltip.mode === 'hash' ? t.hashLegend.cacheRead : t.apiLegend.cacheRead}:{' '}
-                        {formatNumber(tooltip.cacheRead)}
-                      </span>
-                    </div>
-                  )}
-                  {tooltip.cacheWrite > 0 && (
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="w-2 h-2 rounded-sm inline-block"
-                        style={{ backgroundColor: COLORS.cacheWrite }}
-                      />
-                      <span>
-                        {tooltip.mode === 'hash' ? t.hashLegend.cacheWrite : t.apiLegend.cacheWrite}
-                        : {formatNumber(tooltip.cacheWrite)}
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="w-2 h-2 rounded-sm inline-block"
-                      style={{ backgroundColor: COLORS.output }}
-                    />
-                    <span>
-                      {t.output} {formatNumber(tooltip.output)}
-                    </span>
-                  </div>
-                  <div className="pt-1 border-t border-border/20">
-                    {t.total} {formatNumber(tooltip.total)} &middot; ${tooltip.cost.toFixed(4)}
-                  </div>
-                  {tooltip.mode === 'hash' && tooltip.hashBlocks !== null && (
-                    <div>
-                      {t.hashBlocksLabel} {formatNumber(tooltip.cachedHashBlocks ?? 0)} /{' '}
-                      {formatNumber(tooltip.hashBlocks)} {t.cachedSuffix}
-                      {tooltip.hashTokenCount !== null && (
-                        <>
-                          {' '}
-                          &middot; {t.hashTokens} {formatNumber(tooltip.hashTokenCount)}
-                        </>
-                      )}
-                    </div>
-                  )}
-                </>
-              )}
-              {(tooltip.ttftMs !== null || tooltip.tpotMs !== null) && (
-                <div>
-                  TTFT: {tooltip.ttftMs === null ? '—' : formatDuration(tooltip.ttftMs)} &middot;
-                  TPOT: {tooltip.tpotMs === null ? '—' : formatDuration(tooltip.tpotMs)}
-                  {tooltip.tpotMs !== null && <> &middot; {formatInteractivity(tooltip.tpotMs)}</>}
-                  {(() => {
-                    if (tooltip.mode !== 'api') return null;
+          <FloatingTooltip x={tooltip.x} y={tooltip.y} placement="above">
+            <ChartHoverCardBody
+              title={tooltip.label}
+              warning={tooltip.isClassifierLike ? t.classifierLikeSignature : undefined}
+              metrics={
+                tooltip.mode === 'ratio'
+                  ? tooltip.ratio === null
+                    ? []
+                    : [
+                        {
+                          value: tooltip.ratio.toFixed(3),
+                          label: `${t.hashProviderLabel} (${((tooltip.ratio - 1) * 100).toFixed(1)}%)`,
+                          color: ratioColor(tooltip.ratio),
+                        },
+                      ]
+                  : [
+                      ...(tooltip.mode === 'api'
+                        ? [
+                            {
+                              value: formatNumber(tooltip.input),
+                              label: t.apiLegend.input,
+                              color: COLORS.input,
+                            },
+                          ]
+                        : []),
+                      ...(tooltip.cacheRead > 0
+                        ? [
+                            {
+                              value: formatNumber(tooltip.cacheRead),
+                              label:
+                                tooltip.mode === 'hash'
+                                  ? t.hashLegend.cacheRead
+                                  : t.apiLegend.cacheRead,
+                              color: COLORS.cacheRead,
+                            },
+                          ]
+                        : []),
+                      ...(tooltip.cacheWrite > 0
+                        ? [
+                            {
+                              value: formatNumber(tooltip.cacheWrite),
+                              label:
+                                tooltip.mode === 'hash'
+                                  ? t.hashLegend.cacheWrite
+                                  : t.apiLegend.cacheWrite,
+                              color: COLORS.cacheWrite,
+                            },
+                          ]
+                        : []),
+                      {
+                        value: formatNumber(tooltip.output),
+                        label: t.output,
+                        color: COLORS.output,
+                      },
+                    ]
+              }
+              summary={(() => {
+                const parts: string[] = [];
+                if (tooltip.mode === 'ratio') {
+                  if (tooltip.ratio === null) parts.push(t.noHashChain);
+                  if (tooltip.hashTokenCount !== null)
+                    parts.push(`${t.hashTokens} ${formatNumber(tooltip.hashTokenCount)}`);
+                  if (tooltip.providerInputTotal !== null)
+                    parts.push(
+                      `${t.providerInput} ${formatNumber(tooltip.providerInputTotal)} ${t.providerInputDetail}`,
+                    );
+                  if (tooltip.hashBlocks !== null)
+                    parts.push(
+                      `${t.hashBlocksLabel} ${formatNumber(tooltip.cachedHashBlocks ?? 0)} / ${formatNumber(tooltip.hashBlocks)} ${t.cachedSuffix}`,
+                    );
+                  parts.push(
+                    `${t.output} ${formatNumber(tooltip.output)}`,
+                    `$${tooltip.cost.toFixed(4)}`,
+                  );
+                } else {
+                  parts.push(
+                    `${t.total} ${formatNumber(tooltip.total)}`,
+                    `$${tooltip.cost.toFixed(4)}`,
+                  );
+                  if (tooltip.mode === 'hash' && tooltip.hashBlocks !== null) {
+                    parts.push(
+                      `${t.hashBlocksLabel} ${formatNumber(tooltip.cachedHashBlocks ?? 0)} / ${formatNumber(tooltip.hashBlocks)} ${t.cachedSuffix}`,
+                    );
+                    if (tooltip.hashTokenCount !== null)
+                      parts.push(`${t.hashTokens} ${formatNumber(tooltip.hashTokenCount)}`);
+                  }
+                }
+                if (tooltip.ttftMs !== null || tooltip.tpotMs !== null) {
+                  parts.push(
+                    `TTFT: ${tooltip.ttftMs === null ? '—' : formatDuration(tooltip.ttftMs)}`,
+                    `TPOT: ${tooltip.tpotMs === null ? '—' : formatDuration(tooltip.tpotMs)}`,
+                  );
+                  if (tooltip.tpotMs !== null) parts.push(formatInteractivity(tooltip.tpotMs));
+                  if (tooltip.mode === 'api') {
                     const ps = computePrefillSpeed(
                       tooltip.cacheRead,
                       tooltip.cacheWrite,
                       tooltip.ttftMs,
                     );
-                    return ps === null ? null : (
-                      <>
-                        {' '}
-                        &middot; <span>{formatPrefillSpeed(ps)}</span>
-                      </>
-                    );
-                  })()}
-                </div>
-              )}
-            </div>
+                    if (ps !== null) parts.push(formatPrefillSpeed(ps));
+                  }
+                }
+                return parts.join(' · ');
+              })()}
+            />
           </FloatingTooltip>
         )}
       </div>

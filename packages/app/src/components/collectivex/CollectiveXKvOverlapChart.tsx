@@ -4,11 +4,7 @@ import * as d3 from 'd3';
 import { useMemo } from 'react';
 
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
-import {
-  chartTooltipDismiss,
-  chartTooltipShell,
-  chartTooltipTitle,
-} from '@/lib/d3-chart/tooltip-shell';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 import {
@@ -37,7 +33,6 @@ const STRINGS = {
     instructions: 'Shift+Scroll to zoom · Drag to pan · Double-click to reset',
     xAxis: 'Requests per burst (log)',
     yAxis: 'Aggregate bandwidth relative to batch 1 (log)',
-    dismiss: 'Click elsewhere to dismiss',
     pointContext: (row: CollectiveXKvChartPoint['row']) =>
       `${row.op} · batch ${row.batch} · ISL ${row.isl.toLocaleString('en-US')}`,
     pointMetrics: (point: CollectiveXKvChartPoint) =>
@@ -51,7 +46,6 @@ const STRINGS = {
     instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置',
     xAxis: '每次突发请求数（对数）',
     yAxis: '相对批大小 1 的聚合带宽（对数）',
-    dismiss: '点击其他位置关闭',
     pointContext: (row: CollectiveXKvChartPoint['row']) =>
       `${row.op} · batch ${row.batch} · ISL ${row.isl.toLocaleString('en-US')}`,
     pointMetrics: (point: CollectiveXKvChartPoint) =>
@@ -67,15 +61,6 @@ function paddedDomain(values: number[]): [number, number] {
   const min = d3.min(values) ?? 1;
   const max = d3.max(values) ?? 1;
   return min === max ? [min / 2, max * 2] : [min / 1.15, max * 1.15];
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
 }
 
 export function CollectiveXKvOverlapChart({
@@ -202,20 +187,22 @@ export function CollectiveXKvOverlapChart({
       tooltip={{
         rulerType: 'crosshair',
         attachToLayer: 1,
-        content: (point, isPinned) => {
-          const color = colors[point.colorKey] ?? '#888';
-          return chartTooltipShell(
-            `<div class="text-xs">
-            ${isPinned ? chartTooltipDismiss(strings.dismiss) : ''}
-            ${chartTooltipTitle(escapeHtml(point.seriesLabel), color)}
-            <div>${strings.pointContext(point.row)}</div>
-            <div>${strings.pointMetrics(point)}</div>
-            <div class="text-muted-foreground">${strings.latency(point.row)}</div>
-            <div class="text-muted-foreground">${strings.verify(point.row.verify_passed)}</div>
-          </div>`,
-            { pinned: isPinned, minWidth: 230, maxWidth: 380 },
-          );
-        },
+        content: (point, isPinned) =>
+          chartHoverCard(
+            {
+              title: point.seriesLabel,
+              subtitle: strings.pointContext(point.row),
+              color: colors[point.colorKey] ?? '#888',
+              warning: point.row.verify_passed ? undefined : strings.verify(false),
+              metrics: [{ value: `${point.y.toFixed(2)}x`, label: strings.yAxis }],
+              summary: [
+                strings.pointMetrics(point),
+                strings.latency(point.row),
+                strings.verify(point.row.verify_passed),
+              ].join(' · '),
+            },
+            { pinned: isPinned },
+          ),
         getRulerX: (point, scale) =>
           (scale as d3.ScaleLinear<number, number> | d3.ScaleLogarithmic<number, number>)(point.x),
         getRulerY: (point, scale) => scale(point.y),

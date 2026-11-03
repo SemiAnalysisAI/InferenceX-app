@@ -3,8 +3,7 @@
 import { useId, useMemo } from 'react';
 import type * as d3 from 'd3';
 import { D3Chart, type D3ChartProps, type RenderContext } from '@/lib/d3-chart/D3Chart';
-import { chartTooltipShell } from '@/lib/d3-chart/tooltip-shell';
-import { escapeHtml } from '@/lib/shared/utils';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
@@ -175,9 +174,15 @@ export function DistributionHistogram({
           selection.attr('opacity', opacityFor(bucket));
         },
         content: (b) =>
-          chartTooltipShell(
-            `<div class="text-xs">${escapeHtml(format(b.min))} – ${escapeHtml(format(b.max))}: ${b.entries.length} ${b.entries.length === 1 ? t.request : t.requests}</div>`,
-          ),
+          chartHoverCard({
+            title: `${format(b.min)} – ${format(b.max)}`,
+            metrics: [
+              {
+                value: b.entries.length.toLocaleString(),
+                label: b.entries.length === 1 ? t.request : t.requests,
+              },
+            ],
+          }),
         onPointClick: onBucketClick ? (b) => onBucketClick(indices.get(b)!) : undefined,
       },
       noDataOverlay:

@@ -11,6 +11,7 @@ import { useExplorerHref } from '@/hooks/agentic-workload-explorer/use-explorer-
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 import { Button } from '@/components/ui/button';
+import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
 import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import { SectionHeader } from '@/components/agentic-workload-explorer/section-header';
@@ -226,60 +227,35 @@ function TimelineTooltip({ data, t }: { data: TooltipData; t: Strings }) {
   const { row, bar } = data;
   return (
     <FloatingTooltip x={data.x} y={data.y}>
-      <div className="space-y-1 text-2xs font-mono">
-        <div className="flex items-center gap-2">
-          <span
-            className="inline-block w-2 h-2 rounded-sm"
-            style={{
-              backgroundColor: getAgentColor(row.agentType),
-            }}
-          />
-          <span className="font-medium text-foreground">{row.label}</span>
-        </div>
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <span
-            className="inline-block w-1.5 h-1.5 rounded-sm"
-            style={{ backgroundColor: getToolColor(bar.tool) }}
-          />
-          <span>{bar.tool}</span>
-          {bar.model && <span className="text-muted-foreground">({bar.model})</span>}
-        </div>
-        <div className="h-px bg-border/30 my-1" />
-        <div className="flex justify-between gap-4">
-          <span className="text-muted-foreground">{t.duration}</span>
-          <span>{formatDuration(bar.durationMs)}</span>
-        </div>
-        {bar.inputTokens !== null && bar.inputTokens > 0 && (
-          <div className="flex justify-between gap-4">
-            <span className="text-muted-foreground">{t.input}</span>
-            <span>{formatNumber(bar.inputTokens)}</span>
-          </div>
-        )}
-        {bar.outputTokens !== null && bar.outputTokens > 0 && (
-          <div className="flex justify-between gap-4">
-            <span className="text-muted-foreground">{t.output}</span>
-            <span>{formatNumber(bar.outputTokens)}</span>
-          </div>
-        )}
-        {bar.cacheRead !== null && bar.cacheRead > 0 && (
-          <div className="flex justify-between gap-4">
-            <span className="text-muted-foreground">{t.cacheRead}</span>
-            <span>{formatNumber(bar.cacheRead)}</span>
-          </div>
-        )}
-        {bar.cacheWrite !== null && bar.cacheWrite > 0 && (
-          <div className="flex justify-between gap-4">
-            <span className="text-muted-foreground">{t.cacheWrite}</span>
-            <span>{formatNumber(bar.cacheWrite)}</span>
-          </div>
-        )}
-        {bar.costUsd !== null && bar.costUsd > 0 && (
-          <div className="flex justify-between gap-4">
-            <span className="text-muted-foreground">{t.cost}</span>
-            <span>${bar.costUsd.toFixed(4)}</span>
-          </div>
-        )}
-      </div>
+      <ChartHoverCardBody
+        title={row.label}
+        subtitle={bar.model ? `${bar.tool} (${bar.model})` : bar.tool}
+        color={getAgentColor(row.agentType)}
+        metrics={[
+          {
+            value: formatDuration(bar.durationMs),
+            label: t.duration,
+            color: getToolColor(bar.tool),
+          },
+        ]}
+        summary={[
+          bar.inputTokens !== null && bar.inputTokens > 0
+            ? `${t.input} ${formatNumber(bar.inputTokens)}`
+            : null,
+          bar.outputTokens !== null && bar.outputTokens > 0
+            ? `${t.output} ${formatNumber(bar.outputTokens)}`
+            : null,
+          bar.cacheRead !== null && bar.cacheRead > 0
+            ? `${t.cacheRead} ${formatNumber(bar.cacheRead)}`
+            : null,
+          bar.cacheWrite !== null && bar.cacheWrite > 0
+            ? `${t.cacheWrite} ${formatNumber(bar.cacheWrite)}`
+            : null,
+          bar.costUsd !== null && bar.costUsd > 0 ? `${t.cost} $${bar.costUsd.toFixed(4)}` : null,
+        ]
+          .filter(Boolean)
+          .join(' · ')}
+      />
     </FloatingTooltip>
   );
 }

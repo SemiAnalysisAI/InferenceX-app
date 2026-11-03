@@ -13,6 +13,7 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
+import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
 import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
 
 const STRINGS = {
@@ -421,40 +422,18 @@ function ChartTooltip({ data, mode, t }: { data: TooltipState; mode: TokenSplitM
   const split = mode === 'hash' ? point.hash : point.api;
   return (
     <FloatingTooltip x={data.x} y={data.y}>
-      <div className="space-y-1 font-mono text-2xs">
-        <div className="flex items-center gap-2 font-medium text-foreground">
-          <span>{t.turnLabel(point.turn)}</span>
-          <span className="rounded-sm border border-border/30 px-1.5 py-0.5 text-3xs font-normal text-muted-foreground">
-            {mode === 'hash' ? 'hash' : 'api'}
-          </span>
-          {point.subagentLabel && (
-            <span className="rounded-sm border border-border/30 px-1.5 py-0.5 text-3xs font-normal text-muted-foreground">
-              {point.subagentLabel}
-            </span>
-          )}
-        </div>
-        <div className="text-muted-foreground">@ {formatElapsedMMSS(point.elapsedMs)}</div>
-        <div className="flex items-center gap-2 text-foreground">
-          <span
-            className="inline-block h-2 w-2 rounded-sm"
-            style={{ backgroundColor: COLOR_CACHED }}
-          />
-          <span className="text-muted-foreground">{t.cached}</span>
-          <span className="ml-auto tabular-nums">{formatNumber(split.cached)}</span>
-        </div>
-        <div className="flex items-center gap-2 text-foreground">
-          <span
-            className="inline-block h-2 w-2 rounded-sm"
-            style={{ backgroundColor: COLOR_UNCACHED }}
-          />
-          <span className="text-muted-foreground">{t.uncached}</span>
-          <span className="ml-auto tabular-nums">{formatNumber(split.uncached)}</span>
-        </div>
-        <div className="flex items-center gap-2 border-t border-border/20 pt-1 text-foreground">
-          <span className="text-muted-foreground">{t.total}</span>
-          <span className="ml-auto font-medium tabular-nums">{formatNumber(split.total)}</span>
-        </div>
-      </div>
+      <ChartHoverCardBody
+        title={t.turnLabel(point.turn)}
+        subtitle={[mode === 'hash' ? 'hash' : 'api', point.subagentLabel]
+          .filter(Boolean)
+          .join(' · ')}
+        metrics={[
+          { value: formatNumber(split.cached), label: t.cached, color: COLOR_CACHED },
+          { value: formatNumber(split.uncached), label: t.uncached, color: COLOR_UNCACHED },
+          { value: formatNumber(split.total), label: t.total },
+        ]}
+        summary={`@ ${formatElapsedMMSS(point.elapsedMs)}`}
+      />
     </FloatingTooltip>
   );
 }

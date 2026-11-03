@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import * as d3 from 'd3';
 import { D3ChartCard } from '@/components/ui/d3-chart-card';
 import type { D3ChartProps, LayerConfig, RenderContext } from '@/lib/d3-chart/D3Chart';
-import { chartTooltipShell } from '@/lib/d3-chart/tooltip-shell';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { escapeHtml } from '@/lib/shared/utils';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { CHART_COLORS } from '@/components/agentic-workload-explorer/series-colors';
@@ -30,11 +30,10 @@ interface StackedBarBucket {
 }
 
 function tooltipHtml(label: string, rows: { label: string; value: string }[]) {
-  return chartTooltipShell(
-    `<div class="space-y-1 text-xs"><div class="font-semibold">${escapeHtml(label)}</div>${rows
-      .map((row) => `<div>${escapeHtml(row.label)}: ${escapeHtml(row.value)}</div>`)
-      .join('')}</div>`,
-  );
+  return chartHoverCard({
+    title: label,
+    metrics: rows.map((row) => ({ value: escapeHtml(row.value), label: row.label })),
+  });
 }
 
 function Legend({

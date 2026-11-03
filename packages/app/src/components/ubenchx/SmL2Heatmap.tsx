@@ -12,11 +12,7 @@ import {
   placeFloatingTooltip,
   stickyHeaderBottom,
 } from '@/lib/d3-chart/tooltip-placement';
-import {
-  chartTooltipDismiss,
-  chartTooltipShell,
-  chartTooltipTitle,
-} from '@/lib/d3-chart/tooltip-shell';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { Stat } from '@/components/ui/stat';
 
 import { SM_L2_RUNS } from './sm-l2-data';
@@ -30,7 +26,6 @@ const STRINGS = {
     tooltipGpc: 'GPC',
     tooltipDie: 'Die',
     tooltipValue: 'Value',
-    tooltipDismiss: 'Click elsewhere to dismiss',
     tooltipRow: 'row',
     tooltipCol: 'column',
     cycles: 'cycles',
@@ -53,7 +48,6 @@ const STRINGS = {
     tooltipGpc: 'GPC',
     tooltipDie: 'Die',
     tooltipValue: '值',
-    tooltipDismiss: '点击其他区域关闭',
     tooltipRow: '行',
     tooltipCol: '列',
     cycles: '周期',
@@ -241,16 +235,14 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
       const val = result.matrix[i][j];
       const color = i === j ? 'var(--muted-foreground)' : colorScale(val);
 
-      tooltip.innerHTML = chartTooltipShell(
-        `${pinned ? chartTooltipDismiss(t.tooltipDismiss) : ''}
-          ${chartTooltipTitle(`${val.toFixed(1)} ${t.cycles}`, color)}
-          <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-            <strong>${t.tooltipSm} (${t.tooltipRow}):</strong> ${infoI.sm} &middot; ${t.tooltipGpc} ${infoI.gpc} &middot; ${t.tooltipDie} ${infoI.die}
-          </div>
-          <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-            <strong>${t.tooltipSm} (${t.tooltipCol}):</strong> ${infoJ.sm} &middot; ${t.tooltipGpc} ${infoJ.gpc} &middot; ${t.tooltipDie} ${infoJ.die}
-          </div>`,
-        { pinned, maxWidth: 240 },
+      tooltip.innerHTML = chartHoverCard(
+        {
+          title: `${t.tooltipSm} ${infoI.sm} × ${infoJ.sm}`,
+          color,
+          metrics: [{ value: val.toFixed(1), label: t.cycles }],
+          summary: `${t.tooltipSm} (${t.tooltipRow}) ${t.tooltipGpc} ${infoI.gpc} · ${t.tooltipDie} ${infoI.die} · ${t.tooltipSm} (${t.tooltipCol}) ${t.tooltipGpc} ${infoJ.gpc} · ${t.tooltipDie} ${infoJ.die}`,
+        },
+        { pinned, maxWidth: 260 },
       );
       tooltip.style.display = 'block';
     };

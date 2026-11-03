@@ -6,6 +6,7 @@ import { type StatRow } from '@/lib/agentic-workload-explorer/stat-rows';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 import { Button } from '@/components/ui/button';
+import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
 import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
 
 const COLORS = {
@@ -374,54 +375,39 @@ export function LatencyWaterfall({ rows }: { rows: StatRow[] }) {
         </svg>
 
         {tooltip && (
-          <FloatingTooltip x={tooltip.x} y={tooltip.y} placement="above" className="space-y-1">
-            <div className="text-2xs font-mono font-medium text-foreground">{tooltip.label}</div>
-            <div className="text-3xs font-mono text-muted-foreground space-y-0.5">
-              {tooltip.canDecompose ? (
-                <>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="w-2 h-2 rounded-sm inline-block"
-                      style={{ backgroundColor: COLORS.prefill }}
-                    />
-                    <span>
-                      {t.prefill}: {formatDuration(tooltip.prefillMs)} (
-                      {((tooltip.prefillMs / tooltip.totalMs) * 100).toFixed(0)}%)
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="w-2 h-2 rounded-sm inline-block"
-                      style={{ backgroundColor: COLORS.decode }}
-                    />
-                    <span>
-                      {t.decode}: {formatDuration(tooltip.decodeMs)} (
-                      {((tooltip.decodeMs / tooltip.totalMs) * 100).toFixed(0)}%)
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <span
-                    className="w-2 h-2 rounded-sm inline-block"
-                    style={{ backgroundColor: COLORS.undecomposed }}
-                  />
-                  <span>
-                    {t.undecomposed}: {formatDuration(tooltip.totalMs)}
-                  </span>
-                </div>
-              )}
-              <div className="pt-1 border-t border-border/20">
-                {t.e2e}: {formatDuration(tooltip.totalMs)}
-                {tooltip.tpotMs !== null && <> &middot; TPOT: {tooltip.tpotMs.toFixed(1)}ms/tok</>}
-                {tooltip.outputTokens > 0 && (
-                  <>
-                    {' '}
-                    &middot; {tooltip.outputTokens} {t.outputTokens}
-                  </>
-                )}
-              </div>
-            </div>
+          <FloatingTooltip x={tooltip.x} y={tooltip.y} placement="above">
+            <ChartHoverCardBody
+              title={tooltip.label}
+              metrics={
+                tooltip.canDecompose
+                  ? [
+                      {
+                        value: formatDuration(tooltip.prefillMs),
+                        label: `${t.prefill} · ${((tooltip.prefillMs / tooltip.totalMs) * 100).toFixed(0)}%`,
+                        color: COLORS.prefill,
+                      },
+                      {
+                        value: formatDuration(tooltip.decodeMs),
+                        label: `${t.decode} · ${((tooltip.decodeMs / tooltip.totalMs) * 100).toFixed(0)}%`,
+                        color: COLORS.decode,
+                      },
+                    ]
+                  : [
+                      {
+                        value: formatDuration(tooltip.totalMs),
+                        label: t.undecomposed,
+                        color: COLORS.undecomposed,
+                      },
+                    ]
+              }
+              summary={[
+                `${t.e2e}: ${formatDuration(tooltip.totalMs)}`,
+                tooltip.tpotMs === null ? null : `TPOT: ${tooltip.tpotMs.toFixed(1)}ms/tok`,
+                tooltip.outputTokens > 0 ? `${tooltip.outputTokens} ${t.outputTokens}` : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            />
           </FloatingTooltip>
         )}
       </div>

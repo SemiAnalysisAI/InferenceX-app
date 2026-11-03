@@ -12,6 +12,7 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
+import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
 import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
 
 const STRINGS = {
@@ -395,17 +396,12 @@ function ChartTooltip({ data, t }: { data: TooltipState; t: Strings }) {
   const { point, agentLabel, agentColor } = data;
   return (
     <FloatingTooltip x={data.x} y={data.y}>
-      <div className="space-y-1 font-mono text-2xs">
-        <div className="flex items-center gap-1.5 font-medium text-foreground">
-          <div className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: agentColor }} />
-          <span>{agentLabel}</span>
-        </div>
-        <div className="text-muted-foreground">@ {formatElapsedMMSS(point.elapsedMs)}</div>
-        <div className="flex items-center gap-2 border-t border-border/20 pt-1 text-foreground">
-          <span className="text-muted-foreground">{t.inputTokens}</span>
-          <span className="ml-auto font-medium tabular-nums">{formatNumber(point.total)}</span>
-        </div>
-      </div>
+      <ChartHoverCardBody
+        title={agentLabel}
+        subtitle={`@ ${formatElapsedMMSS(point.elapsedMs)}`}
+        color={agentColor}
+        metrics={[{ value: formatNumber(point.total), label: t.inputTokens }]}
+      />
     </FloatingTooltip>
   );
 }

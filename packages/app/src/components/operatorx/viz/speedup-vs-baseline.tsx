@@ -4,10 +4,11 @@ import { useState } from 'react';
 
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { track } from '@/lib/analytics/analytics';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 import { EmptyChart } from '../charts/empty';
-import { HardwareLegend, OpxChart, tooltipHtml } from '../charts/kit';
+import { HardwareLegend, OpxChart } from '../charts/kit';
 import { originBarsLayer } from '../charts/layers';
 import { formatRatio, ratioScale } from '../charts/scales';
 import { hardwareLabel } from '../compare/hardware';
@@ -135,12 +136,16 @@ function SpeedupVsBaseline({ model }: { model: ComparisonModel }) {
           tooltip={{
             rulerType: 'none',
             content: (b) =>
-              tooltipHtml({
+              chartHoverCard({
                 title: hardwareLabel(b.hw),
+                subtitle: grouped
+                  ? `${grouping === 'size' ? `${sizeLabel} ` : ''}${b.group}`
+                  : undefined,
                 color: model.colors[b.hw],
-                rows: [
-                  `${grouped ? `${grouping === 'size' ? `${sizeLabel} ` : ''}${b.group} · ` : ''}${strings.shared(b.cases)}`,
+                metrics: [
+                  { value: formatRatio(b.value), label: strings.axis(hardwareLabel(baseline)) },
                 ],
+                summary: strings.shared(b.cases),
               }),
           }}
           legendElement={grouped ? <HardwareLegend model={model} hardware={series} /> : undefined}

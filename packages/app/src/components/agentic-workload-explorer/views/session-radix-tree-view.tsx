@@ -12,6 +12,7 @@ import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
 import { Button } from '@/components/ui/button';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
+import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
 import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
 import { EmptyState } from '@/components/ui/empty-state';
 
@@ -486,15 +487,14 @@ function D3Tree({
       )}
       <svg ref={svgRef} className={`min-w-full ${rendered ? '' : 'h-0 overflow-hidden'}`} />
       {tooltip && (
-        <FloatingTooltip x={tooltip.x} y={tooltip.y} className="space-y-1 text-2xs font-mono">
-          <div className="font-medium text-foreground">
-            {tooltip.data.blocks > 0 ? t.block(tooltip.data.blocks) : t.root}
-          </div>
-          <div className="text-muted-foreground">{t.request(tooltip.data.reqs)}</div>
-          {tooltip.data.branches > 0 && (
-            <div className="text-muted-foreground">{t.branch(tooltip.data.branches)}</div>
-          )}
-          {tooltip.data.branches === 0 && <div className="text-muted-foreground">{t.leafNode}</div>}
+        <FloatingTooltip x={tooltip.x} y={tooltip.y}>
+          <ChartHoverCardBody
+            title={tooltip.data.blocks > 0 ? t.block(tooltip.data.blocks) : t.root}
+            metrics={[]}
+            summary={`${t.request(tooltip.data.reqs)} · ${
+              tooltip.data.branches > 0 ? t.branch(tooltip.data.branches) : t.leafNode
+            }`}
+          />
         </FloatingTooltip>
       )}
     </div>

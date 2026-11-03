@@ -36,6 +36,7 @@ import { CURRENT_TRACE_VERSION } from '@semianalysisai/inferencex-db/proxytrace/
 import { SUBAGENT_STATS_WINDOW_DAYS } from '@semianalysisai/inferencex-db/proxytrace/shared/subagent';
 import { IDLE_GAP_CUTOFF_MS } from '@semianalysisai/inferencex-db/proxytrace/shared/wall-clock';
 import { snapshotNow } from '@/lib/agentic-workload-explorer/snapshot';
+import { ChartHoverCardBody } from '@/components/ui/chart-hover-card';
 import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
 
 const STRINGS = {
@@ -934,49 +935,43 @@ function HourlyTokenChart({ data }: { data: HourlyToken[] }) {
 
       {tooltip && (
         <FloatingTooltip x={tooltip.x} y={tooltip.y}>
-          <div className="space-y-1 text-2xs font-mono">
-            <div className="font-medium text-foreground">
-              {formatExplorerDateTime(tooltip.item.hour, locale, {
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                timeZoneName: 'short',
-              })}
-            </div>
-            <div className="h-px bg-border/30" />
-            <div className="flex justify-between gap-4">
-              <span className="text-muted-foreground">{t.requests}</span>
-              <span>{Number(tooltip.item.requestCount)}</span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span style={{ color: HOURLY_COLORS.input }}>{t.input}</span>
-              <span>{formatNumber(Number(tooltip.item.input))}</span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span style={{ color: HOURLY_COLORS.cacheRead }}>{t.cacheRead}</span>
-              <span>{formatNumber(Number(tooltip.item.cacheRead))}</span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span style={{ color: HOURLY_COLORS.cacheWrite }}>{t.cacheWrite}</span>
-              <span>{formatNumber(Number(tooltip.item.cacheWrite))}</span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span style={{ color: HOURLY_COLORS.output }}>{t.output}</span>
-              <span>{formatNumber(Number(tooltip.item.output))}</span>
-            </div>
-            <div className="flex justify-between gap-4 font-medium">
-              <span className="text-foreground">{t.total}</span>
-              <span>
-                {formatNumber(
-                  Number(tooltip.item.input) +
-                    Number(tooltip.item.cacheRead) +
-                    Number(tooltip.item.cacheWrite) +
-                    Number(tooltip.item.output),
-                )}
-              </span>
-            </div>
-          </div>
+          <ChartHoverCardBody
+            title={formatExplorerDateTime(tooltip.item.hour, locale, {
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              timeZoneName: 'short',
+            })}
+            metrics={[
+              {
+                value: formatNumber(Number(tooltip.item.input)),
+                label: t.input,
+                color: HOURLY_COLORS.input,
+              },
+              {
+                value: formatNumber(Number(tooltip.item.cacheRead)),
+                label: t.cacheRead,
+                color: HOURLY_COLORS.cacheRead,
+              },
+              {
+                value: formatNumber(Number(tooltip.item.cacheWrite)),
+                label: t.cacheWrite,
+                color: HOURLY_COLORS.cacheWrite,
+              },
+              {
+                value: formatNumber(Number(tooltip.item.output)),
+                label: t.output,
+                color: HOURLY_COLORS.output,
+              },
+            ]}
+            summary={`${t.total} ${formatNumber(
+              Number(tooltip.item.input) +
+                Number(tooltip.item.cacheRead) +
+                Number(tooltip.item.cacheWrite) +
+                Number(tooltip.item.output),
+            )} · ${t.requests} ${Number(tooltip.item.requestCount)}`}
+          />
         </FloatingTooltip>
       )}
     </ExpandableChart>
@@ -1210,22 +1205,15 @@ function WeeklySessionsByHarnessChart({ data }: { data: WeeklySessionPoint[] }) 
 
       {tooltip && (
         <FloatingTooltip x={tooltip.x} y={tooltip.y}>
-          <div className="space-y-1 text-2xs font-mono">
-            <div className="font-medium text-foreground">
-              {t.weekOf(formatWeekLabel(tooltip.item.week, locale))}
-            </div>
-            <div className="h-px bg-border/30" />
-            {harnessLegend.map((item) => (
-              <div key={item.key} className="flex justify-between gap-4">
-                <span style={{ color: HARNESS_COLORS[item.key] }}>{item.label}</span>
-                <span>{formatNumber(tooltip.item[item.key])}</span>
-              </div>
-            ))}
-            <div className="flex justify-between gap-4 font-medium">
-              <span className="text-foreground">{t.total}</span>
-              <span>{formatNumber(tooltip.item.total)}</span>
-            </div>
-          </div>
+          <ChartHoverCardBody
+            title={t.weekOf(formatWeekLabel(tooltip.item.week, locale))}
+            metrics={harnessLegend.map((item) => ({
+              value: formatNumber(tooltip.item[item.key]),
+              label: item.label,
+              color: HARNESS_COLORS[item.key],
+            }))}
+            summary={`${t.total} ${formatNumber(tooltip.item.total)}`}
+          />
         </FloatingTooltip>
       )}
     </ExpandableChart>
@@ -1407,26 +1395,17 @@ function HourlyCostChart({ data }: { data: HourlyToken[] }) {
 
       {tooltip && (
         <FloatingTooltip x={tooltip.x} y={tooltip.y}>
-          <div className="space-y-1 text-2xs font-mono">
-            <div className="font-medium text-foreground">
-              {formatExplorerDateTime(tooltip.item.hour, locale, {
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                timeZoneName: 'short',
-              })}
-            </div>
-            <div className="h-px bg-border/30" />
-            <div className="flex justify-between gap-4">
-              <span className="text-muted-foreground">{t.requests}</span>
-              <span>{Number(tooltip.item.requestCount)}</span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span>{t.estCost}</span>
-              <span>${Number(tooltip.item.cost).toFixed(4)}</span>
-            </div>
-          </div>
+          <ChartHoverCardBody
+            title={formatExplorerDateTime(tooltip.item.hour, locale, {
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              timeZoneName: 'short',
+            })}
+            metrics={[{ value: `$${Number(tooltip.item.cost).toFixed(4)}`, label: t.estCost }]}
+            summary={`${t.requests} ${Number(tooltip.item.requestCount)}`}
+          />
         </FloatingTooltip>
       )}
     </ExpandableChart>
@@ -2095,30 +2074,20 @@ function RpsTimeseriesChart({
 
       {tooltip && (
         <FloatingTooltip x={tooltip.x} y={tooltip.y}>
-          <div className="space-y-1 text-2xs font-mono">
-            <div className="font-medium text-foreground">
-              {formatExplorerDateTime(tooltip.item.bucket, locale, {
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                timeZoneName: 'short',
-              })}
-            </div>
-            <div className="h-px bg-border/30" />
-            <div className="flex justify-between gap-4">
-              <span style={{ color: barColor }}>RPS</span>
-              <span>{formatRpsValue(tooltip.item.rps)}</span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span style={{ color: avgColor }}>{t.rollingAvg}</span>
-              <span>{formatRpsValue(tooltip.avg)}</span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span className="text-muted-foreground">{t.requests}</span>
-              <span>{formatNumber(tooltip.item.requestCount)}</span>
-            </div>
-          </div>
+          <ChartHoverCardBody
+            title={formatExplorerDateTime(tooltip.item.bucket, locale, {
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              timeZoneName: 'short',
+            })}
+            metrics={[
+              { value: formatRpsValue(tooltip.item.rps), label: 'RPS', color: barColor },
+              { value: formatRpsValue(tooltip.avg), label: t.rollingAvg, color: avgColor },
+            ]}
+            summary={`${t.requests} ${formatNumber(tooltip.item.requestCount)}`}
+          />
         </FloatingTooltip>
       )}
     </ExpandableChart>
@@ -2411,34 +2380,23 @@ function WallClockStackedBarChart({ data }: { data: WallClockDay[] }) {
 
       {tooltip && (
         <FloatingTooltip x={tooltip.x} y={tooltip.y}>
-          <div className="space-y-1 text-2xs font-mono">
-            <div className="font-medium text-foreground">{tooltip.item.day}</div>
-            <div className="h-px bg-border/30" />
-            <div className="flex justify-between gap-4">
-              <span className="text-muted-foreground">{t.requests}</span>
-              <span>{formatNumber(tooltip.item.requests)}</span>
-            </div>
-            {wallClockLegendItems.map((seg) => {
+          <ChartHoverCardBody
+            title={tooltip.item.day}
+            metrics={wallClockLegendItems.map((seg) => {
               const ms =
                 seg.key === 'llm'
                   ? tooltip.item.llmMs
                   : seg.key === 'tool'
                     ? tooltip.item.toolMs
                     : tooltip.item.idleMs;
-              return (
-                <div key={seg.key} className="flex justify-between gap-4">
-                  <span style={{ color: seg.color }}>{seg.label}</span>
-                  <span>
-                    {fmtHours(ms)} · {pct(ms, totalOf(tooltip.item))}
-                  </span>
-                </div>
-              );
+              return {
+                value: fmtHours(ms),
+                label: `${seg.label} · ${pct(ms, totalOf(tooltip.item))}`,
+                color: seg.color,
+              };
             })}
-            <div className="flex justify-between gap-4 font-medium">
-              <span className="text-foreground">{t.total}</span>
-              <span>{fmtHours(totalOf(tooltip.item))}</span>
-            </div>
-          </div>
+            summary={`${t.total} ${fmtHours(totalOf(tooltip.item))} · ${t.requests} ${formatNumber(tooltip.item.requests)}`}
+          />
         </FloatingTooltip>
       )}
     </ExpandableChart>

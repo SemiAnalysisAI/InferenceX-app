@@ -12,7 +12,7 @@ import { Heading } from '@/components/ui/heading';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import ChartLegend from '@/components/ui/chart-legend';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
-import { chartTooltipShell, chartTooltipTitle } from '@/lib/d3-chart/tooltip-shell';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { collectiveXRunDasharray } from './data';
@@ -93,13 +93,6 @@ const STRINGS = {
     instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置',
   },
 } as const;
-const escapeHtml = (value: string) =>
-  value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
 
 export function CollectiveXSwapSection({
   datasets,
@@ -333,9 +326,18 @@ export function CollectiveXSwapSection({
           attachToLayer: 1,
           rulerType: 'crosshair',
           content: (p) =>
-            chartTooltipShell(
-              `<div class="text-xs">${chartTooltipTitle(`${escapeHtml(p.device)} · ${t.blocks(p.row.num_blocks)}`, color(p))}<div>${formatSwapBytes(p.x)}</div><div>${t.payload}: ${formatSwapBytes(p.row.payload_bytes)}</div><div>${percentile}: ${p.y.toFixed(3)} ${metric === 'bandwidth' ? 'GB/s' : 'µs'}</div><div>${p.row.sample_count} ${t.samples} · ${t.verified}</div></div>`,
-            ),
+            chartHoverCard({
+              title: p.device,
+              subtitle: `${t.blocks(p.row.num_blocks)} · ${formatSwapBytes(p.x)}`,
+              color: color(p),
+              metrics: [
+                {
+                  value: p.y.toFixed(3),
+                  label: `${percentile} (${metric === 'bandwidth' ? 'GB/s' : 'µs'})`,
+                },
+              ],
+              summary: `${t.payload}: ${formatSwapBytes(p.row.payload_bytes)} · ${p.row.sample_count} ${t.samples} · ${t.verified}`,
+            }),
           getRulerX: (p, scale) => (scale as d3.ScaleLogarithmic<number, number>)(p.x),
           getRulerY: (p, scale) => scale(p.y),
         }}

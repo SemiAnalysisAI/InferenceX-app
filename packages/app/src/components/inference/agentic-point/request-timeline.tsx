@@ -645,7 +645,7 @@ export function RequestTimelineView({
         <CursorPopover cursor={cursor} dataStart={dataStart} times={sortedTimes} />
       )}
 
-      {tooltip && <TimelineTooltip data={tooltip} linkable={Boolean(datasetSlug)} />}
+      {tooltip && <TimelineTooltip data={tooltip} />}
     </div>
   );
 }

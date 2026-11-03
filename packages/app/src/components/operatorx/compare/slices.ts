@@ -1,7 +1,6 @@
 import type { ComparisonView } from '@semianalysisai/inferencex-db/operatorx/compare';
 
 import type { Locale } from '@/lib/i18n/i18n';
-import { escapeHtml } from '@/lib/shared/utils';
 
 export {
   sliceKey,
@@ -34,9 +33,8 @@ export function caseOrigin(
   return c.sources.map((s) => ({ label: view.models[s.model], value: s.roles.join(', ') }));
 }
 
-export function originRows(view: ComparisonView, i: number, locale: Locale): string[] {
-  return caseOrigin(view, i, locale).map(
-    (o) =>
-      `<span class="text-muted-foreground">${escapeHtml(o.label)}</span> ${escapeHtml(o.value)}`,
-  );
+export function originText(view: ComparisonView, i: number, locale: Locale): string {
+  return caseOrigin(view, i, locale)
+    .map((o) => `${o.label} ${o.value}`)
+    .join(' · ');
 }
