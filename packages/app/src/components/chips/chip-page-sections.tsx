@@ -1,7 +1,10 @@
+import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
 import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
+import { HwVendorLogo } from '@/components/ui/hw-vendor-logo';
+import { Heading } from '@/components/ui/heading';
 import { CatalogLinkCard } from '@/components/catalog/catalog-link-card';
 import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { analyticsPlacement } from '@/lib/analytics/placement';
@@ -42,7 +45,7 @@ const STRINGS = {
   en: {
     breadcrumbRoot: 'AI Chips',
     backToIndex: 'All AI inference chips',
-    indexTitle: 'AI Chips for LLM Inference',
+    indexTitle: 'AI chips for LLM inference',
     indexIntro:
       'Specs, cloud pricing and continuously measured inference benchmarks for every chip InferenceX covers. Each page joins the hardware data used by the live dashboard with the SemiAnalysis AI Cloud TCO rates.',
     chipPages: 'Chip pages',
@@ -92,7 +95,7 @@ const STRINGS = {
     vsRatioNote: 'Ratios are spec-sheet values; see the live compare pages for measured deltas.',
     vsRatioNa: 'n/a',
     vsSpecTableCaption: 'Spec-sheet comparison',
-    specScrollHint: 'Swipe horizontally to view all specification values.',
+    specScrollHint: 'Swipe horizontally to view all specification values',
     overviewHeading: 'Overview',
     benchmarkHeading: 'How InferenceX benchmarks it',
     vsIntroPrefix: 'Spec-sheet and pricing comparison of',
@@ -153,7 +156,7 @@ const STRINGS = {
     vsRatioNote: '倍数为纸面规格对比；实测差距请见实时对比页面。',
     vsRatioNa: '不适用',
     vsSpecTableCaption: '纸面规格对比',
-    specScrollHint: '左右滑动可查看全部规格参数。',
+    specScrollHint: '左右滑动可查看全部规格参数',
     overviewHeading: '概览',
     benchmarkHeading: 'InferenceX 如何测试这款芯片',
     vsIntroPrefix: '本页对比',
@@ -205,8 +208,8 @@ function breadcrumbJsonLd(locale: Locale, leafName: string, leafPath: string) {
 }
 
 const FaqSection = ({ faq, locale }: { faq: readonly ChipFaqItem[]; locale: Locale }) => (
-  <section aria-labelledby="chip-faq" className="mt-10 border-t border-border/50 pt-10">
-    <h2 id="chip-faq" className="text-xl font-semibold tracking-tight">
+  <section aria-labelledby="chip-faq" className="mt-10 border-t border-border/30 pt-10">
+    <h2 id="chip-faq" className="text-xl font-semibold">
       {STRINGS[locale].faqHeading}
     </h2>
     <dl className="mt-4 space-y-6">
@@ -229,19 +232,16 @@ const LiveResultsSection = ({ locale }: { locale: Locale }) => {
     { href: localePath('/overview', locale), label: t.liveLinkOverview },
   ];
   return (
-    <section
-      aria-labelledby="chip-live-results"
-      className="mt-10 rounded-xl border border-brand/20 bg-brand/6 p-5 md:p-6"
-    >
-      <h2 id="chip-live-results" className="text-xl font-semibold tracking-tight">
+    <section aria-labelledby="chip-live-results" className="mt-10 border-t border-border/30 pt-10">
+      <h2 id="chip-live-results" className="text-xl font-semibold">
         {t.liveCta}
       </h2>
       <p className="mt-2 leading-7 text-muted-foreground">{t.liveCtaBody}</p>
-      <ul className="mt-3 space-y-1">
+      <ul className="mt-3 space-y-2">
         {links.map((link) => (
           <li key={link.href}>
             <Link href={link.href} className="text-sm font-medium text-brand hover:underline">
-              {link.label} →
+              {link.label}
             </Link>
           </li>
         ))}
@@ -266,27 +266,25 @@ const SEMIANALYSIS_MODELS = [
 const ModelsSection = ({ locale }: { locale: Locale }) => {
   const t = STRINGS[locale];
   return (
-    <section aria-labelledby="chip-models" className="mt-10 border-t border-border/50 pt-10">
-      <h2 id="chip-models" className="text-xl font-semibold tracking-tight">
+    <section aria-labelledby="chip-models" className="mt-10 border-t border-border/30 pt-10">
+      <h2 id="chip-models" className="text-xl font-semibold">
         {t.modelsHeading}
       </h2>
       <p className="mt-2 leading-7 text-muted-foreground">{t.modelsBody}</p>
-      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+      <div className="-mx-4 mt-4 grid gap-2 sm:grid-cols-2">
         {SEMIANALYSIS_MODELS.map((model) => (
           <a
             key={model.href}
             href={model.href}
             target="_blank"
             rel="noreferrer"
-            className="group block h-full"
+            className="group block h-full rounded-lg p-4 transition-colors hover:bg-muted/60"
           >
-            <Card className="h-full p-5 transition-colors hover:border-brand/50">
-              <h3 className="font-semibold text-brand">
-                SemiAnalysis {model.title}
-                <ExternalLinkIcon />
-              </h3>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">{t[model.descKey]}</p>
-            </Card>
+            <h3 className="font-medium text-foreground">
+              SemiAnalysis {model.title}
+              <ExternalLinkIcon />
+            </h3>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">{t[model.descKey]}</p>
           </a>
         ))}
       </div>
@@ -319,24 +317,25 @@ export const SpecTable = ({ entry, locale }: { entry: ChipPageEntry; locale: Loc
   ];
   return (
     <div className="relative mt-4">
-      <div className="overflow-x-auto rounded-lg border border-border/40">
-        <table className="w-full min-w-[36rem] text-sm">
-          <tbody className="divide-y divide-border/40">
-            {rows.map(([label, value], index) => (
-              <tr key={label} className={index % 2 === 1 ? 'bg-muted/10' : undefined}>
+      <div className="overflow-x-auto rounded-lg border border-border/30">
+        <table className="w-full text-sm">
+          <tbody className="divide-y divide-border/30">
+            {rows.map(([label, value]) => (
+              <tr key={label}>
                 <th
                   scope="row"
-                  className="w-[52%] px-4 py-2.5 text-left font-medium text-muted-foreground"
+                  className="px-3 py-2.5 text-left font-medium text-muted-foreground sm:px-4"
                 >
                   {label}
                 </th>
-                <td className="px-4 py-2.5 text-right font-mono whitespace-nowrap">{value}</td>
+                <td className="px-3 py-2.5 text-right whitespace-nowrap tabular-nums sm:px-4">
+                  {value}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <p className="mt-2 text-xs text-muted-foreground md:hidden">{t.specScrollHint}</p>
       <p className="mt-3 text-sm text-muted-foreground">
         {t.pricingSource}{' '}
         <a
@@ -368,17 +367,15 @@ const RelatedLinks = ({ entry, locale }: { entry: ChipPageEntry; locale: Locale 
     return chip ? [chip] : [];
   });
   return (
-    <div className="mt-10 grid gap-8 border-t border-border/50 pt-10 md:grid-cols-3">
+    <div className="mt-10 grid gap-8 border-t border-border/30 pt-10 md:grid-cols-3">
       <section aria-label={t.relatedArticles}>
-        <h2 className="text-sm font-semibold tracking-eyebrow text-muted-foreground uppercase">
-          {t.relatedArticles}
-        </h2>
+        <h2 className="text-sm font-medium text-muted-foreground">{t.relatedArticles}</h2>
         <ul className="mt-3 space-y-2">
           {posts.map((post) => (
             <li key={post.slug}>
               <Link
                 href={localePath(`/blog/${post.slug}`, locale)}
-                className="text-sm text-brand hover:underline"
+                className="text-sm text-foreground hover:underline"
               >
                 {post.title}
               </Link>
@@ -387,15 +384,13 @@ const RelatedLinks = ({ entry, locale }: { entry: ChipPageEntry; locale: Locale 
         </ul>
       </section>
       <section aria-label={t.relatedTerms}>
-        <h2 className="text-sm font-semibold tracking-eyebrow text-muted-foreground uppercase">
-          {t.relatedTerms}
-        </h2>
+        <h2 className="text-sm font-medium text-muted-foreground">{t.relatedTerms}</h2>
         <ul className="mt-3 space-y-2">
           {terms.map((term) => (
             <li key={term.slug}>
               <Link
                 href={localePath(`/glossary/${term.slug}`, locale)}
-                className="text-sm text-brand hover:underline"
+                className="text-sm text-foreground hover:underline"
               >
                 {term.term}
               </Link>
@@ -404,15 +399,13 @@ const RelatedLinks = ({ entry, locale }: { entry: ChipPageEntry; locale: Locale 
         </ul>
       </section>
       <section aria-label={t.relatedChips}>
-        <h2 className="text-sm font-semibold tracking-eyebrow text-muted-foreground uppercase">
-          {t.relatedChips}
-        </h2>
+        <h2 className="text-sm font-medium text-muted-foreground">{t.relatedChips}</h2>
         <ul className="mt-3 space-y-2">
           {chips.map((chip) => (
             <li key={chip.slug}>
               <Link
                 href={localePath(`/chips/${chip.slug}`, locale)}
-                className="text-sm text-brand hover:underline"
+                className="text-sm text-foreground hover:underline"
               >
                 {chip.title}
               </Link>
@@ -445,27 +438,26 @@ export const ChipDetailContent = ({ entry, locale }: { entry: ChipPageEntry; loc
       <JsonLd data={jsonLd} />
       <div className="container mx-auto px-4 lg:px-8">
         <article className="mx-auto max-w-5xl">
-          <Card className="overflow-hidden p-0">
-            <header className="relative border-b border-border/50 px-5 py-8 md:px-10 md:py-12">
+          <Card className="overflow-hidden p-0 md:p-0">
+            <header className="relative border-b border-border/30 px-5 py-8 md:px-10 md:py-12">
               <Link
                 href={localePath('/chips', locale)}
-                className="group inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-brand"
+                className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
               >
-                <span aria-hidden="true">←</span>
+                <ArrowLeft aria-hidden="true" className="size-4" />
                 {t.backToIndex}
               </Link>
-              <div className="mt-8 flex flex-wrap items-center gap-2">
-                <span className="rounded-full border border-brand/25 bg-brand/8 px-3 py-1 text-xs font-semibold tracking-eyebrow text-brand uppercase">
-                  {hw.vendor} · {hw.arch}
-                </span>
-              </div>
-              <h1 className="mt-4 max-w-4xl text-4xl font-bold tracking-heading text-balance md:text-6xl">
+              <p className="mt-8 flex items-center gap-2 text-sm text-muted-foreground">
+                <HwVendorLogo vendor={hw.vendor} />
+                {hw.vendor} · {hw.arch}
+              </p>
+              <Heading as="h1" level="display" className="mt-3 max-w-4xl">
                 {entry.title}
-              </h1>
+              </Heading>
             </header>
             <div className="px-5 py-8 md:px-10 md:py-12">
               <section aria-labelledby="chip-overview">
-                <h2 id="chip-overview" className="text-xl font-semibold tracking-tight">
+                <h2 id="chip-overview" className="text-xl font-semibold">
                   {t.overviewHeading}
                 </h2>
                 {overview.map((paragraph) => (
@@ -476,18 +468,18 @@ export const ChipDetailContent = ({ entry, locale }: { entry: ChipPageEntry; loc
               </section>
               <section
                 aria-labelledby="chip-specs"
-                className="mt-10 border-t border-border/50 pt-10"
+                className="mt-10 border-t border-border/30 pt-10"
               >
-                <h2 id="chip-specs" className="text-xl font-semibold tracking-tight">
+                <h2 id="chip-specs" className="text-xl font-semibold">
                   {t.specsHeading}
                 </h2>
                 <SpecTable entry={entry} locale={locale} />
               </section>
               <section
                 aria-labelledby="chip-benchmarks"
-                className="mt-10 border-t border-border/50 pt-10"
+                className="mt-10 border-t border-border/30 pt-10"
               >
-                <h2 id="chip-benchmarks" className="text-xl font-semibold tracking-tight">
+                <h2 id="chip-benchmarks" className="text-xl font-semibold">
                   {t.benchmarkHeading}
                 </h2>
                 <p className="mt-3 leading-7 text-muted-foreground">{benchmarkContext}</p>
@@ -522,18 +514,18 @@ export const ChipVsContent = ({ page, locale }: { page: ChipVsPage; locale: Loca
       <JsonLd data={jsonLd} />
       <div className="container mx-auto px-4 lg:px-8">
         <article className="mx-auto max-w-5xl">
-          <Card className="overflow-hidden p-0">
-            <header className="relative border-b border-border/50 px-5 py-8 md:px-10 md:py-12">
+          <Card className="overflow-hidden p-0 md:p-0">
+            <header className="relative border-b border-border/30 px-5 py-8 md:px-10 md:py-12">
               <Link
                 href={localePath('/chips', locale)}
-                className="group inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-brand"
+                className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
               >
-                <span aria-hidden="true">←</span>
+                <ArrowLeft aria-hidden="true" className="size-4" />
                 {t.backToIndex}
               </Link>
-              <h1 className="mt-8 max-w-4xl text-4xl font-bold tracking-heading text-balance md:text-6xl">
+              <Heading as="h1" level="display" className="mt-8 max-w-4xl">
                 {title}
-              </h1>
+              </Heading>
               <p className="mt-4 max-w-3xl leading-7 text-muted-foreground">
                 {t.vsIntroPrefix}{' '}
                 <Link
@@ -554,38 +546,57 @@ export const ChipVsContent = ({ page, locale }: { page: ChipVsPage; locale: Loca
             </header>
             <div className="px-5 py-8 md:px-10 md:py-12">
               <section aria-labelledby="vs-table">
-                <h2 id="vs-table" className="text-xl font-semibold tracking-tight">
+                <h2 id="vs-table" className="text-xl font-semibold">
                   {t.vsSpecTableCaption}
                 </h2>
-                <div className="mt-4 overflow-x-auto">
-                  <table className="w-full text-sm">
+                <div className="mt-4 overflow-x-auto rounded-lg border border-border/30">
+                  <table className="w-full min-w-xl text-sm">
                     <thead>
-                      <tr className="border-b border-border/60 text-left">
-                        <th className="py-2 pr-4 font-medium text-muted-foreground"> </th>
-                        <th className="py-2 pr-4 font-semibold">{page.a.label}</th>
-                        <th className="py-2 pr-4 font-semibold">{page.b.label}</th>
-                        <th className="py-2 font-medium text-muted-foreground">
+                      <tr className="border-b border-border/30 text-xs text-muted-foreground">
+                        <th scope="col" className="px-4 py-2.5 text-left font-medium">
+                          <span className="sr-only">{t.vsSpecTableCaption}</span>
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-4 py-2.5 text-right font-medium text-foreground"
+                        >
+                          {page.a.label}
+                        </th>
+                        <th
+                          scope="col"
+                          className="px-4 py-2.5 text-right font-medium text-foreground"
+                        >
+                          {page.b.label}
+                        </th>
+                        <th scope="col" className="px-4 py-2.5 text-right font-medium">
                           {page.a.label} / {page.b.label}
                         </th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-border/30">
                       {highlights.map((row) => (
-                        <tr key={row.key} className="border-b border-border/40">
+                        <tr key={row.key}>
                           <th
                             scope="row"
-                            className="py-2 pr-4 text-left font-medium text-muted-foreground"
+                            className="px-4 py-2.5 text-left font-medium text-muted-foreground"
                           >
                             {labels[row.key]}
                           </th>
-                          <td className="py-2 pr-4 font-mono">{localizeValue(row.aValue)}</td>
-                          <td className="py-2 pr-4 font-mono">{localizeValue(row.bValue)}</td>
-                          <td className="py-2 font-mono">{row.ratio ?? t.vsRatioNa}</td>
+                          <td className="px-4 py-2.5 text-right whitespace-nowrap tabular-nums">
+                            {localizeValue(row.aValue)}
+                          </td>
+                          <td className="px-4 py-2.5 text-right whitespace-nowrap tabular-nums">
+                            {localizeValue(row.bValue)}
+                          </td>
+                          <td className="px-4 py-2.5 text-right whitespace-nowrap tabular-nums text-muted-foreground">
+                            {row.ratio ?? t.vsRatioNa}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
+                <p className="mt-2 text-xs text-muted-foreground md:hidden">{t.specScrollHint}</p>
                 <p className="mt-3 text-sm text-muted-foreground">{t.vsRatioNote}</p>
               </section>
               <FaqSection faq={faq} locale={locale} />
@@ -620,14 +631,16 @@ export const ChipsIndexContent = ({ locale }: { locale: Locale }) => {
       <div className="container mx-auto px-4 lg:px-8">
         <div className="mx-auto max-w-5xl">
           <header className="py-8 md:py-12">
-            <h1 className="text-4xl font-bold tracking-heading md:text-5xl">{t.indexTitle}</h1>
+            <Heading as="h1" level="display" className="break-keep">
+              {t.indexTitle}
+            </Heading>
             <p className="mt-4 max-w-3xl leading-7 text-muted-foreground">{t.indexIntro}</p>
           </header>
           <section aria-labelledby="chips-list">
-            <h2 id="chips-list" className="text-xl font-semibold tracking-tight">
+            <h2 id="chips-list" className="text-xl font-semibold">
               {t.chipPages}
             </h2>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="-mx-3 mt-3 grid gap-x-4 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
               {chips.map((chip) => {
                 const translation = locale === 'zh' ? getZhChipTranslation(chip.slug) : undefined;
                 const summary = translation?.summary ?? chip.summary;
@@ -646,10 +659,10 @@ export const ChipsIndexContent = ({ locale }: { locale: Locale }) => {
             </div>
           </section>
           <section aria-labelledby="vs-list" className="mt-12 pb-12">
-            <h2 id="vs-list" className="text-xl font-semibold tracking-tight">
+            <h2 id="vs-list" className="text-xl font-semibold">
               {t.vsPages}
             </h2>
-            <ul className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            <ul className="-mx-3 mt-3 grid gap-x-4 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
               {vsPages.map((page) => (
                 <li key={page.slug}>
                   <CatalogLinkCard

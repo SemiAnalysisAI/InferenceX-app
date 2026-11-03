@@ -1,13 +1,19 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { Suspense } from 'react';
 
 import { HW_REGISTRY, SITE_NAME, SITE_URL } from '@semianalysisai/inferencex-constants';
 
 import { AgentXCompareHero } from '@/components/compare/agentx-compare-hero';
+import {
+  CompareCatalogLink,
+  CompareCatalogLinks,
+  CompareModelSection,
+  ComparePairGroup,
+} from '@/components/compare/compare-catalog';
 import { ComparePairCardLink } from '@/components/compare/compare-pair-card-link';
 import { JsonLd } from '@/components/seo/json-ld';
 import { Card } from '@/components/ui/card';
+import { Heading } from '@/components/ui/heading';
 import { ModelLogo } from '@/components/ui/model-logo';
 import { CompareRouteSkeleton } from '@/components/motion/route-skeletons';
 import { comparisonPairHref, comparisonScenarioForModel } from '@/lib/compare/compare-agentx';
@@ -55,21 +61,21 @@ function groupPairsByVendorForModel(
   if (cross.length > 0) {
     groups.push({
       heading: 'NVIDIA 与 AMD',
-      description: '跨厂商的不同架构代际对比。',
+      description: '跨厂商的不同架构代际对比',
       pairs: cross,
     });
   }
   if (nvidia.length > 0) {
     groups.push({
       heading: 'NVIDIA 芯片对比',
-      description: 'Hopper 与 Blackwell 代际对比。',
+      description: 'Hopper 与 Blackwell 代际对比',
       pairs: nvidia,
     });
   }
   if (amd.length > 0) {
     groups.push({
       heading: 'AMD 芯片对比',
-      description: 'CDNA 3 与 CDNA 4 代际对比。',
+      description: 'CDNA 3 与 CDNA 4 代际对比',
       pairs: amd,
     });
   }
@@ -108,50 +114,35 @@ async function CompareCatalogZh() {
     <>
       <section id="model-comparisons" data-testid="compare-model-catalog">
         <Card>
-          <p className="font-mono text-xs font-semibold tracking-eyebrow text-muted-foreground uppercase">
-            对比目录
-          </p>
-          <h2 className="mt-2 text-2xl font-bold tracking-tight lg:text-3xl">
+          <Heading level="section" className="text-2xl">
             AgentX 与 8K/1K 测试结果
-          </h2>
-          <p className="mt-3 text-base lg:text-lg text-muted-foreground max-w-3xl">
+          </Heading>
+          <p className="mt-3 max-w-3xl text-base text-muted-foreground">
             共 {totalUrls.toLocaleString()} 组推理基准测试对比，涵盖{' '}
             {formatModelListZh(modelsWithPairs)}
             。已有 AgentX 数据的模型会默认展示长上下文、多轮 trace 回放结果；尚无 AgentX
-            数据的模型则默认展示受控的 8K/1K 工作负载。每张卡片都会标明测试场景。
+            数据的模型则默认展示受控的 8K/1K 工作负载。每组对比都会标明测试场景。
           </p>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link
-              data-testid="compare-index-per-dollar-link-zh"
+          <CompareCatalogLinks>
+            <CompareCatalogLink
+              testId="compare-index-per-dollar-link-zh"
               href="/zh/compare-per-dollar"
-              className="inline-flex items-center gap-2 rounded-md border border-border px-5 py-3 text-base lg:text-lg font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
             >
               芯片每美元性能对比
-              <span aria-hidden="true" className="text-lg lg:text-xl">
-                →
-              </span>
-            </Link>
-            <Link
-              data-testid="compare-index-precision-link-zh"
+            </CompareCatalogLink>
+            <CompareCatalogLink
+              testId="compare-index-precision-link-zh"
               href="/zh/compare-precision"
-              className="inline-flex items-center gap-2 rounded-md border border-border px-5 py-3 text-base lg:text-lg font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
             >
-              量化精度对比（FP8 与 BF16 等）
-              <span aria-hidden="true" className="text-lg lg:text-xl">
-                →
-              </span>
-            </Link>
-            <Link
-              data-testid="compare-index-spec-decode-link-zh"
+              量化精度对比（FP4、FP8、BF16）
+            </CompareCatalogLink>
+            <CompareCatalogLink
+              testId="compare-index-spec-decode-link-zh"
               href="/zh/compare-spec-decode"
-              className="inline-flex items-center gap-2 rounded-md border border-border px-5 py-3 text-base lg:text-lg font-semibold text-foreground shadow-sm transition-colors hover:bg-muted"
             >
               投机解码对比（启用 MTP 与关闭投机解码）
-              <span aria-hidden="true" className="text-lg lg:text-xl">
-                →
-              </span>
-            </Link>
-          </div>
+            </CompareCatalogLink>
+          </CompareCatalogLinks>
         </Card>
       </section>
 
@@ -160,53 +151,50 @@ async function CompareCatalogZh() {
         const groups = groupPairsByVendorForModel(model, pairs);
         const scenario = comparisonScenarioForModel(model);
         return (
-          <section key={model.slug} id={model.slug}>
-            <Card className="flex flex-col gap-4">
-              <div>
-                <h2 className="flex items-center gap-2.5 text-xl lg:text-2xl font-bold tracking-tight">
-                  <ModelLogo model={model.displayName as Model} className="size-6 lg:size-7" />
-                  {model.label}
-                </h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  在 {model.label} 上共有 {pairs.length} 组芯片对比，均有基准测试数据。
-                </p>
-              </div>
-              {groups.map((group) => (
-                <div key={`${model.slug}__${group.heading}`} className="flex flex-col gap-3">
-                  <div>
-                    <h3 className="text-base font-semibold">{group.heading}</h3>
-                    <p className="text-xs text-muted-foreground mt-1">{group.description}</p>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {group.pairs.map(({ slug, label, a, b }) => {
-                      const aMeta = HW_REGISTRY[a];
-                      const bMeta = HW_REGISTRY[b];
-                      const archLine = `${aMeta?.arch ?? '—'} · ${bMeta?.arch ?? '—'}`;
-                      return (
-                        <ComparePairCardLink
-                          key={slug}
-                          href={comparisonPairHref('zh', slug)}
-                          slug={slug}
-                          label={label}
-                          archLine={archLine}
-                          scenarioLabel={scenario.label}
-                          locale="zh"
-                          hardwareA={{
-                            label: aMeta?.label ?? a.toUpperCase(),
-                            vendor: aMeta?.vendor,
-                          }}
-                          hardwareB={{
-                            label: bMeta?.label ?? b.toUpperCase(),
-                            vendor: bMeta?.vendor,
-                          }}
-                        />
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </Card>
-          </section>
+          <CompareModelSection
+            key={model.slug}
+            id={model.slug}
+            title={
+              <>
+                <ModelLogo model={model.displayName as Model} className="size-6" />
+                {model.label}
+              </>
+            }
+            summary={`在 ${model.label} 上共有 ${pairs.length} 组芯片对比，均有基准测试数据`}
+          >
+            {groups.map((group) => (
+              <ComparePairGroup
+                key={`${model.slug}__${group.heading}`}
+                heading={group.heading}
+                description={group.description}
+              >
+                {group.pairs.map(({ slug, label, a, b }) => {
+                  const aMeta = HW_REGISTRY[a];
+                  const bMeta = HW_REGISTRY[b];
+                  const archLine = `${aMeta?.arch ?? '—'} · ${bMeta?.arch ?? '—'}`;
+                  return (
+                    <ComparePairCardLink
+                      key={slug}
+                      href={comparisonPairHref('zh', slug)}
+                      slug={slug}
+                      label={label}
+                      archLine={archLine}
+                      scenarioLabel={scenario.label}
+                      locale="zh"
+                      hardwareA={{
+                        label: aMeta?.label ?? a.toUpperCase(),
+                        vendor: aMeta?.vendor,
+                      }}
+                      hardwareB={{
+                        label: bMeta?.label ?? b.toUpperCase(),
+                        vendor: bMeta?.vendor,
+                      }}
+                    />
+                  );
+                })}
+              </ComparePairGroup>
+            ))}
+          </CompareModelSection>
         );
       })}
     </>

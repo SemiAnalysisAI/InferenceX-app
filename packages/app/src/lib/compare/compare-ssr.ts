@@ -310,7 +310,12 @@ export type CompareJsonLdVariant = 'full' | 'per-dollar';
 
 export function fmtCost(v: number): string {
   if (v >= 10) return `$${v.toFixed(1)}`;
-  return `$${v.toFixed(2)}`;
+  if (v >= 0.1) return `$${v.toFixed(2)}`;
+  return `$${v.toFixed(3)}`;
+}
+
+export function fmtTput(v: number): string {
+  return Math.round(v).toLocaleString('en-US');
 }
 
 export function fmtPctDelta(ratio: number): string {
@@ -450,17 +455,17 @@ function fullSummary(i: FullBoth): string {
 
 const FULL_BOTH_TEMPLATES: ((i: FullBoth) => string)[] = [
   (i) =>
-    `At ${i.target} tok/s/user interactivity on ${i.modelLabel}, ${i.aLabel} delivers ${i.aValue.toFixed(0)} tok/s/chip at ${fmtCost(i.aCost)} per million tokens; ${i.bLabel} delivers ${i.bValue.toFixed(0)} tok/s/chip at ${fmtCost(i.bCost)}. ${fullSummary(i)} at this point.`,
+    `At ${i.target} tok/s/user interactivity on ${i.modelLabel}, ${i.aLabel} delivers ${fmtTput(i.aValue)} tok/s/chip at ${fmtCost(i.aCost)} per million tokens; ${i.bLabel} delivers ${fmtTput(i.bValue)} tok/s/chip at ${fmtCost(i.bCost)}. ${fullSummary(i)} at this point.`,
   (i) =>
-    `${i.aLabel} posts ${i.aValue.toFixed(0)} tok/s/chip for ${fmtCost(i.aCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel}; ${i.bLabel} posts ${i.bValue.toFixed(0)} tok/s/chip for ${fmtCost(i.bCost)}. ${fullSummary(i)}.`,
+    `${i.aLabel} posts ${fmtTput(i.aValue)} tok/s/chip for ${fmtCost(i.aCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel}; ${i.bLabel} posts ${fmtTput(i.bValue)} tok/s/chip for ${fmtCost(i.bCost)}. ${fullSummary(i)}.`,
   (i) =>
-    `Throughput at ${i.target} tok/s/user on ${i.modelLabel}: ${i.aLabel} hits ${i.aValue.toFixed(0)} tok/s/chip, ${i.bLabel} hits ${i.bValue.toFixed(0)}. Per-million costs land at ${fmtCost(i.aCost)} and ${fmtCost(i.bCost)} respectively. ${fullSummary(i)}.`,
+    `Throughput at ${i.target} tok/s/user on ${i.modelLabel}: ${i.aLabel} hits ${fmtTput(i.aValue)} tok/s/chip, ${i.bLabel} hits ${fmtTput(i.bValue)}. Per-million costs land at ${fmtCost(i.aCost)} and ${fmtCost(i.bCost)} respectively. ${fullSummary(i)}.`,
   (i) =>
-    `${i.aLabel} / ${i.bLabel} on ${i.modelLabel} at ${i.target} tok/s/user: ${i.aValue.toFixed(0)} / ${i.bValue.toFixed(0)} tok/s/chip, ${fmtCost(i.aCost)} / ${fmtCost(i.bCost)} per million tokens. ${fullSummary(i)}.`,
+    `${i.aLabel} / ${i.bLabel} on ${i.modelLabel} at ${i.target} tok/s/user: ${fmtTput(i.aValue)} / ${fmtTput(i.bValue)} tok/s/chip, ${fmtCost(i.aCost)} / ${fmtCost(i.bCost)} per million tokens. ${fullSummary(i)}.`,
   (i) =>
-    `${BAND_PHRASE[i.band].charAt(0).toUpperCase() + BAND_PHRASE[i.band].slice(1)} of the ${i.range} interactivity band, at ${i.target} tok/s/user on ${i.modelLabel}: ${i.aLabel} runs ${i.aValue.toFixed(0)} tok/s/chip at ${fmtCost(i.aCost)}/M tokens, ${i.bLabel} runs ${i.bValue.toFixed(0)} at ${fmtCost(i.bCost)}/M. ${fullSummary(i)}.`,
+    `${BAND_PHRASE[i.band].charAt(0).toUpperCase() + BAND_PHRASE[i.band].slice(1)} of the ${i.range} interactivity band, at ${i.target} tok/s/user on ${i.modelLabel}: ${i.aLabel} runs ${fmtTput(i.aValue)} tok/s/chip at ${fmtCost(i.aCost)}/M tokens, ${i.bLabel} runs ${fmtTput(i.bValue)} at ${fmtCost(i.bCost)}/M. ${fullSummary(i)}.`,
   (i) =>
-    `Setting ${i.target} tok/s/user as the target on ${i.modelLabel}, ${i.aLabel} produces ${i.aValue.toFixed(0)} tok/s/chip (${fmtCost(i.aCost)} per million tokens) and ${i.bLabel} produces ${i.bValue.toFixed(0)} (${fmtCost(i.bCost)}). ${fullSummary(i)}.`,
+    `Setting ${i.target} tok/s/user as the target on ${i.modelLabel}, ${i.aLabel} produces ${fmtTput(i.aValue)} tok/s/chip (${fmtCost(i.aCost)} per million tokens) and ${i.bLabel} produces ${fmtTput(i.bValue)} (${fmtCost(i.bCost)}). ${fullSummary(i)}.`,
 ];
 
 const FULL_SINGLE_TEMPLATES: ((args: {
@@ -472,11 +477,11 @@ const FULL_SINGLE_TEMPLATES: ((args: {
   presentCost: number;
 }) => string)[] = [
   (i) =>
-    `At ${i.target} tok/s/user on ${i.modelLabel}, ${i.presentLabel} delivers ${i.presentValue.toFixed(0)} tok/s/chip at ${fmtCost(i.presentCost)} per million tokens; ${i.missingLabel} hasn't been benchmarked at this target.`,
+    `At ${i.target} tok/s/user on ${i.modelLabel}, ${i.presentLabel} delivers ${fmtTput(i.presentValue)} tok/s/chip at ${fmtCost(i.presentCost)} per million tokens; ${i.missingLabel} hasn't been benchmarked at this target.`,
   (i) =>
-    `${i.presentLabel} hits ${i.presentValue.toFixed(0)} tok/s/chip for ${fmtCost(i.presentCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel}. No ${i.missingLabel} data at this operating point.`,
+    `${i.presentLabel} hits ${fmtTput(i.presentValue)} tok/s/chip for ${fmtCost(i.presentCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel}. No ${i.missingLabel} data at this operating point.`,
   (i) =>
-    `${i.presentLabel}: ${i.presentValue.toFixed(0)} tok/s/chip, ${fmtCost(i.presentCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel}. ${i.missingLabel} is unmeasured here.`,
+    `${i.presentLabel}: ${fmtTput(i.presentValue)} tok/s/chip, ${fmtCost(i.presentCost)} per million tokens at ${i.target} tok/s/user on ${i.modelLabel}. ${i.missingLabel} is unmeasured here.`,
 ];
 
 export function pickRotated<T>(arr: T[], pageSeed: string, rowIndex: number): T {

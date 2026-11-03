@@ -26,7 +26,7 @@ const STRINGS = {
   en: {
     eyebrowSuffix: 'Chip comparison',
     mainChartLinkText: 'the main inference chart',
-    perDollarLinkText: 'View performance-per-dollar view →',
+    perDollarLinkText: 'View performance per dollar →',
     caveatSeqFallback: 'sequence',
     caveatPrecFallback: 'precision',
     emptyState:
@@ -113,49 +113,87 @@ export default function ComparePageClient({
       initialSequence={initialSequence}
       initialPrecisions={initialPrecisions}
     >
-      <div className="flex flex-col gap-4">
-        <Card className="flex flex-col gap-3">
-          <header>
-            <div className="text-xs uppercase tracking-wider text-muted-foreground">
-              {modelLabel} · {t.eyebrowSuffix}
-            </div>
-            <h1 className="vt-compare-title text-2xl lg:text-3xl font-bold tracking-tight mt-1">
-              {label}
-            </h1>
-            {isZh ? (
-              <p className="mt-2 text-sm text-muted-foreground max-w-3xl">
-                对比 <strong>{aLabel}</strong>（{aVendor} {aArch}）与 <strong>{bLabel}</strong>（
-                {bVendor} {bArch}）在 <strong>{modelLabel}</strong> 上的 AI
-                推理基准测试结果，涵盖不同 LLM
-                工作负载下的延迟、吞吐量和成本。可通过下方图表控件切换序列长度、精度和指标，操作方式与
-                <Link href="/zh" className="underline hover:text-primary">
-                  {t.mainChartLinkText}
-                </Link>
-                相同。
+      <InferenceProvider
+        activeTab="compare"
+        initialActiveHwTypes={[a, b]}
+        compareGpuPair={compareGpuPair}
+        benchmarkQueryScope={benchmarkQueryScope}
+        initialBenchmarkModel={initialModel}
+        initialBenchmarkRows={initialBenchmarkRows}
+        initialBenchmarkSequence={defaultSequence ?? undefined}
+      >
+        <div className="flex flex-col gap-4">
+          <Card className="flex flex-col gap-3">
+            <header>
+              <p className="text-sm text-muted-foreground">
+                {modelLabel} · {t.eyebrowSuffix}
               </p>
-            ) : (
-              <p className="mt-2 text-sm text-muted-foreground max-w-3xl">
-                Head-to-head AI inference benchmark comparison of <strong>{aLabel}</strong> (
-                {aVendor} {aArch}) and <strong>{bLabel}</strong> ({bVendor} {bArch}) on{' '}
-                <strong>{modelLabel}</strong>. Latency, throughput, and cost across LLM workloads.
-                Use the chart controls below to switch sequences, precisions, and metrics — same
-                interactions as{' '}
-                <Link href="/" className="underline hover:text-primary">
-                  {t.mainChartLinkText}
-                </Link>
-                .
-              </p>
-            )}
-            {agenticIntro && (
-              <p
-                className="mt-3 max-w-3xl text-sm text-foreground/80"
-                data-testid="compare-agentic-intro"
-              >
-                {agenticIntro.paragraph}{' '}
+              <h1 className="vt-compare-title mt-1 text-2xl font-semibold text-balance lg:text-3xl">
+                {label}
+              </h1>
+              {isZh ? (
+                <p className="mt-2 text-sm text-muted-foreground max-w-3xl">
+                  对比 <strong>{aLabel}</strong>（{aVendor} {aArch}）与 <strong>{bLabel}</strong>（
+                  {bVendor} {bArch}）在 <strong>{modelLabel}</strong> 上的 AI
+                  推理基准测试结果，涵盖不同 LLM
+                  工作负载下的延迟、吞吐量和成本。可通过下方图表控件切换序列长度、精度和指标，操作方式与
+                  <Link href="/zh" className="underline hover:text-primary">
+                    {t.mainChartLinkText}
+                  </Link>
+                  相同。
+                </p>
+              ) : (
+                <p className="mt-2 text-sm text-muted-foreground max-w-3xl">
+                  Head-to-head AI inference benchmark comparison of <strong>{aLabel}</strong> (
+                  {aVendor} {aArch}) and <strong>{bLabel}</strong> ({bVendor} {bArch}) on{' '}
+                  <strong>{modelLabel}</strong>. Latency, throughput, and cost across LLM workloads.
+                  Use the chart controls below to switch sequences, precisions, and metrics — same
+                  interactions as{' '}
+                  <Link href="/" className="underline hover:text-primary">
+                    {t.mainChartLinkText}
+                  </Link>
+                  .
+                </p>
+              )}
+              {agenticIntro && (
+                <p
+                  className="mt-3 max-w-3xl text-sm text-foreground"
+                  data-testid="compare-agentic-intro"
+                >
+                  {agenticIntro.paragraph}{' '}
+                  <Link
+                    href={agenticIntro.href}
+                    data-testid="compare-agentic-intro-link"
+                    className="font-medium text-brand underline underline-offset-4 hover:no-underline"
+                  >
+                    {agenticIntro.linkLabel} →
+                  </Link>
+                </p>
+              )}
+              {narrative.length > 0 && (
+                <div className="mt-3 flex flex-col gap-2 max-w-3xl" data-testid="compare-narrative">
+                  {narrative.map((para, i) => (
+                    <p key={i} className="text-sm text-foreground">
+                      {para}
+                      {i === narrative.length - 1 && (
+                        <>
+                          {' '}
+                          <span className="text-muted-foreground">
+                            {isZh
+                              ? `（以上数据基于此 URL 对应的默认 ${defaultSequence ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} 配置；在控件中切换序列长度、精度或模型后，下方表格和图表会同步更新。）`
+                              : `(Numbers reflect the default ${defaultSequence ?? t.caveatSeqFallback} · ${defaultPrecision ?? t.caveatPrecFallback} selection for this URL — table and chart below update if you change sequence, precision, or model in the controls.)`}
+                          </span>
+                        </>
+                      )}
+                    </p>
+                  ))}
+                </div>
+              )}
+              <p className="mt-2 text-sm">
                 <Link
-                  href={agenticIntro.href}
-                  data-testid="compare-agentic-intro-link"
-                  className="font-medium text-brand underline underline-offset-4 hover:no-underline"
+                  href={isZh ? `/zh/compare-per-dollar/${slug}` : `/compare-per-dollar/${slug}`}
+                  className="text-muted-foreground underline hover:text-foreground"
+                  onClick={() => track('compare_cross_link_to_per_dollar', { slug })}
                 >
                   {agenticIntro.linkLabel} →
                 </Link>

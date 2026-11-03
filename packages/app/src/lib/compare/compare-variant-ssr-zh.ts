@@ -10,6 +10,7 @@ import {
   bandFor,
   fmtCost,
   fmtPctDelta,
+  fmtTput,
   type PairSummary,
   pickRotated,
   type SsrInterpolatedRow,
@@ -51,24 +52,24 @@ function variantStateAtZh(kind: VariantCompareKind, label: string): string {
 
 const PRECISION_BOTH_TEMPLATES_ZH: ((i: VariantBoth) => string)[] = [
   (i) =>
-    `在 ${i.gpuLabel} 上运行 ${i.modelLabel}，目标交互性为 ${i.target} tok/s/user 时，${i.aLabel} 的吞吐量为 ${i.aValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${i.bLabel} 的吞吐量为 ${i.bValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${variantFullSummaryZh(i)}。较低的量化精度以模型准确率为代价换取更高吞吐量；如需了解对模型质量的影响，请查看评估页。`,
+    `在 ${i.gpuLabel} 上运行 ${i.modelLabel}，目标交互性为 ${i.target} tok/s/user 时，${i.aLabel} 的吞吐量为 ${fmtTput(i.aValue)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${i.bLabel} 的吞吐量为 ${fmtTput(i.bValue)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${variantFullSummaryZh(i)}。较低的量化精度以模型准确率为代价换取更高吞吐量；如需了解对模型质量的影响，请查看评估页。`,
   (i) =>
-    `当 ${i.modelLabel} 在 ${i.gpuLabel} 上的目标交互性为 ${i.target} tok/s/user 时，${i.aLabel} 的吞吐量为 ${i.aValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${i.bLabel} 的吞吐量为 ${i.bValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${variantFullSummaryZh(i)}。不同量化精度下的模型准确率差异可在评估页查看。`,
+    `当 ${i.modelLabel} 在 ${i.gpuLabel} 上的目标交互性为 ${i.target} tok/s/user 时，${i.aLabel} 的吞吐量为 ${fmtTput(i.aValue)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${i.bLabel} 的吞吐量为 ${fmtTput(i.bValue)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${variantFullSummaryZh(i)}。不同量化精度下的模型准确率差异可在评估页查看。`,
   (i) =>
-    `在 ${i.gpuLabel} 上运行 ${i.modelLabel}，目标交互性为 ${i.target} tok/s/user 时，${i.aLabel} 与 ${i.bLabel} 的吞吐量分别为 ${i.aValue.toFixed(0)} 和 ${i.bValue.toFixed(0)} tok/s/chip，每百万 token 成本分别为 ${fmtCost(i.aCost)} 和 ${fmtCost(i.bCost)}。${variantFullSummaryZh(i)}。较低量化精度下的成本与吞吐量权衡只是整体考量的一部分；模型准确率数据请参阅评估页。`,
+    `在 ${i.gpuLabel} 上运行 ${i.modelLabel}，目标交互性为 ${i.target} tok/s/user 时，${i.aLabel} 与 ${i.bLabel} 的吞吐量分别为 ${fmtTput(i.aValue)} 和 ${fmtTput(i.bValue)} tok/s/chip，每百万 token 成本分别为 ${fmtCost(i.aCost)} 和 ${fmtCost(i.bCost)}。${variantFullSummaryZh(i)}。较低量化精度下的成本与吞吐量权衡只是整体考量的一部分；模型准确率数据请参阅评估页。`,
   (i) =>
-    `${bandPositionZh(i.target, i.range, i.band)}。在这一运行点，${i.aLabel} 在 ${i.gpuLabel} 上运行 ${i.modelLabel} 的吞吐量为 ${i.aValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${i.bLabel} 的吞吐量为 ${i.bValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${variantFullSummaryZh(i)}。调整量化精度会同时影响推理速度和模型质量；模型准确率基准测试请参阅评估页。`,
+    `${bandPositionZh(i.target, i.range, i.band)}。在这一运行点，${i.aLabel} 在 ${i.gpuLabel} 上运行 ${i.modelLabel} 的吞吐量为 ${fmtTput(i.aValue)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${i.bLabel} 的吞吐量为 ${fmtTput(i.bValue)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${variantFullSummaryZh(i)}。调整量化精度会同时影响推理速度和模型质量；模型准确率基准测试请参阅评估页。`,
 ];
 
 const SPEC_DECODE_BOTH_TEMPLATES_ZH: ((i: VariantBoth) => string)[] = [
   (i) =>
-    `在 ${i.gpuLabel} 上运行 ${i.modelLabel}，目标交互性设为 ${i.target} tok/s/user：${variantStateAtZh('spec-decode', i.aLabel)}，吞吐量为 ${i.aValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${variantStateAtZh('spec-decode', i.bLabel)}，吞吐量为 ${i.bValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${variantFullSummaryZh(i)}。投机解码通过接受 draft token 降低每 token 延迟；收益因工作负载和 prompt 分布而异。`,
+    `在 ${i.gpuLabel} 上运行 ${i.modelLabel}，目标交互性设为 ${i.target} tok/s/user：${variantStateAtZh('spec-decode', i.aLabel)}，吞吐量为 ${fmtTput(i.aValue)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${variantStateAtZh('spec-decode', i.bLabel)}，吞吐量为 ${fmtTput(i.bValue)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${variantFullSummaryZh(i)}。投机解码通过接受 draft token 降低每 token 延迟；收益因工作负载和 prompt 分布而异。`,
   (i) =>
-    `${i.modelLabel} 在 ${i.gpuLabel} 上的目标交互性设为 ${i.target} tok/s/user：${variantStateAtZh('spec-decode', i.aLabel)}，吞吐量为 ${i.aValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${variantStateAtZh('spec-decode', i.bLabel)}，吞吐量为 ${i.bValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${variantFullSummaryZh(i)}。draft token 接受率决定了在给定并发数下，投机解码是提升性能还是拖累性能。`,
+    `${i.modelLabel} 在 ${i.gpuLabel} 上的目标交互性设为 ${i.target} tok/s/user：${variantStateAtZh('spec-decode', i.aLabel)}，吞吐量为 ${fmtTput(i.aValue)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${variantStateAtZh('spec-decode', i.bLabel)}，吞吐量为 ${fmtTput(i.bValue)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${variantFullSummaryZh(i)}。draft token 接受率决定了在给定并发数下，投机解码是提升性能还是拖累性能。`,
   (i) =>
-    `在 ${i.gpuLabel} 上运行 ${i.modelLabel}，目标交互性设为 ${i.target} tok/s/user：${variantStateAtZh('spec-decode', i.aLabel)}，吞吐量为 ${i.aValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${variantStateAtZh('spec-decode', i.bLabel)}，吞吐量为 ${i.bValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${variantFullSummaryZh(i)}。投机解码会增加 draft token 的计算量，以减少解码步数；收益取决于序列长度和批大小。`,
+    `在 ${i.gpuLabel} 上运行 ${i.modelLabel}，目标交互性设为 ${i.target} tok/s/user：${variantStateAtZh('spec-decode', i.aLabel)}，吞吐量为 ${fmtTput(i.aValue)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${variantStateAtZh('spec-decode', i.bLabel)}，吞吐量为 ${fmtTput(i.bValue)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${variantFullSummaryZh(i)}。投机解码会增加 draft token 的计算量，以减少解码步数；收益取决于序列长度和批大小。`,
   (i) =>
-    `${bandPositionZh(i.target, i.range, i.band)}。在这一运行点，${variantStateAtZh('spec-decode', i.aLabel)}，吞吐量为 ${i.aValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${variantStateAtZh('spec-decode', i.bLabel)}，吞吐量为 ${i.bValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${variantFullSummaryZh(i)}。投机解码的收益因工作负载而异；输出较短的 prompt 通常收益较小。`,
+    `${bandPositionZh(i.target, i.range, i.band)}。在这一运行点，${variantStateAtZh('spec-decode', i.aLabel)}，吞吐量为 ${fmtTput(i.aValue)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${variantStateAtZh('spec-decode', i.bLabel)}，吞吐量为 ${fmtTput(i.bValue)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${variantFullSummaryZh(i)}。投机解码的收益因工作负载而异；输出较短的 prompt 通常收益较小。`,
 ];
 
 const VARIANT_SINGLE_TEMPLATES_ZH: ((args: {
@@ -82,11 +83,11 @@ const VARIANT_SINGLE_TEMPLATES_ZH: ((args: {
   presentCost: number;
 }) => string)[] = [
   (i) =>
-    `在 ${i.gpuLabel} 上运行 ${i.modelLabel}，目标交互性设为 ${i.target} tok/s/user：${variantStateAtZh(i.kind, i.presentLabel)}，吞吐量为 ${i.presentValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.presentCost)}；${variantStateAtZh(i.kind, i.missingLabel)}，该运行点暂无基准测试数据。`,
+    `在 ${i.gpuLabel} 上运行 ${i.modelLabel}，目标交互性设为 ${i.target} tok/s/user：${variantStateAtZh(i.kind, i.presentLabel)}，吞吐量为 ${fmtTput(i.presentValue)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.presentCost)}；${variantStateAtZh(i.kind, i.missingLabel)}，该运行点暂无基准测试数据。`,
   (i) =>
-    `${i.modelLabel} 在 ${i.gpuLabel} 上的目标交互性设为 ${i.target} tok/s/user：${variantStateAtZh(i.kind, i.presentLabel)}，吞吐量为 ${i.presentValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.presentCost)}；${variantStateAtZh(i.kind, i.missingLabel)}，该运行点暂无数据。`,
+    `${i.modelLabel} 在 ${i.gpuLabel} 上的目标交互性设为 ${i.target} tok/s/user：${variantStateAtZh(i.kind, i.presentLabel)}，吞吐量为 ${fmtTput(i.presentValue)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.presentCost)}；${variantStateAtZh(i.kind, i.missingLabel)}，该运行点暂无数据。`,
   (i) =>
-    `在 ${i.gpuLabel} 上运行 ${i.modelLabel}，目标交互性设为 ${i.target} tok/s/user：${variantStateAtZh(i.kind, i.presentLabel)}，吞吐量为 ${i.presentValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.presentCost)}；${variantStateAtZh(i.kind, i.missingLabel)}，该运行点尚未测试。`,
+    `在 ${i.gpuLabel} 上运行 ${i.modelLabel}，目标交互性设为 ${i.target} tok/s/user：${variantStateAtZh(i.kind, i.presentLabel)}，吞吐量为 ${fmtTput(i.presentValue)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.presentCost)}；${variantStateAtZh(i.kind, i.missingLabel)}，该运行点尚未测试。`,
 ];
 
 export function variantCompareNarrativeZh(

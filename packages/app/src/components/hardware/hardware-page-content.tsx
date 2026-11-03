@@ -22,6 +22,10 @@ const HARDWARE_PROSE_CLASS = cn(
   'prose-table:my-5 prose-td:tabular-nums [&_td:first-child]:whitespace-nowrap',
 );
 
+// CJK text has per-character min-content widths, so on phones an auto-width table squeezes
+// every column to a character and the rows turn tall. Size zh tables to content in the scroller.
+const HARDWARE_PROSE_ZH_CLASS = 'max-md:prose-table:w-max max-md:prose-table:min-w-full';
+
 export interface HardwarePageContentProps {
   locale: Locale;
   meta: HardwarePageMeta;
@@ -48,7 +52,10 @@ export function HardwarePageContent({ locale, meta, headings, content }: Hardwar
             {hasToc && (
               <BlogToc headings={headings} locale={locale} variant="inline" className="lg:hidden" />
             )}
-            <article className={HARDWARE_PROSE_CLASS} data-testid="hardware-article">
+            <article
+              className={cn(HARDWARE_PROSE_CLASS, locale === 'zh' && HARDWARE_PROSE_ZH_CLASS)}
+              data-testid="hardware-article"
+            >
               {content}
               <p className="mt-10 max-w-[76ch] border-t border-border/40 pt-5 text-xs leading-5 text-muted-foreground">
                 {BLOG_COPY[locale].copyright}

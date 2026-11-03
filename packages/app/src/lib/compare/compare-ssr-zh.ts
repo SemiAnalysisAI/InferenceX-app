@@ -14,6 +14,7 @@ import {
   computeCompareStat,
   fmtCost,
   fmtPctDelta,
+  fmtTput,
   type FullBoth,
   type PairSummary,
   type PerDollarBoth,
@@ -104,17 +105,17 @@ function fullSummaryZh(i: FullBoth): string {
 
 const FULL_BOTH_TEMPLATES_ZH: ((i: FullBoth) => string)[] = [
   (i) =>
-    `当 ${i.modelLabel} 的目标交互性为 ${i.target} tok/s/user 时，${i.aLabel} 的吞吐量为 ${i.aValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${i.bLabel} 的吞吐量为 ${i.bValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${fullSummaryZh(i)}。`,
+    `当 ${i.modelLabel} 的目标交互性为 ${i.target} tok/s/user 时，${i.aLabel} 的吞吐量为 ${fmtTput(i.aValue)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${i.bLabel} 的吞吐量为 ${fmtTput(i.bValue)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${fullSummaryZh(i)}。`,
   (i) =>
-    `在 ${i.modelLabel} 的 ${i.target} tok/s/user 运行点，${i.aLabel} 的吞吐量为 ${i.aValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${i.bLabel} 的吞吐量为 ${i.bValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${fullSummaryZh(i)}。`,
+    `在 ${i.modelLabel} 的 ${i.target} tok/s/user 运行点，${i.aLabel} 的吞吐量为 ${fmtTput(i.aValue)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${i.bLabel} 的吞吐量为 ${fmtTput(i.bValue)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${fullSummaryZh(i)}。`,
   (i) =>
-    `当 ${i.modelLabel} 的目标交互性为 ${i.target} tok/s/user 时，${i.aLabel} 与 ${i.bLabel} 的吞吐量分别为 ${i.aValue.toFixed(0)} 和 ${i.bValue.toFixed(0)} tok/s/chip，每百万 token 成本分别为 ${fmtCost(i.aCost)} 和 ${fmtCost(i.bCost)}。${fullSummaryZh(i)}。`,
+    `当 ${i.modelLabel} 的目标交互性为 ${i.target} tok/s/user 时，${i.aLabel} 与 ${i.bLabel} 的吞吐量分别为 ${fmtTput(i.aValue)} 和 ${fmtTput(i.bValue)} tok/s/chip，每百万 token 成本分别为 ${fmtCost(i.aCost)} 和 ${fmtCost(i.bCost)}。${fullSummaryZh(i)}。`,
   (i) =>
-    `以 ${i.target} tok/s/user 为目标运行 ${i.modelLabel} 时，${i.aLabel} 的吞吐量为 ${i.aValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${i.bLabel} 的吞吐量为 ${i.bValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${fullSummaryZh(i)}。`,
+    `以 ${i.target} tok/s/user 为目标运行 ${i.modelLabel} 时，${i.aLabel} 的吞吐量为 ${fmtTput(i.aValue)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${i.bLabel} 的吞吐量为 ${fmtTput(i.bValue)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${fullSummaryZh(i)}。`,
   (i) =>
-    `${bandPositionZh(i.target, i.range, i.band)}。在这一运行点，${i.aLabel} 运行 ${i.modelLabel} 的吞吐量为 ${i.aValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${i.bLabel} 的吞吐量为 ${i.bValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${fullSummaryZh(i)}。`,
+    `${bandPositionZh(i.target, i.range, i.band)}。在这一运行点，${i.aLabel} 运行 ${i.modelLabel} 的吞吐量为 ${fmtTput(i.aValue)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${i.bLabel} 的吞吐量为 ${fmtTput(i.bValue)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${fullSummaryZh(i)}。`,
   (i) =>
-    `将 ${i.modelLabel} 的目标交互性设为 ${i.target} tok/s/user 时，${i.aLabel} 的吞吐量为 ${i.aValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${i.bLabel} 的吞吐量为 ${i.bValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${fullSummaryZh(i)}。`,
+    `将 ${i.modelLabel} 的目标交互性设为 ${i.target} tok/s/user 时，${i.aLabel} 的吞吐量为 ${fmtTput(i.aValue)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.aCost)}；${i.bLabel} 的吞吐量为 ${fmtTput(i.bValue)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.bCost)}。${fullSummaryZh(i)}。`,
 ];
 
 const FULL_SINGLE_TEMPLATES_ZH: ((args: {
@@ -126,11 +127,11 @@ const FULL_SINGLE_TEMPLATES_ZH: ((args: {
   presentCost: number;
 }) => string)[] = [
   (i) =>
-    `当 ${i.modelLabel} 的目标交互性为 ${i.target} tok/s/user 时，${i.presentLabel} 的吞吐量为 ${i.presentValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.presentCost)}；${i.missingLabel} 在该运行点暂无基准测试数据。`,
+    `当 ${i.modelLabel} 的目标交互性为 ${i.target} tok/s/user 时，${i.presentLabel} 的吞吐量为 ${fmtTput(i.presentValue)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.presentCost)}；${i.missingLabel} 在该运行点暂无基准测试数据。`,
   (i) =>
-    `在 ${i.modelLabel} 的 ${i.target} tok/s/user 运行点，${i.presentLabel} 的吞吐量为 ${i.presentValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.presentCost)}；${i.missingLabel} 在该运行点暂无数据。`,
+    `在 ${i.modelLabel} 的 ${i.target} tok/s/user 运行点，${i.presentLabel} 的吞吐量为 ${fmtTput(i.presentValue)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.presentCost)}；${i.missingLabel} 在该运行点暂无数据。`,
   (i) =>
-    `当 ${i.modelLabel} 的目标交互性为 ${i.target} tok/s/user 时，${i.presentLabel} 的吞吐量为 ${i.presentValue.toFixed(0)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.presentCost)}；${i.missingLabel} 在该运行点尚未测试。`,
+    `当 ${i.modelLabel} 的目标交互性为 ${i.target} tok/s/user 时，${i.presentLabel} 的吞吐量为 ${fmtTput(i.presentValue)} tok/s/chip，每百万 token 成本为 ${fmtCost(i.presentCost)}；${i.missingLabel} 在该运行点尚未测试。`,
 ];
 
 export const AGENTIC_SCENARIO_INTRO_ZH: AgenticScenarioIntro = {

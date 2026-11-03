@@ -9,9 +9,9 @@ const INDEX_DESCRIPTION_EN =
 
 export const MODEL_PAGE_COPY = {
   en: {
-    indexTitle: 'Model Architectures',
+    indexTitle: 'Model architectures',
     indexDescription: INDEX_DESCRIPTION_EN,
-    inferenceDashboard: 'Inference Dashboard',
+    inferenceDashboard: 'Inference dashboard',
     modelBreadcrumb: 'Model',
     released: 'Released',
     detailTitle: (model: string) => `${model} — Architecture, Evals & Inference Performance`,
@@ -19,9 +19,7 @@ export const MODEL_PAGE_COPY = {
       `${model} inference performance (${scenario})`,
     dashboardDescription: (model: string, scenario: string) =>
       `Live InferenceX benchmark data for ${model} on the ${scenario} workload, measured in total tokens per dollar across every chip config with data.`,
-    openDashboard: 'Open in full dashboard →',
-    inferenceBenchmarksLink: (model: string) =>
-      `${model} inference benchmarks: tok/s and $/M tok by chip →`,
+    openDashboard: 'Open in full dashboard',
     englishArticleNotice: '',
     englishArticleLink: '',
     developerLogoAlt: (developer: string) => `${developer} logo`,
@@ -37,9 +35,7 @@ export const MODEL_PAGE_COPY = {
     dashboardHeading: (model: string, scenario: string) => `${model} 推理性能（${scenario}）`,
     dashboardDescription: (model: string, scenario: string) =>
       `展示 ${model} 在 ${scenario} 工作负载下的 InferenceX 实时基准测试结果，覆盖所有有数据的芯片配置，并以每美元总 token 数为比较指标。`,
-    openDashboard: '在完整仪表板中查看 →',
-    inferenceBenchmarksLink: (model: string) =>
-      `查看 ${model} 推理基准测试：各芯片的 tok/s 与 $/M tok →`,
+    openDashboard: '在完整仪表板中查看',
     englishArticleNotice:
       '模型深度解析正文目前仅提供英文版；下方保留英文原文，页面其余文案均已中文化。',
     englishArticleLink: '查看英文原文',

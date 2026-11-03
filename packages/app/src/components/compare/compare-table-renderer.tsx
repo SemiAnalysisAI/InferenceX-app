@@ -49,7 +49,7 @@ export function CompareTableRenderer({
     }[view.status];
     return (
       <div
-        className="border border-border/50 rounded-md px-4 py-3 text-sm text-muted-foreground bg-muted/30"
+        className="rounded-lg border border-border/30 px-4 py-3 text-sm text-muted-foreground"
         data-testid="compare-table-status"
         data-status={view.status}
         role={view.status === 'error' ? 'alert' : 'status'}

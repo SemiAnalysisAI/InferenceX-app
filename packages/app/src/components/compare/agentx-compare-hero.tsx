@@ -397,10 +397,10 @@ const LANDING_HARDWARE_RESULTS = [
   {
     id: 'tpu-kimi-k3',
     vendor: 'Google',
-    title: 'TPU Kimi K3 Submission',
+    title: 'TPU Kimi K3 submission',
     titleZh: 'TPU Kimi K3 提交结果',
-    subtitle: '2.8 Trillion parameters AgentX',
-    subtitleZh: '2.8 万亿参数 AgentX',
+    subtitle: '2.8 trillion parameters · AgentX',
+    subtitleZh: '2.8 万亿参数 · AgentX',
     href: '/inference/kimi-k3',
     model: 'kimi-k3',
     analyticsEvent: 'landing_tpu_results_clicked',
@@ -409,10 +409,10 @@ const LANDING_HARDWARE_RESULTS = [
   {
     id: 'rubin-glm-5-3',
     vendor: 'NVIDIA',
-    title: 'Vera Rubin NVL72 GLM 5.3 Submission',
+    title: 'Vera Rubin NVL72 GLM 5.3 submission',
     titleZh: 'Vera Rubin NVL72 GLM 5.3 提交结果',
-    subtitle: '744 Billion parameters AgentX',
-    subtitleZh: '7440 亿参数 AgentX',
+    subtitle: '744 billion parameters · AgentX',
+    subtitleZh: '7440 亿参数 · AgentX',
     href: '/inference/glm-5-3',
     model: 'glm-5-3',
     analyticsEvent: 'landing_rubin_results_clicked',
@@ -441,18 +441,16 @@ const LANDING_HARDWARE_RESULTS = [
 
 const STRINGS = {
   en: {
-    eyebrow: 'AgentX / live results',
-    title: 'Compare Realistic Agentic Inference Perf',
+    title: 'Compare realistic agentic inference performance',
     description:
-      'Long Context Multi Turn Inference Performance. Compare Across Google TPUv7 Ironwood, OpenAI Jalapeño, MI355X, GB300 NVL72, GB200 NVL72, B200, H200, H100, RTX Pro, and soon TPUv8i, SambaNova SN50, Rubin NVL72, MI455X UALoE72',
-    revenueCalculator: 'Token Revenue Calculator',
+      'Long-context, multi-turn inference performance on Google TPUv7 Ironwood, OpenAI Jalapeño, MI355X, GB300 NVL72, GB200 NVL72, B200, H200, H100 and RTX Pro. TPUv8i, SambaNova SN50, Rubin NVL72 and MI455X UALoE72 are next.',
+    revenueCalculator: 'Token revenue calculator',
     dashboard: 'Dashboard',
     ledgerTitle: 'Models with AgentX results',
     modelAction: 'View results',
-    newModel: 'NEW',
+    newModel: 'New',
   },
   zh: {
-    eyebrow: 'AgentX｜最新结果',
     title: '真实智能体工作负载下的推理性能对比',
     description:
       '比较不同硬件平台在长上下文、多轮智能体工作负载下的推理性能，覆盖 Google TPUv7 Ironwood、OpenAI Jalapeño、MI355X、GB300 NVL72、GB200 NVL72、B200、H200、H100 和 RTX Pro，即将支持 TPUv8i、SambaNova SN50、Rubin NVL72 与 MI455X UALoE72。',
@@ -485,23 +483,20 @@ export function AgentXCompareHero({
     <section data-testid="compare-agentx-primary">
       <Card className="overflow-hidden p-0 md:p-0">
         <div className="grid lg:grid-cols-[minmax(0,1.15fr)_minmax(19rem,0.85fr)]">
-          <div className="flex flex-col justify-center px-6 py-5 md:px-8 md:py-6 lg:px-10 lg:py-7">
-            <p className="font-mono text-xs font-semibold tracking-eyebrow text-brand uppercase">
-              {t.eyebrow}
-            </p>
+          <div className="flex flex-col justify-center p-6 md:p-8 lg:p-10">
             <div className="relative">
-              <Heading className="mt-3 max-w-2xl text-2xl/[1.8rem] font-semibold tracking-tight text-foreground lg:text-[2.4rem]/[2.4rem]">
+              <Heading className="max-w-2xl text-3xl font-semibold text-foreground lg:text-4xl lg:tracking-heading">
                 {t.title}
               </Heading>
               {surface === 'landing' && <MinecraftSplash />}
             </div>
-            <p className="mt-3 max-w-3xl text-base leading-7 text-muted-foreground lg:text-lg">
+            <p className="mt-4 max-w-3xl text-base leading-7 text-muted-foreground">
               {t.description}
             </p>
             <div
               aria-hidden="true"
               data-testid="compare-agentx-vendor-marks"
-              className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-foreground"
+              className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-foreground"
             >
               {VENDOR_MARKS.filter((mark) => surface === 'landing' || mark.name !== 'Huawei').map(
                 (mark) => (
@@ -538,14 +533,14 @@ export function AgentXCompareHero({
                 ),
               )}
             </div>
-            <div className="mt-5 flex flex-wrap gap-3">
+            <div className="mt-6 flex flex-wrap gap-3">
               <CompareIndexTrackedLink
                 data-testid="compare-agentx-revenue-calculator-link"
                 href={`${prefix}/profit-estimator-per-gigawatt`}
                 analyticsEvent="compare_agentx_revenue_calculator_clicked"
                 analyticsSurface={surface}
                 appNavigation
-                className="group motion-press inline-flex min-h-11 items-center gap-2 rounded-md bg-brand px-5 py-2.5 font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-brand/90"
+                className="group motion-press inline-flex min-h-11 items-center gap-2 rounded-md bg-brand px-5 py-2.5 font-medium text-primary-foreground transition-colors hover:bg-brand/90"
               >
                 {t.revenueCalculator}
                 <ArrowRight
@@ -560,7 +555,7 @@ export function AgentXCompareHero({
                 analyticsTarget="kimi-k3"
                 analyticsSurface={surface}
                 appNavigation
-                className="group motion-press inline-flex min-h-11 items-center gap-2 rounded-md border border-border px-5 py-2.5 font-semibold text-foreground transition-colors hover:bg-muted"
+                className="group motion-press inline-flex min-h-11 items-center gap-2 rounded-md border border-border px-5 py-2.5 font-medium text-foreground transition-colors hover:bg-muted"
               >
                 {t.dashboard}
                 <ArrowRight
@@ -571,9 +566,9 @@ export function AgentXCompareHero({
             </div>
           </div>
 
-          <div className="border-t border-border/70 bg-muted/15 lg:border-t-0 lg:border-l">
+          <div className="border-t border-border/30 bg-muted/20 lg:border-t-0 lg:border-l">
             {surface === 'landing' && (
-              <div className="divide-y divide-border/70 border-b border-border/70">
+              <div className="divide-y divide-border/20 border-b border-border/20">
                 {LANDING_HARDWARE_RESULTS.map((result) => {
                   const mark = VENDOR_MARKS.find((vendor) => vendor.name === result.vendor);
                   return (
@@ -585,7 +580,7 @@ export function AgentXCompareHero({
                       analyticsTarget={result.model}
                       analyticsSurface={surface}
                       appNavigation
-                      className="group flex min-h-14 items-center justify-between gap-4 px-5 py-2.5 transition-colors hover:bg-brand/5 focus-visible:outline-none"
+                      className="group flex min-h-14 items-center justify-between gap-4 px-5 py-3 transition-colors hover:bg-muted/60 focus-visible:outline-none"
                     >
                       <span className="flex min-w-0 items-center gap-3">
                         {result.vendor === 'MiniMax' ? (
@@ -615,7 +610,7 @@ export function AgentXCompareHero({
                           </svg>
                         )}
                         <span className="min-w-0">
-                          <span className="flex items-center gap-1.5 text-sm font-semibold leading-tight text-foreground group-hover:text-brand">
+                          <span className="flex items-center gap-2 text-sm font-medium leading-tight text-foreground">
                             <span className="min-w-0">
                               {locale === 'zh' ? result.titleZh : result.title}
                             </span>
@@ -625,7 +620,7 @@ export function AgentXCompareHero({
                               </NewBadge>
                             )}
                           </span>
-                          <span className="mt-1 block font-mono text-3xs tracking-eyebrow text-brand uppercase">
+                          <span className="mt-1 block text-xs text-muted-foreground">
                             {locale === 'zh' && 'subtitleZh' in result
                               ? result.subtitleZh
                               : result.subtitle}
@@ -644,7 +639,7 @@ export function AgentXCompareHero({
                 })}
               </div>
             )}
-            <nav aria-label={t.ledgerTitle} className="divide-y divide-border/70">
+            <nav aria-label={t.ledgerTitle} className="divide-y divide-border/20">
               {ledgerModels.map((model) => (
                 <CompareIndexTrackedLink
                   key={model.slug}
@@ -654,7 +649,7 @@ export function AgentXCompareHero({
                   analyticsTarget={model.slug}
                   analyticsSurface={surface}
                   appNavigation
-                  className="group flex min-h-14 items-center justify-between gap-4 px-5 py-2.5 transition-colors hover:bg-brand/5 focus-visible:outline-none"
+                  className="group flex min-h-14 items-center justify-between gap-4 px-5 py-3 transition-colors hover:bg-muted/60 focus-visible:outline-none"
                 >
                   <span className="flex min-w-0 items-center gap-3">
                     {MODEL_LOGOS[model.slug] && (
@@ -668,16 +663,11 @@ export function AgentXCompareHero({
                         className="size-8 shrink-0 object-contain"
                       />
                     )}
-                    <span className="min-w-0">
-                      <span className="flex items-center gap-1.5 text-sm font-semibold leading-tight text-foreground group-hover:text-brand">
-                        <span className="min-w-0">{model.label}</span>
-                        {isNewAgentxModel(model) && (
-                          <NewBadge data-new-badge="agentx-ledger">{t.newModel}</NewBadge>
-                        )}
-                      </span>
-                      <span className="mt-1 block font-mono text-3xs tracking-eyebrow text-brand uppercase">
-                        AgentX
-                      </span>
+                    <span className="flex min-w-0 items-center gap-2 text-sm font-medium leading-tight text-foreground">
+                      <span className="min-w-0">{model.label}</span>
+                      {isNewAgentxModel(model) && (
+                        <NewBadge data-new-badge="agentx-ledger">{t.newModel}</NewBadge>
+                      )}
                     </span>
                   </span>
                   <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground group-hover:text-foreground">
