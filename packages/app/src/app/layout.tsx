@@ -1,11 +1,10 @@
 import '@/lib/runtime/polyfills';
 import './globals.css';
 
-import { Analytics } from '@vercel/analytics/next';
-import { SpeedInsights } from '@vercel/speed-insights/next';
 import type { Metadata } from 'next';
 import { DM_Sans } from 'next/font/google';
 
+import { VercelAnalytics } from '@/components/analytics/vercel-analytics';
 import { Footer } from '@/components/footer/footer';
 import { Header } from '@/components/header/header';
 import { RouteTransition } from '@/components/motion/route-transition';
@@ -210,8 +209,7 @@ export default function RootLayout({
               <Footer />
             </ThemeProvider>
           </QueryProvider>
-          {process.env.VERCEL && <Analytics />}
-          {process.env.VERCEL && <SpeedInsights />}
+          {process.env.VERCEL && <VercelAnalytics />}
         </PostHogProvider>
       </body>
     </html>

@@ -16,6 +16,7 @@ import type { HardwareConfig, InferenceData } from '@/components/inference/types
 import { UnofficialBanner } from '@/components/ui/unofficial-banner';
 import type { BenchmarkRow, EvalRow } from '@/lib/api/api';
 import type { TokenBasis } from '@/lib/benchmarks/benchmark-transform';
+import { DEFAULT_CHIP_BASIS, type ChipBasis } from '@/lib/benchmarks/chip-basis';
 import { normalizeEvalHardwareKey } from '@/lib/charts/chart-utils';
 import { notifyClientSearchChange } from '@/lib/routing/client-navigation';
 import { setProfitRouteUnofficialRuns } from '@/lib/routing/profit-estimator-routes';
@@ -89,6 +90,7 @@ export interface UnofficialRunContextType {
     sequence: Sequence,
     chartType: 'e2e' | 'interactivity',
     tokenBasis?: TokenBasis,
+    chipBasis?: ChipBasis,
   ) => {
     data: InferenceData[];
     hardwareConfig: HardwareConfig;
@@ -317,7 +319,9 @@ async function fetchUnofficialRuns(
   signal: AbortSignal,
 ): Promise<UnofficialRunResponse> {
   const url = `/api/unofficial-run?runId=${encodeURIComponent(ids.join(','))}`;
-  const response = await fetch(url, { cache: 'no-store', signal });
+  // Default cache mode: the route's Cache-Control already keeps in-progress
+  // runs fresh, and `no-store` would make every load bypass the CDN copy.
+  const response = await fetch(url, { signal });
   const data = (await response.json()) as Partial<UnofficialRunResponse> & {
     error?: string;
   };
@@ -375,6 +379,12 @@ export function UnofficialRunProvider({
         ? chartDataModule.buildChartData(unofficialBenchmarkRows)
         : null,
     [unofficialBenchmarkRows, chartDataModule],
+  );
+  // Non-default token and chip bases are built on first request and kept per row set.
+  const overlayVariantCache = useMemo(
+    () => new Map<string, UnofficialChartData>(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [unofficialBenchmarkRows],
   );
   const unofficialUncachedChartData = useMemo(
     () =>
@@ -456,14 +466,29 @@ export function UnofficialRunProvider({
       sequence: Sequence,
       chartType: 'e2e' | 'interactivity',
       tokenBasis: TokenBasis = 'total',
+      chipBasis: ChipBasis = DEFAULT_CHIP_BASIS,
     ) => {
-      const source = tokenBasis === 'uncached' ? unofficialUncachedChartData : unofficialChartData;
+      let source = tokenBasis === 'uncached' ? unofficialUncachedChartData : unofficialChartData;
+      if (chipBasis !== DEFAULT_CHIP_BASIS && unofficialBenchmarkRows && chartDataModule) {
+        const key = `${tokenBasis}:${chipBasis}`;
+        source = overlayVariantCache.get(key) ?? null;
+        if (!source) {
+          source = chartDataModule.buildChartData(unofficialBenchmarkRows, tokenBasis, chipBasis);
+          overlayVariantCache.set(key, source);
+        }
+      }
       const chartGroup = source?.[`${model}_${sequence}`];
       if (!chartGroup) return null;
       const dataForChart = chartType === 'e2e' ? chartGroup.e2e : chartGroup.interactivity;
       return { data: dataForChart.data, hardwareConfig: dataForChart.gpus };
     },
-    [unofficialChartData, unofficialUncachedChartData],
+    [
+      unofficialChartData,
+      unofficialUncachedChartData,
+      unofficialBenchmarkRows,
+      chartDataModule,
+      overlayVariantCache,
+    ],
   );
 
   const resetOverlaySelection = useCallback(() => {

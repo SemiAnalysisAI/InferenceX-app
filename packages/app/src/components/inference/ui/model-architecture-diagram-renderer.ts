@@ -118,7 +118,7 @@ export function localizeArchitectureDiagramText(value: string, locale: Locale): 
     )
     .replaceAll('sparse top-', '稀疏 top-');
 }
-const BLOCK_COLORS = {
+export const BLOCK_COLORS = {
   embedding: { light: '#dbeafe', dark: '#1e3a5f', stroke: '#3b82f6' },
   attention: { light: '#fef3c7', dark: '#422006', stroke: '#d97706' },
   ffn: { light: '#d1fae5', dark: '#064e3b', stroke: '#059669' },
@@ -305,80 +305,63 @@ export function deriveArchitectureVariant(
   };
 }
 
-export function renderDiagram(
-  svgEl: SVGSVGElement,
+// Layout constants shared by the height calculation and the renderer.
+const pad = { top: 20, right: 16, bottom: 16, left: 16 };
+const blockH = 52;
+const smallH = 32;
+const arrowH = 20;
+const circleR = 9;
+const mergeGap = 36;
+const residLeftX = pad.left + 6;
+const collapsedTxH = 64;
+
+const expertSize = 36;
+const expertGap = 6;
+const expertGridH = 70;
+
+const subBlockH = 34;
+const subArrowH = 12;
+const subPadY = 10;
+const drillGap = 8;
+
+/**
+ * Height the drawn diagram will have, or null for the encoder-decoder layout, whose
+ * height depends on text wrapping at the rendered width.
+ */
+export function diagramHeight(
   arch: ModelArchitecture,
-  isDark: boolean,
-  expandedBlocks: Set<string>,
-  onBlockClick: (blockId: string) => void,
-  locale: Locale = 'en',
-) {
-  if (arch.encoderDecoder) {
-    renderCausalEncoderDecoder(svgEl, arch, isDark, expandedBlocks, onBlockClick, locale);
-    return;
-  }
-  const svg = d3.select(svgEl);
-  svg.selectAll('*').remove();
+  expandedBlocks: ReadonlySet<string>,
+): number | null {
+  if (arch.encoderDecoder) return null;
+  return computeDiagramLayout(arch, expandedBlocks).totalH;
+}
 
-  const containerWidth = svgEl.clientWidth || svgEl.parentElement?.clientWidth || 600;
-  const width = Math.min(containerWidth, 640);
-
-  const fg = isDark ? '#eaebec' : '#131416';
-  const mutedFg = isDark ? '#9ca3af' : '#6b7280';
-  const borderColor = isDark ? '#374151' : '#d1d5db';
-  const bgSubtle = isDark ? '#1f2937' : '#f9fafb';
-  const expandedBg = isDark ? '#111827' : '#f1f5f9';
-  const localizedText = (value: string): string => localizeArchitectureDiagramText(value, locale);
-
-  const pad = { top: 20, right: 16, bottom: 16, left: 16 };
-  const bw = width - pad.left - pad.right;
-  const innerW = bw - 32;
-  const innerX = pad.left + 16;
-  const cx = width / 2;
-  const blockH = 52;
-  const smallH = 32;
-  const arrowH = 20;
-  const circleR = 9;
-  const mergeGap = 36;
-  const residLeftX = pad.left + 6;
-  const collapsedTxH = 64;
-
-  const expertSize = 36;
-  const expertGap = 6;
-  const expertGridH = 70;
-
-  const subBlockH = 34;
-  const subArrowH = 12;
-  const subPadY = 10;
-  const drillGap = 8;
-
+/**
+ * Vertical layout of the standard diagram. It depends only on the architecture and the
+ * expanded blocks, never on the width, so the page can reserve the height before drawing.
+ */
+export function computeDiagramLayout(arch: ModelArchitecture, expandedBlocks: ReadonlySet<string>) {
+  const variant = deriveArchitectureVariant(arch, expandedBlocks, {
+    blockHeight: subBlockH,
+    arrowHeight: subArrowH,
+    paddingY: subPadY,
+  });
   const {
     isMoE,
-    sharedExperts,
-    ffnVariant,
     hasDenseLayers,
-    denseLayerCount,
-    moeLayerCount,
-    isAttnExpandable,
+    hasHashBlock,
     hasAlternatingLayers,
-    alternatingSpecs,
-    attnFlow,
-    ffnFlow,
-    denseFFNFlow,
-    attnExpanded,
-    ffnExpanded,
     txExpanded,
     denseTxExpanded,
     denseAttnExpanded,
     denseFFNExpanded,
-    hasHashBlock,
     hashBlockExpanded,
     hashExpertsExpanded,
     altBlockExpanded,
     altExpertsExpanded,
-    altAttnExpandable,
     altAttnExpanded,
-    altAttnFlow,
+    attnExpanded,
+    ffnExpanded,
     attnExpandedH,
     ffnExpandedH,
     denseAttnExpandedH,
@@ -386,11 +369,7 @@ export function renderDiagram(
     altExpertsExpandedH,
     altAttnExpandedH,
     hashExpertsExpandedH,
-  } = deriveArchitectureVariant(arch, expandedBlocks, {
-    blockHeight: subBlockH,
-    arrowHeight: subArrowH,
-    paddingY: subPadY,
-  });
+  } = variant;
 
   let y = pad.top;
 
@@ -644,6 +623,176 @@ export function renderDiagram(
   y += specsH;
 
   const totalH = y + pad.bottom;
+
+  return {
+    ...variant,
+    titleY,
+    embedY,
+    denseTxStart,
+    denseNorm1Y,
+    denseAttnY,
+    denseAttnExpandedStartY,
+    denseMerge1Y,
+    denseNorm2Y,
+    denseFFNBlockY,
+    denseFFNExpandedStartY,
+    denseMerge2Y,
+    denseTxEnd,
+    hashTxStart,
+    hashNorm1Y,
+    hashAttnY,
+    hashMerge1Y,
+    hashNorm2Y,
+    hashExpertY,
+    hashFFNExpandedStartY,
+    hashMerge2Y,
+    hashTxEnd,
+    altBlockStart,
+    altBlockEnd,
+    altNorm1Y,
+    altAttnY,
+    altAttnExpandedStartY,
+    altMerge1Y,
+    altNorm2Y,
+    altRouterY,
+    altExpertY,
+    altFFNExpandedStartY,
+    altMerge2Y,
+    altIndicatorY,
+    txStart,
+    attnY,
+    attnExpandedStartY,
+    merge1Y,
+    norm1Y,
+    _routerY,
+    expertY,
+    ffnY,
+    ffnExpandedStartY,
+    merge2Y,
+    norm2Y,
+    txEnd,
+    finalNormY,
+    outputY,
+    specsY,
+    specsH,
+    totalH,
+  };
+}
+
+export function renderDiagram(
+  svgEl: SVGSVGElement,
+  arch: ModelArchitecture,
+  isDark: boolean,
+  expandedBlocks: Set<string>,
+  onBlockClick: (blockId: string) => void,
+  locale: Locale = 'en',
+) {
+  if (arch.encoderDecoder) {
+    renderCausalEncoderDecoder(svgEl, arch, isDark, expandedBlocks, onBlockClick, locale);
+    return;
+  }
+  const svg = d3.select(svgEl);
+  svg.selectAll('*').remove();
+
+  const containerWidth = svgEl.clientWidth || svgEl.parentElement?.clientWidth || 600;
+  const width = Math.min(containerWidth, 640);
+
+  const fg = isDark ? '#eaebec' : '#131416';
+  const mutedFg = isDark ? '#9ca3af' : '#6b7280';
+  const borderColor = isDark ? '#374151' : '#d1d5db';
+  const bgSubtle = isDark ? '#1f2937' : '#f9fafb';
+  const expandedBg = isDark ? '#111827' : '#f1f5f9';
+  const localizedText = (value: string): string => localizeArchitectureDiagramText(value, locale);
+
+  const bw = width - pad.left - pad.right;
+  const innerW = bw - 32;
+  const innerX = pad.left + 16;
+  const cx = width / 2;
+
+  const {
+    isMoE,
+    sharedExperts,
+    ffnVariant,
+    hasDenseLayers,
+    denseLayerCount,
+    moeLayerCount,
+    isAttnExpandable,
+    hasAlternatingLayers,
+    alternatingSpecs,
+    attnFlow,
+    ffnFlow,
+    denseFFNFlow,
+    attnExpanded,
+    ffnExpanded,
+    txExpanded,
+    denseTxExpanded,
+    denseAttnExpanded,
+    denseFFNExpanded,
+    hasHashBlock,
+    hashBlockExpanded,
+    hashExpertsExpanded,
+    altBlockExpanded,
+    altExpertsExpanded,
+    altAttnExpandable,
+    altAttnExpanded,
+    altAttnFlow,
+    attnExpandedH,
+    ffnExpandedH,
+    denseAttnExpandedH,
+    denseFFNExpandedH,
+    altExpertsExpandedH,
+    altAttnExpandedH,
+    hashExpertsExpandedH,
+    titleY,
+    embedY,
+    denseTxStart,
+    denseNorm1Y,
+    denseAttnY,
+    denseAttnExpandedStartY,
+    denseMerge1Y,
+    denseNorm2Y,
+    denseFFNBlockY,
+    denseFFNExpandedStartY,
+    denseMerge2Y,
+    denseTxEnd,
+    hashTxStart,
+    hashNorm1Y,
+    hashAttnY,
+    hashMerge1Y,
+    hashNorm2Y,
+    hashExpertY,
+    hashFFNExpandedStartY,
+    hashMerge2Y,
+    hashTxEnd,
+    altBlockStart,
+    altBlockEnd,
+    altNorm1Y,
+    altAttnY,
+    altAttnExpandedStartY,
+    altMerge1Y,
+    altNorm2Y,
+    altExpertY,
+    altFFNExpandedStartY,
+    altMerge2Y,
+    altIndicatorY,
+    txStart,
+    attnY,
+    attnExpandedStartY,
+    merge1Y,
+    norm1Y,
+    _routerY,
+    expertY,
+    ffnY,
+    ffnExpandedStartY,
+    merge2Y,
+    norm2Y,
+    txEnd,
+    finalNormY,
+    outputY,
+    specsY,
+    specsH,
+    totalH,
+  } = computeDiagramLayout(arch, expandedBlocks);
 
   svg.attr('width', width).attr('height', totalH).attr('viewBox', `0 0 ${width} ${totalH}`);
 

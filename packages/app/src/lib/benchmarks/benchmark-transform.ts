@@ -27,6 +27,13 @@ import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
 import { resolvePowerTier } from '@/lib/power/power-tier';
 import { modelSystemPower } from '@/lib/power/modeled-system-power';
 import type { BenchmarkRow } from '@/lib/api/api';
+import {
+  DEFAULT_CHIP_BASIS,
+  inputTputPerTotalChip,
+  withChipBasis,
+  type ChipBasis,
+  type ChipBasisRow,
+} from '@/lib/benchmarks/chip-basis';
 
 /**
  * Producer schema version whose unprefixed `joules_per_*` fields are documented
@@ -130,6 +137,8 @@ export function benchmarkRowPhysicalChips(row: BenchmarkRow): number {
       disagg: row.disagg,
       num_prefill_gpu: row.num_prefill_gpu,
       num_decode_gpu: row.num_decode_gpu,
+      prefill_num_workers: row.prefill_num_workers,
+      decode_num_workers: row.decode_num_workers,
       tp: usesPrefill ? row.prefill_tp : row.decode_tp,
       pp: aggregatePipelineParallel(row, row.metrics, usesPrefill),
     },
@@ -138,7 +147,7 @@ export function benchmarkRowPhysicalChips(row: BenchmarkRow): number {
 }
 
 export function rowToAggDataEntry(
-  row: BenchmarkRow,
+  row: ChipBasisRow,
   { modelPower = true }: AggDataEntryOptions = {},
 ): AggDataEntry {
   const isAgentic = row.benchmark_type === 'agentic_traces';
@@ -314,6 +323,8 @@ export function rowToAggDataEntry(
         disagg: row.disagg,
         num_prefill_gpu: row.num_prefill_gpu,
         num_decode_gpu: row.num_decode_gpu,
+        prefill_num_workers: row.prefill_num_workers,
+        decode_num_workers: row.decode_num_workers,
         tp: aggregateTp,
         pp: aggregatePp,
       },
@@ -322,6 +333,7 @@ export function rowToAggDataEntry(
     disagg: row.disagg,
     num_prefill_gpu: row.num_prefill_gpu,
     num_decode_gpu: row.num_decode_gpu,
+    chip_basis: row.chip_basis,
     spec_decoding: row.spec_method,
     ep: aggregateEp,
     // Pipeline parallelism has no configs-table column — the ingest mapper
@@ -399,8 +411,10 @@ export function applyUncachedTokenBasis(entry: AggDataEntry): boolean {
     return false;
   }
   const totalTput = entry.tput_per_gpu;
-  const prefixTput = entry.input_tput_per_gpu * rate;
-  entry.input_tput_per_gpu -= prefixTput;
+  // A disaggregated per-pool row reports input per prefill chip; the prefix
+  // removed from the per-total-chip `tput_per_gpu` must use the same denominator.
+  const prefixTput = (inputTputPerTotalChip(entry) ?? 0) * rate;
+  entry.input_tput_per_gpu -= entry.input_tput_per_gpu * rate;
   entry.tput_per_gpu = Math.max(0, totalTput - prefixTput);
   const inputScale = rate < 1 ? 1 / (1 - rate) : undefined;
   const scaleInputJoules = (joules: number | undefined) =>
@@ -489,12 +503,15 @@ export function mergeRunScopedRows(
  *   full set (median/p90/p99/p99.9) so this mainly affects that scenario.
  * @param tokenBasis Whether token-rate metrics count cached prompt prefix
  *   tokens; see {@link TokenBasis}.
+ * @param chipBasis Which chips divide disaggregated input/output throughput;
+ *   see {@link ChipBasis}.
  */
 export function transformBenchmarkRows(
   rows: BenchmarkRow[],
   percentile = 'median',
   tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
   tokenBasis: TokenBasis = 'total',
+  chipBasis: ChipBasis = DEFAULT_CHIP_BASIS,
 ): {
   chartData: InferenceData[][];
   hardwareConfig: HardwareConfig;
@@ -506,7 +523,7 @@ export function transformBenchmarkRows(
   const specsByHw = new Map<string, GpuSpecs>();
   const pointsByHw: Record<string, InferenceData[][]> = {};
   for (const row of rows) {
-    const entry = rowToAggDataEntry(row);
+    const entry = rowToAggDataEntry(withChipBasis(row, chipBasis));
     if (tokenBasis === 'uncached' && !applyUncachedTokenBasis(entry)) continue;
     const hwKey = getHardwareKey(entry);
     entry.hwKey = hwKey;
@@ -553,6 +570,7 @@ export function transformChartRowsForPrecisions(
   precisions: ReadonlySet<string>,
   percentile = 'median',
   tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
+  chipBasis: ChipBasis = DEFAULT_CHIP_BASIS,
 ): InferenceData[] {
   const chartDef = (chartDefinitions as ChartDefinition[])[chartIndex];
   const xKey = withPercentile(chartDef.x, percentile) as keyof AggDataEntry;
@@ -578,7 +596,7 @@ export function transformChartRowsForPrecisions(
       specs = getGpuSpecs(hwKey, tcoBasis);
       specsByHw.set(hwKey, specs);
     }
-    const entry = rowToAggDataEntry(row);
+    const entry = rowToAggDataEntry(withChipBasis(row, chipBasis));
     entry.hwKey = hwKey;
     points.push(createChartDataPoint(entry.date, entry, xKey, yKey, hwKey, specs));
   }

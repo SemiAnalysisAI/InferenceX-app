@@ -1,4 +1,5 @@
 import type { AggDataEntry, InferenceData, PowerBasisFieldKey } from '@/components/inference/types';
+import { disaggDeploymentChips, exactPerTotalChipRates } from '@/lib/benchmarks/chip-basis';
 
 export const POWER_BASES = [
   'gpu-measured',
@@ -194,8 +195,13 @@ type PowerBasisEntry = Pick<
   | 'output_tput_per_gpu'
   | 'disagg'
   | 'benchmark_type'
+  | 'chip_basis'
   | 'num_prefill_gpu'
   | 'num_decode_gpu'
+  | 'prefill_num_workers'
+  | 'decode_num_workers'
+  | 'isl'
+  | 'osl'
   | 'avg_power_w'
   | 'joules_per_output_token'
   | 'joules_per_total_token'
@@ -207,21 +213,39 @@ interface PowerBasisNormalization {
   totalOutputTokPerSec: number | null;
 }
 
-export function powerBasisNormalization(
-  entry: Pick<
-    PowerBasisEntry,
-    'output_tput_per_gpu' | 'disagg' | 'benchmark_type' | 'num_prefill_gpu' | 'num_decode_gpu'
-  >,
-): PowerBasisNormalization {
+/** Fields `powerBasisNormalization` reads; every chart point and entry carries them. */
+export type PowerNormalizationInput = Partial<
+  Pick<
+    AggDataEntry,
+    | 'tput_per_gpu'
+    | 'input_tput_per_gpu'
+    | 'output_tput_per_gpu'
+    | 'disagg'
+    | 'chip_basis'
+    | 'num_prefill_gpu'
+    | 'num_decode_gpu'
+    | 'prefill_num_workers'
+    | 'decode_num_workers'
+    | 'isl'
+    | 'osl'
+  >
+>;
+
+/**
+ * Whole-deployment output tokens/s and the chips that produced them. Aggregated
+ * rows normalize per chip. Disaggregated rows use every deployment chip with the
+ * output rate converted to that same denominator, on either chip basis; legacy rows
+ * without recorded pool sizes count their deployment once, not once per pool.
+ */
+export function powerBasisNormalization(entry: PowerNormalizationInput): PowerBasisNormalization {
   const perGpu = entry.output_tput_per_gpu;
   const unavailable = { allocatedGpus: null, totalOutputTokPerSec: null };
   if (!isPositive(perGpu)) return unavailable;
   if (!entry.disagg) return { allocatedGpus: 1, totalOutputTokPerSec: perGpu };
-  if (entry.benchmark_type !== 'single_turn') return unavailable;
-  const prefill = entry.num_prefill_gpu;
-  const decode = entry.num_decode_gpu;
-  if (!count(prefill) || !count(decode)) return unavailable;
-  return { allocatedGpus: prefill + decode, totalOutputTokPerSec: perGpu * decode };
+  const chips = disaggDeploymentChips(entry);
+  const output = exactPerTotalChipRates(entry)?.output;
+  if (!count(chips) || !isPositive(output)) return unavailable;
+  return { allocatedGpus: chips, totalOutputTokPerSec: output * chips };
 }
 
 function provisionedGpuSecondsPerToken(

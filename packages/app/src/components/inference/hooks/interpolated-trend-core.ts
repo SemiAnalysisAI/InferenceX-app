@@ -7,6 +7,12 @@ import {
 } from '@/components/calculator/interpolation';
 import { MeasuredTrendPoint } from '@/components/inference/hooks/trend-line-point';
 import {
+  DEFAULT_CHIP_BASIS,
+  withChipBasis,
+  type ChipBasis,
+  type ChipBasisRow,
+} from '@/lib/benchmarks/chip-basis';
+import {
   isBenchmarkMetricKey,
   tokenMetricTypeForConfigKey,
 } from '@/components/inference/metric-registry';
@@ -94,6 +100,12 @@ type TrendPointBase = Pick<
   | 'tput_per_gpu'
   | 'input_tput_per_gpu'
   | 'output_tput_per_gpu'
+  | 'disagg'
+  | 'num_prefill_gpu'
+  | 'num_decode_gpu'
+  | 'prefill_num_workers'
+  | 'decode_num_workers'
+  | 'chip_basis'
   | 'isl'
   | 'osl'
   | 'total_prompt_tokens'
@@ -113,7 +125,7 @@ function withLegacyOutputThroughput(row: BenchmarkRow, entry: AggDataEntry): Agg
 const RUN_URL_PATTERN =
   /^https:\/\/github\.com\/[^/]+\/[^/]+\/actions\/runs\/(?<id>\d+)(?:\/attempts\/\d+)?\/?$/;
 
-function createTrendRowPreparer(): (row: BenchmarkRow) => TrendRow | null {
+function createTrendRowPreparer(): (row: ChipBasisRow) => TrendRow | null {
   const canonical = new Map<string, string>();
   const intern = (value: string) => {
     const existing = canonical.get(value);
@@ -228,6 +240,12 @@ function createTrendRowPreparer(): (row: BenchmarkRow) => TrendRow | null {
         tput_per_gpu: tputPerGpu,
         input_tput_per_gpu: inputTputPerGpu,
         output_tput_per_gpu: metrics.output_tput_per_gpu ?? 0,
+        disagg: row.disagg,
+        num_prefill_gpu: row.num_prefill_gpu,
+        num_decode_gpu: row.num_decode_gpu,
+        prefill_num_workers: row.prefill_num_workers,
+        decode_num_workers: row.decode_num_workers,
+        chip_basis: row.chip_basis,
         isl: row.isl,
         osl: row.osl,
         total_prompt_tokens: metrics.total_prompt_tokens,
@@ -250,11 +268,14 @@ function createTrendRowPreparer(): (row: BenchmarkRow) => TrendRow | null {
 const trendSourceKey = (source: TrendSource) => `${source.date}:${source.runId}:${source.hwKey}`;
 const trendSourceKeys = new WeakMap<TrendSource, string>();
 
-export function prepareTrendRows(allRows: readonly BenchmarkRow[]): TrendRow[] {
+export function prepareTrendRows(
+  allRows: readonly BenchmarkRow[],
+  chipBasis: ChipBasis = DEFAULT_CHIP_BASIS,
+): TrendRow[] {
   const prepareTrendRow = createTrendRowPreparer();
   const prepared: TrendRow[] = [];
   for (const row of dedupeAgenticHistoryRuns([...allRows])) {
-    const trendRow = prepareTrendRow(row);
+    const trendRow = prepareTrendRow(withChipBasis(row, chipBasis));
     if (trendRow) prepared.push(trendRow);
   }
   return prepared;
@@ -309,8 +330,9 @@ export function rowToLightweightPoint(
   requestedMetrics: readonly DerivedMetricKey[],
   tokenRevenuePricing?: TokenRevenuePricing | null,
   tcoBasis?: TcoBasis,
+  chipBasis: ChipBasis = DEFAULT_CHIP_BASIS,
 ): InferenceData | null {
-  const trendRow = createTrendRowPreparer()(row);
+  const trendRow = createTrendRowPreparer()(withChipBasis(row, chipBasis));
   return (
     trendRow &&
     trendPoint(trendRow, trendPointMetrics(requestedMetrics), tokenRevenuePricing, tcoBasis)
@@ -559,9 +581,9 @@ export interface GroupTrendRowsOptions {
  */
 export function groupTrendRowsByDate(
   allRows: readonly BenchmarkRow[],
-  options: GroupTrendRowsOptions,
+  options: GroupTrendRowsOptions & { readonly chipBasis?: ChipBasis },
 ): Map<string, Map<string, InferenceData[]>> {
-  return groupTrendRows(prepareTrendRows(allRows), options);
+  return groupTrendRows(prepareTrendRows(allRows, options.chipBasis), options);
 }
 
 const NO_POINTS: readonly InferenceData[] = [];

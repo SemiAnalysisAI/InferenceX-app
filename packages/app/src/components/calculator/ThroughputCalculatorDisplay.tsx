@@ -1,5 +1,6 @@
 'use client';
 
+import { chipBasisCsvNote, withTotalChipQualifier } from '@/lib/benchmarks/chip-basis';
 import { ControlPanel } from '@/components/ui/control-panel';
 import { MobileControlSection } from '@/components/ui/mobile-control-section';
 import { track } from '@/lib/analytics/analytics';
@@ -63,6 +64,7 @@ import { MultiSelect } from '@/components/ui/multi-select';
 import { lockedCostProviderOptions, useLockedTierDialog } from '@/components/ui/tco-model-dialog';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { TcoBasisToggle, useShowsTcoBasisSelector } from '@/components/ui/tco-basis-toggle';
+import { ChipBasisNote } from '@/components/ui/chip-basis-note';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Percentile,
@@ -235,6 +237,10 @@ const STRINGS = {
     note: 'Note:',
     disaggCost:
       ' Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo TRTLLM) report input and output throughput per prefill chip and per decode chip rather than per chip overall, and $/M tok is derived from those rates — so on the Input and Output token types a disaggregated config reads cheaper than it is, by a median 2× and up to 18× across run history. Total-token cost is unaffected: it comes from throughput per chip overall, which both kinds report on the same basis. The Fleet Lifecycle page deliberately differs — it derives its per-token-type figures from that total, so everything there is on one denominator.',
+    disaggCostTotal:
+      ' Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo TRTLLM) have their input and output throughput divided by every chip in the deployment, prefill plus decode, the same basis aggregated configs use, so $/M tok on the Input and Output token types compares like for like.',
+    disaggThroughputTotal:
+      ' Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo TRTLLM) have their input and output throughput divided by every chip in the deployment, prefill plus decode, the same basis aggregated configs use, so the Input and Output token types compare like for like. Total throughput is the same on either basis.',
     disaggThroughput:
       ' Disaggregated inference configurations (e.g., MoRI SGLang, Dynamo TRTLLM) report input and output throughput per prefill chip and per decode chip rather than per chip overall — divided by fewer chips, so on the Input and Output token types a disaggregated config reads faster per chip than it is, by a median 2× and up to 18× on input and 7× on output. Total throughput is unaffected: both kinds report it per chip overall. The Fleet Lifecycle page deliberately differs — it derives its per-token-type figures from that total, so everything there is on one denominator.',
     fleetMoved:
@@ -298,6 +304,10 @@ const STRINGS = {
     note: '注意：',
     disaggCost:
       '分离式推理配置（如 MoRI SGLang、Dynamo TRTLLM）的输入与输出吞吐量分别按预填充芯片与解码芯片报告，而非按芯片总数，而 $/M tok 由这些速率推导。因此在「输入」与「输出」token 类型下，分离式配置显示的成本低于实际，中位数仅为实际值的 1/2，在运行历史中最低可至 1/18。总计口径的成本不受影响：它来自按芯片总数计的吞吐量，两种部署方式在该口径上一致。「集群生命周期」页面与此有意不同：它由该总量推导各 token 类型的数值，因此那里的所有数字都在同一分母上。',
+    disaggCostTotal:
+      '分离式推理配置（如 MoRI SGLang、Dynamo TRTLLM）的输入与输出吞吐量按部署中的芯片总数（预填充芯片 + 解码芯片）计算，与聚合配置口径一致，因此「输入」与「输出」token 类型下的 $/M tok 可以直接对比。',
+    disaggThroughputTotal:
+      '分离式推理配置（如 MoRI SGLang、Dynamo TRTLLM）的输入与输出吞吐量按部署中的芯片总数（预填充芯片 + 解码芯片）计算，与聚合配置口径一致，因此在「输入」与「输出」token 类型下可以直接对比。总吞吐量在两种口径下相同。',
     disaggThroughput:
       '分离式推理配置（如 MoRI SGLang、Dynamo TRTLLM）的输入与输出吞吐量分别按预填充芯片与解码芯片报告，而非按芯片总数。由于除以的芯片数更少，在「输入」与「输出」token 类型下，分离式配置显示的每芯片吞吐量高于实际，中位数为实际值的 2 倍，输入最高达 18 倍、输出最高达 7 倍。总计口径的吞吐量不受影响：两种部署方式均按芯片总数报告。「集群生命周期」页面与此有意不同：它由该总量推导各 token 类型的数值，因此那里的所有数字都在同一分母上。',
     fleetMoved:
@@ -388,9 +398,15 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     effectiveSequence: selectedSequence,
     effectivePrecisions: selectedPrecisions,
     tcoBasis,
+    chipBasis,
   } = useGlobalFilterSelection();
   const scenarioShowsTcoBasis = useShowsTcoBasisSelector();
-  const { setSelectedModel, setSelectedSequence, setSelectedPrecisions } = useGlobalFilterActions();
+  const { setSelectedModel, setSelectedSequence, setSelectedPrecisions, setChipBasis } =
+    useGlobalFilterActions();
+  const chipBasisControl = useMemo(
+    () => ({ value: chipBasis, onChange: setChipBasis, source: 'calculator' }),
+    [chipBasis, setChipBasis],
+  );
   const { selectedRunDate, selectedRunId } = useGlobalFilterRun();
   const { availablePrecisions, availableSequences, availableModels } =
     useGlobalFilterAvailability();
@@ -460,6 +476,8 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     true,
     costType,
     tcoBasis,
+    false,
+    chipBasis,
   );
   const error = throughputError;
 
@@ -713,8 +731,11 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
       const config = hardwareConfig[hwKey] || getHardwareConfig(hwKey);
       return config ? getDisplayLabel(config) : hwKey;
     });
-    exportToCsv(`InferenceX_calculator_${selectedModel}`, headers, rows);
-  }, [results, targetValue, hardwareConfig]);
+    // Input and output columns follow the chip basis on disaggregated rows.
+    exportToCsv(`InferenceX_calculator_${selectedModel}`, headers, rows, [
+      chipBasisCsvNote(chipBasis, locale),
+    ]);
+  }, [results, targetValue, hardwareConfig, chipBasis, locale]);
 
   const handleViewModeChange = useCallback((value: CalculatorViewMode) => {
     setViewMode(value);
@@ -876,7 +897,9 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
     resolveColor,
   ]);
 
-  const chartTitle =
+  // Input/Output values follow the chip basis; name the denominator on the total basis.
+  const totalChipBasis = chipBasis === 'total' && costType !== 'total';
+  const baseChartTitle =
     locale === 'zh'
       ? getChartTitleZh(
           barMetric,
@@ -894,6 +917,9 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
           costProvider,
           isAgenticSequence ? selectedPercentile : undefined,
         );
+  const chartTitle = totalChipBasis
+    ? (withTotalChipQualifier(baseChartTitle, locale) ?? baseChartTitle)
+    : baseChartTitle;
 
   if (!loading && error) {
     console.error(error);
@@ -1328,33 +1354,23 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                             </p>
                           </>
                         )}
-                        <div
-                          className={`overflow-hidden transition-all duration-200 ease-in-out ${
-                            barMetric === 'cost' && costType !== 'total'
-                              ? 'max-h-20 opacity-100'
-                              : 'max-h-0 opacity-0'
-                          }`}
-                        >
-                          <p
-                            data-testid="calculator-disagg-cost-note"
-                            className="text-muted-foreground text-xs mt-2 border-l-2 border-amber-500 pl-2 bg-amber-500/5 py-1"
-                          >
-                            <strong>{t.note}</strong>
-                            {t.disaggCost}
-                          </p>
-                        </div>
-                        <div
-                          className={`overflow-hidden transition-all duration-200 ease-in-out ${
-                            barMetric === 'throughput' || barMetric === 'power'
-                              ? 'max-h-20 opacity-100'
-                              : 'max-h-0 opacity-0'
-                          }`}
-                        >
-                          <p className="text-muted-foreground text-xs mt-2 border-l-2 border-amber-500 pl-2 bg-amber-500/5 py-1">
-                            <strong>{t.note}</strong>
-                            {t.disaggThroughput}
-                          </p>
-                        </div>
+                        <ChipBasisNote
+                          visible={barMetric === 'cost' && costType !== 'total'}
+                          testId="calculator-disagg-cost-note"
+                          label={t.note}
+                          text={chipBasis === 'total' ? t.disaggCostTotal : t.disaggCost}
+                          chipBasis={chipBasisControl}
+                        />
+                        <ChipBasisNote
+                          visible={barMetric === 'throughput' || barMetric === 'power'}
+                          testId="calculator-disagg-throughput-note"
+                          showToggle={costType !== 'total'}
+                          label={t.note}
+                          text={
+                            chipBasis === 'total' ? t.disaggThroughputTotal : t.disaggThroughput
+                          }
+                          chipBasis={chipBasisControl}
+                        />
                         <UnofficialDomainNotice />
                       </>
                     );
@@ -1368,6 +1384,7 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                         targetValue={targetValue}
                         barMetric={barMetric}
                         costType={costType}
+                        totalChipBasis={totalChipBasis}
                         runUrl={runUrl}
                         selectedBars={selectedBars}
                         onBarSelect={handleBarSelect}

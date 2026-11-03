@@ -441,6 +441,8 @@ describe('purgeAll', () => {
     expect(mockRevalidateTag).toHaveBeenCalledWith('db-page', 'max');
     expect(mockRevalidateTag).toHaveBeenCalledWith('db-cdn', 'max');
     expect(mockRevalidateTag).not.toHaveBeenCalledWith('db-cdn', { expire: 0 });
+    // Stored log text never changes on ingest, so its year-long CDN entries survive.
+    expect(mockRevalidateTag).not.toHaveBeenCalledWith('db-log', expect.anything());
   });
 
   it('drops every layer outright when asked to purge immediately', async () => {
@@ -452,6 +454,8 @@ describe('purgeAll', () => {
     expect(mockRevalidateTag).toHaveBeenCalledWith('db-page', { expire: 0 });
     expect(mockRevalidateTag).toHaveBeenCalledWith('db-cdn', { expire: 0 });
     expect(mockRevalidateTag).toHaveBeenCalledWith('collectivex', { expire: 0 });
+    // Retractions must drop cached server logs too.
+    expect(mockRevalidateTag).toHaveBeenCalledWith('db-log', { expire: 0 });
     expect(mockRevalidateTag).not.toHaveBeenCalledWith(expect.anything(), 'max');
   });
 
@@ -618,6 +622,38 @@ describe('cachedJson', () => {
     expect(JSON.parse(await bodyText(res))).toEqual(data);
   });
 
+  it.each(['gzip, deflate, br, zstd', 'deflate, gzip', 'br', undefined])(
+    'leaves compression to the CDN with one variant for Accept-Encoding %j',
+    async (acceptEncoding) => {
+      const data = { label: '基准测试', rows: [1, 2, 3] };
+      const res = cachedJson(
+        apiRequest(acceptEncoding === undefined ? {} : { 'Accept-Encoding': acceptEncoding }),
+        data,
+        { compression: 'cdn' },
+      );
+      expect(res.status).toBe(200);
+      expect(res.headers.get('Content-Encoding')).toBeNull();
+      expect(res.headers.get('Vary')).toBeNull();
+      expect(res.headers.get('ETag')).toBe(
+        cachedJson(apiRequest(), data, { compression: 'cdn' }).headers.get('ETag'),
+      );
+      expect(res.headers.get('Cache-Control')).toBe(
+        'public, max-age=60, s-maxage=86400, stale-while-revalidate=86400',
+      );
+      expect(JSON.parse(await bodyText(res))).toEqual(data);
+    },
+  );
+
+  it('answers If-None-Match without Vary when the CDN compresses', () => {
+    const data = { rows: [1] };
+    const etag = cachedJson(apiRequest(), data, { compression: 'cdn' }).headers.get('ETag')!;
+    const res = cachedJson(apiRequest({ 'Accept-Encoding': 'br', 'If-None-Match': etag }), data, {
+      compression: 'cdn',
+    });
+    expect(res.status).toBe(304);
+    expect(res.headers.get('Vary')).toBeNull();
+  });
+
   it('streams large payloads across multiple chunks', async () => {
     const res = cachedJson(apiRequest(), { big: 'x'.repeat(200_000) });
     const reader = res.body!.getReader();
@@ -769,6 +805,18 @@ describe('cachedJsonResponse', () => {
     expect(Buffer.from(await res.arrayBuffer()).equals(Buffer.from(stored.subarray(33)))).toBe(
       true,
     );
+  });
+
+  it('decodes a stored body to plain JSON without Vary when the CDN compresses', async () => {
+    const data = { label: '基准测试', rows: [1, 2, 3] };
+    const options = { compression: 'cdn' } as const;
+    mockBlobGetBytes.mockResolvedValueOnce(null);
+    const respond = cachedJsonResponse(() => Promise.resolve(data), 'cdn', options);
+    const request = () => apiRequest({ 'Accept-Encoding': 'gzip, deflate, br, zstd' });
+    await respond(request());
+    mockBlobGetBytes.mockResolvedValueOnce(storedBytes());
+
+    await sameResponse(await respond(request()), cachedJson(request(), data, options));
   });
 
   it('answers a held ETag from the stored digest with a 304', async () => {

@@ -9,7 +9,11 @@ import type { ChangelogRow, WorkflowChangelogDate } from '@/lib/api/api';
 const { mockFetch } = vi.hoisted(() => ({ mockFetch: vi.fn() }));
 vi.mock('@/lib/api/api', () => ({ fetchWorkflowChangelogs: mockFetch }));
 
-import { type ComparisonChangelog, useComparisonChangelogs } from './use-comparison-changelogs';
+import {
+  type ComparisonChangelog,
+  shouldFetchComparisonChangelogs,
+  useComparisonChangelogs,
+} from './use-comparison-changelogs';
 
 const changelog = (date: string, id: number, description: string): ChangelogRow => ({
   workflow_run_id: id,
@@ -114,14 +118,65 @@ function legacyChangelogs(dates: string[], perDate: Map<string, WorkflowChangelo
   return results;
 }
 
+const NO_RANGE = { startDate: '', endDate: '' };
+
+describe('shouldFetchComparisonChangelogs', () => {
+  const base = {
+    embedded: true,
+    changelogOpened: false,
+    selectedDateRange: NO_RANGE,
+    selectedDates: [] as string[],
+  };
+
+  it('defers the changelog request for a collapsed embedded changelog', () => {
+    expect(shouldFetchComparisonChangelogs(base)).toBe(false);
+  });
+
+  it('fetches once the reader opens the changelog', () => {
+    expect(shouldFetchComparisonChangelogs({ ...base, changelogOpened: true })).toBe(true);
+  });
+
+  it('fetches when a date comparison needs per-date run configs', () => {
+    expect(
+      shouldFetchComparisonChangelogs({
+        ...base,
+        selectedDateRange: { startDate: '2026-10-01', endDate: '2026-10-02' },
+      }),
+    ).toBe(true);
+    expect(shouldFetchComparisonChangelogs({ ...base, selectedDates: ['2026-10-01'] })).toBe(true);
+  });
+
+  it('ignores a half-set date range', () => {
+    expect(
+      shouldFetchComparisonChangelogs({
+        ...base,
+        selectedDateRange: { startDate: '2026-10-01', endDate: '' },
+      }),
+    ).toBe(false);
+  });
+
+  it('always fetches on the full dashboard, where the changelog starts expanded', () => {
+    expect(shouldFetchComparisonChangelogs({ ...base, embedded: false })).toBe(true);
+  });
+});
+
 let observed: ReturnType<typeof useComparisonChangelogs> | undefined;
 
-function Probe({ gpus, availableDates }: { gpus: string[]; availableDates: string[] }) {
+function Probe({
+  gpus,
+  availableDates,
+  enabled,
+}: {
+  gpus: string[];
+  availableDates: string[];
+  enabled: boolean;
+}) {
   observed = useComparisonChangelogs(
     gpus,
     { startDate: '2026-01-01', endDate: '2026-01-05' },
     availableDates,
     'agentic_traces',
+    enabled,
   );
   return null;
 }
@@ -136,7 +191,7 @@ describe('useComparisonChangelogs', () => {
     vi.clearAllMocks();
   });
 
-  async function render(gpus: string[], availableDates: string[]) {
+  async function render(gpus: string[], availableDates: string[], enabled = true) {
     if (root) act(() => root?.unmount());
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     root = createRoot(document.createElement('div'));
@@ -145,7 +200,7 @@ describe('useComparisonChangelogs', () => {
         createElement(
           QueryClientProvider,
           { client },
-          createElement(Probe, { gpus, availableDates }),
+          createElement(Probe, { gpus, availableDates, enabled }),
         ),
       );
     });
@@ -172,6 +227,12 @@ describe('useComparisonChangelogs', () => {
     expect(observed?.changelogs.map((c) => c.date)).toEqual(['2026-01-04', '2026-01-01']);
     expect(observed?.loading).toBe(false);
     expect(observed?.totalDatesQueried).toBe(3);
+  });
+
+  it('requests nothing while disabled', async () => {
+    await render(['h100'], ['2026-01-01'], false);
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(observed).toEqual({ changelogs: [], loading: false, totalDatesQueried: 0 });
   });
 
   it('makes no request without GPUs or dates', async () => {

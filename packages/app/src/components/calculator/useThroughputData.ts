@@ -1,5 +1,6 @@
 'use client';
 
+import { DEFAULT_CHIP_BASIS, type ChipBasis } from '@/lib/benchmarks/chip-basis';
 import { useCallback, useMemo } from 'react';
 
 import { DB_MODEL_TO_DISPLAY } from '@semianalysisai/inferencex-constants';
@@ -58,6 +59,7 @@ export function useThroughputData(
   selectedTokenType: CostType = 'total',
   tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
   includePower = false,
+  chipBasis: ChipBasis = DEFAULT_CHIP_BASIS,
 ) {
   const initialCacheScope = useMemo(
     () =>
@@ -119,6 +121,7 @@ export function useThroughputData(
       percentile: selectedPercentile,
       tokenType: selectedTokenType,
       tcoBasis,
+      chipBasis,
     };
 
     const official = buildGpuGroups<GroupMeta>(allRows, {
@@ -170,6 +173,7 @@ export function useThroughputData(
     selectedPercentile,
     selectedTokenType,
     tcoBasis,
+    chipBasis,
     overlayRows,
     runIndexByUrl,
   ]);

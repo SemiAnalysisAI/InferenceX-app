@@ -1,5 +1,6 @@
 import { GPU_VENDORS, rowToSequence } from '@semianalysisai/inferencex-constants';
 
+import type { ChipBasis } from '@/lib/benchmarks/chip-basis';
 import {
   applyAgenticPercentileToXLabel,
   applyScopeFilters,
@@ -93,6 +94,8 @@ export interface InferenceSeriesOptions {
   /** Return only the best series per GPU SKU. */
   readonly best: boolean;
   readonly tcoBasis?: TcoBasis;
+  /** Which chips divide disaggregated input/output throughput. Defaults to per pool. */
+  readonly chipBasis?: ChipBasis;
   readonly allPoints?: boolean;
   readonly userCosts?: Record<string, number>;
   readonly userPowers?: Record<string, number>;
@@ -270,6 +273,7 @@ export function buildInferenceSeries(
     new Set(precisions),
     percentile,
     options.tcoBasis,
+    options.chipBasis,
   );
   const matchedHwKeys = [
     ...new Set(

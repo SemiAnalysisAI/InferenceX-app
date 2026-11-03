@@ -1,4 +1,5 @@
 import { GET as unofficial } from '@/app/api/unofficial-run/route';
+import type { ChipBasis } from '@/lib/benchmarks/chip-basis';
 import { loadBenchmarks, parseBenchmarksQuery } from '@/lib/benchmarks/benchmarks-endpoint.server';
 import {
   buildGpuGroups,
@@ -67,6 +68,8 @@ export function selection(search: URLSearchParams, fallback = Sequence.AgenticTr
 }
 export type ViewSelection = Omit<ReturnType<typeof selection>, 'precisions'> & {
   precisions: string[];
+  /** Only views that list `chipBasis` set it; the rest keep the per-pool default. */
+  chipBasis?: ChipBasis;
 };
 
 export function comparisonSelections(search: URLSearchParams) {

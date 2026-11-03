@@ -1,11 +1,13 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { Suspense, type ReactNode } from 'react';
 
 import { SectionNav } from '@/components/agentic-workload-explorer/section-nav';
 import { SnapshotStamp } from '@/components/agentic-workload-explorer/snapshot-stamp';
 import { TraceVersionSelector } from '@/components/agentic-workload-explorer/trace-version-selector';
 import { Heading } from '@/components/ui/heading';
+import { explorerRelativePath } from '@/lib/agentic-workload-explorer/paths';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
@@ -23,11 +25,13 @@ const STRINGS = {
 
 export function ExplorerShell({ children }: { children: ReactNode }) {
   const strings = STRINGS[useLocale()];
+  // The overview page's TabIntro carries its h1; every section page uses this title as its h1.
+  const isOverview = explorerRelativePath(usePathname() ?? '') === '/';
   return (
     <section className="flex min-w-0 flex-col gap-4" data-testid="agentic-workload-explorer">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <Heading as="h2" level="section" className="mb-1">
+          <Heading as={isOverview ? 'h2' : 'h1'} level="section" className="mb-1">
             {strings.title}
           </Heading>
           <p className="text-sm text-muted-foreground">{strings.description}</p>

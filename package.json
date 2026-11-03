@@ -43,6 +43,7 @@
     "admin:db:migrate": "bun run --cwd packages/db db:migrate",
     "admin:db:migrate:collectivex": "bun run --cwd packages/db db:migrate:collectivex",
     "admin:db:apply-overrides": "bun run --cwd packages/db db:apply-overrides",
+    "admin:db:backfill-agentic-disagg-throughput": "bun run --cwd packages/db db:backfill-agentic-disagg-throughput",
     "admin:db:backfill-full-response-interactivity": "bun run --cwd packages/db db:backfill-full-response-interactivity",
     "admin:db:backfill-gpu-metrics": "bun run --cwd packages/db db:backfill-gpu-metrics",
     "admin:db:backfill-gpu-sample-blobs": "bun run --cwd packages/db db:backfill-gpu-sample-blobs",

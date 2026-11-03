@@ -1,6 +1,6 @@
 import type { OperatorXStatus } from '@semianalysisai/inferencex-db/operatorx/normalize';
 
-import { hardwareLabel } from './compare/hardware';
+import { hardwareLabel, sortHardware } from './compare/hardware';
 import type { ComparisonModel } from './compare/model';
 
 const STATES: { id: OperatorXStatus | 'not-run'; label: string; className: string }[] = [
@@ -25,7 +25,7 @@ export function CoverageStrip({ model }: { model: ComparisonModel }) {
         ))}
       </div>
       <ul className="grid gap-x-5 gap-y-1.5 sm:grid-cols-2 lg:grid-cols-4">
-        {model.available.map((hw) => {
+        {sortHardware(Object.keys(model.view.measurements)).map((hw) => {
           const status = model.view.measurements[hw]?.status ?? [];
           const counts = new Map<string, number>();
           for (let i = 0; i < total; i++) {

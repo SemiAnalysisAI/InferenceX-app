@@ -9,6 +9,6 @@ function ThroughputSummary({ model }: { model: ComparisonModel }) {
 export const throughputSummary: VizDefinition = {
   id: 'throughput-summary',
   title: 'Median and best throughput',
-  ops: ['gemm', 'moe'],
+  ops: ['gemm', 'moe', 'attention'],
   Component: ThroughputSummary,
 };

@@ -15,6 +15,7 @@ import {
   parsePrecisionsParam,
   parseSequenceParam,
   parseTcoBasisParam,
+  parseChipBasisParam,
   parseVendorsParam,
   resolveModelParam,
 } from '@/lib/views-api/params';
@@ -115,6 +116,7 @@ export function GET(request: NextRequest) {
       parseDateParam(search.get('extendToDate'), 'extendToDate') ??
       new Date().toISOString().slice(0, 10);
     const tcoBasis = parseTcoBasisParam(search.get('tcoBasis'));
+    const chipBasis = parseChipBasisParam(search.get('chipBasis'));
     const priceSource = parseEnumParam(
       search.get('priceSource'),
       'priceSource',
@@ -190,6 +192,7 @@ export function GET(request: NextRequest) {
       selectedYAxisMetric: metricConfigKey,
       requestedMetrics: trendMetricDependencies(trendMetricKey),
       tcoBasis,
+      chipBasis,
       tokenRevenuePricing: pricing,
       ...(rowFilter ? { rowFilter } : {}),
     });
@@ -283,6 +286,7 @@ export function GET(request: NextRequest) {
       frameworks,
       deployment,
       tcoBasis,
+      chipBasis,
       priceSource,
       extendToDate,
       start: start ?? null,

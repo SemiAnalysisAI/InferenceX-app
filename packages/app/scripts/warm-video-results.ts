@@ -1,5 +1,13 @@
 import { env } from 'node:process';
+import { publishVideoResults } from '../src/lib/video/video-publication';
 if (!env.INFERENCEX_APP_URL) throw new Error('INFERENCEX_APP_URL is not set');
+if (!env.INVALIDATE_SECRET) throw new Error('INVALIDATE_SECRET is not set');
+if (!env.H3_RUN_ID) throw new Error('H3_RUN_ID is not set');
+if (
+  !['repository_dispatch', 'workflow_dispatch'].includes(env.H3_PUBLICATION_EVENT ?? '') ||
+  (env.H3_PUBLICATION_EVENT === 'repository_dispatch' && !env.H3_MERGE_RUN_ID)
+)
+  throw new Error('H3 publication requires an explicit source run and dispatch identity');
 const origin = new URL(env.INFERENCEX_APP_URL).origin;
 const bypassSecret = env.VERCEL_PROTECTION_BYPASS_SECRET;
 const headers = bypassSecret ? { 'x-vercel-protection-bypass': bypassSecret } : undefined;
@@ -13,18 +21,26 @@ async function get(path: string) {
     throw new Error('BLOB_READ_WRITE_TOKEN is not configured on the frontend');
   return response.json();
 }
-const runId = env.H3_RUN_ID;
-if (runId && !/^[1-9]\d*$/u.test(runId)) throw new Error('Invalid H3_RUN_ID');
-const catalog = runId ? { runs: [{ id: runId }] } : await get('?page=1');
-const runs: { id: number | string }[] = catalog.runs;
-for (const run of runs) {
-  const data = await get(`?run=${run.id}`);
-  for (const artifact of data.artifacts) {
-    if (artifact.stored || artifact.expired) continue;
-    const result = await get(`?run=${run.id}&artifact=${artifact.id}&format=media`);
-    if (result.storageVersion !== 1) throw new Error('Unexpected H3 storage response');
-    console.log(
-      `Stored H3 run ${run.id}, artifact ${artifact.id}, ${result.sources.length} executions`,
-    );
-  }
+async function post(body: { runId: string; artifactId: string; mergeRunId: string | null }) {
+  const response = await fetch(`${origin}/api/video-runs`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${env.INVALIDATE_SECRET}`,
+      ...headers,
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(290000),
+  });
+  if (!response.ok) throw new Error(`H3 publication failed: HTTP ${response.status}`);
+  return response.json();
 }
+await publishVideoResults({
+  get,
+  post,
+  runId: env.H3_RUN_ID,
+  mergeRunId: env.H3_MERGE_RUN_ID || null,
+  onStored: (run, artifact, sources) => {
+    console.log(`Stored video run ${run}, artifact ${artifact}, ${sources} executions`);
+  },
+});

@@ -8,6 +8,7 @@ import {
   PRECISION_KEYS,
 } from '@semianalysisai/inferencex-constants';
 import { flattenAgenticAggRow } from './agentic-v3-flatten';
+import { hasRealPoolSplit, perPoolThroughputPatch } from './disagg-throughput';
 import { preferFullResponseMetrics } from './full-response-interactivity';
 import {
   resolveModelKey,
@@ -201,6 +202,19 @@ export function mapBenchmarkRow(
   let metrics = captureNumericMetrics(row, tracker);
   normalizePowerContractMetrics(row, metrics);
   if (isAgentic) metrics = preferFullResponseMetrics(metrics);
+  if (
+    isAgentic &&
+    hasRealPoolSplit({
+      disagg: topology.disagg,
+      num_prefill_gpu: topology.numPrefillGpu,
+      num_decode_gpu: topology.numDecodeGpu,
+      prefill_num_workers: topology.prefillNumWorkers,
+      decode_num_workers: topology.decodeNumWorkers,
+    })
+  ) {
+    const perPool = perPoolThroughputPatch(metrics, topology.numPrefillGpu, topology.numDecodeGpu);
+    if (perPool) Object.assign(metrics, perPool);
+  }
   if (!topology.disagg && (metrics.prefill_pp !== undefined || metrics.decode_pp !== undefined)) {
     const pp = Math.max(metrics.prefill_pp ?? 1, metrics.decode_pp ?? 1);
     metrics.prefill_pp = pp;

@@ -28,23 +28,49 @@ export interface ComparisonChangelog {
   runConfigs: RunConfigRow[];
 }
 
+/**
+ * An embedded dashboard shows the changelog collapsed, so it requests
+ * `/api/v1/workflow-changelogs` only once the reader opens it, or once a date
+ * comparison needs per-date run configs.
+ */
+export function shouldFetchComparisonChangelogs({
+  embedded,
+  changelogOpened,
+  selectedDateRange,
+  selectedDates,
+}: {
+  embedded: boolean;
+  changelogOpened: boolean;
+  selectedDateRange: { startDate: string; endDate: string };
+  selectedDates: readonly string[];
+}): boolean {
+  return (
+    !embedded ||
+    changelogOpened ||
+    (Boolean(selectedDateRange.startDate) && Boolean(selectedDateRange.endDate)) ||
+    selectedDates.length > 0
+  );
+}
+
 export function useComparisonChangelogs(
   selectedGPUs: string[],
   selectedDateRange: { startDate: string; endDate: string },
   availableDates: string[],
   benchmarkType?: 'agentic_traces',
+  enabled = true,
 ) {
   const hasGPUs = selectedGPUs.length > 0;
   const hasDateRange = Boolean(selectedDateRange.startDate) && Boolean(selectedDateRange.endDate);
 
   const datesToQuery = useMemo(() => {
-    if (!hasGPUs) return [];
+    if (!hasGPUs || !enabled) return [];
     if (!hasDateRange) return availableDates;
     return availableDates.filter(
       (d) => d >= selectedDateRange.startDate && d <= selectedDateRange.endDate,
     );
   }, [
     hasGPUs,
+    enabled,
     hasDateRange,
     availableDates,
     selectedDateRange.startDate,

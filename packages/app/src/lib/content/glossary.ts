@@ -15,6 +15,8 @@ export interface GlossaryEntry {
   slug: string;
   term: string;
   abbreviation?: string;
+  /** Spelled-out name shown in the search title when the term is itself an acronym. */
+  expansion?: string;
   aliases?: readonly string[];
   category: GlossaryCategory;
   plainEnglish: string;
@@ -977,6 +979,7 @@ const entries = [
   {
     slug: 'nvfp4',
     term: 'NVFP4',
+    expansion: 'NVIDIA 4-Bit Floating Point',
     aliases: ['NVIDIA FP4'],
     category: 'Numerical precision',
     plainEnglish:
@@ -2514,6 +2517,7 @@ const entries = [
     slug: 'nccl',
     term: 'NCCL',
     abbreviation: 'NCCL',
+    expansion: 'NVIDIA Collective Communications Library',
     aliases: ['NVIDIA Collective Communications Library', 'RCCL'],
     category: 'Software',
     plainEnglish:
@@ -2533,6 +2537,7 @@ const entries = [
     slug: 'gemm',
     term: 'GEMM',
     abbreviation: 'GEMM',
+    expansion: 'General Matrix Multiply',
     aliases: ['general matrix multiply', 'matrix multiplication kernel'],
     category: 'Software',
     plainEnglish:
@@ -2838,6 +2843,7 @@ const entries = [
     slug: 'xla',
     term: 'XLA',
     abbreviation: 'XLA',
+    expansion: 'Accelerated Linear Algebra',
     aliases: ['Accelerated Linear Algebra', 'StableHLO', 'XLA compiler'],
     category: 'Software',
     plainEnglish:
@@ -2948,12 +2954,12 @@ const entries = [
   {
     slug: 'double-buffering',
     term: 'Double buffering',
-    aliases: ['triple buffering', 'prefetch pipelining', 'DMA overlap'],
+    aliases: ['multiple buffering', 'triple buffering', 'prefetch pipelining', 'DMA overlap'],
     category: 'Software',
     plainEnglish:
       'Double buffering fetches the next chunk of data while the chip is still computing on the current one, so memory latency is hidden behind useful work.',
     definition:
-      'Double buffering is a kernel technique that allocates two on-chip buffers so a DMA transfer into one overlaps computation on the other, with triple buffering extending the same idea to a deeper pipeline.',
+      'Double buffering, the two-buffer form of multiple buffering, overlaps a DMA transfer into one on-chip buffer with computation on the other. Kernels use it to hide memory latency, and triple buffering extends the same idea to a deeper pipeline.',
     explanation:
       'On TPU a Pallas kernel hides HBM latency by fetching the next block into VMEM while the MXU works on the current block. Both blocks must fit in VMEM, so compute block size sets how far ahead the prefetch can run. The SparseCore ReduceScatter uses double buffering to transfer one chunk while accumulating another, overlapping local reductions and die-to-die transfers with slower chip-to-chip traffic. The grouped matmul triple-buffers expert weights so the next group’s weights are in flight while the current group computes. Asynchronous GDN state transfers use the same pattern, which initially cost VMEM until scratch buffers were reused.',
     significance:

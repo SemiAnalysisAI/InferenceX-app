@@ -30,6 +30,7 @@ import { operations as gpuSpecsViews } from '../views-api/docs/gpu-specs';
 import { operations as historicalViews } from '../views-api/docs/historical';
 import { operations as inferenceViews } from '../views-api/docs/inference';
 import { operations as modelArchitectureViews } from '../views-api/docs/model-architectures';
+import { operations as operatorXViews } from '../views-api/docs/operatorx';
 import { operations as optionsViews } from '../views-api/docs/options';
 import { operations as overviewViews } from '../views-api/docs/overview';
 import { operations as rankingsViews } from '../views-api/docs/rankings';
@@ -266,7 +267,7 @@ const benchmarkMetricsSchema: ApiSchema = {
   type: 'object',
   additionalProperties: numberSchema,
   description:
-    'Scalar metric map. Time metrics, including p99_itl and p99_tpot, are in seconds. p99_itl measures inter-token latency; p99_tpot measures per-request time per output token. Use the actual p99_itl field for an inter-token latency requirement, not the reciprocal of p99_intvty. Throughput metrics use tokens per second per GPU unless their name states otherwise; output_tput_per_gpu counts output tokens. Keys evolve independently; measured power / energy / GPU-telemetry keys are typed below.',
+    'Scalar metric map. Time metrics, including p99_itl and p99_tpot, are in seconds. p99_itl measures inter-token latency; p99_tpot measures per-request time per output token. Use the actual p99_itl field for an inter-token latency requirement, not the reciprocal of p99_intvty. Throughput metrics use tokens per second per GPU unless their name states otherwise; output_tput_per_gpu counts output tokens. On disaggregated rows tput_per_gpu divides by every chip, input_tput_per_gpu by prefill chips and output_tput_per_gpu by decode chips, for fixed-sequence and agentic runs alike. Agentic disaggregated rows also keep the original per-total-chip rates from the producer as input_tput_per_total_gpu and output_tput_per_total_gpu. Keys evolve independently; measured power / energy / GPU-telemetry keys are typed below.',
   properties: Object.fromEntries(
     POWER_METRIC_KEYS.map((key): [string, ApiSchema] => [
       key,
@@ -740,7 +741,7 @@ const percentileSchema = objectSchema({
   n: integerSchema,
 });
 const nullablePercentileSchema: ApiSchema = { oneOf: [percentileSchema, { type: 'null' }] };
-const idListSchema: ApiSchema = { type: 'string', pattern: '^\\d+(,\\d+)*$' };
+const idListSchema: ApiSchema = { type: 'string', pattern: String.raw`^\d+(,\d+)*$` };
 const positiveIdSchema: ApiSchema = { type: 'integer', minimum: 1 };
 const safePositiveIdSchema: ApiSchema = { ...positiveIdSchema, maximum: Number.MAX_SAFE_INTEGER };
 
@@ -822,6 +823,7 @@ export const apiOperations: readonly ApiOperation[] = [
     ...overviewViews,
     ...rankingsViews,
     ...compareViews,
+    ...operatorXViews,
   ]),
   ...extensionViews,
   ...modelArchitectureViews,
@@ -1062,8 +1064,8 @@ export const apiOperations: readonly ApiOperation[] = [
         'query',
         false,
         'date',
-        'Latest data on or before YYYY-MM-DD, unless exact is true.',
-        'YYYY-MM-DD 当日或之前的最新数据，exact 为 true 时仅限当日。',
+        'Latest data on or before this calendar date (YYYY-MM-DD), unless exact is true. An empty value means the latest data; any other value, such as latest, yields 400.',
+        '返回该日期（YYYY-MM-DD）当日或之前的最新数据，exact 为 true 时仅限当日。空值表示最新数据；不是有效日期的取值（如 latest）返回 400。',
         { type: 'string', format: 'date' },
         '2026-08-08',
       ),
@@ -1072,8 +1074,8 @@ export const apiOperations: readonly ApiOperation[] = [
         'query',
         false,
         'boolean',
-        'Set true to require the supplied date exactly.',
-        '设为 true 时严格匹配所给日期。',
+        'Set true to require the supplied date exactly. Only true and false are accepted.',
+        '设为 true 时严格匹配所给日期。仅接受 true 或 false。',
         { type: 'boolean', default: false },
         false,
       ),
@@ -1082,8 +1084,8 @@ export const apiOperations: readonly ApiOperation[] = [
         'query',
         false,
         'integer',
-        'Numeric GitHub Actions run ID. Non-numeric values are ignored.',
-        'GitHub Actions 数字运行 ID。非数字值会被忽略。',
+        'Positive integer GitHub Actions run ID. Other values yield 400.',
+        'GitHub Actions 运行 ID，须为正整数。其他取值返回 400。',
         positiveIdSchema,
         123456789,
       ),
@@ -1092,8 +1094,8 @@ export const apiOperations: readonly ApiOperation[] = [
         'query',
         false,
         'boolean',
-        'With a numeric runId, return that run’s logical snapshot. Append-only runs include predecessors whose shared topologies keep the same image.',
-        '与数字 runId 一起使用时，返回该次运行对应的逻辑快照；append-only 运行的快照还会包含此前运行的数据，前提是两者共有的拓扑使用同一镜像。',
+        'With a numeric runId, return that run’s logical snapshot. Append-only runs include predecessors whose shared topologies keep the same image. Only true and false are accepted, and true requires runId.',
+        '与数字 runId 一起使用时，返回该次运行对应的逻辑快照；append-only 运行的快照还会包含此前运行的数据，前提是两者共有的拓扑使用同一镜像。仅接受 true 或 false，且为 true 时必须提供 runId。',
         { type: 'boolean', default: false },
         false,
       ),
@@ -1102,8 +1104,8 @@ export const apiOperations: readonly ApiOperation[] = [
         'query',
         false,
         'enum',
-        'calculator trims each row to the page-owned metric allowlist the throughput calculator consumes and removes workers; measured power metrics are excluded from this view. Requires sequence. Omit for every stored metric, including measured power.',
-        'calculator 会将每行裁剪为吞吐量计算器所需的页面专用指标允许列表并移除 workers；此视图不包含实测功率指标。需要同时提供 sequence。省略则返回全部已存储指标，包括实测功率。',
+        'calculator trims each row to the page-owned metric allowlist the throughput calculator consumes and removes workers; measured power metrics are excluded from this view. Requires sequence. Omit for every stored metric, including measured power. Other values yield 400 Unknown view.',
+        'calculator 会将每行裁剪为吞吐量计算器所需的页面专用指标允许列表并移除 workers；此视图不包含实测功率指标。需要同时提供 sequence。省略则返回全部已存储指标，包括实测功率。其他取值返回 400 Unknown view。',
         { type: 'string', enum: ['calculator'] },
         'calculator',
       ),
@@ -1137,8 +1139,8 @@ export const apiOperations: readonly ApiOperation[] = [
       ),
       errorResponse(
         '400',
-        'The model is missing or unsupported, the calculator sequence is unknown, a supplied powerValid value is not strictV2, or powerValid=strictV2 is combined with view=calculator.',
-        '模型缺失或不受支持、计算器序列未知、提供的 powerValid 取值不是 strictV2，或 powerValid=strictV2 与 view=calculator 组合使用。',
+        'A query parameter is malformed, so nothing is read from the database: the model is missing or unsupported, date is not a YYYY-MM-DD calendar date, exact or exactRun is not true or false, runId is not a positive integer, exactRun=true has no runId, view is not calculator, the calculator sequence is unknown, a supplied powerValid value is not strictV2, or powerValid=strictV2 is combined with view=calculator. Unknown parameters are ignored.',
+        '查询参数格式错误，请求不会读取数据库：模型缺失或不受支持、date 不是 YYYY-MM-DD 格式的有效日期、exact 或 exactRun 不是 true 或 false、runId 不是正整数、exactRun=true 但未提供 runId、view 不是 calculator、计算器序列未知、提供的 powerValid 取值不是 strictV2，或 powerValid=strictV2 与 view=calculator 组合使用。未知参数会被忽略。',
         PUBLIC_API_ERRORS.unknownModel,
       ),
       errorResponse(
@@ -1416,7 +1418,11 @@ export const apiOperations: readonly ApiOperation[] = [
         'CSV workload list',
         'Comma-separated <isl>x<osl> token pairs.',
         '以逗号分隔的 <isl>x<osl> token 组合。',
-        { type: 'string', default: '1024x1024,8192x1024', pattern: '^\\d+x\\d+(,\\d+x\\d+)*$' },
+        {
+          type: 'string',
+          default: '1024x1024,8192x1024',
+          pattern: String.raw`^\d+x\d+(,\d+x\d+)*$`,
+        },
         '1024x1024,8192x1024',
       ),
       parameter(
@@ -2577,8 +2583,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/server-log',
     summary: text('Read a benchmark server log', '读取基准服务器日志'),
     description: text(
-      'Returns one stored .log/.out file for a benchmark result ID. Use file with a name from server-log-files. Add offset or limit for a bounded chunk; add download=1 to stream the complete selected file as a text attachment.',
-      '返回某个基准测试结果 ID 对应的一份已存储的 .log/.out 文件。file 应使用 server-log-files 返回的文件名。可添加 offset 或 limit，按指定范围分块读取；添加 download=1 可将完整的所选文件作为文本附件流式下载。',
+      'Returns one stored .log/.out file for a benchmark result ID. Use file with a name from server-log-files. Add offset or limit for a bounded chunk; add download=1 to stream the complete selected file as a text attachment. Without offset, limit, or download, files over 16 MiB return 413; download=1 returns 413 for files over 512 MiB, which must be read in offset/limit ranges. Stored logs never change, so successful responses are CDN-cached for a year.',
+      '返回某个基准测试结果 ID 对应的一份已存储的 .log/.out 文件。file 应使用 server-log-files 返回的文件名。可添加 offset 或 limit，按指定范围分块读取；添加 download=1 可将完整的所选文件作为文本附件流式下载。不带 offset、limit 或 download 时，超过 16 MiB 的文件返回 413；使用 download=1 时，超过 512 MiB 的文件返回 413，需改用 offset/limit 分段读取。已存储的日志不会变化，因此成功响应会在 CDN 缓存一年。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -2671,6 +2677,12 @@ export const apiOperations: readonly ApiOperation[] = [
         'Not found',
       ),
       errorResponse(
+        '413',
+        'The file exceeds the size limit for a complete read (16 MiB, JSON body with bytes and maxBytes) or a download (512 MiB, plain-text body).',
+        '文件超过完整读取（16 MiB，JSON 响应体包含 bytes 和 maxBytes）或下载（512 MiB，纯文本响应体）的大小上限。',
+        'Log file is 951652286 bytes, above the 16777216-byte limit for this mode. Read it with offset and limit, or stream it with download=1.',
+      ),
+      errorResponse(
         '500',
         'The server log query failed.',
         '服务器日志查询失败。',
@@ -2687,8 +2699,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/server-log-search',
     summary: text('Search complete benchmark logs', '搜索完整基准测试日志'),
     description: text(
-      'Runs a literal, case-insensitive search across every stored .log/.out file for one benchmark result. The bounded response contains contextual snippets without transferring complete log files.',
-      '在某个基准测试结果对应的所有已存储 .log/.out 文件中，按字面值执行不区分大小写的搜索。响应仅返回数量受限的上下文片段，无需传输完整日志文件。',
+      'Runs a literal, case-insensitive search across every stored .log/.out file for one benchmark result. The bounded response contains contextual snippets without transferring complete log files. One request scans at most 64 million characters across all files; incomplete is true when that budget stopped the scan before the end. A search that exceeds its time budget returns 504.',
+      '在某个基准测试结果对应的所有已存储 .log/.out 文件中，按字面值执行不区分大小写的搜索。响应仅返回数量受限的上下文片段，无需传输完整日志文件。单次请求在所有文件中最多扫描 6,400 万个字符；若扫描因该上限而未到达末尾，incomplete 为 true。搜索超时则返回 504。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -2741,6 +2753,7 @@ export const apiOperations: readonly ApiOperation[] = [
             }),
           ),
           truncated: booleanSchema,
+          incomplete: booleanSchema,
         }),
         {
           id: 421,
@@ -2755,9 +2768,16 @@ export const apiOperations: readonly ApiOperation[] = [
             },
           ],
           truncated: false,
+          incomplete: false,
         },
       ),
       errorResponse('400', 'The search parameters are invalid.', '搜索参数无效。', 'Invalid query'),
+      errorResponse(
+        '504',
+        'The search exceeded its time budget.',
+        '搜索超时。',
+        'Search timed out. Try a more specific term.',
+      ),
       errorResponse(
         '500',
         'The complete-log search failed.',
@@ -3287,8 +3307,8 @@ const overview = {
       id: 'cache',
       title: text('Caching', '缓存'),
       description: text(
-        'Read endpoints may be served from shared caches. JSON is brotli- or gzip-compressed when Accept-Encoding allows it and uncompressed otherwise, with Vary: Accept-Encoding. Most database-backed JSON responses carry a strong ETag; send it in If-None-Match to receive an empty 304 while the data is unchanged. Browsers may reuse those responses for 60 seconds. Right after a data ingest, a cache may serve the previous response once while it refreshes. CollectiveX responses stay cached until a results upload purges them, and framework releases use a one-hour shared cache.',
-        '只读端点可能由共享缓存提供。若 Accept-Encoding 允许，JSON 以 brotli 或 gzip 压缩，否则不压缩，并附带 Vary: Accept-Encoding。大多数基于数据库的 JSON 响应带有强 ETag；在 If-None-Match 中回传该值，数据未变化时将收到无响应体的 304。浏览器最多可复用这些响应 60 秒。新数据导入后，缓存刷新期间可能再返回一次旧响应。CollectiveX 响应会一直缓存，直到结果上传时被清除；框架版本使用一小时共享缓存。',
+        'Read endpoints may be served from shared caches. JSON is brotli- or gzip-compressed when Accept-Encoding allows it and uncompressed otherwise, with Vary: Accept-Encoding. /api/v1/benchmarks is the exception: the shared cache compresses it, so its ETag and Vary headers come from that cache. Most database-backed JSON responses carry a strong ETag; send it in If-None-Match to receive an empty 304 while the data is unchanged. Browsers may reuse those responses for 60 seconds. Right after a data ingest, a cache may serve the previous response once while it refreshes. CollectiveX responses stay cached until a results upload purges them, and framework releases use a one-hour shared cache.',
+        '只读端点可能由共享缓存提供。若 Accept-Encoding 允许，JSON 以 brotli 或 gzip 压缩，否则不压缩，并附带 Vary: Accept-Encoding。/api/v1/benchmarks 例外：由共享缓存负责压缩，因此其 ETag 和 Vary 头由该缓存决定。大多数基于数据库的 JSON 响应带有强 ETag；在 If-None-Match 中回传该值，数据未变化时将收到无响应体的 304。浏览器最多可复用这些响应 60 秒。新数据导入后，缓存刷新期间可能再返回一次旧响应。CollectiveX 响应会一直缓存，直到结果上传时被清除；框架版本使用一小时共享缓存。',
       ),
     },
     {
@@ -3315,8 +3335,8 @@ const overview = {
       id: 'benchmark-row',
       title: text('BenchmarkRow', 'BenchmarkRow'),
       description: text(
-        'Configuration fields sit beside a metrics map. Time metrics are seconds. Throughput fields ending in _per_gpu retain their legacy names but measure tokens per second per physical chip, including TPUs. num_prefill_gpu and num_decode_gpu count physical chips independently of logical TP; aggregate engines may mirror one count in both columns, so only disaggregated counts should be summed. Optional metrics.dp records data parallelism when supplied. For a P99 inter-token latency requirement, compare p99_itl in seconds (multiply by 1000 for milliseconds). p99_tpot measures per-request time per output token; the reciprocal of p99_intvty is not a substitute for p99_itl.',
-        '配置字段与 metrics 映射位于同一层级，时间指标以秒为单位。以 _per_gpu 结尾的吞吐量字段保留历史名称，实际表示每颗物理芯片每秒处理的 token 数，TPU 也使用此单位。num_prefill_gpu 和 num_decode_gpu 表示物理芯片数，与逻辑 TP 独立；聚合部署可能在两列中重复记录同一芯片数，只有分离式部署才应将两列相加。可选字段 metrics.dp 记录产物中提供的数据并行度。判断 P99 inter-token latency 是否达标时，应使用以秒为单位的 p99_itl（乘以 1000 可换算为毫秒）。p99_tpot 表示请求内每个输出 token 的平均耗时；不能用 p99_intvty 的倒数代替 p99_itl。',
+        'Configuration fields sit beside a metrics map. Time metrics are seconds. Throughput fields ending in _per_gpu retain their legacy names but measure tokens per second per physical chip, including TPUs. num_prefill_gpu and num_decode_gpu count physical chips independently of logical TP; aggregate engines may mirror one count in both columns, so sum them only for disaggregated rows with nonzero prefill_num_workers and decode_num_workers or unequal counts; legacy disaggregated rows without workers (2025-09-29 to 2025-12-05) mirror the deployment size in both columns too. Optional metrics.dp records data parallelism when supplied. For a P99 inter-token latency requirement, compare p99_itl in seconds (multiply by 1000 for milliseconds). p99_tpot measures per-request time per output token; the reciprocal of p99_intvty is not a substitute for p99_itl.',
+        '配置字段与 metrics 映射位于同一层级，时间指标以秒为单位。以 _per_gpu 结尾的吞吐量字段保留历史名称，实际表示每颗物理芯片每秒处理的 token 数，TPU 也使用此单位。num_prefill_gpu 和 num_decode_gpu 表示物理芯片数，与逻辑 TP 独立；聚合部署可能在两列中重复记录同一芯片数；只有 prefill_num_workers 与 decode_num_workers 均非零、或两列数值不同的分离式部署才应将两列相加；2025-09-29 至 2025-12-05 期间未记录 worker 的旧分离式数据同样在两列中重复记录整套部署的芯片数。可选字段 metrics.dp 记录产物中提供的数据并行度。判断 P99 inter-token latency 是否达标时，应使用以秒为单位的 p99_itl（乘以 1000 可换算为毫秒）。p99_tpot 表示请求内每个输出 token 的平均耗时；不能用 p99_intvty 的倒数代替 p99_itl。',
       ),
       shape: 'BenchmarkRows',
       example: benchmarkExample[0],

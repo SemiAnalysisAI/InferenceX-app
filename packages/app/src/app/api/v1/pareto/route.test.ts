@@ -82,9 +82,9 @@ describe('GET /api/v1/pareto', () => {
       exact: false,
       runId: '123',
       exactRun: true,
-      calculator: false,
+      view: undefined,
       sequence: '',
-      powerValidFilter: null,
+      powerValid: null,
     });
   });
 

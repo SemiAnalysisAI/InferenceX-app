@@ -95,6 +95,25 @@ function cdnCacheTag(): string {
   return namespace ? `db-cdn:${namespace}` : 'db-cdn';
 }
 
+/**
+ * CDN tag for stored benchmark log text. Ingest never rewrites a stored log:
+ * it only links new bundles and adds missing files, so a response for one
+ * (id, file, range) cannot change. Ordinary ingests therefore leave this tag
+ * alone; only an immediate purge (corrections and retractions) drops it.
+ */
+export function serverLogCacheTag(): string {
+  const namespace = cacheNamespace();
+  return namespace ? `db-log:${namespace}` : 'db-log';
+}
+
+/**
+ * Stored log text is immutable, so the CDN keeps it for a year and browsers
+ * for an hour. Each Neon read of a deep offset decompresses the log up to that
+ * offset, so every CDN hit saves real database time.
+ */
+export const SERVER_LOG_CACHE_CONTROL =
+  'public, max-age=3600, s-maxage=31536000, stale-while-revalidate=86400';
+
 interface CachedQueryOptions {
   /** Use blob storage directly, skipping unstable_cache. Use for payloads known to exceed 2MB. */
   blobOnly?: boolean;
@@ -339,6 +358,7 @@ export async function purgeAll({
   revalidateTag(cacheTag(), { expire: 0 });
   revalidateTag(pageCacheTag(), stale);
   revalidateTag(cdnCacheTag(), stale);
+  if (immediate) revalidateTag(serverLogCacheTag(), { expire: 0 });
   // CollectiveX responses are cached only under their own tag (no blobs), so
   // a full purge must drop that tag explicitly.
   purgeCollectiveX({ immediate });
@@ -393,11 +413,15 @@ export function cdnHeaders(
  * CDN-cached plain-text response (e.g. CSV) with the same cache headers and
  * purge tag as cachedJson. Uncompressed — use only for small payloads.
  */
-export function cachedText(data: string, contentType: string): Response {
+export function cachedText(
+  data: string,
+  contentType: string,
+  options?: { tag?: string; cacheControl?: string },
+): Response {
   return new Response(data, {
     headers: {
       'Content-Type': contentType,
-      ...cdnHeaders(),
+      ...cdnHeaders(options?.tag, options?.cacheControl),
     },
   });
 }
@@ -528,10 +552,23 @@ function compressedBody(
   });
 }
 
+/**
+ * Who compresses a cachedJson body.
+ *
+ * - `origin` (default): the function negotiates br, gzip or identity and sends
+ *   `Vary: Accept-Encoding`. The Vercel CDN keys that Vary on the raw header
+ *   string, so `gzip, deflate`, `deflate, gzip` and `gzip, deflate, br, zstd`
+ *   each get their own cache entry and their own origin miss.
+ * - `cdn`: the function always sends plain JSON without Vary, so each URL has
+ *   one CDN entry, which the CDN compresses for each client as it serves it.
+ */
+export type JsonCompression = 'origin' | 'cdn';
+
 interface CachedJsonOptions {
   tag?: string;
   cacheControl?: string;
   version?: string;
+  compression?: JsonCompression;
 }
 
 function jsonValidation(
@@ -540,14 +577,17 @@ function jsonValidation(
   options: CachedJsonOptions | undefined,
   brotliQuality = BROTLI_QUALITY,
 ) {
-  const encoding = negotiateEncoding(request.headers.get('Accept-Encoding'));
+  const originCompression = options?.compression !== 'cdn';
+  const encoding = originCompression
+    ? negotiateEncoding(request.headers.get('Accept-Encoding'))
+    : 'identity';
   const etag = entityTag(
     digest,
     encoding === 'br' && brotliQuality !== BROTLI_QUALITY ? `br${brotliQuality}` : encoding,
   );
   const headers = {
     ETag: etag,
-    Vary: 'Accept-Encoding',
+    ...(originCompression ? { Vary: 'Accept-Encoding' } : {}),
     ...cdnHeaders(options?.tag, options?.cacheControl),
   };
   const notModified = matchesIfNoneMatch(request.headers.get('If-None-Match'), etag)
@@ -565,9 +605,10 @@ export function notModifiedJson(
 
 /**
  * CDN-cached streamed JSON response — supports up to 20 MB on Vercel CDN.
- * The body is brotli, gzip, or identity per the request's Accept-Encoding,
- * with `Vary: Accept-Encoding` and a strong ETag; a matching If-None-Match
- * gets a bodiless 304.
+ * With `compression: 'origin'` (default) the body is brotli, gzip, or identity
+ * per the request's Accept-Encoding, with `Vary: Accept-Encoding`. With `'cdn'`
+ * it is always identity. Either way it carries a strong ETag, and a matching
+ * If-None-Match gets a bodiless 304.
  */
 export function cachedJson<T>(request: Request, data: T, options?: CachedJsonOptions): Response {
   return cachedJsonBytes(request, new TextEncoder().encode(JSON.stringify(data)), options);
@@ -632,12 +673,16 @@ function readEncodedJson(stored: Uint8Array): EncodedJson {
   };
 }
 
-function encodedJsonResponse(request: Request, encoded: EncodedJson): Response {
+function encodedJsonResponse(
+  request: Request,
+  encoded: EncodedJson,
+  options: CachedJsonOptions | undefined,
+): Response {
   const {
     encoding,
     headers: cacheHeaders,
     notModified,
-  } = jsonValidation(request, encoded.digest, undefined, encoded.brotliQuality);
+  } = jsonValidation(request, encoded.digest, options, encoded.brotliQuality);
   if (notModified) return notModified;
   if (encoding === 'br') {
     return new Response(identityBody(encoded.brotli), {
@@ -658,6 +703,7 @@ function encodedJsonResponse(request: Request, encoded: EncodedJson): Response {
 export function cachedJsonResponse<Args extends unknown[]>(
   load: (...args: Args) => Promise<unknown>,
   keyPrefix: string,
+  options?: CachedJsonOptions,
 ): (request: Request, ...args: Args) => Promise<Response> {
   const inflight = new Map<string, Promise<EncodedJson>>();
   const fill = async (path: string, args: Args): Promise<EncodedJson> => {
@@ -677,7 +723,7 @@ export function cachedJsonResponse<Args extends unknown[]>(
     return encoded;
   };
   return async (request: Request, ...args: Args): Promise<Response> => {
-    if (!blobEnabled()) return cachedJson(request, await load(...args));
+    if (!blobEnabled()) return cachedJson(request, await load(...args), options);
     blobGeneration ??= cachedQuery(() => Promise.resolve(randomUUID()), 'blob-generation');
     const path = `generation/${await blobGeneration()}/${blobKeyForArgs(keyPrefix, args)}.response.br`;
     let flight = inflight.get(path);
@@ -685,7 +731,7 @@ export function cachedJsonResponse<Args extends unknown[]>(
       flight = fill(path, args).finally(() => inflight.delete(path));
       inflight.set(path, flight);
     }
-    return encodedJsonResponse(request, await flight);
+    return encodedJsonResponse(request, await flight, options);
   };
 }
 

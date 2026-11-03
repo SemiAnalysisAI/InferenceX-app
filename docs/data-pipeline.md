@@ -450,10 +450,12 @@ Server-log writes, trace-replay link checks and trace-replay writes retry up to 
 backoff on transient connection errors (`CONNECTION_CLOSED`, auth timeouts, SQLSTATE class 08)
 because both writers are transactional and re-check existing links.
 
-Full-bundle search stays inside PostgreSQL: each file is scanned through overlapping 16 MiB
-character slices, and the API returns at most 50 match contexts rather than transferring the
-complete file. The overlap preserves literal matches that cross a slice boundary. Files are
-processed sequentially so a multinode bundle cannot materialize every large log in one query.
+Full-bundle search stays inside PostgreSQL: each file is scanned through overlapping 4 Mi
+character slices matched with `strpos(lower(...))`, and the API returns at most 50 match
+contexts rather than transferring the complete file. The overlap preserves literal matches that
+cross a slice boundary. Files are processed sequentially so a multinode bundle cannot materialize
+every large log in one query. One search scans at most 64 million characters across all files
+(`incomplete: true` when that cap stops it) and fails after 25 s.
 
 #### Block storage (migration 021)
 
@@ -462,12 +464,14 @@ A TOAST-compressed text value decompresses from its start, so reading 1 MiB near
 independently brotli-compressed blocks of 1 Mi code points (about 24x smaller than the text
 column), and a row in `server_log_block_files` marks the file as block-backed once all its blocks
 exist. Readers use the blocks for marked files and the text columns otherwise, with identical
-results: offsets still count code points, and search keeps the slice loop above, so matches and
-their context are clipped to each slice exactly as before. A chunk read touches only the blocks
-it overlaps (about 100 ms at any offset). Each block also stores a bloom filter of the
-case-folded 1-3 grams of its text plus the next 255 code points. Search asks PostgreSQL which
-blocks may hold every gram of the term (`get_bit`), skips slices without such blocks, and
-decompresses only the candidate blocks and the context around a match.
+results: offsets still count code points, and search keeps the slice loop and scan budget above,
+so matches and their context are clipped to each slice exactly as before. A chunk read touches
+only the blocks it overlaps (about 100 ms at any offset), and a complete read of a block-backed
+file within the byte cap decodes its blocks instead of transferring the text column. Each block
+also stores a bloom filter of the case-folded 1-3 grams of its text plus the next 255 code
+points. Search asks PostgreSQL which blocks may hold every gram of the term (`get_bit`), skips
+slices without such blocks, and decompresses only the candidate blocks and the context around a
+match, where it compares the lowercased text with the lowercased term.
 
 `SERVER_LOG_BLOCKS=1` makes ingest write blocks next to the text columns.
 `bun run admin:db:compact-server-logs` (`--log-id`, `--limit`, `--dry-run`) converts
@@ -634,6 +638,12 @@ reconstructs each request's decode interval from the retained lifecycle duration
 minus TTFT, then divides by `output_sequence_length - 1`. The same helper powers
 the one-time `db:backfill-full-response-interactivity` data migration, keeping
 historical rows and newly ingested rows on one definition.
+
+### Disaggregated Throughput Basis
+
+Disaggregated rows store `input_tput_per_gpu` per prefill chip, `output_tput_per_gpu` per decode chip, and `tput_per_gpu` per deployment chip. The fixed-sequence producer writes that basis directly. The AgentX producer divides all three by every chip, so `etl/disagg-throughput.ts` moves multinode agentic disaggregated rows to the per-pool basis at ingest and copies the producer's rates to `input_tput_per_total_gpu` / `output_tput_per_total_gpu`.
+
+`admin:db:backfill-agentic-disagg-throughput` applies the same change to stored rows, then refreshes `latest_benchmarks`; run `admin:cache:invalidate <origin> --immediate` afterwards. The benchmark queries apply it on read too, so the app is correct before the backfill and on public-DB copies, whose sync never updates existing rows. Raw SQL readers such as the MCP server see the per-pool basis only after the backfill. A row holding either per-total key is never rescaled twice. Legacy fixed-sequence Dynamo rows (2025-09-29 to 2025-12-05) carry `disagg: true` with no workers and the whole deployment in both pool fields. Most October 2025 rows store rates per deployment chip; later ones store them per pool with unrecorded pool sizes, which the app solves from the rates themselves (`exactPerTotalChipRates` in `lib/benchmarks/chip-basis.ts`). Their chips are counted once. Agentic rows are rescaled at ingest, by the backfill and on read only when they record a real split (workers, or unequal pool fields), the same rule the app uses.
 
 ### Agentic Point-Detail Payloads
 

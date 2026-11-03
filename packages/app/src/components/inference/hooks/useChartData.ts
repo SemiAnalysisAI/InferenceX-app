@@ -60,6 +60,12 @@ import {
   type TokenBasis,
 } from '@/lib/benchmarks/benchmark-transform';
 import { remapInferencePoint } from '@/lib/charts/chart-utils';
+import {
+  CHIP_BASIS_METRICS,
+  DEFAULT_CHIP_BASIS,
+  withTotalChipQualifier,
+  type ChipBasis,
+} from '@/lib/benchmarks/chip-basis';
 import { DEFAULT_TCO_BASIS, getModelSortIndex, type TcoBasis } from '@/lib/catalog/constants';
 import { Sequence, type Model } from '@/lib/catalog/data-mappings';
 import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/shared/utils';
@@ -136,6 +142,7 @@ export function useChartData(
   fixedSequenceStatistic: FixedSequenceStatistic = 'median',
   tokenBasis: TokenBasis = 'total',
   prefetchLatestRows = false,
+  chipBasis: ChipBasis = DEFAULT_CHIP_BASIS,
 ) {
   const queryDate = asOfRunId
     ? (selectedRunDate ?? '')
@@ -285,8 +292,8 @@ export function useChartData(
         chartData: [] as InferenceData[][],
         hardwareConfig: {} as HardwareConfig,
       };
-    return transformBenchmarkRows(rows, selectedPercentile, tcoBasis, tokenBasis);
-  }, [rows, selectedPercentile, tcoBasis, tokenBasis]);
+    return transformBenchmarkRows(rows, selectedPercentile, tcoBasis, tokenBasis, chipBasis);
+  }, [rows, selectedPercentile, tcoBasis, tokenBasis, chipBasis]);
 
   const prevHardwareConfigRef = useRef<{ key: string; config: HardwareConfig }>({
     key: '',
@@ -463,8 +470,29 @@ export function useChartData(
                 ]),
               )
             : {};
+        const labelled = { ...chartDef, ...revenueLabels, ...tokenBasisLabels } as Record<
+          string,
+          unknown
+        >;
+        // Disaggregated rows change with the chip basis; name the denominator so a
+        // chart, its PNG export and a share-link viewer can't mistake one for the other.
+        const chipBasisLabels: Partial<ChartDefinition> =
+          chipBasis === 'total' && CHIP_BASIS_METRICS.has(selectedYAxisMetric)
+            ? Object.fromEntries(
+                (['label', 'title', 'chartTitle'] as const).flatMap((field) => [
+                  [
+                    `${selectedYAxisMetric}_${field}`,
+                    withTotalChipQualifier(labelled[`${selectedYAxisMetric}_${field}`], 'en'),
+                  ],
+                  [
+                    `${selectedYAxisMetric}_${field}Zh`,
+                    withTotalChipQualifier(labelled[`${selectedYAxisMetric}_${field}Zh`], 'zh'),
+                  ],
+                ]),
+              )
+            : {};
         const yLabelKey = `${selectedYAxisMetric}_label` as keyof ChartDefinition;
-        const dynamicYLabel = { ...chartDef, ...revenueLabels, ...tokenBasisLabels }[yLabelKey];
+        const dynamicYLabel = { ...labelled, ...chipBasisLabels }[yLabelKey];
 
         return {
           chartDefinition: {
@@ -472,6 +500,7 @@ export function useChartData(
             ...rooflineOverrides,
             ...revenueLabels,
             ...tokenBasisLabels,
+            ...chipBasisLabels,
             heading: chartHeading,
             x_scale_field: xAxisField,
             x_label: xAxisLabel,
@@ -492,6 +521,7 @@ export function useChartData(
       selectedSequence,
       tokenRevenuePriceSource,
       tokenBasis,
+      chipBasis,
     ],
   );
 

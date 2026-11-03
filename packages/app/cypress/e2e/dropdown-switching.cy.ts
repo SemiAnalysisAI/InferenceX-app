@@ -9,6 +9,7 @@ describe('Dropdown one-click switching', () => {
     });
     cy.visit('/inference?g_model=DeepSeek-V4-Pro');
     cy.get('[data-testid="inference-chart-display"]').should('exist');
+    cy.get('#chart-0 [data-testid="scenario-selector"]').should('be.visible');
   });
 
   it('clicking another selector closes the first and opens the second in one click', () => {

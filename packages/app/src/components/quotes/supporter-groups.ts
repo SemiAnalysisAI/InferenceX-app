@@ -16,6 +16,7 @@ export interface SupporterGroup {
   id: string;
   label: Record<Locale, string>;
   logos: WallLogo[];
+  desktopColumns?: number;
 }
 
 /**
@@ -25,10 +26,20 @@ export interface SupporterGroup {
  */
 export const CURATED_SUPPORTER_GROUPS: SupporterGroup[] = [
   {
-    id: 'chinese-frontier-labs',
-    label: { en: 'Chinese frontier labs', zh: '中国前沿实验室' },
+    id: 'ai-accelerators',
+    label: { en: 'AI Accelerators', zh: 'AI 加速器' },
     logos: [
-      { label: 'DeepSeek', logo: 'deepseek-color.svg' },
+      { label: 'Google', logo: 'google-color.svg' },
+      { label: 'AMD', logo: 'amd.svg', quoteOrg: 'AMD' },
+      { label: 'NVIDIA', logo: 'nvidia-color.svg', quoteOrg: 'NVIDIA' },
+      { label: 'OpenAI Jalapeño', logo: 'openai.svg', quoteOrg: 'OpenAI' },
+      { label: 'SambaNova', logo: 'sambanova.webp', quoteOrg: 'SambaNova' },
+    ],
+  },
+  {
+    id: 'chinese-frontier-labs',
+    label: { en: 'Chinese Frontier Labs', zh: '中国前沿实验室' },
+    logos: [
       { label: 'Kimi', logo: 'kimi-color.svg' },
       { label: 'Moonshot AI', logo: 'moonshot-ai.svg', quoteOrg: 'Moonshot AI' },
       { label: 'Alibaba Qwen', logo: 'qwen-color.svg', quoteOrg: 'Alibaba Qwen' },
@@ -37,8 +48,8 @@ export const CURATED_SUPPORTER_GROUPS: SupporterGroup[] = [
     ],
   },
   {
-    id: 'us-labs',
-    label: { en: 'US labs', zh: '美国实验室' },
+    id: 'us-frontier-labs',
+    label: { en: 'US Frontier Labs & NeoLabs', zh: '美国前沿实验室与 NeoLabs' },
     logos: [
       { label: 'OpenAI', logo: 'openai.svg', quoteOrg: 'OpenAI' },
       {
@@ -46,15 +57,16 @@ export const CURATED_SUPPORTER_GROUPS: SupporterGroup[] = [
         logo: 'meta.svg',
         quoteOrg: 'Meta Superintelligence Labs',
       },
-      { label: 'Google', logo: 'google-color.svg' },
-      { label: 'Periodic Labs', logo: 'periodic-labs.png', quoteOrg: 'Periodic Labs' },
+      { label: 'Google', logo: 'google-color.svg', quoteOrg: 'Google' },
       { label: 'Prime Intellect', logo: 'prime-intellect.svg', quoteOrg: 'Prime Intellect' },
       { label: 'Adaptive ML', logo: 'adaptive-ml.svg', quoteOrg: 'Adaptive ML' },
+      { label: 'Periodic Labs', logo: 'periodic-labs.png', quoteOrg: 'Periodic Labs' },
     ],
   },
   {
-    id: 'hyperscalers-clouds',
-    label: { en: 'Hyperscalers and clouds', zh: '超大规模云厂商与云平台' },
+    id: 'hyperscalers-neoclouds',
+    label: { en: 'Hyperscalers & Neoclouds', zh: '超大规模云厂商与 Neocloud' },
+    desktopColumns: 8,
     logos: [
       { label: 'Microsoft', logo: 'microsoft.svg', quoteOrg: 'Microsoft' },
       { label: 'Google Cloud', logo: 'google-color.svg' },
@@ -64,40 +76,43 @@ export const CURATED_SUPPORTER_GROUPS: SupporterGroup[] = [
       { label: 'Together AI', logo: 'together-ai.svg', quoteOrg: 'Together AI' },
       { label: 'Lambda', logo: 'lambda.svg', quoteOrg: 'Lambda' },
       { label: 'Crusoe', logo: 'crusoe.svg', quoteOrg: 'Crusoe' },
-      { label: 'Baseten', logo: 'baseten.svg', quoteOrg: 'Baseten' },
+      { label: 'GMI Cloud', logo: 'gmi-cloud.svg', quoteOrg: 'GMI Cloud' },
+      { label: 'TensorWave', logo: 'tensorwave.svg', quoteOrg: 'TensorWave' },
+      { label: 'Voltage Park', logo: 'voltage-park.svg', quoteOrg: 'Voltage Park' },
+      { label: 'Firmus', logo: 'firmus.svg', quoteOrg: 'Firmus' },
+      { label: 'Core42', logo: 'core42.webp', quoteOrg: 'Core42' },
+      { label: 'Verda', logo: 'verda.svg', quoteOrg: 'Verda' },
       { label: 'Vultr', logo: 'vultr.svg', quoteOrg: 'Vultr' },
     ],
   },
   {
+    id: 'managed-inference-providers',
+    label: { en: 'Managed Inference Providers', zh: '托管推理服务商' },
+    logos: [
+      { label: 'Together AI', logo: 'together-ai.svg', quoteOrg: 'Together AI' },
+      { label: 'GMI Cloud', logo: 'gmi-cloud.svg', quoteOrg: 'GMI Cloud' },
+      { label: 'Nebius', logo: 'nebius.svg', quoteOrg: 'Nebius' },
+      { label: 'Baseten', logo: 'baseten.svg', quoteOrg: 'Baseten' },
+      { label: 'Crusoe', logo: 'crusoe.svg', quoteOrg: 'Crusoe' },
+      { label: 'Tensormesh', logo: 'tensormesh.svg', quoteOrg: 'Tensormesh' },
+    ],
+  },
+  {
     id: 'open-source',
-    label: { en: 'Open source', zh: '开源项目' },
+    label: { en: 'Open Source', zh: '开源项目' },
+    desktopColumns: 6,
     logos: [
       { label: 'SGLang', logo: 'sglang.webp', quoteOrg: 'SGLang' },
       { label: 'vLLM', logo: 'vllm.svg', quoteOrg: 'vLLM' },
-      { label: 'TokenSpeed', logo: 'tokenspeed.webp' },
       { label: 'PyTorch Foundation', logo: 'pytorch.svg', quoteOrg: 'PyTorch Foundation' },
       { label: 'Hugging Face', logo: 'huggingface.svg', quoteOrg: 'Hugging Face' },
-      { label: 'Mooncake', logo: 'kvcache-ai.svg', quoteOrg: 'Mooncake' },
+      { label: 'KVCache.AI', logo: 'kvcache-ai.svg', quoteOrg: 'Mooncake' },
       { label: 'LMCache', logo: 'lmcache.webp', quoteOrg: 'LMCache' },
       { label: 'GPU Mode', logo: 'gpu-mode.png', quoteOrg: 'GPU Mode' },
       { label: 'TileRT', logo: 'tilert.webp', quoteOrg: 'TileRT' },
       { label: 'Anyscale', logo: 'anyscale.svg', quoteOrg: 'Anyscale' },
-    ],
-  },
-  {
-    id: 'silicon-neoclouds-academia',
-    label: { en: 'Silicon, neoclouds and academia', zh: '芯片、neocloud 与学术机构' },
-    logos: [
-      { label: 'NVIDIA', logo: 'nvidia-color.svg', quoteOrg: 'NVIDIA' },
-      { label: 'AMD', logo: 'amd.svg', quoteOrg: 'AMD' },
-      { label: 'SambaNova', logo: 'sambanova.webp', quoteOrg: 'SambaNova' },
-      { label: 'Supermicro', logo: 'supermicro.svg', quoteOrg: 'Supermicro' },
-      { label: 'TensorWave', logo: 'tensorwave.svg', quoteOrg: 'TensorWave' },
-      { label: 'GMI Cloud', logo: 'gmi-cloud.svg', quoteOrg: 'GMI Cloud' },
-      { label: 'Voltage Park', logo: 'voltage-park.svg', quoteOrg: 'Voltage Park' },
-      { label: 'Firmus', logo: 'firmus.svg', quoteOrg: 'Firmus' },
-      { label: 'Stanford', logo: 'stanford.svg', quoteOrg: 'Stanford' },
-      { label: 'UC Berkeley', logo: 'sky-berkeley.webp', quoteOrg: 'UC Berkeley' },
+      { label: 'Red Hat', logo: 'redhat.svg', quoteOrg: 'Red Hat' },
+      { label: 'EmbeddedLLM', logo: 'embeddedllm.webp', quoteOrg: 'EmbeddedLLM' },
     ],
   },
 ];

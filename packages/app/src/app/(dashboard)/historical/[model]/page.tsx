@@ -25,9 +25,9 @@ export default async function HistoricalModelPage({ params }: Props) {
   const { model } = await params;
   const resolved = resolveModelRouteSlug(model);
   if (!resolved) notFound();
-  if (resolved.isAlias) {
-    permanentRedirect(modelRoutePath('historical', resolved.route.slug));
-  }
+  // Prerendered route: reading searchParams here throws DYNAMIC_SERVER_USAGE. next.config
+  // redirects known aliases with their query; this only catches other casings.
+  if (resolved.isAlias) permanentRedirect(modelRoutePath('historical', resolved.route.slug));
   return (
     <>
       <LazyHistoricalTrendsDashboard />

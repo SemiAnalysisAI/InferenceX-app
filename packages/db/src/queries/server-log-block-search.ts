@@ -129,19 +129,24 @@ export async function readBlockSearchIndexes(
   return files;
 }
 
+export interface BlockScanBudget {
+  chunkSize: number;
+  overlap: number;
+  remaining: number;
+  checkDeadline: () => void;
+}
+
 export async function searchBlockFile(
   sql: DbClient,
   file: BlockSearchFile,
-  pattern: RegExp,
+  needle: string,
   searchLength: number,
-  chunkSize: number,
-  overlap: number,
   matches: ServerLogSearchMatch[],
   limit: number,
-): Promise<void> {
+  { chunkSize, overlap, remaining, checkDeadline }: BlockScanBudget,
+): Promise<{ incomplete: boolean; end: number }> {
   const { blocks } = file;
   const decoded = new Map<number, DecodedBlock>();
-  const finder = new RegExp(pattern.source, 'gu');
   const blockAfter = (point: number) => {
     let lo = 0;
     let hi = blocks.length;
@@ -193,8 +198,12 @@ export async function searchBlockFile(
   };
 
   let offset = 0;
+  let end = 0;
   while (matches.length <= limit) {
+    if (offset >= remaining) return { incomplete: true, end };
+    checkDeadline();
     const chunkEnd = Math.min(offset + chunkSize, file.charCount);
+    end = Math.max(end, chunkEnd);
     const lastStart = chunkEnd - searchLength;
     let at = -1;
     for (let i = blockAfter(offset); i < blocks.length && blocks[i].start <= lastStart; i++) {
@@ -202,11 +211,10 @@ export async function searchBlockFile(
       const scanFrom = Math.max(offset, blocks[i].start);
       const scanTo = Math.min(blocks[i].end - 1, lastStart);
       await load(scanFrom, scanTo + searchLength);
-      const window = text(scanFrom, scanTo + searchLength);
-      finder.lastIndex = 0;
-      const found = finder.exec(window);
-      if (found) {
-        const point = scanFrom + countCodePoints(window.slice(0, found.index));
+      const window = text(scanFrom, scanTo + searchLength).toLowerCase();
+      const found = window.indexOf(needle);
+      if (found !== -1) {
+        const point = scanFrom + countCodePoints(window.slice(0, found));
         if (point <= scanTo) {
           at = point;
           break;
@@ -233,4 +241,5 @@ export async function searchBlockFile(
     }
     for (const i of decoded.keys()) if (blocks[i].end <= offset - 120) decoded.delete(i);
   }
+  return { incomplete: false, end };
 }

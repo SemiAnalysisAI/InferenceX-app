@@ -1,4 +1,5 @@
 import { at, number, readVerifiedFiles, ROLES, rows, safePath, text, type Json } from './bundle';
+import { videoArtifactIdentity } from './artifact-identity';
 
 export interface FidelityBundle {
   comparison: Json;
@@ -101,10 +102,13 @@ export function fidelityEvidence(
   for (const source of sources) {
     const sourceId = number(at(source, 'ci', 'databaseId'));
     const attempt = number(at(source, 'ci', 'runAttempt'));
+    const name = text(at(source, 'artifact', 'name'));
+    const identity = videoArtifactIdentity(name);
     const revision = text(at(source, 'ci', 'headSha'));
     const prefix = `sources/${sourceId}/`;
     const manifest = documents.get(`${prefix}manifest.json`);
     const ci = documents.get(`${prefix}ci.json`);
+    const checkout = at(manifest, 'git_commit');
     const role = ROLES.find(
       (candidateRole) =>
         at(comparison, candidateRole, 'run_bundle_sha256') ===
@@ -118,7 +122,9 @@ export function fidelityEvidence(
       !/^[a-f0-9]{40}$/u.test(revision) ||
       at(source, 'ci', 'url') !==
         `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${sourceId}` ||
-      at(source, 'artifact', 'name') !== `h3-video-${sourceId}-${attempt}` ||
+      identity?.run !== String(sourceId) ||
+      identity?.attempt !== String(attempt) ||
+      name.startsWith('h3-fidelity-') ||
       at(source, 'artifact', 'workflow_run', 'id') !== sourceId ||
       at(source, 'artifact', 'workflow_run', 'head_sha') !== revision ||
       !Number.isSafeInteger(number(at(source, 'artifact', 'id'))) ||
@@ -127,9 +133,19 @@ export function fidelityEvidence(
       !hash(at(source, 'source_seal_sha256')) ||
       checksums.get(`${prefix}original-SHA256SUMS`) !== at(source, 'source_seal_sha256') ||
       at(manifest, 'run_id') !== String(sourceId) ||
-      at(manifest, 'git_commit') !== revision ||
+      at(manifest, 'run_attempt') !== String(attempt) ||
+      !/^[a-f0-9]{40}$/u.test(text(checkout)) ||
+      (at(manifest, 'ci', 'head_sha') ?? checkout) !== revision ||
+      ((identity?.configuration || at(manifest, 'artifact_name') !== null) &&
+        at(manifest, 'artifact_name') !== name) ||
+      (identity?.configuration && at(manifest, 'ci', 'head_sha') !== revision) ||
       at(ci, 'run_id') !== String(sourceId) ||
-      at(ci, 'source_sha') !== revision ||
+      at(ci, 'run_attempt') !== String(attempt) ||
+      at(ci, 'source_sha') !== checkout ||
+      ((identity?.configuration || at(ci, 'artifact_name') !== null) &&
+        at(ci, 'artifact_name') !== name) ||
+      ((identity?.configuration || at(ci, 'ci', 'head_sha') !== null) &&
+        at(ci, 'ci', 'head_sha') !== revision) ||
       !role ||
       matchedRoles.has(role)
     )

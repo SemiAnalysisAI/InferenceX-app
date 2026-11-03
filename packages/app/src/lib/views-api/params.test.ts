@@ -25,6 +25,7 @@ import {
   parseRunIdParam,
   parseSequenceParam,
   parseTcoBasisParam,
+  parseChipBasisParam,
   resolveModelParam,
   VENDOR_VALUES,
   VIEWS_MODEL_NAMES,
@@ -205,6 +206,13 @@ describe('dashboard-derived allowlists', () => {
     expect(parseCostProviderParam(null)).toBe('costh');
     expect(parseCostTypeParam(null)).toBe('total');
     expect(() => parseCostTypeParam('gross')).toThrow(ViewsApiParamError);
+  });
+
+  it('defaults chipBasis to the stored per-pool basis and accepts total', () => {
+    expect(parseChipBasisParam(null)).toBe('pool');
+    expect(parseChipBasisParam('total')).toBe('total');
+    expect(parseChipBasisParam('TOTAL')).toBe('total');
+    expect(() => parseChipBasisParam('decode')).toThrow(ViewsApiParamError);
   });
 });
 

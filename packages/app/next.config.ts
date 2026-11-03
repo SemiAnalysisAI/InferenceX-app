@@ -1,6 +1,7 @@
 import { withPostHogConfig } from '@posthog/nextjs-config';
 import type { NextConfig } from 'next';
 import { allowedDevOriginsFromEnv } from './src/lib/runtime/allowed-dev-origins';
+import { HISTORICAL_MODEL_ALIAS_REDIRECTS } from './src/lib/routing/historical-model-redirects';
 import { INFERENCE_MODEL_ALIAS_REDIRECTS } from './src/lib/routing/inference-model-redirects';
 import { VIDEO_ALIAS_REDIRECTS } from './src/lib/video/video-alias-redirects';
 
@@ -80,6 +81,7 @@ const nextConfig: NextConfig = {
         missing: [{ type: 'query' as const, key: 'g_model' }],
       })),
       ...INFERENCE_MODEL_ALIAS_REDIRECTS,
+      ...HISTORICAL_MODEL_ALIAS_REDIRECTS,
       ...VIDEO_ALIAS_REDIRECTS,
       {
         source: '/datasets/:path*',

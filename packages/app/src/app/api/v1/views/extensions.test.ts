@@ -3,7 +3,7 @@ import { profitModelDefaults } from '@/components/calculator/profit-estimator';
 import { servingFixture } from '@/components/video-benchmark/serving.fixture';
 import type { StoredArtifact } from '@/components/video-benchmark/stored';
 import type { BenchmarkRow } from '@/lib/api/api';
-import type { BenchmarksQuery } from '@/lib/benchmarks/benchmarks-endpoint.server';
+import type { BenchmarkRequestParams } from '@/lib/benchmarks/benchmark-request-params';
 import { Model } from '@/lib/catalog/data-mappings';
 import { SYSTEM_POWER_MODEL_REVISION } from '@/lib/power/system-power-model';
 import { NextRequest } from 'next/server';
@@ -27,7 +27,7 @@ vi.mock('@/app/api/gpu-metrics/route', () => ({ readGpuMetricsForView: mocks.met
 vi.mock('@/app/api/video-runs/route', () => ({ GET: mocks.video }));
 vi.mock('@/lib/benchmarks/benchmarks-endpoint.server', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  loadBenchmarks: async (query: BenchmarksQuery) => {
+  loadBenchmarks: async (query: BenchmarkRequestParams) => {
     const response: Response = await mocks.benchmarks(query);
     return response.json();
   },
@@ -475,7 +475,7 @@ describe('new dashboard projections', () => {
         'model=DeepSeek-V4-Pro&runId=123&unofficialrun=456&caps=1,2&costType=output',
       ),
     );
-    const query: BenchmarksQuery = mocks.benchmarks.mock.calls[0][0];
+    const query: BenchmarkRequestParams = mocks.benchmarks.mock.calls[0][0];
     expect(query.runId).toBe('123');
     expect(query.exactRun).toBe(true);
     expect(mocks.unofficial.mock.calls[0][0].nextUrl.pathname).toBe('/api/unofficial-run');
@@ -627,7 +627,7 @@ describe('new dashboard projections', () => {
         agenticRow({ id: 100 }),
       ];
       const pinned = agenticRow({ id: 789, hardware: 'b300', date: '2026-09-08' });
-      mocks.benchmarks.mockImplementation((query: BenchmarksQuery) => {
+      mocks.benchmarks.mockImplementation((query: BenchmarkRequestParams) => {
         if (query.runId === '789' && query.exactRun) return Response.json([pinned]);
         const date = query.date!;
         return Response.json(
@@ -684,7 +684,7 @@ describe('new dashboard projections', () => {
             },
           }),
         );
-      mocks.benchmarks.mockImplementation((query: BenchmarksQuery) =>
+      mocks.benchmarks.mockImplementation((query: BenchmarkRequestParams) =>
         Response.json(query.exact ? curve(2, '2026-09-09') : curve(1, '2026-09-10')),
       );
       mocks.unofficial.mockImplementation(() =>
@@ -860,6 +860,7 @@ describe('new dashboard projections', () => {
       'caps=2,Infinity',
       'caps=2,',
       'costProvider=costn',
+      'chipBasis=decode',
       'surprise=true',
       'runId=0',
       'date=2026-02-30',
@@ -877,6 +878,23 @@ describe('new dashboard projections', () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.params.caps).toEqual([0.5, 2, 5]);
+  });
+  it('echoes the first-token chip basis and keeps it off views without the control', async () => {
+    for (const chipBasis of ['pool', 'total']) {
+      const response = await first(
+        req('first-token', `model=DeepSeek-V4-Pro&costType=output&chipBasis=${chipBasis}`),
+      );
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.params.chipBasis).toBe(chipBasis);
+    }
+    const defaulted = await first(req('first-token', 'model=DeepSeek-V4-Pro'));
+    const defaultedBody = await defaulted.json();
+    expect(defaultedBody.params.chipBasis).toBe('pool');
+    const profitResponse = await profit(
+      req('profit-estimator', 'model=DeepSeek-V4-Pro&chipBasis=total'),
+    );
+    expect(profitResponse.status).toBe(400);
   });
   it('empty submission history is a successful empty view', async () => {
     const result = await submissions(

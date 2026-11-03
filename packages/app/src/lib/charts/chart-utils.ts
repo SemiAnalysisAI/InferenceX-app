@@ -4,6 +4,7 @@ import {
   HUAWEI_CHART_PALETTE,
   resolveFrameworkAlias,
 } from '@semianalysisai/inferencex-constants';
+import { hasPoolSplit } from '@/lib/benchmarks/chip-basis';
 import iwanthue from 'iwanthue';
 import { chartPaletteTheme, isDarkTheme } from '@/lib/themes/themes';
 
@@ -403,10 +404,21 @@ export function writeThroughputChartFields(
 }
 
 export function deploymentChipCount(
-  entry: Pick<AggDataEntry, 'disagg' | 'num_prefill_gpu' | 'num_decode_gpu' | 'tp' | 'pp'>,
+  entry: Pick<
+    AggDataEntry,
+    | 'disagg'
+    | 'num_prefill_gpu'
+    | 'num_decode_gpu'
+    | 'prefill_num_workers'
+    | 'decode_num_workers'
+    | 'tp'
+    | 'pp'
+  >,
   currentHwKey: string,
 ): number {
-  return entry.disagg
+  // Legacy unsplit disaggregated rows record the whole deployment in both pool
+  // fields, so only a real prefill/decode split adds the two pools.
+  return hasPoolSplit(entry)
     ? entry.num_prefill_gpu + entry.num_decode_gpu
     : Math.max(
         entry.num_decode_gpu > 0

@@ -20,6 +20,7 @@ import { track, trackOncePerPageview } from '@/lib/analytics/analytics';
 import type { BenchmarkRow } from '@/lib/api/api';
 import { toCalculatorBenchmarkRows } from '@/lib/benchmarks/benchmark-api-view';
 import { toModel, toPrecisions, toSequence } from '@/lib/compare/compare-enum-coerce';
+import type { CompareChipPageLink } from '@/lib/compare/compare-chip-link';
 import type { AgenticScenarioIntro } from '@/lib/compare/compare-ssr';
 import type { CompareTableData } from '@/lib/compare/compare-table-view';
 
@@ -85,6 +86,7 @@ interface ComparePerDollarPageClientProps {
   aCostPerGpuHr: number;
   bCostPerGpuHr: number;
   heroImageSrc: string;
+  chipPageLink?: CompareChipPageLink | null;
   locale?: 'en' | 'zh';
 }
 
@@ -110,6 +112,7 @@ export default function ComparePerDollarPageClient({
   aCostPerGpuHr,
   bCostPerGpuHr,
   heroImageSrc,
+  chipPageLink = null,
   locale = 'en',
 }: ComparePerDollarPageClientProps) {
   useEffect(() => {
@@ -241,6 +244,22 @@ export default function ComparePerDollarPageClient({
                 {t.fullComparisonLinkText}
               </Link>
             </p>
+            {chipPageLink && (
+              <p className="mt-2 text-sm" data-testid="compare-chip-page-link">
+                <Link
+                  href={chipPageLink.href}
+                  className="underline hover:text-primary text-muted-foreground"
+                  onClick={() =>
+                    track('compare_per_dollar_cross_link_to_chip_page', {
+                      slug,
+                      chip_slug: chipPageLink.slug,
+                    })
+                  }
+                >
+                  {chipPageLink.label} →
+                </Link>
+              </p>
+            )}
           </header>
           <figure
             className="mt-2 flex flex-col gap-2"

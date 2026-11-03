@@ -39,6 +39,11 @@ function hardwareByModelSlug(rows: readonly AvailabilityRow[]): Map<string, Set<
   return out;
 }
 
+/** Hardware keys with benchmark rows, keyed by model slug. */
+export async function getHardwareByModelSlug(): Promise<Map<string, Set<string>>> {
+  return hardwareByModelSlug(await getCachedAvailability());
+}
+
 export async function getComparablePairsByModelSlug(
   rows?: readonly AvailabilityRow[],
 ): Promise<Map<string, ComparePair[]>> {

@@ -27,6 +27,7 @@ export default function EmbedModelPage({
         displayName={entry.displayName}
         sequence={sequence}
         yAxisMetric={options.yAxisMetric}
+        chipBasis={options.chipBasis}
         lockedFrameworks={options.frameworks.length > 0 ? options.frameworks : undefined}
         minimalChrome
       />

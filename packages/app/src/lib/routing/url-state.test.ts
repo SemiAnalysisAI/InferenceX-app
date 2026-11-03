@@ -35,6 +35,11 @@ describe('PARAM_DEFAULTS', () => {
     expect(PARAM_DEFAULTS.g_tco).toBe('internal');
   });
 
+  it('defaults the chip basis to per pool so only the total basis is share-link state', async () => {
+    const { PARAM_DEFAULTS } = await import('@/lib/routing/url-state');
+    expect(PARAM_DEFAULTS.g_chips).toBe('pool');
+  });
+
   it('has an EMPTY default for i_seq so the selected scenario is always written', async () => {
     const { PARAM_DEFAULTS } = await import('@/lib/routing/url-state');
     expect(PARAM_DEFAULTS.i_seq).toBe('');
@@ -1032,5 +1037,34 @@ describe('rememberChartStateInUrl — params this module does not own', () => {
     const params = new URLSearchParams(url.slice(url.indexOf('?')));
     expect(params.get('unofficialruns')).toBe('987654321');
     expect(params.has('unofficialrun')).toBe(false);
+  });
+});
+
+describe('buildShareUrl on the video dashboard', () => {
+  beforeEach(() => {
+    // Fake timers keep the module's deferred URL clean-up from firing after the window stub is gone.
+    vi.useFakeTimers();
+    vi.resetModules();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('shares the live v_ params and nothing else', async () => {
+    setupWindow('?v_y=kjPerVideo&v_optimal=0&history-hardware=H200&i_metric=y_x', '/video');
+    const { buildShareUrl } = await import('@/lib/routing/url-state');
+    const url = new URL(buildShareUrl());
+    expect(url.pathname).toBe('/video');
+    expect(url.searchParams.get('v_y')).toBe('kjPerVideo');
+    expect(url.searchParams.get('v_optimal')).toBe('0');
+    expect(url.searchParams.has('history-hardware')).toBe(false);
+    expect(url.searchParams.has('i_metric')).toBe(false);
+  });
+
+  it('keeps live v_ params out of inference share links', async () => {
+    setupWindow('?v_y=kjPerVideo', '/inference');
+    const { buildShareUrl } = await import('@/lib/routing/url-state');
+    expect(buildShareUrl()).not.toContain('v_y');
   });
 });

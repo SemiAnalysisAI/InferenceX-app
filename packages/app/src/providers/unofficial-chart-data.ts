@@ -5,6 +5,7 @@ import chartDefinitions from '@/components/inference/metric-registry';
 import type { BenchmarkRow } from '@/lib/api/api';
 import { benchmarkCurveDate } from '@/lib/benchmarks/benchmark-run-selection';
 import { transformBenchmarkRows, type TokenBasis } from '@/lib/benchmarks/benchmark-transform';
+import { DEFAULT_CHIP_BASIS, type ChipBasis } from '@/lib/benchmarks/chip-basis';
 
 export type UnofficialChartData = Record<
   string,
@@ -17,6 +18,7 @@ export type UnofficialChartData = Record<
 export function buildChartData(
   benchmarks: BenchmarkRow[],
   tokenBasis: TokenBasis = 'total',
+  chipBasis: ChipBasis = DEFAULT_CHIP_BASIS,
 ): UnofficialChartData {
   const groups = new Map<string, BenchmarkRow[]>();
   for (const row of benchmarks) {
@@ -40,6 +42,7 @@ export function buildChartData(
       'median',
       'external',
       tokenBasis,
+      chipBasis,
     );
     const e2eIdx = (chartDefinitions as ChartDefinition[]).findIndex((d) => d.chartType === 'e2e');
     const interactivityIdx = (chartDefinitions as ChartDefinition[]).findIndex(
