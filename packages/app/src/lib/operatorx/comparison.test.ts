@@ -129,6 +129,56 @@ describe('cross-backend hardware comparison', () => {
   });
 });
 
+describe('repeated views of one comparison', () => {
+  it('match views of a fresh copy whatever was asked before', () => {
+    const key = (m: number, parallel?: object) =>
+      JSON.stringify({ a: { dtype: 'bf16' }, b: { dtype: 'bf16' }, m, n: 64, k: 128, parallel });
+    const source = (model: string, role: string) => [{ model, roles: [role] }];
+    const rows = [
+      row('h200', 'vllm', 5, { caseKey: `${key(1)}|vllm`, sources: source('A', 'q_proj') }),
+      row('b200', 'vllm', 3, { caseKey: `${key(2)}|vllm`, sources: source('B', 'o_proj') }),
+      row('h200', 'aiter', 4, { caseKey: `${key(2)}|aiter`, sources: source('B', 'k_proj') }),
+      row('b200', 'vllm', 2, {
+        caseKey: `${key(4, { tp: 8 })}|vllm`,
+        parallel: 'tp8',
+        kernel: 'k8',
+        sources: source('A', 'q_proj'),
+      }),
+      row('h200', 'vllm', 7, { caseKey: `${key(1)}|vllm`, sources: source('B', 'v_proj') }),
+      row('mi300x', 'aiter', 9, {
+        caseKey: `${key(8)}|aiter`,
+        status: 'missing',
+        sources: source('A', 'q_proj'),
+      }),
+    ];
+    const comparison = (): Comparison => ({
+      op: 'gemm',
+      rows: structuredClone(rows),
+      hardware: ['h200', 'b200', 'mi300x'].map((id) => ({ id, runner: id, runs: [] })),
+      workloads: [{ id: 'gemm:test', label: 'Test', cases: 4, hardware: ['b200', 'h200'] }],
+    });
+    const shared = comparison();
+    const asks: [string | null, string | null, string | null][] = [
+      ['gemm:test', null, null],
+      [null, 'B', null],
+      [null, 'A', 'tp8'],
+      [null, 'A', null],
+      [null, 'missing', null],
+      [null, 'B', 'tp8'],
+    ];
+    for (const [workload, model, parallel] of asks)
+      expect(comparisonView(shared, workload, model, parallel)).toEqual(
+        comparisonView(comparison(), workload, model, parallel),
+      );
+    const b = comparisonView(shared, null, 'B');
+    expect(b.cases.map((c) => c.key)).toEqual([key(2), key(1)]);
+    expect(b.measurements.h200.latencyUs).toEqual([4, 7]);
+    expect(b.measurements.h200.backend).toEqual(['aiter', 'vllm']);
+    expect(b.measurements.b200.latencyUs).toEqual([3, null]);
+    expect(comparisonView(shared, null, 'A', 'tp8').kernels).toEqual(['k8']);
+  });
+});
+
 function moe(ids: string[]): Comparison {
   return {
     op: 'moe',

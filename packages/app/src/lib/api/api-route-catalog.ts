@@ -219,7 +219,7 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'published-read',
     operationId: 'get-operatorx-view',
-    sourceSha256: 'f4218a9564b96efd3e212cd50ec5a85cbf233db9145c91b3debcbcf7cd423ad8',
+    sourceSha256: '89aa6ffe658926222451497ae0e4a65c1d73237771ab31edfc17ff212abecd2a',
   },
   // Agentic Workload Explorer page backend (frozen ProxyTrace snapshot).
   {
@@ -1301,7 +1301,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/operatorx/visualization.ts',
-    sourceSha256: '9f6ae09fc42219d2a18206dfa865517441cf113c4a9ce3e10f961cfd6240f504',
+    sourceSha256: '219682fee3ecc82f24301310e4d32e05fb7e644ca757d0412ac018f64656f510',
     reviewArea: {
       en: 'OperatorX workload-resolved chart defaults and shared shape grouping used by UI and comparison API.',
       zh: 'OperatorX 按工作负载确定的图表默认值及形状分组，由 UI 与对比 API 共用。',
@@ -1309,7 +1309,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/operatorx/compare.ts',
-    sourceSha256: '1d20161803067adbabaf94f43be63467d8afb28c7fa3385b8815c180d56d82a0',
+    sourceSha256: 'ba9aaf164b25825695e0fbf0fcbe8e2cf1676828c7e9c03cfdd2f56b7a09ff3a',
     reviewArea: {
       en: 'OperatorX page-owned comparison: workload filtering and optional hardware normalization references; excluded from published OpenAPI.',
       zh: 'OperatorX 页面专属对比：workload 筛选及可选的硬件归一化参考值；不纳入公开 OpenAPI。',
