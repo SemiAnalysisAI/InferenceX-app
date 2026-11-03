@@ -1,9 +1,13 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { raw } = vi.hoisted(() => ({ raw: vi.fn() }));
-vi.mock('../benchmarks/route', () => ({ GET: raw }));
+const { load } = vi.hoisted(() => ({ load: vi.fn() }));
+vi.mock('@/lib/benchmarks/benchmarks-endpoint.server', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  loadBenchmarks: load,
+}));
 vi.mock('@/lib/cache/api-cache', () => ({
+  cachedQuery: (fn: unknown) => fn,
   cachedJson: (_request: Request, data: unknown) => Response.json(data),
 }));
 import { GET } from './route';
@@ -16,7 +20,7 @@ const request = (suffix = '') =>
 beforeEach(() => vi.clearAllMocks());
 
 describe('GET /api/v1/pareto', () => {
-  it('calls the raw handler without Accept-Encoding so its JSON needs no decoding', async () => {
+  it('computes both boundaries from the raw endpoint rows', async () => {
     const rows = [
       {
         id: 1,
@@ -35,15 +39,8 @@ describe('GET /api/v1/pareto', () => {
         metrics: { x: 3, y: 4 },
       },
     ];
-    raw.mockImplementation((inner: NextRequest) => {
-      expect(inner.headers.get('Accept-Encoding')).toBeNull();
-      return Promise.resolve(Response.json(rows));
-    });
-    const response = await GET(
-      new NextRequest(`https://example.test/api/v1/pareto?${query}`, {
-        headers: { 'Accept-Encoding': 'br, gzip' },
-      }),
-    );
+    load.mockResolvedValue(rows);
+    const response = await GET(request());
     const body = await response.json();
     expect(response.status).toBe(200);
     expect(body.frontier[0].observations).toEqual([rows[1]]);
@@ -51,28 +48,26 @@ describe('GET /api/v1/pareto', () => {
   });
 
   it('forwards only source selectors and returns both boundaries', async () => {
-    raw.mockResolvedValue(
-      Response.json([
-        {
-          id: 1,
-          model: 'dsr1',
-          benchmark_type: 'single_turn',
-          isl: 1024,
-          osl: 1024,
-          hardware: 'h200_sxm',
-          metrics: { x: 1, y: 1 },
-        },
-        {
-          id: 2,
-          model: 'dsr1',
-          benchmark_type: 'single_turn',
-          isl: 1024,
-          osl: 1024,
-          hardware: 'h200_sxm',
-          metrics: { x: 2, y: 3 },
-        },
-      ]),
-    );
+    load.mockResolvedValue([
+      {
+        id: 1,
+        model: 'dsr1',
+        benchmark_type: 'single_turn',
+        isl: 1024,
+        osl: 1024,
+        hardware: 'h200_sxm',
+        metrics: { x: 1, y: 1 },
+      },
+      {
+        id: 2,
+        model: 'dsr1',
+        benchmark_type: 'single_turn',
+        isl: 1024,
+        osl: 1024,
+        hardware: 'h200_sxm',
+        metrics: { x: 2, y: 3 },
+      },
+    ]);
     const response = await GET(request('&runId=123&exactRun=true&hardware=h200_sxm'));
     const body = await response.json();
     expect(response.status).toBe(200);
@@ -81,8 +76,16 @@ describe('GET /api/v1/pareto', () => {
     expect(body.source_url).toBe(
       '/api/v1/benchmarks?model=DeepSeek-R1-0528&runId=123&exactRun=true',
     );
-    expect(raw.mock.calls[0][0].nextUrl.searchParams.get('hardware')).toBeNull();
-    expect(raw.mock.calls[0][0].nextUrl.pathname).toBe('/api/v1/benchmarks');
+    expect(load).toHaveBeenCalledExactlyOnceWith({
+      dbModelKeys: ['dsr1'],
+      date: undefined,
+      exact: false,
+      runId: '123',
+      exactRun: true,
+      calculator: false,
+      sequence: '',
+      powerValidFilter: null,
+    });
   });
 
   it.each(['&i_hinterland=2', '&i_frontier=1'])(
@@ -90,20 +93,13 @@ describe('GET /api/v1/pareto', () => {
     async (suffix) => {
       const response = await GET(request(suffix));
       expect(response.status).toBe(400);
-      expect(raw).not.toHaveBeenCalled();
+      expect(load).not.toHaveBeenCalled();
     },
   );
 
-  it('propagates source failures without returning fake empty boundaries', async () => {
-    raw.mockResolvedValue(Response.json({ error: 'Internal server error' }, { status: 500 }));
-    const response = await GET(request());
-    expect(response.status).toBe(500);
-    expect(await response.json()).toEqual({ error: 'Internal server error' });
-  });
-
-  it('maps unexpected source failures to the public internal error', async () => {
+  it('maps source failures to the public internal error instead of empty boundaries', async () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => {});
-    raw.mockRejectedValue(new Error('offline'));
+    load.mockRejectedValue(new Error('offline'));
     const response = await GET(request());
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({ error: PUBLIC_API_ERRORS.internal });

@@ -166,7 +166,7 @@ async function sharedComparison(
       return comparison;
     },
     `${operatorXBlobPrefix()}comparison:v${OPERATORX_COMPARISON_VERSION}:${op}`,
-    { blobOnly: true },
+    { blobOnly: true, revisioned: true },
   );
   try {
     return await read(revisions);

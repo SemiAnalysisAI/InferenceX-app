@@ -16,6 +16,7 @@ vi.mock('next/cache', () => ({
 }));
 
 vi.mock('./blob-cache', () => ({
+  blobEnabled: () => false,
   blobGet: vi.fn(),
   blobSet: vi.fn(),
   blobPurge: vi.fn(),

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/cache', () => ({ revalidateTag: vi.fn(), unstable_cache: vi.fn() }));
 vi.mock('@/lib/cache/blob-cache', () => ({
+  blobEnabled: () => false,
   blobGet: vi.fn(() => Promise.resolve(null)),
   blobSet: vi.fn(),
 }));

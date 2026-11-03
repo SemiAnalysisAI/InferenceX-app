@@ -1,5 +1,5 @@
 import { GET as unofficial } from '@/app/api/unofficial-run/route';
-import { GET as benchmarks } from '@/app/api/v1/benchmarks/route';
+import { loadBenchmarks, parseBenchmarksQuery } from '@/lib/benchmarks/benchmarks-endpoint.server';
 import {
   buildGpuGroups,
   resolveRowPrecisions,
@@ -90,21 +90,24 @@ export function comparisonSelections(search: URLSearchParams) {
 }
 
 export async function benchmarkRows(
-  request: NextRequest,
   params: Pick<ViewSelection, 'model' | 'date' | 'runId'>,
   options: { exactDate?: boolean } = {},
 ): Promise<BenchmarkRow[]> {
-  return readResponse(
-    await benchmarks(
-      sourceRequest(request, '/api/v1/benchmarks', {
-        model: params.model,
-        date: params.date,
-        exact: options.exactDate && !params.runId ? 'true' : undefined,
-        runId: params.runId,
-        exactRun: params.runId ? 'true' : undefined,
-      }),
-    ),
-  );
+  const search = Object.entries({
+    model: params.model,
+    date: params.date,
+    exact: options.exactDate && !params.runId ? 'true' : undefined,
+    runId: params.runId,
+    exactRun: params.runId ? 'true' : undefined,
+  }).filter((entry): entry is [string, string] => entry[1] !== undefined);
+  const query = parseBenchmarksQuery(new URLSearchParams(search));
+  if (query instanceof Response) throw new ViewsUpstreamError(query.status);
+  try {
+    return await loadBenchmarks(query);
+  } catch (error) {
+    console.error('Error fetching benchmarks:', error);
+    throw new ViewsUpstreamError(500);
+  }
 }
 
 // Extensions retain raw telemetry for modeled-power estimates and carry overlay
@@ -119,7 +122,7 @@ export async function calculatorGroups(
     includeOverlay?: boolean;
   } = {},
 ) {
-  const rows = await benchmarkRows(request, params, sourceOptions);
+  const rows = await benchmarkRows(params, sourceOptions);
   // Comparisons reuse the primary overlay rows for precision resolution only.
   const overlayRows = sourceOptions.overlayRows ?? (await unofficialRows(request));
   const precisions = resolveRowPrecisions(rows, params.sequence, params.precisions, overlayRows);

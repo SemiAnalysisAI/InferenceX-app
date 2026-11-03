@@ -19,6 +19,7 @@ const shared = vi.hoisted(() => ({
   purge: vi.fn(),
 }));
 vi.mock('@/lib/cache/blob-cache', () => ({
+  blobEnabled: () => true,
   blobGet: shared.get,
   blobSet: shared.set,
   blobPurge: shared.purge,

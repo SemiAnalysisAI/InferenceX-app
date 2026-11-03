@@ -1,15 +1,25 @@
+import { brotliCompressSync, brotliDecompressSync } from 'node:zlib';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('@vercel/blob', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   del: vi.fn(),
-  head: vi.fn(),
+  get: vi.fn(),
   list: vi.fn(),
   put: vi.fn(),
 }));
 
 import { blobGet, blobSet, blobPurge } from './blob-cache';
-import { BlobServiceRateLimited, del, head, list, put, type ListBlobResult } from '@vercel/blob';
+import {
+  BlobServiceRateLimited,
+  del,
+  get,
+  list,
+  put,
+  type GetBlobResult,
+  type ListBlobResult,
+  type PutBlobResult,
+} from '@vercel/blob';
 
 // Only the fields blobPurge reads; the full list() result also carries sizes and dates.
 function listPage(count: number): ListBlobResult {
@@ -24,9 +34,17 @@ function listPage(count: number): ListBlobResult {
 }
 
 const mockDel = vi.mocked(del);
-const mockHead = vi.mocked(head);
+const mockGet = vi.mocked(get);
 const mockList = vi.mocked(list);
 const mockPut = vi.mocked(put);
+
+// Only the fields blobGet reads; get() also returns headers and blob metadata.
+function stored(body: Uint8Array): GetBlobResult {
+  return {
+    statusCode: 200,
+    stream: new Response(new Uint8Array(body)).body!,
+  } as unknown as GetBlobResult;
+}
 
 const originalEnv = { ...process.env };
 
@@ -34,14 +52,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   process.env.BLOB_READ_WRITE_TOKEN = 'test-token-123';
   process.env.BLOB_CACHE_PREFIX = 'test-cache';
-
-  vi.stubGlobal('fetch', vi.fn());
 });
 
 afterEach(() => {
   process.env.BLOB_READ_WRITE_TOKEN = originalEnv.BLOB_READ_WRITE_TOKEN;
   process.env.BLOB_CACHE_PREFIX = originalEnv.BLOB_CACHE_PREFIX;
-  vi.unstubAllGlobals();
 });
 
 describe('graceful no-op when credentials missing', () => {
@@ -57,7 +72,7 @@ describe('graceful no-op when credentials missing', () => {
 
   it('blobSet no-ops when BLOB_READ_WRITE_TOKEN is missing', async () => {
     delete process.env.BLOB_READ_WRITE_TOKEN;
-    await blobSet('key', 'value');
+    await blobSet('key', '"value"');
     expect(mockPut).not.toHaveBeenCalled();
   });
 
@@ -68,117 +83,60 @@ describe('graceful no-op when credentials missing', () => {
 });
 
 describe('blobGet', () => {
-  it('returns parsed JSON on cache hit', async () => {
-    const data = { models: ['llama', 'gpt4'], count: 2 };
-    mockHead.mockResolvedValue({ url: 'https://blob.example.com/test-cache/mykey.json' } as any);
-    vi.mocked(globalThis.fetch).mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(data),
-    } as Response);
+  it('reads the compressed body with a single get() and returns its JSON text', async () => {
+    const json = JSON.stringify({ models: ['llama', 'gpt4'], label: '基准' });
+    mockGet.mockResolvedValue(stored(brotliCompressSync(json)));
 
-    const result = await blobGet('mykey');
-    expect(result).toEqual(data);
-    expect(mockHead).toHaveBeenCalledWith('test-cache/mykey.json');
-    expect(globalThis.fetch).toHaveBeenCalledWith('https://blob.example.com/test-cache/mykey.json');
+    expect(await blobGet('bench:llama:2025-01-01')).toBe(json);
+    expect(mockGet).toHaveBeenCalledExactlyOnceWith('test-cache/bench:llama:2025-01-01.json.br', {
+      access: 'public',
+    });
   });
 
-  it('returns null when head() throws (cache miss)', async () => {
-    mockHead.mockRejectedValue(new Error('not found'));
-
-    const result = await blobGet('missing');
-    expect(result).toBeNull();
+  it('returns null when the blob does not exist', async () => {
+    mockGet.mockResolvedValue(null);
+    expect(await blobGet('missing')).toBeNull();
   });
 
-  it('returns null when fetch response is not ok', async () => {
-    mockHead.mockResolvedValue({ url: 'https://blob.example.com/test-cache/bad.json' } as any);
-    vi.mocked(globalThis.fetch).mockResolvedValue({
-      ok: false,
-      status: 404,
-    } as Response);
-
-    const result = await blobGet('bad');
-    expect(result).toBeNull();
+  it('returns null when get() throws', async () => {
+    mockGet.mockRejectedValue(new Error('Failed to fetch blob: 503 Service Unavailable'));
+    expect(await blobGet('down')).toBeNull();
   });
 
-  it('returns null when fetch throws a network error', async () => {
-    mockHead.mockResolvedValue({ url: 'https://blob.example.com/test-cache/net.json' } as any);
-    vi.mocked(globalThis.fetch).mockRejectedValue(new Error('network error'));
-
-    const result = await blobGet('net');
-    expect(result).toBeNull();
-  });
-
-  it('returns null when json parsing fails', async () => {
-    mockHead.mockResolvedValue({ url: 'https://blob.example.com/test-cache/corrupt.json' } as any);
-    vi.mocked(globalThis.fetch).mockResolvedValue({
-      ok: true,
-      json: () => Promise.reject(new SyntaxError('Unexpected token')),
-    } as unknown as Response);
-
-    const result = await blobGet('corrupt');
-    expect(result).toBeNull();
-  });
-
-  it('constructs path using prefix and key with .json extension', async () => {
-    mockHead.mockRejectedValue(new Error('miss'));
-
-    await blobGet('bench:llama:2025-01-01');
-    expect(mockHead).toHaveBeenCalledWith('test-cache/bench:llama:2025-01-01.json');
+  it('returns null for a truncated body instead of partial JSON', async () => {
+    const body = brotliCompressSync(JSON.stringify({ rows: Array.from({ length: 5000 }, String) }));
+    mockGet.mockResolvedValue(stored(body.subarray(0, -8)));
+    expect(await blobGet('truncated')).toBeNull();
   });
 });
 
 describe('blobSet', () => {
-  it('puts JSON data with correct options', async () => {
-    mockPut.mockResolvedValue({} as any);
-    const data = { benchmarks: [1, 2, 3] };
+  it('stores the JSON brotli-compressed under the .json.br path', async () => {
+    mockPut.mockResolvedValue({} as PutBlobResult);
+    const json = JSON.stringify({ benchmarks: [1, 2, 3], label: '基准' });
 
-    await blobSet('my-data', data);
+    await blobSet('my-data', json);
 
-    expect(mockPut).toHaveBeenCalledWith('test-cache/my-data.json', JSON.stringify(data), {
+    const [path, body, options] = mockPut.mock.calls[0]!;
+    expect(path).toBe('test-cache/my-data.json.br');
+    expect(brotliDecompressSync(body as Buffer).toString('utf8')).toBe(json);
+    expect(options).toEqual({
       access: 'public',
       addRandomSuffix: false,
-      contentType: 'application/json',
+      contentType: 'application/octet-stream',
     });
-  });
-
-  it('serializes complex nested objects', async () => {
-    mockPut.mockResolvedValue({} as any);
-    const nested = { a: { b: { c: [1, 'two', null] } } };
-
-    await blobSet('nested', nested);
-
-    const [, body] = mockPut.mock.calls[0];
-    expect(JSON.parse(body as string)).toEqual(nested);
-  });
-
-  it('handles string data', async () => {
-    mockPut.mockResolvedValue({} as any);
-
-    await blobSet('version', 'v1.2.3');
-
-    const [, body] = mockPut.mock.calls[0];
-    expect(body).toBe('"v1.2.3"');
-  });
-
-  it('handles null data', async () => {
-    mockPut.mockResolvedValue({} as any);
-
-    await blobSet('empty', null);
-
-    const [, body] = mockPut.mock.calls[0];
-    expect(body).toBe('null');
   });
 
   it('swallows "already exists" error from put (race condition)', async () => {
     mockPut.mockRejectedValue(new Error('This blob already exists'));
 
-    await expect(blobSet('racy-key', { x: 1 })).resolves.toBeUndefined();
+    await expect(blobSet('racy-key', '{"x":1}')).resolves.toBeUndefined();
   });
 
   it('rethrows non-"already exists" errors', async () => {
     mockPut.mockRejectedValue(new Error('Network timeout'));
 
-    await expect(blobSet('fail-key', { x: 1 })).rejects.toThrow('Network timeout');
+    await expect(blobSet('fail-key', '{"x":1}')).rejects.toThrow('Network timeout');
   });
 });
 

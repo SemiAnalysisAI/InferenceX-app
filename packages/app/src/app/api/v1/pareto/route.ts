@@ -1,10 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
-import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
+import { type NextRequest, NextResponse } from 'next/server';
 
 import { cachedJson } from '@/lib/cache/api-cache';
 import { computeParetoResponse, parseParetoRequest } from '@/lib/api/pareto-api';
 import { PUBLIC_API_ERRORS, publicApiError } from '@/lib/api/public-api-errors';
-import { GET as getBenchmarks } from '../benchmarks/route';
+import { loadBenchmarks, parseBenchmarksQuery } from '@/lib/benchmarks/benchmarks-endpoint.server';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,17 +14,14 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: 400 });
   }
+  // Reuse the raw endpoint's cache, fixture mode, snapshot and power-validity semantics.
+  const query = parseBenchmarksQuery(parsed.sourceParams);
+  if (query instanceof Response) return query;
   try {
-    // Reuse the raw endpoint's cache, fixture mode, snapshot and power-validity semantics.
-    const url = new URL('/api/v1/benchmarks', request.url);
-    url.search = parsed.sourceParams.toString();
-    // The source request carries no Accept-Encoding, so cachedJson answers with plain JSON.
-    const response = await getBenchmarks(new NextRequest(url));
-    if (!response.ok) return response;
-    const rows: BenchmarkRow[] = await response.json();
+    const rows = await loadBenchmarks(query);
     return cachedJson(
       request,
-      computeParetoResponse(rows, parsed.selection, `${url.pathname}${url.search}`),
+      computeParetoResponse(rows, parsed.selection, `/api/v1/benchmarks?${parsed.sourceParams}`),
     );
   } catch (error) {
     console.error('Error computing Pareto boundaries:', error);
