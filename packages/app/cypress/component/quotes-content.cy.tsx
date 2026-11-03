@@ -287,10 +287,11 @@ describe('QuotesContent supporter logo wall', () => {
         const top = Math.round(li.getBoundingClientRect().top);
         rows.set(top, (rows.get(top) ?? 0) + 1);
       }
-      expect([...rows.values()]).to.deep.equal([8, 8]);
+      expect([...rows.values()]).to.deep.equal([8, 7]);
     });
     cy.get('[data-testid="supporter-group-other"]').within(() => {
       cy.get('img[alt="Supermicro"]').should('be.visible');
+      cy.get('img[alt="Baseten"]').should('be.visible');
     });
     cy.get('[data-testid="supporter-logo-wall"] img[alt="TokenSpeed"]').should('not.exist');
     cy.get('[data-testid="supporter-group-us-frontier-labs"]').within(() => {
@@ -299,7 +300,7 @@ describe('QuotesContent supporter logo wall', () => {
       }
     });
     cy.get('[data-testid="supporter-group-hyperscalers-neoclouds"]').within(() => {
-      for (const alt of ['Core42', 'Verda', 'Baseten', 'Vultr']) {
+      for (const alt of ['Core42', 'Verda', 'Vultr']) {
         cy.get(`img[alt="${alt}"]`).should('be.visible');
       }
     });
@@ -308,9 +309,13 @@ describe('QuotesContent supporter logo wall', () => {
       .find('[data-testid^="supporter-group-"]')
       .first()
       .should('have.attr', 'data-testid', 'supporter-group-ai-accelerators');
-    cy.get('[data-testid="supporter-group-ai-accelerators"] li')
-      .last()
-      .find('img')
-      .should('have.attr', 'alt', 'SambaNova');
+    cy.get('[data-testid="supporter-group-ai-accelerators"] img').should(($logos) => {
+      expect([...$logos].map((logo) => logo.getAttribute('alt'))).to.deep.equal([
+        'Google',
+        'AMD',
+        'NVIDIA',
+        'SambaNova',
+      ]);
+    });
   });
 });
