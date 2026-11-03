@@ -363,6 +363,7 @@ describe('QuotesContent supporter logo wall', () => {
       'Crusoe',
       'Tensormesh',
       'Morph LLM',
+      'Doubleword',
     ];
     for (const locale of ['en', 'zh'] as const) {
       cy.viewport(375, 812);
