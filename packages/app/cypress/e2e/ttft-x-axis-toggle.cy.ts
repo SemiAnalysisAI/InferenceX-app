@@ -155,9 +155,7 @@ describe('Parallelism labels in standard controls', () => {
         .should('match', /^\d+$/);
       cy.get('#scatter-point-labels').click();
       cy.get('#scatter-parallelism-labels').should('have.attr', 'data-state', 'unchecked');
-      cy.get(`[data-testid="scatter-graph"] ${POINT_LABELS}`)
-        .filter(':visible')
-        .should('have.length', 0);
+      cy.get(`[data-testid="scatter-graph"] ${POINT_LABELS}:visible`).should('not.exist');
     });
   }
 
