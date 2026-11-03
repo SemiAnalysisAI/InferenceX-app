@@ -153,17 +153,23 @@ export default function EvaluationChartDisplay() {
           workload={selectedBenchmark?.toUpperCase() ?? '—'}
           precision={selectedPrecisions.map((p) => getPrecisionLabel(p as Precision)).join(', ')}
           metric={t.scoreMetric}
-          date={selectedRunDate ? evaluationCaptionDate(selectedRunDate, locale) : undefined}
-          source={
-            isUnofficialRun
-              ? locale === 'zh'
-                ? 'SemiAnalysis InferenceX™ + 非官方 overlays'
-                : 'SemiAnalysis InferenceX™ + unofficial overlays'
-              : 'SemiAnalysis InferenceX™'
-          }
         />
       </div>
     </>
+  );
+  const footer = (
+    <ResultContext
+      locale={locale}
+      layout="footer"
+      date={selectedRunDate ? evaluationCaptionDate(selectedRunDate, locale) : undefined}
+      source={
+        isUnofficialRun
+          ? locale === 'zh'
+            ? 'SemiAnalysis InferenceX™ + 非官方 overlays'
+            : 'SemiAnalysis InferenceX™ + unofficial overlays'
+          : 'SemiAnalysis InferenceX™'
+      }
+    />
   );
 
   return (
@@ -238,10 +244,11 @@ export default function EvaluationChartDisplay() {
                 <>
                   {caption}
                   <EvaluationTable data={tableData} />
+                  <div className="mt-3">{footer}</div>
                 </>
               )
             ) : (
-              <EvalBarChartD3 caption={caption} />
+              <EvalBarChartD3 caption={caption} footer={footer} />
             ))}
         </>
       </ChartSection>

@@ -121,8 +121,8 @@ function CellMissing({ hardware, reason }: { hardware: string; reason: string })
 const COST_DELTA_NEUTRAL_BAND = 0.05;
 const COST_DELTA_SATURATION = 0.5;
 const COST_DELTA_CLASS = {
-  cheaper: 'text-success',
-  pricier: 'text-destructive',
+  cheaper: 'text-[color-mix(in_oklch,var(--success)_60%,var(--foreground))]',
+  pricier: 'text-[color-mix(in_oklch,var(--destructive)_60%,var(--foreground))]',
   even: 'text-muted-foreground',
   'no-baseline': 'text-muted-foreground',
 } as const;

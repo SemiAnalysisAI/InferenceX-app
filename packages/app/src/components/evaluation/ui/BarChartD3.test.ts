@@ -6,10 +6,12 @@ import type { EvaluationChartData } from '../types';
 import {
   evaluationChartBlockingState,
   evaluationChartIsInitializing,
+  evaluationPointDetails,
+  formatEvaluationDate,
+  formatEvaluationEmptyStateDate,
   generateEvaluationTooltipContent,
   sizeScoreLabelBackgrounds,
 } from './BarChartD3';
-import * as barChartModule from './BarChartD3';
 
 function makeDatum(configLabel: string, score: number): EvaluationChartData {
   return {
@@ -81,63 +83,53 @@ describe('sizeScoreLabelBackgrounds', () => {
 describe('evaluation chart locale presentation', () => {
   for (const unofficialBranch of [undefined, 'tpuv7_updates']) {
     it.each([
-      { dp: undefined, expected: '' },
-      { dp: 1, expected: '' },
-      { dp: 8, expected: '<strong>DP:</strong> 8' },
+      { dp: undefined, expected: false },
+      { dp: 1, expected: false },
+      { dp: 8, expected: true },
     ])(
-      `shows only non-default DP in ${unofficialBranch ? 'unofficial' : 'official'} tooltips ($dp)`,
+      `shows only non-default DP in ${unofficialBranch ? 'unofficial' : 'official'} details ($dp)`,
       ({ dp, expected }) => {
-        const html = generateEvaluationTooltipContent(
+        const { rows } = evaluationPointDetails(
           { ...makeDatum('TPU7x (vLLM)', 0.9), dp, physicalChips: 4 },
-          false,
           unofficialBranch,
         );
-        expect(html).toContain('<strong>Chips:</strong> 4');
-        if (expected) expect(html).toContain(expected);
-        else expect(html).not.toContain('<strong>DP:</strong>');
+        expect(rows).toContainEqual({ label: 'Chips', value: '4' });
+        expect(rows.some((row) => row.label === 'DP' && row.value === '8')).toBe(expected);
       },
     );
   }
 
-  it('preserves the raw English tooltip date while formatting the Chinese date', () => {
-    const module = barChartModule as typeof barChartModule & {
-      formatEvaluationDate?: (date: string, locale: 'en' | 'zh') => string;
-      formatEvaluationEmptyStateDate?: (date: string, locale: 'en' | 'zh') => string;
-      generateEvaluationTooltipContent?: (
-        data: EvaluationChartData,
-        isPinned: boolean,
-        unofficialBranch: string | undefined,
-        locale: 'en' | 'zh',
-      ) => string;
-    };
+  it('keeps the hover card compact and the full breakdown in the details', () => {
+    const html = generateEvaluationTooltipContent(makeDatum('B200 SGLang', 0.9), '#000');
+    expect(html).toContain('0.9000');
+    expect(html).toContain('2026-01-01');
+    expect(html).not.toContain('Min score');
+    expect(html).not.toContain('Click elsewhere');
+  });
 
-    expect(module.formatEvaluationDate?.('2026-01-02', 'en')).toBe('2026-01-02');
-    expect(module.formatEvaluationDate?.('2026-01-02', 'zh')).toBe('2026年1月2日');
-    expect(module.formatEvaluationEmptyStateDate?.('2026-01-02', 'en')).toBe('Jan 2, 2026');
-    expect(module.formatEvaluationEmptyStateDate?.('2026-01-02', 'zh')).toBe('2026年1月2日');
-    const englishHtml = module.generateEvaluationTooltipContent?.(
-      makeDatum('B200 SGLang', 0.9),
-      false,
-      undefined,
-      'en',
-    );
-    expect(englishHtml).toContain('<strong>Date:</strong> 2026-01-01');
-    const html = module.generateEvaluationTooltipContent?.(
+  it('preserves the raw English date while formatting the Chinese date', () => {
+    expect(formatEvaluationDate('2026-01-02', 'en')).toBe('2026-01-02');
+    expect(formatEvaluationDate('2026-01-02', 'zh')).toBe('2026年1月2日');
+    expect(formatEvaluationEmptyStateDate('2026-01-02', 'en')).toBe('Jan 2, 2026');
+    expect(formatEvaluationEmptyStateDate('2026-01-02', 'zh')).toBe('2026年1月2日');
+    expect(evaluationPointDetails(makeDatum('B200 SGLang', 0.9)).date).toBe('2026-01-01');
+    const details = evaluationPointDetails(
       {
         ...makeDatum('B200 SGLang', 0.9),
         runUrl: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123',
       },
-      true,
       'feature/zh',
       'zh',
     );
-    expect(html).toContain('点击其他区域关闭');
-    expect(html).toContain('非官方运行');
-    expect(html).toContain('<strong>平均得分：</strong>');
-    expect(html).toContain('<strong>并发数：</strong>');
-    expect(html).toContain('GitHub Actions 运行记录');
-    expect(html).not.toContain('Mean score');
-    expect(html).not.toContain('Concurrency');
+    expect(details.warning).toContain('非官方运行');
+    expect(details.metrics[0].label).toBe('平均得分');
+    expect(details.rows).toContainEqual({ label: '并发数', value: '1' });
+    expect(details.links[0]).toMatchObject({
+      label: 'GitHub Actions 运行记录',
+      href: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/123',
+    });
+    expect(JSON.stringify(details)).not.toContain('Mean score');
+    expect(JSON.stringify(details)).not.toContain('Concurrency');
   });
 });
 

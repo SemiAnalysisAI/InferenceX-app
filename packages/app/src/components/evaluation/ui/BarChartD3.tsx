@@ -14,7 +14,8 @@ import {
   overlayMarkerPosition,
   xMarkerPath,
 } from '@/lib/d3-chart/overlay-x-marker';
-import { chartTooltipDismiss, chartTooltipShellStyle } from '@/lib/d3-chart/tooltip-shell';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
+import { ChartPointDetails, type ChartPointDetailsRow } from '@/components/ui/chart-point-details';
 import { computeLeftMargin } from '@/lib/d3-chart/dynamic-margins';
 
 import { useEvaluation } from '@/components/evaluation/EvaluationContext';
@@ -62,22 +63,12 @@ export const formatEvaluationEmptyStateDate = (dateStr: string, locale: Locale) 
   }).format(new Date(year, month - 1, day));
 };
 
-const runLinkHTML = (runUrl: string | undefined, locale: Locale) =>
-  runUrl
-    ? `<div style="font-size: 11px; margin-top: 4px;">
-        <a href="${runUrl}" target="_blank" rel="noopener noreferrer" style="color: var(--muted-foreground); text-decoration: underline; cursor: pointer;">${locale === 'zh' ? 'GitHub Actions 运行记录' : 'GitHub Actions run'}</a>
-      </div>`
-    : '';
-
-const row = (label: string, value: string) =>
-  `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${label}${/[\u4E00-\u9FFF]/u.test(label) ? '：' : ':'}</strong> ${value}</div>`;
-
 const fmtSideTooltip = (tp: number, ep: number, dpa: boolean, nw: number, locale: Locale) =>
   `TP ${tp}, EP ${ep}, DPA ${dpa ? (locale === 'zh' ? '是' : 'True') : locale === 'zh' ? '否' : 'False'}, NW ${nw}`;
 
 const EVALUATION_TOOLTIP_STRINGS = {
   en: {
-    dismiss: 'Click elsewhere to dismiss',
+    runLink: 'GitHub Actions run',
     unofficial: '✕ Unofficial run',
     branch: 'Branch',
     date: 'Date',
@@ -98,7 +89,7 @@ const EVALUATION_TOOLTIP_STRINGS = {
     chipSplit: (prefill: number, decode: number) => `${prefill} prefill / ${decode} decode`,
   },
   zh: {
-    dismiss: '点击其他区域关闭',
+    runLink: 'GitHub Actions 运行记录',
     unofficial: '✕ 非官方运行',
     branch: '分支',
     date: '日期',
@@ -121,67 +112,89 @@ const EVALUATION_TOOLTIP_STRINGS = {
   },
 } as const;
 
-const parallelismHTML = (data: EvaluationChartData, locale: Locale): string => {
+const parallelismRows = (data: EvaluationChartData, locale: Locale): ChartPointDetailsRow[] => {
   const t = EVALUATION_TOOLTIP_STRINGS[locale];
   if (!data.disagg) {
-    return (
-      row(t.tensorParallelism, String(data.tp)) +
-      row(t.chips, String(data.physicalChips ?? data.numDecodeGpu)) +
-      (data.dp && data.dp > 1 ? row('DP', String(data.dp)) : '') +
-      row(t.expertParallelism, String(data.ep)) +
-      row(t.dataParallelAttention, data.dp_attention ? t.yes : t.no)
-    );
+    return [
+      { label: t.tensorParallelism, value: String(data.tp) },
+      { label: t.chips, value: String(data.physicalChips ?? data.numDecodeGpu) },
+      ...(data.dp && data.dp > 1 ? [{ label: 'DP', value: String(data.dp) }] : []),
+      { label: t.expertParallelism, value: String(data.ep) },
+      { label: t.dataParallelAttention, value: data.dp_attention ? t.yes : t.no },
+    ];
   }
-  return (
-    row(t.multinode, data.isMultinode ? t.yes : t.no) +
-    row(
-      t.prefill,
-      fmtSideTooltip(
+  return [
+    { label: t.multinode, value: data.isMultinode ? t.yes : t.no },
+    {
+      label: t.prefill,
+      value: fmtSideTooltip(
         data.prefillTp,
         data.prefillEp,
         data.prefillDpAttention,
         data.prefillNumWorkers,
         locale,
       ),
-    ) +
-    row(
-      t.decode,
-      fmtSideTooltip(data.tp, data.ep, data.dp_attention, data.decodeNumWorkers, locale),
-    ) +
-    row(t.chips, t.chipSplit(data.numPrefillGpu, data.numDecodeGpu))
-  );
+      wide: true,
+    },
+    {
+      label: t.decode,
+      value: fmtSideTooltip(data.tp, data.ep, data.dp_attention, data.decodeNumWorkers, locale),
+      wide: true,
+    },
+    { label: t.chips, value: t.chipSplit(data.numPrefillGpu, data.numDecodeGpu) },
+  ];
+};
+
+export const evaluationPointDetails = (
+  data: EvaluationChartData,
+  unofficialBranch?: string,
+  locale: Locale = 'en',
+) => {
+  const t = EVALUATION_TOOLTIP_STRINGS[locale];
+  const [title = '', ...rest] = data.configLabel.split('\n');
+  const precision = getPrecisionLabel(data.precision as Precision);
+  const date = formatEvaluationDate(data.date, locale);
+  return {
+    title,
+    subtitle: rest.join(' ') || undefined,
+    date,
+    warning: unofficialBranch ? t.unofficial : undefined,
+    metrics: [
+      { value: data.score.toFixed(4), label: t.meanScore },
+      { value: (data.minScore ?? data.score).toFixed(4), label: t.minScore },
+      { value: (data.maxScore ?? data.score).toFixed(4), label: t.maxScore },
+    ],
+    rows: [
+      ...(unofficialBranch ? [{ label: t.branch, value: unofficialBranch, wide: true }] : []),
+      { label: t.concurrency, value: String(data.conc) },
+      { label: t.precision, value: precision },
+      ...parallelismRows(data, locale),
+    ],
+    links: data.runUrl
+      ? [{ action: 'run', label: t.runLink, href: data.runUrl, external: true }]
+      : [],
+    summary: `${precision} · ${t.concurrency} ${data.conc} · ${date}`,
+  };
 };
 
 export const generateEvaluationTooltipContent = (
   data: EvaluationChartData,
-  isPinned: boolean,
+  color: string,
   unofficialBranch?: string,
   locale: Locale = 'en',
 ): string => {
-  const t = EVALUATION_TOOLTIP_STRINGS[locale];
-  const minScore = data.minScore ?? data.score;
-  const maxScore = data.maxScore ?? data.score;
-  const border = unofficialBranch ? '2px solid #dc2626' : undefined;
-  return `
-    <div style="${chartTooltipShellStyle({ pinned: isPinned, border })}">
-      ${isPinned ? chartTooltipDismiss(t.dismiss) : ''}
-      ${
-        unofficialBranch
-          ? `<div style="color: #dc2626; font-size: 11px; font-weight: 600; margin-bottom: 4px;">${t.unofficial}</div>
-      ${row(t.branch, unofficialBranch)}`
-          : ''
-      }
-      <div style="color: var(--foreground); font-size: 12px; font-weight: 600; margin-bottom: 8px;">${data.configLabel.replaceAll('\n', '<br>')}</div>
-      ${row(t.date, formatEvaluationDate(data.date, locale))}
-      ${row(t.meanScore, data.score.toFixed(4))}
-      ${row(t.minScore, minScore.toFixed(4))}
-      ${row(t.maxScore, maxScore.toFixed(4))}
-      ${row(t.concurrency, String(data.conc))}
-      ${row(t.precision, getPrecisionLabel(data.precision as Precision))}
-      ${parallelismHTML(data, locale)}
-      ${runLinkHTML(data.runUrl, locale)}
-    </div>
-  `;
+  const details = evaluationPointDetails(data, unofficialBranch, locale);
+  return chartHoverCard(
+    {
+      title: details.title,
+      subtitle: details.subtitle,
+      color,
+      metrics: [details.metrics[0]],
+      summary: unofficialBranch ? `${unofficialBranch} · ${details.summary}` : details.summary,
+      warning: details.warning,
+    },
+    { border: unofficialBranch ? '2px solid #dc2626' : undefined },
+  );
 };
 
 function formatYAxisLabels(axisGroup: d3.Selection<SVGGElement, unknown, null, undefined>) {
@@ -349,7 +362,13 @@ export function evaluationChartIsInitializing({
   return !isEvaluationDataSettled;
 }
 
-export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
+export default function EvalBarChartD3({
+  caption,
+  footer,
+}: {
+  caption?: ReactNode;
+  footer?: ReactNode;
+}) {
   const {
     loading,
     isEvaluationDataSettled,
@@ -803,11 +822,29 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
     }),
     [chartMargin.left, chartMargin.right, xDomain],
   );
+  const pointColor = useCallback(
+    (datum: EvaluationChartData, isOverlay: boolean) =>
+      isOverlay
+        ? overlayRunColor(overlayRunIndex(datum.runUrl ?? null, runIndexByUrl))
+        : getCssColor(resolveColor(datum.configLabel, String(datum.hwKey))),
+    [getCssColor, resolveColor, runIndexByUrl],
+  );
   const tooltipConfig = useMemo(
     () => ({
       rulerType: 'crosshair' as const,
-      content: (datum: EvaluationChartData, isPinned: boolean) =>
-        generateEvaluationTooltipContent(datum, isPinned, undefined, locale),
+      content: (datum: EvaluationChartData) =>
+        generateEvaluationTooltipContent(datum, pointColor(datum, false), undefined, locale),
+      details: (datum: EvaluationChartData, isOverlay: boolean, close: () => void) => (
+        <ChartPointDetails
+          {...evaluationPointDetails(
+            datum,
+            isOverlay ? branchForRowRef.current(datum) : undefined,
+            locale,
+          )}
+          color={pointColor(datum, isOverlay)}
+          onClose={close}
+        />
+      ),
       getRulerX: (
         datum: EvaluationChartData,
         scale:
@@ -833,7 +870,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
       ) => selection.attr('r', 6),
       attachToLayer: 1,
     }),
-    [locale],
+    [locale, pointColor],
   );
 
   const layers = useMemo(
@@ -1113,10 +1150,11 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
             hoverPath: xMarkerPath(OVERLAY_X_HOVER_SIZE),
             tooltip,
             handle: chartRef.current,
-            content: (datum, pinned) =>
+            panel: true,
+            content: (datum) =>
               generateEvaluationTooltipContent(
                 datum,
-                pinned,
+                pointColor(datum, true),
                 branchForRowRef.current(datum),
                 locale,
               ),
@@ -1172,6 +1210,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
       unofficialPaletteIdentity,
       runIndexByUrl,
       locale,
+      pointColor,
     ],
   );
 
@@ -1232,6 +1271,7 @@ export default function EvalBarChartD3({ caption }: { caption?: ReactNode }) {
       watermark={getChartWatermark(isUnofficialRun)}
       grabCursor={false}
       caption={caption}
+      footer={footer}
       xScale={xScaleConfig}
       yScale={yScaleConfig}
       xAxis={xAxisConfig}

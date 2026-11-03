@@ -8,6 +8,7 @@ import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import { ChartSection } from '@/components/ui/chart-section';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { Heading } from '@/components/ui/heading';
+import { ResultContext } from '@/components/ui/result-context';
 import { exportToCsv } from '@/lib/export/csv-export';
 import { reliabilityChartToCsv } from '@/lib/export/csv-export-helpers';
 import { useLocale } from '@/lib/i18n/use-locale';
@@ -21,20 +22,21 @@ const STRINGS = {
     description:
       'Success rate percentages for inference runs across chip models, showing hardware reliability for inference runs over time',
     captionHeading: 'Success rate by chip model',
-    captionSource: 'Source: SemiAnalysis InferenceX™',
+    captionSource: 'SemiAnalysis InferenceX™',
   },
   zh: {
     heading: '芯片可靠性',
     description: '汇总所选时间范围内各芯片型号的推理运行成功率，用于比较硬件可靠性',
     captionHeading: '各芯片型号成功率',
-    captionSource: '数据来源：SemiAnalysis InferenceX™',
+    captionSource: 'SemiAnalysis InferenceX™',
   },
 } as const;
 
 export default function ReliabilityChartDisplay() {
   const CHART_ID = 'reliability-chart';
   const { setIsLegendExpanded, chartData, enabledModels } = useReliabilityContext();
-  const t = STRINGS[useLocale()];
+  const locale = useLocale();
+  const t = STRINGS[locale];
 
   const handleExportCsv = useCallback(() => {
     const { headers, rows } = reliabilityChartToCsv(chartData);
@@ -67,15 +69,13 @@ export default function ReliabilityChartDisplay() {
       >
         <ReliabilityBarChartD3
           caption={
-            <>
-              <div className="md:pr-24">
-                <Heading as="h3" level="card">
-                  {t.captionHeading}
-                </Heading>
-                <p className="text-sm text-muted-foreground">{t.captionSource}</p>
-              </div>
-            </>
+            <div className="md:pr-24">
+              <Heading as="h3" level="card">
+                {t.captionHeading}
+              </Heading>
+            </div>
           }
+          footer={<ResultContext locale={locale} layout="footer" source={t.captionSource} />}
         />
       </ChartSection>
     </div>

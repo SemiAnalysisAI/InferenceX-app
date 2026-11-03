@@ -13,7 +13,8 @@ import {
   type RenderContext,
   type ZoomContext,
 } from '@/lib/d3-chart/D3Chart';
-import { chartTooltipDismiss, chartTooltipShellStyle } from '@/lib/d3-chart/tooltip-shell';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
+import { ChartPointDetails } from '@/components/ui/chart-point-details';
 import type { SubmissionVolumeRow } from '@/lib/submissions/submissions-types';
 
 import {
@@ -29,6 +30,7 @@ interface SubmissionsChartProps {
   volume: SubmissionVolumeRow[];
   mode: ChartMode;
   caption?: ReactNode;
+  footer?: ReactNode;
 }
 
 const NVIDIA_COLOR = '#76b900';
@@ -94,34 +96,26 @@ export function formatSubmissionDate(date: number | Date, locale: Locale): strin
   return SUBMISSION_DATE_FORMATTERS[locale].format(new Date(date));
 }
 
-function generateTooltipContent(d: ChartPoint, isPinned: boolean, locale: Locale): string {
-  const t = SUBMISSIONS_STRINGS[locale];
+function submissionMetrics(d: ChartPoint, locale: Locale) {
   const numberLocale = locale === 'zh' ? 'zh-CN' : 'en-US';
-  const dateStr = formatSubmissionDate(d.date, locale);
-  return `
-    <div style="${chartTooltipShellStyle({ pinned: isPinned, minWidth: 160 })}">
-      ${isPinned ? chartTooltipDismiss(t.dismiss) : ''}
-      <div style="color: var(--foreground); font-size: 12px; font-weight: 600; margin-bottom: 8px;">${dateStr}</div>
-      <div style="display: flex; align-items: center; gap: 6px; color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${NVIDIA_COLOR};"></span>
-        <span>NVIDIA:</span> <strong>${d.nvidia.toLocaleString(numberLocale)}</strong>
-      </div>
-      <div style="display: flex; align-items: center; gap: 6px; color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
-        <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${AMD_COLOR};"></span>
-        <span>AMD:</span> <strong>${d.amd.toLocaleString(numberLocale)}</strong>
-      </div>
-      <div style="display: flex; align-items: center; gap: 6px; color: var(--muted-foreground); font-size: 11px;">
-        <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${TOTAL_COLOR};"></span>
-        <span>${t.total}:</span> <strong>${d.total.toLocaleString(numberLocale)}</strong>
-      </div>
-    </div>`;
+  return [
+    { value: d.nvidia.toLocaleString(numberLocale), label: 'NVIDIA' },
+    { value: d.amd.toLocaleString(numberLocale), label: 'AMD' },
+    { value: d.total.toLocaleString(numberLocale), label: SUBMISSIONS_STRINGS[locale].total },
+  ];
+}
+
+function generateTooltipContent(d: ChartPoint, locale: Locale): string {
+  return chartHoverCard({
+    title: formatSubmissionDate(d.date, locale),
+    metrics: submissionMetrics(d, locale),
+  });
 }
 
 const SUBMISSIONS_STRINGS = {
   en: {
     onChangeOnly: 'On-change only',
     total: 'Total',
-    dismiss: 'Click elsewhere to dismiss',
     markerLine1: 'Switched to',
     markerLine2: 'on-change runs',
     noData: 'No submission data to display',
@@ -132,7 +126,6 @@ const SUBMISSIONS_STRINGS = {
   zh: {
     onChangeOnly: '仅显示变更触发的运行',
     total: '合计',
-    dismiss: '点击其他区域关闭',
     markerLine1: '自此改为',
     markerLine2: '仅在变更时运行',
     noData: '暂无可显示的提交数据',
@@ -142,7 +135,7 @@ const SUBMISSIONS_STRINGS = {
   },
 } as const;
 
-export default function SubmissionsChart({ volume, mode, caption }: SubmissionsChartProps) {
+export default function SubmissionsChart({ volume, mode, caption, footer }: SubmissionsChartProps) {
   const [isLegendExpanded, setIsLegendExpanded] = useState(true);
   const [enabledLines, setEnabledLines] = useState<Set<LineKey>>(new Set(LINE_KEYS));
   const [onChangeOnly, setOnChangeOnly] = useState(true);
@@ -341,13 +334,21 @@ export default function SubmissionsChart({ volume, mode, caption }: SubmissionsC
         }}
         tooltip={{
           rulerType: 'vertical',
-          content: (point, isPinned) => generateTooltipContent(point, isPinned, locale),
+          content: (point) => generateTooltipContent(point, locale),
+          details: (point, _isOverlay, close) => (
+            <ChartPointDetails
+              title={formatSubmissionDate(point.date, locale)}
+              metrics={submissionMetrics(point, locale)}
+              onClose={close}
+            />
+          ),
           getRulerX: (d, xScale) => (xScale as unknown as d3.ScaleTime<number, number>)(d.date),
           getRulerY: (d, yScale) => yScale(d.total),
           proximityHover: true,
           getDataX: (d) => d.date,
         }}
         caption={caption}
+        footer={footer}
         legendElement={
           <ChartLegend
             variant="sidebar"

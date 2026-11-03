@@ -9,6 +9,7 @@ import { ChartShareActions } from '@/components/ui/chart-display-helpers';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Heading } from '@/components/ui/heading';
+import { ResultContext } from '@/components/ui/result-context';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { SegmentedToggle, type SegmentedToggleOption } from '@/components/ui/segmented-toggle';
 import { Stat } from '@/components/ui/stat';
@@ -17,7 +18,7 @@ import { submissionsVolumeToCsv } from '@/lib/export/csv-export-helpers';
 import { useSubmissions } from '@/hooks/api/use-submissions';
 import { useLocale } from '@/lib/i18n/use-locale';
 
-import SubmissionsChart, { type ChartMode } from './SubmissionsChart';
+import SubmissionsChart, { type ChartMode, formatSubmissionDate } from './SubmissionsChart';
 import SubmissionsTable from './SubmissionsTable';
 import { computeTotalStats } from './submissions-utils';
 
@@ -37,7 +38,7 @@ const STRINGS = {
     noTableData: 'No submission records are available',
     chartModeAria: 'Chart mode',
     chartCaption: 'Submission activity',
-    chartSource: 'Source: SemiAnalysis InferenceX™',
+    chartSource: 'SemiAnalysis InferenceX™',
     statDatapoints: 'Datapoints generated',
     statConfigs: 'Distinct configurations',
     statModels: 'Unique models',
@@ -61,7 +62,7 @@ const STRINGS = {
     noTableData: '暂无提交记录',
     chartModeAria: '图表模式',
     chartCaption: '提交活动',
-    chartSource: '数据来源：SemiAnalysis InferenceX™',
+    chartSource: 'SemiAnalysis InferenceX™',
     statDatapoints: '已生成数据点',
     statConfigs: '不同配置数',
     statModels: '模型数',
@@ -109,6 +110,15 @@ export default function SubmissionsDisplay() {
     if (!data?.summary) return null;
     return computeTotalStats(data.summary);
   }, [data?.summary]);
+
+  const latestDate = useMemo(
+    () =>
+      data?.volume.reduce<string | undefined>(
+        (latest, row) => (!latest || row.date > latest ? row.date : latest),
+        undefined,
+      ),
+    [data?.volume],
+  );
 
   if (error) {
     return (
@@ -187,8 +197,15 @@ export default function SubmissionsDisplay() {
                 <Heading as="h3" level="card">
                   {t.chartCaption}
                 </Heading>
-                <p className="text-sm text-muted-foreground">{t.chartSource}</p>
               </div>
+            }
+            footer={
+              <ResultContext
+                locale={locale}
+                layout="footer"
+                date={latestDate ? formatSubmissionDate(new Date(latestDate), locale) : undefined}
+                source={t.chartSource}
+              />
             }
           />
         ) : (

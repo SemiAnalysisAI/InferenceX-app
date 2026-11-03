@@ -14,9 +14,11 @@ import {
   type ScaleConfig,
   type AxisConfig,
 } from '@/lib/d3-chart/D3Chart';
+import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { computeLeftMargin } from '@/lib/d3-chart/dynamic-margins';
 import { twoRowYAxisLabels } from '@/lib/d3-chart/axis-labels';
-import { chartTooltipShell, chartTooltipTitle } from '@/lib/d3-chart/tooltip-shell';
+import { axisLabelUnit, chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
+import { ChartPointDetails } from '@/components/ui/chart-point-details';
 
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
@@ -115,19 +117,27 @@ function BarChart({ data, spec }: { data: AiChartBarPoint[]; spec: AiChartSpec }
     return [barLayer];
   }, [data]);
 
-  const tooltip = useMemo<TooltipConfig<AiChartBarPoint>>(
-    () => ({
+  const tooltip = useMemo<TooltipConfig<AiChartBarPoint>>(() => {
+    const metrics = (d: AiChartBarPoint, unitsOnly: boolean) => [
+      {
+        value: d.value.toLocaleString(numberLocale, { maximumFractionDigits: 2 }),
+        label: unitsOnly ? axisLabelUnit(spec.yAxisLabel) : spec.yAxisLabel,
+      },
+    ];
+    return {
       rulerType: 'none',
       content: (d) =>
-        sanitize(
-          chartTooltipShell(`${chartTooltipTitle(d.label, d.color)}
-          <div style="color: var(--muted-foreground); font-size: 11px;">
-            <strong>${spec.yAxisLabel}:</strong> ${d.value.toLocaleString(numberLocale, { maximumFractionDigits: 2 })}
-          </div>`),
-        ),
-    }),
-    [numberLocale, spec.yAxisLabel],
-  );
+        sanitize(chartHoverCard({ title: d.label, color: d.color, metrics: metrics(d, true) })),
+      details: (d, _isOverlay, close) => (
+        <ChartPointDetails
+          title={d.label}
+          color={d.color}
+          metrics={metrics(d, false)}
+          onClose={close}
+        />
+      ),
+    };
+  }, [numberLocale, spec.yAxisLabel]);
 
   return (
     <div role="img" aria-label={t.chartAria.bar}>
@@ -191,25 +201,36 @@ function ScatterChart({
     return [scatterLayer];
   }, [data, colorMap]);
 
-  const tooltip = useMemo<TooltipConfig<InferenceData>>(
-    () => ({
-      rulerType: 'crosshair',
-      content: (d) => {
-        const hwKey = d.hwKey ?? '';
-        const color = colorMap[hwKey] ?? '#888';
-        return sanitize(
-          chartTooltipShell(`${chartTooltipTitle(hwKey, color)}
-          <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 2px;">
-            <strong>${t.interactivity}:</strong> ${d.x.toFixed(1)} tok/s/user
-          </div>
-          <div style="color: var(--muted-foreground); font-size: 11px;">
-            <strong>${spec.yAxisLabel}:</strong> ${d.y.toLocaleString(numberLocale, { maximumFractionDigits: 2 })}
-          </div>`),
-        );
+  const tooltip = useMemo<TooltipConfig<InferenceData>>(() => {
+    const metrics = (d: InferenceData, unitsOnly: boolean) => [
+      {
+        value: d.y.toLocaleString(numberLocale, { maximumFractionDigits: 2 }),
+        label: unitsOnly ? axisLabelUnit(spec.yAxisLabel) : spec.yAxisLabel,
       },
-    }),
-    [colorMap, numberLocale, spec.yAxisLabel, t.interactivity],
-  );
+      { value: d.x.toFixed(1), label: unitsOnly ? 'tok/s/user' : t.interactivityAxis },
+    ];
+    return {
+      rulerType: 'crosshair',
+      content: (d) =>
+        sanitize(
+          chartHoverCard({
+            title: d.hwKey ?? '',
+            color: colorMap[d.hwKey ?? ''] ?? '#888',
+            metrics: metrics(d, true),
+          }),
+        ),
+      details: (d, _isOverlay, close) => (
+        <ChartPointDetails
+          title={d.hwKey ?? ''}
+          color={colorMap[d.hwKey ?? ''] ?? '#888'}
+          metrics={metrics(d, false)}
+          onClose={close}
+        />
+      ),
+      getRulerX: (d, xS) => (xS as ContinuousScale)(d.x),
+      getRulerY: (d, yS) => yS(d.y),
+    };
+  }, [colorMap, numberLocale, spec.yAxisLabel, t.interactivityAxis]);
 
   return (
     <div role="group" aria-label={t.chartAria.scatter}>
@@ -309,31 +330,41 @@ function LineChart({
     return [lineLayer, scatterLayer];
   }, [lineData, flatPoints, colorMap]);
 
-  const tooltip = useMemo<TooltipConfig<LinePoint>>(
-    () => ({
-      rulerType: 'crosshair',
-      content: (d) => {
-        const color = colorMap[d.hwKey] ?? '#888';
-        const config = getHardwareConfig(d.hwKey);
-        const label = config
-          ? `${config.label}${config.suffix ? ` ${config.suffix}` : ''}`
-          : d.hwKey;
-        return sanitize(
-          chartTooltipShell(`${chartTooltipTitle(label, color)}
-          <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 2px;">
-            <strong>${t.interactivity}:</strong> ${d.x.toFixed(1)} tok/s/user
-          </div>
-          <div style="color: var(--muted-foreground); font-size: 11px;">
-            <strong>${spec.yAxisLabel}:</strong> ${d.y.toLocaleString(numberLocale, { maximumFractionDigits: 2 })}
-          </div>`),
-        );
+  const tooltip = useMemo<TooltipConfig<LinePoint>>(() => {
+    const label = (d: LinePoint) => {
+      const config = getHardwareConfig(d.hwKey);
+      return config ? `${config.label}${config.suffix ? ` ${config.suffix}` : ''}` : d.hwKey;
+    };
+    const metrics = (d: LinePoint, unitsOnly: boolean) => [
+      {
+        value: d.y.toLocaleString(numberLocale, { maximumFractionDigits: 2 }),
+        label: unitsOnly ? axisLabelUnit(spec.yAxisLabel) : spec.yAxisLabel,
       },
-      getRulerX: (d, xS) => (xS as any)(d.x),
-      getRulerY: (d, yS) => (yS as any)(d.y),
+      { value: d.x.toFixed(1), label: unitsOnly ? 'tok/s/user' : t.interactivityAxis },
+    ];
+    return {
+      rulerType: 'crosshair',
+      content: (d) =>
+        sanitize(
+          chartHoverCard({
+            title: label(d),
+            color: colorMap[d.hwKey] ?? '#888',
+            metrics: metrics(d, true),
+          }),
+        ),
+      details: (d, _isOverlay, close) => (
+        <ChartPointDetails
+          title={label(d)}
+          color={colorMap[d.hwKey] ?? '#888'}
+          metrics={metrics(d, false)}
+          onClose={close}
+        />
+      ),
+      getRulerX: (d, xS) => (xS as ContinuousScale)(d.x),
+      getRulerY: (d, yS) => yS(d.y),
       attachToLayer: 1,
-    }),
-    [colorMap, numberLocale, spec.yAxisLabel, t.interactivity],
-  );
+    };
+  }, [colorMap, numberLocale, spec.yAxisLabel, t.interactivityAxis]);
 
   return (
     <div role="group" aria-label={t.chartAria.line}>
@@ -389,27 +420,28 @@ function RadarChart({
     return [radarLayer];
   }, [data, axes]);
 
-  const tooltip = useMemo<TooltipConfig<AiRadarItem>>(
-    () => ({
+  const tooltip = useMemo<TooltipConfig<AiRadarItem>>(() => {
+    const metrics = (d: AiRadarItem) =>
+      axes.flatMap((axis, i) => {
+        const raw = d.rawValues[i];
+        return raw === null || raw === undefined
+          ? []
+          : [
+              {
+                value: raw.toLocaleString(numberLocale, { maximumFractionDigits: 2 }),
+                label: axis.label,
+              },
+            ];
+      });
+    return {
       rulerType: 'none',
-      content: (d) => {
-        const metricRows = axes
-          .map((axis, i) => {
-            const raw = d.rawValues[i];
-            return raw === null
-              ? ''
-              : `<div><strong>${axis.label}:</strong> ${raw.toLocaleString(numberLocale, { maximumFractionDigits: 2 })}</div>`;
-          })
-          .filter(Boolean)
-          .join('');
-        return sanitize(
-          chartTooltipShell(`${chartTooltipTitle(d.label, d.color)}
-          <div style="color: var(--muted-foreground); font-size: 11px;">${metricRows}</div>`),
-        );
-      },
-    }),
-    [axes, numberLocale],
-  );
+      content: (d) =>
+        sanitize(chartHoverCard({ title: d.label, color: d.color, metrics: metrics(d) })),
+      details: (d, _isOverlay, close) => (
+        <ChartPointDetails title={d.label} color={d.color} metrics={metrics(d)} onClose={close} />
+      ),
+    };
+  }, [axes, numberLocale]);
 
   const dummyScale = useMemo<ScaleConfig>(() => ({ type: 'linear', domain: [0, 1] }), []);
 

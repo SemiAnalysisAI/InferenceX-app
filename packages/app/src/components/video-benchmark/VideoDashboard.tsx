@@ -1,11 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import {
-  HW_REGISTRY,
-  TCO_SOURCE_TITLE,
-  TCO_SOURCE_URL,
-} from '@semianalysisai/inferencex-constants';
+import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import ChartLegend from '@/components/ui/chart-legend';
@@ -13,7 +9,10 @@ import { ChartSection } from '@/components/ui/chart-section';
 import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
 import { Heading } from '@/components/ui/heading';
-import { captionControlTriggerClassName } from '@/components/ui/result-context';
+import { InfoHelp } from '@/components/ui/option-info';
+import { CaptionField, ResultContext } from '@/components/ui/result-context';
+import { PricesSourceLink } from '@/components/ui/chart-display-helpers';
+import { TcoPriceTable } from '@/components/ui/editable-tco-badges';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { ShareButton } from '@/components/ui/share-button';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -74,8 +73,7 @@ const STRINGS = {
     toggleCompare: 'Show or hide the Compare section',
     toggleEvidence: 'Show or hide performance evidence',
     tier: 'Cost tier',
-    badges: 'TCO $/chip/hr',
-    source: 'Source',
+    tierInfo: 'Which published TCO tier sets the $/chip/hr behind the cost metrics.',
     apiReference: 'API reference',
     idle: (list: string) =>
       `Per participating GPU: ${list} reserved more boards than one video uses; the idle boards are not counted.`,
@@ -107,8 +105,7 @@ const STRINGS = {
     toggleCompare: '展开或收起“对比”区块',
     toggleEvidence: '展开或收起性能测量证据',
     tier: '成本档位',
-    badges: 'TCO $/chip/hr',
-    source: '来源',
+    tierInfo: '成本指标所用的 $/chip/hr 采用哪一档已发布的 TCO。',
     apiReference: 'API 参考价',
     idle: (list: string) =>
       `按参与计算的 GPU 计：${list}预留的板卡多于单条视频所需，空闲板卡未计入。`,
@@ -277,6 +274,106 @@ export default function VideoDashboard() {
     URL.revokeObjectURL(url);
   };
 
+  const legend = (
+    <div data-testid="video-legend">
+      <ChartLegend
+        variant="sidebar"
+        legendItems={legendItems}
+        isLegendExpanded={legendExpanded}
+        onExpandedChange={setLegendExpanded}
+        disableActiveSort
+        switches={[
+          {
+            id: 'video-optimal-only',
+            label: s.optimalOnly,
+            checked: state.optimal,
+            infoTooltip: s.optimalInfo,
+            onCheckedChange: (checked) => {
+              update({ optimal: checked });
+              track('video_optimal_toggled', { enabled: checked });
+            },
+          },
+        ]}
+      />
+    </div>
+  );
+
+  const priceItems = [...measured.keys()]
+    .filter((key) => !hidden.has(key))
+    .map((key) => ({
+      base: key,
+      label: HW_REGISTRY[key]?.badgeLabel ?? hardwareLabel(key),
+      value: costPerGpuHour(key, state.tier)?.toFixed(2) ?? '—',
+    }));
+
+  const footer = (
+    <ResultContext
+      locale={locale}
+      layout="footer"
+      scenario={
+        <CaptionField
+          label={s.tier}
+          value={TIER_LABELS[state.tier][locale]}
+          testId="result-context-cost-tier"
+          hideLabel
+          control={
+            <span className="inline-flex items-center gap-0.5">
+              <SearchableSelect
+                triggerTestId="video-cost-tier"
+                triggerAriaLabel={s.tier}
+                value={state.tier}
+                onValueChange={(value) => {
+                  update({ tier: value as CostTier });
+                  track('video_tier_changed', { value });
+                }}
+                placeholder={s.tier}
+                initialLabel={TIER_LABELS[state.tier][locale]}
+                searchable={false}
+                trackPrefix="video_cost_tier"
+                size="sm"
+                className="w-auto max-w-full text-xs"
+                contentClassName="w-72"
+                groups={[
+                  {
+                    label: '',
+                    options: COST_TIERS.map((tier) => ({
+                      value: tier,
+                      label: TIER_LABELS[tier][locale],
+                      testId: `video-cost-tier-${tier}`,
+                    })),
+                  },
+                ]}
+              />
+              <InfoHelp label={s.tier} value="video-cost-tier" align="start">
+                {s.tierInfo}
+              </InfoHelp>
+            </span>
+          }
+        />
+      }
+      controlsEnd={
+        priceItems.length > 0 ? (
+          <TcoPriceTable
+            items={priceItems}
+            testId="video-tco-table"
+            cellTestId="video-tco-badge"
+            inputIdPrefix="video-tco"
+          />
+        ) : undefined
+      }
+      source="SemiAnalysis InferenceX™"
+      metaEnd={
+        <span className="inline-flex flex-wrap items-center gap-x-2">
+          <span className="tabular-nums">
+            {s.apiReference}
+            {locale === 'zh' ? '：' : ': '}
+            {formatApiPrice(state.apiPrice)}/video-s ({H3_API_REFERENCE.capturedOn})
+          </span>
+          <PricesSourceLink />
+        </span>
+      }
+    />
+  );
   return (
     <div className="mx-auto min-w-0 w-full max-w-7xl space-y-4 py-2" data-testid="video-dashboard">
       <section className="relative z-20">
@@ -330,68 +427,6 @@ export default function VideoDashboard() {
               {modelLabel} · {metricLabel(state.y, locale, options)} {s.vs}{' '}
               {metricLabel(state.x, locale, options)}
             </Heading>
-            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-              <span className="inline-flex flex-wrap items-center gap-x-1">
-                <span className="font-medium text-foreground">{s.tier}:</span>{' '}
-                <span className="no-export inline-flex items-center">
-                  <SearchableSelect
-                    triggerTestId="video-cost-tier"
-                    triggerAriaLabel={s.tier}
-                    value={state.tier}
-                    onValueChange={(value) => {
-                      update({ tier: value as CostTier });
-                      track('video_tier_changed', { value });
-                    }}
-                    placeholder={s.tier}
-                    initialLabel={TIER_LABELS[state.tier][locale]}
-                    searchable={false}
-                    trackPrefix="video_cost_tier"
-                    size="sm"
-                    className={captionControlTriggerClassName}
-                    contentClassName="w-72"
-                    groups={[
-                      {
-                        label: '',
-                        options: COST_TIERS.map((tier) => ({
-                          value: tier,
-                          label: TIER_LABELS[tier][locale],
-                          testId: `video-cost-tier-${tier}`,
-                        })),
-                      },
-                    ]}
-                  />
-                </span>
-                <span className="export-only hidden">{TIER_LABELS[state.tier][locale]}</span>
-              </span>
-              <span className="flex flex-wrap items-center gap-1">
-                {s.badges}:
-                {hardwareKeys.map((key) => (
-                  <span
-                    key={key}
-                    className="rounded border px-1.5 py-0.5 tabular-nums"
-                    data-testid="video-tco-badge"
-                  >
-                    {HW_REGISTRY[key]?.badgeLabel ?? hardwareLabel(key)}{' '}
-                    {costPerGpuHour(key, state.tier)?.toFixed(2) ?? '—'}
-                  </span>
-                ))}
-              </span>
-              <span>
-                {s.apiReference}: {formatApiPrice(state.apiPrice)}/video-s (
-                {H3_API_REFERENCE.capturedOn})
-              </span>
-              <span>
-                {s.source}:{' '}
-                <a
-                  className="underline underline-offset-2"
-                  href={TCO_SOURCE_URL}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {TCO_SOURCE_TITLE}
-                </a>
-              </span>
-            </div>
             {idle.length > 0 && (
               <p className="mt-1 text-xs text-muted-foreground" data-testid="video-idle-note">
                 {s.idle(idle.join(locale === 'zh' ? '、' : ', '))}
@@ -418,46 +453,34 @@ export default function VideoDashboard() {
               </Button>
             </div>
           )}
-          {!loading && !error && (
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
-              <div className="min-w-0">
-                {state.view === 'chart' ? (
-                  <VideoHardwareChart
-                    points={cells}
-                    state={state}
-                    colorFor={colorFor}
-                    hidden={hidden}
-                    onSelect={(p: VideoPoint) =>
-                      track('video_point_selected', { gpu: p.hardwareKey ?? '', run: p.runId })
-                    }
-                  />
-                ) : (
-                  <VideoPointsTable points={cells} state={state} hidden={hidden} />
-                )}
-              </div>
-              <div data-testid="video-legend">
-                <ChartLegend
-                  variant="sidebar"
-                  legendItems={legendItems}
-                  isLegendExpanded={legendExpanded}
-                  onExpandedChange={setLegendExpanded}
-                  disableActiveSort
-                  switches={[
-                    {
-                      id: 'video-optimal-only',
-                      label: s.optimalOnly,
-                      checked: state.optimal,
-                      infoTooltip: s.optimalInfo,
-                      onCheckedChange: (checked) => {
-                        update({ optimal: checked });
-                        track('video_optimal_toggled', { enabled: checked });
-                      },
-                    },
-                  ]}
-                />
-              </div>
-            </div>
-          )}
+          {!loading &&
+            !error &&
+            (state.view === 'chart' ? (
+              <VideoHardwareChart
+                points={cells}
+                state={state}
+                colorFor={colorFor}
+                hidden={hidden}
+                onSelect={(p: VideoPoint) =>
+                  track('video_point_selected', {
+                    gpu: p.hardwareKey ?? '',
+                    run: p.runId,
+                  })
+                }
+                legend={legend}
+                footer={footer}
+              />
+            ) : (
+              <>
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
+                  <div className="min-w-0">
+                    <VideoPointsTable points={cells} state={state} hidden={hidden} />
+                  </div>
+                  {legend}
+                </div>
+                {footer}
+              </>
+            ))}
         </div>
       </ChartSection>
       <VideoKpiCards points={cells} state={state} colorFor={colorFor} loading={loading} />

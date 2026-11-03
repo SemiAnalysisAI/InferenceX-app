@@ -1,7 +1,7 @@
 'use client';
 
 import { track } from '@/lib/analytics/analytics';
-import { type ReactNode, useMemo, useRef } from 'react';
+import { type ReactNode, useMemo } from 'react';
 import * as d3 from 'd3';
 
 import { getHardwareConfig, getModelSortIndex } from '@/lib/catalog/constants';
@@ -10,7 +10,7 @@ import { D3Chart, type LayerConfig } from '@/lib/d3-chart/D3Chart';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { twoRowYAxisLabels } from '@/lib/d3-chart/axis-labels';
 import { computeLeftMargin, measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
-import { chartTooltipDismiss, chartTooltipShellStyle } from '@/lib/d3-chart/tooltip-shell';
+import { chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 
 import { useReliabilityContext } from '@/components/reliability/ReliabilityContext';
 import type { ModelSuccessRateData } from '@/components/reliability/types';
@@ -19,6 +19,7 @@ import { type Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
 import ChartLegend from '@/components/ui/chart-legend';
 import { Button } from '@/components/ui/button';
+import { ChartPointDetails } from '@/components/ui/chart-point-details';
 import { EmptyState } from '@/components/ui/empty-state';
 
 type ChartItem = ModelSuccessRateData & { modelLabel: string };
@@ -27,36 +28,36 @@ const BASE_MARGIN = { top: 24, right: 24, bottom: 40 };
 
 const TOOLTIP_STRINGS = {
   en: {
-    dismiss: 'Click elsewhere to dismiss',
-    successRate: 'Success rate:',
-    successful: 'Successful:',
-    totalRuns: 'Total runs:',
+    successRate: 'success rate',
+    successful: 'successful',
+    totalRuns: 'total runs',
   },
   zh: {
-    dismiss: '点击其他区域关闭',
-    successRate: '成功率：',
-    successful: '成功次数：',
-    totalRuns: '总运行次数：',
+    successRate: '成功率',
+    successful: '成功次数',
+    totalRuns: '总运行次数',
   },
 } as const;
 
+const reliabilityMetrics = (data: ChartItem, locale: Locale) => {
+  const t = TOOLTIP_STRINGS[locale];
+  return [
+    { value: `${data.successRate.toFixed(2)}%`, label: t.successRate },
+    { value: String(data.n_success), label: t.successful },
+    { value: String(data.total), label: t.totalRuns },
+  ];
+};
+
 const generateReliabilityTooltipContent = (
   data: ChartItem,
-  isPinned: boolean,
+  color: string,
   locale: Locale = 'en',
-): string => {
-  const t = TOOLTIP_STRINGS[locale];
-  const modelLabel = getHardwareConfig(data.model).label;
-  return `
-    <div style="${chartTooltipShellStyle({ pinned: isPinned })}">
-      ${isPinned ? chartTooltipDismiss(t.dismiss) : ''}
-      <div style="color: var(--foreground); font-size: 12px; font-weight: 600; margin-bottom: 8px;">${modelLabel}</div>
-      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${t.successRate}</strong> ${data.successRate.toFixed(2)}%</div>
-      <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${t.successful}</strong> ${data.n_success}</div>
-      <div style="color: var(--muted-foreground); font-size: 11px;"><strong>${t.totalRuns}</strong> ${data.total}</div>
-    </div>
-  `;
-};
+): string =>
+  chartHoverCard({
+    title: getHardwareConfig(data.model).label,
+    color,
+    metrics: reliabilityMetrics(data, locale),
+  });
 
 function positionLabelPairs(
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
@@ -110,8 +111,7 @@ const RELIABILITY_STRINGS = {
     loadError: 'Failed to load reliability data',
     retry: 'Retry',
     noData: 'No reliability data available for this date range',
-    instructions:
-      'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset · Hover for details',
+    instructions: 'Shift+Scroll to zoom horizontally · Drag to pan · Double-click to reset',
     runCount: (success: number, total: number) => `${success}/${total} runs`,
   },
   zh: {
@@ -122,13 +122,18 @@ const RELIABILITY_STRINGS = {
     loadError: '可靠性数据加载失败',
     retry: '重试',
     noData: '所选时间范围内暂无可靠性数据',
-    instructions: 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置 · 悬停查看详情',
+    instructions: 'Shift+滚轮横向缩放 · 拖动平移 · 双击重置',
     runCount: (success: number, total: number) => `${success}/${total} 次运行`,
   },
 } as const;
 
-export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode }) {
-  const hoveredBarXRef = useRef(0);
+export default function ReliabilityBarChartD3({
+  caption,
+  footer,
+}: {
+  caption?: ReactNode;
+  footer?: ReactNode;
+}) {
   const {
     loading,
     error,
@@ -259,9 +264,23 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
   const tooltipConfig = useMemo(
     () => ({
       rulerType: 'vertical' as const,
-      content: (datum: ChartItem, isPinned: boolean) =>
-        generateReliabilityTooltipContent(datum, isPinned, locale),
-      getRulerX: () => hoveredBarXRef.current,
+      content: (datum: ChartItem) =>
+        generateReliabilityTooltipContent(datum, getCssColor(resolveColor(datum.model)), locale),
+      details: (datum: ChartItem, _isOverlay: boolean, close: () => void) => (
+        <ChartPointDetails
+          title={getHardwareConfig(datum.model).label}
+          color={getCssColor(resolveColor(datum.model))}
+          metrics={reliabilityMetrics(datum, locale)}
+          onClose={close}
+        />
+      ),
+      getRulerX: (
+        datum: ChartItem,
+        scale:
+          | d3.ScaleBand<string>
+          | d3.ScaleLinear<number, number>
+          | d3.ScaleLogarithmic<number, number>,
+      ) => (scale as d3.ScaleLinear<number, number>)(datum.successRate),
       getRulerY: (
         datum: ChartItem,
         scale: d3.ScaleLinear<number, number> | d3.ScaleLogarithmic<number, number>,
@@ -270,7 +289,6 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
         return (bandScale(datum.modelLabel) ?? 0) + bandScale.bandwidth() / 2;
       },
       onHoverStart: (selection: d3.Selection<SVGRectElement, ChartItem, SVGGElement, unknown>) => {
-        hoveredBarXRef.current = Number.parseFloat(selection.attr('width') || '0');
         selection.attr('stroke', 'var(--foreground)').attr('stroke-width', 1.5);
       },
       onHoverEnd: (selection: d3.Selection<SVGRectElement, ChartItem, SVGGElement, unknown>) => {
@@ -278,7 +296,7 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
       },
       attachToLayer: 0,
     }),
-    [locale],
+    [locale, getCssColor, resolveColor],
   );
 
   const dynamicHeight = useMemo(() => {
@@ -420,6 +438,7 @@ export default function ReliabilityBarChartD3({ caption }: { caption?: ReactNode
         grabCursor
         clipContent={false}
         caption={caption}
+        footer={footer}
         noDataOverlay={emptyOverlay}
         instructions={legendT.instructions}
         xScale={xScaleConfig}

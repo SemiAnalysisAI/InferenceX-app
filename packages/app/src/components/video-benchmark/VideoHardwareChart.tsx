@@ -1,11 +1,14 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { curveLinear, type Selection } from 'd3';
+import { ChartPointDetails } from '@/components/ui/chart-point-details';
+import { EmptyState } from '@/components/ui/empty-state';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
+import { axisLabelUnit, chartHoverCard } from '@/lib/d3-chart/tooltip-shell';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 import { useLocale } from '@/lib/i18n/use-locale';
-import { escapeHtml } from '@/lib/shared/utils';
 import { zeroAnchoredDomain } from './chart-domain';
 import { layoutLabel } from './deployment';
 import { formatMetric, metricLabel, type VideoPoint } from './metrics';
@@ -23,13 +26,14 @@ const STRINGS = {
     multi:
       "Solid lines join each hardware's Pareto-optimal deployments (GPUs per video and model split); faded points are dominated deployments.",
     multiOptimal:
-      "Solid lines join each hardware's Pareto-optimal deployments (GPUs per video and model split); dominated deployments are hidden. Turn off Optimal Only to show them.",
-    controls:
-      'Shift+scroll to zoom; drag to pan; double-click to reset. Click a point to pin its details.',
+      "Solid lines join each hardware's Pareto-optimal deployments (GPUs per video and model split); dominated deployments are hidden. Turn off Optimal only to show them.",
+    controls: 'Shift+Scroll to zoom · Drag to pan · Double-click to reset',
     deployment: 'Deployment',
-    n: 'valid samples',
-    run: 'run',
-    noData: 'No hardware has both selected metrics for this configuration.',
+    n: 'Valid samples',
+    run: 'Run',
+    runtime: 'Runtime',
+    runLink: 'GitHub Actions run',
+    noData: 'No hardware has both selected metrics for this configuration',
   },
   zh: {
     single: (layouts: string) =>
@@ -38,11 +42,13 @@ const STRINGS = {
       '实线连接同一硬件的 Pareto 最优部署（每条视频占用的 GPU 数及模型切分方式）；淡色点为被支配的部署。',
     multiOptimal:
       '实线连接同一硬件的 Pareto 最优部署（每条视频占用的 GPU 数及模型切分方式）；被支配的部署已隐藏，关闭“仅最优”可显示。',
-    controls: 'Shift+滚轮缩放，拖动平移，双击重置。点击数据点可固定详情。',
+    controls: 'Shift+滚轮缩放 · 拖动平移 · 双击重置',
     deployment: '部署',
     n: '有效样本',
     run: '运行',
-    noData: '当前配置下没有硬件同时具备所选的两个指标。',
+    runtime: 'Runtime',
+    runLink: 'GitHub Actions 运行记录',
+    noData: '当前配置下没有硬件同时具备所选的两个指标',
   },
 };
 
@@ -54,12 +60,16 @@ export default function VideoHardwareChart({
   colorFor,
   hidden,
   onSelect,
+  legend,
+  footer,
 }: {
   points: VideoPoint[];
   state: VideoDashboardState;
   colorFor: (hardwareKey: string) => string;
   hidden: ReadonlySet<string>;
   onSelect?: (point: VideoPoint) => void;
+  legend?: ReactNode;
+  footer?: ReactNode;
 }) {
   const locale = useLocale();
   const s = STRINGS[locale];
@@ -77,7 +87,10 @@ export default function VideoHardwareChart({
   const layouts = [...new Set(plotted.map((p) => layoutLabel(p, locale)))].join(
     locale === 'zh' ? '；' : '; ',
   );
-  const colon = locale === 'zh' ? '：' : ': ';
+  const metrics = (p: PlottedVideoPoint, unitsOnly: boolean) => [
+    { value: formatMetric(p.y, state.y), label: unitsOnly ? axisLabelUnit(yLabel) : yLabel },
+    { value: formatMetric(p.x, state.x), label: unitsOnly ? axisLabelUnit(xLabel) : xLabel },
+  ];
   const pointLabel = (p: PlottedVideoPoint) =>
     multiLayout ? `${p.label} · ${layoutLabel(p, locale)}` : p.label;
   const drawLabels = (
@@ -163,7 +176,38 @@ export default function VideoHardwareChart({
       tooltip={{
         rulerType: 'none',
         content: (p) =>
-          `<div class="p-3 text-sm"><strong>${escapeHtml(p.label)}</strong><br/>${s.deployment}${colon}${escapeHtml(layoutLabel(p, locale))}<br/>${escapeHtml(xLabel)}${colon}${formatMetric(p.x, state.x)}<br/>${escapeHtml(yLabel)}${colon}${formatMetric(p.y, state.y)}<br/>${s.n}${colon}${p.samples} · ${s.run} #${escapeHtml(p.runId)}</div>`,
+          chartHoverCard({
+            title: p.label,
+            subtitle: layoutLabel(p, locale),
+            color: p.color,
+            metrics: metrics(p, true),
+            summary: `${s.n} ${p.samples} · ${s.run} #${p.runId}`,
+          }),
+        details: (p, _isOverlay, close) => (
+          <ChartPointDetails
+            title={p.label}
+            subtitle={layoutLabel(p, locale)}
+            color={p.color}
+            metrics={metrics(p, false)}
+            rows={[
+              { label: s.deployment, value: layoutLabel(p, locale) },
+              { label: s.n, value: String(p.samples) },
+              { label: s.run, value: `#${p.runId}` },
+              { label: s.runtime, value: p.runtime, wide: true },
+            ]}
+            links={[
+              {
+                action: 'run',
+                label: s.runLink,
+                href: `https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${p.runId}`,
+                external: true,
+              },
+            ]}
+            onClose={close}
+          />
+        ),
+        getRulerX: (p, x) => (x as ContinuousScale)(p.x),
+        getRulerY: (p, y) => y(p.y),
         onPointClick: onSelect,
       }}
       zoom={{
@@ -185,6 +229,8 @@ export default function VideoHardwareChart({
           {multiLayout ? (state.optimal ? s.multiOptimal : s.multi) : s.single(layouts || '—')}
         </p>
       }
+      legendElement={legend}
+      footer={footer}
     />
   );
 }

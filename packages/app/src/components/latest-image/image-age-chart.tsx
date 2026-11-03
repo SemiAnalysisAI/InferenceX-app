@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Heading } from '@/components/ui/heading';
+import { ResultContext } from '@/components/ui/result-context';
 import { useImageAgeHistory } from '@/hooks/api/use-image-age-history';
 import { useResponsiveChartDimensions } from '@/hooks/useResponsiveChartDimensions';
 import { track } from '@/lib/analytics/analytics';
@@ -194,16 +195,27 @@ export function ImageAgeChart({
                   />
                 )}
               </svg>
-              <p className="min-h-5 text-sm tabular-nums" data-testid="image-age-readout">
-                {active
-                  ? `${active.date} · P90 ${dayLabel(active.p90AgeDays)} · ${active.configurationCount} ${zh ? '个配置' : 'configurations'}`
-                  : ''}
-              </p>
-              <p className="mt-2 text-xs text-muted-foreground">
-                {zh
-                  ? '移动指针或聚焦图表后按左右方向键查看每日数值'
-                  : 'Hover, or focus the chart and use the arrow keys to inspect each day'}
-              </p>
+              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                <p
+                  className="min-h-5 text-xs whitespace-nowrap text-muted-foreground tabular-nums"
+                  data-testid="image-age-readout"
+                >
+                  {active && (
+                    <>
+                      {active.date} ·{' '}
+                      <span className="text-base font-semibold text-foreground">
+                        P90 {dayLabel(active.p90AgeDays)}
+                      </span>{' '}
+                      · {active.configurationCount} {zh ? '个配置' : 'configurations'}
+                    </>
+                  )}
+                </p>
+                <p className="no-export ml-auto text-right text-2xs leading-4 text-muted-foreground">
+                  {zh
+                    ? '移动指针或聚焦图表后按左右方向键查看每日数值'
+                    : 'Hover, or focus the chart and use the arrow keys to inspect each day'}
+                </p>
+              </div>
             </>
           ) : (
             <EmptyState bare className="py-16">
@@ -218,6 +230,14 @@ export function ImageAgeChart({
             ? '历史曲线只统计下表中的配置，按每日已知的最近成功提交重建。无新提交时年龄继续增加；新配置从首次提交当天起计入。'
             : 'History tracks the configurations in the table below, using the latest successful submission known on each day. Ages increase on days without submissions; new configurations enter on their first submission date.'}
         </p>
+        <div className="mt-3">
+          <ResultContext
+            locale={locale}
+            layout="footer"
+            date={summary.date}
+            source="SemiAnalysis InferenceX™"
+          />
+        </div>
       </Card>
     </section>
   );
