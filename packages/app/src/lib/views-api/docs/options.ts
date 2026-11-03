@@ -125,6 +125,14 @@ const responseExample = {
   params: { format: 'json' },
   models: [
     {
+      name: 'Kimi-K3',
+      dbKeys: ['kimik3'],
+      category: 'deprecated',
+      releaseDate: '2026-07-27',
+      compareSlug: 'kimi-k3',
+      deprecatedSequences: ['1k/1k', '1k/8k'],
+    },
+    {
       name: 'DeepSeek-V4-Pro',
       dbKeys: ['dsv4'],
       category: 'deprecated',

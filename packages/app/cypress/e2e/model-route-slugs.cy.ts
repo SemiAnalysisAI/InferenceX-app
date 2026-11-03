@@ -134,14 +134,14 @@ describe('GLM-5.3-Flash registration without published observations', () => {
       expect(sourceAvailability.length, 'nonempty source availability fixture').to.be.greaterThan(
         0,
       );
-      const kimiAvailability = sourceAvailability.map((row) => ({ ...row, model: 'kimik3' }));
-      expect([...new Set(kimiAvailability.map((row) => row.model))]).to.deep.equal(['kimik3']);
-      cy.intercept('GET', '/api/v1/availability*', { body: kimiAvailability });
+      const flashAvailability = sourceAvailability.map((row) => ({ ...row, model: 'dsv4flash' }));
+      expect([...new Set(flashAvailability.map((row) => row.model))]).to.deep.equal(['dsv4flash']);
+      cy.intercept('GET', '/api/v1/availability*', { body: flashAvailability });
       cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
         expect(
           new URL(request.url).searchParams.get('model'),
           'first and later locked requests',
-        ).to.eq('Kimi-K3');
+        ).to.eq('DeepSeek-V4.1-Flash');
         request.reply({ body: [] });
       });
       const locked = {
@@ -151,13 +151,13 @@ describe('GLM-5.3-Flash registration without published observations', () => {
         },
       };
       cy.visit(`${locale}/inference/glm-5-3-flash`, locked);
-      cy.location('pathname').should('eq', `${locale}/inference/kimi-k3`);
-      cy.get('[data-testid="model-selector"]').should('contain.text', 'Kimi K3');
+      cy.location('pathname').should('eq', `${locale}/inference/deepseek-v41-flash`);
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek V4.1 Flash');
       cy.get('[data-testid="model-selector"]').click();
       cy.contains('[role="option"]', 'GLM 5.3 Flash').should('not.exist');
       cy.get('body').type('{esc}');
       cy.visit(`${locale}/inference?g_model=GLM-5.3-Flash`, locked);
-      cy.location('pathname').should('eq', `${locale}/inference/kimi-k3`);
+      cy.location('pathname').should('eq', `${locale}/inference/deepseek-v41-flash`);
       cy.get('[data-testid="model-selector"]').should('not.contain.text', 'GLM 5.3 Flash');
     });
   }
@@ -176,27 +176,27 @@ describe('Per-model dashboard routes', () => {
       cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek V4 Pro');
     });
 
-    it(`renders Kimi K3 chart data from bare ${locale}/inference`, () => {
+    it(`renders DeepSeek V4.1 Flash chart data from bare ${locale}/inference`, () => {
       cy.intercept('GET', '/api/v1/availability', {
         body: modelSelectionAvailability
           .filter((row) => row.model === 'dsv4')
-          .map((row) => ({ ...row, model: 'kimik3' })),
+          .map((row) => ({ ...row, model: 'dsv4flash' })),
       });
       cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
-        expect(new URL(request.url).searchParams.get('model')).to.eq('Kimi-K3');
+        expect(new URL(request.url).searchParams.get('model')).to.eq('DeepSeek-V4.1-Flash');
         request.reply({
           body: modelSelectionBenchmarks
             .filter((row) => row.model === 'dsv4')
-            .map((row) => ({ ...row, model: 'kimik3' })),
+            .map((row) => ({ ...row, model: 'dsv4flash' })),
         });
       });
       cy.visit(`${locale}/inference`, visitOptions);
-      cy.location('pathname').should('eq', `${locale}/inference/kimi-k3`);
-      cy.get('[data-testid="model-selector"]').should('contain.text', 'Kimi K3');
+      cy.location('pathname').should('eq', `${locale}/inference/deepseek-v41-flash`);
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek V4.1 Flash');
       cy.get('[data-testid="scatter-graph"] svg .dot-group').should('have.length.greaterThan', 0);
     });
 
-    it(`opens bare ${locale}/inference on Kimi K3 without dropping shared filters`, () => {
+    it(`opens bare ${locale}/inference on DeepSeek V4.1 Flash without dropping shared filters`, () => {
       const query = '?i_seq=agentic-traces&i_prec=fp4&utm_source=default-model-test';
       cy.request({ url: `${locale}/inference${query}`, followRedirect: false }).then((response) => {
         expect(response.status).to.eq(307);
@@ -204,13 +204,16 @@ describe('Per-model dashboard routes', () => {
           String(response.headers.location),
           String(Cypress.config('baseUrl')),
         );
-        expect(destination.pathname).to.eq(`${locale}/inference/kimi-k3`);
+        expect(destination.pathname).to.eq(`${locale}/inference/deepseek-v41-flash`);
         expect(destination.search).to.eq(query);
       });
       cy.visit(`${locale}/inference${query}`, visitOptions);
-      cy.location('pathname').should('eq', `${locale}/inference/kimi-k3`);
-      cy.get('[data-testid="model-selector"]').should('contain.text', 'Kimi K3');
-      cy.get('[data-testid="inference-page-heading"]').should('contain.text', 'Kimi K3');
+      cy.location('pathname').should('eq', `${locale}/inference/deepseek-v41-flash`);
+      cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek V4.1 Flash');
+      cy.get('[data-testid="inference-page-heading"]').should(
+        'contain.text',
+        'DeepSeek V4.1 Flash',
+      );
     });
 
     it(`retains the current model when navigating from ${locale}/evaluation`, () => {

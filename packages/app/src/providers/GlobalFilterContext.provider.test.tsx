@@ -421,7 +421,7 @@ describe('GlobalFilterProvider context isolation', () => {
       mocks.featureGateUnlocked = false;
       rerenderProvider?.();
     });
-    expect(selectionSnapshot?.selectedModel).toBe(Model.Kimi_K3);
+    expect(selectionSnapshot?.selectedModel).toBe(Model.DeepSeek_V4_1_Flash);
     expect(availabilitySnapshot?.availableModels).not.toContain(Model.GLM_5_3_Flash);
   });
 

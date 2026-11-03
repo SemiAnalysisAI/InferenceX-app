@@ -6,14 +6,14 @@ these routes become available only after the corresponding app change deploys.
 Do not assume an installed skill proves server availability.
 
 The bare `/inference` and `/zh/inference` entry routes temporarily redirect to
-their `/kimi-k3` pages unless `g_model` explicitly selects a model. Other query
+their `/deepseek-v41-flash` pages unless `g_model` explicitly selects a model. Other query
 parameters are preserved. This is a navigation default, not an API default:
-`/api/v1/views/inference` still requires `model`; pass `model=Kimi-K3&sequence=agentic-traces` to match
+`/api/v1/views/inference` still requires `model`; pass `model=DeepSeek-V4.1-Flash&sequence=agentic-traces` to match
 the landing page. Existing model-specific links and historical results remain available.
 
 `/inference` 和 `/zh/inference` 在未通过 `g_model` 指定模型时，会临时重定向到
-各自的 `/kimi-k3` 页面，并保留其他查询参数。这只改变页面入口；
-`/api/v1/views/inference` 仍要求显式传入 `model`，使用 `model=Kimi-K3&sequence=agentic-traces`
+各自的 `/deepseek-v41-flash` 页面，并保留其他查询参数。这只改变页面入口；
+`/api/v1/views/inference` 仍要求显式传入 `model`，使用 `model=DeepSeek-V4.1-Flash&sequence=agentic-traces`
 可查询入口页面对应的模型。已有模型链接和历史结果不受影响。
 
 Inference places Scenario beside Cost Tier and TCO Basis below the plot on desktop
@@ -128,11 +128,12 @@ Qwen3.5 workload-retirement coverage:
    for static model, hardware, sequence and metric registries; use each specialized
    view's `options`, `configurations`, `workloads`, or raw run-list operation for
    data-dependent choices.
-   MiniMax M3 and DeepSeek V4 Pro have `category=deprecated` in `options.models`.
+   Kimi K3, MiniMax M3 and DeepSeek V4 Pro have `category=deprecated` in `options.models`.
    They remain selectable through explicit model parameters and overview
    `modelScope=all`. MiniMax M3.1 Flash and DeepSeek V4.1 Flash remain in the default
    model group. Historical data and unofficial-run overlays remain available;
-   current-image views exclude both retired models.
+   current-image views exclude these retired models. Kimi K3's existing links,
+   profit-estimator defaults, model metadata and raw API identities remain unchanged.
    Qwen3.5 remains active for AgentX; only its 8K/1K workload is retired.
    Read `options.models[].deprecatedSequences` for each model's deprecated
    sequence keys, including global retirements. The global
@@ -142,7 +143,7 @@ Qwen3.5 workload-retirement coverage:
    overlays, but is excluded from current-image views. The raw benchmark and
    latest-image APIs keep historical rows; no data is deleted.
    Preserve `options.models` order within each category when rendering model
-   selectors. The default group is Kimi K3, DeepSeek V4.1 Flash, GLM5.2/GLM5.3,
+   selectors. The default group is DeepSeek V4.1 Flash, GLM5.2/GLM5.3,
    MiniMax M3.1 Flash, Muse Spark Open, Qwen3.5, then
    Qwen3.8 Flash Next. This presentation order does not change `defaults.model`
    or the overview's model order.

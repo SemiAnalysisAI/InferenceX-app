@@ -1320,7 +1320,6 @@ describe('assembleOverviewPageData over the overview-rows fixture', () => {
     expect(page.models.map((m) => `${m.model}/${m.scenario}`)).toEqual([
       `${Model.Muse_Spark_Open}/agentx`,
       `${Model.DeepSeek_V4_1_Flash}/agentx`,
-      `${Model.Kimi_K3}/agentx`,
       `${Model.MiniMax_M3_1_Flash}/agentx`,
       `${Model.GLM_5_2}/agentx`,
       `${Model.Qwen3_5}/agentx`,
@@ -1450,6 +1449,7 @@ describe('overview model scope', () => {
     expect(page.modelScope).toBe('default');
     expect(page.models.some((m) => m.model === Model.MiniMax_M3)).toBe(false);
     expect(page.models.some((m) => m.model === Model.DeepSeek_V4_Pro)).toBe(false);
+    expect(page.models.some((m) => m.model === Model.Kimi_K3)).toBe(false);
     expect(page.models.some((m) => m.model === Model.MiniMax_M3_1_Flash)).toBe(true);
   });
 
@@ -1460,9 +1460,11 @@ describe('overview model scope', () => {
       ...DEFAULT_MODELS,
       ...MAINTENANCE_MODELS,
       Model.DeepSeek_V4_Pro,
+      Model.Kimi_K3,
       Model.MiniMax_M3,
       ...[...DEPRECATED_MODELS].filter(
-        (model) => model !== Model.MiniMax_M3 && model !== Model.DeepSeek_V4_Pro,
+        (model) =>
+          model !== Model.MiniMax_M3 && model !== Model.DeepSeek_V4_Pro && model !== Model.Kimi_K3,
       ),
     ]);
     expect(page.modelScope).toBe('all');
@@ -1476,6 +1478,7 @@ describe('overview model scope', () => {
     expect(categoryOf(Model.GLM_5)).toBe('deprecated');
     expect(categoryOf(Model.GptOss)).toBe('deprecated');
     expect(categoryOf(Model.MiniMax_M3)).toBe('deprecated');
+    expect(categoryOf(Model.Kimi_K3)).toBe('deprecated');
   });
 
   it('forwards the model scope through the historical assembler', () => {
@@ -1486,9 +1489,11 @@ describe('overview model scope', () => {
       ...DEFAULT_MODELS,
       ...MAINTENANCE_MODELS,
       Model.DeepSeek_V4_Pro,
+      Model.Kimi_K3,
       Model.MiniMax_M3,
       ...[...DEPRECATED_MODELS].filter(
-        (model) => model !== Model.MiniMax_M3 && model !== Model.DeepSeek_V4_Pro,
+        (model) =>
+          model !== Model.MiniMax_M3 && model !== Model.DeepSeek_V4_Pro && model !== Model.Kimi_K3,
       ),
     ]);
     expect(page.modelScope).toBe('all');
