@@ -116,8 +116,10 @@ function namespaceExportIds(target: SVGSVGElement) {
     [...target.querySelectorAll('[id]')].find((other) => other.id === `${node.id}-png`)?.remove();
     node.id = `${node.id}-png`;
   }
+  if (ids.size === 0) return;
   for (const node of target.querySelectorAll('*')) {
     for (const attribute of node.attributes) {
+      if (!attribute.value.includes('#')) continue;
       let value = attribute.value;
       for (const [id, replacement] of ids) {
         value = value.replaceAll(`url(#${id})`, `url(#${replacement})`);

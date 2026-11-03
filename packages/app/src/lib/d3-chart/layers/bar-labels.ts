@@ -1,5 +1,6 @@
 import type * as d3 from 'd3';
 
+import { writeAttrs, writeText } from '../chart-update';
 import type { ContinuousScale } from '../types';
 
 export interface BarLabelConfig<T> {
@@ -23,29 +24,29 @@ export function renderBarLabels<T>(
 
   selection.exit().remove();
 
-  entered
-    .merge(selection)
-    .attr('x', (d) => (xScale(config.getX(d)) || 0) + xScale.bandwidth() / 2)
-    .attr('y', (d) => {
+  const labels = writeAttrs(entered.merge(selection), {
+    x: (d) => (xScale(config.getX(d)) || 0) + xScale.bandwidth() / 2,
+    y: (d) => {
       const barHeight = height - yScale(config.getY(d));
       return yScale(config.getY(d)) + barHeight / 2;
-    })
-    .attr('text-anchor', 'middle')
-    .attr('dominant-baseline', 'central')
-    .attr('transform', (d) => {
+    },
+    'text-anchor': 'middle',
+    'dominant-baseline': 'central',
+    transform: (d) => {
       const cx = (xScale(config.getX(d)) || 0) + xScale.bandwidth() / 2;
       const barHeight = height - yScale(config.getY(d));
       const cy = yScale(config.getY(d)) + barHeight / 2;
       return `rotate(-90, ${cx}, ${cy})`;
-    })
-    .attr('fill', config.foreground)
-    .attr('font-size', (d) => {
+    },
+    fill: config.foreground,
+    'font-size': (d) => {
       const barHeight = height - yScale(config.getY(d));
       return `${Math.min(Math.max(barHeight * 0.3, 8), 14)}px`;
-    })
-    .attr('font-weight', '600')
-    .attr('pointer-events', 'none')
-    .text((d) => config.getLabel(d));
+    },
+    'font-weight': '600',
+    'pointer-events': 'none',
+  });
+  writeText(labels, (d) => config.getLabel(d));
 }
 
 export function updateBarLabelsOnZoom<T>(

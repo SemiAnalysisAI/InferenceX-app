@@ -27,7 +27,14 @@ import {
   updateLayerForMetric,
   updateLayerPositionOnZoom,
 } from './layer-renderer';
-import type { AxisConfig, D3ChartProps, LayerConfig, RenderContext, ZoomContext } from './types';
+import type {
+  AxisConfig,
+  D3ChartProps,
+  LayerConfig,
+  RenderContext,
+  ZoomConfig,
+  ZoomContext,
+} from './types';
 
 interface RendererDeps {
   svgRef: React.RefObject<SVGSVGElement | null>;
@@ -82,6 +89,41 @@ function resolveTickValues(
 
 function gridVisibility(xAxis?: AxisConfig, yAxis?: AxisConfig): GridVisibility {
   return { x: xAxis?.grid ?? true, y: yAxis?.grid ?? true };
+}
+
+const ZOOM_REWRITES_LAYER: Record<LayerConfig['type'], boolean> = {
+  bar: true,
+  horizontalBar: true,
+  point: true,
+  errorBar: true,
+  line: true,
+  barLabel: true,
+  roofline: false,
+  scatter: false,
+  radar: false,
+  custom: false,
+};
+
+function rescaleForZoom(
+  xScale: BuiltScale,
+  yScale: BuiltScale,
+  zoomConfig: ZoomConfig | undefined,
+  transform: d3.ZoomTransform,
+): { xScale: BuiltScale; yScale: BuiltScale } {
+  const axes = zoomConfig?.axes ?? 'both';
+  let zoomedX = xScale;
+  let zoomedY = yScale;
+  if ((axes === 'x' || axes === 'both') && !isBandScale(xScale)) {
+    zoomedX = zoomConfig?.rescaleX
+      ? zoomConfig.rescaleX(xScale as ContinuousScale, transform)
+      : transform.rescaleX(xScale as ContinuousScale);
+  }
+  if ((axes === 'y' || axes === 'both') && !isBandScale(yScale)) {
+    zoomedY = zoomConfig?.rescaleY
+      ? zoomConfig.rescaleY(yScale as ContinuousScale, transform)
+      : transform.rescaleY(yScale as ContinuousScale);
+  }
+  return { xScale: zoomedX, yScale: zoomedY };
 }
 
 export interface ZoomFrameBatcher {
@@ -410,13 +452,21 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
         : buildScale({ type: 'linear', domain: [0, 1] }, [height, 0]);
       scalesRef.current = { xScale, yScale };
 
+      const initialTransform = zoomTransformRef.current;
+      const restoresZoom =
+        zoomConfig?.enabled &&
+        (initialTransform.k !== 1 || initialTransform.x !== 0 || initialTransform.y !== 0);
+      const shown = restoresZoom
+        ? rescaleForZoom(xScale, yScale, zoomConfig, initialTransform)
+        : { xScale, yScale };
+
       if (hasScales) {
-        const xTickValues = resolveTickValues(xAxisConfig?.tickValues, xScale as AnyScale);
-        const yTickValues = resolveTickValues(yAxisConfig?.tickValues, yScale as AnyScale);
+        const xTickValues = resolveTickValues(xAxisConfig?.tickValues, shown.xScale as AnyScale);
+        const yTickValues = resolveTickValues(yAxisConfig?.tickValues, shown.yScale as AnyScale);
         renderGrid(
           layout,
-          xScale as AnyScale,
-          yScale as any,
+          shown.xScale as AnyScale,
+          shown.yScale as any,
           yAxisConfig?.tickCount ?? 5,
           0,
           xTickValues,
@@ -424,7 +474,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
           'both',
           gridVisibility(xAxisConfig, yAxisConfig),
         );
-        renderAxes(layout, xScale as AnyScale, yScale as any, {
+        renderAxes(layout, shown.xScale as AnyScale, shown.yScale as any, {
           xTickFormat: xAxisConfig?.tickFormat,
           yTickFormat: yAxisConfig?.tickFormat,
           xTickCount: xAxisConfig?.tickCount,
@@ -456,16 +506,26 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
 
       const layerSelections: (d3.Selection<any, any, any, any> | null)[] = [];
       for (const layer of layers) {
-        const sel = renderLayer(layer, renderGroup, xScale, yScale, layout, ctx);
+        const layerScales = ZOOM_REWRITES_LAYER[layer.type] ? shown : { xScale, yScale };
+        const sel = renderLayer(
+          layer,
+          renderGroup,
+          layerScales.xScale,
+          layerScales.yScale,
+          layout,
+          ctx,
+        );
         layerSelections.push(sel);
       }
       customLayerDisplayIdentitiesRef.current = customLayerDisplayIdentities(layers);
       lastDisplayIdentityRef.current = displayIdentity;
 
+      const getDataX = tooltipConfig?.proximityHover ? tooltipConfig.getDataX : undefined;
+      if (getDataX) renderGroup.selectAll('.proximity-overlay').remove();
       raiseInOrder(renderGroup, RAISE_ORDER);
 
       if (tooltipConfig) {
-        if (tooltipConfig.proximityHover && tooltipConfig.getDataX) {
+        if (getDataX) {
           const rulers = createRulers(
             renderGroup,
             tooltipConfig.rulerType,
@@ -475,11 +535,8 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
           );
           const { rulerGroup, verticalRuler, horizontalRuler } = rulers;
           const containerEl = svgRef.current!.parentElement as HTMLDivElement;
-          const getDataX = tooltipConfig.getDataX;
           const sortedData = [...data].toSorted((a, b) => getDataX(a) - getDataX(b));
           const bisector = d3.bisector<T, number>((d) => getDataX(d)).center;
-
-          renderGroup.selectAll('.proximity-overlay').remove();
 
           renderGroup
             .append('rect')
@@ -647,22 +704,12 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
                 hideTooltipElements(tooltipRef, svgRef);
               }
 
-              let newXScale: BuiltScale = zoomXScale;
-              let newYScale: BuiltScale = zoomYScale;
-              if (currentZoomAxes === 'x' || currentZoomAxes === 'both') {
-                if (currentZoomConfig?.rescaleX && !isBandScale(zoomXScale)) {
-                  newXScale = currentZoomConfig.rescaleX(zoomXScale as ContinuousScale, transform);
-                } else if (!isBandScale(zoomXScale)) {
-                  newXScale = transform.rescaleX(zoomXScale as ContinuousScale);
-                }
-              }
-              if (currentZoomAxes === 'y' || currentZoomAxes === 'both') {
-                if (currentZoomConfig?.rescaleY && !isBandScale(zoomYScale)) {
-                  newYScale = currentZoomConfig.rescaleY(zoomYScale as ContinuousScale, transform);
-                } else if (!isBandScale(zoomYScale)) {
-                  newYScale = transform.rescaleY(zoomYScale as ContinuousScale);
-                }
-              }
+              const { xScale: newXScale, yScale: newYScale } = rescaleForZoom(
+                zoomXScale,
+                zoomYScale,
+                currentZoomConfig,
+                transform,
+              );
 
               const zoomContext: ZoomContext = {
                 ...zoomBaseContext,
