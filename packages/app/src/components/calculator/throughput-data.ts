@@ -149,7 +149,23 @@ function firstTokenSeconds(
 function inputTokenShare(row: ChipBasisRow): number | null {
   // Self-consistent: the rates share the denominator `tput_per_gpu` uses, so the
   // split they imply is the measured one. 1% covers float noise.
-  const measured = measuredInputShare({ ...row, ...row.metrics }, 0.01);
+  const m = row.metrics;
+  const measured = measuredInputShare(
+    {
+      disagg: row.disagg,
+      chip_basis: row.chip_basis,
+      num_prefill_gpu: row.num_prefill_gpu,
+      num_decode_gpu: row.num_decode_gpu,
+      prefill_num_workers: row.prefill_num_workers,
+      decode_num_workers: row.decode_num_workers,
+      isl: row.isl,
+      osl: row.osl,
+      tput_per_gpu: m.tput_per_gpu,
+      input_tput_per_gpu: m.input_tput_per_gpu,
+      output_tput_per_gpu: m.output_tput_per_gpu,
+    },
+    0.01,
+  );
   if (measured !== null) return measured;
 
   const { isl, osl } = row;
@@ -230,7 +246,13 @@ export function buildGpuGroups<M extends GroupMeta>(
     const tput = m.tput_per_gpu ?? 0;
     const outputTput = m.output_tput_per_gpu ?? tput;
     const inputTput = m.input_tput_per_gpu ?? 0;
-    const cacheHitRate = pricingCacheHitRate({ ...m, hw: row.hardware });
+    const cacheHitRate = pricingCacheHitRate({
+      server_gpu_cache_hit_rate: m.server_gpu_cache_hit_rate,
+      server_external_cache_hit_rate: m.server_external_cache_hit_rate,
+      server_cpu_cache_hit_rate: m.server_cpu_cache_hit_rate,
+      theoretical_cache_hit_rate: m.theoretical_cache_hit_rate,
+      hw: row.hardware,
+    });
     const theoreticalRate =
       typeof m.theoretical_cache_hit_rate === 'number' &&
       Number.isFinite(m.theoretical_cache_hit_rate)
