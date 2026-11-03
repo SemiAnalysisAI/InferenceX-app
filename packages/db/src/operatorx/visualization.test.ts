@@ -8,6 +8,7 @@ function row(x: number, precision: ComputePrecision, n = 64): ComparisonCase {
   return {
     key: `${x}-${n}-${precision}`,
     testlist: 'gemm',
+    opType: 'gemm',
     sources: [],
     shape: `${x}×${n}×128`,
     precision,
@@ -16,6 +17,7 @@ function row(x: number, precision: ComputePrecision, n = 64): ComparisonCase {
     dims: { m: x, n, k: 128 },
     flops: 2 * x * n * 128,
     bytes: 2 * (x * 128 + n * 128 + x * n),
+    work: null,
   };
 }
 
@@ -126,6 +128,7 @@ function moeCase(tokens: number, extra: Record<string, unknown> = {}): Compariso
   return {
     key: JSON.stringify(args),
     testlist: 'moe',
+    opType: 'moe',
     sources: [],
     ...labels,
     computePrecision: 'fp8',
@@ -133,6 +136,7 @@ function moeCase(tokens: number, extra: Record<string, unknown> = {}): Compariso
     dims: { tokens },
     flops: 1,
     bytes: 1,
+    work: null,
   };
 }
 

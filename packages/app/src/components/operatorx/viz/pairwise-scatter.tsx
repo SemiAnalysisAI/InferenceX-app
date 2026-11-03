@@ -197,7 +197,7 @@ function PairwiseScatter({ model }: { model: ComparisonModel }) {
 export const pairwiseScatter: VizDefinition = {
   id: 'pairwise-scatter',
   title: 'Head to head',
-  ops: ['gemm', 'moe'],
+  ops: ['gemm', 'moe', 'attention'],
   span: 5,
   Component: PairwiseScatter,
 };

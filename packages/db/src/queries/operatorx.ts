@@ -9,7 +9,11 @@ import {
 } from '../operatorx/bundle';
 import { normalizeBundle } from '../operatorx/normalize';
 import type { Comparison, ComparisonOp } from '../operatorx/compare';
-import { buildRunComparison, OPERATORX_COMPARISON_VERSION } from '../operatorx/comparison-cache';
+import {
+  buildRunComparison,
+  OPERATORX_COMPARISON_OPS,
+  OPERATORX_COMPARISON_VERSION,
+} from '../operatorx/comparison-cache';
 
 const DOCS_INSERT_CHUNK = 20;
 const DOCS_READ_BATCH = 8;
@@ -126,7 +130,7 @@ async function writeRunComparisons(
   revision: string,
 ): Promise<void> {
   dataset.run.revision = revision;
-  for (const op of ['gemm', 'moe'] as const) {
+  for (const op of OPERATORX_COMPARISON_OPS) {
     const comparison = buildRunComparison(op, { runner, dataset });
     await tx`
       INSERT INTO opx_run_comparisons (run_id, op, format_version, comparison)
