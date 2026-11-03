@@ -2,7 +2,6 @@
 
 import { useId } from 'react';
 import { CHART_TYPE } from '@/lib/d3-chart/typography';
-import { paretoFrontier } from './frontier';
 
 export const resultsNumber = (value: number | null | undefined, digits = 2): string =>
   value === null || value === undefined || !Number.isFinite(value)
@@ -256,88 +255,6 @@ export function ResultsLines({
       <text x="588" y="258" textAnchor="end" fill="currentColor" fontSize={CHART_TYPE.axisLabel}>
         {xLabel}
       </text>
-    </svg>
-  );
-}
-
-export function ResultsPareto({
-  series,
-  label,
-  xLabel,
-  yLabel,
-}: {
-  series: ResultSeries[];
-  label: string;
-  xLabel: string;
-  yLabel: string;
-}) {
-  const frontiers = series.flatMap((s) => {
-    const frontier = paretoFrontier(s.points, 'lower', 'higher');
-    const selected = new Set(frontier);
-    return [
-      { ...s, points: frontier },
-      {
-        ...s,
-        key: `${s.key}-dominated`,
-        connect: false,
-        opacity: 0.3,
-        points: s.points.filter((p) => !selected.has(p)),
-      },
-    ];
-  });
-  return <ResultsLines series={frontiers} label={label} xLabel={xLabel} yLabel={yLabel} />;
-}
-
-export function ResultsRatingSchema({
-  labels,
-  label,
-}: {
-  labels: readonly string[];
-  label: string;
-}) {
-  const center = { x: 320, y: 145 },
-    radius = 95;
-  return (
-    <svg viewBox="0 0 640 300" className="mx-auto w-full max-w-2xl" role="img" aria-label={label}>
-      {[0.33, 0.66, 1].map((r) => (
-        <circle
-          key={r}
-          cx={center.x}
-          cy={center.y}
-          r={radius * r}
-          fill="none"
-          stroke="currentColor"
-          opacity=".12"
-          strokeDasharray="4 4"
-        />
-      ))}
-      {labels.map((text, i) => {
-        const angle = -Math.PI / 2 + (i * 2 * Math.PI) / labels.length;
-        const dx = Math.cos(angle),
-          dy = Math.sin(angle);
-        return (
-          <g key={text}>
-            <line
-              x1={center.x}
-              y1={center.y}
-              x2={center.x + radius * dx}
-              y2={center.y + radius * dy}
-              stroke="currentColor"
-              opacity=".2"
-            />
-            <text
-              x={center.x + (radius + 16) * dx}
-              y={center.y + (radius + 16) * dy + 4}
-              textAnchor={dx > 0.1 ? 'start' : dx < -0.1 ? 'end' : 'middle'}
-              fill="currentColor"
-              opacity=".7"
-              fontSize={CHART_TYPE.axisLabel}
-            >
-              {text}
-            </text>
-          </g>
-        );
-      })}
     </svg>
   );
 }
