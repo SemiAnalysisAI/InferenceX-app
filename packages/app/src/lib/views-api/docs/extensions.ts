@@ -490,8 +490,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
   ],
   r_steps: ['Recorded denoising step count.', '记录的去噪步数。'],
   r_gpus: [
-    'Participating GPU count. deploymentCells retains the pre-filter GPU-count series.',
-    '参与计算的 GPU 数。deploymentCells 保留应用此筛选前的数据，供按 GPU 数作图。',
+    'Participating GPU count for cards and tables. deploymentCells and overlayDeploymentCells retain the official and named-run GPU-count series before this filter.',
+    '卡片和表格使用的参与计算 GPU 数。deploymentCells 和 overlayDeploymentCells 分别保留正式结果及指定运行在此筛选前的 GPU 数序列。',
   ],
   r_engine: [
     'Recorded engine name, separate from runtime revision.',
@@ -584,8 +584,8 @@ export function viewParameter(view: ReadonlyView, name: string): ApiParameter {
         ]
       : view === 'video' && (name === 'unofficialrun' || name === 'unofficialruns')
         ? [
-            'Single stored run ID (unofficialrun or canonical unofficialruns alias; multiple IDs and both aliases together return 400) for separate overview overlayCells, whether approved or unapproved. Actual approval is preserved; the selected run is excluded from official cells. Unknown or ineligible runs return no overlay. No publication is triggered.',
-            '单个已存储运行 ID，可用 unofficialrun 或分享链接的 unofficialruns 别名；多个 ID 或同时使用两个别名返回 400。所选运行无论是否已批准，都只放入 overview 中独立的 overlayCells，保留实际批准状态，并从正式结果中排除；未知或未达准入要求的运行不返回叠加结果。该参数不会触发发布。',
+            'Single stored run ID (unofficialrun or canonical unofficialruns alias; multiple IDs and both aliases together return 400) for separate overview overlayCells and overlayDeploymentCells, whether approved or unapproved. Actual approval is preserved; the selected run is excluded from official cells. Unknown or ineligible runs return no overlay. No publication is triggered.',
+            '单个已存储运行 ID，可用 unofficialrun 或分享链接的 unofficialruns 别名；多个 ID 或同时使用两个别名返回 400。所选运行无论是否已批准，都只放入 overview 中独立的 overlayCells 和 overlayDeploymentCells，保留实际批准状态，并从正式结果中排除；未知或未达准入要求的运行不返回叠加结果。该参数不会触发发布。',
           ]
         : view === 'current-inferencex-image' && name === 'sequence'
           ? ([
@@ -720,6 +720,7 @@ const NEW_VIEWS = {
       deploymentCells: objects,
       workloadMix: objects,
       overlayCells: objects,
+      overlayDeploymentCells: objects,
       clipQuality,
       options: object,
       state: object,
@@ -775,8 +776,8 @@ const NEW_VIEWS = {
 } as const;
 
 const RESULTS_OVERVIEW_NOTES = {
-  en: 'view=overview shares resultProjection with the nine-group UI, admits one canonical 20-clip C1 workload with ten valid samples per hardware, and returns measured metrics plus separately labelled participating/allocated cost and modelled profit. Missing allocation remains null. Default points require publication approval. unofficialrun selects only the exact stored run into overlayCells with its actual approval, excluding it from official cells, deployments and workload mix. Approved cohorts retain default preference; named-only workloads require explicit selection or no matching approved cohort. Clearing never promotes unapproved evidence. Dismissal retains a workload selector only if it remains in the approved choices. The overview returns JSON by default; format=csv returns selected official and named cells with source identities, units and both GPU cost bases as a private no-store download. Missing values are empty CSV cells. Missing quality, stage timing, memory and startup evidence stays null. Play/pause, scrub, difference rendering, theme and expand controls are presentation-only; media uses the published-only read path. ',
-  zh: 'view=overview 与九组指标界面共用 resultProjection，只准入同一份计划 20 条视频的 C1 工作负载，各硬件统一至少 10 个有效样本。响应包含实测指标及分别标注的参与/已分配 GPU 成本和估算利润；分配证据缺失时保留 null。默认数据点须有发布批准。unofficialrun 只把指定的已存储运行放入 overlayCells，保留其实际批准状态，并将其排除在正式结果、部署和工作负载构成之外。默认优先选择有已批准结果的工作负载；仅由指定运行提供的工作负载须明确选择，或在没有匹配的已批准结果时作为回退。清除叠加运行后也不会把未批准数据转为正式结果。移除时，工作负载选择仅在已批准选项中仍然有效时保留。overview 默认返回 JSON；format=csv 导出当前筛选的正式及指定运行数据点，包含来源标识、单位和两种 GPU 成本口径。CSV 响应设置 Cache-Control: private, no-store；缺失值以空单元格表示。质量、阶段计时、内存和启动证据缺失时保留 null。播放、拖动、差异显示、主题和展开控件只影响展示；媒体使用只读已发布路径。',
+  en: 'view=overview shares resultProjection with the nine-group UI, admits one canonical 20-clip C1 workload with ten valid samples per hardware, and returns measured metrics plus separately labelled participating/allocated cost and modelled profit. Missing allocation remains null. Default points require publication approval. unofficialrun selects only the exact stored run into overlayCells (selected GPU count) and overlayDeploymentCells (all matching GPU counts) with its actual approval, excluding it from official cells, deployments and workload mix. Approved cohorts retain default preference; named-only workloads require explicit selection or no matching approved cohort. Clearing never promotes unapproved evidence. Dismissal retains a workload selector only if it remains in the approved choices. The overview returns JSON by default; format=csv returns selected official and named cells with source identities, units and both GPU cost bases as a private no-store download. Missing values are empty CSV cells. Missing quality, stage timing, memory and startup evidence stays null. Play/pause, scrub, difference rendering, theme and expand controls are presentation-only; media uses the published-only read path. ',
+  zh: 'view=overview 与九组指标界面共用 resultProjection，只准入同一份计划 20 条视频的 C1 工作负载，各硬件统一至少 10 个有效样本。响应包含实测指标及分别标注的参与/已分配 GPU 成本和估算利润；分配证据缺失时保留 null。默认数据点须有发布批准。unofficialrun 只把指定的已存储运行放入 overlayCells（所选 GPU 数）和 overlayDeploymentCells（所有匹配的 GPU 数），保留其实际批准状态，并将其排除在正式结果、部署和工作负载构成之外。默认优先选择有已批准结果的工作负载；仅由指定运行提供的工作负载须明确选择，或在没有匹配的已批准结果时作为回退。清除叠加运行后也不会把未批准数据转为正式结果。移除时，工作负载选择仅在已批准选项中仍然有效时保留。overview 默认返回 JSON；format=csv 导出当前筛选的正式及指定运行数据点，包含来源标识、单位和两种 GPU 成本口径。CSV 响应设置 Cache-Control: private, no-store；缺失值以空单元格表示。质量、阶段计时、内存和启动证据缺失时保留 null。播放、拖动、差异显示、主题和展开控件只影响展示；媒体使用只读已发布路径。',
 };
 
 export const operations: ApiOperation[] = Object.entries(NEW_VIEWS).map(

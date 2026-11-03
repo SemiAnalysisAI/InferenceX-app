@@ -292,7 +292,7 @@ const values = <T extends string | number>(items: (T | null)[]) => [
 const latest = (input: VideoPoint[]) => {
   const groups = new Map<string, VideoPoint[]>();
   for (const point of input) {
-    const key = JSON.stringify([point.workloadKey, point.results?.engine ?? point.runtime]);
+    const key = JSON.stringify([point.workloadKey, point.results?.engine ?? null]);
     groups.set(key, [...(groups.get(key) ?? []), point]);
   }
   return [...groups.values()].flatMap(latestVideoCells);
@@ -372,14 +372,14 @@ export function resultProjection(
   const cells = deploymentCells.filter(
     (p) => state.gpuCount === null || p.point.participating === state.gpuCount,
   );
-  const overlayCells = latest(
+  const overlayDeploymentCells = latest(
     namedMatches.filter(
-      (p) =>
-        p.workloadKey === workloadKey &&
-        !state.hidden.includes(p.hardwareKey ?? '') &&
-        (state.gpuCount === null || p.participating === state.gpuCount),
+      (p) => p.workloadKey === workloadKey && !state.hidden.includes(p.hardwareKey ?? ''),
     ),
   ).map((p) => resultCell(p, state));
+  const overlayCells = overlayDeploymentCells.filter(
+    (cell) => state.gpuCount === null || cell.point.participating === state.gpuCount,
+  );
   const workloadMix = latest(
     qualified.filter((point) => {
       const m = resultMetadata(point);
@@ -406,6 +406,7 @@ export function resultProjection(
     cells,
     overlayCells,
     deploymentCells,
+    overlayDeploymentCells,
     allCells: deploymentCells,
     workloadMix,
     workloadKey,

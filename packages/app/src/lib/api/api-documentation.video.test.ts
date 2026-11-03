@@ -4,6 +4,18 @@ import { RESULT_CSV_COLUMNS } from '@/components/video-benchmark/results-csv';
 import { toCsv } from '@/lib/views-api/csv';
 
 describe('VideoGenX overview API documentation', () => {
+  it('exposes separate named-run deployment series before the GPU-count filter', () => {
+    const document = buildOpenApiDocument('https://api-docs.test');
+    const schema = Object.values(document.components.schemas).find(
+      (value) => 'properties' in value && value.properties?.clipQuality,
+    )!;
+    expect(schema).toMatchObject({
+      properties: {
+        overlayCells: { type: 'array' },
+        overlayDeploymentCells: { type: 'array' },
+      },
+    });
+  });
   it('documents the overview-only CSV representation and format selector', () => {
     const document = buildOpenApiDocument('https://api-docs.test');
     const operation = (document.paths['/api/v1/views/video'] as Record<string, unknown>).get as {

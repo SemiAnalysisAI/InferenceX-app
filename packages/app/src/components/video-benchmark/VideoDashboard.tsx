@@ -447,6 +447,11 @@ export default function VideoDashboard() {
       const next = parseResultsState(location.search);
       latest.current = next;
       setState(next);
+      const params = new URLSearchParams(location.search);
+      if (
+        ['history-hardware', 'history-concurrency', 'history-query'].some((key) => params.has(key))
+      )
+        setHistoryOpen(true);
     };
     read();
     window.addEventListener('popstate', read);
@@ -528,7 +533,7 @@ export default function VideoDashboard() {
     (option) => option.value === projection.state.workload,
   );
   const cells = [...projection.cells, ...overlayCells];
-  const deploymentCells = [...projection.deploymentCells, ...overlayCells];
+  const deploymentCells = [...projection.deploymentCells, ...projection.overlayDeploymentCells];
   const hidden = useMemo(() => new Set(state.hidden), [state.hidden]);
   const { resolveColor, getCssColor } = useThemeColors({
     highContrast: false,

@@ -177,13 +177,20 @@ export default function VideoHistory() {
     }
   }
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    setHardware(params.get('history-hardware') ?? '');
-    setConcurrency(params.get('history-concurrency') ?? '');
-    setQuery(params.get('history-query') ?? '');
+    const read = () => {
+      const params = new URLSearchParams(location.search);
+      setHardware(params.get('history-hardware') ?? '');
+      setConcurrency(params.get('history-concurrency') ?? '');
+      setQuery(params.get('history-query') ?? '');
+    };
+    read();
+    window.addEventListener('popstate', read);
     const controller = new AbortController();
     void load(1, controller.signal);
-    return () => controller.abort();
+    return () => {
+      window.removeEventListener('popstate', read);
+      controller.abort();
+    };
   }, []);
   const observations = entries.flatMap((entry) =>
     entry.sources.flatMap((source) => source.observations),

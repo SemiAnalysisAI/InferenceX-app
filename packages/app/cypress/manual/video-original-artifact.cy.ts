@@ -124,7 +124,10 @@ describe('original H100 artifact through the local development replay', () => {
         path.startsWith('/zh') ? '未发布' : 'unpublished',
       );
       cy.get('[data-testid="video-results"] section[id]').should(($sections) => {
-        expect([...$sections].map((section) => section.id)).to.deep.equal(RESULT_GROUPS);
+        expect([...$sections].map((section) => section.id)).to.deep.equal([
+          'comparison-clips',
+          ...RESULT_GROUPS,
+        ]);
       });
       cy.get('[data-testid="results-overlay"]').should('contain', run);
       cy.get('[data-testid="results-power-trace"] circle').should('have.length', 1478);

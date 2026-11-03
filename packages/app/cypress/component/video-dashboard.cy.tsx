@@ -172,6 +172,37 @@ describe('VideoGenX results', () => {
     cy.location('search').should('contain', 'other=1').and('not.contain', 'unofficialrun=');
   });
 
+  it('keeps named-run GPU-count chart points when the cards select one GPU count', () => {
+    mount({
+      search: '?unofficialrun=34341996789',
+      editPage: (page) => {
+        const entry = page.entries.find((item) => item.runId === '34341996789')!;
+        entry.approved = false;
+        const source = entry.sources[0];
+        const fourGpu = source.observations.find((observation) => observation.cell === 'c1')!;
+        source.observations.push({
+          ...structuredClone(fourGpu),
+          id: 'two-gpu:c1',
+          participating: 2,
+          allocated: 2,
+        });
+      },
+    });
+    const latencyPoints =
+      '[data-testid="results-latency-series"] [data-hardware="b200-overlay"] > circle';
+    cy.get(latencyPoints).should('have.length', 2);
+    cy.get('[data-testid="results-gpus"]').contains('button', /^2$/).click();
+    costRow('b200').find('td').eq(2).should('have.text', '2');
+    cy.get(latencyPoints).should('have.length', 2);
+    cy.get('[data-testid="results-gpus"]').contains('button', /^4$/).click();
+    costRow('b200').find('td').eq(2).should('have.text', '4');
+    cy.get(latencyPoints).should('have.length', 2);
+    cy.location('search').should('contain', 'r_gpus=4');
+    cy.get('[data-testid="results-hardware-b200"]').uncheck();
+    costRow('b200').should('not.exist');
+    cy.get(latencyPoints).should('not.exist');
+  });
+
   for (const onlyDiagnostic of [false, true]) {
     it(`shows a named unapproved run with ${onlyDiagnostic ? 'no approved cohort' : 'an approved cohort'} and clears it without promotion`, () => {
       mount({
@@ -360,10 +391,13 @@ describe('VideoGenX results', () => {
     cy.get('[role="listbox"] [role="option"]').first().click();
     cy.location('search').should('not.contain', 'r_date=');
   });
-  it('keeps the nine groups in order and admits only the common 20-clip C1 workload', () => {
+  it('keeps the video comparison before the nine groups and admits only the common 20-clip C1 workload', () => {
     mount();
     cy.get('[data-testid="video-results"] section[id]').should(($sections) => {
-      expect([...$sections].map((section) => section.id)).to.deep.equal(RESULT_GROUPS);
+      expect([...$sections].map((section) => section.id)).to.deep.equal([
+        'comparison-clips',
+        ...RESULT_GROUPS,
+      ]);
     });
     costRow('b200').should('contain', '0.15');
     costRow('b200', 'allocated').should('contain', '0.3');
@@ -591,16 +625,17 @@ describe('VideoGenX results', () => {
         expect(rect.right).to.be.at.most(width);
       });
       cy.get('[data-select-option]').last().click();
+      cy.get('[data-testid^="option-help-content-"]').should('not.exist');
       cy.location('search').should('contain', 'r_workload=');
       cy.get('[data-testid="results-workload"]').click('left');
       cy.get('[role="grid"]').should('be.visible');
-      cy.focused().trigger('keydown', { key: 'Escape' });
+      cy.get('[data-slot="select-content"] input').should('have.focus').type('{esc}');
       cy.get('[role="grid"]').should('not.exist');
       cy.get('[data-testid="results-workload"]').should('have.focus');
       cy.get('[data-testid="results-workload"]').click('left');
       cy.get('[role="grid"]').should('be.visible');
-      cy.focused().trigger('keydown', { key: 'ArrowDown' });
-      cy.focused().trigger('keydown', { key: 'Enter' });
+      cy.get('[data-slot="select-content"] input').should('have.focus').type('{downarrow}');
+      cy.focused().should('match', '[data-select-option]').type('{enter}');
       cy.location('search').should('not.contain', 'r_workload=');
       cy.document().then((document) => document.documentElement.classList.add('dark'));
       assertResultsFit();

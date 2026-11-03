@@ -204,6 +204,38 @@ describe('VideoGenX results contract', () => {
     expect(cleared.cells.map((cell) => cell.point.id)).toEqual(['official:c1']);
   });
 
+  it('retains every named-run GPU count for deployment charts while filtering cards and tables', () => {
+    const official = { ...eligible, id: 'official:c1', runId: '100', results: evidence() };
+    const named = [2, 4].map((participating) => ({
+      ...official,
+      id: `named:${participating}g`,
+      runId: '200',
+      hardwareKey: 'b200',
+      approved: false,
+      participating,
+    }));
+    const selection = { ...state(), unofficialRun: '200', gpuCount: 4 };
+    const result = resultProjection([official], selection, named);
+    expect(result.overlayCells.map((cell) => cell.point.id)).toEqual(['named:4g']);
+    expect(result.overlayDeploymentCells).toEqual(
+      resultProjection([official], { ...selection, gpuCount: null }, named).overlayCells,
+    );
+    expect(result.overlayDeploymentCells.map((cell) => cell.point.participating)).toEqual([2, 4]);
+    expect(result.overlayDeploymentCells.every((cell) => cell.overlay)).toBe(true);
+    expect(result.deploymentCells.map((cell) => cell.point.id)).toEqual(['official:c1']);
+    expect(result.workloadMix.map((cell) => cell.point.id)).toEqual(['official:c1']);
+    expect(result.options.gpuCounts.toSorted()).toEqual([2, 4]);
+    for (const change of [
+      { hidden: ['b200'] },
+      { unofficialRun: null },
+      { engine: 'different' },
+      { workload: 'missing' },
+    ])
+      expect(
+        resultProjection([official], { ...selection, ...change }, named).overlayDeploymentCells,
+      ).toEqual([]);
+  });
+
   it('prefers an approved cohort but permits explicit or fallback diagnostic-only selection', () => {
     const identity = JSON.parse(eligible.workloadKey!);
     identity.plan.generation.frame_count = 124;
@@ -292,6 +324,25 @@ describe('VideoGenX results contract', () => {
       participating: null,
       allocated: null,
     });
+  });
+  it.each([
+    ['recorded results without an engine', evidence({ engine: null })],
+    ['legacy results without engine metadata', undefined],
+  ] as const)('keeps only the latest deployment across runtime revisions for %s', (_, results) => {
+    const newest = { ...eligible, id: 'newest:c1', runtime: 'b'.repeat(40), results };
+    const previous = { ...newest, id: 'previous:c1', runtime: 'a'.repeat(40) };
+    const recorded = { ...newest, id: 'recorded:c1', results: evidence({ engine: 'sglang' }) };
+    const projection = resultProjection([newest, previous, recorded], state());
+    expect(projection.cells.map((cell) => cell.point.id)).toEqual(['newest:c1', 'recorded:c1']);
+    expect(projection.workloadMix.map((cell) => cell.point.id)).toEqual([
+      'newest:c1',
+      'recorded:c1',
+    ]);
+    expect(projection.cells[0].metadata.engine).toBeNull();
+    expect(projection.options.engines).toEqual(['sglang']);
+    expect(
+      resultProjection([newest, previous], { ...state(), engine: newest.runtime }).cells,
+    ).toEqual([]);
   });
   it('uses the legacy P50 only when its complete identity explicitly records client delivery timing', () => {
     const old = resultProjection([eligible], state()).cells[0];

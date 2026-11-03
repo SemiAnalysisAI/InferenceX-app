@@ -378,7 +378,10 @@ describe('Video results synchronized clips', () => {
       .and('contain', 'sglang 666666666666')
       .and('contain', 'Receipt')
       .and('not.contain', c1('b200').runId);
-    cy.document().should((doc) => expect(doc.documentElement.scrollWidth).to.equal(390));
+    cy.window().its('innerWidth').should('eq', 390);
+    cy.document().should((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+    });
     pick('Case', 'drum-taps · take 1');
     cy.get(tile).should('contain', '25 dB');
     cy.get(tile).contains('dt', 'wall time').next('dd').should('have.text', '120 s');
@@ -406,7 +409,10 @@ describe('Video results synchronized clips', () => {
           );
         });
       cy.get('[data-testid="video-results-play"]').click();
-      cy.document().should((doc) => expect(doc.documentElement.scrollWidth).to.equal(width));
+      cy.window().its('innerWidth').should('eq', width);
+      cy.document().should((doc) => {
+        expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+      });
       cy.get('[data-testid="video-results-clip"]').should(($tiles) => {
         const lefts = new Set(
           [...$tiles].map((tile) => Math.round(tile.getBoundingClientRect().left)),

@@ -343,6 +343,15 @@ describe('published VideoGenX dashboard projection', () => {
       ),
     );
     expect(named.overlayCells[0].point).toMatchObject({ hardwareKey: 'h100', approved: false });
+    const gpuFilteredResponse = await GET(
+      request(
+        `view=overview&unofficialrun=${point.runId}&r_gpus=${point.participating === 4 ? 8 : 4}`,
+      ),
+    );
+    const gpuFiltered = await gpuFilteredResponse.json();
+    expect(gpuFiltered.overlayCells).toEqual([]);
+    expect(gpuFiltered.overlayDeploymentCells).toEqual(named.overlayDeploymentCells);
+    expect(gpuFiltered.overlayDeploymentCells[0].point.id).toBe(point.id);
     const hiddenResponse = await GET(
       request(`view=overview&unofficialrun=${point.runId}&r_hidden=h100`),
     );
