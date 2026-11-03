@@ -4,10 +4,10 @@ import { useMemo, useState } from 'react';
 import * as d3 from 'd3';
 import { D3ChartCard } from '@/components/ui/d3-chart-card';
 import type { D3ChartProps, LayerConfig, RenderContext } from '@/lib/d3-chart/D3Chart';
+import { chartTooltipShell } from '@/lib/d3-chart/tooltip-shell';
 import { escapeHtml } from '@/lib/shared/utils';
 import { useLocale } from '@/lib/i18n/use-locale';
-import { Card, CardContent } from '@/components/ui/card';
-import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
+import { CHART_COLORS } from '@/components/agentic-workload-explorer/series-colors';
 
 const PALETTE = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)'];
 
@@ -30,9 +30,11 @@ interface StackedBarBucket {
 }
 
 function tooltipHtml(label: string, rows: { label: string; value: string }[]) {
-  return `<div class="space-y-1 text-xs"><div class="font-semibold">${escapeHtml(label)}</div>${rows
-    .map((row) => `<div>${escapeHtml(row.label)}: ${escapeHtml(row.value)}</div>`)
-    .join('')}</div>`;
+  return chartTooltipShell(
+    `<div class="space-y-1 text-xs"><div class="font-semibold">${escapeHtml(label)}</div>${rows
+      .map((row) => `<div>${escapeHtml(row.label)}: ${escapeHtml(row.value)}</div>`)
+      .join('')}</div>`,
+  );
 }
 
 function Legend({
@@ -431,43 +433,6 @@ export function TrendsStackedChart({
     />
   );
 }
-
-export function SectionHeader({ label, subtext }: { label: string; subtext?: string }) {
-  return <DashboardSectionHeader title={label} description={subtext} className="mb-2" />;
-}
-
-export function StatCard({
-  label,
-  value,
-  detail,
-}: {
-  label: string;
-  value: string;
-  detail?: string;
-}) {
-  return (
-    <Card className="gap-0 py-3">
-      <CardContent className="px-3">
-        <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
-          {label}
-        </div>
-        <div className="text-lg font-mono font-bold mt-1">{value}</div>
-        {detail && <div className="text-3xs font-mono text-muted-foreground mt-0.5">{detail}</div>}
-      </CardContent>
-    </Card>
-  );
-}
-
-export const CHART_COLORS = [
-  '#0b86d1',
-  '#f7b041',
-  '#10b981',
-  '#ef4444',
-  '#8b5cf6',
-  '#06b6d4',
-  '#ec4899',
-  '#84cc16',
-];
 
 export function buildColorMap(keys: string[]): Record<string, string> {
   return Object.fromEntries(keys.map((key, i) => [key, CHART_COLORS[i % CHART_COLORS.length]]));

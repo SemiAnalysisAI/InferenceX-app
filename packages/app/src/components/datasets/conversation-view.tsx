@@ -4,18 +4,18 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
 import { Card } from '@/components/ui/card';
+import { Stat } from '@/components/ui/stat';
 import { TraceFlamegraph } from '@/components/datasets/trace-flamegraph';
 import { useDatasetConversation } from '@/hooks/api/use-datasets';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { compact, formatShare } from './format';
-import { Stat } from './stat';
 
 const STRINGS = {
   en: {
     loading: 'Loading conversation…',
-    loadError: 'Failed to load conversation.',
-    notFound: 'Conversation not found.',
+    loadError: 'Failed to load conversation',
+    notFound: 'Conversation not found',
     retry: 'Retry',
     backToDataset: 'Back to AgentX dataset',
     breadcrumbDatasets: 'AgentX',
@@ -32,8 +32,8 @@ const STRINGS = {
   },
   zh: {
     loading: '正在加载对话…',
-    loadError: '对话加载失败。',
-    notFound: '未找到对话。',
+    loadError: '对话加载失败',
+    notFound: '未找到对话',
     retry: '重试',
     backToDataset: '返回 AgentX 数据集',
     breadcrumbDatasets: 'AgentX',
@@ -81,7 +81,7 @@ export function ConversationView({ slug, convId }: { slug: string; convId: strin
         <span>{t.loadError}</span>
         <button
           type="button"
-          className="text-primary underline"
+          className="text-brand underline"
           onClick={() => {
             track('datasets_conversation_retry_clicked', { slug });
             void refetch();
@@ -89,7 +89,7 @@ export function ConversationView({ slug, convId }: { slug: string; convId: strin
         >
           {t.retry}
         </button>
-        <Link href={`${prefix}/agentx/${slug}`} className="text-primary underline">
+        <Link href={`${prefix}/agentx/${slug}`} className="text-brand underline">
           {t.backToDataset}
         </Link>
       </div>
@@ -103,7 +103,7 @@ export function ConversationView({ slug, convId }: { slug: string; convId: strin
         data-locale={locale}
       >
         {t.notFound}{' '}
-        <Link href={`${prefix}/agentx/${slug}`} className="text-primary underline">
+        <Link href={`${prefix}/agentx/${slug}`} className="text-brand underline">
           {t.backToDataset}
         </Link>
       </div>
@@ -115,7 +115,7 @@ export function ConversationView({ slug, convId }: { slug: string; convId: strin
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <div className="mb-1 flex min-h-8 flex-wrap items-center gap-2 text-sm text-muted-foreground">
           <Link href={`${prefix}/agentx`} className="hover:text-foreground">
             {t.breadcrumbDatasets}
           </Link>
@@ -126,7 +126,7 @@ export function ConversationView({ slug, convId }: { slug: string; convId: strin
           <span>/</span>
           <span className="text-foreground">{t.breadcrumbConversation}</span>
         </div>
-        <h1 className="break-all font-mono text-lg font-semibold text-foreground">
+        <h1 className="break-all text-lg font-semibold text-foreground tabular-nums">
           {data.conv_id}
         </h1>
         {data.models.length > 0 && (
@@ -134,7 +134,7 @@ export function ConversationView({ slug, convId }: { slug: string; convId: strin
             {data.models.map((m) => (
               <span
                 key={m}
-                className="rounded-md border border-border/40 px-2 py-0.5 text-xs text-foreground"
+                className="rounded-md border border-border/30 px-2 py-0.5 text-xs text-foreground"
               >
                 {m}
               </span>
@@ -156,7 +156,7 @@ export function ConversationView({ slug, convId }: { slug: string; convId: strin
 
       <Card className="p-4">
         <h2 className="mb-3 text-lg font-semibold text-foreground">{t.flamegraph}</h2>
-        <p className="mb-4 text-xs text-muted-foreground">{t.flamegraphDesc}</p>
+        <p className="mb-4 max-w-4xl text-sm leading-6 text-muted-foreground">{t.flamegraphDesc}</p>
         <TraceFlamegraph
           structure={data.structure}
           highlightTurn={highlight.turn}

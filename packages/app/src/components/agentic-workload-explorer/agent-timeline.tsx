@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { type SessionRequest } from '@/lib/agentic-workload-explorer/session-context';
 import { buildRequestRuns } from '@/lib/agentic-workload-explorer/subagent-runs';
@@ -10,20 +10,24 @@ import { TOOL_COLORS as BASE_TOOL_COLORS } from '@/lib/agentic-workload-explorer
 import { useExplorerHref } from '@/hooks/agentic-workload-explorer/use-explorer-href';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
+import { Button } from '@/components/ui/button';
+import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
+import { ChartButtons } from '@/components/ui/chart-buttons';
+import { SectionHeader } from '@/components/agentic-workload-explorer/section-header';
+import { EmptyState } from '@/components/ui/empty-state';
 
 const STRINGS = {
   en: {
-    sectionTitle: 'Agent Timeline',
+    sectionTitle: 'Agent timeline',
     noData: 'No requests to display',
-    resetZoom: 'Reset Zoom',
-    exportPng: 'Export PNG',
+    resetZoom: 'Reset zoom',
     rows: (n: number) => `${n} row${n === 1 ? '' : 's'}`,
     agentHeader: 'Agent',
     duration: 'Duration',
     input: 'Input',
     output: 'Output',
-    cacheRead: 'Cache Read',
-    cacheWrite: 'Cache Write',
+    cacheRead: 'Cache read',
+    cacheWrite: 'Cache write',
     cost: 'Cost',
     requests: (n: number) => `${n} request${n === 1 ? '' : 's'}`,
     subAgentInstances: (n: number) => `${n} sub-agent instance${n === 1 ? '' : 's'}`,
@@ -33,7 +37,6 @@ const STRINGS = {
     sectionTitle: '智能体时间线',
     noData: '暂无请求数据',
     resetZoom: '重置缩放',
-    exportPng: '导出 PNG',
     rows: (n: number) => `${n} 行`,
     agentHeader: '智能体',
     duration: '耗时',
@@ -222,10 +225,7 @@ type Strings = (typeof STRINGS)[keyof typeof STRINGS];
 function TimelineTooltip({ data, t }: { data: TooltipData; t: Strings }) {
   const { row, bar } = data;
   return (
-    <div
-      className="fixed z-50 pointer-events-none rounded-md border border-border bg-surface p-2.5 shadow-lg"
-      style={{ left: data.x + 12, top: data.y - 10 }}
-    >
+    <FloatingTooltip x={data.x} y={data.y}>
       <div className="space-y-1 text-2xs font-mono">
         <div className="flex items-center gap-2">
           <span
@@ -234,7 +234,7 @@ function TimelineTooltip({ data, t }: { data: TooltipData; t: Strings }) {
               backgroundColor: getAgentColor(row.agentType),
             }}
           />
-          <span className="font-bold text-foreground">{row.label}</span>
+          <span className="font-medium text-foreground">{row.label}</span>
         </div>
         <div className="flex items-center gap-2 text-muted-foreground">
           <span
@@ -242,9 +242,9 @@ function TimelineTooltip({ data, t }: { data: TooltipData; t: Strings }) {
             style={{ backgroundColor: getToolColor(bar.tool) }}
           />
           <span>{bar.tool}</span>
-          {bar.model && <span className="text-subtle">({bar.model})</span>}
+          {bar.model && <span className="text-muted-foreground">({bar.model})</span>}
         </div>
-        <div className="h-px bg-border my-1" />
+        <div className="h-px bg-border/30 my-1" />
         <div className="flex justify-between gap-4">
           <span className="text-muted-foreground">{t.duration}</span>
           <span>{formatDuration(bar.durationMs)}</span>
@@ -280,7 +280,7 @@ function TimelineTooltip({ data, t }: { data: TooltipData; t: Strings }) {
           </div>
         )}
       </div>
-    </div>
+    </FloatingTooltip>
   );
 }
 
@@ -288,7 +288,6 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
   const t = STRINGS[useLocale()];
   const explorerHref = useExplorerHref();
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
-  const chartRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const params = useParams();
 
@@ -419,126 +418,44 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
 
   const totalCost = rows.reduce((s, r) => s + r.totalCost, 0);
 
-  const exportToPng = useCallback(() => {
-    const container = chartRef.current;
-    if (!container) return;
-
-    const dpr = window.devicePixelRatio || 2;
-    const totalWidth = LABEL_WIDTH + chartWidth;
-    const totalHeight = svgHeight;
-
-    const canvas = document.createElement('canvas');
-    canvas.width = totalWidth * dpr;
-    canvas.height = totalHeight * dpr;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    ctx.scale(dpr, dpr);
-
-    const isMinecraft = document.documentElement.classList.contains('minecraft');
-    const darkLike = isMinecraft;
-    ctx.fillStyle = isMinecraft ? '#1e1e1e' : '#fafafa';
-    ctx.fillRect(0, 0, totalWidth, totalHeight);
-
-    ctx.fillStyle = darkLike ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)';
-    ctx.fillRect(0, 0, LABEL_WIDTH, totalHeight);
-
-    ctx.strokeStyle = darkLike ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(LABEL_WIDTH, 0);
-    ctx.lineTo(LABEL_WIDTH, totalHeight);
-    ctx.stroke();
-
-    ctx.font = '600 9px ui-monospace, SFMono-Regular, monospace';
-    ctx.fillStyle = darkLike ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)';
-    ctx.fillText('AGENT', 8, HEADER_HEIGHT - 8);
-
-    ctx.beginPath();
-    ctx.moveTo(0, HEADER_HEIGHT);
-    ctx.lineTo(totalWidth, HEADER_HEIGHT);
-    ctx.stroke();
-
-    ctx.font = '500 10px ui-monospace, SFMono-Regular, monospace';
-    for (let ri = 0; ri < rows.length; ri++) {
-      const row = rows[ri];
-      const y = HEADER_HEIGHT + ri * (ROW_HEIGHT + ROW_GAP) + ROW_HEIGHT / 2 + 4;
-      const color = getAgentColor(row.agentType);
-
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.roundRect(8, y - 10, 3, 14, 1);
-      ctx.fill();
-
-      ctx.fillStyle = color;
-      const label = row.label.length > 22 ? `${row.label.slice(0, 20)}...` : row.label;
-      ctx.fillText(label, 16, y);
-
-      ctx.fillStyle = darkLike ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)';
-      ctx.font = '400 9px ui-monospace, SFMono-Regular, monospace';
-      ctx.fillText(String(row.bars.length), LABEL_WIDTH - 16, y);
-      ctx.font = '500 10px ui-monospace, SFMono-Regular, monospace';
-    }
-
-    const svg = container.querySelector('svg');
-    if (!svg) return;
-
-    const svgData = new XMLSerializer().serializeToString(svg);
-    const svgBlob = new Blob([svgData], {
-      type: 'image/svg+xml;charset=utf-8',
-    });
-    const url = URL.createObjectURL(svgBlob);
-    const img = new Image();
-
-    img.addEventListener('load', () => {
-      ctx.drawImage(img, LABEL_WIDTH, 0, chartWidth, svgHeight);
-      URL.revokeObjectURL(url);
-
-      const link = document.createElement('a');
-      link.download = `agent-timeline-${params.id || 'session'}.png`;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-    });
-
-    img.src = url;
-  }, [rows, chartWidth, svgHeight, LABEL_WIDTH, HEADER_HEIGHT, ROW_HEIGHT, ROW_GAP, params.id]);
+  const chartId = `agent-timeline-${useId().replaceAll(/[^a-zA-Z0-9_-]/gu, '')}`;
 
   if (rows.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-32 text-muted-foreground text-xs font-mono">
-        {t.noData}
-      </div>
-    );
+    return <EmptyState className="h-32">{t.noData}</EmptyState>;
   }
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-3">
-        <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-          {t.sectionTitle}
-        </span>
-        <div className="flex-1 h-px bg-border" />
-        {isZoomed && (
-          <button
-            onClick={() => {
-              resetZoom();
-              track('agentic_workload_timeline_zoom_reset');
-            }}
-            className="text-3xs font-mono text-subtle hover:text-foreground px-1.5 py-0.5 border border-border rounded hover:bg-surface-hover transition-colors"
-          >
-            {t.resetZoom}
-          </button>
-        )}
-        <button
-          onClick={() => {
-            exportToPng();
-            track('agentic_workload_timeline_export_png');
-          }}
-          className="text-3xs font-mono text-subtle hover:text-foreground px-1.5 py-0.5 border border-border rounded hover:bg-surface-hover transition-colors"
-        >
-          {t.exportPng}
-        </button>
-        <span className="text-3xs font-mono text-muted-foreground">{t.rows(rows.length)}</span>
+    <div id={chartId} className="space-y-3">
+      <SectionHeader
+        label={t.sectionTitle}
+        detail={t.rows(rows.length)}
+        actions={
+          <ChartButtons
+            chartId={chartId}
+            exportFileName={`agent-timeline-${params.id || 'session'}`}
+            hideZoomReset
+            onExportPng={() => track('agentic_workload_timeline_export_png')}
+            leadingControls={
+              isZoomed ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  onClick={() => {
+                    resetZoom();
+                    track('agentic_workload_timeline_zoom_reset');
+                  }}
+                >
+                  {t.resetZoom}
+                </Button>
+              ) : undefined
+            }
+            className="mb-0"
+          />
+        }
+      />
+      <div className="max-h-0 overflow-hidden" aria-hidden="true">
+        <div id={`${chartId}-export`} className="p-4" />
       </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1">
@@ -553,19 +470,17 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
         ))}
       </div>
 
-      <div className="rounded-md border border-border bg-surface overflow-hidden">
+      <div className="rounded-xl border border-border/30 bg-card overflow-hidden">
         <div className="flex">
           <div
-            className="flex-shrink-0 border-r border-border bg-surface"
+            className="flex-shrink-0 border-r border-border/20 bg-card"
             style={{ width: LABEL_WIDTH }}
           >
             <div
-              className="border-b border-border flex items-end px-2 pb-1"
+              className="border-b border-border/20 flex items-end px-2 pb-1"
               style={{ height: HEADER_HEIGHT }}
             >
-              <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
-                {t.agentHeader}
-              </span>
+              <span className="text-xs font-medium text-muted-foreground">{t.agentHeader}</span>
             </div>
             {rows.map((row) => {
               const color = getAgentColor(row.agentType);
@@ -582,7 +497,7 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
                   <span className="text-3xs font-mono truncate font-medium" style={{ color }}>
                     {row.label}
                   </span>
-                  <span className="text-3xs font-mono text-subtle ml-auto shrink-0">
+                  <span className="text-3xs font-mono text-muted-foreground ml-auto shrink-0">
                     {row.bars.length}
                   </span>
                 </div>
@@ -590,7 +505,7 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
             })}
           </div>
 
-          <div className="flex-1 overflow-x-auto" ref={chartRef}>
+          <div className="flex-1 overflow-x-auto" data-chart-scroll>
             <svg
               width={chartWidth}
               height={svgHeight}
@@ -774,18 +689,16 @@ export function AgentTimeline({ requests }: { requests: SessionRequest[] }) {
 
       <div className="flex items-center gap-4 text-2xs font-mono text-muted-foreground px-1">
         <span>{t.requests(rows.reduce((s, r) => s + r.bars.length, 0))}</span>
-        <span className="h-px w-3 bg-border" />
+        <span className="h-px w-3 bg-border/30" />
         <span>{t.subAgentInstances(rows.length - (rows[0]?.agentType === 'Main' ? 1 : 0))}</span>
-        <span className="h-px w-3 bg-border" />
+        <span className="h-px w-3 bg-border/30" />
         <span>
           {t.span} {formatDuration(totalDurationMs)}
         </span>
         {totalCost > 0 && (
           <>
-            <span className="h-px w-3 bg-border" />
-            <span className="text-emerald-500">
-              ${totalCost < 0.01 ? '<0.01' : totalCost.toFixed(3)}
-            </span>
+            <span className="h-px w-3 bg-border/30" />
+            <span>${totalCost < 0.01 ? '<0.01' : totalCost.toFixed(3)}</span>
           </>
         )}
       </div>

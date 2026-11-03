@@ -152,14 +152,14 @@ export type ExplorerSectionPath = keyof typeof EXPLORER_SECTION_META;
 
 export const EXPLORER_SESSION_TAB_META = {
   conversation: { en: 'Conversation', zh: '对话' },
-  raw: { en: 'Raw Trace', zh: '原始 Trace' },
+  raw: { en: 'Raw trace', zh: '原始 Trace' },
   statistics: { en: 'Statistics', zh: '统计' },
-  'prefill-vs-decode': { en: 'Prefill vs Decode', zh: 'Prefill 与 Decode' },
+  'prefill-vs-decode': { en: 'Prefill vs decode', zh: 'Prefill 与 Decode' },
   flamegraph: { en: 'Flamegraph', zh: '火焰图' },
-  'tokens-over-time': { en: 'Tokens Over Time', zh: 'Token 随时间变化' },
+  'tokens-over-time': { en: 'Tokens over time', zh: 'Token 随时间变化' },
   timeline: { en: 'Timeline', zh: '时间线' },
   flow: { en: 'Flow', zh: '流程图' },
-  'radix-tree': { en: 'Radix Tree', zh: 'Radix Tree' },
+  'radix-tree': { en: 'Radix tree', zh: 'Radix Tree' },
 } as const satisfies Record<string, Record<Locale, string>>;
 
 export type ExplorerSessionTab = keyof typeof EXPLORER_SESSION_TAB_META;

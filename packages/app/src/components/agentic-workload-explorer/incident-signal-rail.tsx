@@ -1,12 +1,13 @@
 'use client';
 
 import { type KeyboardEvent, useMemo, useRef, useState } from 'react';
-import { formatNumber } from '@/lib/agentic-workload-explorer/format';
-import { exportSvgToPng, ExportPngButton } from '@/lib/agentic-workload-explorer/export-png';
+import { formatExplorerDateTime, formatNumber } from '@/lib/agentic-workload-explorer/format';
 import type { ErrorData } from '@/lib/agentic-workload-explorer/api-types';
-import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
+import { ChartActions, Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
+import type { Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
+import { EmptyState } from '@/components/ui/empty-state';
 
 type Severity = 'nominal' | 'watch' | 'elevated' | 'critical';
 
@@ -30,30 +31,30 @@ const VOLUME_HEIGHT = 38;
 const SEVERITY_META: Record<Severity, { fill: string; badge: string }> = {
   nominal: {
     fill: '#22c55e',
-    badge: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-500',
+    badge: 'border-success/30 bg-success/10 text-success',
   },
   watch: {
     fill: '#f59e0b',
-    badge: 'border-amber-500/30 bg-amber-500/10 text-amber-500',
+    badge: 'border-warning/30 bg-warning/10 text-warning',
   },
   elevated: {
     fill: '#f97316',
-    badge: 'border-orange-500/30 bg-orange-500/10 text-orange-500',
+    badge: 'border-warning/50 bg-warning/20 text-warning',
   },
   critical: {
     fill: '#f43f5e',
-    badge: 'border-rose-500/30 bg-rose-500/10 text-rose-500',
+    badge: 'border-destructive/30 bg-destructive/10 text-destructive',
   },
 };
 
 const STRINGS = {
   en: {
-    title: 'Hourly Incident Signals',
+    title: 'Hourly incident signals',
     noSignals: 'No hourly error signals are available for this trace version.',
     baselineNote: (hours: number, anomalyCount: number) =>
       `Median + MAD baseline over the prior ${hours} hours · ${anomalyCount} anomalous ${anomalyCount === 1 ? 'hour' : 'hours'}`,
     exportLabel: 'Export hourly incident signal rail as PNG',
-    exportTitle: 'Hourly Incident Signals',
+    exportTitle: 'Hourly incident signals',
     requests: 'requests',
     errorRate: 'Error rate',
     volume: 'Volume',
@@ -171,8 +172,8 @@ function buildRailPoints(data: ErrorData['timeline']): RailPoint[] {
   });
 }
 
-function formatHourUtc(hour: string) {
-  return new Date(hour).toLocaleString('en-US', {
+function formatHourUtc(hour: string, locale: Locale) {
+  return formatExplorerDateTime(hour, locale, {
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
@@ -188,19 +189,15 @@ function formatRate(rate: number) {
 export function IncidentSignalRail({ data }: { data: ErrorData['timeline'] }) {
   const locale = useLocale();
   const t = STRINGS[locale];
-  const svgRef = useRef<SVGSVGElement>(null);
   const pointRefs = useRef<(SVGGElement | null)[]>([]);
   const points = useMemo(() => buildRailPoints(data), [data]);
   const [selectedHour, setSelectedHour] = useState<string | null>(() => data.at(-1)?.hour ?? null);
 
   if (points.length === 0) {
     return (
-      <div
-        role="status"
-        className="flex min-h-48 items-center justify-center px-4 text-center text-2xs font-mono text-muted-foreground"
-      >
+      <EmptyState role="status" bare className="min-h-48 px-4">
         {t.noSignals}
-      </div>
+      </EmptyState>
     );
   }
 
@@ -251,7 +248,7 @@ export function IncidentSignalRail({ data }: { data: ErrorData['timeline'] }) {
       <div className="space-y-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-3xs font-mono font-bold uppercase tracking-eyebrow">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium">
               {(Object.keys(SEVERITY_META) as Severity[]).map((severity) => (
                 <span
                   key={severity}
@@ -270,26 +267,14 @@ export function IncidentSignalRail({ data }: { data: ErrorData['timeline'] }) {
               {t.baselineNote(TRAILING_HOURS, anomalyCount)}
             </p>
           </div>
-          <ExportPngButton
-            locale={locale}
-            label={t.exportLabel}
-            onClick={() => {
-              track('agentic_workload_incident_rail_export_png');
-              if (svgRef.current) {
-                exportSvgToPng(svgRef.current, {
-                  title: t.exportTitle,
-                  filename: 'hourly-incident-signals.png',
-                  svgWidth: chartWidth,
-                  svgHeight: CHART_HEIGHT,
-                });
-              }
-            }}
+          <ChartActions
+            fileName="hourly-incident-signals"
+            onExportPng={() => track('agentic_workload_incident_rail_export_png')}
           />
         </div>
 
-        <div className="overflow-x-auto border-y border-border bg-background/30">
+        <div className="overflow-x-auto border-y border-border/20" data-chart-scroll>
           <svg
-            ref={svgRef}
             viewBox={`0 0 ${chartWidth} ${CHART_HEIGHT}`}
             className="h-[244px] min-w-[760px]"
             style={{ width: chartWidth }}
@@ -366,7 +351,7 @@ export function IncidentSignalRail({ data }: { data: ErrorData['timeline'] }) {
               const height = Math.max(1, RATE_TOP + RATE_HEIGHT - y);
               const volumeHeight = Math.max(1, (point.totalCount / maxVolume) * VOLUME_HEIGHT);
               const isSelected = index === activeIndex;
-              const hourLabel = formatHourUtc(point.hour);
+              const hourLabel = formatHourUtc(point.hour, locale);
               const baselineLabel = point.hasBaseline
                 ? t.trailingBaselineLabel(formatRate(point.baselineRate))
                 : t.baselineLearning;
@@ -448,7 +433,7 @@ export function IncidentSignalRail({ data }: { data: ErrorData['timeline'] }) {
               opacity={0.55}
               className="text-3xs font-mono"
             >
-              {new Date(points[0].hour).toLocaleDateString('en-US', {
+              {formatExplorerDateTime(points[0].hour, locale, {
                 month: 'short',
                 day: 'numeric',
                 timeZone: 'UTC',
@@ -462,25 +447,25 @@ export function IncidentSignalRail({ data }: { data: ErrorData['timeline'] }) {
               opacity={0.55}
               className="text-3xs font-mono"
             >
-              {formatHourUtc(points.at(-1)!.hour)}
+              {formatHourUtc(points.at(-1)!.hour, locale)}
             </text>
           </svg>
         </div>
 
         <div
-          className="grid gap-3 border border-border bg-background/40 p-3 sm:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))]"
+          className="grid gap-3 pt-1 sm:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))]"
           aria-live="polite"
           aria-atomic="true"
         >
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span
-                className={`inline-flex border px-1.5 py-0.5 text-3xs font-mono font-bold uppercase tracking-eyebrow ${SEVERITY_META[selected.severity].badge}`}
+                className={`inline-flex rounded-md border px-1.5 py-0.5 text-xs font-medium ${SEVERITY_META[selected.severity].badge}`}
               >
                 {t.severity[selected.severity].label}
               </span>
-              <span className="truncate text-2xs font-mono font-bold">
-                {formatHourUtc(selected.hour)}
+              <span className="truncate text-2xs font-mono font-medium">
+                {formatHourUtc(selected.hour, locale)}
               </span>
             </div>
             <p className="mt-1 text-3xs font-mono text-muted-foreground">
@@ -488,26 +473,22 @@ export function IncidentSignalRail({ data }: { data: ErrorData['timeline'] }) {
             </p>
           </div>
           <div>
-            <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
-              {t.errorRate}
-            </div>
-            <div className="text-sm font-mono font-bold">{formatRate(selected.rate)}</div>
+            <div className="text-xs font-medium text-muted-foreground">{t.errorRate}</div>
+            <div className="text-sm font-medium tabular-nums">{formatRate(selected.rate)}</div>
             <div className="text-3xs font-mono text-muted-foreground">
               {formatNumber(selected.errorCount)} {t.errors}
             </div>
           </div>
           <div>
-            <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
-              {t.volume}
+            <div className="text-xs font-medium text-muted-foreground">{t.volume}</div>
+            <div className="text-sm font-medium tabular-nums">
+              {formatNumber(selected.totalCount)}
             </div>
-            <div className="text-sm font-mono font-bold">{formatNumber(selected.totalCount)}</div>
             <div className="text-3xs font-mono text-muted-foreground">{t.requests}</div>
           </div>
           <div>
-            <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
-              {t.trailingBaseline}
-            </div>
-            <div className="text-sm font-mono font-bold">
+            <div className="text-xs font-medium text-muted-foreground">{t.trailingBaseline}</div>
+            <div className="text-sm font-medium tabular-nums">
               {selected.hasBaseline ? formatRate(selected.baselineRate) : t.learning}
             </div>
             <div className="text-3xs font-mono text-muted-foreground">

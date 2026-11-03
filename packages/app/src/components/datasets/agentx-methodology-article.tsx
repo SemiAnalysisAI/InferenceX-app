@@ -1,6 +1,10 @@
+import { ArrowLeft } from 'lucide-react';
 import Image from 'next/image';
 
+import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
+
 import { AgentXMethodologyLink } from './agentx-methodology-link';
+import { FactGrid } from './fact-grid';
 
 type Locale = 'en' | 'zh';
 
@@ -81,7 +85,7 @@ const FIGURE_ASSETS = {
 const CONTENT = {
   en: {
     eyebrow: 'Field guide / AI infrastructure',
-    title: 'AgentX Methodology',
+    title: 'AgentX methodology',
     lead: 'AgentX converts opt-in Claude Code proxy traces into deterministic AIPerf workloads. This page documents how collection metadata becomes a replay and which controls define a valid benchmark result.',
     facts: [
       { value: '393', label: 'published sessions' },
@@ -133,7 +137,7 @@ const CONTENT = {
       { label: 'AgentX v1.0 full dataset', target: 'dataset-full' },
       { label: 'AgentX v1.0 256k dataset', target: 'dataset-256k' },
       { label: 'AIPerf WEKA trace replay guide', target: 'aiperf-weka' },
-      { label: 'SPEED-Bench paper', target: 'speed-bench' },
+      { label: 'SPEED-bench paper', target: 'speed-bench' },
       { label: 'SGLang forced acceptance control', target: 'sglang-pr' },
       { label: 'TensorRT-LLM forced acceptance control', target: 'trtllm-pr' },
       { label: 'vLLM synthetic acceptance control', target: 'vllm-pr' },
@@ -457,7 +461,7 @@ function MethodFigure({
       className="group my-7 block rounded-xl focus-visible:outline-none"
     >
       <figure
-        className="overflow-hidden rounded-xl border border-border/70 bg-card transition-colors group-hover:border-primary/50"
+        className="overflow-hidden rounded-xl border border-border/30 bg-card transition-colors group-hover:border-border"
         data-testid={`agentx-methodology-figure-${figure}`}
       >
         <Image
@@ -469,10 +473,11 @@ function MethodFigure({
           quality={100}
           className="h-auto w-full"
         />
-        <figcaption className="border-t border-border/70 px-4 py-3 text-sm leading-6 text-muted-foreground">
+        <figcaption className="border-t border-border/20 px-4 py-3 text-sm leading-6 text-muted-foreground">
           <span className="block">{copy.caption}</span>
-          <span className="mt-1 inline-block font-medium text-foreground underline decoration-border underline-offset-4 transition-colors group-hover:text-primary group-hover:decoration-primary">
-            {locale === 'zh' ? '查看原始分辨率图片' : 'View full-resolution image'} ↗
+          <span className="mt-1 inline-block font-medium text-foreground underline decoration-border underline-offset-4 transition-colors group-hover:text-brand group-hover:decoration-brand">
+            {locale === 'zh' ? '查看原始分辨率图片' : 'View full-resolution image'}
+            <ExternalLinkIcon aria-hidden="true" />
           </span>
         </figcaption>
       </figure>
@@ -482,7 +487,7 @@ function MethodFigure({
 
 function Paragraphs({ items }: { items: readonly string[] }) {
   return (
-    <div className="space-y-4 text-base leading-7 text-muted-foreground">
+    <div className="max-w-3xl space-y-4 text-base leading-7 text-muted-foreground">
       {items.map((item) => (
         <p key={item}>{item}</p>
       ))}
@@ -492,7 +497,7 @@ function Paragraphs({ items }: { items: readonly string[] }) {
 
 function SectionHeading({ id, children }: { id: string; children: React.ReactNode }) {
   return (
-    <h2 id={id} className="mb-4 scroll-mt-24 text-2xl font-semibold tracking-tight text-foreground">
+    <h2 id={id} className="mb-4 scroll-mt-24 text-2xl font-semibold text-foreground">
       {children}
     </h2>
   );
@@ -504,32 +509,22 @@ export function AgentXMethodologyArticle({ locale }: { locale: Locale }) {
 
   return (
     <article data-testid="agentx-methodology-article">
-      <header className="border-b border-border/70 pb-8">
+      <header className="border-b border-border/20 pb-8">
         <AgentXMethodologyLink
           href={`${prefix}/agentx`}
           analyticsEvent="agentx_methodology_returned"
           analyticsTarget="overview"
-          className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+          className="inline-flex min-h-8 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
-          {locale === 'zh' ? '← 返回 AgentX' : '← Back to AgentX'}
+          <ArrowLeft aria-hidden="true" className="size-4" />
+          {locale === 'zh' ? '返回 AgentX' : 'Back to AgentX'}
         </AgentXMethodologyLink>
-        <p className="mt-8 font-mono text-xs font-semibold tracking-eyebrow-wide text-brand uppercase">
-          {t.eyebrow}
-        </p>
+        <p className="mt-8 text-xs font-medium text-muted-foreground">{t.eyebrow}</p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
           {t.title}
         </h1>
         <p className="mt-5 max-w-3xl text-lg leading-8 text-muted-foreground">{t.lead}</p>
-        <dl className="mt-8 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border/70 bg-border/70 lg:grid-cols-4">
-          {t.facts.map((fact) => (
-            <div key={fact.label} className="flex flex-col bg-card px-4 py-5">
-              <dt className="order-2 mt-1 text-sm leading-5 text-muted-foreground">{fact.label}</dt>
-              <dd className="order-1 font-mono text-xl font-semibold tabular-nums text-foreground">
-                {fact.value}
-              </dd>
-            </div>
-          ))}
-        </dl>
+        <FactGrid items={t.facts} />
       </header>
 
       <div className="py-10">
@@ -613,9 +608,9 @@ export function AgentXMethodologyArticle({ locale }: { locale: Locale }) {
           <Paragraphs items={t.dramParagraphs} />
         </section>
 
-        <section aria-labelledby="scope" className="mt-14 border-t border-border/70 pt-10">
+        <section aria-labelledby="scope" className="mt-14 border-t border-border/20 pt-10">
           <SectionHeading id="scope">{t.limitsTitle}</SectionHeading>
-          <p className="text-base leading-7 text-muted-foreground">{t.limits}</p>
+          <p className="max-w-3xl text-base leading-7 text-muted-foreground">{t.limits}</p>
           <h3 className="mt-8 text-base font-semibold text-foreground">{t.sourcesTitle}</h3>
           <ul className="mt-3 grid gap-x-8 gap-y-2 sm:grid-cols-2">
             {t.sources.map((source) => (
@@ -626,9 +621,10 @@ export function AgentXMethodologyArticle({ locale }: { locale: Locale }) {
                   analyticsTarget={source.target}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm leading-6 text-primary underline decoration-primary/40 underline-offset-4 hover:decoration-primary"
+                  className="text-sm leading-6 text-brand underline decoration-brand/40 underline-offset-4 hover:decoration-brand"
                 >
-                  {source.label} ↗
+                  {source.label}
+                  <ExternalLinkIcon aria-hidden="true" />
                 </AgentXMethodologyLink>
               </li>
             ))}

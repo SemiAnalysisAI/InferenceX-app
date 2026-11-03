@@ -1,7 +1,10 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Stat } from '@/components/ui/stat';
 import {
   Select,
   SelectContent,
@@ -9,9 +12,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { formatNumber, truncateHash } from '@/lib/agentic-workload-explorer/format';
+import {
+  formatExplorerDateTime,
+  formatNumber,
+  truncateHash,
+} from '@/lib/agentic-workload-explorer/format';
 import { useDashboardData } from '@/hooks/agentic-workload-explorer/use-dashboard-data';
-import { exportSvgToPng, ExportPngButton } from '@/lib/agentic-workload-explorer/export-png';
 import {
   useTraceVersion,
   appendTraceVersion,
@@ -22,48 +28,52 @@ import type {
   ModelCache,
   ClientCache,
 } from '@/lib/agentic-workload-explorer/api-types';
-import { snapshotNow } from '@/lib/agentic-workload-explorer/snapshot';
+import { formatSnapshotDate, snapshotNow } from '@/lib/agentic-workload-explorer/snapshot';
+import { SectionHeader } from '@/components/agentic-workload-explorer/section-header';
+import { TOKEN_SERIES_COLORS } from '@/components/agentic-workload-explorer/series-colors';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
-import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
+import { ChartActions, Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
+import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
 
 const STRINGS = {
   en: {
     stats: 'Stats',
-    cacheHitRateOverTime: 'Cache Hit Rate Over Time',
-    cacheReadVsWriteTrends: 'Cache Read vs Write Trends',
-    cacheReadVsWrite: 'Cache Read vs Write',
-    cacheEfficiencyByModel: 'Cache Efficiency by Model',
-    cacheByClient: 'Cache by Client',
-    cacheEfficiencyPerDev: 'Cache Efficiency per Developer',
+    cacheHitRateOverTime: 'Cache hit rate over time',
+    cacheReadVsWriteTrends: 'Cache read vs write trends',
+    cacheReadVsWrite: 'Cache read vs write',
+    cacheEfficiencyByModel: 'Cache efficiency by model',
+    cacheByClient: 'Cache by client',
+    cacheEfficiencyPerDev: 'Cache efficiency per developer',
     cacheEfficiencyPerDevDetail: 'final 90 days · cache_read / (cache_read + input)',
-    loading: 'loading...',
+    loading: 'Loading…',
     lastNDays: (n: number) => `last ${n} days`,
     nModels: (n: number) => `${n} model${n === 1 ? '' : 's'}`,
     nClients: (n: number) => `${n} client${n === 1 ? '' : 's'}`,
-    cacheHitRate: 'Cache Hit Rate',
-    cacheReadTokens: 'Cache Read Tokens',
-    cacheWriteTokens: 'Cache Write Tokens',
-    totalRequests: 'Total Requests',
+    cacheHitRate: 'Cache hit rate',
+    cacheReadTokens: 'Cache read tokens',
+    cacheWriteTokens: 'Cache write tokens',
+    totalRequests: 'Total requests',
     ofRequests: (hit: string, total: string) => `${hit} of ${total} requests`,
     noDailyCacheData: 'No daily cache data available',
     noModelCacheData: 'No model cache data available',
     noClientCacheData: 'No client cache data available',
-    failedToLoad: 'Failed to load cache data.',
+    failedToLoad: 'Failed to load cache data',
     allClients: 'All clients',
     cacheReadLegend: 'cache read',
     cacheWriteLegend: 'cache write',
     efficiency: 'Efficiency',
-    cacheReadHeatmap: 'Cache Read',
+    cacheReadHeatmap: 'Cache read',
     inputHeatmap: 'Input',
     less: 'Less',
     more: 'More',
     rankHeader: '#',
-    apiKeyHash: 'API Key Hash',
-    hitRate: 'Hit Rate',
-    cacheReadHeader: 'Cache Read',
-    cacheWriteHeader: 'Cache Write',
+    apiKeyHash: 'API key hash',
+    hitRate: 'Hit rate',
+    cacheReadHeader: 'Cache read',
+    cacheWriteHeader: 'Cache write',
     requestsHeader: 'Requests',
+    weekdayLabels: ['', 'Mon', '', 'Wed', '', 'Fri', ''],
   },
   zh: {
     stats: '统计',
@@ -86,7 +96,7 @@ const STRINGS = {
     noDailyCacheData: '暂无每日缓存数据',
     noModelCacheData: '暂无模型缓存数据',
     noClientCacheData: '暂无客户端缓存数据',
-    failedToLoad: '缓存数据加载失败。',
+    failedToLoad: '缓存数据加载失败',
     allClients: '所有客户端',
     cacheReadLegend: '缓存读取',
     cacheWriteLegend: '缓存写入',
@@ -96,11 +106,12 @@ const STRINGS = {
     less: '低',
     more: '高',
     rankHeader: '#',
-    apiKeyHash: 'API Key Hash',
+    apiKeyHash: 'API key 哈希',
     hitRate: '命中率',
     cacheReadHeader: '缓存读取',
     cacheWriteHeader: '缓存写入',
     requestsHeader: '请求数',
+    weekdayLabels: ['', '周一', '', '周三', '', '周五', ''],
   },
 } as const;
 
@@ -172,6 +183,7 @@ interface HeatmapEntry {
 const HEATMAP_COLORS = ['var(--color-border)', '#065f46', '#047857', '#059669', '#10b981'];
 
 function CacheEfficiencyHeatmap({ t }: { t: Strings }) {
+  const locale = useLocale();
   const { apiParam: traceVersionParam } = useTraceVersion();
   const [data, setData] = useState<HeatmapEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -183,7 +195,6 @@ function CacheEfficiencyHeatmap({ t }: { t: Strings }) {
     inputTokens: number;
     x: number;
     y: number;
-    width: number;
   } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -268,13 +279,13 @@ function CacheEfficiencyHeatmap({ t }: { t: Strings }) {
   const svgW = LABEL_W + weeks.length * (CELL_SIZE + CELL_GAP);
   const svgH = 7 * (CELL_SIZE + CELL_GAP) + 20;
 
-  const weekdayLabels = ['', 'Mon', '', 'Wed', '', 'Fri', ''];
+  const weekdayLabels = t.weekdayLabels;
 
   if (loading) {
     return (
       <div>
         <SectionHeader label={t.cacheEfficiencyPerDev} detail={t.loading} />
-        <Skeleton className="h-40 w-full rounded-md" />
+        <Skeleton className="h-40 w-full rounded-xl" />
       </div>
     );
   }
@@ -285,7 +296,7 @@ function CacheEfficiencyHeatmap({ t }: { t: Strings }) {
     <div>
       <SectionHeader label={t.cacheEfficiencyPerDev} detail={t.cacheEfficiencyPerDevDetail} />
       <Expandable title={t.cacheEfficiencyPerDev} subtitle={t.cacheEfficiencyPerDevDetail} corner>
-        <div className="rounded-md border border-border bg-surface p-3">
+        <Card>
           <div className="flex items-center gap-2 mb-3">
             <Select
               value={selectedClient === null ? 'all' : `client:${selectedClient}`}
@@ -318,7 +329,7 @@ function CacheEfficiencyHeatmap({ t }: { t: Strings }) {
                     x={LABEL_W - 4}
                     y={20 + i * (CELL_SIZE + CELL_GAP) + CELL_SIZE / 2 + 3}
                     textAnchor="end"
-                    fill="var(--muted)"
+                    fill="var(--muted-foreground)"
                     fontSize="8px"
                     fontFamily="var(--font-mono, ui-monospace, monospace)"
                   >
@@ -335,11 +346,11 @@ function CacheEfficiencyHeatmap({ t }: { t: Strings }) {
                       key={`ml-${wi}`}
                       x={LABEL_W + wi * (CELL_SIZE + CELL_GAP)}
                       y={12}
-                      fill="var(--muted)"
+                      fill="var(--muted-foreground)"
                       fontSize="8px"
                       fontFamily="var(--font-mono, ui-monospace, monospace)"
                     >
-                      {firstDay.date.toLocaleDateString('en-US', {
+                      {formatExplorerDateTime(firstDay.date, locale, {
                         month: 'short',
                       })}
                     </text>
@@ -371,16 +382,13 @@ function CacheEfficiencyHeatmap({ t }: { t: Strings }) {
                       style={{ cursor: entry ? 'pointer' : 'default' }}
                       onMouseEnter={(e) => {
                         if (!entry) return;
-                        const svgRect = e.currentTarget.ownerSVGElement?.getBoundingClientRect();
-                        if (!svgRect) return;
                         setHoveredCell({
                           day: day.key,
                           efficiency: efficiency * 100,
                           cacheRead: entry.cacheRead,
                           inputTokens: entry.inputTokens,
-                          x: e.clientX - svgRect.left,
-                          y: e.clientY - svgRect.top,
-                          width: svgRect.width,
+                          x: e.clientX,
+                          y: e.clientY,
                         });
                       }}
                       onMouseLeave={() => setHoveredCell(null)}
@@ -391,14 +399,7 @@ function CacheEfficiencyHeatmap({ t }: { t: Strings }) {
             </svg>
 
             {hoveredCell && (
-              <div
-                className="absolute pointer-events-none z-50 bg-background border border-border rounded-md shadow-lg px-2.5 py-1.5"
-                style={{
-                  left: Math.min(hoveredCell.x + 12, hoveredCell.width - 180),
-                  top: hoveredCell.y - 8,
-                  transform: 'translateY(-100%)',
-                }}
-              >
+              <FloatingTooltip x={hoveredCell.x} y={hoveredCell.y} placement="above">
                 <div className="text-3xs font-mono font-medium text-foreground">
                   {hoveredCell.day}
                 </div>
@@ -409,7 +410,7 @@ function CacheEfficiencyHeatmap({ t }: { t: Strings }) {
                   {t.cacheReadHeatmap}: {formatNumber(hoveredCell.cacheRead)} · {t.inputHeatmap}:{' '}
                   {formatNumber(hoveredCell.inputTokens)}
                 </div>
-              </div>
+              </FloatingTooltip>
             )}
           </div>
 
@@ -424,45 +425,20 @@ function CacheEfficiencyHeatmap({ t }: { t: Strings }) {
             ))}
             <span className="text-3xs font-mono text-muted-foreground">{t.more}</span>
           </div>
-        </div>
+        </Card>
       </Expandable>
-    </div>
-  );
-}
-
-function SectionHeader({ label, detail }: { label: string; detail?: string }) {
-  return (
-    <div className="flex items-center gap-2 mb-2">
-      <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-        {label}
-      </span>
-      <span className="flex-1 h-px bg-border" />
-      {detail && <span className="text-3xs font-mono text-subtle">{detail}</span>}
-    </div>
-  );
-}
-
-function StatCard({ label, value, detail }: { label: string; value: string; detail?: string }) {
-  return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
-        {label}
-      </div>
-      <div className="text-lg font-mono font-bold mt-0.5">{value}</div>
-      {detail && <div className="text-3xs font-mono text-muted-foreground mt-0.5">{detail}</div>}
     </div>
   );
 }
 
 function HitRateChart({ daily, t }: { daily: DailyCache[]; t: Strings }) {
   const locale = useLocale();
-  const svgRef = useRef<SVGSVGElement>(null);
   const data = daily.slice(-30);
   if (data.length === 0) {
     return (
-      <div className="text-xs font-mono text-muted-foreground text-center py-8">
+      <EmptyState bare className="py-8">
         {t.noDailyCacheData}
-      </div>
+      </EmptyState>
     );
   }
 
@@ -487,28 +463,14 @@ function HitRateChart({ daily, t }: { daily: DailyCache[]; t: Strings }) {
 
   return (
     <Expandable title={t.cacheHitRate}>
-      <div className="rounded-md border border-border bg-surface p-3">
+      <Card>
         <div className="flex items-center justify-end mb-2">
-          <ExportPngButton
-            locale={locale}
-            onClick={() => {
-              if (svgRef.current)
-                exportSvgToPng(svgRef.current, {
-                  title: 'Cache Hit Rate',
-                  filename: 'cache-hit-rate.png',
-                  svgWidth: CHART_W,
-                  svgHeight: CHART_H,
-                });
-              track('agentic_workload_cache_export_png', { chart: 'hit-rate' });
-            }}
+          <ChartActions
+            fileName="cache-hit-rate"
+            onExportPng={() => track('agentic_workload_cache_export_png', { chart: 'hit-rate' })}
           />
         </div>
-        <svg
-          ref={svgRef}
-          viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-          className="w-full"
-          style={{ maxHeight: 240 }}
-        >
+        <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full" style={{ maxHeight: 240 }}>
           {yTicks.map((tick) => (
             <g key={`y-${tick}`}>
               {tick > 0 && (
@@ -568,29 +530,24 @@ function HitRateChart({ daily, t }: { daily: DailyCache[]; t: Strings }) {
                 className="fill-muted-foreground"
                 style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
               >
-                {new Date(d.day).toLocaleDateString('en-US', {
-                  timeZone: 'UTC',
-                  month: 'short',
-                  day: 'numeric',
-                })}
+                {formatSnapshotDate(d.day, locale)}
               </text>
             );
           })}
         </svg>
-      </div>
+      </Card>
     </Expandable>
   );
 }
 
 function ReadWriteChart({ daily, t }: { daily: DailyCache[]; t: Strings }) {
   const locale = useLocale();
-  const svgRef = useRef<SVGSVGElement>(null);
   const data = daily.slice(-30);
   if (data.length === 0) {
     return (
-      <div className="text-xs font-mono text-muted-foreground text-center py-8">
+      <EmptyState bare className="py-8">
         {t.noDailyCacheData}
-      </div>
+      </EmptyState>
     );
   }
 
@@ -610,39 +567,33 @@ function ReadWriteChart({ daily, t }: { daily: DailyCache[]; t: Strings }) {
 
   return (
     <Expandable title={t.cacheReadVsWrite}>
-      <div className="rounded-md border border-border bg-surface p-3">
+      <Card>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-4 text-3xs font-mono text-muted-foreground">
             <span className="flex items-center gap-1">
-              <span className="inline-block w-2.5 h-2.5 rounded-sm bg-emerald-500" />{' '}
+              <span
+                className="inline-block w-2.5 h-2.5 rounded-sm"
+                style={{ backgroundColor: TOKEN_SERIES_COLORS.cacheRead }}
+              />{' '}
               {t.cacheReadLegend}
             </span>
             <span className="flex items-center gap-1">
-              <span className="inline-block w-2.5 h-2.5 rounded-sm bg-amber-500" />{' '}
+              <span
+                className="inline-block w-2.5 h-2.5 rounded-sm"
+                style={{ backgroundColor: TOKEN_SERIES_COLORS.cacheWrite }}
+              />{' '}
               {t.cacheWriteLegend}
             </span>
           </div>
-          <ExportPngButton
-            locale={locale}
-            onClick={() => {
-              if (svgRef.current)
-                exportSvgToPng(svgRef.current, {
-                  title: 'Cache Read vs Write',
-                  filename: 'cache-read-vs-write.png',
-                  svgWidth: CHART_W,
-                  svgHeight: CHART_H,
-                });
-              track('agentic_workload_cache_export_png', { chart: 'read-vs-write' });
-            }}
+          <ChartActions
+            fileName="cache-read-vs-write"
+            onExportPng={() =>
+              track('agentic_workload_cache_export_png', { chart: 'read-vs-write' })
+            }
           />
         </div>
 
-        <svg
-          ref={svgRef}
-          viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-          className="w-full"
-          style={{ maxHeight: 240 }}
-        >
+        <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full" style={{ maxHeight: 240 }}>
           {yTicks.map((tick) => (
             <g key={`y-${tick}`}>
               {tick > 0 && (
@@ -686,7 +637,7 @@ function ReadWriteChart({ daily, t }: { daily: DailyCache[]; t: Strings }) {
                 y={sy(d.cacheRead)}
                 width={barWidth}
                 height={Math.max((d.cacheRead / yMax) * PLOT_H, 0.5)}
-                fill="#10b981"
+                fill={TOKEN_SERIES_COLORS.cacheRead}
                 rx={1}
               >
                 <title>
@@ -698,7 +649,7 @@ function ReadWriteChart({ daily, t }: { daily: DailyCache[]; t: Strings }) {
                 y={sy(d.cacheWrite)}
                 width={barWidth}
                 height={Math.max((d.cacheWrite / yMax) * PLOT_H, 0.5)}
-                fill="#f59e0b"
+                fill={TOKEN_SERIES_COLORS.cacheWrite}
                 rx={1}
               >
                 <title>
@@ -713,17 +664,13 @@ function ReadWriteChart({ daily, t }: { daily: DailyCache[]; t: Strings }) {
                   className="fill-muted-foreground"
                   style={{ fontSize: SVG_FONT_SIZE, fontFamily: SVG_FONT }}
                 >
-                  {new Date(d.day).toLocaleDateString('en-US', {
-                    timeZone: 'UTC',
-                    month: 'short',
-                    day: 'numeric',
-                  })}
+                  {formatSnapshotDate(d.day, locale)}
                 </text>
               )}
             </g>
           ))}
         </svg>
-      </div>
+      </Card>
     </Expandable>
   );
 }
@@ -739,9 +686,9 @@ function ModelEfficiencyChart({ byModel, t }: { byModel: ModelCache[]; t: String
 
   if (sorted.length === 0) {
     return (
-      <div className="text-xs font-mono text-muted-foreground text-center py-8">
+      <EmptyState bare className="py-8">
         {t.noModelCacheData}
-      </div>
+      </EmptyState>
     );
   }
 
@@ -757,14 +704,14 @@ function ModelEfficiencyChart({ byModel, t }: { byModel: ModelCache[]; t: String
           </span>
           <div className="flex-1 h-4 bg-border/30 rounded-sm overflow-hidden relative">
             <div
-              className="h-full bg-emerald-500 rounded-sm"
+              className="h-full bg-muted-foreground/60 rounded-sm"
               style={{ width: `${Math.max(m.hitRate, 1)}%` }}
             />
           </div>
-          <span className="text-2xs font-mono text-foreground shrink-0 w-[64px] text-right">
+          <span className="text-2xs font-mono tabular-nums whitespace-nowrap text-foreground shrink-0 min-w-16 text-right">
             {m.hitRate.toFixed(1)}%
           </span>
-          <span className="hidden sm:inline text-3xs font-mono text-muted-foreground shrink-0 w-[120px] text-right">
+          <span className="hidden sm:inline text-3xs font-mono tabular-nums whitespace-nowrap text-muted-foreground shrink-0 min-w-30 text-right">
             {formatNumber(m.cacheRead)} / {formatNumber(m.cacheWrite)}
           </span>
         </div>
@@ -784,9 +731,9 @@ function ClientCacheTable({ byClient, t }: { byClient: ClientCache[]; t: Strings
 
   if (sorted.length === 0) {
     return (
-      <div className="text-xs font-mono text-muted-foreground text-center py-8">
+      <EmptyState bare className="py-8">
         {t.noClientCacheData}
-      </div>
+      </EmptyState>
     );
   }
 
@@ -794,37 +741,25 @@ function ClientCacheTable({ byClient, t }: { byClient: ClientCache[]; t: Strings
     <div className="overflow-x-auto">
       <table className="w-full font-mono text-2xs">
         <thead>
-          <tr className="text-muted-foreground text-left border-b border-border">
-            <th className="py-1.5 px-2 font-bold text-3xs uppercase tracking-eyebrow">
-              {t.rankHeader}
-            </th>
-            <th className="py-1.5 px-2 font-bold text-3xs uppercase tracking-eyebrow">
-              {t.apiKeyHash}
-            </th>
-            <th className="py-1.5 px-2 font-bold text-3xs uppercase tracking-eyebrow text-right">
-              {t.hitRate}
-            </th>
-            <th className="py-1.5 px-2 font-bold text-3xs uppercase tracking-eyebrow text-right">
-              {t.cacheReadHeader}
-            </th>
-            <th className="py-1.5 px-2 font-bold text-3xs uppercase tracking-eyebrow text-right">
-              {t.cacheWriteHeader}
-            </th>
-            <th className="py-1.5 px-2 font-bold text-3xs uppercase tracking-eyebrow text-right">
-              {t.requestsHeader}
-            </th>
+          <tr className="text-muted-foreground text-left border-b border-border/20">
+            <th className="py-1.5 px-2 font-medium text-xs">{t.rankHeader}</th>
+            <th className="py-1.5 px-2 font-medium text-xs">{t.apiKeyHash}</th>
+            <th className="py-1.5 px-2 font-medium text-xs text-right">{t.hitRate}</th>
+            <th className="py-1.5 px-2 font-medium text-xs text-right">{t.cacheReadHeader}</th>
+            <th className="py-1.5 px-2 font-medium text-xs text-right">{t.cacheWriteHeader}</th>
+            <th className="py-1.5 px-2 font-medium text-xs text-right">{t.requestsHeader}</th>
           </tr>
         </thead>
         <tbody>
           {sorted.map((u, i) => (
-            <tr key={u.apiKeyHash} className="border-b border-border/50 hover:bg-surface-hover">
+            <tr key={u.apiKeyHash} className="border-b border-border/20 hover:bg-surface-hover">
               <td className="py-1.5 px-2 text-muted-foreground">{i + 1}</td>
               <td className="py-1.5 px-2">
-                <span className="text-subtle" title={u.apiKeyHash}>
+                <span className="text-muted-foreground" title={u.apiKeyHash}>
                   {truncateHash(u.apiKeyHash, 8)}
                 </span>
               </td>
-              <td className="py-1.5 px-2 text-right font-bold">{u.hitRate.toFixed(1)}%</td>
+              <td className="py-1.5 px-2 text-right font-medium">{u.hitRate.toFixed(1)}%</td>
               <td className="py-1.5 px-2 text-right text-muted-foreground">
                 {formatNumber(u.cacheRead)}
               </td>
@@ -874,19 +809,18 @@ function CachePageContent() {
         {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="rounded-md border border-border bg-surface p-3">
+              <div key={i} className="rounded-xl border border-border/30 bg-card p-3">
                 <Skeleton className="h-3 w-20 mb-2" />
                 <Skeleton className="h-6 w-16" />
               </div>
             ))}
           </div>
         ) : error || !data ? (
-          <div className="text-sm font-mono text-muted-foreground text-center py-8">
-            {t.failedToLoad}
-          </div>
+          <EmptyState>{t.failedToLoad}</EmptyState>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <StatCard
+          <dl className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <Stat
+              boxed
               label={t.cacheHitRate}
               value={`${data.stats.hitRate.toFixed(1)}%`}
               detail={t.ofRequests(
@@ -894,10 +828,14 @@ function CachePageContent() {
                 formatNumber(data.stats.totalRequests),
               )}
             />
-            <StatCard label={t.cacheReadTokens} value={formatNumber(data.stats.totalCacheRead)} />
-            <StatCard label={t.cacheWriteTokens} value={formatNumber(data.stats.totalCacheWrite)} />
-            <StatCard label={t.totalRequests} value={formatNumber(data.stats.totalRequests)} />
-          </div>
+            <Stat boxed label={t.cacheReadTokens} value={formatNumber(data.stats.totalCacheRead)} />
+            <Stat
+              boxed
+              label={t.cacheWriteTokens}
+              value={formatNumber(data.stats.totalCacheWrite)}
+            />
+            <Stat boxed label={t.totalRequests} value={formatNumber(data.stats.totalRequests)} />
+          </dl>
         )}
       </div>
 
@@ -924,16 +862,16 @@ function CachePageContent() {
               label={t.cacheEfficiencyByModel}
               detail={t.nModels(data.byModel.length)}
             />
-            <div className="rounded-md border border-border bg-surface p-3">
+            <Card>
               <ModelEfficiencyChart byModel={data.byModel} t={t} />
-            </div>
+            </Card>
           </div>
 
           <div>
             <SectionHeader label={t.cacheByClient} detail={t.nClients(data.byClient.length)} />
-            <div className="rounded-md border border-border bg-surface p-3">
+            <Card>
               <ClientCacheTable byClient={data.byClient} t={t} />
-            </div>
+            </Card>
           </div>
 
           <CacheEfficiencyHeatmap t={t} />

@@ -1,8 +1,12 @@
+import { ArrowRight } from 'lucide-react';
+
+import { buttonVariants } from '@/components/ui/button';
 import {
   getLocalizedFrameworks,
   getOptimizationsOverview,
 } from '@/lib/agentx/agentx-optimizations-zh';
 import type { Locale } from '@/lib/i18n/i18n';
+import { cn } from '@/lib/shared/utils';
 
 import { AgentXOptimizationsLink } from './agentx-optimizations-link';
 
@@ -15,12 +19,9 @@ export function AgentXOptimizationsCallout({ locale }: { locale: Locale }) {
     <section
       aria-labelledby="agentx-optimizations-title"
       data-testid="agentx-optimizations-callout"
-      className="rounded-lg border border-primary/30 bg-primary/5"
     >
-      <div className="px-4 py-4 sm:px-5 sm:py-5">
-        <p className="mb-2 font-mono text-2xs font-medium tracking-eyebrow text-primary uppercase">
-          {overview.eyebrow}
-        </p>
+      <div>
+        <p className="mb-2 text-xs font-medium text-muted-foreground">{overview.eyebrow}</p>
         <h2 id="agentx-optimizations-title" className="text-lg font-semibold text-foreground">
           {overview.title}
         </h2>
@@ -31,9 +32,10 @@ export function AgentXOptimizationsCallout({ locale }: { locale: Locale }) {
           analyticsEvent="agentx_optimizations_opened"
           analyticsTarget="agentx-callout"
           data-testid="agentx-optimizations-cta"
-          className="mt-4 inline-flex min-h-11 items-center rounded-md border border-primary/40 px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/10"
+          className={cn(buttonVariants({ variant: 'outline' }), 'mt-4')}
         >
-          {overview.ui.readMore} →
+          {overview.ui.readMore}
+          <ArrowRight aria-hidden="true" />
         </AgentXOptimizationsLink>
 
         <ul className="mt-4 flex flex-wrap gap-2">
@@ -45,7 +47,10 @@ export function AgentXOptimizationsCallout({ locale }: { locale: Locale }) {
                 analyticsTarget={framework.slug}
                 data-testid="agentx-optimizations-framework-link"
                 data-framework={framework.slug}
-                className="inline-flex min-h-11 items-center rounded-md border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary"
+                className={cn(
+                  buttonVariants({ variant: 'outline', size: 'sm' }),
+                  'font-normal text-muted-foreground hover:text-foreground',
+                )}
               >
                 {framework.name}
               </AgentXOptimizationsLink>

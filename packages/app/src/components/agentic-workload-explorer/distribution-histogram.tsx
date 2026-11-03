@@ -3,6 +3,7 @@
 import { useId, useMemo } from 'react';
 import type * as d3 from 'd3';
 import { D3Chart, type D3ChartProps, type RenderContext } from '@/lib/d3-chart/D3Chart';
+import { chartTooltipShell } from '@/lib/d3-chart/tooltip-shell';
 import { escapeHtml } from '@/lib/shared/utils';
 import { useLocale } from '@/lib/i18n/use-locale';
 
@@ -174,7 +175,9 @@ export function DistributionHistogram({
           selection.attr('opacity', opacityFor(bucket));
         },
         content: (b) =>
-          `${escapeHtml(format(b.min))} – ${escapeHtml(format(b.max))}: ${b.entries.length} ${b.entries.length === 1 ? t.request : t.requests}`,
+          chartTooltipShell(
+            `<div class="text-xs">${escapeHtml(format(b.min))} – ${escapeHtml(format(b.max))}: ${b.entries.length} ${b.entries.length === 1 ? t.request : t.requests}</div>`,
+          ),
         onPointClick: onBucketClick ? (b) => onBucketClick(indices.get(b)!) : undefined,
       },
       noDataOverlay:
@@ -191,13 +194,10 @@ export function DistributionHistogram({
           {t.above(beyondAxis, format(buckets.at(-1)!.max).replace(/\.0(?=\D|$)/u, ''))}
         </p>
       )}
-      <div className="mt-3 grid grid-cols-5 gap-1.5 border-t border-border pt-3">
+      <div className="mt-3 grid grid-cols-5 gap-1.5 border-t border-border/20 pt-3">
         {percentiles.map((p) => (
-          <div
-            key={p.label}
-            className="min-w-0 rounded-md border border-border bg-surface-hover px-1 py-1.5 text-center"
-          >
-            <div className="flex items-center justify-center gap-1 text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground">
+          <div key={p.label} className="min-w-0 rounded-md bg-muted/40 px-1 py-1.5 text-center">
+            <div className="flex items-center justify-center gap-1 text-xs font-medium text-muted-foreground">
               {GUIDE_COLORS[p.label] && (
                 <span
                   className="inline-block h-0.5 w-2.5"
@@ -207,7 +207,7 @@ export function DistributionHistogram({
               {p.label}
             </div>
             <div
-              className={`mt-0.5 truncate font-mono font-bold tracking-tight ${expanded ? 'text-sm' : 'text-xs'}`}
+              className={`mt-0.5 truncate font-mono font-medium ${expanded ? 'text-sm' : 'text-xs'}`}
             >
               {format(p.value)}
             </div>

@@ -1,8 +1,8 @@
 'use client';
 
 import { useMemo, useState, useRef, useCallback, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
+import { FloatingTooltip } from '@/lib/d3-chart/floating-tooltip';
 import {
   formatDuration,
   formatInteractivity,
@@ -19,13 +19,9 @@ import { buildHashMetrics, type HashSourceRow } from '@/lib/agentic-workload-exp
 import { useExplorerHref } from '@/hooks/agentic-workload-explorer/use-explorer-href';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
-
-const COLORS = {
-  input: '#0ea5e9',
-  cacheRead: '#10b981',
-  cacheWrite: '#f59e0b',
-  output: '#8b5cf6',
-} as const;
+import { TOKEN_SERIES_COLORS as COLORS } from '@/components/agentic-workload-explorer/series-colors';
+import { Button } from '@/components/ui/button';
+import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 
 const RATIO_COLORS = {
   good: '#10b981',
@@ -35,38 +31,40 @@ const RATIO_COLORS = {
 
 const STRINGS = {
   en: {
-    sectionTitle: 'Token Flamegraph',
+    sectionTitle: 'Token flamegraph',
     noData: 'No request data available',
-    apiCache: 'API Cache',
-    hashBlocks: 'Hash Blocks',
-    hashProvider: 'Hash / Provider',
+    apiCache: 'API cache',
+    hashBlocks: 'Hash blocks',
+    hashProvider: 'Hash / provider',
     hashProviderTooltip:
       'Hash chain token count / provider-reported input tokens. 1.0 means the padded chain matches billing.',
     chronological: 'Chronological',
+    modeLabel: 'Cache view',
+    layoutLabel: 'Layout',
     grouped: 'Grouped',
     classifierLike: 'Classifier-like',
-    expandAll: 'Expand All',
-    collapseAll: 'Collapse All',
+    expandAll: 'Expand all',
+    collapseAll: 'Collapse all',
     classifierLikeSignature: 'Classifier-like response signature',
     noHashChain: 'No hash chain recorded for this request',
-    hashProviderLabel: 'Hash / Provider:',
-    hashTokens: 'Hash Tokens:',
-    providerInput: 'Provider Input:',
+    hashProviderLabel: 'Hash / provider:',
+    hashTokens: 'Hash tokens:',
+    providerInput: 'Provider input:',
     providerInputDetail: '(input + cache_read + cache_write)',
-    hashBlocksLabel: 'Hash Blocks:',
+    hashBlocksLabel: 'Hash blocks:',
     cachedSuffix: 'cached',
     output: 'Output:',
     total: 'Total:',
     apiLegend: {
       input: 'Input',
-      cacheRead: 'Cache Read',
-      cacheWrite: 'Cache Write',
+      cacheRead: 'Cache read',
+      cacheWrite: 'Cache write',
       output: 'Output',
     },
     hashLegend: {
       input: 'Input',
-      cacheRead: 'Cached Prefix',
-      cacheWrite: 'Uncached Suffix',
+      cacheRead: 'Cached prefix',
+      cacheWrite: 'Uncached suffix',
       output: 'Output',
     },
     ratioLegend: {
@@ -88,6 +86,8 @@ const STRINGS = {
     hashProviderTooltip:
       'Hash chain token 数 / provider 上报的 input token 数。1.0 表示填充后的 chain 与计费一致。',
     chronological: '时间顺序',
+    modeLabel: '缓存视图',
+    layoutLabel: '布局',
     grouped: '分组',
     classifierLike: '类分类器',
     expandAll: '全部展开',
@@ -220,12 +220,6 @@ export function TokenFlamegraph({ rows, sessionId }: { rows: StatRow[]; sessionI
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(800);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -465,91 +459,41 @@ export function TokenFlamegraph({ rows, sessionId }: { rows: StatRow[]; sessionI
 
   return (
     <div className="space-y-4">
-      <div className="sticky -top-5 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 -mx-2 px-2 pt-5 pb-2 space-y-2 border-b border-border">
+      <div className="sticky -top-5 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 -mx-2 px-2 pt-5 pb-2 space-y-2 border-b border-border/20">
         <div className="flex items-center gap-3">
-          <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-            {t.sectionTitle}
-          </span>
-          <div className="flex-1 h-px bg-border" />
+          <span className="text-xs font-medium text-muted-foreground">{t.sectionTitle}</span>
+          <div className="flex-1 h-px bg-border/30" />
         </div>
 
         <div className="flex items-center gap-4 flex-wrap">
-          <div className="flex items-center border border-border rounded overflow-hidden">
-            <button
-              type="button"
-              onClick={() => {
-                setMode('api');
-                track('agentic_workload_flamegraph_mode_changed', { mode: 'api' });
-              }}
-              className={`text-3xs font-mono px-2 py-1 transition-colors ${
-                mode === 'api'
-                  ? 'bg-surface-hover text-foreground'
-                  : 'text-subtle hover:text-foreground'
-              }`}
-            >
-              {t.apiCache}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMode('hash');
-                track('agentic_workload_flamegraph_mode_changed', { mode: 'hash' });
-              }}
-              className={`text-3xs font-mono px-2 py-1 border-l border-border transition-colors ${
-                mode === 'hash'
-                  ? 'bg-surface-hover text-foreground'
-                  : 'text-subtle hover:text-foreground'
-              }`}
-            >
-              {t.hashBlocks}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMode('ratio');
-                track('agentic_workload_flamegraph_mode_changed', { mode: 'ratio' });
-              }}
-              title={t.hashProviderTooltip}
-              className={`text-3xs font-mono px-2 py-1 border-l border-border transition-colors ${
-                mode === 'ratio'
-                  ? 'bg-surface-hover text-foreground'
-                  : 'text-subtle hover:text-foreground'
-              }`}
-            >
-              {t.hashProvider}
-            </button>
-          </div>
+          <SegmentedToggle
+            role="group"
+            ariaLabel={t.modeLabel}
+            value={mode}
+            onValueChange={(next) => {
+              setMode(next);
+              track('agentic_workload_flamegraph_mode_changed', { mode: next });
+            }}
+            options={[
+              { value: 'api', label: t.apiCache },
+              { value: 'hash', label: t.hashBlocks },
+              { value: 'ratio', label: t.hashProvider, title: t.hashProviderTooltip },
+            ]}
+          />
           {subagentGroupTurns.length > 0 && (
-            <div className="flex items-center border border-border rounded overflow-hidden">
-              <button
-                type="button"
-                onClick={() => {
-                  setLayout('chronological');
-                  track('agentic_workload_flamegraph_layout_changed', { layout: 'chronological' });
-                }}
-                className={`text-3xs font-mono px-2 py-1 transition-colors ${
-                  layout === 'chronological'
-                    ? 'bg-surface-hover text-foreground'
-                    : 'text-subtle hover:text-foreground'
-                }`}
-              >
-                {t.chronological}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setLayout('grouped');
-                  track('agentic_workload_flamegraph_layout_changed', { layout: 'grouped' });
-                }}
-                className={`text-3xs font-mono px-2 py-1 border-l border-border transition-colors ${
-                  layout === 'grouped'
-                    ? 'bg-surface-hover text-foreground'
-                    : 'text-subtle hover:text-foreground'
-                }`}
-              >
-                {t.grouped}
-              </button>
-            </div>
+            <SegmentedToggle
+              role="group"
+              ariaLabel={t.layoutLabel}
+              value={layout}
+              onValueChange={(next) => {
+                setLayout(next);
+                track('agentic_workload_flamegraph_layout_changed', { layout: next });
+              }}
+              options={[
+                { value: 'chronological', label: t.chronological },
+                { value: 'grouped', label: t.grouped },
+              ]}
+            />
           )}
           {legendItems.map((item) => (
             <div key={item.key} className="flex items-center gap-1.5">
@@ -565,27 +509,29 @@ export function TokenFlamegraph({ rows, sessionId }: { rows: StatRow[]; sessionI
             <span className="text-3xs font-mono text-muted-foreground">{t.classifierLike}</span>
           </div>
           {subagentGroupTurns.length > 0 && layout === 'grouped' && (
-            <div className="flex items-center gap-1 ml-auto">
-              <button
+            <div className="ml-auto flex items-center gap-2">
+              <Button
                 type="button"
+                variant="outline"
+                size="xs"
                 onClick={() => {
                   expandAll();
                   track('agentic_workload_flamegraph_expand_all');
                 }}
-                className="text-3xs font-mono text-subtle hover:text-foreground px-1.5 py-0.5 border border-border rounded hover:bg-surface-hover transition-colors"
               >
                 {t.expandAll}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="outline"
+                size="xs"
                 onClick={() => {
                   collapseAll();
                   track('agentic_workload_flamegraph_collapse_all');
                 }}
-                className="text-3xs font-mono text-subtle hover:text-foreground px-1.5 py-0.5 border border-border rounded hover:bg-surface-hover transition-colors"
               >
                 {t.collapseAll}
-              </button>
+              </Button>
             </div>
           )}
         </div>
@@ -593,7 +539,7 @@ export function TokenFlamegraph({ rows, sessionId }: { rows: StatRow[]; sessionI
 
       <div
         ref={containerRef}
-        className="bg-surface border border-border rounded-md p-4 overflow-x-auto relative"
+        className="bg-card border border-border/30 rounded-xl p-4 overflow-x-auto relative"
       >
         <svg width={containerWidth - 32} height={svgHeight} className="block">
           {mode === 'ratio' && barWidth > 0 && (
@@ -693,7 +639,7 @@ export function TokenFlamegraph({ rows, sessionId }: { rows: StatRow[]; sessionI
                   y={y + ROW_HEIGHT / 2}
                   dominantBaseline="central"
                   className={`fill-current hover:underline ${
-                    row.isClassifierLike ? 'text-orange-500' : 'text-muted-foreground'
+                    row.isClassifierLike ? 'text-warning' : 'text-muted-foreground'
                   }`}
                   style={{
                     fontSize: '11px',
@@ -775,7 +721,7 @@ export function TokenFlamegraph({ rows, sessionId }: { rows: StatRow[]; sessionI
                   x={barX + barWidth + 8}
                   y={y + ROW_HEIGHT / 2}
                   dominantBaseline="central"
-                  className="fill-current text-subtle"
+                  className="fill-current text-muted-foreground"
                   style={{
                     fontSize: '10px',
                     fontFamily: 'var(--font-mono, ui-monospace, monospace)',
@@ -796,175 +742,140 @@ export function TokenFlamegraph({ rows, sessionId }: { rows: StatRow[]; sessionI
           })}
         </svg>
 
-        {tooltip &&
-          mounted &&
-          createPortal(
-            (() => {
-              const TOOLTIP_MAX_HEIGHT = 180;
-              const TOOLTIP_WIDTH = 240;
-              const vw = window.innerWidth;
-              const vh = window.innerHeight;
-              const placeAbove =
-                tooltip.y >= TOOLTIP_MAX_HEIGHT + 8 || vh - tooltip.y < TOOLTIP_MAX_HEIGHT + 8;
-              const left = Math.max(8, Math.min(tooltip.x + 12, vw - TOOLTIP_WIDTH - 8));
-              return (
-                <div
-                  className="fixed pointer-events-none z-50 bg-background border border-border rounded-md shadow-lg px-3 py-2 space-y-1"
-                  style={{
-                    left,
-                    top: placeAbove ? tooltip.y - 8 : tooltip.y + 20,
-                    transform: placeAbove ? 'translateY(-100%)' : 'none',
-                  }}
-                >
-                  <div className="text-2xs font-mono font-medium text-foreground">
-                    {tooltip.label}
-                  </div>
-                  {tooltip.isClassifierLike && (
-                    <div className="text-3xs font-mono uppercase tracking-eyebrow text-orange-500">
-                      {t.classifierLikeSignature}
+        {tooltip && (
+          <FloatingTooltip x={tooltip.x} y={tooltip.y} placement="above" className="space-y-1">
+            <div className="text-2xs font-mono font-medium text-foreground">{tooltip.label}</div>
+            {tooltip.isClassifierLike && (
+              <div className="text-xs text-warning font-medium">{t.classifierLikeSignature}</div>
+            )}
+            <div className="text-3xs font-mono text-muted-foreground space-y-0.5">
+              {tooltip.mode === 'ratio' ? (
+                <>
+                  {tooltip.ratio === null ? (
+                    <div>{t.noHashChain}</div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="w-2 h-2 rounded-sm inline-block"
+                        style={{ backgroundColor: ratioColor(tooltip.ratio) }}
+                      />
+                      <span className="text-foreground">
+                        {t.hashProviderLabel}{' '}
+                        <span className="font-medium">{tooltip.ratio.toFixed(3)}</span>{' '}
+                        <span className="text-muted-foreground">
+                          ({((tooltip.ratio - 1) * 100).toFixed(1)}%)
+                        </span>
+                      </span>
                     </div>
                   )}
-                  <div className="text-3xs font-mono text-muted-foreground space-y-0.5">
-                    {tooltip.mode === 'ratio' ? (
-                      <>
-                        {tooltip.ratio === null ? (
-                          <div>{t.noHashChain}</div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <span
-                              className="w-2 h-2 rounded-sm inline-block"
-                              style={{ backgroundColor: ratioColor(tooltip.ratio) }}
-                            />
-                            <span className="text-foreground">
-                              {t.hashProviderLabel}{' '}
-                              <span className="font-medium">{tooltip.ratio.toFixed(3)}</span>{' '}
-                              <span className="text-subtle">
-                                ({((tooltip.ratio - 1) * 100).toFixed(1)}%)
-                              </span>
-                            </span>
-                          </div>
-                        )}
-                        {tooltip.hashTokenCount !== null && (
-                          <div>
-                            {t.hashTokens} {formatNumber(tooltip.hashTokenCount)}
-                          </div>
-                        )}
-                        {tooltip.providerInputTotal !== null && (
-                          <div>
-                            {t.providerInput} {formatNumber(tooltip.providerInputTotal)}{' '}
-                            <span className="text-subtle">{t.providerInputDetail}</span>
-                          </div>
-                        )}
-                        {tooltip.hashBlocks !== null && (
-                          <div>
-                            {t.hashBlocksLabel} {formatNumber(tooltip.cachedHashBlocks ?? 0)} /{' '}
-                            {formatNumber(tooltip.hashBlocks)} {t.cachedSuffix}
-                          </div>
-                        )}
-                        <div className="pt-1 border-t border-border">
-                          {t.output} {formatNumber(tooltip.output)} &middot; $
-                          {tooltip.cost.toFixed(4)}
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        {tooltip.mode === 'api' && (
-                          <div className="flex items-center gap-2">
-                            <span
-                              className="w-2 h-2 rounded-sm inline-block"
-                              style={{ backgroundColor: COLORS.input }}
-                            />
-                            <span>
-                              {t.apiLegend.input}: {formatNumber(tooltip.input)}
-                            </span>
-                          </div>
-                        )}
-                        {tooltip.cacheRead > 0 && (
-                          <div className="flex items-center gap-2">
-                            <span
-                              className="w-2 h-2 rounded-sm inline-block"
-                              style={{ backgroundColor: COLORS.cacheRead }}
-                            />
-                            <span>
-                              {tooltip.mode === 'hash'
-                                ? t.hashLegend.cacheRead
-                                : t.apiLegend.cacheRead}
-                              : {formatNumber(tooltip.cacheRead)}
-                            </span>
-                          </div>
-                        )}
-                        {tooltip.cacheWrite > 0 && (
-                          <div className="flex items-center gap-2">
-                            <span
-                              className="w-2 h-2 rounded-sm inline-block"
-                              style={{ backgroundColor: COLORS.cacheWrite }}
-                            />
-                            <span>
-                              {tooltip.mode === 'hash'
-                                ? t.hashLegend.cacheWrite
-                                : t.apiLegend.cacheWrite}
-                              : {formatNumber(tooltip.cacheWrite)}
-                            </span>
-                          </div>
-                        )}
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="w-2 h-2 rounded-sm inline-block"
-                            style={{ backgroundColor: COLORS.output }}
-                          />
-                          <span>
-                            {t.output} {formatNumber(tooltip.output)}
-                          </span>
-                        </div>
-                        <div className="pt-1 border-t border-border">
-                          {t.total} {formatNumber(tooltip.total)} &middot; $
-                          {tooltip.cost.toFixed(4)}
-                        </div>
-                        {tooltip.mode === 'hash' && tooltip.hashBlocks !== null && (
-                          <div>
-                            {t.hashBlocksLabel} {formatNumber(tooltip.cachedHashBlocks ?? 0)} /{' '}
-                            {formatNumber(tooltip.hashBlocks)} {t.cachedSuffix}
-                            {tooltip.hashTokenCount !== null && (
-                              <>
-                                {' '}
-                                &middot; {t.hashTokens} {formatNumber(tooltip.hashTokenCount)}
-                              </>
-                            )}
-                          </div>
-                        )}
-                      </>
-                    )}
-                    {(tooltip.ttftMs !== null || tooltip.tpotMs !== null) && (
-                      <div>
-                        TTFT: {tooltip.ttftMs === null ? '—' : formatDuration(tooltip.ttftMs)}{' '}
-                        &middot; TPOT:{' '}
-                        {tooltip.tpotMs === null ? '—' : formatDuration(tooltip.tpotMs)}
-                        {tooltip.tpotMs !== null && (
-                          <> &middot; {formatInteractivity(tooltip.tpotMs)}</>
-                        )}
-                        {(() => {
-                          if (tooltip.mode !== 'api') return null;
-                          const ps = computePrefillSpeed(
-                            tooltip.cacheRead,
-                            tooltip.cacheWrite,
-                            tooltip.ttftMs,
-                          );
-                          return ps === null ? null : (
-                            <>
-                              {' '}
-                              &middot;{' '}
-                              <span className="text-sky-500">{formatPrefillSpeed(ps)}</span>
-                            </>
-                          );
-                        })()}
-                      </div>
-                    )}
+                  {tooltip.hashTokenCount !== null && (
+                    <div>
+                      {t.hashTokens} {formatNumber(tooltip.hashTokenCount)}
+                    </div>
+                  )}
+                  {tooltip.providerInputTotal !== null && (
+                    <div>
+                      {t.providerInput} {formatNumber(tooltip.providerInputTotal)}{' '}
+                      <span className="text-muted-foreground">{t.providerInputDetail}</span>
+                    </div>
+                  )}
+                  {tooltip.hashBlocks !== null && (
+                    <div>
+                      {t.hashBlocksLabel} {formatNumber(tooltip.cachedHashBlocks ?? 0)} /{' '}
+                      {formatNumber(tooltip.hashBlocks)} {t.cachedSuffix}
+                    </div>
+                  )}
+                  <div className="pt-1 border-t border-border/20">
+                    {t.output} {formatNumber(tooltip.output)} &middot; ${tooltip.cost.toFixed(4)}
                   </div>
+                </>
+              ) : (
+                <>
+                  {tooltip.mode === 'api' && (
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="w-2 h-2 rounded-sm inline-block"
+                        style={{ backgroundColor: COLORS.input }}
+                      />
+                      <span>
+                        {t.apiLegend.input}: {formatNumber(tooltip.input)}
+                      </span>
+                    </div>
+                  )}
+                  {tooltip.cacheRead > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="w-2 h-2 rounded-sm inline-block"
+                        style={{ backgroundColor: COLORS.cacheRead }}
+                      />
+                      <span>
+                        {tooltip.mode === 'hash' ? t.hashLegend.cacheRead : t.apiLegend.cacheRead}:{' '}
+                        {formatNumber(tooltip.cacheRead)}
+                      </span>
+                    </div>
+                  )}
+                  {tooltip.cacheWrite > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="w-2 h-2 rounded-sm inline-block"
+                        style={{ backgroundColor: COLORS.cacheWrite }}
+                      />
+                      <span>
+                        {tooltip.mode === 'hash' ? t.hashLegend.cacheWrite : t.apiLegend.cacheWrite}
+                        : {formatNumber(tooltip.cacheWrite)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="w-2 h-2 rounded-sm inline-block"
+                      style={{ backgroundColor: COLORS.output }}
+                    />
+                    <span>
+                      {t.output} {formatNumber(tooltip.output)}
+                    </span>
+                  </div>
+                  <div className="pt-1 border-t border-border/20">
+                    {t.total} {formatNumber(tooltip.total)} &middot; ${tooltip.cost.toFixed(4)}
+                  </div>
+                  {tooltip.mode === 'hash' && tooltip.hashBlocks !== null && (
+                    <div>
+                      {t.hashBlocksLabel} {formatNumber(tooltip.cachedHashBlocks ?? 0)} /{' '}
+                      {formatNumber(tooltip.hashBlocks)} {t.cachedSuffix}
+                      {tooltip.hashTokenCount !== null && (
+                        <>
+                          {' '}
+                          &middot; {t.hashTokens} {formatNumber(tooltip.hashTokenCount)}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+              {(tooltip.ttftMs !== null || tooltip.tpotMs !== null) && (
+                <div>
+                  TTFT: {tooltip.ttftMs === null ? '—' : formatDuration(tooltip.ttftMs)} &middot;
+                  TPOT: {tooltip.tpotMs === null ? '—' : formatDuration(tooltip.tpotMs)}
+                  {tooltip.tpotMs !== null && <> &middot; {formatInteractivity(tooltip.tpotMs)}</>}
+                  {(() => {
+                    if (tooltip.mode !== 'api') return null;
+                    const ps = computePrefillSpeed(
+                      tooltip.cacheRead,
+                      tooltip.cacheWrite,
+                      tooltip.ttftMs,
+                    );
+                    return ps === null ? null : (
+                      <>
+                        {' '}
+                        &middot; <span>{formatPrefillSpeed(ps)}</span>
+                      </>
+                    );
+                  })()}
                 </div>
-              );
-            })(),
-            document.body,
-          )}
+              )}
+            </div>
+          </FloatingTooltip>
+        )}
       </div>
     </div>
   );

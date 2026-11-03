@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import {
   ConversationView,
   buildConversationTree,
@@ -16,14 +16,14 @@ import { track } from '@/lib/analytics/analytics';
 
 const STRINGS = {
   en: {
-    exitReplay: '⏹ Exit Replay',
-    replay: '▶ Replay',
+    exitReplay: 'Exit replay',
+    replay: 'Replay',
     loadingRequests: (loaded: number, total: number) =>
       `Loading all requests (${loaded} / ${total})...`,
   },
   zh: {
-    exitReplay: '⏹ 退出回放',
-    replay: '▶ 回放',
+    exitReplay: '退出回放',
+    replay: '回放',
     loadingRequests: (loaded: number, total: number) => `加载全部请求中 (${loaded} / ${total})…`,
   },
 };
@@ -162,55 +162,52 @@ export default function ConversationPage() {
   );
 
   return (
-    <Card>
-      <CardContent className="pt-6">
-        <div className="flex items-center gap-2 mb-3">
-          <button
-            onClick={() => {
-              track('agentic_workload_replay_toggled', { enabled: !replayMode });
-              if (replayMode) handleDisableReplay();
-              else handleEnableReplay();
-            }}
-            className={`flex items-center gap-1.5 px-2 py-1 text-2xs font-mono border rounded-md transition-colors ${
-              replayMode
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/20'
-                : 'bg-surface hover:bg-surface-hover border-border text-subtle hover:text-foreground'
-            }`}
-          >
-            {replayMode ? t.exitReplay : t.replay}
-          </button>
-          {loadingAll && (
-            <span className="flex items-center gap-1.5 text-2xs font-mono text-subtle">
-              <span className="h-3 w-3 border-2 border-foreground/20 border-t-foreground/60 rounded-full animate-spin" />
-              {t.loadingRequests(requests.length, total)}
-            </span>
-          )}
-        </div>
-
-        {replayReady && (
-          <div className="mb-3">
-            <ReplayControls
-              isPlaying={replay.isPlaying}
-              currentIndex={replay.currentIndex}
-              total={nodeCount}
-              speed={replay.speed}
-              onToggle={replay.toggle}
-              onSpeedChange={replay.setSpeed}
-              onSeek={replay.seekTo}
-              onReset={replay.reset}
-            />
-          </div>
+    <div>
+      <div className="flex items-center gap-2 mb-3">
+        <Button
+          type="button"
+          variant="outline"
+          size="xs"
+          aria-pressed={replayMode}
+          onClick={() => {
+            track('agentic_workload_replay_toggled', { enabled: !replayMode });
+            if (replayMode) handleDisableReplay();
+            else handleEnableReplay();
+          }}
+        >
+          {replayMode ? t.exitReplay : t.replay}
+        </Button>
+        {loadingAll && (
+          <span className="flex items-center gap-1.5 text-2xs font-mono text-muted-foreground">
+            <span className="h-3 w-3 border-2 border-foreground/20 border-t-foreground/60 rounded-full animate-spin" />
+            {t.loadingRequests(requests.length, total)}
+          </span>
         )}
+      </div>
 
-        <div>
-          <ConversationView
-            requests={requests}
-            visibleNodeCount={replayReady ? replay.currentIndex : undefined}
-            reversed={replayMode ? false : Boolean(reversed)}
+      {replayReady && (
+        <div className="mb-3">
+          <ReplayControls
+            isPlaying={replay.isPlaying}
+            currentIndex={replay.currentIndex}
+            total={nodeCount}
+            speed={replay.speed}
+            onToggle={replay.toggle}
+            onSpeedChange={replay.setSpeed}
+            onSeek={replay.seekTo}
+            onReset={replay.reset}
           />
-          <div ref={lastNodeRef} />
         </div>
-      </CardContent>
-    </Card>
+      )}
+
+      <div>
+        <ConversationView
+          requests={requests}
+          visibleNodeCount={replayReady ? replay.currentIndex : undefined}
+          reversed={replayMode ? false : Boolean(reversed)}
+        />
+        <div ref={lastNodeRef} />
+      </div>
+    </div>
   );
 }

@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { SegmentedToggle } from '@/components/ui/segmented-toggle';
+import { SEGMENT_RADIUS_STYLE, SEGMENTED_CONTAINER_STYLE } from '@/components/ui/control-styles';
+import { cn } from '@/lib/shared/utils';
 import {
   formatNumber,
   formatTimestamp,
@@ -23,24 +27,24 @@ import { track } from '@/lib/analytics/analytics';
 
 const STRINGS = {
   en: {
-    sessionInfo: 'Session Info',
+    sessionInfo: 'Session info',
     client: 'Client',
     started: 'Started',
-    lastActive: 'Last Active',
-    cliVersion: 'CLI Version',
+    lastActive: 'Last active',
+    cliVersion: 'CLI version',
     platform: 'Platform',
-    traceVersion: 'Trace Version',
-    traceMode: 'Trace Mode',
+    traceVersion: 'Trace version',
+    traceMode: 'Trace mode',
     anonymized: 'Anonymized',
     full: 'Full',
     usage: 'Usage',
     requests: 'Requests',
-    inputTokens: 'Input Tokens',
-    outputTokens: 'Output Tokens',
-    cacheCreated: 'Cache Created',
-    cacheRead: 'Cache Read',
-    estCost: 'Est. Cost',
-    readWriteOut: 'Read : Write : Out',
+    inputTokens: 'Input tokens',
+    outputTokens: 'Output tokens',
+    cacheCreated: 'Cache created',
+    cacheRead: 'Cache read',
+    estCost: 'Est. cost',
+    readWriteOut: 'Read : write : out',
     requestsHeading: 'Requests',
     loading: (remaining: number) => `Loading... (${remaining} remaining)`,
     sessionNotFound: 'Session not found',
@@ -255,20 +259,18 @@ export default function SessionLayout({ children }: { children: React.ReactNode 
         <div className="flex items-center gap-1.5 text-xs font-mono">
           <Link
             href={explorerHref('/sessions')}
-            className="text-subtle hover:text-foreground transition-colors"
+            className="text-muted-foreground hover:text-foreground transition-colors"
           >
             sessions
           </Link>
-          <span className="text-subtle">/</span>
+          <span className="text-muted-foreground">/</span>
           <span className="font-medium">{session.id}</span>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-        <div className="rounded-md border border-border bg-surface p-3">
-          <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground mb-2">
-            {t.sessionInfo}
-          </div>
+        <Card>
+          <div className="text-xs font-medium text-muted-foreground mb-2">{t.sessionInfo}</div>
           <div className="text-xs space-y-1.5">
             <div className="flex justify-between items-center">
               <span className="text-muted-foreground">{t.client}</span>
@@ -276,8 +278,11 @@ export default function SessionLayout({ children }: { children: React.ReactNode 
                 {truncateHash(session.clientApiKeyHash)}
               </span>
             </div>
-            <InfoRow label={t.started} value={formatTimestamp(session.startedAt)} />
-            <InfoRow label={t.lastActive} value={formatSnapshotTime(session.lastActiveAt)} />
+            <InfoRow label={t.started} value={formatTimestamp(session.startedAt, locale)} />
+            <InfoRow
+              label={t.lastActive}
+              value={formatSnapshotTime(session.lastActiveAt, locale)}
+            />
             {session.metadata?.cliVersion && (
               <InfoRow label={t.cliVersion} value={`v${session.metadata.cliVersion}`} />
             )}
@@ -305,19 +310,17 @@ export default function SessionLayout({ children }: { children: React.ReactNode 
               <span className="text-muted-foreground">{t.traceMode}</span>
               <span
                 className={`font-mono ${
-                  session.privacyMode === 'anon' ? 'text-emerald-500' : 'text-amber-500'
+                  session.privacyMode === 'anon' ? 'text-foreground' : 'text-muted-foreground'
                 }`}
               >
                 {session.privacyMode === 'anon' ? t.anonymized : t.full}
               </span>
             </div>
           </div>
-        </div>
+        </Card>
 
-        <div className="rounded-md border border-border bg-surface p-3">
-          <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground mb-2">
-            {t.usage}
-          </div>
+        <Card>
+          <div className="text-xs font-medium text-muted-foreground mb-2">{t.usage}</div>
           <div className="text-xs space-y-1.5">
             <InfoRow label={t.requests} value={String(usage.requestCount)} />
             <InfoRow label={t.inputTokens} value={formatNumber(Number(usage.totalInputTokens))} />
@@ -341,54 +344,43 @@ export default function SessionLayout({ children }: { children: React.ReactNode 
               />
             )}
           </div>
-        </div>
+        </Card>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-3">
-          <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-            {t.requestsHeading}
-          </span>
-          <span className="text-3xs font-mono text-subtle">
+          <span className="text-xs font-medium text-muted-foreground">{t.requestsHeading}</span>
+          <span className="text-3xs font-mono text-muted-foreground">
             {requests.length} / {data.total}
           </span>
         </div>
         <div className="flex min-w-0 max-w-full items-center gap-2">
-          <div className="flex shrink-0 items-center gap-0.5 border border-border rounded-md p-0.5">
-            <button
-              onClick={() => {
-                track('agentic_workload_session_sort_changed', { reversed: false });
-                selectReversed(false);
-              }}
-              className={`px-2 py-1 text-2xs font-mono rounded transition-colors ${
-                reversed ? 'text-subtle hover:text-foreground' : 'bg-surface-hover text-foreground'
-              }`}
-            >
-              {t.oldest}
-            </button>
-            <button
-              onClick={() => {
-                track('agentic_workload_session_sort_changed', { reversed: true });
-                selectReversed(true);
-              }}
-              className={`px-2 py-1 text-2xs font-mono rounded transition-colors ${
-                reversed ? 'bg-surface-hover text-foreground' : 'text-subtle hover:text-foreground'
-              }`}
-            >
-              {t.newest}
-            </button>
-          </div>
-          <nav className="flex min-w-0 items-center gap-0.5 overflow-x-auto border border-border rounded-md p-0.5">
+          <SegmentedToggle
+            role="group"
+            ariaLabel={t.requestsHeading}
+            className="shrink-0"
+            value={reversed ? 'newest' : 'oldest'}
+            onValueChange={(next) => {
+              const nextReversed = next === 'newest';
+              track('agentic_workload_session_sort_changed', { reversed: nextReversed });
+              selectReversed(nextReversed);
+            }}
+            options={[
+              { value: 'oldest', label: t.oldest },
+              { value: 'newest', label: t.newest },
+            ]}
+          />
+          <nav className={cn(SEGMENTED_CONTAINER_STYLE, 'flex-nowrap overflow-x-auto')}>
             {navLinks.map((link) => {
               const isActive = link.active;
               return (
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`shrink-0 whitespace-nowrap px-2.5 py-1 text-2xs font-mono rounded transition-colors ${
+                  className={`inline-flex min-h-11 shrink-0 items-center whitespace-nowrap ${SEGMENT_RADIUS_STYLE} px-2 text-sm font-medium transition-colors md:min-h-6 ${
                     isActive
-                      ? 'bg-surface-hover text-foreground'
-                      : 'text-subtle hover:text-foreground'
+                      ? 'bg-muted text-foreground dark:bg-input'
+                      : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   {link.label}
@@ -402,7 +394,7 @@ export default function SessionLayout({ children }: { children: React.ReactNode 
       {requests.length < data.total && (
         <div ref={sentinelRef} className="flex items-center justify-center py-4 gap-2">
           <span className="h-4 w-4 border-2 border-foreground/20 border-t-foreground/60 rounded-full animate-spin" />
-          <span className="text-2xs font-mono text-subtle">
+          <span className="text-2xs font-mono text-muted-foreground">
             {t.loading(data.total - requests.length)}
           </span>
         </div>

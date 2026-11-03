@@ -199,7 +199,7 @@ describe('DatasetDetail conversation search', () => {
     act(() => vi.advanceTimersByTime(250));
 
     const next = [...container.querySelectorAll('button')].find(
-      (button) => button.textContent === 'Next →',
+      (button) => button.textContent === 'Next',
     );
     expect(next).toBeDefined();
     act(() => next?.click());
@@ -243,7 +243,7 @@ describe('DatasetDetail conversation search', () => {
     act(() => root.render(createElement(DatasetDetail, { slug: 'trace' })));
 
     expect(container.textContent).toContain('正在加载对话…');
-    expect(container.textContent).not.toContain('没有匹配的对话。');
+    expect(container.textContent).not.toContain('没有匹配的对话');
 
     act(() => root.unmount());
   });
@@ -261,8 +261,8 @@ describe('DatasetDetail conversation search', () => {
 
     act(() => root.render(createElement(DatasetDetail, { slug: 'trace' })));
 
-    expect(container.textContent).toContain('对话加载失败。');
-    expect(container.textContent).not.toContain('没有匹配的对话。');
+    expect(container.textContent).toContain('对话加载失败');
+    expect(container.textContent).not.toContain('没有匹配的对话');
 
     act(() => root.unmount());
   });

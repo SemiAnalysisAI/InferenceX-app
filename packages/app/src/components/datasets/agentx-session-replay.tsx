@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { useReducedMotion } from '@/components/inference/replay/useReducedMotion';
+import { Stat } from '@/components/ui/stat';
 import { cn } from '@/lib/shared/utils';
 
 import {
@@ -67,9 +68,9 @@ const STRINGS = {
   zh: {
     eyebrow: '会话回放',
     request: (range: string, total: number) => `请求 ${range} / ${total}`,
-    context: (n: number) => `context ${tokens(n)}`,
-    main: 'main',
-    sub: (n: number) => `sub ${n}`,
+    context: (n: number) => `上下文 ${tokens(n)}`,
+    main: '主',
+    sub: (n: number) => `子 ${n}`,
     notes: {
       warmStart: `回放从会话中途开始。warmup 已将 ${tokens(WARM_PREFIX)} token 的 prefix 写入 KV cache。`,
       fanOut: '三个 subagent 并行启动。它们的 KV cache 为空，prompt 需要从头 prefill。',
@@ -123,7 +124,7 @@ function Row({ row, frame, label }: { row: ReplayRow; frame: Frame; label: strin
     <li className="flex items-center gap-2" data-testid="agentx-session-replay-row">
       <span
         className={cn(
-          'w-12 shrink-0 text-right font-mono text-3xs',
+          'min-w-12 shrink-0 whitespace-nowrap text-right font-mono text-3xs tabular-nums',
           active ? 'font-semibold text-foreground' : 'text-muted-foreground',
           shown ? 'opacity-100' : 'opacity-0',
         )}
@@ -226,14 +227,12 @@ export function AgentXSessionReplay({ locale }: { locale: Locale }) {
   return (
     <figure
       ref={ref}
-      className="border-b border-border/60 px-5 py-5 sm:px-6"
+      className="border-b border-border/20 px-5 py-5 sm:px-6"
       data-testid="agentx-session-replay"
     >
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <p className="font-mono text-2xs font-medium uppercase tracking-eyebrow text-primary">
-          {t.eyebrow}
-        </p>
-        <p className="font-mono text-2xs uppercase tracking-eyebrow text-muted-foreground tabular-nums">
+        <p className="text-xs font-medium text-muted-foreground">{t.eyebrow}</p>
+        <p className="text-xs text-muted-foreground tabular-nums font-medium">
           {t.request(range, REPLAY_ROWS.length)}
           {mainRow ? ` · ${t.context(mainRow.cached + mainRow.fresh)}` : null}
         </p>
@@ -245,7 +244,7 @@ export function AgentXSessionReplay({ locale }: { locale: Locale }) {
           {TICKS.map((tick) => (
             <span
               key={tick}
-              className="absolute inset-y-0 border-l border-border/60"
+              className="absolute inset-y-0 border-l border-border/20"
               style={{ left: pct(tick) }}
             />
           ))}
@@ -274,23 +273,25 @@ export function AgentXSessionReplay({ locale }: { locale: Locale }) {
         <p className="mt-0.5 ml-14 font-mono text-3xs text-muted-foreground">{t.axis}</p>
       </div>
 
-      <dl className="mt-4 grid grid-cols-2 gap-x-5 gap-y-3 border-t border-border/60 pt-4 sm:grid-cols-4">
+      <dl className="mt-4 grid grid-cols-2 gap-x-5 gap-y-3 border-t border-border/20 pt-4 sm:grid-cols-4">
         {stats.map((stat) => (
-          <div key={stat.key} className="flex flex-col">
-            <dt className="order-2 mt-0.5 flex items-center gap-1.5 text-xs leading-5 text-muted-foreground">
-              {stat.color ? (
-                <span
-                  aria-hidden="true"
-                  className={cn('size-2 shrink-0', stat.key === 'cached' && 'opacity-40')}
-                  style={{ backgroundColor: stat.color }}
-                />
-              ) : null}
-              {stat.label}
-            </dt>
-            <dd className="order-1 font-mono text-lg font-semibold text-foreground tabular-nums">
-              {stat.value}
-            </dd>
-          </div>
+          <Stat
+            key={stat.key}
+            valueFirst
+            value={stat.value}
+            label={
+              <span className="inline-flex items-center gap-1.5">
+                {stat.color ? (
+                  <span
+                    aria-hidden="true"
+                    className={cn('size-2 shrink-0', stat.key === 'cached' && 'opacity-40')}
+                    style={{ backgroundColor: stat.color }}
+                  />
+                ) : null}
+                {stat.label}
+              </span>
+            }
+          />
         ))}
       </dl>
 

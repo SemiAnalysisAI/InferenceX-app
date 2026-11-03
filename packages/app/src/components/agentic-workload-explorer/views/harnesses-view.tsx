@@ -1,10 +1,8 @@
 'use client';
 
-import { Suspense, useMemo, useRef, type ReactNode } from 'react';
-import {
-  HARNESS_LABELS,
-  type Harness,
-} from '@semianalysisai/inferencex-db/proxytrace/shared/harness';
+import { Suspense, useMemo, type ReactNode } from 'react';
+import type { Harness } from '@semianalysisai/inferencex-db/proxytrace/shared/harness';
+import { harnessLabel } from '@/lib/agentic-workload-explorer/harness-label';
 import type {
   HarnessBucket,
   HarnessProfile,
@@ -12,29 +10,31 @@ import type {
   HarnessShare,
   SessionMetric,
 } from '@semianalysisai/inferencex-db/proxytrace/harnesses';
+import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
+import { ChartActions, Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
 import { useDashboardData } from '@/hooks/agentic-workload-explorer/use-dashboard-data';
 import {
   appendTraceVersion,
   useTraceVersion,
 } from '@/hooks/agentic-workload-explorer/use-trace-version';
-import { exportSvgToPng, ExportPngButton } from '@/lib/agentic-workload-explorer/export-png';
 import { formatNumber } from '@/lib/agentic-workload-explorer/format';
 import {
   bucketQuantile,
   HARNESS_COLORS,
   presentHarnesses,
 } from '@/lib/agentic-workload-explorer/harness-profile';
+import { SectionHeader } from '@/components/agentic-workload-explorer/section-header';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
+import { EmptyState } from '@/components/ui/empty-state';
 
 const STRINGS = {
   en: {
     summary: 'Summary',
     summaryDetail: 'prompt tokens = input + cache read + cache write',
-    failedToLoad: 'Failed to load harness data.',
-    noData: 'No data.',
+    failedToLoad: 'Failed to load harness data',
+    noData: 'No data',
     metric: 'Metric',
     calls: 'Calls',
     perSessionExact: 'Per session · exact',
@@ -61,13 +61,13 @@ const STRINGS = {
     outputTokensP50: 'Output tokens p50',
     outputTokensP95: 'Output tokens p95',
     responsesLt20OutputTokens: 'Responses < 20 output tokens',
-    promptTokensPerSession: 'Prompt Tokens per Session',
-    outputTokensPerSession: 'Output Tokens per Session',
-    requestsPerSession: 'Requests per Session',
-    promptTokensPerRequestSessionMean: 'Prompt Tokens per Request, Session Mean',
-    promptTokensPerMainAgentRequest: 'Prompt Tokens per Main-Agent Request',
-    outputTokensPerResponse: 'Output Tokens per Response',
-    toolCallsPerMainAgentResponse: 'Tool Calls per Main-Agent Response',
+    promptTokensPerSession: 'Prompt tokens per session',
+    outputTokensPerSession: 'Output tokens per session',
+    requestsPerSession: 'Requests per session',
+    promptTokensPerRequestSessionMean: 'Prompt tokens per request, session mean',
+    promptTokensPerMainAgentRequest: 'Prompt tokens per main-agent request',
+    outputTokensPerResponse: 'Output tokens per response',
+    toolCallsPerMainAgentResponse: 'Tool calls per main-agent response',
     sessionDetail: (count: string) => `share of sessions · ${count} sessions · exact`,
     sampleDetail: (pct: number, count: string) => `${pct}% block sample · ${count} requests`,
     shareOfRequests: (detail: string) => `share of requests · ${detail}`,
@@ -161,41 +161,29 @@ function byHarness<T extends { harness: Harness }>(rows: T[]): Map<Harness, T[]>
   return map;
 }
 
-function SectionHeader({ label, detail }: { label: string; detail?: string }) {
-  return (
-    <div className="flex items-center gap-2 mb-2">
-      <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-        {label}
-      </span>
-      <span className="flex-1 h-px bg-border" />
-      {detail && <span className="text-3xs font-mono text-subtle">{detail}</span>}
-    </div>
-  );
-}
-
 function ChartFrame({
   title,
   detail,
-  onExport,
-  locale,
+  fileName,
+  onExportPng,
   children,
 }: {
   title: string;
   detail: string;
-  onExport: () => void;
-  locale: 'en' | 'zh';
+  fileName: string;
+  onExportPng: () => void;
   children: ReactNode;
 }) {
   return (
     <div>
       <SectionHeader label={title} detail={detail} />
       <Expandable title={title} subtitle={detail}>
-        <div className="rounded-md border border-border bg-surface p-3">
+        <Card>
           <div className="mb-2 flex items-center justify-end gap-2">
-            <ExportPngButton locale={locale} onClick={onExport} />
+            <ChartActions fileName={fileName} onExportPng={onExportPng} />
           </div>
           {children}
-        </div>
+        </Card>
       </Expandable>
     </div>
   );
@@ -240,18 +228,18 @@ function GridLine({ x1, y1, x2, y2 }: { x1: number; y1: number; x2: number; y2: 
   );
 }
 
-const TH =
-  'px-2 py-1.5 text-3xs font-mono font-bold uppercase tracking-eyebrow text-muted-foreground whitespace-nowrap';
+const TH = 'px-2 py-1.5 text-xs font-medium text-muted-foreground whitespace-nowrap';
 const TD = 'px-2 py-1.5 text-2xs font-mono tabular-nums whitespace-nowrap';
 
 function HarnessHead({ harness }: { harness: Harness }) {
+  const locale = useLocale();
   return (
     <th className={`${TH} text-right`}>
       <span
         className="mr-1.5 inline-block size-1.5 rounded-[1px] align-middle"
         style={{ backgroundColor: HARNESS_COLORS[harness] }}
       />
-      {HARNESS_LABELS[harness]}
+      {harnessLabel(harness, locale)}
     </th>
   );
 }
@@ -355,9 +343,9 @@ function SummaryTable({
   ];
 
   return (
-    <div className="overflow-x-auto rounded-md border border-border bg-surface">
+    <div className="overflow-x-auto rounded-xl border border-border/30 bg-card">
       <table className="w-full">
-        <thead className="border-b border-border">
+        <thead className="border-b border-border/20">
           <tr>
             <th className={`${TH} text-left`}>{strings.metric}</th>
             {harnesses.map((h) => (
@@ -366,9 +354,12 @@ function SummaryTable({
           </tr>
         </thead>
         {groups.map((group) => (
-          <tbody key={group.label} className="divide-y divide-border border-b border-border">
+          <tbody key={group.label} className="divide-y divide-border/20 border-b border-border/20">
             <tr>
-              <td colSpan={harnesses.length + 1} className={`${TH} text-left text-subtle`}>
+              <td
+                colSpan={harnesses.length + 1}
+                className={`${TH} text-left text-muted-foreground`}
+              >
                 {group.label}
               </td>
             </tr>
@@ -401,9 +392,9 @@ function ToolCallsTable({ shares, callsLabel }: { shares: HarnessShare[]; callsL
   };
 
   return (
-    <div className="overflow-x-auto rounded-md border border-border bg-surface">
+    <div className="overflow-x-auto rounded-xl border border-border/30 bg-card">
       <table className="w-full">
-        <thead className="border-b border-border">
+        <thead className="border-b border-border/20">
           <tr>
             <th className={`${TH} text-left`}>{callsLabel}</th>
             {harnesses.map((h) => (
@@ -411,7 +402,7 @@ function ToolCallsTable({ shares, callsLabel }: { shares: HarnessShare[]; callsL
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-border">
+        <tbody className="divide-y divide-border/20">
           {CALL_ORDER.map((key) => (
             <tr key={key}>
               <td className={`${TD} text-left`}>{key}</td>
@@ -453,7 +444,6 @@ function HarnessHistogram({
   axisLabel,
   filename,
   noDataLabel,
-  locale,
 }: {
   buckets: HarnessBucket[];
   perDecade: number;
@@ -462,9 +452,8 @@ function HarnessHistogram({
   axisLabel: string;
   filename: string;
   noDataLabel: string;
-  locale: 'en' | 'zh';
 }) {
-  const svgRef = useRef<SVGSVGElement>(null);
+  const locale = useLocale();
   const positive = buckets.filter((b) => b.bucket >= 0);
   const harnesses = presentHarnesses(positive);
   const raw = byHarness(positive);
@@ -495,25 +484,17 @@ function HarnessHistogram({
     <ChartFrame
       title={title}
       detail={detail}
-      locale={locale}
-      onExport={() => {
-        track('agentic_workload_harness_histogram_export', { title, file_name: filename });
-        if (svgRef.current)
-          exportSvgToPng(svgRef.current, {
-            title,
-            subtitle: detail,
-            filename,
-            svgWidth: CHART_W,
-            svgHeight: height,
-          });
-      }}
+      fileName={filename.replace(/\.png$/u, '')}
+      onExportPng={() =>
+        track('agentic_workload_harness_histogram_export', { title, file_name: filename })
+      }
     >
       {harnesses.length === 0 ? (
-        <div className="py-8 text-center text-xs font-mono text-muted-foreground">
+        <EmptyState bare className="py-8">
           {noDataLabel}
-        </div>
+        </EmptyState>
       ) : (
-        <svg ref={svgRef} viewBox={`0 0 ${CHART_W} ${height}`} className="w-full">
+        <svg viewBox={`0 0 ${CHART_W} ${height}`} className="w-full">
           {logTicks(lo, hi).map((t) => (
             <g key={t}>
               <GridLine x1={sx(Math.log10(t))} y1={MARGIN.top} x2={sx(Math.log10(t))} y2={axisY} />
@@ -533,7 +514,7 @@ function HarnessHistogram({
             return (
               <g key={h}>
                 <AxisText x={MARGIN.left - 6} y={base - 4} anchor="end">
-                  {HARNESS_LABELS[h]}
+                  {harnessLabel(h, locale)}
                 </AxisText>
                 <line
                   x1={MARGIN.left}
@@ -560,7 +541,7 @@ function HarnessHistogram({
                       fillOpacity={0.85}
                     >
                       <title>
-                        {HARNESS_LABELS[h]} · {formatTokens(10 ** (b.bucket / perDecade))}–
+                        {harnessLabel(h, locale)} · {formatTokens(10 ** (b.bucket / perDecade))}–
                         {formatTokens(10 ** ((b.bucket + 1) / perDecade))}: {pct(share, 1)} (
                         {formatNumber(b.count)})
                       </title>
@@ -626,20 +607,16 @@ function HarnessesPageContent() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <Skeleton className="h-64 w-full rounded-md" />
+        <Skeleton className="h-64 w-full rounded-xl" />
         <div className="grid gap-4 lg:grid-cols-2">
-          <Skeleton className="h-64 w-full rounded-md" />
-          <Skeleton className="h-64 w-full rounded-md" />
+          <Skeleton className="h-64 w-full rounded-xl" />
+          <Skeleton className="h-64 w-full rounded-xl" />
         </div>
       </div>
     );
   }
   if (error || !data) {
-    return (
-      <div className="py-8 text-center text-sm font-mono text-muted-foreground">
-        {t.failedToLoad}
-      </div>
-    );
+    return <EmptyState>{t.failedToLoad}</EmptyState>;
   }
 
   const metric = (m: SessionMetric) => data.sessionBuckets.filter((b) => b.metric === m);
@@ -662,7 +639,6 @@ function HarnessesPageContent() {
           axisLabel={t.axisPromptTokens}
           filename="harness-session-prompt-tokens.png"
           noDataLabel={t.noData}
-          locale={locale}
         />
         <HarnessHistogram
           buckets={metric('output')}
@@ -672,7 +648,6 @@ function HarnessesPageContent() {
           axisLabel={t.axisOutputTokens}
           filename="harness-session-output-tokens.png"
           noDataLabel={t.noData}
-          locale={locale}
         />
         <HarnessHistogram
           buckets={metric('requests')}
@@ -682,7 +657,6 @@ function HarnessesPageContent() {
           axisLabel={t.axisRequests}
           filename="harness-session-requests.png"
           noDataLabel={t.noData}
-          locale={locale}
         />
         <HarnessHistogram
           buckets={metric('promptPerRequest')}
@@ -692,7 +666,6 @@ function HarnessesPageContent() {
           axisLabel={t.axisPromptPerRequest}
           filename="harness-session-prompt-per-request.png"
           noDataLabel={t.noData}
-          locale={locale}
         />
         <HarnessHistogram
           buckets={data.contextBuckets}
@@ -702,7 +675,6 @@ function HarnessesPageContent() {
           axisLabel={t.axisPromptTokens}
           filename="harness-prompt-tokens.png"
           noDataLabel={t.noData}
-          locale={locale}
         />
         <HarnessHistogram
           buckets={data.outputBuckets}
@@ -712,12 +684,11 @@ function HarnessesPageContent() {
           axisLabel={t.axisOutputTokens}
           filename="harness-output-tokens.png"
           noDataLabel={t.noData}
-          locale={locale}
         />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <div>
+        <div className="min-w-0">
           <SectionHeader label={t.toolCallsPerMainAgentResponse} detail={sampleDetail} />
           <ToolCallsTable shares={data.toolCallsPerResponse} callsLabel={t.calls} />
         </div>

@@ -1,9 +1,12 @@
 'use client';
 
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { ExternalLinkIcon } from '@/components/ui/external-link-icon';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -12,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Stat } from '@/components/ui/stat';
 import { DistributionCard } from '@/components/datasets/distribution-card';
 import {
   useDataset,
@@ -24,7 +28,6 @@ import { useSearchTracking } from '@/lib/analytics/use-search-tracking';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { getDatasetDescription } from './dataset-description';
 import { compact, formatPct, formatShare, localeNumber, perConversation } from './format';
-import { Stat } from './stat';
 
 const PAGE = 50;
 const SEARCH_DEBOUNCE_MS = 250;
@@ -32,12 +35,12 @@ const SEARCH_DEBOUNCE_MS = 250;
 const STRINGS = {
   en: {
     loading: 'Loading dataset…',
-    loadError: 'Failed to load dataset.',
-    notFound: 'Dataset not found.',
+    loadError: 'Failed to load dataset',
+    notFound: 'Dataset not found',
     retry: 'Retry',
     backToDatasets: 'Back to AgentX',
-    breadcrumbDatasets: '← AgentX',
-    viewOnHf: 'View on HuggingFace ↗',
+    breadcrumbDatasets: 'AgentX',
+    viewOnHf: 'View on HuggingFace',
     conversations: 'Conversations',
     medianReqConvo: 'Median requests / convo',
     meanReqConvo: 'Mean requests / convo',
@@ -73,21 +76,21 @@ const STRINGS = {
     thOutput: 'Output',
     thCached: 'Cached',
     modelSuffix: (n: number) => `${n} model${n === 1 ? '' : 's'}`,
-    noMatch: 'No conversations match.',
+    noMatch: 'No conversations match',
     loadingConversations: 'Loading conversations…',
-    conversationsError: 'Failed to load conversations.',
-    prev: '← Prev',
-    next: 'Next →',
+    conversationsError: 'Failed to load conversations',
+    prev: 'Prev',
+    next: 'Next',
     pageOf: (p: number, total: number) => `Page ${p} of ${total}`,
   },
   zh: {
     loading: '正在加载数据集…',
-    loadError: '数据集加载失败。',
-    notFound: '未找到数据集。',
+    loadError: '数据集加载失败',
+    notFound: '未找到数据集',
     retry: '重试',
     backToDatasets: '返回 AgentX',
-    breadcrumbDatasets: '← AgentX',
-    viewOnHf: '在 HuggingFace 查看 ↗',
+    breadcrumbDatasets: 'AgentX',
+    viewOnHf: '在 HuggingFace 查看',
     conversations: '对话数',
     medianReqConvo: '每对话中位请求数',
     meanReqConvo: '每对话平均请求数',
@@ -118,16 +121,16 @@ const STRINGS = {
     sortId: '对话 ID',
     thConversation: '对话',
     thTurns: '轮次',
-    thSubagents: 'Subagent',
+    thSubagents: 'Subagent 数',
     thInput: '输入',
     thOutput: '输出',
     thCached: '缓存',
     modelSuffix: (n: number) => `${n} 个模型`,
-    noMatch: '没有匹配的对话。',
+    noMatch: '没有匹配的对话',
     loadingConversations: '正在加载对话…',
-    conversationsError: '对话加载失败。',
-    prev: '← 上一页',
-    next: '下一页 →',
+    conversationsError: '对话加载失败',
+    prev: '上一页',
+    next: '下一页',
     pageOf: (p: number, total: number) => `第 ${p} 页，共 ${total} 页`,
   },
 } as const;
@@ -204,7 +207,7 @@ export function DatasetDetail({
         <span>{t.loadError}</span>
         <button
           type="button"
-          className="text-primary underline"
+          className="text-brand underline"
           onClick={() => {
             track('datasets_detail_retry_clicked', { slug });
             void refetch();
@@ -212,7 +215,7 @@ export function DatasetDetail({
         >
           {t.retry}
         </button>
-        <Link href={`${prefix}/agentx`} className="text-primary underline">
+        <Link href={`${prefix}/agentx`} className="text-brand underline">
           {t.backToDatasets}
         </Link>
       </div>
@@ -226,7 +229,7 @@ export function DatasetDetail({
         data-locale={locale}
       >
         {t.notFound}{' '}
-        <Link href={`${prefix}/agentx`} className="text-primary underline">
+        <Link href={`${prefix}/agentx`} className="text-brand underline">
           {t.backToDatasets}
         </Link>
       </div>
@@ -242,29 +245,27 @@ export function DatasetDetail({
   return (
     <div className="min-h-svh flex flex-col gap-6">
       <div>
-        <div className="mb-1 flex items-center gap-2">
-          <Link
-            href={`${prefix}/agentx`}
-            className="text-xs text-muted-foreground hover:text-foreground"
-          >
-            {t.breadcrumbDatasets}
-          </Link>
-        </div>
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <Link
+          href={`${prefix}/agentx`}
+          className="inline-flex min-h-8 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeft aria-hidden="true" className="size-4" />
+          {t.breadcrumbDatasets}
+        </Link>
+        <div className="mt-2 flex flex-wrap items-baseline justify-between gap-2">
           <h1 className="text-2xl font-semibold text-foreground">{dataset.label}</h1>
-          <div className="flex items-center gap-2 text-xs">
-            <span className="rounded-full border border-border/50 px-2 py-0.5 uppercase tracking-wide text-muted-foreground">
-              {dataset.variant}
-            </span>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="font-mono text-muted-foreground">{dataset.variant}</span>
             {dataset.hf_url && (
               <a
                 href={dataset.hf_url}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => track('datasets_hf_link_clicked', { slug })}
-                className="text-primary hover:underline"
+                className="group text-brand hover:underline"
               >
                 {t.viewOnHf}
+                <ExternalLinkIcon aria-hidden="true" />
               </a>
             )}
           </div>
@@ -272,7 +273,7 @@ export function DatasetDetail({
         {description && (
           <p
             data-testid="dataset-description"
-            className="mt-2 max-w-3xl text-sm text-muted-foreground"
+            className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground"
           >
             {description}
           </p>
@@ -284,7 +285,7 @@ export function DatasetDetail({
           <section className="min-w-0" aria-labelledby="dataset-overview-group">
             <h2
               id="dataset-overview-group"
-              className="mb-2 text-2xs font-medium uppercase tracking-eyebrow text-muted-foreground"
+              className="mb-2 text-xs font-medium text-muted-foreground"
             >
               {t.overviewGroup}
             </h2>
@@ -307,7 +308,7 @@ export function DatasetDetail({
           <section className="min-w-0" aria-labelledby="dataset-agent-mix-group">
             <h2
               id="dataset-agent-mix-group"
-              className="mb-2 text-2xs font-medium uppercase tracking-eyebrow text-muted-foreground"
+              className="mb-2 text-xs font-medium text-muted-foreground"
             >
               {t.agentMixGroup}
             </h2>
@@ -326,7 +327,7 @@ export function DatasetDetail({
           </section>
         </div>
         {s.modelMix && Object.keys(s.modelMix).length > 0 && (
-          <div className="mt-4 border-t border-border/40 pt-3">
+          <div className="mt-4 border-t border-border/20 pt-3">
             <div className="mb-1.5 text-xs font-medium text-muted-foreground">{t.modelMix}</div>
             <div className="flex flex-wrap gap-2">
               {Object.entries(s.modelMix)
@@ -334,7 +335,7 @@ export function DatasetDetail({
                 .map(([model, count]) => (
                   <span
                     key={model}
-                    className="rounded-md border border-border/40 px-2 py-0.5 text-xs text-foreground"
+                    className="rounded-md border border-border/30 px-2 py-0.5 text-xs text-foreground"
                   >
                     {model} <span className="text-muted-foreground">{compact(count)}</span>
                   </span>
@@ -433,10 +434,10 @@ export function DatasetDetail({
           </div>
         </div>
 
-        <Card className="overflow-hidden p-0">
+        <Card className="overflow-hidden p-0 md:p-0">
           <div className="overflow-x-auto" data-testid="dataset-conversations-table-scroll">
             <table className="w-full min-w-[40rem] text-sm">
-              <thead className="border-b border-border/40 bg-muted/30 text-xs text-muted-foreground">
+              <thead className="border-b border-border/20 bg-muted/30 text-xs text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 text-left font-medium">{t.thConversation}</th>
                   <th className="px-3 py-2 text-right font-medium">{t.thTurns}</th>
@@ -458,7 +459,7 @@ export function DatasetDetail({
                         <Link
                           href={`${prefix}/agentx/${slug}/conversations/${encodeURIComponent(c.conv_id)}`}
                           onClick={() => track('datasets_conversation_clicked', { slug })}
-                          className="font-mono text-xs text-primary hover:underline"
+                          className="font-mono text-xs text-brand hover:underline"
                         >
                           {c.conv_id.slice(0, 20)}…
                         </Link>
@@ -505,32 +506,38 @@ export function DatasetDetail({
         </Card>
 
         {pageCount > 1 && (
-          <div className="flex items-center justify-center gap-3 text-xs">
-            <button
+          <div className="flex items-center justify-center gap-3 text-sm">
+            <Button
               type="button"
+              variant="outline"
+              size="xs"
               disabled={paginationPending || page === 0}
               onClick={() => {
                 const next = Math.max(0, page - 1);
                 track('datasets_conversations_page_changed', { direction: 'prev', page: next });
                 setConversationQuery((current) => ({ ...current, page: next }));
               }}
-              className="rounded-md border border-border/40 px-2 py-1 hover:bg-accent disabled:opacity-30"
             >
+              <ArrowLeft aria-hidden="true" />
               {t.prev}
-            </button>
-            <span className="text-muted-foreground">{t.pageOf(page + 1, pageCount)}</span>
-            <button
+            </Button>
+            <span className="text-muted-foreground tabular-nums">
+              {t.pageOf(page + 1, pageCount)}
+            </span>
+            <Button
               type="button"
+              variant="outline"
+              size="xs"
               disabled={paginationPending || page >= pageCount - 1}
               onClick={() => {
                 const next = Math.min(pageCount - 1, page + 1);
                 track('datasets_conversations_page_changed', { direction: 'next', page: next });
                 setConversationQuery((current) => ({ ...current, page: next }));
               }}
-              className="rounded-md border border-border/40 px-2 py-1 hover:bg-accent disabled:opacity-30"
             >
               {t.next}
-            </button>
+              <ArrowRight aria-hidden="true" />
+            </Button>
           </div>
         )}
       </section>

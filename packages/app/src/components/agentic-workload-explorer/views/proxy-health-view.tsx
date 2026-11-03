@@ -2,7 +2,14 @@
 
 import { Suspense, useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatNumber, formatDuration } from '@/lib/agentic-workload-explorer/format';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Stat } from '@/components/ui/stat';
+import {
+  bucketLabel,
+  formatDuration,
+  formatExplorerDateTime,
+  formatNumber,
+} from '@/lib/agentic-workload-explorer/format';
 import { useDashboardData } from '@/hooks/agentic-workload-explorer/use-dashboard-data';
 import {
   useTraceVersion,
@@ -10,31 +17,32 @@ import {
 } from '@/hooks/agentic-workload-explorer/use-trace-version';
 import { formatSnapshotTime } from '@/lib/agentic-workload-explorer/snapshot';
 import { Expandable } from '@/components/agentic-workload-explorer/expandable-chart';
+import { SectionHeader } from '@/components/agentic-workload-explorer/section-header';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
   en: {
     failedToLoad: 'Failed to load endpoint data',
-    totalRequests: 'Total Requests',
-    errorRate: 'Error Rate',
+    totalRequests: 'Total requests',
+    errorRate: 'Error rate',
     routes: 'Routes',
-    errorsFinal24h: 'Errors (Final 24h)',
+    errorsFinal24h: 'Errors (final 24h)',
     final7days: 'final 7 days',
     errors: (n: string) => `${n} errors`,
     uniqueEndpoints: 'unique endpoints',
     final24hours: 'final 24 hours',
-    statusCodeDistribution: 'Status Code Distribution',
-    hourlyTraffic: 'Hourly Traffic',
+    statusCodeDistribution: 'Status code distribution',
+    hourlyTraffic: 'Hourly traffic',
     final48hours: 'final 48 hours',
-    routeBreakdown: 'Route Breakdown',
-    latestErrors: 'Latest Errors',
+    routeBreakdown: 'Route breakdown',
+    latestErrors: 'Latest errors',
     thEndpoint: 'Endpoint',
     thTotal: 'Total',
     thSuccess: 'Success',
     thErrors: 'Errors',
     thSuccessPct: 'Success %',
-    thAvgLatency: 'Avg Latency',
-    thP95Latency: 'p95 Latency',
+    thAvgLatency: 'Avg latency',
+    thP95Latency: 'p95 latency',
     thTime: 'Time',
     thModel: 'Model',
     thStatus: 'Status',
@@ -76,18 +84,6 @@ const STRINGS = {
     tooltipTotal: '合计',
   },
 } as const;
-
-function SectionHeader({ label, detail }: { label: string; detail?: string }) {
-  return (
-    <div className="flex items-center gap-3">
-      <span className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-        {label}
-      </span>
-      <div className="flex-1 h-px bg-border" />
-      {detail && <span className="text-3xs font-mono text-muted-foreground">{detail}</span>}
-    </div>
-  );
-}
 
 interface RouteStat {
   endpoint: string;
@@ -189,7 +185,8 @@ export default function ProxyHealthPage() {
 }
 
 function ProxyHealthPageContent() {
-  const t = STRINGS[useLocale()];
+  const locale = useLocale();
+  const t = STRINGS[locale];
   const { apiParam: traceVersionParam } = useTraceVersion();
 
   const { data, loading } = useDashboardData<ProxyHealthData>({
@@ -215,11 +212,7 @@ function ProxyHealthPageContent() {
   }
 
   if (!data) {
-    return (
-      <div className="text-sm font-mono text-muted-foreground text-center py-8">
-        {t.failedToLoad}
-      </div>
-    );
+    return <EmptyState>{t.failedToLoad}</EmptyState>;
   }
 
   const totalRequests = data.routeStats.reduce((s, r) => s + r.total, 0);
@@ -228,32 +221,36 @@ function ProxyHealthPageContent() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard
+      <dl className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <Stat
+          boxed
           label={t.totalRequests}
           value={formatNumber(totalRequests)}
-          subtitle={t.final7days}
+          detail={t.final7days}
         />
-        <StatCard
+        <Stat
+          boxed
           label={t.errorRate}
           value={`${errorRate.toFixed(1)}%`}
-          subtitle={t.errors(formatNumber(totalErrors))}
-          color={
-            errorRate > 5 ? 'text-rose-500' : errorRate > 1 ? 'text-amber-500' : 'text-emerald-500'
+          detail={t.errors(formatNumber(totalErrors))}
+          valueClassName={
+            errorRate > 5 ? 'text-destructive' : errorRate > 1 ? 'text-warning' : 'text-success'
           }
         />
-        <StatCard
+        <Stat
+          boxed
           label={t.routes}
           value={String(data.routeStats.length)}
-          subtitle={t.uniqueEndpoints}
+          detail={t.uniqueEndpoints}
         />
-        <StatCard
+        <Stat
+          boxed
           label={t.errorsFinal24h}
           value={String(data.recentErrors.length)}
-          subtitle={t.final24hours}
-          color={data.recentErrors.length > 10 ? 'text-rose-500' : undefined}
+          detail={t.final24hours}
+          valueClassName={data.recentErrors.length > 10 ? 'text-destructive' : undefined}
         />
-      </div>
+      </dl>
 
       {data.statusDistribution.length > 0 && (
         <div>
@@ -276,10 +273,10 @@ function ProxyHealthPageContent() {
                     }}
                   />
                   <span
-                    className="text-3xs font-mono font-bold"
+                    className="text-3xs font-mono font-medium"
                     style={{ color: STATUS_COLORS[s.statusGroup] || '#6b7280' }}
                   >
-                    {s.statusGroup}
+                    {bucketLabel(s.statusGroup, locale)}
                   </span>
                 </div>
               );
@@ -292,7 +289,7 @@ function ProxyHealthPageContent() {
         <div>
           <SectionHeader label={t.hourlyTraffic} detail={t.final48hours} />
           <Expandable title={t.hourlyTraffic} subtitle={t.final48hours} corner>
-            <div className="mt-3 rounded-md border border-border bg-surface p-3">
+            <div className="mt-3 rounded-xl border border-border/30 bg-card p-3">
               <HourlyTrafficChart hourly={data.hourlyByEndpoint} tooltipTotal={t.tooltipTotal} />
             </div>
           </Expandable>
@@ -301,29 +298,29 @@ function ProxyHealthPageContent() {
 
       <div>
         <SectionHeader label={t.routeBreakdown} detail={t.final7days} />
-        <div className="mt-3 rounded-md border border-border bg-surface overflow-hidden">
+        <div className="mt-3 rounded-xl border border-border/30 bg-card overflow-hidden">
           <table className="w-full text-2xs font-mono">
             <thead>
-              <tr className="border-b border-border bg-surface-hover">
-                <th className="text-left px-3 py-2 text-muted-foreground font-bold uppercase tracking-wider text-3xs">
+              <tr className="border-b border-border/20 bg-surface-hover">
+                <th className="text-left px-3 py-2 text-muted-foreground font-medium text-xs">
                   {t.thEndpoint}
                 </th>
-                <th className="text-right px-3 py-2 text-muted-foreground font-bold uppercase tracking-wider text-3xs">
+                <th className="text-right px-3 py-2 text-muted-foreground font-medium text-xs">
                   {t.thTotal}
                 </th>
-                <th className="text-right px-3 py-2 text-muted-foreground font-bold uppercase tracking-wider text-3xs">
+                <th className="text-right px-3 py-2 text-muted-foreground font-medium text-xs">
                   {t.thSuccess}
                 </th>
-                <th className="text-right px-3 py-2 text-muted-foreground font-bold uppercase tracking-wider text-3xs">
+                <th className="text-right px-3 py-2 text-muted-foreground font-medium text-xs">
                   {t.thErrors}
                 </th>
-                <th className="text-right px-3 py-2 text-muted-foreground font-bold uppercase tracking-wider text-3xs">
+                <th className="text-right px-3 py-2 text-muted-foreground font-medium text-xs">
                   {t.thSuccessPct}
                 </th>
-                <th className="text-right px-3 py-2 text-muted-foreground font-bold uppercase tracking-wider text-3xs">
+                <th className="text-right px-3 py-2 text-muted-foreground font-medium text-xs">
                   {t.thAvgLatency}
                 </th>
-                <th className="text-right px-3 py-2 text-muted-foreground font-bold uppercase tracking-wider text-3xs">
+                <th className="text-right px-3 py-2 text-muted-foreground font-medium text-xs">
                   {t.thP95Latency}
                 </th>
               </tr>
@@ -334,24 +331,26 @@ function ProxyHealthPageContent() {
                 return (
                   <tr
                     key={route.endpoint}
-                    className="border-b border-border last:border-0 hover:bg-surface-hover"
+                    className="border-b border-border/20 last:border-0 hover:bg-surface-hover"
                   >
-                    <td className="px-3 py-2 text-foreground">{route.endpoint}</td>
+                    <td className="px-3 py-2 text-foreground">
+                      {bucketLabel(route.endpoint, locale)}
+                    </td>
                     <td className="px-3 py-2 text-right">{formatNumber(route.total)}</td>
-                    <td className="px-3 py-2 text-right text-emerald-500">
+                    <td className="px-3 py-2 text-right text-success">
                       {formatNumber(route.successCount)}
                     </td>
-                    <td className="px-3 py-2 text-right text-rose-500">
+                    <td className="px-3 py-2 text-right text-destructive">
                       {route.errorCount > 0 ? formatNumber(route.errorCount) : '—'}
                     </td>
                     <td className="px-3 py-2 text-right">
                       <span
                         className={
                           successRate >= 99
-                            ? 'text-emerald-500'
+                            ? 'text-success'
                             : successRate >= 95
-                              ? 'text-amber-500'
-                              : 'text-rose-500'
+                              ? 'text-warning'
+                              : 'text-destructive'
                         }
                       >
                         {successRate.toFixed(1)}%
@@ -380,26 +379,26 @@ function ProxyHealthPageContent() {
 
       <div>
         <SectionHeader label={t.latestErrors} detail={t.final24hours} />
-        <div className="mt-3 rounded-md border border-border bg-surface overflow-hidden">
+        <div className="mt-3 rounded-xl border border-border/30 bg-card overflow-hidden">
           <table className="w-full text-2xs font-mono">
             <thead>
-              <tr className="border-b border-border bg-surface-hover">
-                <th className="text-left px-3 py-2 text-muted-foreground font-bold uppercase tracking-wider text-3xs">
+              <tr className="border-b border-border/20 bg-surface-hover">
+                <th className="text-left px-3 py-2 text-muted-foreground font-medium text-xs">
                   {t.thTime}
                 </th>
-                <th className="text-left px-3 py-2 text-muted-foreground font-bold uppercase tracking-wider text-3xs">
+                <th className="text-left px-3 py-2 text-muted-foreground font-medium text-xs">
                   {t.thEndpoint}
                 </th>
-                <th className="text-left px-3 py-2 text-muted-foreground font-bold uppercase tracking-wider text-3xs">
+                <th className="text-left px-3 py-2 text-muted-foreground font-medium text-xs">
                   {t.thModel}
                 </th>
-                <th className="text-right px-3 py-2 text-muted-foreground font-bold uppercase tracking-wider text-3xs">
+                <th className="text-right px-3 py-2 text-muted-foreground font-medium text-xs">
                   {t.thStatus}
                 </th>
-                <th className="text-right px-3 py-2 text-muted-foreground font-bold uppercase tracking-wider text-3xs">
+                <th className="text-right px-3 py-2 text-muted-foreground font-medium text-xs">
                   {t.thDuration}
                 </th>
-                <th className="text-left px-3 py-2 text-muted-foreground font-bold uppercase tracking-wider text-3xs">
+                <th className="text-left px-3 py-2 text-muted-foreground font-medium text-xs">
                   {t.thError}
                 </th>
               </tr>
@@ -408,19 +407,19 @@ function ProxyHealthPageContent() {
               {data.recentErrors.map((err) => (
                 <tr
                   key={err.id}
-                  className="border-b border-border last:border-0 hover:bg-surface-hover"
+                  className="border-b border-border/20 last:border-0 hover:bg-surface-hover"
                 >
                   <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">
-                    {formatSnapshotTime(err.timestamp)}
+                    {formatSnapshotTime(err.timestamp, locale)}
                   </td>
-                  <td className="px-3 py-2 text-foreground">{err.endpoint}</td>
+                  <td className="px-3 py-2 text-foreground">{bucketLabel(err.endpoint, locale)}</td>
                   <td className="px-3 py-2 text-muted-foreground">{err.model ?? '—'}</td>
                   <td className="px-3 py-2 text-right">
                     <span
                       className={
                         err.responseStatusCode && err.responseStatusCode >= 500
-                          ? 'text-rose-500'
-                          : 'text-amber-500'
+                          ? 'text-destructive'
+                          : 'text-warning'
                       }
                     >
                       {err.responseStatusCode ?? 'null'}
@@ -429,14 +428,17 @@ function ProxyHealthPageContent() {
                   <td className="px-3 py-2 text-right text-muted-foreground">
                     {err.durationMs ? formatDuration(err.durationMs) : '—'}
                   </td>
-                  <td className="px-3 py-2 text-rose-400 truncate max-w-xs" title={err.error ?? ''}>
+                  <td
+                    className="px-3 py-2 text-destructive truncate max-w-xs"
+                    title={err.error ?? ''}
+                  >
                     {err.error ? err.error.slice(0, 80) : '—'}
                   </td>
                 </tr>
               ))}
               {data.recentErrors.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-3 py-6 text-center text-emerald-500">
+                  <td colSpan={6} className="px-3 py-6 text-center text-success">
                     {t.noErrors}
                   </td>
                 </tr>
@@ -456,6 +458,7 @@ function HourlyTrafficChart({
   hourly: HourlyEndpoint[];
   tooltipTotal: string;
 }) {
+  const locale = useLocale();
   const { hours, endpointNames, seriesByEndpoint, maxCount } = useMemo(() => {
     const hourSet = new Set<string>();
     const epSet = new Set<string>();
@@ -506,7 +509,8 @@ function HourlyTrafficChart({
     );
   }
 
-  const labelInterval = Math.max(1, Math.floor(hours.length / 8));
+  // Four intervals: at eight, the date + hour labels overlapped in both locales.
+  const labelInterval = Math.max(1, Math.floor(hours.length / 4));
 
   return (
     <div>
@@ -557,14 +561,14 @@ function HourlyTrafficChart({
                     opacity={0.8}
                   >
                     <title>
-                      {new Date(hr).toLocaleString(undefined, {
+                      {formatExplorerDateTime(hr, locale, {
                         month: 'short',
                         day: 'numeric',
                         hour: '2-digit',
                         minute: '2-digit',
                       })}
                       {'\n'}
-                      {ep}: {count} ({total} {tooltipTotal})
+                      {bucketLabel(ep, locale)}: {count} ({total} {tooltipTotal})
                     </title>
                   </rect>
                 );
@@ -577,18 +581,19 @@ function HourlyTrafficChart({
           i % labelInterval === 0 ? (
             <text
               key={hr}
-              x={sx(i) + barWidth / 2}
+              x={i + labelInterval >= hours.length ? sx(i) + barWidth : sx(i) + barWidth / 2}
               y={CHART_H - 4}
-              textAnchor="middle"
+              textAnchor={i + labelInterval >= hours.length ? 'end' : 'middle'}
               fill="var(--color-muted-foreground)"
               fontFamily={SVG_FONT}
               fontSize={SVG_FONT_SIZE}
             >
-              {new Date(hr).toLocaleString(undefined, {
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-              })}
+              {formatExplorerDateTime(
+                hr,
+                locale,
+                { month: 'short', day: 'numeric', hour: '2-digit' },
+                { axisTick: true },
+              )}
             </text>
           ) : null,
         )}
@@ -601,36 +606,12 @@ function HourlyTrafficChart({
               className="w-2.5 h-2.5 rounded-sm"
               style={{ backgroundColor: colorMap.get(ep), opacity: 0.8 }}
             />
-            <span className="text-3xs font-mono text-muted-foreground">{ep}</span>
+            <span className="text-3xs font-mono text-muted-foreground">
+              {bucketLabel(ep, locale)}
+            </span>
           </div>
         ))}
       </div>
-    </div>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  subtitle,
-  color,
-}: {
-  label: string;
-  value: string;
-  subtitle?: string;
-  color?: string;
-}) {
-  return (
-    <div className="rounded-md border border-border bg-surface px-3 py-2.5">
-      <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-muted-foreground">
-        {label}
-      </div>
-      <div
-        className={`text-lg font-mono font-bold tracking-tight mt-0.5 ${color ?? 'text-foreground'}`}
-      >
-        {value}
-      </div>
-      {subtitle && <div className="text-3xs font-mono text-subtle mt-0.5">{subtitle}</div>}
     </div>
   );
 }
