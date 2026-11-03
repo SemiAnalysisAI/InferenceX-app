@@ -809,7 +809,7 @@ evidence remains. An older H100 workload does not qualify a newer workload.
 | UI controls                       | API parameters                                       | Contract                                                                                                                                                                                                                             |
 | --------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Model and frozen workload         | `r_model`, `r_workload`                              | Compact key from options.workloads resolves to full canonical identity; one 20-scheduled-clip C1 spec, at least 10 valid samples on every hardware; shorter historical runs remain History-only.                                     |
-| Resolution, duration, mode, steps | `r_resolution`, `r_duration`, `r_mode`, `r_steps`    | Exact recorded metadata; no mode inferred from model names.                                                                                                                                                                          |
+| Resolution, duration, mode, steps | `r_resolution`, `r_duration`, `r_mode`, `r_steps`    | Exact recorded plan metadata; duration is the requested value, not decoded output duration. No mode inferred from model names.                                                                                                       |
 | GPU count, engine, execution date | `r_gpus`, `r_engine`, `r_date`                       | `deploymentCells` and `overlayDeploymentCells` preserve official and named-run GPU-count series before the GPU filter; cards and tables use filtered `cells` and `overlayCells`.                                                     |
 | Hardware legend                   | `r_hidden`                                           | Applies to all groups and media selection.                                                                                                                                                                                           |
 | Deadline                          | `r_deadline`                                         | Seconds, default 120. Attainment = on-time valid / valid; goodput = on-time valid / wall seconds. Missing per-request timing stays null.                                                                                             |
@@ -825,6 +825,19 @@ samples. Missing quality, stage timing, memory and startup data remains null.
 Per-clip PSNR requires separately sealed pairs against the pinned official Diffusers
 reference. Playable clips or hardware labels alone do not establish a reference.
 Never replace nulls with example numbers.
+
+`point.videoSecondsPerHour` is the sum of validated decoded media durations from
+technically valid measured requests, divided by measurement wall seconds and
+multiplied by 3600; warmup is excluded. Video-second throughput divides this rate
+by 3600. Cost per video-second divides hourly GPU cost by this rate, independently
+for participating and allocated GPUs. Modelled revenue uses the same output rate
+times utilization and the entered price. Every valid measured request must have
+a positive recorded media duration. Otherwise, or when older stored History
+omits this optional field, video-second throughput, per-video-second cost,
+revenue and profit remain null. Requested `durationSeconds` stays in workload
+identity and filters and never fills missing output duration.
+
+中文：`point.videoSecondsPerHour` 按有效测量请求的实际解码视频总时长除以测量窗口时长，再乘以 3600，且排除 warmup。视频秒吞吐量、两种 GPU 口径的每视频秒成本及估算收入共用这一输出速率。任何有效测量请求缺少正的视频时长，或旧 History 未提供此可选字段时，这些指标及利润均为 null。`durationSeconds` 保留计划请求时长，仅用于工作负载身份与筛选，不补齐缺失的输出时长。
 
 `view=overview` returns `clipQuality: { status, groups }`. The status describes
 artifact-read coverage (`ready`, `partial`, `unavailable`), not quality. Every group
@@ -886,12 +899,12 @@ retains a workload selector only if it remains in the approved choices. Approved
 cohorts retain default preference; a workload found only in the named run requires
 explicit selection or no matching approved cohort. Both channels use the same
 qualification and metric rules. Legacy dashboard/compare views stay approved-only.
-The overview returns JSON by default. `format=csv` is available only with `view=overview`; it exports the current official and named cells with exact source/workload/run/artifact identity, approval, units and participating/allocated GPU costs. Empty CSV cells mean missing evidence. The response is private and no-store.
+The overview returns JSON by default. `format=csv` is available only with `view=overview`; it exports the current official and named cells with exact source/workload/run/artifact identity, approval, units and participating/allocated GPU costs. `duration_s` retains the requested plan duration; `video_seconds_per_s`, next to `clips_per_s`, reports validated decoded output seconds per wall second. Empty CSV cells mean missing evidence. The response is private and no-store.
 
 中文：默认结果必须有匹配的发布批准记录。指定运行的通道只包含该运行，保留实际批准状态；
 清除叠加运行后不会将未批准数据转为正式结果。移除时，工作负载选择仅在已批准选项中仍然有效时保留。默认优先选择有已批准结果的工作负载；
 仅由指定运行提供的工作负载须明确选择，或在没有匹配的已批准结果时作为回退。两条通道共用准入和计算规则。
-旧 dashboard/compare 视图仍仅接纳已批准结果。overview 默认返回 JSON；仅 `view=overview` 接受 `format=csv`，导出当前筛选的正式及指定运行数据点，保留来源与批准状态、单位及参与/已分配 GPU 成本；空单元格表示缺失数据，CSV 响应设置 `Cache-Control: private, no-store`。
+旧 dashboard/compare 视图仍仅接纳已批准结果。overview 默认返回 JSON；仅 `view=overview` 接受 `format=csv`，导出当前筛选的正式及指定运行数据点，保留来源与批准状态、单位及参与/已分配 GPU 成本。`duration_s` 保留计划请求时长；紧邻 `clips_per_s` 的 `video_seconds_per_s` 表示每测量秒生成的有效解码视频秒数。空单元格表示缺失数据，CSV 响应设置 `Cache-Control: private, no-store`。
 
 ### Landing-page Huawei link
 

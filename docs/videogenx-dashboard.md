@@ -52,7 +52,7 @@ Approved evidence determines the preferred cohort. A workload available only in
 the named run requires explicit selection, or becomes the fallback when no approved
 cohort matches. The browser retains one bounded History read and rederives both
 lists when the URL changes. Legacy dashboard/compare APIs remain approved-only.
-The overview API returns JSON by default. `format=csv` downloads the same selected official and named cells with exact source/workload/run/artifact identities, approval state, units and both GPU cost bases. Missing values remain empty cells; CSV is private and no-store.
+The overview API returns JSON by default. `format=csv` downloads the same selected official and named cells with exact source/workload/run/artifact identities, approval state, units and both GPU cost bases. `duration_s` retains the requested plan duration; `video_seconds_per_s` reports validated decoded output seconds per wall second. Missing values remain empty cells; CSV is private and no-store.
 
 The Workload menu shows compact summaries derived from recorded model and generation
 metadata. Its existing help control shows the full source label, exact source
@@ -73,7 +73,7 @@ The uncalibrated rating schema is also disclosed on request.
 | ------------------------ | --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
 | Validity                 | Workload/manifest hashes, sealed validation, completion counts, power validity; links to per-clip PSNR    | Unsealed or incompatible pairs; audio summaries                |
 | Latency                  | Serial/harness latency, client delivery P50/P90, P95 from >=20 aligned valid timings, deadline attainment | Missing client timestamps; text/denoise/VAE/encode stages      |
-| Throughput               | Valid clips/wall second, generated video seconds/wall second, deadline goodput                            | Unsupported workload/mode distributions                        |
+| Throughput               | Valid clips/wall second, validated decoded video seconds/wall second, deadline goodput                    | Unsupported workload/mode distributions                        |
 | Resources & Energy       | Valid participating-board power samples, mean/observed peak, J/clip, J/frame                              | Missing samples, GPU/host memory without their own measurement |
 | Cost                     | Modelled TCO from registry rates and measured output; both GPU counts                                     | Missing allocation count or rate                               |
 | Quality                  | Sealed per-clip PSNR; seven named human-rating dimensions without scores                                  | SSIM, VBench/CLIP/VLM and calibrated human scores              |
@@ -156,16 +156,23 @@ not a calibrated quality verdict or proof of a hardware-only effect.
 Both bases are always visible: participating boards and allocated boards. An
 allocation must be evidenced; participating count is never substituted for it.
 TCO per video = recorded GPU count × registry $/GPU-hour / measured clips/hour.
-Cost per video-second divides by the recorded duration. Owning and rental tiers
-reuse `hardware.ts` and the shared hardware registry. These are modelled costs,
-not measurements or API bills.
+Cost per video-second = hourly GPU cost / `videoSecondsPerHour`, the validated
+decoded output seconds per measurement wall hour. This rate includes only valid
+measured requests and excludes warmup. Requested plan duration remains workload
+and filter metadata: a 5-second request can produce 124 frames at 24 fps, or
+5.1667 decoded seconds. Owning and rental tiers reuse `hardware.ts` and the shared
+hardware registry. These are modelled costs, not measurements or API bills.
 
 The estimator begins with empty price inputs. Each T2V/I2V/R2V price is a user
 scenario for the selected resolution and duration. Unknown mode yields no assumed
-mode price. Revenue/hour = valid video-seconds/hour × utilization × entered price;
+mode price. Revenue/hour = validated decoded video-seconds/hour × utilization × entered price;
 profit/hour subtracts the entire hourly GPU TCO for that basis. Both are normalized
 by the corresponding GPU count for the plotted profit/GPU-hour. Utilization
-reduces revenue, not the hours billed. This does not establish sustained capacity.
+reduces revenue, not the hours billed. Missing output duration for any valid
+measured request, or a legacy History projection without `videoSecondsPerHour`,
+leaves video-second throughput, per-video-second cost, revenue and profit null;
+requested duration is never a fallback. Per-video costs can remain available.
+This does not establish sustained capacity.
 
 ## Control coverage
 
@@ -203,13 +210,14 @@ Difference 是相对明确绑定的官方 Diffusers 参考视频的浏览器 RGB
 默认视频卡片保留硬件、GPU 数量、媒体及两种 TCO 口径；完整 prompt、seed、重复次数、
 运行、产物、Runtime 和媒体来源可在“Prompt 与来源”中查看。
 
-成本同时按参与计算和分配的 GPU 数量估算，分配证据缺失时不填补。利润输入默认空白，属于用户
+成本同时按参与计算和分配的 GPU 数量估算，分配证据缺失时不填补。视频秒吞吐量、每视频秒成本及收入使用有效测量请求的实际解码视频时长，不包含 warmup；请求时长仅用于工作负载身份与筛选。
+任何有效测量请求缺少视频时长，或旧 History 投影没有 `videoSecondsPerHour` 时，上述指标及利润保持为空，不以请求时长代替。每条视频成本仍可在证据充分时计算。利润输入默认空白，属于用户
 场景假设；利用率只降低收入，不减少付费时长。模式未知时不套用 T2V/I2V/R2V 价格。
 只读 API 与页面共用选择和计算逻辑，`r_*` 参数可以分享，`?unofficialrun=` 只读取指定的已存储运行，
 保留其发布批准状态，并单独放入 overlayCells 和 overlayDeploymentCells；选中期间，即使已批准也不进入正式结果、部署或工作负载构成。overlayCells 按所选 GPU 数筛选卡片和表格；overlayDeploymentCells 保留所有匹配的 GPU 数，用于延迟和前沿图。
 默认优先选择有已批准结果的工作负载；仅由指定运行提供的工作负载须明确选择，
 或在没有匹配的已批准结果时作为回退。
 支持隐藏硬件及移除；清除叠加运行后不会将未批准数据转为正式结果。
-移除时，工作负载选择仅在已批准选项中仍然有效时保留。overview 默认返回 JSON；`format=csv` 下载当前筛选的正式及指定运行数据点，保留来源、工作负载、运行、产物和批准状态，标明单位及两种 GPU 成本口径。缺失值保留为空单元格，CSV 不缓存。
+移除时，工作负载选择仅在已批准选项中仍然有效时保留。overview 默认返回 JSON；`format=csv` 下载当前筛选的正式及指定运行数据点，保留来源、工作负载、运行、产物和批准状态，标明单位及两种 GPU 成本口径。`duration_s` 保留计划请求时长，`video_seconds_per_s` 表示每测量秒生成的有效解码视频秒数。缺失值保留为空单元格，CSV 不缓存。
 读取不会启动 GPU、写入 Blob 或发布媒体。测试覆盖 API 一致性、样本门槛、
 两种成本口径、缺失证据、同步视频与中英文 390px 布局。

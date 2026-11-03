@@ -57,7 +57,7 @@ describe('VideoGenX results contract', () => {
 
   it('preserves unknown allocation and planned measures rather than synthesizing values', () => {
     const point: VideoPoint = { ...eligible, allocated: null, energyKj: null };
-    const row = resultProjection([point], state()).cells[0];
+    const row = resultProjection([point], { ...state(), apiPrice: 0.08 }).cells[0];
     expect(row.cost.participating).not.toBeNull();
     expect(row.cost.allocated).toBeNull();
     expect(row.profit.allocated).toBeNull();
@@ -66,6 +66,8 @@ describe('VideoGenX results contract', () => {
     expect(row.p95).toBeNull();
     expect(row.deadlineAttainment).toBeNull();
     expect(row.metadata.mode).toBeNull();
+    expect(row.videoSecondsPerSecond).toBeNull();
+    expect(row.cost.participating!.perVideoSecond).toBeNull();
   });
 
   it('computes both cost bases from measured throughput and charges reserved capacity at zero utilization', () => {
@@ -74,15 +76,29 @@ describe('VideoGenX results contract', () => {
       utilization: 0,
       apiPrices: { t2v: 0.08, i2v: null, r2v: null },
     };
-    const point = { ...eligible, participating: 2, allocated: 8, results: evidence() };
+    const point = {
+      ...eligible,
+      participating: 2,
+      allocated: 8,
+      valid: 20,
+      wallSeconds: 200,
+      videoSecondsPerHour: 1860,
+      results: evidence(),
+    };
     const row = resultProjection([point], selection).cells[0];
     expect(row.cost.allocated!.perVideo).toBeCloseTo(row.cost.participating!.perVideo * 4);
     expect(row.cost.participating!.perVideoSecond).toBeCloseTo(
-      row.cost.participating!.perVideo / point.durationSeconds!,
+      row.cost.participating!.perHour / 1860,
     );
+    expect(row.videoSecondsPerSecond).toBeCloseTo(31 / 60);
+    expect(row.metadata.duration).toBe(eligible.durationSeconds);
     expect(row.profit.allocated!.revenuePerHour).toBe(0);
     expect(row.profit.allocated!.profitPerHour).toBe(-row.cost.allocated!.perHour);
     expect(row.profit.allocated!.profitPerGpuHour).toBe(-row.cost.allocated!.perHour / 8);
+    expect(
+      resultProjection([point], { ...selection, utilization: 0.5 }).cells[0].profit.allocated!
+        .revenuePerHour,
+    ).toBeCloseTo(74.4);
     const changedMode = { ...point, results: evidence({ mode: 'i2v' }) };
     expect(resultProjection([changedMode], selection).cells[0].profit.participating).toBeNull();
   });
@@ -278,7 +294,12 @@ describe('VideoGenX results contract', () => {
     });
   });
   it('keeps engines and workload-mix cohorts distinct rather than overwriting or pooling them', () => {
-    const a = { ...eligible, id: 'first:c1', results: evidence({ engine: 'sglang' }) };
+    const a = {
+      ...eligible,
+      id: 'first:c1',
+      videoSecondsPerHour: 200,
+      results: evidence({ engine: 'sglang' }),
+    };
     const b = { ...eligible, id: 'second:c1', results: evidence({ engine: 'vllm-omni' }) };
     const plan = JSON.parse(eligible.workloadKey!);
     plan.plan.generation.height = 512;

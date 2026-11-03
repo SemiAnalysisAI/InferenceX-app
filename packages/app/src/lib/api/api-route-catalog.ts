@@ -1468,7 +1468,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results.ts',
-    sourceSha256: '3f11a8873d5d61bdf45132b5d42ebedc52021c59e8c33bc55c9f80cf8da3c172',
+    sourceSha256: 'f86086b0bda3b4ca95432bac05b56da85bfbe8a2a2c1d24cad378fdc1ef476de',
     reviewArea: {
       en: 'Shared nine-group VideoGenX selectors, sample admission, dual GPU cost bases and modelled profit.',
       zh: '九组 VideoGenX 指标共用的筛选、样本准入、两种 GPU 成本口径及估算利润。',
@@ -1476,7 +1476,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results-csv.ts',
-    sourceSha256: '7660d5f9792d360480466633d7c94ef5a655ba172869faa1aa1501fa6f80b72c',
+    sourceSha256: '5a769d8f0acdddc566aa79da0ee37c4b32a6bbd73a1aa9a512700755a5d6f90a',
     reviewArea: {
       en: 'VideoGenX overview CSV identities, selected cells, units, missing values and dual GPU cost bases.',
       zh: 'VideoGenX overview CSV 的身份、所选数据点、单位、缺失值与两种 GPU 成本口径。',
@@ -1556,7 +1556,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/history.ts',
-    sourceSha256: 'a366ea25ffdb319c24d568b8631febe0e42829ce070bfbb43bac20b77ba9047d',
+    sourceSha256: 'c365805b22e05e8abf1fe9478bd4168c467975598c8f632c05224786d2905f2d',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
@@ -1564,7 +1564,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/metrics.ts',
-    sourceSha256: '92939ba02a0ed280796e7ebfbf4aa5bdf5e34d4880470bfc48fa8dea63cdcd6e',
+    sourceSha256: '714a52e0ee739d79736a76e67dec77c2607be24951647829b3132baf72a43996',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',
@@ -1572,7 +1572,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/points.ts',
-    sourceSha256: '7a1b2e3895fe943c3fd519b4d8f37db9177630202c2e1800c5bdf34f737be565',
+    sourceSha256: 'ccebcba1718d4998d9a23f45a6fdccc4b0949ecd44e5e6b82de6b132d3ccb29b',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',

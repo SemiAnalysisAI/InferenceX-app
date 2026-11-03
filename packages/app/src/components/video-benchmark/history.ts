@@ -37,6 +37,8 @@ export interface VideoHistoryObservation {
   /** Replicas behind the endpoint (`execution.deployment.replica_count`); null before that record existed. */
   replicas: number | null;
   wallSeconds: number | null;
+  /** Valid decoded output seconds per measurement wall-hour; absent in older projections. */
+  videoSecondsPerHour?: number | null;
   durationSeconds: number | null;
   frameCount: number | null;
   /** Summed mean board W over the recorded generation window; null when the power phase is invalid. */
@@ -164,6 +166,7 @@ export function videoHistoryEntry(
             allocated: point.allocated,
             replicas: point.replicas,
             wallSeconds: point.wall,
+            videoSecondsPerHour: point.secondsRate,
             durationSeconds: number(at(point.workload, 'generation', 'duration_seconds')),
             frameCount: number(at(point.workload, 'generation', 'frame_count')),
             avgPowerW: point.power,

@@ -80,6 +80,7 @@ function toPoint(
     p50: num(o.p50),
     p90: num(o.p90),
     wallSeconds: num(o.wallSeconds),
+    videoSecondsPerHour: num(o.videoSecondsPerHour),
     durationSeconds: num(o.durationSeconds),
     frameCount: num(o.frameCount),
     energyKj: num(o.energyKj),

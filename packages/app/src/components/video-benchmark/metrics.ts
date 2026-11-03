@@ -31,6 +31,8 @@ export interface VideoPoint {
   p50: number | null;
   p90: number | null;
   wallSeconds: number | null;
+  /** Valid decoded output seconds per measurement wall-hour; absent in older projections. */
+  videoSecondsPerHour?: number | null;
   durationSeconds: number | null;
   frameCount: number | null;
   /** GPU-board kJ per valid clip over the recorded generation window; null when power is invalid. */

@@ -358,6 +358,7 @@ describe('VideoGenX results', () => {
     // projections. It is never written to the committed history fixture.
     mount({
       edit: (observation) => {
+        observation.videoSecondsPerHour = 400;
         // Turn the H100 row into an explicitly synthetic second
         // workload so the test changes clip duration without replacing the
         // retained B200/H200 cohort used for the scenario assertions below.
@@ -395,7 +396,7 @@ describe('VideoGenX results', () => {
     cy.get('[data-testid="results-profit"] [data-testid="results-empty"]').should('exist');
     cy.get('[data-testid="results-price-t2v"]').type('0.05');
     cy.location('search').should('contain', 'r_price_t2v=0.05');
-    cy.get('[data-testid="results-profit"] [data-hardware="b200"]').should('contain', '2.88');
+    cy.get('[data-testid="results-profit"] [data-hardware="b200"]').should('contain', '3.27');
     cy.get('[data-testid="results-utilization"]').then(($input) => {
       const input = $input[0] as HTMLInputElement;
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;

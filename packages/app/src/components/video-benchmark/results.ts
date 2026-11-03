@@ -197,10 +197,9 @@ function resultCell(point: VideoPoint, state: ResultsState): ResultCell {
   const metadata = resultMetadata(point);
   const clipsPerSecond =
     positive(point.valid) && positive(point.wallSeconds) ? point.valid / point.wallSeconds : null;
-  const videoSecondsPerSecond =
-    clipsPerSecond !== null && positive(point.durationSeconds)
-      ? clipsPerSecond * point.durationSeconds
-      : null;
+  const videoSecondsPerSecond = positive(point.videoSecondsPerHour)
+    ? point.videoSecondsPerHour / 3600
+    : null;
   const energy = metricValue(point, 'kjPerVideo', { tier: state.costTier });
   const joulesPerClip = energy === null ? null : energy * 1000;
   const price =
@@ -221,7 +220,9 @@ function resultCell(point: VideoPoint, state: ResultsState): ResultCell {
       perVideo = perHour / (clipsPerSecond * 3600);
     return {
       perVideo,
-      perVideoSecond: positive(point.durationSeconds) ? perVideo / point.durationSeconds : null,
+      perVideoSecond: positive(point.videoSecondsPerHour)
+        ? perHour / point.videoSecondsPerHour
+        : null,
       perHour,
     };
   };

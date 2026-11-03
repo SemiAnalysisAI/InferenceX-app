@@ -146,7 +146,7 @@ const STRINGS = {
     priceDetail:
       'Scenario inputs, not measured revenue or current API prices. Enter a price for each mode; an unknown mode has no price.',
     costNote:
-      'Modelled TCO from the hardware registry and measured output rate. Both GPU bases are shown; missing allocation evidence stays unknown. Each price applies only to the selected resolution, duration and mode.',
+      'Modelled TCO uses recorded GPU counts and measured output rate. Video-second costs use valid decoded output duration; workload duration is the request setting. Missing allocation stays unknown.',
     profitNote:
       'Revenue = measured video-s/hr × utilisation × entered $/video-s. Profit subtracts all hourly GPU TCO; divide by the stated GPU count. No capacity or sustained-load claim.',
     scenarioPrice: 'API $ / video-s · selected workload',
@@ -289,7 +289,7 @@ const STRINGS = {
     priceDetail:
       '价格输入是场景假设，不是实测收入或当前 API 报价。分别填写各模式的价格；未知模式不套用价格。',
     costNote:
-      '使用硬件注册表的 TCO 与实测产出速率建模，同时展示两种 GPU 口径；分配证据缺失时保持未知。价格仅适用于所选分辨率、时长和模式。',
+      'TCO 估算使用记录的 GPU 数量和实测产出速率。每视频秒成本按有效输出的实际时长计算，工作负载时长为请求值。分配证据缺失时保持未知。',
     profitNote:
       '收入 = 实测 video-s/hr × 利用率 × 输入单价。利润扣除全部每小时 GPU TCO，再除以相应 GPU 数量。不据此推断容量或持续负载能力。',
     scenarioPrice: 'API $ / video-s · 当前工作负载',

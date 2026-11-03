@@ -25,6 +25,7 @@ const observation: VideoHistoryObservation = {
   allocated: 4,
   replicas: null,
   wallSeconds: 3013.4,
+  videoSecondsPerHour: 192,
   durationSeconds: 8,
   frameCount: 192,
   avgPowerW: 2727.5,
@@ -106,6 +107,7 @@ describe('videoPoints', () => {
         runId: '34342452354',
         artifactId: 10107476604,
         p50: 150.6,
+        videoSecondsPerHour: 192,
         publishedAt: '2026-09-10T00:00:00Z',
       });
       if (approved !== true) expect(videoPoints([history])).toEqual([]);

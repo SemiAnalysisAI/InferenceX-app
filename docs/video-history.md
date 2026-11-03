@@ -12,7 +12,17 @@ Two launchers produce the serving matrix, and `serving.ts` keys the contract on 
 
 Allocated GPU counts require retained Slurm `AllocTRES` or the validated AMD allocation binding; a native power document's `expected_gpu_count` describes telemetry coverage and cannot establish the reservation. Without allocation evidence, the count and allocation-normalized metrics remain null.
 
-Each observation also carries the cell's participating and allocated GPU counts, measurement wall seconds, clip duration and frame count, summed mean board watts, summed recorded enforced limits (null when no limit snapshot exists), the configured `tp_size` / `ulysses_degree` / `attention_backend` and the endpoint's replica count (`execution.deployment.replica_count`, null for bundles that predate it). The nullable `workloadKey` carries the full canonical workload identity when complete; prompts and seeds cannot be replaced by the shortened display label. These are additive, nullable fields under the same `schemaVersion: 1`; the hardware dashboard reads at most five pages and derives every displayed metric from them, so the browser never parses an artifact bundle for the chart.
+Each observation also carries the cell's participating and allocated GPU counts, measurement wall seconds, requested clip duration and frame count, summed mean board watts, summed recorded enforced limits (null when no limit snapshot exists), the configured `tp_size` / `ulysses_degree` / `attention_backend` and the endpoint's replica count (`execution.deployment.replica_count`, null for bundles that predate it). The nullable `workloadKey` carries the full canonical workload identity when complete; prompts and seeds cannot be replaced by the shortened display label. These are additive, nullable fields under the same `schemaVersion: 1`; the hardware dashboard reads at most five pages and derives every displayed metric from them, so the browser never parses an artifact bundle for the chart.
+
+`videoSecondsPerHour` carries the validated decoded video seconds from technically
+valid measured requests divided by measurement wall seconds, multiplied by 3600.
+Warmup requests are excluded, and every valid measured request must have a positive
+recorded media duration. Fresh History projections emit this nullable field;
+older stored projections may omit it, which the dashboard treats as null. Missing
+output duration leaves video-second throughput, per-video-second cost and revenue
+unavailable.
+`durationSeconds` remains the requested plan duration for workload identity and
+filters; it never substitutes for decoded output duration.
 
 ## Publication and discovery
 

@@ -78,7 +78,7 @@ const STRINGS = {
       'Mean GPU-board joules per valid clip in the selected measurement cell; not a per-clip energy trace.',
     psnrNote: 'No sealed paired PSNR result is available for this clip.',
     metricsHelp:
-      'PSNR uses a sealed Diffusers reference pair and every decoded RGB frame. J/clip is the selected cell mean. Both TCO bases use the selected tier and recorded GPU count.',
+      'PSNR uses a sealed Diffusers reference pair and every decoded RGB frame. J/clip is the selected cell mean. Both TCO bases use the selected tier, recorded GPU count and valid decoded output duration.',
     gpu: (n: number) => `${n} GPU`,
     seconds: 's',
   },
@@ -136,7 +136,7 @@ const STRINGS = {
     energyNote: '所选测量单元每条有效视频的平均 GPU 板卡能耗，不是单条视频的能耗轨迹。',
     psnrNote: '此视频尚无已封存的配对 PSNR 结果。',
     metricsHelp:
-      'PSNR 使用已封存的 Diffusers 参考配对，比较全部解码 RGB 帧。J/clip 是所选测量单元的平均值。两种 TCO 口径均使用所选成本档位和记录的 GPU 数量。',
+      'PSNR 使用已封存的 Diffusers 参考配对，比较全部解码 RGB 帧。J/clip 是所选测量单元的平均值。两种 TCO 口径均使用所选成本档位、记录的 GPU 数量和有效输出的实际时长。',
     gpu: (n: number) => `${n} 张 GPU`,
     seconds: 's',
   },

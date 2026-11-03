@@ -8,7 +8,11 @@ import { RESULT_CSV_COLUMNS, resultCsvRows } from './results-csv';
 describe('VideoGenX overview CSV rows', () => {
   it('keeps exact named provenance, both GPU bases, units, and unknown values', () => {
     const history = structuredClone(retainedHistory) as unknown as VideoHistoryPage;
-    for (const entry of history.entries) entry.approved = false;
+    for (const entry of history.entries) {
+      entry.approved = false;
+      for (const source of entry.sources)
+        for (const point of source.observations) point.videoSecondsPerHour = 240;
+    }
     const runId = history.entries.find((entry) =>
       entry.sources.some((source) => source.hardware.includes('B200')),
     )!.runId;
@@ -37,6 +41,10 @@ describe('VideoGenX overview CSV rows', () => {
       participating_cost_usd_per_video: cell.cost.participating?.perVideo ?? null,
       allocated_cost_usd_per_video: cell.cost.allocated?.perVideo ?? null,
       gpu_board_energy_j_per_clip: cell.joulesPerClip,
+      duration_s: cell.metadata.duration,
+      video_seconds_per_s: 240 / 3600,
+      participating_cost_usd_per_video_s: cell.cost.participating!.perHour / 240,
+      allocated_cost_usd_per_video_s: cell.cost.allocated!.perHour / 240,
       participating_profit_usd_per_hour: null,
       allocated_profit_usd_per_hour: null,
     });

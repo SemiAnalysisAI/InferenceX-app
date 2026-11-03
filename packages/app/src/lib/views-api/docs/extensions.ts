@@ -474,7 +474,10 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     'Exact width×height from the sealed plan, such as 1344×768.',
     '封印计划中的完整宽×高，例如 1344×768。',
   ],
-  r_duration: ['Positive planned clip duration in seconds.', '计划视频时长，单位秒，必须为正数。'],
+  r_duration: [
+    'Positive requested clip duration from the plan, in seconds; not decoded output duration.',
+    '计划中的请求视频时长，单位秒，必须为正数；不是解码输出时长。',
+  ],
   r_mode: [
     'Explicit generation mode; unknown modes are never inferred from model names.',
     '明确记录的生成模式；不从模型名称推断缺失模式。',
@@ -570,8 +573,8 @@ export function viewParameter(view: ReadonlyView, name: string): ApiParameter {
   const note: readonly [string, string] =
     view === 'video' && name === 'format'
       ? [
-          'JSON by default. CSV is available only with view=overview and flattens its selected official and named cells with source identities, both GPU cost bases and units. Empty CSV cells represent missing values.',
-          '默认返回 JSON。CSV 仅适用于 view=overview，按当前选择导出正式及指定运行的数据点，包含来源标识、两种 GPU 成本口径和单位。CSV 空单元格表示数据缺失。',
+          'JSON by default. CSV is available only with view=overview and flattens its selected official and named cells with source identities, both GPU cost bases and units. duration_s is the requested plan duration; video_seconds_per_s is validated decoded output seconds per wall second. Empty CSV cells represent missing values.',
+          '默认返回 JSON。CSV 仅适用于 view=overview，按当前选择导出正式及指定运行的数据点，包含来源标识、两种 GPU 成本口径和单位。duration_s 为计划请求时长，video_seconds_per_s 为每测量秒生成的有效解码视频秒数。CSV 空单元格表示数据缺失。',
         ]
       : view === 'video' && (name === 'unofficialrun' || name === 'unofficialruns')
         ? [
@@ -767,8 +770,8 @@ const NEW_VIEWS = {
 } as const;
 
 const RESULTS_OVERVIEW_NOTES = {
-  en: 'view=overview shares resultProjection with the nine-group UI, admits one canonical 20-clip C1 workload with ten valid samples per hardware, and returns measured metrics plus separately labelled participating/allocated cost and modelled profit. Missing allocation remains null. Default points require publication approval. unofficialrun selects only the exact stored run into overlayCells (selected GPU count) and overlayDeploymentCells (all matching GPU counts) with its actual approval, excluding it from official cells, deployments and workload mix. Approved cohorts retain default preference; named-only workloads require explicit selection or no matching approved cohort. Clearing never promotes unapproved evidence. Dismissal retains a workload selector only if it remains in the approved choices. The overview returns JSON by default; format=csv returns selected official and named cells with source identities, units and both GPU cost bases as a private no-store download. Missing values are empty CSV cells. Missing quality, stage timing, memory and startup evidence stays null. Play/pause, scrub, difference rendering, theme and expand controls are presentation-only; media uses the published-only read path. ',
-  zh: 'view=overview 与九组指标界面共用 resultProjection，只准入同一份计划 20 条视频的 C1 工作负载，各硬件统一至少 10 个有效样本。响应包含实测指标及分别标注的参与/已分配 GPU 成本和估算利润；分配证据缺失时保留 null。默认数据点须有发布批准。unofficialrun 只把指定的已存储运行放入 overlayCells（所选 GPU 数）和 overlayDeploymentCells（所有匹配的 GPU 数），保留其实际批准状态，并将其排除在正式结果、部署和工作负载构成之外。默认优先选择有已批准结果的工作负载；仅由指定运行提供的工作负载须明确选择，或在没有匹配的已批准结果时作为回退。清除叠加运行后也不会把未批准数据转为正式结果。移除时，工作负载选择仅在已批准选项中仍然有效时保留。overview 默认返回 JSON；format=csv 导出当前筛选的正式及指定运行数据点，包含来源标识、单位和两种 GPU 成本口径。CSV 响应设置 Cache-Control: private, no-store；缺失值以空单元格表示。质量、阶段计时、内存和启动证据缺失时保留 null。播放、拖动、差异显示、主题和展开控件只影响展示；媒体使用只读已发布路径。',
+  en: 'view=overview shares resultProjection with the nine-group UI, admits one canonical 20-clip C1 workload with ten valid samples per hardware, and returns measured metrics plus separately labelled participating/allocated cost and modelled profit. Missing allocation remains null. point.videoSecondsPerHour carries validated decoded output seconds per measurement wall hour from valid measured requests, excluding warmup. Video-second throughput, both per-video-second cost bases and modelled revenue use this output rate. Missing valid output durations or older History without this optional field leave these metrics and profit null; requested durationSeconds remains workload/filter metadata and is never a fallback. Default points require publication approval. unofficialrun selects only the exact stored run into overlayCells (selected GPU count) and overlayDeploymentCells (all matching GPU counts) with its actual approval, excluding it from official cells, deployments and workload mix. Approved cohorts retain default preference; named-only workloads require explicit selection or no matching approved cohort. Clearing never promotes unapproved evidence. Dismissal retains a workload selector only if it remains in the approved choices. The overview returns JSON by default; format=csv returns selected official and named cells with source identities, units and both GPU cost bases as a private no-store download. duration_s is the requested plan duration; video_seconds_per_s beside clips_per_s is validated decoded output seconds per wall second. Missing values are empty CSV cells. Missing quality, stage timing, memory and startup evidence stays null. Play/pause, scrub, difference rendering, theme and expand controls are presentation-only; media uses the published-only read path. ',
+  zh: 'view=overview 与九组指标界面共用 resultProjection，只准入同一份计划 20 条视频的 C1 工作负载，各硬件统一至少 10 个有效样本。响应包含实测指标及分别标注的参与/已分配 GPU 成本和估算利润；分配证据缺失时保留 null。point.videoSecondsPerHour 表示有效测量请求每小时生成的实际解码视频秒数，排除 warmup；视频秒吞吐量、两种 GPU 口径的每视频秒成本及估算收入共用此输出速率。有效输出时长不完整或旧 History 缺少此可选字段时，这些指标及利润均为 null；durationSeconds 保留计划请求时长，仅用于工作负载身份与筛选，不作替代。默认数据点须有发布批准。unofficialrun 只把指定的已存储运行放入 overlayCells（所选 GPU 数）和 overlayDeploymentCells（所有匹配的 GPU 数），保留其实际批准状态，并将其排除在正式结果、部署和工作负载构成之外。默认优先选择有已批准结果的工作负载；仅由指定运行提供的工作负载须明确选择，或在没有匹配的已批准结果时作为回退。清除叠加运行后也不会把未批准数据转为正式结果。移除时，工作负载选择仅在已批准选项中仍然有效时保留。overview 默认返回 JSON；format=csv 导出当前筛选的正式及指定运行数据点，包含来源标识、单位和两种 GPU 成本口径。duration_s 保留计划请求时长；紧邻 clips_per_s 的 video_seconds_per_s 为每测量秒生成的有效解码视频秒数。CSV 响应设置 Cache-Control: private, no-store；缺失值以空单元格表示。质量、阶段计时、内存和启动证据缺失时保留 null。播放、拖动、差异显示、主题和展开控件只影响展示；媒体使用只读已发布路径。',
 };
 
 export const operations: ApiOperation[] = Object.entries(NEW_VIEWS).map(
