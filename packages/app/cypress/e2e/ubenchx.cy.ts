@@ -12,17 +12,18 @@ describe('ubenchX hub and test routes', () => {
   it('opens /ubenchx on the mem-bw view with the Beta title and test selector', () => {
     cy.visit('/ubenchx', dismissModal);
     cy.url().should('include', '/ubenchx/mem-bw');
-    cy.contains('h1', 'ubenchX Microbenchmarks (Beta)').should('be.visible');
+    cy.contains('h1', 'ubenchX microbenchmarks').should('be.visible');
+    cy.get('[data-testid="ubenchx-maturity"]').should('have.text', 'Beta');
     cy.get('[data-testid="nav-link-ubenchx"]').should('have.attr', 'href', '/ubenchx/mem-bw');
-    cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'HBM Bandwidth');
-    cy.contains('h2', 'HBM Bandwidth').should('be.visible');
+    cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'HBM bandwidth');
+    cy.contains('h2', 'HBM bandwidth').should('be.visible');
     cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
     cy.contains('H100 SXM').should('be.visible');
     cy.get('[data-testid="ubenchx-metric-select"]').should('contain', 'MBU');
-    cy.contains('h2', 'Memory Bandwidth Utilization').should('be.visible');
+    cy.contains('h2', 'Memory bandwidth utilization').should('be.visible');
     cy.get('[data-testid="ubenchx-metric-select"]').click();
     cy.contains('[role="option"]', 'Bandwidth (TB/s)').click();
-    cy.contains('h2', 'Bandwidth vs Message Size').should('be.visible');
+    cy.contains('h2', 'Bandwidth vs message size').should('be.visible');
     cy.get('[data-testid="ubenchx-metric-select"]').should('contain', 'TB/s');
   });
 
@@ -53,7 +54,7 @@ describe('ubenchX hub and test routes', () => {
         'Product',
         'Measured # of GPCs',
         'Measured # of SMs',
-        'Measured TPC Groupings',
+        'Measured TPC groupings',
       ]);
     });
     cy.get('[data-testid="tpc-skyline-table"] tbody tr').should(
@@ -95,18 +96,21 @@ describe('ubenchX hub and test routes', () => {
     cy.get('[data-testid="sm-l2-heatmap"] svg rect').last().as('overlay');
     cy.get('@overlay').click(520, 120, { force: true });
     cy.get('[data-testid="sm-l2-tooltip"]')
-      .should('be.visible')
+      .should('have.css', 'display', 'block')
       .invoke('text')
       .then((pinned) => {
         cy.get('@overlay').trigger('mousemove', 60, 60, { force: true });
-        cy.get('[data-testid="sm-l2-tooltip"]').should('be.visible').and('have.text', pinned);
+        cy.get('[data-testid="sm-l2-tooltip"]')
+          .should('have.css', 'display', 'block')
+          .and('have.text', pinned);
       });
   });
 
   it('opens /zh/ubenchx on the Chinese mem-bw view with the Beta title', () => {
     cy.visit('/zh/ubenchx', dismissModal);
     cy.url().should('include', '/zh/ubenchx/mem-bw');
-    cy.contains('h1', 'ubenchX 微基准测试（Beta）').should('be.visible');
+    cy.contains('h1', 'ubenchX 微基准测试').should('be.visible');
+    cy.get('[data-testid="ubenchx-maturity"]').should('have.text', 'Beta');
     cy.get('[data-testid="ubenchx-test-select"]').should('contain', 'HBM 带宽');
     cy.get('meta[name="robots"]').should('have.attr', 'content').and('contain', 'noindex');
     cy.get('link[rel="alternate"][hreflang="en"]')
@@ -293,7 +297,7 @@ describe('Huawei copy-bandwidth evidence', () => {
       .should('have.length', 9);
     cy.get('[data-testid="ubenchx-metric-select"]').click();
     cy.contains('[role="option"]', 'Bandwidth (TB/s)').click();
-    cy.contains('h2', 'Bandwidth vs Message Size').should('be.visible');
+    cy.contains('h2', 'Bandwidth vs message size').should('be.visible');
     cy.screenshot('huawei-bandwidth-en', { capture: 'fullPage' });
     cy.visit('/zh/ubenchx/mem-bw', dismiss);
     cy.contains('图执行时间按拷贝次数摊销').should('be.visible');

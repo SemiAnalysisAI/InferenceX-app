@@ -16,10 +16,10 @@ describe('Compare-per-dollar slug page — slimmed table + cross-link', () => {
     });
   });
 
-  it('shows only the Dollar-per-Million-Tokens and Concurrency metric rows', () => {
+  it('shows only the dollars-per-million-tokens and Concurrency metric rows', () => {
     cy.get('[data-testid="compare-interpolated-table"] tbody').should(
       'contain.text',
-      'Dollar per Million Tokens',
+      'Dollars per million tokens',
     );
     cy.get('[data-testid="compare-interpolated-table"] tbody').should(
       'contain.text',
@@ -39,8 +39,8 @@ describe('Compare-per-dollar slug page — slimmed table + cross-link', () => {
     );
   });
 
-  it('exposes a "View full latency + throughput comparison" cross-link to /compare/', () => {
-    cy.contains('a', 'View full latency + throughput comparison').should(
+  it('exposes a "View full latency and throughput comparison" cross-link to /compare/', () => {
+    cy.contains('a', 'View full latency and throughput comparison').should(
       'have.attr',
       'href',
       '/compare/deepseek-r1-gb200-vs-h100',
@@ -72,7 +72,7 @@ describe('Chinese compare-per-dollar table', () => {
     cy.visit('/zh/compare-per-dollar/deepseek-r1-gb200-vs-h100');
     cy.get('[data-testid="compare-interpolated-table"] tbody')
       .should('contain.text', '每百万 token 成本（美元）')
-      .and('not.contain.text', 'Dollar per Million Tokens');
+      .and('not.contain.text', 'Dollars per million tokens');
   });
 });
 
@@ -85,7 +85,7 @@ describe('Compare slug page — cross-link to per-dollar view', () => {
   });
 
   it('renders a cross-link to /compare-per-dollar/<same-slug>', () => {
-    cy.contains('a', 'View performance-per-dollar view').should(
+    cy.contains('a', 'View performance per dollar').should(
       'have.attr',
       'href',
       '/compare-per-dollar/deepseek-r1-gb200-vs-h100',

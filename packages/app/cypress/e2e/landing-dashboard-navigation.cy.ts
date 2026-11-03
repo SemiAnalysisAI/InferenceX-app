@@ -150,7 +150,7 @@ describe('landing model curation', () => {
         cy.get('[data-new-badge="landing-minimax-m31-flash"]').should('not.exist');
         cy.get('[data-testid="landing-huawei-results-link"]')
           .find('[data-new-badge="landing-huawei"]')
-          .should('contain.text', prefix ? '新' : 'NEW')
+          .should('contain.text', prefix ? '新' : 'New')
           .and('have.class', 'new-badge-flash');
         cy.get('[data-testid="landing-minimax-m31-flash-minimax-logo"]').should(
           'have.attr',
@@ -159,11 +159,14 @@ describe('landing model curation', () => {
         );
         cy.get('[data-testid="landing-tpu-kimi-k3-results-link"]')
           .should('have.attr', 'href', `${prefix}${TPU_KIMI_RESULTS_HREF}`)
-          .and('contain.text', prefix ? 'TPU Kimi K3 提交结果' : 'TPU Kimi K3 Submission')
-          .and('contain.text', prefix ? '2.8 万亿参数 AgentX' : '2.8 Trillion parameters AgentX');
+          .and('contain.text', prefix ? 'TPU Kimi K3 提交结果' : 'TPU Kimi K3 submission')
+          .and(
+            'contain.text',
+            prefix ? '2.8 万亿参数 · AgentX' : '2.8 trillion parameters · AgentX',
+          );
         cy.get('[data-testid="landing-tpu-kimi-k3-google-logo"] path').should('have.length', 4);
         cy.get('[data-new-badge="landing-tpu-kimi-k3"]')
-          .should('contain.text', prefix ? '新' : 'NEW')
+          .should('contain.text', prefix ? '新' : 'New')
           .and('have.class', 'new-badge-flash');
         cy.get('[data-testid="landing-tpu-kimi-k3-results-link"]')
           .next()
@@ -171,9 +174,9 @@ describe('landing model curation', () => {
           .and('have.attr', 'href', `${prefix}/inference/glm-5-3`)
           .and(
             'contain.text',
-            prefix ? 'Vera Rubin NVL72 GLM 5.3 提交结果' : 'Vera Rubin NVL72 GLM 5.3 Submission',
+            prefix ? 'Vera Rubin NVL72 GLM 5.3 提交结果' : 'Vera Rubin NVL72 GLM 5.3 submission',
           )
-          .and('contain.text', prefix ? '7440 亿参数 AgentX' : '744 Billion parameters AgentX');
+          .and('contain.text', prefix ? '7440 亿参数 · AgentX' : '744 billion parameters · AgentX');
         cy.get('[data-testid="landing-rubin-glm-5-3-nvidia-logo"] path').should(
           'have.attr',
           'fill',

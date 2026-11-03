@@ -29,7 +29,7 @@ const rows: SubmissionSummaryRow[] = [
 describe('SubmissionsTable — Spec Method column', () => {
   it('renders a Spec Method column header', () => {
     cy.mount(<SubmissionsTable data={rows} />);
-    cy.contains('th', 'Spec Method').should('be.visible');
+    cy.contains('th', 'Spec method').should('be.visible');
   });
 
   it('renders canonical spec_method labels and shows an em-dash for "none"', () => {
@@ -61,17 +61,17 @@ describe('SubmissionsTable — Spec Method column', () => {
 
   it('sorts by spec_method when the header is clicked', () => {
     cy.mount(<SubmissionsTable data={rows} />);
-    cy.contains('th', 'Spec Method').click();
+    cy.contains('th', 'Spec method').click();
     cy.get('tbody tr').first().should('contain.text', 'MI355X');
     cy.get('tbody tr').last().should('contain.text', 'B300');
-    cy.contains('th', 'Spec Method').click();
+    cy.contains('th', 'Spec method').click();
     cy.get('tbody tr').first().should('contain.text', 'B300');
     cy.get('tbody tr').last().should('contain.text', 'MI355X');
   });
 
   it('filters rows when the search query matches a spec_method', () => {
     cy.mount(<SubmissionsTable data={rows} />);
-    cy.get('input[placeholder="Search configs..."]').type('eagle');
+    cy.get('input[placeholder="Search configs"]').type('eagle');
     cy.get('tbody tr').should('have.length', 1).first().should('contain.text', 'B300');
   });
 });

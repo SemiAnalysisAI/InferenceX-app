@@ -334,7 +334,7 @@ describe('API documentation', () => {
       .and('have.attr', 'hreflang', 'zh-CN');
     cy.get('[data-testid="footer-link-api"]')
       .should('have.attr', 'href', '/api')
-      .and('have.text', 'API Reference');
+      .and('have.text', 'API reference');
 
     cy.request('/api/openapi.json').then(({ body, headers, status }) => {
       expect(status).to.equal(200);

@@ -16,7 +16,7 @@ const boxOf = (el: Element) => el.getBoundingClientRect();
 
 const dismissNudges = (win: Cypress.AUTWindow) => {
   win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-  win.sessionStorage.setItem('inferencex-reproducibility-nudge-shown', '1');
+  win.localStorage.setItem('inferencex-reproducibility-nudge-dismissed', '1');
 };
 
 const firstRowCell = (header: string) =>

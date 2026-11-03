@@ -88,7 +88,7 @@ describe('Agentic Workload Explorer', () => {
     cy.get('[data-testid="d3-chart-svg"]').should('have.length', 6);
     cy.get('.stacked-segment').should('have.length', 6);
     cy.get('.line-path').should('have.length.at.least', 1);
-    cy.get('button[aria-label="Expand chart: Model Mix Over Time"]').click();
+    cy.get('button[aria-label="Expand chart: Model mix over time"]').click();
     cy.get('[role="dialog"]').within(() => {
       cy.get('.stacked-segment')
         .first()

@@ -64,7 +64,8 @@ it('shows measured and missing GPU coverage, then switches the URL to MoE', () =
 
   cy.visit('/operatorx');
   cy.wait('@gemm');
-  cy.get('[data-testid="operatorx-page"] h1').should('have.text', 'OperatorX (Experimental Beta)');
+  cy.get('[data-testid="operatorx-page"] h1').should('have.text', 'OperatorX');
+  cy.get('[data-testid="operatorx-maturity"]').should('have.text', 'Experimental');
   cy.get('[data-testid="operatorx-coverage"]')
     .should('contain.text', 'Coverage of 2 cases')
     .and('contain.text', '2/2')
@@ -333,6 +334,43 @@ for (const prefix of ['', '/zh']) {
             expect(point.__data__.y).to.be.closeTo(268.435456, 1e-9);
           });
       });
+  });
+}
+
+for (const prefix of ['', '/zh']) {
+  it(`plots head-to-head measurements across vendor backends at ${prefix || '/'}`, () => {
+    const ascend = normalizeBundle(run('105', 'ascend950pr-external', [64, 128]));
+    ascend.results = ascend.results.map((r) => ({ ...r, backend: 'torch_npu_linear' }));
+    const nvidia = normalizeBundle(run('106', 'h200-dgxc', [64, 128]));
+    const view = comparisonView(
+      buildComparison('gemm', [
+        { runner: 'ascend950pr-external', dataset: ascend },
+        { runner: 'h200-dgxc', dataset: nvidia },
+      ]),
+      null,
+    );
+    cy.intercept('GET', '/api/v1/operatorx/compare?op=gemm*', view).as('crossBackend');
+    cy.visit(`${prefix}/operatorx`);
+    cy.wait('@crossBackend');
+    cy.get('[data-testid="operatorx-viz-pairwise-scatter"]')
+      .scrollIntoView()
+      .within(() => {
+        cy.contains(prefix ? '没有两者都实测过的用例' : 'No case was measured on both').should(
+          'not.exist',
+        );
+        cy.contains(prefix ? '在 2 个用例中' : 'of 2').should('be.visible');
+        cy.get('svg').should('exist');
+        cy.get('[data-testid="chart-legend"]').should('not.exist');
+        cy.get('span[aria-hidden="true"].rounded-full').should('have.length', 2);
+      });
+    // The plot fills the height the row leaves, so only the card padding sits below it.
+    cy.get('[data-testid="operatorx-viz-pairwise-scatter"]').should(($card) => {
+      const plot = [...$card.find('svg')]
+        .map((svg) => svg.getBoundingClientRect())
+        .toSorted((a, b) => b.width - a.width)[0];
+      const padding = Number.parseFloat(getComputedStyle($card[0]).paddingBottom);
+      expect($card[0].getBoundingClientRect().bottom - plot.bottom).to.be.closeTo(padding, 2);
+    });
   });
 }
 

@@ -580,7 +580,7 @@ describe('component CSS harness', () => {
         const direct = card
           .querySelector('[data-testid="direct-content"]')!
           .getBoundingClientRect();
-        const padding = width < 640 ? 12 : width < 768 ? 16 : 24;
+        const padding = width < 768 ? 16 : 24;
         expect(getComputedStyle(card).paddingLeft).to.equal(`${padding}px`);
         for (const slot of ['card-header', 'card-content', 'card-footer']) {
           const bounds = card.querySelector(`[data-slot="${slot}"]`)!.getBoundingClientRect();

@@ -36,8 +36,8 @@ const showChart = () => cy.get('[data-testid="calculator-lifecycle-chart-view-bt
 
 function assertFleetControlLabels(locale: 'en' | 'zh' = 'en') {
   for (const [id, label] of [
-    ['fleet-cost', locale === 'zh' ? '计价方式' : 'Cost Provider'],
-    ['fleet-cost-type', locale === 'zh' ? 'Token 类型' : 'Token Type'],
+    ['fleet-cost', locale === 'zh' ? '计价方式' : 'Cost provider'],
+    ['fleet-cost-type', locale === 'zh' ? 'Token 类型' : 'Token type'],
   ]) {
     cy.get(`label[for="${id}"]`).should('have.text', label).click();
     cy.get(`button#${id}`).should('have.attr', 'aria-expanded', 'true');
@@ -141,7 +141,7 @@ describe('Fleet — Fleet Lifecycle', () => {
   before(() => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-      win.sessionStorage.setItem('inferencex-reproducibility-nudge-shown', '1');
+      win.localStorage.setItem('inferencex-reproducibility-nudge-dismissed', '1');
     });
     cy.visit('/fleet');
     cy.get('[data-testid="calculator-lifecycle-section"]').should('exist');
@@ -153,13 +153,13 @@ describe('Fleet — Fleet Lifecycle', () => {
     for (const width of [375, 1440]) {
       cy.viewport(width, 900);
       cy.get('[data-testid="fleet-benchmark-panel"]').within(() => {
-        cy.get('legend').should('have.text', 'Benchmark Config');
+        cy.get('legend').should('have.text', 'Benchmark config');
         cy.get('#fleet-model').should('exist');
         cy.get('#fleet-sequence').should('exist');
         cy.get('#fleet-precision').should('exist');
       });
       cy.get('[data-testid="fleet-chart-panel"]').within(() => {
-        cy.get('legend').should('have.text', 'Chart Config');
+        cy.get('legend').should('have.text', 'Chart config');
         cy.get('#fleet-cost').should('exist');
         cy.get('#fleet-cost-type').should('exist');
         cy.get('#fleet-target').should('exist');
@@ -184,7 +184,7 @@ describe('Fleet — Fleet Lifecycle', () => {
     assertFleetControlLabels();
     cy.get('[data-testid="calculator-lifecycle-section"]')
       .should('be.visible')
-      .and('contain.text', 'Fleet Lifecycle');
+      .and('contain.text', 'Fleet lifecycle');
     cy.get('[data-testid="calc-fleet-mw-input"]').should('have.value', '10');
     cy.get('[data-testid="calculator-lifecycle-figure"]').should('be.visible');
     cy.get('[data-testid="calculator-lifecycle-empty"]').should('not.exist');
@@ -194,15 +194,15 @@ describe('Fleet — Fleet Lifecycle', () => {
     showTable();
     cy.get('[data-testid="calculator-lifecycle-table"]').should('be.visible');
     cy.get('[data-testid="calculator-lifecycle-table"]').within(() => {
-      cy.contains('th', 'Config Now').should('exist');
-      cy.contains('th', 'First Run').should('exist');
-      cy.contains('th', 'Latest Best').should('exist');
+      cy.contains('th', 'Config now').should('exist');
+      cy.contains('th', 'First run').should('exist');
+      cy.contains('th', 'Latest best').should('exist');
       cy.contains('th', 'Improvements').should('exist');
       cy.contains('th', 'Chips').should('exist');
-      cy.contains('th', 'Concurrent Users now').should('exist');
+      cy.contains('th', 'Concurrent users now').should('exist');
       cy.contains('th', 'Margin $/day').should('exist');
       cy.contains('th', 'Payback').should('exist');
-      cy.contains('th', 'Cumulative Margin').should('exist');
+      cy.contains('th', 'Cumulative margin').should('exist');
       cy.get('tbody tr').should('have.length.greaterThan', 0);
     });
     cy.get('[data-testid="calculator-lifecycle-empty"]').should('not.exist');
@@ -267,7 +267,7 @@ describe('Fleet — Fleet Lifecycle', () => {
       });
 
     cy.get('[data-testid="calculator-lifecycle-figure"]').within(() => {
-      cy.contains('h2', 'Fleet Lifecycle').should('be.visible');
+      cy.contains('h2', 'Fleet lifecycle').should('be.visible');
       cy.contains('tok/s/user').should('be.visible');
     });
     cy.get('[data-testid="calculator-lifecycle-chart-svg"]').should('be.visible');
@@ -277,7 +277,7 @@ describe('Fleet — Fleet Lifecycle', () => {
     cy.get('[data-testid="calculator-lifecycle-table"]').should('be.visible');
     cy.get('[data-testid="calculator-lifecycle-chart-svg"]').should('not.exist');
     cy.get('[data-testid="calculator-lifecycle-figure"]').within(() => {
-      cy.contains('h2', 'Fleet Lifecycle').should('be.visible');
+      cy.contains('h2', 'Fleet lifecycle').should('be.visible');
     });
 
     showChart();
@@ -382,7 +382,8 @@ describe('Fleet — Fleet Lifecycle', () => {
       readout().find('tbody tr').should('have.length', lines.length);
     });
     cy.get('[data-testid="calculator-lifecycle-chart-svg"] path.line-path').then((lines) => {
-      hoverPlot(0.05);
+      // Close to the left edge: only the chips whose first run predates it are plotted there.
+      hoverPlot(0.02);
       readout()
         .find('tbody tr')
         .should('have.length.greaterThan', 0)
@@ -467,7 +468,7 @@ describe('Fleet — Fleet Lifecycle', () => {
     );
 
     cy.get('[data-testid="calc-lifecycle-metric-cumulative-revenue"]').click();
-    chartText().should('contain', 'Cumulative Revenue ($)');
+    chartText().should('contain', 'Cumulative revenue ($)');
     cy.get('[data-testid="calculator-lifecycle-chart-svg"] .lifecycle-zero-rule').should(
       'not.exist',
     );
@@ -504,12 +505,12 @@ describe('Fleet — Fleet Lifecycle', () => {
       .then((perDay) => {
         const sign = Math.sign(money(perDay));
         expect(sign, 'a non-zero daily margin to accumulate').to.not.equal(0);
-        firstRowCell('Cumulative Margin')
+        firstRowCell('Cumulative margin')
           .invoke('text')
           .then((short) => {
             cy.get('[data-testid="calc-lifecycle-horizon-input"]').clear();
             cy.get('[data-testid="calc-lifecycle-horizon-input"]').type('96');
-            firstRowCell('Cumulative Margin')
+            firstRowCell('Cumulative margin')
               .invoke('text')
               .should((long) => {
                 const delta = (money(long) - money(short)) * sign;
@@ -531,10 +532,10 @@ describe('Fleet — Fleet Lifecycle', () => {
       .invoke('text')
       .should('match', /^\d+(?:\.\d+)?×$/u);
 
-    firstRowCell('First Run')
+    firstRowCell('First run')
       .invoke('text')
       .should('match', /\d{4}-\d{2}-\d{2}/u);
-    firstRowCell('Latest Best')
+    firstRowCell('Latest best')
       .invoke('text')
       .should('match', /\d{4}-\d{2}-\d{2}/u);
   });
@@ -545,12 +546,12 @@ describe('Fleet — Fleet Lifecycle', () => {
       .and('have.attr', 'step', '0.25');
     lineVertices().then((curved) => {
       expect(curved).to.be.greaterThan(20);
-      firstRowCell('Cumulative Margin')
+      firstRowCell('Cumulative margin')
         .invoke('text')
         .then((short) => {
           cy.get('[data-testid="calc-lifecycle-ramp-input"]').clear();
           cy.get('[data-testid="calc-lifecycle-ramp-input"]').type('18');
-          firstRowCell('Cumulative Margin')
+          firstRowCell('Cumulative margin')
             .invoke('text')
             .should((long) => expect(money(long)).to.be.lessThan(money(short)));
           cy.get('[data-testid="calc-lifecycle-ramp-input"]').clear();
@@ -584,7 +585,7 @@ describe('Fleet — Fleet Lifecycle', () => {
       expect(chips.length).to.be.greaterThan(0);
       expect(new Set(chips).size).to.equal(chips.length);
     });
-    firstRowCell('Config Now').invoke('text').should('not.be.empty');
+    firstRowCell('Config now').invoke('text').should('not.be.empty');
   });
 
   it('follows legend visibility', () => {
@@ -651,7 +652,7 @@ describe('Fleet — self-contained lifecycle regressions', () => {
     cy.visit('/fleet?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4&c_mw=10&c_price=7', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        win.sessionStorage.setItem('inferencex-reproducibility-nudge-shown', '1');
+        win.localStorage.setItem('inferencex-reproducibility-nudge-dismissed', '1');
         unlockAgenticGate(win);
       },
     });
@@ -706,7 +707,7 @@ describe('Fleet — self-contained lifecycle regressions', () => {
         );
       }
       expect(header, 'lifecycle CSV header').to.equal(
-        'Chip,Config Now,First Run,Latest Best,Improvements,Gain,Chips,tok/s/MW now,Concurrent Users now,Revenue $/day,Cost $/day,Margin $/day,Payback,Cumulative Margin,Availability',
+        'Chip,Config now,First run,Latest best,Improvements,Gain,Chips,tok/s/MW now,Concurrent users now,Revenue $/day,Cost $/day,Margin $/day,Payback,Cumulative margin,Availability',
       );
     });
     cy.get('[data-testid="tco-basis-toggle"]').should('not.exist');
@@ -818,7 +819,7 @@ describe('Fleet — Fleet Lifecycle in Chinese', () => {
     cy.visit('/zh/fleet', {
       onBeforeLoad(win) {
         win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        win.sessionStorage.setItem('inferencex-reproducibility-nudge-shown', '1');
+        win.localStorage.setItem('inferencex-reproducibility-nudge-dismissed', '1');
       },
     });
     cy.get('[data-testid="calculator-lifecycle-section"]').should('exist');
@@ -838,7 +839,7 @@ describe('Fleet — Fleet Lifecycle in Chinese', () => {
     showTable();
     cy.get('[data-testid="calculator-lifecycle-table"]').should('be.visible');
     cy.get('[data-testid="calculator-lifecycle-section"]')
-      .should('contain.text', 'Token 价格')
+      .should('contain.text', '输入、输出价格')
       .and('contain.text', '每 MW 收入')
       .and('contain.text', '当前配置')
       .and('contain.text', '首次运行')
@@ -846,8 +847,8 @@ describe('Fleet — Fleet Lifecycle in Chinese', () => {
       .and('contain.text', '来源：');
     cy.get('[data-testid="calculator-lifecycle-section"]')
       .should('not.contain.text', 'Enter a facility power budget')
-      .and('not.contain.text', 'Cumulative Margin')
-      .and('not.contain.text', 'First Run');
+      .and('not.contain.text', 'Cumulative margin')
+      .and('not.contain.text', 'First run');
 
     showTable();
     cy.window().then(captureLifecycleCsvDownloads);

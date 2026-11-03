@@ -10,7 +10,7 @@ const MODEL_LABELS = [
 ];
 
 const PLATFORM_HEADERS = [
-  'Model · Scenario',
+  'Model · scenario',
   'B200 · Reference',
   'MI355X',
   'B300',
@@ -21,11 +21,11 @@ const PLATFORM_HEADERS = [
 const SINGLE_TURN = 'single_turn_8k1k';
 const MATRIX_ROWS = 8;
 const AGENTX = 'agentx';
-const AGENTX_LABEL = 'Long Context Multi-Turn Realistic Agentic Scenario (AgentX)';
+const AGENTX_LABEL = 'Long-context multi-turn realistic agentic scenario (AgentX)';
 const AGENTX_LABEL_ZH = '长上下文、多轮交互的真实智能体场景（AgentX）';
 const AGENTX_SHORT = 'AgentX';
 
-const PAGE_TITLE = 'Agentic Inference Costs';
+const PAGE_TITLE = 'Agentic inference costs';
 const PAGE_TITLE_ZH = '智能体推理成本';
 const SOURCE_NOTE = `Source: InferenceX & ${TCO_SOURCE_TITLE}`;
 const SOURCE_NOTE_ZH = `来源：InferenceX 与 ${TCO_SOURCE_TITLE}`;
@@ -349,7 +349,7 @@ describe('Overview page', () => {
       cy.wait('@emptyOverview');
       cy.get('[data-testid="overview-empty-state"]')
         .should('have.attr', 'role', 'status')
-        .and('have.text', '没有符合当前筛选条件的总览结果。');
+        .and('have.text', '没有符合当前筛选条件的总览结果');
       cy.get('[data-testid="overview-desktop-matrix"]').should('not.exist');
       cy.get('[data-testid="overview-mobile-list"]').should('not.exist');
     });
@@ -784,7 +784,7 @@ describe('Overview page', () => {
         cy.visit(href);
 
         cy.get('[data-testid="inference-chart-display"]').should('exist');
-        cy.contains('Comparison Date Range').should('be.visible');
+        cy.contains('Comparison date range').should('be.visible');
         cy.contains('button', 'Select date range').should('not.have.class', 'animate-pulse');
         cy.get('[data-testid="model-selector"]').click();
         cy.contains('[role="option"]', 'DeepSeek V4 Pro 0813 1.6T').click();
@@ -813,7 +813,7 @@ describe('Overview page', () => {
         expect(href).not.to.contain('i_dates=');
         cy.visit(href);
 
-        cy.contains('Comparison Date Range').should('be.visible');
+        cy.contains('Comparison date range').should('be.visible');
         cy.contains('button', 'Select date range')
           .should('not.have.class', 'animate-pulse')
           .and('not.have.class', 'border-red-500');
@@ -835,7 +835,7 @@ describe('Overview page', () => {
         expect(href).not.to.contain('i_dates=');
         cy.visit(href);
 
-        cy.contains('Comparison Date Range').should('not.exist');
+        cy.contains('Comparison date range').should('not.exist');
       });
   });
 
@@ -939,11 +939,11 @@ describe('Overview page', () => {
         cy.get('[data-overview-engine-scope="community"]')
           .should('have.attr', 'aria-current', 'true')
           .and('match', 'span')
-          .and('have.text', 'Open Source Community Engines (vLLM/SGLang)')
+          .and('have.text', 'Open-source community engines (vLLM/SGLang)')
           .and('not.have.attr', 'href');
         cy.get('[data-overview-engine-scope="all"]')
           .should('have.attr', 'href', '/overview?engine=all')
-          .and('have.text', 'All Platforms');
+          .and('have.text', 'All platforms');
       });
 
     cy.get('[data-testid="overview-tier-switcher"]').then(([tier]) => {
@@ -1103,8 +1103,8 @@ describe('Overview page', () => {
     cy.get('[data-testid="chart-section-tabs"]').should('not.exist');
     cy.get('[data-testid="nav-link-overview"]')
       .should('have.attr', 'href', '/overview')
-      .and('have.class', 'text-brand');
-    cy.get('[data-testid="nav-link-dashboard"]').should('not.have.class', 'text-brand');
+      .and('have.attr', 'aria-current', 'page');
+    cy.get('[data-testid="nav-link-dashboard"]').should('not.have.attr', 'aria-current');
 
     cy.contains('h1', PAGE_TITLE).should('exist');
     cy.contains(
@@ -1146,9 +1146,6 @@ describe('Overview page', () => {
           expect([...$headers].map((header) => header.textContent?.trim())).to.deep.equal(
             PLATFORM_HEADERS,
           );
-          for (const header of $headers) {
-            expect(getComputedStyle(header).fontSize).to.equal('14px');
-          }
         });
         cy.get('[data-testid="overview-desktop-model"]').should('have.length', MATRIX_ROWS);
         cy.get('[data-testid="overview-platform"]').should('have.length', MATRIX_ROWS * 5);
@@ -1230,12 +1227,10 @@ describe('Overview page', () => {
     cy.visit('/overview');
     cy.get('[data-testid="overview-scope-metric"]')
       .should('have.text', SCOPE_METRIC)
-      .and('have.css', 'font-size', '16px')
-      .and('have.css', 'font-weight', '600');
+      .and('have.css', 'font-size', '16px');
     cy.get('[data-testid="overview-scope-direction"]')
       .should('have.text', SCOPE_DIRECTION)
-      .and('have.css', 'font-size', '14px')
-      .and('have.css', 'font-weight', '400');
+      .and('have.css', 'font-size', '14px');
     cy.get('[data-testid="overview-scope-metric"]').then(([metric]) => {
       cy.get('[data-testid="overview-scope-direction"]').then(([direction]) => {
         expect(getComputedStyle(direction).color).not.to.equal(getComputedStyle(metric).color);

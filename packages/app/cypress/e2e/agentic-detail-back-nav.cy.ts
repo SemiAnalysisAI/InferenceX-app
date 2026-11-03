@@ -188,7 +188,9 @@ function clickTracedPoint(): void {
 function openPointDetail(): void {
   cy.get(`[data-testid="legend-points-${SOLO_HW_KEY}"]`).should('exist');
   clickTracedPoint();
-  cy.get('[data-chart-tooltip]:visible [data-action="view-charts"]').should('be.visible').click();
+  cy.get('[data-testid="point-details-panel"] [data-action="view-charts"]')
+    .should('be.visible')
+    .click();
 }
 
 const backControl = (locale: 'en' | 'zh') =>
@@ -255,7 +257,7 @@ describe('Agentic point detail — returning to the chart', () => {
     soloLegendSeries();
     clickTracedPoint();
 
-    cy.get('[data-chart-tooltip]:visible [data-action="view-charts"]')
+    cy.get('[data-testid="point-details-panel"] [data-action="view-charts"]')
       .should('be.visible')
       .then(($link) => {
         const href = $link.attr('href') ?? '';
@@ -263,7 +265,7 @@ describe('Agentic point detail — returning to the chart', () => {
         expect(params.get('unofficialruns'), 'overlay run carried forward').to.equal('987654321');
       });
 
-    cy.get('[data-chart-tooltip]:visible [data-action="view-charts"]').click();
+    cy.get('[data-testid="point-details-panel"] [data-action="view-charts"]').click();
     cy.location('search').should('contain', 'unofficialruns=987654321');
     chartLink('en').should('have.attr', 'href').and('contain', 'unofficialruns=987654321');
   });

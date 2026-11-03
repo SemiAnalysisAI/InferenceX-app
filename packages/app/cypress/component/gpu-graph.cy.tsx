@@ -137,8 +137,8 @@ describe('GPUGraph', () => {
     cy.get('#gpu-point-labels').should('have.attr', 'data-state', 'checked');
     cy.get(labels).filter(':visible').first().should('have.text', '4');
     cy.get('#gpu-point-labels').click();
-    cy.get(`${labels}:visible`).should('not.exist');
-    cy.get('label[for="gpu-offloading-label"]').should('have.text', 'Offloading Label');
+    cy.get(labels).filter(':visible').should('have.length', 0);
+    cy.get('label[for="gpu-offloading-label"]').should('have.text', 'Offloading label');
     cy.get('#gpu-offloading-label').should('have.attr', 'data-state', 'checked').click();
     cy.get('@setShowOffloadingLabel').should('have.been.calledWith', false);
   });
@@ -379,9 +379,11 @@ describe('GPUGraph', () => {
     cy.get('#test-gpu-agentic-decorations [data-testid="agentic-optimization-note"]').should(
       'not.exist',
     );
-    cy.get('#test-gpu-agentic-decorations svg .dot-group').first().trigger('mouseenter');
-    cy.get('[data-chart-tooltip]').should('contain.text', 'Speculative Decoding');
-    cy.get('[data-chart-tooltip]').should('contain.text', 'MTP');
+    cy.get('#test-gpu-agentic-decorations svg .dot-group .visible-shape')
+      .first()
+      .click({ force: true });
+    cy.get('[data-testid="point-details-panel"]').should('contain.text', 'Speculative decoding');
+    cy.get('[data-testid="point-details-panel"]').should('contain.text', 'MTP');
   });
 
   it('renders date line labels along each roofline when showLineLabels is on', () => {
@@ -976,7 +978,7 @@ describe('GPU comparison with unofficial runs', () => {
       .should('have.attr', 'stroke', overlayRunColor(0))
       .and('have.attr', 'stroke-dasharray', overlayRooflineDasharray(0));
     cy.get('.sidebar-legend')
-      .should('contain.text', 'UNOFFICIAL: feat/power-sweep')
+      .should('contain.text', 'Unofficial: feat/power-sweep')
       .and('contain.text', '✕ B200');
     cy.get('#gpu-overlay .line-label')
       .should('have.length', 3)
@@ -990,7 +992,7 @@ describe('GPU comparison with unofficial runs', () => {
     cy.contains('button', 'Hide overlay hardware').click();
     cy.get('#gpu-overlay .unofficial-overlay-pt').should('not.exist');
     cy.get('#gpu-overlay .roofline-overlay-run0_b200_fp4').should('not.exist');
-    cy.get('.sidebar-legend').should('not.contain.text', 'UNOFFICIAL');
+    cy.get('.sidebar-legend').should('not.contain.text', 'Unofficial');
   });
 
   it('measures an unofficial curve from its point and removes the ruler when hidden', () => {
@@ -1024,7 +1026,7 @@ describe('GPU comparison with unofficial runs', () => {
     );
 
     cy.get('#gpu-overlay .dot-group .visible-shape').first().click({ force: true });
-    cy.get('[data-chart-tooltip]:visible [data-action="view-power-trace"]').click();
+    cy.get('[data-testid="point-details-panel"] [data-action="view-power-trace"]').click();
     cy.get('@setMetric').should('have.been.calledWith', POWER_TIMELINE_METRIC_KEY);
   });
 });

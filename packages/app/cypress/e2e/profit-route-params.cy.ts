@@ -2,7 +2,7 @@ import { interceptProfitData } from '../support/profit-fixtures';
 
 function suppressNudges(win: Cypress.AUTWindow): void {
   win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-  win.sessionStorage.setItem('inferencex-reproducibility-nudge-shown', '1');
+  win.localStorage.setItem('inferencex-reproducibility-nudge-dismissed', '1');
 }
 
 describe('Profit estimator route parameters', { testIsolation: true }, () => {
@@ -12,27 +12,24 @@ describe('Profit estimator route parameters', { testIsolation: true }, () => {
   });
 
   for (const prefix of ['', '/zh']) {
+    const roofline = prefix ? '理论上限' : 'Theoretical roofline';
+    const actual = prefix ? '实测' : 'Actual';
     for (const tab of ['profit-estimator', 'profit-estimator-per-gigawatt']) {
       it(`defaults to roofline and preserves explicit Actual in ${prefix}/${tab}`, () => {
         const base = `${prefix}/${tab}/deepseek-v4`;
         cy.visit(base, { onBeforeLoad: suppressNudges });
         cy.get('[data-testid="profit-estimator-chart"]').should('exist');
         cy.get('[data-testid="profit-cache-hit-selector"]')
-          .should('contain.text', 'Theroticial Roofline')
+          .should('contain.text', roofline)
           .click();
-        cy.contains('[role="option"]', /^Actual$/).click();
+        cy.contains('[role="option"]', new RegExp(`^${actual}$`)).click();
         cy.location('pathname').should('eq', `${base}/cache-hit-mode/actual`);
         cy.reload();
-        cy.get('[data-testid="profit-cache-hit-selector"]')
-          .should('contain.text', 'Actual')
-          .click();
-        cy.contains('[role="option"]', 'Theroticial Roofline').click();
+        cy.get('[data-testid="profit-cache-hit-selector"]').should('contain.text', actual).click();
+        cy.contains('[role="option"]', roofline).click();
         cy.location('pathname').should('eq', base);
         cy.reload();
-        cy.get('[data-testid="profit-cache-hit-selector"]').should(
-          'contain.text',
-          'Theroticial Roofline',
-        );
+        cy.get('[data-testid="profit-cache-hit-selector"]').should('contain.text', roofline);
       });
 
       it(`hydrates, edits, reloads and resets ${prefix}/${tab} route state`, () => {
@@ -45,10 +42,7 @@ describe('Profit estimator route parameters', { testIsolation: true }, () => {
         cy.get('label[for="profit-target"]').should('contain.text', 'P90');
         cy.get('[data-testid="profit-percentile-selector"]').should('not.exist');
         cy.location('pathname').should('eq', `${base}/target/24/cache-hit-mode/theoretical`);
-        cy.get('[data-testid="profit-cache-hit-selector"]').should(
-          'contain.text',
-          'Theroticial Roofline',
-        );
+        cy.get('[data-testid="profit-cache-hit-selector"]').should('contain.text', roofline);
         cy.document().then((doc) => {
           doc.documentElement.dataset.routeSentinel = 'same-document';
         });

@@ -27,7 +27,7 @@ describe('GpuSpecsBarChart', () => {
 
   it('localizes metric controls, axis text, and chart instructions on /zh', () => {
     cy.mount(<ZhBarChartWrapper />);
-    cy.get('[data-testid="gpu-specs-bar-chart"]').should('contain.text', '指标：');
+    cy.get('[data-testid="gpu-specs-bar-chart"]').should('contain.text', '指标');
     cy.get('[data-testid="gpu-specs-metric-select"]').should('contain.text', '显存容量');
     cy.get('[data-testid="gpu-specs-bar-chart"] svg').should('contain.text', '显存容量 (GB)');
     cy.get('[data-testid="gpu-specs-bar-chart"]').should('contain.text', '悬停柱形可查看详情');

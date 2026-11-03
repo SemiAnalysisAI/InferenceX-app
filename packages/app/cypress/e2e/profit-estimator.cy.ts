@@ -43,7 +43,7 @@ function stubOpenRouter(): void {
 
 function suppressNudges(win: Cypress.AUTWindow): void {
   win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-  win.sessionStorage.setItem('inferencex-reproducibility-nudge-shown', '1');
+  win.localStorage.setItem('inferencex-reproducibility-nudge-dismissed', '1');
 }
 
 function unlockPowerGate(win: Cypress.AUTWindow): void {
@@ -503,7 +503,7 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
         cy.get('#profit-power').click();
         cy.get('[role="option"]').contains('All in Measured').click();
         cy.get('[data-testid="profit-power-unavailable"]').should('not.exist');
-        cy.contains('No SKU can be priced for the current selection.').should('be.visible');
+        cy.contains('No SKU can be priced for the current selection').should('be.visible');
         cy.get('#profit-target').should('have.value', '60');
         cy.get('[data-testid="profit-model-selector"]').should('contain', 'Kimi K3');
         cy.get('[data-testid="profit-price-source-selector"]').should('contain', 'Moonshot');
@@ -529,7 +529,7 @@ function parseCompactUsd(text: string): number {
   return (sign === '-' ? -1 : 1) * Number.parseFloat(digits) * scale;
 }
 
-describe('Profit Estimator per GW', () => {
+describe('Profit estimator per GW', () => {
   before(() => {
     stubOpenRouter();
     cy.visit('/profit-estimator-per-gigawatt', { onBeforeLoad: suppressNudges });
@@ -573,12 +573,12 @@ describe('Profit Estimator per GW', () => {
     cy.get('body').type('{esc}');
     cy.get('button#profit-cost').should('have.attr', 'aria-expanded', 'false').and('be.focused');
     cy.get('[data-testid="profit-segment-key"]').should('not.exist');
-    chart().should('contain.text', 'Model License Fee').and('contain.text', 'Profit');
+    chart().should('contain.text', 'Model license fee').and('contain.text', 'Profit');
     cy.get('[data-testid="profit-caption"] h2').should(
       'contain.text',
-      'Revenue & Profit Estimates per GigaWatt Per Year at P90 60 tok/s/user Interactivity (Beta)',
+      'revenue & profit estimates per gigawatt per year at P90 60 tok/s/user interactivity (Beta)',
     );
-    cy.contains('Revenue & Profit Estimator per GigaWatt (Beta)').should('be.visible');
+    cy.contains('Revenue & profit estimator per gigawatt (Beta)').should('be.visible');
     cy.get('[data-testid="result-context-cost-tier"]').should(
       'contain.text',
       'Owning at Large Hyperscaler Volume',
@@ -589,7 +589,7 @@ describe('Profit Estimator per GW', () => {
     cy.get('[data-testid="profit-caption"] h2').should('contain.text', 'Kimi K3');
     cy.get('[data-testid="profit-selling-prices"]')
       .should('contain.text', 'Input: $3')
-      .and('contain.text', 'Cached Input: $0.3')
+      .and('contain.text', 'Cached input: $0.3')
       .and('contain.text', 'Output: $15')
       .and('contain.text', '(Moonshot list price)')
       .and('not.contain.text', 'moonshotai');
@@ -625,7 +625,7 @@ describe('Profit Estimator per GW', () => {
     cy.get('[data-testid="profit-high-contrast"]').should('not.exist');
     chart().should('not.contain.text', 'H200');
     cy.get('[data-testid="profit-formula-notes"]')
-      .should('contain.text', 'Revenue per GigaWatt Formula')
+      .should('contain.text', 'Revenue per gigawatt formula')
       .and('not.contain.text', '60% utilization');
     openFormulaNotes();
     cy.get('[data-testid="profit-formula-notes"]').should('contain.text', '60% utilization');
@@ -648,14 +648,14 @@ describe('Profit Estimator per GW', () => {
     });
     cy.get('[data-testid="tab-trigger-profit-estimator-per-gigawatt"]').should(
       'contain.text',
-      'Profit Estimator per GW',
+      'Profit estimator per GW',
     );
     cy.get('[data-testid="footer-link-calculator"]')
       .should('have.attr', 'href', '/calculator')
-      .and('contain.text', 'TCO Calculator');
+      .and('contain.text', 'TCO calculator');
     cy.get('[data-testid="footer-link-fleet"]')
       .should('have.attr', 'href', '/fleet')
-      .and('contain.text', 'Fleet Lifecycle');
+      .and('contain.text', 'Fleet lifecycle');
 
     chart()
       .find('rect.bar-tco')
@@ -729,7 +729,7 @@ describe('Profit Estimator per GW', () => {
       .then((allBars) => {
         cy.get('[data-testid="profit-legend"] li').should('have.length.greaterThan', 1);
         cy.get('[data-testid="profit-tco-badge"]').should('have.length', 4);
-        cy.get('[data-testid="profit-tco-badges"]').should('contain.text', 'GB300: 2.31');
+        cy.get('[data-testid="profit-custom-cost-gb300"]').should('have.value', '2.31');
         cy.get('[data-testid="profit-legend"] li').first().click();
         bars().should('have.length.lessThan', allBars);
         chart()
@@ -737,9 +737,8 @@ describe('Profit Estimator per GW', () => {
           .should('have.length.lessThan', 4)
           .and('have.length.greaterThan', 0);
         cy.get('[data-testid="profit-tco-badge"]').should('have.length', 1);
-        cy.get('[data-testid="profit-tco-badges"]')
-          .should('contain.text', 'GB300: 2.31')
-          .and('not.contain.text', 'MI355X');
+        cy.get('[data-testid="profit-custom-cost-gb300"]').should('have.value', '2.31');
+        cy.get('[data-testid="profit-tco-badges"]').should('not.contain.text', 'MI355X');
         cy.get('[data-testid="profit-reset-filter"]').click();
         bars().should('have.length', allBars);
         cy.get('[data-testid="profit-tco-badge"]').should('have.length', 4);
@@ -752,7 +751,7 @@ describe('Profit Estimator per GW', () => {
     cy.contains('[role="option"]', 'OpenRouter').click();
     cy.get('[data-testid="profit-selling-prices"]')
       .should('contain.text', 'Input: $0.6')
-      .and('contain.text', 'Cached Input: $0.1')
+      .and('contain.text', 'Cached input: $0.1')
       .and('contain.text', 'Output: $2.5')
       .and('contain.text', '(OpenRouter)');
     cy.get('[data-testid="profit-list-price-source"]').should('not.exist');
@@ -791,7 +790,7 @@ describe('Profit Estimator per GW', () => {
       .then((tcoBarsBefore) => {
         cy.get('[data-testid="profit-custom-cost-gb300"]').should('have.value', '2.31');
         cy.get('[data-testid="profit-custom-cost-gb300"]').clear().type('9').blur();
-        cy.get('[data-testid="profit-tco-badges"]').should('contain.text', 'GB300: 9');
+        cy.get('[data-testid="profit-custom-cost-gb300"]').should('have.value', '9');
         cy.get('[data-testid="profit-custom-cost-gb300"]').clear().blur();
         chart().find('rect.bar-tco').should('have.length.lessThan', tcoBarsBefore);
         cy.get('[data-testid="profit-custom-cost-gb300"]').type('1.5').blur();
@@ -800,7 +799,7 @@ describe('Profit Estimator per GW', () => {
 
     cy.get('button#profit-cost').click();
     cy.get('[data-testid="cost-provider-costh"]').click();
-    cy.get('[data-testid="profit-tco-badges"]').should('contain.text', 'GB300: 2.31');
+    cy.get('[data-testid="profit-custom-cost-gb300"]').should('have.value', '2.31');
     cy.get('[data-testid="profit-tco-source"]').should('contain.text', 'TCO Model');
     cy.get('[data-testid="result-context-cost-tier"]').should(
       'contain.text',
@@ -814,16 +813,15 @@ describe('Profit Estimator per GW', () => {
       'contain.text',
       'Owning at Large Hyperscaler Volume',
     );
-    cy.get('[data-testid="profit-tco-badges"]').should('contain.text', 'MI355X: 1.5');
+    cy.get('[data-testid="profit-custom-cost-mi355x"]').should('have.value', '1.5');
     cy.get('[data-testid="profit-custom-cost-gb300"]').clear().type('4').blur();
     cy.get('[data-testid="result-context-cost-tier"]').should('contain.text', 'Custom');
-    cy.get('[data-testid="profit-tco-badges"]')
-      .should('contain.text', 'GB300: 4')
-      .and('contain.text', 'MI355X: 1.5');
+    cy.get('[data-testid="profit-custom-cost-gb300"]').should('have.value', '4');
+    cy.get('[data-testid="profit-custom-cost-mi355x"]').should('have.value', '1.5');
     cy.get('[data-testid="profit-tco-source"]').should('not.exist');
     cy.get('button#profit-cost').click();
     cy.get('[data-testid="cost-provider-costh"]').click();
-    cy.get('[data-testid="profit-tco-badges"]').should('contain.text', 'GB300: 2.31');
+    cy.get('[data-testid="profit-custom-cost-gb300"]').should('have.value', '2.31');
   });
 
   it('explains a missing OpenRouter listing instead of drawing an unpriced chart', () => {
@@ -863,12 +861,12 @@ describe('Profit Estimator per GW — compare history', () => {
   it('offers the agentic chip configs and shows the range picker once one is chosen', () => {
     cy.visit('/profit-estimator-per-gigawatt', { onBeforeLoad: suppressNudges });
     chart().should('exist');
-    historyPanel().should('contain.text', 'Compare history').and('contain.text', 'Chip Config');
+    historyPanel().should('contain.text', 'Compare history').and('contain.text', 'Chip config');
     cy.get('[data-testid="profit-history-date-range"]').should('not.exist');
     bars()
       .its('length')
       .then((allBars) => {
-        chipTrigger().should('contain.text', 'Select Chip Config');
+        chipTrigger().should('contain.text', 'Select chip config');
         chipTrigger().click({ force: true });
         cy.get('[role="option"]').should('have.length', 5).and('contain.text', 'GB300');
         cy.get('[role="option"]').should('contain.text', 'H200');
@@ -881,7 +879,7 @@ describe('Profit Estimator per GW — compare history', () => {
         cy.get('[role="option"]').contains('GB300').click();
         cy.get('body').type('{esc}');
         cy.get('[data-testid="profit-history-date-range"]').should('not.exist');
-        chipTrigger().should('contain.text', 'Select Chip Config');
+        chipTrigger().should('contain.text', 'Select chip config');
       });
   });
 
@@ -891,7 +889,7 @@ describe('Profit Estimator per GW — compare history', () => {
     pickChip('GB300');
     pickChip('B200');
     cy.contains('button', 'Select date range').click();
-    cy.contains('button', 'Max Range').click();
+    cy.contains('button', 'Max range').click();
     cy.contains('button', 'Apply').click();
 
     cy.contains('button', 'Jul 15, 2026').should('be.visible');
@@ -926,7 +924,7 @@ describe('Profit Estimator per GW — compare history', () => {
     cy.get('[data-testid="profit-history-date-range"]').should('not.exist');
     cy.get('[data-testid="profit-history-note"]').should('not.exist');
     chart().find('rect.bar-tco').should('have.length', 4);
-    chipTrigger().should('contain.text', 'Select Chip Config');
+    chipTrigger().should('contain.text', 'Select chip config');
     changelog().should('not.exist');
   });
 
@@ -936,13 +934,13 @@ describe('Profit Estimator per GW — compare history', () => {
     changelog().should('not.exist');
     pickChip('GB300');
     changelog()
-      .contains('button', 'Config Changelog (3 dates with changes)')
+      .contains('button', 'Config changelog (3 dates with changes)')
       .should('have.attr', 'aria-expanded', 'true');
     changelog()
       .should('contain.text', PROFIT_CHANGELOG_NOTES[PROFIT_HISTORY_DATE])
       .and('contain.text', PROFIT_CHANGELOG_NOTES[PROFIT_DATE])
-      .and('contain.text', 'Git Commit')
-      .and('contain.text', 'Workflow Run')
+      .and('contain.text', 'Git commit')
+      .and('contain.text', 'Workflow run')
       .and('contain.text', 'Add all to chart');
     changelog().find('span:contains("On chart")').should('have.length', 0);
     changelog()
@@ -1134,11 +1132,11 @@ describe('Profit Estimator — GLM 5.2/5.3', () => {
     cy.get('[data-testid="result-context-license-fee"]').should('have.text', '20%');
     cy.get('[data-testid="profit-caption"] h2').should(
       'contain.text',
-      'GLM5.2/GLM5.3 744B Agentic Revenue & Profit Estimates per Chip per Hour at P90 135 tok/s/user Interactivity',
+      'GLM5.2/GLM5.3 744B Agentic revenue & profit estimates per chip per hour at P90 135 tok/s/user interactivity',
     );
     cy.get('[data-testid="profit-selling-prices"]')
       .should('contain.text', 'Input: $1.4')
-      .and('contain.text', 'Cached Input: $0.26')
+      .and('contain.text', 'Cached input: $0.26')
       .and('contain.text', 'Output: $4.4')
       .and('contain.text', '(Z.ai list price)');
     cy.get('[data-testid="profit-list-price-source"]')
@@ -1231,11 +1229,11 @@ describe('Profit Estimator — MiniMax M3', () => {
     cy.get('[data-testid="result-context-license-fee"]').should('have.text', '20%');
     cy.get('[data-testid="profit-caption"] h2').should(
       'contain.text',
-      'MiniMax M3 428B Agentic Revenue & Profit Estimates per Chip per Hour at P90 115 tok/s/user Interactivity',
+      'MiniMax M3 428B Agentic revenue & profit estimates per chip per hour at P90 115 tok/s/user interactivity',
     );
     cy.get('[data-testid="profit-selling-prices"]')
       .should('contain.text', 'Input: $0.3')
-      .and('contain.text', 'Cached Input: $0.06')
+      .and('contain.text', 'Cached input: $0.06')
       .and('contain.text', 'Output: $1.2')
       .and('contain.text', '(MiniMax list price)');
     cy.get('[data-testid="profit-list-price-source"]')
@@ -1349,11 +1347,11 @@ describe('Profit Estimator — DeepSeek V4 Pro', () => {
     cy.get('[data-testid="result-context-license-fee"]').should('have.text', '0%');
     cy.get('[data-testid="profit-caption"] h2').should(
       'contain.text',
-      'DeepSeek V4 Pro 0813 1.6T Agentic Revenue & Profit Estimates per Chip per Hour at P90 170 tok/s/user Interactivity',
+      'DeepSeek V4 Pro 0813 1.6T Agentic revenue & profit estimates per chip per hour at P90 170 tok/s/user interactivity',
     );
     cy.get('[data-testid="profit-selling-prices"]')
       .should('contain.text', 'Input: $1.32')
-      .and('contain.text', 'Cached Input: $0.044')
+      .and('contain.text', 'Cached input: $0.044')
       .and('contain.text', 'Output: $3.96')
       .and('contain.text', '(DeepSeek list price)');
     cy.get('[data-testid="profit-list-price-source"]')
@@ -1439,11 +1437,11 @@ describe('Profit Estimator — DeepSeek V4.1 Flash', () => {
     cy.get('[data-testid="result-context-license-fee"]').should('have.text', '0%');
     cy.get('[data-testid="profit-caption"] h2').should(
       'contain.text',
-      'DeepSeek V4.1 Flash 552B Agentic Revenue & Profit Estimates per Chip per Hour at P90 150 tok/s/user Interactivity',
+      'DeepSeek V4.1 Flash 552B Agentic revenue & profit estimates per chip per hour at P90 150 tok/s/user interactivity',
     );
     cy.get('[data-testid="profit-selling-prices"]')
       .should('contain.text', 'Input: $0.3')
-      .and('contain.text', 'Cached Input: $0.006')
+      .and('contain.text', 'Cached input: $0.006')
       .and('contain.text', 'Output: $1.2')
       .and('contain.text', '(DeepSeek list price)');
     cy.get('[data-testid="profit-list-price-source"]')
@@ -1557,7 +1555,7 @@ describe('Profit Estimator (per chip-hour)', () => {
     cy.get('[data-testid="profit-lab-cut-input"]').should('have.value', '30');
     cy.get('[data-testid="profit-caption"] h2').should(
       'contain.text',
-      'Kimi K3 2.8T Agentic Revenue & Profit Estimates per Chip per Hour at P90 60 tok/s/user Interactivity (Beta)',
+      'Kimi K3 2.8T Agentic revenue & profit estimates per chip per hour at P90 60 tok/s/user interactivity (Beta)',
     );
     cy.get('button#profit-cost').should('contain.text', 'Rent - 3 Year Commit');
     cy.get('[data-testid="result-context-cost-tier"]').should(
@@ -1566,7 +1564,7 @@ describe('Profit Estimator (per chip-hour)', () => {
     );
     cy.get('[data-testid="profit-formula-notes"]').should(
       'contain.text',
-      'Revenue per Chip-Hour Formula',
+      'Revenue per chip-hour formula',
     );
     openFormulaNotes();
     cy.get('[data-testid="profit-formula-notes"]').should('contain.text', 'TCO $/chip/hr');
@@ -1577,13 +1575,13 @@ describe('Profit Estimator (per chip-hour)', () => {
       .should('match', /^\$\d+\.\d{2}/u)
       .and('not.match', /[BMk]/u);
     chart().find('rect.bar-tco').should('have.length', 4);
-    chart().should('contain.text', 'Model License Fee');
+    chart().should('contain.text', 'Model license fee');
     cy.get('button#profit-price-source').click();
     cy.contains('[role="option"]', 'OpenRouter').click();
-    chart().should('contain.text', 'Compute Expense').and('contain.text', 'Model License Fee');
+    chart().should('contain.text', 'Compute expense').and('contain.text', 'Model license fee');
     chart().find('image.bar-vendor-mark').should('have.length', 4);
     cy.get('[data-testid="tab-trigger-profit-estimator"]')
-      .should('contain.text', 'Profit Estimator')
+      .should('contain.text', 'Profit estimator')
       .and('have.attr', 'data-tab-active');
   });
 
@@ -1618,7 +1616,7 @@ describe('Profit Estimator — responsive control panels', () => {
         cy.visit(route, { onBeforeLoad: suppressNudges });
         chart().should('exist');
         cy.get('[data-testid="profit-benchmark-panel"]').within(() => {
-          cy.get('legend').should('have.text', 'Benchmark Config');
+          cy.get('legend').should('have.text', 'Benchmark config');
           cy.get('#profit-model').should('contain.text', 'Kimi K3');
           cy.get('#profit-target').should('have.value', '60');
         });
@@ -1650,7 +1648,7 @@ describe('Profit Estimator — responsive control panels', () => {
           expect(history.right - chip.right, 'no empty history column').to.be.lessThan(24);
         });
         cy.get('[data-testid="profit-pricing-panel"]').within(() => {
-          cy.get('legend').should('have.text', 'Pricing Config');
+          cy.get('legend').should('have.text', 'Pricing config');
           cy.get('#profit-price-source').click();
         });
         cy.get('[data-testid="result-context-utilization"] #profit-utilization').should(
@@ -1767,7 +1765,7 @@ describe('VR publication economics', () => {
           });
         cy.get('[data-testid="profit-cache-hit-selector"]').should(
           'contain.text',
-          'Theroticial Roofline',
+          'Theoretical roofline',
         );
         assertCachePricing(0.97);
         cy.get('[data-testid="profit-cache-hit-selector"]').click();

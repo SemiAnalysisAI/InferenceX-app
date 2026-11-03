@@ -238,7 +238,7 @@ describe('Inference Replay — Simplified Chinese', () => {
       });
       visitChineseReplay();
       cy.get('[data-testid="replay-history-query-error"]')
-        .should('contain.text', '基准测试历史加载失败。')
+        .should('contain.text', '基准测试历史加载失败')
         .and('contain.text', '重试');
       cy.then(() => {
         attemptsBeforeRetry = attempts;

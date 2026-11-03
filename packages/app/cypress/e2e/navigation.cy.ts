@@ -196,21 +196,17 @@ describe('First-load navigation', () => {
   });
 
   it('navigates to AgentX from the header with one click', () => {
-    cy.get('[data-testid="nav-link-agentx"]')
-      .should('have.attr', 'href', '/agentx')
-      .find('[data-nav-badge="agentx"]')
-      .should('be.visible')
-      .and('have.text', 'NEW');
+    cy.get('[data-testid="nav-link-agentx"]').should('have.attr', 'href', '/agentx');
     cy.get('[data-testid="nav-link-agentx"]').click();
     cy.location('pathname').should('eq', '/agentx');
   });
 
   it('leads the landing page with the AgentX hero and its two CTAs', () => {
     cy.get('[data-testid="compare-agentx-primary"]').within(() => {
-      cy.get('h1').should('have.text', 'Compare Realistic Agentic Inference Perf');
+      cy.get('h1').should('have.text', 'Compare realistic agentic inference performance');
       cy.get('h2').should('not.exist');
       cy.get('[data-testid="compare-agentx-revenue-calculator-link"]')
-        .should('contain.text', 'Token Revenue Calculator')
+        .should('contain.text', 'Token revenue calculator')
         .and('have.attr', 'href', '/profit-estimator-per-gigawatt');
       cy.get('[data-testid="compare-agentx-dashboard-link"]')
         .should('have.text', 'Dashboard')
@@ -259,13 +255,13 @@ describe('Huawei UBenchX launch banner', { testIsolation: true }, () => {
         .should('have.attr', 'href', `${locale}/ubenchx/core-memory-profiles`)
         .and(
           'contain.text',
-          locale ? 'Huawei Ascend 950PR 微基准测试' : 'Huawei Ascend 950PR Microbenchmarks',
+          locale ? 'Huawei Ascend 950PR 微基准测试' : 'Huawei Ascend 950PR microbenchmarks',
         )
         .and(
           'contain.text',
           locale
             ? '周期级核心访存微基准测试（Beta）'
-            : 'Cycle Level Core memory-access MicroBenchmarks (Beta)',
+            : 'Cycle-level core memory-access microbenchmarks (beta)',
         )
         .click();
       cy.location('pathname').should('eq', `${locale}/ubenchx/core-memory-profiles`);
@@ -289,13 +285,13 @@ describe('OperatorX launch banner A/B arm', { testIsolation: true }, () => {
         .and('have.attr', 'href', `${locale}/operatorx`)
         .and(
           'contain.text',
-          locale ? 'Huawei Ascend 950PR 微基准测试' : 'Huawei Ascend 950PR Microbenchmarks',
+          locale ? 'Huawei Ascend 950PR 微基准测试' : 'Huawei Ascend 950PR microbenchmarks',
         )
         .and(
           'contain.text',
           locale
             ? '950PR GEMM FLOPs 与最大 FLOPS 利用率'
-            : '950PR GEMM FLOPs and Max FLOPS utilization',
+            : '950PR GEMM FLOPs and max FLOPS utilization',
         )
         .click();
       cy.location('pathname').should('eq', `${locale}/operatorx`);
@@ -454,10 +450,34 @@ describe('TPUv7 results', { testIsolation: true }, () => {
 
 describe('H3 video performance history', () => {
   beforeEach(() => {
-    cy.intercept('GET', '/api/video-runs?format=history&page=*', {
-      schemaVersion: 1,
-      entries: [],
-      nextPage: null,
+    cy.intercept('GET', '/api/video-runs?page=*', { runs: [], nextPage: null }).as('runList');
+  });
+  it('shares a comparison built by opening two CI runs through the page', () => {
+    for (const saved of [
+      servingArtifact(123, 40, 'NVIDIA H200'),
+      servingArtifact(456, 41, 'NVIDIA B200'),
+    ]) {
+      cy.intercept('GET', `/api/video-runs?run=${saved.runId}`, {
+        run: videoRun(Number(saved.runId), 'success'),
+        artifacts: [saved.artifact],
+      });
+      cy.intercept(
+        'GET',
+        `/api/video-runs?run=${saved.runId}&artifact=${saved.artifact.id}&format=media`,
+        saved,
+      );
+    }
+    cy.intercept('GET', 'https://media.test/**', { statusCode: 204 });
+    cy.visit('/video?view=tradeoff&run=123&artifact=40');
+    cy.get('[data-testid="video-tradeoff"] tbody tr').should('have.length', 3);
+    cy.contains('summary', 'Run details and artifact selection').click();
+    cy.get('[data-testid="video-ci-runs"] form input').type('456');
+    cy.get('[data-testid="video-ci-runs"] form').submit();
+    cy.get('[data-testid="video-tradeoff"] tbody tr').should('have.length', 6);
+    cy.location().should((location) => {
+      const params = new URLSearchParams(location.search);
+      expect(params.get('run')).to.equal('456');
+      expect(params.get('compare')).to.equal('123.40,456.41');
     });
   });
   it('opens published history behind the dashboard and restores its filters after reload', () => {
@@ -492,6 +512,10 @@ describe('H3 video performance history', () => {
         win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
       },
     });
+    // The empty state is already in the server HTML. The run list request comes from the same
+    // hydration pass that attaches the unlock key listener, so wait for it before typing.
+    cy.wait('@runList');
+    cy.get('[data-testid="video-ci-runs"]').should('contain', 'No H3 runs in this page');
     cy.get('video[data-role]').should('not.exist');
     cy.get('[data-testid="tab-trigger-hidden"]').should('not.exist');
     cy.get('body').type(

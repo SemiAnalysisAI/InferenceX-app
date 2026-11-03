@@ -191,13 +191,13 @@ describe('Historical Trends — Content & Interactions', () => {
       cy.visit('/historical?g_model=DeepSeek-R1-0528&i_metric=y_measuredPrefillJPerInputToken');
       cy.wait('@benchmarks');
       cy.wait('@history');
-      cy.get('[data-testid="yaxis-metric-selector"]').should('contain.text', 'Measured Energy');
+      cy.get('[data-testid="yaxis-metric-selector"]').should('contain.text', 'Measured energy');
       cy.get('[data-testid="measured-energy-denominator"]').should('contain.text', 'Input token');
       cy.get('[data-testid="measured-energy-scope"]').should('contain.text', 'Prefill GPUs');
       cy.get('[data-testid="historical-target-slider"]').should('be.visible');
       cy.get('[data-testid="historical-trend-figure"]')
         .should('be.visible')
-        .and('contain.text', 'No historical data found for the tracked configurations.');
+        .and('contain.text', 'No historical data found for the tracked configurations');
       cy.contains(
         'No interactivity chart data available for the selected model and sequence.',
       ).should('not.exist');
@@ -231,7 +231,7 @@ describe('Historical Trends — Content & Interactions', () => {
     });
     cy.get('[data-testid="historical-trend-figure"]')
       .find('.sidebar-legend')
-      .contains('label', 'Log Scale')
+      .contains('label', 'Log scale')
       .should('exist');
 
     cy.get('#historical-log-scale').click();
@@ -355,7 +355,7 @@ describe('Historical Trends — Chinese route', () => {
     cy.intercept('GET', '**/api/v1/benchmarks?*', []).as('emptyBenchmarks');
     cy.reload();
     cy.wait('@emptyBenchmarks');
-    cy.contains('所选模型和序列暂无交互性图表数据。').should('be.visible');
+    cy.contains('所选模型和序列暂无交互性图表数据').should('be.visible');
     cy.get('[data-testid="historical-trends-display"] .animate-pulse').should('not.exist');
     cy.get('[data-testid="historical-target-slider"]').should('not.exist');
     cy.get('[data-testid="historical-trend-figure"]').should('not.exist');
@@ -374,7 +374,7 @@ describe('Historical Trends — Chinese route', () => {
       cy.reload();
       cy.wait('@failedBenchmarks');
       cy.wait('@failedBenchmarks');
-      cy.contains('历史基准测试数据加载失败。').should('be.visible');
+      cy.contains('历史基准测试数据加载失败').should('be.visible');
       cy.contains('historical-database-internal-detail').should('not.exist');
       cy.contains('button', '重新加载页面')
         .then(() => {
@@ -405,8 +405,8 @@ describe('Historical Trends — Chinese route', () => {
       cy.wait('@secondaryHistory');
       cy.wait('@secondaryHistory');
       cy.get('[data-testid="historical-trend-error"]')
-        .should('contain.text', '历史趋势数据加载失败。')
-        .and('not.contain.text', '历史基准测试数据加载失败。')
+        .should('contain.text', '历史趋势数据加载失败')
+        .and('not.contain.text', '历史基准测试数据加载失败')
         .and('not.contain.text', 'secondary-history-internal-detail');
       cy.contains('button', '重试加载趋势数据').click();
       cy.wait('@secondaryHistory');

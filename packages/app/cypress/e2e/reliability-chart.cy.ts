@@ -99,7 +99,7 @@ describe('Reliability Chart — Chinese route and settled states', () => {
     cy.intercept('GET', '**/api/v1/reliability/daily', []).as('emptyReliability');
     visitReliability('/zh/reliability');
     cy.wait('@emptyReliability');
-    cy.contains('所选时间范围内暂无可靠性数据。').should('be.visible');
+    cy.contains('所选时间范围内暂无可靠性数据').should('be.visible');
     cy.contains('正在加载可靠性数据……').should('not.exist');
   });
 
@@ -119,7 +119,7 @@ describe('Reliability Chart — Chinese route and settled states', () => {
     cy.wait('@retryReliability');
     cy.get('[data-testid="reliability-error"]')
       .should('be.visible')
-      .and('contain.text', '可靠性数据加载失败。');
+      .and('contain.text', '可靠性数据加载失败');
     cy.contains('database-internal-detail').should('not.exist');
     cy.contains('[data-testid="reliability-error"] button', '重试')
       .then(() => {

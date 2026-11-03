@@ -8,7 +8,7 @@ describe('Compare precision index page', () => {
   it('leads the /compare index with AgentX results and keeps fixed-sequence tools', () => {
     cy.visit('/compare');
     cy.get('[data-testid="compare-agentx-primary"]').within(() => {
-      cy.get('h1').should('have.text', 'Compare Realistic Agentic Inference Perf');
+      cy.get('h1').should('have.text', 'Compare realistic agentic inference performance');
       cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 8);
       cy.get('[data-testid="compare-agentx-model-kimi-k3"]').should(
         'have.attr',
@@ -16,7 +16,7 @@ describe('Compare precision index page', () => {
         '/inference/kimi-k3',
       );
       cy.get('[data-testid="compare-agentx-revenue-calculator-link"]')
-        .should('contain.text', 'Token Revenue Calculator')
+        .should('contain.text', 'Token revenue calculator')
         .and('have.attr', 'href', '/profit-estimator-per-gigawatt');
       cy.get('[data-testid="compare-agentx-dashboard-link"]')
         .should('have.text', 'Dashboard')
@@ -25,7 +25,7 @@ describe('Compare precision index page', () => {
     });
     cy.get('[data-testid="compare-model-catalog"]')
       .should('contain.text', 'AgentX and 8K/1K results')
-      .and('contain.text', 'Each card identifies its scenario');
+      .and('contain.text', 'Each pair lists its scenario');
     cy.get('[data-testid="compare-index-precision-link"]')
       .should('have.attr', 'href', '/compare-precision')
       .and('contain.text', 'Compare precisions');

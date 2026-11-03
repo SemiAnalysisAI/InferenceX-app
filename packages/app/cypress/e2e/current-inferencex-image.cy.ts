@@ -214,7 +214,7 @@ describe('Current InferenceX Image localized routes', () => {
       .and('contain.text', '0d')
       .and('not.contain.text', '关闭');
     cy.get('td[title^="Last submission:"]').should('have.length.greaterThan', 0);
-    cy.contains('label', 'Node Type')
+    cy.contains('label', 'Node type')
       .parent()
       .find('button')
       .trigger('pointerover', { pointerType: 'mouse' });
@@ -258,7 +258,7 @@ describe('Current InferenceX Image localized routes', () => {
     cy.get('[data-slot="select-item"]').contains('FP8').click();
     cy.get('#image-hardware-select').click();
     cy.get('[data-slot="select-item"]').contains('B200').click();
-    cy.contains('当前筛选组合没有镜像记录，请调整一个或多个筛选条件。').should('be.visible');
+    cy.contains('当前筛选组合没有镜像记录，请调整一个或多个筛选条件').should('be.visible');
   });
 
   it('hides primary API details, retries, and keeps the table internally scrollable', () => {
@@ -275,7 +275,7 @@ describe('Current InferenceX Image localized routes', () => {
     cy.wait('@latestImagesRetry');
     cy.wait('@latestImagesRetry');
     cy.get('[data-testid="current-image-error"]')
-      .should('contain.text', '无法加载镜像数据。')
+      .should('contain.text', '无法加载镜像数据')
       .and('not.contain.text', 'sensitive database detail')
       .contains('button', '重试')
       .then(($button) => {
@@ -414,9 +414,9 @@ describe('Current InferenceX Image localized routes', () => {
         cy.get('th[scope="row"]')
           .should('contain.text', 'DeepSeek-R1')
           .and('contain.text', 'H200')
-          .and('contain.text', 'fp8')
-          .and('contain.text', 'Spec Decode: Off')
-          .and('contain.text', 'Single Node');
+          .and('contain.text', 'FP8')
+          .and('contain.text', 'Spec decode: Off')
+          .and('contain.text', 'Single node');
         cy.get('code')
           .first()
           .should('have.text', longImage)

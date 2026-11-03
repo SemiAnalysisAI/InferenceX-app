@@ -230,14 +230,10 @@ describe('Modeled power source links', () => {
           locale,
           width: Math.min(1000, width - 32),
         });
-        if (overlay) {
-          cy.get(`${svg} .unofficial-overlay-pt`).eq(1).click({ force: true });
-        } else {
-          cy.scatterPoints('#power-compare-test')
-            .should((points) => expect(points).to.have.length.at.least(2))
-            .then((points) => clickScatterPoint(points[1]));
-        }
-        cy.get('[data-chart-tooltip]:visible').within(() => {
+        cy.get(`${svg} ${overlay ? '.unofficial-overlay-pt' : '.dot-group'}`)
+          .eq(1)
+          .click({ force: true });
+        cy.get('[data-testid="point-details-panel"]').within(() => {
           if (overlay) cy.contains('powerx-compare').should('exist');
           cy.get('[data-testid="tooltip-modeled-system-power"]').within(() => {
             cy.get(`a[href="${SYSTEM_POWER_MODEL_SOURCE_URL}"]`)
@@ -251,7 +247,7 @@ describe('Modeled power source links', () => {
                 const bounds = $link[0].getBoundingClientRect();
                 expect(bounds.left).to.be.at.least(0);
                 expect(bounds.right).to.be.at.most(width);
-                const shell = $link.closest('[data-chart-tooltip]')[0].firstElementChild!;
+                const shell = $link.closest('[data-testid="point-details-panel"]')[0];
                 const frame = shell.getBoundingClientRect();
                 expect(bounds.top).to.be.at.least(frame.top);
                 expect(bounds.bottom).to.be.at.most(frame.bottom);

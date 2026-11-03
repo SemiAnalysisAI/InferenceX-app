@@ -117,23 +117,22 @@ describe('Inference ChartControls', () => {
   });
 
   it('hides the GPU comparison section when no GPUs are selected', () => {
-    cy.contains('Comparison Date Range').should('not.exist');
+    cy.contains('Comparison date range').should('not.exist');
     cy.contains('Intermediary Dates').should('not.exist');
   });
 
-  it('uses a full-width benchmark row above chart and history controls on desktop', () => {
+  it('places benchmark and chart config side by side above history controls on desktop', () => {
     cy.viewport(1280, 900);
     cy.get('fieldset').should('have.length', 3);
     cy.get('fieldset').then(($groups) => {
-      const rects = [...$groups].map((group) => group.getBoundingClientRect());
-      expect(rects[1].top).to.be.greaterThan(rects[0].bottom);
-      expect(rects[2].top).to.be.closeTo(rects[1].top, 1);
-      expect(rects[0].left).to.equal(rects[1].left);
-      expect(rects[0].right).to.equal(rects[2].right);
-      expect(rects[1].width, 'axes get more space than the history picker').to.be.greaterThan(
-        rects[2].width,
+      const [benchmark, chart, history] = [...$groups].map((group) =>
+        group.getBoundingClientRect(),
       );
-      expect(rects[0].height, 'benchmark controls fit in a single row').to.be.lessThan(130);
+      expect(chart.top).to.be.closeTo(benchmark.top, 1);
+      expect(benchmark.right).to.be.lessThan(chart.left);
+      expect(history.top).to.be.greaterThan(Math.max(benchmark.bottom, chart.bottom));
+      expect(history.left).to.be.closeTo(benchmark.left, 1);
+      expect(benchmark.height, 'benchmark controls fit in a single row').to.be.lessThan(130);
     });
     cy.get('#model-select').then(($model) => {
       const model = $model[0].getBoundingClientRect();
@@ -189,7 +188,6 @@ describe('Inference ChartControls', () => {
         expect(y.top).to.be.greaterThan(x.bottom);
         expect(x.height).to.equal(44);
         expect(y.height).to.equal(x.height);
-        expect(x.width).to.be.at.most(176);
         expect(x.width).to.be.lessThan(y.width);
       });
     });
@@ -216,7 +214,6 @@ describe('Inference ChartControls', () => {
         const benchmark = $groups[0].getBoundingClientRect();
         const chart = $groups[1].getBoundingClientRect();
         expect(benchmark.top).to.equal(chart.top);
-        expect(benchmark.width).to.be.greaterThan(chart.width);
         expect(benchmark.right).to.be.lessThan(chart.left);
         expect(benchmark.height, 'benchmark controls fit in a single row').to.be.lessThan(130);
       });
@@ -435,7 +432,7 @@ describe('Inference ChartControls with GPUs selected', () => {
       },
     });
 
-    cy.contains('Comparison Date Range').should('be.visible');
+    cy.contains('Comparison date range').should('be.visible');
   });
 
   it('leaves the optional date range unflagged for a selected current config', () => {

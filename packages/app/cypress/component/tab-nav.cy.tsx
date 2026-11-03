@@ -120,7 +120,7 @@ describe('TabNav — attached unofficial-run banner', () => {
           if (width < 640) expect(actionBounds.height, 'phone touch target').to.be.at.least(44);
         }
         const label = [...banner.querySelectorAll('span')].find(
-          (span) => span.textContent?.trim() === 'NON-OFFICIAL',
+          (span) => span.textContent?.trim() === 'Non-official',
         )!;
         expect(label.getBoundingClientRect().height, 'warning label stays on one line').to.equal(
           parseFloat(getComputedStyle(label).lineHeight),
@@ -353,18 +353,18 @@ describe('TabNav — Hidden popover for gated tabs', () => {
   it('highlights the Hidden trigger when the current path is one of the gated tabs', () => {
     cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1'));
     mountTabNav({ pathname: '/feedback' });
-    cy.get('[data-testid="tab-trigger-hidden"]').should('have.class', 'border-secondary');
+    cy.get('[data-testid="tab-trigger-hidden"]').should('have.class', 'border-brand');
   });
 
   it('highlights the Hidden trigger on /collectivex, which is now gated', () => {
     cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1'));
     mountTabNav({ pathname: '/collectivex' });
-    cy.get('[data-testid="tab-trigger-hidden"]').should('have.class', 'border-secondary');
+    cy.get('[data-testid="tab-trigger-hidden"]').should('have.class', 'border-brand');
   });
 
   it('does NOT highlight the Hidden trigger on a non-gated path', () => {
     cy.window().then((win) => win.localStorage.setItem('inferencex-feature-gate-konami-v1', '1'));
     mountTabNav({ pathname: '/inference' });
-    cy.get('[data-testid="tab-trigger-hidden"]').should('not.have.class', 'border-secondary');
+    cy.get('[data-testid="tab-trigger-hidden"]').should('not.have.class', 'border-brand');
   });
 });

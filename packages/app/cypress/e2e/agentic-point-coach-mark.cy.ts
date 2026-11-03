@@ -20,7 +20,7 @@ function freshVisitor(win: Cypress.AUTWindow) {
   unlockAgenticGate(win);
   win.localStorage.removeItem(STORAGE_KEY);
   win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-  win.sessionStorage.setItem('inferencex-reproducibility-nudge-shown', '1');
+  win.localStorage.setItem('inferencex-reproducibility-nudge-dismissed', '1');
   win.sessionStorage.setItem('inferencex-star-nudge-shown', '1');
   win.localStorage.setItem('inferencex-filter-hint-nudge-dismissed', '1');
 }
@@ -47,8 +47,8 @@ describe('Agentic chart without the retired point callout', () => {
         expect(win.localStorage.getItem(STORAGE_KEY)).to.eq(null);
       });
 
-      cy.scatterPoints().then((points) => clickScatterPoint(agenticPoints(points)[0]));
-      cy.get('[data-chart-tooltip]:visible')
+      cy.get(AGENTIC_POINTS).first().find('.visible-shape').click({ force: true });
+      cy.get('[data-testid="point-details-panel"]')
         .should('have.length', 1)
         .find('a[href*="/inference/agentic/"]')
         .should('have.attr', 'href')
@@ -70,7 +70,7 @@ describe('Agentic chart without the retired point callout', () => {
     cy.wait('@unofficialRun');
     cy.get('[data-testid="scatter-graph"]').scrollIntoView();
     // Official rows can draw before the overlay run lands. Its legend row then widens the sidebar
-    // and the chart redraws at the narrower width, which dismisses a pinned tooltip, so pin one
+    // and the chart redraws at the narrower width, which dismisses a pinned point, so pin one
     // only after the overlay is listed and the chart is drawn at its container's settled width.
     cy.contains('[data-testid="scatter-graph"] li', OVERLAY_RUN_BRANCH).should('be.visible');
     cy.get('[data-testid="scatter-graph"] [data-testid="d3-chart-svg"]').should(($svg) => {
@@ -82,7 +82,7 @@ describe('Agentic chart without the retired point callout', () => {
       .should('have.length.greaterThan', 0)
       .first()
       .click({ force: true });
-    cy.get('[data-chart-tooltip]:visible').should('have.length', 1);
+    cy.get('[data-testid="point-details-panel"]').should('have.length', 1);
     cy.get(COACH_MARK).should('not.exist');
   });
 });

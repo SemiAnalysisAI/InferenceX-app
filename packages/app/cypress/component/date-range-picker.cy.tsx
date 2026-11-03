@@ -55,7 +55,7 @@ describe('DateRangePicker', () => {
     const dates = ['2025-12-01', '2025-12-15', '2026-01-01', '2026-02-01', '2026-03-01'];
     cy.mount(<DateRangePickerHarness availableDates={dates} />);
     cy.contains('Select date range').click();
-    cy.contains('button', 'Max Range').should('be.visible');
+    cy.contains('button', 'Max range').should('be.visible');
   });
 
   it('shows overlay when no available dates', () => {
@@ -86,10 +86,10 @@ describe('DateRangePicker', () => {
       </PathnameContext.Provider>,
     );
     cy.contains('选择日期范围').click();
-    cy.contains('请选择开始和结束日期以定义日期范围。').should('be.visible');
+    cy.contains('请选择开始和结束日期以定义日期范围').should('be.visible');
     cy.contains('button', '最大范围').should('be.visible');
     cy.contains('button', '取消').should('be.visible');
     cy.contains('button', '应用').should('be.visible');
-    cy.get('[role="dialog"]').should('not.contain.text', 'Max Range');
+    cy.get('[role="dialog"]').should('not.contain.text', 'Max range');
   });
 });

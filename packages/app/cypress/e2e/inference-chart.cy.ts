@@ -160,8 +160,7 @@ describe('Inference Chart', () => {
     cy.wait(['@chartAvailability', '@chartBenchmarks']);
   });
 
-  it('hides the logo watermark when the unofficial-domain notice is shown', () => {
-    cy.contains('This deployment is not hosted at').should('be.visible');
+  it('hides the logo watermark on unofficial domains', () => {
     cy.get('[data-testid="inference-chart-display"] pattern[id^="logo-pattern-"]').should(
       'not.exist',
     );
@@ -189,7 +188,7 @@ describe('Inference Chart', () => {
     cy.get('[data-testid="chart-figure"]')
       .first()
       .find('[data-testid="result-context"]')
-      .should('contain.text', 'Cost Tier: Owning at Large Hyperscaler Volume')
+      .should('contain.text', 'Cost tier: Owning at Large Hyperscaler Volume')
       .and('contain.text', 'Updated:')
       .and('contain.text', 'SemiAnalysis InferenceX')
       .and('not.contain.text', 'Model:')
@@ -437,7 +436,7 @@ describe('Inference Chart', () => {
     );
     cy.visit('/inference');
     cy.wait('@availabilityFailure');
-    cy.contains('h2', 'Something went wrong!').should('be.visible');
+    cy.contains('h2', 'Something went wrong').should('be.visible');
   });
 });
 
@@ -535,7 +534,7 @@ describe('Deprecated model source attribution', () => {
     cy.get('#chart-0').should(($chart) => assertContextBelowPlot($chart[0]!));
     cy.get('#chart-0 [data-testid="result-context"]').should(
       'contain.text',
-      'Source: SemiAnalysis InferenceX™ + UNOFFICIAL overlays (Deprecated)',
+      'Source: SemiAnalysis InferenceX™ + unofficial overlays (Deprecated)',
     );
     cy.get('#chart-0 .unofficial-watermark-image').should('exist');
     cy.get('.deprecated-watermark').should('not.exist');
@@ -590,7 +589,7 @@ describe('Inference Chart — Simplified Chinese mobile path', () => {
       .should('be.visible')
       .and('contain.text', '运行信息');
     cy.get('label[for="x-axis-mode-select"]').should('have.text', 'X 轴指标');
-    cy.get('[data-testid="x-axis-mode-selector"]').click();
+    cy.get('[data-testid="x-axis-mode-selector"]').click('right', { scrollBehavior: 'center' });
     cy.get('[data-testid="x-axis-mode-e2e"]').should('have.text', '端到端延迟').click();
     cy.get('[data-testid="x-axis-mode-selector"]')
       .should('contain.text', '端到端延迟')

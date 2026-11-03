@@ -501,7 +501,7 @@ describe('ChartLegend (sidebar variant)', () => {
 
     cy.get('[data-testid="offload-halo-key"]')
       .should('be.visible')
-      .and('contain.text', 'KV offload ON')
+      .and('contain.text', 'KV offload on')
       .and('not.contain.text', 'Dashed halo:')
       .and('not.have.class', 'no-export');
     cy.get('[data-testid="offload-halo-key"] circle[stroke-dasharray="3 2"]').should('exist');

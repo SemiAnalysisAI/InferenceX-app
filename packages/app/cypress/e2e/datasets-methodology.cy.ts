@@ -35,7 +35,7 @@ describe('AgentX dataset methodology', () => {
     cy.visit('/agentx', { onBeforeLoad: unlockAgenticGate });
 
     cy.get('[data-testid="agentx-methodology"]').within(() => {
-      cy.get('h1').should('have.text', 'AgentX Benchmark Datasets');
+      cy.get('h1').should('have.text', 'AgentX benchmark datasets');
       cy.get('[data-testid="agentx-methodology-step"]').should('have.length', 4);
       cy.get('[data-testid="agentx-methodology-step"] h3').then(($headings) => {
         expect([...$headings].map((heading) => heading.textContent)).to.deep.equal([
@@ -55,7 +55,7 @@ describe('AgentX dataset methodology', () => {
         .should('contain.text', 'Read the full methodology')
         .and('have.attr', 'href', '/agentx/methodology');
       cy.get('[data-testid="agentx-results-cta"]')
-        .should('contain.text', 'View AgentX Performance Results')
+        .should('contain.text', 'View AgentX performance results')
         .and('have.attr', 'href', '/inference');
     });
   });
@@ -99,7 +99,7 @@ describe('AgentX dataset methodology', () => {
     cy.visit('/agentx/methodology', { onBeforeLoad: unlockAgenticGate });
 
     cy.get('[data-testid="agentx-methodology-article"]').within(() => {
-      cy.get('h1').should('have.text', 'AgentX Methodology');
+      cy.get('h1').should('have.text', 'AgentX methodology');
       cy.contains('393 sessions built on June 21, 2026').should('be.visible');
       cy.contains('directed acyclic graph (DAG)').should('be.visible');
       cy.contains('following one-hour profiling window').should('be.visible');

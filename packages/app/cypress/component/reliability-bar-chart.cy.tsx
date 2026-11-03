@@ -13,7 +13,7 @@ describe('ReliabilityBarChartD3', () => {
       reliability: { error: 'Server error', chartData: [], refetch },
     });
     cy.get('[data-testid="reliability-error"]')
-      .should('contain.text', 'Failed to load reliability data.')
+      .should('contain.text', 'Failed to load reliability data')
       .find('button')
       .should('have.text', 'Retry')
       .click();
@@ -28,7 +28,7 @@ describe('ReliabilityBarChartD3', () => {
     mountWithProviders(<ReliabilityBarChartD3 />, {
       reliability: { error: null, chartData: [] },
     });
-    cy.contains('No reliability data available for this date range.').should('be.visible');
+    cy.contains('No reliability data available for this date range').should('be.visible');
   });
 
   it('renders SVG with horizontal bars when data is provided', () => {
@@ -128,6 +128,6 @@ describe('ReliabilityBarChartD3', () => {
       },
     );
 
-    cy.contains('High Contrast').should('exist');
+    cy.contains('High contrast').should('exist');
   });
 });

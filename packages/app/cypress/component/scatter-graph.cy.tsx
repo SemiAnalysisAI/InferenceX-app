@@ -867,7 +867,7 @@ describe('ScatterGraph', () => {
     ).should('have.css', 'opacity', '1');
   });
 
-  it('keeps the desktop legend below the top guideline without changing the mobile gap', () => {
+  it('aligns the desktop legend with the top guideline without changing the mobile gap', () => {
     cy.viewport(1440, 900);
     const chartId = 'test-scatter-legend';
     const data = [
@@ -904,7 +904,7 @@ describe('ScatterGraph', () => {
       cy.get(`#${chartId}`).should(($chart) => {
         const legend = $chart[0].querySelector('.sidebar-legend')!.getBoundingClientRect();
         const guideline = $chart[0].querySelector('.border-top')!.getBoundingClientRect();
-        expect(legend.top - guideline.top, 'legend below top guideline').to.be.closeTo(8, 0.1);
+        expect(legend.top - guideline.top, 'legend level with top guideline').to.be.closeTo(0, 0.1);
       });
     };
     assertDesktopAlignment();
@@ -1942,7 +1942,7 @@ describe('ChartDisplay responsive status notes', () => {
             unofficial: {},
           },
         );
-        cy.get('[data-testid="chart-status-notes"]').should(($notes) => {
+        cy.get('[data-testid="result-context-markers"]').should(($notes) => {
           const notes = $notes[0];
           const bounds = notes.getBoundingClientRect();
           const offload = notes
@@ -1954,7 +1954,7 @@ describe('ChartDisplay responsive status notes', () => {
         });
         cy.get('[data-testid="offload-halo-key"]').should(
           'contain.text',
-          locale === 'zh' ? 'KV offload 已开启' : 'KV offload ON',
+          locale === 'zh' ? 'KV offload 已开启' : 'KV offload on',
         );
         cy.get('#chart-0 [data-slot="chart-footer"] [data-testid="atom-engine-footnote"]').should(
           'have.text',
@@ -2002,9 +2002,9 @@ describe('ChartDisplay responsive status notes', () => {
         allOverlayHwTypes: new Set(['b200_trt']),
       },
     });
-    cy.get('[data-testid="chart-status-notes"] [data-testid="offload-halo-key"]').should(
+    cy.get('[data-testid="result-context-markers"] [data-testid="offload-halo-key"]').should(
       'contain.text',
-      'KV offload ON',
+      'KV offload on',
     );
     cy.get('#chart-0 [data-testid="atom-engine-footnote"]').should(
       'contain.text',
@@ -2517,7 +2517,7 @@ describe('ChartDisplay engine comparison guard', () => {
     });
 
     cy.get('[data-testid="inference-table-view-btn"]').click();
-    cy.contains('No data available for the current filters.').should('be.visible');
+    cy.contains('No data available for the current filters').should('be.visible');
     cy.get('[data-testid="inference-results-table"]').should('not.exist');
   });
 

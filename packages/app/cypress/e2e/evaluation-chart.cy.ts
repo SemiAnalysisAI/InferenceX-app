@@ -40,7 +40,7 @@ describe('Evaluation Chart — Content & Interactions', () => {
     cy.get('#evaluation-chart')
       .closest('figure')
       .find('.sidebar-legend')
-      .contains('label', 'Show Labels')
+      .contains('label', 'Show labels')
       .should('exist');
 
     cy.get('#eval-show-labels').then(($switch) => {
@@ -395,7 +395,7 @@ describe('Evaluation Chart — Simplified Chinese mobile path', () => {
       });
       cy.visit('/zh/evaluation?e2e=fetch-error');
       cy.get('[data-testid="evaluation-query-error"]', { timeout: 15000 })
-        .should('contain.text', '评估数据加载失败。')
+        .should('contain.text', '评估数据加载失败')
         .and('contain.text', '重试');
       cy.then(() => {
         succeed = true;
@@ -429,12 +429,12 @@ describe('Evaluation Chart — Simplified Chinese mobile path', () => {
         cy.visit('/zh/evaluation?e2e=availability-retry');
 
         cy.get('[data-testid="evaluation-query-error"]', { timeout: 15000 })
-          .should('contain.text', '筛选项可用性数据加载失败。')
+          .should('contain.text', '筛选项可用性数据加载失败')
           .and('contain.text', '重试');
         cy.get('[data-testid="evaluation-results-table"]').should('be.visible');
         cy.get('[data-testid="evaluation-view-toggle"]').contains('图表').click();
         cy.get('[data-testid="evaluation-query-error"]')
-          .should('contain.text', '筛选项可用性数据加载失败。')
+          .should('contain.text', '筛选项可用性数据加载失败')
           .and('contain.text', '重试');
         cy.get('#evaluation-chart svg circle').should('have.length.greaterThan', 0);
         cy.then(() => {
@@ -456,7 +456,7 @@ describe('Evaluation Chart — Simplified Chinese mobile path', () => {
       body: compactEvalRows([]),
     });
     cy.visit('/zh/evaluation?e2e=empty-success');
-    cy.contains('当前筛选条件下没有可用数据。').should('be.visible');
+    cy.contains('当前筛选条件下没有可用数据').should('be.visible');
     cy.get('[data-testid="evaluation-view-toggle"]').contains('图表').click();
     cy.contains(/该模型暂无评估数据|所选模型与基准测试组合暂无评估数据/u).should('be.visible');
     cy.get('[data-testid="evaluation-query-error"]').should('not.exist');

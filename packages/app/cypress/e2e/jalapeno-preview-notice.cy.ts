@@ -57,7 +57,7 @@ describe('official preview notices', () => {
     cy.get('[data-testid="calculator-controls"]').within(() => {
       cy.get('#calc-cost-type').click();
     });
-    cy.get('[role="option"]').contains('Output Tokens').click();
+    cy.get('[role="option"]').contains('Output tokens').click();
     cy.get('[data-testid="calculator-controls"] input[type="number"]')
       .first()
       .clear()
@@ -102,7 +102,7 @@ describe('official preview notices', () => {
     cy.visit('/fleet?g_model=DeepSeek-R1-0528&i_seq=8k%2F1k&i_prec=fp4');
 
     cy.get('[data-testid="fleet-cost-type-selector"]').click();
-    cy.get('[role="option"]').contains('Output Tokens').click();
+    cy.get('[role="option"]').contains('Output tokens').click();
     cy.get('[data-testid="fleet-legend"]', { timeout: 20000 }).should('contain.text', 'Vera Rubin');
     cy.get('[data-testid="fleet-controls"] input[type="number"]').clear().type('100').blur();
     cy.get('[data-testid="calc-fleet-mw-input"]').should('have.value', '10');

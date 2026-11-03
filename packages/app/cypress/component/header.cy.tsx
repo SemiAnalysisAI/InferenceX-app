@@ -127,12 +127,10 @@ describe('Header', () => {
   it('shows AgentX as a top-level nav link and highlights AgentX child pages', () => {
     cy.get('[data-testid="nav-link-agentx"]')
       .should('be.visible')
-      .and('have.attr', 'href', '/agentx')
-      .find('[data-nav-badge="agentx"]')
-      .should('have.text', 'NEW');
+      .and('have.attr', 'href', '/agentx');
 
     mountHeader('/agentx/claude-code-traces');
-    cy.get('[data-testid="nav-link-agentx"]').should('have.class', 'text-brand');
+    cy.get('[data-testid="nav-link-agentx"]').should('have.attr', 'aria-current', 'page');
   });
 
   it('keeps AgentX in the Chinese navigation tree', () => {
@@ -141,10 +139,7 @@ describe('Header', () => {
       .should('be.visible')
       .and('contain.text', 'AgentX')
       .and('have.attr', 'href', '/zh/agentx')
-      .and('have.class', 'text-brand');
-    cy.get('[data-testid="nav-link-agentx"]')
-      .find('[data-nav-badge="agentx"]')
-      .should('have.text', '新');
+      .and('have.attr', 'aria-current', 'page');
   });
 
   it('localizes the mobile navigation accessible name without changing English', () => {
@@ -162,7 +157,7 @@ describe('Header', () => {
   it('orders the nav with Home first and AgentX second', () => {
     const expected = ['Home', 'AgentX', 'Overview', 'Dashboard', 'ubenchX', 'About'];
     cy.get('[data-testid^="nav-link-"]').then(($links) => {
-      const labels = [...$links].map((link) => (link.textContent ?? '').replace('NEW', '').trim());
+      const labels = [...$links].map((link) => (link.textContent ?? '').replace('New', '').trim());
       expect(labels).to.deep.equal(expected);
     });
   });
@@ -180,17 +175,15 @@ describe('Header', () => {
   });
 
   for (const pathname of ['/', '/zh']) {
-    it(`omits the leaves toggle from desktop and mobile headers on ${pathname}`, () => {
+    it(`shows the language and theme toggles on desktop and opens the mobile menu on ${pathname}`, () => {
       cy.viewport(1440, 900);
       mountHeader(pathname);
-      cy.get('[data-testid="autumn-leaves-toggle"]').should('not.exist');
       cy.get('[data-testid="language-toggle"]').should('be.visible');
       cy.get('[data-testid="theme-toggle"]').should('be.visible');
 
       cy.viewport(375, 812);
       cy.get('[data-testid="mobile-menu-toggle"]').click();
       cy.get('[data-testid="mobile-menu"]').should('be.visible');
-      cy.get('[data-testid="autumn-leaves-toggle"]').should('not.exist');
     });
   }
 
@@ -206,11 +199,7 @@ describe('Header', () => {
       cy.contains('a', 'Overview').should('be.visible').and('have.attr', 'href', '/overview');
       cy.contains('a', 'Dashboard').should('be.visible').and('have.attr', 'href', '/inference');
       cy.contains('a', 'ubenchX').should('be.visible').and('have.attr', 'href', '/ubenchx/mem-bw');
-      cy.contains('a', 'AgentX')
-        .should('be.visible')
-        .and('have.attr', 'href', '/agentx')
-        .find('[data-nav-badge="agentx"]')
-        .should('have.text', 'NEW');
+      cy.contains('a', 'AgentX').should('be.visible').and('have.attr', 'href', '/agentx');
       cy.contains('a', 'Comparisons').should('not.exist');
       cy.contains('a', 'Articles').should('not.exist');
       cy.contains('a', 'Supporters').should('not.exist');

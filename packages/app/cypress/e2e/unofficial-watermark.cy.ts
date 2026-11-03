@@ -84,14 +84,29 @@ describe('Unofficial-run watermark', () => {
         const tooltip = $point[0].ownerDocument.querySelector<HTMLElement>('[data-chart-tooltip]');
         expect(tooltip).not.to.equal(null);
         expect(tooltip!.style.display).to.equal('block');
-        expect(tooltip).to.contain.text('Offload Type: DRAM');
-        expect(tooltip).to.contain.text('KV Offload Engine: HiCache');
-        expect(tooltip).to.contain.text('KV Transfer Engine: NIXL');
-        expect(tooltip).to.contain.text('Router: SGLang Router 0.3.2');
-        expect(tooltip).to.contain.text('Decode Context Parallelism (DCP): 8');
-        expect(tooltip).to.contain.text('Prefill Context Parallelism (PCP): 4');
-        expect(tooltip).to.contain.text('Chip Cache Hit Rate: 87.5%');
+        expect(tooltip).to.contain.text('Unofficial run');
+        expect(tooltip).to.contain.text('TP8/DCP8/PCP4');
+        $point[0].dispatchEvent(new MouseEvent('mouseleave'));
       });
+    cy.get('[data-testid="scatter-graph"] .unofficial-overlay-pt .overlay-x')
+      .first()
+      .click({ force: true });
+    for (const [label, value] of [
+      ['Offload type', 'DRAM'],
+      ['KV offload engine', 'HiCache'],
+      ['KV transfer engine', 'NIXL'],
+      ['Router', 'SGLang Router 0.3.2'],
+      ['Decode context parallelism (DCP)', '8'],
+      ['Prefill context parallelism (PCP)', '4'],
+      ['Chip cache hit rate', '87.5%'],
+    ]) {
+      cy.contains('[data-testid="point-details-panel"] [data-slot="stat"]', label).should(
+        'contain.text',
+        value,
+      );
+    }
+    cy.get('[data-testid="point-details-close"]').click();
+    cy.get('[data-testid="point-details-panel"]').should('not.exist');
 
     expandLegendAdvanced();
     cy.get('#scatter-parallelism-labels').click();

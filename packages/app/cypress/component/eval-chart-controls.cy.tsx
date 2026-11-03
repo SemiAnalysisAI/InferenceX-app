@@ -48,7 +48,7 @@ describe('Evaluation ChartControls', () => {
       expect(rects[1].left).to.be.greaterThan(rects[0].right);
       expect(rects[1].top).to.be.closeTo(rects[0].top, 2);
     });
-    cy.contains('Run Date:')
+    cy.contains('Run date:')
       .closest('button')
       .then(($date) => {
         cy.contains('Changelog')
@@ -105,13 +105,13 @@ describe('Evaluation ChartControls', () => {
       .should('have.attr', 'aria-expanded', 'false')
       .click()
       .should('have.attr', 'aria-expanded', 'true');
-    cy.contains('Run Date:').should('be.visible');
+    cy.contains('Run date:').should('be.visible');
 
     cy.get('[data-testid="evaluation-secondary-controls"] button')
       .first()
       .click()
       .should('have.attr', 'aria-expanded', 'false');
-    cy.contains('Run Date:').should('not.be.visible');
+    cy.contains('Run date:').should('not.be.visible');
     cy.get('#model-select').should('contain.text', 'DeepSeek R1 0528');
   });
 
@@ -120,7 +120,7 @@ describe('Evaluation ChartControls', () => {
     mountWithProviders(<EvaluationChartControls />, { evaluation: {} });
 
     cy.get('[data-testid="evaluation-secondary-controls"] > button').should('not.be.visible');
-    cy.contains('Run Date:').should('be.visible');
+    cy.contains('Run date:').should('be.visible');
   });
 
   it('localizes the mobile secondary changed-count label', () => {

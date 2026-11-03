@@ -577,7 +577,7 @@ describe('CollectiveX availability states', () => {
     cy.wait('@missing');
     cy.get('[data-testid="collectivex-error"]')
       .should('be.visible')
-      .and('contain.text', 'The CollectiveX dataset failed to load.')
+      .and('contain.text', 'The CollectiveX dataset failed to load')
       .and('not.contain.text', 'API error: 404');
     cy.get('[data-testid="collectivex-error-version-select"]').should('contain.text', 'V1');
   });
@@ -588,7 +588,7 @@ describe('CollectiveX availability states', () => {
     cy.wait('@runs');
     cy.get('[data-testid="collectivex-no-runs-selected"]')
       .should('be.visible')
-      .and('contain.text', 'No CollectiveX results are stored yet.');
+      .and('contain.text', 'No CollectiveX results are stored yet');
     cy.get('[data-testid="collectivex-suite-filter"]').should('not.exist');
     cy.get('[data-testid="collectivex-chart-filters"]').should('not.exist');
     cy.get('[data-testid="collectivex-support-matrices"]').should('be.visible');
@@ -603,7 +603,7 @@ describe('CollectiveX availability states', () => {
     cy.wait('@down');
     cy.get('[data-testid="collectivex-error"]')
       .should('be.visible')
-      .and('contain.text', 'The CollectiveX dataset failed to load.')
+      .and('contain.text', 'The CollectiveX dataset failed to load')
       .and('not.contain.text', 'API error: 503');
 
     let failRequests = true;
@@ -626,7 +626,7 @@ describe('CollectiveX availability states', () => {
     cy.wait('@zhDown');
     cy.get('[data-testid="collectivex-error"]')
       .should('contain.text', 'CollectiveX 运行暂不可用')
-      .and('contain.text', 'CollectiveX 数据集加载失败。')
+      .and('contain.text', 'CollectiveX 数据集加载失败')
       .and('not.contain.text', 'collectivex-internal-storage-detail');
     cy.contains('button', '重试')
       .then(() => {

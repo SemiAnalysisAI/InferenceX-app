@@ -109,7 +109,7 @@ describe('GPU comparison agentic point detail', () => {
 
     cy.get('[data-testid="gpu-multiselect"] [role="combobox"]').click({ force: true });
     cy.get('[role="option"]').first().click();
-    cy.contains('Comparison Date Range').should('be.visible');
+    cy.contains('Comparison date range').should('be.visible');
     cy.contains('button', 'Select date range')
       .should('not.have.class', 'animate-pulse')
       .and('not.have.class', 'border-red-500');
@@ -118,7 +118,7 @@ describe('GPU comparison agentic point detail', () => {
       if ($body.text().includes('View anyway')) {
         cy.contains('button', 'View anyway').click();
       } else {
-        cy.contains('button', 'Max Range').click();
+        cy.contains('button', 'Max range').click();
         cy.contains('button', 'Apply').click();
       }
     });
@@ -140,14 +140,21 @@ describe('GPU comparison agentic point detail', () => {
         cy.wrap($point).find('.visible-shape').click({ force: true });
       });
 
-    cy.get('[data-chart-tooltip]:visible').should('have.length', 1);
-    cy.get('[data-chart-tooltip]:visible')
-      .should('contain', 'Offload Type: DRAM')
-      .and('contain', 'KV Offload Engine: Mooncake 0.3.11.post1')
-      .and('contain', 'Router: vLLM Router 0.1.14')
-      .and('contain', 'Chip Cache Hit Rate: 87.5%')
+    cy.get('[data-testid="point-details-panel"]')
+      .should('have.length', 1)
       .and('not.contain', 'Offload Mode');
-    cy.get('[data-chart-tooltip]:visible [data-action="view-charts"]')
+    for (const [label, value] of [
+      ['Offload type', 'DRAM'],
+      ['KV offload engine', 'Mooncake 0.3.11.post1'],
+      ['Router', 'vLLM Router 0.1.14'],
+      ['Chip cache hit rate', '87.5%'],
+    ]) {
+      cy.contains('[data-testid="point-details-panel"] [data-slot="stat"]', label).should(
+        'contain.text',
+        value,
+      );
+    }
+    cy.get('[data-testid="point-details-panel"] [data-action="view-charts"]')
       .should('be.visible')
       .then(($link) => {
         expect($link).to.match('a');
@@ -158,7 +165,7 @@ describe('GPU comparison agentic point detail', () => {
         expect(params.get('i_seq')).to.equal('agentic-traces');
         expect(params.get('i_gpus')).to.be.a('string').and.not.equal('');
       });
-    cy.get('[data-chart-tooltip]:visible [data-action="view-logs"]')
+    cy.get('[data-testid="point-details-panel"] [data-action="view-logs"]')
       .should('be.visible')
       .then(($link) => {
         expect($link).to.match('a');

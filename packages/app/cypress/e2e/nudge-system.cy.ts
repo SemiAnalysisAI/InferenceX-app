@@ -5,7 +5,7 @@ function clearAllNudgeStorage(win: Cypress.AUTWindow) {
     'inferencex-starred',
     'inferencex-star-modal-dismissed',
     'inferencex-huawei-ascend-950pr-ubenchx-banner-dismissed',
-    'inferencex-reproducibility-nudge-shown',
+    'inferencex-reproducibility-nudge-dismissed',
     'inferencex-star-nudge-shown',
     'inferencex-export-nudge-shown',
     'inferencex-gradient-nudge-shown',
@@ -32,8 +32,8 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
     });
     cy.get('[data-testid="launch-banner"]')
       .should('be.visible')
-      .and('contain.text', 'Huawei Ascend 950PR Microbenchmarks')
-      .and('contain.text', 'Cycle Level Core memory-access MicroBenchmarks (Beta)')
+      .and('contain.text', 'Huawei Ascend 950PR microbenchmarks')
+      .and('contain.text', 'Cycle-level core memory-access microbenchmarks (beta)')
       .and('contain.text', 'View results');
     cy.get('[data-new-badge="launch-banner"]').should('have.class', 'new-badge-flash');
     cy.get('[data-new-badge]')
@@ -234,8 +234,8 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
     cy.get('[data-testid="launch-modal"]')
       .should('be.visible')
       .and('have.attr', 'aria-modal', 'true')
-      .and('contain.text', 'TPUv7 prelimary results across multiple models')
-      .and('contain.text', 'AgentX Preview Submissions')
+      .and('contain.text', 'TPUv7 preliminary results across multiple models')
+      .and('contain.text', 'AgentX preview submissions')
       .then(($modal) => {
         const rect = $modal[0].getBoundingClientRect();
         const root = $modal[0].ownerDocument.documentElement;
@@ -326,8 +326,8 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
     cy.viewport(375, 812);
     cy.visit('/', { onBeforeLoad: clearAllNudgeStorage });
     cy.get('[data-testid="launch-banner"] p')
-      .should('contain.text', 'Huawei Ascend 950PR Microbenchmarks')
-      .and('contain.text', 'Cycle Level Core memory-access MicroBenchmarks (Beta)')
+      .should('contain.text', 'Huawei Ascend 950PR microbenchmarks')
+      .and('contain.text', 'Cycle-level core memory-access microbenchmarks (beta)')
       .and('have.css', 'white-space', 'normal')
       .should(($paragraphs) => {
         for (const text of $paragraphs) {
@@ -381,7 +381,7 @@ describe('Landing nudges — banner', { testIsolation: true }, () => {
 });
 
 describe('Dashboard nudges — reproducibility toast', () => {
-  it('reproducibility nudge is session-only — gone after reload', () => {
+  it('reproducibility nudge stays dismissed across reloads', () => {
     cy.visit('/inference', {
       onBeforeLoad(win) {
         clearAllNudgeStorage(win);
@@ -389,11 +389,11 @@ describe('Dashboard nudges — reproducibility toast', () => {
     });
     cy.get('[data-testid="reproducibility-nudge"]').should('not.exist');
     cy.get('[data-testid="reproducibility-nudge"]', { timeout: 4000 }).should('be.visible');
+    cy.get('[data-testid="reproducibility-nudge"] button[aria-label="Dismiss"]').click();
+    cy.get('[data-testid="reproducibility-nudge"]').should('not.exist');
 
     cy.window().then((win) => {
-      expect(win.sessionStorage.getItem('inferencex-reproducibility-nudge-shown')).to.not.equal(
-        null,
-      );
+      expect(win.localStorage.getItem('inferencex-reproducibility-nudge-dismissed')).to.eq('1');
     });
     cy.reload();
     cy.wait(2000);
@@ -403,7 +403,7 @@ describe('Dashboard nudges — reproducibility toast', () => {
 
 function suppressCompetingDashboardToasts(win: Cypress.AUTWindow) {
   clearAllNudgeStorage(win);
-  win.sessionStorage.setItem('inferencex-reproducibility-nudge-shown', '1');
+  win.localStorage.setItem('inferencex-reproducibility-nudge-dismissed', '1');
   win.sessionStorage.setItem('inferencex-star-nudge-shown', '1');
 }
 

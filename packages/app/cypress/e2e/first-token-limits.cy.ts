@@ -17,7 +17,7 @@ const concurrenciesAtOrAbove = (floor: number) =>
 
 const dismissNudges = (win: Cypress.AUTWindow) => {
   win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-  win.sessionStorage.setItem('inferencex-reproducibility-nudge-shown', '1');
+  win.localStorage.setItem('inferencex-reproducibility-nudge-dismissed', '1');
 };
 
 const firstRowCell = (header: string) =>
@@ -39,11 +39,11 @@ describe('First-Token Limits', () => {
     });
 
     it('picks the cheapest row that clears the interactivity floor, not the cheapest row', () => {
-      cy.get('label[for="first-token-caps"]').should('contain.text', 'TTFT Caps');
+      cy.get('label[for="first-token-caps"]').should('contain.text', 'TTFT caps');
       cy.get('[data-testid="first-token-caps"]').should('have.value', '0.1,2');
       cy.get('label[for="first-token-min-interactivity"]').should(
         'contain.text',
-        'Minimum Median Interactivity',
+        'Minimum Median interactivity',
       );
       cy.get('[data-testid="first-token-min-interactivity"]')
         .should('have.value', '')

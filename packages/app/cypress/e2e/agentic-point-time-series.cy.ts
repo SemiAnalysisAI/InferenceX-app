@@ -346,7 +346,7 @@ describe('Agentic point request metric time series', () => {
       }
     });
 
-    cy.contains('button', 'TP8/DCP8 • c=8').should('be.visible');
+    cy.contains('button', 'TP8/DCP8 · c=8').should('be.visible');
     cy.get('[data-testid="detail-view-logs"]').click();
     cy.location('search').should('contain', 'view=logs');
     cy.get('#agentic-log-file').click();
@@ -742,7 +742,7 @@ describe('Agentic point request metric time series', () => {
 
     cy.visit('/zh/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
     cy.get('[data-testid="agentic-request-charts-query-error"]')
-      .should('contain.text', '请求图表数据加载失败。')
+      .should('contain.text', '请求图表数据加载失败')
       .and('contain.text', '重试');
     cy.then(() => {
       requestChartAttemptsBeforeRetry = requestChartAttempts;
@@ -754,7 +754,7 @@ describe('Agentic point request metric time series', () => {
 
     cy.get('[data-testid="detail-view-aggregates"]').click();
     cy.get('[data-testid="agentic-aggregates-query-error"]')
-      .should('contain.text', '跨配置聚合数据加载失败。')
+      .should('contain.text', '跨配置聚合数据加载失败')
       .and('contain.text', '重试');
     cy.then(() => {
       aggregateAttemptsBeforeRetry = aggregateAttempts;
@@ -766,7 +766,7 @@ describe('Agentic point request metric time series', () => {
 
     cy.get('[data-testid="detail-view-timeline"]').click();
     cy.get('[data-testid="agentic-timeline-query-error"]')
-      .should('contain.text', '请求时间线加载失败。')
+      .should('contain.text', '请求时间线加载失败')
       .and('contain.text', '重试');
     cy.then(() => {
       timelineAttemptsBeforeRetry = timelineAttempts;
@@ -797,7 +797,7 @@ describe('Agentic point request metric time series', () => {
     cy.visit('/zh/inference/agentic/206885', { onBeforeLoad: unlockAgenticGate });
 
     cy.get('[data-testid="agentic-trace-query-error"]')
-      .should('contain.text', '无法加载基准测试数据点 #206885 的 trace 数据。')
+      .should('contain.text', '无法加载基准测试数据点 #206885 的 trace 数据')
       .and('contain.text', '重试');
     cy.then(() => {
       traceAttemptsBeforeRetry = traceAttempts;
@@ -808,14 +808,14 @@ describe('Agentic point request metric time series', () => {
     cy.then(() => expect(traceAttempts).to.be.greaterThan(traceAttemptsBeforeRetry));
 
     cy.get('[data-testid="agentic-siblings-query-error"]')
-      .should('contain.text', 'SKU 导航数据加载失败。')
+      .should('contain.text', 'SKU 导航数据加载失败')
       .and('contain.text', '重试');
     cy.then(() => {
       siblingAttemptsBeforeRetry = siblingAttempts;
       failSibling = false;
     });
     cy.get('[data-testid="agentic-siblings-query-error"]').contains('button', '重试').click();
-    cy.contains('button', 'TP8/DCP8 • c=8').should('be.visible');
+    cy.contains('button', 'TP8/DCP8 · c=8').should('be.visible');
     cy.then(() => expect(siblingAttempts).to.be.greaterThan(siblingAttemptsBeforeRetry));
   });
 });
@@ -966,11 +966,11 @@ describe('Agentic point orchestrator metric sources', () => {
 
   it('switches every server chart to an orchestrator-normalized worker', () => {
     cy.get('[data-testid="point-summary"]')
-      .should('contain.text', 'Offload Type')
+      .should('contain.text', 'Offload type')
       .and('contain.text', 'DRAM')
-      .and('contain.text', 'KV Offload Engine')
+      .and('contain.text', 'KV offload engine')
       .and('contain.text', 'LMCache 0.5.1')
-      .and('contain.text', 'KV Transfer Engine')
+      .and('contain.text', 'KV transfer engine')
       .and('contain.text', 'Mooncake')
       .and('contain.text', 'Router')
       .and('contain.text', 'vLLM Router 0.1.14')
@@ -1048,7 +1048,7 @@ describe('Agentic point orchestrator metric sources', () => {
     cy.contains('[role="option"]', '解码 · decode-a').click();
 
     cy.get('[data-testid="agentic-metric-source-query-error"]')
-      .should('contain.text', '无法加载所选服务器指标来源。')
+      .should('contain.text', '无法加载所选服务器指标来源')
       .and('contain.text', '重试');
     cy.get('[data-testid="agentic-metric-source-query-error"]').contains('button', '重试').click();
     cy.get('[data-testid="agentic-metric-source-query-error"]').should('not.exist');

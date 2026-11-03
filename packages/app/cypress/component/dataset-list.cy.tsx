@@ -122,20 +122,20 @@ describe('DatasetList', () => {
       .each(($section) => {
         cy.wrap($section).find('dt').should('have.length.greaterThan', 0);
       });
-    cy.contains('View dataset →').should('be.visible');
+    cy.contains('View dataset').should('be.visible');
   });
 
   it('shows the empty state when no datasets are ingested', () => {
     cy.intercept('GET', '/api/v1/datasets', { statusCode: 200, body: [] }).as('empty');
     mountList();
     cy.wait('@empty');
-    cy.contains('No datasets ingested yet.').should('be.visible');
+    cy.contains('No datasets ingested yet').should('be.visible');
   });
 
   it('shows the error state when the request fails', () => {
     cy.intercept('GET', '/api/v1/datasets', { statusCode: 500, body: { error: 'boom' } }).as('err');
     mountList();
     cy.wait('@err');
-    cy.contains('Failed to load datasets.').should('be.visible');
+    cy.contains('Failed to load datasets').should('be.visible');
   });
 });

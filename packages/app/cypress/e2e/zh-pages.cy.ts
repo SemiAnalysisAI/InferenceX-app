@@ -253,7 +253,7 @@ describe('Chinese (/zh) pages', () => {
       cy.get('details[aria-label="本页目录"]')
         .should('be.visible')
         .find('summary')
-        .should('contain.text', '点击展开');
+        .should('contain.text', '本页目录');
       cy.get('article.prose a[aria-label="复制本节链接"]')
         .first()
         .should('have.attr', 'href')
@@ -272,7 +272,7 @@ describe('Chinese (/zh) pages', () => {
         const homeLinks = [...document.querySelectorAll<HTMLAnchorElement>('a[href="/"]')];
 
         expect(status).to.eq(404);
-        expect(document.querySelector('h1')?.textContent).to.eq('404 - Page Not Found');
+        expect(document.querySelector('h1')?.textContent).to.eq('Page not found');
         expect(homeLinks.some((link) => link.textContent === 'Go back home')).to.eq(true);
         expect(document.querySelector('meta[name="robots"]')?.getAttribute('content')).to.include(
           'noindex',
@@ -293,8 +293,8 @@ describe('Chinese (/zh) pages', () => {
         },
       });
 
-      cy.contains('h1', '404 - 页面不存在').should('be.visible');
-      cy.contains('找不到该页面。').should('be.visible');
+      cy.contains('h1', '页面不存在').should('be.visible');
+      cy.contains('找不到该页面').should('be.visible');
       cy.contains('a[href="/zh"]', '返回首页').should('be.visible');
       cy.get('meta[name="robots"]').should('have.attr', 'content').and('include', 'noindex');
       cy.get('link[rel="canonical"]').should('not.exist');
@@ -352,7 +352,7 @@ describe('Chinese (/zh) pages', () => {
         .should('contain.text', '投机解码方法：')
         .and('contain.text', '分离式部署：')
         .and('contain.text', '聚合推理芯片数：');
-      cy.get('input[placeholder="搜索配置……"]').type('atom-disagg');
+      cy.get('input[placeholder="搜索配置"]').type('atom-disagg');
       cy.contains('tr', 'Mooncake ATOMesh')
         .first()
         .find('button[aria-label="展开配置详情"]')
@@ -368,8 +368,8 @@ describe('Chinese (/zh) pages', () => {
       );
       cy.reload();
       cy.wait('@emptySubmissions');
-      cy.contains('暂无提交活动数据。').should('be.visible');
-      cy.contains('暂无提交记录。').should('be.visible');
+      cy.contains('暂无提交活动数据').should('be.visible');
+      cy.contains('暂无提交记录').should('be.visible');
     });
 
     it('shows a safe error and retries through a real button click', () => {
@@ -383,14 +383,14 @@ describe('Chinese (/zh) pages', () => {
       }).as('retrySubmissions');
       cy.reload();
       cy.wait('@retrySubmissions');
-      cy.contains('加载提交数据失败。').should('be.visible');
+      cy.contains('加载提交数据失败').should('be.visible');
       cy.contains('submissions-database-internal-detail').should('not.exist');
       cy.contains('button', '重试')
         .then(() => {
           failRequests = false;
         })
         .click();
-      cy.contains('暂无提交记录。').should('be.visible');
+      cy.contains('暂无提交记录').should('be.visible');
     });
 
     it('keeps the chart labels readable and the table scrollable at 375px', () => {
@@ -429,9 +429,8 @@ describe('Chinese (/zh) pages', () => {
 
     it('localizes the empty state, key validation, and accessibility label', () => {
       cy.viewport(1440, 900);
-      cy.get('[data-testid="feedback-viewer"]')
-        .should('contain.text', '用户反馈')
-        .and('contain.text', '暂无反馈记录。');
+      cy.get('[data-testid="zh-tab-intro"]').should('contain.text', '用户反馈');
+      cy.get('[data-testid="feedback-viewer"]').should('contain.text', '暂无反馈记录');
       cy.contains('仅在浏览器中处理密钥').and('contain.text', '不会持久化').should('be.visible');
       cy.get('button[aria-label="显示密钥"]').should('be.visible');
       cy.get('[data-testid="feedback-key-input"]').type('invalid-key');
@@ -452,7 +451,7 @@ describe('Chinese (/zh) pages', () => {
       cy.reload();
       cy.contains('正在加载反馈记录……').should('be.visible');
       cy.wait('@slowFeedbackList');
-      cy.contains('暂无反馈记录。').should('be.visible');
+      cy.contains('暂无反馈记录').should('be.visible');
     });
 
     it('shows a safe fetch error and retries through a real button click', () => {
@@ -467,7 +466,7 @@ describe('Chinese (/zh) pages', () => {
       cy.reload();
       cy.wait('@retryFeedbackList');
       cy.wait('@retryFeedbackList');
-      cy.contains('无法加载反馈数据。').should('be.visible');
+      cy.contains('无法加载反馈数据').should('be.visible');
       cy.contains('feedback-database-internal-detail').should('not.exist');
       cy.contains('button', '重试')
         .then(() => {
@@ -475,7 +474,7 @@ describe('Chinese (/zh) pages', () => {
         })
         .click();
       cy.wait('@retryFeedbackList');
-      cy.contains('暂无反馈记录。').should('be.visible');
+      cy.contains('暂无反馈记录').should('be.visible');
     });
 
     it('keeps the key controls and content within 375px', () => {

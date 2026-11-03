@@ -116,7 +116,9 @@ export function openXAxisMenu(): void {
       cy.wrap($toggle).click();
     }
   });
-  cy.get('[data-testid="x-axis-mode-selector"]').click();
+  // Centered so the sticky header cannot cover it, and on the chevron so the selected option's
+  // help icon does not take the click.
+  cy.get('[data-testid="x-axis-mode-selector"]').click('right', { scrollBehavior: 'center' });
 }
 
 export function selectXAxisMode(

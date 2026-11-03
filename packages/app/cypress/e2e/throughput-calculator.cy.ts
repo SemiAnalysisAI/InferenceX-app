@@ -20,7 +20,7 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="footer-link-calculator"]')
         .scrollIntoView()
         .should('be.visible')
-        .and('contain.text', 'TCO Calculator');
+        .and('contain.text', 'TCO calculator');
 
       cy.get('[data-testid="footer-link-calculator"]').scrollIntoView().click();
       cy.url().should('include', '/calculator');
@@ -103,7 +103,7 @@ describe('TCO Calculator', () => {
         {
           metric: 'power',
           title: 'Tokens per Provisioned All-in Megawatt',
-          badges: ['All in Power/Chip', 'kW'],
+          badges: ['All in power/chip', 'kW'],
         },
         { metric: 'cost', title: 'Cost per Million', badges: ['TCO $/chip/hr', '$'] },
       ] as const;
@@ -159,8 +159,7 @@ describe('TCO Calculator', () => {
       });
     });
 
-    it('hides the table logo with the unofficial-domain notice', () => {
-      cy.contains('This deployment is not hosted at').should('be.visible');
+    it('hides the table logo on unofficial domains', () => {
       cy.get('[data-testid="calculator-results-table"] img[src="/brand/logo-color.webp"]').should(
         'not.exist',
       );
@@ -245,16 +244,16 @@ describe('TCO Calculator', () => {
         cy.get('#calc-cost-type').click();
       });
       cy.get('[role="option"]').should('have.length', 3);
-      cy.get('[role="option"]').eq(0).should('contain.text', 'Total Tokens');
-      cy.get('[role="option"]').eq(1).should('contain.text', 'Input Tokens');
-      cy.get('[role="option"]').eq(2).should('contain.text', 'Output Tokens');
+      cy.get('[role="option"]').eq(0).should('contain.text', 'Total tokens');
+      cy.get('[role="option"]').eq(1).should('contain.text', 'Input tokens');
+      cy.get('[role="option"]').eq(2).should('contain.text', 'Output tokens');
       cy.get('body').type('{esc}');
 
       cy.get('[data-testid="calculator-chart-section"] h2').first().should('contain.text', 'Total');
       cy.get('[data-testid="calculator-controls"]').within(() => {
         cy.get('#calc-cost-type').click();
       });
-      cy.get('[role="option"]').contains('Input Tokens').click();
+      cy.get('[role="option"]').contains('Input tokens').click();
       cy.get('[data-testid="calculator-chart-section"] h2').first().should('contain.text', 'Input');
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
@@ -263,7 +262,7 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-controls"]').within(() => {
         cy.get('#calc-cost-type').click();
       });
-      cy.get('[role="option"]').contains('Output Tokens').click();
+      cy.get('[role="option"]').contains('Output tokens').click();
       cy.get('[data-testid="calculator-chart-section"] h2')
         .first()
         .should('contain.text', 'Output');
@@ -276,7 +275,7 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-controls"]').within(() => {
         cy.get('#calc-cost-type').click();
       });
-      cy.get('[role="option"]').contains('Total Tokens').click();
+      cy.get('[role="option"]').contains('Total tokens').click();
       cy.get('[data-testid="calculator-results-table"] thead').should(
         'contain.text',
         'Total Throughput',
@@ -391,7 +390,7 @@ describe('TCO Calculator', () => {
 
       cy.get('[data-testid="calculator-disagg-cost-note"]').should('not.be.visible');
 
-      for (const tokenType of ['Output Tokens', 'Input Tokens']) {
+      for (const tokenType of ['Output tokens', 'Input tokens']) {
         cy.get('[data-testid="calc-cost-type-selector"]').click();
         cy.contains('[role="option"]', tokenType).click();
         cy.get('body').type('{esc}');
@@ -402,7 +401,7 @@ describe('TCO Calculator', () => {
       }
 
       cy.get('[data-testid="calc-cost-type-selector"]').click();
-      cy.contains('[role="option"]', 'Total Tokens').click();
+      cy.contains('[role="option"]', 'Total tokens').click();
       cy.get('body').type('{esc}');
       cy.get('[data-testid="calculator-disagg-cost-note"]').should('not.be.visible');
     });
@@ -503,7 +502,7 @@ describe('TCO Calculator', () => {
         .should('contain.text', 'P75 Interactivity');
       cy.get('[data-testid="calculator-controls"]').should(
         'contain.text',
-        'Target P75 Interactivity',
+        'Target P75 interactivity',
       );
       cy.get('[data-testid="share-button"]').click();
       cy.get('[data-testid="share-url-input"]').invoke('val').should('include', 'i_pctl=p75');
@@ -543,7 +542,7 @@ describe('TCO Calculator', () => {
         .should('contain.text', 'P90 Interactivity');
       cy.get('[data-testid="calculator-controls"]').should(
         'contain.text',
-        'Target P90 Interactivity',
+        'Target P90 interactivity',
       );
     });
   });
@@ -590,7 +589,7 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calc-costcap-input"]').type('100');
       cy.get('[data-testid="calculator-costcap-table"]').should('be.visible');
       cy.get('[data-testid="calculator-costcap-table"]').within(() => {
-        cy.contains('th', 'Max Interactivity (tok/s/user)').should('exist');
+        cy.contains('th', 'Max interactivity (tok/s/user)').should('exist');
         cy.get('tbody tr').should('have.length.greaterThan', 0);
         cy.get('tbody tr')
           .first()
@@ -652,7 +651,7 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calc-costcap-input"]').should('not.exist');
       cy.get('[data-testid="calculator-costcap-section"]').should(
         'contain.text',
-        'Interactivity Within a Cost Target',
+        'Interactivity within a cost target',
       );
       cy.get('[data-testid="calculator-costcap-collapse"]').click();
       cy.get('[data-testid="calc-costcap-input"]').should('be.visible');

@@ -48,7 +48,7 @@ describe('EvalBarChartD3', () => {
         cy.get('tbody tr').eq(0).find('td').eq(index).should('have.text', '8');
         cy.get('tbody tr').eq(1).find('td').eq(index).should('have.text', '1 / DP8');
       });
-    cy.contains('thead th', 'Physical Chips')
+    cy.contains('thead th', 'Physical chips')
       .invoke('index')
       .then((index) => {
         cy.get('tbody tr').each(($row) => {
@@ -81,7 +81,7 @@ describe('EvalBarChartD3', () => {
       },
       unofficial: {},
     });
-    cy.contains('Failed to load eval data.').should('be.visible');
+    cy.contains('Failed to load eval data').should('be.visible');
   });
 
   it('shows empty state when chartData is empty and selections are made', () => {
