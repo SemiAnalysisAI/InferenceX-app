@@ -429,6 +429,33 @@ describe('cache-aware token revenue interpolation', () => {
 
     expect(revenue).toBeCloseTo(throughput! * 0.0036, 10);
   });
+
+  it('prices one-price revenue without a token mix', () => {
+    const point = rowToLightweightPoint(makeBenchmarkRow({ isl: null, osl: null }), [
+      'tokenRevenuePerGpuHour',
+    ])!;
+    expect(point.tokenRevenuePerGpuHour?.y).toBeCloseTo(400 * 0.0036, 12);
+  });
+
+  it('withholds split-price revenue when a frontier knot has no token mix', () => {
+    const unknownMix = rowToLightweightPoint(
+      makeBenchmarkRow({ isl: null, osl: null, metrics: { tput_per_gpu: 600, median_intvty: 40 } }),
+      ['tokenRevenuePerGpuHour', 'tpPerGpu'],
+    )!;
+    const points = [revenuePoint(20, 800), unknownMix];
+    const split = { source: 'openrouter', inputPerMillion: 1, outputPerMillion: 3 } as const;
+    expect(
+      interpolateMetricAtInteractivity(points, 30, 'tokenRevenuePerGpuHour', split),
+    ).toBeNull();
+    expect(
+      interpolateMetricAtInteractivity(
+        points,
+        30,
+        'tokenRevenuePerGpuHour',
+        NORMALIZED_TOKEN_REVENUE_PRICING,
+      ),
+    ).toBeCloseTo(interpolateMetricAtInteractivity(points, 30, 'tpPerGpu')! * 0.0036, 10);
+  });
 });
 
 describe('rowSupportsTrendMetric', () => {

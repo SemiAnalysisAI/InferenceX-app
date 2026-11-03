@@ -27,6 +27,14 @@ export function cachedInputPricePerMillion(pricing: TokenRevenuePricing): number
     : pricing.inputPerMillion * DEFAULT_CACHED_INPUT_PRICE_RATIO;
 }
 
+/** Whether the input/output token mix changes the blended price at all. */
+export function tokenMixSetsPrice(pricing: TokenRevenuePricing, cacheHits: boolean): boolean {
+  return (
+    pricing.inputPerMillion !== pricing.outputPerMillion ||
+    (cacheHits && cachedInputPricePerMillion(pricing) !== pricing.inputPerMillion)
+  );
+}
+
 export function inputTokenShareForRevenue(point: InferenceData): number | null {
   // Per deployment chip on either chip basis, so the mix never follows the toggle.
   const measured = measuredInputShare(point, RATE_SUM_RELATIVE_TOLERANCE);
@@ -54,20 +62,19 @@ export function tokenRevenueFromRatesPerGpuHour(
 ): number | null {
   if (!(totalTokPerSecond > 0)) return 0;
 
-  const cachedInputPrice = cachedInputPricePerMillion(pricing);
   const hit =
     typeof cacheHitRate === 'number' && Number.isFinite(cacheHitRate)
       ? Math.max(0, Math.min(1, cacheHitRate))
       : 0;
-  const cacheChangesPrice = hit > 0 && cachedInputPrice !== pricing.inputPerMillion;
 
-  if (pricing.inputPerMillion === pricing.outputPerMillion && !cacheChangesPrice) {
+  if (!tokenMixSetsPrice(pricing, hit > 0)) {
     return (totalTokPerSecond * SECONDS_PER_HOUR * pricing.inputPerMillion) / TOKENS_PER_MILLION;
   }
 
   if (inputTokenShare === null || !Number.isFinite(inputTokenShare)) return null;
   const inputShare = Math.max(0, Math.min(1, inputTokenShare));
-  const inputPriceAtPoint = (1 - hit) * pricing.inputPerMillion + hit * cachedInputPrice;
+  const inputPriceAtPoint =
+    (1 - hit) * pricing.inputPerMillion + hit * cachedInputPricePerMillion(pricing);
   const blendedPriceAtPoint =
     inputShare * inputPriceAtPoint + (1 - inputShare) * pricing.outputPerMillion;
   return (totalTokPerSecond * SECONDS_PER_HOUR * blendedPriceAtPoint) / TOKENS_PER_MILLION;
@@ -79,7 +86,9 @@ export function tokenRevenuePerGpuHour(
 ): number | null {
   const total = point.tput_per_gpu ?? 0;
   const cacheHitRate = pricingCacheHitRate(point);
-  const inputShare = inputTokenShareForRevenue(point);
+  const inputShare = tokenMixSetsPrice(pricing, (cacheHitRate ?? 0) > 0)
+    ? inputTokenShareForRevenue(point)
+    : null;
   return tokenRevenueFromRatesPerGpuHour(total, inputShare, cacheHitRate, pricing);
 }
 

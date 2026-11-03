@@ -19,6 +19,7 @@ import {
 import {
   inputTokenShareForRevenue,
   NORMALIZED_TOKEN_REVENUE_PRICING,
+  tokenMixSetsPrice,
   tokenRevenueFromRatesPerGpuHour,
   tokenRevenuePerGpuHour,
 } from '@/components/inference/token-revenue';
@@ -485,14 +486,17 @@ function buildInterpolationCurve(
         Math.max(min, Math.min(max, hermiteInterpolate(xs, ys, slopes, target)));
     };
     const throughputAt = interpolateBounded(sorted.map((p) => extractMetric(p, 'tpPerGpu')!));
-    const inputShares = sorted.map(inputTokenShareForRevenue);
     const cacheHitRates = sorted.map(pricingCacheHitRate);
-    const inputShareAt = inputShares.every((share): share is number => share !== null)
-      ? interpolateBounded(inputShares)
-      : null;
     const cacheHitRateAt = cacheHitRates.every((hit): hit is number => hit !== null)
       ? interpolateBounded(cacheHitRates)
       : null;
+    const inputShares = tokenMixSetsPrice(tokenRevenuePricing, cacheHitRateAt !== null)
+      ? sorted.map(inputTokenShareForRevenue)
+      : null;
+    const inputShareAt =
+      inputShares !== null && inputShares.every((share): share is number => share !== null)
+        ? interpolateBounded(inputShares)
+        : null;
 
     return curve((target) =>
       tokenRevenueFromRatesPerGpuHour(

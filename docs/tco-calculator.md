@@ -105,11 +105,14 @@ as permanent impact figures for the changing live dataset.
 The `/inference` page exposes infrastructure tokens-per-dollar and token revenue
 as separate Y-axis metric families. Revenue selects the total-throughput Pareto
 knots, interpolates throughput, token mix, and cache hit independently, and then
-applies the selected token sale prices. Total, output-only, and input-only
-infrastructure tokens-per-dollar trends spline their matching throughput and
-apply the constant `3600 / $/GPU-hr` multiplier. Reusing the matching frontier
-remains essential: total-throughput knots are not necessarily the output- or
-input-throughput Pareto knots.
+applies the selected token sale prices. When input and output sell at one price
+and cached input either costs the same or no knot has a cache hit, the mix cannot
+move the price (`tokenMixSetsPrice`), so neither a point nor a trend measures or
+interpolates it. The normalized default prices are such a case. Total,
+output-only, and input-only infrastructure tokens-per-dollar trends spline their
+matching throughput and apply the constant `3600 / $/GPU-hr` multiplier. Reusing
+the matching frontier remains essential: total-throughput knots are not
+necessarily the output- or input-throughput Pareto knots.
 
 The revenue axis defaults to normalized cache-aware pricing: uncached input and
 output are `$1/M tok`, while cached input is `$0.10/M tok`, matching Fleet
