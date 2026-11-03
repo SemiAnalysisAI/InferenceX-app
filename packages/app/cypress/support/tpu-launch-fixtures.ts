@@ -33,13 +33,16 @@ export function assertTpuGb300Selected() {
   cy.get('body').type('{esc}');
 }
 
-export function interceptTpuLaunchData(
-  model: 'Qwen-3.5-397B-A17B' | 'Kimi-K3' = 'Qwen-3.5-397B-A17B',
-) {
-  const rows =
-    model === 'Kimi-K3'
-      ? qwenAgenticRows.map((row) => ({ ...row, model: 'kimik3' }))
-      : qwenAgenticRows;
+type TpuLaunchModel = 'Qwen-3.5-397B-A17B' | 'Kimi-K3';
+
+export function tpuLaunchRows(model: TpuLaunchModel = 'Qwen-3.5-397B-A17B') {
+  return model === 'Kimi-K3'
+    ? qwenAgenticRows.map((row) => ({ ...row, model: 'kimik3' }))
+    : qwenAgenticRows;
+}
+
+export function interceptTpuLaunchData(model: TpuLaunchModel = 'Qwen-3.5-397B-A17B') {
+  const rows = tpuLaunchRows(model);
   cy.fixture<AvailabilityRow[]>('api/availability.json').then((availability) => {
     cy.intercept('GET', '/api/v1/availability/compact', {
       body: availabilityBody([
