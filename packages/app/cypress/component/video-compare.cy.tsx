@@ -1,4 +1,5 @@
 import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
+import { useState } from 'react';
 import type { VideoHistoryPage } from '@/components/video-benchmark/history';
 import type { VideoPoint } from '@/components/video-benchmark/metrics';
 import { dashboardCells, videoPoints } from '@/components/video-benchmark/points';
@@ -26,9 +27,21 @@ const pick = (label: string, option: string) => {
   cy.get(`[role="combobox"][aria-label="${label}"]`).click();
   cy.contains('[role="option"]', option).click();
 };
+const expectAudio = (source: string | null) =>
+  cy.get<HTMLVideoElement>('video').should(($videos) => {
+    for (const video of $videos) {
+      const hardware = video.closest<HTMLElement>('[data-hardware]')?.dataset.hardware;
+      expect(video.muted, hardware ?? 'reference').to.equal(!source || hardware !== source);
+    }
+  });
 
 // These decoder fixtures are test inputs, never benchmark evidence.
-function mountResultsClips(keys = ['b200', 'h200'], pathname = '/video', diagnostics = false) {
+function mountResultsClips(
+  keys = ['b200', 'h200'],
+  pathname = '/video',
+  diagnostics = false,
+  unofficialRun?: string,
+) {
   const referenceMedia = { url: '', diagnosticUrl: '' };
   cy.fixture('video-results/reference.mp4', 'base64').then((encoded: string) => {
     cy.window().then((win) => {
@@ -120,20 +133,88 @@ function mountResultsClips(keys = ['b200', 'h200'], pathname = '/video', diagnos
       },
     );
   }
-  cy.mount(
-    <PathnameContext.Provider value={pathname}>
-      <VideoResultsClips
-        points={keys.map(c1)}
-        colorFor={colorFor}
-        hidden={new Set()}
-        costs={{ [c1('b200').id]: { participating: 0.02, allocated: null } }}
-      />
-    </PathnameContext.Provider>,
-  );
+  const selectedPoints = keys.map(c1);
+  function Clips() {
+    const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
+    return (
+      <PathnameContext.Provider value={pathname}>
+        <button onClick={() => setHidden(hidden.size > 0 ? new Set() : new Set(['b200']))}>
+          Toggle B200
+        </button>
+        <VideoResultsClips
+          points={selectedPoints}
+          colorFor={colorFor}
+          hidden={hidden}
+          costs={{ [c1('b200').id]: { participating: 0.02, allocated: null } }}
+          unofficialRun={unofficialRun}
+        />
+      </PathnameContext.Provider>
+    );
+  }
+  cy.mount(<Clips />);
   cy.wait(keys.map((key) => `@results-${key}` as const));
 }
 
 describe('Video results synchronized clips', () => {
+  it('selects one audio source during playback and resets audio when the case changes', () => {
+    mountResultsClips(['b200', 'h100'], '/video', true);
+    expectAudio(null);
+    cy.get('[data-testid="video-results-audio"]').should('contain', 'Muted').click();
+    cy.get('[role="option"]').should(($options) => {
+      expect([...$options].map((option) => option.textContent)).to.deep.equal([
+        'Muted',
+        'Listen to B200',
+        'Listen to H100',
+      ]);
+    });
+    cy.contains('[role="option"]', 'Listen to B200').click();
+    expectAudio('b200');
+    cy.get<HTMLVideoElement>('video').then(($videos) => {
+      for (const video of $videos) video.playbackRate = 0.1;
+    });
+    cy.get('[data-testid="video-results-play"]').click();
+    pick('Audio', 'Listen to H100');
+    expectAudio('h100');
+    cy.get<HTMLVideoElement>('[data-hardware="h100"] video').should(($video) => {
+      expect($video[0].paused).to.equal(false);
+    });
+    cy.screenshot('audio-desktop-en');
+    pick('Audio', 'Muted');
+    expectAudio(null);
+    pick('Audio', 'Listen to B200');
+    pick('Case', 'drum-taps · take 1');
+    expectAudio(null);
+    cy.get('[data-testid="video-results-audio"]').should('contain', 'Muted');
+  });
+
+  it('resets hidden or failed audio sources and supports the Chinese unofficial-run view', () => {
+    cy.viewport(390, 900);
+    mountResultsClips(['b200', 'h100'], '/zh/video', false, c1('h100').runId);
+    cy.get('[data-hardware="h100"]').should('contain', '非官方运行');
+    pick('音频', '收听 B200');
+    expectAudio('b200');
+    cy.contains('button', 'Toggle B200').click();
+    expectAudio(null);
+    cy.get('[data-testid="video-results-audio"]').should('contain', '静音').click();
+    cy.get('[role="option"]').should('have.length', 2).and('not.contain', 'B200');
+    cy.contains('[role="option"]', '静音').click();
+    cy.contains('button', 'Toggle B200').click();
+    expectAudio(null);
+    pick('音频', '收听 H100');
+    expectAudio('h100');
+    cy.document().should((doc) => {
+      expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
+    });
+    cy.screenshot('audio-mobile-zh');
+    cy.get<HTMLVideoElement>('[data-hardware="h100"] video').then(($video) => {
+      $video[0].src = 'data:video/mp4;base64,YmFk';
+      $video[0].load();
+    });
+    expectAudio(null);
+    cy.get('[data-testid="video-results-audio"]').should('contain', '静音').click();
+    cy.get('[role="option"]').should('have.length', 2).and('not.contain', 'H100');
+  });
+
   it('keeps native rerun media and PSNR separate from the original CI performance', () => {
     cy.viewport(390, 900);
     mountResultsClips(['b200', 'h100'], '/video', true);

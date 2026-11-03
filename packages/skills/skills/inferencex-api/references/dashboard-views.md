@@ -826,6 +826,13 @@ Per-clip PSNR requires separately sealed pairs against the pinned official Diffu
 reference. Playable clips or hardware labels alone do not establish a reference.
 Never replace nulls with example numbers.
 
+The comparison player's audio selector starts muted and enables one visible,
+playable hardware clip at a time. Changing the case or hiding or failing that
+source restores mute; the reference stays muted. This is presentation-only:
+audio selection is not a URL/API parameter and changes no returned data.
+
+中文：视频对比默认静音，可选择听一个硬件窗口的声音；切换用例、隐藏音源或音源播放失败后恢复静音，参考视频保持静音。音源选择仅影响播放，不是 URL 或 API 参数，也不改变返回数据。
+
 `point.videoSecondsPerHour` is the sum of validated decoded media durations from
 technically valid measured requests, divided by measurement wall seconds and
 multiplied by 3600; warmup is excluded. Video-second throughput divides this rate

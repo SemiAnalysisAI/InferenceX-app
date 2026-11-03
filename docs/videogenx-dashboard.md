@@ -95,6 +95,10 @@ source identity and matches prompt, seed, repetition and recorded generation
 configuration before showing clips together. Missing media does not erase numeric
 evidence. The shared transport seeks and plays real video elements, stops at the
 shared playable duration, and pauses when the selection or page visibility changes.
+Audio starts muted. The audio selector enables one visible, playable hardware clip
+at a time; the reference stays muted. Changing the case or hiding or failing the
+selected audio source restores mute. Audio selection is local playback state and
+does not change the media, metrics, URL selectors or read-only API response.
 
 Difference displays an amplified absolute RGB difference at matched playback time
 against an explicitly bound official Diffusers reference MP4. Hardware and step
@@ -176,15 +180,15 @@ This does not establish sustained capacity.
 
 ## Control coverage
 
-| Control                                                                     | Read-only API coverage                                                                 |
-| --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Model, workload, resolution, duration, mode, steps, GPU count, engine, date | `r_*` selection fields                                                                 |
-| Hardware visibility, named stored run                                       | `r_hidden`, `unofficialrun`, separate overlay cells preserving approval                |
-| Deadline, cost tier, mode prices, utilization                               | Same pure calculations in `resultProjection`                                           |
-| Clip/frame energy                                                           | Both normalized values returned; toggle is presentation only                           |
-| Power trace hardware                                                        | All selected cell traces returned; selector is presentation only                       |
-| Clip transport, Difference, case navigation, History expand, theme, Share   | Presentation only; published media metadata uses the existing read-only media contract |
-| Cohort/item help, prompt/source, hashes and rating disclosures, media link  | Presentation only; existing history and published media reads provide their data       |
+| Control                                                                                 | Read-only API coverage                                                                 |
+| --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Model, workload, resolution, duration, mode, steps, GPU count, engine, date             | `r_*` selection fields                                                                 |
+| Hardware visibility, named stored run                                                   | `r_hidden`, `unofficialrun`, separate overlay cells preserving approval                |
+| Deadline, cost tier, mode prices, utilization                                           | Same pure calculations in `resultProjection`                                           |
+| Clip/frame energy                                                                       | Both normalized values returned; toggle is presentation only                           |
+| Power trace hardware                                                                    | All selected cell traces returned; selector is presentation only                       |
+| Clip transport, audio source, Difference, case navigation, History expand, theme, Share | Presentation only; published media metadata uses the existing read-only media contract |
+| Cohort/item help, prompt/source, hashes and rating disclosures, media link              | Presentation only; existing history and published media reads provide their data       |
 
 Admin/publication handlers, private artifacts and credentials are excluded.
 Video results controls and the new disclosures/media link record `video_results_*`
@@ -205,6 +209,7 @@ browser playback and difference failure, bilingual layout and 390px overflow.
 完整哈希及尚未校准的人工评分维度按需展开，图表图例与 TCO 估算口径仍直接可见。
 
 视频窗口只读取已存储产物，核对 prompt、seed、重复次数和生成配置后同步播放。
+默认静音，可选择听一个硬件窗口的声音；参考视频保持静音。切换用例、隐藏音源或音源播放失败后恢复静音。音源选择只影响本地播放，不改变媒体、指标、URL 参数或只读 API 返回内容。
 Difference 是相对明确绑定的官方 Diffusers 参考视频的浏览器 RGB 差异预览，与封存的全帧 PSNR 测量分别展示。不能根据硬件型号或步数推断参考身份。
 参考视频、尺寸或跨域读取条件不满足时显示不可用。蒸馏与完整步数分组保留。
 默认视频卡片保留硬件、GPU 数量、媒体及两种 TCO 口径；完整 prompt、seed、重复次数、

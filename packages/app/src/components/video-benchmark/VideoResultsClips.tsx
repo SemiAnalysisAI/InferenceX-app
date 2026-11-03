@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { InfoHelp } from '@/components/ui/option-info';
 import { track } from '@/lib/analytics/analytics';
@@ -49,6 +49,9 @@ const STRINGS = {
     retry: 'Retry clips',
     play: 'Play',
     pause: 'Pause',
+    audio: 'Audio',
+    muted: 'Muted',
+    listen: (hardware: string) => `Listen to ${hardware}`,
     scrub: 'Scrub all clips',
     clip: 'Clip',
     difference: 'Difference',
@@ -110,6 +113,9 @@ const STRINGS = {
     retry: '重试加载视频',
     play: '播放',
     pause: '暂停',
+    audio: '音频',
+    muted: '静音',
+    listen: (hardware: string) => `收听 ${hardware}`,
     scrub: '同步拖动全部视频',
     clip: '视频',
     difference: '差异',
@@ -294,6 +300,7 @@ function SynchronizedClips({
   const canvases = useRef(new Map<string, HTMLCanvasElement>());
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const [audioSource, setAudioSource] = useState<string | null>(null);
   const [view, setView] = useState<'clip' | 'difference'>('clip');
   const [durations, setDurations] = useState<Record<string, number>>({});
   const [errors, setErrors] = useState<ReadonlySet<string>>(new Set());
@@ -306,8 +313,18 @@ function SynchronizedClips({
     ...visible.filter((key) => group?.clips.has(key) && !errors.has(key)),
     ...(reference ? ['reference'] : []),
   ];
+  const audioSources = playable.filter((key) => key !== 'reference');
+  const audibleSource = audioSource && audioSources.includes(audioSource) ? audioSource : null;
   const knownDurations = playable.flatMap((key) => (durations[key] > 0 ? [durations[key]] : []));
   const duration = knownDurations.length > 0 ? Math.min(...knownDurations) : 0;
+
+  useLayoutEffect(() => {
+    if (audioSource !== audibleSource) setAudioSource(null);
+    const video = audibleSource ? videos.current.get(audibleSource) : null;
+    return () => {
+      if (video) video.muted = true;
+    };
+  }, [audioSource, audibleSource]);
 
   useEffect(() => {
     const pause = () => {
@@ -403,6 +420,22 @@ function SynchronizedClips({
     if (playing || view === 'difference') frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
   }, [playing, view, reference, visibleKey, errors, duration]);
+
+  const changeAudio = (value: string) => {
+    const next = audioSources.includes(value) ? value : null;
+    for (const video of videos.current.values()) video.muted = true;
+    setAudioSource(next);
+    track('video_results_audio_changed', { enabled: next !== null, gpu: next });
+    const video = next ? videos.current.get(next) : null;
+    if (video) {
+      video.muted = false;
+      if (playing)
+        void video.play().catch(() => {
+          video.muted = true;
+          setAudioSource((current) => (current === next ? null : current));
+        });
+    }
+  };
 
   const togglePlay = async () => {
     track(playing ? 'video_results_clips_pause' : 'video_results_clips_play');
@@ -625,7 +658,7 @@ function SynchronizedClips({
                     }}
                     src={clip.url}
                     crossOrigin="anonymous"
-                    muted
+                    muted={audibleSource !== key}
                     playsInline
                     preload="metadata"
                     aria-label={`${hardwareLabel(key)} ${s.clip}`}
@@ -746,6 +779,18 @@ function SynchronizedClips({
         >
           {playing ? s.pause : s.play}
         </Button>
+        <div className="w-40 min-w-0">
+          <VideoSelect
+            label={s.audio}
+            value={audibleSource ?? 'muted'}
+            testId="video-results-audio"
+            options={[
+              { value: 'muted', label: s.muted },
+              ...audioSources.map((key) => ({ value: key, label: s.listen(hardwareLabel(key)) })),
+            ]}
+            onValueChange={changeAudio}
+          />
+        </div>
         <input
           data-testid="video-results-scrub"
           type="range"
