@@ -1,5 +1,6 @@
 'use client';
 
+import { Heading } from '@/components/ui/heading';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 import { HuaweiSkuConfigurations } from './HuaweiSkuConfigurations';
@@ -10,12 +11,12 @@ const STRINGS = {
   en: {
     pageTitle: 'TPC Skyline & SKU configurations',
     pageSubtitle:
-      'NVIDIA scheduling-group measurements and Huawei 950PR SKU configurations, with separate methods and evidence.',
+      'NVIDIA scheduling-group measurements and Huawei 950PR SKU configurations, with separate methods and evidence',
     nvidia: 'NVIDIA measured TPC groupings',
     product: 'Product',
     gpcs: 'Measured # of GPCs',
     sms: 'Measured # of SMs',
-    grouping: 'Measured TPC Groupings',
+    grouping: 'Measured TPC groupings',
     methodology: 'Methodology',
     methodologyText:
       'gpc_query launches thread-block clusters of every size from 2 up to the hardware maximum and records the SM each block runs on. A cluster always runs within one GPC, so SMs that share a cluster are merged into the same GPC. Each list gives TPCs (two SMs each) per GPC, sorted descending; positions are not physical GPC indices.',
@@ -27,7 +28,7 @@ const STRINGS = {
   zh: {
     pageTitle: 'TPC Skyline 与 SKU 配置',
     pageSubtitle:
-      '分别展示 NVIDIA 调度分组实测结果和 Huawei 950PR SKU 配置，并说明各自的方法及证据来源。',
+      '分别展示 NVIDIA 调度分组实测结果和 Huawei 950PR SKU 配置，并说明各自的方法及证据来源',
     nvidia: 'NVIDIA 实测 TPC 分组',
     product: '产品',
     gpcs: '实测 GPC 数量',
@@ -54,60 +55,68 @@ export function TpcSkylineContent() {
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-xl font-semibold tracking-tight">{t.pageTitle}</h2>
-        <p className="text-sm text-muted-foreground mt-1">{t.pageSubtitle}</p>
+        <Heading level="section">{t.pageTitle}</Heading>
+        <p className="mt-1 text-sm text-muted-foreground">{t.pageSubtitle}</p>
       </div>
 
-      <h3 className="text-xl font-semibold tracking-tight">{t.nvidia}</h3>
-      <div className="overflow-x-auto rounded-lg border">
-        <table className="w-full text-sm" aria-label={t.aria} data-testid="tpc-skyline-table">
-          <thead className="bg-muted/50">
-            <tr>
-              <th scope="col" className="px-4 py-2.5 text-left font-semibold">
-                {t.product}
-              </th>
-              <th scope="col" className="px-4 py-2.5 text-left font-semibold">
-                {t.gpcs}
-              </th>
-              <th scope="col" className="px-4 py-2.5 text-left font-semibold">
-                {t.sms}
-              </th>
-              <th scope="col" className="px-4 py-2.5 text-left font-semibold">
-                {t.grouping}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {RESULTS.map((r) => (
-              <tr key={r.gpu} className="border-t">
-                <td className="px-4 py-2.5 whitespace-nowrap">{r.gpu}</td>
-                <td className="px-4 py-2.5 tabular-nums">{r.gpcCount}</td>
-                <td className="px-4 py-2.5 tabular-nums">{r.smCount}</td>
-                <td className="px-4 py-2.5 font-mono">[{r.tpcsPerGpc.join(', ')}]</td>
+      <section className="space-y-4">
+        <h3 className="text-lg font-medium">{t.nvidia}</h3>
+        <div className="overflow-x-auto rounded-lg border border-border/30">
+          <table className="w-full text-sm" aria-label={t.aria} data-testid="tpc-skyline-table">
+            <thead className="text-left whitespace-nowrap text-muted-foreground">
+              <tr>
+                <th scope="col" className="px-4 py-2.5 font-medium">
+                  {t.product}
+                </th>
+                <th scope="col" className="px-4 py-2.5 text-right font-medium">
+                  {t.gpcs}
+                </th>
+                <th scope="col" className="px-4 py-2.5 text-right font-medium">
+                  {t.sms}
+                </th>
+                <th scope="col" className="px-4 py-2.5 font-medium">
+                  {t.grouping}
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <section className="text-xs text-muted-foreground space-y-1">
-        <h3 className="text-sm font-semibold">{t.methodology}</h3>
-        <p>{t.methodologyText}</p>
-        {RESULTS.map((r) => (
-          <p key={r.gpu}>
-            <strong>{r.gpu}:</strong> {r.metadata.gpu} | {t.driver}: {r.metadata.driver} | CUDA:{' '}
-            {r.metadata.cuda} | {t.container}: {r.metadata.container} | {r.gpcCount} GPCs,{' '}
-            {r.tpcCount} TPCs, {r.smCount} SMs
-          </p>
-        ))}
-        {sourceUrls.map((url) => (
-          <p key={url}>
-            {t.source}:{' '}
-            <a href={url} target="_blank" rel="noopener noreferrer" className="underline">
-              {url}
-            </a>
-          </p>
-        ))}
+            </thead>
+            <tbody>
+              {RESULTS.map((r) => (
+                <tr key={r.gpu} className="border-t border-border/30">
+                  <td className="px-4 py-2.5 whitespace-nowrap">{r.gpu}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums">{r.gpcCount}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums">{r.smCount}</td>
+                  <td className="px-4 py-2.5 font-mono whitespace-nowrap">
+                    [{r.tpcsPerGpc.join(', ')}]
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="space-y-1 text-xs text-muted-foreground">
+          <h4 className="text-sm font-medium text-foreground">{t.methodology}</h4>
+          <p>{t.methodologyText}</p>
+          {RESULTS.map((r) => (
+            <p key={r.gpu}>
+              <strong>{r.gpu}:</strong> {r.metadata.gpu} | {t.driver}: {r.metadata.driver} | CUDA:{' '}
+              {r.metadata.cuda} | {t.container}: {r.metadata.container} | {r.gpcCount} GPCs,{' '}
+              {r.tpcCount} TPCs, {r.smCount} SMs
+            </p>
+          ))}
+          {sourceUrls.map((url) => (
+            <p key={url}>
+              {t.source}:{' '}
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="break-all underline"
+              >
+                {url}
+              </a>
+            </p>
+          ))}
+        </div>
       </section>
       <HuaweiSkuConfigurations />
     </div>

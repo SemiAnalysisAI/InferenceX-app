@@ -6,6 +6,9 @@ import { useTheme } from 'next-themes';
 import { isDarkTheme } from '@/lib/themes/themes';
 import { generateVendorColors, getVendor } from '@/lib/charts/dynamic-colors';
 
+import { Card } from '@/components/ui/card';
+import ChartLegend from '@/components/ui/chart-legend';
+import { Heading } from '@/components/ui/heading';
 import {
   Select,
   SelectContent,
@@ -15,6 +18,11 @@ import {
 } from '@/components/ui/select';
 import { track } from '@/lib/analytics/analytics';
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
+import {
+  chartTooltipDismiss,
+  chartTooltipShell,
+  chartTooltipTitle,
+} from '@/lib/d3-chart/tooltip-shell';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { Locale } from '@/lib/i18n/i18n';
 
@@ -39,20 +47,20 @@ const GPU_COLORS: Record<string, string> = {
 
 const STRINGS = {
   en: {
-    pageTitle: 'HBM Bandwidth',
+    pageTitle: 'HBM bandwidth',
     pageSubtitle:
-      'Microbenchmark measuring device-memory copy bandwidth across message sizes on NVIDIA, AMD and Huawei accelerators.',
+      'Microbenchmark measuring device-memory copy bandwidth across message sizes on NVIDIA, AMD and Huawei accelerators',
     protocolNote:
       'Huawei uses amortized rotating-buffer graph timing; NVIDIA/AMD use Triton copy timing. Small-message latency is not directly comparable.',
-    latencyTitle: 'Latency vs Message Size',
+    latencyTitle: 'Latency vs message size',
     latencyY: 'Latency (ms)',
-    mbuTitle: 'Memory Bandwidth Utilization (MBU) vs Message Size',
+    mbuTitle: 'Memory bandwidth utilization (MBU) vs message size',
     mbuY: 'MBU (%)',
-    bwTitle: 'Bandwidth vs Message Size',
+    bwTitle: 'Bandwidth vs message size',
     bwY: 'Bandwidth (TB/s)',
-    xAxis: 'Message Size',
+    xAxis: 'Message size',
     yMetric: 'Y-axis',
-    peakNote: 'MBU uses each device’s peak bandwidth.',
+    peakNote: 'MBU uses each device’s peak bandwidth',
     methodology: 'Methodology',
     methodologyText:
       'NVIDIA/AMD: times b.copy_(a) on float32 tensors using triton.testing.do_bench; bandwidth = 2 * bytes / time (read + write). Power-of-two sizes from 8 B to 16 GiB.',
@@ -62,8 +70,9 @@ const STRINGS = {
       'Huawei MBU uses the 1,638.4 GB/s peak (8 HBM stacks × 256 bits × 6.4 Gbps), which Huawei rounds to 1.6 TB/s.',
     amortized: 'Amortized graph copy time',
     source: 'Source',
-    instructions:
-      'Shift+Scroll to zoom · Drag to pan · Double-click to reset · Click a point to pin tooltip',
+    driver: 'Driver',
+    container: 'Container',
+    instructions: 'Shift+Scroll to zoom · Drag to pan · Double-click to reset',
     dismiss: 'Click elsewhere to dismiss',
     tooltipSize: 'Size',
     tooltipLatency: 'Latency',
@@ -74,7 +83,7 @@ const STRINGS = {
   },
   zh: {
     pageTitle: 'HBM 带宽',
-    pageSubtitle: '测量 NVIDIA、AMD 和 Huawei 加速器在不同消息大小下的显存拷贝带宽。',
+    pageSubtitle: '测量 NVIDIA、AMD 和 Huawei 加速器在不同消息大小下的显存拷贝带宽',
     protocolNote:
       'Huawei 使用轮转缓冲区的图执行摊销计时；NVIDIA/AMD 使用 Triton 拷贝计时。小消息延迟不能直接比较。',
     latencyTitle: '延迟 vs 消息大小',
@@ -85,7 +94,7 @@ const STRINGS = {
     bwY: '带宽（TB/s）',
     xAxis: '消息大小',
     yMetric: 'Y 轴',
-    peakNote: 'MBU 按各设备的峰值带宽计算。',
+    peakNote: 'MBU 按各设备的峰值带宽计算',
     methodology: '测试方法',
     methodologyText:
       'NVIDIA/AMD：使用 triton.testing.do_bench 计时 b.copy_(a)（float32 张量）；带宽 = 2 * bytes / time（读 + 写）。消息大小为 2 的幂次，从 8 B 到 16 GiB。',
@@ -95,7 +104,9 @@ const STRINGS = {
       'Huawei 的 MBU 按峰值带宽 1,638.4 GB/s 计算（8 个 HBM stack × 256 位 × 6.4 Gbps），Huawei 将其取整为 1.6 TB/s。',
     amortized: '摊销后的图拷贝时间',
     source: '数据来源',
-    instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
+    driver: '驱动',
+    container: '容器',
+    instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置',
     dismiss: '点击其他区域关闭',
     tooltipSize: '大小',
     tooltipLatency: '延迟',
@@ -163,40 +174,15 @@ function formatTooltip(
   colors: Record<string, string>,
 ): string {
   const color = colors[point.gpuKey] ?? '#888';
-  return `
-    <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); user-select: ${isPinned ? 'text' : 'none'};">
-      ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>` : ''}
-      <div style="display: flex; align-items: center; gap: 6px; color: var(--foreground); font-size: 12px; font-weight: 600; margin-bottom: 8px;">
-        <span style="display: inline-block; width: 8px; height: 8px; border-radius: 9999px; background: ${color};"></span>${point.gpuKey}
-      </div>
+  return chartTooltipShell(
+    `${isPinned ? chartTooltipDismiss(t.dismiss) : ''}
+      ${chartTooltipTitle(point.gpuKey, color)}
       ${tooltipLine(t.tooltipSize, point.sizeLabel)}
       ${tooltipLine(UBENCHX_RUNS[point.gpuKey].metadata.protocol ? t.amortized : t.tooltipLatency, `${point.timeMs.toFixed(4)} ms`)}
       ${tooltipLine(t.tooltipBandwidth, `${(point.bandwidthGbps / 1000).toFixed(3)} TB/s`)}
       ${tooltipLine(t.tooltipMbu, `${point.mbuPercent.toFixed(1)}%`)}
-      ${tooltipLine(t.tooltipPeak, `${point.peakBandwidthGbps / 1000} TB/s`)}
-    </div>
-  `;
-}
-
-function GpuLegend({
-  gpuKeys,
-  colors,
-}: {
-  gpuKeys: readonly string[];
-  colors: Record<string, string>;
-}) {
-  return (
-    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-      {gpuKeys.map((key) => (
-        <span key={key} className="inline-flex items-center gap-1.5">
-          <span
-            className="inline-block h-2.5 w-2.5 rounded-full shrink-0"
-            style={{ backgroundColor: colors[key] ?? '#888' }}
-          />
-          {key}
-        </span>
-      ))}
-    </div>
+      ${tooltipLine(t.tooltipPeak, `${point.peakBandwidthGbps / 1000} TB/s`)}`,
+    { pinned: isPinned },
   );
 }
 
@@ -220,18 +206,24 @@ function UbenchxChart({
   theme: 'light' | 'dark';
 }) {
   const t = STRINGS[locale];
+  const [legendExpanded, setLegendExpanded] = useState(true);
+  const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
+  const visiblePoints = useMemo(
+    () => allPoints.filter((p) => !hidden.has(p.gpuKey)),
+    [allPoints, hidden],
+  );
 
   const lines = useMemo(() => {
     const result: Record<string, { x: number; y: number }[]> = {};
     for (const key of gpuKeys) {
-      const pts = allPoints
+      const pts = visiblePoints
         .filter((p) => p.gpuKey === key)
         .sort((a, b) => a.x - b.x)
         .map((p) => ({ x: p.x, y: p.y }));
       if (pts.length > 0) result[key] = pts;
     }
     return result;
-  }, [allPoints, gpuKeys]);
+  }, [visiblePoints, gpuKeys]);
 
   const xDomain = useMemo<[number, number]>(() => {
     const xs = allPoints.map((p) => p.x);
@@ -258,7 +250,7 @@ function UbenchxChart({
     <D3Chart<ChartPoint>
       chartId={chartId}
       displayIdentity={theme}
-      data={allPoints}
+      data={visiblePoints}
       height={440}
       margin={{ top: 24, right: 20, bottom: 62, left: 78 }}
       watermark="logo"
@@ -279,8 +271,8 @@ function UbenchxChart({
         tickFormat: (value) => {
           const v = Number(value);
           if (v === 0) return '0';
-          if (v >= 1000) return `${(v / 1000).toFixed(v >= 10000 ? 0 : 1)}k`;
-          if (v >= 1) return v.toFixed(v >= 100 ? 0 : v >= 10 ? 1 : 2);
+          if (v >= 1000) return `${Number((v / 1000).toFixed(v >= 10000 ? 0 : 1))}k`;
+          if (v >= 1) return String(Number(v.toFixed(v >= 100 ? 0 : v >= 10 ? 1 : 2)));
           return String(Number(v.toPrecision(2)));
         },
       }}
@@ -298,7 +290,7 @@ function UbenchxChart({
         {
           type: 'point',
           key: `ubenchx-points-${chartId}`,
-          data: allPoints,
+          data: visiblePoints,
           config: {
             getCx: () => 0,
             getCy: () => 0,
@@ -324,6 +316,27 @@ function UbenchxChart({
         attachToLayer: 1,
         content: (point, isPinned) => formatTooltip(point, isPinned, STRINGS[locale], colors),
       }}
+      legendElement={
+        <ChartLegend
+          variant="sidebar"
+          readOnly
+          disableActiveSort
+          isLegendExpanded={legendExpanded}
+          onExpandedChange={setLegendExpanded}
+          legendItems={gpuKeys.map((key) => ({
+            name: key,
+            label: key,
+            color: colors[key] ?? '#888',
+            isActive: !hidden.has(key),
+            onClick: () =>
+              setHidden((prev) => {
+                const next = new Set(prev);
+                if (!next.delete(key)) next.add(key);
+                return next;
+              }),
+          }))}
+        />
+      }
     />
   );
 }
@@ -360,7 +373,7 @@ export function UbenchxContent() {
   );
 
   if (viewResults.length === 0) {
-    return <p className="text-sm text-muted-foreground">No data available.</p>;
+    return <p className="text-sm text-muted-foreground">No data available</p>;
   }
 
   const gpuKeys = viewResults.map((r) => r.gpu);
@@ -370,16 +383,13 @@ export function UbenchxContent() {
   return (
     <div className="space-y-8" role="group" aria-label={t.aria}>
       <div>
-        <h2 className="text-xl font-semibold tracking-tight">{t.pageTitle}</h2>
-        <p className="text-sm text-muted-foreground mt-1">{t.pageSubtitle}</p>
-        <p className="text-sm text-muted-foreground mt-2">{t.protocolNote}</p>
+        <Heading level="section">{t.pageTitle}</Heading>
+        <p className="mt-1 text-sm text-muted-foreground">{t.pageSubtitle}</p>
+        <p className="mt-2 text-sm text-muted-foreground">{t.protocolNote}</p>
       </div>
 
-      <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
-        <label
-          htmlFor="ubenchx-metric-select"
-          className="text-sm font-medium text-muted-foreground"
-        >
+      <div className="flex flex-col space-y-1.5 sm:w-72">
+        <label htmlFor="ubenchx-metric-select" className="text-sm font-medium">
           {t.yMetric}
         </label>
         <Select
@@ -391,7 +401,7 @@ export function UbenchxContent() {
         >
           <SelectTrigger
             id="ubenchx-metric-select"
-            className="w-full sm:w-[240px]"
+            className="w-full"
             data-testid="ubenchx-metric-select"
           >
             <SelectValue />
@@ -406,11 +416,11 @@ export function UbenchxContent() {
         </Select>
       </div>
 
-      <GpuLegend gpuKeys={gpuKeys} colors={colors} />
-
-      <section>
-        <h2 className="text-lg font-semibold mb-2">{t[metric.title]}</h2>
-        {metric.key === 'mbu' && <p className="text-xs text-muted-foreground mb-1">{t.peakNote}</p>}
+      <Card className="gap-2">
+        <div>
+          <Heading level="card">{t[metric.title]}</Heading>
+          {metric.key === 'mbu' && <p className="text-xs text-muted-foreground">{t.peakNote}</p>}
+        </div>
         <UbenchxChart
           key={metric.key}
           chartId={`ubenchx-${metric.key}`}
@@ -422,27 +432,27 @@ export function UbenchxContent() {
           colors={colors}
           theme={theme}
         />
-      </section>
+      </Card>
 
-      <section className="text-xs text-muted-foreground space-y-1">
-        <h3 className="text-sm font-semibold">{t.methodology}</h3>
+      <section className="space-y-1 text-xs text-muted-foreground wrap-break-word">
+        <h3 className="text-sm font-medium text-foreground">{t.methodology}</h3>
         <p>{t.methodologyText}</p>
         <p>{t.huaweiMethodology}</p>
         <p>{t.huaweiReference}</p>
         {viewResults.map((r) => (
           <p key={r.gpu}>
-            <strong>{r.gpu}:</strong> {r.metadata.gpu} | Driver: {r.metadata.driver} | PyTorch:{' '}
+            <strong>{r.gpu}:</strong> {r.metadata.gpu} | {t.driver}: {r.metadata.driver} | PyTorch:{' '}
             {r.metadata.torch} |{' '}
             {r.metadata.cann
               ? `CANN: ${r.metadata.cann} | torch_npu: ${r.metadata.torchNpu}`
-              : `Triton: ${r.metadata.triton} | Container: ${r.metadata.container}`}{' '}
-            |{r.peakBandwidthGbps / 1000} TB/s
+              : `Triton: ${r.metadata.triton} | ${t.container}: ${r.metadata.container}`}{' '}
+            | {r.peakBandwidthGbps / 1000} TB/s
           </p>
         ))}
         {sourceUrls.map((url) => (
           <p key={url}>
             {t.source}:{' '}
-            <a href={url} target="_blank" rel="noopener noreferrer" className="underline">
+            <a href={url} target="_blank" rel="noopener noreferrer" className="break-all underline">
               {url}
             </a>
           </p>

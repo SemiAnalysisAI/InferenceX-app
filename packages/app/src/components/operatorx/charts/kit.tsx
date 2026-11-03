@@ -4,6 +4,7 @@ import { useId, useRef, useState } from 'react';
 
 import ChartLegend from '@/components/ui/chart-legend';
 import { D3Chart, type D3ChartHandle, type D3ChartProps } from '@/lib/d3-chart/D3Chart';
+import { chartTooltipShell, chartTooltipTitle } from '@/lib/d3-chart/tooltip-shell';
 import { escapeHtml } from '@/lib/shared/utils';
 
 import { hardwareLabel } from '../compare/hardware';
@@ -66,11 +67,14 @@ export function tooltipHtml({
   rows: string[];
   footer?: string;
 }): string {
-  return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 180px; max-width: 360px">
-    <div class="font-semibold mb-1"${color ? ` style="color: ${color}"` : ''}>${escapeHtml(title)}</div>
+  return chartTooltipShell(
+    `<div class="text-xs">
+    ${chartTooltipTitle(escapeHtml(title), color)}
     ${rows.map((r) => `<div>${r}</div>`).join('')}
     ${footer ? `<div class="mt-1 text-muted-foreground">${escapeHtml(footer)}</div>` : ''}
-  </div>`;
+  </div>`,
+    { minWidth: 180, maxWidth: 360 },
+  );
 }
 
 export const esc = escapeHtml;

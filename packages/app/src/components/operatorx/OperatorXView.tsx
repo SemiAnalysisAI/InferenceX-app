@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 
 import { Card } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Heading } from '@/components/ui/heading';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useOperatorXModel } from '@/hooks/api/use-operatorx';
@@ -62,9 +63,14 @@ export default function OperatorXView() {
       data-testid="operatorx-page"
     >
       <Card>
-        <Heading as="h1" level="card">
-          {locale === 'zh' ? 'OperatorX（实验性 Beta）' : 'OperatorX (Experimental Beta)'}
-        </Heading>
+        <div className="flex items-baseline gap-2">
+          <Heading as="h1" level="card">
+            OperatorX
+          </Heading>
+          <span className="text-xs text-muted-foreground" data-testid="operatorx-maturity">
+            {locale === 'zh' ? '实验性' : 'Experimental'}
+          </span>
+        </div>
         <TabsList className="mt-4">
           {CATEGORIES.map((c) => (
             <TabsTrigger key={c.value} value={c.value}>
@@ -75,9 +81,11 @@ export default function OperatorXView() {
       </Card>
       {CATEGORIES.map((c) => (
         <TabsContent key={c.value} value={c.value}>
-          {c.value === 'model'
-            ? category === c.value && <ModelViewTab />
-            : category === c.value && <ComparisonDashboard op={c.value} />}
+          {c.value === 'attention' ? (
+            <EmptyState>{locale === 'zh' ? '暂无结果' : 'No results yet'}</EmptyState>
+          ) : (
+            category === c.value && <ComparisonDashboard op={c.value} />
+          )}
         </TabsContent>
       ))}
     </Tabs>

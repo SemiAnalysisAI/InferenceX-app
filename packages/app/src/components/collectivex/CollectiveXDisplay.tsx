@@ -5,9 +5,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { GITHUB_REPO_FULL } from '@semianalysisai/inferencex-constants';
 
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { Card } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Heading } from '@/components/ui/heading';
 import ChartLegend from '@/components/ui/chart-legend';
 import { Label } from '@/components/ui/label';
@@ -19,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Stat } from '@/components/ui/stat';
 import { useCollectiveXRunDatasets, useCollectiveXRuns } from '@/hooks/api/use-collectivex';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { track } from '@/lib/analytics/analytics';
@@ -100,16 +102,12 @@ const STRINGS = {
       'payload-rate': 'Payload bandwidth at selected latency percentile (per chip)',
     },
     all: 'All',
-    loading: 'Resolving CollectiveX run...',
+    loading: 'Resolving CollectiveX run…',
     unavailable: 'CollectiveX run unavailable',
-    loadError: 'The CollectiveX dataset failed to load.',
+    loadError: 'The CollectiveX dataset failed to load',
     retry: 'Retry',
-    description: (
-      <>
-        Compare EP communication, KV-cache transfer, and vLLM <SwapBlocksName /> latency and payload
-        bandwidth.
-      </>
-    ),
+    description:
+      'Compare EP communication, KV-cache transfer, and vLLM swap_blocks latency and payload bandwidth',
     source: 'Source',
     methodology: 'Methodology',
     refresh: 'Refresh',
@@ -120,8 +118,8 @@ const STRINGS = {
     version: 'Benchmark version',
     suiteControl: 'Suites',
     suiteAria: 'Choose which CollectiveX suite to show',
-    selectRuns: 'No CollectiveX results are stored yet.',
-    selectedRunsFailed: 'One or more selected runs failed to load.',
+    selectRuns: 'No CollectiveX results are stored yet',
+    selectedRunsFailed: 'One or more selected runs failed to load',
     runControl: 'Run',
     loadRuns: 'Load runs',
     loadingRuns: 'Loading runs…',
@@ -150,7 +148,7 @@ const STRINGS = {
     tokenRateOption: 'Token rate',
     activationRateOption: 'Activation rate',
     payloadRateOption: 'Payload BW / chip',
-    noSeries: 'No measured series match these filters.',
+    noSeries: 'No measured series match these filters',
     resetFilter: 'Reset filter',
     payloadNote:
       'Activation-data rate is derived at the selected latency percentile and is not physical link bandwidth.',
@@ -158,8 +156,6 @@ const STRINGS = {
       'Payload bandwidth is the full logical payload (incl. FP8 scale bytes) ÷ latency, per chip — a derived rate over logical bytes, not physical link bandwidth. The tooltip β/α is a least-squares fit of latency vs bytes across the ladder (β = per-chip bandwidth term, α = fixed overhead).',
     atLatency: (percentile: string) => `at ${percentile} latency`,
     chartControlsHeading: 'Chart filters',
-    chartControlsDescription:
-      'Choose the measured slice and display metric for the explorer below.',
   },
   zh: {
     operation: {
@@ -187,13 +183,9 @@ const STRINGS = {
     all: '全部',
     loading: '正在加载 CollectiveX 运行数据……',
     unavailable: 'CollectiveX 运行暂不可用',
-    loadError: 'CollectiveX 数据集加载失败。',
+    loadError: 'CollectiveX 数据集加载失败',
     retry: '重试',
-    description: (
-      <>
-        对比 EP 通信、KV 缓存传输及 vLLM <SwapBlocksName /> 的延迟与有效载荷带宽。
-      </>
-    ),
+    description: '对比 EP 通信、KV 缓存传输及 vLLM swap_blocks 的延迟与有效载荷带宽',
     source: '源代码',
     methodology: '测试方法',
     refresh: '刷新',
@@ -204,8 +196,8 @@ const STRINGS = {
     version: '基准版本',
     suiteControl: '测试套件',
     suiteAria: '选择要显示的 CollectiveX 测试套件',
-    selectRuns: '尚未保存任何 CollectiveX 结果。',
-    selectedRunsFailed: '至少一个所选运行加载失败。',
+    selectRuns: '尚未保存任何 CollectiveX 结果',
+    selectedRunsFailed: '至少一个所选运行加载失败',
     runControl: '运行',
     loadRuns: '加载运行',
     loadingRuns: '正在加载运行……',
@@ -233,14 +225,13 @@ const STRINGS = {
     tokenRateOption: 'Token 速率',
     activationRateOption: '激活数据速率',
     payloadRateOption: '每芯片载荷带宽',
-    noSeries: '没有实测序列符合当前筛选条件。',
+    noSeries: '没有实测序列符合当前筛选条件',
     resetFilter: '重置筛选',
     payloadNote: '逻辑载荷速率按所选延迟分位点派生，不代表物理链路带宽。',
     payloadBandwidthNote:
       '载荷带宽为完整逻辑载荷（含 FP8 缩放字节）÷ 延迟（每芯片），是基于逻辑字节的派生速率，不代表物理链路带宽。工具提示中的 β/α 根据各 token 档位下的字节数与延迟做最小二乘拟合（β = 每芯片带宽项，α = 固定开销）。',
     atLatency: (percentile: string) => `${percentile} 延迟分位点`,
     chartControlsHeading: '图表筛选',
-    chartControlsDescription: '选择下方图表要展示的测量切片和指标。',
   },
 } as const;
 
@@ -554,20 +545,20 @@ export default function CollectiveXDisplay() {
 
   if (runsQuery.isLoading) {
     return (
-      <Card data-testid="collectivex-loading" className="min-h-svh items-center justify-center">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
-        <p className="mt-3 text-sm text-muted-foreground">{t.loadingRuns}</p>
-      </Card>
+      <EmptyState data-testid="collectivex-loading" className="min-h-svh">
+        <Loader2 className="mx-auto size-6 animate-spin" />
+        <p className="mt-3">{t.loadingRuns}</p>
+      </EmptyState>
     );
   }
   if (runsQuery.error || !runsQuery.data) {
     return (
-      <Card data-testid="collectivex-error" className="border-destructive">
+      <Card data-testid="collectivex-error" className="border-destructive/30">
         <Heading as="h1" level="card">
           {t.unavailable}
         </Heading>
         <p className="mt-2 text-sm text-destructive">{t.loadError}</p>
-        <div className="mt-4 flex flex-wrap items-center gap-3">
+        <div className="mt-4 flex flex-wrap items-end gap-3">
           <div className="min-w-32">
             <SelectControl
               label={t.version}
@@ -661,9 +652,9 @@ export default function CollectiveXDisplay() {
                       source_sha: singleDataset.run.source_sha,
                     })
                   }
-                  className="inline-flex h-11 items-center gap-1.5 rounded-md border px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:h-8"
+                  className={buttonVariants({ variant: 'outline', size: 'xs' })}
                 >
-                  {t.source} <ExternalLink className="size-3.5" />
+                  {t.source} <ExternalLink />
                 </a>
                 <a
                   data-testid="collectivex-methodology-link"
@@ -675,53 +666,46 @@ export default function CollectiveXDisplay() {
                       source_sha: singleDataset.run.source_sha,
                     })
                   }
-                  className="inline-flex h-11 items-center gap-1.5 rounded-md border px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:h-8"
+                  className={buttonVariants({ variant: 'outline', size: 'xs' })}
                 >
-                  <BookOpen className="size-3.5" /> {t.methodology}
+                  <BookOpen /> {t.methodology}
                 </a>
               </>
             )}
-            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isFetching}>
-              {isFetching ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <RefreshCw className="size-4" />
-              )}
+            <Button variant="outline" size="xs" onClick={handleRefresh} disabled={isFetching}>
+              {isFetching ? <Loader2 className="animate-spin" /> : <RefreshCw />}
               {t.refresh}
             </Button>
           </div>
         </div>
         {(datasets.length > 0 || orderedVisibleRunIds.length > 0) && (
-          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <Stat value={datasets.length > 0 ? seriesCount : '-'} label={t.seriesCount} />
+          <dl className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <Stat size="lg" value={datasets.length > 0 ? seriesCount : '-'} label={t.seriesCount} />
             <Stat
+              size="lg"
               value={datasets.length > 0 ? `${measuredCases}/${requestedCases}` : '-'}
               label={t.measuredCases}
             />
             <Stat
+              size="lg"
               value={datasets.length > 0 ? `${terminalCases}/${requestedCases}` : '-'}
               label={t.terminalCases}
             />
-          </div>
+          </dl>
         )}
       </Card>
 
       {orderedVisibleRunIds.length === 0 && (
-        <Card data-testid="collectivex-no-runs-selected" className="py-6 text-center">
-          <p className="text-sm text-muted-foreground">{t.selectRuns}</p>
-        </Card>
+        <EmptyState data-testid="collectivex-no-runs-selected">{t.selectRuns}</EmptyState>
       )}
       {orderedVisibleRunIds.length > 0 && datasets.length === 0 && loadingRunIds.size > 0 && (
-        <Card
-          data-testid="collectivex-selected-runs-loading"
-          className="min-h-40 items-center justify-center"
-        >
-          <Loader2 className="size-6 animate-spin text-muted-foreground" />
-          <p className="mt-3 text-sm text-muted-foreground">{t.loading}</p>
-        </Card>
+        <EmptyState data-testid="collectivex-selected-runs-loading" className="min-h-40">
+          <Loader2 className="mx-auto size-6 animate-spin" />
+          <p className="mt-3">{t.loading}</p>
+        </EmptyState>
       )}
       {selectedRunErrors > 0 && (
-        <Card data-testid="collectivex-selected-runs-error" className="border-destructive py-4">
+        <Card data-testid="collectivex-selected-runs-error" className="border-destructive/30 py-4">
           <p className="text-sm text-destructive">{t.selectedRunsFailed}</p>
         </Card>
       )}
@@ -737,15 +721,12 @@ export default function CollectiveXDisplay() {
           {shownSuite === 'ep' && (
             <>
               {phaseSeries.length === 0 && (
-                <Card data-testid="collectivex-empty-state" className="py-4">
-                  <p className="text-sm text-muted-foreground">{t.noSeries}</p>
-                </Card>
+                <EmptyState data-testid="collectivex-empty-state">{t.noSeries}</EmptyState>
               )}
               <Card className="relative z-10 py-4 md:py-5" data-testid="collectivex-chart-filters">
-                <div className="mb-4">
-                  <Heading level="card">{t.chartControlsHeading}</Heading>
-                  <p className="mt-1 text-sm text-muted-foreground">{t.chartControlsDescription}</p>
-                </div>
+                <Heading level="card" className="mb-4">
+                  {t.chartControlsHeading}
+                </Heading>
                 <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
                   <SelectControl
                     label={t.epControl}
@@ -980,23 +961,6 @@ export default function CollectiveXDisplay() {
       <CollectiveXSupportMatrices series={combinedSeries} />
       <CollectiveXChangelog version={version} />
     </section>
-  );
-}
-
-function Stat({
-  value,
-  label,
-  compact = false,
-}: {
-  value: React.ReactNode;
-  label: string;
-  compact?: boolean;
-}) {
-  return (
-    <div>
-      <p className={compact ? 'text-sm font-semibold' : 'text-2xl font-semibold'}>{value}</p>
-      <p className="text-xs text-muted-foreground">{label}</p>
-    </div>
   );
 }
 

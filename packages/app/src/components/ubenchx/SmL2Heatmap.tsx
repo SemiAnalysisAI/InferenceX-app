@@ -2,17 +2,29 @@
 
 import * as d3 from 'd3';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { Locale } from '@/lib/i18n/i18n';
+import {
+  CHART_TOOLTIP_Z_INDEX,
+  placeFloatingTooltip,
+  stickyHeaderBottom,
+} from '@/lib/d3-chart/tooltip-placement';
+import {
+  chartTooltipDismiss,
+  chartTooltipShell,
+  chartTooltipTitle,
+} from '@/lib/d3-chart/tooltip-shell';
+import { Stat } from '@/components/ui/stat';
 
 import { SM_L2_RUNS } from './sm-l2-data';
 import { transformSmL2Run, type SmL2ViewResult } from './sm-l2-transform';
 
 const STRINGS = {
   en: {
-    heatmapTitle: 'SM-SM L2 Latency Difference',
+    heatmapTitle: 'SM-SM L2 latency difference',
     colorBarLabel: 'mean |diff| per address (clock64 cycles)',
     tooltipSm: 'SM',
     tooltipGpc: 'GPC',
@@ -21,6 +33,7 @@ const STRINGS = {
     tooltipDismiss: 'Click elsewhere to dismiss',
     tooltipRow: 'row',
     tooltipCol: 'column',
+    cycles: 'cycles',
     methodology: 'Methodology',
     methodologyText:
       'Each SM walks a linked list through L2 cache lines, recording per-hop latency with clock64(). Each cell is the mean absolute difference between two SMs’ matched-address latency profiles, not direct SM-to-SM communication latency or a physical distance.',
@@ -28,8 +41,10 @@ const STRINGS = {
     statsInterGpc: 'Inter-GPC (same die) mean',
     statsCrossDie: 'Cross-die mean',
     source: 'Source',
+    driver: 'Driver',
+    container: 'Container',
     aria: 'ubenchX SM-SM L2 latency difference heatmap',
-    noData: 'No SM-L2 distance data available.',
+    noData: 'No SM-L2 distance data available',
   },
   zh: {
     heatmapTitle: 'SM 间 L2 延迟差异',
@@ -41,6 +56,7 @@ const STRINGS = {
     tooltipDismiss: '点击其他区域关闭',
     tooltipRow: '行',
     tooltipCol: '列',
+    cycles: '周期',
     methodology: '测试方法',
     methodologyText:
       '每个 SM 沿链表遍历 L2 缓存行，并用 clock64() 记录每跳延迟。每个单元格表示两个 SM 在相同地址上测得的延迟特征之间的平均绝对差，既不是 SM 间直接通信延迟，也不是物理距离。',
@@ -48,8 +64,10 @@ const STRINGS = {
     statsInterGpc: '跨 GPC（同 die）平均',
     statsCrossDie: '跨 die 平均',
     source: '数据来源',
+    driver: '驱动',
+    container: '容器',
     aria: 'ubenchX SM 间 L2 延迟差异热力图',
-    noData: '暂无 SM-L2 距离数据。',
+    noData: '暂无 SM-L2 距离数据',
   },
 } as const;
 
@@ -61,6 +79,8 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
   const svgRef = useRef<SVGSVGElement | null>(null);
   const tooltipRef = useRef<HTMLDivElement | null>(null);
   const [pinnedCell, setPinnedCell] = useState<{ i: number; j: number } | null>(null);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const n = result.numSms;
   const colorScale = useMemo(
@@ -78,8 +98,8 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
 
     const marginLeft = 60;
     const marginTop = 20;
-    const marginRight = 70;
-    const marginBottom = 30;
+    const marginRight = 80;
+    const marginBottom = 8;
     const availWidth = containerWidth - marginLeft - marginRight;
     const cellSize = Math.max(MIN_CELL, Math.min(MAX_CELL, Math.floor(availWidth / n)));
     const chartSize = cellSize * n;
@@ -128,19 +148,20 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
         .attr('y', -6)
         .attr('text-anchor', 'middle')
         .attr('fill', 'var(--muted-foreground)')
-        .attr('font-size', '10px')
-        .attr('font-weight', 'bold')
+        .attr('font-size', '11px')
+        .attr('font-weight', 500)
         .text('Die A');
       g.append('text')
         .attr('x', sep + ((n - dieASms) * cellSize) / 2)
         .attr('y', -6)
         .attr('text-anchor', 'middle')
         .attr('fill', 'var(--muted-foreground)')
-        .attr('font-size', '10px')
-        .attr('font-weight', 'bold')
+        .attr('font-size', '11px')
+        .attr('font-weight', 500)
         .text('Die B');
     }
 
+    let lastLabelY = Number.NEGATIVE_INFINITY;
     for (const bound of result.gpcBounds) {
       const x = bound.start * cellSize;
       const y = bound.start * cellSize;
@@ -155,14 +176,15 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
         .attr('stroke', '#aaaaaa')
         .attr('stroke-width', 1);
       const mid = ((bound.start + bound.end) / 2) * cellSize;
+      if (mid - lastLabelY < 12) continue;
+      lastLabelY = mid;
       g.append('text')
         .attr('x', -4)
         .attr('y', mid)
         .attr('text-anchor', 'end')
         .attr('dominant-baseline', 'middle')
-        .attr('fill', '#aaaaaa')
-        .attr('font-size', '7px')
-        .attr('font-weight', 'bold')
+        .attr('fill', 'var(--muted-foreground)')
+        .attr('font-size', '10px')
         .text(`GPC${bound.gpc}${isPartial ? '*' : ''}`);
     }
 
@@ -190,16 +212,15 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
         .attr('y', ty)
         .attr('dominant-baseline', 'middle')
         .attr('fill', 'var(--muted-foreground)')
-        .attr('font-size', '8px')
+        .attr('font-size', '10px')
         .text(tv.toFixed(0));
     }
     barG
       .append('text')
-      .attr('x', barWidth / 2)
-      .attr('y', barHeight + 16)
+      .attr('transform', `translate(${barWidth + 36}, ${barHeight / 2}) rotate(90)`)
       .attr('text-anchor', 'middle')
       .attr('fill', 'var(--muted-foreground)')
-      .attr('font-size', '8px')
+      .attr('font-size', '10px')
       .text(t.colorBarLabel);
 
     const crosshairG = g.append('g').attr('class', 'crosshair').style('pointer-events', 'none');
@@ -220,33 +241,37 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
       const val = result.matrix[i][j];
       const color = i === j ? 'var(--muted-foreground)' : colorScale(val);
 
-      tooltip.innerHTML = `
-        <div style="background: var(--popover); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); user-select: ${pinned ? 'text' : 'none'}; max-width: 240px;">
-          ${pinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.tooltipDismiss}</div>` : ''}
-          <div style="display: flex; align-items: center; gap: 6px; color: var(--foreground); font-size: 12px; font-weight: 600; margin-bottom: 8px;">
-            <span style="display: inline-block; width: 8px; height: 8px; border-radius: 9999px; background: ${color};"></span>
-            ${val.toFixed(1)} cycles
-          </div>
+      tooltip.innerHTML = chartTooltipShell(
+        `${pinned ? chartTooltipDismiss(t.tooltipDismiss) : ''}
+          ${chartTooltipTitle(`${val.toFixed(1)} ${t.cycles}`, color)}
           <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
             <strong>${t.tooltipSm} (${t.tooltipRow}):</strong> ${infoI.sm} &middot; ${t.tooltipGpc} ${infoI.gpc} &middot; ${t.tooltipDie} ${infoI.die}
           </div>
           <div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;">
             <strong>${t.tooltipSm} (${t.tooltipCol}):</strong> ${infoJ.sm} &middot; ${t.tooltipGpc} ${infoJ.gpc} &middot; ${t.tooltipDie} ${infoJ.die}
-          </div>
-        </div>
-      `;
+          </div>`,
+        { pinned, maxWidth: 240 },
+      );
       tooltip.style.display = 'block';
     };
 
     const positionTooltip = (event: MouseEvent) => {
       const tooltip = tooltipRef.current;
-      const svgEl = svgRef.current;
-      if (!tooltip || !svgEl) return;
-      const svgRect = svgEl.getBoundingClientRect();
-      const x = event.clientX - svgRect.left + 16;
-      const y = event.clientY - svgRect.top - 10;
-      tooltip.style.left = `${x}px`;
-      tooltip.style.top = `${y}px`;
+      if (!tooltip) return;
+      const root = document.documentElement;
+      const { left, top } = placeFloatingTooltip({
+        x: event.clientX,
+        y: event.clientY,
+        width: tooltip.offsetWidth,
+        height: tooltip.offsetHeight,
+        offset: 16,
+        placement: 'below',
+        viewportWidth: root.clientWidth || window.innerWidth,
+        viewportHeight: root.clientHeight || window.innerHeight,
+        headerBottom: stickyHeaderBottom(),
+      });
+      tooltip.style.left = `${left}px`;
+      tooltip.style.top = `${top}px`;
     };
 
     const drawCrosshair = (i: number, j: number) => {
@@ -320,7 +345,10 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
     if (!pinnedCell) return;
     const handler = (e: MouseEvent) => {
       const svgEl = svgRef.current;
-      if (svgEl && !svgEl.contains(e.target as Node)) {
+      const target = e.target as Node;
+      // The pinning click redraws the cells, so its target is already detached when this runs.
+      if (!target.isConnected) return;
+      if (svgEl && !svgEl.contains(target)) {
         setPinnedCell(null);
         const tooltip = tooltipRef.current;
         if (tooltip) tooltip.style.display = 'none';
@@ -333,12 +361,16 @@ function SmL2HeatmapChart({ result, locale }: { result: SmL2ViewResult; locale: 
   return (
     <div className="relative w-full overflow-x-auto" data-testid="sm-l2-heatmap">
       <svg ref={svgRef} className="block" />
-      <div
-        ref={tooltipRef}
-        data-testid="sm-l2-tooltip"
-        className="absolute z-50 pointer-events-none"
-        style={{ display: 'none' }}
-      />
+      {mounted &&
+        createPortal(
+          <div
+            ref={tooltipRef}
+            data-testid="sm-l2-tooltip"
+            className="pointer-events-none fixed"
+            style={{ display: 'none', zIndex: CHART_TOOLTIP_Z_INDEX }}
+          />,
+          document.body,
+        )}
     </div>
   );
 }
@@ -366,38 +398,29 @@ export function SmL2Content({ gpu = 'all' }: { gpu?: string }) {
     <div className="space-y-8" role="group" aria-label={t.aria}>
       {results.map(({ key, view }) => (
         <section key={key}>
-          <h2 className="text-lg font-semibold mb-2">
+          <h2 className="mb-2 text-lg font-medium">
             {key}: {t.heatmapTitle}
           </h2>
           <SmL2HeatmapChart result={view} locale={locale} />
 
-          <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-muted-foreground">
-            <div className="rounded-md border p-3">
-              <div className="font-medium">{t.statsIntraGpc}</div>
-              <div className="text-foreground text-sm font-semibold">
-                {view.stats.intraGpcMean.toFixed(1)} cycles
-              </div>
-            </div>
-            <div className="rounded-md border p-3">
-              <div className="font-medium">{t.statsInterGpc}</div>
-              <div className="text-foreground text-sm font-semibold">
-                {view.stats.interGpcSameDieMean.toFixed(1)} cycles
-              </div>
-            </div>
-            <div className="rounded-md border p-3">
-              <div className="font-medium">{t.statsCrossDie}</div>
-              <div className="text-foreground text-sm font-semibold">
-                {view.stats.crossDieMean.toFixed(1)} cycles
-              </div>
-            </div>
-          </div>
+          <dl className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {(
+              [
+                [t.statsIntraGpc, view.stats.intraGpcMean],
+                [t.statsInterGpc, view.stats.interGpcSameDieMean],
+                [t.statsCrossDie, view.stats.crossDieMean],
+              ] as const
+            ).map(([label, value]) => (
+              <Stat key={label} label={label} value={`${value.toFixed(1)} ${t.cycles}`} />
+            ))}
+          </dl>
 
-          <div className="mt-4 text-xs text-muted-foreground space-y-1">
-            <h3 className="text-sm font-semibold">{t.methodology}</h3>
+          <div className="mt-4 space-y-1 text-xs text-muted-foreground">
+            <h3 className="text-sm font-medium text-foreground">{t.methodology}</h3>
             <p>{t.methodologyText}</p>
             <p>
-              <strong>{key}:</strong> {view.metadata.gpu} | Driver: {view.metadata.driver} | CUDA:{' '}
-              {view.metadata.cuda} | Container: {view.metadata.container}
+              <strong>{key}:</strong> {view.metadata.gpu} | {t.driver}: {view.metadata.driver} |
+              CUDA: {view.metadata.cuda} | {t.container}: {view.metadata.container}
             </p>
             <p>
               {t.source}:{' '}

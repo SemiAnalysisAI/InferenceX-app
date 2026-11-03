@@ -27,7 +27,7 @@ const STRINGS = {
     measured:
       'Our core-profile experiments cover PR_9579: 28 Cube and 56 Vector cores, with 14 Cube and 28 Vector IDs observed in each of two die groups. This grouping must not be extrapolated to other SKUs; the table alone does not identify enabled core IDs or physical placement.',
     profiles: 'View measured PR_9579 core profiles',
-    scroll: 'Scroll horizontally to view all configuration columns.',
+    scroll: 'Scroll horizontally to view all configuration columns',
   },
   zh: {
     title: 'Huawei 950PR SKU 配置',
@@ -50,7 +50,7 @@ const STRINGS = {
     measured:
       '我们的核心访存实验覆盖 PR_9579：共 28 个 Cube 核心、56 个 Vector 核心，在两个 die 分组中各观察到 14 个 Cube 和 28 个 Vector 核心 ID。不能将这一分组推广到其他 SKU；仅凭配置表无法确定启用的核心 ID 或物理位置。',
     profiles: '查看 PR_9579 实测核心访存特征',
-    scroll: '横向滚动可查看全部配置列。',
+    scroll: '横向滚动可查看全部配置列',
   },
 } as const;
 
@@ -58,24 +58,27 @@ export function HuaweiSkuConfigurations() {
   const locale = useLocale();
   const t = STRINGS[locale];
   return (
-    <section className="space-y-4 border-t pt-8" data-testid="huawei-sku-configurations">
-      <h3 className="text-xl font-semibold tracking-tight">{t.title}</h3>
-      <p className="text-sm text-muted-foreground max-w-4xl">{t.intro}</p>
+    <section
+      className="space-y-4 border-t border-border/30 pt-8"
+      data-testid="huawei-sku-configurations"
+    >
+      <h3 className="text-lg font-medium">{t.title}</h3>
+      <p className="max-w-4xl text-sm text-muted-foreground">{t.intro}</p>
       <p className="text-xs text-muted-foreground lg:hidden">{t.scroll}</p>
       <div
-        className="overflow-x-auto rounded-lg border"
+        className="overflow-x-auto rounded-lg border border-border/30"
         tabIndex={0}
         role="region"
         aria-label={t.title}
       >
         <table className="w-full text-sm" data-testid="huawei-sku-table">
-          <thead className="bg-muted/50">
+          <thead className="text-muted-foreground">
             <tr>
-              {t.columns.map((label) => (
+              {t.columns.map((label, index) => (
                 <th
                   key={label}
                   scope="col"
-                  className="px-4 py-3 text-left font-semibold whitespace-nowrap"
+                  className={`px-4 py-2.5 font-medium whitespace-nowrap ${index > 0 && index < t.columns.length - 1 ? 'text-right' : 'text-left'}`}
                 >
                   {label}
                 </th>
@@ -89,14 +92,16 @@ export function HuaweiSkuConfigurations() {
                 data-sku={row.sku}
                 className={
                   row.hasCoreProfileMeasurements
-                    ? 'border-t bg-amber-50 dark:bg-amber-950/30'
-                    : 'border-t'
+                    ? 'border-t border-border/30 bg-muted/20'
+                    : 'border-t border-border/30'
                 }
               >
-                <th scope="row" className="px-4 py-3 text-left whitespace-nowrap font-medium">
+                <th scope="row" className="px-4 py-2.5 text-left whitespace-nowrap font-medium">
                   {row.sku}
                   {row.hasCoreProfileMeasurements && (
-                    <span className="block text-xs text-muted-foreground mt-1">{t.tested}</span>
+                    <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                      {t.tested}
+                    </span>
                   )}
                 </th>
                 {[
@@ -109,7 +114,10 @@ export function HuaweiSkuConfigurations() {
                   row.ddrRate.base,
                   row.virtualisationOptions.join(', '),
                 ].map((value, index) => (
-                  <td key={index} className="px-4 py-3 tabular-nums whitespace-nowrap">
+                  <td
+                    key={index}
+                    className={`px-4 py-2.5 tabular-nums whitespace-nowrap ${index < 7 ? 'text-right' : ''}`}
+                  >
                     {value}
                   </td>
                 ))}
@@ -119,7 +127,7 @@ export function HuaweiSkuConfigurations() {
         </table>
       </div>
       <p className="text-xs text-muted-foreground">{t.notes}</p>
-      <div className="border-l-2 border-amber-600 dark:border-amber-400 pl-4 space-y-2">
+      <div className="space-y-2 rounded-lg bg-muted/30 px-4 py-3">
         <p className="text-sm max-w-4xl">{t.measured}</p>
         <Link
           href={`${locale === 'zh' ? '/zh' : ''}/ubenchx/core-memory-profiles`}

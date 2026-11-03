@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Heading } from '@/components/ui/heading';
 
 const STRINGS = {
   en: {
@@ -44,7 +45,7 @@ const STRINGS = {
     methodology: 'Methodology',
     selected: 'Core pair',
     pinned: 'Pinned core pair',
-    sharedScale: 'All four panels use the same color scale.',
+    sharedScale: 'All four panels use the same color scale',
   },
   zh: {
     noPairs: '无核心对',
@@ -70,7 +71,7 @@ const STRINGS = {
     methodology: '测试方法',
     selected: '核心对',
     pinned: '已固定的核心对',
-    sharedScale: '四幅图使用相同的色标范围。',
+    sharedScale: '四幅图使用相同的色标范围',
   },
 } as const;
 
@@ -136,13 +137,13 @@ function Panel({ panel, max, text }: { panel: CoreProfilePanel; max: number; tex
   };
   return (
     <section ref={panelRef} className="space-y-2 min-w-0" data-testid={id}>
-      <h3 className="text-base font-semibold">
+      <h3 className="text-sm font-medium">
         {panel.coreType === 'cube' ? 'Cube' : 'Vector'} · {text[panel.launchMode]}
       </h3>
       <svg
         ref={svgRef}
         viewBox="0 0 420 420"
-        className="w-full"
+        className="w-full max-w-md"
         role="img"
         tabIndex={0}
         aria-label={`${panel.coreType}, ${text[panel.launchMode]}, ${text.units}`}
@@ -218,7 +219,7 @@ function Panel({ panel, max, text }: { panel: CoreProfilePanel; max: number; tex
           stroke="var(--muted-foreground)"
         />
         {ticks.map((i) => (
-          <g key={i} className="text-xs" fill="currentColor">
+          <g key={i} className="text-xs tabular-nums" fill="var(--muted-foreground)">
             <text x={start + (i + 0.5) * step} y={top + extent + 20} textAnchor="middle">
               {panel.coreIds[i]}
             </text>
@@ -237,7 +238,7 @@ function Panel({ panel, max, text }: { panel: CoreProfilePanel; max: number; tex
           y={top + extent + 48}
           textAnchor="middle"
           className="text-xs"
-          fill="currentColor"
+          fill="var(--muted-foreground)"
         >
           {text.core}
         </text>
@@ -245,7 +246,7 @@ function Panel({ panel, max, text }: { panel: CoreProfilePanel; max: number; tex
           transform={`translate(14 ${top + extent / 2}) rotate(-90)`}
           textAnchor="middle"
           className="text-xs"
-          fill="currentColor"
+          fill="var(--muted-foreground)"
         >
           {text.core}
         </text>
@@ -281,19 +282,19 @@ function AscendCoreProfiles() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold">Huawei 950PR</h2>
-        <p className="text-sm text-muted-foreground">{t.subtitle}</p>
+        <h2 className="text-lg font-medium">Huawei 950PR</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{t.subtitle}</p>
       </div>
       <p className="text-sm text-muted-foreground">{t.limits}</p>
       <div className="space-y-1 max-w-lg">
         <p className="text-sm">{t.units}</p>
         <div
-          className="h-4 rounded"
+          className="h-4 rounded-sm"
           style={{
             background: `linear-gradient(to right, ${Array.from({ length: 11 }, (_, i) => `${d3.interpolateReds(i / 10)} ${i * 10}%`).join(', ')})`,
           }}
         />
-        <div className="flex justify-between text-xs">
+        <div className="flex justify-between text-xs tabular-nums">
           <span>0</span>
           <span>{result.colorLimits[1].toFixed(2)}</span>
         </div>
@@ -304,8 +305,8 @@ function AscendCoreProfiles() {
           <Panel key={panel.condition} panel={panel} max={result.colorLimits[1]} text={t} />
         ))}
       </div>
-      <section className="text-sm text-muted-foreground space-y-2">
-        <h3 className="font-semibold">{t.methodology}</h3>
+      <section className="space-y-1 text-xs text-muted-foreground">
+        <h3 className="text-sm font-medium text-foreground">{t.methodology}</h3>
         <p>{t.method}</p>
         <p>{t.concurrentLimit}</p>
         <a className="underline" href={result.sourceUrl} target="_blank" rel="noopener noreferrer">
@@ -322,11 +323,11 @@ export function CoreMemoryProfilesContent() {
   const [gpu, setGpu] = useState('all');
   return (
     <div className="space-y-8">
-      <div className="space-y-2">
-        <h2 className="text-xl font-semibold">{t.title}</h2>
-        <p className="text-sm text-muted-foreground max-w-4xl">{t.comparison}</p>
+      <div>
+        <Heading level="section">{t.title}</Heading>
+        <p className="mt-1 max-w-4xl text-sm text-muted-foreground">{t.comparison}</p>
       </div>
-      <div className="space-y-1.5 sm:w-72">
+      <div className="flex flex-col space-y-1.5 sm:w-72">
         <label htmlFor="core-profile-hardware" className="text-sm font-medium">
           {t.hardware}
         </label>
@@ -337,7 +338,11 @@ export function CoreMemoryProfilesContent() {
             track('ubenchx_core_profile_hardware_selected', { gpu: value });
           }}
         >
-          <SelectTrigger id="core-profile-hardware" data-testid="core-profile-hardware">
+          <SelectTrigger
+            id="core-profile-hardware"
+            data-testid="core-profile-hardware"
+            className="w-full"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

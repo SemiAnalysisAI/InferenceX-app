@@ -4,6 +4,11 @@ import * as d3 from 'd3';
 import { useMemo, useRef } from 'react';
 
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
+import {
+  chartTooltipDismiss,
+  chartTooltipShell,
+  chartTooltipTitle,
+} from '@/lib/d3-chart/tooltip-shell';
 import { useLocale } from '@/lib/i18n/use-locale';
 import type { Locale } from '@/lib/i18n/i18n';
 
@@ -54,10 +59,9 @@ const STRINGS = {
       'payload-rate': 'Payload bandwidth at selected latency percentile (GB/s, per chip)',
     },
     xAxis: 'Source tokens / rank (log)',
-    unavailable: (operation: string) => `${operation} is unavailable for the selected series.`,
-    noSeries: 'No matching CollectiveX series.',
-    instructions:
-      'Shift+Scroll to zoom · Drag to pan · Double-click to reset · Click a point to pin tooltip',
+    unavailable: (operation: string) => `${operation} is unavailable for the selected series`,
+    noSeries: 'No matching CollectiveX series',
+    instructions: 'Shift+Scroll to zoom · Drag to pan · Double-click to reset',
     dismiss: 'Click elsewhere to dismiss',
     atLatency: (percentile: string) => `at ${percentile} latency`,
     tokenCounts: (perRank: string, global: string) =>
@@ -87,9 +91,9 @@ const STRINGS = {
       'payload-rate': '所选延迟分位点的载荷带宽（GB/s，每芯片）',
     },
     xAxis: '每 rank 源 token 数（对数）',
-    unavailable: (operation: string) => `所选序列没有可用的${operation}数据。`,
-    noSeries: '没有匹配的 CollectiveX 序列。',
-    instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
+    unavailable: (operation: string) => `所选序列没有可用的${operation}数据`,
+    noSeries: '没有匹配的 CollectiveX 序列',
+    instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置',
     dismiss: '点击其他区域关闭',
     atLatency: (percentile: string) => `（${percentile} 延迟分位点）`,
     tokenCounts: (perRank: string, global: string) =>
@@ -407,9 +411,9 @@ export function CollectiveXChart({
           attachToLayer: 2,
           content: (point, isPinned) => {
             const color = colors[point.colorKey] ?? '#888';
-            const pinnedNote = isPinned
-              ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>`
-              : '';
+            const pinnedNote = isPinned ? chartTooltipDismiss(t.dismiss) : '';
+            const shellOptions = { pinned: isPinned, minWidth: 230, maxWidth: 380 };
+            const title = chartTooltipTitle(escapeHtml(point.seriesLabel), color);
             if (point.range) {
               const rows = point.range.members
                 .map(
@@ -419,9 +423,10 @@ export function CollectiveXChart({
                 .join('');
               // Two-column grid, so every value starts at the same left edge.
               const table = `<div class="grid text-muted-foreground" style="grid-template-columns: max-content max-content; column-gap: 1.5rem">${rows}</div>`;
-              return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 230px; max-width: 380px; user-select: ${isPinned ? 'text' : 'none'}">
+              return chartTooltipShell(
+                `<div class="text-xs">
             ${pinnedNote}
-            <div class="font-semibold mb-1" style="color: ${color}">${escapeHtml(point.seriesLabel)}</div>
+            ${title}
             <div>${escapeHtml(t.operation[operation])} ${yAxis === 'latency' ? percentile : t.atLatency(percentile)}</div>
             ${
               rangeMode === 'best'
@@ -432,7 +437,9 @@ export function CollectiveXChart({
             <div class="text-muted-foreground">${t.tokenCounts(locale === 'zh' ? point.point.tokens_per_rank.toLocaleString('zh-CN') : String(point.point.tokens_per_rank), locale === 'zh' ? point.point.global_tokens.toLocaleString('zh-CN') : String(point.point.global_tokens))}</div>
             <div class="mt-1 text-muted-foreground">${t.rangeCount(point.range.libraries)}</div>
             ${table}
-          </div>`;
+          </div>`,
+                shellOptions,
+              );
             }
             const measurement = point.point;
             const measuredRoundtrip = measurement.components.roundtrip;
@@ -440,9 +447,10 @@ export function CollectiveXChart({
             const fitLine = fit
               ? `<div class="mt-1 text-muted-foreground">${t.fit(fit.betaGbps.toFixed(fit.betaGbps >= 100 ? 0 : 1), fit.alphaUs.toFixed(1))}</div>`
               : '';
-            return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 230px; max-width: 380px; user-select: ${isPinned ? 'text' : 'none'}">
+            return chartTooltipShell(
+              `<div class="text-xs">
             ${pinnedNote}
-            <div class="font-semibold mb-1" style="color: ${color}">${escapeHtml(point.seriesLabel)}</div>
+            ${title}
             <div>${escapeHtml(t.operation[operation])} ${yAxis === 'latency' ? percentile : t.atLatency(percentile)}: <strong>${formatMetric(point.y, yAxis)}</strong></div>
             <div class="text-muted-foreground">${t.tokenCounts(locale === 'zh' ? measurement.tokens_per_rank.toLocaleString('zh-CN') : String(measurement.tokens_per_rank), locale === 'zh' ? measurement.global_tokens.toLocaleString('zh-CN') : String(measurement.global_tokens))}</div>
             <div class="mt-1 text-muted-foreground">${t.latencyRanks}</div>
@@ -451,7 +459,9 @@ export function CollectiveXChart({
             <div class="text-muted-foreground">${t.operation.combine}: ${formatCollectiveXLatencyPercentiles(measurement.components.combine, t.unavailableValue)}</div>
             <div class="text-muted-foreground">${t.roundTrip}: ${formatCollectiveXLatencyPercentiles(measuredRoundtrip, t.unavailableValue)}${measuredRoundtrip ? t.measured : ''}</div>
             ${fitLine}
-          </div>`;
+          </div>`,
+              shellOptions,
+            );
           },
           getRulerX: (point, scale) =>
             (scale as d3.ScaleLinear<number, number> | d3.ScaleLogarithmic<number, number>)(

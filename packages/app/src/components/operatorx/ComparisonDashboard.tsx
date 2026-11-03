@@ -18,6 +18,7 @@ import { prefetchOperatorXTimelines, useOperatorXComparison } from '@/hooks/api/
 import { useClientSearch } from '@/hooks/useClientSearch';
 import { track } from '@/lib/analytics/analytics';
 import { useDialogCloseTracking } from '@/lib/analytics/use-dialog-close-tracking';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { replaceClientSearch } from '@/lib/routing/client-navigation';
 
 import { CaseDetail } from './CaseDetail';
@@ -34,6 +35,27 @@ import { VISUALIZATIONS } from './viz';
 import type { VizDefinition } from './viz/types';
 
 const NO_BASELINE = 'none';
+
+const STRINGS = {
+  en: {
+    loading: 'Loading results…',
+    empty: 'No results yet',
+    workload: 'Workload',
+    metric: 'Metric',
+    baseline: 'Baseline',
+    none: 'None',
+    loadingWorkload: (label?: string) => `Loading ${label ?? 'workload'}…`,
+  },
+  zh: {
+    loading: '正在加载结果…',
+    empty: '暂无结果',
+    workload: '工作负载',
+    metric: '指标',
+    baseline: '基线',
+    none: '无',
+    loadingWorkload: (label?: string) => `正在加载${label ? ` ${label}` : '工作负载'}…`,
+  },
+};
 
 // Literal class names so Tailwind generates them.
 const SPAN_CLASS = {
@@ -109,6 +131,7 @@ const VizCard = memo(
     span: Span;
     eager: boolean;
   }) => {
+    const locale = useLocale();
     const [mounted, setMounted] = useState(eager);
     const card = useRef<HTMLDivElement>(null);
     useEffect(() => {
@@ -139,7 +162,7 @@ const VizCard = memo(
         className={`min-w-0 ${SPAN_CLASS[span]}`}
       >
         <Heading id={`operatorx-title-${viz.id}`} as="h2" level="card" className="mb-4">
-          {viz.title}
+          {viz.title[locale]}
         </Heading>
         {mounted ? (
           <viz.Component model={model} />
@@ -206,6 +229,8 @@ function ComparisonSkeleton({ op }: { op: ComparisonOp }) {
 }
 
 export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
+  const locale = useLocale();
+  const strings = STRINGS[locale];
   const search = new URLSearchParams(useClientSearch());
   const metric = metricById(search.get('metric'));
   const {
@@ -266,22 +291,28 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
         testId="operatorx-comparison-error"
       />
     );
-  if (isLoading || !view || !model) return <ComparisonSkeleton op={op} />;
+  if (isLoading || !view || !model)
+    return (
+      <Card data-testid="operatorx-loading" className="min-h-svh items-center justify-center">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        <p className="mt-3 text-sm text-muted-foreground">{strings.loading}</p>
+      </Card>
+    );
   const pending = switching
     ? view.workloads.find((w) => w.id === search.get('workload'))
     : undefined;
   if (view.workloads.length === 0)
     return (
       <Card className="py-6 text-center">
-        <p className="text-sm text-muted-foreground">No results yet</p>
+        <p className="text-sm text-muted-foreground">{strings.empty}</p>
       </Card>
     );
 
   return (
     <div className="flex flex-col gap-4">
       <Card className="relative z-10 py-4 md:py-5" data-testid="operatorx-controls">
-        <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
-          <ControlGroup label="Workload" htmlFor="operatorx-workload">
+        <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+          <ControlGroup label={strings.workload} htmlFor="operatorx-workload">
             <SearchableSelect
               triggerId="operatorx-workload"
               value={pending?.id ?? view.workload ?? ''}
@@ -300,27 +331,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
               ]}
             />
           </ControlGroup>
-          <ControlGroup label="Devices" htmlFor="operatorx-parallel">
-            <SearchableSelect
-              triggerId="operatorx-parallel"
-              value={view.parallel || ONE_DEVICE}
-              onValueChange={(v) => {
-                track('operatorx_parallel_selected', { op, parallel: v });
-                setParallel(v);
-              }}
-              searchable={false}
-              groups={[
-                {
-                  label: '',
-                  options: view.parallelOptions.map((o) => ({
-                    value: o.key || ONE_DEVICE,
-                    label: `${o.label} (${o.cases})`,
-                  })),
-                },
-              ]}
-            />
-          </ControlGroup>
-          <ControlGroup label="Metric" htmlFor="operatorx-metric">
+          <ControlGroup label={strings.metric} htmlFor="operatorx-metric">
             <SearchableSelect
               triggerId="operatorx-metric"
               value={metric.id}
@@ -332,13 +343,17 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
               groups={[
                 {
                   label: '',
-                  options: METRICS.map((m) => ({ value: m.id, label: `${m.label} (${m.unit})` })),
+                  options: METRICS.map((m) => ({
+                    value: m.id,
+                    label:
+                      locale === 'zh' ? `${m.label.zh}（${m.unit}）` : `${m.label.en} (${m.unit})`,
+                  })),
                 },
               ]}
             />
           </ControlGroup>
 
-          <ControlGroup label="Baseline" htmlFor="operatorx-baseline">
+          <ControlGroup label={strings.baseline} htmlFor="operatorx-baseline">
             <SearchableSelect
               triggerId="operatorx-baseline"
               value={baseline ?? NO_BASELINE}
@@ -351,7 +366,7 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
                 {
                   label: '',
                   options: [
-                    { value: NO_BASELINE, label: 'None' },
+                    { value: NO_BASELINE, label: strings.none },
                     ...hardware.map((h) => ({ value: h, label: hardwareLabel(h) })),
                   ],
                 },
@@ -359,11 +374,11 @@ export function ComparisonDashboard({ op }: { op: ComparisonOp }) {
             />
           </ControlGroup>
         </div>
-        <div className="mt-4 border-t border-border/60 pt-3">
+        <div className="mt-4 border-t border-border/30 pt-3">
           <CoverageStrip model={model} />
         </div>
       </Card>
-      <Pending active={switching} label={`Loading ${pending?.label ?? 'workload'}…`}>
+      <Pending active={switching} label={strings.loadingWorkload(pending?.label)}>
         <div className="grid gap-4 lg:grid-cols-12">
           {layout(visibleVisualizations(op, baseline)).map(({ viz, span }, index) => (
             <VizCard key={viz.id} model={model} viz={viz} span={span} eager={index === 0} />

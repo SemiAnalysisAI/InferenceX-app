@@ -15,18 +15,20 @@ import { useLocale } from '@/lib/i18n/use-locale';
 
 const STRINGS = {
   en: {
-    title: 'ubenchX Microbenchmarks (Beta)',
+    title: 'ubenchX microbenchmarks',
+    maturity: 'Beta',
     subtitle:
-      'Low-level accelerator microbenchmarks measuring fundamental hardware characteristics.',
+      'Low-level accelerator microbenchmarks measuring fundamental hardware characteristics',
     test: 'Microbenchmark',
     testTooltip: 'The ubenchX microbenchmark to display.',
-    memBwTitle: 'HBM Bandwidth',
+    memBwTitle: 'HBM bandwidth',
     tpcSkylineTitle: 'TPC Skyline & SKU configurations',
     coreProfilesTitle: 'Core memory-access profiles',
   },
   zh: {
-    title: 'ubenchX 微基准测试（Beta）',
-    subtitle: '底层加速器微基准测试，测量基础硬件特性。',
+    title: 'ubenchX 微基准测试',
+    maturity: 'Beta',
+    subtitle: '底层加速器微基准测试，测量基础硬件特性',
     test: '微基准测试',
     testTooltip: '要显示的 ubenchX 微基准测试。',
     memBwTitle: 'HBM 带宽',
@@ -52,10 +54,15 @@ export function UbenchxHub({ current }: { current: UbenchxTestSlug }) {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">{t.title}</h1>
-        <p className="text-sm text-muted-foreground mt-1">{t.subtitle}</p>
+        <div className="flex items-baseline gap-2">
+          <h1 className="text-2xl font-semibold">{t.title}</h1>
+          <span className="text-xs text-muted-foreground" data-testid="ubenchx-maturity">
+            {t.maturity}
+          </span>
+        </div>
+        <p className="mt-1 text-sm text-muted-foreground">{t.subtitle}</p>
       </div>
-      <div className="flex flex-col space-y-1.5 sm:w-[320px]">
+      <div className="flex flex-col space-y-1.5 sm:w-72">
         <LabelWithTooltip htmlFor="ubenchx-test-select" label={t.test} tooltip={t.testTooltip} />
         <Select
           value={current}
@@ -65,7 +72,11 @@ export function UbenchxHub({ current }: { current: UbenchxTestSlug }) {
             router.push(`${prefix}/ubenchx/${value}`);
           }}
         >
-          <SelectTrigger id="ubenchx-test-select" data-testid="ubenchx-test-select">
+          <SelectTrigger
+            id="ubenchx-test-select"
+            data-testid="ubenchx-test-select"
+            className="w-full"
+          >
             <SelectValue>
               {t[UBENCHX_TESTS.find((test) => test.slug === current)!.titleKey]}
             </SelectValue>

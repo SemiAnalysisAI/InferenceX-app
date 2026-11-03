@@ -25,8 +25,31 @@ import { RooflineBars } from './roofline-bars';
 const ORDER: ComputePrecision[] = ['fp4', 'fp8', 'bf16'];
 
 const STRINGS = {
-  en: { sharedOnly: 'Shared cases only' },
-  zh: { sharedOnly: '仅共同用例' },
+  en: {
+    sharedOnly: 'Shared cases only',
+    empty: 'No case has FLOP and byte counts',
+    precision: 'Compute precision',
+    normalized: 'Normalized',
+    ridgeAxis: 'Arithmetic intensity / ridge point',
+    intensityAxis: 'Arithmetic intensity (FLOP/byte)',
+    shareAxis: 'Share of peak compute (%)',
+    tflopsAxis: 'Achieved TFLOPS',
+    share: (pct: string, what: 'compute' | 'bandwidth') => ` · ${pct}% of peak ${what}`,
+    inspect: 'Click for kernel timeline',
+  },
+  zh: {
+    sharedOnly: '仅共同用例',
+    empty: '没有同时带 FLOP 和字节数的用例',
+    precision: '计算精度',
+    normalized: '归一化',
+    ridgeAxis: '算术强度 / roofline 拐点',
+    intensityAxis: '算术强度（FLOP/byte）',
+    shareAxis: '计算峰值占比（%）',
+    tflopsAxis: '实测 TFLOPS',
+    share: (pct: string, what: 'compute' | 'bandwidth') =>
+      ` · ${what === 'compute' ? '计算' : '带宽'}峰值的 ${pct}%`,
+    inspect: '点击查看 kernel 时间线',
+  },
 };
 
 interface Point {
@@ -42,8 +65,6 @@ interface Point {
 
 const SHARED = 'shared';
 const ratio = (v: number) => String(Number(v.toPrecision(2)));
-const share = (v: number, of: number | null, what: string) =>
-  of ? ` · ${ratio((v / of) * 100)}% of peak ${what}` : '';
 
 /** `37% of roofline (88 µs · compute 41%, memory 59%)`. */
 function boundRow(b: RooflineBound, us: number): string {
@@ -68,7 +89,10 @@ export function Roofline({
   model: ComparisonModel;
   summaryOnly?: boolean;
 }) {
-  const strings = STRINGS[useLocale()];
+  const locale = useLocale();
+  const strings = STRINGS[locale];
+  const share = (v: number, of: number | null, what: 'compute' | 'bandwidth') =>
+    of ? strings.share(ratio((v / of) * 100), what) : '';
   const { view } = model;
   const counts = useMemo(() => {
     const m = new Map<ComputePrecision, number>();
@@ -110,11 +134,12 @@ export function Roofline({
     () => rooflineSummary(view, { precision, hardware: model.hardware, sharedOnly, normalized }),
     [view, precision, model.hardware, normalized, sharedOnly],
   );
-  if (!precision) return <EmptyChart>No case has FLOP and byte counts.</EmptyChart>;
-  const composite = view.cases.some(
-    (c) => (c.work?.parts.length ?? 0) > 1 || (c.work?.links.length ?? 0) > 0,
-  );
-  const xs = points.map((p) => p.x);
+  if (!precision) return <EmptyChart>{strings.empty}</EmptyChart>;
+  const xs = normalized
+    ? points.map((p) => p.x)
+    : view.cases.flatMap((c) =>
+        c.computePrecision === precision && c.flops && c.bytes ? [c.flops / c.bytes] : [],
+      );
   const [a0, a1] =
     xs.length > 0
       ? [
@@ -148,7 +173,7 @@ export function Roofline({
             track('operatorx_roofline_precision_selected', { precision: value });
             setPicked(value);
           }}
-          ariaLabel="Compute precision"
+          ariaLabel={strings.precision}
           options={precisions.map((p) => ({ value: p, label: p }))}
         />
         <div className="flex items-center gap-2">
@@ -164,7 +189,7 @@ export function Roofline({
             htmlFor={summaryOnly ? 'opx-summary-normalized' : 'opx-roofline-normalized'}
             className="text-sm font-normal text-muted-foreground"
           >
-            Normalized
+            {strings.normalized}
           </Label>
         </div>
         {summaryOnly && (
@@ -205,23 +230,23 @@ export function Roofline({
             xAxis={
               normalized
                 ? {
-                    label: 'Arithmetic Intensity',
+                    label: strings.ridgeAxis,
                     tickFormat: (v) => ratio(Number(v)),
                   }
                 : {
-                    label: 'Arithmetic Intensity (FLOP/byte)',
+                    label: strings.intensityAxis,
                     tickFormat: (v) => formatCompact(Number(v)),
                   }
             }
             yAxis={
               normalized
                 ? {
-                    label: 'Share of peak compute (%)',
+                    label: strings.shareAxis,
                     tickCount: 6,
                     tickFormat: (v) => ratio(Number(v) * 100),
                   }
                 : {
-                    label: 'Achieved TFLOPS',
+                    label: strings.tflopsAxis,
                     tickCount: 6,
                     tickFormat: (v) => formatCompact(Number(v)),
                   }
@@ -270,13 +295,13 @@ export function Roofline({
                   color: model.colors[p.hw],
                   rows: [
                     esc(`${view.cases[p.i].shape} · ${view.cases[p.i].precision}`),
-                    ...originRows(view, p.i),
+                    ...originRows(view, p.i, locale),
                     `<strong>${p.tflops.toFixed(1)} TFLOPS</strong>${share(p.tflops, peak, 'compute')}`,
                     `<strong>${tbs.toFixed(2)} TB/s</strong>${share(tbs, bw, 'bandwidth')}`,
                     `${(c.flops! / c.bytes!).toFixed(0)} FLOP/byte${composite ? ` · ${p.ai.toFixed(0)} effective` : ''}`,
                     ...(p.bound ? [boundRow(p.bound, p.us)] : []),
                   ],
-                  footer: 'Click for kernel timeline',
+                  footer: strings.inspect,
                 });
               },
             }}
@@ -290,8 +315,8 @@ export function Roofline({
 
 export const roofline: VizDefinition = {
   id: 'roofline',
-  title: 'Roofline',
-  ops: ['gemm', 'moe', 'attention'],
+  title: { en: 'Roofline', zh: 'Roofline' },
+  ops: ['gemm', 'moe'],
   wide: true,
   Component: Roofline,
 };

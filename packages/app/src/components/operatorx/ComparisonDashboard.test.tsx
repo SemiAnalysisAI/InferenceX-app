@@ -45,7 +45,7 @@ vi.mock('./viz', () => ({
   VISUALIZATIONS: [
     {
       id: 'probe',
-      title: 'Probe',
+      title: { en: 'Probe', zh: 'Probe' },
       ops: ['gemm'],
       Component: ({ model }) => {
         state.models.push(model);

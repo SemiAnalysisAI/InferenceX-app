@@ -4,6 +4,11 @@ import * as d3 from 'd3';
 import { useMemo } from 'react';
 
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
+import {
+  chartTooltipDismiss,
+  chartTooltipShell,
+  chartTooltipTitle,
+} from '@/lib/d3-chart/tooltip-shell';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 import {
@@ -32,9 +37,8 @@ interface CollectiveXKvFrontierChartProps {
 
 const STRINGS = {
   en: {
-    noData: 'No measured KV rows match the selected direction.',
-    instructions:
-      'Shift+Scroll to zoom · Drag to pan · Double-click to reset · Click a point to pin tooltip',
+    noData: 'No measured KV rows match the selected direction',
+    instructions: 'Shift+Scroll to zoom · Drag to pan · Double-click to reset',
     xAxis: (logScale: boolean) => `Sequence length (ISL tokens${logScale ? ', log' : ''})`,
     yAxis: (op: CollectiveXKvFrontierSelection['op'], logScale: boolean) =>
       `Aggregate ${op} bandwidth at p50 (GB/s${logScale ? ', log' : ''})`,
@@ -60,8 +64,8 @@ const STRINGS = {
     verify: (passed: boolean) => `verify: ${passed ? 'passed' : 'FAILED'}`,
   },
   zh: {
-    noData: '没有与所选传输方向匹配的 KV 实测数据。',
-    instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
+    noData: '没有与所选传输方向匹配的 KV 实测数据',
+    instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置',
     xAxis: (logScale: boolean) => `序列长度（ISL token${logScale ? '，对数' : ''}）`,
     yAxis: (op: CollectiveXKvFrontierSelection['op'], logScale: boolean) =>
       `p50 聚合 ${op} 带宽（GB/s${logScale ? '，对数' : ''}）`,
@@ -264,15 +268,18 @@ export function CollectiveXKvFrontierChart({
             const share = fraction < 0.001 ? '<0.1%' : `${(fraction * 100).toFixed(1)}%`;
             ceilingLine = `<div class="text-muted-foreground">${strings.ceiling(ceilingAtIsl.y, share)}</div>`;
           }
-          return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 230px; max-width: 380px; user-select: ${isPinned ? 'text' : 'none'}">
-            ${isPinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${strings.dismiss}</div>` : ''}
-            <div class="font-semibold mb-1" style="color: ${color}">${escapeHtml(point.seriesLabel)}</div>
+          return chartTooltipShell(
+            `<div class="text-xs">
+            ${isPinned ? chartTooltipDismiss(strings.dismiss) : ''}
+            ${chartTooltipTitle(escapeHtml(point.seriesLabel), color)}
             <div>${strings.pointContext(row, tier)}</div>
             <div>${strings.pointMetrics(point)}</div>
             <div class="text-muted-foreground">${strings.latency(point)}</div>
             ${ceilingLine}
             <div class="text-muted-foreground">${strings.verify(row.verify_passed)}</div>
-          </div>`;
+          </div>`,
+            { pinned: isPinned, minWidth: 230, maxWidth: 380 },
+          );
         },
         getRulerX: (point, scale) =>
           (scale as d3.ScaleLinear<number, number> | d3.ScaleLogarithmic<number, number>)(point.x),

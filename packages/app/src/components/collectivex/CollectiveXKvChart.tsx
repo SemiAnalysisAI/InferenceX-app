@@ -4,6 +4,11 @@ import * as d3 from 'd3';
 import { useMemo, useRef } from 'react';
 
 import { D3Chart } from '@/lib/d3-chart/D3Chart';
+import {
+  chartTooltipDismiss,
+  chartTooltipShell,
+  chartTooltipTitle,
+} from '@/lib/d3-chart/tooltip-shell';
 import { useLocale } from '@/lib/i18n/use-locale';
 
 import {
@@ -41,9 +46,8 @@ const STRINGS = {
         : selection.x === 'isl'
           ? `Request latency p50, batch 1 (ms${logScale ? ', log' : ''})`
           : `Burst completion latency p50 (ms${logScale ? ', log' : ''})`,
-    noData: 'No measured KV rows match the selected direction.',
-    instructions:
-      'Shift+Scroll to zoom · Drag to pan · Double-click to reset · Click a point to pin tooltip',
+    noData: 'No measured KV rows match the selected direction',
+    instructions: 'Shift+Scroll to zoom · Drag to pan · Double-click to reset',
     dismiss: 'Click elsewhere to dismiss',
     point: (op: string, batch: number, isl: string) => `${op} · batch ${batch} · ISL ${isl}`,
     latency: 'Burst p50 / p95 / min / max',
@@ -68,8 +72,8 @@ const STRINGS = {
         : selection.x === 'isl'
           ? `单请求延迟 p50，batch 1（ms${logScale ? '，对数' : ''}）`
           : `突发完成延迟 p50（ms${logScale ? '，对数' : ''}）`,
-    noData: '所选传输方向下暂无实测 KV 数据。',
-    instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置 · 点击数据点固定提示框',
+    noData: '所选传输方向下暂无实测 KV 数据',
+    instructions: 'Shift+滚轮缩放 · 拖动平移 · 双击重置',
     dismiss: '点击其他区域关闭',
     point: (op: string, batch: number, isl: string) => `${op} · batch ${batch} · ISL ${isl}`,
     latency: '突发 p50 / p95 / 最小值 / 最大值',
@@ -339,16 +343,17 @@ export function CollectiveXKvChart({
               selection.y === 'bandwidth'
                 ? `${value.toFixed(value >= 100 ? 0 : 2)} GB/s`
                 : `${value.toFixed(value >= 100 ? 0 : 2)} ms`;
-            const pinnedNote = isPinned
-              ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${t.dismiss}</div>`
-              : '';
+            const pinnedNote = isPinned ? chartTooltipDismiss(t.dismiss) : '';
             const where = t.point(row.op, row.batch, row.isl.toLocaleString(numberLocale));
             const shell = (body: string) =>
-              `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width: 230px; max-width: 380px; user-select: ${isPinned ? 'text' : 'none'}">
+              chartTooltipShell(
+                `<div class="text-xs">
             ${pinnedNote}
-            <div class="font-semibold mb-1" style="color: ${color}">${escapeHtml(point.seriesLabel)}</div>
+            ${chartTooltipTitle(escapeHtml(point.seriesLabel), color)}
             ${body}
-          </div>`;
+          </div>`,
+                { pinned: isPinned, minWidth: 230, maxWidth: 380 },
+              );
             if (point.range) {
               const rows = point.range.members
                 .map(
