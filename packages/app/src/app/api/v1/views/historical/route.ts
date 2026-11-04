@@ -58,6 +58,21 @@ import { loadFixture } from '@/lib/testing/test-fixtures';
 import { csvResponse } from '@/lib/views-api/csv';
 import { runViewsRoute, ViewsApiParamError } from '@/lib/views-api/errors';
 import { hardwareLegendLabel } from '@/lib/views-api/legend';
+import { getHardwareConfig } from '@/lib/catalog/constants';
+import {
+  buildFrontierHistory,
+  comparisonBuckets,
+  frontierAreas,
+  frontierChapters,
+  frontierHistoryToCsv,
+  frontierRegressions,
+  FRONTIER_COMPARISON_BUCKETS,
+  leadMargins,
+  softwareGainByInteractivity,
+  softwareGains,
+  territoryShares,
+  vendorsAtOtherPrecisions,
+} from '@/components/trends/frontier-history-core';
 import { GET as getWorkflowInfo } from '@/app/api/v1/workflow-info/route';
 import { readResponse, sourceRequest } from '@/lib/views-api/source';
 import type { WorkflowInfoResponse } from '@/lib/api/api';
@@ -109,7 +124,27 @@ export function GET(request: NextRequest) {
     const start = parseDateParam(search.get('start'), 'start');
     const end = parseDateParam(search.get('end'), 'end');
     const format = parseFormatParam(search.get('format'));
-    const chart = parseEnumParam(search.get('chart'), 'chart', ['line', 'waterfall'], 'line');
+    const chart = parseEnumParam(
+      search.get('chart'),
+      'chart',
+      ['line', 'waterfall', 'frontier'],
+      'line',
+    );
+    const groupBy = parseEnumParam(
+      search.get('groupBy'),
+      'groupBy',
+      ['gpu', 'config', 'vendor'],
+      'gpu',
+    );
+    // Order is kept: with two keys the first is the reference the comparison reads from.
+    const compare = [
+      ...new Set(
+        (search.get('compare') ?? '')
+          .split(',')
+          .map((key) => key.trim())
+          .filter(Boolean),
+      ),
+    ];
     if (start && end && start > end)
       throw new ViewsApiParamError('end', 'end must not precede start');
     const extendToDate =
@@ -186,6 +221,126 @@ export function GET(request: NextRequest) {
           return true;
         }
       : undefined;
+
+    if (chart === 'frontier') {
+      const frontierOptions = {
+        selectedPrecisions: resolvedPrecisions,
+        selectedYAxisMetric: metricConfigKey,
+        metricKey: trendMetricKey,
+        requestedMetrics: trendMetricDependencies(trendMetricKey),
+        higherIsBetter: registryEntry?.polarity !== 'lower',
+        tcoBasis,
+        chipBasis,
+        tokenRevenuePricing: pricing,
+        groupBy,
+        ...(rowFilter ? { rowFilter } : {}),
+      };
+      const history = buildFrontierHistory(allRows, frontierOptions);
+      const labelOf = (key: string) => {
+        const series = history.series.find((entry) => entry.key === key);
+        if (!series) return key;
+        if (groupBy === 'vendor') return series.key;
+        return groupBy === 'gpu'
+          ? getHardwareConfig(series.hwKey).label
+          : hardwareLegendLabel(series.hwKey);
+      };
+      const params = {
+        model: displayName,
+        sequence: sequence as string,
+        metric: metricConfigKey,
+        precisions: resolvedPrecisions,
+        gpus,
+        vendors,
+        frameworks,
+        deployment,
+        tcoBasis,
+        chipBasis,
+        priceSource,
+        start: start ?? null,
+        end: end ?? null,
+        format,
+        chart,
+        groupBy,
+        compare,
+      };
+      const areas = frontierAreas(history);
+      const gains = softwareGains(history);
+      const keyByLowercase = new Map(
+        history.series.map((series) => [series.key.toLowerCase(), series.key]),
+      );
+      const compareKeys = [
+        ...new Set(compare.flatMap((key) => keyByLowercase.get(key.toLowerCase()) ?? [])),
+      ];
+      const buckets = comparisonBuckets(history, FRONTIER_COMPARISON_BUCKETS);
+      if (format === 'csv') {
+        const { headers, rows } = frontierHistoryToCsv(history, labelOf);
+        return csvResponse(
+          rows.map((row) => Object.fromEntries(headers.map((header, i) => [header, row[i]]))),
+        );
+      }
+      return cachedJson(request, {
+        view: 'historical',
+        apiVersion: 'v1',
+        params,
+        metric: {
+          key: trendMetricKey,
+          configKey: metricConfigKey,
+          label: registryEntry?.label ?? trendMetricKey,
+          labelZh:
+            registryEntry && 'labelZh' in registryEntry ? registryEntry.labelZh : trendMetricKey,
+        },
+        target,
+        interactivity,
+        hwKeysWithData: history.series.map((series) => series.hwKey),
+        series: [],
+        frontier: {
+          dates: history.dates,
+          levels: history.levels,
+          higherIsBetter: history.higherIsBetter,
+          series: history.series.map((series) => ({
+            ...series,
+            label: labelOf(series.key),
+            areas: areas.get(series.key) ?? [],
+            softwareGain: gains.get(series.key) ?? [],
+            softwareGainByInteractivity: softwareGainByInteractivity(
+              history,
+              series.key,
+              history.dates.length - 1,
+              buckets,
+            ),
+          })),
+          overtakes: history.overtakes,
+          territory: history.dates.map((date, index) => ({
+            date,
+            shares: territoryShares(history, index),
+          })),
+          otherPrecisionVendors: vendorsAtOtherPrecisions(allRows, frontierOptions),
+          regressions: frontierRegressions(
+            history,
+            history.dates.length - 1,
+            history.series.map((series) => series.key),
+          ),
+          chapters: frontierChapters(
+            history,
+            history.series.map((series) => series.key),
+            true,
+          ),
+          comparison:
+            compareKeys.length > 0
+              ? {
+                  keys: compareKeys,
+                  chapters: frontierChapters(history, compareKeys, false),
+                  buckets,
+                  margins: history.dates.map((date, index) => ({
+                    date,
+                    margins: leadMargins(history, index, compareKeys, buckets),
+                  })),
+                }
+              : null,
+        },
+        count: history.overtakes.length,
+      });
+    }
 
     const dateGroupedData = groupTrendRowsByDate(allRows, {
       selectedPrecisions: resolvedPrecisions,
