@@ -3165,8 +3165,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/trace-server-metrics',
     summary: text('Read trace server metrics', '读取跟踪服务器指标'),
     description: text(
-      'Returns point metadata, including prefill/decode TP, EP, DP attention, worker counts, physical GPU counts and recipe_fingerprint for cache-reuse links, and chart-ready aggregate time series for cache usage, queue depth, prefill and decode throughput, and prompt-token sources. metricSources contains source descriptors; source-specific arrays are loaded by the point-detail UI only when selected.',
-      '返回数据点元数据（含 prefill/decode TP、EP、DP attention、worker 数、物理 GPU 数及 recipe_fingerprint，用于缓存复用链接），以及可直接用于图表的聚合时间序列，涵盖缓存使用率、队列深度、prefill/decode 吞吐量和 prompt token 来源。metricSources 包含各来源的描述信息；仅当用户在数据点详情界面选择某个来源时，才会加载该来源对应的数组。',
+      'Returns point metadata, including prefill/decode TP, EP, DP attention, worker counts, physical GPU counts and recipe_fingerprint for cache-reuse links, and chart-ready aggregate time series for cache usage, queue depth, prefill and decode throughput, and prompt-token sources. metricSources contains source descriptors; source-specific arrays are loaded by the point-detail UI only when selected. TokenSpeed exports device KV utilization and running/waiting request gauges; unavailable cache-hit and token-throughput measurements remain empty.',
+      '返回数据点元数据（含 prefill/decode TP、EP、DP attention、worker 数、物理 GPU 数及 recipe_fingerprint，用于缓存复用链接），以及可直接用于图表的聚合时间序列，涵盖缓存使用率、队列深度、prefill/decode 吞吐量和 prompt token 来源。metricSources 包含各来源的描述信息；仅当用户在数据点详情界面选择某个来源时，才会加载该来源对应的数组。TokenSpeed 提供设备 KV 使用率以及运行中和排队请求数；未提供的缓存命中率和 token 吞吐量指标保留为空。',
     ),
     audience: 'public',
     stability: 'beta',
