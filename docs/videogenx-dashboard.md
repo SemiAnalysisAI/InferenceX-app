@@ -87,8 +87,9 @@ The page follows the inference and AgentX two-level layout. The overview has fou
 in-page Back button and browser Back both return to the overview at its previous
 scroll position. The overview stays mounted but hidden under React `Activity`, so
 clip media, the selected clip group and chart state survive the visit. An unknown,
-filtered or hidden `r_point` falls back to the overview. Overlay deployments open
-the same way.
+filtered or hidden `r_point` falls back to the overview. Once results load, the URL
+drops that key, so showing the hardware again or Share cannot reopen it. Overlay
+deployments open the same way.
 
 The detail header names hardware, model, engine, run date and any overlay run ID.
 Chips switch between the measured deployments of that hardware; dashed chips mark

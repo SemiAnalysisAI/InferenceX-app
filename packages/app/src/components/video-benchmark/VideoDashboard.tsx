@@ -336,6 +336,11 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
     state.point === null
       ? undefined
       : deploymentCells.find((cell) => shown(cell) && resultsPointKey(cell) === state.point);
+  // Left in the URL, a dead key would reopen its detail once its hardware is shown again.
+  const deadPoint = state.point !== null && !loading && !error && detailCell === undefined;
+  useEffect(() => {
+    if (deadPoint) commit({ ...latest.current, point: null }, 'replace');
+  }, [deadPoint, commit]);
   const detailHardware = detailCell?.point.hardwareKey ?? null;
   const shownDetail = useRef<string | null>(null);
   useEffect(() => {

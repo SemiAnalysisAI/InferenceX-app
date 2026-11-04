@@ -491,10 +491,11 @@ describe('VideoGenX results', () => {
     row('h200').should('be.visible');
   });
 
-  it('falls back to the overview for an unknown or hidden deployment', () => {
+  it('falls back to the overview for an unknown or hidden deployment and drops its key', () => {
     mount({ search: '?r_y=videosPerGpuHour&r_point=0:missing' });
     cy.get('[data-testid="video-results-detail"]').should('not.exist');
     points().should('have.length', 3);
+    searchParam('r_point').should('equal', null);
     row('b200')
       .invoke('attr', 'data-point')
       .then((point) => {
@@ -517,6 +518,10 @@ describe('VideoGenX results', () => {
         });
         cy.get('[data-testid="video-results-detail"]').should('not.exist');
         row('b200').should('not.exist');
+        searchParam('r_point').should('equal', null);
+        toggleHardware('b200');
+        row('b200').should('exist');
+        cy.get('[data-testid="video-results-detail"]').should('not.exist');
       });
   });
 
