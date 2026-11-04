@@ -23,6 +23,9 @@ describe('chip meta descriptions', () => {
     for (const fact of ['HBM3e', 'TB/s bandwidth', 'W TDP', 'kW all-in power', '/hr cloud price']) {
       expect(description).toContain(fact);
     }
+    const b300 = getChipPage('b300')!;
+    expect(chipMetaDescription(b300, 'en')).toContain('1,100 W TDP');
+    expect(chipMetaDescription(b300, 'zh')).toContain('TDP 1,100 W');
   });
 
   it('fits every chip and versus page within the locale limit', () => {
