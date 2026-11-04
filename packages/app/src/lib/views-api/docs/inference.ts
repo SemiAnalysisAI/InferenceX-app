@@ -161,7 +161,7 @@ const parameters: readonly ApiParameter[] = [
     'frameworks',
     text('Comma-separated framework families.', '逗号分隔的推理框架系列。'),
     'vllm,sglang',
-    ['atom', 'sglang', 'trt', 'vllm'],
+    ['atom', 'sglang', 'tokenspeed', 'trt', 'vllm'],
   ),
   listParam(
     'deployment',

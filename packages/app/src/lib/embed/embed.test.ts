@@ -50,6 +50,7 @@ describe('parseEmbedOptions', () => {
     expect(parseEmbedOptions({ framework: 'vllm,vllm,nope' }).frameworks).toEqual(['vllm']);
     expect(parseEmbedOptions({ framework: 'nope' }).frameworks).toEqual([]);
     expect(parseEmbedOptions({ fw: 'trt' }).frameworks).toEqual(['trt']);
+    expect(parseEmbedOptions({ framework: 'TokenSpeed,nope' }).frameworks).toEqual(['tokenspeed']);
   });
 
   it('takes the first value of a repeated query key', () => {
