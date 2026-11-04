@@ -116,8 +116,24 @@ null when it fails. GPU-board energy excludes host, chassis and facility energy.
 `VideoResultsClips` reads `format=published` once per selected artifact. It validates
 source identity and matches prompt, seed, repetition and recorded generation
 configuration before showing clips together. Missing media does not erase numeric
-evidence. The shared transport seeks and plays real video elements, stops at the
-shared playable duration, and pauses when the selection or page visibility changes.
+evidence. The shared transport drives real video elements through the pure state
+machine in `clip-sync.ts` (`paused`, `buffering`, `playing`, `ended`). Each animation
+frame the component snapshots every active clip (time, `readyState`, `seeking`, buffered
+range, `playbackRate`), hands the snapshots and the user intent to `stepClipGroup`, and
+applies the returned actions; no playback rule lives in the component, and overlay clips
+from `?unofficialrun=` go through the same step. While the group plays, a clip that is
+not seeking and lacks future data (`readyState < 3`) pauses every clip together; the
+transport then shows `Buffering N%`, the share of the shared duration buffered by the
+slowest clip, and the group resumes together from the leader's time once every clip
+has `readyState >= 3` and at least 1 s buffered ahead or a buffer that reaches the end.
+Play before the clips are ready enters buffering instead of starting some clips early.
+The leader is the audible clip when audio is on, otherwise the first clip that is not
+stalled; the audible clip is never seeked to chase another clip. A follower drifting
+40 to 250 ms gets a 10% `playbackRate` nudge and returns to 1.0 once within 10 ms;
+drift beyond 250 ms issues one seek, never while that clip is already seeking.
+Scrubbing seeks every clip and re-buffers. The group stops at the shared playable
+duration and pauses when the selection or page visibility changes. The time display
+and scrubber refresh at most ten times per second.
 Audio starts muted. The audio selector enables one visible, playable hardware clip
 at a time; the reference stays muted. Changing the case or hiding or failing the
 selected audio source restores mute. Audio selection is local playback state and
@@ -259,6 +275,7 @@ Y 轴为每 1 美元 TCO 生成的视频秒数（默认）、每 GPU 小时生�
 符合相同工作负载及样本门槛的已批准 H100 结果或明确指定的诊断运行会增加 H100 窗口，名称和成本沿用硬件注册表。
 
 视频窗口只读取已存储产物，核对 prompt、seed、重复次数和生成配置后同步播放。
+同步播放由 `clip-sync.ts` 中的纯函数状态机驱动（暂停、缓冲、播放、结束四个状态），组件只负责采集每个视频的快照并执行返回的动作，`?unofficialrun=` 叠加视频走同一套逻辑。播放过程中只要有一个视频缺少后续数据，全部视频一起暂停，并显示“缓冲中 N%”（以最慢视频已缓冲的共享时长百分比计）；等每个视频都至少缓冲了 1 秒后续数据，再从同一时间点一起恢复。视频尚未就绪时点击播放会进入缓冲，而不是先播放已就绪的视频。开启音频时以有声视频为主，否则以第一个未停顿的视频为主；有声视频不会被 seek 去追赶其他视频。40 到 250 毫秒的偏差通过微调 playbackRate 纠正，超过 250 毫秒才 seek 一次，且该视频 seek 过程中不会重复触发。时间显示和进度条每秒最多刷新十次。
 默认静音，可选择听一个硬件窗口的声音；参考视频保持静音。切换用例、隐藏音源或音源播放失败后恢复静音。音源选择只影响本地播放，不改变媒体、指标、URL 参数或只读 API 返回内容。
 Difference 是相对明确绑定的官方 Diffusers 参考视频的浏览器 RGB 差异预览，与封存的全帧 PSNR 测量分别展示。不能根据硬件型号或步数推断参考身份。
 参考视频、尺寸或跨域读取条件不满足时显示不可用。蒸馏与完整步数分组保留。

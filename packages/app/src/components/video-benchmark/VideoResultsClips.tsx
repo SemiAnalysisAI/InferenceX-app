@@ -5,6 +5,13 @@ import { Button } from '@/components/ui/button';
 import { InfoHelp } from '@/components/ui/option-info';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
+import {
+  stepClipGroup,
+  type ClipEvent,
+  type ClipGroupStep,
+  type ClipPhase,
+  type ClipSnapshot,
+} from './clip-sync';
 import { comparablePoints } from './compare';
 import { hardwareLabel } from './hardware';
 import type { MetricOptions, VideoPoint } from './metrics';
@@ -50,6 +57,7 @@ const STRINGS = {
     retry: 'Retry clips',
     play: 'Play',
     pause: 'Pause',
+    buffering: (percent: number) => `Buffering ${percent}%`,
     audio: 'Audio',
     muted: 'Muted',
     listen: (hardware: string) => `Listen to ${hardware}`,
@@ -114,6 +122,7 @@ const STRINGS = {
     retry: '重试加载视频',
     play: '播放',
     pause: '暂停',
+    buffering: (percent: number) => `缓冲中 ${percent}%`,
     audio: '音频',
     muted: '静音',
     listen: (hardware: string) => `收听 ${hardware}`,
@@ -169,6 +178,28 @@ const display = (value: number | null | undefined, digits = 1) =>
   typeof value === 'number' && Number.isFinite(value)
     ? value.toLocaleString('en-US', { maximumFractionDigits: digits })
     : '—';
+/** Display refresh cap for the transport time and buffering share. */
+const DISPLAY_INTERVAL_MS = 100;
+
+function clipSnapshot(key: string, video: HTMLVideoElement): ClipSnapshot {
+  const time = video.currentTime;
+  let bufferedEnd = 0;
+  for (let index = 0; index < video.buffered.length; index += 1)
+    if (video.buffered.start(index) <= time + 0.1 && video.buffered.end(index) >= time) {
+      bufferedEnd = video.buffered.end(index);
+      break;
+    }
+  return {
+    key,
+    currentTime: time,
+    duration: Number.isFinite(video.duration) ? video.duration : 0,
+    bufferedEnd,
+    readyState: video.readyState,
+    seeking: video.seeking,
+    ended: video.ended,
+    playbackRate: video.playbackRate,
+  };
+}
 
 export default function VideoResultsClips({
   points,
@@ -305,7 +336,9 @@ function SynchronizedClips({
   const videos = useRef(new Map<string, HTMLVideoElement>());
   const canvases = useRef(new Map<string, HTMLCanvasElement>());
   const [time, setTime] = useState(0);
-  const [playing, setPlaying] = useState(false);
+  const [buffered, setBuffered] = useState(0);
+  const [phase, setPhase] = useState<ClipPhase>('paused');
+  const phaseRef = useRef<ClipPhase>('paused');
   const [audioSource, setAudioSource] = useState<string | null>(null);
   const [view, setView] = useState<'clip' | 'difference'>('clip');
   const [durations, setDurations] = useState<Record<string, number>>({});
@@ -346,13 +379,89 @@ function SynchronizedClips({
     };
   }, [audioSource, audibleSource]);
 
-  useEffect(() => {
-    const pause = () => {
-      for (const video of videos.current.values()) video.pause();
-      setPlaying(false);
+  // The frame loop reads group inputs through this ref so it never re-subscribes mid-playback.
+  const live = useRef({ visibleKey, errors, audibleSource, duration });
+  live.current = { visibleKey, errors, audibleSource, duration };
+
+  const dispatch = (event: ClipEvent): ClipGroupStep => {
+    const current = live.current;
+    const clips = current.visibleKey.split(',').flatMap((key) => {
+      const video = videos.current.get(key);
+      return video && !current.errors.has(key) ? [clipSnapshot(key, video)] : [];
+    });
+    const step = stepClipGroup(
+      {
+        phase: phaseRef.current,
+        clips,
+        audible: current.audibleSource,
+        duration: current.duration,
+      },
+      event,
+    );
+    const setPhaseNow = (next: ClipPhase) => {
+      phaseRef.current = next;
+      setPhase(next);
     };
+    const playAll = () =>
+      Promise.allSettled(clips.map((clip) => videos.current.get(clip.key)?.play())).then(
+        (outcomes) => {
+          // pause() interrupting play() rejects with AbortError; that is group control, not a media failure.
+          const rejected = clips.flatMap((clip, index) => {
+            const outcome = outcomes[index];
+            return outcome.status === 'rejected' &&
+              (outcome.reason as { name?: string } | null)?.name !== 'AbortError'
+              ? [clip.key]
+              : [];
+          });
+          if (rejected.length > 0) setErrors((previous) => new Set([...previous, ...rejected]));
+          if (
+            phaseRef.current === 'playing' &&
+            !outcomes.some((outcome) => outcome.status === 'fulfilled')
+          )
+            setPhaseNow('paused');
+        },
+      );
+    for (const action of step.actions) {
+      switch (action.type) {
+        case 'play-all': {
+          void playAll();
+          break;
+        }
+        case 'pause-all': {
+          for (const clip of clips) videos.current.get(clip.key)?.pause();
+          break;
+        }
+        case 'prime': {
+          void playAll();
+          for (const clip of clips) videos.current.get(clip.key)?.pause();
+          break;
+        }
+        case 'seek': {
+          const video = videos.current.get(action.key);
+          if (video) video.currentTime = action.time;
+          break;
+        }
+        case 'rate': {
+          const video = videos.current.get(action.key);
+          if (video) video.playbackRate = action.rate;
+          break;
+        }
+        default: {
+          break;
+        }
+      }
+    }
+    if (step.phase !== phaseRef.current) setPhaseNow(step.phase);
+    return step;
+  };
+  const show = (step: ClipGroupStep) => {
+    setTime(step.time);
+    setBuffered(step.buffered);
+  };
+
+  useEffect(() => {
     const onVisibility = () => {
-      if (document.hidden) pause();
+      if (document.hidden) show(dispatch('pause'));
     };
     document.addEventListener('visibilitychange', onVisibility);
     return () => {
@@ -364,11 +473,28 @@ function SynchronizedClips({
   useEffect(() => {
     for (const [key, video] of videos.current)
       if (!visibleKey.split(',').includes(key)) video.pause();
-    setPlaying(false);
-    for (const video of videos.current.values()) video.pause();
+    show(dispatch('pause'));
   }, [visibleKey]);
 
   useEffect(() => {
+    if (phase !== 'playing' && phase !== 'buffering') return undefined;
+    let frame = 0;
+    let shown = -Infinity;
+    const tick = (now: number) => {
+      const step = dispatch('tick');
+      const running = step.phase === 'playing' || step.phase === 'buffering';
+      if (!running || now - shown >= DISPLAY_INTERVAL_MS) {
+        shown = now;
+        show(step);
+      }
+      if (running) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [phase]);
+
+  useEffect(() => {
+    if (view !== 'difference' || !reference) return undefined;
     let frame = 0;
     let lastDraw = -Infinity;
     const buffer = document.createElement('canvas');
@@ -377,69 +503,48 @@ function SynchronizedClips({
       setDifferenceErrors((previous) =>
         previous.has(key) ? previous : new Set([...previous, key]),
       );
-    const tick = (now: number) => {
-      const active = visibleKey.split(',').flatMap((key) => {
-        const video = videos.current.get(key);
-        return video && !errors.has(key) ? [video] : [];
-      });
-      const leader = active.find((video) => video.readyState >= 2);
-      if (playing && leader) {
-        setTime(leader.currentTime);
-        for (const video of active)
-          if (
-            video !== leader &&
-            video.readyState >= 2 &&
-            Math.abs(video.currentTime - leader.currentTime) > 0.12
-          )
-            video.currentTime = leader.currentTime;
-        if (duration > 0 && leader.currentTime >= duration - 0.02) {
-          for (const video of active) video.pause();
-          setPlaying(false);
-        }
-      }
-      if (view === 'difference' && reference && context && now - lastDraw >= 100) {
-        lastDraw = now;
-        const ref = videos.current.get('reference');
-        if (ref && ref.readyState >= 2 && ref.videoWidth > 0) {
-          buffer.width = ref.videoWidth;
-          buffer.height = ref.videoHeight;
+    const draw = (now: number) => {
+      frame = requestAnimationFrame(draw);
+      if (!context || now - lastDraw < 100) return;
+      lastDraw = now;
+      const ref = videos.current.get('reference');
+      if (!ref || ref.readyState < 2 || ref.videoWidth === 0) return;
+      buffer.width = ref.videoWidth;
+      buffer.height = ref.videoHeight;
+      try {
+        context.drawImage(ref, 0, 0);
+        const base = context.getImageData(0, 0, buffer.width, buffer.height);
+        for (const key of visibleKey.split(',')) {
+          const video = videos.current.get(key),
+            canvas = canvases.current.get(key);
+          if (!video || !canvas || video.readyState < 2) continue;
+          if (video.videoWidth !== ref.videoWidth || video.videoHeight !== ref.videoHeight) {
+            failDifference(key);
+            continue;
+          }
+          if (Math.abs(video.currentTime - ref.currentTime) > 0.12) continue;
           try {
-            context.drawImage(ref, 0, 0);
-            const base = context.getImageData(0, 0, buffer.width, buffer.height);
-            for (const key of visibleKey.split(',')) {
-              const video = videos.current.get(key),
-                canvas = canvases.current.get(key);
-              if (!video || !canvas || video.readyState < 2) continue;
-              if (video.videoWidth !== ref.videoWidth || video.videoHeight !== ref.videoHeight) {
-                failDifference(key);
-                continue;
-              }
-              if (Math.abs(video.currentTime - ref.currentTime) > 0.12) continue;
-              try {
-                context.drawImage(video, 0, 0);
-                const candidate = context.getImageData(0, 0, buffer.width, buffer.height);
-                canvas.width = buffer.width;
-                canvas.height = buffer.height;
-                const target = canvas.getContext('2d');
-                if (target) {
-                  const difference = target.createImageData(buffer.width, buffer.height);
-                  difference.data.set(absoluteFrameDifference(base.data, candidate.data));
-                  target.putImageData(difference, 0, 0);
-                }
-              } catch {
-                failDifference(key);
-              }
+            context.drawImage(video, 0, 0);
+            const candidate = context.getImageData(0, 0, buffer.width, buffer.height);
+            canvas.width = buffer.width;
+            canvas.height = buffer.height;
+            const target = canvas.getContext('2d');
+            if (target) {
+              const difference = target.createImageData(buffer.width, buffer.height);
+              difference.data.set(absoluteFrameDifference(base.data, candidate.data));
+              target.putImageData(difference, 0, 0);
             }
           } catch {
-            for (const key of visibleKey.split(',')) failDifference(key);
+            failDifference(key);
           }
         }
+      } catch {
+        for (const key of visibleKey.split(',')) failDifference(key);
       }
-      frame = requestAnimationFrame(tick);
     };
-    if (playing || view === 'difference') frame = requestAnimationFrame(tick);
+    frame = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(frame);
-  }, [playing, view, reference, visibleKey, errors, duration]);
+  }, [view, reference, visibleKey]);
 
   const changeAudio = (value: string) => {
     const next = audioSources.includes(value) ? value : null;
@@ -449,7 +554,7 @@ function SynchronizedClips({
     const video = next ? videos.current.get(next) : null;
     if (video) {
       video.muted = false;
-      if (playing)
+      if (phaseRef.current === 'playing')
         void video.play().catch(() => {
           video.muted = true;
           setAudioSource((current) => (current === next ? null : current));
@@ -457,28 +562,11 @@ function SynchronizedClips({
     }
   };
 
-  const togglePlay = async () => {
-    track(playing ? 'video_results_clips_pause' : 'video_results_clips_play');
-    if (playing) {
-      for (const video of videos.current.values()) video.pause();
-      setPlaying(false);
-      return;
-    }
-    if (duration > 0 && time >= duration - 0.02) {
-      for (const video of videos.current.values()) video.currentTime = 0;
-      setTime(0);
-    }
-    const outcomes = await Promise.allSettled(
-      playable.map(async (key) => {
-        await videos.current.get(key)?.play();
-        return key;
-      }),
-    );
-    const rejected = outcomes.flatMap((result, index) =>
-      result.status === 'rejected' ? [playable[index]] : [],
-    );
-    if (rejected.length > 0) setErrors((previous) => new Set([...previous, ...rejected]));
-    setPlaying(outcomes.some((result) => result.status === 'fulfilled'));
+  const wantsPlay = phase === 'playing' || phase === 'buffering';
+  const togglePlay = () => {
+    const pausing = phaseRef.current === 'playing' || phaseRef.current === 'buffering';
+    track(pausing ? 'video_results_clips_pause' : 'video_results_clips_play');
+    show(dispatch(pausing ? 'pause' : 'play'));
   };
 
   return (
@@ -589,10 +677,6 @@ function SynchronizedClips({
                   setDurations((previous) => ({ ...previous, reference: value }));
               }}
               onError={() => setErrors((previous) => new Set([...previous, 'reference']))}
-              onEnded={() => {
-                for (const video of videos.current.values()) video.pause();
-                setPlaying(false);
-              }}
             />
             {errors.has('reference') && (
               <p
@@ -693,10 +777,6 @@ function SynchronizedClips({
                         setDurations((previous) => ({ ...previous, [key]: value }));
                     }}
                     onError={() => setErrors((previous) => new Set([...previous, key]))}
-                    onEnded={() => {
-                      for (const video of videos.current.values()) video.pause();
-                      setPlaying(false);
-                    }}
                   />
                 )}
                 {view === 'difference' && clip && (
@@ -792,12 +872,10 @@ function SynchronizedClips({
           variant="outline"
           size="sm"
           disabled={playable.length === 0}
-          aria-pressed={playing}
-          onClick={() => {
-            void togglePlay();
-          }}
+          aria-pressed={wantsPlay}
+          onClick={togglePlay}
         >
-          {playing ? s.pause : s.play}
+          {wantsPlay ? s.pause : s.play}
         </Button>
         <div className="w-40 min-w-0">
           <VideoSelect
@@ -823,16 +901,22 @@ function SynchronizedClips({
           className="h-11 min-w-0 flex-1 basis-28 accent-primary md:h-8"
           onInput={(event) => {
             const next = Number(event.currentTarget.value);
-            setTime(next);
             setDifferenceErrors(new Set());
-            for (const video of videos.current.values())
-              if (video.readyState >= 1) video.currentTime = next;
+            show(dispatch({ type: 'seek', time: next }));
             track('video_results_clips_scrub', { seconds: next });
           }}
         />
         <span className="font-mono text-xs text-muted-foreground">
           {time.toFixed(2)} / {duration > 0 ? duration.toFixed(2) : '—'} {s.seconds}
         </span>
+        {phase === 'buffering' && (
+          <span
+            data-testid="video-results-buffering"
+            className="font-mono text-xs text-muted-foreground"
+          >
+            {s.buffering(Math.round(buffered * 100))}
+          </span>
+        )}
         <div role="group" aria-label={s.view} className="inline-flex gap-1 rounded-lg border p-1">
           {(['clip', 'difference'] as const).map((mode) => (
             <Button
