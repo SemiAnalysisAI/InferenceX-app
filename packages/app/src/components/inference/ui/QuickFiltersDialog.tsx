@@ -1,9 +1,9 @@
 'use client';
 
+import { OptionInfo } from '@/components/ui/option-info';
 import { ListFilter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { OptionInfo } from '@/components/ui/option-info';
 import type { DeploymentMode, SpecMode } from '@/components/inference/types';
 import type { PowerTier } from '@/lib/power/power-tier';
 import { FRAMEWORK_FAMILIES } from '@/components/inference/utils/quickFilters';
