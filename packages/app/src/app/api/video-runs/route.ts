@@ -9,7 +9,7 @@ import {
 } from '@semianalysisai/inferencex-constants';
 import { getGithubToken } from '@/lib/github/github-artifacts';
 import { loadFixture } from '@/lib/testing/test-fixtures';
-import { localVideoReplayResponse } from '@/lib/testing/video-replay';
+import { localVideoReplayResponse } from '@/lib/video/video-replay';
 import { bearerMatches } from '@/lib/api/bearer-auth';
 import {
   VIDEO_HISTORY_MAX_PAGES,
