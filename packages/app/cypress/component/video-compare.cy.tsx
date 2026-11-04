@@ -323,19 +323,13 @@ describe('Video results synchronized clips', () => {
       .find('dl')
       .should('contain', '—');
   });
-  it('keeps unknown hardware empty and cannot draw a difference after the reference decoder fails', () => {
+  it('shows tiles only for measured hardware and cannot draw a difference after the reference decoder fails', () => {
     mountResultsClips();
-    cy.get('[data-testid="video-results-clip"]').should('have.length', 4);
-    cy.get('[data-testid="video-results-clip"][data-hardware="gb200"] video').should('not.exist');
-    cy.get('[data-testid="video-results-clip"][data-hardware="mi355x"] video').should('not.exist');
-    cy.get('[data-testid="video-results-clip"][data-hardware="gb200"]').should(
-      'not.contain',
-      'Unofficial run',
-    );
-    cy.get('[data-testid="video-results-clip"][data-hardware="mi355x"]').should(
-      'not.contain',
-      'Unofficial run',
-    );
+    cy.get('[data-testid="video-results-clip"]')
+      .should('have.length', 2)
+      .then(($tiles) =>
+        expect([...$tiles].map((tile) => tile.dataset.hardware)).to.deep.equal(['b200', 'h200']),
+      );
     cy.get('[data-testid="video-results-reference"] video').then(($video) => {
       const video = $video[0] as HTMLVideoElement;
       video.src = 'data:video/mp4;base64,YmFk';
