@@ -3,6 +3,7 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { renderChartForExport } from '../export-renderer';
 import { D3Chart } from './D3Chart';
 import type { D3ChartProps } from './types';
 
@@ -212,5 +213,27 @@ describe('D3Chart proximity overlay', () => {
   it('is only created when proximity hover is requested', () => {
     draw(lineChart({ ...proximityTooltip, proximityHover: false }));
     expect(container.querySelectorAll('.proximity-overlay')).toHaveLength(0);
+  });
+});
+
+describe('D3Chart PNG export', () => {
+  function exportedPointPosition() {
+    const svg = container.querySelector('svg')!;
+    const clone = svg.cloneNode(true) as SVGSVGElement;
+    document.body.append(clone);
+    renderChartForExport(svg, clone, 1000, 500);
+    const point = clone.querySelector('.point')!;
+    const position = [point.getAttribute('cx'), point.getAttribute('cy')];
+    clone.remove();
+    return position;
+  }
+
+  it('draws the clone at the live zoom', () => {
+    draw(lineChart(undefined));
+    const [cx, cy] = exportedPointPosition();
+    zoomIn();
+    const [zoomedCx, zoomedCy] = exportedPointPosition();
+    expect(zoomedCx).not.toBe(cx);
+    expect(zoomedCy).not.toBe(cy);
   });
 });

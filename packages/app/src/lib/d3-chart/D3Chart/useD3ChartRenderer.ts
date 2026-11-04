@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef } from 'react';
 import * as d3 from 'd3';
 import { getDomainAwareChartWatermark } from '@/lib/runtime/unofficial-domain';
-import { registerChartExportRenderer, renderExportChart } from '../export-renderer';
+import { registerChartExportRenderer } from '../export-registry';
 
 import {
   computeTooltipPosition,
@@ -369,35 +369,17 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
   useLayoutEffect(() => {
     const source = svgRef.current;
     if (!source) return;
-    return registerChartExportRenderer(source, (target, width, height) => {
+    return registerChartExportRenderer(source, (draw) => {
       const scales = scalesRef.current ?? {
         xScale: d3.scaleLinear(),
         yScale: d3.scaleLinear(),
       };
-      const transform = d3.zoomTransform(source);
-      const axes = zoomConfig?.axes ?? 'both';
-      let { xScale, yScale } = scales;
-      if (zoomConfig?.enabled) {
-        if (axes !== 'y' && !isBandScale(xScale)) {
-          xScale = zoomConfig.rescaleX
-            ? zoomConfig.rescaleX(xScale as ContinuousScale, transform)
-            : transform.rescaleX(xScale);
-        }
-        if (axes !== 'x' && !isBandScale(yScale)) {
-          yScale = zoomConfig.rescaleY
-            ? zoomConfig.rescaleY(yScale as ContinuousScale, transform)
-            : transform.rescaleY(yScale);
-        }
-      }
-      const exportProps = {
-        ...props,
-        layers: props.layers.map((layer) => {
-          if (layer.type !== 'scatter' || !layer.canvas) return layer;
-          const points = canvasPointLayerOf<(typeof layer.data)[number]>(source);
-          return points ? { ...layer, data: points.orderedLike(layer.data, layer.keyFn) } : layer;
-        }),
-      };
-      renderExportChart(target, width, height, exportProps, { xScale, yScale });
+      draw(
+        props,
+        zoomConfig?.enabled
+          ? rescaleForZoom(scales.xScale, scales.yScale, zoomConfig, d3.zoomTransform(source))
+          : scales,
+      );
     });
   });
 

@@ -14,8 +14,9 @@ import {
   getExportCaptureDimensions,
   getExportFontFamily,
   normalizeChartSvgWidthsForExport,
-  useChartExport,
-} from './useChartExport';
+} from '@/lib/export/chart-image-export';
+
+import { useChartExport } from './useChartExport';
 
 describe('useChartExport failure messages', () => {
   let root: Root;
@@ -87,6 +88,24 @@ describe('useChartExport failure messages', () => {
     expect(current.isExporting).toBe(false);
     expect(exportContainer.childElementCount).toBe(0);
     expect(chart.textContent).toBe('DeepSeek R1');
+  });
+
+  it('stays in the exporting state until the capture settles', async () => {
+    const capture = Promise.withResolvers<string>();
+    exportMocks.toPng.mockReturnValueOnce(capture.promise);
+    vi.spyOn(window, 'alert').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    let pending = Promise.resolve();
+    await act(async () => {
+      pending = current.exportToImage();
+      await vi.waitFor(() => expect(exportMocks.toPng).toHaveBeenCalledOnce());
+    });
+    expect(current.isExporting).toBe(true);
+    await act(async () => {
+      capture.reject(new Error('stop after capture'));
+      await pending;
+    });
+    expect(current.isExporting).toBe(false);
   });
 
   it.each([true, false])(
