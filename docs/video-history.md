@@ -61,11 +61,14 @@ Native matrix artifacts use `h3-results-<run>-<attempt>-<recipe-fingerprint>` wh
 ## Local replay
 
 The metadata-only fixture answers published/media reads with 204, so server
-preloading does not fall through to production. An explicit original-artifact
-replay still supplies its verified media through the earlier replay gate.
+preloading does not fall through to production. Without `BLOB_READ_WRITE_TOKEN`
+the page skips that preload and the browser reads History itself, which is how
+the fixture and a replay reach it. An explicit original-artifact replay still
+supplies its verified media through the earlier replay gate.
 
 中文：纯元数据 fixture 的 published/media 请求返回 204，避免服务端预读转而访问生产环境。
-显式原始产物回放仍通过优先执行的回放分支提供已校验媒体。
+未设置 `BLOB_READ_WRITE_TOKEN` 时页面跳过该预读，由浏览器自行读取 History，fixture
+和回放数据即由此到达浏览器。显式原始产物回放仍通过优先执行的回放分支提供已校验媒体。
 
 Only in development, `E2E_FIXTURES=1` serves `cypress/fixtures/api/video-history.json` through the existing fixture loader and checksum manifest. The fixture is a metadata-only projection of retained H100/H200/B200 observations and two fidelity artifacts; it contains no infrastructure paths or video bytes. Its synthetic `approved: true` flags exercise the default chart layout and are not real publication receipts. Unknown publication timestamps remain null. The response header `X-VideoGenX-Replay: 1` causes a visible replay notice. These are historical retained observations, not newly measured results or a new publication.
 

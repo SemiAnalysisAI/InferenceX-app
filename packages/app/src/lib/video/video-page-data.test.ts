@@ -1,13 +1,26 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET } from '@/app/api/video-runs/route';
 import { VIDEO_HISTORY_MAX_PAGES, videoHistoryEntry } from '@/components/video-benchmark/history';
 import { referenceQualityFixture } from '@/components/video-benchmark/reference-quality.fixture';
 import { loadVideoPageData } from './video-page-data';
 
 vi.mock('@/app/api/video-runs/route', () => ({ GET: vi.fn() }));
-afterEach(() => vi.resetAllMocks());
+beforeEach(() => vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'test-token'));
+afterEach(() => {
+  vi.resetAllMocks();
+  vi.unstubAllEnvs();
+});
 
 describe('VideoGenX first document', () => {
+  it('leaves History to the client read when video storage is not configured', async () => {
+    vi.stubEnv('BLOB_READ_WRITE_TOKEN', '');
+    const initial = await loadVideoPageData({ unofficialrun: '456' });
+    expect(initial.state.unofficialRun).toBe('456');
+    expect(initial.history).toBeNull();
+    expect(initial.sides).toEqual({});
+    expect(GET).not.toHaveBeenCalled();
+  });
+
   it('loads the complete bounded cohort and only its URL-selected named media before rendering', async () => {
     const original = referenceQualityFixture(20, '123', 7);
     const named = referenceQualityFixture(20, '456', 8, 'b'.repeat(64), 'NVIDIA H100');

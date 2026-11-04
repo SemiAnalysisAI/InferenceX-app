@@ -8,7 +8,12 @@ const row = (hardware: string) =>
 describe('VideoGenX results routes', () => {
   beforeEach(() => {
     readOnlyVideoRequests();
-    cy.intercept('GET', '/api/video-runs?format=history&page=1*').as('history');
+    resultHistory().then((page) => {
+      cy.intercept('GET', '/api/video-runs?format=history&page=1*', {
+        body: page,
+        headers: { 'X-VideoGenX-Replay': '1' },
+      }).as('history');
+    });
   });
 
   it('keeps the shared fixture projection across reload, language changes and detail history', () => {
@@ -22,23 +27,25 @@ describe('VideoGenX results routes', () => {
         'h200',
       ]);
       cy.visit(`/video?${search}`);
+      cy.wait('@history');
       row('h200')
         .find('td')
         .eq(6)
         .invoke('attr', 'data-value')
         .then((value) => {
-          expect(Number(value), 'UI matches the shared projection for the server fixture').to.equal(
-            h200!.cost.participating!.perVideo,
-          );
+          expect(
+            Number(value),
+            'UI matches the shared projection for the intercepted fixture',
+          ).to.equal(h200!.cost.participating!.perVideo);
         });
     });
     cy.get('#checkbox-b200').should('not.be.checked');
-    cy.get('@history.all').should('have.length', 0);
     cy.reload();
     cy.get('#checkbox-b200').should('not.be.checked');
     cy.location('search').then((sharedSearch) => cy.visit(`/zh/video${sharedSearch}`));
     cy.get('#checkbox-b200').should('not.be.checked');
     cy.get('#video-results-chart-title').should('contain', '每 1 美元 TCO 生成的视频秒数');
+    row('h200').should('exist');
     cy.get('label[for="checkbox-b200"]').click();
     row('b200').should('exist');
     cy.location('search').should('not.contain', 'r_hidden=');

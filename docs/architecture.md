@@ -119,7 +119,8 @@ The overview page (`/overview`, `/zh/overview`) is prerendered with the default 
 ### API responses
 
 VideoGenX (`/video` and `/zh/video`) dynamically reads its URL selection, complete
-bounded History cohort and selected clip metadata before rendering. The existing
+bounded History cohort and selected clip metadata before rendering, when video
+storage is configured; without it the browser reads History itself. The existing
 read-only handler is called in process, preserving its repository visibility and
 local replay gates. Initial props contain History and parsed clip sides, including
 known missing media, rather than raw artifact documents. Hydration reuses them;

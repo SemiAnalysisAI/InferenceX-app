@@ -236,8 +236,9 @@ This does not establish sustained capacity.
 
 ## Control coverage
 
-Both language routes seed their first render with the URL-selected complete
-History cohort and exact selected clip metadata. Hydration reuses successful and
+When video storage is configured, both language routes seed their first render
+with the URL-selected complete History cohort and exact selected clip metadata;
+without it the browser reads History as before. Hydration reuses successful and
 known-missing reads; failures retain the existing retry path. Later media sources
 appear independently without clearing matching clips. Videos use `preload=auto`
 to request real first-frame bytes; no poster, generated frame or new media asset
@@ -245,8 +246,8 @@ is introduced. Cold upstream reads can still delay the server response. This is
 a presentation-only loading change: the read-only API selectors, defaults,
 calculations and official/unofficial source membership remain unchanged.
 
-中文：中英文页面首次渲染即带有 URL 所选的完整有界 History 数据及对应视频元数据。
-hydration 复用成功读取和已确认缺失的结果；失败仍可重试。后续媒体源独立显示，
+中文：配置了视频存储时，中英文页面首次渲染即带有 URL 所选的完整有界 History 数据及对应视频元数据；
+未配置时仍由浏览器读取 History。hydration 复用成功读取和已确认缺失的结果；失败仍可重试。后续媒体源独立显示，
 不会先清空仍匹配的视频。视频通过 `preload=auto` 请求真实首帧字节，不新增封面或媒体产物。
 冷启动时，上游读取仍可能延迟服务端响应。这只是加载方式的调整，不改变只读 API 的
 选择项、默认值、计算或正式／指定运行的来源归属。

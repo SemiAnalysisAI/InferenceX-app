@@ -16,6 +16,7 @@ import {
   resultsClipPoints,
 } from '@/components/video-benchmark/results-clips';
 import type { StoredArtifact } from '@/components/video-benchmark/stored';
+import { videoStorageEnabled } from './video-storage';
 
 export type VideoPageSearchParams = Record<string, string | string[] | undefined>;
 
@@ -33,6 +34,9 @@ export async function loadVideoPageData(params: VideoPageSearchParams): Promise<
       search.append(key, value);
   const state = parseResultsState(search.toString());
   const initial: VideoInitialData = { state, history: null, sides: {} };
+  // A seed stops the client read, and without storage the transport has only an empty
+  // History; local fixture and replay data reach the browser through that client read.
+  if (!videoStorageEnabled()) return initial;
 
   try {
     const historyResponse = await request({
