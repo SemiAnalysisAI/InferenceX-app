@@ -1574,7 +1574,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/video/video-replay.ts',
-    sourceSha256: '350ef35fa3107054edba422cf88da6728239541d6dd7f3a99e8708ddf930d7ad',
+    sourceSha256: 'f7095cc59ca891de5b57c96ebadde92b039c3a389ebb4ee70a14f3091ba6a781',
     reviewArea: {
       en: 'Development-only original artifact replay, exact source media membership and private byte-range delivery.',
       zh: '仅开发环境使用的原始产物回放、精确来源媒体匹配及私有字节区间读取。',

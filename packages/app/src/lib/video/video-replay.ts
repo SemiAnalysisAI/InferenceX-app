@@ -20,6 +20,21 @@ interface Snapshot {
 
 let cached: { manifest: string; value: Promise<Snapshot[]> } | null = null;
 
+/** Serves one verified attachment file from the replay snapshot and returns its asset URL. */
+function replayAssetUrl(replay: Snapshot, source: string, path: string, blob: Blob) {
+  const files = replay.media.get(source) ?? new Map<string, Blob>();
+  files.set(path, blob);
+  replay.media.set(source, files);
+  const query = new URLSearchParams({
+    format: 'replay-asset',
+    run: replay.stored.runId,
+    artifact: String(replay.stored.artifact.id),
+    source,
+    path,
+  });
+  return `/api/video-runs?${query}`;
+}
+
 function active() {
   return (
     process.env.NODE_ENV === 'development' &&
@@ -114,24 +129,14 @@ function snapshot(): Promise<Snapshot[]> {
                   pair.candidate.artifact_id === replay.stored.artifact.id,
               )
               .map((pair) => {
-                const source = `reference:${pair.reference.receipt_sha256}`;
-                const files = replay.media.get(source) ?? new Map<string, Blob>();
-                files.set(
-                  pair.reference.media_path,
-                  quality.media.get(pair.reference.receipt_sha256)!.get(pair.reference.media_path)!,
+                const { receipt_sha256: receipt, media_path: path } = pair.reference;
+                const url = replayAssetUrl(
+                  replay,
+                  `reference:${receipt}`,
+                  path,
+                  quality.media.get(receipt)!.get(path)!,
                 );
-                replay.media.set(source, files);
-                const query = new URLSearchParams({
-                  format: 'replay-asset',
-                  run: replay.stored.runId,
-                  artifact: String(replay.stored.artifact.id),
-                  source,
-                  path: pair.reference.media_path,
-                });
-                return {
-                  ...pair,
-                  reference: { ...pair.reference, url: `/api/video-runs?${query}` },
-                };
+                return { ...pair, reference: { ...pair.reference, url } };
               });
           }
         }
@@ -150,20 +155,13 @@ function snapshot(): Promise<Snapshot[]> {
                   pair.origin.artifact_id === replay.stored.artifact.id,
               )
               .map((pair) => {
-                const mediaUrl = (receipt: string, path: string) => {
-                  const source = `diagnostic:${receipt}`;
-                  const files = replay.media.get(source) ?? new Map<string, Blob>();
-                  files.set(path, diagnostics.media.get(receipt)!.get(path)!);
-                  replay.media.set(source, files);
-                  const query = new URLSearchParams({
-                    format: 'replay-asset',
-                    run: replay.stored.runId,
-                    artifact: String(replay.stored.artifact.id),
-                    source,
+                const mediaUrl = (receipt: string, path: string) =>
+                  replayAssetUrl(
+                    replay,
+                    `diagnostic:${receipt}`,
                     path,
-                  });
-                  return `/api/video-runs?${query}`;
-                };
+                    diagnostics.media.get(receipt)!.get(path)!,
+                  );
                 return {
                   ...pair,
                   candidate: {
