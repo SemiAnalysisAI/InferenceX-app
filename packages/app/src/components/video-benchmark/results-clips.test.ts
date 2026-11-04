@@ -33,10 +33,11 @@ const side = (
   generationKey,
   quality: new Map(),
   records,
-  urls: new Map(
-    records.flatMap((r) =>
-      r.mediaPath ? [[r.mediaPath, `https://media.test/${hardwareKey}/${r.mediaPath}`]] : [],
-    ),
+  media: new Map(
+    records.flatMap((r) => {
+      const url = `https://media.test/${hardwareKey}/${r.mediaPath}`;
+      return r.mediaPath ? [[r.mediaPath, { url, downloadUrl: url }]] : [];
+    }),
   ),
 });
 

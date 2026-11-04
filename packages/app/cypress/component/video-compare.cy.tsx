@@ -27,6 +27,7 @@ const pick = (label: string, option: string) => {
   cy.get(`[role="combobox"][aria-label="${label}"]`).click();
   cy.contains('[role="option"]', option).click();
 };
+const tileVideo = (key: string) => cy.get(`[data-hardware="${key}"] video`);
 const expectAudio = (source: string | null) =>
   cy.get<HTMLVideoElement>('video').should(($videos) => {
     for (const video of $videos) {
@@ -41,8 +42,9 @@ function mountResultsClips(
   pathname = '/video',
   diagnostics = false,
   unofficialRun?: string,
+  previews: string[] = [],
 ) {
-  const referenceMedia = { url: '', diagnosticUrl: '' };
+  const referenceMedia = { url: '', diagnosticUrl: '', previewUrl: '' };
   cy.fixture('video-results/reference.mp4', 'base64').then((encoded: string) => {
     cy.window().then((win) => {
       const bytes = Uint8Array.from(win.atob(encoded), (char) => char.codePointAt(0)!);
@@ -55,6 +57,17 @@ function mountResultsClips(
       }
     });
   });
+  if (previews.length > 0)
+    // A visibly different stand-in for the web encode, so Difference against it would not be zero.
+    cy.fixture('video-results/candidate.mp4', 'base64').then((encoded: string) => {
+      cy.window().then((win) => {
+        const bytes = Uint8Array.from(win.atob(encoded), (char) => char.codePointAt(0)!);
+        referenceMedia.previewUrl = win.URL.createObjectURL(
+          new win.Blob([bytes], { type: 'video/mp4' }),
+        );
+        cy.wrap(referenceMedia.previewUrl).as('preview-url');
+      });
+    });
   for (const key of keys) {
     cy.fixture(`video-results/${key === 'h200' ? 'reference' : 'candidate'}.mp4`, 'base64').then(
       (encoded: string) => {
@@ -73,8 +86,11 @@ function mountResultsClips(
           ]);
           saved.sources[0].assets = saved.sources[0].assets.map(([path, asset]) => [
             path,
-            { ...asset, url },
+            previews.includes(key)
+              ? { ...asset, url, previewUrl: referenceMedia.previewUrl }
+              : { ...asset, url },
           ]);
+          cy.wrap(url).as(`original-${key}`);
           const qualityFixture = referenceQualityFixture();
           const [quality] = verifiedReferencePairs(
             qualityFixture.attachment,
@@ -265,7 +281,8 @@ describe('Video results synchronized clips', () => {
       .should('contain', c1('b200').runId)
       .and('contain', c1('b200').runtime)
       .and('contain', c1('h200').runId)
-      .and('contain', c1('h100').runId);
+      .and('contain', c1('h100').runId)
+      .and('not.contain', 'web encode');
 
     cy.get('[data-testid="video-results-prompt"]')
       .should('contain', 'A drummer taps a snare drum.')
@@ -343,5 +360,36 @@ describe('Video results synchronized clips', () => {
       'contain',
       'No sealed reference pair for this clip.',
     );
+  });
+  it('plays a web rendition in Clip view and the sealed original for Difference, also for an overlay', () => {
+    mountResultsClips(['b200', 'h200'], '/video', false, c1('h200').runId, ['h200']);
+    cy.get('[data-hardware="h200"]').should('contain', 'Unofficial run');
+    cy.get('@preview-url').then((url) => tileVideo('h200').should('have.attr', 'src', url));
+    cy.get('@original-b200').then((url) => tileVideo('b200').should('have.attr', 'src', url));
+    cy.get('[data-testid="video-results-sources"] summary').click();
+    cy.get('[data-testid="video-results-prompt"]').should(
+      'contain',
+      'Playback uses a web encode; Difference, PSNR and the media link use the original.',
+    );
+    cy.get('@original-h200').then((url) =>
+      cy
+        .get('[data-testid="video-results-sources"] tbody tr')
+        .eq(1)
+        .find('a')
+        .should('have.attr', 'href', url),
+    );
+
+    cy.get('[data-testid="video-results-view"][data-view="difference"]').click();
+    cy.get('@original-h200').then((url) => tileVideo('h200').should('have.attr', 'src', url));
+    // The h200 original equals the reference, so only the original yields a black difference.
+    cy.get('[data-testid="video-results-clip"][data-hardware="h200"] canvas').should(($canvas) => {
+      const rgba = ($canvas[0] as HTMLCanvasElement)
+        .getContext('2d')!
+        .getImageData(0, 0, 1, 1).data;
+      expect([...rgba]).to.deep.equal([0, 0, 0, 255]);
+    });
+
+    cy.get('[data-testid="video-results-view"][data-view="clip"]').click();
+    cy.get('@preview-url').then((url) => tileVideo('h200').should('have.attr', 'src', url));
   });
 });

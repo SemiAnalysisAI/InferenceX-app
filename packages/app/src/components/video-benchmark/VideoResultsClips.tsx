@@ -49,6 +49,7 @@ const STRINGS = {
       'Single-clip rerun with fixed noise and parallelism. Charts below use the original 20-clip run.',
     diagnosticMetric: 'Not provided for this diagnostic.',
     media: 'Media',
+    webEncode: 'Playback uses a web encode; Difference, PSNR and the media link use the original.',
     seed: 'seed',
     take: (n: number) => `take ${n}`,
     noPair: 'No retained clips share a verified prompt, seed, take and generation configuration.',
@@ -115,6 +116,7 @@ const STRINGS = {
       '单条视频重跑，使用固定的初始噪声和并行配置。下方图表仍展示原始 20 条视频的测试结果。',
     diagnosticMetric: '此次重跑未提供该指标。',
     media: '视频文件',
+    webEncode: '播放时使用网页转码版本；差异、PSNR 和视频文件链接仍使用原始视频。',
     seed: 'seed',
     take: (n: number) => `第 ${n} 次`,
     noPair: '没有 prompt、seed、重复次数和生成配置均已核实一致的保留视频。',
@@ -613,6 +615,9 @@ function SynchronizedClips({
               {s.seed} {group.seed} · {diagnostic ? s.diagnostic : s.take(group.take)}
             </p>
           )}
+          {visible.some((key) => group?.clips.get(key)?.previewUrl) && (
+            <p className="text-muted-foreground">{s.webEncode}</p>
+          )}
         </div>
         <div className="mt-3 overflow-x-auto">
           <table className="w-full min-w-[44rem] text-left">
@@ -778,7 +783,11 @@ function SynchronizedClips({
                       if (element) videos.current.set(key, element);
                       else videos.current.delete(key);
                     }}
-                    src={clip.url}
+                    src={
+                      view === 'difference' && pairedReference
+                        ? clip.url
+                        : (clip.previewUrl ?? clip.url)
+                    }
                     crossOrigin="anonymous"
                     muted
                     playsInline

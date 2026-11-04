@@ -1638,7 +1638,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results-clips.ts',
-    sourceSha256: 'd4b378c1784163ec053f5a92dd3ee4096ddaee170d569d63f223766bd11183a6',
+    sourceSha256: 'f4a0eccdba30ad3d4ed9c5da26022513cf21d985364badb90475f2d459b0d756',
     reviewArea: {
       en: 'Exact candidate/reference pairing and per-clip quality projection shared by Results and the overview API.',
       zh: 'Results 与 overview API 共用的精确候选/参考配对及逐条质量投影。',
@@ -1718,7 +1718,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/compare.ts',
-    sourceSha256: '3ae75e6a93dd6db966a4a3b0d36caadc36178db28b766921759d0f26a3c2b073',
+    sourceSha256: '2031501278a03b6888885cfff2b8f66a45be33f745db4ccfe01ca34728ea2fd9',
     reviewArea: {
       en: 'VideoGenX public dashboard selectors, source identity and shared numerical projection.',
       zh: 'VideoGenX 公开仪表板的选择项、来源身份与共享数值投影。',

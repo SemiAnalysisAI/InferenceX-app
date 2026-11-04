@@ -53,7 +53,7 @@ describe('VideoGenX first document', () => {
     const sides = Object.values(initial.sides);
     expect(sides).toHaveLength(1);
     expect(sides[0]?.hardwareKey).toBe('h100');
-    expect(sides[0]?.urls.get(path)).toBe('/named.mp4');
+    expect(sides[0]?.media.get(path)?.url).toBe('/named.mp4');
     expect(GET).toHaveBeenCalledTimes(2);
   });
 
