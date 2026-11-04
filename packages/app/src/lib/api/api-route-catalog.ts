@@ -1478,7 +1478,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/benchmarks/benchmark-transform.ts',
-    sourceSha256: '388fde4ab324f87dc45b8872ccf3660a8b14637fa39cdb5f1348ee628400ebde',
+    sourceSha256: '97b97962a9c09df7d7abfe84b6f4cb78d0b0500c9e41bf1fd785d040fcb59ad4',
     reviewArea: {
       en: 'Raw benchmark means and derived reciprocal mean-TPOT interactivity used by Dashboard and read-only views.',
       zh: '仪表板和只读视图共用的原始 benchmark 均值与 mean TPOT 倒数形式的 interactivity。',
@@ -1687,7 +1687,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/calculator/throughput-data.ts',
-    sourceSha256: '2fa8717e7626307c4d3f9408fafa5908718e0cb1beb8d1173c6a657341845a10',
+    sourceSha256: '77455329d9249cf9f99a5b4aa8b53cfaa74ef8c9a5a5713851da756ef88a02aa',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1732,7 +1732,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/lib/views-api/series.ts',
-    sourceSha256: 'f3b64e5e8ea6374c83d1dff8e128600ecc3d9083cead6a122674247a4fa78836',
+    sourceSha256: '28d0eb9cad09282a11126eb28a399efbe61a8cf57ce40e911c8d4ca9e666b08f',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1918,7 +1918,7 @@ export const apiContractSourceDigests = [
     // AgentX cookbook documents the model; no endpoint or parameter shape changes.
     // GLM-5.3-Flash / glm5.3flash is separate from GLM-5.2/5.3; the API
     // model documentation and AgentX cookbook describe the publication boundary.
-    sourceSha256: '2727c70b999445eab770a6095d362e33b94354aabb90bacaa35eb165f1b1ae52',
+    sourceSha256: 'c635cd27433e15298093460ef8b1b2ae8cfe87928c2fc8352036a52bbe809aa9',
     reviewArea: {
       en: 'Published benchmark and TCO model names, aliases, and parameter enums.',
       zh: '已发布基准与 TCO 模型名称、别名和参数枚举。',
