@@ -14,12 +14,6 @@ export interface ComparePair {
   candidate: string | null;
 }
 
-export const DEFAULT_VIDEO_COMPARE_SELECTION: VideoCompareSelection = {
-  baseline: null,
-  candidate: null,
-  caseIndex: 0,
-};
-
 const HARDWARE_KEY = /^[a-z0-9][a-z0-9-]{0,31}$/u;
 const CASE_INDEX = /^\d{1,4}$/u;
 
