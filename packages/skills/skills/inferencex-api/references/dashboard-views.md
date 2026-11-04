@@ -18,6 +18,10 @@ the landing page. Existing model-specific links and historical results remain av
 
 Inference places Scenario beside Cost Tier and TCO Basis below the plot on desktop
 and mobile. An empty selection keeps Scenario below the empty chart for recovery.
+The shared Scenario control, including its label and help icon, is omitted when
+there is only one available scenario. Multiple scenarios remain selectable.
+This visibility rule is presentation-only: the selected sequence, API parameters,
+defaults, measurements, and unofficial overlay data are unchanged.
 PowerX keeps Scenario beside Model on desktop and inside More chart controls on
 mobile. Both surfaces put Precision and Run context (date, run selection and
 changelog) inside More chart controls on mobile; Model stays visible. Desktop keeps
