@@ -436,8 +436,13 @@ function SynchronizedClips({
           break;
         }
         case 'prime': {
-          void playAll();
-          for (const clip of clips) videos.current.get(clip.key)?.pause();
+          // A prime is not a start. Its own pause() rejects every play() with AbortError, so there is no outcome to read.
+          for (const clip of clips) {
+            const video = videos.current.get(clip.key);
+            if (!video) continue;
+            void video.play().catch(() => {});
+            video.pause();
+          }
           break;
         }
         case 'seek': {
