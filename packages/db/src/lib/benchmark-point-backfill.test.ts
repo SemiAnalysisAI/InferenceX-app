@@ -123,4 +123,16 @@ describe('benchmark point backfill recovery', () => {
       ),
     ).toBeNull();
   });
+
+  it('moves a point still on the mtp config and treats the none config as applied', () => {
+    const relabel = BENCHMARK_POINT_BACKFILLS.find((b) => b.set.specMethod === 'none')!;
+    const metrics = { output_tput_per_gpu: 42 };
+    const row = {
+      offload_mode: relabel.offloadMode,
+      recipe_fingerprint: relabel.recipeFingerprint,
+      metrics,
+    };
+    expect(planBenchmarkPointBackfill({ ...row, spec_method: 'mtp' }, relabel)).toEqual(metrics);
+    expect(planBenchmarkPointBackfill({ ...row, spec_method: 'none' }, relabel)).toBeNull();
+  });
 });

@@ -242,7 +242,11 @@ Benchmark point backfills use the same complete point selector as audited point 
 `metricsMerge`, top-level `metricsRemove`, and `offloadMode`. Setting `offloadMode`
 updates both the first-class column and `metrics.offload_mode`; for example, a missed CPU
 KV offload annotation can set `offloadMode: 'on'` and merge `kv_offloading` plus backend
-metadata in one correction. Unrelated metrics remain unchanged.
+metadata in one correction. Unrelated metrics remain unchanged. Setting `specMethod`
+moves the point to the config that differs only in its speculative decoding method and
+adds that method's availability row, dropping the old method's row once no point uses
+it. `SPEC_METHOD_BACKFILLS` (`spec-method-backfills.ts`) uses it for AgentX points the
+matrix labeled `mtp` whose server never drafted.
 
 When extending an already-applied identity-changing correction, record its old
 `set` as `previousSet`. The recovery command accepts that declared prior patch

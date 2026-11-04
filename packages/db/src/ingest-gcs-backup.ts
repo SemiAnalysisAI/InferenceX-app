@@ -578,7 +578,11 @@ async function main(): Promise<void> {
               `${plan.backfillId}: config ${configId}, conc ${row.conc}`,
           );
         }
-        toInsert.push(plan.point);
+        toInsert.push(
+          plan.point.config === row.config
+            ? plan.point
+            : { ...plan.point, configId: await getOrCreateConfig(plan.point.config) },
+        );
       }
       if (toInsert.length > 0) {
         try {
