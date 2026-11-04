@@ -637,6 +637,20 @@ export function softwareGainByInteractivity(
   });
 }
 
+/** Largest software-gain bar magnitude across playback, in log2 units. */
+export function softwareGainBarMaxLog(
+  history: FrontierHistory,
+  keys: readonly string[],
+  buckets: readonly number[],
+): number {
+  let max = 1;
+  for (const key of keys)
+    for (let index = 0; index < history.dates.length; index++)
+      for (const { ratio } of softwareGainByInteractivity(history, key, index, buckets))
+        if (ratio !== null) max = Math.max(max, Math.abs(Math.log2(ratio)));
+  return Math.min(max, 6);
+}
+
 export interface LeadMargin {
   /** Interactivity in tok/s/user. */
   x: number;

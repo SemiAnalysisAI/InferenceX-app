@@ -14,6 +14,7 @@ import {
   frontierValueAt,
   historyFromFirstData,
   softwareGainByInteractivity,
+  softwareGainBarMaxLog,
   softwareGains,
   vendorsAtOtherPrecisions,
   leadMargins,
@@ -427,5 +428,18 @@ describe('software gains', () => {
     expect(slow.ratio).toBeCloseTo(2);
     expect(mid.ratio).toBeCloseTo(2);
     expect(beyond.ratio).toBeNull();
+  });
+
+  it('keeps the bar scale large enough for a peak before the final snapshot', () => {
+    const history = buildFrontierHistory(
+      [
+        ...sweep('h200', '2026-03-01', 1, 'trt:1.0'),
+        ...sweep('h200', '2026-03-20', 4, 'trt:1.1'),
+        ...sweep('h200', '2026-04-10', 2, 'trt:1.2'),
+      ],
+      { ...OPTIONS, groupBy: 'gpu' },
+    );
+    expect(softwareGainByInteractivity(history, 'h200', 2, [20])[0].ratio).toBeCloseTo(2);
+    expect(softwareGainBarMaxLog(history, ['h200'], [20])).toBeCloseTo(2);
   });
 });

@@ -19,6 +19,7 @@ import type { FrontierSeriesStyle } from './FrontierChart';
 import {
   comparisonBuckets,
   FRONTIER_COMPARISON_BUCKETS,
+  softwareGainBarMaxLog,
   softwareGainByInteractivity,
   softwareGains,
   type FrontierHistory,
@@ -140,19 +141,11 @@ export function FrontierSoftwareGainBars({
   const t = STRINGS[useLocale()];
   const { dimensions, setContainerRef } = useResponsiveChartDimensions({ height: PANEL_HEIGHT });
   const buckets = useMemo(() => comparisonBuckets(history, FRONTIER_COMPARISON_BUCKETS), [history]);
-  // Fixed scale across every date so bars grow instead of the axis rescaling.
-  const maxLog = useMemo(() => {
-    let max = 1;
-    for (const key of keys)
-      for (const { ratio } of softwareGainByInteractivity(
-        history,
-        key,
-        history.dates.length - 1,
-        buckets,
-      ))
-        if (ratio !== null) max = Math.max(max, Math.abs(Math.log2(ratio)));
-    return Math.min(max, 6);
-  }, [history, keys, buckets]);
+  // Fixed scale across every date so playback never clips an earlier peak.
+  const maxLog = useMemo(
+    () => softwareGainBarMaxLog(history, keys, buckets),
+    [history, keys, buckets],
+  );
 
   if (keys.length === 0) return null;
   const rows = keys.map((key) => ({
@@ -163,16 +156,7 @@ export function FrontierSoftwareGainBars({
   const height = dimensions.height - PANEL_MARGIN.top - PANEL_MARGIN.bottom;
   const x = d3.scaleBand<number>().domain(buckets).range([0, width]).paddingInner(0.25);
   const inner = d3.scaleBand<string>().domain(keys).range([0, x.bandwidth()]).paddingInner(0.1);
-  const minLog = Math.min(
-    0,
-    ...rows.flatMap((row) =>
-      row.gains.flatMap((g) => (g.ratio === null ? [] : [Math.log2(g.ratio)])),
-    ),
-  );
-  const y = d3
-    .scaleLinear()
-    .domain([Math.max(-maxLog, minLog), maxLog])
-    .range([height, 0]);
+  const y = d3.scaleLinear().domain([-maxLog, maxLog]).range([height, 0]);
   const ticks = d3.range(Math.ceil(y.domain()[0]), Math.floor(maxLog) + 1);
   const label = (key: string) => styles.get(key)?.label ?? key;
 

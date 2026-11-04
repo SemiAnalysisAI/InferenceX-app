@@ -284,6 +284,7 @@ export default function FrontierView({
   );
   const [playing, setPlaying] = useState(false);
   const [memeOvertake, setMemeOvertake] = useState<FrontierOvertake | null>(null);
+  const dismissMeme = useCallback(() => setMemeOvertake(null), []);
   const holdUntil = useRef(0);
   // One meme per playback run: the first time another vendor takes ground from NVIDIA.
   const memeShownThisRun = useRef(false);
@@ -528,7 +529,7 @@ export default function FrontierView({
         dateIndex={dateIndex}
         plotOverlay={
           memesEnabled && memeContext ? (
-            <FrontierMemeOverlay context={memeContext} onDismiss={() => setMemeOvertake(null)} />
+            <FrontierMemeOverlay context={memeContext} onDismiss={dismissMeme} />
           ) : undefined
         }
       />
