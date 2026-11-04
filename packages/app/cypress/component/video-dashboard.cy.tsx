@@ -59,6 +59,9 @@ const points = (selector = '') =>
 const openRow = (hardware: string, overlay = false) =>
   row(hardware).filter(`[data-overlay="${overlay}"]`).find('button').click();
 const toggleHardware = (hardware: string) => cy.get(`label[for="checkbox-${hardware}"]`).click();
+const clips = () => cy.get<HTMLVideoElement>('[data-testid="video-results-clip"] video');
+const clip = (hardware: string) =>
+  cy.get<HTMLVideoElement>(`[data-testid="video-results-clip"][data-hardware="${hardware}"] video`);
 const searchParam = (key: string) =>
   cy.location('search').then((search) => new URLSearchParams(search).get(key));
 const plottedY = (hardware: string) =>
@@ -279,6 +282,69 @@ describe('VideoGenX results', () => {
     cy.get('[data-testid="video-results-clip"][data-hardware="b200"] video').should('exist');
     cy.get('@approvedMedia.all').should('have.length', 1);
     row('b200').should('have.length', 1).and('have.attr', 'data-overlay', 'false');
+  });
+
+  it('holds every clip while one lacks data, then resumes together, ends and restarts from zero', () => {
+    mount({
+      editPage: (page) => {
+        cy.intercept('GET', 'https://media.test/**', {
+          fixture: 'video-results/candidate.mp4,null',
+          headers: { 'Content-Type': 'video/mp4', 'Access-Control-Allow-Origin': '*' },
+        });
+        for (const [hardware, name] of [
+          ['b200', 'NVIDIA B200'],
+          ['h200', 'NVIDIA H200'],
+        ] as const) {
+          const point = videoPoints([page]).find(
+            (item) => item.hardwareKey === hardware && item.concurrency === 1,
+          )!;
+          const saved = servingArtifact(Number(point.runId), point.artifactId, name);
+          saved.sources[0].checksums = saved.sources[0].checksums.map(([path, sha]) => [
+            path,
+            path === 'manifest.json' ? point.id.split(':')[0] : sha,
+          ]);
+          cy.intercept(
+            'GET',
+            `/api/video-runs?run=${point.runId}&artifact=${point.artifactId}&format=published`,
+            saved,
+          );
+        }
+      },
+    });
+    clips().should('have.length', 2).and('have.attr', 'preload', 'auto');
+    clips().should(($videos) => {
+      for (const video of $videos) expect(video.readyState, 'fixture decoded').to.be.at.least(3);
+    });
+    clip('b200').then(($video) => {
+      Object.defineProperty($video[0], 'readyState', { value: 2, configurable: true });
+    });
+    cy.get('[data-testid="video-results-play"]').click();
+    cy.get('[data-testid="video-results-buffering"]').should('contain', 'Buffering');
+    cy.get('[data-testid="video-results-play"]').should('have.attr', 'aria-pressed', 'true');
+    cy.wait(300);
+    clips().should(($videos) => {
+      for (const video of $videos) expect(video.paused, 'no clip starts early').to.equal(true);
+    });
+    clip('b200').then(($video) => {
+      delete ($video[0] as unknown as Record<string, unknown>).readyState;
+    });
+    cy.get('[data-testid="video-results-buffering"]').should('not.exist');
+    cy.get('[data-testid="video-results-play"]', { timeout: 10000 }).should(
+      'have.attr',
+      'aria-pressed',
+      'false',
+    );
+    clips().should(($videos) => {
+      const times = [...$videos].map((video) => video.currentTime);
+      expect(Math.min(...times), 'ended at the shared duration').to.be.at.least(1.6);
+      expect(Math.max(...times) - Math.min(...times), 'ended together').to.be.lessThan(0.3);
+      for (const video of $videos) expect(video.paused).to.equal(true);
+    });
+    cy.get('[data-testid="video-results-play"]').click();
+    cy.get('[data-testid="video-results-play"]').should('have.attr', 'aria-pressed', 'true');
+    clips().should(($videos) => {
+      for (const video of $videos) expect(video.currentTime, 'restarted').to.be.lessThan(1);
+    });
   });
 
   it('keeps matching summaries distinct and selects the exact source ID', () => {
