@@ -21,7 +21,7 @@ import { termBloomGroups } from './server-log-block-search';
 function withoutBlockStorage(call: Mock): DbClient {
   return ((strings: TemplateStringsArray, ...values: unknown[]) =>
     strings.join('').includes('server_log_block_files')
-      ? Promise.resolve([])
+      ? Promise.reject(Object.assign(new Error('no blocks'), { code: '42P01' }))
       : call(strings, ...values)) as unknown as DbClient;
 }
 
@@ -182,38 +182,50 @@ describe('block-backed files', () => {
   });
 });
 
-function blockBackedSql(text: string, fetched: number[] = []): DbClient {
-  const blocks = encodeServerLogBlocks(text);
+function blockBackedSql(texts: Record<string, string>, fetched: string[] = []): DbClient {
+  const files = Object.entries(texts).map(([name, text]) => ({
+    name,
+    chars: countCodePoints(text),
+    blocks: encodeServerLogBlocks(text),
+  }));
   return ((strings: TemplateStringsArray, ...values: unknown[]) => {
     const query = strings.join('');
-    if (query.includes('block_index = any')) {
-      const wanted = values[2] as number[];
-      fetched.push(...wanted);
+    if (query.includes('with ordinality')) {
+      const [ids, names, indexes] = [
+        values[0] as string[],
+        values[1] as string[],
+        values[2] as number[],
+      ];
+      if (ids.some((id) => id !== '7')) return Promise.reject(new Error(`bad ids ${ids}`));
+      fetched.push(names.map((name, i) => `${name}#${indexes[i]}`).join(' '));
       return Promise.resolve(
-        blocks
-          .filter((b) => wanted.includes(b.blockIndex))
-          .map((b) => ({ block_index: b.blockIndex, data: b.data })),
+        names
+          .map((name, i) => ({
+            ord: String(i + 1),
+            data: files.find((f) => f.name === name)!.blocks[indexes[i]].data,
+          }))
+          .toReversed(),
       );
     }
-    if (!query.includes('server_log_block_files'))
-      return Promise.resolve([{ file_name: 'frontend.out' }]);
     const groups = values[3] as number[];
-    const bits = values[5] as number[];
+    const bits = values[4] as number[];
     return Promise.resolve(
-      blocks.map((b) => ({
-        file_name: 'frontend.out',
-        log_id: '7',
-        file_chars: countCodePoints(text),
-        block_index: b.blockIndex,
-        char_offset: b.charOffset,
-        char_count: b.charCount,
-        ascii: b.ascii,
-        candidate: groups.every((group) =>
-          bits.some(
-            (bit, i) => groups[i] === group && ((b.bloom[bit >>> 3] >> (bit & 7)) & 1) === 1,
+      files.flatMap((file) =>
+        file.blocks.map((b) => ({
+          file_name: file.name,
+          log_id: '7',
+          file_chars: file.chars,
+          block_index: b.blockIndex,
+          char_offset: b.charOffset,
+          char_count: b.charCount,
+          ascii: b.ascii,
+          candidate: groups.every((group) =>
+            bits.some(
+              (bit, i) => groups[i] === group && ((b.bloom[bit >>> 3] >> (bit & 7)) & 1) === 1,
+            ),
           ),
-        ),
-      })),
+        })),
+      ),
     );
   }) as unknown as DbClient;
 }
@@ -226,8 +238,8 @@ describe('searchServerLogs on a block-backed file', () => {
   const filler = `${'x'.repeat(straddle)}zebra${'x'.repeat(chunk - 10 - straddle)}`;
   const text = prefix + filler + tail;
   const total = [...prefix].length + filler.length + [...tail].length;
-  const fetched: number[] = [];
-  const sql = blockBackedSql(text, fetched);
+  const fetched: string[] = [];
+  const sql = blockBackedSql({ 'frontend.out': text }, fetched);
 
   function sqlLoop(term: string, limit: number) {
     const chars = [...prefix];
@@ -281,7 +293,7 @@ describe('searchServerLogs on a block-backed file', () => {
     const expected = sqlLoop('é ready', 50);
     expect(expected.matches).toHaveLength(1);
     await expect(searchServerLogs(sql, 42, 'é ready', 50)).resolves.toEqual(expected);
-    expect(fetched).toEqual([3, 4]);
+    expect(fetched).toEqual(['frontend.out#3 frontend.out#4']);
   });
 
   it('finds a term across a block boundary', async () => {
@@ -289,11 +301,101 @@ describe('searchServerLogs on a block-backed file', () => {
     expect(expected.matches.map((m) => m.offset)).toEqual([SERVER_LOG_BLOCK_CHARS - 2]);
     await expect(searchServerLogs(sql, 42, 'ZEBRA', 50)).resolves.toEqual(expected);
   });
+
+  it('finds a match at the first character of the file', async () => {
+    const expected = sqlLoop('😀ready', 50);
+    expect(expected.matches.map((m) => m.offset)).toEqual([0, 12]);
+    await expect(searchServerLogs(sql, 42, '😀READY', 50)).resolves.toEqual(expected);
+  });
+});
+
+const needleAt = (offset: number, length: number) =>
+  `${'x'.repeat(offset)}Needle${'x'.repeat(length - offset - 6)}`;
+
+describe('searchServerLogs across block-backed files', () => {
+  const block = SERVER_LOG_BLOCK_CHARS;
+  const fetched: string[] = [];
+  const sql = blockBackedSql(
+    {
+      'a.out': needleAt(5, block) + 'x'.repeat(block) + needleAt(block - 3, block + 10),
+      'b.out': 'y'.repeat(block) + needleAt(7, block),
+    },
+    fetched,
+  );
+
+  it('fetches later candidate blocks of every file ahead in one query', async () => {
+    const result = await searchServerLogs(sql, 42, 'needle', 50);
+    expect(result.matches.map((m) => [m.fileName, m.offset, m.match])).toEqual([
+      ['a.out', 5, 'Needle'],
+      ['a.out', 3 * block - 3, 'Needle'],
+      ['b.out', block + 7, 'Needle'],
+    ]);
+    expect(result.matches[1].after).toBe('xxxxxxx');
+    expect(fetched).toEqual(['a.out#0 a.out#1', 'a.out#2 a.out#3 b.out#0 b.out#1']);
+  });
+});
+
+describe('searchServerLogs at block and slice edges', () => {
+  const block = SERVER_LOG_BLOCK_CHARS;
+  const sql = blockBackedSql({
+    'p.out': `${'x'.repeat(block - 1)}ab${'x'.repeat(4 * block - 2)}ab${'x'.repeat(block)}`,
+    'q.out': `${'x'.repeat(block - 4)}abab${'x'.repeat(4 * block + 10)}`,
+  });
+  const all = [block - 1, 5 * block - 1, block - 4, block - 2];
+  const search = async (maxScannedCharacters: number) => {
+    const { matches, incomplete } = await searchServerLogs(sql, 42, 'ab', 50, {
+      maxScannedCharacters,
+    });
+    return { offsets: matches.map((m) => m.offset), incomplete };
+  };
+
+  it('checks a one-position edge where a slice ends one character into the next block', async () => {
+    const { matches } = await searchServerLogs(sql, 42, 'AB', 50);
+    expect(matches.map((m) => [m.fileName, m.offset])).toEqual([
+      ['p.out', block - 1],
+      ['p.out', 5 * block - 1],
+      ['q.out', block - 4],
+      ['q.out', block - 2],
+    ]);
+  });
+
+  it('reports a match at the first character before scanning later blocks', async () => {
+    const start = blockBackedSql({ 's.out': `ab${'x'.repeat(block)}ab` });
+    const { matches } = await searchServerLogs(start, 42, 'ab', 50);
+    expect(matches.map((m) => m.offset)).toEqual([0, block + 2]);
+  });
+
+  it('doubles how many candidate blocks each later query fetches ahead', async () => {
+    const fetched: string[] = [];
+    const sparse = blockBackedSql(
+      {
+        'f.out': (needleAt(500, block) + 'x'.repeat(block)).repeat(6),
+      },
+      fetched,
+    );
+    const { matches } = await searchServerLogs(sparse, 42, 'needle', 50);
+    expect(matches.map((m) => m.offset)).toEqual([0, 2, 4, 6, 8, 10].map((k) => k * block + 500));
+    expect(fetched).toEqual([
+      'f.out#0 f.out#1',
+      'f.out#2 f.out#3 f.out#4 f.out#5',
+      'f.out#6 f.out#7 f.out#8 f.out#9 f.out#10 f.out#11',
+    ]);
+  });
+
+  it('counts earlier block-backed files against the scan budget', async () => {
+    const first = 6 * block + 1;
+    await expect(search(first + 5 * block)).resolves.toEqual({ offsets: all, incomplete: false });
+    await expect(search(first + 5 * block - 1)).resolves.toEqual({
+      offsets: all,
+      incomplete: true,
+    });
+    await expect(search(first)).resolves.toEqual({ offsets: all.slice(0, 2), incomplete: true });
+  });
 });
 
 describe('searchServerLogs folds case like PostgreSQL lower()', () => {
   const pad = 'x'.repeat(SERVER_LOG_BLOCK_CHARS);
-  const sql = blockBackedSql(`${pad}xİabc ΟΔΟΣ end\n${pad}`);
+  const sql = blockBackedSql({ 'frontend.out': `${pad}İabc ΟΔΟΣ end\n${pad}` });
   const search = async (term: string) => {
     const { matches } = await searchServerLogs(sql, 42, term, 50);
     return matches.map((m) => [m.offset, m.match]);
@@ -301,16 +403,16 @@ describe('searchServerLogs folds case like PostgreSQL lower()', () => {
   const at = SERVER_LOG_BLOCK_CHARS;
 
   it('keeps offsets aligned after U+0130, which PostgreSQL lowers to one character', async () => {
-    await expect(search('abc')).resolves.toEqual([[at + 2, 'abc']]);
+    await expect(search('abc')).resolves.toEqual([[at + 1, 'abc']]);
   });
 
-  it('matches U+0130 for a plain i, even in a block with no other i', async () => {
-    await expect(search('i')).resolves.toEqual([[at + 1, 'İ']]);
-    await expect(search('İA')).resolves.toEqual([[at + 1, 'İa']]);
+  it('matches U+0130 for a plain i at the start of a block with no other i', async () => {
+    await expect(search('i')).resolves.toEqual([[at, 'İ']]);
+    await expect(search('İA')).resolves.toEqual([[at, 'İa']]);
   });
 
   it('lowers a word-final capital sigma to σ, not ς', async () => {
-    await expect(search('οδοσ')).resolves.toEqual([[at + 6, 'ΟΔΟΣ']]);
+    await expect(search('οδοσ')).resolves.toEqual([[at + 5, 'ΟΔΟΣ']]);
     await expect(search('ς')).resolves.toEqual([]);
   });
 });

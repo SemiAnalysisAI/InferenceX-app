@@ -469,9 +469,12 @@ so matches and their context are clipped to each slice exactly as before. A chun
 only the blocks it overlaps (about 100 ms at any offset), and a complete read of a block-backed
 file within the byte cap decodes its blocks instead of transferring the text column. Each block
 also stores a bloom filter of the case-folded 1-3 grams of its text plus the next 255 code
-points. Search asks PostgreSQL which blocks may hold every gram of the term (`get_bit`), skips
-slices without such blocks, and decompresses only the candidate blocks and the context around a
-match. Skipped slices still count toward the 64-million-character budget, so `incomplete` is the
+points. One query lists the bundle's files and asks PostgreSQL which blocks may hold every gram of
+the term (`get_bit`). Search skips slices without such blocks and decompresses only the candidate
+blocks and the context around a match. Blocks arrive in batched queries: each fetch takes the
+blocks it needs plus the next candidate blocks of this and later files (with their successors, for
+matches that cross a block boundary), 2, 4, 8 and up to 32 more per query. Skipped slices still
+count toward the 64-million-character budget, so `incomplete` is the
 same as for the text columns. Matching lowercases both sides exactly as PostgreSQL's `lower()`
 does under the database's builtin `C.UTF-8` locale (PostgreSQL 17, Unicode 15.1 simple case
 mapping), from a table generated on the database (`queries/server-log-pg-lower.ts`), because
