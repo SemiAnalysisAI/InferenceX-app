@@ -6,6 +6,7 @@ import { publishedVideoHistory, recordVideoHistory } from '@/lib/video/video-his
 import {
   approveVideoPublication,
   readStoredArtifact,
+  renditionPreviews,
   storedArtifacts,
   storeVideoArtifact,
   videoStorageEnabled,
@@ -16,6 +17,7 @@ vi.mock('@/lib/video/video-storage', () => ({
   videoStorageEnabled: vi.fn(() => false),
   storedArtifacts: vi.fn(() => Promise.resolve([])),
   readStoredArtifact: vi.fn(),
+  renditionPreviews: vi.fn(() => Promise.resolve(new Map())),
   storeVideoArtifact: vi.fn(),
 }));
 vi.mock('@/lib/video/video-history-store', () => ({
@@ -27,6 +29,11 @@ vi.mock('@/lib/video/video-history-store', () => ({
 const fetchMock = vi.fn<typeof fetch>();
 vi.stubGlobal('fetch', fetchMock);
 const response = (body: unknown, status = 200) => Response.json(body, { status });
+const clip = (n: number) => `gpu/c1/baseline/artifacts/measurement-r001-c00${n}.mp4`;
+const original = (hash: string) => ({
+  url: `https://store.test/h3-video-media/v1/objects/${hash}/clip.mp4`,
+  downloadUrl: `https://store.test/h3-video-media/v1/objects/${hash}/clip.mp4?download=1`,
+});
 const request = (query = '') => new NextRequest(`http://localhost/api/video-runs${query}`);
 const post = (body: unknown, secret = 'test-secret') =>
   new Request('http://localhost/api/video-runs', {
@@ -47,6 +54,7 @@ afterEach(() => {
   vi.mocked(readStoredArtifact).mockReset();
   vi.mocked(storeVideoArtifact).mockClear();
   vi.mocked(approveVideoPublication).mockReset();
+  vi.mocked(renditionPreviews).mockReset().mockResolvedValue(new Map());
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
@@ -336,6 +344,48 @@ describe('H3 CI artifact access', () => {
     const repeated = await GET(request('?run=10&artifact=20&format=published'));
     expect(await repeated.json()).toEqual(saved);
     expect(readStoredArtifact).toHaveBeenCalledTimes(1);
+  });
+  it('adds a web rendition only to clips whose sealed SHA256 has a receipt', async () => {
+    vi.mocked(videoStorageEnabled).mockReturnValue(true);
+    const artifact = { id: 20, name: 'h3-results-10-1', expired: false, size_in_bytes: 4 };
+    const [a, b] = ['a'.repeat(64), 'b'.repeat(64)];
+    const preview = `https://store.test/h3-video-media/v1/objects/${'e'.repeat(64)}/web-h264-crf23.mp4`;
+    const saved = {
+      storageVersion: 1 as const,
+      runId: '10',
+      artifact,
+      sources: [
+        {
+          id: '10',
+          documents: [],
+          checksums: [
+            [clip(1), a],
+            [clip(2), b],
+          ] as [string, string][],
+          assets: [
+            [clip(1), original(a)],
+            [clip(2), original(b)],
+          ] as [string, ReturnType<typeof original>][],
+          texts: [],
+        },
+      ],
+    };
+    vi.mocked(storedArtifacts).mockResolvedValue([artifact]);
+    vi.mocked(readStoredArtifact).mockResolvedValue(saved);
+    vi.mocked(renditionPreviews).mockResolvedValue(new Map([[a, preview]]));
+    fetchMock.mockImplementation(() => Promise.resolve(response({ private: false })));
+    const published = await GET(request('?run=10&artifact=20&format=published'));
+    const result = await published.json();
+    expect(result.sources[0].assets).toEqual([
+      [clip(1), { ...original(a), previewUrl: preview }],
+      [clip(2), original(b)],
+    ]);
+
+    clearVideoReadCache();
+    vi.mocked(renditionPreviews).mockRejectedValue(new Error('Blob list unavailable'));
+    const fallback = await GET(request('?run=10&artifact=20&format=published'));
+    expect(fallback.status).toBe(200);
+    expect(await fallback.json()).toEqual(saved);
   });
   it('retains stored artifacts after GitHub removes them from the run', async () => {
     const artifact = {

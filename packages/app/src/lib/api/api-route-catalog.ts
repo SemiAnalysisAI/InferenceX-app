@@ -631,8 +631,8 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'ui-artifact-read',
     exclusionReason: {
-      en: 'Hidden H3 viewer transport for public CI runs, checksum-verified artifact ZIPs and stored History. Every GET is read-only, including format=media on a cache miss (204). History can return up to five pages in one response and serves entries from the newest History snapshot only while each record matches its index and receipt upload times. Synthetic History replay and explicit original-artifact replay with private MP4 ranges are development-only. History retains legacy indexes but labels only source-bound approval receipts as approved; default charts use those approved entries. Published History/media payloads have a 30-second process cache (32 entries each) and are served only after the public-repository check passes; errors, partial or unapproved History and missing media are not retained. Successful publication or History backfill clears that process cache. HTTP stays private, no-store. Metadata-only development fixtures return 204 for media. This UI contract is not a public data API.',
-      zh: '供隐藏的 H3 查看器读取公开 CI 运行、校验和已验证的产物 ZIP 与已存历史。所有 GET 都只读，包括 format=media 未命中时返回 204。历史可在一次响应中返回最多五页，只有记录仍与索引和回执上传时间一致时才使用最新历史快照中的条目。合成历史回放及读取原始产物 MP4 字节区间的显式回放仅用于开发环境。历史保留旧索引，但只有与来源绑定的批准回执才标为 approved；默认图表只使用这些条目。已发布 History／媒体载荷在服务进程内最多复用 30 秒，每类最多 32 项，且只在源仓库公开检查通过后返回；错误、不完整或未批准的 History 和缺失媒体不保留。发布或历史补建成功后清空当前进程缓存，HTTP 仍为 private, no-store。开发环境的纯元数据 fixture 对媒体请求返回 204。此界面契约不是公开数据 API。',
+      en: 'Hidden H3 viewer transport for public CI runs, checksum-verified artifact ZIPs and stored History. Every GET is read-only, including format=media on a cache miss (204). History can return up to five pages in one response and serves entries from the newest History snapshot only while each record matches its index and receipt upload times. Synthetic History replay and explicit original-artifact replay with private MP4 ranges are development-only. History retains legacy indexes but labels only source-bound approval receipts as approved; default charts use those approved entries. Published History/media payloads have a 30-second process cache (32 entries each) and are served only after the public-repository check passes; errors, partial or unapproved History and missing media are not retained. Successful publication or History backfill clears that process cache. Published media assets may carry an optional previewUrl, a web playback rendition resolved from one cached listing of rendition receipts bound to the sealed SHA256 of that asset; url stays the sealed original, and a failed listing serves originals only. HTTP stays private, no-store. Metadata-only development fixtures return 204 for media. This UI contract is not a public data API.',
+      zh: '供隐藏的 H3 查看器读取公开 CI 运行、校验和已验证的产物 ZIP 与已存历史。所有 GET 都只读，包括 format=media 未命中时返回 204。历史可在一次响应中返回最多五页，只有记录仍与索引和回执上传时间一致时才使用最新历史快照中的条目。合成历史回放及读取原始产物 MP4 字节区间的显式回放仅用于开发环境。历史保留旧索引，但只有与来源绑定的批准回执才标为 approved；默认图表只使用这些条目。已发布 History／媒体载荷在服务进程内最多复用 30 秒，每类最多 32 项，且只在源仓库公开检查通过后返回；错误、不完整或未批准的 History 和缺失媒体不保留。发布或历史补建成功后清空当前进程缓存。已发布媒体可附带 previewUrl，即网页播放用的转码版本，由一次缓存的转码回执列表按媒体封存的 SHA256 匹配得到；url 仍指向封存的原始视频，列表读取失败时只返回原始视频。HTTP 仍为 private, no-store。开发环境的纯元数据 fixture 对媒体请求返回 204。此界面契约不是公开数据 API。',
     },
     sourceSha256: '0f9343a75208fbc47eb068ed74bdd1e36fe2fbea3bb5828d51242b7fa7c25303',
   },
@@ -1592,8 +1592,8 @@ export const apiContractSourceDigests = [
     source: 'src/lib/video/video-read-cache.ts',
     sourceSha256: '9eef70074624eb6714d0afce49403f8da0535787e7329da75b1012846a4f683b',
     reviewArea: {
-      en: 'VideoGenX bounded published History and media cache, served only after the repository visibility check passes.',
-      zh: 'VideoGenX 已发布 History 与媒体的有界缓存，仅在仓库公开检查通过后返回。',
+      en: 'VideoGenX bounded published History, media and rendition-listing cache, served only after the repository visibility check passes.',
+      zh: 'VideoGenX 已发布 History、媒体及转码回执列表的有界缓存，仅在仓库公开检查通过后返回。',
     },
   },
   {

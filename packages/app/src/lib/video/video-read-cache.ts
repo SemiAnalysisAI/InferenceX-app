@@ -1,7 +1,8 @@
 import type { VideoHistoryPage } from '@/components/video-benchmark/history';
 import type { StoredArtifact } from '@/components/video-benchmark/stored';
 import { publishedVideoHistory } from './video-history-store';
-import { readStoredArtifact, storedArtifacts } from './video-storage';
+import { readStoredArtifact, renditionPreviews, storedArtifacts } from './video-storage';
+import { withRenditionPreviews } from './video-renditions';
 
 const TTL_MS = 30_000;
 const MAX_ENTRIES = 32;
@@ -11,6 +12,7 @@ interface Entry<T> {
 }
 const history = new Map<string, Entry<VideoHistoryPage>>();
 const artifacts = new Map<string, Entry<StoredArtifact | null>>();
+const renditions = new Map<string, Entry<Map<string, string>>>();
 
 // Callers must check repository visibility before serving every read, including a cache hit.
 function read<T>(
@@ -54,20 +56,26 @@ export function cachedVideoHistory(page: number, pages: number) {
   );
 }
 
-export function cachedPublishedArtifact(runId: string, artifactId: string) {
-  return read(
-    artifacts,
-    `${runId}:${artifactId}`,
-    async () => {
-      const saved = await storedArtifacts(runId);
-      const artifact = saved.find((item) => String(item.id) === artifactId);
-      return artifact ? readStoredArtifact(runId, artifact) : null;
-    },
-    (value) => value !== null,
-  );
+export async function cachedPublishedArtifact(runId: string, artifactId: string) {
+  const [saved, previews] = await Promise.all([
+    read(
+      artifacts,
+      `${runId}:${artifactId}`,
+      async () => {
+        const stored = await storedArtifacts(runId);
+        const artifact = stored.find((item) => String(item.id) === artifactId);
+        return artifact ? readStoredArtifact(runId, artifact) : null;
+      },
+      (value) => value !== null,
+    ),
+    // A missing rendition listing only costs download size; the sealed originals still play.
+    read(renditions, 'all', renditionPreviews, () => true).catch(() => new Map<string, string>()),
+  ]);
+  return saved && withRenditionPreviews(saved, previews);
 }
 
 export function clearVideoReadCache() {
   history.clear();
   artifacts.clear();
+  renditions.clear();
 }
