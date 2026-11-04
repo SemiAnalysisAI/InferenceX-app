@@ -67,7 +67,7 @@ export function ChartPointDetails<A extends string = string>({
 
   useEffect(() => {
     ref.current?.scrollIntoView?.({ block: 'nearest' });
-  }, [title, subtitle, date, metrics]);
+  }, [title, subtitle, date]);
 
   return (
     <section
