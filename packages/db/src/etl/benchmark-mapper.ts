@@ -64,6 +64,8 @@ const NON_METRIC_KEYS = new Set([
   'kv_offload_backend',
   'kv_p2p_transfer',
   'router',
+  'spec_algorithm',
+  'spec_draft_model',
   'request_metrics',
   'server_metrics',
   'dataset',
