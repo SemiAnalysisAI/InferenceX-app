@@ -491,6 +491,41 @@ describe('VideoGenX results', () => {
     row('h200').should('be.visible');
   });
 
+  it('keeps the selected clip case and fetched media across a detail visit', () => {
+    mount({
+      editPage: (page) => {
+        const point = videoPoints([page]).find(
+          (item) => item.hardwareKey === 'b200' && item.concurrency === 1,
+        )!;
+        const saved = servingArtifact(Number(point.runId), point.artifactId, 'NVIDIA B200');
+        saved.sources[0].checksums = saved.sources[0].checksums.map(([path, sha]) => [
+          path,
+          path === 'manifest.json' ? point.id.split(':')[0] : sha,
+        ]);
+        cy.intercept('GET', 'https://media.test/**', {
+          fixture: 'video-results/candidate.mp4',
+          headers: { 'Content-Type': 'video/mp4' },
+        });
+        cy.intercept(
+          'GET',
+          `/api/video-runs?run=${point.runId}&artifact=${point.artifactId}&format=published`,
+          saved,
+        ).as('publishedMedia');
+      },
+    });
+    cy.wait('@publishedMedia');
+    cy.get('[data-testid="video-results-case"]').click();
+    cy.contains('[role="option"]', 'take 3').click();
+    cy.get('[data-testid="video-results-case"]').should('contain', 'take 3');
+    openRow('b200');
+    cy.get('[data-testid="video-results-detail"] h1').should('contain', 'B200');
+    cy.get('[data-testid="results-detail-back"]').click();
+    cy.get('[data-testid="video-results-detail"]').should('not.exist');
+    cy.get('[data-testid="video-results-case"]').should('contain', 'take 3');
+    cy.get('[data-testid="video-results-clip"][data-hardware="b200"] video').should('exist');
+    cy.get('@publishedMedia.all').should('have.length', 1);
+  });
+
   it('falls back to the overview for an unknown or hidden deployment and drops its key', () => {
     mount({ search: '?r_y=videosPerGpuHour&r_point=0:missing' });
     cy.get('[data-testid="video-results-detail"]').should('not.exist');
