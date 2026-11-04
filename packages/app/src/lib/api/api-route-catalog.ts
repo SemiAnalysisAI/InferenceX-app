@@ -1953,7 +1953,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/benchmark-presence.ts',
-    sourceSha256: '810dec064e88d9a85060636bff4a1e74063eaaa8b0cf4c82f8fc2c9268a56636',
+    sourceSha256: '2d2aefa31c04195afb8ab615e4c7164609c6c10c93e523267df4ea41857fbfac',
     reviewArea: {
       en: 'Which benchmark IDs count as having a stored trace or a linked server log.',
       zh: '哪些基准 ID 被视为拥有已存储的跟踪或已关联的服务器日志。',
