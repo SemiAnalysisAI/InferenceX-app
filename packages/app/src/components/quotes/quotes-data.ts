@@ -297,16 +297,6 @@ export const QUOTES: Quote[] = [
     link: 'https://www.linkedin.com/in/michael-goin/',
   },
   {
-    text: 'Now commonly hearing "We want the Semianalysis for X". Testament to what @dylan522p has built.',
-    textZh: '现在经常听到"我们想要X领域的 SemiAnalysis"。这是对 @dylan522p 所构建之物的最好证明。',
-    name: 'Sriram Krishnan',
-    title: 'White House Senior AI Advisor',
-    titleZh: '白宫高级 AI 顾问',
-    org: 'White House',
-    logo: 'white-house.svg',
-    link: 'https://x.com/sriramk/status/2048824255702262135',
-  },
-  {
     text: 'Premium Inference is a new category, driven by agents that need fast, interactive tokens with the best per-chip throughput on intelligent frontier models. InferenceX™ is one of the few benchmarks measuring this chip performance in the open, across every major accelerator. We look forward to participating in the official InferenceX with SN50 and showing our premium decode performance on frontier open models tracked transparently.',
     textZh:
       '高端推理（Premium Inference）正在成为一个全新品类，其驱动力来自智能体：它们需要快速、可交互的 token，并要求在前沿智能模型上实现最佳的单芯片吞吐量。InferenceX™ 是少数在所有主流加速器上公开衡量这类芯片性能的基准测试之一。我们期待以 SN50 参与官方 InferenceX，在透明追踪之下展示我们在前沿开源模型上的高端解码性能。',
