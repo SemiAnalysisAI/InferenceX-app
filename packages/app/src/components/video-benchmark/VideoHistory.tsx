@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Heading } from '@/components/ui/heading';
@@ -151,6 +151,8 @@ export default function VideoHistory() {
   const [hardware, setHardware] = useState('');
   const [concurrency, setConcurrency] = useState('');
   const [query, setQuery] = useState('');
+  // Activity re-runs the mount effect when the overview is revealed; loaded pages must survive it.
+  const firstPageLoaded = useRef(false);
   async function load(page: number, signal?: AbortSignal) {
     setLoading(true);
     setError(false);
@@ -169,6 +171,7 @@ export default function VideoHistory() {
           : [...old, ...data.entries.filter((entry) => !old.some((item) => item.id === entry.id))],
       );
       setNextPage(data.nextPage);
+      if (page === 1) firstPageLoaded.current = true;
       setReplay(response.headers.get('x-videogenx-replay') === '1');
     } catch {
       if (!signal?.aborted) setError(true);
@@ -186,7 +189,7 @@ export default function VideoHistory() {
     read();
     window.addEventListener('popstate', read);
     const controller = new AbortController();
-    void load(1, controller.signal);
+    if (!firstPageLoaded.current) void load(1, controller.signal);
     return () => {
       window.removeEventListener('popstate', read);
       controller.abort();
