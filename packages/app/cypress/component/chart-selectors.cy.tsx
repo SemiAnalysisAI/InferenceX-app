@@ -386,9 +386,8 @@ describe('Chart Selectors', () => {
         cy.get('[data-testid="model-selector"]').should('contain.text', 'Muse Spark Open').click();
         cy.get('[role="option"]').then(($options) => {
           expect(
-            [...$options].slice(0, 8).map((option) => option.textContent?.trim()),
+            [...$options].slice(0, 7).map((option) => option.textContent?.trim()),
           ).to.deep.equal([
-            'Kimi K3 2.8T',
             'DeepSeek V4.1 Flash 552B',
             'GLM5.2/GLM5.3 744B',
             'GLM 5.3 Flash',

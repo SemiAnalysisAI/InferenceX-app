@@ -2,9 +2,9 @@ import { COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare/compar
 import { getInferenceModelBySlug, inferenceModelPath } from '@/lib/routing/inference-model-slug';
 
 const FEATURED_AGENTX_MODEL_SLUGS = [
-  'kimi-k3',
-  'muse-spark-open',
   'deepseek-v41-flash',
+  'muse-spark-open',
+  'kimi-k3',
   'deepseek-v4',
   'glm-5-3',
   'minimax-m3',

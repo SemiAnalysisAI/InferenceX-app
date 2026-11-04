@@ -99,7 +99,7 @@ const MODEL_CONFIG: Record<Model, ModelConfig> = {
   [Model.Kimi_K3]: {
     label: 'Kimi K3 2.8T',
     prefix: 'kimik3',
-    category: 'default',
+    category: 'deprecated',
     openRouterModelId: 'moonshotai/kimi-k3',
     logo: 'kimi-color.svg',
   },
@@ -221,7 +221,6 @@ function modelsByCategory(cat: CategoryTag): ReadonlySet<Model> {
 
 // Selector order is independent of the overview registry order and selected defaults.
 const MODEL_SELECTOR_ORDER: readonly Model[] = [
-  Model.Kimi_K3,
   Model.DeepSeek_V4_1_Flash,
   Model.GLM_5_2,
   Model.GLM_5_3_Flash,

@@ -336,6 +336,8 @@ describe('isActiveImageRow', () => {
   });
 
   it('drops deprecated models on every scenario, including point-release buckets', () => {
+    expect(isActiveImageRow(imageRow('kimik3', 'agentic'))).toBe(false);
+    expect(isActiveImageRow(imageRow('kimik3', '8k/1k'))).toBe(false);
     expect(isActiveImageRow(imageRow('dsv4', 'agentic'))).toBe(false);
     expect(isActiveImageRow(imageRow('dsv4', { isl: 4096, osl: 512 }))).toBe(false);
     expect(isActiveImageRow(imageRow('minimaxm3', 'agentic'))).toBe(false);
