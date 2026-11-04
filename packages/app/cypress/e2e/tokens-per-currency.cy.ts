@@ -16,10 +16,7 @@ describe('Tokens per dollar and agentic controls', () => {
       'Owning at Large Hyperscaler Volume',
     );
     cy.get('[data-testid="token-revenue-price-source"]').should('not.exist');
-    cy.get('[data-testid="scatter-graph"]')
-      .first()
-      .find('svg .dot-group')
-      .should('have.length.greaterThan', 1);
+    cy.scatterPoints().should('have.length.greaterThan', 1);
 
     cy.get('[data-testid="yaxis-metric-selector"]').click('right', { force: true });
     cy.get('[data-slot="select-item"]')

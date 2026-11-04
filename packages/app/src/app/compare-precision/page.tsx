@@ -17,7 +17,7 @@ import {
   precisionDisplayLabel,
 } from '@/lib/compare/compare-variant-slug';
 
-export const revalidate = 3600;
+export const revalidate = 86400;
 
 const DESCRIPTION =
   'How does precision affect chip inference? Compare FP4, FP8, BF16 and INT4 head-to-head on the same chip across DeepSeek, Kimi, MiniMax, GLM and Qwen.';

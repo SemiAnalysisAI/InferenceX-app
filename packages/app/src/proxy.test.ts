@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { unstable_doesMiddlewareMatch } from 'next/dist/experimental/testing/server/middleware-testing-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { COMPARE_MODEL_ALIASES } from '@/lib/compare/compare-slug';
 import { config, proxy } from './proxy';
 
 beforeEach(() => {
@@ -140,10 +141,55 @@ it('retains PowerX and compare redirect precedence with a gated saved model', ()
   }
 });
 
+it('canonicalizes a model-route alias with its query', () => {
+  const response = proxy(
+    new NextRequest(
+      'https://inferencex.semianalysis.com/zh/profit-estimator/DeepSeek-V4/target/24?i_pctl=p75&utm_source=x',
+    ),
+    { waitUntil: vi.fn() },
+  );
+  expect(response.status).toBe(308);
+  expect(response.headers.get('location')).toBe(
+    'https://inferencex.semianalysis.com/zh/profit-estimator/deepseek-v4/target/24?utm_source=x',
+  );
+});
+
 describe('proxy matcher', () => {
+  it.each(['inferencex-cli/1.2.3', 'inferencex-skill/0.4.0'])(
+    'runs on API requests from %s',
+    (userAgent) => {
+      for (const url of ['/api/v1/availability', '/api/openapi.json']) {
+        expect(
+          unstable_doesMiddlewareMatch({ config, url, headers: { 'user-agent': userAgent } }),
+        ).toBe(true);
+      }
+    },
+  );
+
   it.each([
-    '/api/v1/availability',
-    '/api/openapi.json',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+    'xinferencex-cli/1.2.3',
+    'InferenceX-CLI/1.2.3',
+  ])('skips API requests from %s', (userAgent) => {
+    expect(
+      unstable_doesMiddlewareMatch({
+        config,
+        url: '/api/v1/availability',
+        headers: { 'user-agent': userAgent },
+      }),
+    ).toBe(false);
+    expect(unstable_doesMiddlewareMatch({ config, url: '/api/v1/availability' })).toBe(false);
+  });
+
+  it('runs on every model-route alias', () => {
+    for (const alias of Object.keys(COMPARE_MODEL_ALIASES)) {
+      for (const url of [`/calculator/${alias}`, `/zh/profit-estimator/${alias}/target/24`]) {
+        expect(unstable_doesMiddlewareMatch({ config, url })).toBe(true);
+      }
+    }
+  });
+
+  it.each([
     '/embed/model/test',
     '/zh/embed/model/test',
     '/inference?i_metric=y_measuredAvgPower',
@@ -159,6 +205,13 @@ describe('proxy matcher', () => {
     '/compare/deepseek-r1-mi355x-vs-b200?i_metric=y_tpPerGpu',
     '/zh/compare-spec-decode/deepseek-r1-b200-fp8-mtp?utm_source=x',
     '/compare/deepseek-r1-b200-vs-mi355x',
+    '/compare/deepseek-r1-b200-vs-mi355x/AGENTIC?utm_source=x',
+    '/zh/compare-precision/deepseek-r1-b200-fp4-vs-fp8/8K-1K',
+    '/historical/Kimi-K3?i_seq=1k%2F1k',
+    '/calculator/kimi',
+    '/zh/profit-estimator-per-gigawatt/kimi-k3/target/30/percentile/p75',
+    '/profit-estimator/kimi-k3?i_pctl=p75',
+    '/zh/profit-estimator/kimi-k3/target/30?percentile=p50',
   ])('runs on %s', (url) => {
     expect(unstable_doesMiddlewareMatch({ config, url })).toBe(true);
   });
@@ -182,6 +235,13 @@ describe('proxy matcher', () => {
     '/inference?g_model=GLM-5x3-Flash',
     '/inference?g_model=not-a-model',
     '/compare-per-dollar/deepseek-r1-b200-vs-mi355x/performance-per-dollar.png?lang=zh',
+    '/compare/deepseek-r1-b200-vs-mi355x/opengraph-image',
+    '/zh/compare-spec-decode/deepseek-r1-b200-fp8-mtp/opengraph-image?v=2',
+    '/calculator',
+    '/calculator/kimi-k3?i_seq=1k%2F1k&g_model=Kimi-K3',
+    '/historical/kimi-k3',
+    '/profit-estimator?i_pctl=p75',
+    '/profit-estimator/kimi-k3/target/30?c_power=modeled',
     '/compare/deepseek-r1-b200-vs-mi355x/8k-1k/extra?utm_source=x',
     '/compare?g_model=DeepSeek-R1-0528',
     '/comparisons/x?g_model=DeepSeek-R1-0528',

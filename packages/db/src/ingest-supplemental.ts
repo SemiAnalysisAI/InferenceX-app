@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils';
-import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils';
+import { createAdminSql } from './etl/db-utils';
 import { createConfigCache } from './etl/config-cache';
 import { createWorkflowRunServices } from './etl/workflow-run';
 import {
@@ -350,8 +350,6 @@ async function main(): Promise<void> {
 
   await ingestSupplementalEvals(configCache, getOrCreateWorkflowRun);
   await ingestSupplementalBmk(configCache, getOrCreateWorkflowRun);
-
-  await refreshLatestBenchmarks(sql);
 
   console.log('\n=== db:ingest:supplemental complete ===');
   console.log('  Invalidate API cache: bun run admin:cache:invalidate');

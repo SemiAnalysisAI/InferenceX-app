@@ -55,7 +55,7 @@ const DOMAIN_OVERVIEW = `InferenceX benchmark database. It contains ML inference
 
 ## Key Views
 - **latest_workflow_runs** keeps the highest attempt for each GitHub run.
-- **latest_benchmarks** is a materialized view of the newest successful logical curve for each config, benchmark type, sequence, offload mode, recipe fingerprint, and concurrency. It can carry points from same-image append-only history. Producer identity remains in \`workflow_run_id\`; logical snapshot identity is in \`snapshot_workflow_run_id\`.
+- **latest_benchmarks** is a view of the newest successful logical curve for each config, benchmark type, sequence, offload mode, recipe fingerprint, and concurrency, kept current as results are written. It can carry points from same-image append-only history. Producer identity remains in \`workflow_run_id\`; logical snapshot identity is in \`snapshot_workflow_run_id\`.
 
 ## Column Names
 - **configs**: id, hardware, framework, model, precision, spec_method, disagg, is_multinode, prefill_tp, prefill_ep, prefill_dp_attention, prefill_num_workers, decode_tp, decode_ep, decode_dp_attention, decode_num_workers, num_prefill_gpu, num_decode_gpu

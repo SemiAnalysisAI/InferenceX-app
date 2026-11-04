@@ -78,6 +78,7 @@ export interface SkipTracker {
   unmappedModels: Set<string>;
   unmappedHws: Set<string>;
   unmappedPrecisions: Set<string>;
+  unexpectedMetrics: Set<string>;
   dbWriteErrors: DbWriteFailure[];
   dbWriteWarnings: DbWriteFailure[];
   recordDbError: (kind: DbWriteKind, subject: string, err: unknown) => void;
@@ -139,6 +140,7 @@ export function createSkipTracker(): SkipTracker {
     unmappedModels,
     unmappedHws,
     unmappedPrecisions,
+    unexpectedMetrics: new Set<string>(),
 
     dbWriteErrors,
     dbWriteWarnings,

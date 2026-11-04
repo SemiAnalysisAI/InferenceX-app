@@ -1,7 +1,7 @@
 import { GPU_VENDORS } from '@semianalysisai/inferencex-constants';
 import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants/models';
 
-import type { AvailabilityRow } from '@/lib/api/api';
+import { datesOfLines, linesForModels, type AvailabilityIndex } from './availability-index';
 
 export interface ModelHistorySummary {
   /** Distinct benchmark dates. */
@@ -19,33 +19,20 @@ const VENDOR_ORDER = [...new Set(Object.values(GPU_VENDORS))];
 
 /** How much benchmark history each display model has, and on whose hardware. */
 export function summarizeModelHistory(
-  rows: readonly AvailabilityRow[],
+  index: AvailabilityIndex,
   models: readonly string[],
 ): Map<string, ModelHistorySummary> {
-  const byDbModel = new Map<string, { dates: Set<string>; vendors: Set<string> }>();
-  for (const row of rows) {
-    const entry = byDbModel.get(row.model) ?? { dates: new Set(), vendors: new Set() };
-    entry.dates.add(row.date);
-    const vendor = GPU_VENDORS[row.hardware.split('_')[0]];
-    if (vendor) entry.vendors.add(vendor);
-    byDbModel.set(row.model, entry);
-  }
   return new Map(
     models.map((model) => {
-      const dates = new Set<string>();
-      const vendors = new Set<string>();
-      for (const key of DISPLAY_MODEL_TO_DB[model] ?? [model]) {
-        const entry = byDbModel.get(key);
-        entry?.dates.forEach((date) => dates.add(date));
-        entry?.vendors.forEach((vendor) => vendors.add(vendor));
-      }
-      const sorted = [...dates].toSorted();
-      const firstDate = sorted[0] ?? null;
-      const lastDate = sorted.at(-1) ?? null;
+      const lines = linesForModels(index, DISPLAY_MODEL_TO_DB[model] ?? [model]);
+      const dates = datesOfLines(index, lines).toSorted();
+      const vendors = new Set(lines.map((line) => GPU_VENDORS[line.hardware.split('_')[0]]));
+      const firstDate = dates[0] ?? null;
+      const lastDate = dates.at(-1) ?? null;
       return [
         model,
         {
-          snapshotDays: dates.size,
+          snapshotDays: dates.length,
           spanDays:
             firstDate && lastDate ? Math.round(dayNumber(lastDate) - dayNumber(firstDate)) + 1 : 0,
           firstDate,

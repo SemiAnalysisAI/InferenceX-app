@@ -5,35 +5,55 @@ export function paretoFrontUpperLeft<T>(
   getX: (p: T) => number,
   getY: (p: T) => number,
 ): T[] {
-  if (points.length === 0) return [];
+  const n = points.length;
+  if (n === 0) return [];
 
-  const sorted = [...points].toSorted((a, b) => {
-    const ax = getX(a);
-    const bx = getX(b);
-    if (ax === bx) return getY(b) - getY(a);
-    return ax - bx;
-  });
+  const xs: number[] = [];
+  const ys: number[] = [];
+  const order: number[] = [];
+  for (let i = 0; i < n; i++) {
+    xs.push(getX(points[i]));
+    ys.push(getY(points[i]));
+    order.push(i);
+  }
+  if (n > 32 || !xs.every(Number.isFinite) || !ys.every(Number.isFinite)) {
+    order.sort((a, b) => (xs[a] === xs[b] ? ys[b] - ys[a] : xs[a] - xs[b]));
+  } else {
+    for (let i = 1; i < n; i++) {
+      const current = order[i];
+      const cx = xs[current];
+      const cy = ys[current];
+      let j = i - 1;
+      while (j >= 0) {
+        const prev = order[j];
+        if (!(cx === xs[prev] ? ys[prev] < cy : cx < xs[prev])) break;
+        order[j + 1] = prev;
+        j--;
+      }
+      order[j + 1] = current;
+    }
+  }
 
-  const front: T[] = [];
+  const front: number[] = [];
 
-  for (const point of sorted) {
-    const px = getX(point);
-    const py = getY(point);
+  for (const i of order) {
+    const px = xs[i];
+    const py = ys[i];
 
-    if (front.length > 0 && getX(front.at(-1)!) === px) {
-      if (py > getY(front.at(-1)!)) {
-        front[front.length - 1] = point;
+    if (front.length > 0 && xs[front.at(-1)!] === px) {
+      if (py > ys[front.at(-1)!]) {
+        front[front.length - 1] = i;
       }
       continue;
     }
 
-    while (front.length > 0 && py >= getY(front.at(-1)!)) {
+    while (front.length > 0 && py >= ys[front.at(-1)!]) {
       front.pop();
     }
-    front.push(point);
+    front.push(i);
   }
 
-  return front;
+  return front.map((i) => points[i]);
 }
 
 export function sign(x: number): number {
@@ -42,7 +62,7 @@ export function sign(x: number): number {
 
 export function monotoneSlopes(xs: number[], ys: number[]): number[] {
   const n = xs.length;
-  if (n < 2) return Array.from({ length: n }, () => 0);
+  if (n < 2) return n === 1 ? [0] : [];
 
   const h: number[] = [];
   const s: number[] = [];
@@ -52,7 +72,7 @@ export function monotoneSlopes(xs: number[], ys: number[]): number[] {
     s.push(hi === 0 ? 0 : (ys[i + 1] - ys[i]) / hi);
   }
 
-  const m: number[] = Array.from({ length: n }, () => 0);
+  const m = xs.map(() => 0);
   for (let i = 1; i < n - 1; i++) {
     const s0 = s[i - 1];
     const s1 = s[i];

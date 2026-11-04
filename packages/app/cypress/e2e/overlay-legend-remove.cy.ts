@@ -5,6 +5,9 @@ import {
   OVERLAY_RUN_ID,
   REAL_CONFIGS,
 } from '../support/overlay-fixtures';
+import { visiblePoints } from '../support/scatter-points';
+
+const CHART_DISPLAY = '[data-testid="inference-chart-display"]';
 
 describe('Official legend X works while an unofficial overlay is loaded', () => {
   before(() => {
@@ -30,8 +33,8 @@ describe('Official legend X works while an unofficial overlay is loaded', () => 
   });
 
   it('clicking the official SKU X hides its points but keeps the overlay', () => {
-    cy.get('[data-testid="inference-chart-display"] svg .dot-group').should(($dots) => {
-      expect(countVisible($dots), 'visible official points').to.be.greaterThan(0);
+    cy.scatterPoints(CHART_DISPLAY).should((points) => {
+      expect(visiblePoints(points), 'visible official points').to.have.length.above(0);
     });
     cy.get('[data-testid="chart-legend"]').contains('B300').should('exist');
     cy.get('[data-testid="chart-legend"] [role="button"][aria-label^="Hide"][aria-label*="B300"]')
@@ -42,8 +45,8 @@ describe('Official legend X works while an unofficial overlay is loaded', () => 
       .first()
       .click({ force: true });
 
-    cy.get('[data-testid="inference-chart-display"] svg .dot-group').should(($dots) => {
-      expect(countVisible($dots), 'visible official points after remove').to.eq(0);
+    cy.scatterPoints(CHART_DISPLAY).should((points) => {
+      expect(visiblePoints(points), 'visible official points after remove').to.have.length(0);
     });
     cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(($pts) => {
       expect(countVisible($pts), 'visible overlay X markers').to.eq(REAL_CONFIGS.length);
@@ -69,8 +72,10 @@ describe('Official legend X works while an unofficial overlay is loaded', () => 
     });
 
     cy.get('[data-testid="chart-legend"] [title^="Show B300"]').should('exist');
-    cy.get('[data-testid="inference-chart-display"] svg .dot-group').should(($dots) => {
-      expect(countVisible($dots), 'visible official points after Y-axis change').to.eq(0);
+    cy.scatterPoints(CHART_DISPLAY).should((points) => {
+      expect(visiblePoints(points), 'visible official points after Y-axis change').to.have.length(
+        0,
+      );
     });
 
     selectXAxisMode('ttft');
@@ -84,8 +89,8 @@ describe('Official legend X works while an unofficial overlay is loaded', () => 
 
   it('re-activating the SKU from the legend restores the official points', () => {
     cy.get('[data-testid="chart-legend"]').contains('B300').click();
-    cy.get('[data-testid="inference-chart-display"] svg .dot-group').should(($dots) => {
-      expect(countVisible($dots), 'visible official points after re-add').to.be.greaterThan(0);
+    cy.scatterPoints(CHART_DISPLAY).should((points) => {
+      expect(visiblePoints(points), 'visible official points after re-add').to.have.length.above(0);
     });
   });
 });

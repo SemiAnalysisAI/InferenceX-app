@@ -32,16 +32,3 @@ export function CompanyLogo({ org, logo }: { org: string; logo?: string }) {
     />
   );
 }
-
-export function highlightBrand(text: string) {
-  const parts = text.split(/(?<brand>InferenceMAX™?|InferenceX™?|InferenceMAX|InferenceX)/giu);
-  return parts.map((part, i) =>
-    /^inference(?:max|x)/iu.test(part) ? (
-      <span key={i} className="text-brand font-semibold">
-        {part}
-      </span>
-    ) : (
-      part
-    ),
-  );
-}

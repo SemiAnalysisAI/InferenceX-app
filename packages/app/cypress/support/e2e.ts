@@ -1,5 +1,13 @@
 import 'cypress-axe';
 
+import type { AvailabilityRow } from '@/lib/api/api';
+import { compactAvailability } from '@/lib/benchmarks/compact-availability';
+import { withSupplementalAvailability } from '@/lib/benchmarks/supplemental-benchmarks';
+
+import { registerScatterPointsQuery } from './scatter-points';
+
+registerScatterPointsQuery();
+
 let suppressLaunchModal = true;
 let suppressTelemetryTutorial = true;
 
@@ -67,6 +75,30 @@ export function interceptDerivedAgenticMetrics(): void {
       ),
     });
   }).as('derivedAgenticMetrics');
+}
+
+function presenceRuns(ids: Iterable<number>): number[] {
+  const runs: number[] = [];
+  let end = 0;
+  for (const id of [...new Set(ids)].toSorted((a, b) => a - b)) {
+    if (id === end && runs.length > 0) runs.push(runs.pop()! + 1);
+    else runs.push(id - end, 1);
+    end = id + 1;
+  }
+  return runs;
+}
+
+export function interceptBenchmarkPresence({
+  trace = [],
+  log = [],
+}: { trace?: Iterable<number>; log?: Iterable<number> } = {}) {
+  return cy.intercept('GET', '/api/v1/benchmark-presence', {
+    body: { trace: presenceRuns(trace), log: presenceRuns(log) },
+  });
+}
+
+export function availabilityBody(rows: readonly AvailabilityRow[]) {
+  return compactAvailability(withSupplementalAvailability([...rows]));
 }
 
 export function expectNoPageOverflow(): void {

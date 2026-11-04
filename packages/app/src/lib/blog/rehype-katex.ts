@@ -4,7 +4,9 @@ import katex, { type KatexOptions } from 'katex';
 import { SKIP, visitParents } from 'unist-util-visit-parents';
 import type { VFile } from 'vfile';
 
-type Options = Omit<KatexOptions, 'displayMode' | 'throwOnError'>;
+type Options = Omit<KatexOptions, 'displayMode' | 'throwOnError'> & {
+  onMath?: () => void;
+};
 type HastNode = Parameters<typeof toText>[0];
 type Root = Extract<HastNode, { type: 'root' }>;
 type ElementContent = Extract<HastNode, { type: 'element' }>['children'][number];
@@ -19,7 +21,7 @@ const EMPTY_OPTIONS: Readonly<Options> = {};
 const EMPTY_CLASSES: readonly unknown[] = [];
 
 export function rehypeKatex(options?: Readonly<Options> | null) {
-  const settings = options ?? EMPTY_OPTIONS;
+  const { onMath, ...settings } = options ?? EMPTY_OPTIONS;
 
   return (tree: Root, file: VFile) => {
     visitParents(tree, 'element', (element, parents) => {
@@ -48,6 +50,7 @@ export function rehypeKatex(options?: Readonly<Options> | null) {
       }
 
       if (!parent) return;
+      onMath?.();
 
       const value = toText(scope, { whitespace: 'pre' });
       let result: ElementContent[];

@@ -27,7 +27,10 @@ export const DEFAULT_TCO_BASIS: TcoBasis = 'internal';
 const DEFAULT_SPECS: GpuSpecs = { tdp: 0, power: 0, costh: 0, costr: 0 };
 
 export function getGpuSpecs(hwKey: string, basis: TcoBasis = DEFAULT_TCO_BASIS): GpuSpecs {
-  const base = hwKey.split(/[-_]/u)[0];
+  const dash = hwKey.indexOf('-');
+  const underscore = hwKey.indexOf('_');
+  const end = dash === -1 ? underscore : underscore === -1 ? dash : Math.min(dash, underscore);
+  const base = end === -1 ? hwKey : hwKey.slice(0, end);
   const entry = HW_REGISTRY[base];
   if (!entry) return DEFAULT_SPECS;
   const internalCost = base === 'tpuv7' ? 1.03 : undefined;
@@ -103,7 +106,8 @@ export function getModelSortIndex(hwKey: string): number {
 }
 
 export function isKnownGpu(hwKey: string): boolean {
-  return hwKey.split('_')[0] in HW_REGISTRY;
+  const underscore = hwKey.indexOf('_');
+  return (underscore === -1 ? hwKey : hwKey.slice(0, underscore)) in HW_REGISTRY;
 }
 
 export function hardwareKeyMatchesBase(hwKey: string, baseGpuKey: string): boolean {

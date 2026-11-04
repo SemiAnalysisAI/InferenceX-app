@@ -129,7 +129,9 @@ export function writeRequestTimelineGz(
           where field = 'request_timeline_gz'
         ),
         request_timeline_version = ${stored.version},
-        request_count = ${stored.requestCount}
+        request_count = ${stored.requestCount},
+        request_chart_data_gz = null,
+        request_chart_data_version = null
       where id = ${traceReplayId}
         and coalesce(request_timeline_version, -1) <= ${stored.version}
       returning id

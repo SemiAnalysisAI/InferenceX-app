@@ -53,11 +53,12 @@ function isWinningRun(row: BenchmarkSeriesRow, winner: BenchmarkSeriesRow): bool
 
 export function dedupeRowsToLatestPerConfig<T extends BenchmarkSeriesRow>(rows: T[]): T[] {
   const winnerPerGroup = new Map<string, T>();
-  for (const row of rows) {
-    const key = seriesKey(row);
-    const current = winnerPerGroup.get(key);
+  const keys = rows.map(seriesKey);
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const current = winnerPerGroup.get(keys[i]);
     if (!current || benchmarkCurveDate(row) > benchmarkCurveDate(current)) {
-      winnerPerGroup.set(key, row);
+      winnerPerGroup.set(keys[i], row);
       continue;
     }
     if (
@@ -65,11 +66,11 @@ export function dedupeRowsToLatestPerConfig<T extends BenchmarkSeriesRow>(rows: 
       row.benchmark_type === 'agentic_traces' &&
       isLaterRun(row, current)
     ) {
-      winnerPerGroup.set(key, row);
+      winnerPerGroup.set(keys[i], row);
     }
   }
-  return rows.filter((row) => {
-    const winner = winnerPerGroup.get(seriesKey(row));
+  return rows.filter((row, i) => {
+    const winner = winnerPerGroup.get(keys[i]);
     if (!winner || benchmarkCurveDate(row) !== benchmarkCurveDate(winner)) return false;
     return row.benchmark_type !== 'agentic_traces' || isWinningRun(row, winner);
   });

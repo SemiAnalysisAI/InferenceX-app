@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import type { AvailabilityRow } from '@/lib/api/api';
 
+import { indexAvailability } from './availability-index';
+import { compactAvailability } from './compact-availability';
 import { summarizeModelHistory } from './model-history-summary';
 
 const row = (model: string, date: string, hardware = 'h200'): AvailabilityRow =>
@@ -26,7 +28,11 @@ describe('summarizeModelHistory', () => {
       row('dsr1', '2026-01-10', 'b200'),
       row('gptoss120b', '2026-01-02'),
     ];
-    const summary = summarizeModelHistory(rows, ['DeepSeek-R1-0528', 'gpt-oss-120b', 'Unknown']);
+    const summary = summarizeModelHistory(indexAvailability(compactAvailability(rows)), [
+      'DeepSeek-R1-0528',
+      'gpt-oss-120b',
+      'Unknown',
+    ]);
     expect(summary.get('DeepSeek-R1-0528')).toEqual({
       snapshotDays: 2,
       spanDays: 10,

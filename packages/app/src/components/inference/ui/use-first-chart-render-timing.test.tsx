@@ -147,4 +147,40 @@ describe('useFirstChartRenderTiming', () => {
       route: '/inference/gpt-oss',
     });
   });
+
+  it('reports when a canvas point layer joins new points, not when an empty layer mounts', async () => {
+    const useTiming = await loadHook();
+    const { markNavigationStart } = await import('@/lib/analytics/navigation-timing');
+    const now = vi.spyOn(performance, 'now').mockReturnValue(300);
+    act(() => root.render(<Chart useTiming={useTiming} />));
+    const layer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    layer.setAttribute('class', 'canvas-point-layer');
+    layer.dataset.pointsJoined = '0';
+    await act(async () => {
+      container.querySelector('[data-testid="chart-root"]')!.append(layer);
+      await Promise.resolve();
+    });
+    expect(track).not.toHaveBeenCalled();
+
+    await act(async () => {
+      layer.dataset.pointsJoined = '1';
+      await Promise.resolve();
+    });
+    expect(track).toHaveBeenCalledTimes(1);
+
+    window.history.pushState(null, '', '/inference/canvas-model');
+    now.mockReturnValue(70_000);
+    markNavigationStart(window.location.pathname);
+    now.mockReturnValue(70_250);
+    await act(async () => {
+      layer.dataset.pointsJoined = '2';
+      await Promise.resolve();
+    });
+    expect(track).toHaveBeenCalledTimes(2);
+    expect(track).toHaveBeenLastCalledWith('inference_chart_rendered', {
+      ms_since_navigation: 250,
+      soft_navigation: true,
+      route: '/inference/canvas-model',
+    });
+  });
 });

@@ -1,4 +1,6 @@
-import { expectNoPageOverflow } from '../support/e2e';
+import { compactTrendHistory } from '@/components/inference/hooks/trend-history-rows';
+
+import { availabilityBody, expectNoPageOverflow } from '../support/e2e';
 import preview from '../fixtures/tpu-preview.json';
 import type { InferenceData } from '../../src/components/inference/types';
 
@@ -8,8 +10,8 @@ const overlayPoints = '[data-testid="inference-chart-display"] svg .unofficial-o
 
 function interceptTpuPreview() {
   const gpuRows = preview.benchmarks.map((row) => ({ ...row, hardware: 'b200', run_url: null }));
-  cy.intercept('GET', '/api/v1/availability', {
-    body: [
+  cy.intercept('GET', '/api/v1/availability/compact', {
+    body: availabilityBody([
       {
         model: 'qwen3.5',
         isl: 8192,
@@ -22,7 +24,7 @@ function interceptTpuPreview() {
         benchmark_type: 'single_turn',
         date: '2026-08-03',
       },
-    ],
+    ]),
   });
   cy.intercept('GET', '/api/v1/benchmarks*', { body: gpuRows });
   cy.intercept('GET', '/api/unofficial-run*', { body: preview }).as('tpuPreview');
@@ -93,8 +95,8 @@ describe('TPU publication preview', () => {
   });
 
   it('places the historical TCO selector beside Cost Tier and updates its export value', () => {
-    cy.intercept('GET', '/api/v1/benchmarks/history*', {
-      body: preview.benchmarks,
+    cy.intercept('GET', '/api/v1/benchmarks/history/trends*', {
+      body: compactTrendHistory(preview.benchmarks),
     });
     cy.visit(
       '/historical?g_model=Qwen-3.5-397B-A17B&i_seq=8k%2F1k&i_prec=fp8&i_metric=y_tokensPerDollarH&g_tco=external',

@@ -25,10 +25,10 @@ const STRINGS = {
  */
 export function useModelHistoryDetails(): ReadonlyMap<string, ReactNode> | undefined {
   const t = STRINGS[useLocale()];
-  const { availabilityRows, availableModels } = useGlobalFilterAvailability();
+  const { availability, availableModels } = useGlobalFilterAvailability();
   return useMemo(() => {
-    if (!availabilityRows) return undefined;
-    const summaries = summarizeModelHistory(availabilityRows, availableModels);
+    if (!availability) return undefined;
+    const summaries = summarizeModelHistory(availability, availableModels);
     return new Map(
       [...summaries].map(([model, summary]) => [
         model,
@@ -46,5 +46,5 @@ export function useModelHistoryDetails(): ReadonlyMap<string, ReactNode> | undef
         </span>,
       ]),
     );
-  }, [availabilityRows, availableModels, t]);
+  }, [availability, availableModels, t]);
 }

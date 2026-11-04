@@ -1,3 +1,5 @@
+import { CANVAS_POINT_LAYER_SELECTOR } from '@/lib/d3-chart/layers/canvas-point-registry';
+
 import { expandLegendAdvanced } from '../support/legend-advanced';
 
 const openReplayDialog = () => {
@@ -130,13 +132,11 @@ describe('Inference Replay', () => {
       );
       cy.get('[data-testid="replay-panel-chart-0"] svg').then(($svg) => {
         const svg = $svg[0];
-        const dots = svg.querySelectorAll('.dot-group');
-        const labels = svg.querySelectorAll('g.line-label');
-        if (dots.length === 0 || labels.length === 0) return;
-        const lastDot = dots.item(dots.length - 1)!;
-        const firstLabel = labels.item(0)!;
+        const points = svg.querySelector(CANVAS_POINT_LAYER_SELECTOR);
+        const firstLabel = svg.querySelector('g.line-label');
+        if (!points || !firstLabel) return;
         expect(
-          lastDot.compareDocumentPosition(firstLabel) & Node.DOCUMENT_POSITION_FOLLOWING,
+          points.compareDocumentPosition(firstLabel) & Node.DOCUMENT_POSITION_FOLLOWING,
           'replay line label follows the scatter points (foreground)',
         ).to.be.greaterThan(0);
       });

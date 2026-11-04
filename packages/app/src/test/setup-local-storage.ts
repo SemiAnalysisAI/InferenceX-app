@@ -54,3 +54,11 @@ if (globalThis.window !== undefined && !globalThis.window.matchMedia) {
       }) as unknown as MediaQueryList,
   });
 }
+
+if (globalThis.HTMLCanvasElement !== undefined) {
+  Object.defineProperty(globalThis.HTMLCanvasElement.prototype, 'getContext', {
+    configurable: true,
+    writable: true,
+    value: () => null,
+  });
+}

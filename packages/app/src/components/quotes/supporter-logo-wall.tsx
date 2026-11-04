@@ -7,7 +7,7 @@ import type { Locale } from '@/lib/i18n/i18n';
 
 import { logoSize } from './logo-metrics';
 import { orgAnchorId } from './quotes-data';
-import { SUPPORTER_GROUPS, type SupporterGroup, type WallLogo } from './supporter-groups';
+import type { SupporterGroup, WallLogo } from './supporter-groups';
 import { SupporterLogoImage } from './supporter-logo-image';
 
 const STRINGS = {
@@ -81,10 +81,10 @@ function LogoTile({ item, jumpTo }: { item: WallLogo; jumpTo: (org: string) => s
 
 export function SupporterLogoWall({
   locale = 'en',
-  groups = SUPPORTER_GROUPS,
+  groups,
 }: {
   locale?: Locale;
-  groups?: readonly SupporterGroup[];
+  groups: readonly SupporterGroup[];
 }) {
   const t = STRINGS[locale];
   return (

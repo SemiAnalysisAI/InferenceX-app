@@ -24,7 +24,7 @@ export const metadata: Metadata = {
   }),
 };
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 86400;
 
 const jsonLd = {
   '@context': 'https://schema.org',

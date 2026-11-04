@@ -23,7 +23,7 @@ import { type Model } from '@/lib/catalog/data-mappings';
 import { zhAlternates } from '@/lib/i18n/i18n';
 import { socialMetadata } from '@/lib/seo/social-metadata';
 
-export const revalidate = 3600;
+export const revalidate = 86400;
 
 const DESCRIPTION =
   '对比 Kimi K3、DeepSeek V4 Pro、MiniMax M3、Qwen 3.5 与 GLM 5.3 的 AgentX 智能体推理结果，并浏览定长序列芯片对比。';

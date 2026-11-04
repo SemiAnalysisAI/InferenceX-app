@@ -57,6 +57,23 @@ jobs:
           : "${APP_URL:?APP_URL repository variable is not set}"
           bun run admin:cache:warmup "$APP_URL" --dashboard
 
+      # A deployment that changes the video History projection starts without a current
+      # snapshot. Rebuild it once here. It writes nothing when every record is current.
+      - name: Backfill video History snapshot
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+          INVALIDATE_SECRET: ${{ secrets.VERCEL_INVALIDATE_SECRET }}
+          VERCEL_PROTECTION_BYPASS_SECRET: ${{ secrets.VERCEL_PROTECTION_BYPASS_SECRET }}
+        run: |
+          : "${APP_URL:?APP_URL repository variable is not set}"
+          : "${INVALIDATE_SECRET:?VERCEL_INVALIDATE_SECRET is not set}"
+          headers=(-H "Authorization: Bearer $INVALIDATE_SECRET" -H "Content-Type: application/json")
+          if [ -n "$VERCEL_PROTECTION_BYPASS_SECRET" ]; then
+            headers+=(-H "x-vercel-protection-bypass: $VERCEL_PROTECTION_BYPASS_SECRET")
+          fi
+          curl -sSf --retry 2 --retry-delay 5 --max-time 300 -X POST \
+            "${APP_URL%/}/api/video-runs" "${headers[@]}" -d '{"history":"backfill"}'
+
       - name: Warm OperatorX and top pages
         env:
           APP_URL: ${{ vars.APP_URL }}

@@ -1,3 +1,7 @@
+import { compactTrendHistory } from '@/components/inference/hooks/trend-history-rows';
+
+import { availabilityBody } from '../support/e2e';
+
 const JALAPENO_QUERY =
   'g_model=DeepSeek-R1-0528&i_seq=8k%2F1k&i_prec=fp4&i_metric=y_outputTputPerGpu';
 const JALAPENO_NOTICE = '[data-testid="jalapeno-official-preview-notice"]';
@@ -8,8 +12,9 @@ const TPUV7_NOTICE = '[data-testid="tpuv7-official-preview-notice"]';
 
 describe('official preview notices', () => {
   beforeEach(() => {
-    cy.intercept('GET', '**/api/v1/availability*', { body: [] });
+    cy.intercept('GET', '**/api/v1/availability/compact', { body: availabilityBody([]) });
     cy.intercept('GET', '**/api/v1/benchmarks/history*', { body: [] });
+    cy.intercept('GET', '**/api/v1/benchmarks/history/trends*', { body: compactTrendHistory([]) });
     cy.intercept('GET', '**/api/v1/benchmarks?*', { body: [] });
   });
 

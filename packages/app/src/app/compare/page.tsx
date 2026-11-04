@@ -23,7 +23,7 @@ import {
 import { bucketComparePairsByVendor, formatModelList } from '@/lib/compare/compare-ssr';
 import { type Model } from '@/lib/catalog/data-mappings';
 
-export const revalidate = 3600;
+export const revalidate = 86400;
 
 const DESCRIPTION =
   'Compare AgentX agentic inference results for Kimi K3, DeepSeek V4 Pro, MiniMax M3, Qwen 3.5, and GLM 5.3, plus fixed-sequence chip comparisons.';

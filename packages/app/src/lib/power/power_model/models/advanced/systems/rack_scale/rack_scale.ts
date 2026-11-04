@@ -98,7 +98,7 @@ export abstract class RackScaleSystem extends GPUSystem {
         ['gpu_count_per_system', this.gpu_count],
         ['system_unit', 'rack'],
       ],
-      configuration: this._configuration(state),
+      configuration: () => this._configuration(state),
     });
   }
 

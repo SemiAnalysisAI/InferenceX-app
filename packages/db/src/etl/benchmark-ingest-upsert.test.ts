@@ -2,7 +2,12 @@ import type { PGlite } from '@electric-sql/pglite';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
-import { bulkIngestBenchmarkRows, type BenchmarkPersistenceInput } from './benchmark-ingest';
+import { getBenchmarkPresence } from '../queries/benchmark-presence';
+import {
+  bulkIngestBenchmarkRows,
+  insertServerLog,
+  type BenchmarkPersistenceInput,
+} from './benchmark-ingest';
 
 let db: PGlite;
 let sql: PgliteSql;
@@ -73,5 +78,19 @@ describe('bulkIngestBenchmarkRows — power_audit on conflict', () => {
     const singleTurn = row({ benchmarkType: 'single_turn', isl: 1024, osl: 1024 });
     expect(await ingest({ ...singleTurn, powerAudit: AUDIT })).toEqual([AUDIT]);
     expect(await ingest(singleTurn)).toEqual([null]);
+  });
+});
+
+describe('insertServerLog', () => {
+  it('publishes log presence for the rows it links', async () => {
+    const { insertedIds } = await bulkIngestBenchmarkRows(
+      sql,
+      [row({ conc: 1 }), row({ conc: 2 }), row({ conc: 4 })],
+      1,
+      '2026-09-11',
+    );
+    expect(await getBenchmarkPresence(sql)).toEqual({ trace: [], log: [] });
+    await insertServerLog(sql, insertedIds, 'log');
+    expect(await getBenchmarkPresence(sql)).toEqual({ trace: [], log: [1, 3] });
   });
 });
