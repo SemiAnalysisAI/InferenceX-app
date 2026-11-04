@@ -18,12 +18,19 @@ import {
   type StoredSource,
 } from '@/components/video-benchmark/stored';
 import { servingCells } from '@/components/video-benchmark/serving';
+import { RENDITION_PROFILE } from './video-renditions';
 
 export const PREFIX = 'h3-video-media/v1';
 export const videoStorageEnabled = () => Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 const runPrefix = (runId: string) => `${PREFIX}/runs/${runId}/`;
 export const approvalPath = (runId: string, artifact: CIArtifact) =>
   `${PREFIX}/approvals/${runId}/${artifact.name}_${artifact.id}.json`;
+const renditionsPrefix = `${PREFIX}/renditions/`;
+export const renditionMediaPath = (outputSha256: string) =>
+  `${PREFIX}/objects/${outputSha256}/${RENDITION_PROFILE}.mp4`;
+/** The output hash in the receipt path lets one listing resolve every rendition URL. */
+export const renditionReceiptPath = (sourceSha256: string, outputSha256: string) =>
+  `${renditionsPrefix}${sourceSha256}/${RENDITION_PROFILE}/${outputSha256}.json`;
 const sourceSeal = (path: string) => /^sources\/[1-9]\d*\/original-SHA256SUMS$/u.test(path);
 const legacyTelemetry = (path: string) =>
   /^gpu\/supervisor\/(?:baseline|candidate)\/telemetry\.jsonl$/u.test(path);
@@ -145,7 +152,7 @@ export async function readStoredArtifact(
     throw error;
   }
 }
-async function immutable(
+export async function immutable(
   path: string,
   body: Blob | string,
   contentType: string,
@@ -375,4 +382,64 @@ export async function storeVideoArtifact(
     signal,
   );
   return result;
+}
+
+export interface StoredIndex {
+  runId: string;
+  artifact: CIArtifact;
+  publishedAt: string;
+}
+
+export async function storedIndexes(): Promise<StoredIndex[]> {
+  if (!videoStorageEnabled()) return [];
+  const indexes: StoredIndex[] = [];
+  let cursor: string | undefined;
+  // ponytail: scan index metadata; add a materialized catalog if the published inventory grows large.
+  do {
+    const batch = await list({ prefix: `${PREFIX}/runs/`, cursor });
+    for (const blob of batch.blobs) {
+      const match =
+        /^h3-video-media\/v1\/runs\/(?<run>[1-9]\d*)\/(?<name>[^/]+)_(?<artifact>[1-9]\d*)\.json$/u.exec(
+          blob.pathname,
+        )?.groups;
+      if (!match || videoArtifactIdentity(match.name)?.run !== match.run) continue;
+      indexes.push({
+        runId: match.run,
+        publishedAt: blob.uploadedAt.toISOString(),
+        artifact: {
+          id: Number(match.artifact),
+          name: match.name,
+          expired: false,
+          size_in_bytes: 0,
+          stored: true,
+          indexUrl: blob.url,
+        },
+      });
+    }
+    cursor = batch.hasMore ? batch.cursor : undefined;
+  } while (cursor);
+  return indexes;
+}
+
+/**
+ * Map each original MP4 SHA256 to its web playback rendition from one listing. A receipt is
+ * written only after its validated MP4 upload, so its path alone identifies a playable rendition.
+ */
+export async function renditionPreviews(): Promise<Map<string, string>> {
+  const previews = new Map<string, string>();
+  if (!videoStorageEnabled()) return previews;
+  let cursor: string | undefined;
+  do {
+    const batch = await list({ prefix: renditionsPrefix, cursor });
+    for (const blob of batch.blobs) {
+      const match =
+        /^h3-video-media\/v1\/renditions\/(?<source>[a-f0-9]{64})\/(?<profile>[^/]+)\/(?<output>[a-f0-9]{64})\.json$/u.exec(
+          blob.pathname,
+        )?.groups;
+      if (match?.profile !== RENDITION_PROFILE || previews.has(match.source)) continue;
+      previews.set(match.source, new URL(`/${renditionMediaPath(match.output)}`, blob.url).href);
+    }
+    cursor = batch.hasMore ? batch.cursor : undefined;
+  } while (cursor);
+  return previews;
 }

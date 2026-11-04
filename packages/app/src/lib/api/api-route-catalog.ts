@@ -1597,6 +1597,14 @@ export const apiContractSourceDigests = [
     },
   },
   {
+    source: 'src/lib/video/video-renditions.ts',
+    sourceSha256: '7be3d6f4253b3d1c1eb14d74213a5722124ffb7c0a438e8d248b9bdd49181fe8',
+    reviewArea: {
+      en: 'VideoGenX web playback rendition receipts and the read-time previewUrl on published media; url, Difference and PSNR keep the sealed original.',
+      zh: 'VideoGenX 网页播放转码回执，以及读取时附加到已发布媒体的 previewUrl；url、差异预览和 PSNR 仍使用封存的原始视频。',
+    },
+  },
+  {
     source: 'src/lib/video/video-replay.ts',
     sourceSha256: 'f7095cc59ca891de5b57c96ebadde92b039c3a389ebb4ee70a14f3091ba6a781',
     reviewArea: {
@@ -1638,10 +1646,10 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/stored.ts',
-    sourceSha256: 'd78d3e1d4f73d3c15c06964ffb448a8ab686f61384ae44ca06af3149df4ffc09',
+    sourceSha256: '4d99e2539248c17a996d8fce5cf42943cb5a91349b04a27961866f21c90a06cc',
     reviewArea: {
-      en: 'Original stored artifact identity and independently verified optional quality attachment without approval promotion.',
-      zh: '原始已存储产物身份及独立校验的可选质量附件，不提升发布批准状态。',
+      en: 'Original stored artifact identity, optional read-time playback previewUrl and independently verified optional quality attachment without approval promotion.',
+      zh: '原始已存储产物身份、读取时附加的可选播放 previewUrl，以及独立校验的可选质量附件，不提升发布批准状态。',
     },
   },
   {

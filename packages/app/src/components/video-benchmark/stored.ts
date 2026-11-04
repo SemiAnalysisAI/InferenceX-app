@@ -4,12 +4,19 @@ import { fidelityEvidence, type FidelityBundle } from './fidelity';
 import type { ClipQuality } from './reference-quality';
 import type { DiagnosticPair } from './diagnostic-quality';
 
+export interface StoredMedia {
+  /** The sealed original. */
+  url: string;
+  downloadUrl: string;
+  /** Web playback rendition of `url`, attached at read time and never stored in the index. */
+  previewUrl?: string;
+}
 export interface StoredSource {
   id: string;
   kind?: 'fidelity';
   documents: [string, Json][];
   checksums: [string, string][];
-  assets: [string, { url: string; downloadUrl: string }][];
+  assets: [string, StoredMedia][];
   texts: [string, string][];
 }
 export function storedFidelityBundle(source: StoredSource): FidelityBundle {
