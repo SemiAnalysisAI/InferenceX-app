@@ -43,6 +43,7 @@ function mountResultsClips(
   diagnostics = false,
   unofficialRun?: string,
   previews: string[] = [],
+  brokenPreview = false,
 ) {
   const referenceMedia = { url: '', diagnosticUrl: '', previewUrl: '' };
   cy.fixture('video-results/reference.mp4', 'base64').then((encoded: string) => {
@@ -61,7 +62,9 @@ function mountResultsClips(
     // A visibly different stand-in for the web encode, so Difference against it would not be zero.
     cy.fixture('video-results/candidate.mp4', 'base64').then((encoded: string) => {
       cy.window().then((win) => {
-        const bytes = Uint8Array.from(win.atob(encoded), (char) => char.codePointAt(0)!);
+        const bytes = brokenPreview
+          ? Uint8Array.of(0, 0, 0, 8)
+          : Uint8Array.from(win.atob(encoded), (char) => char.codePointAt(0)!);
         referenceMedia.previewUrl = win.URL.createObjectURL(
           new win.Blob([bytes], { type: 'video/mp4' }),
         );
@@ -391,5 +394,16 @@ describe('Video results synchronized clips', () => {
 
     cy.get('[data-testid="video-results-view"][data-view="clip"]').click();
     cy.get('@preview-url').then((url) => tileVideo('h200').should('have.attr', 'src', url));
+  });
+  it('falls back to the sealed original when a web rendition cannot be played', () => {
+    mountResultsClips(['b200', 'h200'], '/video', false, undefined, ['h200'], true);
+    cy.get('@original-h200').then((url) => tileVideo('h200').should('have.attr', 'src', url));
+    tileVideo('h200').should(($video) =>
+      expect(($video[0] as HTMLVideoElement).readyState).to.be.at.least(1),
+    );
+    cy.get('[data-testid="video-results-clip"][data-hardware="h200"]').should(
+      'not.contain',
+      'This clip could not be played',
+    );
   });
 });

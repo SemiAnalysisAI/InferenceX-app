@@ -348,6 +348,8 @@ function SynchronizedClips({
   const [view, setView] = useState<'clip' | 'difference'>('clip');
   const [durations, setDurations] = useState<Record<string, number>>({});
   const [errors, setErrors] = useState<ReadonlySet<string>>(new Set());
+  /** Web renditions that failed to load; their clips play the sealed original instead. */
+  const [failedPreviews, setFailedPreviews] = useState<ReadonlySet<string>>(new Set());
   const [differenceErrors, setDifferenceErrors] = useState<ReadonlySet<string>>(new Set());
   // One tile per measured hardware, like the chart legend; roster entries without a cell get none.
   const visible = RESULTS_HARDWARE.filter(
@@ -786,7 +788,9 @@ function SynchronizedClips({
                     src={
                       view === 'difference' && pairedReference
                         ? clip.url
-                        : (clip.previewUrl ?? clip.url)
+                        : clip.previewUrl && !failedPreviews.has(clip.previewUrl)
+                          ? clip.previewUrl
+                          : clip.url
                     }
                     crossOrigin="anonymous"
                     muted
@@ -805,7 +809,12 @@ function SynchronizedClips({
                       if (Number.isFinite(value) && value > 0)
                         setDurations((previous) => ({ ...previous, [key]: value }));
                     }}
-                    onError={() => setErrors((previous) => new Set([...previous, key]))}
+                    onError={(event) => {
+                      const preview = clip.previewUrl;
+                      if (preview && event.currentTarget.currentSrc === preview)
+                        setFailedPreviews((previous) => new Set([...previous, preview]));
+                      else setErrors((previous) => new Set([...previous, key]));
+                    }}
                   />
                 )}
                 {view === 'difference' && clip && (
