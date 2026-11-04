@@ -462,7 +462,7 @@ describe('H3 video performance history', () => {
   });
   it('opens published history behind the dashboard and restores its filters after reload', () => {
     const entry = videoHistoryEntry(servingArtifact(), '2026-09-09T00:00:00Z');
-    cy.intercept('GET', '/api/video-runs?format=history&page=1', {
+    cy.intercept('GET', '/api/video-runs?format=history&page=1*', {
       schemaVersion: 1,
       entries: [entry],
       nextPage: null,

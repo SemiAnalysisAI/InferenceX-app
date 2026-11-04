@@ -4,7 +4,7 @@ import type { VideoHistoryPage } from '@/components/video-benchmark/history';
 
 // Retained H100/H200/B200 C1/C2/C4 observations (cypress/fixtures/api/video-history.json).
 function mount(pathname = '/video', search = '') {
-  cy.intercept('GET', '/api/video-runs?format=history&page=1', {
+  cy.intercept('GET', '/api/video-runs?format=history&page=1*', {
     fixture: 'api/video-history.json',
   }).as('history');
   cy.intercept('GET', '/api/video-runs?page=*', { runs: [], nextPage: null });
@@ -51,7 +51,7 @@ describe('Video hardware dashboard (retained fixture)', () => {
   it('shows stored legacy evidence without promoting it to default chart points', () => {
     cy.fixture('api/video-history.json').then((page: VideoHistoryPage) => {
       for (const entry of page.entries) entry.approved = false;
-      cy.intercept('GET', '/api/video-runs?format=history&page=1', page).as('legacy');
+      cy.intercept('GET', '/api/video-runs?format=history&page=1*', page).as('legacy');
     });
     cy.intercept('GET', '/api/video-runs?run=*', { statusCode: 204 });
     cy.mount(
@@ -304,7 +304,7 @@ describe('Video hardware dashboard (retained fixture)', () => {
     cy.get('[data-testid="video-evidence-toggle"]').should('have.attr', 'aria-expanded', 'false');
   });
   it('shows placeholders while loading instead of a false "Not measured"', () => {
-    cy.intercept('GET', '/api/video-runs?format=history&page=1', (req) => {
+    cy.intercept('GET', '/api/video-runs?format=history&page=1*', (req) => {
       req.reply({ fixture: 'api/video-history.json', delay: 800 });
     }).as('slowHistory');
     cy.intercept('GET', '/api/video-runs?page=*', { runs: [], nextPage: null });
@@ -332,7 +332,7 @@ describe('Video hardware dashboard (retained fixture)', () => {
         for (const entry of page.entries)
           for (const source of entry.sources)
             for (const observation of source.observations) observation.allocated = null;
-        cy.intercept('GET', '/api/video-runs?format=history&page=1', page).as('allocation');
+        cy.intercept('GET', '/api/video-runs?format=history&page=1*', page).as('allocation');
       });
       cy.intercept('GET', '/api/video-runs?page=*', { runs: [], nextPage: null });
       cy.intercept('GET', '/api/video-runs?run=*', { statusCode: 204 });
@@ -364,7 +364,7 @@ describe('Video hardware dashboard (retained fixture)', () => {
     cy.fixture('api/video-history.json').then((page) => {
       page.entries[0].sources[0].powerVerified = true;
       page.entries[2].sources[0].powerVerified = false;
-      cy.intercept('GET', '/api/video-runs?format=history&page=1', page).as('verdicts');
+      cy.intercept('GET', '/api/video-runs?format=history&page=1*', page).as('verdicts');
     });
     cy.intercept('GET', '/api/video-runs?page=*', { runs: [], nextPage: null });
     cy.intercept('GET', '/api/video-runs?run=*', { statusCode: 204 });

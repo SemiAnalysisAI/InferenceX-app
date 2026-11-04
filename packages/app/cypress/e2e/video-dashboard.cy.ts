@@ -5,7 +5,7 @@
 // API reference lists at $0.640 per video.
 describe('Video hardware dashboard (E2E fixtures)', () => {
   beforeEach(() => {
-    cy.intercept('GET', '/api/video-runs?format=history&page=1', {
+    cy.intercept('GET', '/api/video-runs?format=history&page=1*', {
       fixture: 'api/video-history.json',
       headers: { 'X-VideoGenX-Replay': '1' },
     }).as('history');
