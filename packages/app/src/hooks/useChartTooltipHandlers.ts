@@ -9,7 +9,7 @@ import { installTouchInputTracking, isTouchCompatMouseEvent } from '@/lib/d3-cha
 import { useStickyTooltip } from './useStickyTooltip';
 
 import { overlayMarkerPosition } from '@/lib/d3-chart/overlay-x-marker';
-import { canvasPointLayerOf } from '@/lib/d3-chart/layers/canvas-points';
+import { canvasPointLayerOf } from '@/lib/d3-chart/layers/canvas-point-registry';
 export type RulerType = 'vertical' | 'horizontal' | 'crosshair' | 'none';
 
 export interface ChartTooltipConfig<TData> {

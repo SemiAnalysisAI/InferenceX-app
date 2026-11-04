@@ -7,7 +7,7 @@ import { pointLabelAnchor } from '@/lib/d3-chart/layers/point-label-order';
 import {
   CANVAS_POINT_LAYER_SELECTOR,
   canvasPointLayerOf,
-} from '@/lib/d3-chart/layers/canvas-points';
+} from '@/lib/d3-chart/layers/canvas-point-registry';
 import './orange-chicken-theme.css';
 
 const CHART_SELECTOR = '[data-orange-chicken-eligible="true"]';

@@ -24,12 +24,8 @@ import {
   type ScatterPointConfig,
 } from '../layers/scatter-points';
 import { renderRadar } from '../layers/radar';
-import {
-  canvasPointLayerOf,
-  ensureCanvasPointLayer,
-  type CanvasPointLayer,
-  type ScatterDatum,
-} from '../layers/canvas-points';
+import { canvasPointLayerOf } from '../layers/canvas-point-registry';
+import type { CanvasPointLayer, ScatterDatum } from '../layers/canvas-points';
 
 import type { BuiltScale } from './scale-builders';
 import type { LayerConfig, RenderContext, ScatterLayerConfig, ZoomContext } from './types';
@@ -50,7 +46,7 @@ function canvasPointsFor<T extends ScatterDatum>(
   layer: ScatterLayerConfig<T>,
   group: d3.Selection<SVGGElement, unknown, null, undefined>,
 ): CanvasPointLayer<T> | null {
-  return layer.renderer === 'canvas' ? canvasPointLayerOf<T>(group.node()) : null;
+  return layer.canvas ? canvasPointLayerOf<T>(group.node()) : null;
 }
 
 export function renderLayer<T>(
@@ -135,8 +131,8 @@ export function renderLayer<T>(
     }
 
     case 'scatter': {
-      if (layer.renderer === 'canvas' && surface === 'screen') {
-        const points = ensureCanvasPointLayer<(typeof layer.data)[number]>(group.node()!);
+      if (layer.canvas && surface === 'screen') {
+        const points = layer.canvas(group.node()!);
         points.join(layer.data, layer.keyFn, width, height);
         points.restyle(layer.config);
         points.place(xScale as ContinuousScale, yScale as ContinuousScale);

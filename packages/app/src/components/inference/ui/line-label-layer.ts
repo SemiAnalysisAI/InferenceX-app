@@ -2,7 +2,7 @@ import * as d3 from 'd3';
 
 import { pointNearestX } from '@/components/inference/ui/line-label-anchor';
 import { setAttrIfChanged, setStyleIfChanged } from '@/lib/d3-chart/chart-update';
-import { POINT_LABEL_ANCHOR_CLASS } from '@/lib/d3-chart/layers/canvas-points';
+import { POINT_LABEL_ANCHOR_CLASS } from '@/lib/d3-chart/layers/canvas-point-registry';
 import { plotClipSize } from '@/lib/d3-chart/plot-bounds';
 import { CHART_TYPE, px } from '@/lib/d3-chart/typography';
 

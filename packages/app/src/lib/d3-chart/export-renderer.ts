@@ -7,7 +7,7 @@ import type { BuiltScale } from './D3Chart/scale-builders';
 import type { D3ChartProps, RenderContext } from './D3Chart/types';
 import { getDomainAwareChartWatermark } from '@/lib/runtime/unofficial-domain';
 import type { ContinuousScale } from './types';
-import { CANVAS_POINT_LAYER_SELECTOR } from './layers/canvas-points';
+import { CANVAS_POINT_LAYER_SELECTOR } from './layers/canvas-point-registry';
 
 type ExportRenderer = (target: SVGSVGElement, width: number, height: number) => void;
 const renderers = new WeakMap<SVGSVGElement, ExportRenderer>();

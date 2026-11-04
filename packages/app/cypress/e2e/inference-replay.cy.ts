@@ -1,4 +1,4 @@
-import { CANVAS_POINT_LAYER_SELECTOR } from '@/lib/d3-chart/layers/canvas-points';
+import { CANVAS_POINT_LAYER_SELECTOR } from '@/lib/d3-chart/layers/canvas-point-registry';
 
 import { expandLegendAdvanced } from '../support/legend-advanced';
 

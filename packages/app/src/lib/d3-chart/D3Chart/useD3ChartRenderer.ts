@@ -8,12 +8,8 @@ import {
   getTooltipContainerGeometry,
   invalidateTooltipGeometry,
 } from '../layers/scatter-points';
-import {
-  CANVAS_POINT_LAYER_SELECTOR,
-  canvasPointLayerOf,
-  type PointPositions,
-  type ScatterDatum,
-} from '../layers/canvas-points';
+import { CANVAS_POINT_LAYER_SELECTOR, canvasPointLayerOf } from '../layers/canvas-point-registry';
+import type { PointPositions, ScatterDatum } from '../layers/canvas-points';
 import { DEFAULT_CHART_MARGIN, setupChartStructure } from '../chart-setup';
 import {
   raiseInOrder,
@@ -396,7 +392,7 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
       const exportProps = {
         ...props,
         layers: props.layers.map((layer) => {
-          if (layer.type !== 'scatter' || layer.renderer !== 'canvas') return layer;
+          if (layer.type !== 'scatter' || !layer.canvas) return layer;
           const points = canvasPointLayerOf<(typeof layer.data)[number]>(source);
           return points ? { ...layer, data: points.orderedLike(layer.data, layer.keyFn) } : layer;
         }),

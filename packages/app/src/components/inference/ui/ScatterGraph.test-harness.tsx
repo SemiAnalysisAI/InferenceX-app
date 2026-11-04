@@ -9,8 +9,8 @@ import { computeToggle } from '@/hooks/useTogglableSet';
 import {
   CANVAS_POINT_LAYER_SELECTOR,
   POINT_HIT_AREA_CLASS,
-  type CanvasPointLayerElement,
-} from '@/lib/d3-chart/layers/canvas-points';
+} from '@/lib/d3-chart/layers/canvas-point-registry';
+import type { CanvasPointLayerElement } from '@/lib/d3-chart/layers/canvas-points';
 import type * as NextNavigation from 'next/navigation';
 
 vi.mock('@/lib/d3-chart/chart-setup', { spy: true });

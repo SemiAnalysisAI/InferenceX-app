@@ -11,13 +11,15 @@ import { setStyleIfChanged } from '../chart-update';
 import type { ContinuousScale } from '../types';
 import { PointHitGrid, hitAreaPath } from './canvas-point-hit';
 import { joinedDrawOrder } from './canvas-point-order';
+import {
+  CANVAS_POINT_LAYER_CLASS,
+  POINT_HIT_AREA_CLASS,
+  POINT_LABEL_ANCHOR_CLASS,
+  POINTS_JOINED_ATTRIBUTE,
+  canvasPointLayerOf,
+  canvasPointLayers,
+} from './canvas-point-registry';
 import { resolveShapeKey, syncPointLabel, type ScatterPointConfig } from './scatter-points';
-
-export const CANVAS_POINT_LAYER_CLASS = 'canvas-point-layer';
-export const CANVAS_POINT_LAYER_SELECTOR = `.${CANVAS_POINT_LAYER_CLASS}`;
-export const POINT_HIT_AREA_CLASS = 'dot-hit-area';
-export const POINT_LABEL_ANCHOR_CLASS = 'point-label-anchor';
-export const POINTS_JOINED_ATTRIBUTE = 'data-points-joined';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const XHTML_NS = 'http://www.w3.org/1999/xhtml';
@@ -107,7 +109,6 @@ interface RedrawableLayer {
   invalidate: () => void;
 }
 
-const layers = new WeakMap<Element, RedrawableLayer>();
 const liveLayers = new Set<RedrawableLayer>();
 let themeObserver: MutationObserver | null = null;
 
@@ -125,17 +126,6 @@ function observeTheme(): void {
   });
 }
 
-export function canvasPointLayerOf<T extends ScatterDatum = ScatterDatum>(
-  root: Element | null | undefined,
-): CanvasPointLayer<T> | null {
-  if (!root) return null;
-  const element = root.matches(CANVAS_POINT_LAYER_SELECTOR)
-    ? root
-    : root.querySelector(CANVAS_POINT_LAYER_SELECTOR);
-  const layer = element ? layers.get(element) : undefined;
-  return layer instanceof CanvasPointLayer ? (layer as CanvasPointLayer<T>) : null;
-}
-
 export function ensureCanvasPointLayer<T extends ScatterDatum>(
   zoomGroup: SVGGElement,
 ): CanvasPointLayer<T> {
@@ -143,7 +133,7 @@ export function ensureCanvasPointLayer<T extends ScatterDatum>(
   if (existing && existing.element.parentNode === zoomGroup) return existing;
   const layer = new CanvasPointLayer<T>(zoomGroup.ownerDocument);
   zoomGroup.append(layer.element);
-  layers.set(layer.element, layer);
+  canvasPointLayers.set(layer.element, layer);
   liveLayers.add(layer);
   observeTheme();
   return layer;

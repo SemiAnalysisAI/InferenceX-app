@@ -4,8 +4,10 @@ import {
   POINT_HIT_AREA_CLASS,
   POINT_LABEL_ANCHOR_CLASS,
   POINTS_JOINED_ATTRIBUTE,
-  type CanvasPointLayerElement,
-  type ScatterPointSnapshot,
+} from '@/lib/d3-chart/layers/canvas-point-registry';
+import type {
+  CanvasPointLayerElement,
+  ScatterPointSnapshot,
 } from '@/lib/d3-chart/layers/canvas-points';
 
 export const SCATTER_GRAPH = '[data-testid="scatter-graph"]';

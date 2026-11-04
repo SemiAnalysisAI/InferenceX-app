@@ -5,7 +5,7 @@ import { getNavigationTiming } from '@/lib/analytics/navigation-timing';
 import {
   CANVAS_POINT_LAYER_SELECTOR,
   POINTS_JOINED_ATTRIBUTE,
-} from '@/lib/d3-chart/layers/canvas-points';
+} from '@/lib/d3-chart/layers/canvas-point-registry';
 
 const DATA_POINT_SELECTOR = `.dot-group, ${CANVAS_POINT_LAYER_SELECTOR}:not([${POINTS_JOINED_ATTRIBUTE}="0"])`;
 

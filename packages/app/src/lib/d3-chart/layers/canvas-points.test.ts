@@ -4,13 +4,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { PointHitGrid, hitAreaPath } from './canvas-point-hit';
 import { joinedDrawOrder } from './canvas-point-order';
-import {
-  CANVAS_POINT_LAYER_SELECTOR,
-  canvasPointLayerOf,
-  cssEase,
-  ensureCanvasPointLayer,
-  type PointPointerHandlers,
-} from './canvas-points';
+import { CANVAS_POINT_LAYER_SELECTOR, canvasPointLayerOf } from './canvas-point-registry';
+import { cssEase, ensureCanvasPointLayer, type PointPointerHandlers } from './canvas-points';
 import {
   config,
   type Datum,

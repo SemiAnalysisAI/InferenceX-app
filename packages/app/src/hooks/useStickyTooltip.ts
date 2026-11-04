@@ -2,7 +2,7 @@ import * as d3 from 'd3';
 import { useCallback, useRef, useState } from 'react';
 
 import { type ShapeKey, applyNormalState } from '@/lib/charts/chart-rendering';
-import { canvasPointLayerOf } from '@/lib/d3-chart/layers/canvas-points';
+import { canvasPointLayerOf } from '@/lib/d3-chart/layers/canvas-point-registry';
 
 const VALID_SHAPE_KEYS: ReadonlySet<ShapeKey> = new Set([
   'circle',

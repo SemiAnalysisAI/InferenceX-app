@@ -1,11 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  CANVAS_POINT_LAYER_SELECTOR,
-  type CanvasPointLayerElement,
-  type PointPointerHandlers,
-} from './canvas-points';
+import { CANVAS_POINT_LAYER_SELECTOR } from './canvas-point-registry';
+import type { CanvasPointLayerElement, PointPointerHandlers } from './canvas-points';
 import {
   config,
   type Datum,

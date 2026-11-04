@@ -75,8 +75,8 @@ import { computeTooltipPosition } from '@/lib/d3-chart/layers/scatter-points';
 import {
   CANVAS_POINT_LAYER_SELECTOR,
   canvasPointLayerOf,
-  type PointHaloStyle,
-} from '@/lib/d3-chart/layers/canvas-points';
+} from '@/lib/d3-chart/layers/canvas-point-registry';
+import { ensureCanvasPointLayer, type PointHaloStyle } from '@/lib/d3-chart/layers/canvas-points';
 import {
   EMPTY_PERF_RULER_STATE,
   clampIsoX,
@@ -3031,7 +3031,7 @@ const ScatterGraph = React.memo(
             getShapeKeyForPrecision(d.precision, interactionRef.current.selectedPrecisions),
         },
         keyFn: buildPointId,
-        renderer: 'canvas',
+        canvas: ensureCanvasPointLayer,
       };
 
       const updateOverlayLabels = (
