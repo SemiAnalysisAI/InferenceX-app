@@ -1,5 +1,7 @@
 import { QuotesContent } from '@/components/quotes/quotes-content';
+import { SupporterLogoWall } from '@/components/quotes/supporter-logo-wall';
 import { QUOTES } from '@/components/quotes/quotes-data';
+import { IntroSection } from '@/components/landing/intro-section';
 
 function orgAnchorId(org: string): string {
   const slug = org
@@ -83,8 +85,8 @@ describe('QuotesContent', () => {
         cy.get('p').should(
           'have.text',
           locale === 'en'
-            ? '“Making AI infrastructure accessible to more developers starts with measuring how real-world, multi-turn agentic workloads, including context growth and prefix-cache reuse, perform in production. We welcome open-source, reproducible benchmarks like InferenceX that highlight the cost efficiency and interactivity of Google TPUs, running open software, giving developers transparent data to deploy at scale and with confidence.”'
-            : '“要让更多开发者用上 AI 基础设施，首先需要测量真实的多轮智能体工作负载在生产环境中的表现，包括上下文增长和前缀缓存复用。我们欢迎 InferenceX 这样的开源、可复现基准测试，展示 Google TPU 运行开放软件时的成本效率和交互性能，为开发者提供透明的数据，让他们有信心进行大规模部署。”',
+            ? '“Making AI infrastructure accessible to more developers starts with measuring how real-world, multi-turn agentic workloads—including context growth and prefix-cache reuse—perform in production. We welcome open-source, reproducible benchmarks like InferenceX that highlight the cost efficiency and interactivity of Google TPUs running open software. That kind of transparent data gives developers the confidence to deploy at scale.”'
+            : '“要让更多开发者用上 AI 基础设施，首先需要测量真实的多轮智能体工作负载在生产环境中的表现，包括上下文增长和前缀缓存复用。我们欢迎 InferenceX 这样的开源、可复现基准测试，展示 Google TPU 运行开放软件时的成本效率和交互性能。这样的透明数据让开发者有信心进行大规模部署。”',
         );
         cy.get('footer')
           .should('contain.text', 'Bill Jia')
@@ -353,8 +355,17 @@ describe('QuotesContent supporter logo wall', () => {
     });
   });
 
-  it('links the six managed providers to their existing quotes in both locales', () => {
-    const providers = ['Together AI', 'GMI Cloud', 'Nebius', 'Baseten', 'Crusoe', 'Tensormesh'];
+  it('links the managed providers to their quotes in both locales', () => {
+    const providers = [
+      'Together AI',
+      'GMI Cloud',
+      'Nebius',
+      'Baseten',
+      'Crusoe',
+      'Tensormesh',
+      'Morph',
+      'Doubleword',
+    ];
     for (const locale of ['en', 'zh'] as const) {
       cy.viewport(375, 812);
       cy.mount(<QuotesContent locale={locale} />);
@@ -363,7 +374,7 @@ describe('QuotesContent supporter logo wall', () => {
       cy.window().then((win) => {
         cy.stub(win.Element.prototype, 'scrollIntoView').as('providerScroll');
       });
-      cy.get(`${group} img`).should(($logos) => {
+      cy.get(`${group} img:visible`).should(($logos) => {
         expect([...$logos].map((logo) => logo.getAttribute('alt'))).to.deep.equal(providers);
         for (const logo of $logos) {
           const bounds = logo.getBoundingClientRect();
@@ -372,7 +383,7 @@ describe('QuotesContent supporter logo wall', () => {
         }
       });
       for (const org of providers) {
-        cy.get(`${group} img[alt="${org}"]`).closest('button').click();
+        cy.get(`${group} img[alt="${org}"]:visible`).closest('button').click();
         cy.get('@providerScroll').should((stub) => {
           const calls = (
             stub as unknown as { getCalls: () => { thisValue: Element }[] }
@@ -381,9 +392,99 @@ describe('QuotesContent supporter logo wall', () => {
         });
       }
       cy.get('#quote-together-ai').should('contain.text', 'Tri Dao');
+      cy.get('#quote-morph').within(() => {
+        cy.get('p').should(
+          'have.text',
+          locale === 'en'
+            ? "“When you own your hardware, every serving decision shows up directly in your margins. InferenceX's open, reproducible benchmarks show how different accelerators and inference engines actually perform on real workloads, so smaller providers like us can make infra decisions with the same data as the biggest players. Nobody else shows acceptance length like these guys.”"
+            : '“硬件是自己买的，每一项推理服务决策都会直接影响利润率。InferenceX 的开放、可复现基准测试展示了不同加速器和推理引擎在真实工作负载下的实际表现，让我们这样规模较小的服务商也能用和行业巨头一样的数据来做基础设施决策。还没有谁能像他们这样展示 acceptance length。”',
+        );
+        cy.get('footer').should('contain.text', 'Nicholas Khami').and('contain.text', 'Morph');
+        cy.get('img[alt="Morph"]:visible').should(($logo) => {
+          expect(($logo[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
+        });
+      });
+      cy.get('[data-testid="supporter-group-other"] img[alt="Morph"]').should('not.exist');
       cy.get('@providerScroll').then((stub) => {
         (stub as unknown as { restore: () => void }).restore();
       });
     }
+  });
+
+  it('keeps Morph off the landing supporter strip in both locales', () => {
+    for (const locale of ['en', 'zh'] as const) {
+      cy.mount(<IntroSection locale={locale} />);
+      cy.get('[data-testid="intro-section"]').should('not.contain.text', 'Morph');
+      cy.get('a[href$="#quote-morph"]').should('not.exist');
+      cy.get('a[href$="#quote-google"]').should('exist');
+    }
+  });
+
+  for (const locale of ['en', 'zh'] as const) {
+    for (const dark of [false, true]) {
+      it(`uses the official Morph wordmark without effects (${locale}, ${dark ? 'dark' : 'light'})`, () => {
+        for (const width of [375, 1440]) {
+          cy.viewport(width, 900);
+          cy.mount(
+            <div className={dark ? 'dark' : ''}>
+              <QuotesContent locale={locale} />
+            </div>,
+          );
+          for (const section of [
+            '[data-testid="supporter-group-managed-inference-providers"]',
+            '#quote-morph',
+          ]) {
+            cy.get(`${section} img[alt="Morph"]:visible`)
+              .should('have.length', 1)
+              .and('have.attr', 'src', '/logos/morph.svg');
+            cy.get(`${section} img[alt="Morph"]:visible`).should(($images) => {
+              const image = $images[0] as HTMLImageElement;
+              expect(image.naturalWidth).to.equal(174);
+              expect(image.naturalHeight).to.equal(48);
+              expect(getComputedStyle(image).filter).to.equal('none');
+              expect(getComputedStyle(image).opacity).to.equal('1');
+              expect(getComputedStyle(image).backgroundColor).to.equal('rgb(10, 10, 10)');
+              const rect = image.getBoundingClientRect();
+              expect(rect.left).to.be.at.least(0);
+              expect(rect.right).to.be.at.most(width);
+            });
+          }
+          cy.get('#quote-morph').should('contain.text', 'Nicholas Khami');
+        }
+      });
+    }
+  }
+});
+
+const wallLogo = (label: string) => ({ label, logo: 'nvidia-color.svg' });
+const centers = (id: string) =>
+  cy
+    .get(`[data-testid="supporter-group-${id}"] li`)
+    .then(($li) => [...$li].map((li) => Math.round(li.getBoundingClientRect().left)));
+
+describe('SupporterLogoWall columns', () => {
+  it('keeps an explicit column count when a group has fewer logos than columns', () => {
+    cy.viewport(1400, 800);
+    cy.mount(
+      <SupporterLogoWall
+        groups={[
+          {
+            id: 'wide',
+            label: { en: 'Wide', zh: 'Wide' },
+            desktopColumns: 4,
+            logos: ['a', 'b', 'c', 'd', 'e'].map(wallLogo),
+          },
+          {
+            id: 'short',
+            label: { en: 'Short', zh: 'Short' },
+            desktopColumns: 4,
+            logos: ['f', 'g', 'h'].map(wallLogo),
+          },
+        ]}
+      />,
+    );
+    centers('wide').then((wide) => {
+      centers('short').should('deep.equal', wide.slice(0, 3));
+    });
   });
 });

@@ -19,9 +19,9 @@ export interface Quote {
 
 export const QUOTES: Quote[] = [
   {
-    text: 'Making AI infrastructure accessible to more developers starts with measuring how real-world, multi-turn agentic workloads, including context growth and prefix-cache reuse, perform in production. We welcome open-source, reproducible benchmarks like InferenceX that highlight the cost efficiency and interactivity of Google TPUs, running open software, giving developers transparent data to deploy at scale and with confidence.',
+    text: 'Making AI infrastructure accessible to more developers starts with measuring how real-world, multi-turn agentic workloads—including context growth and prefix-cache reuse—perform in production. We welcome open-source, reproducible benchmarks like InferenceX that highlight the cost efficiency and interactivity of Google TPUs running open software. That kind of transparent data gives developers the confidence to deploy at scale.',
     textZh:
-      '要让更多开发者用上 AI 基础设施，首先需要测量真实的多轮智能体工作负载在生产环境中的表现，包括上下文增长和前缀缓存复用。我们欢迎 InferenceX 这样的开源、可复现基准测试，展示 Google TPU 运行开放软件时的成本效率和交互性能，为开发者提供透明的数据，让他们有信心进行大规模部署。',
+      '要让更多开发者用上 AI 基础设施，首先需要测量真实的多轮智能体工作负载在生产环境中的表现，包括上下文增长和前缀缓存复用。我们欢迎 InferenceX 这样的开源、可复现基准测试，展示 Google TPU 运行开放软件时的成本效率和交互性能。这样的透明数据让开发者有信心进行大规模部署。',
     name: 'Bill Jia',
     title: 'VP of Engineering at Google',
     titleZh: 'Google 工程副总裁',
@@ -585,6 +585,27 @@ export const QUOTES: Quote[] = [
     org: 'Mooncake',
     logo: 'kvcache-ai.svg',
     link: 'https://kvcache.ai/',
+  },
+  {
+    text: "When you own your hardware, every serving decision shows up directly in your margins. InferenceX's open, reproducible benchmarks show how different accelerators and inference engines actually perform on real workloads, so smaller providers like us can make infra decisions with the same data as the biggest players. Nobody else shows acceptance length like these guys.",
+    textZh:
+      '硬件是自己买的，每一项推理服务决策都会直接影响利润率。InferenceX 的开放、可复现基准测试展示了不同加速器和推理引擎在真实工作负载下的实际表现，让我们这样规模较小的服务商也能用和行业巨头一样的数据来做基础设施决策。还没有谁能像他们这样展示 acceptance length。',
+    name: 'Nicholas Khami',
+    title: 'Morph',
+    titleZh: 'Morph',
+    org: 'Morph',
+    logo: 'morph.svg',
+  },
+  {
+    text: "Delivering cheap, reliable inference for long horizon agents depends on understanding exactly how hardware and serving software perform at different points on the throughput-latency curve. InferenceX's excellent open, continuously updated benchmarks support the work that our research team do to ensure that we are always driving the most cost efficient way to serve each model across our heterogeneous fleet.",
+    textZh:
+      '要为长周期智能体（long-horizon agents）提供低成本、可靠的推理服务，就必须准确理解硬件和推理服务软件在吞吐量-延迟曲线各个位置上的实际表现。InferenceX 出色的开放、持续更新的基准测试，为我们研究团队的工作提供了有力支撑，帮助我们始终在异构集群上以最具成本效益的方式部署每一个模型。',
+    name: 'Meryem Arik',
+    title: 'Co-Founder & CEO, Doubleword',
+    titleZh: 'Doubleword 联合创始人兼首席执行官',
+    org: 'Doubleword',
+    logo: 'doubleword.png',
+    link: 'https://www.doubleword.ai/',
   },
 ];
 
