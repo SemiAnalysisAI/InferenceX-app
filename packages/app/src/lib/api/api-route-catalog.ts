@@ -1590,7 +1590,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/reference-quality.ts',
-    sourceSha256: 'c4e0f51d6859ece7ab0e7087b6fb8324bcb8bb1a04fce8cb194301f326da366a',
+    sourceSha256: 'ba76cd4e72124871dd3ba104357631d1a2c632a3fa6b1fc7f7f760f4e0d5d4dd',
     reviewArea: {
       en: 'Sealed per-clip reference identity, decoded all-frame PSNR, exact equality, missing/incompatible states and safe public diagnostics.',
       zh: '封存的逐条视频参考身份、解码全帧 PSNR、完全一致、缺失与不兼容状态，以及安全的公开诊断字段。',
@@ -1598,7 +1598,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/diagnostic-quality.ts',
-    sourceSha256: '2af9b2501f588f94c3c0f0ceebdee9f07e27592c85ce2ae3947294ca45337ac2',
+    sourceSha256: 'e3da95c88795c677e46f5cdbdb2da8106980a7be37e47dd42b426493bd8da7ac',
     reviewArea: {
       en: 'Separate native diagnostic media and all-frame scores bound to original CI context, consumed-noise receipts and matching candidate controls; no performance or approval promotion.',
       zh: '原生诊断视频与全帧评分独立保留，绑定原始 CI 上下文、实际使用的初始噪声回执及一致的候选配置；不提升性能证据或发布批准状态。',
@@ -1630,7 +1630,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/tradeoff.ts',
-    sourceSha256: 'da13cd1546412bf9793c62c93b7d80a0ad27cc75f431367b0cc5cd1af8e4c5c3',
+    sourceSha256: 'f7ec9e081fa5bb279d896ddc7e9dc176a338e29da5f6dcd40bf50e53727d542f',
     reviewArea: {
       en: 'Video source metrics and GPU allocation evidence shared by history and API projections.',
       zh: '历史与 API 投影共用的视频来源指标及 GPU 分配证据。',

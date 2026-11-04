@@ -1,4 +1,4 @@
-import { at, number, rows, safePath, text, type Json } from './bundle';
+import { at, canonical, number, rows, safePath, text, type Json } from './bundle';
 import { caseRecords } from './compare';
 import { servingCells } from './serving';
 import { storedBundle, type StoredArtifact } from './stored';
@@ -59,14 +59,6 @@ const digest = (value: Json) => {
   requireEvidence(/^[a-f0-9]{64}$/u.test(result), 'SHA256 identity');
   return result;
 };
-function canonical(value: Json): string {
-  if (value === null || typeof value !== 'object') return JSON.stringify(value);
-  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
-  return `{${Object.keys(value)
-    .sort()
-    .map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`)
-    .join(',')}}`;
-}
 
 const PUBLIC_CHECKS = new Set([
   'pair.valid_media',

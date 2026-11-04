@@ -1,4 +1,4 @@
-import { at, number, rows, safePath, text, type Json } from './bundle';
+import { at, canonical, number, rows, safePath, text, type Json } from './bundle';
 import { videoHistoryEntry } from './history';
 import { namedRunPoints } from './points';
 import {
@@ -50,15 +50,6 @@ const revision = (value: Json) => {
   requireValue(/^[a-f0-9]{40}$/u.test(result), 'source revision');
   return result;
 };
-function canonical(value: Json): string {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
-  if (value !== null && typeof value === 'object')
-    return `{${Object.keys(value)
-      .sort()
-      .map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`)
-      .join(',')}}`;
-  return JSON.stringify(value);
-}
 
 function clipReceipt(receipt: Json, role: 'candidate' | 'reference', plan: Json, caseId: string) {
   requireValue(
