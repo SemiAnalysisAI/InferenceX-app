@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  Activity,
   useCallback,
   useEffect,
   useMemo,
@@ -519,12 +520,12 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
     </details>
   );
 
-  if (detailCell)
-    return (
-      <div
-        className={`${styles.page} mx-auto w-full min-w-0 max-w-7xl py-4`}
-        data-testid="video-results"
-      >
+  return (
+    <div
+      className={`${styles.page} mx-auto w-full min-w-0 max-w-7xl py-4`}
+      data-testid="video-results"
+    >
+      {detailCell && (
         <VideoDeploymentDetail
           cell={detailCell}
           siblings={deploymentCells
@@ -548,340 +549,348 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
           }}
           onPsnr={() => closeDetail('comparison-clips')}
         />
-      </div>
-    );
-
-  return (
-    <div
-      className={`${styles.page} mx-auto flex w-full min-w-0 max-w-7xl flex-col gap-4 py-4`}
-      data-testid="video-results"
-    >
-      <Card>
+      )}
+      {/* Hidden, not unmounted: clip media, the selected clip group and chart state survive a detail visit. */}
+      <Activity mode={detailCell ? 'hidden' : 'visible'}>
         <div className="flex flex-col gap-4">
-          <DashboardSectionHeader
-            title={s.title}
-            description={s.description}
-            actions={
-              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <span>{s.cohort}</span>
-                <InfoHelp label={s.cohort} value="cohort" triggerTestId="results-cohort-help">
-                  {s.cohortHelp}
-                </InfoHelp>
-                {replay && <span data-testid="results-replay">{s.replay}</span>}
-                <ShareButton />
-              </div>
-            }
-            headingAs="h1"
-          />
-          <div className={styles.controls}>
-            <ControlPanel
-              legend={s.benchmarkConfig}
-              className={`${styles.benchmark} ${styles.wide}`}
-              data-testid="results-benchmark-config"
-            >
-              {selector(
-                'model',
-                s.model,
-                options.models.map((v) => ({ value: v, label: v })),
-                s.all,
-              )}
-              <div className="flex min-w-0 flex-col gap-1.5">
-                <Label htmlFor="results-workload">{s.workload}</Label>
-                <SearchableSelect
-                  triggerId="results-workload"
-                  triggerTestId="results-workload"
-                  value={state.workload ?? 'automatic'}
-                  onValueChange={(value) =>
-                    update({ workload: value === 'automatic' ? null : value })
-                  }
-                  groups={[
-                    {
-                      label: '',
-                      options: [
-                        { value: 'automatic', label: s.automatic, help: resolvedWorkload?.help },
-                        ...workloadOptions,
-                      ],
-                    },
-                  ]}
-                  placeholder={s.workload}
-                  contentClassName="max-w-[calc(100vw-2rem)]"
-                  trackPrefix="video_results_workload"
-                />
-                {state.workload === null && resolvedWorkload && (
-                  <p
-                    className="text-xs text-muted-foreground"
-                    data-testid="results-automatic-detail"
+          <Card>
+            <div className="flex flex-col gap-4">
+              <DashboardSectionHeader
+                title={s.title}
+                description={s.description}
+                actions={
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <span>{s.cohort}</span>
+                    <InfoHelp label={s.cohort} value="cohort" triggerTestId="results-cohort-help">
+                      {s.cohortHelp}
+                    </InfoHelp>
+                    {replay && <span data-testid="results-replay">{s.replay}</span>}
+                    <ShareButton />
+                  </div>
+                }
+                headingAs="h1"
+              />
+              <div className={styles.controls}>
+                <ControlPanel
+                  legend={s.benchmarkConfig}
+                  className={`${styles.benchmark} ${styles.wide}`}
+                  data-testid="results-benchmark-config"
+                >
+                  {selector(
+                    'model',
+                    s.model,
+                    options.models.map((v) => ({ value: v, label: v })),
+                    s.all,
+                  )}
+                  <div className="flex min-w-0 flex-col gap-1.5">
+                    <Label htmlFor="results-workload">{s.workload}</Label>
+                    <SearchableSelect
+                      triggerId="results-workload"
+                      triggerTestId="results-workload"
+                      value={state.workload ?? 'automatic'}
+                      onValueChange={(value) =>
+                        update({ workload: value === 'automatic' ? null : value })
+                      }
+                      groups={[
+                        {
+                          label: '',
+                          options: [
+                            {
+                              value: 'automatic',
+                              label: s.automatic,
+                              help: resolvedWorkload?.help,
+                            },
+                            ...workloadOptions,
+                          ],
+                        },
+                      ]}
+                      placeholder={s.workload}
+                      contentClassName="max-w-[calc(100vw-2rem)]"
+                      trackPrefix="video_results_workload"
+                    />
+                    {state.workload === null && resolvedWorkload && (
+                      <p
+                        className="text-xs text-muted-foreground"
+                        data-testid="results-automatic-detail"
+                      >
+                        {resolvedWorkload.label}
+                      </p>
+                    )}
+                  </div>
+                  {selector(
+                    'engine',
+                    s.engine,
+                    options.engines.map((v) => ({ value: v, label: v })),
+                    s.all,
+                  )}
+                </ControlPanel>
+                <MobileControlSection
+                  label={s.secondaryControls}
+                  count={secondaryChanged}
+                  countLabel={s.changed}
+                  testId="results-secondary-controls"
+                >
+                  <ControlPanel
+                    legend={s.chartConfig}
+                    className={`${styles.chartConfig} sm:grid-cols-2`}
+                    data-testid="results-chart-config"
                   >
-                    {resolvedWorkload.label}
-                  </p>
-                )}
+                    {metricSelector('xMetric')}
+                    {metricSelector('yMetric')}
+                  </ControlPanel>
+                  <ControlPanel legend={s.deployment}>
+                    <div className="flex min-w-0 flex-col gap-1.5">
+                      <Label>{s.gpus}</Label>
+                      <SegmentedToggle
+                        role="group"
+                        value={state.gpuCount === null ? 'all' : String(state.gpuCount)}
+                        options={[null, ...options.gpuCounts.toSorted((a, b) => a - b)].map(
+                          (v) => ({
+                            value: v === null ? 'all' : String(v),
+                            label: v === null ? s.all : String(v),
+                          }),
+                        )}
+                        onValueChange={(value) =>
+                          update({ gpuCount: value === 'all' ? null : Number(value) })
+                        }
+                        ariaLabel={s.gpus}
+                        testId="results-gpus"
+                      />
+                    </div>
+                  </ControlPanel>
+                  <ControlPanel legend={s.runContext}>
+                    {selector(
+                      'date',
+                      s.date,
+                      options.dates
+                        .toSorted()
+                        .toReversed()
+                        .map((v) => ({ value: v, label: v })),
+                      s.latest,
+                    )}
+                  </ControlPanel>
+                </MobileControlSection>
               </div>
-              {selector(
-                'engine',
-                s.engine,
-                options.engines.map((v) => ({ value: v, label: v })),
-                s.all,
-              )}
-            </ControlPanel>
-            <MobileControlSection
-              label={s.secondaryControls}
-              count={secondaryChanged}
-              countLabel={s.changed}
-              testId="results-secondary-controls"
-            >
-              <ControlPanel
-                legend={s.chartConfig}
-                className={`${styles.chartConfig} sm:grid-cols-2`}
-                data-testid="results-chart-config"
+            </div>
+          </Card>
+          {loading && (
+            <p role="status" className="text-sm">
+              {s.loading}
+            </p>
+          )}
+          {error && (
+            <div role="alert" className="text-sm">
+              {s.error}{' '}
+              <button
+                className="underline"
+                onClick={() => {
+                  track('video_results_retry');
+                  retry();
+                }}
               >
-                {metricSelector('xMetric')}
-                {metricSelector('yMetric')}
-              </ControlPanel>
-              <ControlPanel legend={s.deployment}>
-                <div className="flex min-w-0 flex-col gap-1.5">
-                  <Label>{s.gpus}</Label>
-                  <SegmentedToggle
-                    role="group"
-                    value={state.gpuCount === null ? 'all' : String(state.gpuCount)}
-                    options={[null, ...options.gpuCounts.toSorted((a, b) => a - b)].map((v) => ({
-                      value: v === null ? 'all' : String(v),
-                      label: v === null ? s.all : String(v),
-                    }))}
-                    onValueChange={(value) =>
-                      update({ gpuCount: value === 'all' ? null : Number(value) })
-                    }
-                    ariaLabel={s.gpus}
-                    testId="results-gpus"
-                  />
-                </div>
-              </ControlPanel>
-              <ControlPanel legend={s.runContext}>
-                {selector(
-                  'date',
-                  s.date,
-                  options.dates
-                    .toSorted()
-                    .toReversed()
-                    .map((v) => ({ value: v, label: v })),
-                  s.latest,
-                )}
-              </ControlPanel>
-            </MobileControlSection>
-          </div>
-        </div>
-      </Card>
-      {loading && (
-        <p role="status" className="text-sm">
-          {s.loading}
-        </p>
-      )}
-      {error && (
-        <div role="alert" className="text-sm">
-          {s.error}{' '}
-          <button
-            className="underline"
-            onClick={() => {
-              track('video_results_retry');
-              retry();
-            }}
-          >
-            {s.retry}
-          </button>
-        </div>
-      )}
-      {state.unofficialRun && (
-        <div
-          className="flex flex-wrap items-center gap-3 rounded border p-3 text-xs"
-          data-testid="results-overlay"
-        >
-          <span style={{ color: overlayRunColor(0) }}>
-            {s.overlay}: {state.unofficialRun}
-          </span>
-          {!cells.some((c) => c.point.runId === state.unofficialRun) && (
-            <span>{s.overlayMissing}</span>
-          )}
-          <button
-            data-testid="results-overlay-dismiss"
-            className="underline"
-            onClick={() => {
-              const approvedWorkloads = resultProjection(points, {
-                ...state,
-                unofficialRun: null,
-              }).options.workloads;
-              update({
-                unofficialRun: null,
-                ...(state.workload !== null &&
-                !approvedWorkloads.some((workload) => workload.key === state.workload)
-                  ? { workload: null }
-                  : {}),
-              });
-              track('video_results_overlay_dismissed');
-            }}
-          >
-            {s.dismiss}
-          </button>
-        </div>
-      )}
-      <Card>
-        <section
-          className="flex min-w-0 flex-col gap-4"
-          aria-labelledby="video-results-chart-title"
-        >
-          <Heading as="h2" level="card" id="video-results-chart-title">
-            {s.chartTitle(
-              model,
-              RESULTS_Y_METRICS[state.yMetric].label[locale],
-              RESULTS_X_METRICS[state.xMetric].label[locale],
-            )}
-          </Heading>
-          <VideoResultsChart
-            cells={deploymentCells}
-            roster={roster}
-            measured={measured}
-            state={state}
-            colorFor={colorFor}
-            labels={labels}
-            onLabelsChange={setLabels}
-            onUpdate={update}
-            onOpen={openPoint}
-            controls={legendControls}
-          />
-          <VideoResultsTable
-            rows={representatives}
-            state={state}
-            color={color}
-            onOpen={(cell) => openPoint(resultsPointKey(cell), 'table')}
-            onDeadlineChange={(deadlineSeconds) => update({ deadlineSeconds })}
-            csvHref={`${apiUrl}&format=csv`}
-          />
-        </section>
-      </Card>
-      <Card>
-        <VideoResultsClips
-          initialSides={initialData?.sides}
-          points={resultsClipPoints(cells, { tier: state.costTier })}
-          colorFor={(key) =>
-            representatives.some((c) => c.overlay && c.point.hardwareKey === key)
-              ? overlayRunColor(0)
-              : colorFor(key)
-          }
-          hidden={hidden}
-          roster={roster}
-          options={{ tier: state.costTier }}
-          costs={Object.fromEntries(
-            cells.map((c) => [
-              c.point.id,
-              {
-                participating: c.cost.participating?.perVideoSecond ?? null,
-                allocated: c.cost.allocated?.perVideoSecond ?? null,
-              },
-            ]),
-          )}
-          unofficialRun={state.unofficialRun ?? undefined}
-        />
-      </Card>
-      <Card className="py-1">
-        {details(
-          'how-to-read',
-          s.howToRead,
-          undefined,
-          <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
-            {s.howToReadItems.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-            <li data-testid="results-not-measured">{s.notMeasured}</li>
-          </ul>,
-        )}
-        {details(
-          'profit',
-          s.estimator,
-          undefined,
-          <div className="flex flex-col gap-3">
-            <p className="text-xs text-muted-foreground">
-              {s.priceNote}. {s.priceDetail} {s.profitNote}
-            </p>
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-              {(['t2v', 'i2v', 'r2v'] as VideoMode[]).map((mode) => (
-                <div key={mode} className="flex min-w-0 flex-col gap-1.5">
-                  <Label htmlFor={`results-price-${mode}`}>
-                    {s.price} · {mode.toUpperCase()}
-                  </Label>
-                  <Input
-                    id={`results-price-${mode}`}
-                    type="number"
-                    min="0"
-                    step="0.005"
-                    placeholder="—"
-                    value={state.apiPrices[mode] ?? ''}
-                    data-testid={`results-price-${mode}`}
-                    onChange={(e) => {
-                      const value = e.target.value === '' ? null : e.target.valueAsNumber;
-                      if (value === null || (Number.isFinite(value) && value >= 0))
-                        update({ apiPrices: { ...state.apiPrices, [mode]: value } });
-                    }}
-                  />
-                </div>
-              ))}
-              <div className="flex min-w-0 flex-col gap-1.5">
-                <Label htmlFor="results-utilization">
-                  {s.utilization} · {n(state.utilization * 100, 0)}%
-                </Label>
-                <input
-                  id="results-utilization"
-                  type="range"
-                  min="0"
-                  max="100"
-                  step="5"
-                  value={state.utilization * 100}
-                  data-testid="results-utilization"
-                  onChange={(e) => update({ utilization: Number(e.target.value) / 100 })}
-                />
-              </div>
+                {s.retry}
+              </button>
             </div>
-            <div data-testid="results-profit">
-              {representatives.some(
-                (c) => c.profit.participating !== null || c.profit.allocated !== null,
-              ) ? (
-                <ResultsBars
-                  rows={profitBars}
-                  label={s.estimator}
-                  unit="$/GPU-hr"
-                  secondaryLabel={s.allocated}
-                />
-              ) : (
-                <div className={`${styles.empty} text-xs`} data-testid="results-empty">
-                  {s.empty}
-                </div>
+          )}
+          {state.unofficialRun && (
+            <div
+              className="flex flex-wrap items-center gap-3 rounded border p-3 text-xs"
+              data-testid="results-overlay"
+            >
+              <span style={{ color: overlayRunColor(0) }}>
+                {s.overlay}: {state.unofficialRun}
+              </span>
+              {!cells.some((c) => c.point.runId === state.unofficialRun) && (
+                <span>{s.overlayMissing}</span>
               )}
+              <button
+                data-testid="results-overlay-dismiss"
+                className="underline"
+                onClick={() => {
+                  const approvedWorkloads = resultProjection(points, {
+                    ...state,
+                    unofficialRun: null,
+                  }).options.workloads;
+                  update({
+                    unofficialRun: null,
+                    ...(state.workload !== null &&
+                    !approvedWorkloads.some((workload) => workload.key === state.workload)
+                      ? { workload: null }
+                      : {}),
+                  });
+                  track('video_results_overlay_dismissed');
+                }}
+              >
+                {s.dismiss}
+              </button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {s.participating} · {s.allocated}
-            </p>
-          </div>,
-        )}
-        {details(
-          'history',
-          s.history,
-          historyOpen,
-          <>
-            <p className="mb-3 text-xs text-muted-foreground">{s.historyNote}</p>
-            {historyOpen && <VideoHistory />}
-          </>,
-        )}
-      </Card>
-      <footer className="flex flex-wrap justify-end gap-3 border-t py-5 text-xs text-muted-foreground">
-        <a
-          className="underline"
-          href={`${apiUrl}&format=csv`}
-          download="videogenx-results.csv"
-          onClick={() => track('video_results_csv_downloaded', { source: 'footer' })}
-        >
-          {s.csv}
-        </a>
-        <a className="underline" href={apiUrl} onClick={() => track('video_results_api_opened')}>
-          {s.sources} · {s.api}
-        </a>
-      </footer>
+          )}
+          <Card>
+            <section
+              className="flex min-w-0 flex-col gap-4"
+              aria-labelledby="video-results-chart-title"
+            >
+              <Heading as="h2" level="card" id="video-results-chart-title">
+                {s.chartTitle(
+                  model,
+                  RESULTS_Y_METRICS[state.yMetric].label[locale],
+                  RESULTS_X_METRICS[state.xMetric].label[locale],
+                )}
+              </Heading>
+              <VideoResultsChart
+                cells={deploymentCells}
+                roster={roster}
+                measured={measured}
+                state={state}
+                colorFor={colorFor}
+                labels={labels}
+                onLabelsChange={setLabels}
+                onUpdate={update}
+                onOpen={openPoint}
+                controls={legendControls}
+              />
+              <VideoResultsTable
+                rows={representatives}
+                state={state}
+                color={color}
+                onOpen={(cell) => openPoint(resultsPointKey(cell), 'table')}
+                onDeadlineChange={(deadlineSeconds) => update({ deadlineSeconds })}
+                csvHref={`${apiUrl}&format=csv`}
+              />
+            </section>
+          </Card>
+          <Card>
+            <VideoResultsClips
+              initialSides={initialData?.sides}
+              points={resultsClipPoints(cells, { tier: state.costTier })}
+              colorFor={(key) =>
+                representatives.some((c) => c.overlay && c.point.hardwareKey === key)
+                  ? overlayRunColor(0)
+                  : colorFor(key)
+              }
+              hidden={hidden}
+              roster={roster}
+              options={{ tier: state.costTier }}
+              costs={Object.fromEntries(
+                cells.map((c) => [
+                  c.point.id,
+                  {
+                    participating: c.cost.participating?.perVideoSecond ?? null,
+                    allocated: c.cost.allocated?.perVideoSecond ?? null,
+                  },
+                ]),
+              )}
+              unofficialRun={state.unofficialRun ?? undefined}
+            />
+          </Card>
+          <Card className="py-1">
+            {details(
+              'how-to-read',
+              s.howToRead,
+              undefined,
+              <ul className="list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
+                {s.howToReadItems.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+                <li data-testid="results-not-measured">{s.notMeasured}</li>
+              </ul>,
+            )}
+            {details(
+              'profit',
+              s.estimator,
+              undefined,
+              <div className="flex flex-col gap-3">
+                <p className="text-xs text-muted-foreground">
+                  {s.priceNote}. {s.priceDetail} {s.profitNote}
+                </p>
+                <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                  {(['t2v', 'i2v', 'r2v'] as VideoMode[]).map((mode) => (
+                    <div key={mode} className="flex min-w-0 flex-col gap-1.5">
+                      <Label htmlFor={`results-price-${mode}`}>
+                        {s.price} · {mode.toUpperCase()}
+                      </Label>
+                      <Input
+                        id={`results-price-${mode}`}
+                        type="number"
+                        min="0"
+                        step="0.005"
+                        placeholder="—"
+                        value={state.apiPrices[mode] ?? ''}
+                        data-testid={`results-price-${mode}`}
+                        onChange={(e) => {
+                          const value = e.target.value === '' ? null : e.target.valueAsNumber;
+                          if (value === null || (Number.isFinite(value) && value >= 0))
+                            update({ apiPrices: { ...state.apiPrices, [mode]: value } });
+                        }}
+                      />
+                    </div>
+                  ))}
+                  <div className="flex min-w-0 flex-col gap-1.5">
+                    <Label htmlFor="results-utilization">
+                      {s.utilization} · {n(state.utilization * 100, 0)}%
+                    </Label>
+                    <input
+                      id="results-utilization"
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="5"
+                      value={state.utilization * 100}
+                      data-testid="results-utilization"
+                      onChange={(e) => update({ utilization: Number(e.target.value) / 100 })}
+                    />
+                  </div>
+                </div>
+                <div data-testid="results-profit">
+                  {representatives.some(
+                    (c) => c.profit.participating !== null || c.profit.allocated !== null,
+                  ) ? (
+                    <ResultsBars
+                      rows={profitBars}
+                      label={s.estimator}
+                      unit="$/GPU-hr"
+                      secondaryLabel={s.allocated}
+                    />
+                  ) : (
+                    <div className={`${styles.empty} text-xs`} data-testid="results-empty">
+                      {s.empty}
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {s.participating} · {s.allocated}
+                </p>
+              </div>,
+            )}
+            {details(
+              'history',
+              s.history,
+              historyOpen,
+              <>
+                <p className="mb-3 text-xs text-muted-foreground">{s.historyNote}</p>
+                {historyOpen && <VideoHistory />}
+              </>,
+            )}
+          </Card>
+          <footer className="flex flex-wrap justify-end gap-3 border-t py-5 text-xs text-muted-foreground">
+            <a
+              className="underline"
+              href={`${apiUrl}&format=csv`}
+              download="videogenx-results.csv"
+              onClick={() => track('video_results_csv_downloaded', { source: 'footer' })}
+            >
+              {s.csv}
+            </a>
+            <a
+              className="underline"
+              href={apiUrl}
+              onClick={() => track('video_results_api_opened')}
+            >
+              {s.sources} · {s.api}
+            </a>
+          </footer>
+        </div>
+      </Activity>
     </div>
   );
 }
