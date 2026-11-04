@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import type { InferenceData } from '@/components/inference/types';
 
-import { baseSku, bestSeriesPerSku, hypervolume, withUnrankedSkus } from './best-series-per-sku';
+import {
+  baseSku,
+  bestSeriesPerSku,
+  hypervolume,
+  skuColumns,
+  withUnrankedSkus,
+} from './best-series-per-sku';
 
 function point(hw: string, hwKey: string, x: number, y: number): InferenceData {
   return { hw, hwKey, x, y } as InferenceData;
@@ -27,22 +33,30 @@ describe('bestSeriesPerSku', () => {
       { ...point('gb300-nvl72', 'gb300_dynamo-sglang', 20, 80), precision: 'fp8' },
     ] as InferenceData[];
 
-    expect(bestSeriesPerSku(rows, 'upper_left', ['fp8'])).toEqual(new Set(['gb300_dynamo-sglang']));
-    expect(bestSeriesPerSku(rows, 'upper_left', ['fp4', 'fp8'])).toEqual(
+    expect(bestSeriesPerSku(skuColumns(rows), 'upper_left', ['fp8'])).toEqual(
+      new Set(['gb300_dynamo-sglang']),
+    );
+    expect(bestSeriesPerSku(skuColumns(rows), 'upper_left', ['fp4', 'fp8'])).toEqual(
       new Set(['gb300_dynamo-trt']),
     );
-    expect(bestSeriesPerSku(rows, 'upper_left', ['bf16'])).toEqual(new Set());
+    expect(bestSeriesPerSku(skuColumns(rows), 'upper_left', ['bf16'])).toEqual(new Set());
+  });
+
+  it('builds the columns of one chart data array once', () => {
+    const points = [point('B200-8', 'b200_trt', 10, 100)];
+    expect(skuColumns(points)).toBe(skuColumns(points));
+    expect(skuColumns([...points])).not.toBe(skuColumns(points));
   });
 
   it('selects the highest normalized frontier AUC within each SKU', () => {
     const selected = bestSeriesPerSku(
-      [
+      skuColumns([
         point('B200-8', 'b200_trt', 10, 100),
         point('B200-8', 'b200_trt', 20, 80),
         point('B200-8', 'b200_sglang', 10, 90),
         point('B200-8', 'b200_sglang', 20, 60),
         point('H200-8', 'h200_vllm', 10, 40),
-      ],
+      ]),
       'upper_left',
     );
 
@@ -51,13 +65,13 @@ describe('bestSeriesPerSku', () => {
 
   it('credits a curve for the measured range a narrower rival does not reach', () => {
     const selected = bestSeriesPerSku(
-      [
+      skuColumns([
         point('B200-8', 'b200_wide', 8, 70),
         point('B200-8', 'b200_wide', 10, 60),
         point('B200-8', 'b200_wide', 20, 50),
         point('B200-8', 'b200_narrow', 8, 90),
         point('B200-8', 'b200_narrow', 10, 80),
-      ],
+      ]),
       'upper_left',
     );
 
@@ -66,12 +80,12 @@ describe('bestSeriesPerSku', () => {
 
   it('keeps a narrower curve that dominates across nearly all of the range', () => {
     const selected = bestSeriesPerSku(
-      [
+      skuColumns([
         point('B200-8', 'b200_wide', 10, 50),
         point('B200-8', 'b200_wide', 21, 40),
         point('B200-8', 'b200_narrow', 10, 100),
         point('B200-8', 'b200_narrow', 20, 80),
-      ],
+      ]),
       'upper_left',
     );
 
@@ -109,7 +123,7 @@ describe('bestSeriesPerSku', () => {
       points.map(([x, y]) => point('mi355x', hwKey, x, y)),
     );
 
-    expect(bestSeriesPerSku(rows, 'upper_left')).toEqual(new Set(['mi355x_vllm']));
+    expect(bestSeriesPerSku(skuColumns(rows), 'upper_left')).toEqual(new Set(['mi355x_vllm']));
   });
 
   it('keeps a large lead where values are high over a long tail of small leads (DeepSeek-V4-Pro GB200)', () => {
@@ -141,7 +155,9 @@ describe('bestSeriesPerSku', () => {
       points.map(([x, y]) => point('GB200-NVL72', hwKey, x, y)),
     );
 
-    expect(bestSeriesPerSku(rows, 'upper_left')).toEqual(new Set(['gb200_dynamo-vllm']));
+    expect(bestSeriesPerSku(skuColumns(rows), 'upper_left')).toEqual(
+      new Set(['gb200_dynamo-vllm']),
+    );
   });
 
   it('ranks a lower-is-better metric exactly like its reciprocal', () => {
@@ -157,8 +173,8 @@ describe('bestSeriesPerSku', () => {
     ];
     const dollarsPerMillion = tokensPerDollar.map((row) => ({ ...row, y: 1e6 / row.y }));
 
-    const higher = bestSeriesPerSku(tokensPerDollar, 'upper_left');
-    expect(bestSeriesPerSku(dollarsPerMillion, 'lower_right')).toEqual(higher);
+    const higher = bestSeriesPerSku(skuColumns(tokensPerDollar), 'upper_left');
+    expect(bestSeriesPerSku(skuColumns(dollarsPerMillion), 'lower_right')).toEqual(higher);
     // Areas: short 60·450 + 50·150 = 34,500; steady 32,000; peaky 31,000.
     expect(higher).toEqual(new Set(['b200_short']));
     const steady = tokensPerDollar.filter((row) => row.hwKey === 'b200_steady');
@@ -173,13 +189,13 @@ describe('bestSeriesPerSku', () => {
 
   it('does not let a singleton preview displace a complete curve', () => {
     const selected = bestSeriesPerSku(
-      [
+      skuColumns([
         point('B200-8', 'b200_complete', 10, 100),
         point('B200-8', 'b200_complete', 20, 80),
         point('B200-8', 'b200_complete', 30, 60),
         point('B200-8', 'b200_complete', 40, 40),
         point('B200-8', 'b200_singleton', 200, 1_000),
-      ],
+      ]),
       'upper_left',
     );
 
@@ -188,11 +204,11 @@ describe('bestSeriesPerSku', () => {
 
   it('keeps a two-point preview from being hidden by a singleton', () => {
     const selected = bestSeriesPerSku(
-      [
+      skuColumns([
         point('B200-8', 'b200_two_points', 10, 100),
         point('B200-8', 'b200_two_points', 20, 80),
         point('B200-8', 'b200_singleton', 200, 1_000),
-      ],
+      ]),
       'upper_left',
     );
 
@@ -201,12 +217,12 @@ describe('bestSeriesPerSku', () => {
 
   it('inverts the score for lower-is-better metrics', () => {
     const selected = bestSeriesPerSku(
-      [
+      skuColumns([
         point('B200-8', 'b200_cheap', 10, 1),
         point('B200-8', 'b200_cheap', 20, 2),
         point('B200-8', 'b200_expensive', 10, 2),
         point('B200-8', 'b200_expensive', 20, 3),
-      ],
+      ]),
       'lower_right',
     );
 
@@ -219,13 +235,13 @@ describe('bestSeriesPerSku', () => {
 
   it('keeps every eligible TileRT series alongside the SKU AUC winner', () => {
     const selected = bestSeriesPerSku(
-      [
+      skuColumns([
         frameworkPoint('B200-8', 'b200_sglang', 'sglang', 20, 1_800),
         frameworkPoint('B200-8', 'b200_sglang', 'sglang', 60, 1_000),
         frameworkPoint('B200-8', 'b200_tilert_mtp', 'tilert', 340, 160),
         frameworkPoint('B200-8', 'b200_tilert_stp', 'tilert', 300, 140),
         frameworkPoint('B200-8', 'b200_unrelated_endpoint', 'vllm', 400, 120),
-      ],
+      ]),
       'upper_left',
     );
 
@@ -239,12 +255,12 @@ describe('bestSeriesPerSku', () => {
         run_url: 'https://github.com/example/actions/runs/123',
       }) as InferenceData;
     const selected = bestSeriesPerSku(
-      [
+      skuColumns([
         overlayPoint('b200_overlay_vllm', 10, 80),
         overlayPoint('b200_overlay_vllm', 20, 60),
         overlayPoint('b200_overlay_sglang', 10, 100),
         overlayPoint('b200_overlay_sglang', 20, 75),
-      ],
+      ]),
       'upper_left',
     );
 
@@ -258,11 +274,11 @@ describe('bestSeriesPerSku', () => {
         run_url: 'https://github.com/example/actions/runs/123',
       }) as InferenceData;
     const selected = bestSeriesPerSku(
-      [
+      skuColumns([
         overlayPoint('b200_overlay_sglang', 'sglang', 20, 1_800),
         overlayPoint('b200_overlay_sglang', 'sglang', 60, 1_000),
         overlayPoint('b200_overlay_tilert_mtp', 'tilert', 340, 160),
-      ],
+      ]),
       'upper_left',
     );
 
@@ -282,7 +298,7 @@ describe('withUnrankedSkus', () => {
       point('GB200-NVL72', 'gb200_dynamo', 10, Number.NaN),
       point('GB200-NVL72', 'gb200_sglang', 10, Number.NaN),
     ];
-    const best = bestSeriesPerSku([...ranked, ...tableOnly], 'upper_left');
+    const best = bestSeriesPerSku(skuColumns([...ranked, ...tableOnly]), 'upper_left');
     expect([...best]).toEqual(['b200_trt']);
 
     const selected = withUnrankedSkus(best, ranked, tableOnly);

@@ -3,10 +3,12 @@ import { describe, expect, it } from 'vitest';
 import type { InferenceData } from '@/components/inference/types';
 import { isFrontierEligible, paretoFrontForDirection } from '@/lib/charts/chart-utils';
 
-import { baseSku, bestSeriesPerSku, hypervolume } from './best-series-per-sku';
+import { baseSku, bestSeriesPerSku, hypervolume, skuColumns } from './best-series-per-sku';
 
 type Direction = 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
 const DIRECTIONS: Direction[] = ['upper_right', 'upper_left', 'lower_left', 'lower_right'];
+const PRECISIONS = ['fp8', 'fp8', 'fp8', 'fp4', 'fp4', 'bf16'];
+const PRECISION_SETS = [['fp8'], ['fp4'], ['fp4', 'fp8'], [], ['bf16'], ['fp8', 'bf16']];
 
 function referenceBaseSku(point: Pick<InferenceData, 'hw' | 'hwKey'>): string {
   const rawHardware = String(point.hw || '').split('-')[0];
@@ -96,7 +98,7 @@ function randomPoints(random: () => number, count: number): InferenceData[] {
       hwKey,
       x: value(),
       y: value(),
-      precision: random() < 0.7 ? 'fp8' : 'fp4',
+      precision: pick(PRECISIONS),
       framework: random() < 0.03 ? 'tilert' : 'vllm',
       powerVariant: random() < 0.03 ? 'p' : undefined,
     } as InferenceData);
@@ -109,12 +111,15 @@ describe('bestSeriesPerSku matches the reference ranking', () => {
     const random = rng(7);
     for (let round = 0; round < 3000; round++) {
       const points = randomPoints(random, Math.floor(random() * 90));
-      const direction = DIRECTIONS[round % 4];
-      const precisions = round % 3 === 0 ? ['fp8'] : undefined;
       const snapshot = points.map((point) => ({ ...point }));
-      expect([...bestSeriesPerSku(points, direction, precisions)]).toEqual(
-        reference(points, direction, precisions),
-      );
+      const columns = skuColumns(points);
+      for (const direction of DIRECTIONS) {
+        for (const precisions of [undefined, PRECISION_SETS[round % PRECISION_SETS.length]]) {
+          expect([...bestSeriesPerSku(columns, direction, precisions)]).toEqual(
+            reference(points, direction, precisions),
+          );
+        }
+      }
       expect(points).toEqual(snapshot);
     }
   });
