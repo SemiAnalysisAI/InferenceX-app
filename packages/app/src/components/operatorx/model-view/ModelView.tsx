@@ -50,6 +50,7 @@ import {
 } from '../compare/hardware';
 import { METRICS, metricById } from '../compare/metrics';
 import { buildModel, caseRefs, type ComparisonModel } from '../compare/model';
+import { slices } from '../compare/slices';
 import { metricVsSize } from '../viz/metric-vs-size';
 import { roofline } from '../viz/roofline';
 import {
@@ -65,7 +66,19 @@ import {
 import { track } from '@/lib/analytics/analytics';
 import { isDarkTheme } from '@/lib/themes/themes';
 
-import { barsHeight, binTokens, gpuValues, inBin, OpBars, sizeBin } from './OpBars';
+import {
+  barsHeight,
+  binPct,
+  binTokens,
+  gpuSweep,
+  gpuValues,
+  inBin,
+  OpBars,
+  OpSweep,
+  sizeBin,
+  SWEEP_PX,
+  tokenBin,
+} from './OpBars';
 
 const DEFAULT_MODEL = 'DeepSeek-R1-0528';
 const PRECISIONS: ComputePrecision[] = ['fp4', 'fp8', 'bf16'];
@@ -130,44 +143,158 @@ const DEFAULT_TOKENS = 128;
 const formatTokens = (t: number) =>
   t >= 10_000 ? `${Number((t / 1000).toPrecision(3))}k` : t.toLocaleString();
 
-/** The token count every row shows, over the sizes any row has data at. */
-function TokenSlider({
+/** Token axis labels: both ends, and the powers of ten between them clear of the ends. */
+function tokenMarks(range: [number, number]): { tokens: number; pct: number }[] {
+  const ends = range.map((b) => ({ tokens: binTokens(b), pct: binPct(b, range) }));
+  if (range[0] === range[1]) return [ends[0]];
+  const inner: { tokens: number; pct: number }[] = [];
+  for (let t = 10; t < ends[1].tokens; t *= 10) {
+    const pct = binPct(tokenBin(t), range);
+    if (pct > 10 && pct < 90) inner.push({ tokens: t, pct });
+  }
+  return [ends[0], ...inner, ends[1]];
+}
+
+/**
+ * The token count every row shows, over the sizes any row has data at; or, with "All token
+ * counts" on, the token axis the rows' line charts share.
+ */
+function SizeControls({
   bins,
   bin,
   onChange,
+  sweep,
+  onSweep,
 }: {
   bins: number[];
   bin: number;
   onChange: (bin: number) => void;
+  sweep: boolean;
+  onSweep: (enabled: boolean) => void;
 }) {
+  const range: [number, number] = [bins[0], bins.at(-1)!];
+  // One step past the largest size: every size at once, as line charts.
+  const all = bins.length;
+  // Where the thumb sits at the largest size; the 16px is the range thumb's width.
+  const last = bins.length > 1 ? (bins.length - 1) / bins.length : 0;
+  const lastAt = `calc(${last * 100}% + ${(0.5 - last) * 16}px)`;
   return (
     <div className="space-y-1">
       <label htmlFor="operatorx-model-tokens" className="flex items-baseline gap-2 text-xs">
         <span className="text-muted-foreground">Tokens</span>
-        <span className="font-semibold tabular-nums">≈ {formatTokens(binTokens(bin))}</span>
+        <span className="font-semibold tabular-nums">
+          {sweep
+            ? `All · ${formatTokens(binTokens(range[0]))}–${formatTokens(binTokens(range[1]))}`
+            : `≈ ${formatTokens(binTokens(bin))}`}
+        </span>
       </label>
-      <input
-        id="operatorx-model-tokens"
-        type="range"
-        min={0}
-        max={bins.length - 1}
-        step={1}
-        value={bins.indexOf(bin)}
-        onChange={(e) => onChange(bins[Number(e.target.value)])}
-        className="w-full accent-primary"
-        data-testid="operatorx-model-tokens"
-      />
-      <div className="flex justify-between text-2xs text-muted-foreground tabular-nums">
-        <span>{formatTokens(binTokens(bins[0]))}</span>
-        <span>{formatTokens(binTokens(bins.at(-1)!))}</span>
+      <div className="relative">
+        <input
+          id="operatorx-model-tokens"
+          type="range"
+          min={0}
+          max={all}
+          step={1}
+          value={sweep ? all : bins.indexOf(bin)}
+          aria-valuetext={sweep ? 'All token counts' : `${formatTokens(binTokens(bin))} tokens`}
+          onChange={(e) => {
+            const at = Number(e.target.value);
+            if (at === all) {
+              if (!sweep) onSweep(true);
+              return;
+            }
+            if (sweep) onSweep(false);
+            onChange(bins[at]);
+          }}
+          className="relative w-full accent-primary"
+          data-testid="operatorx-model-tokens"
+        />
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute top-1/2 h-3 w-px -translate-y-1/2 bg-muted-foreground/60"
+          style={{ left: lastAt }}
+          data-testid="operatorx-model-tokens-notch"
+        />
       </div>
+      <div className="relative h-4 text-2xs text-muted-foreground tabular-nums">
+        <span className="absolute left-0">{formatTokens(binTokens(range[0]))}</span>
+        {bins.length > 1 && (
+          <span className="absolute -translate-x-full pr-1" style={{ left: lastAt }}>
+            {formatTokens(binTokens(range[1]))}
+          </span>
+        )}
+        <span className={`absolute right-0 ${sweep ? 'font-semibold text-foreground' : ''}`}>
+          All
+        </span>
+      </div>
+      {sweep && (
+        // Aligned with the charts' plot area, which leaves room for the value labels.
+        <div
+          className="relative mr-[4.5rem] h-6 border-t border-border/60 text-2xs text-muted-foreground tabular-nums"
+          data-testid="operatorx-model-token-axis"
+        >
+          {tokenMarks(range).map((m, i, every) => (
+            <span
+              key={m.tokens}
+              // too narrow for the inner powers of ten on phones: the ends only
+              className={`absolute top-1 whitespace-nowrap ${i === 0 ? '' : i === every.length - 1 ? '-translate-x-full' : '-translate-x-1/2 max-md:hidden'}`}
+              style={{ left: `${m.pct}%` }}
+            >
+              {formatTokens(m.tokens)}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-function SlotTooltip({ data, tokens }: { data: SlotData; tokens: number }) {
+/** Each GPU's range across every size, for the tooltip of a row of line charts. */
+function SweepTooltipRows({ model, indices }: { model: ComparisonModel; indices: number[] }) {
+  const { format, unit } = model.metric;
+  // `8.13–2222 TFLOPS`: the unit once, after the range
+  const bare = (v: number) => format(v).replace(unit, '').trim();
+  return (
+    <ul className="space-y-0.5">
+      {gpuSweep(model, indices).map(({ hardware, points }) => {
+        const values = points.map((p) => p.value);
+        return (
+          <li key={hardware} className="flex items-center gap-2 tabular-nums">
+            <span
+              className="inline-block size-2 rounded-full"
+              style={{ background: model.colors[hardware] }}
+            />
+            <span className="w-14">{hardwareLabel(hardware)}</span>
+            <strong>
+              {bare(Math.min(...values))}–{bare(Math.max(...values))} {unit}
+            </strong>
+            <span className="text-muted-foreground">
+              {points.length} {points.length === 1 ? 'size' : 'sizes'}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function SlotTooltip({ data, tokens, sweep }: { data: SlotData; tokens: number; sweep: boolean }) {
   const { model, atSize, slot, block } = data;
   if (!model) return null;
+  if (sweep)
+    return (
+      <div className="space-y-1.5 text-xs">
+        <div className="font-semibold">
+          {slot.label} <span className="font-normal text-muted-foreground">· {block.label}</span>
+        </div>
+        <div className="text-muted-foreground">
+          {data.indices.length.toLocaleString()} {data.indices.length === 1 ? 'shape' : 'shapes'} ·
+          median {model.metric.label.toLowerCase()} per size, lowest to highest
+        </div>
+        <SweepTooltipRows model={model} indices={data.indices} />
+        <div className="text-muted-foreground">Click for every shape and its kernel timeline</div>
+      </div>
+    );
   const rows = gpuValues(model, atSize);
   return (
     <div className="space-y-1.5 text-xs">
@@ -370,6 +497,7 @@ function BlockRows({
   block,
   slots,
   tokens,
+  range,
   lanes,
   isDark,
   onOpen,
@@ -378,6 +506,8 @@ function BlockRows({
   block: LayerBlock;
   slots: SlotData[];
   tokens: number;
+  /** With the slider on All, the size bins the line charts span; else null. */
+  range: [number, number] | null;
   /** GPUs shown, which sets the height of a row of bars. */
   lanes: number;
   isDark: boolean;
@@ -387,7 +517,7 @@ function BlockRows({
 }) {
   const [hovered, setHovered] = useState<string | null>(null);
   const c = BLOCK_COLORS[block.kind];
-  const { rows, at } = boxes(block, Math.max(barsHeight(lanes), 40));
+  const { rows, at } = boxes(block, Math.max(range ? SWEEP_PX : barsHeight(lanes), 40));
   return (
     <div
       className={`grid ${ROW_GRID} gap-x-4`}
@@ -437,7 +567,7 @@ function BlockRows({
               <TooltipRoot delayDuration={150}>
                 <TooltipTrigger asChild>{target}</TooltipTrigger>
                 <TooltipContent side="top" align="center" className="w-80">
-                  <SlotTooltip data={data} tokens={tokens} />
+                  <SlotTooltip data={data} tokens={tokens} sweep={range !== null} />
                 </TooltipContent>
               </TooltipRoot>
             ) : (
@@ -447,7 +577,16 @@ function BlockRows({
               className="pointer-events-none relative z-[2] flex items-center"
               style={{ gridColumn: 2, gridRow: gridRow(data.bar, data.bar) }}
             >
-              {measured && data.model ? (
+              {measured && data.model && range ? (
+                <div className="w-full">
+                  <OpSweep
+                    model={data.model}
+                    series={gpuSweep(data.model, data.indices)}
+                    range={range}
+                    empty="No results on these GPUs"
+                  />
+                </div>
+              ) : measured && data.model ? (
                 <div className="w-full">
                   <OpBars
                     model={data.model}
@@ -553,7 +692,36 @@ function BlockRows({
   );
 }
 
-/** Every shape of one slot: size sweep and roofline, each point opening its kernel timeline. */
+/** The dim each op sweeps with the token count. */
+const SIZE_DIM: Partial<Record<string, string>> = { gemm: 'm', moe: 'tokens', attention: 'tokens' };
+
+/**
+ * A slot's cases as the shapes Metric vs size sweeps (`sliceKey`): one shape over the token
+ * count each. A layer runs at several shard sizes across serving configs (one per
+ * tensor-parallel degree), so a slot can hold more than one. Largest shard first: the lowest
+ * tensor-parallel degree.
+ */
+function shapeFamilies(
+  view: ComparisonView,
+  indices: number[],
+  op: ComparisonOp,
+): [string, number[]][] {
+  const size = SIZE_DIM[op] ?? 'tokens';
+  const volume = (i: number) =>
+    Object.entries(view.cases[i].dims)
+      .filter(([k]) => k !== size)
+      .reduce((t, [, v]) => t * v, 1);
+  return [
+    ...slices(
+      op,
+      indices.map((i) => view.cases[i]),
+    ),
+  ]
+    .map(([key, at]): [string, number[]] => [key, at.map((j) => indices[j])])
+    .sort(([ka, a], [kb, b]) => volume(b[0]) - volume(a[0]) || ka.localeCompare(kb));
+}
+
+/** One shape of one slot: size sweep and roofline, each point opening its kernel timeline. */
 function SlotDetail({
   data,
   modelName,
@@ -564,17 +732,26 @@ function SlotDetail({
   onClose: () => void;
 }) {
   const [inspected, setInspected] = useState<number | null>(null);
-  // A case opened for one op never carries over to the next op shown
+  const [pickedFamily, setFamily] = useState<string | null>(null);
+  // A case or shape opened for one op never carries over to the next op shown
   const [inspectedFor, setInspectedFor] = useState(data);
   if (inspectedFor !== data) {
     setInspectedFor(data);
     setInspected(null);
+    setFamily(null);
   }
+  const families = useMemo(
+    () =>
+      data?.model ? shapeFamilies(data.model.view, data.indices, data.slot.op as ComparisonOp) : [],
+    [data],
+  );
+  const [familyKey, familyIndices] = families.find(([k]) => k === pickedFamily) ??
+    families[0] ?? [null, []];
   const queryClient = useQueryClient();
   const sub = useMemo(() => {
-    if (!data?.model) return null;
-    const { model, indices, slot } = data;
-    const view = subView(model.view, indices);
+    if (!data?.model || familyKey === null) return null;
+    const { model, slot } = data;
+    const view = subView(model.view, familyIndices);
     const measured = measuredHardware([view]).filter((hw) => model.available.includes(hw));
     const op = slot.op as ComparisonOp;
     return {
@@ -601,21 +778,44 @@ function SlotDetail({
         },
       ),
     };
-  }, [data, queryClient]);
+  }, [data, familyKey, familyIndices, queryClient]);
   return (
     <Dialog open={data !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         className="flex max-h-[94vh] w-[min(96vw,72rem)] max-w-[min(96vw,72rem)] flex-col gap-4 overflow-y-auto p-4 sm:p-6"
         data-testid="operatorx-model-slot-detail"
       >
-        {data && sub && (
+        {data && sub && familyKey !== null && (
           <>
             <DialogHeader>
               <DialogTitle className="font-mono">{data.slot.label}</DialogTitle>
               <DialogDescription>
-                {data.block.label} · {modelName} · {data.indices.length.toLocaleString()} shapes
+                {data.block.label} · {modelName} · {familyIndices.length.toLocaleString()}{' '}
+                {familyIndices.length === 1 ? 'size' : 'sizes'} of{' '}
+                <span className="font-mono">{SIZE_DIM[data.slot.op] ?? 'tokens'}</span>
               </DialogDescription>
             </DialogHeader>
+            {/* One picker for both charts: Metric vs size gets this one shape only */}
+            <div className="space-y-1.5" data-testid="operatorx-model-slot-shapes">
+              <SearchableSelect
+                size="sm"
+                searchable={families.length > 8}
+                value={familyKey}
+                onValueChange={(key) => {
+                  track('operatorx_model_shape_selected', { op: data.slot.op });
+                  setInspected(null);
+                  setFamily(key);
+                }}
+                triggerAriaLabel="Shape"
+                groups={[{ label: '', options: families.map(([k]) => ({ value: k, label: k })) }]}
+              />
+              {families.length > 1 && (
+                <p className="text-xs text-muted-foreground">
+                  This layer runs at {families.length} shapes across the serving configs, mostly one
+                  shard size per tensor-parallel degree. Each is swept over the token count.
+                </p>
+              )}
+            </div>
             <div className="space-y-6">
               <section className="space-y-2">
                 <h3 className="text-sm font-semibold">{roofline.title}</h3>
@@ -655,6 +855,7 @@ export function ModelView() {
   const [pickedPrecision, setPrecision] = useState<ComputePrecision | null>(null);
   const [open, setOpen] = useState<SlotData | null>(null);
   const [pickedBin, setBin] = useState<number | null>(null);
+  const [sweep, setSweep] = useState(false);
 
   // Device splits any of the model's ops has cases at; one device by default.
   const splits = useMemo(() => {
@@ -801,6 +1002,7 @@ export function ModelView() {
     [resolved, bin],
   );
   const tokens = bin === null ? DEFAULT_TOKENS : binTokens(bin);
+  const range: [number, number] | null = sweep && bins.length > 0 ? [bins[0], bins.at(-1)!] : null;
 
   const error = gemm.error ?? moe.error ?? attention.error;
   if (error)
@@ -922,7 +1124,20 @@ export function ModelView() {
                   </button>
                 ))}
               </div>
-              {bin === null ? <div /> : <TokenSlider bins={bins} bin={bin} onChange={setBin} />}
+              {bin === null ? (
+                <div />
+              ) : (
+                <SizeControls
+                  bins={bins}
+                  bin={bin}
+                  onChange={setBin}
+                  sweep={sweep}
+                  onSweep={(enabled) => {
+                    track('operatorx_model_sweep_toggled', { model: requested, enabled });
+                    setSweep(enabled);
+                  }}
+                />
+              )}
             </div>
             <div className="flex flex-col">
               {blocks.map((block, b) => (
@@ -940,6 +1155,7 @@ export function ModelView() {
                     block={block}
                     slots={slots.get(block.id) ?? []}
                     tokens={tokens}
+                    range={range}
                     lanes={hardware.length}
                     isDark={isDark}
                     onOpen={(data) => {

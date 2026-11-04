@@ -15,7 +15,6 @@ const STRINGS = {
     title: 'Median (fill) and best (outline)',
     individual: 'Each accelerator uses its own compute-bound cases.',
     noData: 'No compute-bound measurements for this precision.',
-    cohort: 'Shared cases at or above every selected accelerator’s ridge point',
     empty: 'No shared compute-bound cases. Try selecting fewer accelerators or another precision.',
     missing: 'A compute or bandwidth reference is unavailable for',
     median: 'Median',
@@ -29,7 +28,6 @@ const STRINGS = {
     title: '中位数（填充）与最佳值（轮廓）',
     individual: '各加速器使用各自的计算受限用例。',
     noData: '此精度没有计算受限的实测用例。',
-    cohort: '算术强度不低于每个所选加速器 roofline 拐点的共同实测用例',
     empty: '没有共同的计算受限用例。请减少所选加速器，或切换精度。',
     missing: '以下硬件缺少计算峰值或带宽参考值',
     median: '中位数',
@@ -164,10 +162,8 @@ export function RooflineBars({
       data-testid="operatorx-roofline-summary"
     >
       <p className="text-xs text-muted-foreground">
-        <span className="font-medium text-foreground">{strings.title}</span> ·{' '}
-        {summary.sharedOnly
-          ? `${strings.cohort}: ${summary.caseIndices.length}.`
-          : strings.individual}
+        <span className="font-medium text-foreground">{strings.title}</span>
+        {!summary.sharedOnly && ` · ${strings.individual}`}
       </p>
       {summary.bars.length === 0 ? (
         <EmptyChart>

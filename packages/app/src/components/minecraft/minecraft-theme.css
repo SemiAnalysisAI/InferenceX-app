@@ -196,3 +196,9 @@ html[data-inferencex-embed] [data-testid='minecraft-play-banner'] {
     border-color: CanvasText;
   }
 }
+
+/* Monocraft is wider than DM Sans; tighten desktop nav links so the header row
+   fits without clipping a link or shifting the theme toggle. */
+.minecraft header nav > a {
+  padding-inline: 0.375rem;
+}

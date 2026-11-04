@@ -40,33 +40,44 @@
   content: none;
 }
 
-.halloween-wordmark {
-  color: #b54708;
+.inferencex-wave-wordmark {
+  --wordmark-blue: #1d4ed8;
+  color: var(--wordmark-blue);
   text-rendering: geometricPrecision;
   font-kerning: normal;
 }
 
-.halloween-wordmark-x {
-  color: #7e22ce;
+:is(.dark, .minecraft, .csgo, .gta, .doom, .halo) .inferencex-wave-wordmark {
+  --wordmark-blue: #93c5fd;
 }
 
-:is(.dark, .minecraft, .csgo, .gta, .doom, .halo) .halloween-wordmark {
-  color: #fb923c;
+.inferencex-wave-letter {
+  display: inline-block;
+  animation: inferencex-blue-wave 1.8s ease-in-out infinite;
 }
 
-:is(.dark, .minecraft, .csgo, .gta, .doom, .halo) .halloween-wordmark-x {
-  color: #c084fc;
+@keyframes inferencex-blue-wave {
+  0%,
+  100% {
+    transform: translateY(-3px);
+  }
+  50% {
+    transform: translateY(3px);
+  }
 }
 
-.halloween-wordmark-pumpkin {
-  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
-  transform: rotate(12deg);
+@media (prefers-reduced-motion: reduce) {
+  .inferencex-wave-letter {
+    animation: none;
+  }
 }
 
 @media (forced-colors: active) {
-  .halloween-wordmark,
-  .halloween-wordmark-x {
+  .inferencex-wave-wordmark {
     color: LinkText;
+  }
+  .inferencex-wave-letter {
+    animation: none;
   }
 }
 

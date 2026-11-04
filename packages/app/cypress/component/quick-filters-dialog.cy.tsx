@@ -29,7 +29,12 @@ describe('QuickFiltersDialog', () => {
           { inference: { availableQuickFilters } },
         );
         const explanations = [
-          ['best-per-sku', locale === 'zh' ? '共同实测范围' : 'shared measured range'],
+          [
+            'best-per-sku',
+            locale === 'zh'
+              ? 'Pareto 前沿在图表中所覆盖的面积'
+              : 'chart area its measured Pareto frontier dominates',
+          ],
           ['vendor', locale === 'zh' ? '芯片制造商' : 'company that makes the chip'],
           ['framework', 'Dynamo vLLM'],
           ['deployment', locale === 'zh' ? '不同的 worker' : 'across workers'],

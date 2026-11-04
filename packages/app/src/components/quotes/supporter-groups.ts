@@ -24,6 +24,9 @@ export interface SupporterGroup {
  * referenced here lands in the derived "Other" group, so new quotes always
  * show up on the wall without editing this list.
  */
+// Managed inference providers share the neocloud grid so their logos line up column for column.
+const PROVIDER_COLUMNS = 8;
+
 export const CURATED_SUPPORTER_GROUPS: SupporterGroup[] = [
   {
     id: 'ai-accelerators',
@@ -66,7 +69,7 @@ export const CURATED_SUPPORTER_GROUPS: SupporterGroup[] = [
   {
     id: 'hyperscalers-neoclouds',
     label: { en: 'Hyperscalers & Neoclouds', zh: '超大规模云厂商与 Neocloud' },
-    desktopColumns: 8,
+    desktopColumns: PROVIDER_COLUMNS,
     logos: [
       { label: 'Microsoft', logo: 'microsoft.svg', quoteOrg: 'Microsoft' },
       { label: 'Google Cloud', logo: 'google-color.svg' },
@@ -88,6 +91,7 @@ export const CURATED_SUPPORTER_GROUPS: SupporterGroup[] = [
   {
     id: 'managed-inference-providers',
     label: { en: 'Managed Inference Providers', zh: '托管推理服务商' },
+    desktopColumns: PROVIDER_COLUMNS,
     logos: [
       { label: 'Together AI', logo: 'together-ai.svg', quoteOrg: 'Together AI' },
       { label: 'GMI Cloud', logo: 'gmi-cloud.svg', quoteOrg: 'GMI Cloud' },
@@ -95,6 +99,8 @@ export const CURATED_SUPPORTER_GROUPS: SupporterGroup[] = [
       { label: 'Baseten', logo: 'baseten.svg', quoteOrg: 'Baseten' },
       { label: 'Crusoe', logo: 'crusoe.svg', quoteOrg: 'Crusoe' },
       { label: 'Tensormesh', logo: 'tensormesh.svg', quoteOrg: 'Tensormesh' },
+      { label: 'Morph', logo: 'morph.svg', quoteOrg: 'Morph' },
+      { label: 'Doubleword', logo: 'doubleword.png', quoteOrg: 'Doubleword' },
     ],
   },
   {

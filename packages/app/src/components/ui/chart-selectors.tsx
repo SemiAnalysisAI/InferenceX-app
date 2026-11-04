@@ -348,8 +348,7 @@ export function ScenarioSelector({
   const fixedGroups = groupByCategory(fixedSeq, (s) =>
     getSequenceCategoryForModel(s as Sequence, model),
   );
-  if (availableSequences.length === 0) return null;
-  const isOnlySelectedScenario = availableSequences.length === 1 && availableSequences[0] === value;
+  if (availableSequences.length <= 1) return null;
   const scenarioLabel = (seq: string) => {
     const label = getSequenceLabel(seq as Sequence, locale);
     return getSequenceCategoryForModel(seq as Sequence, model) === 'deprecated'
@@ -386,8 +385,6 @@ export function ScenarioSelector({
     <SearchableSelect
       showSelectedHelp={variant !== 'caption'}
       className={variant === 'caption' ? captionControlTriggerClassName : undefined}
-      key={isOnlySelectedScenario ? 'fixed' : 'selectable'}
-      disabled={isOnlySelectedScenario}
       value={value}
       initialLabel={scenarioLabel(value)}
       contentClassName="min-w-[min(16rem,var(--radix-popover-content-available-width))]"
@@ -399,7 +396,7 @@ export function ScenarioSelector({
         track('selector_scenario_changed', { scenario: v });
         onChange(v as Sequence);
       }}
-      open={isOnlySelectedScenario ? false : open}
+      open={open}
       onOpenChange={onOpenChange}
       groups={[
         { label: '', options: agentic.map(toScenarioOption) },

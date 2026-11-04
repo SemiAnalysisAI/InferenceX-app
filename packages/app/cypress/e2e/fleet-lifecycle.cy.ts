@@ -756,10 +756,7 @@ describe('Fleet — Fleet Lifecycle with agentic traces', () => {
       },
     });
     cy.wait('@agenticBenchmarks');
-    cy.get('button[data-testid="fleet-sequence-selector"]')
-      .should('be.visible')
-      .and('have.text', 'Agentic')
-      .and('be.disabled');
+    cy.get('[data-testid="fleet-sequence-selector"]').should('not.exist');
     cy.get('button[data-testid="fleet-precision-selector"]')
       .should('have.text', 'FP4')
       .and('be.disabled');

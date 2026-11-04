@@ -84,7 +84,10 @@ is not cached. Local-directory sources keep the raw path.
 
 ### Bulk compact reads
 
-One SQL query loads the listed run revisions; merging keeps newest-first order.
+Compact reads load the listed run revisions in batches of eight, since Neon's HTTP
+driver rejects responses over 64 MiB and one run's GEMM comparison reaches ~5 MiB;
+merging keeps newest-first order. Projections are written as JSON objects. Rows
+written before that fix hold a double-encoded jsonb string and are parsed on read.
 Missing/stale projections alone use bounded raw fallback; only a missing table
 suppresses a SQL error. Responses and timeline identities are preserved.
 
@@ -127,7 +130,7 @@ normalization costs and must not be reported as an end-to-end production speedup
 
 ## Median and best throughput bars
 
-The Median and best throughput panel replaces Distribution per GPU and sits beside Head to head on desktop. Metric vs size is the last chart. Its horizontal bars show median throughput as a fill and the
+The Median and best throughput panel replaces Distribution per GPU and spans its own row; Metric vs size is the last chart. Its horizontal bars show median throughput as a fill and the
 best measured throughput as an outline, sorted by the displayed median. They follow
 the selected workload, hardware, precision and Normalized switch. Normalized bars
 show a fraction of each accelerator's peak; absolute bars show TFLOPS.
@@ -293,7 +296,9 @@ dispatch/combine, and attention's dcp merge. Attention's own tensor-parallel
 all-reduce runs outside the op. Share of roofline is that time over measured
 latency. The roofline chart plots each case at its effective intensity: where
 the GPU's roofline reaches the case's bound, so the gap under the roof is the
-case's share of roofline. For a single-stage op this is plain FLOP/byte.
+case's share of roofline. For a single-stage op this is plain FLOP/byte. The x axis
+reads "Arithmetic Intensity" (FLOP/byte, or over the ridge point when normalized) either
+way; the tooltip gives plain FLOP/byte and, for staged cases, the effective value.
 
 中文：MoE 与注意力算子包含多个阶段（投影、注意力核心或线性递归、路由、专家、共享专家），
 各阶段精度与算术强度不同，多卡切分还会引入集合通信。某用例在某 GPU 上的 roofline
@@ -303,7 +308,35 @@ GEMM 的 all-reduce，MoE 的 all-reduce、all-gather/reduce-scatter 或专家�
 dispatch/combine，以及注意力的 dcp 合并。注意力自身的张量并行 all-reduce 不在算子
 内。Roofline 占比为该时间与实测延迟之比。Roofline 图按等效算术强度放置每个用例，
 即 GPU roofline 达到该用例上界的位置，因此点与屋顶之间的差距即为 roofline 占比；
-单阶段算子的等效强度就是普通的 FLOP/byte。
+单阶段算子的等效强度就是普通的 FLOP/byte。横轴统一标为 "Arithmetic Intensity"
+（FLOP/byte，归一化时为与拐点之比）；提示框给出普通 FLOP/byte，多阶段用例另给等效值。
+
+## Model View
+
+Beside each measured op, Model View shows one row per selected GPU at the token count
+the slider picks (half-octave size bins; each value is the GPU's median over the op's
+cases in that bin). The slider has one more step past the largest size, **All**: there
+a shared token axis appears under it and each row's bars become line charts: one line
+per GPU over every size bin, log tokens across and log metric up, scaled to the row,
+with the row's largest and smallest values beside it. A GPU measured at one size shows
+as a dot. The tooltip then gives each GPU's range across sizes. Sliding back to a size
+restores the bars.
+
+Clicking an op opens its detail for one shape swept over the token count (`m` for GEMM,
+`tokens` for MoE and attention). A layer runs at several shard sizes across the serving
+configs, one per tensor-parallel degree (DeepSeek-R1 `o_proj` has `k` 16384, 4096, 2048
+and 1024), so the detail picks one, largest first, and lists the others to switch to.
+
+中文：Model View 在每个已测量算子旁，按滑块选择的 token 数为每个所选 GPU 显示一行
+（按半个倍频程分组；数值为该 GPU 在该组内各用例的中位数）。滑块在最大规模之后还有一档
+**All**：拖到这一档时，滑块下方出现共享的 token 坐标轴，各行的柱形换成折线图：每个 GPU
+一条线，覆盖全部规模分组，横轴为对数 token 数，纵轴为对数指标并按行缩放，旁边标出该行的
+最大值和最小值。只在一个规模上测量的 GPU 显示为一个点。此时提示框给出每个 GPU 在各规模上
+的取值范围。拖回任一规模即恢复柱形。
+
+点击算子打开其详情，只显示一个形状随 token 数（GEMM 为 `m`，MoE 和注意力为 `tokens`）
+变化的数据。同一层在不同服务配置中按张量并行度切分为不同大小（如 DeepSeek-R1 `o_proj` 的
+`k` 为 16384、4096、2048 和 1024），因此详情默认显示最大的一种，并可切换到其他切分。
 
 ## Data API
 
@@ -434,8 +467,8 @@ successful finite positive latency across backends; ties keep the first result.
 If no backend succeeds, the first explicit status is retained without inventing a
 measurement. The newest-per-hardware/case/backend raw selection is unchanged.
 `measurements[hardware].backend` identifies the selected backend alongside its
-original run, revision, result index, kernel, and CUDA Graph flag. Head-to-head
-points and timeline inspection use these same selected measurements. Thus identical
+original run, revision, result index, kernel, and CUDA Graph flag. Chart points and
+timeline inspection use these same selected measurements. Thus identical
 BF16 cases measured by `torch_npu_linear` and `vllm` can be compared, while different
 precision or quantization arguments remain separate. This adds no OpenAPI
 operation; the compare route stays page-owned.
@@ -445,7 +478,7 @@ operation; the compare route stays page-owned.
 有限正数的最快结果；延迟相同则保留首条结果。若没有成功结果，则保留首条明确状态，不补造测量值。
 原始数据仍按设备、用例和 backend 分别选取最新结果。`measurements[hardware].backend`
 记录所选 backend，并保留原始 run、revision、result index、kernel 和 CUDA Graph 标记；
-Head to head 与时间线使用同一条测量记录。OperatorX 仍使用页面专属 API，不新增公开 OpenAPI 接口。
+图表数据点与时间线使用同一条测量记录。OperatorX 仍使用页面专属 API，不新增公开 OpenAPI 接口。
 
 ### Parallel timeline reads
 

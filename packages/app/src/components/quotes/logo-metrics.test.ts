@@ -17,7 +17,7 @@ describe('logo wall sizing', () => {
 
   it('makes wordmarks shorter but wider than square marks', () => {
     const mark = logoSize('openai.svg');
-    for (const file of ['lambda.svg', 'oracle.svg', 'meta.svg']) {
+    for (const file of ['lambda.svg', 'oracle.svg', 'meta.svg', 'morph.svg']) {
       const word = logoSize(file);
       expect(word.height, file).toBeLessThan(mark.height);
       expect(word.width, file).toBeGreaterThan(mark.width);

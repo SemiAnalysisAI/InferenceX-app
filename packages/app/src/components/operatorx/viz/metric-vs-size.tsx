@@ -57,22 +57,25 @@ function MetricVsSize({ model }: { model: ComparisonModel }) {
   const sizeLabel = view.op === 'gemm' ? 'M' : 'Tokens';
   return (
     <div className="space-y-3">
-      <SearchableSelect
-        size="sm"
-        searchable
-        value={current[0]}
-        onValueChange={(value) => {
-          track('operatorx_metric_vs_size_slice_selected', { slice: value, metric: metric.id });
-          setSlice(value);
-        }}
-        triggerAriaLabel="Shape"
-        groups={[
-          {
-            label: '',
-            options: groups.map(([k]) => ({ value: k, label: k })),
-          },
-        ]}
-      />
+      {/* One shape needs no picker; the Model View op detail picks it for both charts */}
+      {groups.length > 1 && (
+        <SearchableSelect
+          size="sm"
+          searchable
+          value={current[0]}
+          onValueChange={(value) => {
+            track('operatorx_metric_vs_size_slice_selected', { slice: value, metric: metric.id });
+            setSlice(value);
+          }}
+          triggerAriaLabel="Shape"
+          groups={[
+            {
+              label: '',
+              options: groups.map(([k]) => ({ value: k, label: k })),
+            },
+          ]}
+        />
+      )}
       <OpxChart<Point>
         inspect={{ model, caseOf: (p) => p.i }}
         chartId="operatorx-metric-vs-size"

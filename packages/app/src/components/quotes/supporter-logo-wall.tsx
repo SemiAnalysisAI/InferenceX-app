@@ -8,6 +8,7 @@ import type { Locale } from '@/lib/i18n/i18n';
 import { logoSize } from './logo-metrics';
 import { orgAnchorId } from './quotes-data';
 import { SUPPORTER_GROUPS, type SupporterGroup, type WallLogo } from './supporter-groups';
+import { SupporterLogoImage } from './supporter-logo-image';
 
 const STRINGS = {
   en: {
@@ -40,13 +41,14 @@ function scrollToOrg(org: string) {
 function LogoTile({ item, jumpTo }: { item: WallLogo; jumpTo: (org: string) => string }) {
   const size = logoSize(item.logo);
   const img = (
-    <img
-      src={`/logos/${item.logo}`}
+    <SupporterLogoImage
+      logo={item.logo}
       alt={item.label}
       width={size.width}
       height={size.height}
       style={{ '--logo-h': `${size.height}px` } as CSSProperties}
-      className={size.invertInDark ? `${IMG} ${IMG_DARK_INVERT}` : IMG}
+      className={IMG}
+      darkClassName={size.invertInDark ? IMG_DARK_INVERT : undefined}
     />
   );
   const { quoteOrg } = item;
@@ -106,7 +108,7 @@ export function SupporterLogoWall({
                 aria-labelledby={labelId}
                 style={
                   {
-                    '--cols': Math.min(group.logos.length, group.desktopColumns ?? MAX_COLUMNS),
+                    '--cols': group.desktopColumns ?? Math.min(group.logos.length, MAX_COLUMNS),
                   } as CSSProperties
                 }
                 className="flex flex-wrap items-center justify-center gap-y-3 lg:grid lg:grid-cols-[repeat(var(--cols),minmax(0,1fr))] lg:gap-x-3 lg:gap-y-2"

@@ -55,6 +55,11 @@ Other dashboards keep their existing query-state behavior.
 
 **Prefix convention**: `g_` (global), `i_` (inference), `e_` (evaluation), `r_` (reliability), and `c_` (calculator). The canonical dashboard route registry declares which scopes belong in each share URL.
 
+The shared Scenario selector renders only when more than one scenario is available,
+omitting its label and help icon otherwise in both field and caption layouts.
+This is a presentation-only API coverage exclusion: selected sequences, API
+parameters, defaults, measurements, and unofficial overlays are unchanged.
+
 Inference places Scenario in the chart footer beside Cost Tier and TCO Basis on
 desktop and mobile, including below an empty chart so users can recover from an
 empty selection. PowerX keeps Scenario beside Model on
