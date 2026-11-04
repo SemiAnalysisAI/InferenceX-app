@@ -287,9 +287,6 @@ jobs:
           : "${INGEST_REPO:?BENCHMARK_REPO repository variable is not set}"
           bun run admin:db:prepare:ci
 
-      - name: Run migrations
-        run: bun run admin:db:migrate --yes
-
       - name: Ingest results to DB
         env:
           GITHUB_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
