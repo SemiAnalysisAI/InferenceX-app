@@ -197,6 +197,23 @@ describe('stepClipGroup', () => {
     });
   });
 
+  it('hiding the page pauses playing clips but keeps a pending start', () => {
+    const playing = stepClipGroup(
+      group([clip('b200', { playbackRate: 1.1 }), clip('h100')]),
+      'hide',
+    );
+    expect(playing).toMatchObject({
+      phase: 'paused',
+      actions: [{ type: 'pause-all' }, { type: 'rate', key: 'b200', rate: 1 }],
+    });
+    const partial = [clip('b200', { currentTime: 0, bufferedEnd: 2 }), clip('h100')];
+    for (const phase of ['loading', 'buffering'] as const)
+      expect(stepClipGroup(group(partial, { phase }), 'hide')).toMatchObject({
+        phase,
+        actions: [],
+      });
+  });
+
   it('scrubbing pauses the group, seeks every clip including the audible one, and reloads', () => {
     const step = stepClipGroup(
       group([clip('b200', { playbackRate: 1.1 }), clip('h100')], { audible: 'h100' }),

@@ -467,7 +467,7 @@ function SynchronizedClips({
 
   useEffect(() => {
     const onVisibility = () => {
-      if (document.hidden) show(dispatch('pause'));
+      if (document.hidden) show(dispatch('hide'));
     };
     document.addEventListener('visibilitychange', onVisibility);
     return () => {

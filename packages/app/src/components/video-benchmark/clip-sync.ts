@@ -10,7 +10,8 @@
  */
 export type ClipPhase = 'paused' | 'loading' | 'buffering' | 'playing' | 'ended';
 
-export type ClipEvent = 'play' | 'pause' | 'tick' | { type: 'seek'; time: number };
+/** `hide` is the page becoming hidden: it stops audible playback but keeps a start the user is waiting for. */
+export type ClipEvent = 'play' | 'pause' | 'hide' | 'tick' | { type: 'seek'; time: number };
 
 export interface ClipSnapshot {
   key: string;
@@ -152,8 +153,9 @@ export function stepClipGroup(group: ClipGroup, event: ClipEvent): ClipGroupStep
     return result(active ? 'loading' : 'paused', event.time);
   }
   switch (event) {
+    case 'hide':
     case 'pause': {
-      if (!active) return result(phase);
+      if (event === 'hide' ? phase !== 'playing' : !active) return result(phase);
       actions.push({ type: 'pause-all' });
       resetRates(clips, actions);
       return result('paused');

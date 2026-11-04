@@ -137,7 +137,9 @@ stalled; the audible clip is never seeked to chase another clip. A follower drif
 40 to 250 ms gets a 10% `playbackRate` nudge and returns to 1.0 once within 10 ms;
 drift beyond 250 ms issues one seek, never while that clip is already seeking.
 Scrubbing seeks every clip and re-buffers. The group stops at the shared playable
-duration and pauses when the selection or page visibility changes. The time display
+duration and pauses when the selection changes. A hidden page pauses playing clips but
+keeps a pending `loading` or `buffering` start, which runs once the page is visible and
+the clips are ready, so switching tabs while a clip downloads does not cancel Play. The time display
 and scrubber refresh at most ten times per second.
 Audio starts muted. The audio selector enables one visible, playable hardware clip
 at a time; the reference stays muted. Changing the case or hiding or failing the
