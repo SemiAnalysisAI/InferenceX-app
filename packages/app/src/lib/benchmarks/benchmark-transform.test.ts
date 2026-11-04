@@ -4,13 +4,16 @@ import { describe, it, expect, vi } from 'vitest';
 import { getPointLabel } from '@/components/inference/utils/tooltipUtils';
 import type { BenchmarkRow } from '@/lib/api/api';
 import { dedupeAgenticHistoryRuns } from '@/lib/benchmarks/benchmark-run-selection';
+import { Percentile } from '@/lib/catalog/data-mappings';
 
 import {
   applyUncachedTokenBasis,
   benchmarkRowPhysicalChips,
   mergeRunScopedRows,
+  rowLatencyMetric,
   rowToAggDataEntry,
   transformBenchmarkRows,
+  type LatencyPercentile,
 } from './benchmark-transform';
 
 function makeRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
@@ -258,6 +261,17 @@ describe('rowToAggDataEntry', () => {
     expect(entry.median_intvty).toBe(200);
     expect(entry.std_itl).toBe(0.001);
     expect(entry.std_intvty).toBe(20);
+  });
+
+  it('drops plain ITL at percentiles without full-response ITL once any percentile reports it', () => {
+    const row = makeRow({
+      benchmark_type: 'agentic_traces',
+      metrics: { median_full_response_itl: 0.005, p90_itl: 0.01, p90_intvty: 100 },
+    });
+    const entry = rowToAggDataEntry(row);
+
+    expect([entry.p90_itl, entry.p90_intvty, entry.median_intvty]).toEqual([0, 0, 200]);
+    expect(rowLatencyMetric(row, Percentile.P90, 'intvty')).toBe(0);
   });
 
   it('defaults missing metrics to 0', () => {
@@ -799,6 +813,50 @@ describe('rowToAggDataEntry', () => {
     expect(entry.workers![0].avg_temp_c).toBe(71.2);
     expect(entry.workers![1].hosts).toEqual(['dn0', 'dn1', 'dn2', 'dn3']);
     expect(entry.workers![1].avg_temp_c).toBeUndefined();
+  });
+});
+
+describe('rowLatencyMetric', () => {
+  it('returns the rowToAggDataEntry latency field for every percentile and alias shape', () => {
+    let state = 11;
+    const random = () => {
+      state = (Math.imul(state, 1_664_525) + 1_013_904_223) >>> 0;
+      return state / 2 ** 32;
+    };
+    const VALUES = [undefined, undefined, 0, -0.5, 0.004, 0.02, 1.5, 7, Number.NaN];
+    const pick = () => VALUES[Math.floor(random() * VALUES.length)];
+    const percentiles: LatencyPercentile[] = [
+      'mean',
+      'median',
+      Percentile.P75,
+      Percentile.P90,
+      'p95',
+      'p99',
+      'p99.9',
+    ];
+    const suffixes = ['full_response_itl', 'itl', 'ttlt', 'e2el', 'ttft', 'intvty', 'tpot'];
+    for (let round = 0; round < 400; round++) {
+      const metrics: Record<string, number> = {};
+      for (const percentile of percentiles) {
+        for (const suffix of suffixes) {
+          const value =
+            random() < (suffix === 'full_response_itl' ? 0.1 : 0.6) ? pick() : undefined;
+          if (value !== undefined) metrics[`${percentile}_${suffix}`] = value;
+        }
+      }
+      const row = makeRow({
+        benchmark_type: random() < 0.6 ? 'agentic_traces' : 'single_turn',
+        metrics,
+      });
+      const entry = new Map(Object.entries(rowToAggDataEntry(row, { modelPower: false })));
+      for (const percentile of percentiles) {
+        for (const metric of ['intvty', 'e2el', 'ttft'] as const) {
+          expect(rowLatencyMetric(row, percentile, metric)).toBe(
+            entry.get(`${percentile}_${metric}`),
+          );
+        }
+      }
+    }
   });
 });
 

@@ -24,9 +24,11 @@ copying it, and HGX fan sizing, the modeled host components and each network gro
 share are built once per frozen system and operating state. `power-model-reuse.test.ts`
 checks that a reused model dumps exactly what a fresh one does. These port edits are
 performance only and need the same companion upstream PR as any other port change.
-Callers of `rowToAggDataEntry` that read no power field (calculator throughput groups,
-compare SSR tables, the overview AgentX tier reads, the historical hardware filter)
-pass `{ modelPower: false }` and get `modeledSystemPower` undefined.
+Callers of `rowToAggDataEntry` that read no power field (compare SSR tables, the
+overview AgentX tier reads, the historical hardware filter) pass `{ modelPower: false }`
+and get `modeledSystemPower` undefined. The calculator's `buildGpuGroups` builds no entry
+at all: it reads the hardware key fields off the row and its latency fields through
+`rowLatencyMetric`.
 
 ## Operating state
 
