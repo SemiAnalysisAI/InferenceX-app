@@ -20,7 +20,8 @@ export const benchmarkCurveWorkflowRunId = (row: BenchmarkSeriesRow): number | u
 export const benchmarkCurveRunStartedAt = (row: BenchmarkSeriesRow): string | null | undefined =>
   row.curve_run_started_at ?? row.run_started_at;
 
-const seriesKey = (row: BenchmarkSeriesRow): string =>
+/** One benchmark configuration: the unit whose latest sweep represents it in a snapshot. */
+export const seriesKey = (row: BenchmarkSeriesRow): string =>
   row.benchmark_type === 'agentic_traces'
     ? benchmarkCurveScope(row)
     : JSON.stringify([

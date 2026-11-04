@@ -70,6 +70,8 @@ interface MultiSelectProps {
   placeholder?: string;
   size?: 'sm' | 'default';
   className?: string;
+  /** Classes for the dropdown panel, e.g. a width wider than the trigger. */
+  contentClassName?: string;
   disabled?: boolean;
   maxSelections?: number;
   minSelections?: number;
@@ -99,6 +101,7 @@ function MultiSelect({
   placeholder,
   size = 'default',
   className,
+  contentClassName,
   disabled = false,
   maxSelections,
   minSelections,
@@ -372,7 +375,7 @@ function MultiSelect({
         <span className="absolute right-2 flex size-3.5 items-center justify-center">
           {isSelected && <CheckIcon className="size-4 text-primary" />}
         </span>
-        <span className="flex min-w-0 items-center gap-2">
+        <span className="flex min-w-0 flex-1 items-center gap-2">
           {option.icon}
           {option.label}
           {option.badge}
@@ -502,6 +505,7 @@ function MultiSelect({
           data-slot="select-content"
           className={cn(
             'bg-popover text-popover-foreground animate-in fade-in-0 zoom-in-95 slide-in-from-top-2 absolute z-[120] mt-1 flex max-h-72 w-full origin-top flex-col overflow-hidden rounded-md border shadow-md',
+            contentClassName,
           )}
         >
           <div className="min-h-0 p-1 space-y-1 overflow-y-auto custom-scrollbar">

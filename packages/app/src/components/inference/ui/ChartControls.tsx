@@ -191,6 +191,8 @@ interface ChartControlsProps {
   /** PowerX: the Count / Per / Show as controls that stand in for the Y-axis metric pick. */
   /** PowerX's Chart Config cells; receives the X-Axis Metric cell so it can place it. */
   powerXControls?: (slots: PowerXChartConfigSlots) => ReactNode;
+  /** Extra details on each model's row in the model dropdown, e.g. its benchmark history. */
+  modelDetails?: ReadonlyMap<string, ReactNode>;
 }
 
 export default function ChartControls({
@@ -200,6 +202,7 @@ export default function ChartControls({
   showXAxisMode = false,
   runContext,
   powerXControls,
+  modelDetails,
 }: ChartControlsProps) {
   const locale = useLocale();
   const t = STRINGS[locale];
@@ -541,6 +544,7 @@ export default function ChartControls({
                 data-testid="model-selector"
                 trailing={<ModelArchitectureInfoLink model={selectedModel} locale={locale} />}
                 newModels={AGENTX_NEW_MODEL_DISPLAY_NAMES}
+                modelDetails={modelDetails}
               />
             </div>
             {!isMobile && <div className="hidden md:contents">{benchmarkSelectors}</div>}

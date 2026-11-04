@@ -1,5 +1,6 @@
 'use client';
 
+import { GOOGLE_BLUE, HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 import { CHIP_BASIS_METRICS, chipBasisCsvNote } from '@/lib/benchmarks/chip-basis';
 import { track } from '@/lib/analytics/analytics';
 import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
@@ -62,11 +63,47 @@ import {
 } from '@/components/inference/metric-registry';
 import { Button } from '@/components/ui/button';
 
+import FrontierView, {
+  FRONTIER_SECTIONS,
+  isFrontierSection,
+  type FrontierGrouping,
+  type FrontierSection,
+} from './FrontierView';
+import { frontierHistoryToCsv } from './frontier-history-core';
+import { useFrontierHistory } from './useFrontierHistory';
+import { useModelHistoryDetails } from './useModelHistoryDetails';
+
+/** Vendors with frontier data, the one with the most chips first. */
+function vendorsByChipCount(series: readonly { vendor: string | null }[]): string[] {
+  const counts = new Map<string, number>();
+  for (const { vendor } of series) if (vendor) counts.set(vendor, (counts.get(vendor) ?? 0) + 1);
+  return [...counts]
+    .toSorted((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([vendor]) => vendor);
+}
+
+/** Brand colors, matching the GPU specs pages. */
+const VENDOR_COLORS: Record<string, string> = {
+  NVIDIA: '#76b900',
+  AMD: '#ed1c24',
+  Google: GOOGLE_BLUE,
+};
+
 const STRINGS = {
   en: {
     chartView: 'Chart view',
     line: 'Trend line',
     waterfall: 'Improvement waterfall',
+    frontier: 'Frontier',
+    compare: 'Compare',
+    software: 'Software gains',
+    frontierTitle: (yTitle: string, isAgentic: boolean) =>
+      `${yTitle} vs. ${isAgentic ? 'P90 ' : ''}Interactivity Over Time`,
+    interactivityAxis: (isAgentic: boolean) =>
+      `${isAgentic ? 'P90 ' : ''}Interactivity (tok/s/user)`,
+    frontierLoadError: 'Frontier history could not be loaded.',
+    frontierEmpty: 'No frontier history for the selected configurations.',
+    memes: 'Meme',
     heading: 'Historical Trends',
     description:
       'Interpolated performance metrics over time at a fixed interactivity operating point.',
@@ -94,6 +131,15 @@ const STRINGS = {
     chartView: '图表视图',
     line: '趋势线',
     waterfall: '性能提升瀑布图',
+    frontier: '前沿',
+    compare: '对比',
+    software: '软件提升',
+    frontierTitle: (yTitle: string, isAgentic: boolean) =>
+      `${yTitle} 与${isAgentic ? ' P90 ' : ''}交互性的前沿随时间变化`,
+    interactivityAxis: (isAgentic: boolean) => `${isAgentic ? 'P90 ' : ''}交互性 (tok/s/user)`,
+    frontierLoadError: '前沿历史数据加载失败。',
+    frontierEmpty: '所选配置暂无前沿历史数据。',
+    memes: '梗图',
     heading: '历史趋势',
     description: '将交互性固定在指定水平后，展示各项性能指标随时间的变化；数据经插值计算。',
     targetLabel: '目标交互性（tok/s/user）',
@@ -126,9 +172,18 @@ function historicalRunDate(date: string, locale: 'en' | 'zh'): string {
 }
 
 export default function HistoricalTrendsDisplay() {
-  const [chartView, setChartView] = useState<'line' | 'waterfall'>('line');
+  const [chartView, setChartView] = useState<'line' | 'waterfall' | FrontierSection>('line');
+  const frontierSection = isFrontierSection(chartView) ? chartView : null;
+  const [memesEnabled, setMemesEnabled] = useState(true);
+  // Compare can put vendors or chips side by side; the other views always show chips.
+  const [compareGrouping, setCompareGrouping] = useState<FrontierGrouping>('vendor');
+  const frontierGrouping: FrontierGrouping =
+    frontierSection === 'compare' ? compareGrouping : 'gpu';
+  // A vendor narrows every chip view to that company's chips; null shows all vendors.
+  const [frontierVendorFilter, setFrontierVendorFilter] = useState<string | null>(null);
   const PerformanceChart = chartView === 'waterfall' ? ImprovementWaterfallChart : TrendChart;
   const { tcoBasis, chipBasis } = useGlobalFilterSelection();
+  const modelDetails = useModelHistoryDetails();
   const { setChipBasis } = useGlobalFilterActions();
   const chipBasisControl = useMemo(
     () => ({ value: chipBasis, onChange: setChipBasis, source: 'historical' }),
@@ -151,6 +206,7 @@ export default function HistoricalTrendsDisplay() {
     setLogScale,
     setIsLegendExpanded,
     setHighContrast,
+    setSelectedPrecisions,
   } = useInferenceActions();
 
   const hasInteractivityChart =
@@ -222,6 +278,27 @@ export default function HistoricalTrendsDisplay() {
     chipBasis,
   });
 
+  const higherIsBetter =
+    METRIC_REGISTRY[selectedYAxisMetric.replace(/^y_/u, '') as MetricKey]?.polarity !== 'lower';
+  const {
+    history: frontierHistory,
+    hiddenVendors: frontierHiddenVendors,
+    loading: frontierLoading,
+    error: frontierError,
+  } = useFrontierHistory({
+    selectedModel: selectedModel as Model,
+    selectedSequence: selectedSequence as Sequence,
+    selectedPrecisions,
+    selectedYAxisMetric,
+    higherIsBetter,
+    tokenRevenuePricing,
+    tcoBasis,
+    chipBasis,
+    activeHwKeys: activeHwTypes,
+    groupBy: frontierGrouping,
+    enabled: frontierSection !== null && hasInteractivityChart,
+  });
+
   const activeHwKeys = useMemo(() => [...activeHwTypes], [activeHwTypes]);
   const { resolveColor } = useThemeColors({
     highContrast,
@@ -254,9 +331,211 @@ export default function HistoricalTrendsDisplay() {
         }),
     [trendLines, activeHwTypes, hardwareConfig, selectedPrecisions, resolveColor],
   );
+  // Chips of one vendor share a hue in the dashboard palette, so comparing them needs distinct
+  const frontierVendors = useMemo(
+    () => vendorsByChipCount(frontierHistory?.series ?? []),
+    [frontierHistory],
+  );
+  const vendorFilter =
+    frontierVendorFilter && frontierVendors.includes(frontierVendorFilter)
+      ? frontierVendorFilter
+      : null;
+  // Chips of one vendor share a hue in the dashboard palette, so views that put chips side by
+  // side, or show one vendor's chips, use the high-contrast palette; vendors without a brand
+  // color take one from it too.
+  const contrastChips =
+    frontierGrouping === 'gpu' && (frontierSection !== 'frontier' || vendorFilter !== null);
+  const frontierContrastKeys = useMemo(
+    () => (frontierSection ? (frontierHistory?.series ?? []).map((series) => series.key) : []),
+    [frontierSection, frontierHistory],
+  );
+  const { resolveColor: resolveContrastColor } = useThemeColors({
+    highContrast: true,
+    identifiers: frontierContrastKeys,
+  });
+  const frontierStyles = useMemo(
+    () =>
+      new Map(
+        (frontierHistory?.series ?? []).map((series) => {
+          if (series.hwKey === series.vendor)
+            return [
+              series.key,
+              {
+                label: series.key,
+                color: VENDOR_COLORS[series.key] ?? resolveContrastColor(series.key),
+              },
+            ];
+          // Each SKU takes the label and legend color of its first visible config.
+          const colorKey = hardwareConfig[series.hwKey]
+            ? series.hwKey
+            : (activeHwKeys.find((key) => key.split('_')[0] === series.hwKey) ?? series.hwKey);
+          const config = hardwareConfig[colorKey];
+          const baseLabel = config?.label ?? series.hwKey;
+          return [
+            series.key,
+            {
+              label: series.precision
+                ? `${baseLabel} (${getPrecisionLabel(series.precision as Precision)})`
+                : baseLabel,
+              color: contrastChips ? resolveContrastColor(series.key) : resolveColor(colorKey),
+            },
+          ];
+        }),
+      ),
+    [
+      frontierHistory,
+      hardwareConfig,
+      resolveColor,
+      resolveContrastColor,
+      contrastChips,
+      activeHwKeys,
+    ],
+  );
+  const frontierConfigLabel = useCallback(
+    (config: string) => (hardwareConfig[config] ? getDisplayLabel(hardwareConfig[config]) : config),
+    [hardwareConfig],
+  );
+
+  // Vendors that only have data at another precision, named so Compare can offer to add it.
+  const frontierHiddenNotes = useMemo(
+    () =>
+      frontierHiddenVendors.map((entry) => ({
+        vendor: entry.vendor,
+        chips: entry.hardware.map((hw) => HW_REGISTRY[hw]?.label ?? hw).join(', '),
+        precisions: entry.precisions,
+        precisionLabel: entry.precisions
+          .map((precision) => getPrecisionLabel(precision as Precision))
+          .join(', '),
+      })),
+    [frontierHiddenVendors],
+  );
+  const frontierVendorOf = useCallback(
+    (key: string) => frontierHistory?.series.find((entry) => entry.key === key)?.vendor ?? null,
+    [frontierHistory],
+  );
+
   const showsJalapenoPreview = includesJalapenoResult(lineConfigs.map((config) => config.hwKey));
   const showsVeraRubinPreview = includesVeraRubinResult(lineConfigs.map((config) => config.hwKey));
   const showsTpuv7Preview = includesTpuv7Result(lineConfigs.map((config) => config.hwKey));
+
+  const captionContext = (
+    <>
+      <ResultContext
+        locale={locale}
+        model={getModelLabel(selectedModel as Model)}
+        workload={getSequenceLabel(selectedSequence as Sequence, locale)}
+        precision={selectedPrecisions
+          .map((prec: string) => getPrecisionLabel(prec as Precision))
+          .join(', ')}
+        metric={currentYLabel}
+        costTier={(() => {
+          const tier = metricCostTier(selectedYAxisMetric.replace(/^y_/u, '') as MetricKey);
+          return tier ? costTierOptionLabel(tier, locale) : undefined;
+        })()}
+        costTierControl={<CostTierSelector allowCustom={false} />}
+        tcoBasis={<TcoBasisCaption hardwareKeys={activeHwTypes} source="historical" />}
+        target={
+          frontierSection
+            ? undefined
+            : `${isAgentic ? 'P90 ' : ''}${targetInteractivity} tok/s/user`
+        }
+        date={selectedRunDate ? historicalRunDate(selectedRunDate, locale) : undefined}
+        source="SemiAnalysis InferenceX™"
+      />
+      {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}
+      {showsVeraRubinPreview && <VeraRubinOfficialPreviewNotice />}
+      {showsTpuv7Preview && <Tpuv7OfficialPreviewNotice />}
+      <MetricAssumptionNotes
+        selectedYAxisMetric={selectedYAxisMetric}
+        activeHwKeys={activeHwTypes}
+        includeAllPowerThroughputMetrics={false}
+        includePowerThroughputCaveat={false}
+        tcoBasis={tcoBasis}
+        chipBasis={chipBasisControl}
+      />
+      <UnofficialDomainNotice />
+    </>
+  );
+
+  const legend = (
+    <ChartLegend
+      variant="sidebar"
+      collapsible={chartView !== 'waterfall'}
+      onItemRemove={removeHwType}
+      legendItems={Object.entries(hardwareConfig)
+        .filter(([key]) => hwTypesWithData.has(key))
+        .toSorted(([a], [b]) => getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b))
+        .map(([key, hwConfig]) => ({
+          name: hwConfig.name,
+          label: getDisplayLabel(hwConfig),
+          color: resolveColor(key),
+          title: hwConfig.gpu,
+          hw: key,
+          isActive: activeHwTypes.has(key),
+          onClick: () => {
+            toggleHwType(key);
+            track('historical_hw_type_toggled', { gpu: key });
+          },
+        }))}
+      isLegendExpanded={isLegendExpanded}
+      onExpandedChange={(expanded) => {
+        setIsLegendExpanded(expanded);
+        track('historical_legend_expanded', { enabled: expanded });
+      }}
+      switches={[
+        ...(frontierSection
+          ? [
+              {
+                id: 'historical-frontier-memes',
+                label: t.memes,
+                checked: memesEnabled,
+                onCheckedChange: (checked: boolean) => {
+                  setMemesEnabled(checked);
+                  track('historical_frontier_memes_toggled', { enabled: checked });
+                },
+              },
+            ]
+          : []),
+        ...(chartView === 'waterfall'
+          ? []
+          : [
+              {
+                id: 'historical-log-scale',
+                label: t.logScale,
+                checked: logScale,
+                onCheckedChange: (checked: boolean) => {
+                  setLogScale(checked);
+                  track('historical_log_scale_toggled', { enabled: checked });
+                },
+              },
+            ]),
+        {
+          id: 'historical-high-contrast',
+          label: t.highContrast,
+          checked: highContrast,
+          onCheckedChange: (checked: boolean) => {
+            setHighContrast(checked);
+            track('historical_high_contrast_toggled', { enabled: checked });
+          },
+        },
+      ]}
+      actions={
+        [...hwTypesWithData].some((key) => !activeHwTypes.has(key))
+          ? [
+              {
+                id: 'historical-reset-filter',
+                label: t.resetFilter,
+                onClick: () => {
+                  selectAllHwTypes();
+                  track('historical_legend_filter_reset');
+                },
+              },
+            ]
+          : []
+      }
+      enableTooltips={true}
+    />
+  );
 
   if (error) {
     return (
@@ -290,7 +569,7 @@ export default function HistoricalTrendsDisplay() {
         <Card className="relative z-30">
           <div className="flex flex-col gap-4">
             <DashboardSectionHeader title={t.heading} description={t.description} />
-            <ChartControls tcoSource="historical" hideGpuComparison />
+            <ChartControls tcoSource="historical" hideGpuComparison modelDetails={modelDetails} />
             <div className="space-y-2">
               <Skeleton className="h-5 w-56" />
               <Skeleton className="h-9 w-full" />
@@ -341,9 +620,9 @@ export default function HistoricalTrendsDisplay() {
             description={t.description}
             actions={<ChartShareActions />}
           />
-          <ChartControls tcoSource="historical" hideGpuComparison />
+          <ChartControls tcoSource="historical" hideGpuComparison modelDetails={modelDetails} />
 
-          {!loading && hasInteractivityChart && (
+          {!loading && hasInteractivityChart && !frontierSection && (
             <TooltipProvider delayDuration={0}>
               <div className="rounded-md border border-border/60 bg-muted/20 p-3 space-y-2">
                 <LabelWithTooltip
@@ -416,8 +695,8 @@ export default function HistoricalTrendsDisplay() {
               chartId="historical-trend"
               hideZoomReset={chartView === 'waterfall'}
               leadingControls={
-                <div role="group" aria-label={t.chartView} className="flex gap-1">
-                  {(['line', 'waterfall'] as const).map((view) => (
+                <div role="group" aria-label={t.chartView} className="flex flex-wrap gap-1">
+                  {(['line', 'waterfall', ...FRONTIER_SECTIONS] as const).map((view) => (
                     <Button
                       key={view}
                       size="sm"
@@ -441,10 +720,23 @@ export default function HistoricalTrendsDisplay() {
                 precisions: selectedPrecisions,
                 gpuCount: activeHwTypes.size,
               })}
-              zoomResetEvent="d3chart_zoom_reset_historical-trend"
+              zoomResetEvent={
+                frontierSection
+                  ? 'd3chart_zoom_reset_historical-frontier'
+                  : 'd3chart_zoom_reset_historical-trend'
+              }
               setIsLegendExpanded={setIsLegendExpanded}
               exportFileName={`InferenceX_historical_${selectedModel}`}
               onExportCsv={() => {
+                if (frontierSection) {
+                  if (!frontierHistory) return;
+                  const { headers, rows } = frontierHistoryToCsv(
+                    frontierHistory,
+                    (key) => frontierStyles.get(key)?.label ?? key,
+                  );
+                  exportToCsv(`InferenceX_historical_frontier_${selectedModel}`, headers, rows);
+                  return;
+                }
                 const { headers, rows } = historicalTrendToCsv(
                   trendLines,
                   lineConfigs,
@@ -462,132 +754,82 @@ export default function HistoricalTrendsDisplay() {
                 );
               }}
             />
-            <Card>
-              <PerformanceChart
-                chartId="historical-trend"
-                lowerIsBetter={
-                  METRIC_REGISTRY[selectedYAxisMetric.replace(/^y_/u, '') as MetricKey]
-                    ?.polarity === 'lower'
-                }
-                caption={
-                  <>
-                    <Heading as="h2" level="card">
-                      {t.captionTitle(currentYTitle, targetInteractivity, isAgentic)}
-                    </Heading>
-                    <ResultContext
-                      locale={locale}
-                      model={getModelLabel(selectedModel as Model)}
-                      workload={getSequenceLabel(selectedSequence as Sequence, locale)}
-                      precision={selectedPrecisions
-                        .map((prec: string) => getPrecisionLabel(prec as Precision))
-                        .join(', ')}
-                      metric={currentYLabel}
-                      costTier={(() => {
-                        const tier = metricCostTier(
-                          selectedYAxisMetric.replace(/^y_/u, '') as MetricKey,
-                        );
-                        return tier ? costTierOptionLabel(tier, locale) : undefined;
-                      })()}
-                      costTierControl={<CostTierSelector allowCustom={false} />}
-                      tcoBasis={
-                        <TcoBasisCaption hardwareKeys={activeHwTypes} source="historical" />
-                      }
-                      target={`${isAgentic ? 'P90 ' : ''}${targetInteractivity} tok/s/user`}
-                      date={
-                        selectedRunDate ? historicalRunDate(selectedRunDate, locale) : undefined
-                      }
-                      source="SemiAnalysis InferenceX™"
-                    />
-                    {showsJalapenoPreview && <JalapenoOfficialPreviewNotice />}
-                    {showsVeraRubinPreview && <VeraRubinOfficialPreviewNotice />}
-                    {showsTpuv7Preview && <Tpuv7OfficialPreviewNotice />}
-                    <MetricAssumptionNotes
-                      selectedYAxisMetric={selectedYAxisMetric}
-                      activeHwKeys={activeHwTypes}
-                      includeAllPowerThroughputMetrics={false}
-                      includePowerThroughputCaveat={false}
-                      tcoBasis={tcoBasis}
-                      chipBasis={chipBasisControl}
-                    />
-                    <UnofficialDomainNotice />
-                  </>
-                }
-                trendLines={trendLines}
-                lineConfigs={lineConfigs}
-                yLabel={currentYLabel}
-                logScale={logScale}
-                selectedPrecisions={selectedPrecisions}
-                legendElement={
-                  <ChartLegend
-                    variant="sidebar"
-                    collapsible={chartView === 'line'}
-                    onItemRemove={removeHwType}
-                    legendItems={Object.entries(hardwareConfig)
-                      .filter(([key]) => hwTypesWithData.has(key))
-                      .toSorted(
-                        ([a], [b]) =>
-                          getModelSortIndex(a) - getModelSortIndex(b) || a.localeCompare(b),
-                      )
-                      .map(([key, hwConfig]) => ({
-                        name: hwConfig.name,
-                        label: getDisplayLabel(hwConfig),
-                        color: resolveColor(key),
-                        title: hwConfig.gpu,
-                        hw: key,
-                        isActive: activeHwTypes.has(key),
-                        onClick: () => {
-                          toggleHwType(key);
-                          track('historical_hw_type_toggled', { gpu: key });
-                        },
-                      }))}
-                    isLegendExpanded={isLegendExpanded}
-                    onExpandedChange={(expanded) => {
-                      setIsLegendExpanded(expanded);
-                      track('historical_legend_expanded', { enabled: expanded });
-                    }}
-                    switches={[
-                      ...(chartView === 'line'
-                        ? [
-                            {
-                              id: 'historical-log-scale',
-                              label: t.logScale,
-                              checked: logScale,
-                              onCheckedChange: (checked: boolean) => {
-                                setLogScale(checked);
-                                track('historical_log_scale_toggled', { enabled: checked });
-                              },
-                            },
-                          ]
-                        : []),
-                      {
-                        id: 'historical-high-contrast',
-                        label: t.highContrast,
-                        checked: highContrast,
-                        onCheckedChange: (checked: boolean) => {
-                          setHighContrast(checked);
-                          track('historical_high_contrast_toggled', { enabled: checked });
-                        },
-                      },
-                    ]}
-                    actions={
-                      [...hwTypesWithData].some((key) => !activeHwTypes.has(key))
-                        ? [
-                            {
-                              id: 'historical-reset-filter',
-                              label: t.resetFilter,
-                              onClick: () => {
-                                selectAllHwTypes();
-                                track('historical_legend_filter_reset');
-                              },
-                            },
-                          ]
-                        : []
-                    }
-                    enableTooltips={true}
-                  />
-                }
-              />
-            </Card>
+            {frontierSection ? (
+              frontierError ? (
+                <Card>
+                  <p className="text-destructive text-sm">{t.frontierLoadError}</p>
+                </Card>
+              ) : frontierLoading || !frontierHistory ? (
+                <Card>
+                  <Skeleton className="h-[600px] w-full" />
+                </Card>
+              ) : frontierHistory.dates.length === 0 ? (
+                <Card>
+                  <p className="text-muted-foreground text-sm">{t.frontierEmpty}</p>
+                </Card>
+              ) : (
+                <FrontierView
+                  chartId="historical-frontier"
+                  section={frontierSection}
+                  grouping={frontierGrouping}
+                  onGroupingChange={(grouping) => {
+                    setCompareGrouping(grouping);
+                    track('historical_frontier_grouping_changed', { group_by: grouping });
+                  }}
+                  vendors={frontierVendors}
+                  vendor={vendorFilter}
+                  onVendorChange={(vendor) => {
+                    setFrontierVendorFilter(vendor);
+                    track('historical_frontier_vendor_changed', { vendor: vendor ?? 'all' });
+                  }}
+                  history={frontierHistory}
+                  styles={frontierStyles}
+                  memesEnabled={memesEnabled}
+                  vendorOf={frontierVendorOf}
+                  hiddenVendors={frontierHiddenNotes}
+                  onAddPrecisions={(precisions) => {
+                    setSelectedPrecisions([...new Set([...selectedPrecisions, ...precisions])]);
+                    track('historical_frontier_precision_added', {
+                      precisions: precisions.join(','),
+                    });
+                  }}
+                  configLabel={frontierConfigLabel}
+                  xLabel={t.interactivityAxis(isAgentic)}
+                  yLabel={currentYLabel}
+                  logScale={logScale}
+                  legendElement={legend}
+                  caption={
+                    <>
+                      <Heading as="h2" level="card">
+                        {t.frontierTitle(currentYTitle, isAgentic)}
+                      </Heading>
+                      {captionContext}
+                    </>
+                  }
+                />
+              )
+            ) : (
+              <Card>
+                <PerformanceChart
+                  chartId="historical-trend"
+                  lowerIsBetter={!higherIsBetter}
+                  caption={
+                    <>
+                      <Heading as="h2" level="card">
+                        {t.captionTitle(currentYTitle, targetInteractivity, isAgentic)}
+                      </Heading>
+                      {captionContext}
+                    </>
+                  }
+                  trendLines={trendLines}
+                  lineConfigs={lineConfigs}
+                  yLabel={currentYLabel}
+                  logScale={logScale}
+                  selectedPrecisions={selectedPrecisions}
+                  legendElement={legend}
+                />
+              </Card>
+            )}
           </figure>
         </section>
       ) : (

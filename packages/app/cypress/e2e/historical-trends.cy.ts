@@ -415,3 +415,105 @@ describe('Historical Trends — Chinese route', () => {
     });
   });
 });
+
+describe('Historical frontier views', () => {
+  beforeEach(() => {
+    cy.intercept('GET', '**/api/v1/benchmarks/history?*', {
+      fixture: 'api/benchmarks-history.json',
+    }).as('frontierHistory');
+    cy.visit('/historical?g_model=DeepSeek-R1-0528');
+    cy.wait('@frontierHistory');
+    cy.get('[data-testid="historical-trend-figure"] svg').should('be.visible');
+  });
+
+  it('adds Frontier, Compare and Software gains beside the trend views', () => {
+    cy.get('[data-testid^="historical-view-"]').then(($buttons) => {
+      expect([...$buttons].map((button) => button.textContent)).to.deep.equal([
+        'Trend line',
+        'Improvement waterfall',
+        'Frontier',
+        'Compare',
+        'Software gains',
+      ]);
+    });
+    cy.get('[data-testid="historical-view-frontier"]').click();
+    cy.get('[data-testid="frontier-view"]').should('be.visible');
+    cy.get('[data-testid="historical-target-slider"]').should('not.exist');
+    cy.get('[data-testid="frontier-grouping"]').should('not.exist');
+    cy.get('[data-testid="frontier-vendor-all"]').should('have.attr', 'aria-pressed', 'true');
+    cy.get('[data-testid="frontier-svg"] path.fr-area').should('have.length', 1);
+    // Choosing a vendor redraws the frontier from that company's chips alone.
+    cy.get('[data-testid="frontier-vendor-AMD"]').click();
+    cy.get('[data-testid="frontier-vendor-AMD"]').should('have.attr', 'aria-pressed', 'true');
+    cy.get('[data-testid="frontier-svg"] .line-label').should(($labels) => {
+      expect($labels.text()).to.contain('MI3');
+      expect($labels.text()).not.to.contain('B200');
+    });
+
+    cy.get('[data-testid="historical-view-line"]').click();
+    cy.get('[data-testid="trend-chart-svg"]').should('be.visible');
+    cy.get('[data-testid="historical-target-slider"]').should('exist');
+  });
+
+  it('compares vendors and chips with lead bars and per-series selection', () => {
+    cy.get('[data-testid="historical-view-compare"]').click();
+    cy.get('[data-testid="frontier-grouping-vendor"]').should('have.attr', 'aria-pressed', 'true');
+    cy.get('[data-testid="frontier-series-NVIDIA"]').should('have.attr', 'aria-pressed', 'true');
+    cy.get('[data-testid="frontier-series-AMD"]').should('have.attr', 'aria-pressed', 'true');
+    cy.get('[data-testid="frontier-lead-bars"] rect').should('have.length.greaterThan', 0);
+    cy.get('[data-testid="frontier-area-timeline"] path').should('have.length.greaterThan', 0);
+
+    // One series on its own gets the shading under its curve.
+    cy.get('[data-testid="frontier-series-AMD"]').click();
+    cy.get('[data-testid="frontier-lead-bars"]').should('not.exist');
+    cy.contains('Pick at least two to compare.').should('be.visible');
+    cy.get('[data-testid="frontier-svg"] path.fr-area').should('have.length', 1);
+
+    cy.get('[data-testid="frontier-vendor"]').should('not.exist');
+    cy.get('[data-testid="frontier-grouping-gpu"]').click();
+    cy.get('[data-testid^="frontier-series-"][aria-pressed="true"]').should('have.length', 2);
+    cy.get('[data-testid="frontier-series-b200"]').should('exist');
+    cy.get('[data-testid="frontier-vendor-NVIDIA"]').click();
+    cy.get('[data-testid="frontier-series-mi355x"]').should('not.exist');
+    cy.get('[data-testid="frontier-series-b200"]').should('exist');
+  });
+
+  it('shows same-chip software gains without a vendor option', () => {
+    cy.get('[data-testid="historical-view-software"]').click();
+    cy.get('[data-testid="frontier-grouping"]').should('not.exist');
+    cy.get('[data-testid^="frontier-series-"]').first().should('not.contain.text', 'NVIDIA');
+    cy.get('[data-testid="frontier-software-gain"]')
+      .closest('section')
+      .should('contain.text', 'the ground of its first run');
+    cy.get('[data-testid="frontier-software-bars"] rect').should('have.length.greaterThan', 0);
+  });
+
+  it('scrubs the chapter timeline and lists the points behind the curve', () => {
+    cy.get('[data-testid="historical-view-frontier"]').click();
+    cy.get('[data-testid="frontier-date-slider"]').then(($slider) => {
+      const last = Number($slider.attr('max'));
+      expect(last).to.be.greaterThan(1);
+      expect(Number($slider.val())).to.equal(last);
+    });
+    // Cypress cannot type into a range input; set it the way a drag would, through React.
+    cy.get<HTMLInputElement>('[data-testid="frontier-date-slider"]').then(([slider]) => {
+      const { prototype } = slider.ownerDocument.defaultView!.HTMLInputElement;
+      Object.getOwnPropertyDescriptor(prototype, 'value')!.set!.call(slider, '0');
+      slider.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    cy.get('[data-testid="frontier-date-slider"]').should('have.value', '0');
+    cy.get('[data-testid="frontier-play"]').should('contain.text', 'Play');
+
+    cy.get('[data-testid="frontier-data-toggle"]').click();
+    cy.get('[data-testid="frontier-data-table"] tbody tr').should('have.length.greaterThan', 0);
+  });
+
+  it('labels the frontier views in Chinese', () => {
+    cy.visit('/zh/historical?g_model=DeepSeek-R1-0528');
+    cy.wait('@frontierHistory');
+    cy.get('[data-testid="historical-view-frontier"]').should('have.text', '前沿').click();
+    cy.get('[data-testid="historical-view-compare"]').should('have.text', '对比');
+    cy.get('[data-testid="historical-view-software"]').should('have.text', '软件提升');
+    cy.get('[data-testid="frontier-vendor-all"]').should('have.text', '全部');
+  });
+});
