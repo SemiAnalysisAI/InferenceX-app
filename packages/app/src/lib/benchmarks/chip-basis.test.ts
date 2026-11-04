@@ -12,7 +12,6 @@ import {
   measuredInputShare,
   perTotalChipRates,
   rowsWithChipBasis,
-  totalChipFactors,
   withChipBasis,
   withTotalChipQualifier,
 } from './chip-basis';
@@ -50,21 +49,23 @@ function row(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
   } as BenchmarkRow;
 }
 
-describe('totalChipFactors', () => {
+describe('exactPerTotalChipRates', () => {
   it('scales each pool to its share of every deployment chip', () => {
-    expect(totalChipFactors(row())).toEqual({ input: 4 / 16, output: 12 / 16 });
+    const split = row();
+    expect(exactPerTotalChipRates({ ...split, ...split.metrics })).toEqual({
+      input: 3600 * (4 / 16),
+      output: 133 * (12 / 16),
+    });
   });
 
   it.each([
-    ['aggregated rows', { disagg: false }],
-    [
-      'legacy rows without a real prefill/decode split',
-      { prefill_num_workers: 0, decode_num_workers: 0, num_prefill_gpu: 72, num_decode_gpu: 72 },
-    ],
-    ['a missing prefill pool', { num_prefill_gpu: 0 }],
-    ['a missing decode pool', { num_decode_gpu: 0 }],
-  ])('leaves %s alone', (_label, overrides) => {
-    expect(totalChipFactors(row(overrides))).toBeNull();
+    ['aggregated rows', { disagg: false }, { input: 3600, output: 133 }],
+    ['rows already on the total basis', { chip_basis: 'total' }, { input: 3600, output: 133 }],
+    ['a missing prefill pool', { num_prefill_gpu: 0 }, null],
+    ['a missing decode pool', { num_decode_gpu: 0 }, null],
+  ] as const)('leaves %s unscaled', (_label, overrides, expected) => {
+    const source = { ...row(), ...row().metrics, ...overrides };
+    expect(exactPerTotalChipRates(source)).toEqual(expected);
   });
 });
 
@@ -321,5 +322,10 @@ describe('hasPoolSplit', () => {
       hasPoolSplit({ ...base, num_prefill_gpu: 36, num_decode_gpu: 36, prefill_num_workers: 0 }),
     ).toBe(false);
     expect(hasPoolSplit({ ...base, disagg: false })).toBe(false);
+    const mirrored = { ...base, num_prefill_gpu: 36, num_decode_gpu: 36 };
+    expect(hasPoolSplit({ ...mirrored, prefill_num_workers: 1, decode_num_workers: 0 })).toBe(
+      false,
+    );
+    expect(hasPoolSplit({ ...mirrored, prefill_num_workers: 1, decode_num_workers: 1 })).toBe(true);
   });
 });

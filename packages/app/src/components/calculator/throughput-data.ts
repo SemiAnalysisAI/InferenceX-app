@@ -1,4 +1,4 @@
-import { rowToSequence } from '@semianalysisai/inferencex-constants';
+import { DB_MODEL_TO_DISPLAY, rowToSequence } from '@semianalysisai/inferencex-constants';
 
 import {
   DEFAULT_CHIP_BASIS,
@@ -7,9 +7,9 @@ import {
   type ChipBasis,
   type ChipBasisRow,
 } from '@/lib/benchmarks/chip-basis';
-import type { AggDataEntry, HardwareConfig } from '@/components/inference/types';
+import type { HardwareConfig } from '@/components/inference/types';
 import type { BenchmarkRow } from '@/lib/api/api';
-import { rowToAggDataEntry } from '@/lib/benchmarks/benchmark-transform';
+import { rowLatencyMetric } from '@/lib/benchmarks/benchmark-transform';
 import { pricingCacheHitRate } from '@/lib/calculator/cache-pricing';
 import { getHardwareKey } from '@/lib/charts/chart-utils';
 import {
@@ -69,11 +69,11 @@ export interface OverlayGroupMeta extends GroupMeta {
 }
 
 function getAgenticMetric(
-  entry: AggDataEntry,
+  row: BenchmarkRow,
   percentile: Percentile,
   suffix: 'intvty' | 'e2el' | 'ttft',
 ): number {
-  const value = entry[`${percentile}_${suffix}` as keyof AggDataEntry];
+  const value = rowLatencyMetric(row, percentile, suffix);
   return typeof value === 'number' ? value : 0;
 }
 
@@ -85,14 +85,14 @@ function getAgenticMetric(
  * a zero would clear every cap.
  */
 function firstTokenSeconds(
-  entry: AggDataEntry,
+  row: BenchmarkRow,
   sequence: Sequence,
   percentile: Percentile,
 ): number | undefined {
   const value =
     sequence === Sequence.AgenticTraces
-      ? getAgenticMetric(entry, percentile, 'ttft')
-      : entry.median_ttft;
+      ? getAgenticMetric(row, percentile, 'ttft')
+      : rowLatencyMetric(row, 'median', 'ttft');
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
 }
 
@@ -149,7 +149,23 @@ function firstTokenSeconds(
 function inputTokenShare(row: ChipBasisRow): number | null {
   // Self-consistent: the rates share the denominator `tput_per_gpu` uses, so the
   // split they imply is the measured one. 1% covers float noise.
-  const measured = measuredInputShare({ ...row, ...row.metrics }, 0.01);
+  const m = row.metrics;
+  const measured = measuredInputShare(
+    {
+      disagg: row.disagg,
+      chip_basis: row.chip_basis,
+      num_prefill_gpu: row.num_prefill_gpu,
+      num_decode_gpu: row.num_decode_gpu,
+      prefill_num_workers: row.prefill_num_workers,
+      decode_num_workers: row.decode_num_workers,
+      isl: row.isl,
+      osl: row.osl,
+      tput_per_gpu: m.tput_per_gpu,
+      input_tput_per_gpu: m.input_tput_per_gpu,
+      output_tput_per_gpu: m.output_tput_per_gpu,
+    },
+    0.01,
+  );
   if (measured !== null) return measured;
 
   const { isl, osl } = row;
@@ -212,9 +228,14 @@ export function buildGpuGroups<M extends GroupMeta>(
     if (!precisions.includes(row.precision)) continue;
     if (!supportsTokenMetric(row, tokenType)) continue;
 
-    const entry = rowToAggDataEntry(row);
-    const hwKey = getHardwareKey(entry);
-    const hwConfig = getHardwareConfig(hwKey, entry.model);
+    const hwKey = getHardwareKey({
+      hw: row.hardware,
+      framework: row.framework,
+      disagg: row.disagg,
+      benchmark_type: row.benchmark_type,
+      spec_decoding: row.spec_method,
+    });
+    const hwConfig = getHardwareConfig(hwKey, DB_MODEL_TO_DISPLAY[row.model] ?? row.model);
     if (!hwConfig) continue;
 
     const classified = classify(hwKey, row);
@@ -230,7 +251,13 @@ export function buildGpuGroups<M extends GroupMeta>(
     const tput = m.tput_per_gpu ?? 0;
     const outputTput = m.output_tput_per_gpu ?? tput;
     const inputTput = m.input_tput_per_gpu ?? 0;
-    const cacheHitRate = pricingCacheHitRate({ ...m, hw: row.hardware });
+    const cacheHitRate = pricingCacheHitRate({
+      server_gpu_cache_hit_rate: m.server_gpu_cache_hit_rate,
+      server_external_cache_hit_rate: m.server_external_cache_hit_rate,
+      server_cpu_cache_hit_rate: m.server_cpu_cache_hit_rate,
+      theoretical_cache_hit_rate: m.theoretical_cache_hit_rate,
+      hw: row.hardware,
+    });
     const theoreticalRate =
       typeof m.theoretical_cache_hit_rate === 'number' &&
       Number.isFinite(m.theoretical_cache_hit_rate)
@@ -243,19 +270,19 @@ export function buildGpuGroups<M extends GroupMeta>(
     if (!grouped[groupKey]) grouped[groupKey] = [];
     groupMeta[groupKey] = meta;
 
-    const ttft = firstTokenSeconds(entry, sequence, percentile);
+    const ttft = firstTokenSeconds(row, sequence, percentile);
 
     grouped[groupKey].push({
       sourceRow: row,
       hwKey,
       interactivity:
         sequence === Sequence.AgenticTraces
-          ? getAgenticMetric(entry, percentile, 'intvty')
-          : entry.median_intvty,
+          ? getAgenticMetric(row, percentile, 'intvty')
+          : rowLatencyMetric(row, 'median', 'intvty'),
       ...(ttft === undefined ? {} : { ttft }),
       ...(sequence === Sequence.AgenticTraces
         ? {
-            e2eLatency: getAgenticMetric(entry, percentile, 'e2el'),
+            e2eLatency: getAgenticMetric(row, percentile, 'e2el'),
             date: row.date,
           }
         : {}),
@@ -267,7 +294,7 @@ export function buildGpuGroups<M extends GroupMeta>(
       ...(tokenShare === null ? {} : { inputTokenShare: tokenShare }),
       concurrency: row.conc,
       tp: row.decode_tp,
-      dp: entry.dp,
+      dp: row.metrics.dp,
       precision: row.precision,
       ep: row.decode_ep,
       dp_attention: row.decode_dp_attention,

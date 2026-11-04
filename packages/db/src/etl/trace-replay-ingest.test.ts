@@ -9,7 +9,18 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
 import { PROFILE_INLINE_BYTES, readTraceProfileGz } from '../lib/trace-profile-storage';
-import { getTraceAvailability } from '../queries/trace-availability';
+import {
+  SEQUENCE_LENGTH_SKETCHES_VERSION,
+  sequenceLengthSketchColumns,
+} from '../queries/agentic-shared';
+import { getBenchmarkPresence } from '../queries/benchmark-presence';
+import {
+  REQUEST_CHART_DATA_VERSION,
+  getRequestChartData,
+  requestChartDataFromTimelineGz,
+} from '../queries/request-chart-data';
+import { CHART_SERIES_SUMMARY_VERSION } from './chart-series-summary';
+import { encodeRequestChartColumns } from './request-chart-columns';
 import {
   REQUEST_TIMELINE_VERSION,
   computeRequestTimeline,
@@ -48,8 +59,11 @@ function preparedFixture(): PreparedTraceReplay {
     serverMetricsJsonGz: Buffer.from('metrics'),
     serverMetricsJsonSize: 700,
     aggregateStatsJson: Buffer.from('{"version":1}'),
+    sequenceLengthSketches: null,
     chartSeriesJson: Buffer.from('{"version":12}'),
+    chartSeriesSummaryGz: Buffer.from('chart-summary'),
     requestTimelineGz: Buffer.from('timeline-gzip'),
+    requestChartDataGz: Buffer.from('chart-columns'),
     chartWindows: 2,
     timelineRequests: 3,
     compressionMs: 10,
@@ -200,6 +214,14 @@ describe('prepareTraceReplay', () => {
     expect(prepared.timelineRequests).toBe(2);
     expect(prepared.requestTimelineGz).not.toBeNull();
     expect(gunzipSync(prepared.requestTimelineGz!).toString('utf8')).toBe(JSON.stringify(expected));
+    expect(prepared.requestChartDataGz).toEqual(
+      encodeRequestChartColumns(await requestChartDataFromTimelineGz(prepared.requestTimelineGz!)),
+    );
+    const { sketches } = sequenceLengthSketchColumns(
+      JSON.parse(prepared.aggregateStatsJson!.toString('utf8')),
+    );
+    expect(sketches).not.toBeNull();
+    expect(prepared.sequenceLengthSketches).toEqual(sketches);
     expect(gunzipRequestTimeline(prepared.requestTimelineGz!)).toMatchObject({
       version: REQUEST_TIMELINE_VERSION,
       requests: [
@@ -248,7 +270,7 @@ describe('persistPreparedTraceReplay', () => {
     const uploads = calls.filter((call) =>
       call.text.includes('trace_replay_upload_parts (field, part, data)'),
     );
-    expect(uploads).toHaveLength(6);
+    expect(uploads).toHaveLength(8);
     expect(linkCall?.values.some((value) => Array.isArray(value) && value.includes(41))).toBe(true);
     const metricUpdate = calls.find((call) =>
       call.text.includes("not (metrics ? 'median_full_response_itl')"),
@@ -266,6 +288,8 @@ describe('persistPreparedTraceReplay (PostgreSQL)', () => {
     request_timeline: unknown;
     request_timeline_gz: Uint8Array | null;
     request_timeline_version: number | null;
+    request_chart_data_gz: Uint8Array | null;
+    request_chart_data_version: number | null;
     request_count: number | null;
     profile_export_jsonl_gz: Uint8Array | null;
     profile_size: number | null;
@@ -275,6 +299,10 @@ describe('persistPreparedTraceReplay (PostgreSQL)', () => {
     metrics_size: number | null;
     aggregate_stats: unknown;
     chart_series: unknown;
+    chart_series_summary_gz: Uint8Array | null;
+    chart_series_summary_version: number | null;
+    sequence_length_sketches: Uint8Array | null;
+    sequence_length_sketches_version: number | null;
   }
 
   const persistedTimeline: RequestTimeline = {
@@ -329,12 +357,15 @@ describe('persistPreparedTraceReplay (PostgreSQL)', () => {
       select
         br.trace_replay_id::int as trace_replay_id,
         atr.request_timeline, atr.request_timeline_gz, atr.request_timeline_version,
+        atr.request_chart_data_gz, atr.request_chart_data_version,
         atr.request_count, atr.profile_export_jsonl_gz,
         atr.profile_export_uncompressed_size::int as profile_size,
         atr.server_metrics_csv, atr.server_metrics_csv_size::int as csv_size,
         atr.server_metrics_json_gz,
         atr.server_metrics_json_uncompressed_size::int as metrics_size,
-        atr.aggregate_stats, atr.chart_series
+        atr.aggregate_stats, atr.chart_series,
+        atr.chart_series_summary_gz, atr.chart_series_summary_version,
+        atr.sequence_length_sketches, atr.sequence_length_sketches_version
       from benchmark_results br
       join agentic_trace_replay atr on atr.id = br.trace_replay_id
       where br.id = ${benchmarkResultId}
@@ -342,11 +373,15 @@ describe('persistPreparedTraceReplay (PostgreSQL)', () => {
     return row!;
   }
 
-  it('stores the gzip timeline, its version and its request count in their own columns', async () => {
+  it('stores the gzip timeline, its chart columns, version and request count in their own columns', async () => {
+    const requestTimelineGz = await gzipRequestTimeline(persistedTimeline);
+    const chartData = await requestChartDataFromTimelineGz(requestTimelineGz);
     const prepared: PreparedTraceReplay = {
       ...preparedFixture(),
-      requestTimelineGz: await gzipRequestTimeline(persistedTimeline),
+      requestTimelineGz,
+      requestChartDataGz: encodeRequestChartColumns(chartData),
       timelineRequests: persistedTimeline.requests.length,
+      sequenceLengthSketches: Buffer.from('sketches'),
     };
 
     await expect(persistPreparedTraceReplay(pg, [41], prepared)).resolves.toBe(1);
@@ -356,6 +391,8 @@ describe('persistPreparedTraceReplay (PostgreSQL)', () => {
     expect(gunzipRequestTimeline(row.request_timeline_gz!)).toEqual(persistedTimeline);
     expect(row.request_timeline_version).toBe(REQUEST_TIMELINE_VERSION);
     expect(row.request_count).toBe(3);
+    expect(row.request_chart_data_version).toBe(REQUEST_CHART_DATA_VERSION);
+    await expect(getRequestChartData(pg, 41)).resolves.toEqual(chartData);
     expect(row.request_timeline).toBeNull();
     expect(Buffer.from(row.profile_export_jsonl_gz!).toString()).toBe('profile');
     expect(row.profile_size).toBe(70);
@@ -365,6 +402,10 @@ describe('persistPreparedTraceReplay (PostgreSQL)', () => {
     expect(row.metrics_size).toBe(700);
     expect(row.aggregate_stats).toEqual({ version: 1 });
     expect(row.chart_series).toEqual({ version: 12 });
+    expect(Buffer.from(row.chart_series_summary_gz!).toString()).toBe('chart-summary');
+    expect(row.chart_series_summary_version).toBe(CHART_SERIES_SUMMARY_VERSION);
+    expect(Buffer.from(row.sequence_length_sketches!).toString()).toBe('sketches');
+    expect(row.sequence_length_sketches_version).toBe(SEQUENCE_LENGTH_SKETCHES_VERSION);
   });
 
   it('leaves every timeline column null when no timeline was computed', async () => {
@@ -372,7 +413,9 @@ describe('persistPreparedTraceReplay (PostgreSQL)', () => {
       persistPreparedTraceReplay(pg, [42], {
         ...preparedFixture(),
         requestTimelineGz: null,
+        requestChartDataGz: null,
         timelineRequests: 0,
+        chartSeriesSummaryGz: null,
       }),
     ).resolves.toBe(1);
 
@@ -380,8 +423,14 @@ describe('persistPreparedTraceReplay (PostgreSQL)', () => {
     expect(row.request_timeline_gz).toBeNull();
     expect(row.request_timeline_version).toBeNull();
     expect(row.request_count).toBeNull();
+    expect(row.request_chart_data_gz).toBeNull();
+    expect(row.request_chart_data_version).toBeNull();
     expect(row.request_timeline).toBeNull();
     expect(row.chart_series).toEqual({ version: 12 });
+    expect(row.chart_series_summary_gz).toBeNull();
+    expect(row.chart_series_summary_version).toBeNull();
+    expect(row.sequence_length_sketches).toBeNull();
+    expect(row.sequence_length_sketches_version).toBeNull();
   });
 
   // The multi-megabyte PGlite round trip can exceed 5 seconds under parallel CI load.
@@ -400,7 +449,8 @@ describe('persistPreparedTraceReplay (PostgreSQL)', () => {
     expect(row.profile_export_jsonl_gz).toBeNull();
     const restored = await readTraceProfileGz(pg, row.trace_replay_id!);
     expect(restored?.equals(profile)).toBe(true);
-    expect(await getTraceAvailability(pg, [41, 43])).toEqual({ 41: true, 43: true });
+    const presence = await getBenchmarkPresence(pg);
+    expect(presence.trace).toEqual([41, 3]);
     expect(gunzipRequestTimeline(row.request_timeline_gz!)).toEqual(persistedTimeline);
     expect(await persistPreparedTraceReplay(pg, [43], prepared)).toBe(0);
     const after = await storedTrace(43);

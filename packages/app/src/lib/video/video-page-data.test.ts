@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GET } from '@/app/api/video-runs/route';
-import { videoHistoryEntry } from '@/components/video-benchmark/history';
+import { VIDEO_HISTORY_MAX_PAGES, videoHistoryEntry } from '@/components/video-benchmark/history';
 import { referenceQualityFixture } from '@/components/video-benchmark/reference-quality.fixture';
 import { loadVideoPageData } from './video-page-data';
 
@@ -16,12 +16,15 @@ describe('VideoGenX first document', () => {
     vi.mocked(GET).mockImplementation(async (request) => {
       const query = request.nextUrl.searchParams;
       if (query.get('format') === 'history') {
-        const first = query.get('page') === '1';
+        expect([query.get('page'), query.get('pages')]).toEqual([
+          '1',
+          String(VIDEO_HISTORY_MAX_PAGES),
+        ]);
         return Response.json(
           {
             schemaVersion: 1,
-            entries: [videoHistoryEntry(first ? original.stored : named.stored, null)],
-            nextPage: first ? 2 : null,
+            entries: [original.stored, named.stored].map((saved) => videoHistoryEntry(saved, null)),
+            nextPage: null,
           },
           { headers: { 'X-VideoGenX-Replay': '1' } },
         );
@@ -32,13 +35,13 @@ describe('VideoGenX first document', () => {
     });
     const initial = await loadVideoPageData({ unofficialrun: '456' });
     expect(initial.state.unofficialRun).toBe('456');
-    expect(initial.history?.pages).toHaveLength(2);
+    expect(initial.history?.pages[0].entries).toHaveLength(2);
     expect(initial.history?.replay).toBe(true);
     const sides = Object.values(initial.sides);
     expect(sides).toHaveLength(1);
     expect(sides[0]?.hardwareKey).toBe('h100');
     expect(sides[0]?.urls.get(path)).toBe('/named.mp4');
-    expect(GET).toHaveBeenCalledTimes(3);
+    expect(GET).toHaveBeenCalledTimes(2);
   });
 
   it('keeps loaded metrics when a selected media read fails and leaves retry available', async () => {

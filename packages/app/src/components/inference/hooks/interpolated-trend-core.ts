@@ -5,21 +5,30 @@ import {
   reciprocalMetricAt,
   recoverReciprocalNumerator,
 } from '@/components/calculator/interpolation';
-import { DEFAULT_CHIP_BASIS, withChipBasis, type ChipBasis } from '@/lib/benchmarks/chip-basis';
+import { MeasuredTrendPoint } from '@/components/inference/hooks/trend-line-point';
+import {
+  DEFAULT_CHIP_BASIS,
+  withChipBasis,
+  type ChipBasis,
+  type ChipBasisRow,
+} from '@/lib/benchmarks/chip-basis';
 import {
   isBenchmarkMetricKey,
   tokenMetricTypeForConfigKey,
 } from '@/components/inference/metric-registry';
 import {
-  applyTokenRevenuePricing,
   inputTokenShareForRevenue,
   NORMALIZED_TOKEN_REVENUE_PRICING,
+  tokenMixSetsPrice,
   tokenRevenueFromRatesPerGpuHour,
+  tokenRevenuePerGpuHour,
 } from '@/components/inference/token-revenue';
 import type {
+  AggDataEntry,
   InferenceData,
   TokenRevenuePricing,
   TrendDataPoint,
+  TrendSource,
   YAxisMetricKey,
 } from '@/components/inference/types';
 import type { BenchmarkRow } from '@/lib/api/api';
@@ -27,15 +36,31 @@ import {
   benchmarkCurveDate,
   dedupeAgenticHistoryRuns,
 } from '@/lib/benchmarks/benchmark-run-selection';
-import { rowToAggDataEntry } from '@/lib/benchmarks/benchmark-transform';
+import { benchmarkRowPhysicalChips, rowToAggDataEntry } from '@/lib/benchmarks/benchmark-transform';
 import { pricingCacheHitRate } from '@/lib/calculator/cache-pricing';
 import {
-  buildDerivedChartFields,
+  chartMetric,
+  derivedMetricRequest,
   getHardwareKey,
+  requestsPowerChartFields,
   type DerivedMetricKey,
+  type DerivedMetricRequest,
+  type ThroughputChartInput,
+  writeDerivedChartFields,
+  writeThroughputChartFields,
 } from '@/lib/charts/chart-utils';
-import { DEFAULT_TCO_BASIS, isKnownGpu, type TcoBasis } from '@/lib/catalog/constants';
-import { supportsTokenMetric } from '@/lib/benchmarks/supplemental-benchmarks';
+import {
+  DEFAULT_TCO_BASIS,
+  getGpuSpecs,
+  isKnownGpu,
+  type GpuSpecs,
+  type TcoBasis,
+} from '@/lib/catalog/constants';
+import {
+  supportedTokenMetrics,
+  supportsTokenMetric,
+  type TokenMetricType,
+} from '@/lib/benchmarks/supplemental-benchmarks';
 
 /** Snapshot-scoped token metric support for raw historical rows. */
 export function rowSupportsTrendMetric(row: BenchmarkRow, selectedYAxisMetric: string): boolean {
@@ -51,88 +76,268 @@ export function historicalInteractivityAxis(isAgentic: boolean) {
   };
 }
 
-/**
- * Build a lightweight InferenceData-compatible point from a raw BenchmarkRow.
- * This deliberately skips full chart transformation and derives only the
- * selected trend metric plus its frontier/interpolation dependencies.
- */
+export interface TrendRow {
+  readonly row: BenchmarkRow;
+  readonly hwKey: string;
+  readonly precisionGroupKey: string;
+  readonly curveDate: string;
+  readonly tokenMetrics: readonly TokenMetricType[] | undefined;
+  readonly point: TrendPointBase;
+  readonly derivedThroughput: ThroughputChartInput;
+  derivedEntry: AggDataEntry | undefined;
+}
+
+type TrendPointBase = Pick<
+  InferenceData,
+  | 'x'
+  | 'y'
+  | 'hw'
+  | 'hwKey'
+  | 'precision'
+  | 'tp'
+  | 'physicalChips'
+  | 'dp'
+  | 'conc'
+  | 'date'
+  | 'trendSource'
+  | 'tput_per_gpu'
+  | 'input_tput_per_gpu'
+  | 'output_tput_per_gpu'
+  | 'disagg'
+  | 'num_prefill_gpu'
+  | 'num_decode_gpu'
+  | 'prefill_num_workers'
+  | 'decode_num_workers'
+  | 'chip_basis'
+  | 'isl'
+  | 'osl'
+  | 'total_prompt_tokens'
+  | 'total_generation_tokens'
+  | 'server_gpu_cache_hit_rate'
+  | 'server_external_cache_hit_rate'
+  | 'server_cpu_cache_hit_rate'
+  | 'theoretical_cache_hit_rate'
+>;
+
+function withLegacyOutputThroughput(row: BenchmarkRow, entry: AggDataEntry): AggDataEntry {
+  return row.metrics.output_tput_per_gpu === null || row.metrics.output_tput_per_gpu === undefined
+    ? { ...entry, output_tput_per_gpu: entry.tput_per_gpu }
+    : entry;
+}
+
+const RUN_URL_PATTERN =
+  /^https:\/\/github\.com\/[^/]+\/[^/]+\/actions\/runs\/(?<id>\d+)(?:\/attempts\/\d+)?\/?$/;
+
+function createTrendRowPreparer(): (row: ChipBasisRow) => TrendRow | null {
+  const canonical = new Map<string, string>();
+  const intern = (value: string) => {
+    const existing = canonical.get(value);
+    if (existing !== undefined) return existing;
+    canonical.set(value, value);
+    return value;
+  };
+  let hardwareRow: BenchmarkRow | undefined;
+  let hwKey = '';
+  let knownGpu = false;
+  let groupHwKey: string | undefined;
+  let groupPrecision: string | undefined;
+  let precisionGroupKey = '';
+  let rawCurveDate: string | undefined;
+  let curveDate = '';
+  let runUrl: string | null | undefined;
+  let runId: number | undefined;
+  let lastSource: TrendSource | undefined;
+
+  return (row) => {
+    if (
+      !hardwareRow ||
+      row.hardware !== hardwareRow.hardware ||
+      row.framework !== hardwareRow.framework ||
+      row.spec_method !== hardwareRow.spec_method ||
+      row.disagg !== hardwareRow.disagg ||
+      row.benchmark_type !== hardwareRow.benchmark_type
+    ) {
+      hardwareRow = row;
+      hwKey = intern(
+        getHardwareKey({
+          hw: row.hardware,
+          framework: row.framework,
+          disagg: row.disagg,
+          benchmark_type: row.benchmark_type,
+          spec_decoding: row.spec_method,
+        }),
+      );
+      knownGpu = isKnownGpu(hwKey);
+    }
+    if (!knownGpu) return null;
+
+    const isAgentic = row.benchmark_type === 'agentic_traces';
+    const agenticEntry = isAgentic ? rowToAggDataEntry(row) : undefined;
+    const interactivity = agenticEntry ? agenticEntry.p90_intvty : (row.metrics.median_intvty ?? 0);
+    if (isAgentic && (!Number.isFinite(interactivity) || interactivity <= 0)) return null;
+
+    if (row.run_url !== runUrl) {
+      runUrl = row.run_url;
+      const id = runUrl?.match(RUN_URL_PATTERN)?.groups?.id;
+      runId = id === undefined ? undefined : Number(id);
+    }
+    const benchmarkType = isAgentic ? 'agentic_traces' : 'single_turn';
+    let trendSource: TrendSource | undefined;
+    if (runId !== undefined) {
+      trendSource =
+        lastSource &&
+        lastSource.runUrl === row.run_url &&
+        lastSource.date === row.date &&
+        lastSource.model === row.model &&
+        lastSource.precision === row.precision &&
+        lastSource.hwKey === hwKey &&
+        lastSource.benchmarkType === benchmarkType
+          ? lastSource
+          : {
+              date: row.date,
+              runId,
+              runUrl: row.run_url!,
+              model: row.model,
+              precision: row.precision,
+              hwKey,
+              benchmarkType,
+            };
+      if (trendSource !== lastSource) {
+        trendSourceKeys.set(trendSource, trendSourceKey(trendSource));
+        lastSource = trendSource;
+      }
+    }
+
+    if (hwKey !== groupHwKey || row.precision !== groupPrecision) {
+      groupHwKey = hwKey;
+      groupPrecision = row.precision;
+      precisionGroupKey = intern(`${hwKey}__${row.precision}`);
+    }
+    const rowCurveDate = benchmarkCurveDate(row);
+    if (rowCurveDate !== rawCurveDate) {
+      rawCurveDate = rowCurveDate;
+      curveDate = intern(rowCurveDate);
+    }
+
+    const metrics = row.metrics;
+    const tputPerGpu = metrics.tput_per_gpu ?? 0;
+    const inputTputPerGpu = metrics.input_tput_per_gpu ?? 0;
+    return {
+      row,
+      hwKey,
+      precisionGroupKey,
+      curveDate,
+      tokenMetrics: supportedTokenMetrics(row),
+      point: {
+        x: interactivity,
+        y: tputPerGpu,
+        hw: row.hardware,
+        hwKey,
+        precision: row.precision,
+        tp: row.decode_tp,
+        physicalChips: benchmarkRowPhysicalChips(row),
+        dp: metrics.dp,
+        conc: row.conc,
+        date: curveDate,
+        trendSource,
+        tput_per_gpu: tputPerGpu,
+        input_tput_per_gpu: inputTputPerGpu,
+        output_tput_per_gpu: metrics.output_tput_per_gpu ?? 0,
+        disagg: row.disagg,
+        num_prefill_gpu: row.num_prefill_gpu,
+        num_decode_gpu: row.num_decode_gpu,
+        prefill_num_workers: row.prefill_num_workers,
+        decode_num_workers: row.decode_num_workers,
+        chip_basis: row.chip_basis,
+        isl: row.isl,
+        osl: row.osl,
+        total_prompt_tokens: metrics.total_prompt_tokens,
+        total_generation_tokens: metrics.total_generation_tokens,
+        server_gpu_cache_hit_rate: metrics.server_gpu_cache_hit_rate,
+        server_external_cache_hit_rate: metrics.server_external_cache_hit_rate,
+        server_cpu_cache_hit_rate: metrics.server_cpu_cache_hit_rate,
+        theoretical_cache_hit_rate: metrics.theoretical_cache_hit_rate,
+      },
+      derivedThroughput: {
+        tput_per_gpu: tputPerGpu,
+        output_tput_per_gpu: metrics.output_tput_per_gpu ?? tputPerGpu,
+        input_tput_per_gpu: inputTputPerGpu,
+      },
+      derivedEntry: agenticEntry && withLegacyOutputThroughput(row, agenticEntry),
+    };
+  };
+}
+
+const trendSourceKey = (source: TrendSource) => `${source.date}:${source.runId}:${source.hwKey}`;
+const trendSourceKeys = new WeakMap<TrendSource, string>();
+
+export function prepareTrendRows(
+  allRows: readonly BenchmarkRow[],
+  chipBasis: ChipBasis = DEFAULT_CHIP_BASIS,
+): TrendRow[] {
+  const prepareTrendRow = createTrendRowPreparer();
+  const prepared: TrendRow[] = [];
+  for (const row of dedupeAgenticHistoryRuns([...allRows])) {
+    const trendRow = prepareTrendRow(withChipBasis(row, chipBasis));
+    if (trendRow) prepared.push(trendRow);
+  }
+  return prepared;
+}
+
+interface TrendPointMetrics {
+  readonly request: DerivedMetricRequest;
+  readonly priceRevenue: boolean;
+  readonly derivesFromEntry: boolean;
+}
+
+function trendPointMetrics(requestedMetrics: readonly DerivedMetricKey[]): TrendPointMetrics {
+  const priceRevenue = requestedMetrics.includes('tokenRevenuePerGpuHour');
+  const derived = priceRevenue
+    ? requestedMetrics.filter((key) => key !== 'tokenRevenuePerGpuHour')
+    : requestedMetrics;
+  return {
+    request: derivedMetricRequest(derived),
+    priceRevenue,
+    derivesFromEntry: requestsPowerChartFields(derived),
+  };
+}
+
+function trendPoint(
+  trendRow: TrendRow,
+  { request, priceRevenue, derivesFromEntry }: TrendPointMetrics,
+  tokenRevenuePricing: TokenRevenuePricing | null = NORMALIZED_TOKEN_REVENUE_PRICING,
+  tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
+  specs: GpuSpecs = getGpuSpecs(trendRow.hwKey, tcoBasis),
+): InferenceData {
+  const point = { ...trendRow.point } as InferenceData;
+  if (derivesFromEntry) {
+    trendRow.derivedEntry ??= withLegacyOutputThroughput(
+      trendRow.row,
+      rowToAggDataEntry(trendRow.row),
+    );
+    writeDerivedChartFields(point, trendRow.derivedEntry, request, specs);
+  } else {
+    writeThroughputChartFields(point, trendRow.derivedThroughput, request, specs);
+  }
+  if (priceRevenue && tokenRevenuePricing) {
+    const revenue = tokenRevenuePerGpuHour(point, tokenRevenuePricing);
+    if (revenue !== null) point.tokenRevenuePerGpuHour = chartMetric(revenue);
+  }
+  return point;
+}
+
 export function rowToLightweightPoint(
   row: BenchmarkRow,
   requestedMetrics: readonly DerivedMetricKey[],
-  tokenRevenuePricing: TokenRevenuePricing | null = NORMALIZED_TOKEN_REVENUE_PRICING,
-  tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
+  tokenRevenuePricing?: TokenRevenuePricing | null,
+  tcoBasis?: TcoBasis,
   chipBasis: ChipBasis = DEFAULT_CHIP_BASIS,
 ): InferenceData | null {
-  const entry = rowToAggDataEntry(withChipBasis(row, chipBasis));
-  const hwKey = getHardwareKey(entry);
-  // Historical rows predating explicit output-throughput telemetry used total
-  // throughput as output throughput. Preserve that production fallback for
-  // output cost, purchasing-power, and energy trend metrics.
-  const derivedEntry =
-    row.metrics.output_tput_per_gpu === null || row.metrics.output_tput_per_gpu === undefined
-      ? { ...entry, output_tput_per_gpu: entry.tput_per_gpu }
-      : entry;
-  if (!isKnownGpu(hwKey)) return null;
-  // workflow_run_id is a database ID, not a GitHub Actions ID. Preserve the
-  // actual producer URL (including repository and attempt), never the snapshot ID.
-  const runMatch = row.run_url?.match(
-    /^https:\/\/github\.com\/[^/]+\/[^/]+\/actions\/runs\/(?<id>\d+)(?:\/attempts\/\d+)?\/?$/,
+  const trendRow = createTrendRowPreparer()(withChipBasis(row, chipBasis));
+  return (
+    trendRow &&
+    trendPoint(trendRow, trendPointMetrics(requestedMetrics), tokenRevenuePricing, tcoBasis)
   );
-
-  // Reuse the main chart's normalization: AgentX slow-tail interactivity is
-  // 1 / P90 full-response ITL (seconds), with legacy ITL support in the adapter.
-  // Never use raw p90_intvty: older artifacts computed P90(1 / ITL) instead.
-  const isAgentic = row.benchmark_type === 'agentic_traces';
-  const interactivity = isAgentic ? entry.p90_intvty : (row.metrics.median_intvty ?? 0);
-  if (isAgentic && (!Number.isFinite(interactivity) || interactivity <= 0)) return null;
-
-  const point = {
-    x: interactivity,
-    y: row.metrics.tput_per_gpu ?? 0,
-    hw: row.hardware,
-    hwKey,
-    precision: row.precision,
-    tp: row.decode_tp,
-    physicalChips: entry.physicalChips,
-    dp: entry.dp,
-    conc: row.conc,
-    date: benchmarkCurveDate(row),
-    trendSource: runMatch
-      ? {
-          date: row.date,
-          runId: Number(runMatch.groups!.id),
-          runUrl: row.run_url!,
-          model: row.model,
-          precision: row.precision,
-          hwKey,
-          benchmarkType: row.benchmark_type === 'agentic_traces' ? 'agentic_traces' : 'single_turn',
-        }
-      : undefined,
-    tput_per_gpu: entry.tput_per_gpu,
-    input_tput_per_gpu: entry.input_tput_per_gpu,
-    output_tput_per_gpu: entry.output_tput_per_gpu,
-    // Pool sizes and basis let the token mix (token revenue) read per-pool rates
-    // on the deployment basis, identically under both chip bases.
-    disagg: entry.disagg,
-    num_prefill_gpu: entry.num_prefill_gpu,
-    num_decode_gpu: entry.num_decode_gpu,
-    prefill_num_workers: entry.prefill_num_workers,
-    decode_num_workers: entry.decode_num_workers,
-    chip_basis: entry.chip_basis,
-    isl: entry.isl,
-    osl: entry.osl,
-    total_prompt_tokens: entry.total_prompt_tokens,
-    total_generation_tokens: entry.total_generation_tokens,
-    server_gpu_cache_hit_rate: entry.server_gpu_cache_hit_rate,
-    server_external_cache_hit_rate: entry.server_external_cache_hit_rate,
-    server_cpu_cache_hit_rate: entry.server_cpu_cache_hit_rate,
-    theoretical_cache_hit_rate: entry.theoretical_cache_hit_rate,
-    ...buildDerivedChartFields(derivedEntry, hwKey, requestedMetrics, tcoBasis),
-  } as InferenceData;
-
-  return requestedMetrics.includes('tokenRevenuePerGpuHour')
-    ? applyTokenRevenuePricing([point], tokenRevenuePricing)[0]!
-    : point;
 }
 
 /**
@@ -211,17 +416,20 @@ function recoverProportionalMultiplier(
 }
 
 /**
- * Interpolate a selected metric at a target interactivity for a set of InferenceData points
- * from a single GPU. Uses a throughput-based Pareto front + monotone cubic Hermite spline.
- *
- * Exported for unit testing.
+ * Target-independent interpolation state for one GPU's points: the throughput
+ * frontier plus everything the spline needs, so moving the target only
+ * evaluates `at` instead of rebuilding the frontier and slopes.
  */
-export function interpolateMetricAtInteractivity(
+interface InterpolationCurve {
+  readonly frontier: InferenceData[];
+  readonly at: (targetInteractivity: number) => number | null;
+}
+
+function buildInterpolationCurve(
   points: InferenceData[],
-  targetInteractivity: number,
   metricKey: YAxisMetricKey,
   tokenRevenuePricing?: TokenRevenuePricing | null,
-): number | null {
+): InterpolationCurve | null {
   if (points.length === 0) return null;
 
   // Proportional business metrics use the corresponding total/output/input
@@ -240,19 +448,20 @@ export function interpolateMetricAtInteractivity(
   );
   if (frontier.length === 0) return null;
 
-  // Sort frontier by interactivity ascending
-  const sorted = [...frontier].toSorted((a, b) => a.x - b.x);
-
+  const ascending = frontier.every((p, i) => i === 0 || frontier[i - 1].x < p.x);
+  const sorted = ascending ? frontier : [...frontier].toSorted((a, b) => a.x - b.x);
+  const minX = sorted[0].x;
+  const maxX = sorted.at(-1)!.x;
   // No extrapolation — target must be within frontier range
-  if (targetInteractivity < sorted[0].x || targetInteractivity > sorted.at(-1)!.x) {
-    return null;
-  }
+  const curve = (valueAt: (target: number) => number | null): InterpolationCurve => ({
+    frontier,
+    at: (target) => (target < minX || target > maxX ? null : valueAt(target)),
+  });
 
   // Single point — only return if target matches exactly
   if (sorted.length === 1) {
-    return Math.abs(targetInteractivity - sorted[0].x) < 1e-6
-      ? extractMetric(sorted[0], metricKey)
-      : null;
+    const value = extractMetric(sorted[0], metricKey);
+    return curve((target) => (Math.abs(target - minX) < 1e-6 ? value : null));
   }
 
   // Extract metric values from frontier points. If ANY point is missing the
@@ -260,12 +469,8 @@ export function interpolateMetricAtInteractivity(
   // bail out — silently coercing nulls to zero would render a flat-zero trend
   // line that looks like real data.
   const xs = sorted.map((p) => p.x);
-  const metricYs: number[] = [];
-  for (const p of sorted) {
-    const v = extractMetric(p, metricKey);
-    if (v === null) return null;
-    metricYs.push(v);
-  }
+  const metricYs = sorted.map((p) => extractMetric(p, metricKey));
+  if (!metricYs.every((v): v is number => v !== null)) return null;
 
   // Fleet Lifecycle interpolates the physical throughput, measured cache hit
   // fraction, and compatible input-token share independently, then prices that
@@ -275,25 +480,31 @@ export function interpolateMetricAtInteractivity(
   if (metricKey === 'tokenRevenuePerGpuHour' && tokenRevenuePricing) {
     const interpolateBounded = (ys: number[]) => {
       const slopes = monotoneSlopes(xs, ys);
-      const raw = hermiteInterpolate(xs, ys, slopes, targetInteractivity);
-      return Math.max(Math.min(...ys), Math.min(Math.max(...ys), raw));
+      const min = Math.min(...ys);
+      const max = Math.max(...ys);
+      return (target: number) =>
+        Math.max(min, Math.min(max, hermiteInterpolate(xs, ys, slopes, target)));
     };
-    const throughputYs = sorted.map((p) => extractMetric(p, 'tpPerGpu')!);
-    const inputShares = sorted.map(inputTokenShareForRevenue);
+    const throughputAt = interpolateBounded(sorted.map((p) => extractMetric(p, 'tpPerGpu')!));
     const cacheHitRates = sorted.map(pricingCacheHitRate);
-    const inputShare = inputShares.every((share): share is number => share !== null)
-      ? interpolateBounded(inputShares)
-      : null;
-    const cacheHitRate = cacheHitRates.every((hit): hit is number => hit !== null)
+    const cacheHitRateAt = cacheHitRates.every((hit): hit is number => hit !== null)
       ? interpolateBounded(cacheHitRates)
       : null;
+    const inputShares = tokenMixSetsPrice(tokenRevenuePricing, cacheHitRateAt !== null)
+      ? sorted.map(inputTokenShareForRevenue)
+      : null;
+    const inputShareAt =
+      inputShares !== null && inputShares.every((share): share is number => share !== null)
+        ? interpolateBounded(inputShares)
+        : null;
 
-    const throughput = interpolateBounded(throughputYs);
-    return tokenRevenueFromRatesPerGpuHour(
-      throughput,
-      inputShare,
-      cacheHitRate,
-      tokenRevenuePricing,
+    return curve((target) =>
+      tokenRevenueFromRatesPerGpuHour(
+        throughputAt(target),
+        inputShareAt ? inputShareAt(target) : null,
+        cacheHitRateAt ? cacheHitRateAt(target) : null,
+        tokenRevenuePricing,
+      ),
     );
   }
 
@@ -306,8 +517,9 @@ export function interpolateMetricAtInteractivity(
     const multiplier = recoverProportionalMultiplier(metricYs, tputYs);
     if (multiplier !== null) {
       const tputSlopes = monotoneSlopes(xs, tputYs);
-      const tput = hermiteInterpolate(xs, tputYs, tputSlopes, targetInteractivity);
-      return Math.max(0, tput) * multiplier;
+      return curve(
+        (target) => Math.max(0, hermiteInterpolate(xs, tputYs, tputSlopes, target)) * multiplier,
+      );
     }
   }
 
@@ -315,28 +527,34 @@ export function interpolateMetricAtInteractivity(
   // throughput and re-derive rather than splining the metric, preserving the identity.
   const throughputKey = RECIPROCAL_OF_THROUGHPUT[metricKey];
   if (throughputKey) {
-    const tputYs: number[] = [];
-    for (const p of sorted) {
-      const v = extractMetric(p, throughputKey);
-      if (v === null) return null;
-      tputYs.push(v);
-    }
+    const tputYs = sorted.map((p) => extractMetric(p, throughputKey));
+    if (!tputYs.every((v): v is number => v !== null)) return null;
     const numerator = recoverReciprocalNumerator(metricYs, tputYs);
     // null means these points do not obey the identity — fall through and spline
     // the metric directly rather than rewrite it from one point's ratio.
     if (numerator !== null) {
       const tputSlopes = monotoneSlopes(xs, tputYs);
-      const tput = hermiteInterpolate(xs, tputYs, tputSlopes, targetInteractivity);
-      return reciprocalMetricAt(numerator, Math.max(0, tput));
+      return curve((target) =>
+        reciprocalMetricAt(
+          numerator,
+          Math.max(0, hermiteInterpolate(xs, tputYs, tputSlopes, target)),
+        ),
+      );
     }
   }
 
-  // Monotone cubic Hermite spline interpolation
   const slopes = monotoneSlopes(xs, metricYs);
-  const interpolated = hermiteInterpolate(xs, metricYs, slopes, targetInteractivity);
+  return curve((target) => Math.max(0, hermiteInterpolate(xs, metricYs, slopes, target)));
+}
 
-  // Clamp to prevent negative values from cubic spline overshoots
-  return Math.max(0, interpolated);
+export function interpolateMetricAtInteractivity(
+  points: InferenceData[],
+  targetInteractivity: number,
+  metricKey: YAxisMetricKey,
+  tokenRevenuePricing?: TokenRevenuePricing | null,
+): number | null {
+  const curve = buildInterpolationCurve(points, metricKey, tokenRevenuePricing);
+  return curve === null ? null : curve.at(targetInteractivity);
 }
 
 function extractMetric(point: InferenceData, metricKey: YAxisMetricKey): number | null {
@@ -349,12 +567,9 @@ function extractMetric(point: InferenceData, metricKey: YAxisMetricKey): number 
 
 export interface GroupTrendRowsOptions {
   readonly tcoBasis?: TcoBasis;
-  /** Which chips divide disaggregated input/output throughput. Defaults to per pool. */
-  readonly chipBasis?: ChipBasis;
   readonly selectedPrecisions: readonly string[];
   readonly selectedYAxisMetric: string;
   readonly requestedMetrics: readonly DerivedMetricKey[];
-  /** Extra row-level filter (e.g. the views API's gpu/vendor/date scoping). */
   readonly rowFilter?: (row: BenchmarkRow) => boolean;
   /**
    * Pricing applied when `tokenRevenuePerGpuHour` is requested. Defaults to
@@ -370,6 +585,17 @@ export interface GroupTrendRowsOptions {
  */
 export function groupTrendRowsByDate(
   allRows: readonly BenchmarkRow[],
+  options: GroupTrendRowsOptions & { readonly chipBasis?: ChipBasis },
+): Map<string, Map<string, InferenceData[]>> {
+  return groupTrendRows(prepareTrendRows(allRows, options.chipBasis), options);
+}
+
+const NO_POINTS: readonly InferenceData[] = [];
+const NO_LINE_POINTS: readonly TrendDataPoint[] = [];
+const NO_SOURCES: readonly TrendSource[] = [];
+
+export function groupTrendRows(
+  trendRows: readonly TrendRow[],
   options: GroupTrendRowsOptions,
 ): Map<string, Map<string, InferenceData[]>> {
   const {
@@ -380,36 +606,52 @@ export function groupTrendRowsByDate(
     tokenRevenuePricing = NORMALIZED_TOKEN_REVENUE_PRICING,
   } = options;
   const result = new Map<string, Map<string, InferenceData[]>>();
-  if (allRows.length === 0) return result;
 
   const multiPrecision = selectedPrecisions.length > 1;
-  for (const row of dedupeAgenticHistoryRuns([...allRows])) {
+  const tokenType = tokenMetricTypeForConfigKey(selectedYAxisMetric);
+  const tcoBasis = options.tcoBasis === undefined ? DEFAULT_TCO_BASIS : options.tcoBasis;
+  const specsByHwKey = new Map<string, GpuSpecs>();
+  const pointMetrics = trendPointMetrics(requestedMetrics);
+  let lastDate: string | undefined;
+  let dateMap: Map<string, InferenceData[]> | undefined;
+  let lastGroupKey: string | undefined;
+  let groupPoints: InferenceData[] | undefined;
+  let lastHwKey: string | undefined;
+  let specs: GpuSpecs | undefined;
+  for (const trendRow of trendRows) {
+    const { row, curveDate, hwKey, precisionGroupKey, tokenMetrics } = trendRow;
     if (!selectedPrecisions.includes(row.precision)) continue;
-    if (!rowSupportsTrendMetric(row, selectedYAxisMetric)) continue;
+    if (tokenMetrics && !tokenMetrics.includes(tokenType)) continue;
     if (rowFilter && !rowFilter(row)) continue;
 
-    const point = rowToLightweightPoint(
-      row,
-      requestedMetrics,
-      tokenRevenuePricing,
-      options.tcoBasis,
-      options.chipBasis,
-    );
-    if (!point) continue;
+    if (hwKey !== lastHwKey || !specs) {
+      lastHwKey = hwKey;
+      specs = specsByHwKey.get(hwKey);
+      if (!specs) {
+        specs = getGpuSpecs(hwKey, tcoBasis);
+        specsByHwKey.set(hwKey, specs);
+      }
+    }
+    const point = trendPoint(trendRow, pointMetrics, tokenRevenuePricing, tcoBasis, specs);
 
-    const curveDate = benchmarkCurveDate(row);
-    let dateMap = result.get(curveDate);
-    if (!dateMap) {
-      dateMap = new Map();
-      result.set(curveDate, dateMap);
+    if (curveDate !== lastDate || !dateMap) {
+      lastDate = curveDate;
+      lastGroupKey = undefined;
+      dateMap = result.get(curveDate);
+      if (!dateMap) {
+        dateMap = new Map();
+        result.set(curveDate, dateMap);
+      }
     }
 
-    const hwKey = point.hwKey as string;
-    const groupKey = multiPrecision ? `${hwKey}__${row.precision}` : hwKey;
-    let groupPoints = dateMap.get(groupKey);
-    if (!groupPoints) {
-      groupPoints = [];
-      dateMap.set(groupKey, groupPoints);
+    const groupKey = multiPrecision ? precisionGroupKey : hwKey;
+    if (groupKey !== lastGroupKey || !groupPoints) {
+      lastGroupKey = groupKey;
+      groupPoints = dateMap.get(groupKey);
+      if (!groupPoints) {
+        groupPoints = [...NO_POINTS];
+        dateMap.set(groupKey, groupPoints);
+      }
     }
     groupPoints.push(point);
   }
@@ -417,107 +659,168 @@ export function groupTrendRowsByDate(
   return result;
 }
 
-export interface BuildTrendLinesOptions {
-  readonly targetInteractivity: number;
+export interface BuildTrendCurvesOptions {
   readonly trendMetricKey: YAxisMetricKey;
+  readonly tokenRevenuePricing?: TokenRevenuePricing | null;
+}
+
+export interface EvaluateTrendCurvesOptions {
+  readonly targetInteractivity: number;
   /**
    * Extend each line to this date with a synthetic copy of its last value when
    * the line ends earlier. The hook passes wall-clock today; the views API
    * passes the latest data date so responses stay cache-stable.
    */
   readonly extendToDate?: string;
-  /** Pricing used when interpolating `tokenRevenuePerGpuHour`. */
-  readonly tokenRevenuePricing?: TokenRevenuePricing | null;
 }
+
+export interface BuildTrendLinesOptions
+  extends BuildTrendCurvesOptions, EvaluateTrendCurvesOptions {}
 
 export interface TrendLinesResult {
   readonly trendLines: Map<string, TrendDataPoint[]>;
   readonly hwKeysWithData: string[];
 }
 
-/**
- * Interpolate the selected metric at the target interactivity for every
- * (date, group) bucket and assemble date-sorted trend lines per group key.
- */
-export function buildTrendLines(
+class TrendBucket {
+  readonly index: number;
+  readonly date: string;
+  readonly time: number;
+  readonly at: InterpolationCurve['at'];
+  readonly sources: readonly TrendSource[];
+  readonly waterfallEligible: boolean;
+
+  constructor(
+    index: number,
+    date: string,
+    time: number,
+    at: InterpolationCurve['at'],
+    sources: readonly TrendSource[],
+    waterfallEligible: boolean,
+  ) {
+    this.index = index;
+    this.date = date;
+    this.time = time;
+    this.at = at;
+    this.sources = sources;
+    this.waterfallEligible = waterfallEligible;
+  }
+}
+
+export interface TrendCurves {
+  readonly byGroup: ReadonlyMap<string, readonly TrendBucket[]>;
+  readonly timeSorted: boolean;
+}
+
+export function buildTrendCurves(
   dateGroupedData: ReadonlyMap<string, ReadonlyMap<string, InferenceData[]>>,
-  options: BuildTrendLinesOptions,
-): TrendLinesResult {
-  const {
-    targetInteractivity,
-    trendMetricKey,
-    extendToDate,
-    tokenRevenuePricing = NORMALIZED_TOKEN_REVENUE_PRICING,
-  } = options;
-  const resultMap = new Map<string, Map<string, TrendDataPoint>>();
+  options: BuildTrendCurvesOptions,
+): TrendCurves {
+  const { trendMetricKey, tokenRevenuePricing = NORMALIZED_TOKEN_REVENUE_PRICING } = options;
+  const outputMetric = trendMetricKey.toLowerCase().includes('output');
+  let bucketCount = 0;
+  const byGroup = new Map<string, TrendBucket[]>();
+  let timeSorted = true;
 
   for (const [date, byGroupKey] of dateGroupedData) {
+    const time = new Date(date).getTime();
+    if (Number.isNaN(time)) timeSorted = false;
     for (const [groupKey, points] of byGroupKey) {
-      const interpolated = interpolateMetricAtInteractivity(
-        points,
-        targetInteractivity,
-        trendMetricKey,
-        tokenRevenuePricing,
-      );
-      if (interpolated === null) continue;
+      const curve = buildInterpolationCurve(points, trendMetricKey, tokenRevenuePricing);
+      if (curve === null) continue;
       // Preserve the source curve's provenance, including reused points from older runs.
-      const frontierKey = PROPORTIONAL_TO_THROUGHPUT[trendMetricKey] ?? 'tpPerGpu';
-      const frontier = paretoFrontUpperLeft(
-        points,
-        (point) => point.x,
-        (point) => extractMetric(point, frontierKey)!,
-      );
-      const sources = [
-        ...new Map(
-          frontier
-            .flatMap((point) => (point.trendSource ? [point.trendSource] : []))
-            .map((source) => [`${source.date}:${source.runId}:${source.hwKey}`, source]),
-        ).values(),
-      ];
-      if (!resultMap.has(groupKey)) resultMap.set(groupKey, new Map());
-      resultMap.get(groupKey)!.set(date, {
+      const keys: string[] = [];
+      const sources = [...NO_SOURCES];
+      for (const { trendSource: source } of curve.frontier) {
+        if (!source || sources.includes(source)) continue;
+        const key = trendSourceKeys.get(source) ?? trendSourceKey(source);
+        const at = keys.indexOf(key);
+        if (at === -1) {
+          keys.push(key);
+          sources.push(source);
+        } else sources[at] = source;
+      }
+      const bucket = new TrendBucket(
+        bucketCount++,
         date,
-        value: interpolated,
-        x: targetInteractivity,
+        time,
+        curve.at,
         sources,
-        waterfallEligible:
-          !trendMetricKey.toLowerCase().includes('output') ||
-          frontier.every(
+        !outputMetric ||
+          curve.frontier.every(
             (point) =>
               typeof point.output_tput_per_gpu === 'number' &&
               Number.isFinite(point.output_tput_per_gpu) &&
               point.output_tput_per_gpu > 0,
           ),
-      });
+      );
+      const group = byGroup.get(groupKey);
+      if (group) group.push(bucket);
+      else byGroup.set(groupKey, Array.of(bucket));
     }
+  }
+
+  if (timeSorted) for (const group of byGroup.values()) group.sort((a, b) => a.time - b.time);
+
+  return { byGroup, timeSorted };
+}
+
+export function evaluateTrendCurves(
+  curves: TrendCurves,
+  options: EvaluateTrendCurvesOptions,
+): TrendLinesResult {
+  const { targetInteractivity, extendToDate } = options;
+  const { byGroup, timeSorted } = curves;
+  const pointsByGroup = new Map<string, TrendDataPoint[]>();
+  const lineKeys: string[] = [];
+  const lineStarts: number[] = [];
+  for (const [groupKey, group] of byGroup) {
+    const points = [...NO_LINE_POINTS];
+    let start = -1;
+    for (const { index, date, at, sources, waterfallEligible } of group) {
+      const value = at(targetInteractivity);
+      if (value === null) continue;
+      if (start === -1 || index < start) start = index;
+      points.push(
+        new MeasuredTrendPoint(date, value, targetInteractivity, sources, waterfallEligible),
+      );
+    }
+    if (start === -1) continue;
+    pointsByGroup.set(groupKey, points);
+    let slot = lineStarts.length;
+    while (slot > 0 && lineStarts[slot - 1] > start) slot--;
+    lineKeys.splice(slot, 0, groupKey);
+    lineStarts.splice(slot, 0, start);
   }
 
   const lines = new Map<string, TrendDataPoint[]>();
   const keysWithData: string[] = [];
+  for (const groupKey of lineKeys) {
+    const points = pointsByGroup.get(groupKey)!;
+    if (!timeSorted) points.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  for (const [groupKey, dateMap] of resultMap) {
-    const points = [...dateMap.values()].toSorted(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
-    );
-    if (points.length > 0) {
-      // Extend line to the requested date if the last point is earlier
-      const last = points.at(-1)!;
-      if (extendToDate !== undefined && last.date < extendToDate) {
-        points.push({
-          date: extendToDate,
-          value: last.value,
-          x: last.x,
-          synthetic: true,
-        });
-      }
-      lines.set(groupKey, points);
-      // Return base hwKey for legend filtering
-      const baseHwKey = groupKey.includes('__') ? groupKey.split('__')[0] : groupKey;
-      if (!keysWithData.includes(baseHwKey)) {
-        keysWithData.push(baseHwKey);
-      }
+    const last = points.at(-1)!;
+    if (extendToDate !== undefined && last.date < extendToDate) {
+      points.push({
+        date: extendToDate,
+        value: last.value,
+        x: last.x,
+        synthetic: true,
+      });
+    }
+    lines.set(groupKey, points);
+    const baseHwKey = groupKey.includes('__') ? groupKey.split('__')[0] : groupKey;
+    if (!keysWithData.includes(baseHwKey)) {
+      keysWithData.push(baseHwKey);
     }
   }
 
   return { trendLines: lines, hwKeysWithData: keysWithData };
+}
+
+export function buildTrendLines(
+  dateGroupedData: ReadonlyMap<string, ReadonlyMap<string, InferenceData[]>>,
+  options: BuildTrendLinesOptions,
+): TrendLinesResult {
+  return evaluateTrendCurves(buildTrendCurves(dateGroupedData, options), options);
 }

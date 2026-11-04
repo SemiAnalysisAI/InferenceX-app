@@ -3,6 +3,9 @@
 ## Structure
 
 **Unit tests**: Vitest, colocated with source (`*.test.ts` next to `*.ts`). Config: `packages/app/vitest.config.ts`.
+
+Unit test workers are reused across files (`isolate: false`), with isolation restored per file by `src/test/file-isolation-runner.ts`. Before each file, the runner re-evaluates every inlined (source) module and clears mocks, matching Vitest's own per-file reset. It also restores `process.env` and `globalThis` to the worker's starting state and gives `@vitest-environment jsdom` files a fresh JSDOM window. Packages loaded from `node_modules` stay cached in the worker, so a package must not keep per-test state at import time. Next's `node-environment-baseline` is loaded before any test so that its `AsyncLocalStorage` global never depends on file order. `src/test/environment-grouped-sequencer.ts` runs files with the same environment back to back, so workers rarely restart. Transformed modules are cached on disk (`experimental.fsModuleCache`, `node_modules/.experimental-vitest-cache`). CI restores that cache between runs.
+
 **Component tests**: Cypress, in `packages/app/cypress/component/`. Use these for isolated UI behavior with controlled providers, routes, and API intercepts.
 **Integration tests**: Cypress, in `packages/app/cypress/e2e/`. Use these for page routing, browser history, API fixture mode, and cross-component workflows. Config: `packages/app/cypress.config.ts`.
 
@@ -46,6 +49,8 @@ bun run test:e2e
 The local `bun run test:e2e` command is a curated smoke suite across the core page, chart, overlay, localization, and component paths. It is the default agent and developer check and is intended to stay under one minute once the app is running.
 
 The complete suite is `bun run test:e2e:full`. It runs all Cypress component and integration specs. GitHub Actions runs that same coverage as four component shards (Chrome) plus eight integration shards per browser, Chrome and Firefox. The CI workflow is the merge gate for the full E2E suite.
+
+One `build` job compiles the app with `E2E_FIXTURES=1` and uploads `.next` (without `.next/cache`) as a zstd tarball, the `e2e-app-build` artifact. Each integration shard installs dependencies, unpacks that artifact and runs `next start`, so the app is built once per workflow run instead of once per shard. The artifact is scoped to the run, so a shard always serves the commit under test. The build job is also the only writer of the Bun package cache and the Next.js build cache.
 
 `packages/app/timings.json` and `timings-firefox.json` are the committed Chrome
 and Firefox `cypress-split` baselines. `component-timings.json` is the Chrome

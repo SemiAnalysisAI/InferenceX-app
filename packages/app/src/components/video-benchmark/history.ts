@@ -8,6 +8,7 @@ import { resultsEvidence, type ResultsEvidence } from './results-evidence';
 
 /** Shared bound for dashboard history reads in the browser and view API. */
 export const VIDEO_HISTORY_MAX_PAGES = 5;
+export const VIDEO_HISTORY_PAGE_SIZE = 10;
 
 export interface VideoHistoryObservation {
   results?: ResultsEvidence | null;

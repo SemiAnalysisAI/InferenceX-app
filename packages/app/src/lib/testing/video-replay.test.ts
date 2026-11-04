@@ -175,9 +175,10 @@ describe('original-artifact development replay', () => {
       expect(deniedArtifact.status).toBe(404);
     }
     const historyResponse = await GET(
-      new NextRequest('http://localhost/api/video-runs?format=history'),
+      new NextRequest('http://localhost/api/video-runs?format=history&page=1&pages=5'),
     );
     const history = await historyResponse.json();
+    expect(history.nextPage).toBeNull();
     expect(history.entries).toHaveLength(1);
     expect(history.entries[0]).toMatchObject({ approved: false, publishedAt: null });
     expect(history.entries[0].sources[0].observations).toHaveLength(3);

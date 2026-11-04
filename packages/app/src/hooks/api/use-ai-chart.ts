@@ -26,7 +26,8 @@ import {
   dedupeAgenticHistoryRuns,
   dedupeRowsToLatestPerConfig,
 } from '@/lib/benchmarks/benchmark-run-selection';
-import { normalizeEvalHardwareKey, generateHighContrastColors } from '@/lib/charts/chart-utils';
+import { normalizeEvalHardwareKey } from '@/lib/charts/chart-utils';
+import { generateHighContrastColors } from '@/lib/charts/high-contrast-colors';
 import { getHardwareConfig, getModelSortIndex } from '@/lib/catalog/constants';
 import type { Locale } from '@/lib/i18n/i18n';
 

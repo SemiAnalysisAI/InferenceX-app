@@ -6,6 +6,7 @@ import {
   OVERLAY_RUN_ID,
   REAL_CONFIGS,
 } from '../support/overlay-fixtures';
+import { visiblePoints } from '../support/scatter-points';
 
 const OVERLAY_CONFIGS = [...REAL_CONFIGS, DOMINATED_CONFIG];
 
@@ -46,8 +47,8 @@ describe('Overlay points follow Optimal Only on the selected axes', () => {
 
   it('drops only the dominated overlay point in the default Optimal Only view', () => {
     cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
-    cy.get('[data-testid="inference-chart-display"] svg .dot-group').should(($dots) => {
-      expect(countVisible($dots), 'visible official points').to.eq(REAL_CONFIGS.length);
+    cy.scatterPoints('[data-testid="inference-chart-display"]').should((points) => {
+      expect(visiblePoints(points), 'visible official points').to.have.length(REAL_CONFIGS.length);
     });
     cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(($pts) => {
       expect(countVisible($pts), 'visible overlay X markers').to.eq(REAL_CONFIGS.length);

@@ -8,7 +8,7 @@ export interface ImprovementStep {
   from: number;
   to: number;
   delta: number;
-  sources: TrendSource[];
+  sources: readonly TrendSource[];
 }
 
 const asStep = (
@@ -52,7 +52,10 @@ export function buildImprovementWaterfall(
 }
 
 /** A shared date does not establish a link between a changelog and a measurement. */
-export function matchingChanges(sources: TrendSource[], workflows: WorkflowInfoResponse[]) {
+export function matchingChanges(
+  sources: readonly TrendSource[],
+  workflows: WorkflowInfoResponse[],
+) {
   const changes = workflows.flatMap((workflow) =>
     workflow.changelogs.filter((change) =>
       sources.some(

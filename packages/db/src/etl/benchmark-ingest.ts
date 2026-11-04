@@ -8,6 +8,7 @@ import {
 } from './server-log-artifacts';
 import type { BenchmarkType, PowerAudit, WorkerPower } from './benchmark-mapper';
 import { kvCachePoolTokensFromServerLog } from './server-log-metrics';
+import { serverLogBlocksEnabled, writeTextAsBlocks } from './server-log-block-writer';
 import {
   capServerLogText,
   maxServerLogFileBytes,
@@ -208,6 +209,8 @@ async function insertDeferredServerLogFiles(
         set server_log_id = ${logId}
         where id = any(${tx.array(unlinked.map((row) => row.id))}::bigint[])
       `;
+      if (serverLogBlocksEnabled())
+        await writeTextAsBlocks(tx, logId, primary.fileName, primaryText);
     }
 
     for (const logId of bundleIds) {
@@ -227,11 +230,14 @@ async function insertDeferredServerLogFiles(
       for (const file of additional) {
         if (storedNames.has(file.fileName)) continue;
         const logText = readStored(file);
-        await tx`
+        const inserted = await tx`
           insert into server_log_files (server_log_id, file_name, log_text)
           values (${logId}, ${file.fileName}, ${logText})
           on conflict (server_log_id, file_name) do nothing
+          returning 1
         `;
+        if (inserted.length > 0 && serverLogBlocksEnabled())
+          await writeTextAsBlocks(tx, logId, file.fileName, logText);
       }
     }
 

@@ -1,4 +1,9 @@
-import { interceptDerivedAgenticMetrics } from '../support/e2e';
+import {
+  availabilityBody,
+  interceptBenchmarkPresence,
+  interceptDerivedAgenticMetrics,
+} from '../support/e2e';
+import { clickScatterPoint } from '../support/scatter-points';
 
 const AGENTIC_DATE = '2026-06-12';
 const DEFAULT_MODEL_DB_KEY = 'dsv4';
@@ -122,16 +127,11 @@ function interceptDetailPage(): void {
 }
 
 function interceptChart(): void {
-  cy.intercept('GET', '/api/v1/availability', { body: availability }).as('availability');
+  cy.intercept('GET', '/api/v1/availability/compact', { body: availabilityBody(availability) }).as(
+    'availability',
+  );
   cy.intercept('GET', '/api/v1/benchmarks*', { body: benchmarks }).as('benchmarks');
-  cy.intercept('GET', '/api/v1/trace-availability*', (request) => {
-    const ids = new URL(request.url).searchParams.get('ids')?.split(',') ?? [];
-    request.reply({
-      body: Object.fromEntries(
-        ids.filter((id) => tracedIds.has(Number(id))).map((id) => [id, true]),
-      ),
-    });
-  });
+  interceptBenchmarkPresence({ trace: tracedIds });
   interceptDerivedAgenticMetrics();
   interceptDetailPage();
 }
@@ -174,15 +174,14 @@ function clickTracedPoint(): void {
         'chart rebuilt at the container width',
       ).to.be.closeTo(containerWidth, 1);
     });
-  cy.get('[data-testid="inference-chart-display"] svg .dot-group')
+  cy.scatterPoints('[data-testid="inference-chart-display"]')
     .should('have.length.greaterThan', 0)
-    .then(($dots) => {
-      const target = [...$dots].find((node) => {
-        const datum = (node as unknown as { __data__?: { hwKey?: string; id?: number } }).__data__;
-        return datum?.hwKey === SOLO_HW_KEY && tracedIds.has(Number(datum?.id));
-      });
+    .then((points) => {
+      const target = points.find(
+        (point) => point.datum.hwKey === SOLO_HW_KEY && tracedIds.has(Number(point.datum.id)),
+      );
       expect(target, `a traced ${SOLO_HW_KEY} point`).to.not.equal(undefined);
-      cy.wrap(target).find('.visible-shape').click({ force: true });
+      clickScatterPoint(target!);
     });
 }
 

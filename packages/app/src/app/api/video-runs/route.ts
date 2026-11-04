@@ -11,7 +11,11 @@ import { getGithubToken } from '@/lib/github/github-artifacts';
 import { loadFixture } from '@/lib/testing/test-fixtures';
 import { localVideoReplayResponse } from '@/lib/testing/video-replay';
 import { bearerMatches } from '@/lib/api/bearer-auth';
-import type { VideoHistoryPage } from '@/components/video-benchmark/history';
+import {
+  VIDEO_HISTORY_MAX_PAGES,
+  type VideoHistoryPage,
+} from '@/components/video-benchmark/history';
+import { recordVideoHistory } from '@/lib/video/video-history-store';
 import {
   approveVideoPublication,
   readStoredArtifact,
@@ -57,11 +61,24 @@ function github(path: string, signal = AbortSignal.timeout(30000)) {
   });
 }
 
+const PUBLIC_REPOSITORY_TTL_MS = 60 * 60 * 1000;
+let repositoryPublicUntil = 0;
+
+async function repositoryIsPublic(): Promise<boolean> {
+  if (Date.now() < repositoryPublicUntil) return true;
+  const repository = await github('');
+  const repo = repository.ok ? await repository.json() : null;
+  if (repo?.private !== false) return false;
+  repositoryPublicUntil = Date.now() + PUBLIC_REPOSITORY_TTL_MS;
+  return true;
+}
+
 export async function GET(request: NextRequest) {
   const query = request.nextUrl.searchParams;
   const runId = query.get('run');
   const artifactId = query.get('artifact');
   const page = query.get('page') ?? '1';
+  const pages = query.get('pages') ?? '1';
   const history = query.get('format') === 'history';
   const publishedOnly = query.get('format') === 'published';
   const media = query.get('format') === 'media' || publishedOnly;
@@ -70,7 +87,10 @@ export async function GET(request: NextRequest) {
     (artifactId && (!runId || !id(artifactId))) ||
     !id(page) ||
     !Number.isSafeInteger(Number(page)) ||
-    (history && (runId || artifactId))
+    (history && (runId || artifactId)) ||
+    !/^[1-9]$/u.test(pages) ||
+    Number(pages) > VIDEO_HISTORY_MAX_PAGES ||
+    (pages !== '1' && !history)
   )
     return NextResponse.json(
       { error: 'Invalid CI run, artifact or page' },
@@ -107,6 +127,7 @@ export async function GET(request: NextRequest) {
         url.searchParams.set('artifact', artifactId);
         url.searchParams.set('format', 'published');
       } else if (!runId) url.searchParams.set('page', page);
+      if (pages !== '1') url.searchParams.set('pages', pages);
       const response = await fetch(url, {
         cache: 'no-store',
         credentials: 'omit',
@@ -142,14 +163,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(data, { status: response.status, headers });
     }
     // This public viewer must never expose artifacts from a repository that becomes private.
-    const repository = await github('');
-    const repo = repository.ok ? await repository.json() : null;
-    if (repo?.private !== false)
+    const historyRead = history ? cachedVideoHistory(Number(page), Number(pages)) : null;
+    void historyRead?.catch(() => undefined);
+    if (!(await repositoryIsPublic()))
       return NextResponse.json(
         { error: 'Public H3 repository unavailable' },
         { status: 503, headers },
       );
-    if (history) return NextResponse.json(await cachedVideoHistory(Number(page)), { headers });
+    if (historyRead) return NextResponse.json(await historyRead, { headers });
     if (artifactId) {
       if (media && !videoStorageEnabled()) return new Response(null, { status: 204, headers });
       if (media) {
@@ -277,7 +298,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid publication request' }, { status: 400, headers });
   }
   const body = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
-  const { runId, artifactId, mergeRunId } = body as Record<string, unknown>;
+  const { runId, artifactId, mergeRunId, history } = body as Record<string, unknown>;
+  if (history === 'backfill' && Object.keys(body).length === 1) {
+    try {
+      const result = await recordVideoHistory(null);
+      clearVideoReadCache();
+      return NextResponse.json(result, { headers });
+    } catch {
+      return NextResponse.json(
+        { error: 'Video history backfill failed, retry shortly' },
+        { status: 502, headers },
+      );
+    }
+  }
   if (
     typeof runId !== 'string' ||
     !id(runId) ||
@@ -341,6 +374,7 @@ export async function POST(request: Request) {
       if (!saved) throw new Error('Stored video index readback failed');
     }
     const receipt = await approveVideoPublication(runId, artifact, saved, mergeRunId, deadline);
+    await recordVideoHistory(saved);
     clearVideoReadCache();
     return NextResponse.json(receipt, { headers });
   } catch {

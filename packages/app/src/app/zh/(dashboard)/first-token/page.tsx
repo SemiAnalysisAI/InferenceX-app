@@ -1,22 +1,15 @@
 import type { Metadata } from 'next';
 
 import FirstTokenLimitsDisplay from '@/components/calculator/FirstTokenLimitsDisplay';
-import { resolveCalculatorUrlSeed } from '@/components/calculator/url-seed';
 import { ZhTabIntro } from '@/components/zh/zh-tab-intro';
 import { tabMetadataZh } from '@/lib/routing/tab-meta-zh';
 
 export const metadata: Metadata = tabMetadataZh('first-token');
 
-interface Props {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}
-
-export default async function ZhFirstTokenPage({ searchParams }: Props) {
-  const sp = await searchParams;
-  const seed = resolveCalculatorUrlSeed(sp);
+export default function ZhFirstTokenPage() {
   return (
     <>
-      <FirstTokenLimitsDisplay urlSeed={seed} />
+      <FirstTokenLimitsDisplay />
       <ZhTabIntro tab="first-token" />
     </>
   );

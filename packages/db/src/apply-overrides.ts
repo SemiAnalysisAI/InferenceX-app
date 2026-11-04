@@ -2,7 +2,7 @@ import { isDeepStrictEqual } from 'node:util';
 
 import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils.js';
 import { configCacheKey } from './etl/config-cache.js';
-import { type Sql, createAdminSql, refreshLatestBenchmarks } from './etl/db-utils.js';
+import { type Sql, createAdminSql } from './etl/db-utils.js';
 import { jsonbParam } from './lib/backfill-runner.js';
 import { planBenchmarkPointBackfill } from './lib/benchmark-point-backfill.js';
 import { selectRunOverrides } from './lib/run-override-selection.js';
@@ -651,8 +651,6 @@ async function main(): Promise<void> {
     const staleTarget = await previewBenchmarkPointBackfill(backfill);
     if (staleTarget) throw new Error(`${backfill.id}: benchmark point verification failed`);
   }
-
-  await refreshLatestBenchmarks(sql);
 
   console.log('\n=== apply-overrides complete ===');
   console.log('  Manual runs: invalidate the API cache with bun run admin:cache:invalidate');

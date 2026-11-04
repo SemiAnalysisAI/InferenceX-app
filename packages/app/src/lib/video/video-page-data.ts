@@ -35,19 +35,17 @@ export async function loadVideoPageData(params: VideoPageSearchParams): Promise<
   const initial: VideoInitialData = { state, history: null, sides: {} };
 
   try {
-    const pages: VideoHistoryPage[] = [];
-    let replay = false;
-    for (let page = 1; page <= VIDEO_HISTORY_MAX_PAGES; page++) {
-      const response = await request({ format: 'history', page: String(page) });
-      if (!response.ok) throw new Error('Published history unavailable');
-      const data: VideoHistoryPage = await response.json();
-      if (data.schemaVersion !== 1 || !Array.isArray(data.entries))
-        throw new Error('Unsupported published history projection');
-      replay ||= response.headers.get('x-videogenx-replay') === '1';
-      pages.push(data);
-      if (data.nextPage === null) break;
-    }
-    initial.history = { pages, replay };
+    const historyResponse = await request({
+      format: 'history',
+      page: '1',
+      pages: String(VIDEO_HISTORY_MAX_PAGES),
+    });
+    if (!historyResponse.ok) throw new Error('Published history unavailable');
+    const data: VideoHistoryPage = await historyResponse.json();
+    if (data.schemaVersion !== 1 || !Array.isArray(data.entries))
+      throw new Error('Unsupported published history projection');
+    const pages = [data];
+    initial.history = { pages, replay: historyResponse.headers.get('x-videogenx-replay') === '1' };
     const projection = resultProjection(
       videoPoints(pages),
       state,

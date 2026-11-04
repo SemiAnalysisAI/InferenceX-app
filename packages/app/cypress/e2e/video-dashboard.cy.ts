@@ -8,7 +8,7 @@ const row = (hardware: string) =>
 describe('VideoGenX results routes', () => {
   beforeEach(() => {
     readOnlyVideoRequests();
-    cy.intercept('GET', '/api/video-runs?format=history&page=1').as('history');
+    cy.intercept('GET', '/api/video-runs?format=history&page=1*').as('history');
   });
 
   it('keeps the shared fixture projection across reload, language changes and detail history', () => {

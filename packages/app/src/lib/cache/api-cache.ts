@@ -1,10 +1,26 @@
-import { createHash } from 'node:crypto';
-import { constants as zlibConstants, createBrotliCompress, createGzip } from 'node:zlib';
+import { createHash, randomUUID } from 'node:crypto';
+import { promisify } from 'node:util';
+import {
+  brotliCompress,
+  brotliCompressSync,
+  brotliDecompressSync,
+  constants as zlibConstants,
+  createBrotliCompress,
+  createGzip,
+} from 'node:zlib';
 
 import { revalidateTag, unstable_cache } from 'next/cache';
 import { workAsyncStorage } from 'next/dist/server/app-render/work-async-storage.external';
 import { FIXTURES_MODE } from '@semianalysisai/inferencex-db/connection';
-import { blobGet, blobPurge, blobSet } from './blob-cache';
+import {
+  CONTENT_BLOB_KEY_PREFIX,
+  blobEnabled,
+  blobGet,
+  blobGetBytes,
+  blobPurge,
+  blobSet,
+  blobSetBytes,
+} from './blob-cache';
 
 /**
  * CollectiveX data lives in its own database and gets its own cache scope:
@@ -101,8 +117,10 @@ export const SERVER_LOG_CACHE_CONTROL =
 interface CachedQueryOptions {
   /** Use blob storage directly, skipping unstable_cache. Use for payloads known to exceed 2MB. */
   blobOnly?: boolean;
+  revisioned?: boolean;
   /** Cache tag for the unstable_cache path (default 'db'). */
   tag?: string;
+  shareDecodedResult?: boolean;
 }
 
 // Blob argument encoding is explicitly versioned. v1 used `args.join(':')`,
@@ -176,9 +194,47 @@ function blobKeyForArgs(keyPrefix: string, args: unknown[]): string {
   return `${keyPrefix}:${BLOB_KEY_ENCODING_VERSION}:sha256:${digest}`;
 }
 
+const COMPRESS_CACHED_JSON_CHARS = 64 * 1024;
+
+type CachedEntry<T> = { readonly value: T } | { readonly brotli: string };
+
+function packCachedEntry<T>(value: T): CachedEntry<T> {
+  const json = JSON.stringify(value);
+  if (json === undefined || json.length <= COMPRESS_CACHED_JSON_CHARS) return { value };
+  const compressed = brotliCompressSync(json, {
+    params: {
+      [zlibConstants.BROTLI_PARAM_QUALITY]: 4,
+      [zlibConstants.BROTLI_PARAM_SIZE_HINT]: json.length,
+    },
+  });
+  return { brotli: compressed.toString('base64') };
+}
+
+function unpackCachedEntry<T>(entry: CachedEntry<T>): T {
+  if (!('brotli' in entry)) return entry.value;
+  return JSON.parse(
+    brotliDecompressSync(Buffer.from(entry.brotli, 'base64')).toString('utf8'),
+  ) as T;
+}
+
+function lastDecodedEntryUnpacker<T>(): (args: unknown[], entry: CachedEntry<T>) => T {
+  const lastDecodedByArgs = new Map<string, { brotli: string; value: T }>();
+  return (args, entry) => {
+    if (!('brotli' in entry)) return entry.value;
+    const argsKey = JSON.stringify(args);
+    const last = lastDecodedByArgs.get(argsKey);
+    if (last?.brotli === entry.brotli) return last.value;
+    const value = unpackCachedEntry<T>(entry);
+    lastDecodedByArgs.set(argsKey, { brotli: entry.brotli, value });
+    return value;
+  };
+}
+
+let blobGeneration: (() => Promise<string>) | undefined;
+
 /**
  * Cache a function's result using unstable_cache (fast, local).
- * Set `blobOnly: true` for payloads known to exceed Next.js's 2MB unstable_cache limit.
+ * Set `blobOnly: true` for payloads that should live in Blob storage instead.
  */
 export function cachedQuery<T, Args extends unknown[]>(
   fn: (...args: Args) => Promise<T>,
@@ -186,15 +242,17 @@ export function cachedQuery<T, Args extends unknown[]>(
   options?: CachedQueryOptions,
 ): (...args: Args) => Promise<T> {
   if (options?.blobOnly) {
-    return async (...args: Args): Promise<T> => {
-      const blobKey = blobKeyForArgs(keyPrefix, args);
-
-      const cached = await blobGet<T>(blobKey);
-      if (cached) return cached;
-
-      const result = await fn(...args);
+    const inflight = new Map<string, Promise<{ json: string; value: T }>>();
+    const fill = async (path: string, args: Args) => {
+      const cached = await blobGet(path);
+      if (cached !== null) {
+        const value = JSON.parse(cached) as T;
+        if (value) return { json: cached, value };
+      }
+      const value = await fn(...args);
+      const json = JSON.stringify(value);
       try {
-        await blobSet(blobKey, result);
+        await blobSet(path, json);
       } catch (error) {
         // Blob storage is an optimization, not part of the data contract. A
         // cache outage or rejected pathname must not turn a successful DB read
@@ -205,25 +263,59 @@ export function cachedQuery<T, Args extends unknown[]>(
           }`,
         );
       }
-      return result;
+      return { json, value };
+    };
+    return async (...args: Args): Promise<T> => {
+      const blobKey = blobKeyForArgs(keyPrefix, args);
+      if (!blobEnabled()) return fn(...args);
+      blobGeneration ??= cachedQuery(() => Promise.resolve(randomUUID()), 'blob-generation');
+      const path = options.revisioned ? blobKey : `generation/${await blobGeneration()}/${blobKey}`;
+      const pending = inflight.get(path);
+      if (pending) {
+        const { json } = await pending;
+        return JSON.parse(json) as T;
+      }
+      const flight = fill(path, args);
+      inflight.set(path, flight);
+      try {
+        const { value } = await flight;
+        return value;
+      } finally {
+        inflight.delete(path);
+      }
     };
   }
 
+  const packed = (...args: Args): Promise<CachedEntry<T>> => fn(...args).then(packCachedEntry);
+  const fnSource = fn.toString();
+  const unpack = options?.shareDecodedResult
+    ? lastDecodedEntryUnpacker<T>()
+    : (_args: Args, entry: CachedEntry<T>) => unpackCachedEntry(entry);
+
   if (options?.tag) {
-    const tagged = unstable_cache(fn, [cacheKey(keyPrefix)], { tags: [options.tag] });
-    return (...args: Args): Promise<T> => tagged(...args);
+    const tagged = unstable_cache(packed, [cacheKey(keyPrefix), fnSource], {
+      tags: [options.tag],
+    });
+    return async (...args: Args): Promise<T> => unpack(args, await tagged(...args));
   }
 
   // Route handlers need an expired entry to refetch before they answer, or the
   // CDN's background refresh would cache stale data for another day. ISR page
   // renders refetch stale entries themselves, so they read a separately keyed
   // entry under the stale-while-revalidate page tag.
-  const routeCached = unstable_cache(fn, [cacheKey(keyPrefix)], { tags: [cacheTag()] });
-  const pageCached = unstable_cache(fn, [cacheKey(`page:${keyPrefix}`)], {
+  const routeCached = unstable_cache(packed, [cacheKey(keyPrefix), fnSource], {
+    tags: [cacheTag()],
+  });
+  const pageCached = unstable_cache(packed, [cacheKey(`page:${keyPrefix}`), fnSource], {
     tags: [pageCacheTag()],
   });
-  return (...args: Args): Promise<T> =>
-    workAsyncStorage.getStore()?.isStaticGeneration ? pageCached(...args) : routeCached(...args);
+  return async (...args: Args): Promise<T> =>
+    unpack(
+      args,
+      await (workAsyncStorage.getStore()?.isStaticGeneration
+        ? pageCached(...args)
+        : routeCached(...args)),
+    );
 }
 
 /**
@@ -237,8 +329,9 @@ export function cachedQuery<T, Args extends unknown[]>(
 export function cachedDerivedData<T, Args extends unknown[]>(
   fn: (...args: Args) => Promise<T>,
   keyPrefix: string,
+  options?: Pick<CachedQueryOptions, 'shareDecodedResult'>,
 ): (...args: Args) => Promise<T> {
-  return cachedQuery(fn, `derived:${keyPrefix}`);
+  return cachedQuery(fn, `derived:${keyPrefix}`, options);
 }
 
 /**
@@ -255,7 +348,12 @@ export function cachedDerivedData<T, Args extends unknown[]>(
 export async function purgeAll({
   immediate = false,
 }: { immediate?: boolean } = {}): Promise<number> {
-  const deleted = await blobPurge('', [`${OPERATORX_CACHE_SCOPE}/`]);
+  const deleted = await blobPurge(
+    '',
+    immediate
+      ? [`${OPERATORX_CACHE_SCOPE}/`]
+      : [`${OPERATORX_CACHE_SCOPE}/`, CONTENT_BLOB_KEY_PREFIX],
+  );
   const stale = immediate ? { expire: 0 } : 'max';
   revalidateTag(cacheTag(), { expire: 0 });
   revalidateTag(pageCacheTag(), stale);
@@ -373,10 +471,14 @@ export function negotiateEncoding(
   return best;
 }
 
-/** Strong validator for one encoded representation of `bytes`. */
-function entityTag(bytes: Uint8Array, encoding: ResponseEncoding): string {
-  const digest = createHash('sha256').update(bytes).digest('base64url').slice(0, 32);
-  return encoding === 'identity' ? `"${digest}"` : `"${digest}-${encoding}"`;
+function entityTag(digest: string, coding: string): string {
+  return coding === 'identity' ? `"${digest}"` : `"${digest}-${coding}"`;
+}
+
+const ENTITY_DIGEST_CHARS = 32;
+
+function entityDigest(source: Uint8Array | string): string {
+  return createHash('sha256').update(source).digest('base64url').slice(0, ENTITY_DIGEST_CHARS);
 }
 
 /** If-None-Match uses weak comparison (RFC 9110 §13.1.2). */
@@ -393,6 +495,12 @@ const STREAM_CHUNK_BYTES = 64 * 1024;
 // Quality 9 is about 2x gzip's CPU and 8-25% smaller on the dashboard
 // payloads. Quality 10+ is 10-40x slower, too slow for a cold CDN miss.
 const BROTLI_QUALITY = 9;
+const MIB = 1024 * 1024;
+
+function brotliQualityFor(size: number): number {
+  if (size < MIB) return BROTLI_QUALITY;
+  return size < 4 * MIB ? 8 : 7;
+}
 
 function identityBody(bytes: Uint8Array): ReadableStream<Uint8Array> {
   return new ReadableStream({
@@ -405,12 +513,16 @@ function identityBody(bytes: Uint8Array): ReadableStream<Uint8Array> {
   });
 }
 
-function compressedBody(bytes: Uint8Array, encoding: 'br' | 'gzip'): ReadableStream<Uint8Array> {
+function compressedBody(
+  bytes: Uint8Array,
+  encoding: 'br' | 'gzip',
+  brotliQuality: number,
+): ReadableStream<Uint8Array> {
   const encoder =
     encoding === 'br'
       ? createBrotliCompress({
           params: {
-            [zlibConstants.BROTLI_PARAM_QUALITY]: BROTLI_QUALITY,
+            [zlibConstants.BROTLI_PARAM_QUALITY]: brotliQuality,
             [zlibConstants.BROTLI_PARAM_MODE]: zlibConstants.BROTLI_MODE_TEXT,
             [zlibConstants.BROTLI_PARAM_SIZE_HINT]: bytes.byteLength,
           },
@@ -452,6 +564,45 @@ function compressedBody(bytes: Uint8Array, encoding: 'br' | 'gzip'): ReadableStr
  */
 export type JsonCompression = 'origin' | 'cdn';
 
+interface CachedJsonOptions {
+  tag?: string;
+  cacheControl?: string;
+  version?: string;
+  compression?: JsonCompression;
+}
+
+function jsonValidation(
+  request: Request,
+  digest: string,
+  options: CachedJsonOptions | undefined,
+  brotliQuality = BROTLI_QUALITY,
+) {
+  const originCompression = options?.compression !== 'cdn';
+  const encoding = originCompression
+    ? negotiateEncoding(request.headers.get('Accept-Encoding'))
+    : 'identity';
+  const etag = entityTag(
+    digest,
+    encoding === 'br' && brotliQuality !== BROTLI_QUALITY ? `br${brotliQuality}` : encoding,
+  );
+  const headers = {
+    ETag: etag,
+    ...(originCompression ? { Vary: 'Accept-Encoding' } : {}),
+    ...cdnHeaders(options?.tag, options?.cacheControl),
+  };
+  const notModified = matchesIfNoneMatch(request.headers.get('If-None-Match'), etag)
+    ? new Response(null, { status: 304, headers })
+    : null;
+  return { encoding, headers, notModified };
+}
+
+export function notModifiedJson(
+  request: Request,
+  options: CachedJsonOptions & { version: string },
+): Response | null {
+  return jsonValidation(request, entityDigest(options.version), options).notModified;
+}
+
 /**
  * CDN-cached streamed JSON response — supports up to 20 MB on Vercel CDN.
  * With `compression: 'origin'` (default) the body is brotli, gzip, or identity
@@ -459,33 +610,140 @@ export type JsonCompression = 'origin' | 'cdn';
  * it is always identity. Either way it carries a strong ETag, and a matching
  * If-None-Match gets a bodiless 304.
  */
-export function cachedJson<T>(
+export function cachedJson<T>(request: Request, data: T, options?: CachedJsonOptions): Response {
+  return cachedJsonBytes(request, new TextEncoder().encode(JSON.stringify(data)), options);
+}
+
+export function cachedJsonBytes(
   request: Request,
-  data: T,
-  options?: { tag?: string; cacheControl?: string; compression?: JsonCompression },
+  bytes: Uint8Array,
+  options?: CachedJsonOptions,
 ): Response {
-  const bytes = new TextEncoder().encode(JSON.stringify(data));
-  const originCompression = options?.compression !== 'cdn';
-  const encoding = originCompression
-    ? negotiateEncoding(request.headers.get('Accept-Encoding'))
-    : 'identity';
-  const etag = entityTag(bytes, encoding);
-  const cacheHeaders = {
-    ETag: etag,
-    ...(originCompression ? { Vary: 'Accept-Encoding' } : {}),
-    ...cdnHeaders(options?.tag, options?.cacheControl),
-  };
-  if (matchesIfNoneMatch(request.headers.get('If-None-Match'), etag)) {
-    return new Response(null, { status: 304, headers: cacheHeaders });
-  }
+  const brotliQuality = options?.version ? BROTLI_QUALITY : brotliQualityFor(bytes.byteLength);
+  const {
+    encoding,
+    headers: cacheHeaders,
+    notModified,
+  } = jsonValidation(request, entityDigest(options?.version ?? bytes), options, brotliQuality);
+  if (notModified) return notModified;
   if (encoding === 'identity') {
     return new Response(identityBody(bytes), {
       headers: { 'Content-Type': 'application/json', ...cacheHeaders },
     });
   }
-  return new Response(compressedBody(bytes, encoding), {
+  return new Response(compressedBody(bytes, encoding, brotliQuality), {
     headers: { 'Content-Type': 'application/json', 'Content-Encoding': encoding, ...cacheHeaders },
   });
+}
+
+interface EncodedJson {
+  readonly digest: string;
+  readonly brotliQuality: number;
+  readonly body: Uint8Array;
+}
+
+const IDENTITY_BODY = 0;
+
+const compressAsync = promisify(brotliCompress);
+
+async function encodeJson(data: unknown, compression: JsonCompression): Promise<EncodedJson> {
+  const bytes = new TextEncoder().encode(JSON.stringify(data));
+  const digest = entityDigest(bytes);
+  if (compression === 'cdn') return { digest, brotliQuality: IDENTITY_BODY, body: bytes };
+  const brotliQuality = brotliQualityFor(bytes.byteLength);
+  const body = await compressAsync(bytes, {
+    params: {
+      [zlibConstants.BROTLI_PARAM_QUALITY]: brotliQuality,
+      [zlibConstants.BROTLI_PARAM_MODE]: zlibConstants.BROTLI_MODE_TEXT,
+      [zlibConstants.BROTLI_PARAM_SIZE_HINT]: bytes.byteLength,
+    },
+  });
+  return { digest, brotliQuality, body };
+}
+
+function storedEncodedJson({ digest, brotliQuality, body }: EncodedJson): Uint8Array {
+  const stored = new Uint8Array(1 + ENTITY_DIGEST_CHARS + body.byteLength);
+  stored[0] = brotliQuality;
+  new TextEncoder().encodeInto(digest, stored.subarray(1, 1 + ENTITY_DIGEST_CHARS));
+  stored.set(body, 1 + ENTITY_DIGEST_CHARS);
+  return stored;
+}
+
+function readEncodedJson(stored: Uint8Array): EncodedJson {
+  return {
+    brotliQuality: stored[0],
+    digest: new TextDecoder().decode(stored.subarray(1, 1 + ENTITY_DIGEST_CHARS)),
+    body: stored.subarray(1 + ENTITY_DIGEST_CHARS),
+  };
+}
+
+function encodedJsonResponse(
+  request: Request,
+  encoded: EncodedJson,
+  options: CachedJsonOptions | undefined,
+): Response {
+  const {
+    encoding,
+    headers: cacheHeaders,
+    notModified,
+  } = jsonValidation(request, encoded.digest, options, encoded.brotliQuality);
+  if (notModified) return notModified;
+  const storedCoding = encoded.brotliQuality === IDENTITY_BODY ? 'identity' : 'br';
+  if (encoding === storedCoding) {
+    return new Response(identityBody(encoded.body), {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(encoding === 'br' ? { 'Content-Encoding': 'br' } : {}),
+        ...cacheHeaders,
+      },
+    });
+  }
+  const bytes = brotliDecompressSync(encoded.body);
+  if (encoding === 'identity') {
+    return new Response(identityBody(bytes), {
+      headers: { 'Content-Type': 'application/json', ...cacheHeaders },
+    });
+  }
+  return new Response(compressedBody(bytes, encoding, encoded.brotliQuality), {
+    headers: { 'Content-Type': 'application/json', 'Content-Encoding': encoding, ...cacheHeaders },
+  });
+}
+
+export function cachedJsonResponse<Args extends unknown[]>(
+  load: (...args: Args) => Promise<unknown>,
+  keyPrefix: string,
+  options?: CachedJsonOptions,
+): (request: Request, ...args: Args) => Promise<Response> {
+  const compression = options?.compression ?? 'origin';
+  const suffix = compression === 'cdn' ? 'response.json' : 'response.br';
+  const inflight = new Map<string, Promise<EncodedJson>>();
+  const fill = async (path: string, args: Args): Promise<EncodedJson> => {
+    const stored = await blobGetBytes(path);
+    if (stored !== null && stored.byteLength > 1 + ENTITY_DIGEST_CHARS)
+      return readEncodedJson(stored);
+    const encoded = await encodeJson(await load(...args), compression);
+    try {
+      await blobSetBytes(path, storedEncodedJson(encoded));
+    } catch (error) {
+      console.warn(
+        `[blob cache] could not persist ${keyPrefix} response; serving it uncached. ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+    return encoded;
+  };
+  return async (request: Request, ...args: Args): Promise<Response> => {
+    if (!blobEnabled()) return cachedJson(request, await load(...args), options);
+    blobGeneration ??= cachedQuery(() => Promise.resolve(randomUUID()), 'blob-generation');
+    const path = `generation/${await blobGeneration()}/${blobKeyForArgs(keyPrefix, args)}.${suffix}`;
+    let flight = inflight.get(path);
+    if (!flight) {
+      flight = fill(path, args).finally(() => inflight.delete(path));
+      inflight.set(path, flight);
+    }
+    return encodedJsonResponse(request, await flight, options);
+  };
 }
 
 /** Isolated Blob key subtree for this deployment's OperatorX comparisons. */

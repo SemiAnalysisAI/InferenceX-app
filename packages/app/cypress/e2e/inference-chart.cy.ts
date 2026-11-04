@@ -1,3 +1,4 @@
+import type { AvailabilityRow } from '@/lib/api/api';
 import { buildStagedChartLinks } from '../../src/lib/benchmarks/staged-chart-links';
 import type { InferenceData } from '@/components/inference/types';
 import {
@@ -7,8 +8,10 @@ import {
   VR_LATEST_FIXTURE_RUN,
 } from '../support/vr-publication-fixtures';
 import {
+  availabilityBody,
   expectNoPageOverflow,
   unlockAgenticGate,
+  interceptBenchmarkPresence,
   interceptDerivedAgenticMetrics,
   selectXAxisMode,
 } from '../support/e2e';
@@ -21,6 +24,7 @@ import {
   b300Rows,
   singleTurnRows,
 } from '../support/overlay-fixtures';
+import { pointsIn } from '../support/scatter-points';
 
 function openYAxisHelp(metric: string) {
   cy.get('[data-testid="inference-secondary-controls"] > button').then(($toggle) => {
@@ -77,14 +81,17 @@ const boundaryRows = (runUrl: string | null) =>
   }));
 
 function interceptMeasuredComparison(
-  official: object[] = measuredRows(null),
+  official: AvailabilityRow[] = measuredRows(null),
   overlay: object[] = measuredRows(OVERLAY_RUN_URL),
 ) {
-  cy.intercept('GET', '/api/v1/availability', { body: official.slice(0, 1) });
+  cy.intercept('GET', '/api/v1/availability/compact', {
+    body: availabilityBody(official.slice(0, 1)),
+  });
   cy.intercept('GET', '/api/v1/benchmarks*', { body: official });
   cy.intercept('GET', '/api/v1/workflow-info*', {
     body: { runs: [], changelogs: [], configs: [] },
   });
+  cy.intercept('GET', '/api/v1/workflow-changelogs*', { body: { dates: [] } });
   cy.intercept('GET', '/api/unofficial-run*', {
     body: {
       runInfos: [
@@ -106,31 +113,44 @@ function interceptMeasuredComparison(
   }).as('measuredOverlay');
 }
 
-function assertMeasuredValues(selector: string, expected: number[]) {
-  cy.get<SVGElement & { __data__: { y: number } }>(
-    `[data-testid="inference-chart-display"] svg ${selector}`,
-  ).should(($points) => {
-    expect(Array.from($points, (point) => point.__data__.y).sort((a, b) => a - b)).to.deep.equal(
-      expected,
-    );
+const CHART_DISPLAY = '[data-testid="inference-chart-display"]';
+
+type PointSource = 'scatter' | '.dot-group' | '.unofficial-overlay-pt';
+type BoundPoint = HTMLElement & { __data__: { y: number } };
+
+function measuredValues(
+  $display: JQuery<HTMLElement>,
+  source: PointSource,
+  visibleOnly: boolean,
+): number[] {
+  if (source === 'scatter') {
+    return pointsIn($display)
+      .filter((point) => !visibleOnly || point.opacity === 1)
+      .map((point) => point.datum.y)
+      .sort((a, b) => a - b);
+  }
+  const elements = $display.find(`svg ${source}`).toArray() as BoundPoint[];
+  return elements
+    .filter((element) => !visibleOnly || getComputedStyle(element).opacity === '1')
+    .map((element) => element.__data__.y)
+    .sort((a, b) => a - b);
+}
+
+function assertMeasuredValues(source: PointSource, expected: number[]) {
+  cy.get(CHART_DISPLAY).should(($display) => {
+    expect(measuredValues($display, source, false)).to.deep.equal(expected);
   });
 }
 
-function assertVisibleMeasuredValues(selector: string, expected: number[]) {
-  cy.get<SVGElement & { __data__: { y: number } }>(
-    `[data-testid="inference-chart-display"] svg ${selector}`,
-  ).should(($points) => {
-    const values = [...$points]
-      .filter((point) => getComputedStyle(point).opacity === '1')
-      .map((point) => point.__data__.y)
-      .sort((a, b) => a - b);
-    expect(values).to.deep.equal(expected);
+function assertVisibleMeasuredValues(source: PointSource, expected: number[]) {
+  cy.get(CHART_DISPLAY).should(($display) => {
+    expect(measuredValues($display, source, true)).to.deep.equal(expected);
   });
 }
 
 describe('Inference Chart', () => {
   before(() => {
-    cy.intercept('GET', '/api/v1/availability').as('chartAvailability');
+    cy.intercept('GET', '/api/v1/availability/compact').as('chartAvailability');
     cy.intercept('GET', '/api/v1/benchmarks*').as('chartBenchmarks');
     cy.viewport(1440, 900);
     cy.window().then((win) => {
@@ -236,10 +256,7 @@ describe('Inference Chart', () => {
       .first()
       .find('h2')
       .should('contain.text', 'Token Revenue per GPU Hour at OpenRouter Pricing');
-    cy.get('[data-testid="inference-chart-display"] svg .dot-group').should(
-      'have.length.greaterThan',
-      0,
-    );
+    cy.scatterPoints(CHART_DISPLAY).should('have.length.greaterThan', 0);
     cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(
       'have.length.greaterThan',
       0,
@@ -258,7 +275,7 @@ describe('Inference Chart', () => {
   it('keeps cost controls below the plot when changing tiers on mobile', () => {
     cy.viewport(375, 900);
     cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_metric=tokensPerDollarH');
-    cy.get('#chart-0 [data-testid="d3-chart-svg"] .dot-group').should('have.length.greaterThan', 0);
+    cy.scatterPoints('#chart-0').should('have.length.greaterThan', 0);
     cy.get('#chart-0').should(($chart) => assertContextBelowPlot($chart[0]!));
     cy.get('#chart-0 [data-testid="cost-tier-selector"]').click();
     cy.get('[data-testid="cost-tier-rental"]').click();
@@ -302,10 +319,7 @@ describe('Inference Chart', () => {
       .should('contain.text', 'Owning at Large Hyperscaler Volume')
       .find('[data-testid="cost-tier-selector"]')
       .should('be.visible');
-    cy.get('[data-testid="inference-chart-display"] svg .dot-group').should(
-      'have.length.greaterThan',
-      0,
-    );
+    cy.scatterPoints(CHART_DISPLAY).should('have.length.greaterThan', 0);
     cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(
       'have.length.greaterThan',
       0,
@@ -418,7 +432,7 @@ describe('Inference Chart', () => {
   });
 
   it('surfaces the error instead of an endless skeleton when availability fails', () => {
-    cy.intercept('GET', '/api/v1/availability*', { statusCode: 500, body: {} }).as(
+    cy.intercept('GET', '/api/v1/availability/compact', { statusCode: 500, body: {} }).as(
       'availabilityFailure',
     );
     cy.visit('/inference');
@@ -440,8 +454,8 @@ describe('Deprecated model source attribution', () => {
       ['MiniMax-M3.1-Flash', 'minimaxm31flash', false],
     ] as const) {
       const rows = b300Rows(null).map((row) => ({ ...row, model: dbKey }));
-      cy.intercept('GET', '/api/v1/availability', {
-        body: rows.map(({ metrics: _metrics, ...row }) => row),
+      cy.intercept('GET', '/api/v1/availability/compact', {
+        body: availabilityBody(rows.map(({ metrics: _metrics, ...row }) => row)),
       });
       cy.intercept('GET', '/api/v1/benchmarks*', { body: rows });
       cy.visit(`/inference?g_model=${display}&i_seq=agentic-traces`, {
@@ -459,8 +473,8 @@ describe('Deprecated model source attribution', () => {
     const model = 'minimaxm3';
     const officialRows = b300Rows(null).map((row) => ({ ...row, model }));
     const overlayRows = b300Rows(OVERLAY_RUN_URL).map((row) => ({ ...row, model }));
-    cy.intercept('GET', '/api/v1/availability', {
-      body: officialRows.map(({ metrics: _metrics, ...row }) => row),
+    cy.intercept('GET', '/api/v1/availability/compact', {
+      body: availabilityBody(officialRows.map(({ metrics: _metrics, ...row }) => row)),
     });
     cy.intercept('GET', '/api/v1/benchmarks*', { body: officialRows });
     cy.intercept('GET', '/api/unofficial-run*', {
@@ -648,11 +662,14 @@ describe('AgentX replaces a complete curve while preserving an unofficial compar
       run_started_at: '2026-09-01T21:32:27Z',
       run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/33219706372/attempts/2',
     };
-    cy.intercept('GET', '/api/v1/availability', { body: current.slice(0, 1) });
+    cy.intercept('GET', '/api/v1/availability/compact', {
+      body: availabilityBody(current.slice(0, 1)),
+    });
     cy.intercept('GET', '/api/v1/benchmarks*', { body: [old, ...current] });
     cy.intercept('GET', '/api/v1/workflow-info*', {
       body: { runs: [], changelogs: [], configs: [] },
     });
+    cy.intercept('GET', '/api/v1/workflow-changelogs*', { body: { dates: [] } });
     cy.intercept('GET', '/api/unofficial-run*', {
       body: {
         runInfos: [
@@ -688,7 +705,7 @@ describe('AgentX replaces a complete curve while preserving an unofficial compar
     cy.get('#scatter-hide-non-optimal').then(($toggle) => {
       if ($toggle.attr('data-state') === 'checked') cy.wrap($toggle).click();
     });
-    cy.get('[data-testid="inference-chart-display"] svg .dot-group').should('have.length', 6);
+    cy.scatterPoints(CHART_DISPLAY).should('have.length', 6);
     cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(
       'have.length',
       6,
@@ -697,12 +714,12 @@ describe('AgentX replaces a complete curve while preserving an unofficial compar
     cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(
       'not.exist',
     );
-    cy.get('[data-testid="inference-chart-display"] svg .dot-group').should('have.length', 6);
+    cy.scatterPoints(CHART_DISPLAY).should('have.length', 6);
   });
 });
 
 it('opens an old Inference power link on PowerX with the same metric', () => {
-  cy.intercept('GET', '/api/v1/availability').as('powerLinkAvailability');
+  cy.intercept('GET', '/api/v1/availability/compact').as('powerLinkAvailability');
   cy.intercept('GET', '/api/v1/benchmarks*').as('powerLinkBenchmarks');
   cy.viewport(1440, 900);
   cy.visit('/inference/qwen-3-5?i_seq=8k%2F1k&i_prec=fp8&i_metric=y_measuredPowerPercentTdp', {
@@ -744,15 +761,15 @@ it('replots measured settings for official and unofficial data and preserves ove
   });
   cy.get('[data-testid="measured-power-statistic-p75"]').click();
   cy.get('[data-testid="chart-figure"] h2').should('contain', 'Measured P75 Fleet Power per Chip');
-  assertMeasuredValues('.dot-group', [500, 510, 520, 530]);
+  assertMeasuredValues('scatter', [500, 510, 520, 530]);
   assertMeasuredValues('.unofficial-overlay-pt', [550, 560, 570, 580]);
   cy.get('[data-testid="powerx-tab-energy"]').click();
   cy.get('[data-testid="chart-figure"] h2').should('contain', 'Measured Joules per Token');
-  assertMeasuredValues('.dot-group', [2, 3, 4, 5]);
+  assertMeasuredValues('scatter', [2, 3, 4, 5]);
   assertMeasuredValues('.unofficial-overlay-pt', [3, 4, 5, 6]);
   cy.get('[aria-label="Dismiss measured-comparison"]').click();
   cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should('not.exist');
-  assertMeasuredValues('.dot-group', [2, 3, 4, 5]);
+  assertMeasuredValues('scatter', [2, 3, 4, 5]);
 });
 
 it('says when chosen chip configs report no measured power, and plots them on other metrics', () => {
@@ -771,10 +788,7 @@ it('says when chosen chip configs report no measured power, and plots them on ot
     { onBeforeLoad: unlockAgenticGate },
   );
   cy.get('[data-testid="scatter-empty-state"]').should('not.exist');
-  cy.get('[data-testid="inference-chart-display"] svg .dot-group').should(
-    'have.length.at.least',
-    1,
-  );
+  cy.scatterPoints(CHART_DISPLAY).should('have.length.at.least', 1);
 });
 
 it('uses Optimal Only to filter power boundary dots without replacing official or overlay curves', () => {
@@ -790,7 +804,7 @@ it('uses Optimal Only to filter power boundary dots without replacing official o
     if ($toggle.attr('data-state') === 'unchecked') cy.wrap($toggle).click();
   });
   cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
-  assertVisibleMeasuredValues('.dot-group', [650, 700, 900]);
+  assertVisibleMeasuredValues('scatter', [650, 700, 900]);
   assertVisibleMeasuredValues('.unofficial-overlay-pt', [700, 750, 950]);
 
   const curves = '[data-testid="inference-chart-display"] .roofline-path, .overlay-roofline-path';
@@ -808,7 +822,7 @@ it('uses Optimal Only to filter power boundary dots without replacing official o
       for (const optimalOnly of [false, true]) {
         cy.get('#scatter-hide-non-optimal').click();
         assertVisibleMeasuredValues(
-          '.dot-group',
+          'scatter',
           optimalOnly ? [650, 700, 900] : [200, 650, 700, 900],
         );
         assertVisibleMeasuredValues(
@@ -827,7 +841,7 @@ it('uses Optimal Only to filter power boundary dots without replacing official o
   cy.get('[data-testid="powerx-tab-energy"]').click();
   cy.get('[data-testid="chart-figure"] h2').should('contain', 'Measured Joules per Token');
   cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
-  assertVisibleMeasuredValues('.dot-group', [2, 4, 5]);
+  assertVisibleMeasuredValues('scatter', [2, 4, 5]);
   assertVisibleMeasuredValues('.unofficial-overlay-pt', [3, 5, 6]);
   cy.get(curves)
     .should('have.length', 2)
@@ -835,7 +849,7 @@ it('uses Optimal Only to filter power boundary dots without replacing official o
       for (const curve of $curves) expect(curve.dataset.curveKind).to.equal('pareto');
     });
   cy.get('#scatter-hide-non-optimal').click();
-  assertVisibleMeasuredValues('.dot-group', [2, 4, 4.5, 5]);
+  assertVisibleMeasuredValues('scatter', [2, 4, 4.5, 5]);
   assertVisibleMeasuredValues('.unofficial-overlay-pt', [3, 5, 5.5, 6]);
 });
 
@@ -844,21 +858,8 @@ describe('VR publication data compatibility', () => {
     it(`renders September TRTLLM data and cache metrics under ${locale || '/en'}`, () => {
       interceptVrPublicationData();
       cy.visit(`${locale}/inference/deepseek-v4?i_metric=y_tpPerGpu`);
-      cy.get('[data-testid="inference-chart-display"] svg .dot-group').should(($dots) => {
-        const points = [...$dots].map(
-          (node) =>
-            (
-              node as unknown as {
-                __data__: {
-                  id: number;
-                  actualDate: string;
-                  hwKey: string;
-                  server_gpu_cache_hit_rate: number;
-                  theoretical_cache_hit_rate: number;
-                };
-              }
-            ).__data__,
-        );
+      cy.scatterPoints(CHART_DISPLAY).should((scatter) => {
+        const points = scatter.map((point) => point.datum);
         const vr = points.filter((point) => point.hwKey.startsWith('vr200_'));
         expect(new Set(vr.map((point) => Number(point.id))).size).to.equal(4);
         for (const point of vr) {
@@ -877,21 +878,8 @@ describe('VR publication data compatibility', () => {
 });
 
 function assertVrDate(expectedDate: string) {
-  cy.get('[data-testid="inference-chart-display"] svg .dot-group').should(($dots) => {
-    const points = [...$dots].map(
-      (node) =>
-        (
-          node as unknown as {
-            __data__: {
-              id: number;
-              hwKey: string;
-              actualDate: string;
-              server_gpu_cache_hit_rate: number;
-              physicalChips: number;
-            };
-          }
-        ).__data__,
-    );
+  cy.scatterPoints(CHART_DISPLAY).should((scatter) => {
+    const points = scatter.map((point) => point.datum);
     const vr = points.filter((point) => point.hwKey.startsWith('vr200_'));
     const latest = expectedDate === VR_LATEST_FIXTURE_DATE;
     expect(new Set(vr.map((point) => Number(point.id))).size).to.equal(4);
@@ -973,17 +961,19 @@ const withTp4 = (rows: ReturnType<typeof boundaryRows>) => [
 ];
 
 const assertVisibleLoads = (expected: number[]) => {
-  for (const selector of ['.dot-group', '.unofficial-overlay-pt']) {
-    cy.get<SVGElement & { __data__: InferenceData }>(
-      `[data-testid="inference-chart-display"] svg ${selector}`,
-    ).should(($points) => {
-      expect($points).to.have.length(expected.length);
-      expect(
-        [...$points].map((element) => element.__data__.conc).sort((a, b) => a - b),
-      ).to.deep.equal(expected);
-      for (const element of $points) expect(getComputedStyle(element).opacity).to.equal('1');
-    });
-  }
+  cy.scatterPoints(CHART_DISPLAY).should((points) => {
+    expect(points.map((point) => point.datum.conc).sort((a, b) => a - b)).to.deep.equal(expected);
+    for (const point of points) expect(point.opacity).to.equal(1);
+  });
+  cy.get<SVGElement & { __data__: InferenceData }>(
+    `${CHART_DISPLAY} svg .unofficial-overlay-pt`,
+  ).should(($points) => {
+    expect($points).to.have.length(expected.length);
+    expect(
+      [...$points].map((element) => element.__data__.conc).sort((a, b) => a - b),
+    ).to.deep.equal(expected);
+    for (const element of $points) expect(getComputedStyle(element).opacity).to.equal('1');
+  });
 };
 
 describe('Date comparison with unofficial runs', () => {
@@ -1036,7 +1026,9 @@ describe('Staged Pareto deep links', () => {
       workflow_run_id: 42,
     }));
     const otherRows = b300Rows(null, 'b200');
-    cy.intercept('GET', '/api/v1/availability*', { body: [stagedRows[0], otherRows[0]] });
+    cy.intercept('GET', '/api/v1/availability/compact', {
+      body: availabilityBody([stagedRows[0]!, otherRows[0]!]),
+    });
     cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
       if (request.query['exactRun'] === 'true' && request.query['runId'] === runId) {
         request.alias = 'stagedSnapshot';
@@ -1063,8 +1055,8 @@ describe('Staged Pareto deep links', () => {
         runConfigs: [],
       },
     });
-    cy.intercept('GET', '/api/v1/trace-availability*', { body: {} });
-    cy.intercept('GET', '/api/v1/log-availability*', { body: {} });
+    cy.intercept('GET', '/api/v1/workflow-changelogs*', { body: { dates: [] } });
+    interceptBenchmarkPresence();
     const [link] = buildStagedChartLinks('http://localhost:3000', runId, [stagedRows[0]!]);
     const url = new URL(link!.url);
     cy.visit(`${url.pathname}${url.search}`, {
@@ -1132,14 +1124,15 @@ describe('Qwen3.5 chart defaults', () => {
   );
 
   beforeEach(() => {
-    cy.intercept('GET', '/api/v1/availability*', {
-      body: rows.map(({ metrics: _metrics, ...row }) => row),
+    cy.intercept('GET', '/api/v1/availability/compact', {
+      body: availabilityBody(rows.map(({ metrics: _metrics, ...row }) => row)),
     });
     cy.intercept('GET', '/api/v1/benchmarks*', { body: rows });
-    cy.intercept('GET', '/api/v1/trace-availability*', { body: {} });
+    interceptBenchmarkPresence();
     cy.intercept('GET', '/api/v1/workflow-info*', {
       body: { runs: [], changelogs: [], configs: [], runConfigs: [] },
     });
+    cy.intercept('GET', '/api/v1/workflow-changelogs*', { body: { dates: [] } });
     cy.viewport(1440, 1000);
   });
 
@@ -1214,8 +1207,8 @@ describe('Qwen3.5 chart defaults', () => {
         row,
         { ...row, id: row.id + 1000, precision: 'fp4' },
       ]);
-      cy.intercept('GET', '/api/v1/availability*', {
-        body: precisionRows.map(({ metrics: _metrics, ...row }) => row),
+      cy.intercept('GET', '/api/v1/availability/compact', {
+        body: availabilityBody(precisionRows.map(({ metrics: _metrics, ...row }) => row)),
       });
       cy.intercept('GET', '/api/v1/benchmarks*', { body: precisionRows });
       cy.visit(`${path}${path.includes('?') ? '&' : '?'}i_prec=fp8&i_xmode=ttft`, {

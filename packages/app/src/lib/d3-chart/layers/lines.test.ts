@@ -118,6 +118,22 @@ describe('renderLines', () => {
 
     expect(pathsByKey(group).gapped.getAttribute('d')).toBe('M0,160ZM200,120Z');
   });
+
+  it('omits the dash pattern and the path when a series has none to draw', () => {
+    const group = makeGroup();
+    const { xScale, yScale } = makeScales();
+    renderLines(
+      group,
+      { hidden: [{ x: 1, y: 0 }], ...SAMPLE_LINES },
+      xScale,
+      yScale,
+      makeConfig({ isDefined: (d) => d.y > 0 }),
+    );
+
+    const paths = pathsByKey(group);
+    expect(paths.seriesA.hasAttribute('stroke-dasharray')).toBe(false);
+    expect(paths.hidden.hasAttribute('d')).toBe(false);
+  });
 });
 
 describe('updateLinesOnZoom', () => {

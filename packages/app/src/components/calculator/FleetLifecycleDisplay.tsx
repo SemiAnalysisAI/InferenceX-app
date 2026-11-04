@@ -11,7 +11,7 @@ import {
   resolveCalculatorVisibility,
   type CalculatorVisibilityIntent,
 } from '@/components/calculator/ThroughputCalculatorDisplay';
-import type { CalculatorUrlSeed } from '@/components/calculator/url-seed';
+import { CalculatorUrlSeedBoundary } from '@/components/calculator/url-seed-boundary';
 import {
   GlobalFilterProvider,
   useGlobalFilterActions,
@@ -129,17 +129,21 @@ const COST_TYPE_LABELS_ZH: Record<CostType, string> = {
   output: '输出 Token',
 };
 
-export default function FleetLifecycleDisplay({ urlSeed }: { urlSeed?: CalculatorUrlSeed }) {
+export default function FleetLifecycleDisplay() {
   return (
-    <GlobalFilterProvider
-      initialModel={urlSeed?.model}
-      initialSequence={urlSeed?.sequence}
-      initialPrecisions={urlSeed?.precisions}
-      initialRunDate={urlSeed?.runDate}
-      initialRunId={urlSeed?.runId}
-    >
-      <FleetLifecycleInner initialPercentile={urlSeed?.percentile ?? Percentile.P90} />
-    </GlobalFilterProvider>
+    <CalculatorUrlSeedBoundary>
+      {(urlSeed) => (
+        <GlobalFilterProvider
+          initialModel={urlSeed.model}
+          initialSequence={urlSeed.sequence}
+          initialPrecisions={urlSeed.precisions}
+          initialRunDate={urlSeed.runDate}
+          initialRunId={urlSeed.runId}
+        >
+          <FleetLifecycleInner initialPercentile={urlSeed.percentile ?? Percentile.P90} />
+        </GlobalFilterProvider>
+      )}
+    </CalculatorUrlSeedBoundary>
   );
 }
 

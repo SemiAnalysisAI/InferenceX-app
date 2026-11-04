@@ -4,6 +4,7 @@ import { CHIP_BASIS_METRICS, chipBasisCsvNote } from '@/lib/benchmarks/chip-basi
 import { track } from '@/lib/analytics/analytics';
 import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
 import { useLocale } from '@/lib/i18n/use-locale';
+import dynamic from 'next/dynamic';
 import React, { useCallback, useMemo, useState } from 'react';
 
 import {
@@ -19,7 +20,6 @@ import ChartControls from '@/components/inference/ui/ChartControls';
 import { CostTierSelector } from '@/components/inference/ui/CostTierSelector';
 import { TcoBasisCaption } from '@/components/inference/ui/TcoBasisCaption';
 import TrendChart from '@/components/inference/ui/TrendChart';
-import ImprovementWaterfallChart from '@/components/inference/ui/ImprovementWaterfallChart';
 import { Card } from '@/components/ui/card';
 import { ChartButtons } from '@/components/ui/chart-buttons';
 import { ChartShareActions, MetricAssumptionNotes } from '@/components/ui/chart-display-helpers';
@@ -61,6 +61,11 @@ import {
   type MetricKey,
 } from '@/components/inference/metric-registry';
 import { Button } from '@/components/ui/button';
+
+const ImprovementWaterfallChart = dynamic(
+  () => import('@/components/inference/ui/ImprovementWaterfallChart'),
+  { loading: () => <Skeleton className="h-[430px] w-full" /> },
+);
 
 const STRINGS = {
   en: {

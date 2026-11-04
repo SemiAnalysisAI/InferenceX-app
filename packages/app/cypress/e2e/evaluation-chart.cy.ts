@@ -1,4 +1,6 @@
-import { expectNoPageOverflow } from '../support/e2e';
+import { compactEvalRows } from '@/components/evaluation/compact-rows';
+
+import { availabilityBody, expectNoPageOverflow } from '../support/e2e';
 
 describe('Evaluation Chart — Content & Interactions', () => {
   before(() => {
@@ -383,10 +385,12 @@ describe('Evaluation Chart — Simplified Chinese mobile path', () => {
     cy.fixture('api/evaluations.json').then((evaluations) => {
       let attempts = 0;
       let succeed = false;
-      cy.intercept('GET', '/api/v1/evaluations', (request) => {
+      cy.intercept('GET', '/api/v1/evaluations/compact', (request) => {
         attempts += 1;
         request.reply(
-          succeed ? { statusCode: 200, body: evaluations } : { statusCode: 500, body: {} },
+          succeed
+            ? { statusCode: 200, body: compactEvalRows(evaluations) }
+            : { statusCode: 500, body: {} },
         );
       });
       cy.visit('/zh/evaluation?e2e=fetch-error');
@@ -410,13 +414,18 @@ describe('Evaluation Chart — Simplified Chinese mobile path', () => {
       cy.fixture('api/evaluations.json').then((evaluations) => {
         let availabilityAttempts = 0;
         let succeed = false;
-        cy.intercept('GET', '/api/v1/availability*', (request) => {
+        cy.intercept('GET', '/api/v1/availability/compact', (request) => {
           availabilityAttempts += 1;
           request.reply(
-            succeed ? { statusCode: 200, body: availability } : { statusCode: 500, body: {} },
+            succeed
+              ? { statusCode: 200, body: availabilityBody(availability) }
+              : { statusCode: 500, body: {} },
           );
         });
-        cy.intercept('GET', '/api/v1/evaluations', { statusCode: 200, body: evaluations });
+        cy.intercept('GET', '/api/v1/evaluations/compact', {
+          statusCode: 200,
+          body: compactEvalRows(evaluations),
+        });
         cy.visit('/zh/evaluation?e2e=availability-retry');
 
         cy.get('[data-testid="evaluation-query-error"]', { timeout: 15000 })
@@ -442,7 +451,10 @@ describe('Evaluation Chart — Simplified Chinese mobile path', () => {
   });
 
   it('renders a successful empty response without offering an error retry', () => {
-    cy.intercept('GET', '/api/v1/evaluations', { statusCode: 200, body: [] });
+    cy.intercept('GET', '/api/v1/evaluations/compact', {
+      statusCode: 200,
+      body: compactEvalRows([]),
+    });
     cy.visit('/zh/evaluation?e2e=empty-success');
     cy.contains('当前筛选条件下没有可用数据。').should('be.visible');
     cy.get('[data-testid="evaluation-view-toggle"]').contains('图表').click();

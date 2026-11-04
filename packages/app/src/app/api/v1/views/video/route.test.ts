@@ -143,6 +143,15 @@ const pages = [
   ),
 ];
 const request = (query = '') => new NextRequest(`https://example.test/api/v1/views/video?${query}`);
+function historyResponse(req: NextRequest) {
+  const first = Number(req.nextUrl.searchParams.get('page')) - 1;
+  const read = pages.slice(first, first + Number(req.nextUrl.searchParams.get('pages') ?? 1));
+  return Response.json({
+    schemaVersion: 1,
+    entries: read.flatMap((item) => item.entries),
+    nextPage: read.at(-1)!.nextPage,
+  });
+}
 
 function storedServingArtifact(): StoredArtifact {
   const fixture = servingFixture();
@@ -176,8 +185,7 @@ function storedServingArtifact(): StoredArtifact {
 beforeEach(() => {
   source.mockReset();
   source.mockImplementation((req: NextRequest) => {
-    if (req.nextUrl.searchParams.get('format') === 'history')
-      return Response.json(pages[Number(req.nextUrl.searchParams.get('page')) - 1]);
+    if (req.nextUrl.searchParams.get('format') === 'history') return historyResponse(req);
     return new Response(null, { status: 204 });
   });
 });
@@ -448,7 +456,7 @@ describe('published VideoGenX dashboard projection', () => {
     const { cells } = dashboardCells(videoPoints(pages));
     const options = metricOptions(state);
     expect(body.params.view).toBe('dashboard');
-    expect(body.coverage).toEqual({ pagesRead: 2, maxPages: 5, nextPage: null, truncated: false });
+    expect(body.coverage).toEqual({ pagesRead: 1, maxPages: 5, nextPage: null, truncated: false });
     expect(body.plot).toEqual(plotVideoPoints(cells, state, () => '', new Set()));
     expect(body.rows.map((row: { point: { id: string } }) => row.point.id)).toEqual(
       listedVideoCells(cells, state, new Set()).map((p) => p.id),
@@ -468,10 +476,10 @@ describe('published VideoGenX dashboard projection', () => {
     expect(body.evidence.power).toEqual(powerUtilization(cells));
     expect(body.evidence.plateau).toEqual(concurrencyPlateau(cells));
     expect(body.comparison.cases.status).toBe('not-requested');
-    expect(source).toHaveBeenCalledTimes(2);
-    expect(
-      source.mock.calls.every(([req]) => req.nextUrl.searchParams.get('format') === 'history'),
-    ).toBe(true);
+    expect(source).toHaveBeenCalledTimes(1);
+    expect(source.mock.calls[0][0].nextUrl.searchParams.toString()).toBe(
+      'format=history&page=1&pages=5',
+    );
   });
 
   it('shares axis, tier, optimal, API price, compare and hardware-filter semantics with the UI', async () => {
@@ -513,14 +521,28 @@ describe('published VideoGenX dashboard projection', () => {
   });
 
   it('reports the same five-page bound and never silently presents truncated history as complete', async () => {
-    source.mockImplementation((req: NextRequest) =>
-      Response.json(page([], Number(req.nextUrl.searchParams.get('page')) + 1)),
-    );
+    source.mockImplementation(() => Response.json(page([], 6)));
     const response = await GET(request());
     const body = await response.json();
-    expect(source).toHaveBeenCalledTimes(5);
+    expect(source).toHaveBeenCalledTimes(1);
     expect(body.coverage).toEqual({ pagesRead: 5, maxPages: 5, nextPage: 6, truncated: true });
     expect(body.rows).toEqual([]);
+  });
+
+  it.each([
+    [0, 1],
+    [1, 1],
+    [10, 1],
+    [11, 2],
+    [30, 3],
+    [41, 5],
+  ])('counts %i complete-history entries as %i pages read', async (count, pagesRead) => {
+    const entry = page([], null).entries[0];
+    const entries = Array.from({ length: count }, () => entry);
+    source.mockImplementation(() => Response.json({ schemaVersion: 1, entries, nextPage: null }));
+    const response = await GET(request());
+    const body = await response.json();
+    expect(body.coverage).toEqual({ pagesRead, maxPages: 5, nextPage: null, truncated: false });
   });
 
   it('keeps missing published comparison media distinct from an empty successful matched case list', async () => {
@@ -540,11 +562,9 @@ describe('published VideoGenX dashboard projection', () => {
   it('pairs published cases, clamps the requested index and excludes asset URLs and raw documents', async () => {
     const saved = storedServingArtifact();
     source.mockImplementation((req: NextRequest) =>
-      Response.json(
-        req.nextUrl.searchParams.get('format') === 'published'
-          ? saved
-          : pages[Number(req.nextUrl.searchParams.get('page')) - 1],
-      ),
+      req.nextUrl.searchParams.get('format') === 'published'
+        ? Response.json(saved)
+        : historyResponse(req),
     );
     const response = await GET(request('view=compare&v_case=9999'));
     const body = await response.json();
@@ -590,7 +610,7 @@ describe('published VideoGenX dashboard projection', () => {
     source.mockImplementation((req: NextRequest) =>
       req.nextUrl.searchParams.get('format') === 'published'
         ? Response.json({ error: 'secret-token' }, { status: 503 })
-        : Response.json(pages[Number(req.nextUrl.searchParams.get('page')) - 1]),
+        : historyResponse(req),
     );
     const compareResponse = await GET(request('view=compare'));
     const body = await compareResponse.json();

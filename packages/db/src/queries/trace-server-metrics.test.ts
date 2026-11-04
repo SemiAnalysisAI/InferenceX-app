@@ -36,6 +36,7 @@ function metaRow(overrides: Record<string, unknown> = {}) {
     id: 42,
     trace_replay_id: 7,
     has_blob: true,
+    summary_gz: null,
     chart_series: currentSeries(),
     metric_sources: [],
     hardware: 'gb200',
@@ -152,8 +153,8 @@ describe('getTraceServerMetrics', () => {
     expect(result?.prefillTps).toEqual([{ t: 0, value: 321 }]);
     expect(calls).toHaveLength(3);
     expect(calls[1]).toContain('server_metrics_json_gz as blob');
-    expect(calls[2]).toContain('update agentic_trace_replay set chart_series');
-    expect(calls[2]).toContain('::jsonb where id');
+    expect(calls[2]).toContain('set chart_series = ');
+    expect(calls[2]).toContain('chart_series_summary_gz = ');
   });
 
   it('returns null without a blob and does not issue a second query', async () => {

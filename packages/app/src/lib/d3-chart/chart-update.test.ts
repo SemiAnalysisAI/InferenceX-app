@@ -10,6 +10,8 @@ import {
   setAttrIfChanged,
   setStyleIfChanged,
   setTextIfChanged,
+  writeAttrs,
+  writeText,
 } from './chart-update';
 import type { ChartLayout, ChartSetupConfig } from './types';
 
@@ -770,6 +772,142 @@ describe('write-if-changed helpers', () => {
     element.style.display = 'none';
     setStyleIfChanged(element, 'display', '');
     expect(element.style.display).toBe('');
+  });
+});
+
+describe('writeAttrs and writeText', () => {
+  it('write only changed attributes, remove nullish ones and keep attribute order', () => {
+    const element = document.createElementNS(SVG_NS, 'rect');
+    const selection = d3.select(element).datum(2);
+    writeAttrs(selection, { x: (d) => d * 10, class: 'bar', fill: 'red' });
+    expect(element.outerHTML).toBe('<rect x="20" class="bar" fill="red"></rect>');
+
+    const records = recordMutations(element, () =>
+      writeAttrs(selection, { x: (d) => d * 10, class: () => undefined, fill: null, y: 5 }),
+    );
+    expect(records.map((record) => record.attributeName)).toEqual(['class', 'fill', 'y']);
+    expect(element.outerHTML).toBe('<rect x="20" y="5"></rect>');
+  });
+
+  it('replace element children with one text node, as selection.text does', () => {
+    const element = document.createElementNS(SVG_NS, 'text');
+    const tspan = document.createElementNS(SVG_NS, 'tspan');
+    tspan.textContent = 'TP8';
+    element.append(tspan);
+    const selection = d3.select(element).datum('TP8');
+
+    writeText(selection, (d) => d);
+    expect(element.outerHTML).toBe('<text>TP8</text>');
+    expect(recordMutations(element, () => writeText(selection, (d) => d))).toHaveLength(0);
+
+    writeText(selection, () => null);
+    expect(element.childNodes).toHaveLength(0);
+    expect(recordMutations(element, () => writeText(selection, () => ''))).toHaveLength(0);
+
+    element.append('TP8', tspan);
+    writeText(selection, (d) => d);
+    expect(element.outerHTML).toBe('<text>TP8</text>');
+  });
+});
+
+const prefixedLabel = (d: d3.AxisDomain) => `#${String(d)}`;
+
+describe('renderAxes parity with d3-axis', () => {
+  it('renders the same DOM as d3 axis generators across domain, format and tick changes', () => {
+    const ours = makeLayout();
+    const theirs = makeLayout();
+    const steps: [
+      d3.ScaleLinear<number, number> | d3.ScaleLogarithmic<number, number>,
+      number[] | undefined,
+    ][] = [
+      [d3.scaleLinear().domain([0, 100]).range([0, 720]), undefined],
+      [d3.scaleLinear().domain([20, 60]).range([0, 720]), undefined],
+      [d3.scaleLinear().domain([60, 20]).range([0, 720]), [25, 30, 55, 70]],
+      [d3.scaleLog().domain([1, 1000]).range([0, 720]), undefined],
+    ];
+    for (const [index, [xScale, tickValues]] of steps.entries()) {
+      const yScale = d3
+        .scaleLinear()
+        .domain([0, 10 * (index + 1)])
+        .range([540, 0]);
+      renderAxes(ours, xScale, yScale, {
+        xTickCount: index === 1 ? 4 : undefined,
+        xTickValues: tickValues,
+        xTickFormat: index === 2 ? prefixedLabel : undefined,
+        yTickCount: 3,
+        yTickSize: index === 3 ? 0 : undefined,
+      });
+      const xGen = d3.axisBottom(xScale).tickSize(6);
+      if (index === 1) xGen.ticks(4);
+      if (tickValues) xGen.tickValues(tickValues.filter((v) => v >= 20 && v <= 60));
+      if (index === 2) xGen.tickFormat(prefixedLabel);
+      theirs.xAxisGroup.call(xGen);
+      theirs.yAxisGroup.call(
+        d3
+          .axisLeft(yScale)
+          .tickSize(index === 3 ? 0 : 6)
+          .ticks(3),
+      );
+      expect(ours.xAxisGroup.node()!.outerHTML).toBe(theirs.xAxisGroup.node()!.outerHTML);
+      expect(ours.yAxisGroup.node()!.outerHTML).toBe(theirs.yAxisGroup.node()!.outerHTML);
+    }
+  });
+
+  it('matches d3 for band and time scales and after labels are customized', () => {
+    const ours = makeLayout();
+    const theirs = makeLayout();
+    const split = (group: d3.Selection<SVGGElement, unknown, null, undefined>) => {
+      group.selectAll('.tick').attr('data-mark', (_, index) => String(index));
+      group.selectAll<SVGTextElement, unknown>('.tick text').each(function () {
+        const label = this.textContent ?? '';
+        this.textContent = '';
+        const tspan = document.createElementNS(SVG_NS, 'tspan');
+        tspan.textContent = label;
+        this.append(tspan);
+      });
+    };
+    const domains = [
+      ['b200 fp4', 'h100 fp8', 'mi355x fp4'],
+      ['h100 fp8', 'gb200 fp4', 'b200 fp4', 'mi300x fp8'],
+      ['h100 fp8', 'gb200 fp4', 'b200 fp4', 'mi300x fp8'],
+    ];
+    for (const [index, domain] of domains.entries()) {
+      const yScale = d3.scaleBand().domain(domain).range([0, 540]).padding(0.2);
+      const xScale = d3
+        .scaleTime()
+        .domain([new Date(2026, 0, 1), new Date(2026, index + 2, 1)])
+        .range([0, 720]);
+      renderAxes(ours, xScale, yScale, { xTickCount: 5 });
+      theirs.xAxisGroup.call(d3.axisBottom(xScale).tickSize(6).ticks(5));
+      theirs.yAxisGroup.call(d3.axisLeft(yScale).tickSize(0));
+      expect(ours.xAxisGroup.node()!.outerHTML).toBe(theirs.xAxisGroup.node()!.outerHTML);
+      expect(ours.yAxisGroup.node()!.outerHTML).toBe(theirs.yAxisGroup.node()!.outerHTML);
+      split(ours.yAxisGroup);
+      split(theirs.yAxisGroup);
+    }
+    const bandX = d3.scaleBand().domain(['a', 'b', 'c']).range([0, 720]).round(true);
+    renderAxes(ours, bandX, d3.scaleLinear().range([540, 0]), { xTickFormat: (d) => `#${d}` });
+    theirs.xAxisGroup.call(
+      d3
+        .axisBottom(bandX)
+        .tickSize(6)
+        .tickFormat((d) => `#${d}`),
+    );
+    expect(ours.xAxisGroup.node()!.outerHTML).toBe(theirs.xAxisGroup.node()!.outerHTML);
+  });
+
+  it('writes nothing when axes and grid are re-rendered with unchanged scales', () => {
+    const layout = makeLayout();
+    const xScale = d3.scaleLinear().domain([0, 100]).range([0, 720]);
+    const yScale = d3.scaleLinear().domain([0, 10]).range([540, 0]);
+    renderAxes(layout, xScale, yScale, {});
+    renderGrid(layout, xScale, yScale, 5);
+    expect(
+      recordMutations(layout.g.node()!, () => {
+        renderAxes(layout, xScale, yScale, {});
+        renderGrid(layout, xScale, yScale, 5);
+      }),
+    ).toHaveLength(0);
   });
 });
 

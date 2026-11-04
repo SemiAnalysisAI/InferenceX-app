@@ -1,6 +1,15 @@
 import type { DbClient } from '../connection.js';
+import {
+  CHART_SERIES_SUMMARY_VERSION,
+  encodeChartSeriesSummary,
+} from '../etl/chart-series-summary';
+import type { ChartSeries } from '../etl/compute-chart-series';
 import type { RequestTimeline } from '../etl/compute-request-timeline';
 import { gzipRequestTimeline } from '../etl/request-timeline-codec';
+import {
+  encodeSequenceLengthSketches,
+  SEQUENCE_LENGTH_SKETCH_FORMAT,
+} from '../etl/sequence-length-sketch-codec';
 
 import {
   buildTokenLengthSketch,
@@ -9,7 +18,27 @@ import {
 
 export const STATS_VERSION = 9;
 
-interface ProfileRecord {
+export const SEQUENCE_LENGTH_SKETCHES_VERSION = STATS_VERSION * 100 + SEQUENCE_LENGTH_SKETCH_FORMAT;
+
+export interface SequenceLengthSketchColumns {
+  sketches: Buffer | null;
+  version: number | null;
+}
+
+export function sequenceLengthSketchColumns(aggregateStats: unknown): SequenceLengthSketchColumns {
+  const sketches =
+    typeof aggregateStats === 'object' &&
+    aggregateStats !== null &&
+    'version' in aggregateStats &&
+    aggregateStats.version === STATS_VERSION
+      ? encodeSequenceLengthSketches(
+          'sequenceLengths' in aggregateStats ? aggregateStats.sequenceLengths : undefined,
+        )
+      : null;
+  return { sketches, version: sketches ? SEQUENCE_LENGTH_SKETCHES_VERSION : null };
+}
+
+export interface IslOslRecord {
   metadata?: { benchmark_phase?: string; was_cancelled?: boolean };
   metrics?: {
     input_sequence_length?: { value?: number } | number;
@@ -17,24 +46,28 @@ interface ProfileRecord {
   };
 }
 
+export function pushRecordIslOsl(rec: IslOslRecord, isl: number[], osl: number[]): void {
+  if (rec.metadata?.was_cancelled === true) return;
+  const m = rec.metrics ?? {};
+  const i = readNum(m.input_sequence_length);
+  const o = readNum(m.output_sequence_length);
+  if (typeof i === 'number') isl.push(i);
+  if (typeof o === 'number') osl.push(o);
+}
+
 export function extractIslOsl(jsonl: string): { isl: number[]; osl: number[] } {
   const isl: number[] = [];
   const osl: number[] = [];
   for (const line of jsonl.split('\n')) {
     if (!line) continue;
-    let rec: ProfileRecord;
+    let rec: IslOslRecord;
     try {
-      rec = JSON.parse(line) as ProfileRecord;
+      rec = JSON.parse(line) as IslOslRecord;
     } catch {
       continue;
     }
     if (rec.metadata?.benchmark_phase && rec.metadata.benchmark_phase !== 'profiling') continue;
-    if (rec.metadata?.was_cancelled === true) continue;
-    const m = rec.metrics ?? {};
-    const i = readNum(m.input_sequence_length);
-    const o = readNum(m.output_sequence_length);
-    if (typeof i === 'number') isl.push(i);
-    if (typeof o === 'number') osl.push(o);
+    pushRecordIslOsl(rec, isl, osl);
   }
   return { isl, osl };
 }
@@ -105,21 +138,7 @@ export function readNum(v: unknown): number | undefined {
   return undefined;
 }
 
-export async function fetchAggregateStatsRows<Stats>(
-  sql: DbClient,
-  benchmarkResultIds: readonly number[],
-): Promise<{ benchmark_result_id: number; stats: Stats | null }[]> {
-  return (await sql`
-    select
-      br.id as benchmark_result_id,
-      atr.aggregate_stats as stats
-    from benchmark_results br
-    join agentic_trace_replay atr on atr.id = br.trace_replay_id
-    where br.id = any(${benchmarkResultIds}::bigint[])
-  `) as unknown as { benchmark_result_id: number; stats: Stats | null }[];
-}
-
-export type WriteBackColumn = 'aggregate_stats' | 'chart_series';
+export type WriteBackColumn = 'aggregate_stats';
 
 let writeBackWarned = false;
 
@@ -138,22 +157,6 @@ function warnWriteBackFailure(target: string, error: unknown): void {
   );
 }
 
-function updateJsonbColumn(
-  sql: DbClient,
-  column: WriteBackColumn,
-  traceReplayId: number,
-  value: unknown,
-): Promise<unknown> {
-  switch (column) {
-    case 'aggregate_stats': {
-      return sql`update agentic_trace_replay set aggregate_stats = ${value}::jsonb where id = ${traceReplayId}`;
-    }
-    case 'chart_series': {
-      return sql`update agentic_trace_replay set chart_series = ${value}::jsonb where id = ${traceReplayId}`;
-    }
-  }
-}
-
 export function writeBackTraceReplayJsonb(
   sql: DbClient,
   column: WriteBackColumn,
@@ -162,8 +165,35 @@ export function writeBackTraceReplayJsonb(
 ): void {
   if (payload === null || payload === undefined) return;
   const value = structuredClone(payload);
-  void updateJsonbColumn(sql, column, traceReplayId, value).catch((error: unknown) => {
+  const { sketches, version } = sequenceLengthSketchColumns(value);
+  void sql`
+    update agentic_trace_replay set aggregate_stats = ${value}::jsonb,
+      sequence_length_sketches = ${sketches},
+      sequence_length_sketches_version = ${version}
+    where id = ${traceReplayId}
+  `.catch((error: unknown) => {
     warnWriteBackFailure(column, error);
+  });
+}
+
+export function writeBackChartSeries(
+  sql: DbClient,
+  traceReplayId: number,
+  series: ChartSeries,
+): void {
+  const json = JSON.stringify(series);
+  const write = async () => {
+    const summary = encodeChartSeriesSummary(json);
+    await sql`
+      update agentic_trace_replay
+      set chart_series = ${json}::jsonb,
+          chart_series_summary_gz = ${summary},
+          chart_series_summary_version = ${CHART_SERIES_SUMMARY_VERSION}
+      where id = ${traceReplayId}
+    `;
+  };
+  void write().catch((error: unknown) => {
+    warnWriteBackFailure('chart_series', error);
   });
 }
 
@@ -178,7 +208,9 @@ export async function writeBackRequestTimeline(
       update agentic_trace_replay
       set request_timeline_gz = ${gz},
           request_timeline_version = ${timeline.version},
-          request_count = ${timeline.requests.length}
+          request_count = ${timeline.requests.length},
+          request_chart_data_gz = null,
+          request_chart_data_version = null
       where id = ${traceReplayId}
         and coalesce(request_timeline_version, -1) <= ${timeline.version}
     `;

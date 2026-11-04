@@ -447,8 +447,14 @@ function capabilityFor(hardware: string, framework: string, date: string) {
   )?.supportedTokenMetrics;
 }
 
+export function supportedTokenMetrics(
+  row: Pick<BenchmarkRow, 'hardware' | 'framework' | 'date'>,
+): readonly TokenMetricType[] | undefined {
+  return capabilityFor(row.hardware, row.framework, row.date);
+}
+
 export function supportsTokenMetric(row: BenchmarkRow, tokenType: TokenMetricType): boolean {
-  return capabilityFor(row.hardware, row.framework, row.date)?.includes(tokenType) ?? true;
+  return supportedTokenMetrics(row)?.includes(tokenType) ?? true;
 }
 
 export function supportsChartTokenMetric(
@@ -456,6 +462,8 @@ export function supportsChartTokenMetric(
   date: string,
   tokenType: TokenMetricType,
 ): boolean {
-  const [hardware, ...frameworkParts] = hwKey.split('_');
-  return capabilityFor(hardware, frameworkParts.join('_'), date)?.includes(tokenType) ?? true;
+  const separator = hwKey.indexOf('_');
+  const hardware = separator === -1 ? hwKey : hwKey.slice(0, separator);
+  const framework = separator === -1 ? '' : hwKey.slice(separator + 1);
+  return capabilityFor(hardware, framework, date)?.includes(tokenType) ?? true;
 }

@@ -1,3 +1,7 @@
+import type { AvailabilityRow } from '@/lib/api/api';
+
+import { availabilityBody } from '../support/e2e';
+
 describe('Dropdown one-click switching', () => {
   beforeEach(() => {
     cy.window().then((win) => {
@@ -36,9 +40,9 @@ describe('Dropdown one-click switching', () => {
   });
 
   it('keeps NEW pills off AgentX models in the model dropdown', () => {
-    cy.fixture('api/availability.json').then((rows: Record<string, unknown>[]) => {
-      cy.intercept('GET', '/api/v1/availability', {
-        body: [
+    cy.fixture<AvailabilityRow[]>('api/availability.json').then((rows) => {
+      cy.intercept('GET', '/api/v1/availability/compact', {
+        body: availabilityBody([
           ...rows,
           {
             model: 'dsv41flash',
@@ -50,8 +54,8 @@ describe('Dropdown one-click switching', () => {
             spec_method: 'mtp',
             disagg: false,
             date: '2026-09-10',
-          },
-        ],
+          } as AvailabilityRow,
+        ]),
       }).as('availability');
     });
     cy.visit('/inference?g_model=DeepSeek-V4-Pro');

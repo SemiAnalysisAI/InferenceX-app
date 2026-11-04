@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { REQUEST_TIMELINE_VERSION, type RequestTimeline } from '../etl/compute-request-timeline';
-import { gzipRequestTimeline } from '../etl/request-timeline-codec';
+import { encodeRequestChartColumns } from '../etl/request-chart-columns';
+import { gzipRequestTimeline, gzipRequestTimelineParts } from '../etl/request-timeline-codec';
 import type { DbClient } from '../connection.js';
 
 import {
@@ -75,6 +76,8 @@ const legacyMeta = (legacyRequestCount: number) => ({
   gz_bytes: null,
   timeline_version: REQUEST_TIMELINE_VERSION,
   legacy_request_count: legacyRequestCount,
+  columns_bytes: null,
+  columns_inline: null,
 });
 
 const gzipMeta = (gzBytes: number) => ({
@@ -83,6 +86,8 @@ const gzipMeta = (gzBytes: number) => ({
   gz_bytes: gzBytes,
   timeline_version: REQUEST_TIMELINE_VERSION,
   legacy_request_count: null,
+  columns_bytes: null,
+  columns_inline: null,
 });
 
 describe('request chart data', () => {
@@ -165,7 +170,10 @@ describe('request chart data', () => {
 
   it('decodes a gzip timeline in Node and encodes the same tuples as the legacy path', async () => {
     const stored = await gzipRequestTimeline(timeline);
-    const { sql, calls } = mockSql([[gzipMeta(stored.length)], [{ slice: stored }]]);
+    const { sql, calls } = mockSql([
+      [gzipMeta(stored.length)],
+      [{ slice: stored.toString('base64') }],
+    ]);
 
     const result = await getRequestChartData(sql, 444941);
 
@@ -184,7 +192,10 @@ describe('request chart data', () => {
     const corrupted = Buffer.from(stored);
     const middle = Math.floor(corrupted.length / 2);
     corrupted.writeUInt8(corrupted.readUInt8(middle) ^ 255, middle);
-    const { sql } = mockSql([[gzipMeta(corrupted.length)], [{ slice: corrupted }]]);
+    const { sql } = mockSql([
+      [gzipMeta(corrupted.length)],
+      [{ slice: corrupted.toString('base64') }],
+    ]);
 
     await expect(getRequestChartData(sql, 444941)).resolves.toBeNull();
     expect(error).toHaveBeenCalledTimes(1);
@@ -195,5 +206,80 @@ describe('request chart data', () => {
     const { sql } = mockSql([[legacyMeta(2)], []]);
 
     await expect(getRequestChartData(sql, 42)).resolves.toBeNull();
+  });
+
+  it('logs and returns null when a legacy timeline above the projection cap disappears', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { sql } = mockSql([[legacyMeta(LEGACY_PROJECTION_MAX_REQUESTS + 1)], []]);
+
+    await expect(getRequestChartData(sql, 42)).resolves.toBeNull();
+    expect(error.mock.calls[0]![0]).toContain('trace_replay_id=3811');
+  });
+
+  it('reads time bounds a gzip timeline header lacks as zero', async () => {
+    const { gz } = await gzipRequestTimelineParts(
+      { version: REQUEST_TIMELINE_VERSION },
+      timeline.requests,
+    );
+    const { sql } = mockSql([[gzipMeta(gz.length)], [{ slice: gz.toString('base64') }]]);
+
+    const result = await getRequestChartData(sql, 444941);
+
+    expect(result).toMatchObject({ startNs: 0, endNs: 0, durationS: 0 });
+    expect(result?.requests).toEqual(encodeRequestChartData(timeline, timeline.requests).requests);
+  });
+
+  it('serves precomputed columns from the metadata query without reading the timeline', async () => {
+    const expected = encodeRequestChartData(timeline, timeline.requests);
+    const columns = encodeRequestChartColumns(expected);
+    const { sql, calls } = mockSql([
+      [
+        {
+          ...gzipMeta(1_000_000),
+          columns_bytes: columns.length,
+          columns_inline: columns.toString('base64'),
+        },
+      ],
+    ]);
+
+    await expect(getRequestChartData(sql, 444941)).resolves.toEqual(expected);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toContain('request_chart_data_version');
+  });
+
+  it('reads precomputed columns too large to inline in guarded slices', async () => {
+    const expected = encodeRequestChartData(timeline, timeline.requests);
+    const columns = encodeRequestChartColumns(expected);
+    const { sql, calls } = mockSql([
+      [{ ...gzipMeta(1_000_000), columns_bytes: columns.length, columns_inline: null }],
+      [{ slice: columns.toString('base64') }],
+    ]);
+
+    await expect(getRequestChartData(sql, 444941)).resolves.toEqual(expected);
+    expect(calls).toHaveLength(2);
+    expect(calls[1]).toContain('substring(request_chart_data_gz');
+    expect(calls[1]).toContain('octet_length(request_chart_data_gz)');
+  });
+
+  it('logs unreadable columns and falls back to the gzip timeline', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const stored = await gzipRequestTimeline(timeline);
+    const { sql } = mockSql([
+      [
+        {
+          ...gzipMeta(stored.length),
+          columns_bytes: 4,
+          columns_inline: Buffer.from('nope').toString('base64'),
+        },
+      ],
+      [{ slice: stored.toString('base64') }],
+    ]);
+
+    await expect(getRequestChartData(sql, 444941)).resolves.toEqual(
+      encodeRequestChartData(timeline, timeline.requests),
+    );
+    expect(error).toHaveBeenCalledTimes(1);
+    expect(error.mock.calls[0]![0]).toContain('[request chart data]');
+    expect(error.mock.calls[0]![0]).toContain('trace_replay_id=3811');
   });
 });

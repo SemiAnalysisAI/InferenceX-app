@@ -1,6 +1,7 @@
 import type { VideoHistoryPage } from '@/components/video-benchmark/history';
 import type { StoredArtifact } from '@/components/video-benchmark/stored';
-import { publishedVideoHistory, readStoredArtifact, storedArtifacts } from './video-storage';
+import { publishedVideoHistory } from './video-history-store';
+import { readStoredArtifact, storedArtifacts } from './video-storage';
 
 const TTL_MS = 30_000;
 const MAX_ENTRIES = 32;
@@ -11,7 +12,7 @@ interface Entry<T> {
 const history = new Map<string, Entry<VideoHistoryPage>>();
 const artifacts = new Map<string, Entry<StoredArtifact | null>>();
 
-// Callers must check repository visibility before every read, including a cache hit.
+// Callers must check repository visibility before serving every read, including a cache hit.
 function read<T>(
   cache: Map<string, Entry<T>>,
   key: string,
@@ -40,11 +41,11 @@ function read<T>(
   return entry.value;
 }
 
-export function cachedVideoHistory(page: number) {
+export function cachedVideoHistory(page: number, pages: number) {
   return read(
     history,
-    String(page),
-    () => publishedVideoHistory(page),
+    `${page}:${pages}`,
+    () => publishedVideoHistory(page, pages),
     (value) =>
       value.entries.every(
         (entry) =>

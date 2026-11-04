@@ -18,8 +18,7 @@ export interface LatestImageRow {
 
 /**
  * Fetch the latest non-null image tag per unique (model, hardware, framework, precision,
- * spec_method, disagg, benchmark_type, isl, osl). Uses the latest_benchmarks materialized view for
- * fast lookups. `benchmark_type` is part of the line key so agentic (null isl/osl) rows
+ * spec_method, disagg, benchmark_type, isl, osl). `benchmark_type` is part of the line key so agentic (null isl/osl) rows
  * stay distinct from fixed-sequence rows and the frontend can label them as AgentX.
  */
 export async function getLatestImages(sql: DbClient): Promise<LatestImageRow[]> {

@@ -5,8 +5,8 @@ import { readTraceProfileChunks } from '../lib/trace-profile-storage';
  * Backed by `agentic_trace_replay.request_timeline_gz`: gzip of the JSON
  * document pre-computed at ingest time (see `etl/compute-request-timeline.ts`),
  * versioned by the `request_timeline_version` column. The compressed bytes are
- * read in bounded `substring()` slices because Neon's HTTP driver hex-encodes
- * bytea and rejects responses over 64 MiB. Rows that
+ * read as base64 text in bounded, parallel `substring()` slices because Neon's
+ * HTTP driver rejects responses over 64 MiB. Rows that
  * `db:backfill-request-timeline` has not converted yet still hold the legacy
  * `request_timeline` JSONB, which is read as bounded text chunks. The slow
  * path re-computes from `profile_export_jsonl_gz` and is only taken when
@@ -40,10 +40,12 @@ interface RawTimelineChunkRow {
 }
 
 /**
- * Raw bytes per `request_timeline_gz` read. Neon hex-encodes bytea, so one
- * slice is about 32 MiB on the wire, half of its 64 MiB response cap.
+ * Raw bytes per `request_timeline_gz` read, and how many reads stay in flight.
+ * Slices travel base64-encoded (about 5.6 MB each), well under Neon's 64 MiB
+ * response cap, and parallel reads hide the per-query round trip.
  */
-export const REQUEST_TIMELINE_GZ_SLICE_BYTES = 16 * 1024 * 1024;
+export const REQUEST_TIMELINE_GZ_SLICE_BYTES = 4 * 1024 * 1024;
+const REQUEST_TIMELINE_GZ_SLICES_IN_FLIGHT = 4;
 
 // JSONB can be far smaller on disk than its serialized response due to TOAST
 // compression, so every current legacy timeline uses bounded chunks. Timeline
@@ -65,11 +67,63 @@ export function logRequestTimelineReadFailure(traceReplayId: number, error: unkn
 }
 
 /**
- * Read a stored `request_timeline_gz` value of `byteLength` bytes through
- * bounded `substring()` slices and concatenate them. Never selects the whole
- * value. Throws when the row disappears or the value changes length between
- * slices; a same-length rewrite fails the gzip checksum when decoded.
+ * Yield a stored bytea of `byteLength` bytes in order through bounded slices,
+ * keeping a few reads in flight. `readSlice` selects one `substring()` as
+ * base64 text, which is a third smaller than bytea hex on the wire, and must
+ * re-check the value's `octet_length` so a row that disappears, shrinks or
+ * grows fails the read; a same-length rewrite fails the gzip checksum when
+ * decoded.
  */
+export async function* readBase64Slices(
+  byteLength: number,
+  sliceBytes: number,
+  readSlice: (from: number, length: number) => Promise<Record<string, unknown> | undefined>,
+): AsyncGenerator<Buffer> {
+  if (!Number.isSafeInteger(sliceBytes) || sliceBytes <= 0) {
+    throw new Error('Invalid timeline slice size');
+  }
+  const read = async (offset: number): Promise<Buffer> => {
+    const length = Math.min(sliceBytes, byteLength - offset);
+    const row = await readSlice(offset + 1, length);
+    const text = row?.slice;
+    const bytes = typeof text === 'string' ? Buffer.from(text, 'base64') : null;
+    if (bytes?.length !== length) {
+      throw new Error(`Stored value changed or ended at byte ${offset} of ${byteLength}`);
+    }
+    return bytes;
+  };
+  const pending: Promise<Buffer>[] = [];
+  let next = 0;
+  while (next < byteLength || pending.length > 0) {
+    while (next < byteLength && pending.length < REQUEST_TIMELINE_GZ_SLICES_IN_FLIGHT) {
+      const slice = read(next);
+      slice.catch(() => {});
+      pending.push(slice);
+      next += sliceBytes;
+    }
+    const slice = pending.shift();
+    if (slice) yield await slice;
+  }
+}
+
+export function requestTimelineGzSlices(
+  sql: DbClient | Sql,
+  traceReplayId: number,
+  byteLength: number,
+  sliceBytes = REQUEST_TIMELINE_GZ_SLICE_BYTES,
+): AsyncGenerator<Buffer> {
+  return readBase64Slices(byteLength, sliceBytes, async (from, length) => {
+    const [row] = await sql`
+      select encode(substring(request_timeline_gz from ${from}::int for ${length}::int), 'base64') as slice
+      from agentic_trace_replay
+      where id = ${traceReplayId}
+        and request_timeline_version = ${REQUEST_TIMELINE_VERSION}
+        and octet_length(request_timeline_gz) = ${byteLength}
+    `;
+    return row;
+  });
+}
+
 export async function readRequestTimelineGz(
   sql: DbClient | Sql,
   traceReplayId: number,
@@ -77,24 +131,16 @@ export async function readRequestTimelineGz(
   sliceBytes = REQUEST_TIMELINE_GZ_SLICE_BYTES,
 ): Promise<Buffer> {
   const slices: Buffer[] = [];
-  let received = 0;
-  while (received < byteLength) {
-    const rows = await sql`
-      select substring(request_timeline_gz from ${received + 1}::int for ${sliceBytes}::int) as slice
-      from agentic_trace_replay
-      where id = ${traceReplayId}
-    `;
-    const slice: unknown = rows[0]?.slice;
-    if (!(slice instanceof Uint8Array) || slice.length === 0) {
-      throw new Error(`request_timeline_gz ended after ${received} of ${byteLength} bytes`);
-    }
-    slices.push(Buffer.from(slice.buffer, slice.byteOffset, slice.byteLength));
-    received += slice.length;
-  }
-  if (received !== byteLength) {
-    throw new Error(`request_timeline_gz grew past ${byteLength} bytes during the read`);
+  for await (const slice of requestTimelineGzSlices(sql, traceReplayId, byteLength, sliceBytes)) {
+    slices.push(slice);
   }
   return Buffer.concat(slices, byteLength);
+}
+
+export interface StoredRequestTimelineGz {
+  sha256: string | null;
+  byteLength: number;
+  chunks: AsyncGenerator<Buffer>;
 }
 
 /**
@@ -104,13 +150,13 @@ export async function readRequestTimelineGz(
 export async function getStoredRequestTimelineGz(
   sql: DbClient,
   benchmarkResultId: number,
-  sliceBytes = 1024 * 1024,
-): Promise<AsyncGenerator<Buffer> | null> {
-  if (!Number.isSafeInteger(sliceBytes) || sliceBytes <= 0) {
-    throw new Error('Invalid timeline slice size');
-  }
+  sliceBytes = REQUEST_TIMELINE_GZ_SLICE_BYTES,
+): Promise<StoredRequestTimelineGz | null> {
   const [row] = await sql`
-    select atr.id as trace_replay_id, octet_length(atr.request_timeline_gz) as gz_bytes
+    select
+      atr.id as trace_replay_id,
+      octet_length(atr.request_timeline_gz) as gz_bytes,
+      encode(atr.request_timeline_sha256, 'hex') as sha256
     from benchmark_results br
     join agentic_trace_replay atr on atr.id = br.trace_replay_id
     where br.id = ${benchmarkResultId}
@@ -118,26 +164,38 @@ export async function getStoredRequestTimelineGz(
       and atr.request_timeline_gz is not null
   `;
   if (!row) return null;
-  const size = Number(row.gz_bytes);
-  if (!Number.isSafeInteger(size) || size <= 0) throw new Error('Invalid stored timeline size');
-  const traceReplayId = Number(row.trace_replay_id);
-  return (async function* () {
-    for (let offset = 0; offset < size; offset += sliceBytes) {
-      const length = Math.min(sliceBytes, size - offset);
-      const [part] = await sql`
-        select substring(request_timeline_gz from ${offset + 1}::int for ${length}::int) as slice
-        from agentic_trace_replay
-        where id = ${traceReplayId}
-          and request_timeline_version = ${REQUEST_TIMELINE_VERSION}
-          and octet_length(request_timeline_gz) = ${size}
-      `;
-      const bytes = part?.slice;
-      if (!(bytes instanceof Uint8Array) || bytes.length !== length) {
-        throw new Error(`Stored timeline changed or ended at byte ${offset} of ${size}`);
-      }
-      yield Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-    }
-  })();
+  const byteLength = Number(row.gz_bytes);
+  if (!Number.isSafeInteger(byteLength) || byteLength <= 0) {
+    throw new Error('Invalid stored timeline size');
+  }
+  return {
+    sha256: typeof row.sha256 === 'string' ? row.sha256 : null,
+    byteLength,
+    chunks: requestTimelineGzSlices(sql, Number(row.trace_replay_id), byteLength, sliceBytes),
+  };
+}
+
+export async function getCurrentRequestTimelineSha256s(
+  sql: DbClient,
+  benchmarkResultIds: readonly number[],
+): Promise<Map<number, string | null>> {
+  const rows = await sql`
+    select
+      br.id as benchmark_result_id,
+      case
+        when atr.request_timeline_version = ${REQUEST_TIMELINE_VERSION}
+          then encode(atr.request_timeline_sha256, 'hex')
+      end as sha256
+    from benchmark_results br
+    join agentic_trace_replay atr on atr.id = br.trace_replay_id
+    where br.id = any(${benchmarkResultIds}::bigint[])
+  `;
+  return new Map(
+    rows.map((row) => [
+      Number(row.benchmark_result_id),
+      typeof row.sha256 === 'string' ? row.sha256 : null,
+    ]),
+  );
 }
 
 /**

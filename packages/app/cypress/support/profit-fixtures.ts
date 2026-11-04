@@ -1,3 +1,4 @@
+import { availabilityBody } from './e2e';
 import { metricsFor } from './overlay-fixtures';
 
 export const PROFIT_MODEL_DB_KEY = 'kimik3';
@@ -241,9 +242,9 @@ export const profitWorkflowInfo = (date: string) => {
 };
 
 export const interceptProfitData = (): void => {
-  cy.intercept('GET', '/api/v1/availability*', { body: profitAvailabilityRows() }).as(
-    'profit-availability',
-  );
+  cy.intercept('GET', '/api/v1/availability/compact', {
+    body: availabilityBody(profitAvailabilityRows()),
+  }).as('profit-availability');
   cy.intercept('GET', '/api/v1/benchmarks*', (req) => {
     const display = String(req.query['model'] ?? '');
     const dbKey = PROFIT_DB_KEY_BY_DISPLAY_MODEL[display];
@@ -260,4 +261,16 @@ export const interceptProfitData = (): void => {
   cy.intercept('GET', '/api/v1/workflow-info*', (req) => {
     req.reply({ body: profitWorkflowInfo(String(req.query['date'] ?? '')) });
   }).as('profit-workflow-info');
+  cy.intercept('GET', '/api/v1/workflow-changelogs*', (req) => {
+    const from = String(req.query['from'] ?? '');
+    const to = String(req.query['to'] ?? '');
+    const dates = PROFIT_DATES.filter((d) => d >= from && d <= to)
+      .toSorted()
+      .map((date) => {
+        const { runs, changelogs, runConfigs } = profitWorkflowInfo(date);
+        return { date, runs, changelogs, runConfigs };
+      })
+      .filter((d) => d.changelogs.length > 0);
+    req.reply({ body: { dates } });
+  }).as('profit-workflow-changelogs');
 };

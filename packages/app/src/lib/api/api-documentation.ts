@@ -2479,8 +2479,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/request-timeline',
     summary: text('Read a request timeline', '读取请求时间线'),
     description: text(
-      'Returns a versioned benchmark window and per-request replay identity, source provenance, dispatch, acknowledgement, completion, token, phase, worker, and cancellation timing. Current stored timelines stream directly as gzip JSON with all request records preserved (decompressed for clients whose Accept-Encoding excludes gzip, and without an ETag); legacy timelines retain the same response shape.',
-      '返回带版本号的基准测试时间窗口，以及每个请求的重放标识、来源追溯信息、调度/确认/完成/取消时间、token 指标、阶段和 worker 信息。当前版本的已存储时间线以 gzip JSON 直接流式传输，保留全部请求记录（若客户端的 Accept-Encoding 不含 gzip，则解压后返回，且不带 ETag）；旧版时间线的响应结构不变。',
+      'Returns a versioned benchmark window and per-request replay identity, source provenance, dispatch, acknowledgement, completion, token, phase, worker, and cancellation timing. Current stored timelines stream directly as gzip JSON with all request records preserved (decompressed for clients whose Accept-Encoding excludes gzip, and without an ETag). Once a timeline has been copied to the content-addressed CDN store, clients that accept gzip get a 307 redirect to those exact gzip bytes, served as Content-Type application/gzip without Content-Encoding, so decompress the body yourself (for example curl -L ... | gunzip). Legacy timelines retain the same response shape.',
+      '返回带版本号的基准测试时间窗口，以及每个请求的重放标识、来源追溯信息、调度/确认/完成/取消时间、token 指标、阶段和 worker 信息。当前版本的已存储时间线以 gzip JSON 直接流式传输，保留全部请求记录（若客户端的 Accept-Encoding 不含 gzip，则解压后返回，且不带 ETag）。时间线复制到按内容寻址的 CDN 存储后，接受 gzip 的客户端会收到 307 重定向，指向完全相同的 gzip 字节，其 Content-Type 为 application/gzip 且没有 Content-Encoding，需要自行解压（例如 curl -L ... | gunzip）。旧版时间线的响应结构不变。',
     ),
     audience: 'public',
     stability: 'beta',
@@ -3112,8 +3112,8 @@ export const apiOperations: readonly ApiOperation[] = [
     path: '/api/v1/trace-histograms',
     summary: text('Read trace histograms', '读取跟踪直方图'),
     description: text(
-      'Returns input and output token count arrays for each benchmark result ID. IDs are deduplicated and at most 200 are accepted.',
-      '按基准结果 ID 返回输入和输出 token 计数数组。ID 会去重，最多接受 200 个。',
+      'Returns input and output token count arrays for each benchmark result ID. IDs are deduplicated and at most 200 are accepted. Once a response has been copied to the content-addressed CDN store, clients that accept gzip get a 307 redirect to the gzip of the same JSON, served as Content-Type application/gzip without Content-Encoding, so decompress the body yourself.',
+      '按基准结果 ID 返回输入和输出 token 计数数组。ID 会去重，最多接受 200 个。响应复制到按内容寻址的 CDN 存储后，接受 gzip 的客户端会收到 307 重定向，指向相同 JSON 的 gzip，其 Content-Type 为 application/gzip 且没有 Content-Encoding，需要自行解压。',
     ),
     audience: 'public',
     stability: 'beta',

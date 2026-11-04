@@ -8,8 +8,8 @@ and sealed media loader. All visible copy lives in component-local `STRINGS`.
 
 Stored Blob indexes and matching publication approvals →
 `GET /api/video-runs?format=history` → `videoPoints` →
-`resultProjection`. Reads stop after five pages; the view API reports pagination
-coverage. History retains unapproved stored sources; `videoPoints` admits only
+`resultProjection`. Reads fetch at most five pages in one request
+(`page=1&pages=5`); the view API reports pagination coverage. History retains unapproved stored sources; `videoPoints` admits only
 entries with an approval receipt matching their original source and checkout.
 Approval is separate from full-sweep or release qualification. The browser never
 publishes a run or generates a clip. The read-only
@@ -297,7 +297,7 @@ Difference 是相对明确绑定的官方 Diffusers 参考视频的浏览器 RGB
 成本同时按参与计算和分配的 GPU 数量估算，分配证据缺失时不填补；图表与结果表使用所选口径（`r_basis`），视频卡片和部署详情同时展示两种口径。每 GPU 小时生成视频数同样按所选口径的 GPU 数折算：作业分配 8 张、实际使用 4 张时，按分配口径计算的值减半。视频秒吞吐量、每视频秒成本及收入使用有效测量请求的实际解码视频时长，不包含 warmup；请求时长仅用于工作负载身份与筛选。
 任何有效测量请求缺少视频时长，或旧 History 投影没有 `videoSecondsPerHour` 时，上述指标及利润保持为空，不以请求时长代替。每条视频成本仍可在证据充分时计算。利润输入默认空白，属于用户
 场景假设；利用率只降低收入，不减少付费时长。模式未知时不套用 T2V/I2V/R2V 价格。
-只读 API 与页面共用选择和计算逻辑，`r_*` 参数可以分享，`?unofficialrun=` 只读取指定的已存储运行，
+页面与只读 API 以一次请求最多读取五页 History，共用选择和计算逻辑，`r_*` 参数可以分享，`?unofficialrun=` 只读取指定的已存储运行，
 保留其发布批准状态，并单独放入 overlayCells 和 overlayDeploymentCells；选中期间，即使已批准也不进入正式结果、部署或工作负载构成。overlayCells 按所选 GPU 数筛选结果表和视频；overlayDeploymentCells 保留所有匹配的 GPU 数，用于图表和部署详情。
 默认优先选择有已批准结果的工作负载；仅由指定运行提供的工作负载须明确选择，
 或在没有匹配的已批准结果时作为回退。

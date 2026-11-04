@@ -19,7 +19,9 @@ export function slices(op: ComparisonOp, cases: ComparisonCase[]): Map<string, n
   const out = new Map<string, number[]>();
   cases.forEach((c, i) => {
     const k = sliceKey(op, c);
-    out.set(k, [...(out.get(k) ?? []), i]);
+    const indices = out.get(k);
+    if (indices) indices.push(i);
+    else out.set(k, [i]);
   });
   return out;
 }

@@ -79,8 +79,6 @@ function descriptorToOnOff(v: unknown): string | null {
   return typeof v === 'string' && v.length > 0 ? (v === 'none' ? 'off' : 'on') : null;
 }
 
-const _warnedMetricKeys = new Set<string>();
-
 export interface WorkerPower {
   role: string;
   worker_idx: number;
@@ -206,7 +204,7 @@ export function mapBenchmarkRow(
   const specMethod = normalizeSpecMethod(row.spec_decoding);
 
   const topology = resolveConfigTopology(row, framework, frameworkDisagg);
-  let metrics = captureNumericMetrics(row);
+  let metrics = captureNumericMetrics(row, tracker);
   normalizePowerContractMetrics(row, metrics);
   if (isAgentic) metrics = preferFullResponseMetrics(metrics);
   if (
@@ -279,19 +277,17 @@ export function mapBenchmarkRow(
   };
 }
 
-function captureNumericMetrics(row: Record<string, any>): Record<string, number> {
+function captureNumericMetrics(
+  row: Record<string, any>,
+  tracker: SkipTracker,
+): Record<string, number> {
   const metrics: Record<string, number> = {};
   for (const [rawKey, val] of Object.entries(row)) {
     if (NON_METRIC_KEYS.has(rawKey)) continue;
     const n = parseNum(val);
     if (n === undefined) continue;
     metrics[rawKey] = n;
-    if (!METRIC_KEYS.has(rawKey) && !_warnedMetricKeys.has(rawKey)) {
-      _warnedMetricKeys.add(rawKey);
-      console.warn(
-        `  [WARN] auto-captured unexpected metric '${rawKey}' — add to METRIC_KEYS in constants/src/metric-keys.ts or NON_METRIC_KEYS in benchmark-mapper.ts`,
-      );
-    }
+    if (!METRIC_KEYS.has(rawKey)) tracker.unexpectedMetrics.add(rawKey);
   }
   return metrics;
 }

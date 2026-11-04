@@ -81,6 +81,38 @@ describe('Footer', () => {
       .and('have.attr', 'href', '/hardware');
   });
 
+  it('tracks each footer destination under its own event', () => {
+    const capture = cy.stub();
+    registerAnalyticsClient({ capture });
+    cy.get('[data-testid="footer-links-more"] a').each(($link) => {
+      $link[0].addEventListener('click', (event) => event.preventDefault());
+      cy.wrap($link).click();
+    });
+    cy.wrap(null).should(() => {
+      const footerClicks = capture
+        .getCalls()
+        .map((call) => call.args)
+        .filter(([name]) => String(name).startsWith('footer_'));
+      expect(footerClicks).to.deep.equal(
+        [
+          'supporters',
+          'agentx',
+          'telemetry',
+          'compare',
+          'articles',
+          'hardware',
+          'whitepapers',
+          'api',
+          'historical',
+          'calculator',
+          'fleet',
+          'first_token',
+          'cache_reuse',
+        ].map((name) => [`footer_${name}_clicked`, { placement: 'footer' }]),
+      );
+    });
+  });
+
   for (const width of [390, 768, 1280]) {
     it(`keeps every footer destination readable and inside the page at ${width}px`, () => {
       cy.viewport(width, 720);

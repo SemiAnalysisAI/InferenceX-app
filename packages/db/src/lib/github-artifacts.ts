@@ -1,5 +1,6 @@
-import { execSync } from 'node:child_process';
+import { execSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 export interface ArtifactMeta {
@@ -75,15 +76,33 @@ export function pairWithBenchmarkSibling(
   );
 }
 
-export function downloadArtifact(artifact: ArtifactMeta, destRoot: string): string {
-  const zipPath = path.join(destRoot, 'artifact.zip');
-  execSync(`gh api "${artifact.archive_download_url}" > "${zipPath}"`, {
-    stdio: ['pipe', 'pipe', 'inherit'],
+function run(command: string, args: string[], stdout: number | 'inherit'): Promise<void> {
+  const { promise, resolve, reject } = Promise.withResolvers<void>();
+  const child = spawn(command, args, { stdio: ['ignore', stdout, 'inherit'] });
+  child.once('error', reject);
+  child.once('close', (code, signal) => {
+    if (code === 0) resolve();
+    else reject(new Error(`${command} ${args[0]} exited with ${signal ?? code}`));
   });
+  return promise;
+}
+
+export async function downloadArtifact(artifact: ArtifactMeta, destRoot: string): Promise<string> {
+  const zipDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gh-artifact-'));
+  const zipPath = path.join(zipDir, 'artifact.zip');
   const destDir = path.join(destRoot, artifact.name);
-  fs.mkdirSync(destDir, { recursive: true });
-  execSync(`unzip -oq "${zipPath}" -d "${destDir}"`, { stdio: 'inherit' });
-  fs.unlinkSync(zipPath);
+  try {
+    const zip = fs.openSync(zipPath, 'w');
+    try {
+      await run('gh', ['api', artifact.archive_download_url], zip);
+    } finally {
+      fs.closeSync(zip);
+    }
+    fs.mkdirSync(destDir, { recursive: true });
+    await run('unzip', ['-oq', zipPath, '-d', destDir], 'inherit');
+  } finally {
+    fs.rmSync(zipDir, { recursive: true, force: true });
+  }
   return destDir;
 }
 

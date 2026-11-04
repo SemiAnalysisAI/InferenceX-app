@@ -15,6 +15,7 @@ import {
   createMockHardwareConfig,
   createMockInferenceData,
 } from '../support/mock-data';
+import { clickScatterPoint } from '../support/scatter-points';
 import { mountWithProviders } from '../support/test-utils';
 
 const OVERLAY_RUN_ID = 31415926535;
@@ -229,9 +230,13 @@ describe('Modeled power source links', () => {
           locale,
           width: Math.min(1000, width - 32),
         });
-        cy.get(`${svg} ${overlay ? '.unofficial-overlay-pt' : '.dot-group'}`)
-          .eq(1)
-          .click({ force: true });
+        if (overlay) {
+          cy.get(`${svg} .unofficial-overlay-pt`).eq(1).click({ force: true });
+        } else {
+          cy.scatterPoints('#power-compare-test')
+            .should((points) => expect(points).to.have.length.at.least(2))
+            .then((points) => clickScatterPoint(points[1]));
+        }
         cy.get('[data-chart-tooltip]:visible').within(() => {
           if (overlay) cy.contains('powerx-compare').should('exist');
           cy.get('[data-testid="tooltip-modeled-system-power"]').within(() => {

@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { confirm, hasNoSslFlag, hasYesFlag } from './cli-utils';
-import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils';
+import { createAdminSql } from './etl/db-utils';
 import {
   applyChangelogBackfills,
   planBenchmarkPoint,
@@ -787,8 +787,6 @@ async function main(): Promise<void> {
   console.log(` ${Math.round((Date.now() - phase2Start) / 1000)}s\n`);
 
   console.log('\n=== Maintenance ===');
-
-  await refreshLatestBenchmarks(sql);
 
   process.stdout.write('  Vacuuming tables...');
   const vacuumEnd = Date.now();

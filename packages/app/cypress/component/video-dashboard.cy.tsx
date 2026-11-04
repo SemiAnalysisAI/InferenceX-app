@@ -38,7 +38,7 @@ function mount({
   readOnlyVideoRequests();
   resultHistory(edit).then((page) => {
     editPage?.(page);
-    cy.intercept('GET', '/api/video-runs?format=history&page=1', page).as('history');
+    cy.intercept('GET', '/api/video-runs?format=history&page=1*', page).as('history');
   });
   cy.window().then((win) =>
     win.history.replaceState(null, '', `${win.location.pathname}${search}`),
