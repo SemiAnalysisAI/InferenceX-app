@@ -32,6 +32,7 @@ const MARKER_SIZE = 20;
 const MARKER_HOVER_SCALE = 1.15;
 const NO_SLOT = 0;
 const NO_SHAPE = 255;
+const CANVAS_CONTEXT_OPTIONS: CanvasRenderingContext2DSettings = { willReadFrequently: true };
 
 export interface ScatterDatum {
   precision: string;
@@ -787,7 +788,7 @@ export class CanvasPointLayer<T extends ScatterDatum> {
   }
 
   private draw(): void {
-    this.context ??= this.canvas.getContext('2d');
+    this.context ??= this.canvas.getContext('2d', CANVAS_CONTEXT_OPTIONS);
     const context = this.context;
     if (!context) return;
     const ratio = this.canvas.width / Math.max(1, this.width);
