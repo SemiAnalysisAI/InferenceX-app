@@ -2,7 +2,7 @@ import { gzipSync } from 'node:zlib';
 
 import { describe, expect, it } from 'vitest';
 
-import { STATS_VERSION } from './agentic-shared';
+import { SEQUENCE_LENGTH_SKETCHES_VERSION, STATS_VERSION } from './agentic-shared';
 import type { DbClient } from '../connection.js';
 
 import { computeDerivedFromBlob, getDerivedAgenticMetrics } from './derived-agentic-metrics.js';
@@ -117,6 +117,27 @@ function mockSql(queue: unknown[][]): {
   return { sql, calls };
 }
 
+function statsRow(overrides: Record<string, unknown>): Record<string, unknown> {
+  return {
+    benchmark_result_id: 7,
+    version: null,
+    e2el_per_osl_p75: null,
+    e2el_per_osl_p90: null,
+    kv_cache_util: null,
+    prefix_cache_hit_rate: null,
+    ...overrides,
+  };
+}
+
+interface WrittenStats {
+  version: number;
+  isl: unknown;
+  osl: unknown;
+  kvCacheUtil: unknown;
+  prefixCacheHitRate: unknown;
+  e2elPerOsl: { p75: number; p90: number; n: number } | null;
+}
+
 describe('getDerivedAgenticMetrics write-back', () => {
   it('self-heals aggregate_stats from the profile blob, carrying server fields forward', async () => {
     const jsonl = [
@@ -126,20 +147,10 @@ describe('getDerivedAgenticMetrics write-back', () => {
     const blob = gzipSync(Buffer.from(jsonl));
 
     const staleServerKv = { mean: 0.4, p50: 0.4, p75: 0.5, p90: 0.6, p99: 0.7, n: 3 };
-    const staleStats = {
-      version: STATS_VERSION - 1,
-      isl: null,
-      osl: null,
-      kvCacheUtil: staleServerKv,
-      prefixCacheHitRate: null,
-      normalizedSessionTimeS: 999,
-      p90PrefillTpsPerUser: 999,
-      normalizedE2e400: null,
-    };
 
     const { sql, calls } = mockSql([
-      [{ benchmark_result_id: 7, stats: staleStats }],
-      [{ benchmark_result_id: 7, trace_replay_id: 870 }],
+      [statsRow({ version: STATS_VERSION - 1, kv_cache_util: staleServerKv })],
+      [{ benchmark_result_id: 7, trace_replay_id: 870, has_server_metrics: true }],
       [{ parts: 0, inline_size: blob.length }],
       [{ data: blob }],
     ]);
@@ -151,35 +162,32 @@ describe('getDerivedAgenticMetrics write-back', () => {
 
     expect(calls).toHaveLength(5);
     expect(calls[4]!.text).toContain('update agentic_trace_replay set aggregate_stats');
-    expect(calls[4]!.text).toContain('::jsonb where id');
+    expect(calls[4]!.text).toContain('aggregate_stats = ?::jsonb');
 
-    interface WrittenStats {
-      version: number;
-      isl: unknown;
-      osl: unknown;
-      kvCacheUtil: unknown;
-      e2elPerOsl: { p75: number; p90: number; n: number } | null;
-    }
-    const [written, traceReplayId] = calls[4]!.values as [WrittenStats, number];
+    const [written, sketches, sketchesVersion, traceReplayId] = calls[4]!.values as [
+      WrittenStats,
+      Buffer | null,
+      number | null,
+      number,
+    ];
     expect(traceReplayId).toBe(870);
+    expect(sketches).not.toBeNull();
+    expect(sketchesVersion).toBe(SEQUENCE_LENGTH_SKETCHES_VERSION);
     expect(written.version).toBe(STATS_VERSION);
     expect(written.e2elPerOsl?.n).toBe(2);
     expect(written.e2elPerOsl?.p90).toBeCloseTo(0.038, 8);
     expect(written.isl).not.toBeNull();
     expect(written.osl).not.toBeNull();
     expect(written.kvCacheUtil).toEqual(staleServerKv);
-    expect(written).not.toHaveProperty('normalizedSessionTimeS');
-    expect(written).not.toHaveProperty('p90PrefillTpsPerUser');
-    expect(written).not.toHaveProperty('normalizedE2e400');
   });
 
-  it('does not stamp the bundle when there are no server fields to preserve', async () => {
+  it('does not stamp the bundle when a server blob exists but no server fields are stored', async () => {
     const jsonl = rec('s1', 0, { isl: 100, osl: 50, ttft_ms: 500, latency_ms: 1000 });
     const blob = gzipSync(Buffer.from(jsonl));
 
     const { sql, calls } = mockSql([
-      [{ benchmark_result_id: 7, stats: null }],
-      [{ benchmark_result_id: 7, trace_replay_id: 870 }],
+      [statsRow({})],
+      [{ benchmark_result_id: 7, trace_replay_id: 870, has_server_metrics: true }],
       [{ parts: 0, inline_size: blob.length }],
       [{ data: blob }],
     ]);
@@ -191,16 +199,41 @@ describe('getDerivedAgenticMetrics write-back', () => {
     expect(calls.some((c) => c.text.includes('update agentic_trace_replay'))).toBe(false);
   });
 
+  it('stamps the bundle with null server fields when the point has no server blob', async () => {
+    const cancelled = JSON.parse(
+      rec('s1', 1, { isl: 300, osl: 100, ttft_ms: 500, latency_ms: 3000 }),
+    ) as { metadata: Record<string, unknown> };
+    cancelled.metadata.was_cancelled = true;
+    const jsonl = [
+      rec('s1', 0, { isl: 100, osl: 50, ttft_ms: 500, latency_ms: 1000 }),
+      JSON.stringify(cancelled),
+    ].join('\n');
+    const blob = gzipSync(Buffer.from(jsonl));
+
+    const { sql, calls } = mockSql([
+      [statsRow({})],
+      [{ benchmark_result_id: 7, trace_replay_id: 870, has_server_metrics: false }],
+      [{ parts: 0, inline_size: blob.length }],
+      [{ data: blob }],
+    ]);
+
+    const result = await getDerivedAgenticMetrics(sql, [7]);
+
+    expect(result[7]?.p90_e2e_norm_intvty).toBeCloseTo(1 / 0.029, 6);
+    expect(calls).toHaveLength(5);
+    const [written, ...columns] = calls[4]!.values as [WrittenStats, ...unknown[]];
+    expect(columns.at(-1)).toBe(870);
+    expect(written.version).toBe(STATS_VERSION);
+    expect(written.e2elPerOsl?.n).toBe(2);
+    expect(written.isl).toMatchObject({ n: 1, p50: 100 });
+    expect(written.kvCacheUtil).toBeNull();
+    expect(written.prefixCacheHitRate).toBeNull();
+  });
+
   it('takes the fast path (no blob read, no write-back) when stats are current', async () => {
-    const currentStats = {
-      version: STATS_VERSION,
-      isl: null,
-      osl: null,
-      kvCacheUtil: null,
-      prefixCacheHitRate: null,
-      e2elPerOsl: { mean: 0.03, p50: 0.03, p75: 0.04, p90: 0.05, p99: 0.06, n: 5 },
-    };
-    const { sql, calls } = mockSql([[{ benchmark_result_id: 7, stats: currentStats }]]);
+    const { sql, calls } = mockSql([
+      [statsRow({ version: STATS_VERSION, e2el_per_osl_p75: 0.04, e2el_per_osl_p90: 0.05 })],
+    ]);
 
     const result = await getDerivedAgenticMetrics(sql, [7]);
 
@@ -210,15 +243,7 @@ describe('getDerivedAgenticMetrics write-back', () => {
   });
 
   it('maps a missing ratio bundle to nulls on the fast path', async () => {
-    const currentStats = {
-      version: STATS_VERSION,
-      isl: null,
-      osl: null,
-      kvCacheUtil: null,
-      prefixCacheHitRate: null,
-      e2elPerOsl: null,
-    };
-    const { sql } = mockSql([[{ benchmark_result_id: 7, stats: currentStats }]]);
+    const { sql } = mockSql([[statsRow({ version: STATS_VERSION })]]);
 
     const result = await getDerivedAgenticMetrics(sql, [7]);
     expect(result[7]).toEqual({ id: 7, p75_e2e_norm_intvty: null, p90_e2e_norm_intvty: null });

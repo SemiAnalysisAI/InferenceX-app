@@ -44,15 +44,24 @@ export async function compileBlogMdx(
   components: Record<string, ComponentType<any>> = createMdxComponents(locale),
 ) {
   const highlighter = await getHighlighter();
+  const math = { rendered: false };
 
-  return compileMDX({
+  const compiled = await compileMDX({
     source,
     components,
     options: {
       mdxOptions: {
         remarkPlugins: [remarkGfm, [remarkMath, { singleDollarTextMath: false }]],
         rehypePlugins: [
-          [rehypeKatex, { strict: false }],
+          [
+            rehypeKatex,
+            {
+              strict: false,
+              onMath: () => {
+                math.rendered = true;
+              },
+            },
+          ],
           [
             rehypeShikiFromHighlighter,
             highlighter,
@@ -65,4 +74,5 @@ export async function compileBlogMdx(
       },
     },
   });
+  return { ...compiled, hasMath: math.rendered };
 }

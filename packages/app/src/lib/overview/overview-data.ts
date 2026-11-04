@@ -586,15 +586,12 @@ function configPriorityIndex(config: OverviewConfigView): number {
 
 function selectPlatformRead(
   configs: readonly OverviewConfigResult[],
-  hardware: string,
-  tier: OverviewTier,
+  tier: number,
 ): OverviewTierRead {
-  const reads = configs
-    .filter((config) => config.hardware === hardware)
-    .map((config): ConfigTierRead => {
-      const { tierValues: _tierValues, ...view } = config;
-      return { ...readConfigAtTier(config, tier), config: view };
-    });
+  const reads = configs.map((config): ConfigTierRead => {
+    const { tierValues: _tierValues, ...view } = config;
+    return { ...readConfigAtTier(config, tier), config: view };
+  });
 
   for (const priority of OVERVIEW_SLICE_PRIORITY) {
     const exact = reads
@@ -615,22 +612,47 @@ function selectPlatformRead(
   return bestMissingRead ? nonComparableAsMissing(bestMissingRead, tier) : nullTierRead(tier);
 }
 
+export interface OverviewCubeRead extends Omit<OverviewTierRead, 'tier' | 'config'> {
+  config: number | null;
+  missingReason: OverviewMissingReason | null;
+}
+
+export interface OverviewCubePlatform {
+  hardware: OverviewReferenceHardware;
+  configs: OverviewConfigView[];
+  reads: OverviewCubeRead[];
+}
+
+export interface OverviewCubeRow {
+  model: Model;
+  modelLabel: string;
+  category: CategoryTag;
+  scenario: OverviewScenario;
+  platforms: OverviewCubePlatform[];
+}
+
+export interface OverviewCube {
+  engineScope: OverviewEngineScope;
+  modelScope: OverviewModelScope;
+  rows: OverviewCubeRow[];
+  history: { window: OverviewHistoricalWindow; baseline: OverviewCubeRow[] } | null;
+}
+
 function missingReasonForPlatform(
-  workloadRows: readonly BenchmarkRow[],
-  hardware: string,
+  hardwareRows: readonly BenchmarkRow[],
+  configs: readonly OverviewConfigResult[],
   read: OverviewTierRead,
-  bucketReads: readonly OverviewTierRead[],
+  tier: number,
 ): OverviewMissingReason | null {
   if (isInRangeTierRead(read)) return null;
-  const hardwareRows = workloadRows.filter((row) => row.hardware === hardware);
   if (hardwareRows.length === 0) return 'no_scenario_data';
-  const supportedRows = hardwareRows.filter((row) => OVERVIEW_PRECISIONS.includes(row.precision));
-  if (supportedRows.length === 0) return 'int4_bf16_only';
-  if (bucketReads.length === 0) return 'no_scenario_data';
+  if (!hardwareRows.some((row) => OVERVIEW_PRECISIONS.includes(row.precision))) {
+    return 'int4_bf16_only';
+  }
+  if (configs.length === 0) return 'no_scenario_data';
   // `cannot reach` is a claim about the whole platform, so it holds only when
-  // EVERY qualified serving series tops out below the tier — one merely
   // under-swept stack downgrades the gap to a missing exact read.
-  return bucketReads.every((r) => r.boundary === 'unreachable')
+  return configs.every((config) => readConfigAtTier(config, tier).boundary === 'unreachable')
     ? 'cannot_reach_at_tier'
     : 'no_exact_at_tier';
 }
@@ -655,48 +677,51 @@ export function overviewCostPerMtok(
   return (costPerGpuHour * 1_000_000) / (totalTputPerGpu * 3600);
 }
 
-function buildPlatformResults(
-  model: Model,
-  scenario: OverviewScenario,
-  scenarioRows: readonly BenchmarkRow[],
+function sliceOverviewRow(
+  row: OverviewCubeRow,
   tier: OverviewTier,
   referenceHardware: OverviewReferenceHardware,
-): OverviewPlatformResult[] {
-  const configs = buildConfigs(model, scenario, scenarioRows);
-  const readsForHardware = (hardware: string): OverviewTierRead[] =>
-    configs
-      .filter((config) => config.hardware === hardware)
-      .map((config) => readConfigAtTier(config, tier));
-
-  const platforms = OVERVIEW_HARDWARE.map((hardware) => {
-    const read = selectPlatformRead(configs, hardware, tier);
+): OverviewModelSummary {
+  const tierIndex = OVERVIEW_TIERS.indexOf(tier);
+  const platforms = row.platforms.map((platform) => {
+    const cubeRead = platform.reads[tierIndex];
+    const config = cubeRead.config === null ? null : platform.configs[cubeRead.config];
     return {
-      hardware,
-      hardwareLabel: overviewHardwareLabel(hardware, model),
-      precision: read.config?.precision ?? null,
-      read,
-      missingReason: missingReasonForPlatform(
-        scenarioRows,
-        hardware,
-        read,
-        readsForHardware(hardware),
-      ),
-      costPerMtok: overviewCostPerMtok(hardware, read.value),
+      hardware: platform.hardware,
+      hardwareLabel: overviewHardwareLabel(platform.hardware, row.model),
+      precision: config?.precision ?? null,
+      read: {
+        tier,
+        value: cubeRead.value,
+        boundary: cubeRead.boundary,
+        estimated: cubeRead.estimated,
+        evidenceDate: cubeRead.evidenceDate,
+        evidenceTopologies: cubeRead.evidenceTopologies,
+        config,
+      },
+      missingReason: cubeRead.missingReason,
+      costPerMtok: overviewCostPerMtok(platform.hardware, cubeRead.value),
     };
   });
 
   const referenceCost =
     platforms.find((platform) => platform.hardware === referenceHardware)?.costPerMtok ?? null;
-  return platforms.map((platform) => ({
-    ...platform,
-    costVsReferencePct:
-      platform.hardware === referenceHardware ||
-      referenceCost === null ||
-      platform.costPerMtok === null
-        ? null
-        : platform.costPerMtok / referenceCost - 1,
-    historicalComparison: null,
-  }));
+  return {
+    model: row.model,
+    modelLabel: row.modelLabel,
+    category: row.category,
+    scenario: row.scenario,
+    platforms: platforms.map((platform) => ({
+      ...platform,
+      costVsReferencePct:
+        platform.hardware === referenceHardware ||
+        referenceCost === null ||
+        platform.costPerMtok === null
+          ? null
+          : platform.costPerMtok / referenceCost - 1,
+      historicalComparison: null,
+    })),
+  };
 }
 
 function deployedGpuFactor(row: BenchmarkRow): number {
@@ -720,7 +745,7 @@ interface OverviewAgenticTierPoint extends TcoTierPoint {
  *  the throughput read at the tier is total tok/s per deployed GPU. */
 function buildAgenticTierReads(rows: readonly BenchmarkRow[]): TcoTierRead[] {
   const points = rows.flatMap((row): OverviewAgenticTierPoint[] => {
-    const entry = rowToAggDataEntry(row);
+    const entry = rowToAggDataEntry(row, { modelPower: false });
     const factor = deployedGpuFactor(row);
     const interactivity = entry.p90_intvty;
     const e2eLatency = entry.p90_e2el;
@@ -831,6 +856,41 @@ function buildConfigResult(
   };
 }
 
+function buildOverviewCubeRow(
+  model: Model,
+  rows: readonly BenchmarkRow[],
+  engineScope: OverviewEngineScope,
+  scenario: OverviewScenario,
+): OverviewCubeRow {
+  const scenarioRows = overviewScenarioRows(scenario, overviewEngineRows(rows, engineScope));
+  return {
+    model,
+    modelLabel: getModelLabel(model),
+    category: getModelCategory(model),
+    scenario,
+    platforms: OVERVIEW_HARDWARE.map((hardware) => {
+      const hardwareRows = scenarioRows.filter((row) => row.hardware === hardware);
+      const configs = buildConfigs(model, scenario, hardwareRows);
+      const selected: OverviewConfigView[] = [];
+      const reads = OVERVIEW_TIERS.map((tier): OverviewCubeRead => {
+        const read = selectPlatformRead(configs, tier);
+        let index = selected.findIndex((view) => view.key === read.config?.key);
+        if (read.config !== null && index === -1) index = selected.push(read.config) - 1;
+        return {
+          value: read.value,
+          boundary: read.boundary,
+          estimated: read.estimated,
+          evidenceDate: read.evidenceDate,
+          evidenceTopologies: read.evidenceTopologies,
+          config: read.config === null ? null : index,
+          missingReason: missingReasonForPlatform(hardwareRows, configs, read, tier),
+        };
+      });
+      return { hardware, configs: selected, reads };
+    }),
+  };
+}
+
 export function buildOverviewModelSummary(
   model: Model,
   rows: BenchmarkRow[],
@@ -839,15 +899,11 @@ export function buildOverviewModelSummary(
   scenario: OverviewScenario = overviewScenarioForModel(model, rows),
   referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
 ): OverviewModelSummary {
-  const scopedRows = overviewEngineRows(rows, engineScope);
-  const scenarioRows = overviewScenarioRows(scenario, scopedRows);
-  return {
-    model,
-    modelLabel: getModelLabel(model),
-    category: getModelCategory(model),
-    scenario,
-    platforms: buildPlatformResults(model, scenario, scenarioRows, tier, referenceHardware),
-  };
+  return sliceOverviewRow(
+    buildOverviewCubeRow(model, rows, engineScope, scenario),
+    tier,
+    referenceHardware,
+  );
 }
 
 /**
@@ -869,7 +925,10 @@ export function overviewHardwareTierReader(
   const scenarioRows = overviewScenarioRows(scenario, scopedRows);
   const configs = buildConfigs(model, scenario, scenarioRows);
   return (hardware, tier) => {
-    const read = selectPlatformRead(configs, hardware, tier);
+    const read = selectPlatformRead(
+      configs.filter((config) => config.hardware === hardware),
+      tier,
+    );
     return { read, costPerMtok: overviewCostPerMtok(hardware, read.value) };
   };
 }
@@ -883,7 +942,9 @@ const overviewScenarioRank = (scenario: OverviewScenario): number =>
  *  while AgentX rows lead within each band — 8K/1K rows follow — and each
  *  (band, scenario) group keeps MODEL_CONFIG declaration order. The sort is
  *  stable, so ties never shuffle. */
-function sortOverviewSummaries(summaries: OverviewModelSummary[]): OverviewModelSummary[] {
+function sortOverviewSummaries<T extends Pick<OverviewModelSummary, 'category' | 'scenario'>>(
+  summaries: T[],
+): T[] {
   return summaries.toSorted(
     (a, b) =>
       overviewCategoryRank(a.category) - overviewCategoryRank(b.category) ||
@@ -897,6 +958,52 @@ function sortOverviewSummaries(summaries: OverviewModelSummary[]): OverviewModel
  *  model still renders all platforms with missing reasons. Live and fixture
  *  paths both feed this. Scenario presence reads the unscoped rows so switching
  *  the engine scope changes cell contents, never the shape of the matrix. */
+function buildOverviewCubeRows(
+  rowsByModel: Record<string, BenchmarkRow[]>,
+  engineScope: OverviewEngineScope,
+  modelScope: OverviewModelScope,
+): OverviewCubeRow[] {
+  return sortOverviewSummaries(
+    overviewModelsForScope(modelScope).flatMap((model) => {
+      const rows = rowsByModel[model] ?? [];
+      return overviewScenariosForModel(model, rows).map((scenario) =>
+        buildOverviewCubeRow(model, rows, engineScope, scenario),
+      );
+    }),
+  );
+}
+
+export function buildOverviewCube(
+  rowsByModel: Record<string, BenchmarkRow[]>,
+  engineScope: OverviewEngineScope = 'community',
+  modelScope: OverviewModelScope = OVERVIEW_DEFAULT_MODEL_SCOPE,
+): OverviewCube {
+  return {
+    engineScope,
+    modelScope,
+    rows: buildOverviewCubeRows(rowsByModel, engineScope, modelScope),
+    history: null,
+  };
+}
+
+export function buildOverviewHistoricalCube(
+  currentRowsByModel: Record<string, BenchmarkRow[]>,
+  baselineRowsByModel: Record<string, BenchmarkRow[]>,
+  window: OverviewHistoricalWindow,
+  engineScope: OverviewEngineScope = 'community',
+  modelScope: OverviewModelScope = OVERVIEW_DEFAULT_MODEL_SCOPE,
+): OverviewCube {
+  return {
+    engineScope,
+    modelScope,
+    rows: buildOverviewCubeRows(currentRowsByModel, engineScope, modelScope),
+    history: {
+      window,
+      baseline: buildOverviewCubeRows(baselineRowsByModel, engineScope, modelScope),
+    },
+  };
+}
+
 export function assembleOverviewPageData(
   rowsByModel: Record<string, BenchmarkRow[]>,
   tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
@@ -904,29 +1011,11 @@ export function assembleOverviewPageData(
   referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
   modelScope: OverviewModelScope = OVERVIEW_DEFAULT_MODEL_SCOPE,
 ): OverviewPageData {
-  const perModel = overviewModelsForScope(modelScope).map((model) => ({
-    model,
-    rows: rowsByModel[model] ?? [],
-  }));
-  return {
-    models: sortOverviewSummaries(
-      perModel.flatMap(({ model, rows }) =>
-        overviewScenariosForModel(model, rows).map((scenario) =>
-          buildOverviewModelSummary(model, rows, tier, engineScope, scenario, referenceHardware),
-        ),
-      ),
-    ),
+  return sliceOverviewCube(
+    buildOverviewCube(rowsByModel, engineScope, modelScope),
     tier,
-    engineScope,
-    comparisonMode: OVERVIEW_DEFAULT_COMPARISON_MODE,
     referenceHardware,
-    modelScope,
-    rowScope: 'all',
-    hardwareRowScope: 'all',
-    unchangedRowCount: 0,
-    emptyRowCount: 0,
-    historicalWindow: null,
-  };
+  );
 }
 
 /** A row earns its place in the 30-day matrix when at least one platform has a
@@ -1012,33 +1101,34 @@ function overviewPlatformKey(
   return `${model.model}|${model.scenario}|${platform.hardware}`;
 }
 
-export function assembleOverviewHistoricalPageData(
-  currentRowsByModel: Record<string, BenchmarkRow[]>,
-  baselineRowsByModel: Record<string, BenchmarkRow[]>,
-  window: OverviewHistoricalWindow,
-  tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
-  engineScope: OverviewEngineScope = 'community',
-  referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
-  modelScope: OverviewModelScope = OVERVIEW_DEFAULT_MODEL_SCOPE,
+export function sliceOverviewCube(
+  cube: OverviewCube,
+  tier: OverviewTier,
+  referenceHardware: OverviewReferenceHardware,
 ): OverviewPageData {
-  const current = assembleOverviewPageData(
-    currentRowsByModel,
+  const current: OverviewPageData = {
+    models: cube.rows.map((row) => sliceOverviewRow(row, tier, referenceHardware)),
     tier,
-    engineScope,
+    engineScope: cube.engineScope,
+    comparisonMode: OVERVIEW_DEFAULT_COMPARISON_MODE,
     referenceHardware,
-    modelScope,
-  );
-  const baseline = assembleOverviewPageData(
-    baselineRowsByModel,
-    tier,
-    engineScope,
-    referenceHardware,
-    modelScope,
-  );
+    modelScope: cube.modelScope,
+    rowScope: 'all',
+    hardwareRowScope: 'all',
+    unchangedRowCount: 0,
+    emptyRowCount: 0,
+    historicalWindow: null,
+  };
+  if (cube.history === null) return current;
+
+  const { window } = cube.history;
   const baselineByKey = new Map(
-    baseline.models.flatMap((model) =>
-      model.platforms.map((platform) => [overviewPlatformKey(model, platform), platform] as const),
-    ),
+    cube.history.baseline.flatMap((row) => {
+      const model = sliceOverviewRow(row, tier, referenceHardware);
+      return model.platforms.map(
+        (platform) => [overviewPlatformKey(model, platform), platform] as const,
+      );
+    }),
   );
 
   return {
@@ -1091,4 +1181,26 @@ export function assembleOverviewHistoricalPageData(
       }),
     })),
   };
+}
+
+export function assembleOverviewHistoricalPageData(
+  currentRowsByModel: Record<string, BenchmarkRow[]>,
+  baselineRowsByModel: Record<string, BenchmarkRow[]>,
+  window: OverviewHistoricalWindow,
+  tier: OverviewTier = OVERVIEW_PRIMARY_TIER,
+  engineScope: OverviewEngineScope = 'community',
+  referenceHardware: OverviewReferenceHardware = OVERVIEW_DEFAULT_REFERENCE_HARDWARE,
+  modelScope: OverviewModelScope = OVERVIEW_DEFAULT_MODEL_SCOPE,
+): OverviewPageData {
+  return sliceOverviewCube(
+    buildOverviewHistoricalCube(
+      currentRowsByModel,
+      baselineRowsByModel,
+      window,
+      engineScope,
+      modelScope,
+    ),
+    tier,
+    referenceHardware,
+  );
 }

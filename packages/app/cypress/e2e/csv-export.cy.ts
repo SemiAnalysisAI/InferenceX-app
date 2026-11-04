@@ -1,4 +1,5 @@
 import { captureCsvDownloads, exportFirstChart, readCapturedCsv } from '../support/csv-download';
+import { JOINED_POINT_LAYER, SCATTER_GRAPH } from '../support/scatter-points';
 
 interface ExportRoute {
   route: string;
@@ -9,7 +10,7 @@ interface ExportRoute {
 const routes: readonly ExportRoute[] = [
   {
     route: '/inference?g_model=DeepSeek-V4-Pro',
-    ready: '[data-testid="scatter-graph"] svg .dot-group',
+    ready: `${SCATTER_GRAPH} ${JOINED_POINT_LAYER}`,
     headers: ['Hardware Key', 'Throughput/Chip (tok/s)', 'Mean TTFT (s)'],
   },
   {

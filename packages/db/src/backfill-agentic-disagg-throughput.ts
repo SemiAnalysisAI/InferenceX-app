@@ -6,7 +6,7 @@
  * rescaled or per pool are left alone, so the script is safe to rerun.
  */
 import { hasNoSslFlag } from './cli-utils.js';
-import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils.js';
+import { createAdminSql } from './etl/db-utils.js';
 import { isPerTotalAgenticCandidate, perPoolThroughputPatch } from './etl/disagg-throughput.js';
 import { confirmProceed, jsonbParam, runBackfillMain } from './lib/backfill-runner.js';
 
@@ -59,7 +59,6 @@ async function main(): Promise<void> {
     }
   });
   console.log(`  Rescaled ${patches.length} row(s).`);
-  await refreshLatestBenchmarks(sql);
   console.log(
     '  Invalidate the API cache after the backfill: bun run admin:cache:invalidate <origin> --immediate',
   );

@@ -2,19 +2,17 @@ import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 
 import ThroughputCalculatorDisplay from '@/components/calculator/ThroughputCalculatorDisplay';
-import { resolveCalculatorUrlSeed } from '@/components/calculator/url-seed';
 import { ZhTabIntro } from '@/components/zh/zh-tab-intro';
-import {
-  modelRoutePath,
-  pathWithSearchParams,
-  resolveModelRouteSlug,
-} from '@/lib/routing/model-routes';
+import { MODEL_ROUTES, modelRoutePath, resolveModelRouteSlug } from '@/lib/routing/model-routes';
 import { modelTabCanonicalPath } from '@/lib/routing/tab-meta';
 import { MODEL_TAB_META_ZH, modelTabMetadataZh } from '@/lib/routing/tab-meta-zh';
 
 interface Props {
   params: Promise<{ model: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}
+
+export function generateStaticParams() {
+  return MODEL_ROUTES.map((route) => ({ model: route.slug }));
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -28,22 +26,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   );
 }
 
-export default async function ZhCalculatorModelPage({ params, searchParams }: Props) {
-  const [{ model }, sp] = await Promise.all([params, searchParams]);
+export default async function ZhCalculatorModelPage({ params }: Props) {
+  const { model } = await params;
   const resolved = resolveModelRouteSlug(model);
   if (!resolved) notFound();
   if (resolved.isAlias) {
-    permanentRedirect(
-      pathWithSearchParams(`/zh${modelRoutePath('calculator', resolved.route.slug)}`, sp),
-    );
+    permanentRedirect(`/zh${modelRoutePath('calculator', resolved.route.slug)}`);
   }
-  const seed = resolveCalculatorUrlSeed(sp);
   const meta = MODEL_TAB_META_ZH.calculator;
   return (
     <>
-      <ThroughputCalculatorDisplay
-        urlSeed={{ ...seed, model: seed.model ?? resolved.route.model }}
-      />
+      <ThroughputCalculatorDisplay routeModel={resolved.route.model} />
       <ZhTabIntro
         tab="calculator"
         title={meta.title(resolved.route.seoName)}

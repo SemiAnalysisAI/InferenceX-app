@@ -10,7 +10,6 @@ import {
   modelRoutePathnameRewrite,
   modelRouteAvailableForTab,
   modelRoutesForTab,
-  pathWithSearchParams,
   modelRouteSlug,
   parseModelRoutePathname,
   resolveModelRouteSlug,
@@ -228,21 +227,5 @@ describe('modelRoutePath', () => {
     for (const tab of MODEL_ROUTE_TABS) {
       expect(modelRoutePath(tab, 'kimi-k3')).toBe(`/${tab}/kimi-k3`);
     }
-  });
-});
-
-describe('pathWithSearchParams', () => {
-  it('returns the bare path when there are no params', () => {
-    expect(pathWithSearchParams('/calculator/kimi-k26', {})).toBe('/calculator/kimi-k26');
-  });
-
-  it('keeps share-link params, including repeated keys and reserved characters', () => {
-    expect(
-      pathWithSearchParams('/calculator/kimi-k26', {
-        i_seq: '8k/1k',
-        unofficialruns: ['a', 'b'],
-        missing: undefined,
-      }),
-    ).toBe('/calculator/kimi-k26?i_seq=8k%2F1k&unofficialruns=a&unofficialruns=b');
   });
 });

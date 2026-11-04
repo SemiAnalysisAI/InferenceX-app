@@ -103,7 +103,7 @@ export function buildGpuDataPoints(
     if (row.precision !== precision) continue;
     if (specMethod !== undefined && row.spec_method !== specMethod) continue;
 
-    const entry = rowToAggDataEntry(row);
+    const entry = rowToAggDataEntry(row, { modelPower: false });
     const hwKey = getHardwareKey(entry);
     if (!getHardwareConfig(hwKey)) continue;
 
@@ -153,7 +153,7 @@ function buildAgenticGpuDataPoints(
     if (row.precision !== precision) continue;
     if (specMethod !== undefined && row.spec_method !== specMethod) continue;
 
-    const entry = rowToAggDataEntry(row);
+    const entry = rowToAggDataEntry(row, { modelPower: false });
     const hwKey = getHardwareKey(entry);
     if (!getHardwareConfig(hwKey)) continue;
 

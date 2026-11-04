@@ -3,7 +3,8 @@ import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-// Compare detail pages are ISR: served from the CDN and regenerated hourly. Reading request
+// Compare detail pages are ISR: served from the CDN and regenerated after an ingest purge, with a
+// daily (hourly for precision and spec-decode) backstop. Reading request
 // data, opting into dynamic rendering, or wrapping the page in a Suspense fallback would
 // bring back per-request renders or a skeleton that paints before the content.
 const FAMILIES = ['compare', 'compare-per-dollar', 'compare-precision', 'compare-spec-decode'];
@@ -22,6 +23,8 @@ const layouts = LOCALES.flatMap((locale) =>
 
 const read = (file: string) => readFileSync(path.join(APP_DIR, file), 'utf8');
 
+const DAILY_FAMILIES = new Set(['compare', 'compare-per-dollar']);
+
 const DYNAMIC_PATTERNS: [string, RegExp][] = [
   ['searchParams', /\bsearchParams\b/],
   ['next/headers', /from ['"]next\/headers['"]/],
@@ -36,9 +39,12 @@ describe('compare detail route rendering', () => {
     for (const file of pages) expect(existsSync(path.join(APP_DIR, file)), file).toBe(true);
   });
 
-  it.each(pages)('%s revalidates hourly and renders on demand', (file) => {
+  it.each(pages)('%s revalidates on its backstop interval and renders on demand', (file) => {
     const source = read(file);
-    expect(source).toMatch(/^export const revalidate = 3600;$/m);
+    const revalidate = file.split(path.sep).some((part) => DAILY_FAMILIES.has(part))
+      ? '86400'
+      : '3600';
+    expect(source).toMatch(new RegExp(`^export const revalidate = ${revalidate};$`, 'm'));
     expect(source).toMatch(/^export function generateStaticParams\(\)/m);
   });
 

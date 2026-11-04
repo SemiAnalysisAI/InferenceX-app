@@ -131,7 +131,24 @@ jobs:
             github.event.client_payload.source-run-id == '' ||
             github.event.client_payload.source-run-id == github.event.client_payload.merge-run-id
           )
-        run: sleep 300
+        env:
+          GH_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
+          INGEST_REPO: ${{ vars.BENCHMARK_REPO }}
+          SOURCE_RUN_ID: ${{ github.event.client_payload.source-run-id ||
+            github.event.client_payload.run-id }}
+          MERGE_RUN_ID: ${{ github.event.client_payload.merge-run-id ||
+            github.event.client_payload.run-id }}
+        run: |
+          deadline=$((SECONDS + 300))
+          for run_id in $(printf '%s\n' "$SOURCE_RUN_ID" "$MERGE_RUN_ID" | sort -u); do
+            until [ "$(gh api "repos/$INGEST_REPO/actions/runs/$run_id" --jq .status 2>/dev/null)" = completed ]; do
+              if [ "$SECONDS" -ge "$deadline" ]; then
+                echo "::warning::Run $run_id was not completed after 300 s; continuing"
+                break
+              fi
+              sleep 10
+            done
+          done
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -270,9 +287,6 @@ jobs:
           : "${INGEST_REPO:?BENCHMARK_REPO repository variable is not set}"
           bun run admin:db:prepare:ci
 
-      - name: Run migrations
-        run: bun run admin:db:migrate --yes
-
       - name: Ingest results to DB
         env:
           GITHUB_TOKEN: ${{ secrets.INFX_MAIN_PAT }}
@@ -290,12 +304,10 @@ jobs:
           bun run admin:db:ingest:ci
 
       - name: Apply run overrides
+        id: overrides
         env:
           OVERRIDE_RUN_ID: ${{ steps.artifacts.outputs.merge-run-id }}
         run: bun run admin:db:apply-overrides --run-id "$OVERRIDE_RUN_ID" --allow-unregistered-run --yes
-
-      - name: Verify database
-        run: bun run admin:db:verify
 
       - name: Invalidate Vercel cache
         run: |
@@ -317,6 +329,10 @@ jobs:
       - name: Verify PowerX source, database and public API
         id: powerx
         run: bun packages/db/src/verify-power-publication.ts power-publication.json "${CACHE_INVALIDATE_URL%/api/v1/invalidate}"
+
+      - name: Verify database
+        if: ${{ !cancelled() && steps.overrides.outcome == 'success' }}
+        run: bun run admin:db:verify
 
       # Database write failures that are not PowerX problems fail this step
       # instead of the PowerX check. Runs even when an earlier step failed, so

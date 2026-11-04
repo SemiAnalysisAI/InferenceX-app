@@ -1,3 +1,5 @@
+import { availabilityBody } from '../support/e2e';
+import { expectHwKeyOpacity } from '../support/scatter-points';
 import {
   MODEL_SELECTION_DB_KEYS,
   modelSelectionAvailability,
@@ -24,7 +26,7 @@ describe('GLM-5.3-Flash registration without published observations', () => {
     for (const width of [1280, 375]) {
       it(`keeps ${locale}/inference/glm-5-3-flash distinct at ${width}px`, () => {
         cy.viewport(width, 900);
-        cy.intercept('GET', '/api/v1/availability', { body: [] });
+        cy.intercept('GET', '/api/v1/availability/compact', { body: availabilityBody([]) });
         cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
           if (new URL(request.url).searchParams.get('model') === 'GLM-5.3-Flash') {
             request.alias = 'flashBenchmarks';
@@ -63,7 +65,7 @@ describe('GLM-5.3-Flash registration without published observations', () => {
     for (const route of ['/inference/glm-5-3-flash', '/inference?g_model=GLM-5.3-Flash']) {
       it(`requests only Flash from the first unlocked ${locale}${route} render and reload`, () => {
         const requestedModels: (string | null)[] = [];
-        cy.intercept('GET', '/api/v1/availability*', { body: [] });
+        cy.intercept('GET', '/api/v1/availability/compact', { body: availabilityBody([]) });
         cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
           const model = new URL(request.url).searchParams.get('model');
           requestedModels.push(model);
@@ -106,7 +108,7 @@ describe('GLM-5.3-Flash registration without published observations', () => {
           },
         }).as('flashOverlay');
       });
-      cy.intercept('GET', '/api/v1/availability*', { body: [] });
+      cy.intercept('GET', '/api/v1/availability/compact', { body: availabilityBody([]) });
       cy.intercept('GET', '/api/v1/benchmarks*', { body: [] });
       cy.visit(`${locale}/inference?unofficialrun=38825822770`, {
         onBeforeLoad(win) {
@@ -136,7 +138,9 @@ describe('GLM-5.3-Flash registration without published observations', () => {
       );
       const flashAvailability = sourceAvailability.map((row) => ({ ...row, model: 'dsv41flash' }));
       expect([...new Set(flashAvailability.map((row) => row.model))]).to.deep.equal(['dsv41flash']);
-      cy.intercept('GET', '/api/v1/availability*', { body: flashAvailability });
+      cy.intercept('GET', '/api/v1/availability/compact', {
+        body: availabilityBody(flashAvailability),
+      });
       cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
         expect(
           new URL(request.url).searchParams.get('model'),
@@ -177,10 +181,12 @@ describe('Per-model dashboard routes', () => {
     });
 
     it(`renders DeepSeek V4.1 Flash chart data from bare ${locale}/inference`, () => {
-      cy.intercept('GET', '/api/v1/availability', {
-        body: modelSelectionAvailability
-          .filter((row) => row.model === 'dsv4')
-          .map((row) => ({ ...row, model: 'dsv41flash' })),
+      cy.intercept('GET', '/api/v1/availability/compact', {
+        body: availabilityBody(
+          modelSelectionAvailability
+            .filter((row) => row.model === 'dsv4')
+            .map((row) => ({ ...row, model: 'dsv41flash' })),
+        ),
       });
       cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
         expect(new URL(request.url).searchParams.get('model')).to.eq('DeepSeek-V4.1-Flash');
@@ -193,7 +199,7 @@ describe('Per-model dashboard routes', () => {
       cy.visit(`${locale}/inference`, visitOptions);
       cy.location('pathname').should('eq', `${locale}/inference/deepseek-v41-flash`);
       cy.get('[data-testid="model-selector"]').should('contain.text', 'DeepSeek V4.1 Flash');
-      cy.get('[data-testid="scatter-graph"] svg .dot-group').should('have.length.greaterThan', 0);
+      cy.scatterPoints().should('have.length.greaterThan', 0);
     });
 
     it(`opens bare ${locale}/inference on DeepSeek V4.1 Flash without dropping shared filters`, () => {
@@ -323,7 +329,9 @@ function expectBestPerSku(enabled: boolean) {
 }
 
 function visitModel(model: string, extra = '', path = '/inference') {
-  cy.intercept('GET', '/api/v1/availability', { body: modelSelectionAvailability });
+  cy.intercept('GET', '/api/v1/availability/compact', {
+    body: availabilityBody(modelSelectionAvailability),
+  });
   cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
     const requested = new URL(request.url).searchParams.get('model') ?? '';
     request.reply({
@@ -349,11 +357,13 @@ describe('Inference model presentation', () => {
     for (const width of [1280, 375]) {
       it(`updates model copy and metadata without reloading on ${locale || '/'} at ${width}px`, () => {
         cy.viewport(width, 900);
-        cy.intercept('GET', '/api/v1/availability', {
-          body: ['kimik3', 'glm5.3', 'dsv41flash'].map((model) => ({
-            ...modelSelectionAvailability[0],
-            model,
-          })),
+        cy.intercept('GET', '/api/v1/availability/compact', {
+          body: availabilityBody(
+            ['kimik3', 'glm5.3', 'dsv41flash'].map((model) => ({
+              ...modelSelectionAvailability[0]!,
+              model,
+            })),
+          ),
         });
         cy.visit(
           `${locale}/inference/kimi-k3?i_seq=agentic-traces&i_xmode=interactivity#benchmark`,
@@ -466,8 +476,8 @@ describe('Model-local manual legend selection', () => {
     selectModel(FLASH);
     expectSelection(['checkbox-b200_vllm', 'checkbox-gb300_vllm']);
     expectBestPerSku(true);
-    cy.get('.dot-group[data-hw-key="gb300_vllm"]').should('have.css', 'opacity', '1');
-    cy.get('.dot-group[data-hw-key="gb300_dynamo-sglang"]').should('have.css', 'opacity', '0');
+    expectHwKeyOpacity('gb300_vllm', 1);
+    expectHwKeyOpacity('gb300_dynamo-sglang', 0);
 
     selectModel(PRO);
     expectSelection(['checkbox-b200_vllm', 'checkbox-gb300_dynamo-sglang']);

@@ -1,3 +1,5 @@
+import { availabilityBody } from '../support/e2e';
+
 const MODEL_DISPLAY = 'DeepSeek-V4-Pro';
 const MODEL_DB = 'dsv4';
 const RUN_DATE = '2026-07-30';
@@ -75,11 +77,14 @@ const availability = [
 ];
 
 const visitOverflowChart = (withOverlay: boolean) => {
-  cy.intercept('GET', '/api/v1/availability', { body: availability }).as('availability');
+  cy.intercept('GET', '/api/v1/availability/compact', { body: availabilityBody(availability) }).as(
+    'availability',
+  );
   cy.intercept('GET', '/api/v1/benchmarks*', { body: rows(null) }).as('benchmarks');
   cy.intercept('GET', '/api/v1/workflow-info*', {
     body: { runs: [], changelogs: [], configs: [] },
   }).as('workflowInfo');
+  cy.intercept('GET', '/api/v1/workflow-changelogs*', { body: { dates: [] } });
   if (withOverlay) {
     cy.intercept('GET', '/api/unofficial-run*', {
       body: {

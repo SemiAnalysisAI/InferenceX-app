@@ -11,6 +11,7 @@ import type { LineConfig } from '../layers/lines';
 import type { RooflineConfig } from '../layers/rooflines';
 import type { BarLabelConfig } from '../layers/bar-labels';
 import type { ScatterPointConfig } from '../layers/scatter-points';
+import type { CanvasPointLayer } from '../layers/canvas-points';
 import type { RadarConfig } from '../layers/radar';
 
 export type ScaleConfig =
@@ -72,6 +73,7 @@ export interface ScatterLayerConfig<
   data: T[];
   config: ScatterPointConfig<T>;
   keyFn?: (d: T) => string;
+  canvas?: (zoomGroup: SVGGElement) => CanvasPointLayer<T>;
 }
 
 export interface RadarLayerConfig<T> extends LayerBase {
@@ -186,7 +188,6 @@ export interface D3ChartHandle {
   getSvgElement: () => SVGSVGElement | null;
   getTooltipElement: () => HTMLDivElement | null;
   getScales: () => { xScale: BuiltScale; yScale: BuiltScale } | null;
-  refreshDataPositions: () => void;
 }
 
 export interface D3ChartProps<T = any> {

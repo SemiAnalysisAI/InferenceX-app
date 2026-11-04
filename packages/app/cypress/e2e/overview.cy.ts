@@ -816,10 +816,8 @@ describe('Overview page', () => {
         cy.contains('button', 'Select date range')
           .should('not.have.class', 'animate-pulse')
           .and('not.have.class', 'border-red-500');
-        cy.get('[data-testid="scatter-graph"]')
-          .should('be.visible')
-          .find('svg .dot-group')
-          .should('have.length.greaterThan', 0);
+        cy.get('[data-testid="scatter-graph"]').should('be.visible');
+        cy.scatterPoints().should('have.length.greaterThan', 0);
         cy.contains('Select a date range or add a run to view chip comparison').should('not.exist');
       });
   });

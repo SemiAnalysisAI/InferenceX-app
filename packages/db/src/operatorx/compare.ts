@@ -248,14 +248,110 @@ export function buildComparison(op: ComparisonOp, inputs: ComparisonInput[]): Co
   };
 }
 
+interface Scope {
+  bySplit: Map<string, number[]>;
+  splits: ParallelOption[];
+}
+
+interface RowIndex {
+  keyId: Int32Array;
+  keyCase: Int32Array;
+  hardwareId: Int32Array;
+  caseIds: Map<string, number>;
+  caseKeys: string[];
+  backends: string[];
+  hardware: string[];
+  models: string[];
+  scopes: Map<string, Scope>;
+}
+
+const rowIndexes = new WeakMap<Pick<Comparison, 'rows'>, RowIndex>();
+
+function intern(ids: Map<string, number>, values: string[], value: string): number {
+  let id = ids.get(value);
+  if (id === undefined) {
+    id = values.length;
+    ids.set(value, id);
+    values.push(value);
+  }
+  return id;
+}
+
+function rowIndex(comparison: Pick<Comparison, 'rows'>): RowIndex {
+  const known = rowIndexes.get(comparison);
+  if (known) return known;
+  const { rows } = comparison;
+  const keyIds = new Map<string, number>();
+  const hardwareIds = new Map<string, number>();
+  const keyId = new Int32Array(rows.length);
+  const hardwareId = new Int32Array(rows.length);
+  const hardware: string[] = [];
+  let lastHardware: string | null = null;
+  let lastHardwareId = -1;
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    let id = keyIds.get(r.caseKey);
+    if (id === undefined) {
+      id = keyIds.size;
+      keyIds.set(r.caseKey, id);
+    }
+    keyId[i] = id;
+    if (r.hardware !== lastHardware) {
+      lastHardware = r.hardware;
+      lastHardwareId = intern(hardwareIds, hardware, r.hardware);
+    }
+    hardwareId[i] = lastHardwareId;
+  }
+  const cases = new Map<string, { seen: Uint8Array; count: number }>();
+  let lastModel: string | null = null;
+  let last: { seen: Uint8Array; count: number } = { seen: new Uint8Array(0), count: 0 };
+  for (let i = 0; i < rows.length; i++)
+    for (const s of rows[i].sources) {
+      if (s.model !== lastModel) {
+        lastModel = s.model;
+        let m = cases.get(s.model);
+        if (!m) {
+          m = { seen: new Uint8Array(keyIds.size), count: 0 };
+          cases.set(s.model, m);
+        }
+        last = m;
+      }
+      if (last.seen[keyId[i]] === 0) {
+        last.seen[keyId[i]] = 1;
+        last.count++;
+      }
+    }
+  const index: RowIndex = {
+    keyId,
+    keyCase: new Int32Array(keyIds.size).fill(-1),
+    hardwareId,
+    caseIds: new Map(),
+    caseKeys: [],
+    backends: Array.from<string>({ length: keyIds.size }).fill(''),
+    hardware,
+    models: [...cases]
+      .sort((a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0]))
+      .map(([m]) => m),
+    scopes: new Map(),
+  };
+  rowIndexes.set(comparison, index);
+  return index;
+}
+
+function caseOf(index: RowIndex, key: string, id: number): number {
+  let c = index.keyCase[id];
+  if (c === -1) {
+    const separator = key.lastIndexOf('|');
+    c = intern(index.caseIds, index.caseKeys, separator === -1 ? key : key.slice(0, separator));
+    index.keyCase[id] = c;
+    if (separator !== -1) index.backends[id] = key.slice(separator + 1);
+  }
+  return c;
+}
+
 /** Models any case comes from, most cases first. */
-export function comparisonModels({ rows }: Pick<Comparison, 'rows'>): string[] {
-  const cases = new Map<string, Set<string>>();
-  for (const r of rows)
-    for (const s of r.sources) cases.set(s.model, (cases.get(s.model) ?? new Set()).add(r.caseKey));
-  return [...cases]
-    .sort((a, b) => b[1].size - a[1].size || a[0].localeCompare(b[0]))
-    .map(([m]) => m);
+export function comparisonModels(comparison: Pick<Comparison, 'rows'>): string[] {
+  return [...rowIndex(comparison).models];
 }
 
 /** A case as every runner measured it: described once. */
@@ -318,13 +414,44 @@ export interface ParallelOption {
   cases: number;
 }
 
-/** The splits rows are at, with their case counts: one device first, then by size. */
-function parallelOptions(rows: ComparisonRow[]): ParallelOption[] {
-  const cases = new Map<string, Set<string>>();
-  for (const r of rows) cases.set(r.parallel, (cases.get(r.parallel) ?? new Set()).add(r.caseKey));
-  return [...cases]
-    .map(([key, set]) => ({ key, label: parallelLabel(key), cases: set.size }))
-    .sort((a, b) => compareSplits(a.key, b.key));
+function scopeOf(
+  comparison: Comparison,
+  index: RowIndex,
+  workload: string | null,
+  model: string | null,
+): Scope {
+  const name = model ? `model:${model}` : workload ? `workload:${workload}` : '';
+  const known = index.scopes.get(name);
+  if (known) return known;
+  const bySplit = new Map<string, number[]>();
+  const cases = new Map<string, { seen: Uint8Array; count: number }>();
+  comparison.rows.forEach((r, i) => {
+    if (
+      !(model
+        ? r.sources.some((s) => s.model === model)
+        : workload && r.workloads.includes(workload))
+    )
+      return;
+    let split = cases.get(r.parallel);
+    if (!split) {
+      split = { seen: new Uint8Array(index.keyCase.length), count: 0 };
+      cases.set(r.parallel, split);
+      bySplit.set(r.parallel, []);
+    }
+    bySplit.get(r.parallel)!.push(i);
+    if (split.seen[index.keyId[i]] === 0) {
+      split.seen[index.keyId[i]] = 1;
+      split.count++;
+    }
+  });
+  const scope = {
+    bySplit,
+    splits: [...cases]
+      .map(([key, split]) => ({ key, label: parallelLabel(key), cases: split.count }))
+      .sort((a, b) => compareSplits(a.key, b.key)),
+  };
+  if (!model || index.models.includes(model)) index.scopes.set(name, scope);
+  return scope;
 }
 
 const measured = (r: ComparisonRow) =>
@@ -354,67 +481,72 @@ export function comparisonView(
       find(DEFAULT_WORKLOADS[comparison.op]) ??
       comparison.workloads[0]?.id ??
       null);
-  const scoped = model
-    ? comparison.rows.filter((r) => r.sources.some((s) => s.model === model))
-    : workload
-      ? comparison.rows.filter((r) => r.workloads.includes(workload))
-      : [];
-  const splits = parallelOptions(scoped);
+  const index = rowIndex(comparison);
+  const scope = scopeOf(comparison, index, workload, model);
+  const splits = scope.splits.map((o) => ({ ...o }));
   const split = splits.find((o) => o.key === parallel)?.key ?? splits[0]?.key ?? '';
   // Raw rows retain backend identity. Hardware comparisons align full operation
   // arguments across vendor-specific backends, selecting the fastest valid result.
-  const selected = new Map<string, ComparisonRow & { backend: string }>();
-  for (const row of scoped.filter((r) => r.parallel === split)) {
-    const separator = row.caseKey.lastIndexOf('|');
-    const r = {
-      ...row,
-      backend: separator === -1 ? '' : row.caseKey.slice(separator + 1),
-      caseKey: separator === -1 ? row.caseKey : row.caseKey.slice(0, separator),
-    };
-    const key = `${r.hardware}|${r.caseKey}`;
-    const previous = selected.get(key);
-    if (
-      !previous ||
-      (previous.status === 'missing' && r.status !== 'missing') ||
-      (measured(r) && (!measured(previous) || r.latencyUs! < previous.latencyUs!))
-    ) {
-      selected.set(key, r);
+  const all = comparison.rows;
+  const splitRows = scope.bySplit.get(split) ?? [];
+  const caseIds = Int32Array.from(splitRows, (i) => caseOf(index, all[i].caseKey, index.keyId[i]));
+  const caseCount = index.caseKeys.length;
+  const present = new Uint8Array(index.hardware.length);
+  const slot = new Int32Array(index.hardware.length * caseCount).fill(-1);
+  const selected: number[] = [];
+  for (let n = 0; n < splitRows.length; n++) {
+    const i = splitRows[n];
+    present[index.hardwareId[i]] = 1;
+    const key = index.hardwareId[i] * caseCount + caseIds[n];
+    const at = slot[key];
+    if (at === -1) {
+      slot[key] = selected.length;
+      selected.push(i);
+      continue;
     }
+    const r = all[i];
+    const p = all[selected[at]];
+    if (
+      (p.status === 'missing' && r.status !== 'missing') ||
+      (measured(r) && (!measured(p) || r.latencyUs! < p.latencyUs!))
+    )
+      selected[at] = i;
   }
-  const rows = [...selected.values()];
-  const caseIndex = new Map<string, number>();
+  const caseIndex = new Int32Array(caseCount).fill(-1);
   const cases: ComparisonCase[] = [];
   const models: string[] = [];
   const modelIndex = new Map<string, number>();
-  const internModel = (name: string) => {
-    if (!modelIndex.has(name)) {
-      modelIndex.set(name, models.length);
-      models.push(name);
-    }
-    return modelIndex.get(name)!;
-  };
-  for (const r of rows) {
-    const seen = caseIndex.get(r.caseKey);
+  const sortedRoles = new Set<string[]>();
+  for (const i of selected) {
+    const r = all[i];
+    const id = index.keyCase[index.keyId[i]];
+    const seen = caseIndex[id];
     // Runners can list different layers for one case; the case names every one.
-    if (seen !== undefined) {
+    if (seen !== -1) {
       const merged = cases[seen].sources;
       for (const s of r.sources) {
-        const m = internModel(s.model);
+        const m = intern(modelIndex, models, s.model);
         const into = merged.find((x) => x.model === m);
         if (into) {
-          into.roles = [...new Set([...into.roles, ...s.roles])].sort();
+          if (!sortedRoles.has(into.roles) || !s.roles.every((role) => into.roles.includes(role))) {
+            into.roles = [...new Set([...into.roles, ...s.roles])].sort();
+            sortedRoles.add(into.roles);
+          }
         } else {
           merged.push({ model: m, roles: [...s.roles] });
         }
       }
       continue;
     }
-    caseIndex.set(r.caseKey, cases.length);
+    caseIndex[id] = cases.length;
     cases.push({
-      key: r.caseKey,
+      key: index.caseKeys[id],
       testlist: r.testlist,
       opType: r.opType,
-      sources: r.sources.map((s) => ({ model: internModel(s.model), roles: [...s.roles] })),
+      sources: r.sources.map((s) => ({
+        model: intern(modelIndex, models, s.model),
+        roles: [...s.roles],
+      })),
       shape: r.shape,
       precision: r.precision,
       computePrecision: r.computePrecision,
@@ -429,13 +561,14 @@ export function comparisonView(
   const kernelIndex = new Map<string, number>();
   const measurements: Record<string, ComparisonColumns> = {};
   const hardware = comparison.hardware
-    .filter((h) => rows.some((r) => r.hardware === h.id))
+    .filter((h) => present[index.hardware.indexOf(h.id)] === 1)
     .map((h) => {
       const reference = OPERATORX_HARDWARE_REFERENCES[h.id];
       return reference ? { ...h, reference } : h;
     });
+  const nulls = Array.from<null>({ length: cases.length }).fill(null);
+  const empty = () => [...nulls];
   for (const h of hardware) {
-    const empty = () => Array.from({ length: cases.length }, () => null);
     measurements[h.id] = {
       backend: empty(),
       status: empty(),
@@ -447,30 +580,25 @@ export function comparisonView(
       revision: empty(),
     };
   }
-  for (const r of rows) {
-    const i = caseIndex.get(r.caseKey)!;
+  for (const i of selected) {
+    const r = all[i];
+    const c = caseIndex[index.keyCase[index.keyId[i]]];
     const col = measurements[r.hardware];
-    col.backend![i] = r.backend;
-    col.status[i] = r.status;
-    col.latencyUs[i] = r.latencyUs;
-    col.cudaGraph[i] = r.cudaGraph;
-    col.runId[i] = r.runId;
-    col.resultIndex[i] = r.resultIndex;
-    col.revision[i] = r.revision;
-    if (r.kernel) {
-      if (!kernelIndex.has(r.kernel)) {
-        kernelIndex.set(r.kernel, kernels.length);
-        kernels.push(r.kernel);
-      }
-      col.kernel[i] = kernelIndex.get(r.kernel)!;
-    }
+    col.backend![c] = index.backends[index.keyId[i]];
+    col.status[c] = r.status;
+    col.latencyUs[c] = r.latencyUs;
+    col.cudaGraph[c] = r.cudaGraph;
+    col.runId[c] = r.runId;
+    col.resultIndex[c] = r.resultIndex;
+    col.revision[c] = r.revision;
+    if (r.kernel) col.kernel[c] = intern(kernelIndex, kernels, r.kernel);
   }
   return {
     op: comparison.op,
     hardware,
     workloads: comparison.workloads,
     workload,
-    modelOptions: comparisonModels(comparison),
+    modelOptions: [...index.models],
     model,
     parallelOptions: splits,
     parallel: split,

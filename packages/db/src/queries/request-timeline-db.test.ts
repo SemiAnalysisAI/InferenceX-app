@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
 
 import type { PGlite } from '@electric-sql/pglite';
@@ -9,7 +10,11 @@ import { migratedPglite, pgliteSql, type PgliteSql } from '../lib/test-pglite';
 
 import * as agenticShared from './agentic-shared';
 import { encodeRequestChartData, getRequestChartData } from './request-chart-data';
-import { getRequestTimeline, getStoredRequestTimelineGz } from './request-timeline';
+import {
+  getCurrentRequestTimelineSha256s,
+  getRequestTimeline,
+  getStoredRequestTimelineGz,
+} from './request-timeline';
 import { getTraceHistograms } from './trace-histograms';
 
 vi.mock('./agentic-shared', async (importOriginal) => {
@@ -185,15 +190,18 @@ describe('request timeline storage on PostgreSQL', () => {
 
 describe('stored gzip timeline streaming', () => {
   it('returns the exact complete document in bounded slices without decoding', async () => {
-    const chunks = await getStoredRequestTimelineGz(sql, 102, 23);
-    expect(chunks).not.toBeNull();
+    const stored = await getStoredRequestTimelineGz(sql, 102, 23);
+    expect(stored).not.toBeNull();
     const bytes: Buffer[] = [];
-    for await (const chunk of chunks!) {
+    for await (const chunk of stored!.chunks) {
       expect(chunk.length).toBeLessThanOrEqual(23);
       bytes.push(chunk);
     }
     expect(bytes.length).toBeGreaterThan(1);
-    expect(gunzipRequestTimeline(Buffer.concat(bytes))).toEqual(gzipOnly);
+    const gz = Buffer.concat(bytes);
+    expect(gunzipRequestTimeline(gz)).toEqual(gzipOnly);
+    expect(stored!.byteLength).toBe(gz.length);
+    expect(stored!.sha256).toBe(createHash('sha256').update(gz).digest('hex'));
   });
 
   it('leaves legacy and missing points to the existing fallback', async () => {
@@ -202,15 +210,68 @@ describe('stored gzip timeline streaming', () => {
   });
 
   it('rejects a disappearing row instead of completing a truncated response', async () => {
-    const chunks = await getStoredRequestTimelineGz(sql, 102, 23);
-    const first = await chunks!.next();
+    const chunks = (await getStoredRequestTimelineGz(sql, 102, 23))!.chunks;
+    const first = await chunks.next();
     expect(first.value).toHaveLength(23);
     const [row] = await sql`select request_timeline_gz from agentic_trace_replay where id = 12`;
     await sql`update agentic_trace_replay set request_timeline_gz = null where id = 12`;
     try {
-      await expect(chunks!.next()).rejects.toThrow('Stored timeline changed');
+      const drain = async (): Promise<void> => {
+        for await (const chunk of chunks) expect(chunk).toHaveLength(23);
+      };
+      await expect(drain()).rejects.toThrow('Stored value changed');
     } finally {
       await sql`update agentic_trace_replay set request_timeline_gz = ${row.request_timeline_gz} where id = 12`;
+    }
+  });
+});
+
+const sha256 = (bytes: Buffer): string => createHash('sha256').update(bytes).digest('hex');
+describe('request timeline digests', () => {
+  const digestOf = async (traceReplayId: number): Promise<string | null> => {
+    const [row] = await sql`
+      select encode(request_timeline_sha256, 'hex') as sha256
+      from agentic_trace_replay where id = ${traceReplayId}
+    `;
+    return typeof row?.sha256 === 'string' ? row.sha256 : null;
+  };
+
+  it('keeps the digest of every write to the gzip column, whatever the writer sets', async () => {
+    const [row] = await sql`select request_timeline_gz from agentic_trace_replay where id = 12`;
+    const original = Buffer.from(row!.request_timeline_gz as Uint8Array);
+    expect(await digestOf(12)).toBe(sha256(original));
+    const rewritten = await gzipRequestTimeline(timelineFor(9));
+    try {
+      await sql`
+        update agentic_trace_replay
+        set request_timeline_gz = ${rewritten}, request_timeline_sha256 = ${Buffer.alloc(32)}
+        where id = 12
+      `;
+      expect(await digestOf(12)).toBe(sha256(rewritten));
+      await sql`update agentic_trace_replay set request_timeline_sha256 = null where id = 12`;
+      expect(await digestOf(12)).toBe(sha256(rewritten));
+      await sql`update agentic_trace_replay set request_timeline_gz = null where id = 12`;
+      expect(await digestOf(12)).toBeNull();
+    } finally {
+      await sql`update agentic_trace_replay set request_timeline_gz = ${original} where id = 12`;
+    }
+    expect(await digestOf(12)).toBe(sha256(original));
+    expect(await digestOf(11)).toBeNull();
+  });
+
+  it('reports a digest only for points whose stored timeline is current', async () => {
+    const digests = await getCurrentRequestTimelineSha256s(sql, [101, 102, 103, 104, 999999]);
+    expect([...digests.keys()].toSorted()).toEqual([101, 102, 103, 104]);
+    expect(digests.get(101)).toBeNull();
+    expect(digests.get(102)).toBe(await digestOf(12));
+    expect(digests.get(103)).toBe(await digestOf(13));
+    expect(digests.get(104)).toBe(await digestOf(14));
+    await sql`update agentic_trace_replay set request_timeline_version = ${REQUEST_TIMELINE_VERSION - 1} where id = 13`;
+    try {
+      const stale = await getCurrentRequestTimelineSha256s(sql, [103]);
+      expect(stale.get(103)).toBeNull();
+    } finally {
+      await sql`update agentic_trace_replay set request_timeline_version = ${REQUEST_TIMELINE_VERSION} where id = 13`;
     }
   });
 });

@@ -19,7 +19,7 @@ import {
 
 import CalculatorTable from '@/components/calculator/CalculatorTable';
 import CostTargetPanel from '@/components/calculator/CostTargetPanel';
-import type { CalculatorUrlSeed } from '@/components/calculator/url-seed';
+import { CalculatorUrlSeedBoundary } from '@/components/calculator/url-seed-boundary';
 import {
   GlobalFilterProvider,
   useGlobalFilterActions,
@@ -366,17 +366,21 @@ export function getChartTitleZh(
   }
 }
 
-export default function ThroughputCalculatorDisplay({ urlSeed }: { urlSeed?: CalculatorUrlSeed }) {
+export default function ThroughputCalculatorDisplay({ routeModel }: { routeModel?: Model }) {
   return (
-    <GlobalFilterProvider
-      initialModel={urlSeed?.model}
-      initialSequence={urlSeed?.sequence}
-      initialPrecisions={urlSeed?.precisions}
-      initialRunDate={urlSeed?.runDate}
-      initialRunId={urlSeed?.runId}
-    >
-      <ThroughputCalculatorInner initialPercentile={urlSeed?.percentile ?? Percentile.P90} />
-    </GlobalFilterProvider>
+    <CalculatorUrlSeedBoundary routeModel={routeModel}>
+      {(urlSeed) => (
+        <GlobalFilterProvider
+          initialModel={urlSeed.model}
+          initialSequence={urlSeed.sequence}
+          initialPrecisions={urlSeed.precisions}
+          initialRunDate={urlSeed.runDate}
+          initialRunId={urlSeed.runId}
+        >
+          <ThroughputCalculatorInner initialPercentile={urlSeed.percentile ?? Percentile.P90} />
+        </GlobalFilterProvider>
+      )}
+    </CalculatorUrlSeedBoundary>
   );
 }
 

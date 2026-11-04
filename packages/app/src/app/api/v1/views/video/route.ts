@@ -2,6 +2,7 @@ import { GET as videoRuns } from '@/app/api/video-runs/route';
 import { compareSide, pairCases } from '@/components/video-benchmark/compare';
 import {
   VIDEO_HISTORY_MAX_PAGES,
+  VIDEO_HISTORY_PAGE_SIZE,
   type VideoHistoryPage,
 } from '@/components/video-benchmark/history';
 import { servingCells } from '@/components/video-benchmark/serving';
@@ -31,21 +32,23 @@ export const maxDuration = 300;
 const headers = { 'Cache-Control': 'private, no-store' };
 
 async function dashboardResponse(request: NextRequest, view: 'dashboard' | 'compare') {
-  const pages: VideoHistoryPage[] = [];
-  let nextPage: number | null = 1;
-  for (let page = 1; page <= VIDEO_HISTORY_MAX_PAGES; page++) {
-    const payload = await readResponse<VideoHistoryPage>(
-      await videoRuns(
-        sourceRequest(request, '/api/video-runs', { format: 'history', page: String(page) }),
-      ),
-    );
-    if (payload.schemaVersion !== 1 || !Array.isArray(payload.entries))
-      throw new Error('Unsupported published history projection');
-    pages.push(payload);
-    nextPage = payload.nextPage;
-    if (nextPage === null) break;
-  }
-  const projection = videoDashboardProjection(pages, request.nextUrl.search);
+  const history = await readResponse<VideoHistoryPage>(
+    await videoRuns(
+      sourceRequest(request, '/api/video-runs', {
+        format: 'history',
+        page: '1',
+        pages: String(VIDEO_HISTORY_MAX_PAGES),
+      }),
+    ),
+  );
+  if (history.schemaVersion !== 1 || !Array.isArray(history.entries))
+    throw new Error('Unsupported published history projection');
+  const { nextPage } = history;
+  const pagesRead =
+    nextPage === null
+      ? Math.max(1, Math.ceil(history.entries.length / VIDEO_HISTORY_PAGE_SIZE))
+      : nextPage - 1;
+  const projection = videoDashboardProjection([history], request.nextUrl.search);
   const { baseline, candidate } = projection.comparison;
   let cases: {
     status: 'not-requested' | 'no-pair' | 'not-published' | 'ready' | 'unavailable';
@@ -108,7 +111,7 @@ async function dashboardResponse(request: NextRequest, view: 'dashboard' | 'comp
       ...projection,
       params: { ...projection.params, view, displayView: projection.params.view },
       coverage: {
-        pagesRead: pages.length,
+        pagesRead,
         maxPages: VIDEO_HISTORY_MAX_PAGES,
         nextPage,
         truncated: nextPage !== null,

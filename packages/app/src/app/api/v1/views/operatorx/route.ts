@@ -31,51 +31,60 @@ const PAGE_SIZE = 100;
 const ONE_DEVICE = '1';
 
 /** One case on one GPU: the case as described once, plus that GPU's newest result. */
-function flatten(view: ComparisonView, hardware: readonly string[]) {
-  return view.cases.flatMap((c, i) =>
-    hardware.flatMap((hw) => {
+function flatten(
+  view: ComparisonView,
+  hardware: readonly string[],
+  status: (typeof STATUSES)[number],
+  from = 0,
+  to = Infinity,
+) {
+  const rows = [];
+  let total = 0;
+  for (let i = 0; i < view.cases.length; i++) {
+    const c = view.cases[i];
+    for (const hw of hardware) {
       const col = view.measurements[hw];
-      const status = col?.status[i];
+      const result = col?.status[i];
       // A GPU with no result for the case never ran it.
-      if (!col || !status) return [];
+      if (!col || !result || (status !== 'all' && result !== status)) continue;
+      if (total++ < from || total > to) continue;
       const latencyUs = col.latencyUs[i];
       const per = (v: number | null) =>
         v !== null && latencyUs !== null && latencyUs > 0 ? v / (latencyUs * 1e6) : null;
       const kernel = col.kernel[i];
       const bound = rooflineBound(c, hw);
-      return [
-        {
-          case_key: c.key,
-          op_type: c.opType,
-          parallel: view.parallel || ONE_DEVICE,
-          testlist: c.testlist,
-          sources: c.sources.map((s) => ({ model: view.models[s.model], roles: s.roles })),
-          shape: c.shape,
-          precision: c.precision,
-          compute_precision: c.computePrecision,
-          x: c.x,
-          dims: c.dims,
-          flops: c.flops,
-          bytes: c.bytes,
-          hardware: hw,
-          status,
-          latency_us: latencyUs,
-          tflops: per(c.flops),
-          tb_s: per(c.bytes),
-          roofline_us: bound?.us ?? null,
-          roofline_share: bound && latencyUs ? bound.us / latencyUs : null,
-          kernel: kernel === null ? null : view.kernels[kernel],
-          cuda_graph: col.cudaGraph[i],
-          run_id: col.runId[i],
-          result_index: col.resultIndex[i],
-          revision: col.revision[i],
-        },
-      ];
-    }),
-  );
+      rows.push({
+        case_key: c.key,
+        op_type: c.opType,
+        parallel: view.parallel || ONE_DEVICE,
+        testlist: c.testlist,
+        sources: c.sources.map((s) => ({ model: view.models[s.model], roles: s.roles })),
+        shape: c.shape,
+        precision: c.precision,
+        compute_precision: c.computePrecision,
+        x: c.x,
+        dims: c.dims,
+        flops: c.flops,
+        bytes: c.bytes,
+        hardware: hw,
+        status: result,
+        latency_us: latencyUs,
+        tflops: per(c.flops),
+        tb_s: per(c.bytes),
+        roofline_us: bound?.us ?? null,
+        roofline_share: bound && latencyUs ? bound.us / latencyUs : null,
+        kernel: kernel === null ? null : view.kernels[kernel],
+        cuda_graph: col.cudaGraph[i],
+        run_id: col.runId[i],
+        result_index: col.resultIndex[i],
+        revision: col.revision[i],
+      });
+    }
+  }
+  return { rows, total };
 }
 
-type Row = ReturnType<typeof flatten>[number];
+type Row = ReturnType<typeof flatten>['rows'][number];
 
 /** CSV cells are scalars: nested fields are flattened to readable text. */
 function csvRow(row: Row): Record<string, unknown> {
@@ -133,19 +142,16 @@ export function GET(request: NextRequest) {
     if (modelParam && !model)
       throw new ViewsApiParamError('model', `Unknown model: ${modelParam}`, models);
 
-    const scope = comparisonView(comparison, workload, model ?? null);
-    const splits = scope.parallelOptions.map((o) => o.key || ONE_DEVICE);
     const parallelParam = s.get('parallel');
+    const view = comparisonView(
+      comparison,
+      workload,
+      model ?? null,
+      parallelParam ? (parallelParam === ONE_DEVICE ? '' : parallelParam) : null,
+    );
+    const splits = view.parallelOptions.map((o) => o.key || ONE_DEVICE);
     if (parallelParam && !splits.includes(parallelParam))
       throw new ViewsApiParamError('parallel', `Unknown parallel: ${parallelParam}`, splits);
-    const view = parallelParam
-      ? comparisonView(
-          comparison,
-          workload,
-          model ?? null,
-          parallelParam === ONE_DEVICE ? '' : parallelParam,
-        )
-      : scope;
 
     const available = view.hardware.map((h) => h.id);
     const picked = parseFreeListParam(s.get('hardware'));
@@ -154,9 +160,12 @@ export function GET(request: NextRequest) {
       throw new ViewsApiParamError('hardware', `Unknown hardware: ${unknown}`, available);
     const hardware = picked.length > 0 ? picked : available;
 
-    const rows = flatten(view, hardware).filter((r) => status === 'all' || r.status === status);
-    const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
     const page = parseNumberParam(s.get('page'), 'page', 0, { min: 0, integer: true });
+    const { rows, total } =
+      format === 'csv'
+        ? flatten(view, hardware, status)
+        : flatten(view, hardware, status, page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+    const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
     if (page >= pages)
       throw new ViewsApiParamError('page', `page must be below ${pages}`, [String(pages - 1)]);
 
@@ -197,9 +206,9 @@ export function GET(request: NextRequest) {
           hardware: view.hardware.map((h) => ({ id: h.id, runner: h.runner, runs: h.runs })),
         },
         url: pageUrl(op, view),
-        total: rows.length,
+        total,
         pageSize: PAGE_SIZE,
-        rows: rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
+        rows,
       },
       cache,
     );

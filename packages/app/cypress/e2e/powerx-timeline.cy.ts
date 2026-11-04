@@ -1,3 +1,4 @@
+import { availabilityBody } from '../support/e2e';
 import { assertShareLinkParams } from '../support/share-link';
 
 const MODEL = 'dsv4';
@@ -106,11 +107,14 @@ const availability = [
 ];
 
 function interceptRows() {
-  cy.intercept('GET', '/api/v1/availability', { body: availability }).as('availability');
+  cy.intercept('GET', '/api/v1/availability/compact', { body: availabilityBody(availability) }).as(
+    'availability',
+  );
   cy.intercept('GET', '/api/v1/benchmarks*', { body: rows(RUN_URL, 'b200') }).as('benchmarks');
   cy.intercept('GET', '/api/v1/workflow-info*', {
     body: { runs: [], changelogs: [], configs: [] },
   });
+  cy.intercept('GET', '/api/v1/workflow-changelogs*', { body: { dates: [] } });
   cy.intercept('POST', `/api/gpu-metrics?runId=${RUN_ID}*`, {
     body: seriesFor('b200', RUN_URL, RUN_ID),
   }).as('series');

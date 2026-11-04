@@ -500,7 +500,10 @@ export async function GET(request: NextRequest) {
     return cachedJson(
       request,
       { runInfos, benchmarks, evaluations },
-      { cacheControl: localPreview ? UNCACHED : unofficialRunCacheControl(runInfos) },
+      {
+        cacheControl: localPreview ? UNCACHED : unofficialRunCacheControl(runInfos),
+        compression: 'cdn',
+      },
     );
   } catch (error) {
     console.error('Error processing unofficial run:', error);

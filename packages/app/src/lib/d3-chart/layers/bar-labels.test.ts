@@ -140,7 +140,7 @@ describe('renderBarLabels', () => {
 
     const labels = group.selectAll('.bar-label');
     for (const el of labels.elements) {
-      expect(el.attrs['font-weight']).toBe('600');
+      expect(el.getAttribute('font-weight')).toBe('600');
     }
   });
 

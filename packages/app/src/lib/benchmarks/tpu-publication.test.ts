@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import sweep from '../../../../db/src/etl/fixtures/tpu-manual-sweep.json';
 import { normalizeArtifactRows, normalizeEvalArtifactRows } from '@/app/api/unofficial-run/route';
-import { buildChartData } from '@/providers/unofficial-run-provider';
+import { buildChartData } from '@/providers/unofficial-chart-data';
 import { getPointLabel } from '@/components/inference/utils/tooltipUtils';
 import { pointLabelText } from '@/components/inference/ui/point-label';
-import { rowToAggDataEntry, transformBenchmarkRows } from './benchmark-transform';
+import {
+  rowToAggDataEntry,
+  transformBenchmarkRows,
+  transformChartRowsForPrecisions,
+} from './benchmark-transform';
 import { buildDerivedChartFields } from '../charts/chart-utils';
 import { getGpuSpecs } from '../catalog/constants';
 import { inferenceChartToCsv } from '../export/csv-export-helpers';
@@ -62,6 +66,17 @@ describe('TPU publication paths', () => {
     expect(rowToLightweightPoint(row, ['costh'], null, 'internal')!.costh.y).toBeCloseTo(
       internal.costh.y,
     );
+    for (const points of transformBenchmarkRows([row], 'median', 'external').chartData) {
+      expect(points[0].costh.y).toBe(external.costh.y);
+    }
+    const seriesPoints = transformChartRowsForPrecisions(
+      [row],
+      1,
+      new Set([row.precision]),
+      'median',
+      'external',
+    );
+    expect(seriesPoints[0].costh.y).toBe(external.costh.y);
     const groups = buildGpuGroups([row], {
       sequence: Sequence.EightK_OneK,
       precisions: ['fp8'],

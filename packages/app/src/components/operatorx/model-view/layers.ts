@@ -107,7 +107,7 @@ interface Def {
 }
 
 /** Measured roles as the graphs name them, each with the spellings the data uses. */
-type Present = ReadonlyMap<string, ReadonlySet<string>>;
+export type Present = ReadonlyMap<string, ReadonlySet<string>>;
 
 interface Graph {
   cols: number;
@@ -1012,6 +1012,23 @@ function fallbackSpec(arch: ModelArchitecture | undefined, hasMoe: boolean): Mod
   };
 }
 
+export function measuredRoles(gemms: ComparisonView | undefined, model: string): Present {
+  const present = new Map<string, Set<string>>();
+  const bases = new Map<string, string>();
+  if (gemms)
+    gemms.cases.forEach((_, i) => {
+      for (const role of caseRoles(gemms, i, model)) {
+        let base = bases.get(role);
+        if (base === undefined) {
+          base = baseRole(role);
+          bases.set(role, base);
+        }
+        present.set(base, (present.get(base) ?? new Set()).add(role));
+      }
+    });
+  return present;
+}
+
 /**
  * The model top down, as the architecture diagram draws it: embedding, the layer's
  * attention (and its variants, for hybrids), the dense FFN or MoE, the final norm and
@@ -1021,18 +1038,12 @@ function fallbackSpec(arch: ModelArchitecture | undefined, hasMoe: boolean): Mod
  */
 export function modelLayers(
   arch: ModelArchitecture | undefined,
-  gemms: ComparisonView | undefined,
+  present: Present,
   attention: ComparisonView | undefined,
   model: string,
   hasMoe: boolean,
   open: ReadonlySet<string>,
 ): LayerBlock[] {
-  const present = new Map<string, Set<string>>();
-  if (gemms)
-    gemms.cases.forEach((_, i) => {
-      for (const role of caseRoles(gemms, i, model))
-        present.set(baseRole(role), (present.get(baseRole(role)) ?? new Set()).add(role));
-    });
   const spec = MODEL_SPECS.find(([re]) => re.test(model))?.[1] ?? fallbackSpec(arch, hasMoe);
   const act = spec.act ?? (arch ? ffnGateActivationLabel(arch) : 'SiLU');
   // Every role some box runs, folded or not.

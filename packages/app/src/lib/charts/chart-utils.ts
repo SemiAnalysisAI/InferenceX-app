@@ -1,12 +1,5 @@
-import {
-  GOOGLE_BLUE,
-  HUAWEI_CHART_COLORS,
-  HUAWEI_CHART_PALETTE,
-  resolveFrameworkAlias,
-} from '@semianalysisai/inferencex-constants';
+import { resolveFrameworkAlias } from '@semianalysisai/inferencex-constants';
 import { hasPoolSplit } from '@/lib/benchmarks/chip-basis';
-import iwanthue from 'iwanthue';
-import { chartPaletteTheme, isDarkTheme } from '@/lib/themes/themes';
 
 import type {
   AggDataEntry,
@@ -18,134 +11,29 @@ import {
   BENCHMARK_METRIC_CONFIG_KEYS,
   type BenchmarkMetricKey,
 } from '@/components/inference/metric-registry';
-import { DEFAULT_TCO_BASIS, getGpuSpecs, isKnownGpu, type TcoBasis } from '@/lib/catalog/constants';
-import { getVendor, type Vendor } from '@/lib/charts/dynamic-colors';
+import {
+  DEFAULT_TCO_BASIS,
+  getGpuSpecs,
+  isKnownGpu,
+  type GpuSpecs,
+  type TcoBasis,
+} from '@/lib/catalog/constants';
 import type { Locale } from '@/lib/i18n/i18n';
-import { buildPowerBasisChartFields, type PowerBasisChartFields } from '@/lib/power/power-basis';
+import { POWER_BASIS_FIELD_KEYS, writePowerBasisChartFields } from '@/lib/power/power-basis';
 import { reconstructedRoleEnergy } from '@/components/inference/utils/role-energy';
-
-const BANNED_HUE_TEST: Record<Vendor, ((hue: number) => boolean) | null> = {
-  nvidia: (hue) => hue >= 320 || hue <= 40,
-  amd: (hue) => hue >= 120 && hue <= 195,
-  openai: (hue) => hue < 290 || hue > 350,
-  google: (hue) => hue < 255 || hue > 300,
-  huawei: null,
-  unknown: null,
-};
-
-const PREFERRED_ZONE: Record<
-  Vendor,
-  { hmin: number; hmax: number; cmin?: number; lmin?: number } | null
-> = {
-  nvidia: { hmin: 100, hmax: 195 },
-  amd: { hmin: 20, hmax: 50, cmin: 70, lmin: 50 },
-  openai: { hmin: 300, hmax: 340 },
-  google: { hmin: 265, hmax: 295 },
-  huawei: HUAWEI_CHART_PALETTE.lab,
-  unknown: null,
-};
-
-const PREFERRED_MAX = 4;
-
-const BAN_MAX = 10;
-
-const PALETTE_CACHE = new Map<string, string[]>();
-
-export const generateHighContrastColors = (
-  keys: string[],
-  theme: string,
-  vendorKeyFor?: (key: string) => string,
-): Record<string, string> => {
-  if (keys.length === 0) return {};
-  theme = chartPaletteTheme(theme);
-
-  const colors: Record<string, string> = {};
-  const [lmin, lmax] = isDarkTheme(theme) ? [50, 100] : [30, 65];
-
-  const groups = new Map<Vendor, string[]>();
-  for (const key of keys) {
-    const vendor = getVendor(vendorKeyFor ? vendorKeyFor(key) : key);
-    let list = groups.get(vendor);
-    if (!list) {
-      list = [];
-      groups.set(vendor, list);
-    }
-    list.push(key);
-  }
-
-  const multiVendor = groups.size > 1;
-  const reserveHuawei = groups.has('huawei');
-
-  for (const [vendor, vendorKeys] of groups) {
-    const count = vendorKeys.length;
-    if (vendor === 'huawei' && count === 1) {
-      colors[vendorKeys[0]] = HUAWEI_CHART_COLORS[isDarkTheme(theme) ? 'dark' : 'light'];
-      continue;
-    }
-    if (vendor === 'google' && count === 1) {
-      colors[vendorKeys[0]] = GOOGLE_BLUE;
-      continue;
-    }
-    const isBanned = BANNED_HUE_TEST[vendor] ?? null;
-    const preferred = PREFERRED_ZONE[vendor] ?? null;
-
-    const usePreferred =
-      preferred && ((multiVendor && count <= PREFERRED_MAX) || vendor === 'huawei');
-    const useBan = multiVendor && !usePreferred && isBanned && count <= BAN_MAX;
-
-    const excludeAmber = reserveHuawei && vendor !== 'huawei';
-    const mode = usePreferred ? 'pref' : useBan ? 'ban' : 'open';
-    const cacheKey = `${vendor}|${theme}|${count}|${mode}|${lmin}|${lmax}|${excludeAmber}`;
-
-    let palette = PALETTE_CACHE.get(cacheKey);
-    if (!palette) {
-      palette = iwanthue(count, {
-        colorSpace: usePreferred
-          ? {
-              hmin: preferred.hmin,
-              hmax: preferred.hmax,
-              cmin: preferred.cmin ?? 30,
-              cmax: 100,
-              lmin: Math.max(lmin, preferred.lmin ?? 0),
-              lmax,
-            }
-          : { hmin: 0, hmax: 360, cmin: 30, cmax: 100, lmin, lmax },
-        ...((useBan || excludeAmber) && {
-          colorFilter: (_rgb: [number, number, number], lab: [number, number, number]) => {
-            if (lab[0] < lmin || lab[0] > lmax) return false;
-            const hue = ((Math.atan2(lab[2], lab[1]) * 180) / Math.PI + 360) % 360;
-            return (
-              !(useBan && isBanned?.(hue)) &&
-              !(
-                excludeAmber &&
-                hue >= HUAWEI_CHART_PALETTE.reservedLab.hmin &&
-                hue <= HUAWEI_CHART_PALETTE.reservedLab.hmax
-              )
-            );
-          },
-        }),
-        seed: `${vendor}-${theme}`,
-        clustering: 'force-vector',
-        quality: 50,
-        attempts: 5,
-      });
-      PALETTE_CACHE.set(cacheKey, palette);
-    }
-
-    vendorKeys.sort();
-    vendorKeys.forEach((key, i) => {
-      colors[key] = palette[i];
-    });
-  }
-  return colors;
-};
 
 export const Y_AXIS_METRICS = ['y', ...BENCHMARK_METRIC_CONFIG_KEYS] as const;
 
 export type YAxisMetric = (typeof Y_AXIS_METRICS)[number];
 
-export const getHardwareKey = (entry: AggDataEntry): string => {
-  let normalizedHwName = entry.hw.split('-')[0];
+export type HardwareKeyFields = Pick<
+  AggDataEntry,
+  'hw' | 'framework' | 'disagg' | 'benchmark_type' | 'mtp' | 'spec_decoding'
+>;
+
+export const getHardwareKey = (entry: HardwareKeyFields): string => {
+  const dash = entry.hw.indexOf('-');
+  let normalizedHwName = dash === -1 ? entry.hw : entry.hw.slice(0, dash);
   if (entry.framework) {
     const fw = resolveFrameworkAlias(entry.framework);
     const candidateDirect = `${normalizedHwName}_${fw}`;
@@ -226,8 +114,20 @@ export function buildAvailabilityHwKey(
 
 export type DerivedMetricKey = BenchmarkMetricKey | 'reconstructedPrefillJPerOutputToken';
 export type DerivedChartFields = Pick<InferenceData, DerivedMetricKey>;
+/** Requested derived metrics as a lookup, so writers test a key instead of calling back per metric. */
+export type DerivedMetricRequest = Readonly<Partial<Record<DerivedMetricKey, true>>>;
 
-const chartMetric = (y: number): { y: number; roof: boolean } => ({ y, roof: false });
+export function derivedMetricRequest(keys: readonly DerivedMetricKey[]): DerivedMetricRequest {
+  const request: Partial<Record<DerivedMetricKey, true>> = {};
+  for (const key of keys) request[key] = true;
+  return request;
+}
+
+const UNROOFED_METRIC = { y: 0, roof: false };
+
+export function chartMetric(y: number): { y: number; roof: boolean } {
+  return { ...UNROOFED_METRIC, y };
+}
 
 export function buildDerivedChartFields(
   entry: AggDataEntry,
@@ -240,16 +140,63 @@ export function buildDerivedChartFields(
   currentHwKey: string,
   requestedMetrics: readonly DerivedMetricKey[],
   tcoBasis?: TcoBasis,
+  specs?: GpuSpecs,
 ): Partial<DerivedChartFields>;
 export function buildDerivedChartFields(
   entry: AggDataEntry,
   currentHwKey: string,
   requestedMetrics?: readonly DerivedMetricKey[],
   tcoBasis: TcoBasis = DEFAULT_TCO_BASIS,
+  specs: GpuSpecs = getGpuSpecs(currentHwKey, tcoBasis),
 ): Partial<DerivedChartFields> {
-  const requested = requestedMetrics ? new Set<DerivedMetricKey>(requestedMetrics) : null;
-  const wants = (key: DerivedMetricKey) => requested === null || requested.has(key);
-  const specs = getGpuSpecs(currentHwKey, tcoBasis);
+  const fields: Partial<DerivedChartFields> = {};
+  writeDerivedChartFields(
+    fields,
+    entry,
+    requestedMetrics && derivedMetricRequest(requestedMetrics),
+    specs,
+  );
+  return fields;
+}
+
+export function writeDerivedChartFields(
+  fields: Partial<DerivedChartFields>,
+  entry: AggDataEntry,
+  request: DerivedMetricRequest | undefined,
+  specs: GpuSpecs,
+): void {
+  writeThroughputChartFields(fields, entry, request, specs);
+  let wantsMeasured = request === undefined;
+  let wantsPowerBasis = request === undefined;
+  if (request) {
+    for (const key in request) {
+      if (Object.hasOwn(MEASURED_POWER_FIELD_KEYS, key)) wantsMeasured = true;
+      else if (Object.hasOwn(POWER_BASIS_FIELD_KEYS, key)) wantsPowerBasis = true;
+    }
+  }
+  if (wantsMeasured) writeMeasuredPowerChartFields(fields, entry, specs.tdp, request);
+  if (wantsPowerBasis) writePowerBasisChartFields(fields, entry, specs, request);
+}
+
+export type ThroughputChartInput = Pick<
+  AggDataEntry,
+  'tput_per_gpu' | 'output_tput_per_gpu' | 'input_tput_per_gpu'
+>;
+
+export function requestsPowerChartFields(requestedMetrics: readonly DerivedMetricKey[]): boolean {
+  return requestedMetrics.some(
+    (key) =>
+      Object.hasOwn(MEASURED_POWER_FIELD_KEYS, key) || Object.hasOwn(POWER_BASIS_FIELD_KEYS, key),
+  );
+}
+
+export function writeThroughputChartFields(
+  fields: Partial<DerivedChartFields>,
+  entry: ThroughputChartInput,
+  request: DerivedMetricRequest | undefined,
+  specs: GpuSpecs,
+): void {
+  const all = request === undefined;
   const hardwarePower = specs.power;
   const tputPerGpu = entry.tput_per_gpu ?? 0;
   const outputTputPerGpu = entry.output_tput_per_gpu ?? 0;
@@ -260,109 +207,90 @@ export function buildDerivedChartFields(
   const millionTokensPerHour = tokensPerHour / 1_000_000;
   const millionOutputTokensPerHour = outputTokensPerHour / 1_000_000;
   const millionInputTokensPerHour = inputTokensPerHour / 1_000_000;
-  const fields: Partial<DerivedChartFields> = {};
 
-  if (wants('tpPerGpu')) fields.tpPerGpu = chartMetric(tputPerGpu);
-  if (wants('outputTputPerGpu') && outputTputPerGpu) {
+  if (all || request.tpPerGpu) fields.tpPerGpu = chartMetric(tputPerGpu);
+  if ((all || request.outputTputPerGpu) && outputTputPerGpu) {
     fields.outputTputPerGpu = chartMetric(outputTputPerGpu);
   }
-  if (wants('inputTputPerGpu') && inputTputPerGpu) {
+  if ((all || request.inputTputPerGpu) && inputTputPerGpu) {
     fields.inputTputPerGpu = chartMetric(inputTputPerGpu);
   }
-  if (wants('tokenRevenuePerGpuHour')) {
+  if (all || request.tokenRevenuePerGpuHour) {
     fields.tokenRevenuePerGpuHour = chartMetric(millionTokensPerHour);
   }
-  if (hardwarePower > 0 && wants('tpPerMw'))
+  if (hardwarePower > 0 && (all || request.tpPerMw))
     fields.tpPerMw = chartMetric((tputPerGpu * 1000) / hardwarePower);
-  if (hardwarePower > 0 && wants('inputTputPerMw') && inputTputPerGpu) {
+  if (hardwarePower > 0 && (all || request.inputTputPerMw) && inputTputPerGpu) {
     fields.inputTputPerMw = chartMetric(
       hardwarePower ? (inputTputPerGpu * 1000) / hardwarePower : 0,
     );
   }
-  if (hardwarePower > 0 && wants('outputTputPerMw') && outputTputPerGpu) {
+  if (hardwarePower > 0 && (all || request.outputTputPerMw) && outputTputPerGpu) {
     fields.outputTputPerMw = chartMetric(
       hardwarePower ? (outputTputPerGpu * 1000) / hardwarePower : 0,
     );
   }
 
-  if (wants('costh')) {
+  if (all || request.costh) {
     fields.costh = chartMetric(millionTokensPerHour ? specs.costh / millionTokensPerHour : 0);
   }
-  if (wants('costr')) {
+  if (all || request.costr) {
     fields.costr = chartMetric(millionTokensPerHour ? specs.costr / millionTokensPerHour : 0);
   }
-  if (wants('costhOutput')) {
+  if (all || request.costhOutput) {
     fields.costhOutput = chartMetric(
       millionOutputTokensPerHour ? specs.costh / millionOutputTokensPerHour : 0,
     );
   }
-  if (wants('costrOutput')) {
+  if (all || request.costrOutput) {
     fields.costrOutput = chartMetric(
       millionOutputTokensPerHour ? specs.costr / millionOutputTokensPerHour : 0,
     );
   }
-  if (wants('costhi')) {
+  if (all || request.costhi) {
     fields.costhi = chartMetric(
       millionInputTokensPerHour ? specs.costh / millionInputTokensPerHour : 0,
     );
   }
-  if (wants('costri')) {
+  if (all || request.costri) {
     fields.costri = chartMetric(
       millionInputTokensPerHour ? specs.costr / millionInputTokensPerHour : 0,
     );
   }
-  if (wants('tokensPerDollarH')) {
+  if (all || request.tokensPerDollarH) {
     fields.tokensPerDollarH = chartMetric(specs.costh ? tokensPerHour / specs.costh : 0);
   }
-  if (wants('tokensPerDollarR')) {
+  if (all || request.tokensPerDollarR) {
     fields.tokensPerDollarR = chartMetric(specs.costr ? tokensPerHour / specs.costr : 0);
   }
-  if (wants('outputTokensPerDollarH')) {
+  if (all || request.outputTokensPerDollarH) {
     fields.outputTokensPerDollarH = chartMetric(
       specs.costh ? outputTokensPerHour / specs.costh : 0,
     );
   }
-  if (wants('outputTokensPerDollarR')) {
+  if (all || request.outputTokensPerDollarR) {
     fields.outputTokensPerDollarR = chartMetric(
       specs.costr ? outputTokensPerHour / specs.costr : 0,
     );
   }
-  if (wants('inputTokensPerDollarH')) {
+  if (all || request.inputTokensPerDollarH) {
     fields.inputTokensPerDollarH = chartMetric(specs.costh ? inputTokensPerHour / specs.costh : 0);
   }
-  if (wants('inputTokensPerDollarR')) {
+  if (all || request.inputTokensPerDollarR) {
     fields.inputTokensPerDollarR = chartMetric(specs.costr ? inputTokensPerHour / specs.costr : 0);
   }
 
-  if (hardwarePower > 0 && wants('jTotal')) {
+  if (hardwarePower > 0 && (all || request.jTotal)) {
     fields.jTotal = chartMetric(
       hardwarePower && tputPerGpu ? (hardwarePower * 1000) / tputPerGpu : 0,
     );
   }
-  if (hardwarePower > 0 && wants('jOutput') && outputTputPerGpu) {
+  if (hardwarePower > 0 && (all || request.jOutput) && outputTputPerGpu) {
     fields.jOutput = chartMetric(hardwarePower ? (hardwarePower * 1000) / outputTputPerGpu : 0);
   }
-  if (hardwarePower > 0 && wants('jInput') && inputTputPerGpu) {
+  if (hardwarePower > 0 && (all || request.jInput) && inputTputPerGpu) {
     fields.jInput = chartMetric(hardwarePower ? (hardwarePower * 1000) / inputTputPerGpu : 0);
   }
-
-  const measured = buildMeasuredPowerChartFields(entry, specs.tdp);
-  for (const [key, value] of Object.entries(measured) as [
-    keyof MeasuredPowerChartFields,
-    { y: number; roof: boolean },
-  ][]) {
-    if (wants(key)) fields[key] = value;
-  }
-
-  const powerBasis = buildPowerBasisChartFields(entry, specs);
-  for (const [key, value] of Object.entries(powerBasis) as [
-    keyof PowerBasisChartFields,
-    { y: number; roof: boolean },
-  ][]) {
-    if (wants(key)) fields[key] = value;
-  }
-
-  return fields;
 }
 
 export function deploymentChipCount(
@@ -388,7 +316,7 @@ export function deploymentChipCount(
           : entry.num_prefill_gpu > 0
             ? entry.num_prefill_gpu
             : 0,
-        currentHwKey.split('_')[0] === 'tpuv7' &&
+        (currentHwKey === 'tpuv7' || currentHwKey.startsWith('tpuv7_')) &&
           (entry.num_decode_gpu > 0 || entry.num_prefill_gpu > 0)
           ? 0
           : entry.tp * (entry.pp && entry.pp > 1 ? entry.pp : 1),
@@ -401,10 +329,10 @@ export function createChartDataPoint(
   xKey: keyof AggDataEntry,
   yKey: keyof AggDataEntry,
   currentHwKey: string,
-  derivedFields: DerivedChartFields = buildDerivedChartFields(entry, currentHwKey),
+  specs: GpuSpecs = getGpuSpecs(currentHwKey),
 ): InferenceData {
   const physicalChips = deploymentChipCount(entry, currentHwKey);
-  return {
+  const point: Omit<InferenceData, keyof DerivedChartFields> & Partial<DerivedChartFields> = {
     ...entry,
     date,
     x: (entry[xKey] ?? 0) as number,
@@ -432,81 +360,93 @@ export function createChartDataPoint(
     disagg: entry.disagg || undefined,
     num_prefill_gpu: entry.disagg ? entry.num_prefill_gpu : undefined,
     num_decode_gpu: entry.disagg ? entry.num_decode_gpu : undefined,
-    ...derivedFields,
   };
+  writeDerivedChartFields(point, entry, undefined, specs);
+  return point as InferenceData;
 }
 
+const MEASURED_POWER_FIELD_KEYS = {
+  measuredAvgPower: true,
+  measuredP75Power: true,
+  measuredP90Power: true,
+  measuredPrefillAvgPower: true,
+  measuredDecodeAvgPower: true,
+  measuredJPerOutputToken: true,
+  measuredJPerTotalToken: true,
+  measuredJPerInputToken: true,
+  measuredPrefillJPerInputToken: true,
+  measuredDecodeJPerOutputToken: true,
+  measuredJPerSuccessfulQuery: true,
+  measuredWhPerSuccessfulQuery: true,
+  measuredPowerPercentTdp: true,
+  measuredPowerTimeline: true,
+  reconstructedPrefillJPerOutputToken: true,
+} as const;
+
 type MeasuredPowerChartFields = Partial<
-  Pick<
-    InferenceData,
-    | 'measuredAvgPower'
-    | 'measuredP75Power'
-    | 'measuredP90Power'
-    | 'measuredPrefillAvgPower'
-    | 'measuredDecodeAvgPower'
-    | 'measuredJPerOutputToken'
-    | 'measuredJPerTotalToken'
-    | 'measuredJPerInputToken'
-    | 'measuredPrefillJPerInputToken'
-    | 'measuredDecodeJPerOutputToken'
-    | 'measuredJPerSuccessfulQuery'
-    | 'measuredWhPerSuccessfulQuery'
-    | 'measuredPowerPercentTdp'
-    | 'measuredPowerTimeline'
-    | 'reconstructedPrefillJPerOutputToken'
-  >
+  Pick<InferenceData, keyof typeof MEASURED_POWER_FIELD_KEYS>
 >;
 
-function buildMeasuredPowerChartFields(
+function writeMeasuredPowerChartFields(
+  fields: MeasuredPowerChartFields,
   entry: AggDataEntry,
   tdpWatts: number,
-): MeasuredPowerChartFields {
-  const roleEnergy = reconstructedRoleEnergy(entry);
-  return {
-    ...(typeof entry.avg_power_w === 'number'
-      ? {
-          measuredAvgPower: chartMetric(entry.avg_power_w),
-          measuredPowerTimeline: chartMetric(entry.avg_power_w),
-        }
-      : {}),
-    ...(typeof entry.p75_power_w === 'number' && Number.isFinite(entry.p75_power_w)
-      ? { measuredP75Power: chartMetric(entry.p75_power_w) }
-      : {}),
-    ...(typeof entry.p90_power_w === 'number' && Number.isFinite(entry.p90_power_w)
-      ? { measuredP90Power: chartMetric(entry.p90_power_w) }
-      : {}),
-    ...(typeof entry.prefill_avg_power_w === 'number'
-      ? { measuredPrefillAvgPower: chartMetric(entry.prefill_avg_power_w) }
-      : {}),
-    ...(typeof entry.decode_avg_power_w === 'number'
-      ? { measuredDecodeAvgPower: chartMetric(entry.decode_avg_power_w) }
-      : {}),
-    ...(typeof entry.joules_per_output_token === 'number'
-      ? { measuredJPerOutputToken: chartMetric(entry.joules_per_output_token) }
-      : {}),
-    ...(typeof entry.joules_per_total_token === 'number'
-      ? { measuredJPerTotalToken: chartMetric(entry.joules_per_total_token) }
-      : {}),
-    ...(typeof entry.joules_per_input_token === 'number'
-      ? { measuredJPerInputToken: chartMetric(entry.joules_per_input_token) }
-      : {}),
-    ...(typeof entry.prefill_joules_per_input_token === 'number'
-      ? { measuredPrefillJPerInputToken: chartMetric(entry.prefill_joules_per_input_token) }
-      : {}),
-    ...(typeof entry.decode_joules_per_output_token === 'number'
-      ? { measuredDecodeJPerOutputToken: chartMetric(entry.decode_joules_per_output_token) }
-      : {}),
-    ...(roleEnergy ? { reconstructedPrefillJPerOutputToken: chartMetric(roleEnergy.prefill) } : {}),
-    ...(typeof entry.joules_per_successful_query === 'number'
-      ? {
-          measuredJPerSuccessfulQuery: chartMetric(entry.joules_per_successful_query),
-          measuredWhPerSuccessfulQuery: chartMetric(entry.joules_per_successful_query / 3600),
-        }
-      : {}),
-    ...(typeof entry.avg_power_w === 'number' && tdpWatts > 0
-      ? { measuredPowerPercentTdp: chartMetric((entry.avg_power_w / tdpWatts) * 100) }
-      : {}),
-  };
+  request: DerivedMetricRequest | undefined,
+): void {
+  const all = request === undefined;
+  if (typeof entry.avg_power_w === 'number') {
+    if (all || request.measuredAvgPower) fields.measuredAvgPower = chartMetric(entry.avg_power_w);
+    if (all || request.measuredPowerTimeline)
+      fields.measuredPowerTimeline = chartMetric(entry.avg_power_w);
+  }
+  if (
+    typeof entry.p75_power_w === 'number' &&
+    Number.isFinite(entry.p75_power_w) &&
+    (all || request.measuredP75Power)
+  )
+    fields.measuredP75Power = chartMetric(entry.p75_power_w);
+  if (
+    typeof entry.p90_power_w === 'number' &&
+    Number.isFinite(entry.p90_power_w) &&
+    (all || request.measuredP90Power)
+  )
+    fields.measuredP90Power = chartMetric(entry.p90_power_w);
+  if (typeof entry.prefill_avg_power_w === 'number' && (all || request.measuredPrefillAvgPower))
+    fields.measuredPrefillAvgPower = chartMetric(entry.prefill_avg_power_w);
+  if (typeof entry.decode_avg_power_w === 'number' && (all || request.measuredDecodeAvgPower))
+    fields.measuredDecodeAvgPower = chartMetric(entry.decode_avg_power_w);
+  if (typeof entry.joules_per_output_token === 'number' && (all || request.measuredJPerOutputToken))
+    fields.measuredJPerOutputToken = chartMetric(entry.joules_per_output_token);
+  if (typeof entry.joules_per_total_token === 'number' && (all || request.measuredJPerTotalToken))
+    fields.measuredJPerTotalToken = chartMetric(entry.joules_per_total_token);
+  if (typeof entry.joules_per_input_token === 'number' && (all || request.measuredJPerInputToken))
+    fields.measuredJPerInputToken = chartMetric(entry.joules_per_input_token);
+  if (
+    typeof entry.prefill_joules_per_input_token === 'number' &&
+    (all || request.measuredPrefillJPerInputToken)
+  )
+    fields.measuredPrefillJPerInputToken = chartMetric(entry.prefill_joules_per_input_token);
+  if (
+    typeof entry.decode_joules_per_output_token === 'number' &&
+    (all || request.measuredDecodeJPerOutputToken)
+  )
+    fields.measuredDecodeJPerOutputToken = chartMetric(entry.decode_joules_per_output_token);
+  if (all || request.reconstructedPrefillJPerOutputToken) {
+    const roleEnergy = reconstructedRoleEnergy(entry);
+    if (roleEnergy) fields.reconstructedPrefillJPerOutputToken = chartMetric(roleEnergy.prefill);
+  }
+  if (typeof entry.joules_per_successful_query === 'number') {
+    if (all || request.measuredJPerSuccessfulQuery)
+      fields.measuredJPerSuccessfulQuery = chartMetric(entry.joules_per_successful_query);
+    if (all || request.measuredWhPerSuccessfulQuery)
+      fields.measuredWhPerSuccessfulQuery = chartMetric(entry.joules_per_successful_query / 3600);
+  }
+  if (
+    typeof entry.avg_power_w === 'number' &&
+    tdpWatts > 0 &&
+    (all || request.measuredPowerPercentTdp)
+  )
+    fields.measuredPowerPercentTdp = chartMetric((entry.avg_power_w / tdpWatts) * 100);
 }
 export function remapInferencePoint(
   point: InferenceData,

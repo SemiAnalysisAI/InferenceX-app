@@ -20,7 +20,7 @@ import {
 import { zhAlternates } from '@/lib/i18n/i18n';
 import { socialMetadata } from '@/lib/seo/social-metadata';
 
-export const revalidate = 3600;
+export const revalidate = 86400;
 
 const DESCRIPTION =
   '投机解码（MTP、EAGLE 等）能否提升推理吞吐量并降低成本？每个页面在同一模型和芯片上对比启用与关闭投机解码时的表现，数据来自 InferenceX 开源基准测试。';

@@ -894,33 +894,39 @@ describe('mapBenchmarkRow', () => {
       expect(result!.metrics).not.toHaveProperty('workers');
     });
 
-    it('captures the NVL72 CPU-side keys without an unknown-key warning', async () => {
-      vi.resetModules();
-      const fresh = await import('./benchmark-mapper');
-      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      try {
-        const tracker = createSkipTracker();
-        const result = fresh.mapBenchmarkRow(
-          makeV2Row({
-            power_valid: 1,
-            power_metric_schema_version: 2,
-            cpu_power_valid: 1,
-            avg_cpu_socket_power_w: 250.5,
-            avg_total_cpu_power_w: 1002,
-            total_cpu_energy_j: 601200,
-            avg_total_module_power_w: 17203,
-            total_module_energy_j: 10321800,
-          }),
-          tracker,
-        );
-        expect(result!.metrics).toMatchObject({
+    it('captures the NVL72 CPU-side keys without reporting them as unexpected', () => {
+      const tracker = createSkipTracker();
+      const result = mapBenchmarkRow(
+        makeV2Row({
+          power_valid: 1,
+          power_metric_schema_version: 2,
           cpu_power_valid: 1,
           avg_cpu_socket_power_w: 250.5,
           avg_total_cpu_power_w: 1002,
           total_cpu_energy_j: 601200,
           avg_total_module_power_w: 17203,
           total_module_energy_j: 10321800,
-        });
+        }),
+        tracker,
+      );
+      expect(result!.metrics).toMatchObject({
+        cpu_power_valid: 1,
+        avg_cpu_socket_power_w: 250.5,
+        avg_total_cpu_power_w: 1002,
+        total_cpu_energy_j: 601200,
+        avg_total_module_power_w: 17203,
+        total_module_energy_j: 10321800,
+      });
+      expect([...tracker.unexpectedMetrics]).toEqual([]);
+    });
+
+    it('stores an unknown numeric field and reports it on the tracker instead of logging', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const tracker = createSkipTracker();
+        const result = mapBenchmarkRow(makeV2Row({ brand_new_metric_ms: 12.5 }), tracker);
+        expect(result!.metrics.brand_new_metric_ms).toBe(12.5);
+        expect([...tracker.unexpectedMetrics]).toEqual(['brand_new_metric_ms']);
         expect(warn).not.toHaveBeenCalled();
       } finally {
         warn.mockRestore();
@@ -1397,17 +1403,10 @@ describe('mapBenchmarkRow — power audit provenance', () => {
 
   it("never captures a malformed ['5'] reasons array as a numeric metric", () => {
     const tracker = createSkipTracker();
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    try {
-      const result = mapBenchmarkRow(makeV2Row({ power_invalid_reasons: ['5'] }), tracker);
-      expect(result!.metrics).not.toHaveProperty('power_invalid_reasons');
-      expect(result!.powerInvalidReasons).toBeUndefined();
-      expect(warn.mock.calls.map((call) => String(call[0]))).not.toContainEqual(
-        expect.stringContaining('power_invalid_reasons'),
-      );
-    } finally {
-      warn.mockRestore();
-    }
+    const result = mapBenchmarkRow(makeV2Row({ power_invalid_reasons: ['5'] }), tracker);
+    expect(result!.metrics).not.toHaveProperty('power_invalid_reasons');
+    expect(result!.powerInvalidReasons).toBeUndefined();
+    expect(tracker.unexpectedMetrics.has('power_invalid_reasons')).toBe(false);
   });
 });
 
@@ -1882,7 +1881,7 @@ describe('mapBenchmarkRow — v3 agentic nested agg schema', () => {
   });
 });
 
-describe('NVL72 CPU ingestion', () => {
+describe('CPU-side power ingestion', () => {
   it.each([
     { gpu: 1, cpu: 1, cpuValid: 1, watts: 501 },
     { gpu: 0, cpu: '1', cpuValid: 1, watts: 501 },
@@ -1945,5 +1944,35 @@ describe('NVL72 CPU ingestion', () => {
       cpu: { sample_row_count: 12, reason_codes: ['cpu_socket_count_mismatch'] },
     });
     expect(extractPowerAudit({ sample_count: 1, cpu: 'acpi' })).not.toHaveProperty('cpu');
+  });
+
+  it('keeps AMD RAPL package provenance and CPU keys on single-node rows', () => {
+    const cpu = {
+      sensor_kind: 'rapl_package',
+      source: 'rapl',
+      expected_sockets: 2,
+      observed_sockets: 2,
+      sample_row_count: 1200,
+      reason_codes: [],
+    };
+    const result = mapBenchmarkRow(
+      makeV1Row({
+        hw: 'mi355x-amd',
+        power_valid: 1,
+        cpu_power_valid: 1,
+        avg_cpu_socket_power_w: 310,
+        avg_total_cpu_power_w: 620,
+        total_cpu_energy_j: 37200,
+        power_audit: { sample_count: 600, cpu },
+      }),
+      createSkipTracker(),
+    );
+    expect(result!.powerAudit!.cpu).toEqual(cpu);
+    expect(result!.metrics).toMatchObject({
+      cpu_power_valid: 1,
+      avg_cpu_socket_power_w: 310,
+      avg_total_cpu_power_w: 620,
+      total_cpu_energy_j: 37200,
+    });
   });
 });

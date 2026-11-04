@@ -76,7 +76,6 @@ async function seed() {
   await addPoint(1, 1, 1, 1, { offload: 'off', image: 'trt:rc22' });
   await addRun(11, { githubId: 34413290524 });
   for (const [i, conc] of [1, 20, 30, 60, 227, 260].entries()) await addPoint(i + 2, 11, 2, conc);
-  await db.exec('REFRESH MATERIALIZED VIEW latest_benchmarks');
 }
 const CURVE_MODEL = 'glm5.2';
 interface CurveEntry {
@@ -89,7 +88,6 @@ const byEntry = (a: CurveEntry, b: CurveEntry) =>
   a.scope.localeCompare(b.scope) || a.point.localeCompare(b.point) || a.run - b.run;
 const loadCurvePoints = () => loadStoredCurvePoints(sql, [CURVE_MODEL], 0);
 async function expectSameCurve(state: string) {
-  await db.exec('REFRESH MATERIALIZED VIEW latest_benchmarks');
   const projected = [...publishedCurve(await loadCurvePoints())]
     .flatMap(([scope, points]) =>
       points.map((point) => ({
@@ -125,8 +123,10 @@ beforeAll(async () => {
   for (const name of migrations.filter((filename) => filename < '014_'))
     await db.exec(readFileSync(new URL(name, dir), 'utf8'));
   await seed();
-  const legacyRows = await getLatestBenchmarks(sql, 'glm5.2');
-  legacyCount = legacyRows.length;
+  await db.exec('REFRESH MATERIALIZED VIEW latest_benchmarks');
+  const [legacy] = await sql`SELECT count(*)::int AS count FROM latest_benchmarks lb
+    JOIN configs c ON c.id = lb.config_id WHERE c.model = 'glm5.2'`;
+  legacyCount = Number(legacy.count);
   for (const name of migrations.filter((filename) => filename >= '014_'))
     await db.exec(readFileSync(new URL(name, dir), 'utf8'));
   const retained = await db.query<{ count: number }>(
@@ -152,15 +152,9 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
       ids(await getAllBenchmarksForHistory(sql, 'glm5.2', null, null, 'agentic_traces')),
     ).toEqual([1, ...currentIds]);
   });
-  it('retains power audits in materialized and dated snapshots without reviving replaced points', async () => {
+  it('retains power audits in maintained and dated snapshots without reviving replaced points', async () => {
     await sql`UPDATE benchmark_results SET power_invalid_reasons = '["sampling_gap_exceeded"]'::jsonb,
       power_audit = '{"expected_gpu_count":16}'::jsonb WHERE id IN (1, 2)`;
-    await db.exec(
-      readFileSync(
-        new URL('../../migrations/020_append_only_line_images.sql', import.meta.url),
-        'utf8',
-      ),
-    );
     for (const rows of [
       await getLatestBenchmarks(sql, 'glm5.2'),
       await getLatestBenchmarks(sql, 'glm5.2', '2026-09-11'),
@@ -200,7 +194,6 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
   });
   it('keeps mixed AGG/disagg and offload points submitted in the same sweep', async () => {
     await addPoint(8, 11, 1, 2, { offload: 'off' });
-    await db.exec('REFRESH MATERIALIZED VIEW latest_benchmarks');
     expect(ids(await getLatestBenchmarks(sql, 'glm5.2'))).toEqual([...currentIds, 8]);
   });
   it('reconstructs append-only chains across point properties with producer provenance', async () => {
@@ -208,7 +201,6 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
     await addPoint(8, 12, 1, 300, { offload: 'off' });
     await addRun(13, { append: true });
     await addPoint(9, 13, 2, 400);
-    await db.exec('REFRESH MATERIALIZED VIEW latest_benchmarks');
     const rows = await getLatestBenchmarks(sql, 'glm5.2');
     expect(ids(rows)).toEqual([...currentIds, 8, 9]);
     expect(rows.every((r) => Number(r.curve_workflow_run_id) === 13)).toBe(true);
@@ -262,7 +254,6 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
       await addPoint(id, 21, config, conc, { image, fingerprint });
     await sql`UPDATE benchmark_results SET metrics = metrics || '{"power_valid":1}'::jsonb
       WHERE workflow_run_id = 21`;
-    await db.exec('REFRESH MATERIALIZED VIEW latest_benchmarks');
 
     const rows = await getLatestBenchmarks(sql, 'kimik3');
     expect(ids(rows)).toEqual([
@@ -357,7 +348,6 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
       });
     await sql`UPDATE benchmark_results SET metrics = metrics || '{"power_valid":1}'::jsonb
       WHERE workflow_run_id = 31`;
-    await db.exec('REFRESH MATERIALIZED VIEW latest_benchmarks');
 
     const rows = await getLatestBenchmarks(sql, 'kimik3');
     expect(rows).toHaveLength(35);
@@ -425,7 +415,6 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
   it('preserves accepted rows regardless of overall workflow conclusion', async () => {
     await addRun(12, { conclusion: 'failure' });
     await addPoint(8, 12, 1, 1, { offload: 'off' });
-    await db.exec('REFRESH MATERIALIZED VIEW latest_benchmarks');
     expect(ids(await getLatestBenchmarks(sql, 'glm5.2'))).toEqual([8]);
     expect(ids(await getLatestBenchmarks(sql, 'glm5.2', '2026-09-12'))).toEqual([8]);
     expect(
@@ -435,7 +424,6 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
   it('ignores runs without successful result rows', async () => {
     await addRun(12);
     await addPoint(8, 12, 1, 1, { error: 'benchmark failed' });
-    await db.exec('REFRESH MATERIALIZED VIEW latest_benchmarks');
     expect(ids(await getLatestBenchmarks(sql, 'glm5.2'))).toEqual(currentIds);
     expect(ids(await getLatestBenchmarks(sql, 'glm5.2', '2026-09-12'))).toEqual(currentIds);
     expect(await getBenchmarksForRun(sql, 'glm5.2', 12)).toEqual([]);
@@ -443,7 +431,6 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
   it('uses the latest stored attempt as before', async () => {
     await addRun(12, { githubId: 34413290524, attempt: 2 });
     await addPoint(8, 12, 1, 1, { offload: 'off' });
-    await db.exec('REFRESH MATERIALIZED VIEW latest_benchmarks');
     expect(ids(await getLatestBenchmarks(sql, 'glm5.2'))).toEqual([8]);
     expect(ids(await getLatestBenchmarks(sql, 'glm5.2', '2026-09-12'))).toEqual([8]);
     expect(ids(await getBenchmarksForRun(sql, 'glm5.2', 34413290524))).toEqual([8]);
@@ -470,7 +457,6 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
     await addPoint(9, 1, 4, 1);
     await addPoint(10, 1, 1, 1, { type: 'single_turn', isl: 1024, osl: 1024, offload: 'off' });
     await addPoint(11, 11, 2, 1, { type: 'single_turn', isl: 1024, osl: 1024 });
-    await db.exec('REFRESH MATERIALIZED VIEW latest_benchmarks');
     expect(ids(await getLatestBenchmarks(sql, 'glm5.2'))).toEqual([...currentIds, 8, 9, 10, 11]);
     expect(ids(await getLatestBenchmarks(sql, 'glm5.2', '2026-09-11'))).toEqual([
       ...currentIds,
@@ -526,6 +512,41 @@ describe('AgentX curve snapshots in PostgreSQL', () => {
     await addRun(21, { date: '2026-09-20', githubId: 20, attempt: 2 });
     await addPoint(20, 21, 2, 1400, { image: 'trt:rc27' });
     await expectSameCurve('newer attempt supersedes the older attempt');
+  });
+  it('keeps every point of a run whose rows carry different dates', async () => {
+    await addRun(12);
+    await addPoint(8, 12, 1, 1, { offload: 'off' });
+    await addPoint(9, 12, 1, 2, { offload: 'off' });
+    await sql`UPDATE benchmark_results SET date = '2026-09-11' WHERE id = 9`;
+    expect(ids(await getLatestBenchmarks(sql, 'glm5.2'))).toEqual([8, 9]);
+    expect(ids(await getLatestBenchmarks(sql, 'glm5.2', '2026-09-12'))).toEqual([8, 9]);
+    expect(ids(await getBenchmarksForRun(sql, 'glm5.2', 12))).toEqual([8, 9]);
+  });
+  it('keeps stored curve lines equal to a full rebuild after every kind of write', async () => {
+    const lines = () => sql`SELECT * FROM benchmark_curve_run_lines
+      ORDER BY workflow_run_id, date, curve_scope::text`;
+    const expectRebuilt = async (write: string) => {
+      const maintained = await lines();
+      await sql`SELECT refresh_benchmark_curve_run_lines(array(SELECT id FROM workflow_runs))`;
+      expect(maintained, write).toEqual(await lines());
+    };
+    await expectRebuilt('inserts');
+    expect(await lines()).toHaveLength(2);
+    await sql`UPDATE benchmark_results SET image = 'trt:rc27' WHERE id = 3`;
+    await expectRebuilt('image change');
+    await sql`UPDATE benchmark_results SET error = 'failed' WHERE id = 4`;
+    await expectRebuilt('point marked failed');
+    await sql`UPDATE benchmark_results SET offload_mode = 'off' WHERE id = 5`;
+    await expectRebuilt('offload change');
+    await addRun(12);
+    await sql`UPDATE benchmark_results SET workflow_run_id = 12 WHERE id = 6`;
+    await expectRebuilt('point moved to another run');
+    await sql`UPDATE configs SET precision = 'fp8' WHERE id = 1`;
+    await expectRebuilt('config change');
+    await sql`DELETE FROM benchmark_results WHERE id = 7`;
+    await expectRebuilt('delete');
+    await sql`TRUNCATE benchmark_results CASCADE`;
+    expect(await lines()).toEqual([]);
   });
 });
 

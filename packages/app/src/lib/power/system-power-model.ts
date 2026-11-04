@@ -1,7 +1,7 @@
 import type { Locale } from '@/lib/i18n/i18n';
 
 import manifest from './power-model.manifest.json';
-import { create_power_model, type PowerEstimate, ValueError } from './power_model';
+import { create_power_model, type PowerEstimate, type PowerModel, ValueError } from './power_model';
 import type { PowerComponentBreakdown as PowerComponent } from './power_model/base';
 import { SYSTEMS } from './power_model/models/advanced/systems/catalog';
 import type { RackScaleSystem } from './power_model/models/advanced/systems/rack_scale/rack_scale';
@@ -24,24 +24,6 @@ const RACK_SYSTEMS = {
 } as const satisfies Record<string, keyof typeof SYSTEMS>;
 export type SystemPowerHardware = keyof typeof CHASSIS_SYSTEMS;
 export type RackPowerHardware = keyof typeof RACK_SYSTEMS;
-
-export const AIR_COOLED_SYSTEM_PUE = SYSTEMS.hopper.default_cooling.pue;
-export const LIQUID_COOLED_RACK_PUE = SYSTEMS['gb200-nvl72'].default_cooling.pue;
-
-/** What every facility figure is: the measured IT boundary times one assumed PUE. */
-export const FACILITY_PUE_NOTE: Record<Locale, string> = {
-  en: `Facility = measured IT power × assumed PUE (${AIR_COOLED_SYSTEM_PUE} air-cooled, ${LIQUID_COOLED_RACK_PUE} liquid-cooled).`,
-  zh: `数据中心功耗 = 实测 IT 功耗 × 假定 PUE（风冷 ${AIR_COOLED_SYSTEM_PUE}，液冷 ${LIQUID_COOLED_RACK_PUE}）。`,
-};
-
-/** The PUE label for a set of systems: one value, a `min–max` range, or `—` when none. */
-export const formatPueRange = (pues: readonly number[]): string => {
-  const finite = pues.filter((pue) => Number.isFinite(pue));
-  if (finite.length === 0) return '—';
-  const low = Math.min(...finite);
-  const high = Math.max(...finite);
-  return low === high ? String(low) : `${low}–${high}`;
-};
 
 export const isSystemPowerHardware = (hardware: string): hardware is SystemPowerHardware =>
   Object.hasOwn(CHASSIS_SYSTEMS, hardware);
@@ -119,8 +101,20 @@ export const MEASURED_SYSTEM_POWER_CATEGORIES: ReadonlySet<SystemPowerCategory> 
   'measuredCpu',
 ]);
 
-export const emptySystemPowerBreakdown = (): SystemPowerBreakdown =>
-  Object.fromEntries(SYSTEM_POWER_CATEGORIES.map((key) => [key, 0])) as SystemPowerBreakdown;
+export const emptySystemPowerBreakdown = (): SystemPowerBreakdown => ({
+  gpu: 0,
+  measuredCpu: 0,
+  cpu: 0,
+  memory: 0,
+  nic: 0,
+  nvswitch: 0,
+  storage: 0,
+  other: 0,
+  fans: 0,
+  psuLoss: 0,
+  network: 0,
+  facility: 0,
+});
 
 export const scaleSystemPowerBreakdown = (
   breakdown: SystemPowerBreakdown,
@@ -152,12 +146,19 @@ const LEAF_CATEGORY_RULES: readonly (readonly [RegExp, SystemPowerCategory])[] =
   [/loss/iu, 'psuLoss'],
 ];
 
+const LEAF_CATEGORIES = new Map<string, SystemPowerCategory>();
+
 /** The part a leaf of the pinned model's component tree counts toward. */
 export function systemPowerLeafCategory(topName: string, leafName: string): SystemPowerCategory {
   if (topName === SCALE_OUT_GROUP) return 'network';
   if (leafName === MEASURED_GPU_LEAF) return 'gpu';
   if (leafName === MEASURED_GRACE_LEAF) return 'measuredCpu';
-  return LEAF_CATEGORY_RULES.find(([pattern]) => pattern.test(leafName))?.[1] ?? 'other';
+  let category = LEAF_CATEGORIES.get(leafName);
+  if (!category) {
+    category = LEAF_CATEGORY_RULES.find(([pattern]) => pattern.test(leafName))?.[1] ?? 'other';
+    LEAF_CATEGORIES.set(leafName, category);
+  }
+  return category;
 }
 
 /** Sums the pinned model's leaf components into {@link SystemPowerBreakdown} categories. */
@@ -182,6 +183,22 @@ export interface SystemUnitPower {
   breakdown: SystemPowerBreakdown;
 }
 
+const POWER_MODELS = new Map<string, PowerModel>();
+
+function powerModel(system: keyof typeof SYSTEMS, state: SystemPowerOperatingState): PowerModel {
+  const key = `${system}/${state.workload}/${state.scaleOut}`;
+  let model = POWER_MODELS.get(key);
+  if (!model) {
+    model = create_power_model({
+      system,
+      workload_state: state.workload,
+      using_scale_out: state.scaleOut,
+    });
+    POWER_MODELS.set(key, model);
+  }
+  return model;
+}
+
 function estimateSystem(
   system: keyof typeof SYSTEMS,
   gpuWattsPerGpu: number,
@@ -191,11 +208,7 @@ function estimateSystem(
   if (![gpuWattsPerGpu, graceSocketWatts ?? 0].every(Number.isFinite)) return null;
   let estimate: PowerEstimate;
   try {
-    estimate = create_power_model({
-      system,
-      workload_state: state.workload,
-      using_scale_out: state.scaleOut,
-    }).estimate_breakdown(gpuWattsPerGpu, {
+    estimate = powerModel(system, state).estimate_breakdown(gpuWattsPerGpu, {
       cpu_and_dram_measured_power_per_socket: graceSocketWatts,
     });
   } catch (error) {

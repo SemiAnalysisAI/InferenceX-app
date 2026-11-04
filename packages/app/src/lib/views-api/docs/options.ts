@@ -69,7 +69,10 @@ const responseSchema = objectSchema(
         label: stringSchema,
         vendor: stringSchema,
         arch: stringSchema,
-        tdpW: numberSchema,
+        tdpW: {
+          ...numberSchema,
+          description: 'Per-chip rated TDP in watts, shared with chip pages. B300 uses 1100 W.',
+        },
         costPerHour: objectSchema({ h: numberSchema, r: numberSchema }),
       }),
     ),

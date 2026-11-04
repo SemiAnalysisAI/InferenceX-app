@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { Sql } from './db-utils';
 import {
@@ -12,6 +12,19 @@ import {
   insertServerLogFiles,
   type BenchmarkPersistenceInput,
 } from './benchmark-ingest';
+import * as blockWriter from './server-log-block-writer';
+
+const blocksWritten = vi.hoisted((): string[] => []);
+vi.mock('./server-log-block-writer', async (importOriginal) => ({
+  ...(await importOriginal<typeof blockWriter>()),
+  writeTextAsBlocks: vi.fn(async (_tx: unknown, _id: unknown, fileName: string) => {
+    const { promise, resolve } = Promise.withResolvers<void>();
+    setImmediate(resolve);
+    await promise;
+    blocksWritten.push(fileName);
+    return true;
+  }),
+}));
 
 const point = (recipeFingerprint: string | null) => ({
   configId: 7,
@@ -41,7 +54,11 @@ describe('benchmarkPointIngestKey', () => {
   });
 });
 
-function fakeTransactionSql(linkedId: number | null, storedFileNames: string[] = []) {
+function fakeTransactionSql(
+  linkedId: number | null,
+  storedFileNames: string[] = [],
+  conflictingFileNames?: string[],
+) {
   const calls: { text: string; values: unknown[] }[] = [];
   const tag = vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => {
     const text = strings.join('');
@@ -52,6 +69,9 @@ function fakeTransactionSql(linkedId: number | null, storedFileNames: string[] =
     if (text.includes('insert into server_logs')) return Promise.resolve([{ id: 99 }]);
     if (text.includes('select file_name from server_log_files')) {
       return Promise.resolve(storedFileNames.map((file_name) => ({ file_name })));
+    }
+    if (conflictingFileNames && text.includes('insert into server_log_files')) {
+      return Promise.resolve(conflictingFileNames.includes(String(values[1])) ? [] : [{ 1: 1 }]);
     }
     return Promise.resolve([]);
   }) as any;
@@ -240,5 +260,51 @@ describe('insertServerLogFiles', () => {
       if (previous === undefined) delete process.env.SERVER_LOG_MAX_FILE_BYTES;
       else process.env.SERVER_LOG_MAX_FILE_BYTES = previous;
     }
+  });
+});
+
+describe('insertServerLogFiles block copies', () => {
+  const files = [
+    { fileName: 'results/benchmark.log', logText: 'benchmark' },
+    { fileName: 'results/router.log', logText: 'router' },
+    { fileName: 'results/server.log', logText: 'server' },
+  ];
+
+  afterEach(() => {
+    blocksWritten.length = 0;
+    vi.mocked(blockWriter.writeTextAsBlocks).mockClear();
+    vi.unstubAllEnvs();
+  });
+
+  it('writes blocks for the new primary and each child row it inserted, before resolving', async () => {
+    vi.stubEnv('SERVER_LOG_BLOCKS', '1');
+    const { sql } = fakeTransactionSql(null, [], ['results/router.log']);
+
+    await insertServerLogFiles(sql, [42], files);
+
+    expect(blocksWritten).toEqual(['results/server.log', 'results/benchmark.log']);
+    expect(
+      vi.mocked(blockWriter.writeTextAsBlocks).mock.calls.map((call) => call.slice(1)),
+    ).toEqual([
+      [99, 'results/server.log', 'server'],
+      [99, 'results/benchmark.log', 'benchmark'],
+    ]);
+  });
+
+  it('writes child blocks into an existing bundle without rewriting its primary', async () => {
+    vi.stubEnv('SERVER_LOG_BLOCKS', '1');
+    const { sql } = fakeTransactionSql(7, [], []);
+
+    await insertServerLogFiles(sql, [42], files);
+
+    expect(blocksWritten).toEqual(['results/benchmark.log', 'results/router.log']);
+  });
+
+  it('writes no blocks unless SERVER_LOG_BLOCKS=1', async () => {
+    const { sql } = fakeTransactionSql(null, [], []);
+
+    await insertServerLogFiles(sql, [42], files);
+
+    expect(blockWriter.writeTextAsBlocks).not.toHaveBeenCalled();
   });
 });

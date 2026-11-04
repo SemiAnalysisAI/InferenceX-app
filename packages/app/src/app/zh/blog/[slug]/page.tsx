@@ -1,9 +1,8 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import 'katex/dist/katex.min.css';
-
 import { BlogPostContent } from '@/components/blog/blog-post-content';
+import { KatexStyles } from '@/components/blog/katex-styles';
 import { JsonLd } from '@/components/seo/json-ld';
 import {
   blogDescription,
@@ -75,7 +74,7 @@ export default async function ZhBlogPostPage({ params }: Props) {
   const adjacent = getAdjacentPosts(slug, 'zh');
   const related = getRelatedPosts(slug, getAllPosts('zh'));
   const headings = extractHeadings(raw);
-  const { content } = await compileBlogMdx(raw, 'zh');
+  const { content, hasMath } = await compileBlogMdx(raw, 'zh');
 
   const jsonLd = buildBlogPostingJsonLd(meta, raw, 'zh');
   const breadcrumbJsonLd = buildBlogBreadcrumbJsonLdZh(slug, meta.title);
@@ -84,6 +83,7 @@ export default async function ZhBlogPostPage({ params }: Props) {
     <>
       <JsonLd data={jsonLd} />
       <JsonLd data={breadcrumbJsonLd} />
+      {hasMath && <KatexStyles />}
       <BlogPostContent
         locale="zh"
         meta={meta}

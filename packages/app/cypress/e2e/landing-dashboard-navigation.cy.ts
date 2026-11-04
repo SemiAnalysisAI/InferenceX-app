@@ -1,15 +1,26 @@
+import type { AvailabilityRow } from '@/lib/api/api';
+
+import { availabilityBody } from '../support/e2e';
 import { vrPublicationRows } from '../support/vr-publication-fixtures';
-import { assertTpuGb300Selected, interceptTpuLaunchData } from '../support/tpu-launch-fixtures';
+import {
+  assertTpuGb300Selected,
+  interceptTpuLaunchData,
+  tpuLaunchRows,
+} from '../support/tpu-launch-fixtures';
 
 const minimaxM3RubinRows = vrPublicationRows.map((row) => ({ ...row, model: 'minimaxm3' }));
 
-function interceptMinimaxM3RubinData(rows: typeof minimaxM3RubinRows = minimaxM3RubinRows): void {
-  cy.fixture('api/availability.json').then((availability) => {
-    cy.intercept('GET', '/api/v1/availability*', {
-      body: [
-        ...availability.filter((row: { model: string }) => row.model !== 'minimaxm3'),
+function interceptMinimaxM3RubinData(
+  rows: typeof minimaxM3RubinRows = minimaxM3RubinRows,
+  extraAvailability: readonly AvailabilityRow[] = [],
+): void {
+  cy.fixture<AvailabilityRow[]>('api/availability.json').then((availability) => {
+    cy.intercept('GET', '/api/v1/availability/compact', {
+      body: availabilityBody([
+        ...availability.filter((row) => row.model !== 'minimaxm3'),
         ...rows.map(({ metrics: _metrics, ...row }) => row),
-      ],
+        ...extraAvailability,
+      ]),
     });
   });
   cy.intercept('GET', '/api/v1/benchmarks*', (request) => {
@@ -49,9 +60,7 @@ describe('Muse Spark Open results', () => {
       cy.get('[data-testid="model-selector"]').should(($selector) => {
         expect(['Muse Spark Open 816B', 'Muse-Spark-Open']).to.include($selector.text().trim());
       });
-      cy.get('[data-testid="scenario-selector"]')
-        .should('contain.text', prefix ? '智能体' : 'Agentic')
-        .and('be.disabled');
+      cy.get('[data-testid="scenario-selector"]').should('not.exist');
       cy.get('[data-slot="unofficial-banner"]').should('not.exist');
       cy.get('@museRun.all').should('have.length', 0);
     });
@@ -98,9 +107,7 @@ function assertTpuView() {
 
 function assertKimiTpuView() {
   cy.get('[data-testid="model-selector"]').should('contain.text', 'Kimi K3');
-  cy.get('[data-testid="scenario-selector"]')
-    .invoke('text')
-    .should('match', /Agentic|智能体/u);
+  cy.get('[data-testid="scenario-selector"]').should('not.exist');
   cy.location('search').should('eq', '');
 }
 
@@ -257,18 +264,15 @@ describe('landing model curation', () => {
 
     it(`opens GLM 5.3 Rubin AgentX results from ${prefix || '/'}`, () => {
       const rows = vrPublicationRows.map((row) => ({ ...row, model: 'glm5.2' }));
-      cy.intercept('GET', '/api/v1/availability*', {
-        body: rows.map(({ metrics: _metrics, ...row }) => row),
+      cy.intercept('GET', '/api/v1/availability/compact', {
+        body: availabilityBody(rows.map(({ metrics: _metrics, ...row }) => row)),
       });
       cy.intercept('GET', '/api/v1/benchmarks*', { body: rows });
       cy.visit(prefix || '/');
       cy.get('[data-testid="landing-rubin-glm-5-3-results-link"]').click();
       cy.location('pathname').should('eq', `${prefix}/inference/glm-5-3`);
       cy.get('[data-testid="model-selector"]').should('contain.text', 'GLM5.3');
-      cy.get('[data-testid="scenario-selector"]').should(
-        'contain.text',
-        prefix ? '智能体' : 'Agentic',
-      );
+      cy.get('[data-testid="scenario-selector"]').should('not.exist');
       cy.get('[data-testid="chart-legend"]').should('contain.text', 'Vera Rubin NVL72');
       cy.reload();
       cy.location('pathname').should('eq', `${prefix}/inference/glm-5-3`);
@@ -284,10 +288,7 @@ describe('landing model curation', () => {
       cy.location('pathname').should('eq', `${prefix}/inference/minimax-m3`);
       cy.location('search').should('not.contain', 'i_spec=');
       cy.get('[data-testid^="remove-filter-spec-"]').should('not.exist');
-      cy.get('[data-testid="scenario-selector"]').should(
-        'contain.text',
-        prefix ? '智能体' : 'Agentic',
-      );
+      cy.get('[data-testid="scenario-selector"]').should('not.exist');
       cy.get('[data-testid="chart-legend"]').should('contain.text', 'Vera Rubin NVL72');
       cy.reload();
       cy.get('[data-testid="chart-legend"]').should('contain.text', 'Vera Rubin NVL72');
@@ -326,8 +327,11 @@ describe('landing model curation', () => {
             precision: 'fp8',
           })),
       ];
-      interceptMinimaxM3RubinData(rubinRows);
       interceptTpuLaunchData();
+      interceptMinimaxM3RubinData(
+        rubinRows,
+        tpuLaunchRows().map(({ metrics: _metrics, ...row }) => row),
+      );
       cy.visit(`${prefix}/compare`);
       cy.visit(`${prefix}${TPU_RESULTS_HREF}`);
       assertTpuView();

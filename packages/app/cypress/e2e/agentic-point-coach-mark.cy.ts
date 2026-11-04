@@ -1,14 +1,20 @@
-import { interceptDerivedAgenticMetrics, unlockAgenticGate } from '../support/e2e';
 import {
+  interceptBenchmarkPresence,
+  interceptDerivedAgenticMetrics,
+  unlockAgenticGate,
+} from '../support/e2e';
+import {
+  AGENTIC_FIXTURE_FIRST_ID,
   OVERLAY_RUN_BRANCH,
   OVERLAY_RUN_ID,
   interceptOverlayRun,
 } from '../support/overlay-fixtures';
+import { clickScatterPoint, type ScatterPoint } from '../support/scatter-points';
 
 const STORAGE_KEY = 'inferencex-agentic-point-coach-mark-dismissed';
 const COACH_MARK = '[data-testid="agentic-point-coach-mark"]';
-const AGENTIC_POINTS =
-  '[data-testid="scatter-graph"] .dot-group[data-benchmark-type="agentic_traces"]';
+const agenticPoints = (points: ScatterPoint[]) =>
+  points.filter((point) => point.attrs['benchmark-type'] === 'agentic_traces');
 
 function freshVisitor(win: Cypress.AUTWindow) {
   unlockAgenticGate(win);
@@ -24,9 +30,8 @@ beforeEach(() => {
   cy.clearAllSessionStorage();
   interceptOverlayRun();
   interceptDerivedAgenticMetrics();
-  cy.intercept('GET', '/api/v1/trace-availability?ids=*', (request) => {
-    const ids = new URL(request.url).searchParams.get('ids')?.split(',').filter(Boolean) ?? [];
-    request.reply({ body: Object.fromEntries(ids.map((id) => [id, true])) });
+  interceptBenchmarkPresence({
+    trace: Array.from({ length: 1000 }, (_, index) => AGENTIC_FIXTURE_FIRST_ID + index),
   });
 });
 
@@ -34,7 +39,7 @@ describe('Agentic chart without the retired point callout', () => {
   for (const prefix of ['', '/zh']) {
     it(`keeps point details accessible without a first-visit callout on ${prefix || '/en'}`, () => {
       cy.visit(`${prefix}/inference?i_seq=agentic-traces`, { onBeforeLoad: freshVisitor });
-      cy.get(AGENTIC_POINTS).should('have.length.greaterThan', 0);
+      cy.scatterPoints().should((points) => expect(agenticPoints(points)).to.have.length.above(0));
       cy.get('[data-testid="scatter-graph"]').scrollIntoView();
       cy.wait(1500);
       cy.get(COACH_MARK).should('not.exist');
@@ -42,7 +47,7 @@ describe('Agentic chart without the retired point callout', () => {
         expect(win.localStorage.getItem(STORAGE_KEY)).to.eq(null);
       });
 
-      cy.get(AGENTIC_POINTS).first().find('.visible-shape').click({ force: true });
+      cy.scatterPoints().then((points) => clickScatterPoint(agenticPoints(points)[0]));
       cy.get('[data-chart-tooltip]:visible')
         .should('have.length', 1)
         .find('a[href*="/inference/agentic/"]')
@@ -51,7 +56,7 @@ describe('Agentic chart without the retired point callout', () => {
       cy.get(COACH_MARK).should('not.exist');
 
       cy.reload();
-      cy.get(AGENTIC_POINTS).should('have.length.greaterThan', 0);
+      cy.scatterPoints().should((points) => expect(agenticPoints(points)).to.have.length.above(0));
       cy.get('[data-testid="scatter-graph"]').scrollIntoView();
       cy.wait(1500);
       cy.get(COACH_MARK).should('not.exist');

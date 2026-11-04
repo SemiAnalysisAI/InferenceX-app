@@ -1,3 +1,4 @@
+import { availabilityBody } from '../support/e2e';
 import { expandLegendAdvanced } from '../support/legend-advanced';
 
 describe('Unofficial-run watermark', () => {
@@ -42,7 +43,7 @@ describe('Unofficial-run watermark', () => {
           evaluations: [],
         },
       });
-      cy.intercept('GET', '/api/v1/availability*', { body: [] });
+      cy.intercept('GET', '/api/v1/availability/compact', { body: availabilityBody([]) });
       cy.intercept('GET', '/api/v1/benchmarks*', { body: [] });
 
       cy.visit(

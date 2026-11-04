@@ -3,6 +3,11 @@
 import { useEffect } from 'react';
 import { isEmbedPathname } from '@/lib/embed/embed-route';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { pointLabelAnchor } from '@/lib/d3-chart/layers/point-label-order';
+import {
+  CANVAS_POINT_LAYER_SELECTOR,
+  canvasPointLayerOf,
+} from '@/lib/d3-chart/layers/canvas-point-registry';
 import './orange-chicken-theme.css';
 
 const CHART_SELECTOR = '[data-orange-chicken-eligible="true"]';
@@ -59,6 +64,8 @@ function useChickenMarkers() {
   useEffect(() => {
     const root = document.documentElement;
     const decorated = new Map<SVGGElement, SVGImageElement>();
+    const decoratedCanvasLayers = new Set<Element>();
+    let canvasMarker: HTMLImageElement | null = null;
     let pendingFrame: number | undefined;
 
     const isActive = () =>
@@ -80,7 +87,27 @@ function useChickenMarkers() {
           removeMarker(point, marker);
         }
       }
+      const drawCanvasMarkers = active && !window.matchMedia?.('(forced-colors: active)').matches;
+      for (const layer of decoratedCanvasLayers) {
+        if (!drawCanvasMarkers || !layer.isConnected || !layer.closest(CHART_SELECTOR)) {
+          canvasPointLayerOf(layer)?.setMarker(null);
+          decoratedCanvasLayers.delete(layer);
+        }
+      }
       if (!active) return;
+
+      if (drawCanvasMarkers) {
+        document
+          .querySelectorAll(`${CHART_SELECTOR} ${CANVAS_POINT_LAYER_SELECTOR}`)
+          .forEach((layer) => {
+            if (!canvasMarker) {
+              canvasMarker = new Image();
+              canvasMarker.src = CHICKEN_IMAGE;
+            }
+            canvasPointLayerOf(layer)?.setMarker(canvasMarker);
+            decoratedCanvasLayers.add(layer);
+          });
+      }
 
       document.querySelectorAll(CHART_SELECTOR).forEach((chart) => {
         chart.querySelectorAll<SVGGElement>(POINT_SELECTOR).forEach((point) => {
@@ -98,9 +125,8 @@ function useChickenMarkers() {
           marker.setAttribute('focusable', 'false');
           marker.setAttribute('pointer-events', 'none');
           // Do not replace shapes, hit circles, data, transforms or event handlers.
-          // Being a child of the point inherits clipping, visibility and zoom.
-          const label = point.querySelector(':scope > text');
-          if (label) label.before(marker);
+          const anchor = point.querySelector(':scope > text') ?? pointLabelAnchor(point);
+          if (anchor) anchor.before(marker);
           else point.append(marker);
           point.setAttribute(DECORATED_ATTRIBUTE, '');
           decorated.set(point, marker);
@@ -115,8 +141,10 @@ function useChickenMarkers() {
     const relevantNode = (node: Node) =>
       node instanceof Element &&
       !node.classList.contains(MARKER_CLASS) &&
-      (node.matches(`${CHART_SELECTOR}, ${POINT_SELECTOR}`) ||
-        node.querySelector(`${CHART_SELECTOR}, ${POINT_SELECTOR}`) !== null);
+      (node.matches(`${CHART_SELECTOR}, ${POINT_SELECTOR}, ${CANVAS_POINT_LAYER_SELECTOR}`) ||
+        node.querySelector(
+          `${CHART_SELECTOR}, ${POINT_SELECTOR}, ${CANVAS_POINT_LAYER_SELECTOR}`,
+        ) !== null);
 
     // No transform/style observation: pan, zoom and filtering already operate on
     // the parent group. Only chart/point insertion, removal and eligibility matter.
@@ -156,6 +184,7 @@ function useChickenMarkers() {
       themeObserver.disconnect();
       if (pendingFrame !== undefined) cancelAnimationFrame(pendingFrame);
       for (const [point, marker] of decorated) removeMarker(point, marker);
+      for (const layer of decoratedCanvasLayers) canvasPointLayerOf(layer)?.setMarker(null);
     };
   }, []);
 }

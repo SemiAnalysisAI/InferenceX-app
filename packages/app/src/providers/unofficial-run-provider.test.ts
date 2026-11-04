@@ -4,8 +4,8 @@ import type { BenchmarkRow } from '@/lib/api/api';
 import { Model, Sequence } from '@/lib/catalog/data-mappings';
 import { normalizeArtifactRows } from '@/app/api/unofficial-run/route';
 
+import { buildChartData } from './unofficial-chart-data';
 import {
-  buildChartData,
   overlaySelectionReducer,
   parseAvailableModelsAndSequences,
   parseUnofficialRunIds,

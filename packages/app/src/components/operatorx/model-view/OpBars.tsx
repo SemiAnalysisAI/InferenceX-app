@@ -3,9 +3,12 @@ import type { ComparisonModel } from '../compare/model';
 /** Bins per doubling of the size axis. */
 const BINS_PER_OCTAVE = 2;
 
+/** Unrounded size bin of a token count, for placing ticks on a token axis. */
+export const tokenBin = (tokens: number) => Math.log2(tokens) * BINS_PER_OCTAVE;
+
 /** Size bin of a token count (GEMM M, MoE tokens): half-octaves. */
 export function sizeBin(tokens: number): number {
-  return Math.round(Math.log2(tokens) * BINS_PER_OCTAVE);
+  return Math.round(tokenBin(tokens));
 }
 
 /** Representative token count of a bin. */
@@ -99,6 +102,116 @@ export function OpBars({
           );
         })
       )}
+    </div>
+  );
+}
+
+export interface GpuSweep {
+  hardware: string;
+  /** Median over the cases in each size bin the GPU measured, by bin. */
+  points: { bin: number; value: number }[];
+}
+
+/** Each selected GPU's median metric in every size bin it has a positive value in. */
+export function gpuSweep(model: ComparisonModel, indices: number[]): GpuSweep[] {
+  return model.hardware.flatMap((hw) => {
+    const byBin = new Map<number, number[]>();
+    for (const i of indices) {
+      const x = model.view.cases[i].x;
+      const v = model.value(hw, i);
+      if (x === null || x <= 0 || v === null || v <= 0) continue;
+      const bin = sizeBin(x);
+      const values = byBin.get(bin);
+      if (values) values.push(v);
+      else byBin.set(bin, [v]);
+    }
+    const points = [...byBin]
+      .map(([bin, values]) => ({ bin, value: median(values) }))
+      .sort((a, b) => a.bin - b.bin);
+    return points.length > 0 ? [{ hardware: hw, points }] : [];
+  });
+}
+
+/** Height of a row of line charts. */
+export const SWEEP_PX = 64;
+const SWEEP_PAD_PX = 5;
+
+/** Where a size bin sits across `[first, last]`, as a percentage of the width. */
+export const binPct = (bin: number, [first, last]: [number, number]) =>
+  last === first ? 50 : ((bin - first) / (last - first)) * 100;
+
+/**
+ * One line per selected GPU over every size bin from `range[0]` to `range[1]` (log tokens
+ * across, log metric up, scaled to the row), with the row's largest and smallest values
+ * beside it. The x positions match the shared token axis, so rows read against each other.
+ */
+export function OpSweep({
+  model,
+  series,
+  range,
+  empty,
+}: {
+  model: ComparisonModel;
+  series: GpuSweep[];
+  range: [number, number];
+  empty: string;
+}) {
+  if (series.length === 0)
+    return (
+      <div className="flex items-center" style={{ height: SWEEP_PX }}>
+        <span className="text-xs text-muted-foreground">{empty}</span>
+      </div>
+    );
+  const values = series.flatMap((s) => s.points.map((p) => p.value));
+  const [min, max] = [Math.min(...values), Math.max(...values)];
+  // one value across the row sits mid-height
+  const [lo, hi] = min === max ? [min / 2, max * 2] : [min, max];
+  const y = (v: number) =>
+    SWEEP_PAD_PX +
+    (1 - (Math.log(v) - Math.log(lo)) / (Math.log(hi) - Math.log(lo))) *
+      (SWEEP_PX - 2 * SWEEP_PAD_PX);
+  return (
+    <div className="flex gap-2" style={{ height: SWEEP_PX }}>
+      <div className="relative min-w-0 flex-1 border-b border-l border-border/60">
+        <svg
+          className="absolute inset-0 size-full overflow-visible"
+          viewBox={`0 0 100 ${SWEEP_PX}`}
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          {series.map((s) =>
+            s.points.length > 1 ? (
+              <polyline
+                key={s.hardware}
+                points={s.points.map((p) => `${binPct(p.bin, range)},${y(p.value)}`).join(' ')}
+                fill="none"
+                stroke={model.colors[s.hardware]}
+                strokeWidth={1.5}
+                strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke"
+              />
+            ) : null,
+          )}
+        </svg>
+        {/* a GPU with one size has no line; a dot marks it (circles would stretch with the svg) */}
+        {series.map((s) =>
+          s.points.length === 1 ? (
+            <span
+              key={s.hardware}
+              className="absolute size-[5px] -translate-x-1/2 -translate-y-1/2 rounded-full"
+              style={{
+                left: `${binPct(s.points[0].bin, range)}%`,
+                top: y(s.points[0].value),
+                background: model.colors[s.hardware],
+              }}
+            />
+          ) : null,
+        )}
+      </div>
+      <div className="flex w-16 shrink-0 flex-col justify-between text-2xs leading-none whitespace-nowrap text-muted-foreground tabular-nums">
+        <span>{model.metric.format(max)}</span>
+        <span>{model.metric.format(min)}</span>
+      </div>
     </div>
   );
 }
