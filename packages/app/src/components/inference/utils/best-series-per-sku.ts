@@ -16,7 +16,7 @@ export function baseSku(point: Pick<InferenceData, 'hw' | 'hwKey'>): string {
 
 export interface SkuColumns {
   keys: string[];
-  skus: Int32Array;
+  skus: readonly number[];
   skuCount: number;
   precisions: InferenceData['precision'][];
   first: Int32Array;
@@ -27,7 +27,6 @@ export interface SkuColumns {
   precision: Int32Array;
   tilertSeries: Int32Array;
   tilertPrecision: Int32Array;
-  longest: number;
 }
 
 let pointSeries = new Int32Array(0);
@@ -41,6 +40,74 @@ let frontierY = new Float64Array(0);
 
 const columnsByPoints = new WeakMap<readonly InferenceData[], SkuColumns>();
 
+class SeriesIndex {
+  readonly keys: string[] = [];
+  readonly skus: number[] = [];
+  readonly counts: number[] = [];
+  private readonly hws: InferenceData['hw'][] = [];
+  private readonly skuIds = new Map<string, number>();
+  private readonly byKey = new Map<string, number>();
+  private mixed: Map<string, number> | undefined;
+
+  get skuCount(): number {
+    return this.skuIds.size;
+  }
+
+  of(point: InferenceData): number {
+    const key = String(point.hwKey);
+    let s = this.byKey.get(key);
+    if (s === undefined) {
+      s = this.keys.length;
+      this.byKey.set(key, s);
+      this.add(key, point.hw, baseSku(point));
+    } else if (point.hw !== this.hws[s]) {
+      const sku = baseSku(point);
+      if (this.skuIds.get(sku) !== this.skus[s]) {
+        this.mixed ??= new Map();
+        const mixedKey = `${sku}\u0000${key}`;
+        let other = this.mixed.get(mixedKey);
+        if (other === undefined) {
+          other = this.keys.length;
+          this.mixed.set(mixedKey, other);
+          this.add(key, point.hw, sku);
+        }
+        s = other;
+      }
+    }
+    return s;
+  }
+
+  private add(key: string, hw: InferenceData['hw'], sku: string): void {
+    let id = this.skuIds.get(sku);
+    if (id === undefined) {
+      id = this.skuIds.size;
+      this.skuIds.set(sku, id);
+    }
+    this.keys.push(key);
+    this.hws.push(hw);
+    this.skus.push(id);
+    this.counts.push(0);
+  }
+}
+
+function growPoints(n: number): void {
+  if (pointSeries.length >= n) return;
+  const size = Math.max(n, pointSeries.length * 2);
+  pointSeries = new Int32Array(size);
+  pointPrecision = new Int32Array(size);
+  pointX = new Float64Array(size);
+  pointY = new Float64Array(size);
+}
+
+function growSeries(n: number): void {
+  if (seriesX.length >= n) return;
+  const size = Math.max(n, seriesX.length * 2);
+  seriesX = new Float64Array(size);
+  seriesY = new Float64Array(size);
+  frontierX = new Float64Array(size);
+  frontierY = new Float64Array(size);
+}
+
 export function skuColumns(points: readonly InferenceData[]): SkuColumns {
   let columns = columnsByPoints.get(points);
   if (!columns) {
@@ -52,19 +119,8 @@ export function skuColumns(points: readonly InferenceData[]): SkuColumns {
 
 function buildSkuColumns(points: readonly InferenceData[]): SkuColumns {
   const n = points.length;
-  if (pointSeries.length < n) {
-    const size = Math.max(n, pointSeries.length * 2);
-    pointSeries = new Int32Array(size);
-    pointPrecision = new Int32Array(size);
-    pointX = new Float64Array(size);
-    pointY = new Float64Array(size);
-  }
-  const keys: string[] = [];
-  const seriesHw: InferenceData['hw'][] = [];
-  const seriesSku: number[] = [];
-  const skuIds = new Map<string, number>();
-  const byKey = new Map<string, number>();
-  let mixed: Map<string, number> | undefined;
+  growPoints(n);
+  const series = new SeriesIndex();
   const precisionIds = new Map<InferenceData['precision'], number>();
   const precisions: InferenceData['precision'][] = [];
   const tilert: number[] = [];
@@ -78,27 +134,7 @@ function buildSkuColumns(points: readonly InferenceData[]): SkuColumns {
     const point = points[i];
     if (point.powerVariant || !isFrontierEligible(point) || !Number.isFinite(point.y)) continue;
     if (last < 0 || point.hwKey !== lastHwKey || point.hw !== lastHw) {
-      const key = String(point.hwKey);
-      let s = byKey.get(key);
-      if (s === undefined) {
-        s = keys.length;
-        byKey.set(key, s);
-        addSeries(keys, seriesHw, seriesSku, skuIds, key, point.hw, baseSku(point));
-      } else if (point.hw !== seriesHw[s]) {
-        const sku = baseSku(point);
-        if (skuIds.get(sku) !== seriesSku[s]) {
-          mixed ??= new Map();
-          const mixedKey = `${sku}\u0000${key}`;
-          let other = mixed.get(mixedKey);
-          if (other === undefined) {
-            other = keys.length;
-            mixed.set(mixedKey, other);
-            addSeries(keys, seriesHw, seriesSku, skuIds, key, point.hw, sku);
-          }
-          s = other;
-        }
-      }
-      last = s;
+      last = series.of(point);
       lastHwKey = point.hwKey;
       lastHw = point.hw;
     }
@@ -113,27 +149,24 @@ function buildSkuColumns(points: readonly InferenceData[]): SkuColumns {
       lastPrecision = point.precision;
     }
     if (point.framework === 'tilert') tilert.push(kept);
+    series.counts[last]++;
     pointSeries[kept] = last;
     pointPrecision[kept] = lastPrecisionId;
     pointX[kept] = point.x;
     pointY[kept++] = point.y;
   }
 
+  const { keys, counts } = series;
   const seriesCount = keys.length;
   const precisionCount = precisions.length;
   const first = new Int32Array(seriesCount * precisionCount);
   const count = new Int32Array(seriesCount * precisionCount);
-  const start = new Int32Array(seriesCount + 1);
   for (let k = 0; k < kept; k++) {
     const cell = pointSeries[k] * precisionCount + pointPrecision[k];
     if (count[cell]++ === 0) first[cell] = k;
-    start[pointSeries[k] + 1]++;
   }
-  let longest = 0;
-  for (let s = 0; s < seriesCount; s++) {
-    longest = Math.max(longest, start[s + 1]);
-    start[s + 1] += start[s];
-  }
+  const start = new Int32Array(seriesCount + 1);
+  for (let s = 0; s < seriesCount; s++) start[s + 1] = start[s] + counts[s];
   const x = new Float64Array(kept);
   const y = new Float64Array(kept);
   const precision = new Int32Array(kept);
@@ -148,8 +181,8 @@ function buildSkuColumns(points: readonly InferenceData[]): SkuColumns {
 
   return {
     keys,
-    skus: Int32Array.from(seriesSku),
-    skuCount: skuIds.size,
+    skus: series.skus,
+    skuCount: series.skuCount,
     precisions,
     first,
     count,
@@ -159,27 +192,7 @@ function buildSkuColumns(points: readonly InferenceData[]): SkuColumns {
     precision,
     tilertSeries: Int32Array.from(tilert, (k) => pointSeries[k]),
     tilertPrecision: Int32Array.from(tilert, (k) => pointPrecision[k]),
-    longest,
   };
-}
-
-function addSeries(
-  keys: string[],
-  seriesHw: InferenceData['hw'][],
-  seriesSku: number[],
-  skuIds: Map<string, number>,
-  key: string,
-  hw: InferenceData['hw'],
-  sku: string,
-): void {
-  let id = skuIds.get(sku);
-  if (id === undefined) {
-    id = skuIds.size;
-    skuIds.set(sku, id);
-  }
-  keys.push(key);
-  seriesHw.push(hw);
-  seriesSku.push(id);
 }
 
 export function bestSeriesPerSku(
@@ -187,7 +200,7 @@ export function bestSeriesPerSku(
   direction: Direction,
   precisions?: readonly string[],
 ): Set<string> {
-  const { keys, skus, first, count, start } = columns;
+  const { keys, first, count } = columns;
   const seriesCount = keys.length;
   const precisionCount = columns.precisions.length;
   let allowed: Uint8Array | undefined;
@@ -207,7 +220,7 @@ export function bestSeriesPerSku(
     if (!allowed || allowed[tilertPrecision[t]]) selected.add(keys[tilertSeries[t]]);
   }
 
-  let order: number[];
+  let order: number[] | undefined;
   if (allowed) {
     order = [];
     const firstOf = new Int32Array(seriesCount);
@@ -224,13 +237,78 @@ export function bestSeriesPerSku(
       order.push(s);
     }
     order.sort((a, b) => firstOf[a] - firstOf[b]);
-  } else {
-    order = [...keys.keys()];
   }
 
-  const groupOf = new Int32Array(columns.skuCount).fill(-1);
+  const groups = groupBySku(columns.skus, columns.skuCount, order);
+  growSeries(columns.x.length);
+  const xSign = direction === 'lower_right' ? -1 : 1;
+  const ySign = direction.startsWith('upper') ? -1 : 1;
+  const end = new Int32Array(seriesCount);
+  for (const group of groups) {
+    if (group.length === 1) continue;
+    for (const s of group) end[s] = gatherSeries(columns, s, allowed, xSign, ySign);
+  }
+  rankGroups(groups, keys, columns.start, end, direction, xSign, ySign, selected);
+  return selected;
+}
+
+export function bestSeriesPerSkuOnce(
+  points: readonly InferenceData[],
+  direction: Direction,
+  precisions?: readonly string[],
+): Set<string> {
+  const n = points.length;
+  growPoints(n);
+  growSeries(n);
+  const xSign = direction === 'lower_right' ? -1 : 1;
+  const ySign = direction.startsWith('upper') ? -1 : 1;
+  const series = new SeriesIndex();
+  const selected = new Set<string>();
+  let last = -1;
+  let lastHwKey: string | undefined;
+  let lastHw: InferenceData['hw'] | undefined;
+  let kept = 0;
+  for (let i = 0; i < n; i++) {
+    const point = points[i];
+    if (precisions && !precisions.includes(point.precision)) continue;
+    if (point.powerVariant || !isFrontierEligible(point) || !Number.isFinite(point.y)) continue;
+    if (point.framework === 'tilert') selected.add(String(point.hwKey));
+    if (last < 0 || point.hwKey !== lastHwKey || point.hw !== lastHw) {
+      last = series.of(point);
+      lastHwKey = point.hwKey;
+      lastHw = point.hw;
+    }
+    series.counts[last]++;
+    pointSeries[kept] = last;
+    pointX[kept] = point.x * xSign;
+    pointY[kept++] = point.y * ySign;
+  }
+
+  const { keys, counts } = series;
+  const seriesCount = keys.length;
+  const start = new Int32Array(seriesCount + 1);
+  for (let s = 0; s < seriesCount; s++) start[s + 1] = start[s] + counts[s];
+  const end = start.slice(0, seriesCount);
+  for (let k = 0; k < kept; k++) {
+    const at = end[pointSeries[k]]++;
+    seriesX[at] = pointX[k];
+    seriesY[at] = pointY[k];
+  }
+  const groups = groupBySku(series.skus, series.skuCount);
+  rankGroups(groups, keys, start, end, direction, xSign, ySign, selected);
+  return selected;
+}
+
+function groupBySku(
+  skus: readonly number[],
+  skuCount: number,
+  order?: readonly number[],
+): number[][] {
+  const groupOf = new Int32Array(skuCount).fill(-1);
   const groups: number[][] = [];
-  for (const s of order) {
+  const total = order ? order.length : skus.length;
+  for (let i = 0; i < total; i++) {
+    const s = order ? order[i] : i;
     const g = groupOf[skus[s]];
     if (g < 0) {
       groupOf[skus[s]] = groups.length;
@@ -239,18 +317,21 @@ export function bestSeriesPerSku(
       groups[g].push(s);
     }
   }
+  return groups;
+}
 
-  if (seriesX.length < columns.longest) {
-    const size = Math.max(columns.longest, seriesX.length * 2);
-    seriesX = new Float64Array(size);
-    seriesY = new Float64Array(size);
-    frontierX = new Float64Array(size);
-    frontierY = new Float64Array(size);
-  }
-  const xSign = direction === 'lower_right' ? -1 : 1;
-  const ySign = direction.startsWith('upper') ? -1 : 1;
-  const frontierOf = new Int32Array(seriesCount);
-  const areaOf = new Float64Array(seriesCount);
+function rankGroups(
+  groups: readonly number[][],
+  keys: readonly string[],
+  start: Int32Array,
+  end: Int32Array,
+  direction: Direction,
+  xSign: number,
+  ySign: number,
+  selected: Set<string>,
+): void {
+  const frontierOf = new Int32Array(keys.length);
+  const areaOf = new Float64Array(keys.length);
   for (const group of groups) {
     if (group.length === 1) {
       selected.add(keys[group[0]]);
@@ -260,9 +341,8 @@ export function bestSeriesPerSku(
     let lastComparable = 0;
     for (let g = 0; g < group.length; g++) {
       const s = group[g];
-      const len = gatherSeries(columns, start[s], start[s + 1], allowed, xSign, ySign);
-      sortRange(seriesX, seriesY, undefined, 0, len);
-      frontierOf[s] = walkFrontier(len, direction, xSign, ySign, areaOf, s);
+      sortRange(seriesX, seriesY, undefined, start[s], end[s]);
+      frontierOf[s] = walkFrontier(start[s], end[s], direction, xSign, ySign, areaOf, s);
       if (frontierOf[s] < MIN_CURVE_FRONTIER_POINTS) continue;
       comparable++;
       lastComparable = g;
@@ -284,34 +364,33 @@ export function bestSeriesPerSku(
     }
     selected.add(keys[winner]);
   }
-
-  return selected;
 }
 
 function gatherSeries(
   columns: SkuColumns,
-  from: number,
-  to: number,
+  s: number,
   allowed: Uint8Array | undefined,
   xSign: number,
   ySign: number,
 ): number {
   const { x, y, precision } = columns;
-  let len = 0;
+  const from = columns.start[s];
+  const to = columns.start[s + 1];
+  let end = from;
   if (xSign < 0) {
     for (let i = to - 1; i >= from; i--) {
       if (allowed && !allowed[precision[i]]) continue;
-      seriesX[len] = -x[i];
-      seriesY[len++] = y[i] * ySign;
+      seriesX[end] = -x[i];
+      seriesY[end++] = y[i] * ySign;
     }
   } else {
     for (let i = from; i < to; i++) {
       if (allowed && !allowed[precision[i]]) continue;
-      seriesX[len] = x[i];
-      seriesY[len++] = y[i] * ySign;
+      seriesX[end] = x[i];
+      seriesY[end++] = y[i] * ySign;
     }
   }
-  return len;
+  return end;
 }
 
 function sortRange(
@@ -339,6 +418,7 @@ function sortRange(
 }
 
 function walkFrontier(
+  from: number,
   end: number,
   direction: Direction,
   xSign: number,
@@ -352,7 +432,7 @@ function walkFrontier(
   const fy = frontierY;
   let len = 0;
   let bound = direction === 'upper_right' ? -Infinity : Infinity;
-  for (let i = 0; i < end; i++) {
+  for (let i = from; i < end; i++) {
     const x = xs[i] * xSign;
     const y = ys[i] * ySign;
     if (direction === 'upper_right') {

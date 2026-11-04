@@ -3,7 +3,13 @@ import { describe, expect, it } from 'vitest';
 import type { InferenceData } from '@/components/inference/types';
 import { isFrontierEligible, paretoFrontForDirection } from '@/lib/charts/chart-utils';
 
-import { baseSku, bestSeriesPerSku, hypervolume, skuColumns } from './best-series-per-sku';
+import {
+  baseSku,
+  bestSeriesPerSku,
+  bestSeriesPerSkuOnce,
+  hypervolume,
+  skuColumns,
+} from './best-series-per-sku';
 
 type Direction = 'upper_right' | 'upper_left' | 'lower_left' | 'lower_right';
 const DIRECTIONS: Direction[] = ['upper_right', 'upper_left', 'lower_left', 'lower_right'];
@@ -106,7 +112,7 @@ function randomPoints(random: () => number, count: number): InferenceData[] {
   return points;
 }
 
-describe('bestSeriesPerSku matches the reference ranking', () => {
+describe('bestSeriesPerSku and bestSeriesPerSkuOnce match the reference ranking', () => {
   it('agrees on randomized inputs with ties, gaps, mixed SKUs and invalid values', () => {
     const random = rng(7);
     for (let round = 0; round < 3000; round++) {
@@ -115,9 +121,9 @@ describe('bestSeriesPerSku matches the reference ranking', () => {
       const columns = skuColumns(points);
       for (const direction of DIRECTIONS) {
         for (const precisions of [undefined, PRECISION_SETS[round % PRECISION_SETS.length]]) {
-          expect([...bestSeriesPerSku(columns, direction, precisions)]).toEqual(
-            reference(points, direction, precisions),
-          );
+          const expected = reference(points, direction, precisions);
+          expect([...bestSeriesPerSku(columns, direction, precisions)]).toEqual(expected);
+          expect([...bestSeriesPerSkuOnce(points, direction, precisions)]).toEqual(expected);
         }
       }
       expect(points).toEqual(snapshot);
