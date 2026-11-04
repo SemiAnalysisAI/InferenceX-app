@@ -18,8 +18,7 @@ import styles from './results.module.css';
 
 const STRINGS = {
   en: {
-    back: 'Back',
-    chart: 'Video chart',
+    back: 'Back to overview',
     unofficial: 'Unofficial run',
     deployments: 'Deployments',
     clips: 'clips',
@@ -96,8 +95,7 @@ const STRINGS = {
     unapproved: 'No matching approval receipt',
   },
   zh: {
-    back: '返回',
-    chart: '视频图表',
+    back: '返回概览',
     unofficial: '非官方运行',
     deployments: '部署',
     clips: '条视频',
@@ -130,8 +128,8 @@ const STRINGS = {
     time: '时间（s）',
     powerSummary: (avg: string, peak: string) => `平均 ${avg} · 观测峰值 ${peak}`,
     energy: '能耗',
-    perClip: '每条有效视频 kJ',
-    perFrame: '每帧 J',
+    perClip: '每条有效视频能耗（kJ）',
+    perFrame: '每帧能耗（J）',
     energyNote: '仅统计 GPU 板卡，不含主机、机箱和设施能耗。',
     throughput: '吞吐量',
     videoSecondsPerHour: '每小时生成的视频秒数',
@@ -171,7 +169,7 @@ const STRINGS = {
     point: '观测 ID',
     approval: '发布批准',
     approved: '已批准',
-    unapproved: '暂无匹配的发布批准回执',
+    unapproved: '未找到匹配的发布批准回执',
   },
 };
 
@@ -256,7 +254,7 @@ export default function VideoDeploymentDetail({
 
   return (
     <div className="flex min-w-0 flex-col gap-4" data-testid="video-results-detail">
-      <nav aria-label={s.chart} className="text-sm">
+      <div className="text-sm">
         <button
           type="button"
           className="cursor-pointer underline-offset-2 hover:underline"
@@ -265,8 +263,7 @@ export default function VideoDeploymentDetail({
         >
           ← {s.back}
         </button>
-        <span className="text-muted-foreground"> · {s.chart}</span>
-      </nav>
+      </div>
       <Card>
         <div className="flex min-w-0 flex-col gap-4">
           <div>
@@ -283,6 +280,7 @@ export default function VideoDeploymentDetail({
           </div>
           <div
             className="flex flex-wrap items-center gap-2 text-xs"
+            role="group"
             aria-label={s.deployments}
             data-testid="results-detail-deployments"
           >

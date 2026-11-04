@@ -14,8 +14,9 @@ import styles from './results.module.css';
 
 const STRINGS = {
   en: {
-    title: 'Selected points',
-    hint: 'One row per hardware. Select a row to open its telemetry.',
+    title: 'Representative deployments',
+    hint: 'One row per hardware and unofficial run: the deployment with the most videos per participating GPU-hour. Select a row to open its telemetry.',
+    open: (label: string) => `Open telemetry for ${label}`,
     basis: { participating: 'participating GPUs', allocated: 'allocated GPUs' },
     costNote: (basis: string, tier: string) => `Costs: ${basis} · ${tier}`,
     deadline: 'Deadline (s)',
@@ -29,8 +30,9 @@ const STRINGS = {
     empty: 'No measured data for this selection',
   },
   zh: {
-    title: '所选数据点',
-    hint: '每种硬件一行。点击行可查看该部署的遥测数据。',
+    title: '代表性部署',
+    hint: '每种硬件及每个非官方运行各占一行，展示按参与计算的 GPU 折算后每 GPU 小时生成视频数最多的部署。点击行可查看其遥测数据。',
+    open: (label: string) => `查看 ${label} 的遥测数据`,
     basis: { participating: '参与计算的 GPU', allocated: '分配的 GPU' },
     costNote: (basis: string, tier: string) => `成本口径：${basis} · ${tier}`,
     deadline: '截止时间（s）',
@@ -38,7 +40,7 @@ const STRINGS = {
     hardware: '硬件',
     gpus: 'GPU（参与 / 分配）',
     meets: (seconds: string) => `${seconds} s 内完成`,
-    power: '平均功率 W',
+    power: '平均功率（W）',
     valid: '有效',
     unofficial: '非官方运行',
     empty: '当前选择没有实测数据',
@@ -147,6 +149,7 @@ export default function VideoResultsTable({
                     <td>
                       <button
                         type="button"
+                        aria-label={s.open(label)}
                         className="flex items-center gap-2 text-left underline-offset-2 hover:underline"
                       >
                         <span className={styles.dot} style={{ background: color(cell) }} />

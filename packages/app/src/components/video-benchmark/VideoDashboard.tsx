@@ -63,7 +63,7 @@ const STRINGS = {
   en: {
     title: 'VideoGenX',
     description:
-      'Serving latency, cost and energy for one matched 20-clip video workload across hardware. Every point opens the run behind it.',
+      'Serving latency, cost and energy for one matched 20-clip video workload across hardware. Click a point to pin its measurements; View telemetry opens that deployment.',
     benchmarkConfig: 'Benchmark config',
     chartConfig: 'Chart config',
     deployment: 'Deployment',
@@ -126,7 +126,7 @@ const STRINGS = {
   zh: {
     title: 'VideoGenX',
     description:
-      '在同一组匹配的 20 条视频工作负载上，比较各硬件的服务延迟、成本与能耗。点击任一数据点即可查看对应运行。',
+      '在同一组匹配的 20 条视频工作负载上，比较各硬件的服务延迟、成本与能耗。点击数据点可固定显示其测量值，再点击“查看遥测”打开对应部署。',
     benchmarkConfig: '基准测试配置',
     chartConfig: '图表配置',
     deployment: '部署',
@@ -154,7 +154,7 @@ const STRINGS = {
     cohortHelp:
       '所有硬件共用一个固定的 20 条视频 C1 工作负载，至少需要 10 个有效样本。其他运行保留在性能历史中。Fixture 回放只读取已保留的证据，不是新测量。',
     replay: '本地回放 · 未发布',
-    chartTitle: (model: string, y: string, x: string) => `${model} · ${y}与${x}`,
+    chartTitle: (model: string, y: string, x: string) => `${model} · ${y} vs ${x}`,
     costBasis: 'GPU 口径',
     tier: '成本档位',
     participating: '参与计算的 GPU',

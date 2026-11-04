@@ -75,9 +75,11 @@ The page follows the inference and AgentX two-level layout. The overview has fou
    run is one series with its own Pareto frontier; Optimal Only hides dominated
    deployments. The sidebar legend toggles hardware, greys out roster hardware
    without a matched run, and holds the deployment-label switch and the GPU basis
-   and cost tier selects. A pinned point lists its measurements and opens the deployment
-   detail. The results table below has one representative row per hardware and run,
-   scrolls horizontally on narrow screens, and opens the same detail.
+   and cost tier selects. Clicking a point pins a popover with its measurements;
+   its View telemetry button opens the deployment detail. The Representative
+   deployments table below has one row per hardware and unofficial run, showing the
+   deployment with the most videos per participating GPU-hour. It scrolls
+   horizontally on narrow screens, and a row opens the same detail.
 3. The clip comparison described in Synchronized clips.
 4. Collapsed details: How to read these results, the profit estimator and
    Performance history. How to read lists the measurements not yet collected. No
@@ -87,10 +89,10 @@ The page follows the inference and AgentX two-level layout. The overview has fou
 `history.state` through the `client-navigation` helpers, so the in-page Back button
 pops that entry even after reload or Forward. Browser Back also returns to the
 overview at its previous scroll position. The overview stays mounted but hidden
-under React `Activity`, so clip media, the selected clip group and chart state survive the visit. An unknown,
-filtered or hidden `r_point` falls back to the overview. Once results load, the URL
-drops that key, so showing the hardware again or Share cannot reopen it. Overlay
-deployments open the same way.
+under React `Activity`, so clip media, the selected clip group, loaded History pages
+and chart state survive the visit. An unknown, filtered or hidden `r_point` falls
+back to the overview. Once results load, the URL drops that key, so showing the
+hardware again or Share cannot reopen it. Overlay deployments open the same way.
 
 The detail header names hardware, model, engine, run date and any overlay run ID.
 Chips switch between the measured deployments of that hardware; dashed chips mark
@@ -249,9 +251,10 @@ browser playback and difference failure, bilingual layout and 390px overflow.
 部署（GPU 数量）和运行信息（运行日期）四组。图表绘制所选工作负载的全部实测部署：X 轴为单条视频 P50（默认）或 P90 延迟，
 Y 轴为每 1 美元 TCO 生成的视频秒数（默认）、每 GPU 小时生成视频数或每条有效视频的 GPU 能耗；每种硬件及每个叠加运行
 各自绘制 Pareto 前沿。右侧图例可隐藏硬件，没有匹配运行的硬件显示为灰色，GPU 口径与成本档位也在图例中切换。
-图表下方的结果表每种硬件一行，窄屏可横向滚动。点击数据点或表格行进入部署详情（`r_point`），页内返回或浏览器后退
-都会回到原滚动位置；概览在后台保持挂载，视频和图表状态不会丢失。详情页分为遥测、有效性、来源三个标签页，
-未知或已隐藏的 `r_point` 回到概览。如何解读、利润估算器与性能历史默认折叠，尚未采集的指标在“如何解读”中列出，
+图表下方的“代表性部署”表格每种硬件及每个叠加运行一行，展示按参与计算的 GPU 折算后每 GPU 小时生成视频数最多的部署，窄屏可横向滚动。
+点击数据点会固定显示其测量值，再点击“查看遥测”进入部署详情（`r_point`）；点击表格行则直接进入详情。详情入口在 `history.state` 中做标记，
+刷新或前进后页内返回仍会弹出该条目，浏览器后退也会回到原滚动位置；概览在后台保持挂载，视频、已加载的性能历史和图表状态不会丢失。
+详情页分为遥测、有效性、来源三个标签页。未知、已筛除或已隐藏的 `r_point` 回到概览，结果加载后会从 URL 中移除，重新显示该硬件或分享时不会再打开它。如何解读、利润估算器与性能历史默认折叠，尚未采集的指标在“如何解读”中列出，
 不使用占位图表或示意数值。功率无效时不展示功率或能耗结论。默认保留四个硬件视频窗口；
 符合相同工作负载及样本门槛的已批准 H100 结果或明确指定的诊断运行会增加 H100 窗口，名称和成本沿用硬件注册表。
 

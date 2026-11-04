@@ -80,7 +80,7 @@ const STRINGS = {
     published: '存储时间',
     publication: '发布批准',
     approved: '已批准用于仪表板',
-    unapproved: '暂无匹配的发布批准回执',
+    unapproved: '未找到匹配的发布批准回执',
     execution: '原始执行时间',
     source: '原始运行',
     sourceSha: '源码 SHA',

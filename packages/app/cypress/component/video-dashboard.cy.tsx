@@ -105,7 +105,7 @@ describe('VideoGenX results', () => {
         .should('contain', zh ? '已批准用于仪表板' : 'Approved for dashboard');
       cy.get('[data-testid="video-history-publication"]')
         .eq(4)
-        .should('contain', zh ? '暂无匹配的发布批准回执' : 'No matching approval receipt');
+        .should('contain', zh ? '未找到匹配的发布批准回执' : 'No matching approval receipt');
       cy.get('[data-testid="video-history-power"]').should(($verdicts) => {
         expect([...$verdicts].map((el) => el.textContent?.trim())).to.deep.equal(
           zh
@@ -466,10 +466,12 @@ describe('VideoGenX results', () => {
     cy.get('[data-chart-tooltip]:visible [data-action="view-telemetry"]').click();
     cy.get('[data-testid="video-results-detail"] h1').should('contain', 'B200');
     searchParam('r_point').should('match', /^34341996789:/u);
-    cy.get('[data-testid="results-detail-deployments"] [aria-pressed="true"]').should(
-      'contain',
-      '4 GPU',
-    );
+    cy.get('[data-testid="results-detail-deployments"]')
+      .should('have.attr', 'role', 'group')
+      .and('have.attr', 'aria-label', 'Deployments')
+      .find('[aria-pressed="true"]')
+      .should('contain', '4 GPU');
+    cy.get('[data-testid="video-results-detail"] nav').should('not.exist');
     cy.get('[data-testid="results-power-trace"] svg').should('exist');
     cy.get('[data-testid="results-detail-latency"]')
       .invoke('text')
@@ -484,6 +486,7 @@ describe('VideoGenX results', () => {
     cy.get('[data-testid="video-results-detail"]').should('not.exist');
     cy.location('search').should('not.contain', 'r_point=');
     points().should('have.length', 3);
+    row('h200').find('button').should('have.attr', 'aria-label', 'Open telemetry for H200');
     openRow('h200');
     cy.get('[data-testid="video-results-detail"] h1').should('contain', 'H200');
     cy.go('back');
