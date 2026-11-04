@@ -56,7 +56,7 @@ export const HW_REGISTRY: Record<string, HwEntry> = {
     arch: 'Blackwell',
     label: 'B300',
     sort: 2,
-    tdp: 1200,
+    tdp: 1100,
     power: 1.9,
     costh: 2.26,
     costr: 4.25,

@@ -952,6 +952,11 @@ model-specific; retain the registry's accompanying features and source link.
 
 ### GPU specification networking
 
+For rated per-chip TDP, read `hardware[].tdpW` from
+`GET /api/v1/views/options`. B300 (`key=b300`) uses 1100 W, matching the
+English/Chinese chip tables and SEO descriptions. This is separate from its
+unchanged 1.9 kW all-in provisioned power reference.
+
 `GET /api/v1/views/gpu-specs` shares its hardware source with `/gpu-specs` and the
 English/Chinese chip pages. GB200 NVL72 includes ConnectX-7 400G InfiniBand NDR per
 GPU; GB300 NVL72 includes ConnectX-8 800G InfiniBand XDR per GPU. Their inter-rack
