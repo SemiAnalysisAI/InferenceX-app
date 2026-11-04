@@ -101,7 +101,8 @@ describe('official preview notices', () => {
   it('shows the Vera Rubin preview when its output-token fleet curve is visible', () => {
     cy.visit('/fleet?g_model=DeepSeek-R1-0528&i_seq=8k%2F1k&i_prec=fp4');
 
-    cy.get('[data-testid="fleet-cost-type-selector"]').click();
+    cy.get('[data-testid="fleet-legend"]', { timeout: 20000 }).should('be.visible');
+    cy.get('#fleet-cost-type').click();
     cy.get('[role="option"]').contains('Output Tokens').click();
     cy.get('[data-testid="fleet-legend"]', { timeout: 20000 }).should('contain.text', 'Vera Rubin');
     cy.get('[data-testid="fleet-controls"] input[type="number"]').clear().type('100').blur();

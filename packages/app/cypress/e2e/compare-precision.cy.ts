@@ -20,7 +20,7 @@ describe('Compare precision index page', () => {
         .and('have.attr', 'href', '/profit-estimator-per-gigawatt');
       cy.get('[data-testid="compare-agentx-dashboard-link"]')
         .should('have.text', 'Dashboard')
-        .and('have.attr', 'href', '/inference/kimi-k3');
+        .and('have.attr', 'href', '/inference/deepseek-v41-flash');
       cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
     });
     cy.get('[data-testid="compare-model-catalog"]')
@@ -61,7 +61,7 @@ describe('Compare precision index page', () => {
         .and('have.attr', 'href', '/zh/profit-estimator-per-gigawatt');
       cy.get('[data-testid="compare-agentx-dashboard-link"]')
         .should('have.text', '仪表板')
-        .and('have.attr', 'href', '/zh/inference/kimi-k3');
+        .and('have.attr', 'href', '/zh/inference/deepseek-v41-flash');
       cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
     });
     cy.get('[data-testid="compare-model-catalog"]').should(

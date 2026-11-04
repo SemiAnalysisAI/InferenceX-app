@@ -34,6 +34,7 @@ describe('model selector ordering', () => {
   it('keeps non-default models in their existing order and excludes hidden models', () => {
     expect(MODEL_OPTIONS.filter((model) => !isModelDefault(model))).toEqual([
       Model.DeepSeek_V4_Pro,
+      Model.Kimi_K3,
       Model.Kimi_K2_5,
       Model.MiniMax_M3,
       Model.DeepSeek_R1,
@@ -227,8 +228,8 @@ describe('isModelDeprecated', () => {
     expect(isModelDeprecated(Model.Kimi_K2_5)).toBe(true);
   });
 
-  it('keeps Kimi K3 active', () => {
-    expect(isModelDeprecated(Model.Kimi_K3)).toBe(false);
+  it('marks Kimi K3 deprecated', () => {
+    expect(isModelDeprecated(Model.Kimi_K3)).toBe(true);
   });
 
   it('keeps GLM-5.2 active', () => {

@@ -56,6 +56,11 @@ describe('GET /api/v1/views/options', () => {
     expect(dsv4).toBeDefined();
     expect(dsv4.dbKeys).toContain('dsv4');
     expect(dsv4.category).toBe('deprecated');
+    expect(body.models.find((m: { name: string }) => m.name === 'Kimi-K3')).toMatchObject({
+      dbKeys: ['kimik3'],
+      category: 'deprecated',
+      compareSlug: 'kimi-k3',
+    });
     expect(body.models.find((m: { name: string }) => m.name === 'GLM-5.3-Flash')).toMatchObject({
       dbKeys: ['glm5.3flash'],
       releaseDate: null,
@@ -90,7 +95,6 @@ describe('GET /api/v1/views/options', () => {
         .filter((model: { category: string }) => model.category === 'default')
         .map((model: { name: string }) => model.name),
     ).toEqual([
-      'Kimi-K3',
       'DeepSeek-V4.1-Flash',
       'GLM-5.2',
       'GLM-5.3-Flash',

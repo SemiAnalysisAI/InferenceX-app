@@ -76,7 +76,7 @@ const nextConfig: NextConfig = {
       // The featured model can change; do not permanently cache this default.
       ...LOCALE_PREFIXES.map((prefix) => ({
         source: `${prefix}/inference`,
-        destination: `${prefix}/inference/kimi-k3`,
+        destination: `${prefix}/inference/deepseek-v41-flash`,
         permanent: false,
         missing: [{ type: 'query' as const, key: 'g_model' }],
       })),

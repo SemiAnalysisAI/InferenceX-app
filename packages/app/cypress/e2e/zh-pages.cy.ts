@@ -21,7 +21,7 @@ describe('Chinese (/zh) pages', () => {
           .and('have.attr', 'href', '/zh/profit-estimator-per-gigawatt');
         cy.get('[data-testid="compare-agentx-dashboard-link"]')
           .should('have.text', '仪表板')
-          .and('have.attr', 'href', '/zh/inference/kimi-k3');
+          .and('have.attr', 'href', '/zh/inference/deepseek-v41-flash');
         cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
         cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 2);
         for (const hidden of ['minimax-m3', 'kimi-k3', 'glm-5-3']) {
@@ -68,8 +68,11 @@ describe('Chinese (/zh) pages', () => {
     });
 
     it('renders the Chinese h1 without an intro box', () => {
-      cy.location('pathname').should('eq', '/zh/inference/kimi-k3');
-      cy.get('[data-testid="inference-page-heading"]').should('have.text', 'Kimi K3 推理基准测试');
+      cy.location('pathname').should('eq', '/zh/inference/deepseek-v41-flash');
+      cy.get('[data-testid="inference-page-heading"]').should(
+        'have.text',
+        'DeepSeek V4.1 Flash 推理基准测试',
+      );
       cy.get('[data-testid="zh-tab-intro"]').should('not.exist');
 
       cy.get('[data-testid="tab-trigger-evaluation"]')
