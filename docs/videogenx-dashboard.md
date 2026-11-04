@@ -141,7 +141,9 @@ duration and pauses when the selection or page visibility changes. The time disp
 and scrubber refresh at most ten times per second.
 Audio starts muted. The audio selector enables one visible, playable hardware clip
 at a time; the reference stays muted. Changing the case or hiding or failing the
-selected audio source restores mute. Audio selection is local playback state and
+selected audio source restores mute. The layout effect that owns `muted` reapplies it
+whenever the overview is revealed again behind a deployment detail, since React would
+not reapply an unchanged prop. Audio selection is local playback state and
 does not change the media, metrics, URL selectors or read-only API response.
 
 Difference displays an amplified absolute RGB difference at matched playback time
@@ -284,7 +286,7 @@ Y 轴为每 1 美元 TCO 生成的视频秒数（默认）、每 GPU 小时生�
 
 视频窗口只读取已存储产物，核对 prompt、seed、重复次数和生成配置后同步播放。
 同步播放由 `clip-sync.ts` 中的纯函数状态机驱动（暂停、加载、缓冲、播放、结束五个状态），组件只负责采集每个视频的快照并执行返回的动作，`?unofficialrun=` 叠加视频走同一套逻辑。所有视频在挂载时即以 `preload="auto"` 完整下载；视频只有几秒长，因此先下载完整再播放，播放过程中不会卡顿。只要还有视频没有从当前时间缓冲到共享结尾（允许 50 毫秒误差）或 `readyState` 低于 3，控制条就显示“加载中 N%”（以最慢视频已缓冲的共享时长百分比计）。此时点击播放会进入加载状态，等全部视频加载完成后一起开始；拖动进度条和结束后重播同样经过加载状态。播放过程中若有视频停顿（未在 seek 且 `readyState` 低于 3，例如浏览器回收了缓冲），全部视频一起暂停并显示“缓冲中 N%”，等每个视频都至少缓冲了 1 秒后续数据或缓冲到结尾后，再从主视频的时间点一起恢复。开启音频时以有声视频为主，否则以第一个未停顿的视频为主；有声视频不会被 seek 去追赶其他视频。40 到 250 毫秒的偏差通过微调 playbackRate 纠正，超过 250 毫秒才 seek 一次，且该视频 seek 过程中不会重复触发。时间显示和进度条每秒最多刷新十次。
-默认静音，可选择听一个硬件窗口的声音；参考视频保持静音。切换用例、隐藏音源或音源播放失败后恢复静音。音源选择只影响本地播放，不改变媒体、指标、URL 参数或只读 API 返回内容。
+默认静音，可选择听一个硬件窗口的声音；参考视频保持静音。切换用例、隐藏音源或音源播放失败后恢复静音。从部署详情返回总览时，负责 `muted` 的 layout effect 会重新应用音源选择，因为 React 不会重新设置没有变化的 prop。音源选择只影响本地播放，不改变媒体、指标、URL 参数或只读 API 返回内容。
 Difference 是相对明确绑定的官方 Diffusers 参考视频的浏览器 RGB 差异预览，与封存的全帧 PSNR 测量分别展示。不能根据硬件型号或步数推断参考身份。
 参考视频、尺寸或跨域读取条件不满足时显示不可用。蒸馏与完整步数分组保留。
 每个有测量结果且未隐藏的硬件显示一张视频卡片，与图表图例一致；没有测量结果的硬件不显示卡片，有测量结果但没有已发布媒体的硬件显示空卡片。默认视频卡片保留硬件、GPU 数量、媒体及两种 TCO 口径；完整 prompt、seed、重复次数、

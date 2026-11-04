@@ -377,12 +377,10 @@ function SynchronizedClips({
     );
   }, [group, visibleKey]);
 
+  // Owns `muted`: <Activity> re-runs this body on reveal, whereas an unchanged muted prop would not be reapplied.
   useLayoutEffect(() => {
     if (audioSource !== audibleSource) setAudioSource(null);
-    const video = audibleSource ? videos.current.get(audibleSource) : null;
-    return () => {
-      if (video) video.muted = true;
-    };
+    for (const [key, video] of videos.current) video.muted = key !== audibleSource;
   }, [audioSource, audibleSource]);
 
   // The frame loop reads group inputs through this ref so it never re-subscribes mid-playback.
@@ -556,7 +554,6 @@ function SynchronizedClips({
 
   const changeAudio = (value: string) => {
     const next = audioSources.includes(value) ? value : null;
-    for (const video of videos.current.values()) video.muted = true;
     setAudioSource(next);
     track('video_results_audio_changed', { enabled: next !== null, gpu: next });
     const video = next ? videos.current.get(next) : null;
@@ -778,7 +775,7 @@ function SynchronizedClips({
                     }}
                     src={clip.url}
                     crossOrigin="anonymous"
-                    muted={audibleSource !== key}
+                    muted
                     playsInline
                     preload="auto"
                     aria-label={`${hardwareLabel(key)} ${s.clip}`}
