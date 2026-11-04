@@ -121,9 +121,7 @@ export interface ResultSeries {
   key: string;
   label: string;
   color: string;
-  connect?: boolean;
-  opacity?: number;
-  points: { x: number; y: number; upper?: number | null; middle?: number | null }[];
+  points: { x: number; y: number }[];
 }
 export function ResultsLines({
   series,
@@ -138,7 +136,7 @@ export function ResultsLines({
 }) {
   const all = series.flatMap((s) => s.points);
   const maxX = Math.max(1, ...all.map((p) => p.x)),
-    maxY = Math.max(1, ...all.flatMap((p) => [p.y, p.upper ?? 0, p.middle ?? 0]));
+    maxY = Math.max(1, ...all.map((p) => p.y));
   const x = (v: number) => 48 + (v / maxX) * 540,
     y = (v: number) => 218 - (v / maxY) * 180;
   const path = (ps: { x: number; y: number }[]) =>
@@ -177,70 +175,9 @@ export function ResultsLines({
       ))}
       {series.map((s) => {
         const ps = [...s.points].sort((a, b) => a.x - b.x);
-        const bands = ps.filter((p) => typeof p.upper === 'number');
         return (
-          <g key={s.key} data-hardware={s.key} opacity={s.opacity ?? 1}>
-            {bands.length > 1 && (
-              <path
-                d={`${path(bands)} ${bands
-                  .toReversed()
-                  .map((p) => `L${x(p.x)},${y(p.upper!)}`)
-                  .join(' ')} Z`}
-                fill={s.color}
-                opacity=".12"
-              />
-            )}
-            {s.connect !== false && ps.length > 1 && (
-              <path d={path(ps)} fill="none" stroke={s.color} strokeWidth="2" />
-            )}
-            {ps.filter((p) => typeof p.middle === 'number').length > 1 && (
-              <path
-                d={path(
-                  ps
-                    .filter((p) => typeof p.middle === 'number')
-                    .map((p) => ({ x: p.x, y: p.middle! })),
-                )}
-                fill="none"
-                stroke={s.color}
-                strokeWidth="1.5"
-                strokeDasharray="4 4"
-              />
-            )}
-            {ps.map((p, i) => (
-              <g key={`interval-${i}`}>
-                {typeof p.upper === 'number' && (
-                  <g data-percentile="p95">
-                    <line
-                      x1={x(p.x)}
-                      x2={x(p.x)}
-                      y1={y(p.y)}
-                      y2={y(p.upper)}
-                      stroke={s.color}
-                      opacity=".4"
-                    />
-                    <line
-                      x1={x(p.x) - 5}
-                      x2={x(p.x) + 5}
-                      y1={y(p.upper)}
-                      y2={y(p.upper)}
-                      stroke={s.color}
-                    />
-                  </g>
-                )}
-                {typeof p.middle === 'number' && (
-                  <circle
-                    data-percentile="p90"
-                    cx={x(p.x)}
-                    cy={y(p.middle)}
-                    r="3"
-                    fill="var(--background)"
-                    stroke={s.color}
-                  >
-                    <title>{`P90: ${resultsNumber(p.middle)} ${yLabel}`}</title>
-                  </circle>
-                )}
-              </g>
-            ))}
+          <g key={s.key} data-hardware={s.key}>
+            {ps.length > 1 && <path d={path(ps)} fill="none" stroke={s.color} strokeWidth="2" />}
             {ps.map((p, i) => (
               <circle key={i} cx={x(p.x)} cy={y(p.y)} r="4" fill={s.color}>
                 <title>{`${s.label}: ${resultsNumber(p.x)} ${xLabel}, ${resultsNumber(p.y)} ${yLabel}`}</title>
