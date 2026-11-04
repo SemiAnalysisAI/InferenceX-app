@@ -129,11 +129,12 @@ describe('cross-backend hardware comparison', () => {
   });
 });
 
+const key = (m: number, parallel?: object) =>
+  JSON.stringify({ a: { dtype: 'bf16' }, b: { dtype: 'bf16' }, m, n: 64, k: 128, parallel });
+const source = (model: string, role: string) => [{ model, roles: [role] }];
+
 describe('repeated views of one comparison', () => {
   it('match views of a fresh copy whatever was asked before', () => {
-    const key = (m: number, parallel?: object) =>
-      JSON.stringify({ a: { dtype: 'bf16' }, b: { dtype: 'bf16' }, m, n: 64, k: 128, parallel });
-    const source = (model: string, role: string) => [{ model, roles: [role] }];
     const rows = [
       row('h200', 'vllm', 5, { caseKey: `${key(1)}|vllm`, sources: source('A', 'q_proj') }),
       row('b200', 'vllm', 3, { caseKey: `${key(2)}|vllm`, sources: source('B', 'o_proj') }),
