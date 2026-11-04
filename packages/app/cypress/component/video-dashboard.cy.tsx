@@ -204,10 +204,14 @@ describe('VideoGenX results', () => {
     });
     row('h200').should('exist');
     cy.get<string>('@namedWorkload').then((sourceId) => {
-      cy.get('[data-testid="results-workload"]').click('left');
-      cy.get('[data-select-option]')
-        .filter((_, option) => option.dataset.value === sourceId)
-        .click();
+      cy.window().then((win) => {
+        win.history.pushState(
+          null,
+          '',
+          `${win.location.pathname}${win.location.search}&r_workload=${sourceId}`,
+        );
+        win.dispatchEvent(new PopStateEvent('popstate'));
+      });
     });
     row('b200').should('have.attr', 'data-overlay', 'true');
     row('h200').should('not.exist');
@@ -347,53 +351,6 @@ describe('VideoGenX results', () => {
     });
   });
 
-  it('keeps matching summaries distinct and selects the exact source ID', () => {
-    mount({
-      edit: (observation) => {
-        if (!observation.hardware.includes('H100') || observation.durationSeconds !== 8) return;
-        const workload = JSON.parse(observation.workloadKey!);
-        workload.plan.cases[0].seed += 1;
-        observation.workloadKey = JSON.stringify(workload);
-        observation.hardware = 'NVIDIA GB200';
-      },
-    });
-    cy.get('[data-testid="results-workload"]').click('left');
-    cy.get('[data-select-option]').should('have.length', 3);
-    cy.get('[data-select-option]')
-      .eq(1)
-      .invoke('text')
-      .then((first) => {
-        cy.get('[data-select-option]').eq(2).invoke('text').should('not.equal', first);
-      });
-    cy.get('[data-select-option]')
-      .eq(1)
-      .then(($option) => {
-        const sourceId = $option.attr('data-value')!;
-        cy.wrap($option).closest('[role="row"]').find('[data-option-help]').click();
-        cy.get('[data-testid^="option-help-content-"]').should('contain', sourceId);
-        cy.location('search').should((search) => {
-          expect(new URLSearchParams(search).get('r_workload')).to.equal(null);
-        });
-        cy.get('[data-select-option]').eq(1).click();
-        cy.location('search').should((search) => {
-          expect(new URLSearchParams(search).get('r_workload')).to.equal(sourceId);
-        });
-      });
-  });
-
-  it('uses the shared selector fallbacks and clears scenario prices when the model changes', () => {
-    mount();
-    cy.contains('summary', 'Profit estimator').click();
-    cy.get('[data-testid="results-price-t2v"]').type('0.05');
-    cy.get('[data-testid="results-model"]').click();
-    cy.get('[role="listbox"] [role="option"]').last().click();
-    cy.get('[data-testid="results-price-t2v"]').should('have.value', '');
-    cy.location('search').should('contain', 'r_model=');
-    cy.get('[data-testid="results-model"]').click();
-    cy.get('[role="listbox"] [role="option"]').first().click();
-    cy.location('search').should('not.contain', 'r_model=');
-  });
-
   it('applies the sample floor, preserves unknown allocation and drops every planned placeholder', () => {
     mount({
       edit: (observation) => {
@@ -430,8 +387,9 @@ describe('VideoGenX results', () => {
     mount({ search: '?r_y=videosPerGpuHour' });
     points().should('have.length', 3);
     cy.get('[data-testid="video-results-single-note"]').should('be.visible');
-    cy.get('#checkbox-gb200').should('have.attr', 'aria-disabled', 'true');
-    cy.contains('label', 'GB200 NVL72 · no matched run').should('exist');
+    cy.get('#checkbox-mi355x').should('have.attr', 'aria-disabled', 'true');
+    cy.contains('label', 'MI355X · no matched run').should('exist');
+    cy.get('#checkbox-gb200').should('not.exist');
     cy.get('[data-testid="video-results-clip"]').should(($tiles) => {
       const hardware = [...$tiles].map((tile) => tile.dataset.hardware);
       expect(hardware, 'tiles follow the measured legend entries').to.deep.equal([
@@ -460,25 +418,13 @@ describe('VideoGenX results', () => {
     cy.location('search').should('not.contain', 'r_hidden=');
   });
 
-  it('uses explicit scenario prices and clears them for a different workload', () => {
+  it('applies explicit scenario prices and utilisation to profit', () => {
     // Synthetic additive evidence exercises controls absent from retained public
     // projections. It is never written to the committed history fixture.
     mount({
       edit: (observation) => {
         observation.videoSecondsPerHour = 400;
         observation.results = evidence(observation);
-        // Turn the H100 row into an explicitly synthetic second workload so the test changes
-        // clip duration without replacing the retained B200/H200 cohort used below.
-        if (observation.hardware.includes('H100')) {
-          const workload = JSON.parse(observation.workloadKey!);
-          workload.plan.generation.duration_seconds = 10;
-          workload.plan.generation.frame_count = 240;
-          observation.workloadKey = JSON.stringify(workload);
-          observation.workload = observation.workload.replace('8 s', '10 s');
-          observation.durationSeconds = 10;
-          observation.frameCount = 240;
-          observation.hardware = 'NVIDIA GB200';
-        }
       },
     });
     cy.contains('summary', 'Profit estimator').click();
@@ -494,15 +440,6 @@ describe('VideoGenX results', () => {
     });
     cy.get('[data-testid="results-profit"] [data-hardware="b200"]').should('contain', '-1.73');
     cy.location('search').should('contain', 'r_utilization=0');
-    cy.get('[data-testid="results-price-i2v"]').type('0.09');
-    cy.get('[data-testid="results-price-r2v"]').type('0.12');
-    cy.get('[data-testid="results-workload"]').click('left');
-    cy.contains('[data-select-option]', '10 s').click();
-    row('gb200').should('exist');
-    for (const mode of ['t2v', 'i2v', 'r2v'])
-      cy.get(`[data-testid="results-price-${mode}"]`).should('have.value', '');
-    cy.get('[data-testid="results-profit"] [data-testid="results-empty"]').should('exist');
-    cy.location('search').should('not.contain', 'r_price_');
   });
 
   it('plots the selected axis metrics and cost basis', () => {
@@ -655,7 +592,7 @@ describe('VideoGenX results', () => {
     ['/zh/video', 1440],
     ['/zh/video', 320],
   ] as const) {
-    it(`keeps ${pathname} and its workload menu readable at ${width} px`, () => {
+    it(`keeps ${pathname} and its workload line readable at ${width} px`, () => {
       cy.viewport(width, 844);
       mount({ pathname, search: '?r_y=videosPerGpuHour' });
       cy.get('[data-testid="video-results"] h1').should('contain', 'VideoGenX');
@@ -721,35 +658,12 @@ describe('VideoGenX results', () => {
       );
       assertResultsFit();
       cy.get('[data-testid="results-detail-back"]').click();
-      cy.get('[data-testid="results-workload"]').click('left');
-      cy.get('[role="grid"]')
-        .should('be.visible')
-        .should(($menu) => {
-          const rect = $menu[0].getBoundingClientRect();
-          expect(rect.left).to.be.at.least(0);
-          expect(rect.right).to.be.at.most(width);
-          expect(rect.height).to.be.greaterThan(0);
-          expect($menu[0].scrollWidth).to.be.at.most($menu[0].clientWidth + 1);
-        });
-      cy.get('[data-select-option]')
-        .last()
-        .should(($option) => {
-          expect($option[0].scrollWidth).to.be.at.most($option[0].clientWidth + 1);
-          expect($option.text()).to.contain('MiniMax');
-        });
-      cy.get('[data-select-option]')
-        .last()
-        .closest('[role="row"]')
-        .find('[data-option-help]')
-        .click();
-      cy.get('[data-testid^="option-help-content-"]').should(($help) => {
-        const rect = $help[0].getBoundingClientRect();
+      cy.get('[data-testid="results-workload-summary"]').should(($line) => {
+        const rect = $line[0].getBoundingClientRect();
+        expect($line.text()).to.contain('MiniMax');
         expect(rect.left).to.be.at.least(0);
         expect(rect.right).to.be.at.most(width);
       });
-      cy.get('[data-select-option]').last().click();
-      cy.get('[data-testid^="option-help-content-"]').should('not.exist');
-      cy.location('search').should('contain', 'r_workload=');
     });
   }
 });

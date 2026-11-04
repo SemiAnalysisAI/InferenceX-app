@@ -7,6 +7,7 @@ import {
   DEFAULT_RESULTS_STATE,
   parseResultsState,
   resultProjection,
+  resultsHardwareRoster,
   resultsSearch,
   type ResultsState,
 } from './results';
@@ -369,5 +370,14 @@ describe('VideoGenX results contract', () => {
       resultProjection([{ ...eligible, workloadKey: JSON.stringify(identity) }], state()).cells[0]
         .deliveryP50,
     ).toBeNull();
+  });
+
+  it('lists planned MI355X before its first run and other hardware only once measured', () => {
+    expect(resultsHardwareRoster([])).toEqual(['mi355x']);
+    expect(resultsHardwareRoster([{ hardwareKey: 'h200' }, { hardwareKey: 'b200' }])).toEqual([
+      'b200',
+      'mi355x',
+      'h200',
+    ]);
   });
 });

@@ -13,9 +13,12 @@ import {
 
 export const RESULTS_HARDWARE = ['gb200', 'b200', 'mi355x', 'h200', 'h100'] as const;
 
+/** Listed before its first matched run so readers see it is coming; other hardware appears with data. */
+const PLANNED_HARDWARE: readonly string[] = ['mi355x'];
+
 export function resultsHardwareRoster(points: readonly Pick<VideoPoint, 'hardwareKey'>[]) {
   return RESULTS_HARDWARE.filter(
-    (key) => key !== 'h100' || points.some((point) => point.hardwareKey === key),
+    (key) => PLANNED_HARDWARE.includes(key) || points.some((point) => point.hardwareKey === key),
   );
 }
 export type VideoMode = 't2v' | 'i2v' | 'r2v';

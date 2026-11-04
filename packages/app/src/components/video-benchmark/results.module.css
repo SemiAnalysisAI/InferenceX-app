@@ -7,9 +7,6 @@
   align-items: start;
   grid-template-columns: minmax(0, 1fr);
 }
-.benchmark {
-  grid-template-columns: minmax(0, 1fr);
-}
 .empty {
   min-height: 60px;
   display: grid;
@@ -55,12 +52,8 @@
   .controls {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .wide,
   .chartConfig {
     grid-column: 1 / -1;
-  }
-  .benchmark {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr);
   }
 }
 @media (min-width: 1024px) {

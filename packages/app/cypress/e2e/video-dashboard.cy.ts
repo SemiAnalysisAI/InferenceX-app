@@ -76,13 +76,6 @@ describe('VideoGenX results routes', () => {
     cy.visit('/video?unofficialrun=34342452354&other=1&r_y=videosPerGpuHour');
     cy.get('[data-testid="results-overlay"]').should('contain', '34342452354');
     cy.get('[data-testid="results-overlay-dismiss"]').should('be.visible');
-    cy.get('[data-testid="results-workload"]').click('left');
-    cy.get('[data-select-option]').last().click();
-    cy.location('search').then((search) => {
-      const selected = new URLSearchParams(search).get('r_workload');
-      expect(selected).not.to.equal(null);
-      cy.wrap(selected).as('selectedWorkload');
-    });
     row('h200').should('exist');
     cy.get('[data-testid="video-results-chart"] .dot-group[data-hardware="h200"]').should('exist');
     cy.get('label[for="checkbox-h200"]').click();
@@ -98,14 +91,12 @@ describe('VideoGenX results routes', () => {
     cy.get('label[for="checkbox-h200"]').click();
     row('h200').should('exist');
     cy.get('[data-testid="results-overlay-dismiss"]').click();
-    cy.get<string>('@selectedWorkload').then((selected) => {
-      cy.location('search').should((search) => {
-        const params = new URLSearchParams(search);
-        expect(params.get('r_workload')).to.equal(selected);
-        expect(params.get('other')).to.equal('1');
-        expect(params.has('unofficialrun')).to.equal(false);
-        expect(params.has('unofficialruns')).to.equal(false);
-      });
+    cy.location('search').should((search) => {
+      const params = new URLSearchParams(search);
+      expect(params.get('r_y')).to.equal('videosPerGpuHour');
+      expect(params.get('other')).to.equal('1');
+      expect(params.has('unofficialrun')).to.equal(false);
+      expect(params.has('unofficialruns')).to.equal(false);
     });
     row('h200').should('have.attr', 'data-overlay', 'false');
   });

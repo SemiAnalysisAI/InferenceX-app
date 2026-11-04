@@ -3,17 +3,17 @@ describe('original H100 artifact through the local development replay', () => {
   const artifact = 13068476608;
   const overview = `/api/v1/views/video?view=overview&unofficialrun=${run}&r_tier=r`;
 
-  it('changes workload and GPU count without updating the router during render', () => {
+  it('changes GPU count without updating the router during render', () => {
     cy.visit(`/video?unofficialrun=${run}`, {
       onBeforeLoad(win) {
         cy.spy(win.console, 'error').as('consoleError');
       },
     });
     cy.get('[data-testid="results-replay"]').should('be.visible');
-    cy.get('#results-workload').click('left', { scrollBehavior: 'center' });
-    cy.contains('button', 'MiniMaxAI/MiniMax-H3 · 1344×768 · 5 s · 24 fps · 49 steps').click({
-      scrollBehavior: 'center',
-    });
+    cy.contains(
+      '[data-testid="results-workload-summary"]',
+      'MiniMaxAI/MiniMax-H3 · 1344×768 · 5 s · 24 fps · 49 steps',
+    );
     cy.contains('[role="group"] button', /^4$/).click({
       scrollBehavior: 'center',
     });

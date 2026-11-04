@@ -20,11 +20,10 @@ Comparisons require one complete canonical workload identity, C1, exactly 20
 scheduled clips and at least ten valid samples on every hardware. Model revision,
 all generation settings, prompts, seeds and measurement semantics remain in the
 identity. The default selects the cohort covering the most target hardware.
-Smoke, incomplete and unmatched evidence stays in Performance history. The four
-default comparison targets are GB200, B200, MI355X and H200; missing hardware remains
-visible without invented results. H100 joins the roster when qualified approved
-evidence or the exact named diagnostic run is available, with the same workload
-and sample requirements. Its label and costs use the hardware registry. These are
+Smoke, incomplete and unmatched evidence stays in Performance history. MI355X is
+listed before its first matched run, without invented results. GB200, H200 and H100
+join the roster when qualified approved evidence or the exact named diagnostic run
+is available, with the same workload and sample requirements. Its label and costs use the hardware registry. These are
 comparison targets, not claims that all models run on all hardware.
 
 Latest observations are selected separately by workload, hardware, deployment
@@ -64,9 +63,11 @@ only; query IDs and API projection values remain unchanged.
 
 The page follows the inference and AgentX two-level layout. The overview has four parts:
 
-1. The header card holds the cohort help, Share and four control panels: Benchmark
-   config (model, workload, engine), Chart config (X and Y metric), Deployment (GPU
-   count) and Run context (run date). The replay label appears only when fixture
+1. The header card holds the cohort help, Share, one line naming the fixed model,
+   workload and engine, and three control panels: Chart config (X and Y metric),
+   Deployment (GPU count) and Run context (run date). Model, workload and engine
+   have no selectors while one cohort is published; a shared `r_workload` link still
+   selects its workload. The replay label appears only when fixture
    replay is active.
 2. The chart card plots every measured deployment of the selected workload. X is
    median (default) or P90 latency per clip; when every plotted deployment generates

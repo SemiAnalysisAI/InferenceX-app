@@ -24,7 +24,7 @@ import { Heading } from '@/components/ui/heading';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { MobileControlSection } from '@/components/ui/mobile-control-section';
-import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { hardwareLabel } from './hardware';
 import { leadCell } from './deployment';
@@ -64,23 +64,16 @@ const STRINGS = {
     title: 'VideoGenX',
     description:
       'Serving latency, cost and energy for one matched 20-clip video workload across hardware. Click a point to pin its measurements; View telemetry opens that deployment.',
-    benchmarkConfig: 'Benchmark config',
     chartConfig: 'Chart config',
     deployment: 'Deployment',
     runContext: 'Run context',
     secondaryControls: 'Chart, GPU count and run date',
     changed: 'changed',
-    model: 'Model',
-    workload: 'Workload',
     gpus: 'GPU count',
-    engine: 'Engine',
     date: 'Run date',
     xAxis: 'X-axis metric',
     yAxis: 'Y-axis metric',
     all: 'All',
-    automatic: 'Matched workload',
-    publishedLabel: 'Source label',
-    sourceId: 'Source ID',
     stepsUnit: 'steps',
     latest: 'Latest published',
     loading: 'Loading video results…',
@@ -127,23 +120,16 @@ const STRINGS = {
     title: 'VideoGenX',
     description:
       '在同一组匹配的 20 条视频工作负载上，比较各硬件的服务延迟、成本与能耗。点击数据点可固定显示其测量值，再点击“查看遥测”打开对应部署。',
-    benchmarkConfig: '基准测试配置',
     chartConfig: '图表配置',
     deployment: '部署',
     runContext: '运行信息',
     secondaryControls: '图表、GPU 数量与运行日期',
     changed: '项已更改',
-    model: '模型',
-    workload: '工作负载',
     gpus: 'GPU 数量',
-    engine: '引擎',
     date: '运行日期',
     xAxis: 'X 轴指标',
     yAxis: 'Y 轴指标',
     all: '全部',
-    automatic: '匹配的工作负载',
-    publishedLabel: '来源标签',
-    sourceId: '来源 ID',
     stepsUnit: '步',
     latest: '最新已发布结果',
     loading: '正在加载视频结果…',
@@ -279,56 +265,32 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
   const { options, roster } = projection;
   const hidden = useMemo(() => new Set(state.hidden), [state.hidden]);
   const shown = (cell: ResultCell) => !hidden.has(cell.point.hardwareKey ?? '');
-  const workloadOptions = useMemo(() => {
-    const byId = new Map([...namedPoints, ...points].map((point) => [point.id, point]));
-    const rows = options.workloads.map(({ key, label }) => {
-      const metadata = resultMetadata(byId.get(key)!);
-      const summary = [
-        metadata.model,
-        metadata.resolution,
-        metadata.duration === null ? null : `${metadata.duration} s`,
-        metadata.fps === null ? null : `${metadata.fps} fps`,
-        metadata.steps === null ? null : `${metadata.steps} ${s.stepsUnit}`,
-        metadata.mode?.toUpperCase(),
-      ]
-        .filter(Boolean)
-        .join(' · ');
-      return { key, label, summary };
-    });
-    return rows.map(({ key, label, summary }) => {
-      const peers = rows.filter((row) => row.summary === summary);
-      let suffixLength = 8;
-      while (
-        peers.some(
-          (row) => row.key !== key && row.key.slice(-suffixLength) === key.slice(-suffixLength),
-        )
-      )
-        suffixLength++;
-      return {
-        value: key,
-        label: peers.length > 1 ? `${summary} · #${key.slice(-suffixLength)}` : summary,
-        help: (
-          <div className="max-w-full break-all">
-            <p>
-              {s.publishedLabel}: {label}
-            </p>
-            <p>
-              {s.sourceId}: {key}
-            </p>
-          </div>
-        ),
-      } satisfies SearchableSelectOption;
-    });
-  }, [options.workloads, points, namedPoints, s]);
-  const resolvedWorkload = workloadOptions.find(
-    (option) => option.value === projection.state.workload,
-  );
+  const workloadLabel = useMemo(() => {
+    const point = [...namedPoints, ...points].find((p) => p.id === projection.state.workload);
+    if (!point) return null;
+    const metadata = resultMetadata(point);
+    return [
+      metadata.model,
+      metadata.resolution,
+      metadata.duration === null ? null : `${metadata.duration} s`,
+      metadata.fps === null ? null : `${metadata.fps} fps`,
+      metadata.steps === null ? null : `${metadata.steps} ${s.stepsUnit}`,
+      metadata.mode?.toUpperCase(),
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  }, [projection.state.workload, points, namedPoints, s]);
   const allCells = [...projection.cells, ...projection.overlayCells];
   const cells = allCells.filter(shown);
   const deploymentCells = useMemo(
     () => [...projection.deploymentCells, ...projection.overlayDeploymentCells],
     [projection],
   );
+  const engines = [
+    ...new Set(
+      deploymentCells.flatMap(({ metadata }) => (metadata.engine ? [metadata.engine] : [])),
+    ),
+  ];
   const detailCell =
     state.point === null
       ? undefined
@@ -392,27 +354,6 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
           }))
         : [{ key, label: hardwareLabel(key), color: colorFor(key), value: null, secondary: null }];
     });
-  const selector = (
-    key: 'model' | 'engine' | 'date',
-    label: string,
-    choices: { value: string; label: string }[],
-    fallback: string,
-  ) => (
-    <div className="flex min-w-0 flex-col gap-1.5">
-      <Label htmlFor={`results-${key}`}>{label}</Label>
-      <SearchableSelect
-        triggerId={`results-${key}`}
-        triggerTestId={`results-${key}`}
-        value={state[key] ?? ''}
-        onValueChange={(value) =>
-          update({ [key]: value || null, ...(key === 'model' ? { workload: null } : {}) })
-        }
-        groups={[{ label: '', options: [{ value: '', label: fallback }, ...choices] }]}
-        placeholder={label}
-        searchable={false}
-      />
-    </div>
-  );
   const metricSelector = (key: 'xMetric' | 'yMetric') => {
     const [label, id, choices] =
       key === 'xMetric'
@@ -532,7 +473,7 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
             )
             .toSorted((a, b) => (a.point.participating ?? 0) - (b.point.participating ?? 0))}
           gpuCounts={options.gpuCounts}
-          workloadLabel={resolvedWorkload?.label ?? detailCell.point.workload}
+          workloadLabel={workloadLabel ?? detailCell.point.workload}
           state={state}
           color={color(detailCell)}
           notMeasured={s.notMeasured}
@@ -553,7 +494,19 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
             <div className="flex flex-col gap-4">
               <DashboardSectionHeader
                 title={s.title}
-                description={s.description}
+                description={
+                  <>
+                    {s.description}
+                    {workloadLabel && (
+                      <span
+                        className="mt-1 block text-xs font-medium"
+                        data-testid="results-workload-summary"
+                      >
+                        {[workloadLabel, ...engines].join(' · ')}
+                      </span>
+                    )}
+                  </>
+                }
                 actions={
                   <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     <span>{s.cohort}</span>
@@ -567,59 +520,6 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
                 headingAs="h1"
               />
               <div className={styles.controls}>
-                <ControlPanel
-                  legend={s.benchmarkConfig}
-                  className={`${styles.benchmark} ${styles.wide}`}
-                  data-testid="results-benchmark-config"
-                >
-                  {selector(
-                    'model',
-                    s.model,
-                    options.models.map((v) => ({ value: v, label: v })),
-                    s.all,
-                  )}
-                  <div className="flex min-w-0 flex-col gap-1.5">
-                    <Label htmlFor="results-workload">{s.workload}</Label>
-                    <SearchableSelect
-                      triggerId="results-workload"
-                      triggerTestId="results-workload"
-                      value={state.workload ?? 'automatic'}
-                      onValueChange={(value) =>
-                        update({ workload: value === 'automatic' ? null : value })
-                      }
-                      groups={[
-                        {
-                          label: '',
-                          options: [
-                            {
-                              value: 'automatic',
-                              label: s.automatic,
-                              help: resolvedWorkload?.help,
-                            },
-                            ...workloadOptions,
-                          ],
-                        },
-                      ]}
-                      placeholder={s.workload}
-                      contentClassName="max-w-[calc(100vw-2rem)]"
-                      trackPrefix="video_results_workload"
-                    />
-                    {state.workload === null && resolvedWorkload && (
-                      <p
-                        className="text-xs text-muted-foreground"
-                        data-testid="results-automatic-detail"
-                      >
-                        {resolvedWorkload.label}
-                      </p>
-                    )}
-                  </div>
-                  {selector(
-                    'engine',
-                    s.engine,
-                    options.engines.map((v) => ({ value: v, label: v })),
-                    s.all,
-                  )}
-                </ControlPanel>
                 <MobileControlSection
                   label={s.secondaryControls}
                   count={secondaryChanged}
@@ -655,15 +555,29 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
                     </div>
                   </ControlPanel>
                   <ControlPanel legend={s.runContext}>
-                    {selector(
-                      'date',
-                      s.date,
-                      options.dates
-                        .toSorted()
-                        .toReversed()
-                        .map((v) => ({ value: v, label: v })),
-                      s.latest,
-                    )}
+                    <div className="flex min-w-0 flex-col gap-1.5">
+                      <Label htmlFor="results-date">{s.date}</Label>
+                      <SearchableSelect
+                        triggerId="results-date"
+                        triggerTestId="results-date"
+                        value={state.date ?? ''}
+                        onValueChange={(value) => update({ date: value || null })}
+                        groups={[
+                          {
+                            label: '',
+                            options: [
+                              { value: '', label: s.latest },
+                              ...options.dates
+                                .toSorted()
+                                .toReversed()
+                                .map((v) => ({ value: v, label: v })),
+                            ],
+                          },
+                        ]}
+                        placeholder={s.date}
+                        searchable={false}
+                      />
+                    </div>
                   </ControlPanel>
                 </MobileControlSection>
               </div>
