@@ -149,7 +149,15 @@ create trigger configs_curve_lines_update
 
 select refresh_benchmark_curve_run_lines(array(select id from workflow_runs));
 
-drop materialized view if exists latest_benchmarks;
+do $drop_latest$
+begin
+  if exists (
+    select 1 from pg_matviews where schemaname = current_schema() and matviewname = 'latest_benchmarks'
+  ) then
+    drop materialized view latest_benchmarks;
+  end if;
+end
+$drop_latest$;
 
 create or replace view benchmark_curve_runs as
 select l.model, l.benchmark_type, l.isl, l.osl, l.curve_scope,
@@ -158,6 +166,14 @@ select l.model, l.benchmark_type, l.isl, l.osl, l.curve_scope,
 from benchmark_curve_run_lines l
 join latest_workflow_runs wr on wr.id = l.workflow_run_id;
 
+do $latest$
+begin
+  if exists (
+    select 1 from pg_views where schemaname = current_schema() and viewname = 'latest_benchmarks'
+  ) then
+    return;
+  end if;
+  execute $create$
 create materialized view latest_benchmarks as
 with recursive ranked_runs as (
   select l.curve_scope, l.workflow_run_id, l.date, l.line_images, l.point_ids,
@@ -201,9 +217,11 @@ with recursive ranked_runs as (
 )
 select br.*, sp.snapshot_date, sp.snapshot_workflow_run_id
 from selected_points sp
-join benchmark_results br on br.id = sp.id;
-
-create unique index latest_benchmarks_pk
-  on latest_benchmarks (config_id, conc, isl, osl, benchmark_type, offload_mode, recipe_fingerprint)
-  nulls not distinct;
-create index latest_benchmarks_model_idx on latest_benchmarks (config_id);
+join benchmark_results br on br.id = sp.id
+$create$;
+  create unique index latest_benchmarks_pk
+    on latest_benchmarks (config_id, conc, isl, osl, benchmark_type, offload_mode, recipe_fingerprint)
+    nulls not distinct;
+  create index latest_benchmarks_model_idx on latest_benchmarks (config_id);
+end
+$latest$;
