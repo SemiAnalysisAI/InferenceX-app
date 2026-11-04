@@ -7,14 +7,17 @@ import {
   SERVER_LOG_BLOOM_LOOKAHEAD,
   serverLogGramBit,
 } from '../server-log-blocks';
+import { pgCaseVariants, pgLowerText } from './server-log-pg-lower';
 import type { ServerLogSearchMatch } from './server-logs.js';
 
 function termFolds(term: string): number[][] {
   return [...term].map((ch) => [
     ...new Set(
-      [ch, ch.toLowerCase(), ch.toUpperCase()]
-        .filter((v) => [...v].length === 1)
-        .map((v) => foldCodePoint(v)),
+      pgCaseVariants(ch.codePointAt(0)!).flatMap((code) =>
+        code < 128
+          ? [foldCodePoint(String.fromCodePoint(code))]
+          : [code, foldCodePoint(String.fromCodePoint(code))],
+      ),
     ),
   ]);
 }
@@ -211,7 +214,7 @@ export async function searchBlockFile(
       const scanFrom = Math.max(offset, blocks[i].start);
       const scanTo = Math.min(blocks[i].end - 1, lastStart);
       await load(scanFrom, scanTo + searchLength);
-      const window = text(scanFrom, scanTo + searchLength).toLowerCase();
+      const window = pgLowerText(text(scanFrom, scanTo + searchLength));
       const found = window.indexOf(needle);
       if (found !== -1) {
         const point = scanFrom + countCodePoints(window.slice(0, found));

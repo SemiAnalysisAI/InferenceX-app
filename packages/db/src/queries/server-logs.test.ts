@@ -14,7 +14,9 @@ import {
   countCodePoints,
   encodeServerLogBlocks,
   SERVER_LOG_BLOCK_CHARS,
+  serverLogGramBit,
 } from '../server-log-blocks';
+import { termBloomGroups } from './server-log-block-search';
 
 function withoutBlockStorage(call: Mock): DbClient {
   return ((strings: TemplateStringsArray, ...values: unknown[]) =>
@@ -180,17 +182,9 @@ describe('block-backed files', () => {
   });
 });
 
-describe('searchServerLogs on a block-backed file', () => {
-  const chunk = SERVER_LOG_SEARCH_CHUNK_CHARACTERS;
-  const prefix = '😀Ready ready😀READY x ';
-  const tail = 'ready! é READY';
-  const straddle = SERVER_LOG_BLOCK_CHARS - 2 - [...prefix].length;
-  const filler = `${'x'.repeat(straddle)}zebra${'x'.repeat(chunk - 10 - straddle)}`;
-  const text = prefix + filler + tail;
+function blockBackedSql(text: string, fetched: number[] = []): DbClient {
   const blocks = encodeServerLogBlocks(text);
-  const total = [...prefix].length + filler.length + [...tail].length;
-  const fetched: number[] = [];
-  const sql = ((strings: TemplateStringsArray, ...values: unknown[]) => {
+  return ((strings: TemplateStringsArray, ...values: unknown[]) => {
     const query = strings.join('');
     if (query.includes('block_index = any')) {
       const wanted = values[2] as number[];
@@ -209,7 +203,7 @@ describe('searchServerLogs on a block-backed file', () => {
       blocks.map((b) => ({
         file_name: 'frontend.out',
         log_id: '7',
-        file_chars: total,
+        file_chars: countCodePoints(text),
         block_index: b.blockIndex,
         char_offset: b.charOffset,
         char_count: b.charCount,
@@ -222,6 +216,18 @@ describe('searchServerLogs on a block-backed file', () => {
       })),
     );
   }) as unknown as DbClient;
+}
+
+describe('searchServerLogs on a block-backed file', () => {
+  const chunk = SERVER_LOG_SEARCH_CHUNK_CHARACTERS;
+  const prefix = '😀Ready ready😀READY x ';
+  const tail = 'ready! é READY';
+  const straddle = SERVER_LOG_BLOCK_CHARS - 2 - [...prefix].length;
+  const filler = `${'x'.repeat(straddle)}zebra${'x'.repeat(chunk - 10 - straddle)}`;
+  const text = prefix + filler + tail;
+  const total = [...prefix].length + filler.length + [...tail].length;
+  const fetched: number[] = [];
+  const sql = blockBackedSql(text, fetched);
 
   function sqlLoop(term: string, limit: number) {
     const chars = [...prefix];
@@ -282,6 +288,42 @@ describe('searchServerLogs on a block-backed file', () => {
     const expected = sqlLoop('zebra', 50);
     expect(expected.matches.map((m) => m.offset)).toEqual([SERVER_LOG_BLOCK_CHARS - 2]);
     await expect(searchServerLogs(sql, 42, 'ZEBRA', 50)).resolves.toEqual(expected);
+  });
+});
+
+describe('searchServerLogs folds case like PostgreSQL lower()', () => {
+  const pad = 'x'.repeat(SERVER_LOG_BLOCK_CHARS);
+  const sql = blockBackedSql(`${pad}xİabc ΟΔΟΣ end\n${pad}`);
+  const search = async (term: string) => {
+    const { matches } = await searchServerLogs(sql, 42, term, 50);
+    return matches.map((m) => [m.offset, m.match]);
+  };
+  const at = SERVER_LOG_BLOCK_CHARS;
+
+  it('keeps offsets aligned after U+0130, which PostgreSQL lowers to one character', async () => {
+    await expect(search('abc')).resolves.toEqual([[at + 2, 'abc']]);
+  });
+
+  it('matches U+0130 for a plain i, even in a block with no other i', async () => {
+    await expect(search('i')).resolves.toEqual([[at + 1, 'İ']]);
+    await expect(search('İA')).resolves.toEqual([[at + 1, 'İa']]);
+  });
+
+  it('lowers a word-final capital sigma to σ, not ς', async () => {
+    await expect(search('οδοσ')).resolves.toEqual([[at + 6, 'ΟΔΟΣ']]);
+    await expect(search('ς')).resolves.toEqual([]);
+  });
+});
+
+describe('termBloomGroups', () => {
+  it('adds no bits for ASCII case variants, which the bloom stores folded', () => {
+    expect(termBloomGroups('K').bits.sort()).toEqual(
+      [serverLogGramBit(107, -1, -1), serverLogGramBit(8490, -1, -1)].sort(),
+    );
+  });
+
+  it('keeps the raw code point of a letter an older runtime did not lower', () => {
+    expect(termBloomGroups('\uA7CB').bits).toContain(serverLogGramBit(42955, -1, -1));
   });
 });
 

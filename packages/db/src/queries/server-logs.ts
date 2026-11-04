@@ -5,6 +5,7 @@ import {
   readBlockSearchIndexes,
   searchBlockFile,
 } from './server-log-block-search';
+import { pgLowerText } from './server-log-pg-lower';
 
 export interface ServerLogChunk {
   fileName: string;
@@ -522,7 +523,7 @@ export async function searchServerLogs(
     const chunkSize = SERVER_LOG_SEARCH_CHUNK_CHARACTERS;
     const searchLength = [...searchTerm].length;
     const overlap = Math.min(Math.max(0, searchLength - 1), 255);
-    const needle = searchTerm.toLowerCase();
+    const needle = pgLowerText(searchTerm);
     const fileNames = (await getServerLogFileNames(sql, benchmarkResultId)) ?? [];
     const matches: ServerLogSearchMatch[] = [];
     let blockFiles = new Map<string, BlockSearchFile>();

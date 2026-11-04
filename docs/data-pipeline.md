@@ -471,7 +471,14 @@ file within the byte cap decodes its blocks instead of transferring the text col
 also stores a bloom filter of the case-folded 1-3 grams of its text plus the next 255 code
 points. Search asks PostgreSQL which blocks may hold every gram of the term (`get_bit`), skips
 slices without such blocks, and decompresses only the candidate blocks and the context around a
-match, where it compares the lowercased text with the lowercased term.
+match. Skipped slices still count toward the 64-million-character budget, so `incomplete` is the
+same as for the text columns. Matching lowercases both sides exactly as PostgreSQL's `lower()`
+does under the database's builtin `C.UTF-8` locale (PostgreSQL 17, Unicode 15.1 simple case
+mapping), from a table generated on the database (`queries/server-log-pg-lower.ts`), because
+JavaScript's `toLowerCase` differs: `İ` becomes two code points instead of `i`, a word-final `Σ`
+becomes `ς` instead of `σ`, and newer engines lower letters PostgreSQL 17 leaves alone. The bloom
+query therefore asks for every code point with the same PostgreSQL lowercase as each term
+character. Regenerate the table if the database's PostgreSQL major version or locale changes.
 
 `SERVER_LOG_BLOCKS=1` makes ingest write blocks next to the text columns.
 `bun run admin:db:compact-server-logs` (`--log-id`, `--limit`, `--dry-run`) converts
