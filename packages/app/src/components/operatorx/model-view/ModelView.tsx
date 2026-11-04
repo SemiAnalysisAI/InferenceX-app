@@ -1,7 +1,7 @@
 'use client';
 
-import { ArrowDown, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
-import { useQueryClient } from '@tanstack/react-query';
+import { ArrowDown, ChevronDown, ChevronUp } from 'lucide-react';
+import { useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { useTheme } from 'next-themes';
 import {
   type CSSProperties,
@@ -38,7 +38,7 @@ import {
   TooltipRoot,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { prefetchOperatorXTimelines, useOperatorXModel } from '@/hooks/api/use-operatorx';
+import { prefetchOperatorXTimelines } from '@/hooks/api/use-operatorx';
 import { useClientSearch } from '@/hooks/useClientSearch';
 import { replaceClientSearch } from '@/lib/routing/client-navigation';
 
@@ -68,8 +68,8 @@ import { track } from '@/lib/analytics/analytics';
 import { isDarkTheme } from '@/lib/themes/themes';
 
 import { barsHeight, binTokens, gpuValues, inBin, OpBars, sizeBin } from './OpBars';
+import { DEFAULT_MODEL, ModelViewLoading } from './shell';
 
-const DEFAULT_MODEL = 'DeepSeek-R1-0528';
 const PRECISIONS: ComputePrecision[] = ['fp4', 'fp8', 'bf16'];
 const ROW_GRID = 'grid-cols-[minmax(16rem,28rem)_minmax(0,1fr)]';
 
@@ -782,14 +782,15 @@ const SlotDetail = memo(
 );
 
 /** A model top down, each op beside a per-GPU sweep of its OperatorX results. */
-export function ModelView() {
+export function ModelView({
+  gemm,
+  moe,
+  attention,
+}: Record<'gemm' | 'moe' | 'attention', UseQueryResult<ComparisonView>>) {
   const search = new URLSearchParams(useClientSearch());
   const metric = metricById(search.get('metric'));
   const requested = search.get('model') ?? DEFAULT_MODEL;
   const requestedSplit = search.get('parallel');
-  const gemm = useOperatorXModel('gemm', requested, requestedSplit);
-  const moe = useOperatorXModel('moe', requested, requestedSplit);
-  const attention = useOperatorXModel('attention', requested, requestedSplit);
   const isDark = isDarkTheme(useTheme().resolvedTheme);
   const [picked, setPicked] = useState<string[] | null>(null);
   const [pickedPrecision, setPrecision] = useState<ComputePrecision | null>(null);
@@ -981,13 +982,7 @@ export function ModelView() {
         testId="operatorx-model-view-error"
       />
     );
-  if (gemm.isLoading || moe.isLoading || attention.isLoading)
-    return (
-      <Card data-testid="operatorx-loading" className="min-h-80 items-center justify-center">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
-        <p className="mt-3 text-sm text-muted-foreground">Loading results…</p>
-      </Card>
-    );
+  if (gemm.isLoading || moe.isLoading || attention.isLoading) return <ModelViewLoading />;
   if (modelOptions.length === 0)
     return (
       <Card className="py-6 text-center">
