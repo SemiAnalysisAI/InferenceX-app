@@ -6,6 +6,7 @@ import { isRecord } from './records.js';
 interface BackfillRow {
   offload_mode: unknown;
   recipe_fingerprint?: unknown;
+  spec_method?: unknown;
   metrics: unknown;
 }
 
@@ -39,6 +40,8 @@ function isApplied(row: BackfillRow, backfill: BenchmarkPointBackfill): boolean 
     backfill.set.recipeFingerprint !== undefined &&
     (row.recipe_fingerprint ?? null) !== backfill.set.recipeFingerprint
   )
+    return false;
+  if (backfill.set.specMethod !== undefined && row.spec_method !== backfill.set.specMethod)
     return false;
   const metrics = asMetricsRecord(row.metrics);
   if (!metrics) return false;

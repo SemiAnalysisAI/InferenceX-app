@@ -1,5 +1,6 @@
 import { type ConfigParams, configCacheKey } from './config-cache';
 import { QWEN35_P90_POWER_BACKFILLS } from './power-p90-backfills';
+import { SPEC_METHOD_BACKFILLS } from './spec-method-backfills';
 import { matchesExpectedBackfillMetrics } from '../lib/benchmark-point-backfill';
 
 export const CONCLUSION_OVERRIDES: ReadonlyMap<number, string> = new Map([
@@ -345,6 +346,7 @@ export interface BenchmarkPointBackfill extends AuditedBackfill {
   set: {
     offloadMode?: 'on' | 'off';
     recipeFingerprint?: string;
+    specMethod?: string;
     metricsMerge?: Readonly<Record<string, JsonValue>>;
     metricsRemove?: readonly string[];
   };
@@ -458,6 +460,7 @@ const GB300_CACHE_HIT_RATE_REASON =
 
 export const BENCHMARK_POINT_BACKFILLS: readonly BenchmarkPointBackfill[] = [
   ...QWEN35_P90_POWER_BACKFILLS,
+  ...SPEC_METHOD_BACKFILLS,
   // Run 34744300699 remeasured these exact same-image TP16 points with valid
   // power. The earlier run predates recipe fingerprints, so backfill its ten
   // audited identities; the existing snapshot DISTINCT then selects the newer
@@ -813,11 +816,12 @@ function backfillPointIdentity(
   backfill: BenchmarkPointBackfill,
   offloadMode: string = backfill.offloadMode,
   recipeFingerprint: string | null = backfill.recipeFingerprint ?? null,
+  config: ConfigParams = backfill.config,
 ): string {
   return JSON.stringify([
     backfill.githubRunId,
     backfill.runAttempt,
-    configCacheKey(backfill.config),
+    configCacheKey(config),
     backfill.benchmarkType,
     backfill.isl,
     backfill.osl,
@@ -825,6 +829,12 @@ function backfillPointIdentity(
     offloadMode,
     recipeFingerprint,
   ]);
+}
+
+export function backfillDesiredConfig(backfill: BenchmarkPointBackfill): ConfigParams {
+  return backfill.set.specMethod === undefined
+    ? backfill.config
+    : { ...backfill.config, specMethod: backfill.set.specMethod };
 }
 
 function backfillProductionPointIdentity(
@@ -971,6 +981,12 @@ export function validateRunBackfills(
     if (backfill.set.recipeFingerprint === '') {
       throw new Error(`${backfill.id}: set.recipeFingerprint must be non-empty`);
     }
+    if (
+      backfill.set.specMethod !== undefined &&
+      (backfill.set.specMethod === '' || backfill.set.specMethod === backfill.config.specMethod)
+    ) {
+      throw new Error(`${backfill.id}: set.specMethod must be non-empty and change the config`);
+    }
     const mergeKeys = Object.keys(backfill.set.metricsMerge ?? {});
     if (backfill.previousSet) {
       const previous = backfill.previousSet;
@@ -988,6 +1004,7 @@ export function validateRunBackfills(
     if (
       backfill.set.offloadMode === undefined &&
       backfill.set.recipeFingerprint === undefined &&
+      backfill.set.specMethod === undefined &&
       mergeKeys.length === 0 &&
       removeKeys.length === 0
     ) {
@@ -1015,6 +1032,7 @@ export function validateRunBackfills(
       backfill,
       desiredOffloadMode,
       desiredRecipeFingerprint,
+      backfillDesiredConfig(backfill),
     );
     if (pointDesiredIdentities.has(desiredIdentity)) {
       throw new Error(`${backfill.id}: desired point identity collides with another backfill`);
@@ -1154,7 +1172,7 @@ export function applyBenchmarkPointBackfill<T extends BackfillablePoint>(
   point: T,
 ): AppliedBenchmarkPointBackfill<T> {
   const sourceIdentity = JSON.stringify([
-    point.configId,
+    configCacheKey(point.config),
     point.benchmarkType,
     point.isl,
     point.osl,
@@ -1187,12 +1205,16 @@ export function applyBenchmarkPointBackfill<T extends BackfillablePoint>(
   if (backfill.set.offloadMode !== undefined) metrics.offload_mode = offloadMode;
   const patched = {
     ...point,
+    config:
+      backfill.set.specMethod === undefined
+        ? point.config
+        : { ...point.config, specMethod: backfill.set.specMethod },
     offloadMode,
     recipeFingerprint: backfill.set.recipeFingerprint ?? point.recipeFingerprint ?? null,
     metrics,
   };
   const desiredIdentity = JSON.stringify([
-    patched.configId,
+    configCacheKey(patched.config),
     patched.benchmarkType,
     patched.isl,
     patched.osl,

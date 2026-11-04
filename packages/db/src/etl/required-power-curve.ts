@@ -176,7 +176,11 @@ export async function preflightRequiredPowerCurves(
         backfilled,
       );
       if (plan.kind === 'purged') continue;
-      incoming.set(stablePowerPointIdentity(benchmarkPublicationIdentity(plan.point)), plan.point);
+      const planned =
+        plan.point.config === mapped.config
+          ? plan.point
+          : { ...plan.point, configId: configIds.get(configCacheKey(plan.point.config)) ?? -1 };
+      incoming.set(stablePowerPointIdentity(benchmarkPublicationIdentity(planned)), planned);
     }
   }
   assertRequiredPowerPointsRetained(required.points, [...incoming.values()], 'before_write');

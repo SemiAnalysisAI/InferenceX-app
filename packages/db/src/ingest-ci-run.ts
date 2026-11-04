@@ -647,7 +647,11 @@ async function main(): Promise<void> {
               `config ${configId}, conc ${row.conc}`,
           );
         }
-        resolved.push(plan.point);
+        resolved.push(
+          plan.point.config === row.config
+            ? plan.point
+            : { ...plan.point, configId: await getOrCreateConfig(plan.point.config) },
+        );
       }
       const attached = attachAgentxAudits(
         windows,

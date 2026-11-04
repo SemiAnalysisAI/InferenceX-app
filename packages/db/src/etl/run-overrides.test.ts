@@ -498,6 +498,63 @@ describe('planBenchmarkPoint', () => {
       registry.splice(registry.indexOf(backfill), 1);
     }
   });
+
+  it('moves a non-drafting B300 Kimi-K3 point to the none config and leaves drafting points alone', () => {
+    const kimiB300 = {
+      ...EXAMPLE_CONFIG,
+      hardware: 'b300',
+      framework: 'vllm',
+      model: 'kimik3',
+      disagg: false,
+      isMultinode: false,
+      prefillTp: 8,
+      prefillEp: 1,
+      prefillDpAttn: false,
+      prefillNumWorkers: 0,
+      decodeTp: 8,
+      decodeEp: 1,
+      decodeDpAttn: false,
+      decodeNumWorkers: 0,
+    };
+    const kimiPoint = (conc: number) => ({
+      configId: 2182,
+      config: kimiB300,
+      benchmarkType: 'agentic_traces',
+      isl: null,
+      osl: null,
+      conc,
+      offloadMode: 'on',
+      recipeFingerprint: '61ba8917bcdef3e354ba09a889270595338d97885bd465fedd01c9dbe7e9beaa',
+      metrics: { median_itl: 0.1 },
+    });
+    const run = { githubRunId: 31893747354, runAttempt: 2 };
+    const seen = new Map<string, string>();
+
+    const relabeled = planBenchmarkPoint(run, kimiPoint(24), seen);
+    expect(relabeled.kind === 'planned' && relabeled.point.config).toEqual({
+      ...kimiB300,
+      specMethod: 'none',
+    });
+    expect(relabeled.kind === 'planned' && relabeled.point.metrics).toEqual({ median_itl: 0.1 });
+
+    const drafting = planBenchmarkPoint(run, kimiPoint(16), seen);
+    expect(drafting).toMatchObject({ kind: 'planned', backfillId: null });
+    expect(drafting.kind === 'planned' && drafting.point.config.specMethod).toBe('mtp');
+
+    expect(() =>
+      planBenchmarkPoint(
+        run,
+        { ...kimiPoint(24), configId: 2116, config: { ...kimiB300, specMethod: 'none' } },
+        seen,
+      ),
+    ).toThrow(/collision/u);
+  });
+
+  it('rejects a spec method correction that does not change the config', () => {
+    expect(() =>
+      validateRunBackfills([], [examplePointBackfill({ set: { specMethod: 'mtp' } })]),
+    ).toThrow(/specMethod/u);
+  });
 });
 
 describe('CONCLUSION_OVERRIDES', () => {
