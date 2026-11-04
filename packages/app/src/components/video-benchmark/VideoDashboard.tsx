@@ -274,20 +274,14 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
     },
     [commit],
   );
+  // Hidden hardware is filtered here, not in the projection, so the legend can still re-show it.
   const projection = useMemo(
-    () => resultProjection(points, state, namedPoints),
+    () => resultProjection(points, { ...state, hidden: [] }, namedPoints),
     [points, state, namedPoints],
   );
-  const { options, overlayCells, roster } = projection;
-  // Hidden hardware leaves the projection, so availability is read before visibility filtering.
-  const measured = useMemo(() => {
-    const unhidden = resultProjection(points, { ...state, hidden: [] }, namedPoints);
-    return new Set(
-      [...unhidden.deploymentCells, ...unhidden.overlayDeploymentCells].map(
-        (cell) => cell.point.hardwareKey ?? '',
-      ),
-    );
-  }, [points, state, namedPoints]);
+  const { options, roster } = projection;
+  const hidden = useMemo(() => new Set(state.hidden), [state.hidden]);
+  const shown = (cell: ResultCell) => !hidden.has(cell.point.hardwareKey ?? '');
   const workloadOptions = useMemo(() => {
     const byId = new Map([...namedPoints, ...points].map((point) => [point.id, point]));
     const rows = options.workloads.map(({ key, label }) => {
@@ -332,16 +326,16 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
   const resolvedWorkload = workloadOptions.find(
     (option) => option.value === projection.state.workload,
   );
-  const cells = [...projection.cells, ...overlayCells];
+  const allCells = [...projection.cells, ...projection.overlayCells];
+  const cells = allCells.filter(shown);
   const deploymentCells = useMemo(
     () => [...projection.deploymentCells, ...projection.overlayDeploymentCells],
     [projection],
   );
-  const hidden = useMemo(() => new Set(state.hidden), [state.hidden]);
   const detailCell =
     state.point === null
       ? undefined
-      : deploymentCells.find((cell) => resultsPointKey(cell) === state.point);
+      : deploymentCells.find((cell) => shown(cell) && resultsPointKey(cell) === state.point);
   const detailHardware = detailCell?.point.hardwareKey ?? null;
   const shownDetail = useRef<string | null>(null);
   useEffect(() => {
@@ -700,7 +694,7 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
               <span style={{ color: overlayRunColor(0) }}>
                 {s.overlay}: {state.unofficialRun}
               </span>
-              {!cells.some((c) => c.point.runId === state.unofficialRun) && (
+              {!allCells.some((c) => c.point.runId === state.unofficialRun) && (
                 <span>{s.overlayMissing}</span>
               )}
               <button
@@ -740,7 +734,6 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
               <VideoResultsChart
                 cells={deploymentCells}
                 roster={roster}
-                measured={measured}
                 state={state}
                 colorFor={colorFor}
                 labels={labels}

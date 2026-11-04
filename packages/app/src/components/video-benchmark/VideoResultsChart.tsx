@@ -89,7 +89,6 @@ interface PlotPoint extends ResultsChartPoint {
 export default function VideoResultsChart({
   cells,
   roster,
-  measured,
   state,
   colorFor,
   labels,
@@ -98,11 +97,9 @@ export default function VideoResultsChart({
   onOpen,
   controls,
 }: {
-  /** Official and named-run deployment cells across every GPU count. */
+  /** Official and named-run deployment cells across every GPU count, hidden hardware included. */
   cells: ResultCell[];
   roster: readonly string[];
-  /** Hardware with a deployment for this workload before visibility filtering. */
-  measured: ReadonlySet<string>;
   state: ResultsState;
   colorFor: (hardwareKey: string) => string;
   labels: boolean;
@@ -255,6 +252,7 @@ export default function VideoResultsChart({
   }, [locale, s, state, y, onOpen]);
 
   const hidden = new Set(state.hidden);
+  const measured = new Set(cells.map((cell) => cell.point.hardwareKey));
   const toggle = (key: string) => {
     const next = new Set(hidden);
     if (next.has(key)) next.delete(key);
