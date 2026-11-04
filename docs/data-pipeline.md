@@ -666,9 +666,8 @@ semantics change so cached point payloads are refreshed.
 
 #### Migration and targeted recovery
 
-The ingest workflows apply pending migrations before ingest; Vercel deploys do not.
-Apply `016_gpu_metrics.sql` before deploying readers if deployment precedes the first
-post-merge ingest, or telemetry reads return 503 until the migration runs. From the
+No workflow or Vercel deploy applies main-database migrations; apply them by hand before deploying code
+that needs them, or readers fail until the migration runs. From the
 repository root, with credentials for the reviewed target database, run
 `bun run admin:db:migrate --yes` after checking pending migrations. The app and ingest
 process must use the same database.
