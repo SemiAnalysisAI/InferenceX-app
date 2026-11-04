@@ -64,6 +64,29 @@ To check the maintained points against a full recompute, compare
 `select refresh_latest_benchmark_points(array(select distinct curve_scope from benchmark_curve_run_lines))`
 inside a transaction that you roll back.
 
+### Maintained Presence (`benchmark_presence_runs`, migration 029)
+
+`/api/v1/benchmark-presence` lists which results have a stored trace (a linked
+`agentic_trace_replay` row with an inline or chunked profile) and which have a linked
+server log, as runs of consecutive result ids. `benchmark_presence_runs` holds those
+runs, one row per (`trace`, `start`) with its `length`, so a read touches about 1.1k
+short rows and returns each list as one string of gaps and lengths.
+
+Statement triggers on `benchmark_results` queue the ids whose `trace_replay_id` or
+`server_log_id` a write sets, changes or removes. Row triggers on
+`agentic_trace_replay` queue the results that link a replay row whose profile appears
+or disappears or whose id moves. A truncate of `benchmark_results` clears the runs.
+At commit, a deferred trigger on `published_benchmark_pending` takes its own advisory
+lock, deletes every run that contains or borders a queued id, and rebuilds the runs
+of those runs' ids and the queued ids from the source rows, by primary key. A run
+ingest refreshes in a few ms of database time. Queuing every result id rebuilds all
+runs in about 0.6 s.
+
+To check the runs against a full recompute, compare `benchmark_presence_runs` with
+the islands of present ids (`id - row_number() over (partition by trace order by id)`)
+or insert every result id into `benchmark_presence_dirty_ids` and call
+`select refresh_benchmark_presence()` inside a transaction that you roll back.
+
 ### Stored Curve Lines (`benchmark_curve_run_lines`, migration 023)
 
 Every curve read starts from one row per workflow run, date and curve scope: its
