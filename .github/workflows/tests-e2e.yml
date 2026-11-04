@@ -178,8 +178,7 @@ jobs:
 
   cypress:
     name: E2E (${{ matrix.browser }}, shard ${{ matrix.shard }}, ${{ matrix.runner }})
-    needs: build
-    if: ${{ !cancelled() && !github.event.pull_request.draft }}
+    if: ${{ !github.event.pull_request.draft }}
     timeout-minutes: 15
     runs-on: ${{ matrix.runner }}
     permissions:
@@ -195,13 +194,6 @@ jobs:
           - browser: chrome
             runner: blacksmith-16vcpu-ubuntu-2404
     steps:
-      - name: Require the app build
-        if: ${{ needs.build.result != 'success' }}
-        env:
-          BUILD_RESULT: ${{ needs.build.result }}
-        run: |
-          echo "::error::Build app for E2E finished with result: $BUILD_RESULT"
-          exit 1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -248,6 +240,19 @@ jobs:
         with:
           path: ~/.cache/Cypress
           key: ${{ steps.cypress-cache.outputs.cache-primary-key }}
+      - name: Wait for the app build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          deadline=$((SECONDS + 600))
+          until [ "$(gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts?name=e2e-app-build" --jq '.total_count')" -gt 0 ]; do
+            build=$(gh api "repos/$REPO/actions/runs/$RUN_ID/jobs?per_page=100" --jq '.jobs[] | select(.name == "Build app for E2E") | .conclusion')
+            if [ -n "$build" ] && [ "$build" != success ]; then echo "::error::Build app for E2E finished with result: $build"; exit 1; fi
+            [ "$SECONDS" -lt "$deadline" ] || { echo '::error::Timed out waiting for the app build'; exit 1; }
+            sleep 5
+          done
       - name: Download app build
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
