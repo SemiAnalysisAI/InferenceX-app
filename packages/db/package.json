@@ -41,6 +41,7 @@
     "db:backfill-runtime-metadata": "bun --env-file=../../.env src/backfill-runtime-metadata.ts",
     "db:backfill-sequence-length-sketches": "bun --env-file=../../.env src/backfill-sequence-length-sketches.ts",
     "db:backfill-server-log-files": "bun --env-file=../../.env src/backfill-server-log-files.ts",
+    "db:backfill-spec-algorithm": "bun --env-file=../../.env src/backfill-spec-algorithm.ts",
     "db:compact-server-logs": "bun --env-file=../../.env src/compact-server-logs.ts",
     "db:reset": "bun --env-file=../../.env src/reset-db.ts",
     "db:sync-public": "bun --env-file=../../.env src/sync-public-db.ts",

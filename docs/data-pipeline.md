@@ -439,6 +439,22 @@ also unioned back into the window rather than dropped. Only after that volume-we
 aggregation is the semantic `[0, 1]` bound applied as a guard against residual counter timing
 skew. Older rows without the component rate series retain the stored-ratio fallback.
 
+### Speculative Decoding Algorithm and Draft Model
+
+`configs.spec_method` is the matrix label (`mtp`, `draft_model`, `none`) and says neither
+which algorithm a server ran nor what drafted. InferenceX results carry `spec_algorithm`
+(`mtp`, `dspark`, `dflash`, `eagle3`, in the golden AL identity vocabulary) and
+`spec_draft_model` (the drafter's repo, or `native` when the served checkpoint drafts for
+itself). Ingest stores both in `metrics`, and the AgentX tooltip shows them, for example
+"DFlash (RadixArk/Muse-Spark-Open-DFlash2)" or "DSpark (native)". Points without them fall
+back to the label.
+
+`db:backfill-spec-algorithm` fills both for stored AgentX points from their server logs
+(`etl/server-log-speculation.ts`): vLLM's and ATOM's `SpeculativeConfig`, SGLang's
+`server_args`, TensorRT-LLM's speculative config, and TileRT's `num_mtp`. Engines often name
+the served checkpoint, or a directory inside `/model`, as the draft model, so only a separate
+drafter's name (DSpark, DFlash, EAGLE, NextN, MTP or draft) is reported as one.
+
 ### Server-Log Artifact Bundles
 
 Server-log artifacts are stored as filename-keyed bundles rather than as a hard-coded list of
