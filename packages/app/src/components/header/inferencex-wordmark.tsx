@@ -2,16 +2,20 @@ export function InferenceXWordmark() {
   return (
     <span
       data-testid="inferencex-wordmark"
-      className="thanksgiving-wordmark relative inline-block pr-1.5 text-lg font-bold tracking-tight"
+      className="inferencex-wave-wordmark inline-block pr-1.5 text-lg font-bold tracking-tight"
+      role="img"
+      aria-label="InferenceX"
     >
-      Inference<span className="thanksgiving-wordmark-x">X</span>
-      <span
-        aria-hidden="true"
-        data-testid="wordmark-turkey"
-        className="thanksgiving-wordmark-turkey pointer-events-none absolute -right-1 -top-2 select-none text-base leading-none"
-      >
-        🦃
-      </span>
+      {[...'InferenceX'].map((letter, index) => (
+        <span
+          key={index}
+          aria-hidden="true"
+          className="inferencex-wave-letter"
+          style={{ animationDelay: `${index * -0.12}s` }}
+        >
+          {letter}
+        </span>
+      ))}
     </span>
   );
 }
