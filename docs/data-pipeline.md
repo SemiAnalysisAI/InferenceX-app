@@ -484,8 +484,9 @@ query therefore asks for every code point with the same PostgreSQL lowercase as 
 character. Regenerate the table if the database's PostgreSQL major version or locale changes.
 
 `SERVER_LOG_BLOCKS=1` makes ingest write blocks next to the text columns.
-`bun run admin:db:compact-server-logs` (`--log-id`, `--limit`, `--dry-run`) converts
-existing files, reading each file's text in ranges of 64 blocks.
+`bun run admin:db:compact-server-logs` (`--log-id`, `--limit`, `--dry-run`, `--concurrency`) converts
+existing files, reading each file's text in ranges of 64 blocks. `--concurrency N` compacts N files at
+once on N connections; each file is its own transaction, so an interrupted run resumes by rerunning.
 
 ### Agentic Dataset Provenance
 

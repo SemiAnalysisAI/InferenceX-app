@@ -2,8 +2,6 @@ import { hasNoSslFlag } from './cli-utils.js';
 import { createAdminSql } from './etl/db-utils.js';
 import { writeServerLogBlocks } from './etl/server-log-block-writer.js';
 
-const sql = createAdminSql({ noSsl: hasNoSslFlag(), max: 1, onnotice: () => {} });
-
 function flagValue(name: string): string | null {
   const index = process.argv.indexOf(name);
   if (index === -1) return null;
@@ -15,6 +13,9 @@ function flagValue(name: string): string | null {
 const limit = Number(flagValue('--limit') ?? Number.MAX_SAFE_INTEGER);
 const onlyLogId = flagValue('--log-id');
 const dryRun = process.argv.includes('--dry-run');
+const concurrency = Math.max(1, Number(flagValue('--concurrency') ?? 1));
+
+const sql = createAdminSql({ noSsl: hasNoSslFlag(), max: concurrency, onnotice: () => {} });
 
 interface Candidate {
   log_id: string;
@@ -40,10 +41,13 @@ const candidates = await sql<Candidate[]>`
   order by id desc, is_primary desc, file_name
   limit ${limit}
 `;
-console.log(`${candidates.length} file(s) to compact${dryRun ? ' (dry run)' : ''}`);
+console.log(
+  `${candidates.length} file(s) to compact${dryRun ? ' (dry run)' : ''} with concurrency ${concurrency}`,
+);
 
 let done = 0;
-for (const { log_id: logId, file_name: fileName, primary } of candidates) {
+let next = 0;
+async function compact({ log_id: logId, file_name: fileName, primary }: Candidate): Promise<void> {
   const t0 = performance.now();
   const [{ chars }] = primary
     ? await sql<{ chars: string }[]>`
@@ -55,7 +59,7 @@ for (const { log_id: logId, file_name: fileName, primary } of candidates) {
   const charCount = Number(chars);
   if (dryRun) {
     console.log(`  ${logId} ${fileName}: ${charCount} chars`);
-    continue;
+    return;
   }
   const written = await sql.begin((tx) =>
     writeServerLogBlocks(tx, logId, fileName, charCount, async (start, length) => {
@@ -75,5 +79,10 @@ for (const { log_id: logId, file_name: fileName, primary } of candidates) {
       `in ${Math.round(performance.now() - t0)} ms`,
   );
 }
+await Promise.all(
+  Array.from({ length: concurrency }, async () => {
+    while (next < candidates.length) await compact(candidates[next++]);
+  }),
+);
 console.log(`compacted ${done} file(s)`);
 await sql.end();
