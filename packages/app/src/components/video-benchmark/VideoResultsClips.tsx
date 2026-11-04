@@ -6,6 +6,7 @@ import { InfoHelp } from '@/components/ui/option-info';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import {
+  clipGroupActive,
   stepClipGroup,
   type ClipEvent,
   type ClipGroupStep,
@@ -58,6 +59,7 @@ const STRINGS = {
     play: 'Play',
     pause: 'Pause',
     buffering: (percent: number) => `Buffering ${percent}%`,
+    downloading: (percent: number) => `Loading ${percent}%`,
     audio: 'Audio',
     muted: 'Muted',
     listen: (hardware: string) => `Listen to ${hardware}`,
@@ -123,6 +125,7 @@ const STRINGS = {
     play: '播放',
     pause: '暂停',
     buffering: (percent: number) => `缓冲中 ${percent}%`,
+    downloading: (percent: number) => `加载中 ${percent}%`,
     audio: '音频',
     muted: '静音',
     listen: (hardware: string) => `收听 ${hardware}`,
@@ -335,8 +338,12 @@ function SynchronizedClips({
   const diagnostic = group?.scope === 'matched-noise-diagnostic';
   const videos = useRef(new Map<string, HTMLVideoElement>());
   const canvases = useRef(new Map<string, HTMLCanvasElement>());
-  const [time, setTime] = useState(0);
-  const [buffered, setBuffered] = useState(0);
+  const [shown, setShown] = useState<Pick<ClipGroupStep, 'time' | 'buffered' | 'ready'>>({
+    time: 0,
+    buffered: 0,
+    ready: false,
+  });
+  const { time, buffered, ready } = shown;
   const [phase, setPhase] = useState<ClipPhase>('paused');
   const phaseRef = useRef<ClipPhase>('paused');
   const [audioSource, setAudioSource] = useState<string | null>(null);
@@ -454,9 +461,11 @@ function SynchronizedClips({
     if (step.phase !== phaseRef.current) setPhaseNow(step.phase);
     return step;
   };
-  const show = (step: ClipGroupStep) => {
-    setTime(step.time);
-    setBuffered(step.buffered);
+  const show = ({ time: at, buffered: share, ready: loaded }: ClipGroupStep) =>
+    setShown({ time: at, buffered: share, ready: loaded });
+  /** Keeps the loaded share current while idle; the frame loop covers the active phases. */
+  const refresh = () => {
+    if (!clipGroupActive(phaseRef.current)) show(dispatch('tick'));
   };
 
   useEffect(() => {
@@ -477,14 +486,14 @@ function SynchronizedClips({
   }, [visibleKey]);
 
   useEffect(() => {
-    if (phase !== 'playing' && phase !== 'buffering') return undefined;
+    if (!clipGroupActive(phase)) return undefined;
     let frame = 0;
-    let shown = -Infinity;
+    let displayed = -Infinity;
     const tick = (now: number) => {
       const step = dispatch('tick');
-      const running = step.phase === 'playing' || step.phase === 'buffering';
-      if (!running || now - shown >= DISPLAY_INTERVAL_MS) {
-        shown = now;
+      const running = clipGroupActive(step.phase);
+      if (!running || now - displayed >= DISPLAY_INTERVAL_MS) {
+        displayed = now;
         show(step);
       }
       if (running) frame = requestAnimationFrame(tick);
@@ -562,12 +571,18 @@ function SynchronizedClips({
     }
   };
 
-  const wantsPlay = phase === 'playing' || phase === 'buffering';
+  const active = clipGroupActive(phase);
   const togglePlay = () => {
-    const pausing = phaseRef.current === 'playing' || phaseRef.current === 'buffering';
+    const pausing = clipGroupActive(phaseRef.current);
     track(pausing ? 'video_results_clips_pause' : 'video_results_clips_play');
     show(dispatch(pausing ? 'pause' : 'play'));
   };
+  const progress =
+    phase === 'buffering'
+      ? s.buffering
+      : !ready && playable.length > 0 && (phase === 'paused' || phase === 'loading')
+        ? s.downloading
+        : null;
 
   return (
     <>
@@ -671,6 +686,8 @@ function SynchronizedClips({
               preload="auto"
               aria-label={s.reference}
               className="size-full object-contain"
+              onProgress={refresh}
+              onCanPlayThrough={refresh}
               onLoadedMetadata={(event) => {
                 const value = event.currentTarget.duration;
                 if (Number.isFinite(value) && value > 0)
@@ -771,6 +788,8 @@ function SynchronizedClips({
                         ? 'size-full object-contain'
                         : 'invisible absolute size-full'
                     }
+                    onProgress={refresh}
+                    onCanPlayThrough={refresh}
                     onLoadedMetadata={(event) => {
                       const value = event.currentTarget.duration;
                       if (Number.isFinite(value) && value > 0)
@@ -872,10 +891,10 @@ function SynchronizedClips({
           variant="outline"
           size="sm"
           disabled={playable.length === 0}
-          aria-pressed={wantsPlay}
+          aria-pressed={active}
           onClick={togglePlay}
         >
-          {wantsPlay ? s.pause : s.play}
+          {active ? s.pause : s.play}
         </Button>
         <div className="w-40 min-w-0">
           <VideoSelect
@@ -909,12 +928,12 @@ function SynchronizedClips({
         <span className="font-mono text-xs text-muted-foreground">
           {time.toFixed(2)} / {duration > 0 ? duration.toFixed(2) : '—'} {s.seconds}
         </span>
-        {phase === 'buffering' && (
+        {progress && (
           <span
             data-testid="video-results-buffering"
             className="font-mono text-xs text-muted-foreground"
           >
-            {s.buffering(Math.round(buffered * 100))}
+            {progress(Math.round(buffered * 100))}
           </span>
         )}
         <div role="group" aria-label={s.view} className="inline-flex gap-1 rounded-lg border p-1">

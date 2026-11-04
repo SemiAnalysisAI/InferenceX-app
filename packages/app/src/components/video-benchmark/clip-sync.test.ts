@@ -129,7 +129,7 @@ describe('stepClipGroup', () => {
       'play',
     );
     expect(restarted).toMatchObject({
-      phase: 'buffering',
+      phase: 'loading',
       actions: [
         { type: 'seek', key: 'b200', time: 0 },
         { type: 'seek', key: 'h100', time: 0 },
@@ -138,39 +138,72 @@ describe('stepClipGroup', () => {
     });
   });
 
-  it('enters buffering instead of starting ready clips early when play is pressed', () => {
-    const cold = group(
-      [
-        clip('b200', { currentTime: 0, readyState: 2, bufferedEnd: 0.27 }),
-        clip('h100', { currentTime: 0, readyState: 4, bufferedEnd: 2.99 }),
-      ],
-      { phase: 'paused' },
-    );
-    const pressed = stepClipGroup(cold, 'play');
-    expect(pressed.phase).toBe('buffering');
+  it('holds play until every clip is buffered to the shared end, reporting the slowest share', () => {
+    const partial = [
+      clip('b200', { currentTime: 0, readyState: 4, bufferedEnd: 2.5 }),
+      clip('h100', { currentTime: 0, readyState: 4, bufferedEnd: 5, duration: 5.17 }),
+    ];
+    const pressed = stepClipGroup(group(partial, { phase: 'paused' }), 'play');
+    expect(pressed.phase).toBe('loading');
     expect(ofType(pressed, 'play-all')).toEqual([]);
     expect(ofType(pressed, 'prime')).toHaveLength(1);
-    expect(pressed.buffered).toBeCloseTo(0.054);
-    const warm = group(
-      [
-        clip('b200', { currentTime: 0, readyState: 4, bufferedEnd: 2.5 }),
-        clip('h100', { currentTime: 0, readyState: 4, bufferedEnd: 2.99 }),
-      ],
-      { phase: 'buffering' },
+    expect(pressed.buffered).toBeCloseTo(0.5);
+    expect(pressed.ready).toBe(false);
+    expect(stepClipGroup(group(partial, { phase: 'loading' }), 'tick')).toMatchObject({
+      phase: 'loading',
+      actions: [],
+    });
+    const decoding = group(
+      [clip('b200', { currentTime: 0, readyState: 2, bufferedEnd: 5 }), partial[1]],
+      { phase: 'loading' },
     );
-    expect(stepClipGroup(warm, 'tick')).toMatchObject({
+    expect(stepClipGroup(decoding, 'tick')).toMatchObject({ phase: 'loading', ready: false });
+    const complete = group(
+      [clip('b200', { currentTime: 0, readyState: 4, bufferedEnd: 4.96 }), partial[1]],
+      { phase: 'loading' },
+    );
+    expect(stepClipGroup(complete, 'tick')).toMatchObject({
+      phase: 'playing',
+      actions: [{ type: 'play-all' }],
+      ready: true,
+    });
+    expect(stepClipGroup(group(partial, { phase: 'paused' }), 'tick')).toMatchObject({
+      phase: 'paused',
+      actions: [],
+      buffered: 0.5,
+      ready: false,
+    });
+  });
+
+  it('starts from a scrub position once the rest of every clip is buffered', () => {
+    const tail = group(
+      [
+        clip('b200', { currentTime: 4, readyState: 4, bufferedEnd: 4.3 }),
+        clip('h100', { currentTime: 4, readyState: 4, bufferedEnd: 5 }),
+      ],
+      { phase: 'loading' },
+    );
+    expect(stepClipGroup(tail, 'tick')).toMatchObject({ phase: 'loading', actions: [] });
+    const rest = group(
+      [
+        clip('b200', { currentTime: 4, readyState: 4, bufferedEnd: 4.96 }),
+        clip('h100', { currentTime: 4, readyState: 4, bufferedEnd: 5 }),
+      ],
+      { phase: 'loading' },
+    );
+    expect(stepClipGroup(rest, 'tick')).toMatchObject({
       phase: 'playing',
       actions: [{ type: 'play-all' }],
     });
   });
 
-  it('scrubbing pauses the group, seeks every clip including the audible one, and re-buffers', () => {
+  it('scrubbing pauses the group, seeks every clip including the audible one, and reloads', () => {
     const step = stepClipGroup(
       group([clip('b200', { playbackRate: 1.1 }), clip('h100')], { audible: 'h100' }),
       { type: 'seek', time: 3 },
     );
     expect(step).toMatchObject({
-      phase: 'buffering',
+      phase: 'loading',
       actions: [
         { type: 'pause-all' },
         { type: 'rate', key: 'b200', rate: 1 },

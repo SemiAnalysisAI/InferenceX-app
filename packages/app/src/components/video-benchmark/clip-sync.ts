@@ -4,7 +4,11 @@
  * elements and renders the phase, so no playback rule lives in the component.
  */
 
-export type ClipPhase = 'paused' | 'buffering' | 'playing' | 'ended';
+/**
+ * `loading` waits for every clip to hold data through the shared end before the group starts;
+ * `buffering` is a stall mid-play, released once each clip has a little data ahead again.
+ */
+export type ClipPhase = 'paused' | 'loading' | 'buffering' | 'playing' | 'ended';
 
 export type ClipEvent = 'play' | 'pause' | 'tick' | { type: 'seek'; time: number };
 
@@ -34,7 +38,7 @@ export interface ClipGroup {
 export type ClipAction =
   | { type: 'play-all' }
   | { type: 'pause-all' }
-  /** play() then pause() inside the user gesture, so browsers that fetch media only after a gesture load while the group buffers. */
+  /** play() then pause() inside the user gesture, so browsers that fetch media only after a gesture load while the group waits. */
   | { type: 'prime' }
   | { type: 'seek'; key: string; time: number }
   | { type: 'rate'; key: string; rate: number };
@@ -46,11 +50,15 @@ export interface ClipGroupStep {
   time: number;
   /** Share of the shared duration buffered by the slowest clip, 0..1. */
   buffered: number;
+  /** Every clip holds data from its time through the shared end, so the group can start without a stall. */
+  ready: boolean;
 }
 
 const HAVE_FUTURE_DATA = 3;
-/** Seconds buffered past the group time before paused clips resume together. */
+/** Seconds buffered past the group time before clips stalled mid-play resume together. */
 export const BUFFER_MARGIN_SECONDS = 1;
+/** Slack before the shared end within which a buffered range counts as reaching it. */
+export const LOADED_SLACK_SECONDS = 0.05;
 /** Drift that starts a playbackRate nudge on a follower. */
 export const NUDGE_SECONDS = 0.04;
 /** Drift at which a nudged follower returns to rate 1. */
@@ -60,14 +68,26 @@ export const SEEK_SECONDS = 0.25;
 export const NUDGE_RATE = 0.1;
 const END_EPSILON = 0.02;
 
+export const clipGroupActive = (phase: ClipPhase) =>
+  phase === 'loading' || phase === 'buffering' || phase === 'playing';
+
 const stalled = (clip: ClipSnapshot) => !clip.seeking && clip.readyState < HAVE_FUTURE_DATA;
 
-function ready(clip: ClipSnapshot, duration: number) {
-  if (clip.readyState < HAVE_FUTURE_DATA) return false;
-  const end = duration > 0 ? duration : clip.duration;
+const endOf = (clip: ClipSnapshot, duration: number) => (duration > 0 ? duration : clip.duration);
+
+/** Decodable and buffered from its time through the shared end. */
+function loaded(clip: ClipSnapshot, duration: number) {
+  const end = endOf(clip, duration);
   return (
-    clip.bufferedEnd - clip.currentTime >= BUFFER_MARGIN_SECONDS ||
-    (end > 0 && clip.bufferedEnd >= end - END_EPSILON)
+    clip.readyState >= HAVE_FUTURE_DATA && end > 0 && clip.bufferedEnd >= end - LOADED_SLACK_SECONDS
+  );
+}
+
+/** Mid-play fallback for a buffer the browser evicted. */
+function hasDataAhead(clip: ClipSnapshot, duration: number) {
+  return (
+    clip.readyState >= HAVE_FUTURE_DATA &&
+    (clip.bufferedEnd - clip.currentTime >= BUFFER_MARGIN_SECONDS || loaded(clip, duration))
   );
 }
 
@@ -78,9 +98,11 @@ function leaderOf({ clips, audible }: ClipGroup) {
 }
 
 function bufferedShare({ clips, duration }: ClipGroup) {
-  if (duration <= 0 || clips.length === 0) return 0;
+  if (clips.length === 0) return 0;
+  const end = duration > 0 ? duration : Math.min(...clips.map((clip) => clip.duration));
+  if (!(end > 0)) return 0;
   const slowest = Math.min(...clips.map((clip) => clip.bufferedEnd));
-  return Math.max(0, Math.min(1, slowest / duration));
+  return Math.max(0, Math.min(1, slowest / end));
 }
 
 function resetRates(clips: readonly ClipSnapshot[], actions: ClipAction[]) {
@@ -88,8 +110,13 @@ function resetRates(clips: readonly ClipSnapshot[], actions: ClipAction[]) {
     if (clip.playbackRate !== 1) actions.push({ type: 'rate', key: clip.key, rate: 1 });
 }
 
-/** Seeks followers that drifted while paused, then starts all clips once each has data ahead. */
-function resume(group: ClipGroup, leader: ClipSnapshot, actions: ClipAction[]): ClipPhase {
+/** Seeks followers that drifted while paused, then starts all clips once each passes the waiting phase's rule. */
+function resume(
+  group: ClipGroup,
+  leader: ClipSnapshot,
+  actions: ClipAction[],
+  waiting: 'loading' | 'buffering',
+): ClipPhase {
   let aligning = false;
   for (const clip of group.clips) {
     if (clip === leader || Math.abs(clip.currentTime - leader.currentTime) <= SEEK_SECONDS)
@@ -97,7 +124,8 @@ function resume(group: ClipGroup, leader: ClipSnapshot, actions: ClipAction[]): 
     aligning = true;
     if (!clip.seeking) actions.push({ type: 'seek', key: clip.key, time: leader.currentTime });
   }
-  if (aligning || !group.clips.every((clip) => ready(clip, group.duration))) return 'buffering';
+  const ready = waiting === 'loading' ? loaded : hasDataAhead;
+  if (aligning || !group.clips.every((clip) => ready(clip, group.duration))) return waiting;
   actions.push({ type: 'play-all' });
   return 'playing';
 }
@@ -111,36 +139,38 @@ export function stepClipGroup(group: ClipGroup, event: ClipEvent): ClipGroupStep
     actions,
     time,
     buffered: bufferedShare(group),
+    ready: clips.every((clip) => loaded(clip, duration)),
   });
   if (!leader) return result('paused');
-  const wantsPlay = phase === 'playing' || phase === 'buffering';
+  const active = clipGroupActive(phase);
 
   if (typeof event === 'object') {
-    if (wantsPlay) actions.push({ type: 'pause-all' });
+    if (active) actions.push({ type: 'pause-all' });
     resetRates(clips, actions);
     for (const clip of clips)
       if (clip.readyState >= 1) actions.push({ type: 'seek', key: clip.key, time: event.time });
-    return result(wantsPlay ? 'buffering' : 'paused', event.time);
+    return result(active ? 'loading' : 'paused', event.time);
   }
   switch (event) {
     case 'pause': {
-      if (!wantsPlay) return result(phase);
+      if (!active) return result(phase);
       actions.push({ type: 'pause-all' });
       resetRates(clips, actions);
       return result('paused');
     }
     case 'play': {
-      if (wantsPlay) return result(phase);
+      if (active) return result(phase);
       if (phase === 'ended') {
         for (const clip of clips) actions.push({ type: 'seek', key: clip.key, time: 0 });
-        return result('buffering', 0);
+        return result('loading', 0);
       }
-      const next = resume(group, leader, actions);
-      if (next === 'buffering') actions.push({ type: 'prime' });
+      const next = resume(group, leader, actions, 'loading');
+      if (next === 'loading') actions.push({ type: 'prime' });
       return result(next);
     }
     case 'tick': {
-      if (phase === 'buffering') return result(resume(group, leader, actions));
+      if (phase === 'loading' || phase === 'buffering')
+        return result(resume(group, leader, actions, phase));
       if (phase !== 'playing') return result(phase);
       if (
         clips.some((clip) => clip.ended) ||

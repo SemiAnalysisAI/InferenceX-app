@@ -319,7 +319,7 @@ describe('VideoGenX results', () => {
       Object.defineProperty($video[0], 'readyState', { value: 2, configurable: true });
     });
     cy.get('[data-testid="video-results-play"]').click();
-    cy.get('[data-testid="video-results-buffering"]').should('contain', 'Buffering');
+    cy.get('[data-testid="video-results-buffering"]').should('contain', 'Loading 100%');
     cy.get('[data-testid="video-results-play"]').should('have.attr', 'aria-pressed', 'true');
     cy.wait(300);
     clips().should(($videos) => {
