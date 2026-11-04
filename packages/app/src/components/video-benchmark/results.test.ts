@@ -181,7 +181,9 @@ describe('VideoGenX results contract', () => {
       expect(
         resultProjection([official], { ...selection, ...filter }, [named]).overlayCells,
       ).toEqual([]);
+    expect(result.roster).toContain('b200');
     const cleared = resultProjection([official], state(), [named, other]);
+    expect(cleared.roster).not.toContain('b200');
     expect(cleared.overlayCells).toEqual([]);
     expect(cleared.cells.map((cell) => cell.point.id)).toEqual(['official:c1']);
   });

@@ -135,6 +135,7 @@ describe('VideoGenX results', () => {
         });
       },
     });
+    cy.window().then((win) => cy.spy(win.console, 'error').as('consoleError'));
     const overlay = '[data-hardware="b200"][data-overlay="true"]';
     row('b200').should('not.exist');
     points(overlay).should('have.length', 2);
@@ -146,6 +147,7 @@ describe('VideoGenX results', () => {
     cy.get('[data-testid="results-gpus"]').contains('button', /^4$/).click();
     row('b200').find('td').eq(1).should('have.text', '4 / 8');
     cy.location('search').should('contain', 'r_gpus=4');
+    cy.get('@consoleError').should('not.be.calledWithMatch', /Cannot update a component/);
     cy.get('label[for="video-results-optimal"]').click();
     points(overlay).should('have.length', 1).and('have.attr', 'data-optimal', 'true');
     searchParam('r_optimal').should('equal', '1');

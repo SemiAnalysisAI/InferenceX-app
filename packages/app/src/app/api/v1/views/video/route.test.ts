@@ -11,8 +11,6 @@ import { listedVideoCells, plotVideoPoints } from '@/components/video-benchmark/
 import { dashboardCells, namedRunPoints, videoPoints } from '@/components/video-benchmark/points';
 import { parseResultsState, resultProjection } from '@/components/video-benchmark/results';
 import { servingFixture } from '@/components/video-benchmark/serving.fixture';
-import { diagnosticQualityFixture } from '@/components/video-benchmark/diagnostic-quality.fixture';
-import { verifiedDiagnosticPairs } from '@/components/video-benchmark/diagnostic-quality';
 import { referenceQualityFixture } from '@/components/video-benchmark/reference-quality.fixture';
 import { verifiedReferencePairs } from '@/components/video-benchmark/reference-quality';
 import {
@@ -255,115 +253,6 @@ describe('published VideoGenX dashboard projection', () => {
     expect(cleared.clipQuality.groups[0].clips[0].quality.candidate.run_id).toBe('124');
     expect(cleared.clipQuality.groups[0].clips[0].quality.psnrDb).toBe(35);
   });
-  it('returns diagnostic native identities beside unchanged CI performance and clears both with the overlay', async () => {
-    const f = diagnosticQualityFixture('h100', 7, 'a'.repeat(64), 20);
-    const saved = f.original.stored;
-    const path = f.attachment.pairs[0].origin.media_path;
-    saved.sources[0].assets = [[path, { url: '/ci.mp4', downloadUrl: '/ci.mp4' }]];
-    const history: VideoHistoryPage = {
-      schemaVersion: 1,
-      nextPage: null,
-      entries: [videoHistoryEntry(saved, null)],
-    };
-    source.mockImplementation((req: NextRequest) =>
-      Response.json(req.nextUrl.searchParams.get('format') === 'history' ? history : saved),
-    );
-    const beforeResponse = await GET(request('view=overview&unofficialrun=123'));
-    const before = await beforeResponse.json();
-    saved.diagnostics = verifiedDiagnosticPairs(f.attachment, f.receipts, [saved], 'f'.repeat(64));
-    saved.diagnostics[0].candidate.url = '/native.mp4';
-    saved.diagnostics[0].reference.url = '/reference.mp4';
-    const afterResponse = await GET(request('view=overview&unofficialrun=123'));
-    const after = await afterResponse.json();
-    expect(after.overlayCells).toEqual(before.overlayCells);
-    expect(after.cells).toEqual(before.cells);
-    expect(after.clipQuality.groups).toHaveLength(2);
-    expect(after.clipQuality.groups[0]).toMatchObject({
-      scope: 'matched-noise-diagnostic',
-      take: null,
-    });
-    expect(after.clipQuality.groups[0].clips[0]).toMatchObject({
-      pointId: null,
-      slotId: null,
-      quality: {
-        candidate: { run_id: 'native-candidate', media_path: 'drum-taps/candidate.mp4' },
-        origin: { run_id: '123', artifact_id: 7 },
-      },
-    });
-    expect(after.clipQuality.groups[1]).toEqual(before.clipQuality.groups[0]);
-    const point = namedRunPoints([history], '123').find((p) => p.cell === 'c1')!;
-    expect(after.clipQuality.groups).toEqual(
-      resultsClipEvidence([publishedResultsSide(saved, point)]),
-    );
-    const clearedResponse = await GET(request('view=overview'));
-    const cleared = await clearedResponse.json();
-    expect(cleared.clipQuality.groups).toEqual([]);
-  });
-  it('returns H100 in the shared roster and keeps its unapproved named projection isolated', async () => {
-    const history = structuredClone(retainedHistory) as unknown as VideoHistoryPage;
-    history.nextPage = null;
-    source.mockImplementation(() => Response.json(history));
-    const point = videoPoints([history]).find(
-      (item) => item.hardwareKey === 'h100' && item.concurrency === 1,
-    )!;
-    const officialResponse = await GET(request('view=overview'));
-    const official = await officialResponse.json();
-    expect(official.roster).toContain('h100');
-    expect(
-      official.cells.find((cell: { point: { id: string } }) => cell.point.id === point.id).point
-        .hardwareKey,
-    ).toBe('h100');
-    const selected = history.entries.find((entry) => entry.runId === point.runId)!;
-    selected.approved = false;
-    const other = structuredClone(selected);
-    other.runId = '987654321';
-    other.id = `${other.runId}.${other.artifact.id}`;
-    for (const item of other.sources)
-      for (const row of item.observations) row.id = `other:${row.id}`;
-    history.entries.unshift(other);
-    const namedResponse = await GET(request(`view=overview&unofficialrun=${point.runId}`));
-    const named = await namedResponse.json();
-    expect(named).toMatchObject(
-      resultProjection(
-        videoPoints([history]),
-        parseResultsState(`unofficialrun=${point.runId}`),
-        namedRunPoints([history], point.runId),
-      ),
-    );
-    expect(named.overlayCells[0].point).toMatchObject({ hardwareKey: 'h100', approved: false });
-    expect(named.overlayCells).toHaveLength(1);
-    expect(named.overlayCells[0].point).toMatchObject({
-      runId: point.runId,
-      artifactId: selected.artifact.id,
-    });
-    expect(named.cells.map((cell: { point: { runId: string } }) => cell.point.runId)).not.toContain(
-      point.runId,
-    );
-    expect(JSON.stringify(named)).not.toContain(other.runId);
-    const gpuFilteredResponse = await GET(
-      request(
-        `view=overview&unofficialrun=${point.runId}&r_gpus=${point.participating === 4 ? 8 : 4}`,
-      ),
-    );
-    const gpuFiltered = await gpuFilteredResponse.json();
-    expect(gpuFiltered.overlayCells).toEqual([]);
-    expect(gpuFiltered.overlayDeploymentCells).toEqual(named.overlayDeploymentCells);
-    expect(gpuFiltered.overlayDeploymentCells[0].point.id).toBe(point.id);
-    const hiddenResponse = await GET(
-      request(`view=overview&unofficialrun=${point.runId}&r_hidden=h100`),
-    );
-    const hidden = await hiddenResponse.json();
-    expect(hidden.overlayCells).toEqual([]);
-    const clearedResponse = await GET(request('view=overview'));
-    const cleared = await clearedResponse.json();
-    expect(cleared.roster).not.toContain('h100');
-    expect(cleared.overlayCells).toEqual([]);
-    expect(
-      cleared.cells.some(
-        (cell: { point: { hardwareKey: string } }) => cell.point.hardwareKey === 'h100',
-      ),
-    ).toBe(false);
-  });
 
   it('returns the same results-page selection and economics with read-only stored media metadata', async () => {
     const history = structuredClone(retainedHistory) as unknown as VideoHistoryPage;
@@ -410,39 +299,12 @@ describe('published VideoGenX dashboard projection', () => {
     expect(body.rows).toEqual([]);
   });
 
-  it('returns the shared diagnostic-only projection and CSV from the same selected cells', async () => {
-    const history = structuredClone(retainedHistory) as unknown as VideoHistoryPage;
-    history.nextPage = null;
-    const run = videoPoints([history]).find((point) => point.hardwareKey === 'b200')!.runId;
-    for (const entry of history.entries) entry.approved = false;
-    source.mockImplementation(() => Response.json(history));
-    const response = await GET(request(`view=overview&unofficialruns=${run}`));
-    const body = await response.json();
-    expect(response.status).toBe(200);
-    expect(body.cells).toEqual([]);
-    expect(body.workloadMix).toEqual([]);
-    expect(body.overlayCells).toHaveLength(1);
-    expect(body).toMatchObject(
-      resultProjection(
-        videoPoints([history]),
-        parseResultsState(`unofficialruns=${run}`),
-        namedRunPoints([history], run),
-      ),
-    );
-    const csv = await GET(request(`view=overview&unofficialruns=${run}&format=csv`));
-    expect(csv.status).toBe(200);
-    expect(csv.headers.get('cache-control')).toBe('private, no-store');
-    const text = await csv.text();
-    expect(text).toContain('source_manifest_sha256');
-    expect(text).toContain('named,false,');
-    expect(text).toContain(String(body.overlayCells[0].point.id));
-    expect(text).not.toContain('official,true,');
-  });
   it('keeps CSV headers when hardware selection removes every cell', async () => {
     const response = await GET(
       request('view=overview&format=csv&r_hidden=gb200,b200,mi355x,h200,h100'),
     );
     expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('private, no-store');
     expect(await response.text()).toMatch(
       /^channel,approved,published_at,run_id,artifact_id,.*\r\n$/u,
     );

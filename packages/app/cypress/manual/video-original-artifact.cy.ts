@@ -3,26 +3,6 @@ describe('original H100 artifact through the local development replay', () => {
   const artifact = 13068476608;
   const overview = `/api/v1/views/video?view=overview&unofficialrun=${run}&r_tier=r`;
 
-  it('changes GPU count without updating the router during render', () => {
-    cy.visit(`/video?unofficialrun=${run}`, {
-      onBeforeLoad(win) {
-        cy.spy(win.console, 'error').as('consoleError');
-      },
-    });
-    cy.get('[data-testid="results-replay"]').should('be.visible');
-    cy.contains(
-      '[data-testid="results-workload-summary"]',
-      'MiniMaxAI/MiniMax-H3 · 1344×768 · 5 s · 24 fps · 49 steps',
-    );
-    cy.contains('[role="group"] button', /^4$/).click({
-      scrollBehavior: 'center',
-    });
-    cy.location('search').should('include', 'r_gpus=4');
-    cy.get('[data-testid="results-row"][data-hardware="h100"] button').click();
-    cy.get('[data-testid="results-power-trace"] circle').should('have.length', 1478);
-    cy.get('@consoleError').should('not.be.calledWithMatch', /Cannot update a component/);
-  });
-
   it('keeps History, JSON, CSV and original stored bytes on the same unapproved source', () => {
     cy.request('/api/video-runs?format=history&page=1').then(({ status, headers, body }) => {
       expect(status).to.equal(200);

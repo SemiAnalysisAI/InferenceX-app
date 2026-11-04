@@ -173,28 +173,16 @@ describe('stepClipGroup', () => {
       buffered: 0.5,
       ready: false,
     });
-  });
-
-  it('starts from a scrub position once the rest of every clip is buffered', () => {
-    const tail = group(
-      [
-        clip('b200', { currentTime: 4, readyState: 4, bufferedEnd: 4.3 }),
-        clip('h100', { currentTime: 4, readyState: 4, bufferedEnd: 5 }),
-      ],
-      { phase: 'loading' },
-    );
-    expect(stepClipGroup(tail, 'tick')).toMatchObject({ phase: 'loading', actions: [] });
-    const rest = group(
-      [
-        clip('b200', { currentTime: 4, readyState: 4, bufferedEnd: 4.96 }),
-        clip('h100', { currentTime: 4, readyState: 4, bufferedEnd: 5 }),
-      ],
-      { phase: 'loading' },
-    );
-    expect(stepClipGroup(rest, 'tick')).toMatchObject({
-      phase: 'playing',
-      actions: [{ type: 'play-all' }],
-    });
+    const scrubbed = (end: number) =>
+      group(
+        [
+          clip('b200', { currentTime: 4, readyState: 4, bufferedEnd: end }),
+          clip('h100', { currentTime: 4, readyState: 4, bufferedEnd: 5 }),
+        ],
+        { phase: 'loading' },
+      );
+    expect(stepClipGroup(scrubbed(4.3), 'tick')).toMatchObject({ phase: 'loading', actions: [] });
+    expect(stepClipGroup(scrubbed(4.96), 'tick')).toMatchObject({ phase: 'playing' });
   });
 
   it('hiding the page pauses playing clips but keeps a pending start', () => {

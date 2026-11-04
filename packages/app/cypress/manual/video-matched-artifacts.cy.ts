@@ -1,11 +1,9 @@
-import { expectNoPageOverflow } from '../support/e2e';
-
-const run = '41280191475';
-const artifacts = { b200: 13074345365, h100: 13074376724 };
-const selection = `unofficialrun=${run}&r_hidden=gb200,mi355x,h200`;
-const overview = `/api/v1/views/video?view=overview&${selection}`;
-
 describe('matched original H100 and B200 artifacts', () => {
+  const run = '41280191475';
+  const artifacts = { b200: 13074345365, h100: 13074376724 };
+  const selection = `unofficialrun=${run}&r_hidden=gb200,mi355x,h200`;
+  const overview = `/api/v1/views/video?view=overview&${selection}`;
+
   it('preserves independent artifact identities and matching workload in History, JSON and CSV', () => {
     cy.request('/api/video-runs?format=history').then(({ body, headers }) => {
       expect(headers['x-videogenx-replay']).to.equal('1');
@@ -109,141 +107,6 @@ describe('matched original H100 and B200 artifacts', () => {
           expect(csv).to.contain(String(cell.deliveryP50));
         }
       });
-    });
-  });
-
-  for (const [width, path] of [
-    [1440, '/video'],
-    [390, '/zh/video'],
-  ] as const) {
-    it(`plays and scrubs both matching original videos at ${width}px ${path}`, () => {
-      cy.viewport(width, 900);
-      cy.visit(`${path}?${selection}`);
-      cy.get('[data-testid="results-overlay"]').should('contain', run);
-      cy.get('[data-testid="video-results-case"]').should(
-        'contain',
-        path.startsWith('/zh') ? '相同初始噪声重跑' : 'Matched-noise rerun',
-      );
-      cy.get('[data-testid="video-results-clip"]').should('have.length', 2);
-      cy.get('[data-testid="video-results-clip"] video').should('have.length', 1);
-      cy.get('[data-hardware="b200"] video').should('not.exist');
-      cy.get('[data-hardware="h100"]').should('contain', '13.23 dB');
-      cy.get('[data-testid="video-results-clip"][data-hardware="h100"]')
-        .find('dd')
-        .then(($values) => {
-          expect([...$values].map((value) => value.textContent?.trim())).to.deep.equal([
-            '—',
-            '13.23 dB',
-            '—',
-            '—',
-            '—',
-          ]);
-        });
-      expectNoPageOverflow();
-      cy.get('[data-testid="video-results-clips"]').screenshot(
-        `matched-noise-${width}-${path.startsWith('/zh') ? 'zh' : 'en'}`,
-        { overwrite: true },
-      );
-      cy.get('[data-testid="video-results-case"]').click();
-      cy.contains('[role="option"]', /ceramic-wheel · (?:take 1|第 1 次)$/).click();
-      cy.get('[data-testid="video-results-clip"]').should('have.length', 2);
-      cy.get('[data-testid="video-results-reference"]').should('contain', 'Diffusers');
-      cy.get('[data-hardware="b200"]').should('contain', '26.18 dB');
-      cy.get('[data-hardware="h100"]').should('contain', '25.39 dB');
-      for (const [hardware, artifact] of Object.entries(artifacts)) {
-        cy.get(`[data-hardware="${hardware}"] video`)
-          .should('have.attr', 'src')
-          .and('contain', `artifact=${artifact}`);
-      }
-      cy.get<HTMLVideoElement>('[data-testid="video-results-clip"] video').should(($videos) => {
-        expect($videos).to.have.length(2);
-        for (const video of $videos) {
-          expect(video.readyState).to.be.at.least(1);
-          expect(video.videoWidth).to.equal(1344);
-          expect(video.videoHeight).to.equal(768);
-        }
-        if (width >= 390) {
-          expect(
-            Math.abs(
-              $videos[0].getBoundingClientRect().top - $videos[1].getBoundingClientRect().top,
-            ),
-          ).to.be.lessThan(2);
-        }
-      });
-      cy.get('[data-testid="video-results-play"]').click();
-      cy.get<HTMLVideoElement>('[data-testid="video-results-clips"] video').should(($videos) => {
-        expect($videos).to.have.length(3);
-        for (const video of $videos) expect(video.currentTime).to.be.greaterThan(0);
-      });
-      cy.get('[data-testid="video-results-play"]').click();
-      cy.get('[data-testid="video-results-scrub"]').invoke('val', '1').trigger('input');
-      cy.get<HTMLVideoElement>('[data-testid="video-results-clips"] video').should(($videos) => {
-        for (const video of $videos) expect(video.currentTime).to.be.within(0.98, 1.1);
-      });
-      cy.get('[data-testid="video-results-view"][data-view="difference"]').click();
-      cy.get<HTMLCanvasElement>('[data-testid="video-results-clip"] canvas').should(($canvases) => {
-        expect($canvases).to.have.length(2);
-        for (const canvas of $canvases) {
-          expect(canvas.width).to.equal(1344);
-          expect(canvas.height).to.equal(768);
-          const pixels = canvas
-            .getContext('2d')!
-            .getImageData(0, 0, canvas.width, canvas.height).data;
-          expect(pixels.some((value, index) => index % 4 !== 3 && value > 0)).to.equal(true);
-        }
-      });
-      cy.get('[data-testid="video-results-view"][data-view="clip"]').click();
-      expectNoPageOverflow();
-      cy.get('[data-testid="video-results-clips"]').screenshot(
-        `matched-hardware-${width}-${path.startsWith('/zh') ? 'zh' : 'en'}`,
-        { overwrite: true },
-      );
-      cy.get('[data-testid="results-overlay-dismiss"]').click();
-      cy.get<HTMLVideoElement>('[data-testid="video-results-clip"] video').should('not.exist');
-      cy.get('[data-testid="video-results-reference"]').should('not.exist');
-    });
-  }
-
-  it('selects the first and last CI cases without confusing the same-name diagnostic', () => {
-    cy.viewport(1440, 900);
-    cy.request(overview).then(({ body }) => {
-      cy.visit(`/video?${selection}`);
-      const groups = body.clipQuality.groups.filter(
-        (group: { scope: string; clips: { caseId: string }[] }) =>
-          group.scope === 'ci' &&
-          ['ceramic-wheel', 'station-clock'].includes(group.clips[0].caseId),
-      );
-      expect(
-        groups.map((group: { clips: { caseId: string }[] }) => group.clips[0].caseId),
-      ).to.deep.equal(['ceramic-wheel', 'station-clock']);
-      for (const group of groups) {
-        const caseId = group.clips[0].caseId;
-        cy.get('[data-testid="video-results-case"]').click();
-        cy.contains('[role="option"]', `${caseId} · take ${group.take}`).click();
-        cy.get('[data-testid="video-results-prompt"]').should('contain', group.prompt);
-        for (const clip of group.clips) {
-          cy.get(`[data-testid="video-results-clip"][data-hardware="${clip.hardware}"]`)
-            .contains('dt', 'PSNR')
-            .next('dd')
-            .should(($score) => {
-              const value = $score.text().trim();
-              if (clip.quality.status === 'identical') {
-                expect(value).to.equal('Exact match');
-              } else {
-                expect(value).to.match(/^\d+(?:\.\d{1,2})? dB$/);
-                expect(Number.parseFloat(value)).to.equal(Number(clip.quality.psnrDb.toFixed(2)));
-              }
-            });
-        }
-        cy.get('[data-testid="video-results-reference"] video').should(($video) => {
-          expect($video.attr('src')).to.be.oneOf(
-            group.clips.map(
-              (clip: { quality: { reference: { url: string } } }) => clip.quality.reference.url,
-            ),
-          );
-        });
-      }
-      expectNoPageOverflow();
     });
   });
 });

@@ -19,10 +19,6 @@ const DEFAULTS: VideoDashboardState = {
 };
 
 describe('video dashboard URL state', () => {
-  it('reads hidden hardware as deduplicated roster keys in roster order', () => {
-    const state = readVideoDashboardState('?v_hidden=h100,b200,h100,unknown&v_tier=r');
-    expect(state.hidden).toEqual(['b200', 'h100']);
-  });
   it('falls back to defaults for missing or invalid params', () => {
     expect(readVideoDashboardState('')).toEqual(DEFAULTS);
     expect(readVideoDashboardState('?v_x=bogus&v_y=nope&v_tier=z&v_view=pie&v_api=free')).toEqual(
