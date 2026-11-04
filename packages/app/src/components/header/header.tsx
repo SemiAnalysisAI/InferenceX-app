@@ -198,7 +198,7 @@ export const Header = () => {
           </IntentPrefetchLink>
 
           <nav
-            className="hidden items-center gap-1 xl:flex"
+            className="hidden min-w-0 items-center gap-1 overflow-hidden xl:flex"
             {...analyticsPlacement('header_desktop')}
           >
             {navLinks.map(({ href, displayHref, label, badgeLabel, testId, event }) => (
@@ -235,7 +235,7 @@ export const Header = () => {
             ))}
           </nav>
 
-          <div className="ml-auto flex items-center gap-0.5 sm:gap-2">
+          <div className="ml-auto flex shrink-0 items-center gap-0.5 sm:gap-2">
             <span className="hidden sm:flex">
               <GitHubStars owner="SemiAnalysisAI" repo="InferenceX" />
             </span>

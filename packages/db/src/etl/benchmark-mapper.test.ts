@@ -1881,7 +1881,7 @@ describe('mapBenchmarkRow — v3 agentic nested agg schema', () => {
   });
 });
 
-describe('NVL72 CPU ingestion', () => {
+describe('CPU-side power ingestion', () => {
   it.each([
     { gpu: 1, cpu: 1, cpuValid: 1, watts: 501 },
     { gpu: 0, cpu: '1', cpuValid: 1, watts: 501 },
@@ -1944,5 +1944,35 @@ describe('NVL72 CPU ingestion', () => {
       cpu: { sample_row_count: 12, reason_codes: ['cpu_socket_count_mismatch'] },
     });
     expect(extractPowerAudit({ sample_count: 1, cpu: 'acpi' })).not.toHaveProperty('cpu');
+  });
+
+  it('keeps AMD RAPL package provenance and CPU keys on single-node rows', () => {
+    const cpu = {
+      sensor_kind: 'rapl_package',
+      source: 'rapl',
+      expected_sockets: 2,
+      observed_sockets: 2,
+      sample_row_count: 1200,
+      reason_codes: [],
+    };
+    const result = mapBenchmarkRow(
+      makeV1Row({
+        hw: 'mi355x-amd',
+        power_valid: 1,
+        cpu_power_valid: 1,
+        avg_cpu_socket_power_w: 310,
+        avg_total_cpu_power_w: 620,
+        total_cpu_energy_j: 37200,
+        power_audit: { sample_count: 600, cpu },
+      }),
+      createSkipTracker(),
+    );
+    expect(result!.powerAudit!.cpu).toEqual(cpu);
+    expect(result!.metrics).toMatchObject({
+      cpu_power_valid: 1,
+      avg_cpu_socket_power_w: 310,
+      avg_total_cpu_power_w: 620,
+      total_cpu_energy_j: 37200,
+    });
   });
 });

@@ -105,7 +105,12 @@ export interface PowerAudit {
   cpu?: PowerAuditCpu;
 }
 
-export const POWER_AUDIT_CPU_SENSOR_KINDS = ['module', 'grace_socket', 'dcgm_cpu_rail'] as const;
+export const POWER_AUDIT_CPU_SENSOR_KINDS = [
+  'module',
+  'grace_socket',
+  'dcgm_cpu_rail',
+  'rapl_package',
+] as const;
 
 export interface PowerAuditCpu {
   sensor_kind?: (typeof POWER_AUDIT_CPU_SENSOR_KINDS)[number];
