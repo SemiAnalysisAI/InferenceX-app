@@ -24,9 +24,9 @@ concurrency:
 jobs:
   publish:
     name: 'Publish H3 media'
-    if: github.repository == 'SemiAnalysisAI/InferenceX-app' && (github.event_name == 'workflow_dispatch' || (github.event.client_payload.source_run_id && github.event.client_payload.merge_run_id))
+    if: github.repository == 'SemiAnalysisAI/InferenceX-app' && !inputs.backfill_renditions && (github.event_name == 'workflow_dispatch' || (github.event.client_payload.source_run_id && github.event.client_payload.merge_run_id))
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ inputs.backfill_renditions && 180 || 60 }}
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -35,7 +35,6 @@ jobs:
         with:
           bun-version-file: package.json
       - name: Persist completed H3 artifacts
-        if: ${{ !inputs.backfill_renditions }}
         env:
           H3_RUN_ID: ${{ inputs.run_id || github.event.client_payload.source_run_id }}
           H3_MERGE_RUN_ID: ${{ github.event.client_payload.merge_run_id }}
@@ -47,6 +46,21 @@ jobs:
           : "${INFERENCEX_APP_URL:?APP_URL repository variable is not set}"
           : "${INVALIDATE_SECRET:?VERCEL_INVALIDATE_SECRET is not set}"
           bun packages/app/scripts/warm-video-results.ts
+
+  renditions:
+    name: 'Encode web playback renditions'
+    needs: publish
+    # Runs after a successful publication, or alone for a backfill. Originals keep serving if it fails.
+    if: ${{ !cancelled() && github.repository == 'SemiAnalysisAI/InferenceX-app' && (needs.publish.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.backfill_renditions)) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.backfill_renditions && 180 || 30 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version-file: package.json
       - name: Install dependencies
         run: bun install --frozen-lockfile
         env:

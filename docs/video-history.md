@@ -53,9 +53,11 @@ Native matrix artifacts use `h3-results-<run>-<attempt>-<recipe-fingerprint>` wh
 ### Web playback renditions
 
 The sealed CI MP4s are about 10 Mbit/s with the `moov` box at the end, so a browser
-must download most of each file before playback. After publication, the same `h3-media`
-job installs ffmpeg and runs `scripts/video-renditions.ts --run <source run>`. A manual
-dispatch with `backfill_renditions` processes every stored index instead. For each sealed
+must download most of each file before playback. After a successful publication, the
+separate `renditions` job in `h3-media` installs ffmpeg and runs
+`scripts/video-renditions.ts --run <source run>`; its failure leaves the publication result
+and the original media unchanged. A manual dispatch with `backfill_renditions` skips
+publication and processes every stored index instead. For each sealed
 MP4 without a receipt, the script downloads the original, checks its recorded SHA256 and
 encodes the fixed `web-h264-crf23` profile: libx264 High, CRF 23, preset slow, yuv420p,
 audio copied and faststart. It rejects output that does not decode, is not faststart, or
@@ -72,7 +74,7 @@ Published media reads list the receipts once per 30-second cache window and add
 original. A failed listing serves the originals only. Indexes, approvals and History
 are unchanged.
 
-中文：封存的 CI MP4 码率约 10 Mbit/s，且 `moov` 位于文件末尾，浏览器须先下载大部分文件才能播放。发布完成后，同一 `h3-media` 任务安装 ffmpeg 并运行 `scripts/video-renditions.ts --run <source run>`；手动触发并勾选 `backfill_renditions` 时处理全部已存储索引。脚本对每个尚无回执的封存 MP4 下载原始文件、核对记录的 SHA256，并按固定的 `web-h264-crf23` 配置转码（libx264 High、CRF 23、preset slow、yuv420p、音频直接复制、faststart）。无法解码、不是 faststart 或时长与原始视频相差超过 0.05 秒的输出会被拒绝。脚本先上传 MP4，再写入记录 ffmpeg 版本和参数的回执；回执存在即表示完成，中断后重跑只处理未完成的视频；回执路径包含输出文件的 SHA256，读取端列一次目录即可得到全部转码版本地址。`--dry-run` 只列出待处理项，`--out-dir` 在本地转码，均不写入 Blob；`--limit` 限制单次处理数量。已发布媒体读取时每 30 秒缓存窗口列出一次回执，为封存 SHA256 有回执的媒体附加 `previewUrl`；`url` 仍是封存的原始视频，列表读取失败时只返回原始视频。索引、发布批准和 History 不变。
+中文：封存的 CI MP4 码率约 10 Mbit/s，且 `moov` 位于文件末尾，浏览器须先下载大部分文件才能播放。发布成功后，`h3-media` 中独立的 `renditions` job 安装 ffmpeg 并运行 `scripts/video-renditions.ts --run <source run>`；该 job 失败不影响发布结果和原始视频。手动触发并勾选 `backfill_renditions` 时跳过发布，处理全部已存储索引。脚本对每个尚无回执的封存 MP4 下载原始文件、核对记录的 SHA256，并按固定的 `web-h264-crf23` 配置转码（libx264 High、CRF 23、preset slow、yuv420p、音频直接复制、faststart）。无法解码、不是 faststart 或时长与原始视频相差超过 0.05 秒的输出会被拒绝。脚本先上传 MP4，再写入记录 ffmpeg 版本和参数的回执；回执存在即表示完成，中断后重跑只处理未完成的视频；回执路径包含输出文件的 SHA256，读取端列一次目录即可得到全部转码版本地址。`--dry-run` 只列出待处理项，`--out-dir` 在本地转码，均不写入 Blob；`--limit` 限制单次处理数量。已发布媒体读取时每 30 秒缓存窗口列出一次回执，为封存 SHA256 有回执的媒体附加 `previewUrl`；`url` 仍是封存的原始视频，列表读取失败时只返回原始视频。索引、发布批准和 History 不变。
 
 ## Evidence boundaries
 
