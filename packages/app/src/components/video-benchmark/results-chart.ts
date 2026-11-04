@@ -10,8 +10,16 @@ export interface ResultsMetricContext {
   tier: CostTier;
 }
 
+/** The clip length and frame rate every plotted deployment generates. */
+export interface ResultsClip {
+  seconds: number;
+  fps: number;
+}
+
 export interface ResultsChartMetric {
   label: { en: string; zh: string };
+  /** The axis title once the plotted clip is known, so a latency names the clip it measures. */
+  clipLabel?: (clip: ResultsClip) => { en: string; zh: string };
   /** Empty when the label already names the unit. */
   unit: string;
   better: 'lower' | 'higher';
@@ -30,7 +38,11 @@ export type ResultsYMetric = (typeof RESULTS_Y_METRIC_KEYS)[number];
 
 export const RESULTS_X_METRICS: Record<ResultsXMetric, ResultsChartMetric> = {
   p50: {
-    label: { en: 'P50 latency per clip', zh: '单条视频 P50 延迟' },
+    label: { en: 'Median latency per clip', zh: '单条视频中位延迟' },
+    clipLabel: ({ seconds, fps }) => ({
+      en: `Median latency per ${seconds} s clip at ${fps} fps`,
+      zh: `生成一段 ${seconds} 秒、${fps} fps 视频的中位延迟`,
+    }),
     unit: 's',
     better: 'lower',
     digits: 1,
@@ -38,6 +50,10 @@ export const RESULTS_X_METRICS: Record<ResultsXMetric, ResultsChartMetric> = {
   },
   p90: {
     label: { en: 'P90 latency per clip', zh: '单条视频 P90 延迟' },
+    clipLabel: ({ seconds, fps }) => ({
+      en: `P90 latency per ${seconds} s clip at ${fps} fps`,
+      zh: `生成一段 ${seconds} 秒、${fps} fps 视频的 P90 延迟`,
+    }),
     unit: 's',
     better: 'lower',
     digits: 1,
@@ -82,8 +98,24 @@ export const isResultsXMetric = (value: string | null): value is ResultsXMetric 
 export const isResultsYMetric = (value: string | null): value is ResultsYMetric =>
   value !== null && Object.hasOwn(RESULTS_Y_METRICS, value);
 
-export function resultsMetricLabel(metric: ResultsChartMetric, locale: 'en' | 'zh'): string {
-  return metric.unit ? `${metric.label[locale]} (${metric.unit})` : metric.label[locale];
+export function resultsMetricLabel(
+  metric: ResultsChartMetric,
+  locale: 'en' | 'zh',
+  clip: ResultsClip | null = null,
+): string {
+  const label = (clip && metric.clipLabel?.(clip)) ?? metric.label;
+  return metric.unit ? `${label[locale]} (${metric.unit})` : label[locale];
+}
+
+/** The clip every cell generates, or null when a cell lacks it or the cells disagree. */
+export function resultsClip(cells: readonly ResultCell[]): ResultsClip | null {
+  const first = cells[0]?.metadata;
+  const seconds = first?.duration ?? null,
+    fps = first?.fps ?? null;
+  if (seconds === null || fps === null || seconds <= 0 || fps <= 0) return null;
+  return cells.every(({ metadata }) => metadata.duration === seconds && metadata.fps === fps)
+    ? { seconds, fps }
+    : null;
 }
 
 /** Run-qualified so a re-exported observation ID in a named run never opens the official cell. */

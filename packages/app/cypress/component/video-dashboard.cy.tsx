@@ -513,7 +513,11 @@ describe('VideoGenX results', () => {
     });
     cy.get('#video-results-chart-title').should(
       'contain',
-      'Video-seconds per $1 TCO vs. P50 latency per clip',
+      'Video-seconds per $1 TCO vs. Median latency per clip',
+    );
+    cy.get('section[aria-labelledby="video-results-chart-title"] .x-axis-label').should(
+      'have.text',
+      'Median latency per 8 s clip at 24 fps (s)',
     );
     plottedY('b200').then((participating) => {
       cy.get('[data-testid="results-cost-basis"]').click();
@@ -670,6 +674,12 @@ describe('VideoGenX results', () => {
         if (width >= 1024)
           expect(legend.left, 'legend beside the chart').to.be.at.least(plot.right);
         else expect(legend.top, 'legend below the chart').to.be.at.least(plot.bottom);
+      });
+      cy.get('[data-testid="video-results-chart"] .x-axis-label').should(($label) => {
+        const svg = $label[0].closest('svg')!.getBoundingClientRect();
+        const label = $label[0].getBoundingClientRect();
+        expect(label.left, 'x-axis title starts inside the chart').to.be.at.least(svg.left);
+        expect(label.right, 'x-axis title ends inside the chart').to.be.at.most(svg.right);
       });
       cy.get('[data-testid="results-table"]').should(($table) => {
         const container = $table[0].parentElement!;

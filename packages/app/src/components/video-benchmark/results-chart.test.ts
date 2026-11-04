@@ -5,7 +5,10 @@ import type { VideoPoint } from './metrics';
 import { videoPoints } from './points';
 import { DEFAULT_RESULTS_STATE, resultProjection, type ResultsState } from './results';
 import {
+  RESULTS_X_METRICS,
   resultsChartSeries,
+  resultsClip,
+  resultsMetricLabel,
   type ResultsChartSelection,
   type ResultsChartSeries,
 } from './results-chart';
@@ -123,5 +126,22 @@ describe('resultsChartSeries', () => {
     expect(overlay.points[0].key).toBe('200:named:c1');
     const hidden = resultsChartSeries(deployments, selection({ hidden: ['h200'] }));
     expect(hidden.map((s) => s.key)).toEqual(['b200']);
+  });
+});
+
+describe('resultsMetricLabel', () => {
+  it('names the clip a latency measures only when every plotted cell generates it', () => {
+    const plotted = cells([fast, mid, slow]);
+    const p50 = RESULTS_X_METRICS.p50;
+    expect(resultsMetricLabel(p50, 'en', resultsClip(plotted))).toBe(
+      'Median latency per 8 s clip at 24 fps (s)',
+    );
+    expect(resultsMetricLabel(p50, 'zh', resultsClip(plotted))).toBe(
+      '生成一段 8 秒、24 fps 视频的中位延迟 (s)',
+    );
+    const mixed = plotted.map((cell, i) =>
+      i === 0 ? { ...cell, metadata: { ...cell.metadata, fps: 30 } } : cell,
+    );
+    expect(resultsMetricLabel(p50, 'en', resultsClip(mixed))).toBe('Median latency per clip (s)');
   });
 });

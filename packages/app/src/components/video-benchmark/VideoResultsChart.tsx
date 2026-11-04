@@ -16,6 +16,7 @@ import {
   RESULTS_X_METRICS,
   RESULTS_Y_METRICS,
   resultsChartSeries,
+  resultsClip,
   resultsMetricLabel,
   type ResultsChartPoint,
 } from './results-chart';
@@ -115,7 +116,8 @@ export default function VideoResultsChart({
   const [legendExpanded, setLegendExpanded] = useState(true);
   const x = RESULTS_X_METRICS[state.xMetric],
     y = RESULTS_Y_METRICS[state.yMetric];
-  const xLabel = resultsMetricLabel(x, locale),
+  const clip = useMemo(() => resultsClip(cells), [cells]);
+  const xLabel = resultsMetricLabel(x, locale, clip),
     yLabel = resultsMetricLabel(y, locale);
   const series = useMemo(
     () =>

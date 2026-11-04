@@ -69,13 +69,14 @@ The page follows the inference and AgentX two-level layout. The overview has fou
    count) and Run context (run date). The replay label appears only when fixture
    replay is active.
 2. The chart card plots every measured deployment of the selected workload. X is
-   P50 (default) or P90 latency per clip. Y is video-seconds per $1 TCO (default),
-   videos per GPU-hour or GPU kJ per valid clip. `results-chart.ts` registers each
-   metric with its label, unit and better direction. Each hardware and each overlay
-   run is one series with its own Pareto frontier; Optimal Only hides dominated
-   deployments. The sidebar legend toggles hardware, greys out roster hardware
-   without a matched run, and holds the deployment-label switch and the GPU basis
-   and cost tier selects. Clicking a point pins a popover with its measurements;
+   median (default) or P90 latency per clip; when every plotted deployment generates
+   clips of one length and frame rate, the axis title names both. Y is video-seconds
+   per $1 TCO (default), videos per GPU-hour or GPU kJ per valid clip.
+   `results-chart.ts` registers each metric with its label, unit and better direction.
+   Each hardware and each overlay run is one series with its own Pareto frontier;
+   Optimal Only hides dominated deployments. The sidebar legend toggles hardware,
+   greys out roster hardware without a matched run, and holds the deployment-label
+   switch and the GPU basis and cost tier selects. Clicking a point pins a popover with its measurements;
    its View telemetry button opens the deployment detail. The Representative
    deployments table below has one row per hardware and unofficial run, showing the
    deployment with the most videos per participating GPU-hour. It scrolls
@@ -277,7 +278,7 @@ browser playback and difference failure, bilingual layout and 390px overflow.
 历史记录保留尚无发布批准的存储结果；默认图表仅接纳发布回执与原始来源及 checkout 匹配的记录。
 发布批准与 full-sweep 或发布资格验收分开。
 页面沿用推理与 AgentX 的两级布局。概览页首将筛选分为基准测试配置（模型、工作负载、引擎）、图表配置（X/Y 指标）、
-部署（GPU 数量）和运行信息（运行日期）四组。图表绘制所选工作负载的全部实测部署：X 轴为单条视频 P50（默认）或 P90 延迟，
+部署（GPU 数量）和运行信息（运行日期）四组。图表绘制所选工作负载的全部实测部署：X 轴为单条视频中位延迟（默认）或 P90 延迟，所有部署生成的视频时长和帧率相同时，轴标题会注明这两项；
 Y 轴为每 1 美元 TCO 生成的视频秒数（默认）、每 GPU 小时生成视频数或每条有效视频的 GPU 能耗；每种硬件及每个叠加运行
 各自绘制 Pareto 前沿。右侧图例可隐藏硬件，没有匹配运行的硬件显示为灰色，GPU 口径与成本档位也在图例中切换。
 图表下方的“代表性部署”表格每种硬件及每个叠加运行一行，展示按参与计算的 GPU 折算后每 GPU 小时生成视频数最多的部署，窄屏可横向滚动。
