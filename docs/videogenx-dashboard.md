@@ -30,19 +30,20 @@ comparison targets, not claims that all models run on all hardware.
 Latest observations are selected separately by workload, hardware, deployment
 and engine. Engine identity comes from recorded configuration. Missing metadata
 is not filled from a runtime SHA or hardware name. The GPU-count selector narrows
-cards and tables; latency-versus-GPU-count and the deployment frontier retain the
-other measured GPU counts for the same workload. Workload-mix rows preserve each
+the results table and clips; the chart and deployment detail retain every measured
+GPU count for the same workload. Workload-mix rows preserve each
 cohort separately rather than averaging across resolutions, durations or modes.
 
-`r_*` URL parameters record filters, hidden hardware, deadline, cost tier, entered
-mode prices and utilization. `r_workload` uses a compact source point identifier;
+`r_*` URL parameters record filters, hidden hardware, chart axes (`r_x`, `r_y`),
+cost basis (`r_basis`), Optimal Only (`r_optimal`), the open deployment
+(`r_point`), deadline, cost tier, entered mode prices and utilization. `r_workload` uses a compact source point identifier;
 canonical workload JSON stays inside the projection. Share includes the `r_`
 registry scope. `?unofficialrun=<id>` reads only that stored run through
 `namedRunPoints`, retaining its actual approval status. While selected, that run
 appears only in `overlayCells` and `overlayDeploymentCells`, even if approved; it
 leaves official cells, deployment cells and workload mix. `overlayCells` uses the
-selected GPU count for cards and tables; `overlayDeploymentCells` retains all
-matching GPU counts for latency and frontier charts. Clearing the selection cannot promote an
+selected GPU count for the table and clips; `overlayDeploymentCells` retains all
+matching GPU counts for the chart and deployment detail. Clearing the selection cannot promote an
 unapproved source. Dismissal clears a workload selection absent from the approved
 choices and preserves valid approved selections. All comparison filters and sample requirements still apply.
 Unknown or unstored runs remain unavailable; the URL cannot trigger publication,
@@ -59,34 +60,52 @@ metadata. Its existing help control shows the full source label, exact source
 point ID. Matching summaries get distinct source-ID suffixes. This is presentation
 only; query IDs and API projection values remain unchanged.
 
-The header keeps the five selectors in one shared control panel. Its help explains
-the 20-clip cohort and fixture replay; the replay label appears only when active.
-Hardware checkboxes sit above a full-width clip comparison, with four default slots
-and an H100 slot when its evidence is available. Item help
-holds longer metric notes while chart encodings and modeled TCO remain visible.
-Validity keeps the workload identity visible and discloses full hashes on request.
-The uncalibrated rating schema is also disclosed on request.
+## Layout
 
-## Nine groups and available measurements
+The page follows the inference and AgentX two-level layout. The overview has four parts:
 
-| Group                    | Available when retained                                                                                   | Empty until evidence exists                                    |
-| ------------------------ | --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| Validity                 | Workload/manifest hashes, sealed validation, completion counts, power validity; links to per-clip PSNR    | Unsealed or incompatible pairs; audio summaries                |
-| Latency                  | Serial/harness latency, client delivery P50/P90, P95 from >=20 aligned valid timings, deadline attainment | Missing client timestamps; text/denoise/VAE/encode stages      |
-| Throughput               | Valid clips/wall second, validated decoded video seconds/wall second, deadline goodput                    | Unsupported workload/mode distributions                        |
-| Resources & Energy       | Valid participating-board power samples, mean/observed peak, J/clip, J/frame                              | Missing samples, GPU/host memory without their own measurement |
-| Cost                     | Modelled TCO from registry rates and measured output; both GPU counts                                     | Missing allocation count or rate                               |
-| Quality                  | Sealed per-clip PSNR; seven named human-rating dimensions without scores                                  | SSIM, VBench/CLIP/VLM and calibrated human scores              |
-| Stability                | Recorded failure categories, with unknown failures preserved                                              | Sustained-load behavior                                        |
-| Startup                  | Recorded warmup request duration, explicitly separate from compile                                        | Load, isolated compile, first request and switch time          |
-| Parallelism & Deployment | Per-hardware frontier of measured deployments                                                             | Best topology without the GPU-count sweep                      |
+1. The header card holds the cohort help, Share and four control panels: Benchmark
+   config (model, workload, engine), Chart config (X and Y metric), Deployment (GPU
+   count) and Run context (run date). The replay label appears only when fixture
+   replay is active.
+2. The chart card plots every measured deployment of the selected workload. X is
+   P50 (default) or P90 latency per clip. Y is video-seconds per $1 TCO (default),
+   videos per GPU-hour or GPU kJ per valid clip. `results-chart.ts` registers each
+   metric with its label, unit and better direction. Each hardware and each overlay
+   run is one series with its own Pareto frontier; Optimal Only hides dominated
+   deployments. The sidebar legend toggles hardware, greys out roster hardware
+   without a matched run, and holds the deployment-label switch and the cost basis
+   and tier selects. A pinned point lists its measurements and opens the deployment
+   detail. The results table below has one representative row per hardware and run,
+   scrolls horizontally on narrow screens, and opens the same detail.
+3. The clip comparison described in Synchronized clips.
+4. Collapsed details: How to read these results, the profit estimator and
+   Performance history. How to read lists the measurements not yet collected. No
+   placeholder chart, illustrative value or uncalibrated rating schema is shipped.
 
-No illustrative measurement, video, coefficient, timestamp, phase band or
-hardware-support matrix is shipped. Hatched areas are actual empty states.
-A technical validity check does not imply quality acceptance or release
-qualification. A median from a native harness is not relabeled client latency.
-Power invalidation is propagated; power and energy stay null when it fails.
-GPU-board energy excludes host, chassis and facility energy.
+`r_point` opens one deployment detail. Opening pushes a history entry, so the
+in-page Back button and browser Back both return to the overview at its previous
+scroll position. The overview stays mounted but hidden under React `Activity`, so
+clip media, the selected clip group and chart state survive the visit. An unknown,
+filtered or hidden `r_point` falls back to the overview. Overlay deployments open
+the same way.
+
+The detail header names hardware, model, engine, run date and any overlay run ID.
+Chips switch between the measured deployments of that hardware; dashed chips mark
+GPU counts without a measurement. A spec grid lists GPUs, concurrency, engine,
+runtime, workload, valid clips, power evidence and the hourly GPU rate. Three tabs
+hold the evidence:
+
+| Tab       | Contents                                                                                                                                                                                                         |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Telemetry | Per-clip latency distribution, recorded P50/P90/P95, deadline attainment, GPU board power trace, energy per clip and frame, throughput, both cost bases, warmup and failure categories, GPU memory when recorded |
+| Validity  | Workload and manifest hashes, sealed validation, completion counts, power validity and the link to per-clip PSNR                                                                                                 |
+| Sources   | Model, workload, runtime, run, artifact, observation and approval identities                                                                                                                                     |
+
+P95 requires at least 20 aligned valid timings. A technical validity check does not
+imply quality acceptance or release qualification. A median from a native harness is
+not relabeled client latency. Power invalidation is propagated; power and energy stay
+null when it fails. GPU-board energy excludes host, chassis and facility energy.
 
 ## Synchronized clips
 
@@ -133,7 +152,7 @@ has 49 updates / 50 sigma points.
 
 The UI and overview JSON share the same exact per-clip association. JSON returns
 all groups under `clipQuality`, so case navigation changes presentation only.
-Validity and Quality link to these per-clip scores. Cell-granularity CSV has no
+The deployment detail's Validity tab links to these per-clip scores. Cell-granularity CSV has no
 per-clip PSNR aggregate. Official and exact named channels retain their approval rules.
 
 中文：质量附件独立于原始候选 ZIP，精确绑定运行、产物、来源、manifest、测量单元、slot、用例、prompt、seed、媒体路径与 SHA256。模型、生成配置、公平性配置和所选计划用例必须一致；其他用例发生变化时仍保留双方原始完整计划哈希。只使用参考回执中实际完成并保留的用例。PSNR 对比全部解码 RGB24 像素和帧；完全一致单独标注，缺失或不兼容配对保持为空。该数值不代表语义质量或发布合格。JSON 返回全部用例组，CSV 不虚构逐条 PSNR 汇总值，发布批准规则不变。
@@ -157,7 +176,10 @@ not a calibrated quality verdict or proof of a hardware-only effect.
 
 ## Cost and profit
 
-Both bases are always visible: participating boards and allocated boards. An
+Both bases are kept: participating boards and allocated boards. The chart and
+table use the selected basis (`r_basis`, default participating); clip tiles and
+the deployment detail show both. Video-seconds per $1 TCO is the reciprocal of
+cost per video-second. An
 allocation must be evidenced; participating count is never substituted for it.
 TCO per video = recorded GPU count × registry $/GPU-hour / measured clips/hour.
 Cost per video-second = hourly GPU cost / `videoSecondsPerHour`, the validated
@@ -200,15 +222,16 @@ hydration 复用成功读取和已确认缺失的结果；失败仍可重试。�
 | Model, workload, resolution, duration, mode, steps, GPU count, engine, date             | `r_*` selection fields                                                                 |
 | Hardware visibility, named stored run                                                   | `r_hidden`, `unofficialrun`, separate overlay cells preserving approval                |
 | Deadline, cost tier, mode prices, utilization                                           | Same pure calculations in `resultProjection`                                           |
-| Clip/frame energy                                                                       | Both normalized values returned; toggle is presentation only                           |
-| Power trace hardware                                                                    | All selected cell traces returned; selector is presentation only                       |
+| Chart axes, cost basis, Optimal Only, open deployment                                   | `r_x`, `r_y`, `r_basis`, `r_optimal`, `r_point`; every axis value is in each cell      |
+| Deployment labels, detail tab, pinned point                                             | Presentation only                                                                      |
 | Clip transport, audio source, Difference, case navigation, History expand, theme, Share | Presentation only; published media metadata uses the existing read-only media contract |
-| Cohort/item help, prompt/source, hashes and rating disclosures, media link              | Presentation only; existing history and published media reads provide their data       |
+| Cohort help, prompt/source and hash disclosures, media link                             | Presentation only; existing history and published media reads provide their data       |
 
 Admin/publication handlers, private artifacts and credentials are excluded.
 Video results controls and the new disclosures/media link record `video_results_*`
 events. Shared `InfoHelp` retains its `selector_option_help_opened` event. Tests cover projection/API parity, both GPU bases,
-nulls and invalid power, sample floors, overlay filtering, clip alignment, real
+nulls and invalid power, sample floors, overlay filtering, chart series for official
+and overlay runs, legend filtering, deployment detail history, clip alignment, real
 browser playback and difference failure, bilingual layout and 390px overflow.
 
 ## 中文说明
@@ -217,11 +240,16 @@ browser playback and difference failure, bilingual layout and 390px overflow.
 比较要求固定的 20 条视频 C1 工作负载，每种硬件至少 10 个有效样本；完整身份包含模型版本、
 生成参数、prompt、seed 和测量语义。较短 smoke、未完成及未匹配结果留在性能历史，不混入比较。
 历史记录保留尚无发布批准的存储结果；默认图表仅接纳发布回执与原始来源及 checkout 匹配的记录。
-发布批准与 full-sweep 或发布资格验收分开。界面按有效性、延迟、吞吐量、资源与能耗、成本、质量、稳定性、启动、并行与部署的顺序展示。
-待采集指标是真正的斜线空态，不使用示意数值。功率无效时不展示功率或能耗结论。
-页首用一个共享控件区域展示五项筛选条件；硬件开关位于视频对比上方。默认保留四个硬件窗口；
-符合相同工作负载及样本门槛的已批准 H100 结果或明确指定的诊断运行会增加 H100 窗口，名称和成本沿用硬件注册表。指标说明、
-完整哈希及尚未校准的人工评分维度按需展开，图表图例与 TCO 估算口径仍直接可见。
+发布批准与 full-sweep 或发布资格验收分开。
+页面沿用推理与 AgentX 的两级布局。概览页首将筛选分为基准测试配置（模型、工作负载、引擎）、图表配置（X/Y 指标）、
+部署（GPU 数量）和运行信息（运行日期）四组。图表绘制所选工作负载的全部实测部署：X 轴为单条视频 P50（默认）或 P90 延迟，
+Y 轴为每 1 美元 TCO 生成的视频秒数（默认）、每 GPU 小时生成视频数或每条有效视频的 GPU 能耗；每种硬件及每个叠加运行
+各自绘制 Pareto 前沿。右侧图例可隐藏硬件，没有匹配运行的硬件显示为灰色，成本口径与成本档位也在图例中切换。
+图表下方的结果表每种硬件一行，窄屏可横向滚动。点击数据点或表格行进入部署详情（`r_point`），页内返回或浏览器后退
+都会回到原滚动位置；概览在后台保持挂载，视频和图表状态不会丢失。详情页分为遥测、有效性、来源三个标签页，
+未知或已隐藏的 `r_point` 回到概览。如何解读、利润估算器与性能历史默认折叠，尚未采集的指标在“如何解读”中列出，
+不使用占位图表或示意数值。功率无效时不展示功率或能耗结论。默认保留四个硬件视频窗口；
+符合相同工作负载及样本门槛的已批准 H100 结果或明确指定的诊断运行会增加 H100 窗口，名称和成本沿用硬件注册表。
 
 视频窗口只读取已存储产物，核对 prompt、seed、重复次数和生成配置后同步播放。
 默认静音，可选择听一个硬件窗口的声音；参考视频保持静音。切换用例、隐藏音源或音源播放失败后恢复静音。音源选择只影响本地播放，不改变媒体、指标、URL 参数或只读 API 返回内容。
@@ -230,14 +258,14 @@ Difference 是相对明确绑定的官方 Diffusers 参考视频的浏览器 RGB
 默认视频卡片保留硬件、GPU 数量、媒体及两种 TCO 口径；完整 prompt、seed、重复次数、
 运行、产物、Runtime 和媒体来源可在“Prompt 与来源”中查看。
 
-成本同时按参与计算和分配的 GPU 数量估算，分配证据缺失时不填补。视频秒吞吐量、每视频秒成本及收入使用有效测量请求的实际解码视频时长，不包含 warmup；请求时长仅用于工作负载身份与筛选。
+成本同时按参与计算和分配的 GPU 数量估算，分配证据缺失时不填补；图表与结果表使用所选口径（`r_basis`），视频卡片和部署详情同时展示两种口径。视频秒吞吐量、每视频秒成本及收入使用有效测量请求的实际解码视频时长，不包含 warmup；请求时长仅用于工作负载身份与筛选。
 任何有效测量请求缺少视频时长，或旧 History 投影没有 `videoSecondsPerHour` 时，上述指标及利润保持为空，不以请求时长代替。每条视频成本仍可在证据充分时计算。利润输入默认空白，属于用户
 场景假设；利用率只降低收入，不减少付费时长。模式未知时不套用 T2V/I2V/R2V 价格。
 只读 API 与页面共用选择和计算逻辑，`r_*` 参数可以分享，`?unofficialrun=` 只读取指定的已存储运行，
-保留其发布批准状态，并单独放入 overlayCells 和 overlayDeploymentCells；选中期间，即使已批准也不进入正式结果、部署或工作负载构成。overlayCells 按所选 GPU 数筛选卡片和表格；overlayDeploymentCells 保留所有匹配的 GPU 数，用于延迟和前沿图。
+保留其发布批准状态，并单独放入 overlayCells 和 overlayDeploymentCells；选中期间，即使已批准也不进入正式结果、部署或工作负载构成。overlayCells 按所选 GPU 数筛选结果表和视频；overlayDeploymentCells 保留所有匹配的 GPU 数，用于图表和部署详情。
 默认优先选择有已批准结果的工作负载；仅由指定运行提供的工作负载须明确选择，
 或在没有匹配的已批准结果时作为回退。
 支持隐藏硬件及移除；清除叠加运行后不会将未批准数据转为正式结果。
 移除时，工作负载选择仅在已批准选项中仍然有效时保留。overview 默认返回 JSON；`format=csv` 下载当前筛选的正式及指定运行数据点，保留来源、工作负载、运行、产物和批准状态，标明单位及两种 GPU 成本口径。`duration_s` 保留计划请求时长，`video_seconds_per_s` 表示每测量秒生成的有效解码视频秒数。缺失值保留为空单元格，CSV 不缓存。
 读取不会启动 GPU、写入 Blob 或发布媒体。测试覆盖 API 一致性、样本门槛、
-两种成本口径、缺失证据、同步视频与中英文 390px 布局。
+两种成本口径、缺失证据、图表中的正式与叠加数据点、图例筛选、部署详情历史记录、同步视频与中英文 390px 布局。

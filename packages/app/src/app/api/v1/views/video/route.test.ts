@@ -357,7 +357,7 @@ describe('published VideoGenX dashboard projection', () => {
     ).toBe(false);
   });
 
-  it('returns the same nine-group selection and economics with read-only stored media metadata', async () => {
+  it('returns the same results-page selection and economics with read-only stored media metadata', async () => {
     const history = structuredClone(retainedHistory) as unknown as VideoHistoryPage;
     history.nextPage = null;
     source.mockImplementation(() => Response.json(history));

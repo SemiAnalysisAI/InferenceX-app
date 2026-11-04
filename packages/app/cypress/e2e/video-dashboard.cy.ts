@@ -2,13 +2,16 @@ import { videoPoints } from '../../src/components/video-benchmark/points';
 import { parseResultsState, resultProjection } from '../../src/components/video-benchmark/results';
 import { readOnlyVideoRequests, resultHistory } from '../support/video-results';
 
+const row = (hardware: string) =>
+  cy.get(`[data-testid="results-table"] [data-testid="results-row"][data-hardware="${hardware}"]`);
+
 describe('VideoGenX results routes', () => {
   beforeEach(() => {
     readOnlyVideoRequests();
     cy.intercept('GET', '/api/video-runs?format=history&page=1').as('history');
   });
 
-  it('keeps the shared fixture projection across reload and language changes', () => {
+  it('keeps the shared fixture projection across reload, language changes and detail history', () => {
     const search = 'r_hidden=b200&r_tier=r';
     resultHistory().then((page) => {
       const projection = resultProjection(videoPoints([page]), parseResultsState(search));
@@ -19,11 +22,9 @@ describe('VideoGenX results routes', () => {
         'h200',
       ]);
       cy.visit(`/video?${search}`);
-      cy.get(
-        '[data-testid="results-cost-table"] [data-hardware="h200"][data-basis="participating"]',
-      )
-        .find('td[data-value]')
-        .first()
+      row('h200')
+        .find('td')
+        .eq(6)
         .invoke('attr', 'data-value')
         .then((value) => {
           expect(Number(value), 'UI matches the shared projection for the server fixture').to.equal(
@@ -31,20 +32,27 @@ describe('VideoGenX results routes', () => {
           );
         });
     });
-    cy.get('[data-testid="results-hardware-b200"]').should('not.be.checked');
+    cy.get('#checkbox-b200').should('not.be.checked');
     cy.get('@history.all').should('have.length', 0);
     cy.reload();
-    cy.get('[data-testid="results-hardware-b200"]').should('not.be.checked');
+    cy.get('#checkbox-b200').should('not.be.checked');
     cy.location('search').then((sharedSearch) => cy.visit(`/zh/video${sharedSearch}`));
-    cy.get('[data-testid="results-hardware-b200"]').should('not.be.checked');
-    cy.get('#cost h2').should('contain', '成本');
-    cy.get('[data-testid="results-hardware-b200"]').check();
-    cy.get('[data-testid="results-cost-table"] [data-hardware="b200"]').should('exist');
+    cy.get('#checkbox-b200').should('not.be.checked');
+    cy.get('#video-results-chart-title').should('contain', '每 1 美元 TCO 生成的视频秒数');
+    cy.get('label[for="checkbox-b200"]').click();
+    row('b200').should('exist');
     cy.location('search').should('not.contain', 'r_hidden=');
+    row('h200').find('button').click();
+    cy.get('[data-testid="video-results-detail"] h1').should('contain', 'H200');
+    cy.location('search').should('contain', 'r_point=');
+    cy.go('back');
+    cy.get('[data-testid="video-results-detail"]').should('not.exist');
+    cy.location('search').should('not.contain', 'r_point=');
+    row('h200').should('be.visible');
   });
 
   it('preserves the selected published overlay through filtering and dismisses it explicitly', () => {
-    cy.visit('/video?unofficialrun=34342452354&other=1');
+    cy.visit('/video?unofficialrun=34342452354&other=1&r_y=videosPerGpuHour');
     cy.get('[data-testid="results-overlay"]').should('contain', '34342452354');
     cy.get('[data-testid="results-overlay-dismiss"]').should('be.visible');
     cy.get('[data-testid="results-workload"]').click('left');
@@ -54,16 +62,20 @@ describe('VideoGenX results routes', () => {
       expect(selected).not.to.equal(null);
       cy.wrap(selected).as('selectedWorkload');
     });
-    cy.get('[data-testid="results-cost-table"] [data-hardware="h200"]').should('exist');
-    cy.get('[data-testid="results-hardware-h200"]').uncheck();
-    cy.get('[data-testid="results-cost-table"] [data-hardware="h200"]').should('not.exist');
+    row('h200').should('exist');
+    cy.get('[data-testid="video-results-chart"] .dot-group[data-hardware="h200"]').should('exist');
+    cy.get('label[for="checkbox-h200"]').click();
+    row('h200').should('not.exist');
+    cy.get('[data-testid="video-results-chart"] .dot-group[data-hardware="h200"]').should(
+      'not.exist',
+    );
     cy.location('search').should((search) => {
       const params = new URLSearchParams(search);
       expect(params.get('unofficialruns')).to.equal('34342452354');
       expect(params.has('unofficialrun')).to.equal(false);
     });
-    cy.get('[data-testid="results-hardware-h200"]').check();
-    cy.get('[data-testid="results-cost-table"] [data-hardware="h200"]').should('exist');
+    cy.get('label[for="checkbox-h200"]').click();
+    row('h200').should('exist');
     cy.get('[data-testid="results-overlay-dismiss"]').click();
     cy.get<string>('@selectedWorkload').then((selected) => {
       cy.location('search').should((search) => {
@@ -74,10 +86,6 @@ describe('VideoGenX results routes', () => {
         expect(params.has('unofficialruns')).to.equal(false);
       });
     });
-    cy.get('[data-testid="results-cost-table"] [data-hardware="h200"]').should(
-      'have.attr',
-      'data-overlay',
-      'false',
-    );
+    row('h200').should('have.attr', 'data-overlay', 'false');
   });
 });

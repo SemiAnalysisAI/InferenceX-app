@@ -841,7 +841,7 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
                     />
                   </div>
                 </div>
-                <div data-testid="results-profit">
+                <div>
                   {representatives.some(
                     (c) => c.profit.participating !== null || c.profit.allocated !== null,
                   ) ? (

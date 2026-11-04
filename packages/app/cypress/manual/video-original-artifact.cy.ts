@@ -18,6 +18,7 @@ describe('original H100 artifact through the local development replay', () => {
       scrollBehavior: 'center',
     });
     cy.location('search').should('include', 'r_gpus=4');
+    cy.get('[data-testid="results-row"][data-hardware="h100"] button').click();
     cy.get('[data-testid="results-power-trace"] circle').should('have.length', 1478);
     cy.get('@consoleError').should('not.be.calledWithMatch', /Cannot update a component/);
   });

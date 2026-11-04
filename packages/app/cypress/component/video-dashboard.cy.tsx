@@ -5,20 +5,9 @@ import type {
   VideoHistoryPage,
 } from '@/components/video-benchmark/history';
 import { videoPoints } from '@/components/video-benchmark/points';
+import type { ResultsEvidence } from '@/components/video-benchmark/results-evidence';
 import { servingArtifact } from '../support/video-artifacts';
 import { readOnlyVideoRequests, resultHistory } from '../support/video-results';
-
-const RESULT_GROUPS = [
-  'validity',
-  'latency',
-  'throughput',
-  'energy',
-  'cost',
-  'quality',
-  'stability',
-  'startup',
-  'deploy',
-];
 
 function assertResultsFit() {
   cy.document().should((document) => {
@@ -63,8 +52,40 @@ function mount({
   cy.get('[data-testid="video-results"]').should('be.visible');
 }
 
-const costRow = (hardware: string, basis = 'participating') =>
-  cy.get(`[data-testid="results-cost-table"] [data-hardware="${hardware}"][data-basis="${basis}"]`);
+const row = (hardware: string) =>
+  cy.get(`[data-testid="results-table"] [data-testid="results-row"][data-hardware="${hardware}"]`);
+const points = (selector = '') =>
+  cy.get(`[data-testid="video-results-chart"] .dot-group${selector}`);
+const openRow = (hardware: string, overlay = false) =>
+  row(hardware).filter(`[data-overlay="${overlay}"]`).find('button').click();
+const toggleHardware = (hardware: string) => cy.get(`label[for="checkbox-${hardware}"]`).click();
+const searchParam = (key: string) =>
+  cy.location('search').then((search) => new URLSearchParams(search).get(key));
+const plottedY = (hardware: string) =>
+  points(`[data-hardware="${hardware}"][data-overlay="false"]`).then(
+    ($group) => ($group[0] as unknown as { __data__: { y: number } }).__data__.y,
+  );
+
+const evidence = (observation: VideoHistoryObservation): ResultsEvidence => ({
+  workloadHash: 'a'.repeat(64),
+  manifestHash: observation.id.split(':')[0],
+  verified: true,
+  engine: 'sglang',
+  mode: 't2v',
+  attempted: 20,
+  notStarted: 0,
+  latencies: Array.from({ length: 20 }, (_, index) => 70 + index * 0.5),
+  clientP50: 75,
+  powerValid: true,
+  powerSeries: [
+    { seconds: 0, watts: 3800 },
+    { seconds: 1, watts: 3900 },
+  ],
+  peakPowerW: 3900,
+  gpuMemoryMiB: null,
+  warmupSeconds: 38.2,
+  failures: { timeout: 0, oom: 0, engine: 0, transport: 0, other: 0 },
+});
 
 describe('VideoGenX results', () => {
   for (const pathname of ['/zh/video']) {
@@ -95,9 +116,9 @@ describe('VideoGenX results', () => {
     });
   }
 
-  it('keeps named-run GPU-count chart points when the cards select one GPU count', () => {
+  it('keeps every named-run deployment in the chart while the table follows the GPU count', () => {
     mount({
-      search: '?unofficialrun=34341996789&r_gpus=3',
+      search: '?unofficialrun=34341996789&r_gpus=3&r_y=videosPerGpuHour&r_optimal=0',
       editPage: (page) => {
         const entry = page.entries.find((item) => item.runId === '34341996789')!;
         entry.approved = false;
@@ -111,20 +132,23 @@ describe('VideoGenX results', () => {
         });
       },
     });
-    const latencyPoints =
-      '[data-testid="results-latency-series"] [data-hardware="b200-overlay"] > circle';
-    cy.get('[data-testid="results-cost-table"] [data-hardware]').should('not.exist');
-    cy.get(latencyPoints).should('have.length', 2);
+    const overlay = '[data-hardware="b200"][data-overlay="true"]';
+    row('b200').should('not.exist');
+    points(overlay).should('have.length', 2);
+    // Same latency on half the boards doubles videos per GPU-hour, so the 4-GPU cell is dominated.
+    points(`${overlay}[data-optimal="false"]`).should('have.length', 1);
     cy.get('[data-testid="results-gpus"]').contains('button', /^2$/).click();
-    costRow('b200').find('td').eq(2).should('have.text', '2');
-    cy.get(latencyPoints).should('have.length', 2);
+    row('b200').find('td').eq(1).should('have.text', '2 / 2');
+    points(overlay).should('have.length', 2);
     cy.get('[data-testid="results-gpus"]').contains('button', /^4$/).click();
-    costRow('b200').find('td').eq(2).should('have.text', '4');
-    cy.get(latencyPoints).should('have.length', 2);
+    row('b200').find('td').eq(1).should('have.text', '4 / 8');
     cy.location('search').should('contain', 'r_gpus=4');
-    cy.get('[data-testid="results-hardware-b200"]').uncheck();
-    costRow('b200').should('not.exist');
-    cy.get(latencyPoints).should('not.exist');
+    cy.get('label[for="video-results-optimal"]').click();
+    points(overlay).should('have.length', 1).and('have.attr', 'data-optimal', 'true');
+    searchParam('r_optimal').should('equal', '1');
+    toggleHardware('b200');
+    row('b200').should('not.exist');
+    points(overlay).should('not.exist');
   });
 
   it('shows a named unapproved run without an approved cohort and clears it without promotion', () => {
@@ -134,14 +158,14 @@ describe('VideoGenX results', () => {
         for (const entry of page.entries) entry.approved = false;
       },
     });
-    costRow('b200').should('have.attr', 'data-overlay', 'true');
+    row('b200').should('have.attr', 'data-overlay', 'true');
     cy.get('[data-testid="video-results-clip"][data-hardware="b200"]').should(
       'contain',
       'Unofficial run',
     );
     cy.get('[data-testid="video-results-sources"] summary').click();
     cy.get('[data-testid="video-results-sources"]').should('contain', 'No matching receipt');
-    cy.get('[data-testid="results-cost-table"] [data-overlay="false"]').should('not.exist');
+    cy.get('[data-testid="results-row"][data-overlay="false"]').should('not.exist');
     cy.get('@history.all')
       .its('length')
       .then((requestCount) => {
@@ -149,7 +173,7 @@ describe('VideoGenX results', () => {
         cy.get('@history.all').should('have.length', requestCount);
       });
     cy.get('[data-testid="results-overlay"]').should('not.exist');
-    cy.get('[data-testid="results-cost-table"] [data-hardware]').should('not.exist');
+    cy.get('[data-testid="results-row"]').should('not.exist');
     cy.get('[data-testid="video-results-clip"] video').should('not.exist');
     cy.get('[data-testid="video-results-play"]').should('be.disabled');
     cy.get('[data-testid="video-results-scrub"]').should('be.disabled');
@@ -175,22 +199,22 @@ describe('VideoGenX results', () => {
           }
       },
     });
-    costRow('h200').should('exist');
+    row('h200').should('exist');
     cy.get<string>('@namedWorkload').then((sourceId) => {
       cy.get('[data-testid="results-workload"]').click('left');
       cy.get('[data-select-option]')
         .filter((_, option) => option.dataset.value === sourceId)
         .click();
     });
-    costRow('b200').should('have.attr', 'data-overlay', 'true');
-    costRow('h200').should('not.exist');
+    row('b200').should('have.attr', 'data-overlay', 'true');
+    row('h200').should('not.exist');
     cy.get('[data-testid="results-overlay-dismiss"]').click();
-    costRow('h200').should('have.attr', 'data-overlay', 'false');
-    costRow('b200').should('not.exist');
+    row('h200').should('have.attr', 'data-overlay', 'false');
+    row('b200').should('not.exist');
     cy.location('search').should('not.contain', 'r_workload=').and('not.contain', 'unofficialrun');
   });
 
-  it('requests the new artifact when a named run re-exports the same observation ID', () => {
+  it('opens the named re-export, not the official cell, when both share an observation ID', () => {
     const namedRun = '90000000001';
     mount({
       editPage: (page) => {
@@ -228,34 +252,33 @@ describe('VideoGenX results', () => {
       win.history.replaceState(null, '', `${win.location.pathname}?unofficialrun=${namedRun}`);
       win.dispatchEvent(new win.PopStateEvent('popstate'));
     });
-    costRow('b200').filter('[data-overlay="true"]').should('exist');
-    costRow('b200').should('have.length', 2);
-    cy.get('#validity tbody tr[data-hardware="b200"]').should('have.length', 4);
-    cy.get('#validity details dl > div').filter(':contains("B200")').should('have.length', 2);
+    row('b200').should('have.length', 2);
     cy.wait('@namedMedia');
     cy.get('[data-testid="video-results-clip"][data-hardware="b200"] video').should('not.exist');
-    cy.get('[data-testid="video-results-sources"] summary').click();
-    cy.get('[data-testid="video-results-sources"] tbody tr')
-      .contains('td', /^B200$/u)
-      .parent()
+    openRow('b200', true);
+    searchParam('r_point').should('match', new RegExp(`^${namedRun}:`, 'u'));
+    cy.get('[data-testid="video-results-detail"] h1').should('contain', 'B200');
+    cy.get('[data-testid="video-results-detail"]').should('contain', `Unofficial run #${namedRun}`);
+    cy.get('[data-testid="results-detail-tab-sources"]').click();
+    cy.get('[data-testid="video-results-detail"]')
       .should('contain', namedRun)
       .and('contain', '99991')
-      .and('contain', 'No matching receipt')
-      .find('a')
-      .should('not.exist');
-    cy.get('[data-testid="results-hardware-b200"]').uncheck();
-    costRow('b200').should('not.exist');
-    cy.get('#validity tbody tr[data-hardware="b200"]').should('not.exist');
-    cy.get('#validity details dl > div').filter(':contains("B200")').should('not.exist');
-    cy.get('[data-testid="results-hardware-b200"]').check();
-    costRow('b200').should('have.length', 2);
+      .and('contain', 'No matching approval receipt');
+    cy.get('[data-testid="results-detail-back"]').click();
+    openRow('b200');
+    cy.get('[data-testid="results-detail-tab-sources"]').click();
+    cy.get('[data-testid="video-results-detail"]')
+      .should('contain', '34341996789')
+      .and('not.contain', namedRun);
+    cy.get('[data-testid="results-detail-back"]').click();
+    toggleHardware('b200');
+    row('b200').should('not.exist');
+    toggleHardware('b200');
+    row('b200').should('have.length', 2);
     cy.get('[data-testid="results-overlay-dismiss"]').click();
     cy.get('[data-testid="video-results-clip"][data-hardware="b200"] video').should('exist');
     cy.get('@approvedMedia.all').should('have.length', 1);
-    costRow('b200').should('have.length', 1).and('have.attr', 'data-overlay', 'false');
-    costRow('b200', 'allocated').should('have.length', 1);
-    cy.get('#validity tbody tr[data-hardware="b200"]').should('have.length', 2);
-    cy.get('#validity details dl > div').filter(':contains("B200")').should('have.length', 1);
+    row('b200').should('have.length', 1).and('have.attr', 'data-overlay', 'false');
   });
 
   it('keeps matching summaries distinct and selects the exact source ID', () => {
@@ -294,6 +317,7 @@ describe('VideoGenX results', () => {
 
   it('uses the shared selector fallbacks and clears scenario prices when the model changes', () => {
     mount();
+    cy.contains('summary', 'Profit estimator').click();
     cy.get('[data-testid="results-price-t2v"]').type('0.05');
     cy.get('[data-testid="results-model"]').click();
     cy.get('[role="listbox"] [role="option"]').last().click();
@@ -303,7 +327,8 @@ describe('VideoGenX results', () => {
     cy.get('[role="listbox"] [role="option"]').first().click();
     cy.location('search').should('not.contain', 'r_model=');
   });
-  it('keeps comparison before the nine groups, applies the common sample floor and preserves unknown allocation', () => {
+
+  it('applies the sample floor, preserves unknown allocation and drops every planned placeholder', () => {
     mount({
       edit: (observation) => {
         if (observation.hardware.includes('H100')) {
@@ -313,55 +338,61 @@ describe('VideoGenX results', () => {
         if (observation.hardware.includes('H200')) observation.allocated = null;
       },
     });
-    cy.get('[data-testid="video-results"] section[id]').should(($sections) => {
-      expect([...$sections].map((section) => section.id)).to.deep.equal([
-        'comparison-clips',
-        ...RESULT_GROUPS,
+    cy.get('details[data-testid^="results-"] > summary').should(($summaries) => {
+      expect([...$summaries].map((summary) => summary.textContent)).to.deep.equal([
+        'How to read these results',
+        'Profit estimator',
+        'Performance history',
       ]);
     });
-    costRow('b200').should('contain', '0.15');
-    costRow('b200', 'allocated').should('contain', '0.3');
-    costRow('h200').should('contain', '0.204');
-    costRow('h200', 'allocated').should('contain', '—');
-    costRow('h100').should('not.exist');
-    cy.get('[data-testid="results-cost-table"] [data-hardware]').should('have.length', 4);
-    cy.get('#latency [data-hardware="h100"] rect, #latency [data-hardware="h100"] circle').should(
-      'not.exist',
-    );
-    cy.get('#throughput [data-hardware="h100"] rect').should('not.exist');
-    cy.get('[data-testid="results-latency-series"] [data-percentile="p90"]').should(
-      'have.length',
-      2,
-    );
-    cy.get('[data-testid="results-latency-series"] [data-percentile="p95"]').should('not.exist');
-    cy.get('#quality [data-testid="results-empty"]').should('exist');
-    cy.get('#startup [data-testid="results-empty"]').should('exist');
+    cy.get('[data-testid="results-not-measured"]').should('contain', 'LoRA switch time');
+    cy.get('[data-testid="results-empty"][data-state="planned"]').should('not.exist');
+    cy.get('[data-testid="results-row"]').should('have.length', 2);
+    row('h100').should('not.exist');
+    cy.get('#checkbox-h100').should('not.exist');
+    row('b200').find('td').eq(6).should('contain', '0.15');
+    row('h200').find('td').eq(6).should('contain', '0.204');
+    row('h200').find('td').eq(1).should('have.text', '4 / —');
+    cy.get('[data-testid="results-cost-basis"]').click();
+    cy.contains('[data-select-option]', 'Allocated GPUs').click();
+    searchParam('r_basis').should('equal', 'allocated');
+    row('b200').find('td').eq(6).should('contain', '0.3');
+    row('h200').find('td').eq(6).should('have.text', '—');
   });
 
-  it('hides hardware in all metrics and handles an empty selection without stale values', () => {
-    mount();
-    cy.get('[data-testid="results-hardware-b200"]').uncheck();
-    costRow('b200').should('not.exist');
-    cy.get('#latency [data-hardware="b200"]').should('not.exist');
-    cy.get('#energy [data-hardware="b200"]').should('not.exist');
+  it('hides hardware from the chart and table through the legend and handles an empty selection', () => {
+    mount({ search: '?r_y=videosPerGpuHour' });
+    points().should('have.length', 3);
+    cy.get('[data-testid="video-results-single-note"]').should('be.visible');
+    cy.get('#checkbox-gb200').should('have.attr', 'aria-disabled', 'true');
+    cy.contains('label', 'GB200 NVL72 · no matched run').should('exist');
+    toggleHardware('b200');
+    cy.get('#checkbox-b200').should('not.be.checked');
+    row('b200').should('not.exist');
+    points('[data-hardware="b200"]').should('not.exist');
     cy.location('search').should('contain', 'r_hidden=b200');
-    for (const hardware of ['gb200', 'mi355x', 'h200', 'h100'])
-      cy.get(`[data-testid="results-hardware-${hardware}"]`).uncheck();
-    cy.get('[data-testid="results-cost-table"] [data-hardware]').should('not.exist');
-    cy.get('#latency [data-hardware] circle').should('not.exist');
-    cy.get('[data-testid="results-hardware-b200"]').check();
-    costRow('b200').should('contain', '0.15');
+    toggleHardware('h200');
+    toggleHardware('h100');
+    cy.get('[data-testid="results-row"]').should('not.exist');
+    points().should('not.exist');
+    cy.get('[data-testid="video-results-chart"]').should(
+      'contain',
+      'No visible hardware has both selected metrics',
+    );
+    cy.get('[data-testid="video-results-legend-reset"]').click();
+    points().should('have.length', 3);
+    cy.location('search').should('not.contain', 'r_hidden=');
   });
 
-  it('uses explicit scenario prices, clears them for a different workload and hides power traces', () => {
+  it('uses explicit scenario prices and clears them for a different workload', () => {
     // Synthetic additive evidence exercises controls absent from retained public
     // projections. It is never written to the committed history fixture.
     mount({
       edit: (observation) => {
         observation.videoSecondsPerHour = 400;
-        // Turn the H100 row into an explicitly synthetic second
-        // workload so the test changes clip duration without replacing the
-        // retained B200/H200 cohort used for the scenario assertions below.
+        observation.results = evidence(observation);
+        // Turn the H100 row into an explicitly synthetic second workload so the test changes
+        // clip duration without replacing the retained B200/H200 cohort used below.
         if (observation.hardware.includes('H100')) {
           const workload = JSON.parse(observation.workloadKey!);
           workload.plan.generation.duration_seconds = 10;
@@ -372,27 +403,9 @@ describe('VideoGenX results', () => {
           observation.frameCount = 240;
           observation.hardware = 'NVIDIA GB200';
         }
-        observation.results = {
-          workloadHash: 'a'.repeat(64),
-          manifestHash: observation.id.split(':')[0],
-          verified: true,
-          engine: 'test-engine',
-          mode: 't2v',
-          attempted: 20,
-          notStarted: 0,
-          latencies: null,
-          powerValid: true,
-          powerSeries: [
-            { seconds: 0, watts: 100 },
-            { seconds: 1, watts: 120 },
-          ],
-          peakPowerW: 120,
-          gpuMemoryMiB: null,
-          warmupSeconds: null,
-          failures: null,
-        };
       },
     });
+    cy.contains('summary', 'Profit estimator').click();
     cy.get('[data-testid="results-profit"] [data-testid="results-empty"]').should('exist');
     cy.get('[data-testid="results-price-t2v"]').type('0.05');
     cy.location('search').should('contain', 'r_price_t2v=0.05');
@@ -405,24 +418,106 @@ describe('VideoGenX results', () => {
     });
     cy.get('[data-testid="results-profit"] [data-hardware="b200"]').should('contain', '-1.73');
     cy.location('search').should('contain', 'r_utilization=0');
-    cy.get('[data-testid="results-trace-select"]').click();
-    cy.contains('[data-select-option]', 'H200').click();
-    cy.get('[data-testid="results-power-trace"] [data-hardware="h200"]').should('exist');
-    cy.get('[data-testid="results-hardware-h200"]').uncheck();
-    cy.get('[data-testid="results-power-trace"] [data-hardware="h200"]').should('not.exist');
-    cy.get('[data-testid="results-power-trace"] [data-hardware="b200"]').should('exist');
-    cy.get('[data-testid="results-trace-select"]').click();
-    cy.get('[data-select-option]').should('not.contain', 'H200');
-    cy.get('[data-testid="results-trace-select"]').click();
     cy.get('[data-testid="results-price-i2v"]').type('0.09');
     cy.get('[data-testid="results-price-r2v"]').type('0.12');
     cy.get('[data-testid="results-workload"]').click('left');
     cy.contains('[data-select-option]', '10 s').click();
-    costRow('gb200').should('exist');
+    row('gb200').should('exist');
     for (const mode of ['t2v', 'i2v', 'r2v'])
       cy.get(`[data-testid="results-price-${mode}"]`).should('have.value', '');
     cy.get('[data-testid="results-profit"] [data-testid="results-empty"]').should('exist');
     cy.location('search').should('not.contain', 'r_price_');
+  });
+
+  it('plots the selected axis metrics and cost basis', () => {
+    mount({
+      edit: (observation) => {
+        observation.videoSecondsPerHour = 400;
+      },
+    });
+    cy.get('#video-results-chart-title').should(
+      'contain',
+      'Video-seconds per $1 TCO vs. P50 latency per clip',
+    );
+    plottedY('b200').then((participating) => {
+      cy.get('[data-testid="results-cost-basis"]').click();
+      cy.contains('[data-select-option]', 'Allocated GPUs').click();
+      // B200 reserved eight boards for four participating ones; H200 used all four.
+      plottedY('b200').should('be.closeTo', participating / 2, 1e-9);
+    });
+    cy.get('[data-testid="results-y-metric"]').click();
+    cy.contains('[data-select-option]', 'GPU energy per valid clip (kJ)').click();
+    searchParam('r_y').should('equal', 'kjPerClip');
+    cy.get('#video-results-chart-title').should('contain', 'GPU energy per valid clip');
+    plottedY('b200').should('be.closeTo', 301.1, 0.1);
+  });
+
+  it('opens deployment telemetry from the popover and table, switches tabs and returns', () => {
+    mount({
+      search: '?r_y=videosPerGpuHour',
+      edit: (observation) => {
+        observation.results = evidence(observation);
+      },
+    });
+    points('[data-hardware="b200"] .visible-shape').click({ force: true });
+    cy.get('[data-chart-tooltip]:visible')
+      .should('contain', 'B200 · 4 GPU')
+      .and('contain', '4 participating · 8 allocated');
+    cy.get('[data-chart-tooltip]:visible [data-action="view-telemetry"]').click();
+    cy.get('[data-testid="video-results-detail"] h1').should('contain', 'B200');
+    searchParam('r_point').should('match', /^34341996789:/u);
+    cy.get('[data-testid="results-detail-deployments"] [aria-pressed="true"]').should(
+      'contain',
+      '4 GPU',
+    );
+    cy.get('[data-testid="results-power-trace"] svg').should('exist');
+    cy.get('[data-testid="results-detail-latency"]')
+      .invoke('text')
+      .should('match', /P95 \d/u);
+    cy.get('[data-testid="video-results-detail"]').should('contain', 'of valid clips met it');
+    cy.get('[data-testid="video-results-detail"]').should('contain', '38.2 s');
+    cy.get('[data-testid="results-detail-tab-validity"]').click();
+    cy.get('[data-testid="results-detail-counts"] td').first().should('have.text', '20');
+    cy.get('[data-testid="video-results-detail"]').should('contain', 'a'.repeat(64));
+    cy.get('[data-testid="results-power-trace"]').should('not.exist');
+    cy.get('[data-testid="results-detail-back"]').click();
+    cy.get('[data-testid="video-results-detail"]').should('not.exist');
+    cy.location('search').should('not.contain', 'r_point=');
+    points().should('have.length', 3);
+    openRow('h200');
+    cy.get('[data-testid="video-results-detail"] h1').should('contain', 'H200');
+    cy.go('back');
+    cy.get('[data-testid="video-results-detail"]').should('not.exist');
+    row('h200').should('be.visible');
+  });
+
+  it('falls back to the overview for an unknown or hidden deployment', () => {
+    mount({ search: '?r_y=videosPerGpuHour&r_point=0:missing' });
+    cy.get('[data-testid="video-results-detail"]').should('not.exist');
+    points().should('have.length', 3);
+    row('b200')
+      .invoke('attr', 'data-point')
+      .then((point) => {
+        cy.window().then((win) => {
+          win.history.replaceState(
+            null,
+            '',
+            `${win.location.pathname}?r_point=${encodeURIComponent(point!)}`,
+          );
+          win.dispatchEvent(new win.PopStateEvent('popstate'));
+        });
+        cy.get('[data-testid="video-results-detail"] h1').should('contain', 'B200');
+        cy.window().then((win) => {
+          win.history.replaceState(
+            null,
+            '',
+            `${win.location.pathname}?r_point=${encodeURIComponent(point!)}&r_hidden=b200`,
+          );
+          win.dispatchEvent(new win.PopStateEvent('popstate'));
+        });
+        cy.get('[data-testid="video-results-detail"]').should('not.exist');
+        row('b200').should('not.exist');
+      });
   });
 
   for (const [pathname, width] of [
@@ -433,11 +528,29 @@ describe('VideoGenX results', () => {
   ] as const) {
     it(`keeps ${pathname} and its workload menu readable at ${width} px`, () => {
       cy.viewport(width, 844);
-      mount({ pathname });
+      mount({ pathname, search: '?r_y=videosPerGpuHour' });
       cy.get('[data-testid="video-results"] h1').should('contain', 'VideoGenX');
-      cy.get('#validity h2').should('contain', pathname.startsWith('/zh') ? '有效性' : 'Validity');
-      cy.get('#energy [data-testid="results-empty"]').should('exist');
+      cy.get('#video-results-chart-title').should(
+        'contain',
+        pathname.startsWith('/zh') ? '每 GPU 小时生成视频数' : 'Videos per GPU-hour',
+      );
       assertResultsFit();
+      cy.get('[data-testid="video-results-chart"]').then(($chart) => {
+        const plot = $chart[0]
+          .querySelector('[data-testid="d3-chart-svg"]')!
+          .getBoundingClientRect();
+        const legend = $chart[0]
+          .querySelector('[data-slot="chart-legend-wrapper"]')!
+          .getBoundingClientRect();
+        if (width >= 1024)
+          expect(legend.left, 'legend beside the chart').to.be.at.least(plot.right);
+        else expect(legend.top, 'legend below the chart').to.be.at.least(plot.bottom);
+      });
+      cy.get('[data-testid="results-table"]').should(($table) => {
+        const container = $table[0].parentElement!;
+        expect(getComputedStyle(container).overflowX).to.equal('auto');
+        if (width < 768) expect(container.scrollWidth).to.be.greaterThan(container.clientWidth);
+      });
       cy.get('[data-testid="video-results-clip"]').should(($tiles) => {
         expect($tiles).to.have.length(5);
         const first = $tiles[0].getBoundingClientRect();
@@ -464,15 +577,15 @@ describe('VideoGenX results', () => {
         if (width < 768) expect(container.scrollWidth).to.be.greaterThan(container.clientWidth);
       });
       assertResultsFit();
-      if (width < 768) {
-        cy.get('[data-testid="video-results-sources"] table').parent().scrollTo('right');
-        cy.get('[data-testid="video-results-sources"] th')
-          .last()
-          .should(($header) => {
-            expect($header[0].getBoundingClientRect().right).to.be.at.most(width);
-          });
-      }
       cy.get('[data-testid="video-results-sources"] summary').click();
+      openRow('b200');
+      cy.get('[data-testid="video-results-detail"] h1').should('contain', 'B200');
+      cy.get('[data-testid="results-detail-tab-telemetry"]').should(
+        'have.text',
+        pathname.startsWith('/zh') ? '遥测' : 'Telemetry',
+      );
+      assertResultsFit();
+      cy.get('[data-testid="results-detail-back"]').click();
       cy.get('[data-testid="results-workload"]').click('left');
       cy.get('[role="grid"]')
         .should('be.visible')
