@@ -1,10 +1,12 @@
 import type { DbClient } from '../connection.js';
 import { readServerLogBlocks } from '../server-log-blocks';
 import {
-  type BlockSearchFile,
-  readBlockSearchIndexes,
+  type BlockSearchIndex,
+  createBlockFetcher,
+  readBlockSearchIndex,
   searchBlockFile,
 } from './server-log-block-search';
+import { pgLowerText } from './server-log-pg-lower';
 
 export interface ServerLogChunk {
   fileName: string;
@@ -522,15 +524,20 @@ export async function searchServerLogs(
     const chunkSize = SERVER_LOG_SEARCH_CHUNK_CHARACTERS;
     const searchLength = [...searchTerm].length;
     const overlap = Math.min(Math.max(0, searchLength - 1), 255);
-    const needle = searchTerm.toLowerCase();
-    const fileNames = (await getServerLogFileNames(sql, benchmarkResultId)) ?? [];
-    const matches: ServerLogSearchMatch[] = [];
-    let blockFiles = new Map<string, BlockSearchFile>();
+    const needle = pgLowerText(searchTerm);
+    let index: BlockSearchIndex;
     try {
-      blockFiles = await readBlockSearchIndexes(sql, benchmarkResultId, fileNames, searchTerm);
+      index = await readBlockSearchIndex(sql, benchmarkResultId, searchTerm);
     } catch (error) {
       if (!isPreLogFilesSchema(error)) throw error;
+      index = {
+        fileNames: (await getServerLogFileNames(sql, benchmarkResultId)) ?? [],
+        files: new Map(),
+      };
     }
+    const { fileNames, files: blockFiles } = index;
+    const fetchBlocks = createBlockFetcher(sql, [...blockFiles.values()]);
+    const matches: ServerLogSearchMatch[] = [];
     let scannedBeforeFile = 0;
     let incomplete = false;
     for (const [fileIndex, fileName] of fileNames.entries()) {
@@ -540,12 +547,20 @@ export async function searchServerLogs(
       }
       const blockFile = blockFiles.get(fileName);
       if (blockFile) {
-        const scan = await searchBlockFile(sql, blockFile, needle, searchLength, matches, limit, {
-          chunkSize,
-          overlap,
-          remaining: maxScanned - scannedBeforeFile,
-          checkDeadline,
-        });
+        const scan = await searchBlockFile(
+          fetchBlocks,
+          blockFile,
+          needle,
+          searchLength,
+          matches,
+          limit,
+          {
+            chunkSize,
+            overlap,
+            remaining: maxScanned - scannedBeforeFile,
+            checkDeadline,
+          },
+        );
         if (matches.length > limit || scan.incomplete) {
           incomplete = scan.incomplete;
           break;
