@@ -128,6 +128,9 @@ describe('GET /api/v1/views/options', () => {
     const h200 = body.hardware.find((h: { key: string }) => h.key === 'h200');
     expect(h200.vendor).toBe('NVIDIA');
     expect(h200.costPerHour.h).toBeGreaterThan(0);
+    expect(body.hardware.find((h: { key: string }) => h.key === 'b300')).toMatchObject({
+      tdpW: 1100,
+    });
 
     const metric = body.metrics.find((m: { configKey: string }) => m.configKey === 'y_tpPerGpu');
     expect(metric).toBeDefined();

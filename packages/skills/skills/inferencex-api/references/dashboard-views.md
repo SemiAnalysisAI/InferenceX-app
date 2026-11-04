@@ -18,6 +18,10 @@ the landing page. Existing model-specific links and historical results remain av
 
 Inference places Scenario beside Cost Tier and TCO Basis below the plot on desktop
 and mobile. An empty selection keeps Scenario below the empty chart for recovery.
+The shared Scenario control, including its label and help icon, is omitted when
+there is only one available scenario. Multiple scenarios remain selectable.
+This visibility rule is presentation-only: the selected sequence, API parameters,
+defaults, measurements, and unofficial overlay data are unchanged.
 PowerX keeps Scenario beside Model on desktop and inside More chart controls on
 mobile. Both surfaces put Precision and Run context (date, run selection and
 changelog) inside More chart controls on mobile; Model stays visible. Desktop keeps
@@ -1012,6 +1016,11 @@ model-specific; retain the registry's accompanying features and source link.
 - `qwen-3-8-27b-eager`: read the model-specific architecture facts and source link with `model=qwen-3-8-27b-eager`.
 
 ### GPU specification networking
+
+For rated per-chip TDP, read `hardware[].tdpW` from
+`GET /api/v1/views/options`. B300 (`key=b300`) uses 1100 W, matching the
+English/Chinese chip tables and SEO descriptions. This is separate from its
+unchanged 1.9 kW all-in provisioned power reference.
 
 `GET /api/v1/views/gpu-specs` shares its hardware source with `/gpu-specs` and the
 English/Chinese chip pages. GB200 NVL72 includes ConnectX-7 400G InfiniBand NDR per

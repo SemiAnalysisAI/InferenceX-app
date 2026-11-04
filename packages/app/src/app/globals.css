@@ -40,33 +40,44 @@
   content: none;
 }
 
-.thanksgiving-wordmark {
-  color: #92400e;
+.inferencex-wave-wordmark {
+  --wordmark-blue: #1d4ed8;
+  color: var(--wordmark-blue);
   text-rendering: geometricPrecision;
   font-kerning: normal;
 }
 
-.thanksgiving-wordmark-x {
-  color: #b91c1c;
+:is(.dark, .minecraft, .csgo, .gta, .doom, .halo) .inferencex-wave-wordmark {
+  --wordmark-blue: #93c5fd;
 }
 
-:is(.dark, .minecraft, .csgo, .gta, .doom, .halo) .thanksgiving-wordmark {
-  color: #fbbf24;
+.inferencex-wave-letter {
+  display: inline-block;
+  animation: inferencex-blue-wave 1.8s ease-in-out infinite;
 }
 
-:is(.dark, .minecraft, .csgo, .gta, .doom, .halo) .thanksgiving-wordmark-x {
-  color: #f87171;
+@keyframes inferencex-blue-wave {
+  0%,
+  100% {
+    transform: translateY(-3px);
+  }
+  50% {
+    transform: translateY(3px);
+  }
 }
 
-.thanksgiving-wordmark-turkey {
-  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
-  transform: rotate(8deg);
+@media (prefers-reduced-motion: reduce) {
+  .inferencex-wave-letter {
+    animation: none;
+  }
 }
 
 @media (forced-colors: active) {
-  .thanksgiving-wordmark,
-  .thanksgiving-wordmark-x {
+  .inferencex-wave-wordmark {
     color: LinkText;
+  }
+  .inferencex-wave-letter {
+    animation: none;
   }
 }
 

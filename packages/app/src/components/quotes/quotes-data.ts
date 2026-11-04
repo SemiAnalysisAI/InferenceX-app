@@ -19,9 +19,9 @@ export interface Quote {
 
 export const QUOTES: Quote[] = [
   {
-    text: 'Making AI infrastructure accessible to more developers starts with measuring how real-world, multi-turn agentic workloads, including context growth and prefix-cache reuse, perform in production. We welcome open-source, reproducible benchmarks like InferenceX that highlight the cost efficiency and interactivity of Google TPUs, running open software, giving developers transparent data to deploy at scale and with confidence.',
+    text: 'Making AI infrastructure accessible to more developers starts with measuring how real-world, multi-turn agentic workloads—including context growth and prefix-cache reuse—perform in production. We welcome open-source, reproducible benchmarks like InferenceX that highlight the cost efficiency and interactivity of Google TPUs running open software. That kind of transparent data gives developers the confidence to deploy at scale.',
     textZh:
-      '要让更多开发者用上 AI 基础设施，首先需要测量真实的多轮智能体工作负载在生产环境中的表现，包括上下文增长和前缀缓存复用。我们欢迎 InferenceX 这样的开源、可复现基准测试，展示 Google TPU 运行开放软件时的成本效率和交互性能，为开发者提供透明的数据，让他们有信心进行大规模部署。',
+      '要让更多开发者用上 AI 基础设施，首先需要测量真实的多轮智能体工作负载在生产环境中的表现，包括上下文增长和前缀缓存复用。我们欢迎 InferenceX 这样的开源、可复现基准测试，展示 Google TPU 运行开放软件时的成本效率和交互性能。这样的透明数据让开发者有信心进行大规模部署。',
     name: 'Bill Jia',
     title: 'VP of Engineering at Google',
     titleZh: 'Google 工程副总裁',
@@ -295,16 +295,6 @@ export const QUOTES: Quote[] = [
     org: 'Red Hat',
     logo: 'redhat.svg',
     link: 'https://www.linkedin.com/in/michael-goin/',
-  },
-  {
-    text: 'Now commonly hearing "We want the Semianalysis for X". Testament to what @dylan522p has built.',
-    textZh: '现在经常听到"我们想要X领域的 SemiAnalysis"。这是对 @dylan522p 所构建之物的最好证明。',
-    name: 'Sriram Krishnan',
-    title: 'White House Senior AI Advisor',
-    titleZh: '白宫高级 AI 顾问',
-    org: 'White House',
-    logo: 'white-house.svg',
-    link: 'https://x.com/sriramk/status/2048824255702262135',
   },
   {
     text: 'Premium Inference is a new category, driven by agents that need fast, interactive tokens with the best per-chip throughput on intelligent frontier models. InferenceX™ is one of the few benchmarks measuring this chip performance in the open, across every major accelerator. We look forward to participating in the official InferenceX with SN50 and showing our premium decode performance on frontier open models tracked transparently.',

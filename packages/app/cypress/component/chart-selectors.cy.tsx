@@ -256,7 +256,7 @@ function assertAgenticInfoInside(height: number) {
 
 function assertDisabledBenchmarkControls() {
   cy.get('[role="combobox"]')
-    .should('have.length', 2)
+    .should('have.length', 1)
     .each(($control) => {
       cy.wrap($control)
         .should('be.disabled')
@@ -282,7 +282,8 @@ describe('Chart Selectors', () => {
         cy.get('[data-testid="precision-multiselect"]').should('have.css', 'height', height);
       };
       assertDisabledBenchmarkControls();
-      assertHeights();
+      cy.get('[data-testid="scenario-selector"]').should('not.exist');
+      cy.get('[data-testid="precision-multiselect"]').should('have.css', 'height', height);
       cy.get('[data-testid="toggle-options"]').click();
       cy.get('[role="combobox"]')
         .should('have.length', 2)
@@ -328,10 +329,10 @@ describe('Chart Selectors', () => {
       cy.get('[data-testid="precision-multiselect"]').click('right');
       cy.get('[role="option"][aria-selected="true"]').should('have.length', 3);
       cy.get('[data-testid="toggle-options"]').click();
-      cy.get('button#scenario-select').should('have.text', '8K / 1K');
+      cy.get('button#scenario-select').should('not.exist');
       cy.get('button#precision-select').should('have.text', 'FP4');
       assertDisabledBenchmarkControls();
-      assertHeights();
+      cy.get('[data-testid="precision-multiselect"]').should('have.css', 'height', height);
     });
   }
 
@@ -351,8 +352,8 @@ describe('Chart Selectors', () => {
         </TooltipProvider>
       </PathnameContext.Provider>,
     );
-    cy.get('label[for="scenario-select"]').should('have.text', '场景');
-    cy.get('button#scenario-select').should('be.visible').and('have.text', '8K / 1K');
+    cy.get('label[for="scenario-select"]').should('not.exist');
+    cy.get('button#scenario-select').should('not.exist');
     cy.get('label[for="precision-select"]').should('have.text', '精度');
     cy.get('button#precision-select').should('be.visible').and('have.text', 'FP4');
     cy.get('[role="combobox"]').each(($value) => {
@@ -532,57 +533,63 @@ describe('Chart Selectors', () => {
       cy.contains('[data-select-option]', '8K / 1K').should('be.visible');
     });
 
-    it('keeps the fixed-sequence scenario visible without a one-option menu', () => {
-      cy.mount(
-        <TooltipProvider delayDuration={0}>
-          <div data-testid="selector-host">
-            <ScenarioSelector
-              value={Sequence.EightK_OneK}
-              onChange={() => {}}
-              availableSequences={[Sequence.EightK_OneK]}
-              data-testid="scenario-selector"
-            />
-          </div>
-        </TooltipProvider>,
-      );
-      cy.get('[data-testid="selector-host"]').should('exist');
-      cy.get('button[data-testid="scenario-selector"]')
-        .should('be.visible')
-        .and('have.text', '8K / 1K');
-      cy.get('label[for="scenario-select"]').should('have.text', 'Scenario');
-      cy.get('[role="combobox"]').should('be.disabled').and('have.css', 'cursor', 'not-allowed');
-    });
+    for (const variant of ['field', 'caption'] as const) {
+      for (const sequence of [Sequence.AgenticTraces, Sequence.EightK_OneK]) {
+        it(`omits the entire ${variant} for sole scenario ${sequence}`, () => {
+          cy.mount(
+            <TooltipProvider delayDuration={0}>
+              <div data-testid="selector-host">
+                <ScenarioSelector
+                  variant={variant}
+                  value={sequence}
+                  onChange={cy.stub().as('changeScenario')}
+                  availableSequences={[sequence]}
+                  data-testid="scenario-selector"
+                />
+              </div>
+            </TooltipProvider>,
+          );
+          cy.get('[data-testid="selector-host"]').should('be.empty');
+          cy.get('@changeScenario').should('not.have.been.called');
+        });
+      }
 
-    it('keeps the agentic scenario and its explanation visible with one option', () => {
-      cy.mount(
-        <TooltipProvider delayDuration={0}>
-          <div data-testid="selector-host">
-            <ScenarioSelector
-              value={Sequence.AgenticTraces}
-              onChange={() => {}}
-              availableSequences={[Sequence.AgenticTraces]}
-              data-testid="scenario-selector"
-            />
-          </div>
-        </TooltipProvider>,
-      );
-      cy.get('[data-testid="selector-host"]').should('exist');
-      cy.get('button[data-testid="scenario-selector"]')
-        .should('be.visible')
-        .and('have.text', 'Agentic');
-      cy.get('label[for="scenario-select"]').should('have.text', 'Scenario');
-      cy.get('[role="combobox"]').should('be.disabled').and('have.css', 'cursor', 'not-allowed');
-      assertAgenticInfoInside(36);
-      cy.get('[data-testid="selected-option-help-agentic-traces"]').trigger('pointerover', {
-        pointerType: 'mouse',
+      it(`restores the ${variant} selector when another scenario becomes available`, () => {
+        function Harness() {
+          const [multiple, setMultiple] = useState(false);
+          const [value, setValue] = useState(Sequence.AgenticTraces);
+          return (
+            <TooltipProvider delayDuration={0}>
+              <button onClick={() => setMultiple(!multiple)}>Toggle scenarios</button>
+              <output data-testid="selected-scenario">{value}</output>
+              <div data-testid="selector-host">
+                <ScenarioSelector
+                  variant={variant}
+                  value={value}
+                  onChange={setValue}
+                  availableSequences={
+                    multiple ? [Sequence.AgenticTraces, Sequence.EightK_OneK] : [value]
+                  }
+                  data-testid="scenario-selector"
+                />
+              </div>
+            </TooltipProvider>
+          );
+        }
+        cy.mount(<Harness />);
+        cy.get('[data-testid="selector-host"]').should('be.empty');
+        cy.contains('button', 'Toggle scenarios').click();
+        cy.get('[data-testid="scenario-selector"]').should('be.enabled').click();
+        cy.contains('[data-select-option]', '8K / 1K').click();
+        cy.get('[data-testid="selected-scenario"]').should('have.text', Sequence.EightK_OneK);
+        cy.contains('button', 'Toggle scenarios').click();
+        cy.get('[data-testid="selector-host"]').should('be.empty');
+        cy.get('[data-testid="selected-scenario"]').should('have.text', Sequence.EightK_OneK);
       });
-      cy.get('[data-testid="scenario-agentic-info-link"]')
-        .should('be.visible')
-        .and('have.attr', 'href', '/agentx');
-    });
+    }
 
     for (const fixed of [true, false]) {
-      it(`keeps the ${fixed ? 'fixed' : 'selectable'} Agentic explainer inside on Chinese phones`, () => {
+      it(`${fixed ? 'omits the sole scenario' : 'keeps the Agentic explainer inside'} on Chinese phones`, () => {
         cy.viewport(390, 720);
         cy.mount(
           <PathnameContext.Provider value="/zh/inference">
@@ -602,6 +609,11 @@ describe('Chart Selectors', () => {
             </TooltipProvider>
           </PathnameContext.Provider>,
         );
+        if (fixed) {
+          cy.get('[data-testid="scenario-selector"]').should('not.exist');
+          cy.get('[data-testid="selected-option-help-agentic-traces"]').should('not.exist');
+          return;
+        }
         assertAgenticInfoInside(44);
         cy.get('[data-testid="selected-option-help-agentic-traces"]').trigger('pointerover', {
           pointerType: 'mouse',
