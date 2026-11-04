@@ -55,6 +55,18 @@ function github(path: string, signal = AbortSignal.timeout(30000)) {
   });
 }
 
+const PUBLIC_REPOSITORY_TTL_MS = 60 * 60 * 1000;
+let repositoryPublicUntil = 0;
+
+async function repositoryIsPublic(): Promise<boolean> {
+  if (Date.now() < repositoryPublicUntil) return true;
+  const repository = await github('');
+  const repo = repository.ok ? await repository.json() : null;
+  if (repo?.private !== false) return false;
+  repositoryPublicUntil = Date.now() + PUBLIC_REPOSITORY_TTL_MS;
+  return true;
+}
+
 export async function GET(request: NextRequest) {
   const query = request.nextUrl.searchParams;
   const runId = query.get('run');
@@ -136,12 +148,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(data, { status: response.status, headers });
     }
     // This public viewer must never expose artifacts from a repository that becomes private.
-    // History reads only stored blobs, so it runs alongside the check and is discarded on failure.
     const historyRead = history ? publishedVideoHistory(Number(page), Number(pages)) : null;
     void historyRead?.catch(() => undefined);
-    const repository = await github('');
-    const repo = repository.ok ? await repository.json() : null;
-    if (repo?.private !== false)
+    if (!(await repositoryIsPublic()))
       return NextResponse.json(
         { error: 'Public H3 repository unavailable' },
         { status: 503, headers },

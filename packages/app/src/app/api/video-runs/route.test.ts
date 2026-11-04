@@ -33,7 +33,10 @@ const post = (body: unknown, secret = 'test-secret') =>
     headers: { Authorization: `Bearer ${secret}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
+const HOUR_MS = 60 * 60 * 1000;
+vi.useFakeTimers({ toFake: ['Date'] });
 afterEach(() => {
+  vi.setSystemTime(Date.now() + 2 * HOUR_MS);
   fetchMock.mockReset();
   vi.mocked(videoStorageEnabled).mockReturnValue(false);
   vi.mocked(storedArtifacts).mockResolvedValue([]);
@@ -44,6 +47,28 @@ afterEach(() => {
   vi.mocked(approveVideoPublication).mockReset();
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
+});
+
+describe('repository visibility on reads', () => {
+  it('trusts a public answer for one hour and asks again after it', async () => {
+    fetchMock.mockResolvedValue(response({ private: false }));
+    await GET(request('?format=history&page=1'));
+    vi.setSystemTime(Date.now() + HOUR_MS - 1);
+    await GET(request('?format=history&page=1'));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    vi.setSystemTime(Date.now() + 2);
+    fetchMock.mockResolvedValue(response({ private: true }));
+    const result = await GET(request('?format=history&page=1'));
+    expect(result.status).toBe(503);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('asks again on every read while the repository is not public', async () => {
+    fetchMock.mockResolvedValue(response({ private: true }));
+    await GET(request('?format=history&page=1'));
+    await GET(request('?format=history&page=1'));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('H3 CI artifact access', () => {
