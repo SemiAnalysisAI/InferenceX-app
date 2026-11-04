@@ -83,10 +83,11 @@ The page follows the inference and AgentX two-level layout. The overview has fou
    Performance history. How to read lists the measurements not yet collected. No
    placeholder chart, illustrative value or uncalibrated rating schema is shipped.
 
-`r_point` opens one deployment detail. Opening pushes a history entry, so the
-in-page Back button and browser Back both return to the overview at its previous
-scroll position. The overview stays mounted but hidden under React `Activity`, so
-clip media, the selected clip group and chart state survive the visit. An unknown,
+`r_point` opens one deployment detail. Opening pushes a history entry marked in
+`history.state` through the `client-navigation` helpers, so the in-page Back button
+pops that entry even after reload or Forward. Browser Back also returns to the
+overview at its previous scroll position. The overview stays mounted but hidden
+under React `Activity`, so clip media, the selected clip group and chart state survive the visit. An unknown,
 filtered or hidden `r_point` falls back to the overview. Once results load, the URL
 drops that key, so showing the hardware again or Share cannot reopen it. Overlay
 deployments open the same way.

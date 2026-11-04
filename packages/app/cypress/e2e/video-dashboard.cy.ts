@@ -49,6 +49,20 @@ describe('VideoGenX results routes', () => {
     cy.get('[data-testid="video-results-detail"]').should('not.exist');
     cy.location('search').should('not.contain', 'r_point=');
     row('h200').should('be.visible');
+    cy.go('forward');
+    cy.get('[data-testid="video-results-detail"] h1').should('contain', 'H200');
+    cy.reload();
+    cy.get('[data-testid="video-results-detail"] h1').should('contain', 'H200');
+    cy.get('[data-testid="results-detail-back"]')
+      .should(([button]) => {
+        const hydrated = Object.keys(button).some((key) => key.startsWith('__reactProps'));
+        expect(hydrated, 'detail Back is hydrated').to.equal(true);
+      })
+      .click();
+    cy.location('search').should('not.contain', 'r_point=');
+    row('h200').should('be.visible');
+    cy.go('forward');
+    cy.get('[data-testid="video-results-detail"] h1').should('contain', 'H200');
   });
 
   it('preserves the selected published overlay through filtering and dismisses it explicitly', () => {

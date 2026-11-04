@@ -12,6 +12,7 @@ import {
 } from 'react';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { track } from '@/lib/analytics/analytics';
+import { pushClientSearch, replaceClientSearch } from '@/lib/routing/client-navigation';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { ShareButton } from '@/components/ui/share-button';
@@ -186,6 +187,10 @@ const STRINGS = {
   },
 };
 const subscribe = () => () => {};
+/** Marks a history entry this page pushed for a detail, so in-page Back pops it even after reload or Forward. */
+const DETAIL_ENTRY = 'videoResultsDetail';
+const onDetailEntry = () =>
+  (window.history.state as Record<string, unknown> | null)?.[DETAIL_ENTRY] === true;
 
 const cellLabel = (cell: ResultCell) =>
   `${hardwareLabel(cell.point.hardwareKey ?? '')}${cell.overlay ? ` · #${cell.point.runId}` : ''}`;
@@ -201,15 +206,12 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
   );
   const [historyOpen, setHistoryOpen] = useState(false);
   const [labels, setLabels] = useState(true);
-  // True while the open detail entry was pushed by this page, so Back can pop it.
-  const pushedDetail = useRef(false);
   const overviewScroll = useRef(0);
   const pendingAnchor = useRef<string | null>(null);
   useEffect(() => {
     const read = () => {
       const next = parseResultsState(location.search);
       latest.current = next;
-      if (next.point === null) pushedDetail.current = false;
       setState(next);
       const params = new URLSearchParams(location.search);
       if (
@@ -229,10 +231,8 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
       ),
     );
     for (const [key, value] of new URLSearchParams(resultsSearch(next))) params.set(key, value);
-    const href = `${location.pathname}${params.size > 0 ? `?${params}` : ''}${location.hash}`;
-    if (mode === 'push')
-      History.prototype.pushState.call(window.history, window.history.state, '', href);
-    else history.replaceState(null, '', href);
+    if (mode === 'push') pushClientSearch(params, { [DETAIL_ENTRY]: true });
+    else replaceClientSearch(params);
     setState(next);
   }, []);
   const update = useCallback(
@@ -257,7 +257,6 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
   const openPoint = useCallback(
     (key: string, source: 'popover' | 'table') => {
       overviewScroll.current = window.scrollY;
-      pushedDetail.current = true;
       commit({ ...latest.current, point: key }, 'push');
       track('video_results_detail_opened', { source });
     },
@@ -267,10 +266,8 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
     (anchor: string | null = null) => {
       pendingAnchor.current = anchor;
       track('video_results_detail_closed');
-      if (pushedDetail.current) {
-        pushedDetail.current = false;
-        history.back();
-      } else commit({ ...latest.current, point: null }, 'replace');
+      if (onDetailEntry()) window.history.back();
+      else commit({ ...latest.current, point: null }, 'replace');
     },
     [commit],
   );

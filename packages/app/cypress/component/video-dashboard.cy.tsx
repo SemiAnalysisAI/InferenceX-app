@@ -489,6 +489,12 @@ describe('VideoGenX results', () => {
     cy.go('back');
     cy.get('[data-testid="video-results-detail"]').should('not.exist');
     row('h200').should('be.visible');
+    cy.go('forward');
+    cy.get('[data-testid="video-results-detail"] h1').should('contain', 'H200');
+    cy.get('[data-testid="results-detail-back"]').click();
+    cy.get('[data-testid="video-results-detail"]').should('not.exist');
+    cy.go('forward');
+    cy.get('[data-testid="video-results-detail"] h1').should('contain', 'H200');
   });
 
   it('keeps the selected clip case and fetched media across a detail visit', () => {
