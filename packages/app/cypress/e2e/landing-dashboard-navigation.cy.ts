@@ -49,9 +49,7 @@ describe('Muse Spark Open results', () => {
       cy.get('[data-testid="model-selector"]').should(($selector) => {
         expect(['Muse Spark Open 816B', 'Muse-Spark-Open']).to.include($selector.text().trim());
       });
-      cy.get('[data-testid="scenario-selector"]')
-        .should('contain.text', prefix ? '智能体' : 'Agentic')
-        .and('be.disabled');
+      cy.get('[data-testid="scenario-selector"]').should('not.exist');
       cy.get('[data-slot="unofficial-banner"]').should('not.exist');
       cy.get('@museRun.all').should('have.length', 0);
     });
@@ -98,9 +96,7 @@ function assertTpuView() {
 
 function assertKimiTpuView() {
   cy.get('[data-testid="model-selector"]').should('contain.text', 'Kimi K3');
-  cy.get('[data-testid="scenario-selector"]')
-    .invoke('text')
-    .should('match', /Agentic|智能体/u);
+  cy.get('[data-testid="scenario-selector"]').should('not.exist');
   cy.location('search').should('eq', '');
 }
 
@@ -265,10 +261,7 @@ describe('landing model curation', () => {
       cy.get('[data-testid="landing-rubin-glm-5-3-results-link"]').click();
       cy.location('pathname').should('eq', `${prefix}/inference/glm-5-3`);
       cy.get('[data-testid="model-selector"]').should('contain.text', 'GLM5.3');
-      cy.get('[data-testid="scenario-selector"]').should(
-        'contain.text',
-        prefix ? '智能体' : 'Agentic',
-      );
+      cy.get('[data-testid="scenario-selector"]').should('not.exist');
       cy.get('[data-testid="chart-legend"]').should('contain.text', 'Vera Rubin NVL72');
       cy.reload();
       cy.location('pathname').should('eq', `${prefix}/inference/glm-5-3`);
@@ -284,10 +277,7 @@ describe('landing model curation', () => {
       cy.location('pathname').should('eq', `${prefix}/inference/minimax-m3`);
       cy.location('search').should('not.contain', 'i_spec=');
       cy.get('[data-testid^="remove-filter-spec-"]').should('not.exist');
-      cy.get('[data-testid="scenario-selector"]').should(
-        'contain.text',
-        prefix ? '智能体' : 'Agentic',
-      );
+      cy.get('[data-testid="scenario-selector"]').should('not.exist');
       cy.get('[data-testid="chart-legend"]').should('contain.text', 'Vera Rubin NVL72');
       cy.reload();
       cy.get('[data-testid="chart-legend"]').should('contain.text', 'Vera Rubin NVL72');

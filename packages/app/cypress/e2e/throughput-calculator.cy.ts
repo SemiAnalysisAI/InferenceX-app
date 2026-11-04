@@ -476,10 +476,7 @@ describe('TCO Calculator', () => {
     });
 
     it('renders throughput and cost calculations from null-ISL/OSL agentic rows', () => {
-      cy.get('button[data-testid="calc-sequence-selector"]')
-        .should('be.visible')
-        .and('have.text', 'Agentic')
-        .and('be.disabled');
+      cy.get('[data-testid="calc-sequence-selector"]').should('not.exist');
       cy.get('button[data-testid="calc-precision-selector"]')
         .should('have.text', 'FP4')
         .and('be.disabled');
@@ -536,10 +533,7 @@ describe('TCO Calculator', () => {
       });
       cy.wait('@agenticBenchmarks');
 
-      cy.get('button[data-testid="calc-sequence-selector"]')
-        .should('be.visible')
-        .and('have.text', 'Agentic')
-        .and('be.disabled');
+      cy.get('[data-testid="calc-sequence-selector"]').should('not.exist');
       cy.get('button[data-testid="calc-precision-selector"]')
         .should('have.text', 'FP4')
         .and('be.disabled');
