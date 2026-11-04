@@ -155,6 +155,8 @@ jobs:
         run: bun run build
         env:
           E2E_FIXTURES: '1'
+      - name: Check client bundle
+        run: bun run check:bundle
       - name: Save Next.js build cache
         if: ${{ steps.nextjs-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

@@ -25,6 +25,7 @@
     "fmt": "oxfmt --check --no-error-on-unmatched-pattern",
     "fmt:fix": "oxfmt --write --no-error-on-unmatched-pattern",
     "check:typography": "bun packages/app/scripts/check-typography.ts",
+    "check:bundle": "bun packages/app/scripts/check-client-bundle.ts",
     "test": "bun run --cwd packages/app test",
     "test:e2e": "bun run --cwd packages/app test:e2e",
     "test:e2e:full": "bun run --cwd packages/app test:e2e:full",
