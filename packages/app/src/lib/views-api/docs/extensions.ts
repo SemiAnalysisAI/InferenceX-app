@@ -536,8 +536,8 @@ const PARAMETER_NOTES: Record<string, [string, string]> = {
     '图表 Y 轴指标：videoSecondsPerDollar（默认）、videosPerGpuHour 或 kjPerClip。仅影响展示；无效值使用默认值。',
   ],
   r_basis: [
-    'GPU cost basis the chart and table plot: participating (default) or allocated. Both bases are always returned.',
-    '图表和表格使用的 GPU 成本口径：participating（默认）或 allocated。响应始终同时返回两种口径。',
+    'GPU basis for the chart and table costs and videos per GPU-hour: participating (default) or allocated. Both bases are always returned.',
+    '图表和表格计算成本及每 GPU 小时生成视频数时采用的 GPU 口径：participating（默认）或 allocated。响应始终同时返回两种口径。',
   ],
   r_optimal: [
     'Optimal Only: 0 also plots dominated deployments; any other value plots each hardware frontier only. Presentation only.',

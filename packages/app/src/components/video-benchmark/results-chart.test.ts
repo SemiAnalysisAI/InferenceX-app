@@ -95,6 +95,21 @@ describe('resultsChartSeries', () => {
     expect(value(allocated, 'unknown:c1')).toBeUndefined();
   });
 
+  it('divides videos per GPU-hour by the GPU count of the selected basis', () => {
+    const b200 = deployment('b200', 4, 30, 400, 200, { hardwareKey: 'b200', allocated: 8 });
+    const unknown = deployment('unknown', 1, 60, 200, 100, { allocated: null });
+    const deployments = cells([b200, unknown]);
+    const videosPerHour = (eligible.valid! * 3600) / eligible.wallSeconds!;
+    const plot = (basis: 'participating' | 'allocated') =>
+      resultsChartSeries(deployments, selection({ y: 'videosPerGpuHour', basis }));
+    const series = (basis: 'participating' | 'allocated', key: string) =>
+      plot(basis).find((s) => s.hardwareKey === key)!;
+    expect(value(series('participating', 'b200'), 'b200:c1')).toBeCloseTo(videosPerHour / 4);
+    expect(value(series('allocated', 'b200'), 'b200:c1')).toBeCloseTo(videosPerHour / 8);
+    expect(value(series('participating', 'h200'), 'unknown:c1')).toBeCloseTo(videosPerHour);
+    expect(plot('allocated').some((s) => s.hardwareKey === 'h200')).toBe(false);
+  });
+
   it('excludes hidden hardware and keeps a named run as its own series', () => {
     const b200 = deployment('b200', 4, 40, 300, 150, { hardwareKey: 'b200' });
     const named = deployment('named', 2, 20, 50, 400, { runId: '200', approved: false });

@@ -74,8 +74,8 @@ The page follows the inference and AgentX two-level layout. The overview has fou
    metric with its label, unit and better direction. Each hardware and each overlay
    run is one series with its own Pareto frontier; Optimal Only hides dominated
    deployments. The sidebar legend toggles hardware, greys out roster hardware
-   without a matched run, and holds the deployment-label switch and the cost basis
-   and tier selects. A pinned point lists its measurements and opens the deployment
+   without a matched run, and holds the deployment-label switch and the GPU basis
+   and cost tier selects. A pinned point lists its measurements and opens the deployment
    detail. The results table below has one representative row per hardware and run,
    scrolls horizontally on narrow screens, and opens the same detail.
 3. The clip comparison described in Synchronized clips.
@@ -180,7 +180,9 @@ not a calibrated quality verdict or proof of a hardware-only effect.
 Both bases are kept: participating boards and allocated boards. The chart and
 table use the selected basis (`r_basis`, default participating); clip tiles and
 the deployment detail show both. Video-seconds per $1 TCO is the reciprocal of
-cost per video-second. An
+cost per video-second. Videos per GPU-hour = valid clips × 3600 / (wall seconds ×
+the selected basis's GPU count), so the allocated basis halves it for a job that
+reserved eight boards and used four. An
 allocation must be evidenced; participating count is never substituted for it.
 TCO per video = recorded GPU count × registry $/GPU-hour / measured clips/hour.
 Cost per video-second = hourly GPU cost / `videoSecondsPerHour`, the validated
@@ -245,7 +247,7 @@ browser playback and difference failure, bilingual layout and 390px overflow.
 页面沿用推理与 AgentX 的两级布局。概览页首将筛选分为基准测试配置（模型、工作负载、引擎）、图表配置（X/Y 指标）、
 部署（GPU 数量）和运行信息（运行日期）四组。图表绘制所选工作负载的全部实测部署：X 轴为单条视频 P50（默认）或 P90 延迟，
 Y 轴为每 1 美元 TCO 生成的视频秒数（默认）、每 GPU 小时生成视频数或每条有效视频的 GPU 能耗；每种硬件及每个叠加运行
-各自绘制 Pareto 前沿。右侧图例可隐藏硬件，没有匹配运行的硬件显示为灰色，成本口径与成本档位也在图例中切换。
+各自绘制 Pareto 前沿。右侧图例可隐藏硬件，没有匹配运行的硬件显示为灰色，GPU 口径与成本档位也在图例中切换。
 图表下方的结果表每种硬件一行，窄屏可横向滚动。点击数据点或表格行进入部署详情（`r_point`），页内返回或浏览器后退
 都会回到原滚动位置；概览在后台保持挂载，视频和图表状态不会丢失。详情页分为遥测、有效性、来源三个标签页，
 未知或已隐藏的 `r_point` 回到概览。如何解读、利润估算器与性能历史默认折叠，尚未采集的指标在“如何解读”中列出，
@@ -259,7 +261,7 @@ Difference 是相对明确绑定的官方 Diffusers 参考视频的浏览器 RGB
 默认视频卡片保留硬件、GPU 数量、媒体及两种 TCO 口径；完整 prompt、seed、重复次数、
 运行、产物、Runtime 和媒体来源可在“Prompt 与来源”中查看。
 
-成本同时按参与计算和分配的 GPU 数量估算，分配证据缺失时不填补；图表与结果表使用所选口径（`r_basis`），视频卡片和部署详情同时展示两种口径。视频秒吞吐量、每视频秒成本及收入使用有效测量请求的实际解码视频时长，不包含 warmup；请求时长仅用于工作负载身份与筛选。
+成本同时按参与计算和分配的 GPU 数量估算，分配证据缺失时不填补；图表与结果表使用所选口径（`r_basis`），视频卡片和部署详情同时展示两种口径。每 GPU 小时生成视频数同样按所选口径的 GPU 数折算：作业分配 8 张、实际使用 4 张时，按分配口径计算的值减半。视频秒吞吐量、每视频秒成本及收入使用有效测量请求的实际解码视频时长，不包含 warmup；请求时长仅用于工作负载身份与筛选。
 任何有效测量请求缺少视频时长，或旧 History 投影没有 `videoSecondsPerHour` 时，上述指标及利润保持为空，不以请求时长代替。每条视频成本仍可在证据充分时计算。利润输入默认空白，属于用户
 场景假设；利用率只降低收入，不减少付费时长。模式未知时不套用 T2V/I2V/R2V 价格。
 只读 API 与页面共用选择和计算逻辑，`r_*` 参数可以分享，`?unofficialrun=` 只读取指定的已存储运行，

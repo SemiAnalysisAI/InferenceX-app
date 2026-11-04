@@ -106,7 +106,7 @@ export default function VideoResultsChart({
   onLabelsChange: (labels: boolean) => void;
   onUpdate: (patch: Partial<ResultsState>) => void;
   onOpen: (pointKey: string, source: 'popover') => void;
-  /** Cost basis and tier selects rendered under the legend switches. */
+  /** GPU basis and cost tier selects rendered under the legend switches. */
   controls: ReactNode;
 }) {
   const locale = useLocale();

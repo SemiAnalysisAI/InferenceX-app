@@ -1,6 +1,5 @@
 import { paretoFrontier } from './frontier';
 import { hardwareSort, type CostTier } from './hardware';
-import { metricValue } from './metrics';
 import type { ResultCell } from './results';
 
 export type CostBasis = 'participating' | 'allocated';
@@ -62,7 +61,12 @@ export const RESULTS_Y_METRICS: Record<ResultsYMetric, ResultsChartMetric> = {
     unit: '',
     better: 'higher',
     digits: 2,
-    value: (cell, { tier }) => metricValue(cell.point, 'videosPerGpuHour', { tier }),
+    value: (cell, { basis }) => {
+      const gpus = cell.point[basis];
+      return cell.clipsPerSecond !== null && gpus !== null && Number.isSafeInteger(gpus) && gpus > 0
+        ? (cell.clipsPerSecond * 3600) / gpus
+        : null;
+    },
   },
   kjPerClip: {
     label: { en: 'GPU energy per valid clip', zh: '每条有效视频的 GPU 能耗' },

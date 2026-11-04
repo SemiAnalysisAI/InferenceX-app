@@ -1476,10 +1476,10 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/components/video-benchmark/results-chart.ts',
-    sourceSha256: 'd7a149571f56ca756a560cc169bb25f21795c0740b528ab7afa2b7517705fd1d',
+    sourceSha256: '3652505dad7435701521fd0e769f80795569d34d818827501cc27eb49a6696ce',
     reviewArea: {
-      en: 'VideoGenX results chart axes, accepted r_x/r_y metric keys, cost basis and deployment detail key.',
-      zh: 'VideoGenX 结果图表的坐标轴、r_x/r_y 可接受的指标键、成本口径及部署详情键。',
+      en: 'VideoGenX results chart axes, accepted r_x/r_y metric keys, GPU basis and deployment detail key.',
+      zh: 'VideoGenX 结果图表的坐标轴、r_x/r_y 可接受的指标键、GPU 口径及部署详情键。',
     },
   },
   {
