@@ -5,6 +5,7 @@ import {
   type PurgedBenchmarkPoint,
   applyBenchmarkPointBackfill,
   applyChangelogBackfills,
+  backfilledPoints,
   BENCHMARK_POINT_BACKFILLS,
   CHANGELOG_BACKFILLS,
   CONCLUSION_OVERRIDES,
@@ -497,6 +498,36 @@ describe('planBenchmarkPoint', () => {
     } finally {
       registry.splice(registry.indexOf(backfill), 1);
     }
+  });
+
+  it('relabels required-power points the same way ingest relabels retained points', () => {
+    const required = {
+      config: {
+        ...EXAMPLE_CONFIG,
+        hardware: 'b300',
+        framework: 'vllm',
+        model: 'kimik3',
+        disagg: false,
+        isMultinode: false,
+        prefillTp: 8,
+        prefillEp: 1,
+        prefillDpAttn: false,
+        prefillNumWorkers: 0,
+        decodeTp: 8,
+        decodeEp: 1,
+        decodeDpAttn: false,
+        decodeNumWorkers: 0,
+      },
+      benchmarkType: 'agentic_traces',
+      isl: null,
+      osl: null,
+      conc: 24,
+      offloadMode: 'on',
+      recipeFingerprint: '61ba8917bcdef3e354ba09a889270595338d97885bd465fedd01c9dbe7e9beaa',
+      metrics: {},
+    };
+    const [relabeled] = backfilledPoints({ githubRunId: 31893747354, runAttempt: 2 }, [required]);
+    expect(relabeled!.config.specMethod).toBe('none');
   });
 
   it('moves a non-drafting B300 Kimi-K3 point to the none config and leaves drafting points alone', () => {

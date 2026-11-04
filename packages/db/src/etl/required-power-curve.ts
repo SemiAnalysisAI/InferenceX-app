@@ -17,7 +17,7 @@ import {
   type RequiredPowerScope,
   type RequiredPowerSource,
 } from './required-power-publication';
-import { planBenchmarkPoint } from './run-overrides';
+import { backfilledPoints, planBenchmarkPoint } from './run-overrides';
 
 export interface CurvePoint {
   identity: Record<string, unknown>;
@@ -183,7 +183,11 @@ export async function preflightRequiredPowerCurves(
       incoming.set(stablePowerPointIdentity(benchmarkPublicationIdentity(planned)), planned);
     }
   }
-  assertRequiredPowerPointsRetained(required.points, [...incoming.values()], 'before_write');
+  assertRequiredPowerPointsRetained(
+    backfilledPoints({ githubRunId: source.runId, runAttempt: source.runAttempt }, required.points),
+    [...incoming.values()],
+    'before_write',
+  );
   const models = [...new Set([...incoming.values()].map((point) => point.config.model))];
   const stored = await loadStoredCurvePoints(sql, models, source.runId);
   const attemptRows =

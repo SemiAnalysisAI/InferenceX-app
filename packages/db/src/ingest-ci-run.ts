@@ -25,6 +25,7 @@ import { createAdminSql } from './etl/db-utils';
 import { materializePowerSeriesForRun } from './queries/gpu-power-series';
 import {
   applyChangelogBackfills,
+  backfilledPoints,
   isRunAttemptPurged,
   planBenchmarkPoint,
   validateRunBackfills,
@@ -913,7 +914,14 @@ async function main(): Promise<void> {
     }
     await traceWorkerPool.close();
     if (requiredPower)
-      assertRequiredPowerPointsRetained(requiredPower.points, retainedPowerPoints, 'after_insert');
+      assertRequiredPowerPointsRetained(
+        backfilledPoints(
+          { githubRunId: runIdNum, runAttempt: runAttemptNum },
+          requiredPower.points,
+        ),
+        retainedPowerPoints,
+        'after_insert',
+      );
     console.log(`  Benchmarks: +${totalNewBmk} new, ${totalDupBmk} dup`);
     if (totalTraceReplayLinked > 0 || tracker.skips.traceReplayMissing > 0) {
       console.log(
