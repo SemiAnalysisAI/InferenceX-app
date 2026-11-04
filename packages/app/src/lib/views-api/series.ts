@@ -28,6 +28,7 @@ import type {
 import { partitionChartDataByLimits } from '@/components/inference/utils';
 import {
   bestSeriesPerSku,
+  skuColumns,
   withUnrankedSkus,
 } from '@/components/inference/utils/best-series-per-sku';
 import {
@@ -371,7 +372,9 @@ export function buildInferenceSeries(
   }
 
   // 8. Best series per SKU over the full mapped point set.
-  const bestHwKeys = direction ? bestSeriesPerSku(mapped, direction) : new Set<string>();
+  const bestHwKeys = direction
+    ? bestSeriesPerSku(skuColumns(mapped), direction)
+    : new Set<string>();
 
   // 9. Group into series by hwKey.
   const byHwKey = new Map<string, InferenceData[]>();

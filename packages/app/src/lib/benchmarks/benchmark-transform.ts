@@ -22,6 +22,7 @@ import {
   type GpuSpecs,
   type TcoBasis,
 } from '@/lib/catalog/constants';
+import { Percentile } from '@/lib/catalog/data-mappings';
 import { getInferenceHardwareConfig } from '@/lib/benchmarks/inference-labels';
 import { isPersistedBenchmarkId } from '@/lib/benchmarks/benchmark-id';
 import { resolvePowerTier } from '@/lib/power/power-tier';
@@ -44,16 +45,59 @@ import {
  */
 const WHOLE_DEPLOYMENT_ENERGY_SCHEMA_VERSION = 2;
 
-const AGENTIC_PERCENTILE_KEYS = ['mean', 'median', 'p75', 'p90', 'p95', 'p99', 'p99.9'].map(
-  (suffix) => ({
+export type LatencyPercentile = 'mean' | 'median' | Percentile | 'p95' | 'p99' | 'p99.9';
+
+interface AgenticPercentileKeys {
+  fullResponseItl: string;
+  itl: string;
+  ttlt: string;
+  e2el: string;
+  tpot: string;
+  intvty: string;
+  ttft: string;
+}
+
+function agenticKeys(suffix: LatencyPercentile): AgenticPercentileKeys {
+  return {
     fullResponseItl: `${suffix}_full_response_itl`,
     itl: `${suffix}_itl`,
     ttlt: `${suffix}_ttlt`,
     e2el: `${suffix}_e2el`,
     tpot: `${suffix}_tpot`,
     intvty: `${suffix}_intvty`,
-  }),
-);
+    ttft: `${suffix}_ttft`,
+  };
+}
+
+const AGENTIC_KEYS_BY_PERCENTILE: Record<LatencyPercentile, AgenticPercentileKeys> = {
+  mean: agenticKeys('mean'),
+  median: agenticKeys('median'),
+  [Percentile.P75]: agenticKeys(Percentile.P75),
+  [Percentile.P90]: agenticKeys(Percentile.P90),
+  p95: agenticKeys('p95'),
+  p99: agenticKeys('p99'),
+  'p99.9': agenticKeys('p99.9'),
+};
+const AGENTIC_PERCENTILE_KEYS = Object.values(AGENTIC_KEYS_BY_PERCENTILE);
+
+function hasFullResponseItl(raw: Record<string, number>): boolean {
+  return AGENTIC_PERCENTILE_KEYS.some((keys) => typeof raw[keys.fullResponseItl] === 'number');
+}
+
+function aliasedItl(
+  raw: Record<string, number>,
+  keys: AgenticPercentileKeys,
+  fullResponse: boolean,
+): number | undefined {
+  const fullResponseItl = raw[keys.fullResponseItl];
+  const itl =
+    typeof fullResponseItl === 'number' && fullResponseItl > 0
+      ? fullResponseItl
+      : fullResponse
+        ? undefined
+        : raw[keys.itl];
+  return typeof itl === 'number' && itl > 0 ? itl : undefined;
+}
 
 /**
  * Agentic trace-replay runs (`benchmark_type === 'agentic_traces'`) emit ttft/ttlt/itl
@@ -73,26 +117,18 @@ const AGENTIC_PERCENTILE_KEYS = ['mean', 'median', 'p75', 'p90', 'p95', 'p99', '
  */
 function applyAgenticMetricAliases(raw: Record<string, number>): Record<string, number> {
   const m: Record<string, number> = { ...raw };
-  const hasFullResponseItl = AGENTIC_PERCENTILE_KEYS.some(
-    (keys) => typeof raw[keys.fullResponseItl] === 'number',
-  );
+  const fullResponse = hasFullResponseItl(raw);
   for (const keys of AGENTIC_PERCENTILE_KEYS) {
-    const fullResponseItl = raw[keys.fullResponseItl];
-    const itl =
-      typeof fullResponseItl === 'number' && fullResponseItl > 0
-        ? fullResponseItl
-        : hasFullResponseItl
-          ? undefined
-          : raw[keys.itl];
+    const itl = aliasedItl(raw, keys, fullResponse);
     const ttlt = raw[keys.ttlt];
     if (m[keys.e2el] === undefined && ttlt !== undefined) m[keys.e2el] = ttlt;
-    if (typeof itl === 'number' && itl > 0) {
+    if (itl === undefined) {
+      delete m[keys.itl];
+      delete m[keys.intvty];
+    } else {
       m[keys.itl] = itl;
       if (m[keys.tpot] === undefined) m[keys.tpot] = itl;
       m[keys.intvty] = 1 / itl;
-    } else {
-      delete m[keys.itl];
-      delete m[keys.intvty];
     }
   }
   if (typeof raw.std_full_response_itl === 'number') {
@@ -102,6 +138,20 @@ function applyAgenticMetricAliases(raw: Record<string, number>): Record<string, 
     m.std_intvty = raw.std_full_response_intvty;
   }
   return m;
+}
+
+export function rowLatencyMetric(
+  row: Pick<BenchmarkRow, 'benchmark_type' | 'metrics'>,
+  percentile: LatencyPercentile,
+  metric: 'intvty' | 'e2el' | 'ttft',
+): number {
+  const raw = row.metrics;
+  const keys = AGENTIC_KEYS_BY_PERCENTILE[percentile];
+  if (row.benchmark_type !== 'agentic_traces' || metric === 'ttft') return raw[keys[metric]] ?? 0;
+  if (metric === 'e2el')
+    return (raw[keys.e2el] === undefined ? raw[keys.ttlt] : raw[keys.e2el]) ?? 0;
+  const itl = aliasedItl(raw, keys, hasFullResponseItl(raw));
+  return itl === undefined ? 0 : 1 / itl;
 }
 
 export interface AggDataEntryOptions {

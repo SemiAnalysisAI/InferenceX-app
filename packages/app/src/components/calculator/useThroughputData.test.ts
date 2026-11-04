@@ -1000,6 +1000,14 @@ describe('buildGpuGroups', () => {
     expect(first.tpPerMw).toBeGreaterThan(0);
   });
 
+  it('reads a missing fixed-sequence median interactivity as zero', () => {
+    const { grouped } = buildGpuGroups([makeRow({ metrics: { tput_per_gpu: 900 } })], {
+      ...shared,
+      classify: singlePrecisionClassify,
+    });
+    expect(Object.values(grouped)[0][0].interactivity).toBe(0);
+  });
+
   describe('chip basis', () => {
     const disagg = makeRow({
       hardware: 'gb300',

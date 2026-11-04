@@ -197,7 +197,7 @@ import {
   createKnownIssueLayer,
 } from '@/components/inference/utils/knownIssueAnnotations';
 import { matchesQuickFilters } from '@/components/inference/utils/quickFilters';
-import { bestSeriesPerSku } from '@/components/inference/utils/best-series-per-sku';
+import { bestSeriesPerSku, skuColumns } from '@/components/inference/utils/best-series-per-sku';
 import { legendChangelogsByHardware } from '@/components/inference/utils/legend-changelog';
 import { powerBreakdownInteractivity } from '@/components/inference/utils/power-breakdown';
 import {
@@ -797,8 +797,12 @@ const ScatterGraph = React.memo(
               direction === 'lower_left' ||
               direction === 'lower_right'
             ) {
-              const selection = bestSeriesPerSku(data, direction, selectedPrecisions);
-              for (const key of bestSeriesPerSku(overlayData.data, direction, selectedPrecisions)) {
+              const selection = bestSeriesPerSku(skuColumns(data), direction, selectedPrecisions);
+              for (const key of bestSeriesPerSku(
+                skuColumns(overlayData.data),
+                direction,
+                selectedPrecisions,
+              )) {
                 selection.add(`overlay:${key}`);
               }
               commitUnifiedSelection(selection);

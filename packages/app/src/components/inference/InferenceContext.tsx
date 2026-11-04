@@ -132,7 +132,7 @@ import { resolveLabelState, serializeLabelState } from './utils/label-defaults';
 import { defaultInferenceHardware, defaultInferenceXAxisMode } from './utils/model-defaults';
 import { powerXViewFor } from './powerx/powerx-views';
 import { usePowerXSurface } from './ui/powerx-surface';
-import { bestSeriesPerSku, withUnrankedSkus } from './utils/best-series-per-sku';
+import { bestSeriesPerSku, skuColumns, withUnrankedSkus } from './utils/best-series-per-sku';
 import { resolveBenchmarkSeed } from './utils/benchmark-seed';
 import {
   EMPTY_QUICK_FILTERS,
@@ -1189,7 +1189,7 @@ export function InferenceProvider({
     ) {
       return unrankedHwTypes;
     }
-    const best = bestSeriesPerSku(graph.data, direction, effectivePrecisions);
+    const best = bestSeriesPerSku(skuColumns(graph.data), direction, effectivePrecisions);
     if (best.size === 0) return unrankedHwTypes;
     return tableCandidates ? withUnrankedSkus(best, graph.data, tableCandidates) : best;
   }, [
