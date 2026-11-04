@@ -1,34 +1,25 @@
+import { type NextRequest, NextResponse } from 'next/server';
+
 import { REQUEST_TIMELINE_VERSION } from '@semianalysisai/inferencex-db/etl/compute-request-timeline';
 import { getDb } from '@semianalysisai/inferencex-db/connection';
 
+import { getCurrentRequestTimelineSha256s } from '@semianalysisai/inferencex-db/queries/request-timeline';
+import { getTraceHistograms } from '@semianalysisai/inferencex-db/queries/trace-histograms';
+
+import { PUBLIC_API_ERRORS, publicApiError } from '@/lib/api/public-api-errors';
 import {
-  getTraceHistograms,
-  type TraceHistogramMap,
-} from '@semianalysisai/inferencex-db/queries/trace-histograms';
+  cachedJsonStoringContentBlob,
+  contentBlobKeyOf,
+  contentBlobRedirect,
+} from '@/lib/cache/content-blob';
 
-import { cachedQuery } from '@/lib/cache/api-cache';
-
-import { idsQueryRoute } from '../id-routes';
+import { parseIdsParam } from '../id-routes';
 
 export const dynamic = 'force-dynamic';
 
-// blobOnly: a 50-id histogram payload can easily exceed Next.js's 2MB
-// unstable_cache limit (each point carries one int per request, ~500-1000+
-// requests for agentic), which manifests as a 500 from the route. Blob
-// storage lets us cache the larger response without losing the warm-cache hit.
-//
-// Key derived from REQUEST_TIMELINE_VERSION: the histograms are read out of the
-// `request_timeline` payload (getTraceHistograms keys its fast path off that
-// constant). The blob cache is write-once with no post-backfill purge, so the
-// version-derived key is what rolls the namespace on a bump — the previously
-// unversioned key would serve stale histograms forever.
 export const CACHE_KEY_PREFIX = `trace-histograms-v${REQUEST_TIMELINE_VERSION}`;
 
-const getCachedTraceHistograms = cachedQuery(
-  (ids: number[]): Promise<TraceHistogramMap> => getTraceHistograms(getDb(), ids),
-  CACHE_KEY_PREFIX,
-  { blobOnly: true },
-);
+const MAX_IDS = 200;
 
 /**
  * GET /api/v1/trace-histograms?ids=1,2,3
@@ -37,8 +28,22 @@ const getCachedTraceHistograms = cachedQuery(
  * `profile_export.jsonl` blobs, keyed by `benchmark_results.id`.
  * Ids without a trace_replay blob are omitted from the response.
  */
-export const GET = idsQueryRoute({
-  maxIds: 200,
-  logLabel: 'trace histograms',
-  fetch: getCachedTraceHistograms,
-});
+export async function GET(request: NextRequest): Promise<Response> {
+  const ids = parseIdsParam(request, MAX_IDS);
+  if (ids instanceof NextResponse) return ids;
+  try {
+    const sha256s = await getCurrentRequestTimelineSha256s(getDb(), ids);
+    const inputs = [...sha256s].toSorted(([a], [b]) => a - b).map(([id, sha]) => `${id}:${sha}`);
+    const key = [...sha256s.values()].every(Boolean)
+      ? contentBlobKeyOf(CACHE_KEY_PREFIX, inputs)
+      : null;
+    const redirect = key ? await contentBlobRedirect(request, key) : null;
+    if (redirect) return redirect;
+    const histograms = await getTraceHistograms(getDb(), ids);
+    const complete = Object.keys(histograms).length === sha256s.size;
+    return cachedJsonStoringContentBlob(request, histograms, complete ? key : null);
+  } catch (error) {
+    console.error('Error fetching trace histograms:', error);
+    return publicApiError(PUBLIC_API_ERRORS.internal, 500);
+  }
+}

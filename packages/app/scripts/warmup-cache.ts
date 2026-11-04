@@ -85,8 +85,12 @@ async function warmupCaches() {
   console.log('Singleton endpoints:');
   await Promise.all([
     hit('/api/v1/availability'),
+    hit('/api/v1/availability/compact'),
+    hit('/api/v1/benchmark-presence'),
     hit('/api/v1/reliability'),
+    hit('/api/v1/reliability/daily'),
     hit('/api/v1/evaluations'),
+    hit('/api/v1/evaluations/compact'),
     hit('/api/v1/submissions'),
   ]);
 
@@ -99,11 +103,13 @@ async function warmupCaches() {
   await hitBatched(dates.latestPerModel.map((date) => apiPath('/api/v1/workflow-info', { date })));
 
   if (!dashboardOnly) {
-    console.log('\nBenchmark history per model × sequence:');
+    console.log('\nBenchmark history (published and trends) per model × sequence:');
     await hitBatched(
       MODELS.flatMap((model) =>
-        SEQUENCES.map(({ isl, osl }) =>
-          apiPath('/api/v1/benchmarks/history', { model, isl: String(isl), osl: String(osl) }),
+        SEQUENCES.flatMap(({ isl, osl }) =>
+          ['/api/v1/benchmarks/history', '/api/v1/benchmarks/history/trends'].map((path) =>
+            apiPath(path, { model, isl: String(isl), osl: String(osl) }),
+          ),
         ),
       ),
     );

@@ -10,6 +10,11 @@ import {
 } from '@semianalysisai/inferencex-db/queries/request-timeline';
 
 import { cachedGzipJson, cachedQuery } from '@/lib/cache/api-cache';
+import {
+  contentBlobKey,
+  contentBlobRedirect,
+  copyingToContentBlob,
+} from '@/lib/cache/content-blob';
 import { PUBLIC_API_ERRORS, publicApiError } from '@/lib/api/public-api-errors';
 
 import { idQueryRoute } from '../id-routes';
@@ -22,6 +27,8 @@ export const dynamic = 'force-dynamic';
 // string would serve stale blob-cached timelines forever.
 /** Version-derived blob-cache key namespace (exported for the key-derivation test). */
 export const CACHE_KEY_PREFIX = `request-timeline-v${REQUEST_TIMELINE_VERSION}`;
+
+const STORED_GZIP_NAMESPACE = 'request-timeline-gz';
 
 const getCachedRequestTimeline = cachedQuery(
   (id: number): Promise<RequestTimeline | null> => getRequestTimeline(getDb(), id),
@@ -49,9 +56,14 @@ export async function GET(request: NextRequest): Promise<Response> {
     return publicApiError(PUBLIC_API_ERRORS.idRequired, 400);
   }
   try {
-    const chunks = await getStoredRequestTimelineGz(getDb(), id);
-    if (chunks) return cachedGzipJson(request, chunks);
-    return legacyGET(request);
+    const stored = await getStoredRequestTimelineGz(getDb(), id);
+    if (!stored) return legacyGET(request);
+    if (!stored.sha256) return cachedGzipJson(request, stored.chunks);
+    const key = contentBlobKey(STORED_GZIP_NAMESPACE, stored.sha256);
+    return (
+      (await contentBlobRedirect(request, key)) ??
+      cachedGzipJson(request, copyingToContentBlob(stored.chunks, key, stored.sha256))
+    );
   } catch (error) {
     console.error('Error fetching request timeline:', error);
     return publicApiError(PUBLIC_API_ERRORS.internal, 500);

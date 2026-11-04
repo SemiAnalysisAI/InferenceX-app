@@ -1,4 +1,8 @@
+import type { AvailabilityRow } from '@/lib/api/api';
+
+import { availabilityBody } from './e2e';
 import { modelSelectionBenchmarks } from './model-selection-fixtures';
+import { expectHwKeyOpacity } from './scatter-points';
 
 const qwenAgenticRows = modelSelectionBenchmarks
   .filter((row) => row.model === 'dsv4')
@@ -23,22 +27,28 @@ qwenAgenticRows.push(
 
 export function assertTpuGb300Selected() {
   cy.get('[data-testid="chart-legend"] #checkbox-gb300_dynamo-sglang').should('be.checked');
-  cy.get('.dot-group[data-hw-key="gb300_dynamo-sglang"]').should('have.css', 'opacity', '1');
+  expectHwKeyOpacity('gb300_dynamo-sglang', 1);
   cy.get('[data-testid="scatter-quick-filters"]').click();
   cy.get('[data-testid="quick-filter-best-per-sku"]').should('have.attr', 'data-state', 'checked');
   cy.get('body').type('{esc}');
 }
 
-export function interceptTpuLaunchData(
-  model: 'Qwen-3.5-397B-A17B' | 'Kimi-K3' = 'Qwen-3.5-397B-A17B',
-) {
-  const rows =
-    model === 'Kimi-K3'
-      ? qwenAgenticRows.map((row) => ({ ...row, model: 'kimik3' }))
-      : qwenAgenticRows;
-  cy.intercept('GET', '/api/v1/availability*', (request) => {
-    request.on('response', (response) => {
-      response.body = [...response.body, ...rows.map(({ metrics: _metrics, ...row }) => row)];
+type TpuLaunchModel = 'Qwen-3.5-397B-A17B' | 'Kimi-K3';
+
+export function tpuLaunchRows(model: TpuLaunchModel = 'Qwen-3.5-397B-A17B') {
+  return model === 'Kimi-K3'
+    ? qwenAgenticRows.map((row) => ({ ...row, model: 'kimik3' }))
+    : qwenAgenticRows;
+}
+
+export function interceptTpuLaunchData(model: TpuLaunchModel = 'Qwen-3.5-397B-A17B') {
+  const rows = tpuLaunchRows(model);
+  cy.fixture<AvailabilityRow[]>('api/availability.json').then((availability) => {
+    cy.intercept('GET', '/api/v1/availability/compact', {
+      body: availabilityBody([
+        ...availability,
+        ...rows.map(({ metrics: _metrics, ...row }) => row),
+      ]),
     });
   });
   cy.intercept('GET', '/api/v1/benchmarks*', (request) => {

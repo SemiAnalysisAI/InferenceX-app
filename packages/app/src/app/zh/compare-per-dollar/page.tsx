@@ -18,7 +18,7 @@ import { formatModelListZh } from '@/lib/compare/compare-ssr-zh';
 import { zhAlternates } from '@/lib/i18n/i18n';
 import { socialMetadata } from '@/lib/seo/social-metadata';
 
-export const revalidate = 3600;
+export const revalidate = 86400;
 
 const DESCRIPTION =
   '哪款芯片的每美元推理性能更高？对比 DeepSeek、Kimi、MiniMax、GLM、Qwen 等模型按 Hyperscaler TCO 归一化后的每百万 token 成本，数据来自 InferenceX 开源基准测试。';

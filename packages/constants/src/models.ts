@@ -75,14 +75,15 @@ export function sequenceToIslOsl(seq: string): { isl: number; osl: number } | nu
   return map[seq] ?? null;
 }
 
+const ISL_OSL_TO_SEQUENCE: Record<string, string> = {
+  '1024_1024': '1k/1k',
+  '1024_8192': '1k/8k',
+  '8192_1024': '8k/1k',
+};
+
 /** Convert ISL/OSL in tokens to a frontend sequence string. */
 export function islOslToSequence(isl: number, osl: number): string | null {
-  const map: Record<string, string> = {
-    '1024_1024': '1k/1k',
-    '1024_8192': '1k/8k',
-    '8192_1024': '8k/1k',
-  };
-  return map[`${isl}_${osl}`] ?? null;
+  return ISL_OSL_TO_SEQUENCE[`${isl}_${osl}`] ?? null;
 }
 
 /**

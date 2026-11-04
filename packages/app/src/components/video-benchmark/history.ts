@@ -7,6 +7,7 @@ import { efficiencyValue, latencyValue, tradeoffPoints } from './tradeoff';
 
 /** Shared bound for dashboard history reads in the browser and view API. */
 export const VIDEO_HISTORY_MAX_PAGES = 5;
+export const VIDEO_HISTORY_PAGE_SIZE = 10;
 
 export interface VideoHistoryObservation {
   id: string;

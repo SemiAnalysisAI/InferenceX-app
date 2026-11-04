@@ -5,7 +5,7 @@ import {
   updateAtomKvCachePoolTokens,
 } from './etl/atom-kv-capacity.js';
 import type { RawMetric } from './etl/compute-chart-series.js';
-import { createAdminSql, refreshLatestBenchmarks } from './etl/db-utils.js';
+import { createAdminSql } from './etl/db-utils.js';
 import { collectMetricPhases } from './etl/gzip-json-stream.js';
 import { parseRunIdFlag, runBackfillMain, runCandidateIdBackfill } from './lib/backfill-runner.js';
 
@@ -19,7 +19,7 @@ const sql = createAdminSql({ noSsl: hasNoSslFlag(), max: 1, onnotice: () => {} }
 
 async function main(): Promise<void> {
   console.log(`=== backfill-atom-kv-capacity: run ${githubRunId} ===`);
-  const processed = await runCandidateIdBackfill(
+  await runCandidateIdBackfill(
     async () => {
       const rows = await sql<{ id: number }[]>`
         select br.id from benchmark_results br
@@ -57,7 +57,6 @@ async function main(): Promise<void> {
       return 'ok';
     },
   );
-  if (processed) await refreshLatestBenchmarks(sql);
 }
 
 runBackfillMain('backfill-atom-kv-capacity', sql, main);

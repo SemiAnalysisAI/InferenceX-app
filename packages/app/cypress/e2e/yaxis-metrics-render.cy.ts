@@ -34,10 +34,7 @@ describe('Y-Axis Metrics All Render Data', () => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
     cy.visit('/inference?g_model=DeepSeek-V4-Pro');
-    cy.get('[data-testid="scatter-graph"]')
-      .first()
-      .find('svg .dot-group')
-      .should('have.length.greaterThan', 0);
+    cy.scatterPoints().should('have.length.greaterThan', 0);
   });
 
   metrics.forEach(({ label, tier }) => {
@@ -49,10 +46,7 @@ describe('Y-Axis Metrics All Render Data', () => {
         cy.get('[data-testid="cost-tier-selector"]').first().click('right', { force: true });
         cy.get(`[data-testid="cost-tier-${tier}"]`).click({ force: true });
       }
-      cy.get('[data-testid="scatter-graph"]')
-        .first()
-        .find('svg .dot-group')
-        .should('have.length.greaterThan', 0);
+      cy.scatterPoints().should('have.length.greaterThan', 0);
     });
   });
 });

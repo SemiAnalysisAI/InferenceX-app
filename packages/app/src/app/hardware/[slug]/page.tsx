@@ -1,8 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
-import 'katex/dist/katex.min.css';
-
+import { KatexStyles } from '@/components/blog/katex-styles';
 import { HardwarePageContent } from '@/components/hardware/hardware-page-content';
 import { JsonLd } from '@/components/seo/json-ld';
 import { extractHeadings } from '@/lib/blog/blog';
@@ -35,12 +34,13 @@ export default async function HardwarePage({ params }: Props) {
   if (!page) notFound();
 
   const { meta, raw } = page;
-  const { content } = await compileBlogMdx(raw);
+  const { content, hasMath } = await compileBlogMdx(raw);
 
   return (
     <>
       <JsonLd data={buildHardwareArticleJsonLd(meta, raw)} />
       <JsonLd data={buildHardwareBreadcrumbJsonLd(meta)} />
+      {hasMath && <KatexStyles />}
       <HardwarePageContent
         locale="en"
         meta={meta}

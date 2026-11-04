@@ -18,16 +18,11 @@ import {
   type StoredSource,
 } from '@/components/video-benchmark/stored';
 import { servingCells } from '@/components/video-benchmark/serving';
-import {
-  videoHistoryEntry,
-  type VideoHistoryEntry,
-  type VideoHistoryPage,
-} from '@/components/video-benchmark/history';
 
-const PREFIX = 'h3-video-media/v1';
+export const PREFIX = 'h3-video-media/v1';
 export const videoStorageEnabled = () => Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 const runPrefix = (runId: string) => `${PREFIX}/runs/${runId}/`;
-const approvalPath = (runId: string, artifact: CIArtifact) =>
+export const approvalPath = (runId: string, artifact: CIArtifact) =>
   `${PREFIX}/approvals/${runId}/${artifact.name}_${artifact.id}.json`;
 const sourceSeal = (path: string) => /^sources\/[1-9]\d*\/original-SHA256SUMS$/u.test(path);
 const legacyTelemetry = (path: string) =>
@@ -380,60 +375,4 @@ export async function storeVideoArtifact(
     signal,
   );
   return result;
-}
-
-/** Read existing immutable indexes only. This path never uploads an artifact or media. */
-export async function publishedVideoHistory(page: number): Promise<VideoHistoryPage> {
-  if (!videoStorageEnabled()) return { schemaVersion: 1, entries: [], nextPage: null };
-  const indexes: { runId: string; artifact: CIArtifact; publishedAt: string }[] = [];
-  let cursor: string | undefined;
-  // ponytail: scan index metadata; add a materialized catalog if the published inventory grows large.
-  do {
-    const batch = await list({ prefix: `${PREFIX}/runs/`, cursor });
-    for (const blob of batch.blobs) {
-      const match =
-        /^h3-video-media\/v1\/runs\/(?<run>[1-9]\d*)\/(?<name>[^/]+)_(?<artifact>[1-9]\d*)\.json$/u.exec(
-          blob.pathname,
-        )?.groups;
-      if (!match || videoArtifactIdentity(match.name)?.run !== match.run) continue;
-      indexes.push({
-        runId: match.run,
-        publishedAt: blob.uploadedAt.toISOString(),
-        artifact: {
-          id: Number(match.artifact),
-          name: match.name,
-          expired: false,
-          size_in_bytes: 0,
-          stored: true,
-          indexUrl: blob.url,
-        },
-      });
-    }
-    cursor = batch.hasMore ? batch.cursor : undefined;
-  } while (cursor);
-  indexes.sort(
-    (a, b) => b.publishedAt.localeCompare(a.publishedAt) || b.artifact.id - a.artifact.id,
-  );
-  const size = 10;
-  const entries = await Promise.all(
-    indexes.slice((page - 1) * size, page * size).map(async (index): Promise<VideoHistoryEntry> => {
-      try {
-        const saved = await readStoredArtifact(index.runId, index.artifact);
-        if (!saved) throw new Error('Published artifact unavailable');
-        const approved = await readVideoPublication(index.runId, index.artifact, saved)
-          .then((receipt) => receipt !== null)
-          .catch(() => false);
-        return { ...videoHistoryEntry(saved, index.publishedAt), approved };
-      } catch (error) {
-        return {
-          id: `${index.runId}.${index.artifact.id}`,
-          ...index,
-          approved: false,
-          sources: [],
-          error: error instanceof Error ? error.message : String(error),
-        };
-      }
-    }),
-  );
-  return { schemaVersion: 1, entries, nextPage: page * size < indexes.length ? page + 1 : null };
 }

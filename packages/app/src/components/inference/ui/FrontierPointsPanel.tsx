@@ -1,10 +1,10 @@
 'use client';
 
+import { ChartButtons } from '@/components/ui/chart-buttons';
 import * as d3 from 'd3';
 import { useMemo } from 'react';
 
 import { useInferenceAnalyticsContext } from '@/components/inference/InferenceContext';
-import { ChartButtons } from '@/components/ui/chart-buttons';
 import { Heading } from '@/components/ui/heading';
 import { useUnofficialRun } from '@/providers/unofficial-run-provider';
 import { exportToCsv } from '@/lib/export/csv-export';

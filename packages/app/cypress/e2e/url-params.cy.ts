@@ -1,5 +1,6 @@
 import { selectXAxisMode } from '../support/e2e';
 import { expandLegendAdvanced } from '../support/legend-advanced';
+import { type ScatterPoint, triggerAtPoint, visiblePoints } from '../support/scatter-points';
 
 const withFixtureModel = (path: string) => {
   const url = new URL(path, 'http://localhost');
@@ -8,6 +9,14 @@ const withFixtureModel = (path: string) => {
   }
   return `${url.pathname}${url.search}${url.hash}`;
 };
+
+const inPlot = (points: ScatterPoint[]) =>
+  visiblePoints(points).filter((point) => {
+    const plot = point.hitArea.parentElement!.querySelector('canvas')!;
+    return (
+      point.x >= 0 && point.x <= plot.clientWidth && point.y >= 0 && point.y <= plot.clientHeight
+    );
+  });
 
 const visitWithDismissedModal = (path: string) => {
   cy.visit(withFixtureModel(path), {
@@ -274,27 +283,19 @@ describe('URL Parameter Persistence', () => {
         'Input Token Throughput per Chip',
       );
 
-      cy.get('[data-testid="scatter-graph"]')
-        .first()
-        .within(() => {
-          cy.get<SVGGElement>('.dot-group')
+      cy.scatterPoints()
+        .should((points) => expect(inPlot(points)).to.not.be.empty)
+        .then((points) => {
+          const point = inPlot(points)[0];
+          triggerAtPoint(point, 'mousemove');
+          cy.get('[data-testid="scatter-graph"] .vertical-ruler')
             .first()
-            .then(($point) => {
-              const match = $point
-                .attr('transform')
-                ?.match(/translate\((?<x>[^,]+),(?<y>[^)]+)\)/u);
-              expect(match, 'point transform').not.to.equal(null);
-              const pointX = Number(match?.groups?.x);
-              const pointY = Number(match?.groups?.y);
-
-              cy.wrap($point).trigger('mouseenter', { force: true });
-              cy.get('.vertical-ruler')
-                .invoke('attr', 'x1')
-                .then((x) => expect(Number(x)).to.be.closeTo(pointX, 1));
-              cy.get('.horizontal-ruler')
-                .invoke('attr', 'y1')
-                .then((y) => expect(Number(y)).to.be.closeTo(pointY, 1));
-            });
+            .invoke('attr', 'x1')
+            .then((x) => expect(Number(x)).to.be.closeTo(point.x, 1));
+          cy.get('[data-testid="scatter-graph"] .horizontal-ruler')
+            .first()
+            .invoke('attr', 'y1')
+            .then((y) => expect(Number(y)).to.be.closeTo(point.y, 1));
         });
     });
   });

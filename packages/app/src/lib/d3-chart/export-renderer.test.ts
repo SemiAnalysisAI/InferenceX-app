@@ -4,11 +4,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { setupChartStructure } from './chart-setup';
 import { renderLayer } from './D3Chart/layer-renderer';
 import type { D3ChartProps, RenderContext } from './D3Chart/types';
-import {
-  registerChartExportRenderer,
-  renderChartForExport,
-  renderExportChart,
-} from './export-renderer';
+import { renderChartForExport } from './export-renderer';
+import { registerChartExportRenderer } from './export-registry';
+import { CANVAS_POINT_LAYER_CLASS, canvasPointLayers } from './layers/canvas-point-registry';
+
+const ORDER_DATA = [
+  { id: 'a', x: 1, y: 1, precision: 'fp8' },
+  { id: 'b', x: 2, y: 2, precision: 'fp8' },
+  { id: 'c', x: 3, y: 3, precision: 'fp8' },
+];
+type OrderDatum = (typeof ORDER_DATA)[number];
+const orderKey = (d: OrderDatum) => d.id;
 
 afterEach(() => {
   document.body.innerHTML = '';
@@ -65,9 +71,7 @@ describe('isolated PNG chart rendering', () => {
     const before = svg.outerHTML;
     const mark = svg.querySelector('.dot-group')!;
     const radius = mark.querySelector('.visible-shape')!.getAttribute('r');
-    const unregister = registerChartExportRenderer(svg, (target, w, h) =>
-      renderExportChart(target, w, h, props, scales),
-    );
+    const unregister = registerChartExportRenderer(svg, (draw) => draw(props, scales));
     const clone = svg.cloneNode(true) as SVGSVGElement;
     document.body.append(clone);
     renderChartForExport(svg, clone, 1200, 400);
@@ -88,5 +92,58 @@ describe('isolated PNG chart rendering', () => {
     expect(scales.yScale.range()).toEqual([536, 0]);
     unregister();
     expect(() => renderChartForExport(svg, clone, 1000, 800)).toThrow('not ready');
+  });
+
+  it.each([
+    ['canvas', true, ['c', 'b', 'a']],
+    ['SVG', false, ['a', 'b', 'c']],
+  ])('draws %s scatter points in the order the live chart shows them', (_, canvas, order) => {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    document.body.append(svg);
+    const layout = setupChartStructure(svg, {
+      chartId: 'export-order',
+      containerWidth: 400,
+      containerHeight: 300,
+      margin: { top: 10, right: 10, bottom: 30, left: 40 },
+      watermark: 'none',
+    });
+    const canvasLayer = layout.zoomGroup.append('g').attr('class', CANVAS_POINT_LAYER_CLASS);
+    const orderedLike = vi.fn((rows: readonly { id: string }[]) => [...rows].toReversed());
+    canvasPointLayers.set(canvasLayer.node()!, { orderedLike });
+    const props: D3ChartProps<OrderDatum> = {
+      data: ORDER_DATA,
+      chartId: 'export-order',
+      watermark: 'none',
+      xScale: { type: 'linear', domain: [0, 4] },
+      yScale: { type: 'linear', domain: [0, 4] },
+      layers: [
+        {
+          type: 'scatter',
+          data: ORDER_DATA,
+          keyFn: orderKey,
+          config: { getColor: () => '#f00' },
+          canvas: canvas
+            ? () => {
+                throw new Error('PNG export draws SVG points');
+              }
+            : undefined,
+        },
+      ],
+    };
+    const scales = {
+      xScale: d3.scaleLinear().domain([0, 4]).range([0, layout.width]),
+      yScale: d3.scaleLinear().domain([0, 4]).range([layout.height, 0]),
+    };
+    registerChartExportRenderer(svg, (draw) => draw(props, scales));
+    const clone = svg.cloneNode(true) as SVGSVGElement;
+    document.body.append(clone);
+    renderChartForExport(svg, clone, 600, 300);
+    expect(
+      [...clone.querySelectorAll('.dot-group')].map(
+        (node) => d3.select<Element, OrderDatum>(node).datum().id,
+      ),
+    ).toEqual(order);
+    expect(clone.querySelector(`.${CANVAS_POINT_LAYER_CLASS}`)).toBeNull();
+    expect(orderedLike.mock.calls).toEqual(canvas ? [[ORDER_DATA, orderKey]] : []);
   });
 });

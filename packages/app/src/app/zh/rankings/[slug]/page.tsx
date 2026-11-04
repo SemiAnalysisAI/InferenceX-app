@@ -21,7 +21,7 @@ import {
 } from '@/lib/live-seo/rankings-zh';
 import { getRankingPageData, type RankingPageData } from '@/lib/live-seo/run-rankings-data.server';
 
-export const revalidate = 3600;
+export const revalidate = 86400;
 
 export function generateStaticParams(): { slug: string }[] {
   return [];

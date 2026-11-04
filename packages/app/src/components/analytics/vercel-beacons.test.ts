@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('@vercel/analytics/next', () => ({ Analytics: () => null }));
 vi.mock('@vercel/speed-insights/next', () => ({ SpeedInsights: () => null }));
 
-import { dropBotBeacon } from './vercel-analytics';
+import { dropBotBeacon } from './vercel-beacons';
 
 const EVENT = { type: 'pageview' as const, url: 'https://inferencex.semianalysis.com/' };
 

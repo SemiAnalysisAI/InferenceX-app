@@ -3,6 +3,9 @@ import { act, memo } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { AvailabilityRow } from '@/lib/api/api';
+import { type AvailabilityIndex, indexAvailability } from '@/lib/benchmarks/availability-index';
+import { compactAvailability } from '@/lib/benchmarks/compact-availability';
 import { Model } from '@/lib/catalog/data-mappings';
 import {
   CLIENT_PATHNAME_CHANGE_EVENT,
@@ -13,7 +16,7 @@ import type * as UrlStateModule from '@/lib/routing/url-state';
 const mocks = vi.hoisted(() => ({
   pathname: '/',
   availability: {
-    data: undefined as unknown[] | undefined,
+    data: undefined as AvailabilityIndex | undefined,
     error: null as Error | null,
     isError: false,
     isPending: true,
@@ -52,10 +55,12 @@ import {
   type GlobalFilterActionsContextType,
 } from './GlobalFilterContext';
 
-const AVAILABILITY_ROWS = [
-  { model: 'kimik3', isl: 8192, osl: 1024, benchmark_type: 'single_turn', precision: 'fp4' },
-  { model: 'dsr1', isl: 8192, osl: 1024, benchmark_type: 'single_turn', precision: 'fp4' },
-];
+const AVAILABILITY = indexAvailability(
+  compactAvailability([
+    { model: 'kimik3', isl: 8192, osl: 1024, benchmark_type: 'single_turn', precision: 'fp4' },
+    { model: 'dsr1', isl: 8192, osl: 1024, benchmark_type: 'single_turn', precision: 'fp4' },
+  ] as AvailabilityRow[]),
+);
 
 let root: Root | undefined;
 let container: HTMLDivElement | undefined;
@@ -89,7 +94,7 @@ function mountAt(path: string, initialModel?: Model): void {
 }
 
 function settleAvailability(initialModel?: Model): void {
-  mocks.availability.data = AVAILABILITY_ROWS;
+  mocks.availability.data = AVAILABILITY;
   mocks.availability.isPending = false;
   render(initialModel);
 }

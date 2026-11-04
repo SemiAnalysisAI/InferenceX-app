@@ -78,13 +78,17 @@ describe('renderErrorBars', () => {
 
   it('stem lines connect yMax to yMin vertically at cx', () => {
     const group = createMockGroup();
-    renderErrorBars(group as any, SAMPLE_DATA, makeConfig());
+    const config = makeConfig();
+    renderErrorBars(group as any, SAMPLE_DATA, config);
 
     const bars = group.selectAll('.error-bar');
     for (let i = 0; i < SAMPLE_DATA.length; i++) {
       const stem = bars.elements[i].children.find((c) => c.attrs['class'] === 'eb-stem')!;
       expect(stem).toBeDefined();
       expect(stem.attrs['stroke']).toBe('#888');
+      expect(stem.attrs['x1']).toBe(config.getCx(SAMPLE_DATA[i]));
+      expect(stem.attrs['y1']).toBe(config.getYMax(SAMPLE_DATA[i]));
+      expect(stem.attrs['y2']).toBe(config.getYMin(SAMPLE_DATA[i]));
     }
   });
 

@@ -18,8 +18,11 @@ export const PREPARED_TRACE_REPLAY_BUFFER_FIELDS = [
   'serverMetricsCsv',
   'serverMetricsJsonGz',
   'aggregateStatsJson',
+  'sequenceLengthSketches',
   'chartSeriesJson',
+  'chartSeriesSummaryGz',
   'requestTimelineGz',
+  'requestChartDataGz',
 ] as const satisfies readonly (keyof PreparedTraceReplay)[];
 
 type BufferField = (typeof PREPARED_TRACE_REPLAY_BUFFER_FIELDS)[number];

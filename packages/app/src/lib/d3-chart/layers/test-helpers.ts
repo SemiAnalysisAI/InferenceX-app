@@ -1,3 +1,8 @@
+interface MockTextNode {
+  nodeType: 3;
+  nodeValue: string;
+}
+
 export interface MockElement {
   tag: string;
   attrs: Record<string, string | number>;
@@ -7,10 +12,58 @@ export interface MockElement {
   datum: unknown;
   removed: boolean;
   handlers?: Record<string, (...args: unknown[]) => void>;
+  getAttribute: (name: string) => string | null;
+  setAttribute: (name: string, value: string) => void;
+  removeAttribute: (name: string) => void;
+  style: {
+    getPropertyValue: (name: string) => string;
+    setProperty: (name: string, value: string) => void;
+    removeProperty: (name: string) => void;
+  };
+  readonly firstChild: MockTextNode | null;
+  readonly lastChild: MockTextNode | null;
+}
+
+function assertedValue(value: string): string | number {
+  return value !== '' && String(Number(value)) === value ? Number(value) : value;
 }
 
 function createMockElement(tag: string, datum?: unknown): MockElement {
-  return { tag, attrs: {}, styles: {}, textContent: '', children: [], datum, removed: false };
+  const textNode: MockTextNode = { nodeType: 3, nodeValue: '' };
+  const element: MockElement = {
+    tag,
+    attrs: {},
+    styles: {},
+    textContent: '',
+    children: [],
+    datum,
+    removed: false,
+    getAttribute: (name) => (name in element.attrs ? String(element.attrs[name]) : null),
+    setAttribute: (name, value) => {
+      element.attrs[name] = assertedValue(value);
+    },
+    removeAttribute: (name) => {
+      delete element.attrs[name];
+    },
+    style: {
+      getPropertyValue: (name) => (name in element.styles ? String(element.styles[name]) : ''),
+      setProperty: (name, value) => {
+        element.styles[name] = assertedValue(value);
+      },
+      removeProperty: (name) => {
+        delete element.styles[name];
+      },
+    },
+    get firstChild() {
+      if (element.textContent === '') return null;
+      textNode.nodeValue = element.textContent;
+      return textNode;
+    },
+    get lastChild() {
+      return element.firstChild;
+    },
+  };
+  return element;
 }
 
 const childStores = new WeakMap<

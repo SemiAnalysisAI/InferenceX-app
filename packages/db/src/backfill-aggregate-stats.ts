@@ -17,6 +17,7 @@ import {
   runBackfillMain,
   runCandidateIdBackfill,
 } from './lib/backfill-runner.js';
+import { sequenceLengthSketchColumns } from './queries/agentic-shared.js';
 
 const flags = parseLimitForceFlags();
 const githubRunId = parseRunIdFlag();
@@ -109,9 +110,12 @@ async function main(): Promise<void> {
         'prefixCacheHitRate',
         'e2elPerOsl',
       ]);
+      const { sketches, version } = sequenceLengthSketchColumns(stats);
       await sql`
         update agentic_trace_replay
-        set aggregate_stats = ${jsonbParam(sql, stats)}
+        set aggregate_stats = ${jsonbParam(sql, stats)},
+          sequence_length_sketches = ${sketches},
+          sequence_length_sketches_version = ${version}
         where id = ${id}
           and coalesce((aggregate_stats->>'version')::int, -1) <= ${STATS_VERSION}
       `;

@@ -1000,6 +1000,14 @@ describe('buildGpuGroups', () => {
     expect(first.tpPerMw).toBeGreaterThan(0);
   });
 
+  it('reads a missing fixed-sequence median interactivity as zero', () => {
+    const { grouped } = buildGpuGroups([makeRow({ metrics: { tput_per_gpu: 900 } })], {
+      ...shared,
+      classify: singlePrecisionClassify,
+    });
+    expect(Object.values(grouped)[0][0].interactivity).toBe(0);
+  });
+
   describe('chip basis', () => {
     const disagg = makeRow({
       hardware: 'gb300',
@@ -1032,6 +1040,10 @@ describe('buildGpuGroups', () => {
       expect(p.inputThroughput).toBe(3600);
       expect(p.outputThroughput).toBe(133);
       expect(p.throughput).toBe(1000);
+    });
+
+    it('measures the token mix per deployment chip on the default pool basis', () => {
+      expect(point().inputTokenShare).toBeCloseTo(900 / (900 + (133 * 12) / 16), 9);
     });
 
     it('divides input, output and their costs by every chip on the total basis', () => {
@@ -1191,6 +1203,12 @@ describe('buildGpuGroups', () => {
     it('clamps into [0,1] — real rows report a GPU rate as high as 1.185', () => {
       expect(only(withMetrics({ server_gpu_cache_hit_rate: 1.185 })).cacheHitRate).toBe(1);
       expect(only(withMetrics({ server_gpu_cache_hit_rate: -0.2 })).cacheHitRate).toBe(0);
+    });
+
+    it('falls back to the theoretical rate only on fallback hardware', () => {
+      const theoretical = { theoretical_cache_hit_rate: 0.4 };
+      expect(only({ ...withMetrics(theoretical), hardware: 'gb300' }).cacheHitRate).toBe(0.4);
+      expect(only(withMetrics(theoretical)).cacheHitRate).toBeUndefined();
     });
   });
 

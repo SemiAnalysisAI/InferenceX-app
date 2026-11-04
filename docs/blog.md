@@ -82,5 +82,7 @@ are full of prices like `$1.95/GPU/hr` and `$3 per million tokens` that would ot
 swallowed into a formula. Inline math therefore also needs `$$…$$`.
 
 KaTeX runs with `strict: false`, and one malformed expression renders in red rather than
-failing the whole build. `katex/dist/katex.min.css` is imported by the post pages, and its
-fonts are emitted to `/_next/static/media/` — no external CDN.
+failing the whole build. `compileBlogMdx` reports `hasMath` when `rehypeKatex` rendered any
+expression, and only then do the post, hardware and model pages render `KatexStyles`, a
+`next/dynamic` client component whose module imports `katex/dist/katex.min.css`; pages without
+math do not load the stylesheet. Its fonts are emitted to `/_next/static/media/` — no external CDN.

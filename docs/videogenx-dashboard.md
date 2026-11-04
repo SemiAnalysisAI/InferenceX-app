@@ -4,7 +4,7 @@ Why `/video` leads with a cross-hardware chart instead of a CI-run browser, and 
 
 ## Data path
 
-Stored blob indexes and explicit publication receipts → `GET /api/video-runs?format=history` (the per-cell projection described in [Video performance history](./video-history.md), with additive nullable fields for GPU counts, wall time, clip shape, board power, enforced limit and server layout) → `points.ts` (`videoPoints`, `latestVideoCells`) → `metrics.ts` (`metricValue`). History keeps unapproved stored sources; `videoPoints` admits only entries whose receipt matches the original source and checkout. The browser reads at most five history pages and never parses an artifact bundle for the chart. The previous CI-run viewer has been removed: `history-*` links open Performance history; Compare loads published media on demand. The public `/api/v1/views/video` dashboard projection reuses these selectors and formulas; explicit legacy views remain available through the API.
+Stored blob indexes and explicit publication receipts → `GET /api/video-runs?format=history` (the per-cell projection described in [Video performance history](./video-history.md), with additive nullable fields for GPU counts, wall time, clip shape, board power, enforced limit and server layout) → `points.ts` (`videoPoints`, `latestVideoCells`) → `metrics.ts` (`metricValue`). History keeps unapproved stored sources; `videoPoints` admits only entries whose receipt matches the original source and checkout. The browser reads at most five history pages in one request (`page=1&pages=5`) and never parses an artifact bundle for the chart. The previous CI-run viewer has been removed: `history-*` links open Performance history; Compare loads published media on demand. The public `/api/v1/views/video` dashboard projection reuses these selectors and formulas; explicit legacy views remain available through the API.
 
 ## Axes and defaults
 
@@ -52,6 +52,6 @@ The retained dashboard fixture has exactly one measured deployment per measured 
 
 InferenceX #2916 的原生 srt-slurm 产物包（`h3-results-<run>-<attempt>`，`evidence_kind: srt_slurm_h3_service`）走同一条投影路径，契约见[视频性能历史](./video-history.md)。它们不记录 GPU 型号：只有在 `ci.site.gpu_model` 或 CI runner 名称能识别出硬件时，对应点才会进入按 SKU 划分的图表、KPI 卡和 Compare；否则只保留在性能历史列表中，硬件留空。功率无效或缺失时显示为未测得。
 
-完整工作负载身份由附加字段 `workloadKey` 保存，包含 prompts 与 seeds；缩写标签只用于显示。身份缺失时保持 null，按原始 source manifest 隔离，不跨来源合并。runtime revision 作为比较变量单独披露。仪表板最多读取五页历史；公开 `/api/v1/views/video` 默认复用相同选择与计算逻辑，旧 API 视图仍可显式指定。
+完整工作负载身份由附加字段 `workloadKey` 保存，包含 prompts 与 seeds；缩写标签只用于显示。身份缺失时保持 null，按原始 source manifest 隔离，不跨来源合并。runtime revision 作为比较变量单独披露。仪表板以一次请求最多读取五页历史；公开 `/api/v1/views/video` 默认复用相同选择与计算逻辑，旧 API 视图仍可显式指定。
 
 `cypress/fixtures/api/video-history.json` 由保留的 `StoredArtifact` 导出通过 `bun run fixtures:video-history <dir>` 重建，只含元数据，并登记在 `_manifest.json` 中。fixture 尚未收录的 run 会作为新条目追加在末尾，发布时间记为未知。下载的 `h3-results-<run>-<attempt>` 产物包可用 `bun scripts/export-stored-artifact.ts <dir> <runId> <artifactId> <name> <bytes> <out.json>` 转成这种导出；保留的原生 H200 run 39002901777 就是这样进入 fixture 的。

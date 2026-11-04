@@ -18,7 +18,7 @@ import {
 } from '@/lib/compare/compare-slug';
 import { bucketComparePairsByVendor, formatModelList } from '@/lib/compare/compare-ssr';
 
-export const revalidate = 3600;
+export const revalidate = 86400;
 
 const DESCRIPTION =
   'Which chip delivers more LLM inference per dollar? Compare cost per million tokens, normalized by hyperscaler TCO, for DeepSeek, Kimi, MiniMax, GLM & Qwen.';

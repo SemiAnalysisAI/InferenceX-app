@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  RESIZE_COALESCE_MS,
   useResponsiveChartDimensions,
   type UseResponsiveChartDimensionsResult,
 } from './useResponsiveChartDimensions';
@@ -169,5 +170,35 @@ describe('useResponsiveChartDimensions', () => {
     expect(observer.disconnected).toBe(true);
     expect(result.current.dimensions).toEqual({ width: 800, height: 600 });
     unmount();
+  });
+
+  it('applies the first width change at once and coalesces a burst into its final width', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const { result, unmount } = renderHook<UseResponsiveChartDimensionsResult>(() =>
+        useResponsiveChartDimensions({ height: 600 }),
+      );
+      act(() => {
+        result.current.setContainerRef(makeContainer(800));
+      });
+      const observer = MockResizeObserver.instances.at(-1)!;
+
+      observer.trigger(1024);
+      expect(result.current.dimensions.width).toBe(1024);
+
+      observer.trigger(1000);
+      observer.trigger(990);
+      expect(result.current.dimensions.width).toBe(1024);
+
+      act(() => vi.advanceTimersByTime(RESIZE_COALESCE_MS));
+      expect(result.current.dimensions).toEqual({ width: 990, height: 600 });
+
+      act(() => vi.advanceTimersByTime(RESIZE_COALESCE_MS));
+      observer.trigger(700);
+      expect(result.current.dimensions.width).toBe(700);
+      unmount();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

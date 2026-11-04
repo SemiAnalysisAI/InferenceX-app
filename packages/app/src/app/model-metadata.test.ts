@@ -12,6 +12,10 @@ vi.mock('@/lib/compare/compare-availability', () => ({
     ),
 }));
 
+vi.mock('@/lib/cache/api-cache', () => ({
+  cachedDerivedData: <T>(fn: () => Promise<T>) => fn,
+}));
+
 import { modelDetailMetadata, modelIndexMetadata } from '@/lib/catalog/model-page-metadata';
 
 describe('model page metadata locale pairing', () => {
