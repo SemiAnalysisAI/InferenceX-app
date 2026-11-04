@@ -133,6 +133,11 @@ interface ModelSelectorProps {
   'data-testid'?: string;
   trailing?: ReactNode;
   newModels?: ReadonlySet<string>;
+  /**
+   * Extra details right-aligned on each model's row, e.g. its history and vendors. When set,
+   * the dropdown panel widens beyond the trigger so the details have room.
+   */
+  modelDetails?: ReadonlyMap<string, ReactNode>;
 }
 
 export function ModelSelector({
@@ -145,14 +150,18 @@ export function ModelSelector({
   'data-testid': testId,
   trailing,
   newModels,
+  modelDetails,
 }: ModelSelectorProps) {
   const t = STRINGS[useLocale()];
   const groups = groupByCategory(availableModels, (m) => getModelCategory(m as Model));
   const optionFor = (model: string) =>
     toOption(
       model,
-      newModels?.has(model) ? (
-        <NewBadge data-new-badge="model-option">{t.newModel}</NewBadge>
+      newModels?.has(model) || modelDetails?.has(model) ? (
+        <>
+          {newModels?.has(model) && <NewBadge data-new-badge="model-option">{t.newModel}</NewBadge>}
+          {modelDetails?.get(model)}
+        </>
       ) : undefined,
     );
   const sections = [
@@ -226,6 +235,7 @@ export function ModelSelector({
             searchable
             plainSelectedText
             showSelectionSummary={false}
+            contentClassName={modelDetails ? 'w-[min(44rem,calc(100vw-2rem))]' : undefined}
           />
         </div>
         {trailing}
