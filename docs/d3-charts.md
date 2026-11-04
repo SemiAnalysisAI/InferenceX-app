@@ -259,7 +259,7 @@ headers aligned through a CSS subgrid, so their x axes line up.
   `softwareGainByInteractivity` (current over first-run frontier at the 12 buckets)
   as grouped bars.
 
-The optional **Meme** switch is an easter egg: once per playback run, the first time
+The optional **Memes** switch is an easter egg: once per playback run, the first time
 another vendor takes part of the curve from NVIDIA, a small meme card appears in the
 top-right corner of the plot. Its component and `public/decorative/frontier-memes/`
 asset load only after it is turned on, and it follows the easter egg testing policy.

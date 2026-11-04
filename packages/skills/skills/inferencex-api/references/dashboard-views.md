@@ -365,7 +365,7 @@ empty. The data is in `frontier`:
 
 The dashboard views use the same functions. Their vendor picker is the existing
 `vendors=` filter (one vendor, with `groupBy=gpu`). Playback, shading, faded earlier points, growth
-rings and the optional "Meme" easter egg are presentation-only and have no API
+rings and the optional "Memes" easter egg are presentation-only and have no API
 parameter.
 
 The Historical model selector lists, per model, the calendar span from its first to

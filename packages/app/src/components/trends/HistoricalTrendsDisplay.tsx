@@ -103,7 +103,7 @@ const STRINGS = {
       `${isAgentic ? 'P90 ' : ''}Interactivity (tok/s/user)`,
     frontierLoadError: 'Frontier history could not be loaded.',
     frontierEmpty: 'No frontier history for the selected configurations.',
-    memes: 'Meme',
+    memes: 'Memes',
     heading: 'Historical Trends',
     description:
       'Interpolated performance metrics over time at a fixed interactivity operating point.',
