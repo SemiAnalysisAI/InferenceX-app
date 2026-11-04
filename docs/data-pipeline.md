@@ -510,6 +510,8 @@ character. Regenerate the table if the database's PostgreSQL major version or lo
 `bun run admin:db:compact-server-logs` (`--log-id`, `--limit`, `--dry-run`, `--concurrency`) converts
 existing files, reading each file's text in ranges of 64 blocks. `--concurrency N` compacts N files at
 once on N connections; each file is its own transaction, so an interrupted run resumes by rerunning.
+Point `DATABASE_WRITE_URL` at the direct endpoint (no `-pooler` in the host): the pooler closed
+connections at 16 and above. Each connection holds up to about 1 GB while it compacts a large file.
 
 ### Agentic Dataset Provenance
 
