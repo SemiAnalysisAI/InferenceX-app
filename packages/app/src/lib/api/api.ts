@@ -9,11 +9,8 @@ import {
   type CollectiveXRunSummary,
   type CollectiveXVersion,
 } from '@/components/collectivex/types';
-import { type CompactEvalRows, expandEvalRows } from '@/components/evaluation/compact-rows';
-import {
-  type CompactTrendHistory,
-  expandTrendHistory,
-} from '@/components/inference/hooks/trend-history-rows';
+import type { CompactEvalRows } from '@/components/evaluation/compact-rows';
+import type { CompactTrendHistory } from '@/components/inference/hooks/trend-history-rows';
 import type { CompactAvailability } from '@/lib/benchmarks/compact-availability';
 import type { BenchmarkRow } from '@semianalysisai/inferencex-db/queries/benchmarks';
 import type { EvalRow } from '@semianalysisai/inferencex-db/queries/evaluations';
@@ -141,18 +138,16 @@ export function fetchBenchmarkHistory(
   return fetchJson<BenchmarkRow[]>(`/api/v1/benchmarks/history?${params}`, signal);
 }
 
-export async function fetchTrendHistory(
+export function fetchTrendHistory(
   model: string,
   isl: number,
   osl: number,
   signal?: AbortSignal,
   benchmarkType?: 'agentic_traces',
-): Promise<BenchmarkRow[]> {
+) {
   const params = new URLSearchParams({ model, isl: String(isl), osl: String(osl) });
   if (benchmarkType) params.set('benchmarkType', benchmarkType);
-  return expandTrendHistory(
-    await fetchJson<CompactTrendHistory>(`/api/v1/benchmarks/history/trends?${params}`, signal),
-  );
+  return fetchJson<CompactTrendHistory>(`/api/v1/benchmarks/history/trends?${params}`, signal);
 }
 
 export function fetchWorkflowInfo(
@@ -215,8 +210,8 @@ export function fetchEvaluations(signal?: AbortSignal) {
   return fetchJson<EvalRow[]>('/api/v1/evaluations', signal);
 }
 
-export async function fetchDashboardEvaluations(signal?: AbortSignal): Promise<EvalRow[]> {
-  return expandEvalRows(await fetchJson<CompactEvalRows>('/api/v1/evaluations/compact', signal));
+export function fetchDashboardEvaluations(signal?: AbortSignal) {
+  return fetchJson<CompactEvalRows>('/api/v1/evaluations/compact', signal);
 }
 
 export interface EvalSampleRow {

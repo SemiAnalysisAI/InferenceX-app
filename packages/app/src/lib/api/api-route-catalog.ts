@@ -1871,7 +1871,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: 'src/lib/api/api.ts',
-    sourceSha256: '19b111205ac3bcb4bc39a1abdfdc9cea1bba1915cfb814b8fd5d3d76e270ac4a',
+    sourceSha256: '42e8361265365e715285d59b8a3db2964531c247fd9dd47b355b05c2ff0de128',
     reviewArea: {
       en: 'Public API client parameter serialization and TypeScript response contracts.',
       zh: '公开 API 客户端的参数序列化和 TypeScript 响应契约。',

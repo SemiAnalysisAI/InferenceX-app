@@ -10,7 +10,7 @@ import type {
   TrendDataPoint,
   YAxisMetricKey,
 } from '@/components/inference/types';
-import { useBenchmarkHistory } from '@/hooks/api/use-benchmark-history';
+import { useTrendHistory } from '@/hooks/api/use-trend-history';
 import { DEFAULT_TCO_BASIS, type TcoBasis } from '@/lib/catalog/constants';
 import { Sequence, type Model } from '@/lib/catalog/data-mappings';
 
@@ -68,12 +68,12 @@ export function useInterpolatedTrendData({
     isLoading,
     error,
     refetch,
-  } = useBenchmarkHistory(enabled ? selectedModel : '', seqIslOsl?.isl ?? 0, seqIslOsl?.osl ?? 0, {
-    ...(selectedSequence === Sequence.AgenticTraces
-      ? { benchmarkType: 'agentic_traces' as const }
-      : {}),
-    view: 'trends',
-  });
+  } = useTrendHistory(
+    enabled ? selectedModel : '',
+    seqIslOsl?.isl ?? 0,
+    seqIslOsl?.osl ?? 0,
+    selectedSequence === Sequence.AgenticTraces ? 'agentic_traces' : undefined,
+  );
   const trendMetricKey = resolveMetricConfigKey(selectedYAxisMetric).slice(2) as YAxisMetricKey;
   const requestedMetrics = useMemo(() => trendMetricDependencies(trendMetricKey), [trendMetricKey]);
 
