@@ -1,5 +1,5 @@
 'use client';
-import { chipBasisCsvNote } from '@/lib/benchmarks/chip-basis';
+import { CHIP_BASIS_METRICS, chipBasisCsvNote } from '@/lib/benchmarks/chip-basis';
 import { DISPLAY_MODEL_TO_DB } from '@semianalysisai/inferencex-constants';
 import { track } from '@/lib/analytics/analytics';
 import { selectionAnalyticsContext } from '@/lib/analytics/selection-context';
@@ -87,6 +87,7 @@ import {
   PricesSourceLink,
   metricCostAssumptions,
 } from '@/components/ui/chart-display-helpers';
+import { ChipBasisCaption } from '@/components/ui/chip-basis-toggle';
 import { metricChartTitle, metricLabel, xAxisLabel } from '@/lib/charts/chart-utils';
 import { exportToCsv } from '@/lib/export/csv-export';
 import { inferenceChartToCsv } from '@/lib/export/csv-export-helpers';
@@ -1330,6 +1331,11 @@ export default function ChartDisplay({
                                 footer
                               />
                             }
+                            chipBasis={
+                              !minimalChrome && CHIP_BASIS_METRICS.has(selectedYAxisMetric) ? (
+                                <ChipBasisCaption control={chipBasisControl} />
+                              ) : undefined
+                            }
                             date={selectedRunDate}
                             dates={selectedDates}
                             dateRange={
@@ -1395,6 +1401,7 @@ export default function ChartDisplay({
                               activeHwKeys={captionHwKeys}
                               userCosts={userCosts}
                               omitCostValues
+                              chipBasis={readOnlyChipBasisControl}
                             />
                           )}
                           {powerXLayout &&
@@ -1757,6 +1764,7 @@ export default function ChartDisplay({
         {!powerXSurface && !embedded && !minimalChrome && renderableGraphs.length === 0 && (
           <ResultContext
             locale={locale}
+            layout="footer"
             scenario={<InferenceScenarioSelector variant="caption" />}
           />
         )}

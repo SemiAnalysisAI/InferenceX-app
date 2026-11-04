@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 
 import { IntentPrefetchLink } from '@/components/ui/intent-prefetch-link';

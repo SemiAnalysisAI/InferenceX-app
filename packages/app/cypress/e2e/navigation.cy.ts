@@ -450,35 +450,11 @@ describe('TPUv7 results', { testIsolation: true }, () => {
 
 describe('H3 video performance history', () => {
   beforeEach(() => {
-    cy.intercept('GET', '/api/video-runs?page=*', { runs: [], nextPage: null }).as('runList');
-  });
-  it('shares a comparison built by opening two CI runs through the page', () => {
-    for (const saved of [
-      servingArtifact(123, 40, 'NVIDIA H200'),
-      servingArtifact(456, 41, 'NVIDIA B200'),
-    ]) {
-      cy.intercept('GET', `/api/video-runs?run=${saved.runId}`, {
-        run: videoRun(Number(saved.runId), 'success'),
-        artifacts: [saved.artifact],
-      });
-      cy.intercept(
-        'GET',
-        `/api/video-runs?run=${saved.runId}&artifact=${saved.artifact.id}&format=media`,
-        saved,
-      );
-    }
-    cy.intercept('GET', 'https://media.test/**', { statusCode: 204 });
-    cy.visit('/video?view=tradeoff&run=123&artifact=40');
-    cy.get('[data-testid="video-tradeoff"] tbody tr').should('have.length', 3);
-    cy.contains('summary', 'Run details and artifact selection').click();
-    cy.get('[data-testid="video-ci-runs"] form input').type('456');
-    cy.get('[data-testid="video-ci-runs"] form').submit();
-    cy.get('[data-testid="video-tradeoff"] tbody tr').should('have.length', 6);
-    cy.location().should((location) => {
-      const params = new URLSearchParams(location.search);
-      expect(params.get('run')).to.equal('456');
-      expect(params.get('compare')).to.equal('123.40,456.41');
-    });
+    cy.intercept('GET', '/api/video-runs?format=history&page=*', {
+      schemaVersion: 1,
+      entries: [],
+      nextPage: null,
+    }).as('historyList');
   });
   it('opens published history behind the dashboard and restores its filters after reload', () => {
     const entry = videoHistoryEntry(servingArtifact(), '2026-09-09T00:00:00Z');
@@ -491,7 +467,10 @@ describe('H3 video performance history', () => {
     cy.wait('@history');
     cy.get('[data-testid="video-history"]').should('not.exist');
     cy.get('[data-testid="video-history-section"] summary').click();
-    cy.get('[data-testid="video-history"] h1').should('contain', 'Performance history');
+    cy.get('[data-testid="video-history-section"] summary').should(
+      'contain',
+      'Performance history',
+    );
     cy.get('[data-testid="video-history-observation"]').should('have.length', 3);
     cy.get('[aria-label="Client concurrency"]').click();
     cy.contains('[role="option"]', 'C2').click();
@@ -512,10 +491,9 @@ describe('H3 video performance history', () => {
         win.localStorage.removeItem('inferencex-feature-gate-konami-v1');
       },
     });
-    // The empty state is already in the server HTML. The run list request comes from the same
-    // hydration pass that attaches the unlock key listener, so wait for it before typing.
-    cy.wait('@runList');
-    cy.get('[data-testid="video-ci-runs"]').should('contain', 'No H3 runs in this page');
+    // The dashboard loads published history in the same hydration pass that attaches the unlock
+    // key listener, so wait for that request before typing.
+    cy.wait('@historyList');
     cy.get('video[data-role]').should('not.exist');
     cy.get('[data-testid="tab-trigger-hidden"]').should('not.exist');
     cy.get('body').type(
@@ -528,7 +506,7 @@ describe('H3 video performance history', () => {
   it('renders the Chinese history section for a history deep link', () => {
     cy.visit('/zh/video?history-hardware=H200');
     cy.get('[data-testid="video-history-section"]').should('have.attr', 'open');
-    cy.get('[data-testid="video-history"] h1').should('contain', '性能历史');
+    cy.get('[data-testid="video-history-section"] summary').should('contain', '性能历史');
     cy.get('head meta[name="robots"]').should('have.attr', 'content', 'noindex, nofollow');
   });
 });

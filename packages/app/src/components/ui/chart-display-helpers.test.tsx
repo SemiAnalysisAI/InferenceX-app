@@ -5,11 +5,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TCO_SOURCE_TITLE, TCO_SOURCE_URL } from '@semianalysisai/inferencex-constants';
 
+const mocks = vi.hoisted(() => ({ locale: 'en' as 'en' | 'zh', track: vi.fn() }));
+vi.mock('@/lib/i18n/use-locale', () => ({ useLocale: () => mocks.locale }));
+vi.mock('@/lib/analytics/analytics', async (importOriginal) => ({
+  ...(await importOriginal<typeof analytics>()),
+  track: mocks.track,
+}));
+
 import {
   ChartShareActions,
   MetricAssumptionNotes,
   metricCostAssumptions,
 } from '@/components/ui/chart-display-helpers';
+import type * as analytics from '@/lib/analytics/analytics';
 import { getGpuSpecs } from '@/lib/catalog/constants';
 
 let container: HTMLDivElement;
@@ -309,8 +317,7 @@ function control(value: 'pool' | 'total', onChange = vi.fn()) {
 }
 
 describe('MetricAssumptionNotes — chip basis toggle', () => {
-  const visibleNote = () =>
-    [...container.querySelectorAll('div.max-h-96 p')].map((p) => p.textContent ?? '').join(' ');
+  const visibleNote = getVisibleCaveatText;
   const toggle = () => container.querySelector('[data-testid="chip-basis-toggle"]');
 
   it.each([

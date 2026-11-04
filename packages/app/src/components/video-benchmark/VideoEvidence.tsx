@@ -157,7 +157,11 @@ function list(items: string[], locale: Locale): string {
 function HardwareName({ hardwareKey, color }: { hardwareKey: string; color: string }) {
   return (
     <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-      <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+      <span
+        aria-hidden="true"
+        className="size-2.5 shrink-0 rounded-full"
+        style={{ backgroundColor: color }}
+      />
       {hardwareLabel(hardwareKey)}
     </span>
   );

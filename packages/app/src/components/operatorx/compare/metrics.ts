@@ -88,7 +88,7 @@ export const METRICS: Metric[] = [
   },
   {
     id: 'rooflineUtil',
-    label: 'Share of roofline',
+    label: { en: 'Share of roofline', zh: 'roofline 占比' },
     unit: '%',
     better: 'higher',
     log: false,

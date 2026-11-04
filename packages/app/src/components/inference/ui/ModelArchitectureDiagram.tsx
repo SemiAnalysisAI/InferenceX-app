@@ -174,7 +174,12 @@ function ArchitectureContent({ model, arch, isExpanded, locale, inset }: Archite
     >
       <div className="min-h-0 overflow-hidden">
         <div ref={containerRef} className={inset ? 'px-4 pb-4' : undefined}>
-          <svg ref={svgRef} className="w-full" data-testid="model-architecture-svg" />
+          <svg
+            ref={svgRef}
+            className="w-full"
+            height={reservedHeight ?? undefined}
+            data-testid="model-architecture-svg"
+          />
           {arch.advertisedContextWindow && arch.contextWindow && (
             <p className="mt-2 text-xs text-muted-foreground">
               {t.contextNote(arch.advertisedContextWindow, arch.contextWindow)}
@@ -253,6 +258,8 @@ function ArchitectureContent({ model, arch, isExpanded, locale, inset }: Archite
                 year: 'numeric',
                 month: 'short',
                 day: 'numeric',
+                // Dates are UTC calendar days; formatting in UTC matches the server render.
+                timeZone: 'UTC',
               })}
             </p>
           )}

@@ -3,7 +3,6 @@
 import dynamic from 'next/dynamic';
 
 import { Card } from '@/components/ui/card';
-import { EmptyState } from '@/components/ui/empty-state';
 import { Heading } from '@/components/ui/heading';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useOperatorXModel } from '@/hooks/api/use-operatorx';
@@ -20,10 +19,10 @@ const ModelView = dynamic(() => import('./model-view/ModelView').then((mod) => m
 });
 
 const CATEGORIES = [
-  { value: 'gemm', label: 'GEMM' },
-  { value: 'moe', label: 'MoE' },
-  { value: 'attention', label: 'Attention' },
-  { value: 'model', label: 'Model View' },
+  { value: 'gemm', label: { en: 'GEMM', zh: 'GEMM' } },
+  { value: 'moe', label: { en: 'MoE', zh: 'MoE' } },
+  { value: 'attention', label: { en: 'Attention', zh: 'Attention' } },
+  { value: 'model', label: { en: 'Model view', zh: '模型视图' } },
 ] as const;
 
 type Category = (typeof CATEGORIES)[number]['value'];
@@ -74,18 +73,16 @@ export default function OperatorXView() {
         <TabsList className="mt-4">
           {CATEGORIES.map((c) => (
             <TabsTrigger key={c.value} value={c.value}>
-              {c.label}
+              {c.label[locale]}
             </TabsTrigger>
           ))}
         </TabsList>
       </Card>
       {CATEGORIES.map((c) => (
         <TabsContent key={c.value} value={c.value}>
-          {c.value === 'attention' ? (
-            <EmptyState>{locale === 'zh' ? '暂无结果' : 'No results yet'}</EmptyState>
-          ) : (
-            category === c.value && <ComparisonDashboard op={c.value} />
-          )}
+          {c.value === 'model'
+            ? category === c.value && <ModelViewTab />
+            : category === c.value && <ComparisonDashboard op={c.value} />}
         </TabsContent>
       ))}
     </Tabs>

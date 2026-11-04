@@ -29,6 +29,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Heading } from '@/components/ui/heading';
 import { Label } from '@/components/ui/label';
 import { RetryableQueryError } from '@/components/ui/retryable-query-error';
 import { SearchableSelect } from '@/components/ui/searchable-select';
@@ -41,6 +43,8 @@ import {
 } from '@/components/ui/tooltip';
 import { prefetchOperatorXTimelines } from '@/hooks/api/use-operatorx';
 import { useClientSearch } from '@/hooks/useClientSearch';
+import { useLocale } from '@/lib/i18n/use-locale';
+import type { Locale } from '@/lib/i18n/i18n';
 import { replaceClientSearch } from '@/lib/routing/client-navigation';
 
 import { CaseDetail } from '../CaseDetail';
@@ -69,6 +73,7 @@ import {
 import { track } from '@/lib/analytics/analytics';
 import { isDarkTheme } from '@/lib/themes/themes';
 
+import { diagramText } from './diagram-copy';
 import {
   barsHeight,
   binPct,
@@ -89,7 +94,6 @@ const ROW_GRID = 'grid-cols-[minmax(16rem,28rem)_minmax(0,1fr)]';
 
 const STRINGS = {
   en: {
-    loading: 'Loading results…',
     empty: 'No results yet',
     model: 'Model',
     devices: 'Devices',
@@ -100,18 +104,33 @@ const STRINGS = {
     split: (label: string, cases: number) => `${label} (${cases})`,
     metricOption: (label: string, unit: string) => `${label} (${unit})`,
     tokens: 'Tokens',
+    all: 'All',
+    allRange: (from: string, to: string) => `All · ${from}–${to}`,
+    allTokens: 'All token counts',
+    tokenCount: (tokens: string) => `${tokens} tokens`,
     or: 'or',
     shapes: (n: number) => `${n.toLocaleString()} ${n === 1 ? 'shape' : 'shapes'}`,
+    sizes: (n: number) => `${n.toLocaleString()} ${n === 1 ? 'size' : 'sizes'}`,
+    sizesOf: (n: number, dim: ReactNode) => (
+      <>
+        {n.toLocaleString()} {n === 1 ? 'size' : 'sizes'} of {dim}
+      </>
+    ),
     atSize: (shapes: string, tokens: string, metric: string) =>
       `${shapes} at ≈ ${tokens} tokens · median ${metric.toLowerCase()}`,
+    perSize: (shapes: string, metric: string) =>
+      `${shapes} · median ${metric.toLowerCase()} per size, lowest to highest`,
     measured: (n: number) => `${n} measured`,
     noResultsAtSize: 'No results at this size',
     noShapesAtSize: 'No shapes at this size',
+    noResultsOnGpus: 'No results on these GPUs',
+    shape: 'Shape',
+    shapeNote: (n: number) =>
+      `This layer runs at ${n} shapes across the serving configs, mostly one shard size per tensor-parallel degree. Each is swept over the token count.`,
     fold: 'Fold into the fused op',
     unfold: 'Unfold into the ops it runs',
   },
   zh: {
-    loading: '正在加载结果…',
     empty: '暂无结果',
     model: '模型',
     devices: '设备',
@@ -122,13 +141,28 @@ const STRINGS = {
     split: (label: string, cases: number) => `${label}（${cases}）`,
     metricOption: (label: string, unit: string) => `${label}（${unit}）`,
     tokens: 'Token 数',
+    all: '全部',
+    allRange: (from: string, to: string) => `全部 · ${from}–${to}`,
+    allTokens: '全部 token 数',
+    tokenCount: (tokens: string) => `${tokens} token`,
     or: '或',
     shapes: (n: number) => `${n.toLocaleString()} 个形状`,
+    sizes: (n: number) => `${n.toLocaleString()} 个尺寸`,
+    sizesOf: (n: number, dim: ReactNode) => (
+      <>
+        {dim} 的 {n.toLocaleString()} 个尺寸
+      </>
+    ),
     atSize: (shapes: string, tokens: string, metric: string) =>
       `≈ ${tokens} token 时共 ${shapes} · ${metric}中位数`,
+    perSize: (shapes: string, metric: string) => `共 ${shapes} · 各尺寸的${metric}中位数，由低到高`,
     measured: (n: number) => `${n} 个已实测`,
     noResultsAtSize: '此尺寸下暂无结果',
     noShapesAtSize: '此尺寸下没有形状',
+    noResultsOnGpus: '所选 GPU 暂无结果',
+    shape: '形状',
+    shapeNote: (n: number) =>
+      `该层在各服务配置下共有 ${n} 种形状，大多是每个张量并行度对应一种分片尺寸。每种形状都按 token 数扫描。`,
     fold: '折叠为融合 op',
     unfold: '展开为其运行的各个 op',
   },
@@ -222,6 +256,7 @@ function SizeControls({
   sweep: boolean;
   onSweep: (enabled: boolean) => void;
 }) {
+  const strings = STRINGS[useLocale()];
   const range: [number, number] = [bins[0], bins.at(-1)!];
   // One step past the largest size: every size at once, as line charts.
   const all = bins.length;
@@ -231,10 +266,10 @@ function SizeControls({
   return (
     <div className="space-y-1">
       <label htmlFor="operatorx-model-tokens" className="flex items-baseline gap-2 text-xs">
-        <span className="text-muted-foreground">Tokens</span>
-        <span className="font-semibold tabular-nums">
+        <span className="text-muted-foreground">{strings.tokens}</span>
+        <span className="font-medium tabular-nums">
           {sweep
-            ? `All · ${formatTokens(binTokens(range[0]))}–${formatTokens(binTokens(range[1]))}`
+            ? strings.allRange(formatTokens(binTokens(range[0])), formatTokens(binTokens(range[1])))
             : `≈ ${formatTokens(binTokens(bin))}`}
         </span>
       </label>
@@ -246,7 +281,9 @@ function SizeControls({
           max={all}
           step={1}
           value={sweep ? all : bins.indexOf(bin)}
-          aria-valuetext={sweep ? 'All token counts' : `${formatTokens(binTokens(bin))} tokens`}
+          aria-valuetext={
+            sweep ? strings.allTokens : strings.tokenCount(formatTokens(binTokens(bin)))
+          }
           onChange={(e) => {
             const at = Number(e.target.value);
             if (at === all) {
@@ -273,8 +310,8 @@ function SizeControls({
             {formatTokens(binTokens(range[1]))}
           </span>
         )}
-        <span className={`absolute right-0 ${sweep ? 'font-semibold text-foreground' : ''}`}>
-          All
+        <span className={`absolute right-0 ${sweep ? 'font-medium text-foreground' : ''}`}>
+          {strings.all}
         </span>
       </div>
       {sweep && (
@@ -299,58 +336,38 @@ function SizeControls({
   );
 }
 
-/** Each GPU's range across every size, for the tooltip of a row of line charts. */
-function SweepTooltipRows({ model, indices }: { model: ComparisonModel; indices: number[] }) {
-  const { format, unit } = model.metric;
-  // `8.13–2222 TFLOPS`: the unit once, after the range
-  const bare = (v: number) => format(v).replace(unit, '').trim();
-  return (
-    <ul className="space-y-0.5">
-      {gpuSweep(model, indices).map(({ hardware, points }) => {
-        const values = points.map((p) => p.value);
-        return (
-          <li key={hardware} className="flex items-center gap-2 tabular-nums">
-            <span
-              className="inline-block size-2 rounded-full"
-              style={{ background: model.colors[hardware] }}
-            />
-            <span className="w-14">{hardwareLabel(hardware)}</span>
-            <strong>
-              {bare(Math.min(...values))}–{bare(Math.max(...values))} {unit}
-            </strong>
-            <span className="text-muted-foreground">
-              {points.length} {points.length === 1 ? 'size' : 'sizes'}
-            </span>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
 function SlotTooltip({ data, tokens, sweep }: { data: SlotData; tokens: number; sweep: boolean }) {
+  const locale = useLocale();
+  const strings = STRINGS[locale];
   const { model, atSize, slot, block } = data;
   if (!model) return null;
-  if (sweep)
+  const title = diagramText(slot.label, locale);
+  const subtitle = diagramText(block.label, locale);
+  if (sweep) {
+    const { format, unit } = model.metric;
+    // `8.13–2222 TFLOPS`: the unit once, after the range
+    const bare = (v: number) => format(v).replace(unit, '').trim();
     return (
-      <div className="space-y-1.5 text-xs">
-        <div className="font-semibold">
-          {slot.label} <span className="font-normal text-muted-foreground">· {block.label}</span>
-        </div>
-        <div className="text-muted-foreground">
-          {data.indices.length.toLocaleString()} {data.indices.length === 1 ? 'shape' : 'shapes'} ·
-          median {model.metric.label.toLowerCase()} per size, lowest to highest
-        </div>
-        <SweepTooltipRows model={model} indices={data.indices} />
-        <div className="text-muted-foreground">Click for every shape and its kernel timeline</div>
-      </div>
+      <ChartHoverCardBody
+        title={title}
+        subtitle={subtitle}
+        metrics={gpuSweep(model, data.indices).map(({ hardware, points }) => {
+          const values = points.map((p) => p.value);
+          return {
+            value: `${bare(Math.min(...values))}–${bare(Math.max(...values))} ${unit}`,
+            label: `${hardwareLabel(hardware)} · ${strings.sizes(points.length)}`,
+            color: model.colors[hardware],
+          };
+        })}
+        summary={strings.perSize(strings.shapes(data.indices.length), model.metric.label[locale])}
+      />
     );
-  const rows = gpuValues(model, atSize);
+  }
   return (
     <ChartHoverCardBody
-      title={diagramText(slot.label, locale)}
-      subtitle={diagramText(block.label, locale)}
-      metrics={rows.map((r) => ({
+      title={title}
+      subtitle={subtitle}
+      metrics={gpuValues(model, atSize).map((r) => ({
         value: model.metric.format(r.value),
         label: `${hardwareLabel(r.hardware)} · ${strings.measured(r.measured)}`,
         color: model.colors[r.hardware],
@@ -518,6 +535,7 @@ function FoldButton({
   style?: CSSProperties;
   testId: string;
 }) {
+  const strings = STRINGS[useLocale()];
   const Icon = fold.open ? ChevronUp : ChevronDown;
   return (
     <button
@@ -526,7 +544,7 @@ function FoldButton({
       className={`pointer-events-auto flex size-3.5 items-center justify-center rounded-full border bg-card text-muted-foreground hover:text-foreground ${className}`}
       style={style}
       aria-expanded={fold.open}
-      aria-label={fold.open ? 'Fold into the fused op' : 'Unfold into the ops it runs'}
+      aria-label={fold.open ? strings.fold : strings.unfold}
       data-testid={testId}
     >
       <Icon className="size-3" />
@@ -550,6 +568,8 @@ const SlotRow = memo(
     onOpen: (data: SlotData) => void;
     onHover: (slot: string | null) => void;
   }) => {
+    const locale = useLocale();
+    const strings = STRINGS[locale];
     const measured = data.indices.length > 0;
     const target = (
       <button
@@ -562,7 +582,7 @@ const SlotRow = memo(
         onBlur={() => onHover(null)}
         className={`rounded-md ${measured ? 'cursor-pointer' : 'cursor-default'} ${lit && measured ? 'bg-muted/60' : ''}`}
         style={{ gridColumn: '1 / -1', gridRow: gridRow(data.first, data.last) }}
-        aria-label={data.slot.label}
+        aria-label={diagramText(data.slot.label, locale)}
         data-testid={`operatorx-model-slot-${data.slot.id}`}
       />
     );
@@ -571,74 +591,36 @@ const SlotRow = memo(
         {measured ? (
           <TooltipRoot delayDuration={150}>
             <TooltipTrigger asChild>{target}</TooltipTrigger>
-            <TooltipContent side="top" align="center" className="w-80">
+            <TooltipContent side="top" align="center">
               <SlotTooltip data={data} tokens={tokens} sweep={range !== null} />
             </TooltipContent>
           </TooltipRoot>
         ) : (
           target
         )}
-      </div>
-      {slots.map((data) => {
-        const measured = data.indices.length > 0;
-        const values = data.model ? gpuValues(data.model, data.atSize) : [];
-        const target = (
-          <button
-            type="button"
-            disabled={!measured}
-            onClick={() => onOpen(data)}
-            onMouseEnter={() => setHovered(data.slot.id)}
-            onMouseLeave={() => setHovered(null)}
-            onFocus={() => setHovered(data.slot.id)}
-            onBlur={() => setHovered(null)}
-            className={`rounded-md ${measured ? 'cursor-pointer' : 'cursor-default'} ${hovered === data.slot.id && measured ? 'bg-muted/60' : ''}`}
-            style={{ gridColumn: '1 / -1', gridRow: gridRow(data.first, data.last) }}
-            aria-label={diagramText(data.slot.label, locale)}
-            data-testid={`operatorx-model-slot-${data.slot.id}`}
-          />
-        );
-        return (
-          <div key={data.slot.id} className="contents">
-            {measured ? (
-              <TooltipRoot delayDuration={150}>
-                <TooltipTrigger asChild>{target}</TooltipTrigger>
-                <TooltipContent side="top" align="center">
-                  <SlotTooltip data={data} tokens={tokens} />
-                </TooltipContent>
-              </TooltipRoot>
-            ) : (
-              target
-            )}
-            <div
-              className="pointer-events-none relative z-[2] flex items-center"
-              style={{ gridColumn: 2, gridRow: gridRow(data.bar, data.bar) }}
-            >
-              {measured && data.model ? (
-                <div className="w-full">
-                  <OpBars
-                    model={data.model}
-                    values={values}
-                    empty={
-                      data.atSize.length > 0 ? strings.noResultsAtSize : strings.noShapesAtSize
-                    }
-                  />
-                </div>
-              ) : (
-                <span className="text-xs text-muted-foreground">{strings.empty}</span>
-              )}
+        <div
+          className="pointer-events-none relative z-[2] flex items-center"
+          style={{ gridColumn: 2, gridRow: gridRow(data.bar, data.bar) }}
+        >
+          {measured && data.model && range ? (
+            <div className="w-full">
+              <OpSweep
+                model={data.model}
+                series={gpuSweep(data.model, data.indices)}
+                range={range}
+                empty={strings.noResultsOnGpus}
+              />
             </div>
           ) : measured && data.model ? (
             <div className="w-full">
               <OpBars
                 model={data.model}
                 values={gpuValues(data.model, data.atSize)}
-                empty={
-                  data.atSize.length > 0 ? 'No results at this size' : 'No shapes at this size'
-                }
+                empty={data.atSize.length > 0 ? strings.noResultsAtSize : strings.noShapesAtSize}
               />
             </div>
           ) : (
-            <span className="text-xs text-muted-foreground">No results yet</span>
+            <span className="text-xs text-muted-foreground">{strings.empty}</span>
           )}
         </div>
       </div>
@@ -652,12 +634,14 @@ const BlockDiagram = memo(
     at,
     hovered,
     stroke,
+    locale,
     onFold,
   }: {
     block: LayerBlock;
     at: Map<string, Box>;
     hovered: string | null;
     stroke: string;
+    locale: Locale;
     onFold: (key: string) => void;
   }) => (
     <div
@@ -672,8 +656,8 @@ const BlockDiagram = memo(
         return (
           <div
             key={n.id}
-            title={n.title}
-            className={`absolute flex items-center justify-center overflow-hidden rounded border bg-card px-1.5 text-center leading-tight ${measured ? 'font-mono text-2xs text-foreground' : 'border-dashed text-2xs text-muted-foreground'} ${lit ? 'ring-2 ring-primary/60' : ''}`}
+            title={n.title && diagramText(n.title, locale)}
+            className={`absolute flex items-center justify-center overflow-hidden rounded-sm border bg-card px-1.5 text-center leading-tight ${measured ? 'font-mono text-2xs text-foreground' : 'border-dashed text-2xs text-muted-foreground'} ${lit ? 'ring-2 ring-primary/60' : ''}`}
             style={{
               left: pct(box.left),
               width: pct(box.width),
@@ -683,7 +667,9 @@ const BlockDiagram = memo(
             }}
             data-testid={`operatorx-model-node-${n.id}`}
           >
-            <span className="line-clamp-2 break-words">{breakable(n.label)}</span>
+            <span className="line-clamp-2 break-words">
+              {breakable(diagramText(n.label, locale))}
+            </span>
           </div>
         );
       })}
@@ -758,6 +744,8 @@ const BlockRows = memo(
     /** Unfolds a fused op, or folds it back. */
     onFold: (key: string) => void;
   }) => {
+    const locale = useLocale();
+    const strings = STRINGS[locale];
     const [hovered, setHovered] = useState<string | null>(null);
     const c = BLOCK_COLORS[block.kind];
     const rowPx = Math.max(range ? SWEEP_PX : barsHeight(lanes), 40);
@@ -782,7 +770,7 @@ const BlockRows = memo(
           }}
         />
         <div className="flex items-baseline gap-2 px-3 pt-2" style={{ gridColumn: 1, gridRow: 1 }}>
-          <span className="text-sm font-semibold">{block.label}</span>
+          <span className="text-sm font-medium">{diagramText(block.label, locale)}</span>
           {block.repeat && block.repeat > 1 && (
             <span className="text-xs text-muted-foreground tabular-nums">×{block.repeat}</span>
           )}
@@ -798,7 +786,14 @@ const BlockRows = memo(
             onHover={setHovered}
           />
         ))}
-        <BlockDiagram block={block} at={at} hovered={hovered} stroke={c.stroke} onFold={onFold} />
+        <BlockDiagram
+          block={block}
+          at={at}
+          hovered={hovered}
+          stroke={c.stroke}
+          locale={locale}
+          onFold={onFold}
+        />
         {block.fold && (
           <button
             type="button"
@@ -806,7 +801,7 @@ const BlockRows = memo(
             className="relative z-[2] flex items-center justify-center rounded-b-lg text-muted-foreground hover:bg-muted/40 hover:text-foreground"
             style={{ gridColumn: 1, gridRow: -2 }}
             aria-expanded
-            aria-label="Fold into the fused op"
+            aria-label={strings.fold}
             data-testid={`operatorx-model-fold-${block.id}`}
           >
             <ChevronUp className="size-3.5" />
@@ -826,6 +821,7 @@ const ModelControls = memo(
     metric,
     precision,
     precisions,
+    locale,
     onPrecision,
   }: {
     requested: string;
@@ -835,11 +831,12 @@ const ModelControls = memo(
     metric: string;
     precision: ComputePrecision | null;
     precisions: ComputePrecision[];
+    locale: Locale;
     onPrecision: (precision: ComputePrecision) => void;
   }) => (
     <Card className="relative z-10 py-4 md:py-5">
       <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
-        <ControlGroup label="Model" htmlFor="operatorx-model">
+        <ControlGroup label={STRINGS[locale].model} htmlFor="operatorx-model">
           <SearchableSelect
             triggerId="operatorx-model"
             value={requested}
@@ -850,7 +847,7 @@ const ModelControls = memo(
             groups={[{ label: '', options: modelOptions.map((m) => ({ value: m, label: m })) }]}
           />
         </ControlGroup>
-        <ControlGroup label="Devices" htmlFor="operatorx-model-parallel">
+        <ControlGroup label={STRINGS[locale].devices} htmlFor="operatorx-model-parallel">
           <SearchableSelect
             triggerId="operatorx-model-parallel"
             value={split || ONE_DEVICE}
@@ -864,13 +861,16 @@ const ModelControls = memo(
                 label: '',
                 options: splits.map((o) => ({
                   value: o.key || ONE_DEVICE,
-                  label: `${o.label} (${o.cases})`,
+                  label: STRINGS[locale].split(
+                    o.key ? o.label : STRINGS[locale].oneDevice,
+                    o.cases,
+                  ),
                 })),
               },
             ]}
           />
         </ControlGroup>
-        <ControlGroup label="Metric" htmlFor="operatorx-metric">
+        <ControlGroup label={STRINGS[locale].metric} htmlFor="operatorx-metric">
           <SearchableSelect
             triggerId="operatorx-metric"
             value={metric}
@@ -882,12 +882,15 @@ const ModelControls = memo(
             groups={[
               {
                 label: '',
-                options: METRICS.map((m) => ({ value: m.id, label: `${m.label} (${m.unit})` })),
+                options: METRICS.map((m) => ({
+                  value: m.id,
+                  label: STRINGS[locale].metricOption(m.label[locale], m.unit),
+                })),
               },
             ]}
           />
         </ControlGroup>
-        <ControlGroup label="Precision" htmlFor="operatorx-model-precision">
+        <ControlGroup label={STRINGS[locale].precision} htmlFor="operatorx-model-precision">
           {precision && (
             <SegmentedToggle
               value={precision}
@@ -895,7 +898,7 @@ const ModelControls = memo(
                 track('operatorx_model_precision_selected', { precision: v });
                 onPrecision(v);
               }}
-              ariaLabel="Compute precision"
+              ariaLabel={STRINGS[locale].computePrecision}
               options={precisions.map((p) => ({ value: p, label: p }))}
             />
           )}
@@ -945,6 +948,8 @@ const SlotDetail = memo(
     modelName: string;
     onClose: () => void;
   }) => {
+    const locale = useLocale();
+    const strings = STRINGS[locale];
     const [inspected, setInspected] = useState<number | null>(null);
     const [pickedFamily, setFamily] = useState<string | null>(null);
     // A case or shape opened for one op never carries over to the next op shown
@@ -1004,11 +1009,15 @@ const SlotDetail = memo(
           {data && sub && familyKey !== null && (
             <>
               <DialogHeader>
-                <DialogTitle className="font-mono">{data.slot.label}</DialogTitle>
+                <DialogTitle className="font-mono">
+                  {diagramText(data.slot.label, locale)}
+                </DialogTitle>
                 <DialogDescription>
-                  {data.block.label} · {modelName} · {familyIndices.length.toLocaleString()}{' '}
-                  {familyIndices.length === 1 ? 'size' : 'sizes'} of{' '}
-                  <span className="font-mono">{SIZE_DIM[data.slot.op] ?? 'tokens'}</span>
+                  {diagramText(data.block.label, locale)} · {modelName} ·{' '}
+                  {strings.sizesOf(
+                    familyIndices.length,
+                    <span className="font-mono">{SIZE_DIM[data.slot.op] ?? 'tokens'}</span>,
+                  )}
                 </DialogDescription>
               </DialogHeader>
               {/* One picker for both charts: Metric vs size gets this one shape only */}
@@ -1022,23 +1031,26 @@ const SlotDetail = memo(
                     setInspected(null);
                     setFamily(key);
                   }}
-                  triggerAriaLabel="Shape"
+                  triggerAriaLabel={strings.shape}
                   groups={[{ label: '', options: families.map(([k]) => ({ value: k, label: k })) }]}
                 />
                 {families.length > 1 && (
                   <p className="text-xs text-muted-foreground">
-                    This layer runs at {families.length} shapes across the serving configs, mostly
-                    one shard size per tensor-parallel degree. Each is swept over the token count.
+                    {strings.shapeNote(families.length)}
                   </p>
                 )}
               </div>
               <div className="space-y-6">
                 <section className="space-y-2">
-                  <h3 className="text-sm font-semibold">{roofline.title}</h3>
+                  <Heading as="h3" level="card">
+                    {roofline.title[locale]}
+                  </Heading>
                   <roofline.Component model={sub.model} />
                 </section>
                 <section className="space-y-2">
-                  <h3 className="text-sm font-semibold">{metricVsSize.title}</h3>
+                  <Heading as="h3" level="card">
+                    {metricVsSize.title[locale]}
+                  </Heading>
                   <metricVsSize.Component model={sub.model} />
                 </section>
               </div>
@@ -1064,6 +1076,8 @@ export function ModelView({
   moe,
   attention,
 }: Record<'gemm' | 'moe' | 'attention', UseQueryResult<ComparisonView>>) {
+  const locale = useLocale();
+  const strings = STRINGS[locale];
   const search = new URLSearchParams(useClientSearch());
   const metric = metricById(search.get('metric'));
   const requested = search.get('model') ?? DEFAULT_MODEL;
@@ -1272,12 +1286,7 @@ export function ModelView({
       />
     );
   if (gemm.isLoading || moe.isLoading || attention.isLoading) return <ModelViewLoading />;
-  if (modelOptions.length === 0)
-    return (
-      <Card className="py-6 text-center">
-        <p className="text-sm text-muted-foreground">No results yet</p>
-      </Card>
-    );
+  if (modelOptions.length === 0) return <EmptyState>{strings.empty}</EmptyState>;
 
   return (
     <TooltipProvider>
@@ -1290,6 +1299,7 @@ export function ModelView({
           metric={metric.id}
           precision={precision}
           precisions={precisions}
+          locale={locale}
           onPrecision={setPrecision}
         />
         {/* Too narrow for the diagram beside its bars: the card scrolls sideways, not the page */}
@@ -1334,7 +1344,9 @@ export function ModelView({
                   {b > 0 && (
                     <div className={`grid ${ROW_GRID} gap-x-4`}>
                       {block.alternative ? (
-                        <span className="my-0.5 text-center text-xs text-muted-foreground">or</span>
+                        <span className="my-0.5 text-center text-xs text-muted-foreground">
+                          {strings.or}
+                        </span>
                       ) : (
                         <ArrowDown className="mx-auto my-1 size-3.5 text-muted-foreground" />
                       )}

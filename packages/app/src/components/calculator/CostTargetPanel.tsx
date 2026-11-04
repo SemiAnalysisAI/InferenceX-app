@@ -325,12 +325,14 @@ export default function CostTargetPanel({
                     testId="calculator-costcap-table"
                     analyticsPrefix="calculator_costcap_table"
                   />
-                  {hasDisagg && (
-                    <p className="text-xs text-muted-foreground">
-                      <span className="font-medium text-foreground">{t.note}</span>
-                      {t.disaggFleet}
-                    </p>
-                  )}
+                  <ChipBasisNote
+                    visible={hasDisagg}
+                    testId="calculator-costcap-disagg-note"
+                    label={t.note}
+                    text={chipBasis === 'total' ? t.disaggFleetTotal : t.disaggFleet}
+                    chipBasis={chipBasisControl}
+                    showToggle={costType !== 'total'}
+                  />
                   <p className="text-xs text-muted-foreground mt-3">
                     {t.assumptions(getCostProviderLabel(costProvider))}
                   </p>

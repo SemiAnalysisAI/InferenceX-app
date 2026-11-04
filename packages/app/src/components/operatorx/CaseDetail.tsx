@@ -83,6 +83,12 @@ const STRINGS = {
     occupancy: 'Occupancy',
     notProfiled: 'Not profiled',
     noneMeasured: 'No selected GPU measured this case',
+    gpus: 'GPUs',
+    fastestRank: 'fastest rank',
+    skew: 'skew',
+    eachRank: (list: string) => `Each rank: ${list}. The timeline below is rank 0’s.`,
+    rankTimes:
+      'Kernel times are from this replay; collectives include waiting for the other ranks.',
   },
   zh: {
     categories: {
@@ -110,6 +116,11 @@ const STRINGS = {
     occupancy: '占用率',
     notProfiled: '没有 profiling 数据',
     noneMeasured: '所选 GPU 均未实测此用例',
+    gpus: 'GPU 数',
+    fastestRank: '最快 rank',
+    skew: '偏差',
+    eachRank: (list: string) => `各 rank 延迟：${list}。下方为 rank 0 的时间线。`,
+    rankTimes: 'kernel 耗时取自本次重放，集合通信的耗时包含等待其他 rank 的时间。',
   },
 };
 
@@ -197,19 +208,21 @@ function TimeAxis({ scaleUs }: { scaleUs: number }) {
 
 /** A split case's GPU count, its fastest rank's latency and the rank skew. */
 function RankSummary({ ranks }: { ranks: TimelineRanks }) {
+  const strings = STRINGS[useLocale()];
   return (
     <>
       <span className="tabular-nums">
-        <span className="text-muted-foreground">GPUs</span> {ranks.world}
+        <span className="text-muted-foreground">{strings.gpus}</span> {ranks.world}
       </span>
       {ranks.latencyUsMin !== null && (
         <span className="tabular-nums">
-          <span className="text-muted-foreground">fastest rank</span> {formatUs(ranks.latencyUsMin)}
+          <span className="text-muted-foreground">{strings.fastestRank}</span>{' '}
+          {formatUs(ranks.latencyUsMin)}
         </span>
       )}
       {ranks.skewUs !== null && (
         <span className="tabular-nums">
-          <span className="text-muted-foreground">skew</span> {formatUs(ranks.skewUs)}
+          <span className="text-muted-foreground">{strings.skew}</span> {formatUs(ranks.skewUs)}
         </span>
       )}
     </>
@@ -268,11 +281,11 @@ function GpuTimeline({
           className="text-xs text-muted-foreground tabular-nums"
           data-testid="operatorx-rank-latencies"
         >
-          Each rank:{' '}
-          {timeline.ranks.latencyUs
-            .map((us, rank) => `${rank} ${us === null ? '—' : formatUs(us)}`)
-            .join(' · ')}
-          . The timeline below is rank 0’s.
+          {strings.eachRank(
+            timeline.ranks.latencyUs
+              .map((us, rank) => `${rank} ${us === null ? '—' : formatUs(us)}`)
+              .join(' · '),
+          )}
         </p>
       )}
       {timeline ? (
@@ -314,6 +327,8 @@ function GpuTimeline({
               </>
             ) : timeline.truncated ? (
               strings.truncated(timeline.events.length)
+            ) : timeline.ranks ? (
+              strings.rankTimes
             ) : null}
           </p>
           <table className="w-full table-fixed text-xs">

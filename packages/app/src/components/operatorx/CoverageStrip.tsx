@@ -3,7 +3,7 @@ import type { OperatorXStatus } from '@semianalysisai/inferencex-db/operatorx/no
 import type { Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
 
-import { hardwareLabel } from './compare/hardware';
+import { hardwareLabel, sortHardware } from './compare/hardware';
 import type { ComparisonModel } from './compare/model';
 
 const STATES: {

@@ -1,5 +1,6 @@
 'use client';
 
+import { ChevronDown } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { HW_REGISTRY } from '@semianalysisai/inferencex-constants';
 import { Button } from '@/components/ui/button';
@@ -8,12 +9,14 @@ import ChartLegend from '@/components/ui/chart-legend';
 import { ChartSection } from '@/components/ui/chart-section';
 import { CollapsibleSection } from '@/components/ui/collapsible-section';
 import { DashboardSectionHeader } from '@/components/ui/dashboard-section-header';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Heading } from '@/components/ui/heading';
 import { InfoHelp } from '@/components/ui/option-info';
 import { CaptionField, ResultContext } from '@/components/ui/result-context';
 import { PricesSourceLink } from '@/components/ui/chart-display-helpers';
 import { TcoPriceTable } from '@/components/ui/editable-tco-badges';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { SegmentedToggle } from '@/components/ui/segmented-toggle';
 import { ShareButton } from '@/components/ui/share-button';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { track } from '@/lib/analytics/analytics';
@@ -65,7 +68,7 @@ const STRINGS = {
     chart: 'Chart',
     table: 'Table',
     viewToggle: 'Chart or table view',
-    optimalOnly: 'Optimal Only',
+    optimalOnly: 'Optimal only',
     optimalInfo:
       "Show only each hardware's Pareto-optimal deployments for the selected axes; turn off to see the dominated deployments faded.",
     compare: 'Compare',
@@ -81,7 +84,7 @@ const STRINGS = {
       `${hardware} (${used} of ${reserved})`,
     deployments: (n: number) => `${n} deployments`,
     history: 'Performance history',
-    historyHint: 'Stored H3 evidence, including older runs without approval.',
+    historyHint: 'Stored H3 evidence, including older runs without approval',
     loading: 'Loading video results…',
     error: 'Could not load video results',
     retry: 'Retry',
@@ -113,7 +116,7 @@ const STRINGS = {
       `${hardware}（${used} / ${reserved} 张）`,
     deployments: (n: number) => `${n} 种部署`,
     history: '性能历史',
-    historyHint: '已存储的 H3 结果，包括尚无发布批准记录的旧运行。',
+    historyHint: '已存储的 H3 结果，包括尚无发布批准记录的旧运行',
     loading: '正在加载视频结果…',
     error: '无法加载视频结果',
     retry: '重试',
@@ -375,7 +378,7 @@ export default function VideoDashboard() {
     />
   );
   return (
-    <div className="mx-auto min-w-0 w-full max-w-7xl space-y-4 py-2" data-testid="video-dashboard">
+    <div className="flex min-w-0 w-full flex-col gap-4" data-testid="video-dashboard">
       <section className="relative z-20">
         <Card>
           <div className="flex flex-col gap-4">
@@ -403,22 +406,19 @@ export default function VideoDashboard() {
         hideImageExport={state.view === 'table'}
         setIsLegendExpanded={setLegendExpanded}
         leadingControls={
-          <div className="flex gap-1" role="group" aria-label={s.viewToggle}>
-            {(['chart', 'table'] as const).map((view) => (
-              <Button
-                key={view}
-                size="sm"
-                variant={state.view === view ? 'default' : 'outline'}
-                aria-pressed={state.view === view}
-                onClick={() => {
-                  update({ view });
-                  track('video_view_changed', { view });
-                }}
-              >
-                {s[view]}
-              </Button>
-            ))}
-          </div>
+          <SegmentedToggle
+            value={state.view}
+            role="group"
+            ariaLabel={s.viewToggle}
+            options={[
+              { value: 'chart', label: s.chart },
+              { value: 'table', label: s.table },
+            ]}
+            onValueChange={(view) => {
+              update({ view });
+              track('video_view_changed', { view });
+            }}
+          />
         }
       >
         <div className="space-y-3 px-4 md:px-6" data-testid="video-chart-card">
@@ -439,9 +439,9 @@ export default function VideoDashboard() {
             </p>
           )}
           {loading && (
-            <p role="status" className="text-sm text-muted-foreground">
+            <EmptyState bare role="status" className="min-h-110">
               {s.loading}
-            </p>
+            </EmptyState>
           )}
           {error && (
             <div role="alert" className="flex flex-wrap items-center gap-3 text-sm">
@@ -510,7 +510,7 @@ export default function VideoDashboard() {
         </>
       )}
       <details
-        className="rounded-xl border px-4 py-3"
+        className="group/history"
         data-testid="video-history-section"
         open={historyOpen}
         onToggle={(event) => {
@@ -520,11 +520,15 @@ export default function VideoDashboard() {
           track('video_history_section_toggled', { enabled: open });
         }}
       >
-        <summary className="cursor-pointer text-sm font-medium">
-          {s.history}
-          <span className="ml-2 font-normal text-muted-foreground">{s.historyHint}</span>
+        <summary className="mb-2 flex cursor-pointer list-none flex-wrap items-center gap-x-2 gap-y-1 [&::-webkit-details-marker]:hidden">
+          <ChevronDown
+            aria-hidden="true"
+            className="size-5 text-muted-foreground transition-transform duration-200 group-open/history:rotate-180"
+          />
+          <h2 className="text-lg font-medium">{s.history}</h2>
+          <span className="text-sm text-muted-foreground">{s.historyHint}</span>
         </summary>
-        <div className="mt-3">{historyOpen && <VideoHistory />}</div>
+        <div>{historyOpen && <VideoHistory />}</div>
       </details>
     </div>
   );

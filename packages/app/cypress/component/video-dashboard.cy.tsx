@@ -101,7 +101,7 @@ describe('Video hardware dashboard (retained fixture)', () => {
       .and('contain', '431.1');
     kpi('h100').should('not.contain', 'Profit').and('not.contain', 'Board power');
   });
-  it('states model, workload and deployment as facts; the legend offers only Optimal Only', () => {
+  it('states model, workload and deployment as facts; the legend offers only Optimal only', () => {
     mount();
     cy.get('[data-testid="video-config-fact"]').should(($facts) => {
       expect([...$facts].map((el) => el.textContent)).to.deep.equal([
@@ -138,7 +138,7 @@ describe('Video hardware dashboard (retained fixture)', () => {
     cy.get('[data-testid="video-legend"]').should('contain', 'H100').and('contain', 'MI355X');
     cy.get('[data-testid="video-legend"] [role="switch"]').should('have.length', 1);
     cy.get('[data-testid="video-optimal-only"]').should('have.attr', 'aria-checked', 'true');
-    cy.get('[data-testid="video-legend"]').should('contain', 'Optimal Only');
+    cy.get('[data-testid="video-legend"]').should('contain', 'Optimal only');
     for (const id of ['video-queue', 'video-optimal', 'video-frontier'])
       cy.get(`[data-testid="${id}"]`).should('not.exist');
     cy.get('[data-testid="video-idle-note"]').should('have.text', IDLE_NOTE);
@@ -238,7 +238,11 @@ describe('Video hardware dashboard (retained fixture)', () => {
       .and('contain', 'Cost tier: Rent - 3 Year Commit');
     kpi('h200').should('contain', '$0.485');
     cy.get('[data-testid="video-history-section"]').should('have.attr', 'open');
-    cy.get('[data-testid="video-history"] h1').should('contain', 'Performance history');
+    cy.get('[data-testid="video-history-section"] summary h2').should(
+      'contain',
+      'Performance history',
+    );
+    cy.get('[data-testid="video-history"] h1').should('not.exist');
   });
   it('reprices the API list price beside the TCO cost, in the cards, the table and the URL', () => {
     mount();
@@ -275,7 +279,7 @@ describe('Video hardware dashboard (retained fixture)', () => {
     kpi('h200').should('contain', 'API list $0.640');
     cy.location('search').should('not.contain', 'v_api');
   });
-  it('toggles Optimal Only from the legend and restores it from v_optimal', () => {
+  it('toggles Optimal only from the legend and restores it from v_optimal', () => {
     mount('/video', '?v_optimal=0');
     cy.get('[data-testid="video-optimal-only"]').should('have.attr', 'aria-checked', 'false');
     // Every fixture deployment is on its hardware's frontier, so the switch changes no point here.

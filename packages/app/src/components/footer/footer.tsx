@@ -99,8 +99,68 @@ const STRINGS = {
 
 const FOOTER_EVENT_PROPERTIES = { placement: 'footer' } as const;
 
-const FOOTER_LINK =
+const LINK_CLASS =
   'inline-flex min-h-11 items-center rounded-md py-1 text-sm leading-snug text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8';
+
+type FooterStringKey = keyof (typeof STRINGS)['en'];
+
+const SEMIANALYSIS_LINKS: readonly (readonly [string, string, FooterStringKey])[] = [
+  ['main-site', 'https://semianalysis.com', 'mainSite'],
+  ['newsletter', 'https://newsletter.semianalysis.com', 'newsletter'],
+  ['about', 'https://semianalysis.com/about/', 'about'],
+];
+
+const LEGAL_LINKS: readonly (readonly [string, string, FooterStringKey])[] = [
+  ['privacy', 'https://semianalysis.com/privacy-policy/', 'privacyPolicy'],
+  ['cookies', 'https://semianalysis.com/cookie-policy/', 'cookiePolicy'],
+];
+
+const CONTRIBUTE_LINKS: readonly (readonly [string, string, FooterStringKey])[] = [
+  ['benchmarks', 'https://github.com/SemiAnalysisAI/InferenceX', 'benchmarks'],
+  ['agentx-harness', 'https://github.com/SemiAnalysisAI/agentx-harness', 'agentxHarness'],
+  ['visualization', 'https://github.com/SemiAnalysisAI/InferenceX-app', 'visualization'],
+];
+
+const MORE_LINKS: readonly (readonly [string, string, FooterStringKey, string?])[] = [
+  ['supporters', '/quotes', 'supporters', 'footer_supporters_clicked'],
+  ['agentx', '/agentx', 'agentx', 'footer_agentx_clicked'],
+  ['telemetry', '/inference/agentic', 'telemetry', 'footer_telemetry_clicked'],
+  ['compare', '/compare', 'comparisons', 'footer_compare_clicked'],
+  ['articles', '/blog', 'articles', 'footer_articles_clicked'],
+  ['hardware', '/hardware', 'hardwareResults', 'footer_hardware_clicked'],
+  ['whitepapers', '/whitepaper', 'whitepapers', 'footer_whitepapers_clicked'],
+  ['api', '/api', 'apiReference', 'footer_api_clicked'],
+  ['historical', '/historical', 'historicalTrends', 'footer_historical_clicked'],
+  ['calculator', '/calculator', 'tcoCalculator', 'footer_calculator_clicked'],
+  ['fleet', '/fleet', 'fleetLifecycle', 'footer_fleet_clicked'],
+  ['first-token', '/first-token', 'firstTokenLimits', 'footer_first_token_clicked'],
+  ['cache-reuse', '/cache-reuse', 'cacheReuse', 'footer_cache_reuse_clicked'],
+  ['reliability', '/reliability', 'gpuReliability'],
+  ['gpu-specs', '/gpu-specs', 'gpuSpecsDashboard'],
+  ['compare-per-dollar', '/compare-per-dollar', 'perfPerDollar'],
+  ['model-architectures', '/model', 'modelArchitectures'],
+  ['glossary', '/glossary', 'glossary'],
+  ['chips', '/chips', 'chipSpecs'],
+  ['rankings', '/rankings', 'rankings'],
+  ['run', '/run', 'runPages'],
+];
+
+const externalLinks = (
+  links: readonly (readonly [string, string, FooterStringKey])[],
+  t: (typeof STRINGS)[keyof typeof STRINGS],
+) =>
+  links.map(([id, href, label]) => (
+    <a
+      key={id}
+      data-testid={`footer-link-${id}`}
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={LINK_CLASS}
+    >
+      {t[label]}
+    </a>
+  ));
 
 export const Footer = () => {
   const locale = useLocale();
@@ -145,91 +205,22 @@ export const Footer = () => {
           >
             <div data-testid="footer-links-semianalysis" className="flex min-w-0 flex-col gap-1">
               <h2 className="mb-1 text-sm font-medium text-foreground">{t.semianalysis}</h2>
-              <a
-                data-testid="footer-link-main-site"
-                href="https://semianalysis.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className={FOOTER_LINK}
-              >
-                {t.mainSite}
-              </a>
-              <a
-                data-testid="footer-link-newsletter"
-                href="https://newsletter.semianalysis.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className={FOOTER_LINK}
-              >
-                {t.newsletter}
-              </a>
-              <a
-                data-testid="footer-link-about"
-                href="https://semianalysis.com/about/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className={FOOTER_LINK}
-              >
-                {t.about}
-              </a>
+              {externalLinks(SEMIANALYSIS_LINKS, t)}
             </div>
             <div data-testid="footer-links-legal" className="flex min-w-0 flex-col gap-1">
               <h2 className="mb-1 text-sm font-medium text-foreground">{t.legal}</h2>
               <IntentPrefetchLink
                 data-testid="footer-link-land-acknowledgement"
                 href={`${prefix}/land-acknowledgement`}
-                className={FOOTER_LINK}
+                className={LINK_CLASS}
               >
                 {t.landAcknowledgement}
               </IntentPrefetchLink>
-              <a
-                data-testid="footer-link-privacy"
-                href="https://semianalysis.com/privacy-policy/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className={FOOTER_LINK}
-              >
-                {t.privacyPolicy}
-              </a>
-              <a
-                data-testid="footer-link-cookies"
-                href="https://semianalysis.com/cookie-policy/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className={FOOTER_LINK}
-              >
-                {t.cookiePolicy}
-              </a>
+              {externalLinks(LEGAL_LINKS, t)}
             </div>
             <div data-testid="footer-links-contribute" className="flex min-w-0 flex-col gap-1">
               <h2 className="mb-1 text-sm font-medium text-foreground">{t.contribute}</h2>
-              <a
-                data-testid="footer-link-benchmarks"
-                href="https://github.com/SemiAnalysisAI/InferenceX"
-                target="_blank"
-                rel="noopener noreferrer"
-                className={FOOTER_LINK}
-              >
-                {t.benchmarks}
-              </a>
-              <a
-                data-testid="footer-link-agentx-harness"
-                href="https://github.com/SemiAnalysisAI/agentx-harness"
-                target="_blank"
-                rel="noopener noreferrer"
-                className={FOOTER_LINK}
-              >
-                {t.agentxHarness}
-              </a>
-              <a
-                data-testid="footer-link-visualization"
-                href="https://github.com/SemiAnalysisAI/InferenceX-app"
-                target="_blank"
-                rel="noopener noreferrer"
-                className={FOOTER_LINK}
-              >
-                {t.visualization}
-              </a>
+              {externalLinks(CONTRIBUTE_LINKS, t)}
             </div>
             <div
               data-testid="footer-links-more"
@@ -237,166 +228,17 @@ export const Footer = () => {
             >
               <h2 className="mb-1 text-sm font-medium text-foreground">{t.more}</h2>
               <div className="grid grid-cols-2 gap-x-6 gap-y-1">
-                <IntentPrefetchLink
-                  data-testid="footer-link-supporters"
-                  href={`${prefix}/quotes`}
-                  onClick={() => track('footer_supporters_clicked', FOOTER_EVENT_PROPERTIES)}
-                  className={FOOTER_LINK}
-                >
-                  {t.supporters}
-                </IntentPrefetchLink>
-                <IntentPrefetchLink
-                  data-testid="footer-link-agentx"
-                  href={`${prefix}/agentx`}
-                  onClick={() => track('footer_agentx_clicked', FOOTER_EVENT_PROPERTIES)}
-                  className={FOOTER_LINK}
-                >
-                  {t.agentx}
-                </IntentPrefetchLink>
-                <IntentPrefetchLink
-                  data-testid="footer-link-telemetry"
-                  href={`${prefix}/inference/agentic`}
-                  onClick={() => track('footer_telemetry_clicked', FOOTER_EVENT_PROPERTIES)}
-                  className={FOOTER_LINK}
-                >
-                  {t.telemetry}
-                </IntentPrefetchLink>
-                <IntentPrefetchLink
-                  data-testid="footer-link-compare"
-                  href={`${prefix}/compare`}
-                  onClick={() => track('footer_compare_clicked', FOOTER_EVENT_PROPERTIES)}
-                  className={FOOTER_LINK}
-                >
-                  {t.comparisons}
-                </IntentPrefetchLink>
-                <IntentPrefetchLink
-                  data-testid="footer-link-articles"
-                  href={`${prefix}/blog`}
-                  onClick={() => track('footer_articles_clicked', FOOTER_EVENT_PROPERTIES)}
-                  className={FOOTER_LINK}
-                >
-                  {t.articles}
-                </IntentPrefetchLink>
-                <IntentPrefetchLink
-                  data-testid="footer-link-hardware"
-                  href={`${prefix}/hardware`}
-                  onClick={() => track('footer_hardware_clicked', FOOTER_EVENT_PROPERTIES)}
-                  className={FOOTER_LINK}
-                >
-                  {t.hardwareResults}
-                </IntentPrefetchLink>
-                <IntentPrefetchLink
-                  data-testid="footer-link-whitepapers"
-                  href={`${prefix}/whitepaper`}
-                  onClick={() => track('footer_whitepapers_clicked', FOOTER_EVENT_PROPERTIES)}
-                  className={FOOTER_LINK}
-                >
-                  {t.whitepapers}
-                </IntentPrefetchLink>
-                <IntentPrefetchLink
-                  data-testid="footer-link-api"
-                  href={`${prefix}/api`}
-                  onClick={() => track('footer_api_clicked', FOOTER_EVENT_PROPERTIES)}
-                  className={FOOTER_LINK}
-                >
-                  {t.apiReference}
-                </IntentPrefetchLink>
-                <IntentPrefetchLink
-                  data-testid="footer-link-historical"
-                  href={`${prefix}/historical`}
-                  className={FOOTER_LINK}
-                  onClick={() => track('footer_historical_clicked', FOOTER_EVENT_PROPERTIES)}
-                >
-                  {t.historicalTrends}
-                </IntentPrefetchLink>
-                <IntentPrefetchLink
-                  data-testid="footer-link-calculator"
-                  href={`${prefix}/calculator`}
-                  className={FOOTER_LINK}
-                  onClick={() => track('footer_calculator_clicked', FOOTER_EVENT_PROPERTIES)}
-                >
-                  {t.tcoCalculator}
-                </IntentPrefetchLink>
-                <IntentPrefetchLink
-                  data-testid="footer-link-fleet"
-                  href={`${prefix}/fleet`}
-                  className={FOOTER_LINK}
-                  onClick={() => track('footer_fleet_clicked', FOOTER_EVENT_PROPERTIES)}
-                >
-                  {t.fleetLifecycle}
-                </IntentPrefetchLink>
-                <IntentPrefetchLink
-                  data-testid="footer-link-first-token"
-                  href={`${prefix}/first-token`}
-                  className={FOOTER_LINK}
-                  onClick={() => track('footer_first_token_clicked', FOOTER_EVENT_PROPERTIES)}
-                >
-                  {t.firstTokenLimits}
-                </IntentPrefetchLink>
-                <IntentPrefetchLink
-                  data-testid="footer-link-cache-reuse"
-                  href={`${prefix}/cache-reuse`}
-                  className={FOOTER_LINK}
-                  onClick={() => track('footer_cache_reuse_clicked', FOOTER_EVENT_PROPERTIES)}
-                >
-                  {t.cacheReuse}
-                </IntentPrefetchLink>
-                <IntentPrefetchLink
-                  data-testid="footer-link-reliability"
-                  href={`${prefix}/reliability`}
-                  className={FOOTER_LINK}
-                >
-                  {t.gpuReliability}
-                </IntentPrefetchLink>
-                <IntentPrefetchLink
-                  data-testid="footer-link-gpu-specs"
-                  href={`${prefix}/gpu-specs`}
-                  className={FOOTER_LINK}
-                >
-                  {t.gpuSpecsDashboard}
-                </IntentPrefetchLink>
-                <IntentPrefetchLink
-                  data-testid="footer-link-compare-per-dollar"
-                  href={`${prefix}/compare-per-dollar`}
-                  className={FOOTER_LINK}
-                >
-                  {t.perfPerDollar}
-                </IntentPrefetchLink>
-                <IntentPrefetchLink
-                  data-testid="footer-link-model-architectures"
-                  href={`${prefix}/model`}
-                  className={FOOTER_LINK}
-                >
-                  {t.modelArchitectures}
-                </IntentPrefetchLink>
-                <IntentPrefetchLink
-                  data-testid="footer-link-glossary"
-                  href={`${prefix}/glossary`}
-                  className={FOOTER_LINK}
-                >
-                  {t.glossary}
-                </IntentPrefetchLink>
-                <IntentPrefetchLink
-                  data-testid="footer-link-chips"
-                  href={`${prefix}/chips`}
-                  className={FOOTER_LINK}
-                >
-                  {t.chipSpecs}
-                </IntentPrefetchLink>
-                <IntentPrefetchLink
-                  data-testid="footer-link-rankings"
-                  href={`${prefix}/rankings`}
-                  className={FOOTER_LINK}
-                >
-                  {t.rankings}
-                </IntentPrefetchLink>
-                <IntentPrefetchLink
-                  data-testid="footer-link-run"
-                  href={`${prefix}/run`}
-                  className={FOOTER_LINK}
-                >
-                  {t.runPages}
-                </IntentPrefetchLink>
+                {MORE_LINKS.map(([id, path, label, event]) => (
+                  <IntentPrefetchLink
+                    key={id}
+                    data-testid={`footer-link-${id}`}
+                    href={`${prefix}${path}`}
+                    onClick={event ? () => track(event, FOOTER_EVENT_PROPERTIES) : undefined}
+                    className={LINK_CLASS}
+                  >
+                    {t[label]}
+                  </IntentPrefetchLink>
+                ))}
               </div>
             </div>
           </div>

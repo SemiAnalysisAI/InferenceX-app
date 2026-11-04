@@ -259,11 +259,10 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
     cy.get('#chart-0 [data-testid="result-context-markers"] [data-testid="offload-halo-key"]')
       .should('be.visible')
       .and('contain.text', 'KV offload on');
-    cy.get('#chart-0 .offload-halo').should('have.length.at.least', 1);
-    cy.get('#chart-0 .dot-group').then(($points) => {
-      cy.get('#chart-0 .offload-halo').should(($halos) => {
-        expect($halos.length).to.be.lessThan($points.length);
-      });
+    cy.scatterPoints('#chart-0').should((points) => {
+      const halos = points.filter((point) => point.halo !== null).length;
+      expect(halos).to.be.at.least(1);
+      expect(halos).to.be.lessThan(points.length);
     });
 
     cy.get(
@@ -291,7 +290,9 @@ describe('X-Axis Mode Toggle (inference chart)', () => {
       expect(points.filter((point) => point.halo !== null)).to.have.length(0);
     });
     cy.get('#scatter-offloading-label').should('have.attr', 'data-state', 'unchecked').click();
-    cy.get('#chart-0 .offload-halo').should('have.length.at.least', 1);
+    cy.scatterPoints('#chart-0').should((points) => {
+      expect(points.filter((point) => point.halo !== null)).to.have.length.at.least(1);
+    });
     cy.get(
       '#chart-0 [data-testid="result-context-markers"] [data-testid="offload-halo-key"]',
     ).should('be.visible');
@@ -442,7 +443,10 @@ describe('Default scenario', () => {
           'help does not overlap the label',
         ).to.be.at.least(label.getBoundingClientRect().right);
       });
-      cy.get('label[for="scenario-select"]').should('be.visible').and('contain.text', 'Scenario');
+      // The footer control keeps its label for screen readers and exports, not on screen.
+      cy.get('label[for="scenario-select"]')
+        .should('have.class', 'sr-only')
+        .and('contain.text', 'Scenario');
       cy.get('h2 [data-testid="scenario-selector"]').should('not.exist');
       cy.get('[data-testid="scenario-selector"]').click('right', {
         scrollBehavior: 'center',
@@ -461,7 +465,7 @@ describe('Default scenario', () => {
   it('keeps 8K / 1K when the link asks for it explicitly', () => {
     interceptAgenticData();
     cy.visit('/zh/inference');
-    cy.get('label[for="scenario-select"]').should('be.visible').and('have.text', '场景:');
+    cy.get('label[for="scenario-select"]').should('have.class', 'sr-only').and('have.text', '场景');
     cy.get('[data-testid="result-context"] [data-testid="scenario-selector"]').should('be.visible');
     cy.get('h2 [data-testid="scenario-selector"]').should('not.exist');
 

@@ -1107,11 +1107,12 @@ const GPUGraph = React.memo(
           comparisonDate: !isOverlay,
           showPowerTelemetry: showPowerTelemetryRef.current,
           runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
-          hasTrace: isPersistedBenchmarkId(d.id)
-            ? traceAvailabilityRef.current?.[d.id] === true
-            : false,
+          hasTrace:
+            d.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(d.id)
+              ? presenceRef.current?.trace.has(d.id) === true
+              : false,
           hasLog: isPersistedBenchmarkId(d.id)
-            ? logAvailabilityRef.current?.[d.id] === true
+            ? presenceRef.current?.log.has(d.id) === true
             : false,
           locale,
         }),

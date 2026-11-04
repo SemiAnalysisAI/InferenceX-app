@@ -47,7 +47,7 @@ describe('Agentic chart without the retired point callout', () => {
         expect(win.localStorage.getItem(STORAGE_KEY)).to.eq(null);
       });
 
-      cy.get(AGENTIC_POINTS).first().find('.visible-shape').click({ force: true });
+      cy.scatterPoints().then((points) => clickScatterPoint(agenticPoints(points)[0]));
       cy.get('[data-testid="point-details-panel"]')
         .should('have.length', 1)
         .find('a[href*="/inference/agentic/"]')

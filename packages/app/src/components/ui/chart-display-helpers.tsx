@@ -154,8 +154,8 @@ function DisaggCaveat({
     )
   ) : locale === 'zh' ? (
     <>
-      <strong>注意：</strong>分离式推理配置（如 MoRI SGLang、Dynamo TRTLLM）按解码芯片或预填充
-      芯片计算
+      <strong>注意：</strong>
+      {'分离式推理配置（如 MoRI SGLang、Dynamo TRTLLM）按解码芯片或预填充芯片计算'}
       {NOUN_ZH[calculationNoun] ?? calculationNoun}
       ，而非按芯片总数计算。因此，与聚合配置进行
       {NOUN_ZH[comparisonNoun] ?? comparisonNoun}
@@ -173,14 +173,29 @@ function DisaggCaveat({
   return (
     <div
       data-disagg-caveat=""
+      data-chip-basis={chipBasis?.value}
       aria-hidden={visible ? undefined : true}
       className={`grid transition-[grid-template-rows,opacity] duration-200 ease-in-out ${
         visible ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
       }`}
     >
-      <p className="min-h-0 overflow-hidden text-xs text-muted-foreground">
-        <span className="mt-2 block border-l-2 border-warning/60 py-1 pl-2">{content}</span>
-      </p>
+      <div className="min-h-0 overflow-hidden text-xs text-muted-foreground">
+        {/* Warning edge while the per-pool basis makes the comparison uneven; neutral once
+        every chip is the denominator. */}
+        <div
+          className={`mt-2 border-l-2 py-1 pl-2 ${totalBasis ? 'border-border' : 'border-warning/60'}`}
+        >
+          <p>{content}</p>
+          {chipBasis && !chipBasis.readOnly && visible && (
+            <ChipBasisToggle
+              value={chipBasis.value}
+              onValueChange={chipBasis.onChange}
+              source={chipBasis.source}
+              className="mt-1.5"
+            />
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -234,6 +249,8 @@ export function MetricAssumptionNotes({
   tcoBasis = DEFAULT_TCO_BASIS,
   userCosts,
   omitCostValues = false,
+  chipBasis,
+  caveatsOnly = false,
 }: {
   selectedYAxisMetric: string;
   activeHwKeys?: ReadonlySet<string> | readonly string[];
@@ -242,6 +259,14 @@ export function MetricAssumptionNotes({
   tcoBasis?: TcoBasis;
   userCosts?: Record<string, number | undefined> | null;
   omitCostValues?: boolean;
+  /**
+   * The chart's disaggregated throughput basis. When provided, every caveat on a
+   * metric that divides input or output throughput describes it, and offers the toggle
+   * unless the control is read-only (embeds, or a chart that hosts the toggle elsewhere).
+   */
+  chipBasis?: ChipBasisControl;
+  /** Render only the disaggregated caveats, without sources or cost badges (embeds). */
+  caveatsOnly?: boolean;
 }) {
   const locale = useLocale();
   const activeBases = useMemo(() => {
@@ -297,7 +322,7 @@ export function MetricAssumptionNotes({
           </SourceLink>
         </>
       )}
-      {costAssumptions && (
+      {!caveatsOnly && costAssumptions && (
         <>
           <MetricBadges
             label={costLabel}

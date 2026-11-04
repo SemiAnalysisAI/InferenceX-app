@@ -2272,10 +2272,10 @@ const ScatterGraph = React.memo(
           runUrl: d.run_url ? updateRepoUrl(d.run_url) : undefined,
           hasTrace:
             d.benchmark_type === 'agentic_traces' && isPersistedBenchmarkId(d.id)
-              ? (interactionRef.current.traceAvailability?.[d.id] ?? false)
+              ? (interactionRef.current.presence?.trace.has(d.id) ?? false)
               : false,
           hasLog: isPersistedBenchmarkId(d.id)
-            ? (interactionRef.current.logAvailability?.[d.id] ?? false)
+            ? (interactionRef.current.presence?.log.has(d.id) ?? false)
             : false,
           locale,
           powerLabelStyle,

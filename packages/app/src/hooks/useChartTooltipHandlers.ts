@@ -9,6 +9,7 @@ import { installTouchInputTracking, isTouchCompatMouseEvent } from '@/lib/d3-cha
 import { useStickyTooltip } from './useStickyTooltip';
 
 import { overlayMarkerPosition } from '@/lib/d3-chart/overlay-x-marker';
+import { canvasPointLayerOf } from '@/lib/d3-chart/layers/canvas-point-registry';
 import { showPinRing } from '@/lib/d3-chart/pin-ring';
 export type RulerType = 'vertical' | 'horizontal' | 'crosshair' | 'none';
 
@@ -218,7 +219,7 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
         d: TData,
         markerPosition: { x: number; y: number } | null,
       ): boolean => {
-        if (isPinned()) return false;
+        if (isPinned() && !config.panel) return false;
         if (isTouchCompatMouseEvent(event)) return false;
         if (config.onHoverStart) {
           config.onHoverStart(target, d);
@@ -236,7 +237,7 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
       };
 
       const hoverMove = (event: MouseEvent) => {
-        if (isPinned()) return;
+        if (isPinned() && !config.panel) return;
         if (isTouchCompatMouseEvent(event)) return;
         const geometry = getTooltipContainerGeometry(containerElement);
         const mx = event.clientX - geometry.bounds.left;
@@ -246,7 +247,7 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
       };
 
       const hoverEnd = (target: d3.Selection<any, TData, any, any>, d: TData): boolean => {
-        if (isPinned()) return false;
+        if (isPinned() && !config.panel) return false;
         if (config.onHoverEnd) {
           config.onHoverEnd(target, d);
         } else {
@@ -263,6 +264,26 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
         markerPosition: { x: number; y: number } | null,
       ) => {
         event.stopPropagation();
+
+        if (config.panel) {
+          tooltipElement.style('opacity', 0).style('display', 'none');
+          rulerGroup.style('display', 'none');
+          if (pinnedPointRef.current === d) {
+            dismissTooltip();
+            return;
+          }
+          const { curX, curY } = getZoomedScales();
+          const x = markerPosition?.x ?? config.getRulerX?.(d, curX);
+          const y = markerPosition?.y ?? (curY ? config.getRulerY?.(d, curY) : undefined);
+          const host = rulerGroup.node()?.parentNode;
+          if (host instanceof Element && x !== undefined && y !== undefined) {
+            showPinRing(host, x, y);
+          }
+          pinTooltip(d);
+          config.onPointClick?.(d);
+          return;
+        }
+
         const geometry = getTooltipContainerGeometry(containerElement);
         const mx = event.clientX - geometry.bounds.left;
         const my = event.clientY - geometry.bounds.top;
@@ -294,127 +315,15 @@ export function useChartTooltipHandlers<TData>(): ChartTooltipHandlers<TData> {
 
       selection
         .on('mouseenter', function (event, d) {
-          if (isPinned() && !config.panel) return;
-          if (isTouchCompatMouseEvent(event)) return;
-
-          if (config.onHoverStart) {
-            config.onHoverStart(d3.select(this), d);
-          } else {
-            d3.select(this).attr('opacity', 0.8);
-          }
-
-          tooltipElement
-            .style('opacity', 1)
-            .style('display', 'block')
-            .style('pointer-events', 'none')
-            .html(config.generateTooltipContent(d, false));
-          invalidateTooltipGeometry(tooltipElement.node());
-
           const markerPosition = this instanceof Element ? overlayMarkerPosition(this) : null;
-          const { curX: currentXScale, curY: currentYScale } = getZoomedScales();
-
-          if (verticalRuler || horizontalRuler) {
-            rulerGroup.style('display', 'block');
-          }
-          if (verticalRuler && config.getRulerX) {
-            const x = markerPosition?.x ?? config.getRulerX(d, currentXScale);
-            verticalRuler.attr('x1', x).attr('x2', x);
-          }
-
-          if (horizontalRuler && currentYScale && config.getRulerY) {
-            const y = markerPosition?.y ?? config.getRulerY(d, currentYScale);
-            horizontalRuler.attr('y1', y).attr('y2', y);
-          }
-        })
-        .on('mousemove', (event) => {
-          if (isPinned() && !config.panel) return;
-          if (isTouchCompatMouseEvent(event)) return;
-
-          const geometry = getTooltipContainerGeometry(containerElement);
-          const mx = event.clientX - geometry.bounds.left;
-          const my = event.clientY - geometry.bounds.top;
-          const pos = computeTooltipPosition(
-            mx,
-            my,
-            tooltipElement,
-            containerElement,
-            10,
-            geometry,
-          );
-          tooltipElement.style('left', `${pos.left}px`).style('top', `${pos.top}px`);
+          hoverStart(event, d3.select(this), d, markerPosition);
         })
         .on('mousemove', hoverMove)
         .on('mouseleave', function (_event, d) {
-          if (isPinned() && !config.panel) return;
-
-          if (config.onHoverEnd) {
-            config.onHoverEnd(d3.select(this), d);
-          } else {
-            d3.select(this).attr('opacity', 1);
-          }
-
-          tooltipElement.style('opacity', 0).style('display', 'none');
-          rulerGroup.style('display', 'none');
+          hoverEnd(d3.select(this), d);
         })
         .on('click', function (event, d) {
-          event.stopPropagation();
-
-          if (config.panel) {
-            tooltipElement.style('opacity', 0).style('display', 'none');
-            rulerGroup.style('display', 'none');
-            if (pinnedPointRef.current === d) {
-              dismissTooltip();
-              return;
-            }
-            const markerPosition = this instanceof Element ? overlayMarkerPosition(this) : null;
-            const { curX, curY } = getZoomedScales();
-            const x = markerPosition?.x ?? config.getRulerX?.(d, curX);
-            const y = markerPosition?.y ?? (curY ? config.getRulerY?.(d, curY) : undefined);
-            const host = rulerGroup.node()?.parentNode;
-            if (host instanceof Element && x !== undefined && y !== undefined) {
-              showPinRing(host, x, y);
-            }
-            pinTooltip(d);
-            config.onPointClick?.(d);
-            return;
-          }
-
-          const geometry = getTooltipContainerGeometry(containerElement);
-          const mx = event.clientX - geometry.bounds.left;
-          const my = event.clientY - geometry.bounds.top;
-          tooltipElement.html(config.generateTooltipContent(d, true));
-          invalidateTooltipGeometry(tooltipElement.node());
-          const pos = computeTooltipPosition(
-            mx,
-            my,
-            tooltipElement,
-            containerElement,
-            10,
-            geometry,
-          );
-          tooltipElement
-            .style('left', `${pos.left}px`)
-            .style('top', `${pos.top}px`)
-            .style('opacity', 1)
-            .style('display', 'block')
-            .style('pointer-events', 'auto');
-
-          const markerPosition = this instanceof Element ? overlayMarkerPosition(this) : null;
-          const { curX: currentXScale, curY: currentYScale } = getZoomedScales();
-          if (verticalRuler || horizontalRuler) {
-            rulerGroup.style('display', 'block');
-          }
-          if (verticalRuler && config.getRulerX) {
-            const x = markerPosition?.x ?? config.getRulerX(d, currentXScale);
-            verticalRuler.attr('x1', x).attr('x2', x);
-          }
-          if (horizontalRuler && currentYScale && config.getRulerY) {
-            const y = markerPosition?.y ?? config.getRulerY(d, currentYScale);
-            horizontalRuler.attr('y1', y).attr('y2', y);
-          }
-
-          pinTooltip(d);
-          config.onPointClick?.(d);
+          pointClick(event, d, this instanceof Element ? overlayMarkerPosition(this) : null);
         });
     },
     [isPinned, pinTooltip, pinnedPointRef, dismissTooltip],

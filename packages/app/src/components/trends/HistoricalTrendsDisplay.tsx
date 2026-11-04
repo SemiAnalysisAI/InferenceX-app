@@ -475,7 +475,14 @@ export default function HistoricalTrendsDisplay() {
                     targetInteractivity,
                     isAgentic ? 'p90' : 'median',
                   );
-                  exportToCsv(`InferenceX_historical_${selectedModel}`, headers, rows);
+                  exportToCsv(
+                    `InferenceX_historical_${selectedModel}`,
+                    headers,
+                    rows,
+                    CHIP_BASIS_METRICS.has(selectedYAxisMetric)
+                      ? [chipBasisCsvNote(chipBasis, locale)]
+                      : [],
+                  );
                 }}
               />
               <PerformanceChart

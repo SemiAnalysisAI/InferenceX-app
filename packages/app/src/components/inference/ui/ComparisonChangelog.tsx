@@ -28,6 +28,8 @@ const COMPARISON_CHANGELOG_STRINGS = {
     label: (count: number) =>
       `Config changelog (${count} date${count === 1 ? '' : 's'} with changes)`,
     loading: 'Config changelog (loading…)',
+    deferred: 'Config changelog',
+    loadingBody: 'Loading changelog…',
     emptyLabel: (count: number) =>
       `Config changelog (${count} date${count === 1 ? '' : 's'} queried, no matching changelog data)`,
     addAll: 'Add all to chart',
@@ -333,7 +335,9 @@ export default function ComparisonChangelog({
         <div className="min-h-0 overflow-hidden">
           <div className="flex flex-col gap-3 pt-2 pl-6">
             {filteredChangelogs.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t.empty}</p>
+              <p className="text-sm text-muted-foreground">
+                {loading || deferred ? t.loadingBody : t.empty}
+              </p>
             ) : (
               filteredChangelogs.map((item) => {
                 const runs = runMetaFor(item);

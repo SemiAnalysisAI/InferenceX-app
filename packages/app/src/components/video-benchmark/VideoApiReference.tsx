@@ -68,7 +68,7 @@ export default function VideoApiReference({
   return (
     <>
       <div className="flex min-w-0 flex-col gap-1.5" data-testid="video-api-reference">
-        <label htmlFor={id} className="text-xs font-medium text-muted-foreground">
+        <label htmlFor={id} className="text-sm font-medium">
           {s.label}
         </label>
         <div className="flex flex-wrap gap-2">

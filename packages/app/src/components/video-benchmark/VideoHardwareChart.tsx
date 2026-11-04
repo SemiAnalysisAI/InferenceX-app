@@ -219,9 +219,9 @@ export default function VideoHardwareChart({
       instructions={s.controls}
       noDataOverlay={
         plotted.length === 0 ? (
-          <p className="text-sm text-muted-foreground" role="status">
+          <EmptyState bare role="status" className="pointer-events-none absolute inset-0 p-8">
             {s.noData}
-          </p>
+          </EmptyState>
         ) : undefined
       }
       caption={

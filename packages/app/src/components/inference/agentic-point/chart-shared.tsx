@@ -56,14 +56,30 @@ export function ChartEmpty({
 }) {
   const locale = useLocale();
   return (
-    <EmptyState bare className="text-xs" style={{ height }}>
+    <EmptyState
+      bare
+      data-testid="agentic-chart-empty"
+      className="w-full text-xs"
+      style={{ aspectRatio: `${width} / ${height}` }}
+    >
       {message ?? (locale === 'zh' ? '暂无数据' : 'No data')}
     </EmptyState>
   );
 }
 
-export function ChartSkeleton() {
-  return <Skeleton className="h-65 bg-muted/30" />;
+/**
+ * Loading placeholder with the chart's own aspect ratio. Charts scale their viewBox to the
+ * card width, so a fixed pixel height would shift the cards below once the chart draws.
+ */
+export function ChartSkeleton({ size = 'inline' }: { size?: keyof typeof CHART_SIZES }) {
+  const { width, height } = CHART_SIZES[size];
+  return (
+    <Skeleton
+      data-testid="agentic-chart-skeleton"
+      className="w-full bg-muted/30"
+      style={{ aspectRatio: `${width} / ${height}` }}
+    />
+  );
 }
 
 export type LegendSwatch = 'line' | 'dashed-line' | 'area';

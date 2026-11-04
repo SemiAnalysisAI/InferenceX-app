@@ -31,8 +31,7 @@ const STRINGS = {
     empty: 'No case has FLOP and byte counts',
     precision: 'Compute precision',
     normalized: 'Normalized',
-    ridgeAxis: 'Arithmetic intensity / ridge point',
-    intensityAxis: 'Arithmetic intensity (FLOP/byte)',
+    intensityAxis: 'Arithmetic intensity',
     shareAxis: 'Share of peak compute (%)',
     tflopsAxis: 'Achieved TFLOPS',
     share: (pct: string, what: 'compute' | 'bandwidth') => ` · ${pct}% of peak ${what}`,
@@ -48,8 +47,7 @@ const STRINGS = {
     empty: '没有同时带 FLOP 和字节数的用例',
     precision: '计算精度',
     normalized: '归一化',
-    ridgeAxis: '算术强度 / roofline 拐点',
-    intensityAxis: '算术强度（FLOP/byte）',
+    intensityAxis: '算术强度',
     shareAxis: '计算峰值占比（%）',
     tflopsAxis: '实测 TFLOPS',
     share: (pct: string, what: 'compute' | 'bandwidth') =>
@@ -62,6 +60,8 @@ const STRINGS = {
     aside: (text: string) => `（${text}）`,
   },
 };
+
+type Strings = (typeof STRINGS)['en' | 'zh'];
 
 interface Point {
   hw: string;
@@ -140,11 +140,10 @@ export function Roofline({
     [view, precision, model.hardware, normalized, sharedOnly],
   );
   if (!precision) return <EmptyChart>{strings.empty}</EmptyChart>;
-  const xs = normalized
-    ? points.map((p) => p.x)
-    : view.cases.flatMap((c) =>
-        c.computePrecision === precision && c.flops && c.bytes ? [c.flops / c.bytes] : [],
-      );
+  const composite = view.cases.some(
+    (c) => (c.work?.parts.length ?? 0) > 1 || (c.work?.links.length ?? 0) > 0,
+  );
+  const xs = points.map((p) => p.x);
   const [a0, a1] =
     xs.length > 0
       ? [
@@ -235,11 +234,11 @@ export function Roofline({
             xAxis={
               normalized
                 ? {
-                    label: strings.ridgeAxis,
+                    label: strings.intensityAxis,
                     tickFormat: (v) => ratio(Number(v)),
                   }
                 : {
-                    label: strings.intensityAxis,
+                    label: `${strings.intensityAxis}${strings.aside('FLOP/byte')}`,
                     tickFormat: (v) => formatCompact(Number(v)),
                   }
             }
@@ -325,7 +324,7 @@ export function Roofline({
 export const roofline: VizDefinition = {
   id: 'roofline',
   title: { en: 'Roofline', zh: 'Roofline' },
-  ops: ['gemm', 'moe'],
+  ops: ['gemm', 'moe', 'attention'],
   wide: true,
   Component: Roofline,
 };

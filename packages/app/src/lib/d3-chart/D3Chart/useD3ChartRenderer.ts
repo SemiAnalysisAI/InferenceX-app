@@ -96,26 +96,39 @@ function gridVisibility(xAxis?: AxisConfig, yAxis?: AxisConfig): GridVisibility 
   return { x: xAxis?.grid ?? true, y: yAxis?.grid ?? true };
 }
 
-function zoomedScales(
+const ZOOM_REWRITES_LAYER: Record<LayerConfig['type'], boolean> = {
+  bar: true,
+  horizontalBar: true,
+  point: true,
+  errorBar: true,
+  line: true,
+  barLabel: true,
+  roofline: false,
+  scatter: false,
+  radar: false,
+  custom: false,
+};
+
+function rescaleForZoom(
   xScale: BuiltScale,
   yScale: BuiltScale,
-  transform: d3.ZoomTransform,
   zoomConfig: ZoomConfig | undefined,
+  transform: d3.ZoomTransform,
 ): { xScale: BuiltScale; yScale: BuiltScale } {
-  const zoomAxes = zoomConfig?.axes ?? 'both';
-  let currentXScale = xScale;
-  let currentYScale = yScale;
-  if ((zoomAxes === 'x' || zoomAxes === 'both') && !isBandScale(xScale)) {
-    currentXScale = zoomConfig?.rescaleX
+  const axes = zoomConfig?.axes ?? 'both';
+  let zoomedX = xScale;
+  let zoomedY = yScale;
+  if ((axes === 'x' || axes === 'both') && !isBandScale(xScale)) {
+    zoomedX = zoomConfig?.rescaleX
       ? zoomConfig.rescaleX(xScale as ContinuousScale, transform)
       : transform.rescaleX(xScale as ContinuousScale);
   }
-  if ((zoomAxes === 'y' || zoomAxes === 'both') && !isBandScale(yScale)) {
-    currentYScale = zoomConfig?.rescaleY
+  if ((axes === 'y' || axes === 'both') && !isBandScale(yScale)) {
+    zoomedY = zoomConfig?.rescaleY
       ? zoomConfig.rescaleY(yScale as ContinuousScale, transform)
       : transform.rescaleY(yScale as ContinuousScale);
   }
-  return { xScale: currentXScale, yScale: currentYScale };
+  return { xScale: zoomedX, yScale: zoomedY };
 }
 
 export interface ZoomFrameBatcher {
@@ -547,7 +560,6 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
           );
           const { rulerGroup, verticalRuler, horizontalRuler } = rulers;
           const containerEl = svgRef.current!.parentElement as HTMLDivElement;
-          const getDataX = tooltipConfig.getDataX;
           const panel = Boolean(tooltipConfig.details);
           const sortedData = [...data].toSorted((a, b) => getDataX(a) - getDataX(b));
           const bisector = d3.bisector<T, number>((d) => getDataX(d)).center;
@@ -839,7 +851,12 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
           .node();
         let position = marker ? overlayMarkerPosition(marker) : null;
         if (!position && tooltipConfig.getRulerX && tooltipConfig.getRulerY && svgRef.current) {
-          const zoomed = zoomedScales(xScale, yScale, d3.zoomTransform(svgRef.current), zoomConfig);
+          const zoomed = rescaleForZoom(
+            xScale,
+            yScale,
+            zoomConfig,
+            d3.zoomTransform(svgRef.current),
+          );
           if (!isBandScale(zoomed.yScale)) {
             position = {
               x: tooltipConfig.getRulerX(
@@ -918,11 +935,11 @@ export function useD3ChartRenderer<T>(props: D3ChartProps<T>, deps: RendererDeps
     scalesRef.current = { xScale, yScale };
 
     const zoomAxes = zoomConfig?.axes ?? 'both';
-    const { xScale: currentXScale, yScale: currentYScale } = zoomedScales(
+    const { xScale: currentXScale, yScale: currentYScale } = rescaleForZoom(
       xScale,
       yScale,
-      d3.zoomTransform(svgRef.current),
       zoomConfig,
+      d3.zoomTransform(svgRef.current),
     );
 
     if (hasScales) {

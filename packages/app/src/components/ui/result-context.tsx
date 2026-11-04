@@ -16,6 +16,7 @@ export interface ResultContextProps {
   costTier?: string;
   costTierControl?: ReactNode;
   tcoBasis?: ReactNode;
+  chipBasis?: ReactNode;
   utilization?: string;
   utilizationControl?: ReactNode;
   utilizationControlId?: string;
@@ -102,6 +103,7 @@ export function ResultContext({
   costTier,
   costTierControl,
   tcoBasis,
+  chipBasis,
   utilization,
   utilizationControl,
   utilizationControlId,
@@ -175,6 +177,7 @@ export function ResultContext({
           controlsEnd) && (
           <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-2">
             <dl className="contents">
+              {scenario}
               {precision && (
                 <div>
                   <dt className="inline font-medium text-foreground">{labels.precision}:</dt>{' '}
@@ -211,6 +214,7 @@ export function ResultContext({
                 />
               )}
               {tcoBasis}
+              {chipBasis}
             </dl>
             {controlsEnd && <div className="ml-auto max-w-full min-w-0">{controlsEnd}</div>}
           </div>

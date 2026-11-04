@@ -8,7 +8,7 @@ import { ModelLogo } from '@/components/ui/model-logo';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { NewBadge } from '@/components/ui/new-badge';
-import { CaptionField, captionControlTriggerClassName } from '@/components/ui/result-context';
+import { CaptionField } from '@/components/ui/result-context';
 import {
   Select,
   SelectContent,
@@ -384,7 +384,8 @@ export function ScenarioSelector({
   const select = (
     <SearchableSelect
       showSelectedHelp={variant !== 'caption'}
-      className={variant === 'caption' ? captionControlTriggerClassName : undefined}
+      size={variant === 'caption' ? 'sm' : undefined}
+      className={variant === 'caption' ? 'w-auto max-w-full text-xs' : undefined}
       value={value}
       initialLabel={scenarioLabel(value)}
       contentClassName="min-w-[min(16rem,var(--radix-popover-content-available-width))]"
@@ -408,13 +409,16 @@ export function ScenarioSelector({
     />
   );
 
+  // The chart footer's controls row: a standard small control whose label is only read by
+  // screen readers and printed in exported images, like the cost tier and TCO basis beside it.
   if (variant === 'caption') {
     return (
       <CaptionField
         label={t.scenario}
         value={scenarioLabel(value)}
+        hideLabel
         control={
-          <div className="flex items-center gap-1">
+          <span className="inline-flex items-center gap-0.5">
             {select}
             <InfoHelp
               label={scenarioLabel(value)}
@@ -424,7 +428,7 @@ export function ScenarioSelector({
             >
               {toScenarioOption(value).help}
             </InfoHelp>
-          </div>
+          </span>
         }
         controlId={id}
         testId="result-context-scenario"

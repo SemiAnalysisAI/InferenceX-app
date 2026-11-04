@@ -297,7 +297,7 @@ all-reduce runs outside the op. Share of roofline is that time over measured
 latency. The roofline chart plots each case at its effective intensity: where
 the GPU's roofline reaches the case's bound, so the gap under the roof is the
 case's share of roofline. For a single-stage op this is plain FLOP/byte. The x axis
-reads "Arithmetic Intensity" (FLOP/byte, or over the ridge point when normalized) either
+reads "Arithmetic intensity" (FLOP/byte, or over the ridge point when normalized) either
 way; the tooltip gives plain FLOP/byte and, for staged cases, the effective value.
 
 中文：MoE 与注意力算子包含多个阶段（投影、注意力核心或线性递归、路由、专家、共享专家），
@@ -308,7 +308,7 @@ GEMM 的 all-reduce，MoE 的 all-reduce、all-gather/reduce-scatter 或专家�
 dispatch/combine，以及注意力的 dcp 合并。注意力自身的张量并行 all-reduce 不在算子
 内。Roofline 占比为该时间与实测延迟之比。Roofline 图按等效算术强度放置每个用例，
 即 GPU roofline 达到该用例上界的位置，因此点与屋顶之间的差距即为 roofline 占比；
-单阶段算子的等效强度就是普通的 FLOP/byte。横轴统一标为 "Arithmetic Intensity"
+单阶段算子的等效强度就是普通的 FLOP/byte。横轴统一标为“算术强度”
 （FLOP/byte，归一化时为与拐点之比）；提示框给出普通 FLOP/byte，多阶段用例另给等效值。
 
 ## Model View
@@ -329,7 +329,7 @@ and 1024), so the detail picks one, largest first, and lists the others to switc
 
 中文：Model View 在每个已测量算子旁，按滑块选择的 token 数为每个所选 GPU 显示一行
 （按半个倍频程分组；数值为该 GPU 在该组内各用例的中位数）。滑块在最大规模之后还有一档
-**All**：拖到这一档时，滑块下方出现共享的 token 坐标轴，各行的柱形换成折线图：每个 GPU
+**全部**（英文页面为 All）：拖到这一档时，滑块下方出现共享的 token 坐标轴，各行的柱形换成折线图：每个 GPU
 一条线，覆盖全部规模分组，横轴为对数 token 数，纵轴为对数指标并按行缩放，旁边标出该行的
 最大值和最小值。只在一个规模上测量的 GPU 显示为一个点。此时提示框给出每个 GPU 在各规模上
 的取值范围。拖回任一规模即恢复柱形。

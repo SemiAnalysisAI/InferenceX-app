@@ -224,7 +224,7 @@ describe('Video compare panel (retained fixture)', () => {
     cy.get('[data-testid="video-compare-controls"]').should('have.attr', 'disabled');
     cy.get('[data-testid="video-compare"]').should(
       'contain',
-      'Comparison needs at least two measured hardware.',
+      'Comparison needs at least two measured hardware',
     );
     cy.get('[data-testid="video-compare-table"]').should('not.exist');
   });

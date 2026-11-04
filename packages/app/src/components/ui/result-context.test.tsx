@@ -151,6 +151,27 @@ describe('ResultContext', () => {
     expect(container.textContent).toContain('Prices: model');
   });
 
+  it('puts the scenario first and the chip basis last on the footer controls row', () => {
+    const container = document.createElement('div');
+    act(() => {
+      createRoot(container).render(
+        <ResultContext
+          locale="en"
+          layout="footer"
+          scenario={<div data-testid="scenario-slot" />}
+          tcoBasis={<div data-testid="tco-slot" />}
+          chipBasis={<div data-testid="chip-slot" />}
+          date="2026-09-01"
+        />,
+      );
+    });
+    const row = container.querySelector('[data-testid="scenario-slot"]')?.parentElement;
+    expect(
+      [...(row?.children ?? [])].map((child) => (child as HTMLElement).dataset.testid),
+    ).toEqual(['scenario-slot', 'tco-slot', 'chip-slot']);
+    expect(container.textContent).toContain('Updated 2026-09-01');
+  });
+
   it('shows utilization and the model license fee when given, in both locales', () => {
     const en = document.createElement('div');
     act(() => {

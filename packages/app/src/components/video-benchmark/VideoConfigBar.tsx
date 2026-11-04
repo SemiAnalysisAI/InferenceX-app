@@ -33,7 +33,7 @@ const STRINGS = {
 function Fact({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex min-w-0 flex-col gap-1.5" data-testid="video-config-fact">
-      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      <span className="text-sm font-medium">{label}</span>
       <span className="flex min-h-9 items-center text-sm break-words">{value}</span>
     </div>
   );

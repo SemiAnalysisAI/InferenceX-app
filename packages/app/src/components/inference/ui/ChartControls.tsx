@@ -538,7 +538,9 @@ export default function ChartControls({
     <TooltipProvider delayDuration={0}>
       <div className="grid min-w-0 items-start gap-x-6 gap-y-4 lg:grid-cols-12">
         <ControlPanel legend={t.benchmarkControls} className={spans.benchmark}>
-          <div className="grid min-w-0 grid-cols-2 items-start gap-3 md:grid-cols-4">
+          <div
+            className={`grid min-w-0 grid-cols-2 items-start gap-3 ${scenarioInFooter ? 'md:grid-cols-3' : 'md:grid-cols-4'}`}
+          >
             <div className="min-w-0 col-span-2">
               <ModelSelector
                 value={selectedModel}

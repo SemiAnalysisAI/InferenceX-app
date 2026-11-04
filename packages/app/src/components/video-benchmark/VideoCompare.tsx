@@ -1,7 +1,9 @@
 'use client';
 
+import { ArrowLeftRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Heading } from '@/components/ui/heading';
 import { Skeleton } from '@/components/ui/skeleton';
 import { track } from '@/lib/analytics/analytics';
@@ -42,7 +44,7 @@ const STRINGS = {
     baseline: 'Baseline',
     candidate: 'Candidate',
     swap: 'Swap sides',
-    needTwo: 'Comparison needs at least two measured hardware.',
+    needTwo: 'Comparison needs at least two measured hardware',
     metrics: 'Metric deltas',
     metric: 'Metric',
     change: 'Change',
@@ -54,7 +56,7 @@ const STRINGS = {
     loadingHint: 'Fetching the retained clips of both runs (two published artifacts).',
     error: 'Could not load clips',
     retry: 'Retry',
-    noClips: 'Clips are not published for one of these runs; the metric deltas below still apply.',
+    noClips: 'Clips are not published for one of these runs; the metric deltas below still apply',
     prompt: 'Prompt',
     seed: 'seed',
     take: (n: number) => `take ${n}`,
@@ -64,11 +66,11 @@ const STRINGS = {
     playBoth: 'Play both',
     pauseBoth: 'Pause both',
     restart: 'Restart both',
-    noPairs: 'No case with the same prompt and seed exists in both runs.',
+    noPairs: 'No case with the same prompt and seed exists in both runs',
     unmatched: (baseline: number, candidate: number) =>
       `${baseline} baseline and ${candidate} candidate records have no counterpart.`,
-    noClip: 'Clip not published for this record.',
-    mediaError: 'The clip could not be played.',
+    noClip: 'Clip not published for this record',
+    mediaError: 'The clip could not be played',
     timeToVideo: 'time to video',
     footnote:
       'Clips are the retained CI outputs of the same prompt and seed on each hardware; nothing is re-generated and nothing is voted on. Time to video is that record’s submit-to-downloaded-media seconds.',
@@ -80,7 +82,7 @@ const STRINGS = {
     baseline: '基线',
     candidate: '候选',
     swap: '交换两侧',
-    needTwo: '至少需要两种已实测的硬件才能对比。',
+    needTwo: '至少需要两种已实测的硬件才能对比',
     metrics: '指标差异',
     metric: '指标',
     change: '变化',
@@ -92,7 +94,7 @@ const STRINGS = {
     loadingHint: '正在读取两次运行保留的视频（两个已发布产物）。',
     error: '无法加载视频',
     retry: '重试',
-    noClips: '其中一次运行没有发布视频；下方的指标差异仍然有效。',
+    noClips: '其中一次运行没有发布视频；下方的指标差异仍然有效',
     prompt: 'Prompt',
     seed: 'seed',
     take: (n: number) => `第 ${n} 次`,
@@ -102,11 +104,11 @@ const STRINGS = {
     playBoth: '同时播放',
     pauseBoth: '同时暂停',
     restart: '从头同时播放',
-    noPairs: '两次运行中没有 prompt 与 seed 均相同的用例。',
+    noPairs: '两次运行中没有 prompt 与 seed 均相同的用例',
     unmatched: (baseline: number, candidate: number) =>
       `${baseline} 条基线记录与 ${candidate} 条候选记录没有对应项。`,
-    noClip: '此记录的视频未发布。',
-    mediaError: '视频无法播放。',
+    noClip: '此记录的视频未发布',
+    mediaError: '视频无法播放',
     timeToVideo: '出片时间',
     footnote:
       '视频为各硬件 CI 运行保留的原始输出，prompt 与 seed 相同；不重新生成，也不投票。出片时间为该记录从提交到下载完成的秒数。',
@@ -117,9 +119,9 @@ type Role = 'baseline' | 'candidate';
 const ROLES: readonly Role[] = ['baseline', 'candidate'];
 
 const CHIP = {
-  better: 'border-emerald-600/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
-  worse: 'border-red-600/40 bg-red-500/10 text-red-700 dark:text-red-300',
-  neutral: 'border-border text-muted-foreground',
+  better: 'border-success/30 bg-success/10 text-success',
+  worse: 'border-destructive/30 bg-destructive/10 text-destructive',
+  neutral: 'border-border/60 text-muted-foreground',
 } as const;
 
 /** The stored artifact of one side, or null when the deployment publishes no media (HTTP 204). */
@@ -136,12 +138,12 @@ async function fetchSide(point: VideoPoint, signal: AbortSignal): Promise<Compar
 
 function DeltaChip({ row, s }: { row: CompareRow; s: Strings }) {
   if (row.deltaPercent === null || row.ratio === null)
-    return <span className={`rounded border px-1.5 py-0.5 text-2xs ${CHIP.neutral}`}>—</span>;
+    return <span className={`rounded-sm border px-1.5 py-0.5 text-2xs ${CHIP.neutral}`}>—</span>;
   const tone = row.candidateBetter === null ? 'neutral' : row.candidateBetter ? 'better' : 'worse';
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5">
       <span
-        className={`rounded border px-1.5 py-0.5 text-2xs font-medium ${CHIP[tone]}`}
+        className={`rounded-sm border px-1.5 py-0.5 text-2xs font-medium ${CHIP[tone]}`}
         title={s[tone]}
         data-tone={tone}
       >
@@ -347,7 +349,7 @@ export default function VideoCompare({
   return (
     <section
       ref={sectionRef}
-      className="space-y-4 rounded-xl border px-4 py-4"
+      className="space-y-4 rounded-xl border border-border/30 bg-card p-4 md:p-6"
       data-testid="video-compare"
       aria-labelledby={headingId}
     >
@@ -355,7 +357,7 @@ export default function VideoCompare({
         <Heading as="h2" level="card" id={headingId}>
           {s.title}
         </Heading>
-        <p className="mt-1 max-w-4xl text-xs text-muted-foreground">{s.subtitle}</p>
+        <p className="mt-1 max-w-4xl text-sm text-muted-foreground">{s.subtitle}</p>
       </div>
       <fieldset
         disabled={measured.length < 2}
@@ -371,13 +373,13 @@ export default function VideoCompare({
         <Button
           type="button"
           variant="outline"
-          size="sm"
+          size="icon"
           onClick={swap}
           aria-label={s.swap}
           title={s.swap}
           data-testid="video-compare-swap"
         >
-          ⇄
+          <ArrowLeftRight aria-hidden="true" />
         </Button>
         <VideoSelect
           label={s.candidate}
@@ -387,22 +389,22 @@ export default function VideoCompare({
         />
       </fieldset>
       {measured.length < 2 && (
-        <p role="status" className="text-sm text-muted-foreground">
+        <EmptyState bare role="status" className="min-h-24">
           {s.needTwo}
-        </p>
+        </EmptyState>
       )}
       {baseline && candidate && (
         <>
           <div className="space-y-3" data-testid="video-compare-clips">
             {loaded && matched ? (
               pairs.length === 0 || !current ? (
-                <p role="status" className="text-sm text-muted-foreground">
+                <EmptyState bare role="status" className="min-h-24">
                   {s.noPairs}
-                </p>
+                </EmptyState>
               ) : (
                 <>
                   <div
-                    className="rounded-lg border bg-muted/30 px-3 py-2"
+                    className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2"
                     data-testid="video-compare-prompt"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
@@ -411,14 +413,14 @@ export default function VideoCompare({
                         <Button
                           type="button"
                           variant="outline"
-                          size="sm"
+                          size="icon-xs"
                           onClick={() => goTo(index - 1)}
                           disabled={index === 0}
                           aria-label={s.prev}
                           title={s.prev}
                           data-testid="video-compare-prev"
                         >
-                          ‹
+                          <ChevronLeft aria-hidden="true" />
                         </Button>
                         <span className="px-1 tabular-nums" data-testid="video-compare-case-of">
                           {s.caseOf(index + 1, pairs.length)}
@@ -426,14 +428,14 @@ export default function VideoCompare({
                         <Button
                           type="button"
                           variant="outline"
-                          size="sm"
+                          size="icon-xs"
                           onClick={() => goTo(index + 1)}
                           disabled={index >= pairs.length - 1}
                           aria-label={s.next}
                           title={s.next}
                           data-testid="video-compare-next"
                         >
-                          ›
+                          <ChevronRight aria-hidden="true" />
                         </Button>
                       </span>
                     </div>
@@ -460,6 +462,7 @@ export default function VideoCompare({
                         >
                           <figcaption className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
                             <span
+                              aria-hidden="true"
                               className="size-2.5 shrink-0 rounded-full"
                               style={{ backgroundColor: paneColor(role) }}
                             />
@@ -495,9 +498,9 @@ export default function VideoCompare({
                               onError={() => setFailedMedia((old) => new Set(old).add(url))}
                             />
                           ) : (
-                            <div className="flex aspect-video items-center justify-center rounded-lg bg-muted p-5 text-sm text-muted-foreground">
+                            <EmptyState className="aspect-video rounded-lg p-5">
                               {s.noClip}
-                            </div>
+                            </EmptyState>
                           )}
                           {url && failedMedia.has(url) && (
                             <p role="alert" className="text-sm text-destructive">
@@ -511,7 +514,7 @@ export default function VideoCompare({
                   <div className="flex flex-wrap gap-2" role="group" aria-label={s.playBoth}>
                     <Button
                       type="button"
-                      size="sm"
+                      size="xs"
                       onClick={() => playback('play')}
                       data-testid="video-compare-play"
                     >
@@ -520,7 +523,7 @@ export default function VideoCompare({
                     <Button
                       type="button"
                       variant="outline"
-                      size="sm"
+                      size="xs"
                       onClick={() => playback('pause')}
                       data-testid="video-compare-pause"
                     >
@@ -529,7 +532,7 @@ export default function VideoCompare({
                     <Button
                       type="button"
                       variant="outline"
-                      size="sm"
+                      size="xs"
                       onClick={() => playback('restart')}
                       data-testid="video-compare-restart"
                     >
@@ -547,9 +550,9 @@ export default function VideoCompare({
                 </>
               )
             ) : fetched ? (
-              <p role="status" className="text-sm text-muted-foreground">
+              <EmptyState bare role="status" className="min-h-24">
                 {s.noClips}
-              </p>
+              </EmptyState>
             ) : pending === pairKey ? (
               <div className="space-y-3" role="status" aria-busy="true">
                 <p className="text-sm text-muted-foreground">
@@ -571,7 +574,9 @@ export default function VideoCompare({
             )}
           </div>
           <div className="space-y-2">
-            <h3 className="text-sm font-medium">{s.metrics}</h3>
+            <Heading as="h3" level="label">
+              {s.metrics}
+            </Heading>
             <div className="overflow-x-auto">
               <table
                 className="w-full min-w-xl text-left text-sm"
@@ -586,11 +591,12 @@ export default function VideoCompare({
                       <th
                         key={role}
                         scope="col"
-                        className="px-3 py-2 font-medium"
+                        className="px-3 py-2 text-right font-medium"
                         data-testid={`video-compare-${role}`}
                       >
                         <span className="inline-flex items-center gap-1.5 text-foreground">
                           <span
+                            aria-hidden="true"
                             className="size-2.5 shrink-0 rounded-full"
                             style={{ backgroundColor: paneColor(role) }}
                           />
@@ -599,22 +605,24 @@ export default function VideoCompare({
                         </span>
                       </th>
                     ))}
-                    <th scope="col" className="px-3 py-2 font-medium">
+                    <th scope="col" className="px-3 py-2 text-right font-medium">
                       {s.change}
                     </th>
                   </tr>
                 </thead>
                 <tbody className="tabular-nums">
                   {rows.map((row) => (
-                    <tr key={row.id} className="border-t" data-metric={row.id}>
+                    <tr key={row.id} className="border-t border-border/40" data-metric={row.id}>
                       <th scope="row" className="px-3 py-2 font-normal text-muted-foreground">
                         {locale === 'zh'
                           ? VIDEO_METRICS[row.id].labelZh
                           : VIDEO_METRICS[row.id].label}
                       </th>
-                      <td className="px-3 py-2">{formatMetric(row.baseline, row.id)}</td>
-                      <td className="px-3 py-2">{formatMetric(row.candidate, row.id)}</td>
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-2 text-right">{formatMetric(row.baseline, row.id)}</td>
+                      <td className="px-3 py-2 text-right">
+                        {formatMetric(row.candidate, row.id)}
+                      </td>
+                      <td className="px-3 py-2 text-right">
                         <DeltaChip row={row} s={s} />
                       </td>
                     </tr>

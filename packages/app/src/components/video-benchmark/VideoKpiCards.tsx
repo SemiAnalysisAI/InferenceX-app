@@ -2,6 +2,7 @@
 
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Stat } from '@/components/ui/stat';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { leadCell } from './deployment';
 import { hardwareLabel, VIDEO_HARDWARE_ROSTER } from './hardware';
@@ -25,7 +26,7 @@ const STRINGS = {
     api: 'API list',
     gpus: 'GPUs',
     of: 'of',
-    unavailable: 'Not measured',
+    unavailable: 'Not measured.',
     why: 'Failed run',
   },
   zh: {
@@ -37,7 +38,7 @@ const STRINGS = {
     api: 'API 标价',
     gpus: '张 GPU',
     of: '/',
-    unavailable: '未测得',
+    unavailable: '未测得。',
     why: '失败的运行',
   },
 };
@@ -77,13 +78,14 @@ export default function VideoKpiCards({
       {VIDEO_HARDWARE_ROSTER.map(({ key, unavailable }) => {
         const point = leadCell(cells, key, options);
         return (
-          <Card key={key} className="gap-2 p-4" data-testid="video-kpi-card" data-hardware={key}>
-            <div className="flex flex-wrap items-center gap-2">
+          <Card key={key} className="gap-3 p-4" data-testid="video-kpi-card" data-hardware={key}>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <span
+                aria-hidden="true"
                 className="size-2.5 shrink-0 rounded-full"
                 style={{ backgroundColor: colorFor(key) }}
               />
-              <span className="font-semibold">{hardwareLabel(key)}</span>
+              <span className="text-sm font-medium">{hardwareLabel(key)}</span>
               {point && (
                 <span className="text-2xs text-muted-foreground">
                   {point.participating ?? '—'} {s.of} {point.allocated ?? '—'} {s.gpus}
@@ -95,38 +97,36 @@ export default function VideoKpiCards({
               )}
             </div>
             {!point && loading ? (
-              <div className="space-y-2" data-testid="video-kpi-skeleton" aria-busy="true">
+              <div
+                className="grid grid-cols-2 gap-x-4 gap-y-3"
+                data-testid="video-kpi-skeleton"
+                aria-busy="true"
+              >
                 {CARD_METRICS.map((id) => (
-                  <Skeleton key={id} className="h-3 w-full" />
+                  <Skeleton key={id} className="h-11 w-full" />
                 ))}
               </div>
             ) : point ? (
-              <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
-                {CARD_METRICS.map((id) => {
-                  const note = secondary(point, id);
-                  return (
-                    <div key={id} className="contents">
-                      <dt className="text-muted-foreground">{s[id]}</dt>
-                      <dd className="text-right font-medium tabular-nums">
-                        {formatMetric(metricValue(point, id, options), id)}
-                        {note && (
-                          <span className="ml-1 text-2xs font-normal text-muted-foreground">
-                            {note}
-                          </span>
-                        )}
-                      </dd>
-                    </div>
-                  );
-                })}
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
+                {CARD_METRICS.map((id) => (
+                  <Stat
+                    key={id}
+                    size="sm"
+                    label={s[id]}
+                    value={formatMetric(metricValue(point, id, options), id)}
+                    detail={secondary(point, id)}
+                  />
+                ))}
               </dl>
             ) : (
               <p className="text-xs text-muted-foreground" data-testid="video-kpi-unavailable">
-                <span className="font-medium text-foreground">{s.unavailable}.</span>{' '}
+                <span className="font-medium text-foreground">{s.unavailable}</span>
+                {locale === 'zh' ? '' : ' '}
                 {unavailable && (
                   <>
                     {unavailable[locale]}{' '}
                     <a
-                      className="underline underline-offset-2"
+                      className="text-brand underline underline-offset-2"
                       href={unavailable.runUrl}
                       target="_blank"
                       rel="noreferrer"

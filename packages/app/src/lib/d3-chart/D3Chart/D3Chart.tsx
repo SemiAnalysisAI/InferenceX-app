@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useImperativeHandle, useRef } from 'react';
-import * as d3 from 'd3';
 
 import { D3ChartWrapper } from '@/components/ui/d3-chart-wrapper';
 import { useChartTooltipHandlers } from '@/hooks/useChartTooltipHandlers';

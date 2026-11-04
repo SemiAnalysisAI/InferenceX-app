@@ -97,7 +97,7 @@ export default function VideoPointsTable({
       header: s.run,
       cell: (p) => (
         <a
-          className="underline underline-offset-2"
+          className="text-brand underline underline-offset-2"
           href={`https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${p.runId}`}
           target="_blank"
           rel="noreferrer"

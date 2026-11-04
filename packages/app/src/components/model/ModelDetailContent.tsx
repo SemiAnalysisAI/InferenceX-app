@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 import { KatexStyles } from '@/components/blog/katex-styles';
 import { JsonLd } from '@/components/seo/json-ld';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Heading } from '@/components/ui/heading';
 import { compileBlogMdx } from '@/lib/blog/blog-mdx';
@@ -32,7 +33,7 @@ export default async function ModelDetailContent({
   locale: Locale;
 }) {
   const { meta, entry, raw } = page;
-  const { content } = await compileBlogMdx(raw, locale);
+  const { content, hasMath } = await compileBlogMdx(raw, locale);
   const scenario = comparisonScenarioForModel(entry);
   const dashboardQuery = new URLSearchParams({
     g_model: entry.displayName,
@@ -102,6 +103,18 @@ export default async function ModelDetailContent({
               </Heading>
             </div>
             <p className="mt-3 max-w-3xl text-base text-muted-foreground">{meta.description}</p>
+            {inferenceHref && (
+              <Button
+                asChild
+                variant="outline"
+                className="mt-4 h-auto min-h-11 whitespace-normal py-2 text-left md:min-h-9"
+              >
+                <Link href={inferenceHref} data-testid="model-inference-link">
+                  {t.inferenceBenchmarksLink(meta.title)}
+                  <ArrowRight aria-hidden="true" />
+                </Link>
+              </Button>
+            )}
             <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
               <span>{meta.developer}</span>
               <span>&middot;</span>

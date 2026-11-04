@@ -246,7 +246,10 @@ describe('Video hardware dashboard (E2E fixtures)', () => {
   it('opens the history section for history deep links and renders the Chinese dashboard', () => {
     cy.visit('/video?history-hardware=H200');
     cy.get('[data-testid="video-history-section"]').should('have.attr', 'open');
-    cy.get('[data-testid="video-history"] h1').should('contain', 'Performance history');
+    cy.get('[data-testid="video-history-section"] summary h2').should(
+      'contain',
+      'Performance history',
+    );
     cy.visit('/zh/video');
     cy.get('[data-testid="video-hardware-chart"] circle.point').should('have.length', 3);
     cy.get('[data-testid="video-chart-card"]').should(

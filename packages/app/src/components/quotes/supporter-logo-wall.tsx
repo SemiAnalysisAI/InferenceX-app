@@ -53,19 +53,28 @@ function LogoTile({ item, jumpTo }: { item: WallLogo; jumpTo: (org: string) => s
   );
   const { quoteOrg } = item;
   return (
-    <li>
-      <button
-        type="button"
-        onClick={() => {
-          track('quotes_logo_clicked', { org: quoteOrg });
-          scrollToOrg(quoteOrg);
-        }}
-        className={`${TILE} cursor-pointer transition-shadow hover:ring-foreground/40 focus-visible:outline-none dark:hover:ring-white/50`}
-        title={jumpTo(quoteOrg)}
-        aria-label={jumpTo(quoteOrg)}
-      >
-        {img}
-      </button>
+    <li className="flex h-12 w-1/3 min-w-0 items-center justify-center px-1 sm:w-1/5 lg:h-16 lg:w-auto lg:px-0">
+      {quoteOrg ? (
+        <button
+          type="button"
+          onClick={() => {
+            track('quotes_logo_clicked', { org: quoteOrg });
+            scrollToOrg(quoteOrg);
+          }}
+          className="flex h-full max-w-full cursor-pointer items-center justify-center rounded-sm px-1 transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          title={jumpTo(quoteOrg)}
+          aria-label={jumpTo(quoteOrg)}
+        >
+          {img}
+        </button>
+      ) : (
+        <span
+          className="flex h-full max-w-full items-center justify-center px-1"
+          title={item.label}
+        >
+          {img}
+        </span>
+      )}
     </li>
   );
 }
@@ -80,10 +89,10 @@ export function SupporterLogoWall({
   const t = STRINGS[locale];
   return (
     <section aria-labelledby="supporter-wall-heading" data-testid="supporter-logo-wall">
-      <h2 id="supporter-wall-heading" className="text-xl font-semibold text-balance">
+      <h2 id="supporter-wall-heading" className="text-xl font-semibold text-balance break-keep">
         {t.heading}
       </h2>
-      <div className="mt-6 flex flex-col gap-5 md:gap-4">
+      <div className="mt-6 flex flex-col gap-6 lg:gap-5">
         {groups.map((group) => {
           const labelId = `supporter-group-${group.id}`;
           return (

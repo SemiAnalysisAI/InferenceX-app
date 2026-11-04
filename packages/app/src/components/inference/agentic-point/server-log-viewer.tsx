@@ -50,6 +50,8 @@ const STRINGS = {
     searching: 'Searching…',
     searchError: 'The logs could not be searched. Try again in a moment.',
     noMatches: 'No matches found',
+    searchIncomplete:
+      'Search stopped after the first 64 million characters; later content was not searched',
     match: 'match',
     matches: 'matches',
     firstMatches: 'Showing the first',
@@ -79,6 +81,7 @@ const STRINGS = {
     searching: '正在搜索……',
     searchError: '无法搜索日志，请稍后重试。',
     noMatches: '未找到匹配内容',
+    searchIncomplete: '搜索已在前 6,400 万个字符处停止，之后的内容未被搜索',
     match: '处匹配',
     matches: '处匹配',
     firstMatches: '显示前',
@@ -504,7 +507,7 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
             </p>
             {searchQuery.data.incomplete ? (
               <p
-                className="text-2xs text-muted-foreground"
+                className="text-xs text-muted-foreground"
                 data-testid="server-log-search-incomplete"
               >
                 {t.searchIncomplete}

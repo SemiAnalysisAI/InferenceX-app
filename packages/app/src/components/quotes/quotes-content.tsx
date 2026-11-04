@@ -31,7 +31,7 @@ function highlightBrand(text: string) {
   const parts = text.split(/(?<brand>InferenceMAX™?|InferenceX™?|InferenceMAX|InferenceX)/giu);
   return parts.map((part, i) =>
     /^inference(?:max|x)/iu.test(part) ? (
-      <span key={i} className="text-brand font-semibold">
+      <span key={i} className="font-medium text-foreground">
         {part}
       </span>
     ) : (
@@ -98,7 +98,7 @@ export function QuotesContent({ locale = 'en' }: { locale?: Locale } = {}) {
           <p className="mt-3 text-base leading-7 text-muted-foreground lg:text-lg">{t.intro}</p>
         </header>
         <div className="border-t border-border/30 pt-10">
-          <SupporterLogoWall locale={locale} />
+          <SupporterLogoWall locale={locale} groups={SUPPORTER_GROUPS} />
         </div>
         <section className="border-t border-border/30 pt-10">
           <div className="flex max-w-4xl flex-col gap-8 md:gap-10">
