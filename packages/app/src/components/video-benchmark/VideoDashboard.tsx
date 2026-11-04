@@ -764,7 +764,6 @@ export default function VideoDashboard({ initialData }: { initialData?: VideoIni
                   : colorFor(key)
               }
               hidden={hidden}
-              roster={roster}
               options={{ tier: state.costTier }}
               costs={Object.fromEntries(
                 cells.map((c) => [

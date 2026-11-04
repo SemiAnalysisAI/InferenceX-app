@@ -432,10 +432,20 @@ describe('VideoGenX results', () => {
     cy.get('[data-testid="video-results-single-note"]').should('be.visible');
     cy.get('#checkbox-gb200').should('have.attr', 'aria-disabled', 'true');
     cy.contains('label', 'GB200 NVL72 · no matched run').should('exist');
+    cy.get('[data-testid="video-results-clip"]').should(($tiles) => {
+      const hardware = [...$tiles].map((tile) => tile.dataset.hardware);
+      expect(hardware, 'tiles follow the measured legend entries').to.deep.equal([
+        'b200',
+        'h200',
+        'h100',
+      ]);
+    });
     toggleHardware('b200');
     cy.get('#checkbox-b200').should('not.be.checked');
     row('b200').should('not.exist');
     points('[data-hardware="b200"]').should('not.exist');
+    cy.get('[data-testid="video-results-clip"][data-hardware="b200"]').should('not.exist');
+    cy.get('[data-testid="video-results-clip"]').should('have.length', 2);
     cy.location('search').should('contain', 'r_hidden=b200');
     toggleHardware('h200');
     toggleHardware('h100');
@@ -667,14 +677,14 @@ describe('VideoGenX results', () => {
         if (width < 768) expect(container.scrollWidth).to.be.greaterThan(container.clientWidth);
       });
       cy.get('[data-testid="video-results-clip"]').should(($tiles) => {
-        expect($tiles).to.have.length(5);
+        expect($tiles, 'one tile per measured hardware').to.have.length(3);
         const first = $tiles[0].getBoundingClientRect();
         const second = $tiles[1].getBoundingClientRect();
         if (width === 1440) {
           const columns = new Set(
             [...$tiles].map((tile) => Math.round(tile.getBoundingClientRect().left)),
           );
-          expect(columns.size).to.equal(5);
+          expect(columns.size).to.equal(3);
         }
         if (width === 320) expect(second.top).to.be.greaterThan(first.top);
         else if (width === 390) expect(second.top).to.be.closeTo(first.top, 2);

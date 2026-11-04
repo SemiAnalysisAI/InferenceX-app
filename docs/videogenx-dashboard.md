@@ -151,8 +151,11 @@ unequal frame geometry or blocked cross-origin pixel access. This preview is not
 sealed PSNR result. Distilled and full-step workloads are not silently equated.
 Per-tile wall time is the selected request's duration; energy is the cell's mean
 J/valid clip and is labeled accordingly.
-The default tiles show hardware, recorded GPU count, media, wall time, per-clip
-PSNR when a sealed pair exists, mean energy and both modeled TCO bases. The reference
+A tile appears for each visible hardware with a measured cell, matching the chart
+legend; roster hardware without a cell gets no tile, and a measured cell without
+published media shows an empty tile. The default tiles show hardware, recorded GPU
+count, media, wall time, per-clip PSNR when a sealed pair exists, mean energy and both
+modeled TCO bases. The reference
 is a separate synchronized video with its recorded update/sigma-point counts and
 no serving performance metrics. Prompt, seed, take, run, artifact,
 runtime and media source remain in the keyboard-accessible Prompt & sources
@@ -284,7 +287,7 @@ Y 轴为每 1 美元 TCO 生成的视频秒数（默认）、每 GPU 小时生�
 默认静音，可选择听一个硬件窗口的声音；参考视频保持静音。切换用例、隐藏音源或音源播放失败后恢复静音。音源选择只影响本地播放，不改变媒体、指标、URL 参数或只读 API 返回内容。
 Difference 是相对明确绑定的官方 Diffusers 参考视频的浏览器 RGB 差异预览，与封存的全帧 PSNR 测量分别展示。不能根据硬件型号或步数推断参考身份。
 参考视频、尺寸或跨域读取条件不满足时显示不可用。蒸馏与完整步数分组保留。
-默认视频卡片保留硬件、GPU 数量、媒体及两种 TCO 口径；完整 prompt、seed、重复次数、
+每个有测量结果且未隐藏的硬件显示一张视频卡片，与图表图例一致；没有测量结果的硬件不显示卡片，有测量结果但没有已发布媒体的硬件显示空卡片。默认视频卡片保留硬件、GPU 数量、媒体及两种 TCO 口径；完整 prompt、seed、重复次数、
 运行、产物、Runtime 和媒体来源可在“Prompt 与来源”中查看。
 
 成本同时按参与计算和分配的 GPU 数量估算，分配证据缺失时不填补；图表与结果表使用所选口径（`r_basis`），视频卡片和部署详情同时展示两种口径。每 GPU 小时生成视频数同样按所选口径的 GPU 数折算：作业分配 8 张、实际使用 4 张时，按分配口径计算的值减半。视频秒吞吐量、每视频秒成本及收入使用有效测量请求的实际解码视频时长，不包含 warmup；请求时长仅用于工作负载身份与筛选。

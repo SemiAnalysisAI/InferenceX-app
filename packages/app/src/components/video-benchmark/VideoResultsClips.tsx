@@ -24,7 +24,7 @@ import {
   type ResultsClipGroup,
   type ResultsClipSide,
 } from './results-clips';
-import { RESULTS_HARDWARE, resultsHardwareRoster } from './results';
+import { RESULTS_HARDWARE } from './results';
 import type { StoredArtifact } from './stored';
 import { videoClipSourceKey as sourceKey, type VideoInitialData } from './initial-data';
 import VideoSelect from './VideoSelect';
@@ -166,7 +166,6 @@ export interface VideoResultsClipsProps {
   points: VideoPoint[];
   colorFor: (key: string) => string;
   hidden: ReadonlySet<string>;
-  roster?: readonly string[];
   options?: MetricOptions;
   costs?: Costs;
   unofficialRun?: string;
@@ -208,7 +207,6 @@ export default function VideoResultsClips({
   points,
   colorFor,
   hidden,
-  roster = resultsHardwareRoster(points),
   costs,
   unofficialRun,
   initialSides = {},
@@ -317,7 +315,6 @@ export default function VideoResultsClips({
         points={selected}
         colorFor={colorFor}
         hidden={hidden}
-        roster={roster}
         costs={costs}
         unofficialRun={unofficialRun}
       />
@@ -330,7 +327,6 @@ function SynchronizedClips({
   points,
   colorFor,
   hidden,
-  roster = resultsHardwareRoster(points),
   costs,
   unofficialRun,
 }: Omit<VideoResultsClipsProps, 'options'> & { group: ResultsClipGroup | null }) {
@@ -351,7 +347,10 @@ function SynchronizedClips({
   const [durations, setDurations] = useState<Record<string, number>>({});
   const [errors, setErrors] = useState<ReadonlySet<string>>(new Set());
   const [differenceErrors, setDifferenceErrors] = useState<ReadonlySet<string>>(new Set());
-  const visible = roster.filter((key) => !hidden.has(key));
+  // One tile per measured hardware, like the chart legend; roster entries without a cell get none.
+  const visible = RESULTS_HARDWARE.filter(
+    (key) => !hidden.has(key) && points.some((point) => point.hardwareKey === key),
+  );
   const referenceClip = resultsClipReference(group, hidden);
   const reference = referenceClip && !errors.has('reference') ? referenceClip : null;
   const visibleKey = [...visible, ...(referenceClip ? ['reference'] : [])].join(',');
