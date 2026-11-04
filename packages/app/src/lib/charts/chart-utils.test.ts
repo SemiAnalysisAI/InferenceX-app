@@ -9,7 +9,6 @@ import type { AggDataEntry, ChartDefinition, InferenceData } from '@/components/
 import { chartDefinitions } from '@/components/inference/metric-registry';
 import {
   buildAvailabilityHwKey,
-  generateHighContrastColors,
   getNestedYValue,
   getHardwareKey,
   normalizeEvalHardwareKey,
@@ -25,6 +24,7 @@ import {
   metricLabel,
   xAxisLabel,
 } from '@/lib/charts/chart-utils';
+import { generateHighContrastColors } from '@/lib/charts/high-contrast-colors';
 
 vi.mock('@/lib/catalog/constants', async (importOriginal) => {
   const actual = await importOriginal<typeof ConstantsModule>();
