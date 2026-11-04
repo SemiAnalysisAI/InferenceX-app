@@ -116,7 +116,7 @@ const STRINGS = {
       '单条视频重跑，使用固定的初始噪声和并行配置。下方图表仍展示原始 20 条视频的测试结果。',
     diagnosticMetric: '此次重跑未提供该指标。',
     media: '视频文件',
-    webEncode: '播放时使用网页转码版本；差异、PSNR 和视频文件链接仍使用原始视频。',
+    webEncode: '播放使用网页转码版本；“差异”视图、PSNR 和视频文件链接仍使用原始视频。',
     seed: 'seed',
     take: (n: number) => `第 ${n} 次`,
     noPair: '没有 prompt、seed、重复次数和生成配置均已核实一致的保留视频。',
