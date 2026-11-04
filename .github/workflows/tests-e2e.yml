@@ -35,7 +35,7 @@ jobs:
       matrix:
         # Four shards; each repeats the dependency install and Cypress setup, so
         # more shards stop paying off for the shorter component suite.
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -79,7 +79,7 @@ jobs:
           CI: true
           # cypress-split picks this shard's component specs, balanced by the
           # committed component-timings.json.
-          SPLIT: 4
+          SPLIT: 8
           SPLIT_INDEX1: ${{ matrix.shard }}
           SPLIT_FILE: component-timings.json
           SPLIT_OUTPUT_FILE: /tmp/cypress-split-component-out.json
@@ -191,8 +191,8 @@ jobs:
         shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
         runner: [blacksmith-8vcpu-ubuntu-2404, blacksmith-16vcpu-ubuntu-2404]
         exclude:
-          - browser: chrome
-            runner: blacksmith-16vcpu-ubuntu-2404
+          - browser: firefox
+            runner: blacksmith-8vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
