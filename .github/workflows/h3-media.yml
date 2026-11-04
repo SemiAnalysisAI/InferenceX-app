@@ -8,7 +8,11 @@ on:
       run_id:
         description: 'InferenceX CI source run ID to publish explicitly'
         type: string
-        required: true
+        required: false
+      backfill_renditions:
+        description: 'Encode web playback renditions for every stored H3 MP4 instead of publishing a run'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -22,7 +26,7 @@ jobs:
     name: 'Publish H3 media'
     if: github.repository == 'SemiAnalysisAI/InferenceX-app' && (github.event_name == 'workflow_dispatch' || (github.event.client_payload.source_run_id && github.event.client_payload.merge_run_id))
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: ${{ inputs.backfill_renditions && 180 || 60 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -31,6 +35,7 @@ jobs:
         with:
           bun-version-file: package.json
       - name: Persist completed H3 artifacts
+        if: ${{ !inputs.backfill_renditions }}
         env:
           H3_RUN_ID: ${{ inputs.run_id || github.event.client_payload.source_run_id }}
           H3_MERGE_RUN_ID: ${{ github.event.client_payload.merge_run_id }}
@@ -42,3 +47,20 @@ jobs:
           : "${INFERENCEX_APP_URL:?APP_URL repository variable is not set}"
           : "${INVALIDATE_SECRET:?VERCEL_INVALIDATE_SECRET is not set}"
           bun packages/app/scripts/warm-video-results.ts
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+        env:
+          CYPRESS_INSTALL_BINARY: '0'
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      - name: Encode web playback renditions
+        env:
+          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+          H3_BACKFILL_RENDITIONS: ${{ inputs.backfill_renditions }}
+          H3_RUN_ID: ${{ inputs.run_id || github.event.client_payload.source_run_id }}
+        run: |
+          if [ "$H3_BACKFILL_RENDITIONS" = true ]; then
+            bun packages/app/scripts/video-renditions.ts
+          else
+            bun packages/app/scripts/video-renditions.ts --run "$H3_RUN_ID"
+          fi
