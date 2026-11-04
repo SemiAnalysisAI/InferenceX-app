@@ -220,7 +220,9 @@ describe('landing model curation', () => {
       cy.get('[data-testid="model-selector"]')
         .invoke('text')
         .should('match', /MiniMax[- ]M3\.1[- ]Flash/u);
-      cy.get('[data-testid="scenario-selector"]').should('not.exist');
+      cy.get('[data-testid="scenario-selector"]')
+        .invoke('text')
+        .should('match', /Agentic|智能体/u);
       cy.reload();
       cy.location('pathname').should('eq', `${prefix}/inference/minimax-m31-flash`);
       cy.get('[data-testid="model-selector"]')
