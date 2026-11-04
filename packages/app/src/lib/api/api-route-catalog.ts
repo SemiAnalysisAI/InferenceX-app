@@ -2030,7 +2030,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/server-logs.ts',
-    sourceSha256: 'fabbd24ecb3c78d8370facc98ba2057ff37a57e59d4427aefcfdcb65f325acda',
+    sourceSha256: '05691469c87acdbca68886a2d4a0c7ccb12c1a79470fdfab0edc56ee16190860',
     reviewArea: {
       en: 'Log filename discovery, size-capped selected-file reads, bounded chunk metadata, budgeted complete-file search, availability, and legacy-schema fallback.',
       zh: '日志文件名发现、有大小上限的指定文件读取、有界分块元数据、有扫描预算的完整文件搜索、可用性以及旧版 schema 回退行为。',
