@@ -249,11 +249,10 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
     scroller().scrollTo('right');
     chart().find('rect.bar-profit').last().should('be.visible');
     chart().find('rect.bar-profit').last().click({ scrollBehavior: false });
-    cy.get('[data-chart-tooltip="profit-estimator-chart"]')
-      .should('be.visible')
-      .and('contain', 'MI355X');
-    chartSvg().trigger('click', { force: true, scrollBehavior: false });
     cy.get('[data-chart-tooltip="profit-estimator-chart"]').should('not.be.visible');
+    cy.get('[data-testid="point-details-panel"]').should('be.visible').and('contain', 'MI355X');
+    chartSvg().trigger('click', { force: true, scrollBehavior: false });
+    cy.get('[data-testid="point-details-panel"]').should('not.exist');
     cy.document().should((doc) => {
       expect(doc.documentElement.scrollWidth).to.be.at.most(390);
     });
@@ -314,7 +313,7 @@ describe('Profit estimator power option', { testIsolation: true }, () => {
       .then((original) => {
         cy.get('#profit-power').click();
         cy.get('[role="option"]').contains('All in Measured').click();
-        cy.contains('No SKU can be priced for the current selection.').should('be.visible');
+        cy.contains('No SKU can be priced for the current selection').should('be.visible');
         cy.get('#profit-target').should('have.value', '60');
         cy.get('[data-testid="profit-model-selector"]').should('contain', 'Kimi K3');
         cy.get('[data-testid="profit-price-source-selector"]').should('contain', 'Moonshot');
@@ -337,7 +336,7 @@ describe('Profit Estimator — responsive control panels', () => {
         cy.visit(route, { onBeforeLoad: suppressNudges });
         chart().should('exist');
         cy.get('[data-testid="profit-benchmark-panel"]').within(() => {
-          cy.get('legend').should('have.text', 'Benchmark Config');
+          cy.get('legend').should('have.text', 'Benchmark config');
           cy.get('#profit-model').should('contain.text', 'Kimi K3');
           cy.get('#profit-target').should('have.value', '60');
         });
@@ -369,7 +368,7 @@ describe('Profit Estimator — responsive control panels', () => {
           expect(history.right - chip.right, 'no empty history column').to.be.lessThan(24);
         });
         cy.get('[data-testid="profit-pricing-panel"]').within(() => {
-          cy.get('legend').should('have.text', 'Pricing Config');
+          cy.get('legend').should('have.text', 'Pricing config');
           cy.get('#profit-price-source').click();
         });
         cy.get('[data-testid="result-context-utilization"] #profit-utilization').should(
@@ -386,7 +385,7 @@ describe('Profit Estimator — responsive control panels', () => {
           .find('input')
           .should('have.length', 3);
         cy.get('[data-testid="profit-pricing-panel"] #profit-cost').should('not.exist');
-        cy.get('[data-testid="profit-caption"] [data-testid="profit-tco-badge"] input').should(
+        cy.get('[data-testid="profit-footer"] [data-testid="profit-tco-badge"] input').should(
           'have.length.greaterThan',
           0,
         );
