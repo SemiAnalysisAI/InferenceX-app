@@ -5,184 +5,223 @@
     "shards": [
       {
         "shard": 1,
-        "duration": 37616,
-        "specs": [
-          "cypress/e2e/inference-chart.cy.ts",
-          "cypress/e2e/agentic-workload-explorer.cy.ts",
-          "cypress/e2e/compare-scenario-routes.cy.ts"
-        ]
+        "duration": 27181,
+        "specs": ["cypress/e2e/ubenchx.cy.ts"]
       },
       {
         "shard": 2,
-        "duration": 37615,
-        "specs": [
-          "cypress/e2e/overview.cy.ts",
-          "cypress/e2e/datasets-distributions.cy.ts",
-          "cypress/e2e/datasets-flamegraph-time.cy.ts",
-          "cypress/e2e/compare-spec-decode.cy.ts"
-        ]
+        "duration": 24884,
+        "specs": ["cypress/e2e/nudge-system.cy.ts"]
       },
       {
         "shard": 3,
-        "duration": 37653,
-        "specs": [
-          "cypress/e2e/nudge-system.cy.ts",
-          "cypress/e2e/custom-user-values.cy.ts",
-          "cypress/e2e/overview-a11y.cy.ts",
-          "cypress/e2e/chart-header-toolbar-overlap.cy.ts",
-          "cypress/e2e/agentic-catalog.cy.ts"
-        ]
+        "duration": 23358,
+        "specs": ["cypress/e2e/fleet-lifecycle.cy.ts"]
       },
       {
         "shard": 4,
-        "duration": 37397,
+        "duration": 21964,
         "specs": [
-          "cypress/e2e/model-route-slugs.cy.ts",
-          "cypress/e2e/agentic-point-coach-mark.cy.ts",
-          "cypress/e2e/tpu-publication.cy.ts",
-          "cypress/e2e/agentx-optimizations.cy.ts",
-          "cypress/e2e/sanity.cy.ts"
+          "cypress/e2e/optional-theme-isolation.cy.ts",
+          "cypress/e2e/agentic-quick-filters.cy.ts"
         ]
       },
       {
         "shard": 5,
-        "duration": 38030,
-        "specs": [
-          "cypress/e2e/fleet-lifecycle.cy.ts",
-          "cypress/e2e/operatorx.cy.ts",
-          "cypress/e2e/dropdown-switching.cy.ts",
-          "cypress/e2e/framework-line-label.cy.ts",
-          "cypress/e2e/csv-export-overlay.cy.ts",
-          "cypress/e2e/fixed-sequence-logs.cy.ts"
-        ]
+        "duration": 21838,
+        "specs": ["cypress/e2e/collectivex.cy.ts", "cypress/e2e/agentx-optimizations.cy.ts"]
       },
       {
         "shard": 6,
-        "duration": 37514,
+        "duration": 21878,
         "specs": [
-          "cypress/e2e/ubenchx.cy.ts",
-          "cypress/e2e/evaluation-chart.cy.ts",
-          "cypress/e2e/jalapeno-preview-notice.cy.ts",
-          "cypress/e2e/profit-power-curves.cy.ts",
-          "cypress/e2e/landing-performance.cy.ts"
+          "cypress/e2e/model-route-slugs.cy.ts",
+          "cypress/e2e/dropdown-switching.cy.ts",
+          "cypress/e2e/agentic-catalog.cy.ts"
         ]
       },
       {
         "shard": 7,
-        "duration": 37353,
+        "duration": 22052,
         "specs": [
-          "cypress/e2e/url-params.cy.ts",
-          "cypress/e2e/calculator-overlay.cy.ts",
-          "cypress/e2e/agentic-detail-back-nav.cy.ts",
-          "cypress/e2e/csv-export.cy.ts",
-          "cypress/e2e/agentx-dataset-click-path.cy.ts"
+          "cypress/e2e/agentic-point-time-series.cy.ts",
+          "cypress/e2e/compare-spec-decode.cy.ts",
+          "cypress/e2e/fixed-sequence-logs.cy.ts"
         ]
       },
       {
         "shard": 8,
-        "duration": 37664,
+        "duration": 22633,
         "specs": [
-          "cypress/e2e/optional-theme-isolation.cy.ts",
-          "cypress/e2e/ai-chart.cy.ts",
-          "cypress/e2e/line-labels.cy.ts",
-          "cypress/e2e/cache-reuse.cy.ts",
-          "cypress/e2e/overlay-legend-remove.cy.ts"
+          "cypress/e2e/inference-chart.cy.ts",
+          "cypress/e2e/agentic-workload-explorer.cy.ts",
+          "cypress/e2e/landing-performance.cy.ts"
         ]
       },
       {
         "shard": 9,
-        "duration": 37946,
+        "duration": 21813,
         "specs": [
-          "cypress/e2e/profit-estimator-power-layout.cy.ts",
-          "cypress/e2e/throughput-calculator.cy.ts",
+          "cypress/e2e/landing-dashboard-navigation.cy.ts",
           "cypress/e2e/video-dashboard.cy.ts",
-          "cypress/e2e/gradient-labels.cy.ts",
-          "cypress/e2e/compare-redirect.cy.ts",
-          "cypress/e2e/tokens-per-currency.cy.ts"
+          "cypress/e2e/overlay-optimal-only.cy.ts"
         ]
       },
       {
         "shard": 10,
-        "duration": 37485,
+        "duration": 22208,
         "specs": [
-          "cypress/e2e/agentic-point-time-series.cy.ts",
-          "cypress/e2e/profit-route-params.cy.ts",
-          "cypress/e2e/api-documentation.cy.ts",
-          "cypress/e2e/datasets-methodology.cy.ts",
-          "cypress/e2e/compare-per-dollar-redirect.cy.ts"
+          "cypress/e2e/overview.cy.ts",
+          "cypress/e2e/calculator-overlay.cy.ts",
+          "cypress/e2e/profit-power-curves.cy.ts",
+          "cypress/e2e/tokens-per-currency.cy.ts"
         ]
       },
       {
         "shard": 11,
-        "duration": 37482,
+        "duration": 22341,
         "specs": [
-          "cypress/e2e/collectivex.cy.ts",
-          "cypress/e2e/ttft-x-axis-toggle.cy.ts",
-          "cypress/e2e/first-token-limits.cy.ts",
-          "cypress/e2e/reliability-chart.cy.ts",
-          "cypress/e2e/unofficial-watermark.cy.ts"
+          "cypress/e2e/throughput-calculator.cy.ts",
+          "cypress/e2e/tpu-publication.cy.ts",
+          "cypress/e2e/gradient-labels.cy.ts",
+          "cypress/e2e/sanity.cy.ts"
         ]
       },
       {
         "shard": 12,
-        "duration": 37469,
+        "duration": 22248,
         "specs": [
-          "cypress/e2e/historical-trends.cy.ts",
-          "cypress/e2e/navigation.cy.ts",
-          "cypress/e2e/gpu-compare-agentic-detail.cy.ts",
-          "cypress/e2e/compare-table.cy.ts",
-          "cypress/e2e/powerx-timeline.cy.ts"
+          "cypress/e2e/inference-replay.cy.ts",
+          "cypress/e2e/jalapeno-preview-notice.cy.ts",
+          "cypress/e2e/reliability-chart.cy.ts",
+          "cypress/e2e/overlay-legend-remove.cy.ts"
         ]
       },
       {
         "shard": 13,
-        "duration": 37386,
+        "duration": 22405,
         "specs": [
-          "cypress/e2e/landing-dashboard-navigation.cy.ts",
-          "cypress/e2e/zh-pages.cy.ts",
+          "cypress/e2e/navigation.cy.ts",
           "cypress/e2e/blog.cy.ts",
-          "cypress/e2e/certified-power-filter.cy.ts",
-          "cypress/e2e/chart-overflow-continuation.cy.ts"
+          "cypress/e2e/first-token-limits.cy.ts",
+          "cypress/e2e/compare-scenario-routes.cy.ts"
         ]
       },
       {
         "shard": 14,
-        "duration": 37626,
+        "duration": 22342,
         "specs": [
-          "cypress/e2e/current-inferencex-image.cy.ts",
-          "cypress/e2e/profit-estimator-models.cy.ts",
-          "cypress/e2e/powerx-compare.cy.ts",
-          "cypress/e2e/site-search.cy.ts",
-          "cypress/e2e/compare-precision.cy.ts"
+          "cypress/e2e/profit-estimator-power-layout.cy.ts",
+          "cypress/e2e/gpu-compare-agentic-detail.cy.ts",
+          "cypress/e2e/line-labels.cy.ts",
+          "cypress/e2e/chart-header-toolbar-overlap.cy.ts"
         ]
       },
       {
         "shard": 15,
-        "duration": 37426,
+        "duration": 22305,
         "specs": [
-          "cypress/e2e/inference-replay.cy.ts",
-          "cypress/e2e/agentx-telemetry.cy.ts",
-          "cypress/e2e/gpu-specs.cy.ts",
-          "cypress/e2e/agentic-quick-filters.cy.ts",
-          "cypress/e2e/compare-per-dollar-table.cy.ts"
+          "cypress/e2e/model-architecture.cy.ts",
+          "cypress/e2e/api-documentation.cy.ts",
+          "cypress/e2e/certified-power-filter.cy.ts",
+          "cypress/e2e/compare-per-dollar-redirect.cy.ts"
         ]
       },
       {
         "shard": 16,
-        "duration": 37363,
+        "duration": 22404,
         "specs": [
           "cypress/e2e/profit-estimator-pricing.cy.ts",
-          "cypress/e2e/model-architecture.cy.ts",
+          "cypress/e2e/powerx-compare.cy.ts",
+          "cypress/e2e/compare-table.cy.ts",
+          "cypress/e2e/framework-line-label.cy.ts"
+        ]
+      },
+      {
+        "shard": 17,
+        "duration": 22379,
+        "specs": [
+          "cypress/e2e/agentx-telemetry.cy.ts",
+          "cypress/e2e/datasets-distributions.cy.ts",
+          "cypress/e2e/datasets-methodology.cy.ts",
+          "cypress/e2e/compare-per-dollar-table.cy.ts"
+        ]
+      },
+      {
+        "shard": 18,
+        "duration": 22272,
+        "specs": [
+          "cypress/e2e/profit-estimator-models.cy.ts",
+          "cypress/e2e/gpu-specs.cy.ts",
+          "cypress/e2e/site-search.cy.ts",
+          "cypress/e2e/compare-redirect.cy.ts"
+        ]
+      },
+      {
+        "shard": 19,
+        "duration": 22416,
+        "specs": [
+          "cypress/e2e/zh-pages.cy.ts",
           "cypress/e2e/yaxis-metrics-render.cy.ts",
-          "cypress/e2e/overlay-optimal-only.cy.ts",
+          "cypress/e2e/datasets-flamegraph-time.cy.ts",
+          "cypress/e2e/agentx-dataset-click-path.cy.ts"
+        ]
+      },
+      {
+        "shard": 20,
+        "duration": 22392,
+        "specs": [
+          "cypress/e2e/historical-trends.cy.ts",
+          "cypress/e2e/custom-user-values.cy.ts",
+          "cypress/e2e/compare-precision.cy.ts",
+          "cypress/e2e/csv-export-overlay.cy.ts"
+        ]
+      },
+      {
+        "shard": 21,
+        "duration": 22661,
+        "specs": [
+          "cypress/e2e/ttft-x-axis-toggle.cy.ts",
+          "cypress/e2e/agentic-point-coach-mark.cy.ts",
+          "cypress/e2e/overview-a11y.cy.ts",
+          "cypress/e2e/powerx-timeline.cy.ts"
+        ]
+      },
+      {
+        "shard": 22,
+        "duration": 22511,
+        "specs": [
+          "cypress/e2e/profit-route-params.cy.ts",
+          "cypress/e2e/operatorx.cy.ts",
+          "cypress/e2e/csv-export.cy.ts",
+          "cypress/e2e/chart-overflow-continuation.cy.ts"
+        ]
+      },
+      {
+        "shard": 23,
+        "duration": 22252,
+        "specs": [
+          "cypress/e2e/ai-chart.cy.ts",
+          "cypress/e2e/evaluation-chart.cy.ts",
+          "cypress/e2e/agentic-detail-back-nav.cy.ts",
           "cypress/e2e/resident-sequence-lengths.cy.ts"
+        ]
+      },
+      {
+        "shard": 24,
+        "duration": 22476,
+        "specs": [
+          "cypress/e2e/url-params.cy.ts",
+          "cypress/e2e/current-inferencex-image.cy.ts",
+          "cypress/e2e/cache-reuse.cy.ts",
+          "cypress/e2e/unofficial-watermark.cy.ts"
         ]
       }
     ],
     "output": "timings.json",
-    "lowerBound": 37564.0625,
-    "longest": 38030,
-    "overheadAboveLowerBound": 0.012403810157647355
+    "lowerBound": 27181,
+    "longest": 27181,
+    "overheadAboveLowerBound": 0
   },
   {
     "kind": "e2e",
@@ -190,184 +229,224 @@
     "shards": [
       {
         "shard": 1,
-        "duration": 38278,
-        "specs": [
-          "cypress/e2e/ubenchx.cy.ts",
-          "cypress/e2e/csv-export.cy.ts",
-          "cypress/e2e/compare-per-dollar-table.cy.ts"
-        ]
+        "duration": 31608,
+        "specs": ["cypress/e2e/nudge-system.cy.ts"]
       },
       {
         "shard": 2,
-        "duration": 38093,
-        "specs": [
-          "cypress/e2e/model-route-slugs.cy.ts",
-          "cypress/e2e/yaxis-metrics-render.cy.ts",
-          "cypress/e2e/reliability-chart.cy.ts",
-          "cypress/e2e/compare-scenario-routes.cy.ts"
-        ]
+        "duration": 26223,
+        "specs": ["cypress/e2e/model-route-slugs.cy.ts"]
       },
       {
         "shard": 3,
-        "duration": 38482,
+        "duration": 24186,
+        "specs": ["cypress/e2e/collectivex.cy.ts"]
+      },
+      {
+        "shard": 4,
+        "duration": 23801,
+        "specs": ["cypress/e2e/fleet-lifecycle.cy.ts"]
+      },
+      {
+        "shard": 5,
+        "duration": 23585,
         "specs": [
-          "cypress/e2e/nudge-system.cy.ts",
-          "cypress/e2e/api-documentation.cy.ts",
-          "cypress/e2e/site-search.cy.ts",
-          "cypress/e2e/csv-export-overlay.cy.ts",
+          "cypress/e2e/inference-chart.cy.ts",
+          "cypress/e2e/compare-spec-decode.cy.ts",
           "cypress/e2e/agentic-catalog.cy.ts"
         ]
       },
       {
-        "shard": 4,
-        "duration": 39250,
-        "specs": [
-          "cypress/e2e/agentic-point-time-series.cy.ts",
-          "cypress/e2e/agentic-point-coach-mark.cy.ts",
-          "cypress/e2e/jalapeno-preview-notice.cy.ts",
-          "cypress/e2e/agentx-optimizations.cy.ts",
-          "cypress/e2e/chart-header-toolbar-overlap.cy.ts"
-        ]
-      },
-      {
-        "shard": 5,
-        "duration": 39244,
-        "specs": [
-          "cypress/e2e/fleet-lifecycle.cy.ts",
-          "cypress/e2e/ai-chart.cy.ts",
-          "cypress/e2e/datasets-flamegraph-time.cy.ts",
-          "cypress/e2e/agentx-dataset-click-path.cy.ts",
-          "cypress/e2e/chart-overflow-continuation.cy.ts"
-        ]
-      },
-      {
         "shard": 6,
-        "duration": 38669,
+        "duration": 24148,
         "specs": [
-          "cypress/e2e/inference-chart.cy.ts",
-          "cypress/e2e/operatorx.cy.ts",
-          "cypress/e2e/agentic-detail-back-nav.cy.ts",
-          "cypress/e2e/compare-spec-decode.cy.ts",
-          "cypress/e2e/tokens-per-currency.cy.ts"
-        ]
-      },
-      {
-        "shard": 7,
-        "duration": 38142,
-        "specs": [
-          "cypress/e2e/landing-dashboard-navigation.cy.ts",
-          "cypress/e2e/current-inferencex-image.cy.ts",
-          "cypress/e2e/cache-reuse.cy.ts",
-          "cypress/e2e/tpu-publication.cy.ts",
-          "cypress/e2e/compare-precision.cy.ts"
-        ]
-      },
-      {
-        "shard": 8,
-        "duration": 38671,
-        "specs": [
-          "cypress/e2e/collectivex.cy.ts",
-          "cypress/e2e/zh-pages.cy.ts",
-          "cypress/e2e/blog.cy.ts",
-          "cypress/e2e/profit-power-curves.cy.ts",
-          "cypress/e2e/sanity.cy.ts"
-        ]
-      },
-      {
-        "shard": 9,
-        "duration": 38629,
-        "specs": [
-          "cypress/e2e/optional-theme-isolation.cy.ts",
-          "cypress/e2e/throughput-calculator.cy.ts",
-          "cypress/e2e/overview-a11y.cy.ts",
-          "cypress/e2e/overlay-optimal-only.cy.ts",
+          "cypress/e2e/ubenchx.cy.ts",
+          "cypress/e2e/framework-line-label.cy.ts",
           "cypress/e2e/landing-performance.cy.ts"
         ]
       },
       {
-        "shard": 10,
-        "duration": 38201,
+        "shard": 7,
+        "duration": 24187,
         "specs": [
-          "cypress/e2e/overview.cy.ts",
-          "cypress/e2e/inference-replay.cy.ts",
-          "cypress/e2e/first-token-limits.cy.ts",
+          "cypress/e2e/optional-theme-isolation.cy.ts",
+          "cypress/e2e/site-search.cy.ts",
+          "cypress/e2e/sanity.cy.ts"
+        ]
+      },
+      {
+        "shard": 8,
+        "duration": 24226,
+        "specs": [
+          "cypress/e2e/agentic-point-time-series.cy.ts",
           "cypress/e2e/certified-power-filter.cy.ts",
-          "cypress/e2e/agentic-quick-filters.cy.ts"
+          "cypress/e2e/csv-export-overlay.cy.ts"
+        ]
+      },
+      {
+        "shard": 9,
+        "duration": 24158,
+        "specs": [
+          "cypress/e2e/landing-dashboard-navigation.cy.ts",
+          "cypress/e2e/agentic-detail-back-nav.cy.ts",
+          "cypress/e2e/overlay-optimal-only.cy.ts"
+        ]
+      },
+      {
+        "shard": 10,
+        "duration": 24142,
+        "specs": [
+          "cypress/e2e/ttft-x-axis-toggle.cy.ts",
+          "cypress/e2e/line-labels.cy.ts",
+          "cypress/e2e/csv-export.cy.ts",
+          "cypress/e2e/chart-overflow-continuation.cy.ts"
         ]
       },
       {
         "shard": 11,
-        "duration": 38138,
+        "duration": 23841,
+        "specs": [
+          "cypress/e2e/model-architecture.cy.ts",
+          "cypress/e2e/jalapeno-preview-notice.cy.ts",
+          "cypress/e2e/datasets-methodology.cy.ts",
+          "cypress/e2e/resident-sequence-lengths.cy.ts"
+        ]
+      },
+      {
+        "shard": 12,
+        "duration": 24399,
         "specs": [
           "cypress/e2e/profit-estimator-models.cy.ts",
-          "cypress/e2e/custom-user-values.cy.ts",
+          "cypress/e2e/calculator-overlay.cy.ts",
+          "cypress/e2e/cache-reuse.cy.ts",
+          "cypress/e2e/compare-precision.cy.ts"
+        ]
+      },
+      {
+        "shard": 13,
+        "duration": 24233,
+        "specs": [
+          "cypress/e2e/profit-estimator-pricing.cy.ts",
+          "cypress/e2e/gpu-compare-agentic-detail.cy.ts",
+          "cypress/e2e/tpu-publication.cy.ts",
+          "cypress/e2e/agentic-quick-filters.cy.ts"
+        ]
+      },
+      {
+        "shard": 14,
+        "duration": 24424,
+        "specs": [
+          "cypress/e2e/profit-estimator-power-layout.cy.ts",
+          "cypress/e2e/blog.cy.ts",
+          "cypress/e2e/compare-table.cy.ts",
+          "cypress/e2e/overlay-legend-remove.cy.ts"
+        ]
+      },
+      {
+        "shard": 15,
+        "duration": 24241,
+        "specs": [
+          "cypress/e2e/overview.cy.ts",
           "cypress/e2e/powerx-compare.cy.ts",
+          "cypress/e2e/video-dashboard.cy.ts",
+          "cypress/e2e/compare-per-dollar-table.cy.ts"
+        ]
+      },
+      {
+        "shard": 16,
+        "duration": 23915,
+        "specs": [
+          "cypress/e2e/agentx-telemetry.cy.ts",
+          "cypress/e2e/datasets-distributions.cy.ts",
+          "cypress/e2e/agentic-workload-explorer.cy.ts",
+          "cypress/e2e/fixed-sequence-logs.cy.ts"
+        ]
+      },
+      {
+        "shard": 17,
+        "duration": 24031,
+        "specs": [
+          "cypress/e2e/throughput-calculator.cy.ts",
+          "cypress/e2e/api-documentation.cy.ts",
+          "cypress/e2e/agentx-optimizations.cy.ts",
+          "cypress/e2e/unofficial-watermark.cy.ts"
+        ]
+      },
+      {
+        "shard": 18,
+        "duration": 23969,
+        "specs": [
+          "cypress/e2e/historical-trends.cy.ts",
+          "cypress/e2e/gpu-specs.cy.ts",
+          "cypress/e2e/overview-a11y.cy.ts",
+          "cypress/e2e/compare-redirect.cy.ts"
+        ]
+      },
+      {
+        "shard": 19,
+        "duration": 24198,
+        "specs": [
+          "cypress/e2e/navigation.cy.ts",
+          "cypress/e2e/agentic-point-coach-mark.cy.ts",
+          "cypress/e2e/profit-power-curves.cy.ts",
+          "cypress/e2e/chart-header-toolbar-overlap.cy.ts"
+        ]
+      },
+      {
+        "shard": 20,
+        "duration": 24040,
+        "specs": [
+          "cypress/e2e/profit-route-params.cy.ts",
+          "cypress/e2e/custom-user-values.cy.ts",
           "cypress/e2e/gradient-labels.cy.ts",
           "cypress/e2e/powerx-timeline.cy.ts"
         ]
       },
       {
-        "shard": 12,
-        "duration": 38121,
+        "shard": 21,
+        "duration": 23905,
         "specs": [
-          "cypress/e2e/model-architecture.cy.ts",
-          "cypress/e2e/url-params.cy.ts",
-          "cypress/e2e/datasets-distributions.cy.ts",
-          "cypress/e2e/datasets-methodology.cy.ts",
-          "cypress/e2e/unofficial-watermark.cy.ts"
-        ]
-      },
-      {
-        "shard": 13,
-        "duration": 38681,
-        "specs": [
-          "cypress/e2e/navigation.cy.ts",
+          "cypress/e2e/inference-replay.cy.ts",
           "cypress/e2e/evaluation-chart.cy.ts",
-          "cypress/e2e/gpu-compare-agentic-detail.cy.ts",
-          "cypress/e2e/video-dashboard.cy.ts",
-          "cypress/e2e/compare-redirect.cy.ts",
-          "cypress/e2e/fixed-sequence-logs.cy.ts"
+          "cypress/e2e/reliability-chart.cy.ts",
+          "cypress/e2e/tokens-per-currency.cy.ts"
         ]
       },
       {
-        "shard": 14,
-        "duration": 38990,
+        "shard": 22,
+        "duration": 24146,
         "specs": [
-          "cypress/e2e/historical-trends.cy.ts",
-          "cypress/e2e/ttft-x-axis-toggle.cy.ts",
-          "cypress/e2e/compare-table.cy.ts",
-          "cypress/e2e/line-labels.cy.ts",
-          "cypress/e2e/overlay-legend-remove.cy.ts",
-          "cypress/e2e/resident-sequence-lengths.cy.ts"
-        ]
-      },
-      {
-        "shard": 15,
-        "duration": 38346,
-        "specs": [
-          "cypress/e2e/profit-estimator-power-layout.cy.ts",
-          "cypress/e2e/agentx-telemetry.cy.ts",
-          "cypress/e2e/calculator-overlay.cy.ts",
-          "cypress/e2e/agentic-workload-explorer.cy.ts",
-          "cypress/e2e/framework-line-label.cy.ts"
-        ]
-      },
-      {
-        "shard": 16,
-        "duration": 38172,
-        "specs": [
-          "cypress/e2e/profit-route-params.cy.ts",
-          "cypress/e2e/profit-estimator-pricing.cy.ts",
-          "cypress/e2e/gpu-specs.cy.ts",
+          "cypress/e2e/url-params.cy.ts",
+          "cypress/e2e/operatorx.cy.ts",
           "cypress/e2e/dropdown-switching.cy.ts",
           "cypress/e2e/compare-per-dollar-redirect.cy.ts"
+        ]
+      },
+      {
+        "shard": 23,
+        "duration": 24208,
+        "specs": [
+          "cypress/e2e/zh-pages.cy.ts",
+          "cypress/e2e/yaxis-metrics-render.cy.ts",
+          "cypress/e2e/datasets-flamegraph-time.cy.ts",
+          "cypress/e2e/compare-scenario-routes.cy.ts"
+        ]
+      },
+      {
+        "shard": 24,
+        "duration": 24223,
+        "specs": [
+          "cypress/e2e/ai-chart.cy.ts",
+          "cypress/e2e/current-inferencex-image.cy.ts",
+          "cypress/e2e/first-token-limits.cy.ts",
+          "cypress/e2e/agentx-dataset-click-path.cy.ts"
         ]
       }
     ],
     "output": "timings-firefox.json",
-    "lowerBound": 38506.6875,
-    "longest": 39250,
-    "overheadAboveLowerBound": 0.01930346514485315
+    "lowerBound": 31608,
+    "longest": 31608,
+    "overheadAboveLowerBound": 0
   },
   {
     "kind": "component",
@@ -375,113 +454,131 @@
     "shards": [
       {
         "shard": 1,
-        "duration": 18421,
-        "specs": [
-          "cypress/component/chart-selectors.cy.tsx",
-          "cypress/component/dataset-list.cy.tsx",
-          "cypress/component/blog-shared-chrome.cy.tsx"
-        ]
+        "duration": 17523,
+        "specs": ["cypress/component/chart-selectors.cy.tsx"]
       },
       {
         "shard": 2,
-        "duration": 18479,
+        "duration": 14486,
+        "specs": ["cypress/component/scatter-graph.cy.tsx"]
+      },
+      {
+        "shard": 3,
+        "duration": 12797,
+        "specs": ["cypress/component/inference-chart-controls.cy.tsx"]
+      },
+      {
+        "shard": 4,
+        "duration": 10954,
         "specs": [
-          "cypress/component/scatter-graph.cy.tsx",
-          "cypress/component/inference-tco-badges.cy.tsx",
-          "cypress/component/inferencex-wordmark.cy.tsx",
-          "cypress/component/distribution-card.cy.tsx",
-          "cypress/component/mode-toggle.cy.tsx",
+          "cypress/component/quick-filters-dialog.cy.tsx",
+          "cypress/component/engine-comparison-confirmation.cy.tsx",
+          "cypress/component/reliability-chart-controls.cy.tsx",
+          "cypress/component/agentic-distribution.cy.tsx",
           "cypress/component/faq-question-link.cy.tsx"
         ]
       },
       {
-        "shard": 3,
-        "duration": 18353,
-        "specs": [
-          "cypress/component/inference-chart-controls.cy.tsx",
-          "cypress/component/power-compare.cy.tsx",
-          "cypress/component/cost-tier-selector.cy.tsx",
-          "cypress/component/submissions-table.cy.tsx",
-          "cypress/component/video-evidence.cy.tsx",
-          "cypress/component/gpu-specs-bar-chart.cy.tsx"
-        ]
-      },
-      {
-        "shard": 4,
-        "duration": 18407,
-        "specs": [
-          "cypress/component/quick-filters-dialog.cy.tsx",
-          "cypress/component/multi-select.cy.tsx",
-          "cypress/component/header.cy.tsx",
-          "cypress/component/date-range-picker.cy.tsx",
-          "cypress/component/video-api-reference.cy.tsx",
-          "cypress/component/collectivex-swap.cy.tsx",
-          "cypress/component/scatter-label-overlap.cy.tsx",
-          "cypress/component/normalized-interactivity-help-link.cy.tsx"
-        ]
-      },
-      {
         "shard": 5,
-        "duration": 18454,
+        "duration": 10929,
         "specs": [
           "cypress/component/powerx-tutorial-layout.cy.tsx",
-          "cypress/component/component-css.cy.tsx",
-          "cypress/component/video-compare.cy.tsx",
-          "cypress/component/scale-up-topology.cy.tsx",
-          "cypress/component/engine-comparison-confirmation.cy.tsx",
-          "cypress/component/powerx-facility-switch.cy.tsx",
+          "cypress/component/date-range-picker.cy.tsx",
+          "cypress/component/autumn-leaves-gutter.cy.tsx",
           "cypress/component/comparison-series-theme.cy.tsx",
-          "cypress/component/reliability-bar-chart.cy.tsx",
+          "cypress/component/mode-toggle.cy.tsx",
           "cypress/component/frontier-points-panel.cy.tsx"
         ]
       },
       {
         "shard": 6,
-        "duration": 18343,
+        "duration": 10937,
         "specs": [
           "cypress/component/video-dashboard.cy.tsx",
-          "cypress/component/power-telemetry.cy.tsx",
-          "cypress/component/date-picker.cy.tsx",
-          "cypress/component/measured-metric-controls.cy.tsx",
-          "cypress/component/bottom-toast.cy.tsx",
-          "cypress/component/umbp-run-label.cy.tsx",
-          "cypress/component/reliability-chart-controls.cy.tsx",
-          "cypress/component/agentic-distribution.cy.tsx"
+          "cypress/component/video-compare.cy.tsx",
+          "cypress/component/eval-chart-controls.cy.tsx",
+          "cypress/component/error-boundary.cy.tsx",
+          "cypress/component/unofficial-banner.cy.tsx",
+          "cypress/component/blog-shared-chrome.cy.tsx"
         ]
       },
       {
         "shard": 7,
-        "duration": 18443,
+        "duration": 10847,
         "specs": [
           "cypress/component/power-timeline.cy.tsx",
-          "cypress/component/chart-legend.cy.tsx",
-          "cypress/component/profit-estimator-chart.cy.tsx",
-          "cypress/component/tab-nav.cy.tsx",
-          "cypress/component/data-table.cy.tsx",
-          "cypress/component/eval-bar-chart.cy.tsx",
-          "cypress/component/trace-flamegraph.cy.tsx",
-          "cypress/component/landing-banner-ab.cy.tsx",
-          "cypress/component/power-analysis-panels.cy.tsx"
+          "cypress/component/power-compare.cy.tsx",
+          "cypress/component/measured-metric-controls.cy.tsx",
+          "cypress/component/umbp-run-label.cy.tsx",
+          "cypress/component/reliability-bar-chart.cy.tsx"
         ]
       },
       {
         "shard": 8,
-        "duration": 18344,
+        "duration": 10917,
         "specs": [
           "cypress/component/gpu-graph.cy.tsx",
-          "cypress/component/quotes-content.cy.tsx",
-          "cypress/component/chart-buttons.cy.tsx",
           "cypress/component/footer.cy.tsx",
-          "cypress/component/eval-chart-controls.cy.tsx",
-          "cypress/component/autumn-leaves-gutter.cy.tsx",
-          "cypress/component/error-boundary.cy.tsx",
-          "cypress/component/unofficial-banner.cy.tsx"
+          "cypress/component/scale-up-topology.cy.tsx",
+          "cypress/component/inference-tco-badges.cy.tsx",
+          "cypress/component/collectivex-swap.cy.tsx",
+          "cypress/component/distribution-card.cy.tsx",
+          "cypress/component/normalized-interactivity-help-link.cy.tsx"
+        ]
+      },
+      {
+        "shard": 9,
+        "duration": 10919,
+        "specs": [
+          "cypress/component/chart-legend.cy.tsx",
+          "cypress/component/date-picker.cy.tsx",
+          "cypress/component/header.cy.tsx",
+          "cypress/component/video-api-reference.cy.tsx",
+          "cypress/component/eval-bar-chart.cy.tsx",
+          "cypress/component/scatter-label-overlap.cy.tsx",
+          "cypress/component/power-analysis-panels.cy.tsx"
+        ]
+      },
+      {
+        "shard": 10,
+        "duration": 10865,
+        "specs": [
+          "cypress/component/quotes-content.cy.tsx",
+          "cypress/component/profit-estimator-chart.cy.tsx",
+          "cypress/component/tab-nav.cy.tsx",
+          "cypress/component/bottom-toast.cy.tsx",
+          "cypress/component/video-evidence.cy.tsx",
+          "cypress/component/landing-banner-ab.cy.tsx"
+        ]
+      },
+      {
+        "shard": 11,
+        "duration": 10866,
+        "specs": [
+          "cypress/component/power-telemetry.cy.tsx",
+          "cypress/component/chart-buttons.cy.tsx",
+          "cypress/component/data-table.cy.tsx",
+          "cypress/component/submissions-table.cy.tsx",
+          "cypress/component/powerx-facility-switch.cy.tsx",
+          "cypress/component/dataset-list.cy.tsx"
+        ]
+      },
+      {
+        "shard": 12,
+        "duration": 10856,
+        "specs": [
+          "cypress/component/component-css.cy.tsx",
+          "cypress/component/multi-select.cy.tsx",
+          "cypress/component/cost-tier-selector.cy.tsx",
+          "cypress/component/inferencex-wordmark.cy.tsx",
+          "cypress/component/trace-flamegraph.cy.tsx",
+          "cypress/component/gpu-specs-bar-chart.cy.tsx"
         ]
       }
     ],
     "output": "component-timings.json",
-    "lowerBound": 18405.5,
-    "longest": 18479,
-    "overheadAboveLowerBound": 0.003993371546548552
+    "lowerBound": 17523,
+    "longest": 17523,
+    "overheadAboveLowerBound": 0
   }
 ]
