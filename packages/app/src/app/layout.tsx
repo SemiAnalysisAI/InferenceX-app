@@ -38,10 +38,12 @@ const dm_sans = DM_Sans({
   variable: '--font-dm-sans',
 });
 
-// On <html> so the :root `--font-mono` token can resolve it.
+// On <html> so the :root `--font-mono` token can resolve it. Not preloaded: the landing page
+// budgets a single font preload (DM Sans), enforced by cypress/e2e/landing-performance.cy.ts.
 const geist = Geist({
   subsets: ['latin'],
   display: 'optional',
+  preload: false,
   variable: '--font-geist',
 });
 

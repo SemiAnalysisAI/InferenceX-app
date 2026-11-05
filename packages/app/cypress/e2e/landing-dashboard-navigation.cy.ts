@@ -159,7 +159,7 @@ describe('landing model curation', () => {
         cy.get('[data-testid="landing-tpu-kimi-k3-results-link"]')
           .should('have.attr', 'href', `${prefix}${TPU_KIMI_RESULTS_HREF}`)
           .and('contain.text', prefix ? 'TPU Kimi K3 提交结果' : 'TPU Kimi K3 Submission')
-          .and('contain.text', prefix ? '2.8 万亿参数 AgentX' : '2.8 Trillion parameters AgentX');
+          .and('contain.text', prefix ? '2.8 万亿参数 · AgentX' : '2.8T parameters · AgentX');
         cy.get('[data-testid="landing-tpu-kimi-k3-google-logo"] path').should('have.length', 4);
         cy.get('[data-new-badge="landing-tpu-kimi-k3"]')
           .should('contain.text', prefix ? '新' : 'NEW')
@@ -172,7 +172,7 @@ describe('landing model curation', () => {
             'contain.text',
             prefix ? 'Vera Rubin NVL72 GLM 5.3 提交结果' : 'Vera Rubin NVL72 GLM 5.3 Submission',
           )
-          .and('contain.text', prefix ? '7440 亿参数 AgentX' : '744 Billion parameters AgentX');
+          .and('contain.text', prefix ? '7440 亿参数 · AgentX' : '744B parameters · AgentX');
         cy.get('[data-testid="landing-rubin-glm-5-3-nvidia-logo"] path').should(
           'have.attr',
           'fill',
