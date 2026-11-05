@@ -2,6 +2,25 @@ import { type ConfigParams, configCacheKey } from './config-cache';
 import { QWEN35_P90_POWER_BACKFILLS } from './power-p90-backfills';
 import { SPEC_METHOD_BACKFILLS } from './spec-method-backfills';
 import { matchesExpectedBackfillMetrics } from '../lib/benchmark-point-backfill';
+import {
+  type RunFrameworkOverride,
+  RUN_FRAMEWORK_OVERRIDES,
+  validateRunFrameworkOverrides,
+} from './run-framework-overrides';
+
+/**
+ * Run framework reassignments live in a dependency-free sibling module because
+ * the benchmark and eval mappers (which the app's unofficial-run route bundles)
+ * read them at mapping time. They are re-exported here so the ledger stays the
+ * single entry point for audited corrections.
+ */
+export {
+  type RunFrameworkOverride,
+  RUN_FRAMEWORK_OVERRIDES,
+  applyRunFrameworkOverridesToChangelogs,
+  resolveRunFramework,
+  rewriteConfigKeyFramework,
+} from './run-framework-overrides';
 
 export const CONCLUSION_OVERRIDES: ReadonlyMap<number, string> = new Map([
   [22806827144, 'success'], // 2026-03-07 | dsr1 fp8 h200 SGLang 0.5.7→0.5.9 bump | Reason: database upload step failed
@@ -897,8 +916,10 @@ function validateBackfillConfig(config: ConfigParams, id: string): void {
 export function validateRunBackfills(
   changelogs: readonly ChangelogBackfill[] = CHANGELOG_BACKFILLS,
   points: readonly BenchmarkPointBackfill[] = BENCHMARK_POINT_BACKFILLS,
+  frameworks: readonly RunFrameworkOverride[] = RUN_FRAMEWORK_OVERRIDES,
 ): void {
   const ids = new Set<string>();
+  validateRunFrameworkOverrides(frameworks, ids, PURGED_RUNS);
   const changelogIdentities = new Set<string>();
   const pointSourceIdentities = new Map<string, string>();
   const pointDesiredIdentities = new Map<string, string>();
