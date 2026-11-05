@@ -987,3 +987,158 @@ export const generateGPUGraphTooltipContent = (config: TooltipConfig): string =>
     </div>
   `;
 };
+
+const HOVER_STRINGS = {
+  en: {
+    conc: (n: number) => `conc ${n}`,
+    chips: (n: number) => `${n} ${n === 1 ? 'chip' : 'chips'}`,
+    cacheHit: 'KV cache hit',
+    chip: 'Chip',
+    chipCpu: 'Chip + CPU',
+    cpu: 'CPU',
+    theoretical: (v: string) => `theoretical ${v}`,
+    details: 'Click for full details',
+  },
+  zh: {
+    conc: (n: number) => `并发 ${n}`,
+    chips: (n: number) => `${n} 芯片`,
+    cacheHit: 'KV cache 命中率',
+    chip: '芯片',
+    chipCpu: '芯片 + CPU',
+    cpu: 'CPU',
+    theoretical: (v: string) => `理论 ${v}`,
+    details: '点击查看完整信息',
+  },
+} as const;
+
+/** Compact value for the hover card: 31,264,799 → 31.26M, 39.308 → 39.3. */
+export const formatHoverValue = (value: number, metric?: string): string => {
+  if (!Number.isFinite(value)) return String(value);
+  if (metric && WATT_METRICS.has(metric)) return fmtWatts(value);
+  const abs = Math.abs(value);
+  if (abs >= 1e9) return `${(value / 1e9).toFixed(2)}B`;
+  if (abs >= 1e6) return `${(value / 1e6).toFixed(2)}M`;
+  if (abs >= 1e4) return `${(value / 1e3).toFixed(1)}K`;
+  if (abs >= 100) return value.toFixed(0);
+  if (abs >= 10) return value.toFixed(1);
+  return String(parseFloat(value.toFixed(2)));
+};
+
+/**
+ * Short axis label for the hover card: the unit in parentheses, keeping a leading
+ * percentile/statistic qualifier. "P90 Interactivity (tok/s/user)" → "P90 tok/s/user".
+ */
+export const shortAxisLabel = (label: string): string => {
+  const unit = /[(（](?<unit>[^()（）]+)[)）]\s*$/u.exec(label.trim())?.groups?.unit;
+  if (!unit) return label;
+  const qualifier = /^(?<q>P\d{2,3}|p\d{2,3}|Median|Mean|中位数|平均)(?![A-Za-z0-9])/u.exec(
+    label.trim(),
+  )?.groups?.q;
+  return qualifier ? `${qualifier} ${unit}` : unit;
+};
+
+const hoverSpecLabel = (d: InferenceData): string | null => {
+  const method = d.spec_decoding ?? 'none';
+  if (method === 'none' || method === '') return null;
+  if (d.spec_algorithm)
+    return SPEC_ALGORITHM_LABELS[d.spec_algorithm] ?? d.spec_algorithm.toUpperCase();
+  return specMethodDisplayLabel(d.model, method);
+};
+
+const hoverOffloadLabel = (d: InferenceData): string | null => {
+  if (!isKvOffloadEnabled(d)) return null;
+  const type = d.kv_offloading?.trim();
+  const parts = [
+    d.kv_offload_backend ? cacheImplementationLabel(d.kv_offload_backend) : null,
+    type && type.toLowerCase() !== 'none' ? offloadTypeLabel(type) : null,
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(' → ') : null;
+};
+
+const hoverClampPct = (v: number) => Math.max(0, Math.min(100, v * 100));
+const hoverPct = (v: number) => `${(v * 100).toFixed(1)}%`;
+
+const hoverSwatch = (color: string, size: number, opacity = 1) =>
+  `<span style="display: inline-block; flex: none; width: ${size}px; height: ${size}px; border-radius: 50%; background: ${color}; opacity: ${opacity}; margin-right: 5px;"></span>`;
+
+const hoverCacheHTML = (d: InferenceData, color: string, locale: Locale): string => {
+  const chip = d.server_gpu_cache_hit_rate;
+  if (chip === undefined || chip === null || Number.isNaN(chip)) return '';
+  const t = HOVER_STRINGS[locale];
+  const offloadEnabled = isKvOffloadEnabled(d);
+  // TRT-LLM reports one combined chip + CPU rate when offload is on.
+  const combined = offloadEnabled && frameworkFamily(d.framework) === 'trt';
+  const rawCpu = d.server_cpu_cache_hit_rate;
+  const cpu =
+    offloadEnabled && !combined && rawCpu !== undefined && rawCpu !== null && !Number.isNaN(rawCpu)
+      ? rawCpu
+      : null;
+  const theoretical = d.theoretical_cache_hit_rate;
+  const hasTheoretical =
+    theoretical !== undefined && theoretical !== null && !Number.isNaN(theoretical);
+  const chipPct = hoverClampPct(chip);
+  const cpuPct = cpu === null ? 0 : Math.min(hoverClampPct(cpu), 100 - chipPct);
+  const offload = hoverOffloadLabel(d);
+  return `
+      <div style="display: flex; justify-content: space-between; gap: 12px; margin-top: 10px; margin-bottom: 4px; font-size: 11px;">
+        <span style="color: var(--muted-foreground);">${t.cacheHit}${offload ? ` · ${escapeHtml(offload)}` : ''}</span>
+        <span style="color: var(--foreground); font-weight: 600;">${hoverPct(chip + (cpu ?? 0))}</span>
+      </div>
+      <div data-hover-cache-bar style="position: relative; display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--border);">
+        <div style="width: ${chipPct}%; background: ${color};"></div>
+        ${cpu === null ? '' : `<div style="width: ${cpuPct}%; background: ${color}; opacity: 0.45;"></div>`}
+        ${hasTheoretical ? `<div style="position: absolute; top: 0; bottom: 0; left: calc(${hoverClampPct(theoretical)}% - 1px); width: 2px; background: var(--foreground); opacity: 0.6;"></div>` : ''}
+      </div>
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 5px; font-size: 10.5px; color: var(--muted-foreground);">
+        <span style="display: inline-flex; align-items: center;">${hoverSwatch(color, 6)}${combined ? t.chipCpu : t.chip} ${hoverPct(chip)}</span>
+        ${cpu === null ? '' : `<span style="display: inline-flex; align-items: center;">${hoverSwatch(color, 6, 0.45)}${t.cpu} ${hoverPct(cpu)}</span>`}
+        ${hasTheoretical ? `<span style="opacity: 0.8;">${t.theoretical(hoverPct(theoretical))}</span>` : ''}
+      </div>`;
+};
+
+export interface HoverTooltipConfig {
+  data: InferenceData;
+  xLabel: string;
+  yLabel: string;
+  selectedYAxisMetric: string;
+  hardwareConfig: HardwareConfig;
+  /** Series color of the hovered point (resolved CSS color). */
+  color: string;
+  locale?: Locale;
+}
+
+/**
+ * Compact hover card. The pinned (clicked) tooltip from `generateTooltipContent`
+ * keeps every field, so hover only shows what you need to read a point at a glance.
+ */
+export const generateHoverTooltipContent = (config: HoverTooltipConfig): string => {
+  const { data: d, xLabel, yLabel, selectedYAxisMetric, hardwareConfig, color } = config;
+  const locale = config.locale ?? 'en';
+  const t = HOVER_STRINGS[locale];
+  const system = hardwareConfig[d.hwKey]
+    ? getDisplayLabel(getPointHardwareConfig(d, hardwareConfig[d.hwKey]))
+    : d.hwKey;
+  const config_ = [
+    t.chips(d.physicalChips ?? d.tp),
+    getPointLabel(d) || `TP${d.tp}`,
+    hoverSpecLabel(d),
+  ].filter(Boolean) as string[];
+  const value = (v: string, label: string) =>
+    `<span style="white-space: nowrap;"><span style="color: var(--foreground); font-weight: 600;">${v}</span> <span style="color: var(--muted-foreground);">${escapeHtml(shortAxisLabel(label))}</span></span>`;
+
+  return `
+    <div data-hover-tooltip style="${tooltipShellStyle({ isPinned: false })}; min-width: 240px; font-variant-numeric: tabular-nums; line-height: 1.35;">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 6px;">
+        <span style="display: inline-flex; align-items: center; min-width: 0; color: var(--foreground); font-size: 12px; font-weight: 600;">${hoverSwatch(color, 8)}<span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(String(system))}</span></span>
+        <span style="flex: none; color: var(--muted-foreground); font-size: 11px;">${escapeHtml(d.precision.toUpperCase())} · ${t.conc(d.conc)}</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 2px 16px; font-size: 12px;">
+        ${value(formatHoverValue(d.y, selectedYAxisMetric), yLabel)}
+        ${value(formatHoverValue(d.x), xLabel)}
+      </div>
+      <div style="margin-top: 2px; color: var(--muted-foreground); font-size: 11px;">${escapeHtml(config_.join(' · '))}</div>
+      ${hoverCacheHTML(d, color, locale)}
+      <div style="margin-top: 8px; color: var(--muted-foreground); font-size: 10px; opacity: 0.75;">${t.details}</div>
+    </div>
+  `;
+};
