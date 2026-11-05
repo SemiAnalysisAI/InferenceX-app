@@ -168,13 +168,12 @@ describe('Overlay points follow Optimal Only on the selected axes', () => {
       expect(countVisible($pts), 'visible overlay X markers').to.eq(REAL_CONFIGS.length);
     });
   });
-  it('replaces the unofficial background and warning with the SemiAnalysis watermark', () => {
+  it('renders the runs as official data, with the SemiAnalysis watermark, when toggled', () => {
     const chart = '[data-testid="inference-chart-display"] svg';
     cy.get(`${chart} .unofficial-watermark-image`).should('exist');
     cy.get(`${chart} pattern[id^="unofficial-pattern-"]`).should('exist');
-    cy.get('[data-testid="remove-unofficial-bg"]')
-      .click()
-      .should('have.attr', 'data-state', 'checked');
+    cy.get('[data-testid="show-as-official"]').click().should('have.attr', 'data-state', 'checked');
+    cy.location('search').should('include', 'asofficial=1');
     cy.get(`${chart} .unofficial-watermark-image`).should('not.exist');
     cy.get(`${chart} pattern[id^="unofficial-pattern-"]`).should('not.exist');
     cy.get(`${chart} pattern[id^="logo-pattern-"] image`).should(
@@ -182,10 +181,11 @@ describe('Overlay points follow Optimal Only on the selected axes', () => {
       'href',
       '/brand/logo-color.webp',
     );
-    cy.get(`${chart} .unofficial-overlay-pt`).should('have.length', OVERLAY_CONFIGS.length);
-    cy.get('[data-testid="remove-unofficial-bg"]')
+    cy.get(`${chart} .unofficial-overlay-pt`).should('not.exist');
+    cy.get('[data-testid="show-as-official"]')
       .click()
       .should('have.attr', 'data-state', 'unchecked');
+    cy.location('search').should('not.include', 'asofficial');
     cy.get(`${chart} .unofficial-watermark-image`).should('exist');
     cy.get(`${chart} pattern[id^="unofficial-pattern-"]`).should('exist');
     cy.get(`${chart} pattern[id^="logo-pattern-"]`).should('not.exist');

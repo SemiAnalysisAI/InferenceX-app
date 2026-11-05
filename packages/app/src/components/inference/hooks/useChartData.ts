@@ -12,7 +12,7 @@ import {
   type XAxisMode,
 } from './chart-data-core';
 
-import { rowToSequence } from '@semianalysisai/inferencex-constants';
+import { DISPLAY_MODEL_TO_DB, rowToSequence } from '@semianalysisai/inferencex-constants';
 import { useQueries, useQuery } from '@tanstack/react-query';
 
 import chartDefinitions, {
@@ -69,6 +69,7 @@ import {
 import { DEFAULT_TCO_BASIS, getModelSortIndex, type TcoBasis } from '@/lib/catalog/constants';
 import { Sequence, type Model } from '@/lib/catalog/data-mappings';
 import { calculateCostsForGpus, calculatePowerForGpus } from '@/lib/shared/utils';
+import { useOfficialPreviewBenchmarkRows } from '@/providers/unofficial-run-provider';
 import { isPreferredVrLine, preferVrDefaultRun, VR_DEFAULT_RUN } from '../default-run-preference';
 
 export {
@@ -208,16 +209,28 @@ export function useChartData(
     benchmarkQueryOptions(selectedModel, VR_DEFAULT_RUN.date, enabled && preferVr, true),
   );
 
+  // Unofficial runs shown as official join the snapshot the way an ingest would: rows up
+  // to the snapshot date, deduped per series with the official rows below.
+  const previewRows = useOfficialPreviewBenchmarkRows();
+  const modelPreviewRows = useMemo(() => {
+    if (!previewRows || asOfRunId || selectedRunId) return null;
+    const dbModelKeys = DISPLAY_MODEL_TO_DB[selectedModel] ?? [selectedModel];
+    return previewRows.filter(
+      (row) => dbModelKeys.includes(row.model) && (!queryDate || row.date <= queryDate),
+    );
+  }, [previewRows, asOfRunId, selectedRunId, selectedModel, queryDate]);
+
   const allRows = useMemo(() => {
     let scopedRows = baseRows;
     if (selectedRunId) {
       if (!runRows) return undefined;
       scopedRows = baseRows ? mergeRunScopedRows(runRows, baseRows) : runRows;
     }
+    if (scopedRows && modelPreviewRows?.length) scopedRows = [...scopedRows, ...modelPreviewRows];
     return preferVr && scopedRows && preferredRows
       ? preferVrDefaultRun(scopedRows, preferredRows)
       : scopedRows;
-  }, [selectedRunId, runRows, baseRows, preferVr, preferredRows]);
+  }, [selectedRunId, runRows, baseRows, modelPreviewRows, preferVr, preferredRows]);
 
   const queryLoading =
     baseLoading || (Boolean(selectedRunId) && runLoading) || (preferVr && preferredLoading);

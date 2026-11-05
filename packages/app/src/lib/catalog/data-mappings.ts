@@ -306,9 +306,9 @@ export function hasExclusion(model: Model | string | null | undefined): boolean 
 
 export function getChartWatermark(
   isUnofficialRun = false,
-  removeUnofficialBg = false,
+  showAsOfficial = false,
 ): 'logo' | 'logo-always' | 'unofficial' {
-  if (isUnofficialRun && removeUnofficialBg) return 'logo-always';
+  if (showAsOfficial) return 'logo-always';
   return isUnofficialRun ? 'unofficial' : 'logo';
 }
 

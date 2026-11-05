@@ -19,16 +19,16 @@ interface RunInfo {
 
 interface UnofficialBannerProps {
   runs: RunInfo[];
-  removeUnofficialBg?: boolean;
-  onRemoveUnofficialBgChange?: (checked: boolean) => void;
+  showAsOfficial?: boolean;
+  onShowAsOfficialChange?: (checked: boolean) => void;
   attached?: boolean;
   onDismissRun?: (runId: string) => void;
   onDismissAll?: () => void;
 }
 
 const STRINGS = {
-  en: { removeUnofficialBg: 'Remove unofficial BG' },
-  zh: { removeUnofficialBg: '移除非官方背景' },
+  en: { showAsOfficial: 'Show as official' },
+  zh: { showAsOfficial: '按官方数据显示' },
 };
 
 export function UnofficialBanner({
@@ -36,8 +36,8 @@ export function UnofficialBanner({
   attached = false,
   onDismissRun,
   onDismissAll,
-  removeUnofficialBg = false,
-  onRemoveUnofficialBgChange,
+  showAsOfficial = false,
+  onShowAsOfficialChange,
 }: UnofficialBannerProps) {
   const locale = useLocale();
   if (runs.length === 0) return null;
@@ -71,18 +71,18 @@ export function UnofficialBanner({
             />
           ))}
         </div>
-        {onRemoveUnofficialBgChange && (
+        {onShowAsOfficialChange && (
           <label className="flex items-center gap-2 text-xs cursor-pointer">
             <Switch
-              data-testid="remove-unofficial-bg"
-              checked={removeUnofficialBg}
+              data-testid="show-as-official"
+              checked={showAsOfficial}
               onCheckedChange={(checked) => {
-                track('unofficial_background_toggled', { removed: checked });
-                onRemoveUnofficialBgChange(checked);
+                track('unofficial_show_as_official_toggled', { enabled: checked });
+                onShowAsOfficialChange(checked);
               }}
-              aria-label={STRINGS[locale].removeUnofficialBg}
+              aria-label={STRINGS[locale].showAsOfficial}
             />
-            {STRINGS[locale].removeUnofficialBg}
+            {STRINGS[locale].showAsOfficial}
           </label>
         )}
         {multiple && onDismissAll && (

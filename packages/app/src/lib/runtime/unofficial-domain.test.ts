@@ -22,13 +22,13 @@ describe('unofficial domain branding', () => {
     expect(getDomainAwareChartWatermark('unofficial', 'preview.example.com')).toBe('unofficial');
     expect(getDomainAwareChartWatermark('none', 'preview.example.com')).toBe('none');
   });
-  it('honors the explicit unofficial background override on every hostname', () => {
+  it('shows the logo on every hostname when unofficial runs render as official', () => {
     for (const hostname of [OFFICIAL_HOSTNAME, 'localhost', 'preview.example.com']) {
-      expect(getDomainAwareChartWatermark(getChartWatermark(true, true), hostname)).toBe('logo');
+      expect(getDomainAwareChartWatermark(getChartWatermark(false, true), hostname)).toBe('logo');
       expect(getDomainAwareChartWatermark(getChartWatermark(true, false), hostname)).toBe(
         'unofficial',
       );
     }
-    expect(getDomainAwareChartWatermark(getChartWatermark(false, true), 'localhost')).toBe('none');
+    expect(getDomainAwareChartWatermark(getChartWatermark(false, false), 'localhost')).toBe('none');
   });
 });

@@ -660,7 +660,7 @@ const ScatterGraph = React.memo(
 
     const {
       isUnofficialRun,
-      removeUnofficialBg,
+      showAsOfficial,
       activeOverlayHwTypes: providerActiveOverlayHwTypes,
       localOfficialOverride,
       resetOverlaySelection,
@@ -4205,7 +4205,7 @@ const ScatterGraph = React.memo(
           dataIdentity={dataIdentity}
           metricIdentity={metricIdentity}
           margin={CHART_MARGIN}
-          watermark={getChartWatermark(isUnofficialRun, removeUnofficialBg)}
+          watermark={getChartWatermark(isUnofficialRun, showAsOfficial)}
           testId="scatter-graph"
           grabCursor={true}
           caption={caption}
