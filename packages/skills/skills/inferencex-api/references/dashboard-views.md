@@ -804,6 +804,14 @@ views. Keep using `vllm-disagg` as the raw framework key and
 `mi355x_vllm-disagg` as its MI355X hardware selector; the label does not rename
 stored data or API selectors.
 
+`TokenSpeed` uses the canonical framework key and family `tokenspeed`. Select it
+with `frameworks=tokenspeed` in inference and historical views; dashboard engine
+filters and embeds use the same family. `/api/v1/views/options` lists its label
+and family. Official runs and unofficial overlays share this classification.
+Trace server metrics support TokenSpeed device KV utilization (a 0–1 fraction)
+and running/waiting request counts. Cache-hit, host-cache and token-throughput
+series remain empty when the engine does not export those measurements.
+
 For every new or changed non-sensitive public-facing data view, implement or
 update its read-only API in the same PR. Reuse the UI's pure transforms, test
 selector effects and source semantics, and update OpenAPI, the route catalog,
