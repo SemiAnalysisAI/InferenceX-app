@@ -155,7 +155,8 @@ export interface ResultsChartSelection extends ResultsMetricContext {
 /** One series per hardware and per named run, each with its own deployment frontier. */
 /**
  * Chip Config history: one series per selected deployment, its runs in measurement
- * order and joined by a line. Every run is plotted; nothing is dominated.
+ * order and joined by a line, and a separate series for the named overlay run.
+ * Every run is plotted; nothing is dominated.
  */
 export function resultsHistorySeries(
   cells: readonly ResultCell[],
@@ -171,7 +172,7 @@ export function resultsHistorySeries(
       yValue = y.value(cell, selection);
     if (xValue === null || yValue === null || !Number.isFinite(xValue) || !Number.isFinite(yValue))
       continue;
-    const key = chipConfigKey(cell.point);
+    const key = `${chipConfigKey(cell.point)}${cell.overlay ? '-overlay' : ''}`;
     groups.set(key, [
       ...(groups.get(key) ?? []),
       { key: resultsPointKey(cell), cell, x: xValue, y: yValue, optimal: true },
@@ -185,13 +186,17 @@ export function resultsHistorySeries(
       return {
         key,
         hardwareKey: ordered[0].cell.point.hardwareKey!,
-        overlay: false,
+        overlay: ordered[0].cell.overlay,
         points: ordered,
         frontier: ordered,
         measured: ordered.length,
       };
     })
-    .toSorted((a, b) => hardwareSort(a.hardwareKey) - hardwareSort(b.hardwareKey));
+    .toSorted(
+      (a, b) =>
+        hardwareSort(a.hardwareKey) - hardwareSort(b.hardwareKey) ||
+        Number(a.overlay) - Number(b.overlay),
+    );
 }
 
 export function resultsChartSeries(

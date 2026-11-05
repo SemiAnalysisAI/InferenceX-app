@@ -475,6 +475,11 @@ export function resultProjection(
         })
         .map((p) => [`${chipConfigKey(p)}:${p.runId}`, p]),
     ).values(),
+    ...latest(
+      namedMatches.filter(
+        (p) => p.workloadKey === workloadKey && state.configs.includes(chipConfigKey(p)),
+      ),
+    ),
   ].map((p) => resultCell(p, state));
   const asOf = state.date === null ? runs : runs.filter((r) => r.date <= state.date!);
   const day = asOf.at(-1)?.date ?? runs[0]?.date ?? null;

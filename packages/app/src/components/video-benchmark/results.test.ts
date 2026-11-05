@@ -290,6 +290,13 @@ describe('VideoGenX results contract', () => {
     expect(history({})).toEqual(['h200:new', 'h200:old']);
     expect(history({ compareFrom: '2026-11-02' })).toEqual(['h200:new']);
     expect(history({ compareTo: '2026-11-02' })).toEqual(['h200:old']);
+    const named = run('h200:named', '400', '2026-11-04T00:00:00Z');
+    const overlaid = resultProjection(
+      [rerun, b200, first],
+      { ...state(), configs: [h200], unofficialRun: '400' },
+      [named],
+    ).history;
+    expect(overlaid.filter((c) => c.overlay).map((c) => c.point.id)).toEqual(['h200:named']);
   });
 
   it('parses public control keys and preserves explicit zero prices', () => {
