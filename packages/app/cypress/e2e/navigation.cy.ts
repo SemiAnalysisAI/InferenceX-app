@@ -1,6 +1,7 @@
 import { videoHistoryEntry } from '../../src/components/video-benchmark/history';
 import { servingArtifact } from '../support/video-artifacts';
 import { expectHwKeyPoints, type ScatterPoint } from '../support/scatter-points';
+import { interceptPreviewSnapshots } from '../support/preview-snapshot-fixtures';
 
 const tpuDatum = (points: ScatterPoint[]) =>
   points.find((point) => String(point.datum.hwKey).startsWith('tpuv7'))!.datum;
@@ -304,6 +305,10 @@ describe('OperatorX launch banner A/B arm', { testIsolation: true }, () => {
 });
 
 describe('TPUv7 results', { testIsolation: true }, () => {
+  beforeEach(() => {
+    interceptPreviewSnapshots({ overFixtures: true });
+  });
+
   for (const locale of ['', '/zh']) {
     it(`preserves TPUv7 FP8 cost basis in ${locale || '/'} share URLs`, () => {
       cy.visit(`${locale}/inference?g_model=Qwen-3.5-397B-A17B&i_seq=8k/1k&i_prec=fp8`);
