@@ -660,6 +660,7 @@ const ScatterGraph = React.memo(
 
     const {
       isUnofficialRun,
+      showAsOfficial,
       activeOverlayHwTypes: providerActiveOverlayHwTypes,
       localOfficialOverride,
       resetOverlaySelection,
@@ -1042,7 +1043,7 @@ const ScatterGraph = React.memo(
       const buckets = new Map<string, Bucket>();
       const getBucket = (point: InferenceData) => {
         const runIndex = overlayRunIndex(point.run_url ?? null, runIndexByUrl);
-        const key = `${scatterSeriesKey(point)}|${point.date}|run${runIndex}`;
+        const key = scatterSeriesKey(point);
         let bucket = buckets.get(key);
         if (!bucket) {
           bucket = {
@@ -1144,10 +1145,12 @@ const ScatterGraph = React.memo(
         points: InferenceData[];
       }
       if (processedOverlayData.length === 0) return {} as Record<string, Entry>;
+      // Combine matching series across unofficial runs. Keep the first
+      // contributing run's style; individual points retain their provenance.
       const grouped = processedOverlayData.reduce(
         (acc, p) => {
           const runIndex = overlayRunIndex(p.run_url ?? null, runIndexByUrl);
-          const key = `${scatterSeriesKey(p)}_run${runIndex}`;
+          const key = scatterSeriesKey(p);
           if (!acc[key]) {
             acc[key] = {
               hwKey: String(p.hwKey),
@@ -1925,10 +1928,7 @@ const ScatterGraph = React.memo(
         const ctx = perfRulerDrawCtxRef.current;
         if (!ctx) return;
         const series = scatterSeriesKey(point);
-        const base =
-          source === 'overlay'
-            ? `overlay-roofline-${series}_run${overlayRunIndex(point.run_url ?? null, runIndexByUrl)}`
-            : `roofline-${series}`;
+        const base = source === 'overlay' ? `overlay-roofline-${series}` : `roofline-${series}`;
         const candidates = [`${base}__${encodeURIComponent(point.date)}`, base];
         const curve = candidates.find(
           (cls) => !ctx.zoomGroup.select(`.${CSS.escape(cls)}`).empty(),
@@ -1940,7 +1940,7 @@ const ScatterGraph = React.memo(
         chartRef.current?.dismissTooltip();
         chartRef.current?.hideTooltip();
       },
-      [runIndexByUrl, clampPerfRulerIsoXToOverlap],
+      [clampPerfRulerIsoXToOverlap],
     );
 
     const setCompareTarget = useSetPowerXCompareTarget();
@@ -4205,7 +4205,7 @@ const ScatterGraph = React.memo(
           dataIdentity={dataIdentity}
           metricIdentity={metricIdentity}
           margin={CHART_MARGIN}
-          watermark={getChartWatermark(isUnofficialRun)}
+          watermark={getChartWatermark(isUnofficialRun, showAsOfficial)}
           testId="scatter-graph"
           grabCursor={true}
           caption={caption}

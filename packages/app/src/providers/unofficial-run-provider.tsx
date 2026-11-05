@@ -46,6 +46,11 @@ interface UnofficialRunResponse {
 }
 
 const EMPTY_UNOFFICIAL_RUN_INFOS: UnofficialRunInfo[] = [];
+const EMPTY_RUN_INDEX: Record<string, number> = {};
+const EMPTY_HW_TYPES = new Set<string>();
+const noOverlayData = () => null;
+
+const AS_OFFICIAL_PARAM = 'asofficial';
 
 const UNOFFICIAL_RUN_PARAM_RE = /^unofficialruns?$/iu;
 function deleteUnofficialRunParams(searchParams: URLSearchParams): void {
@@ -54,6 +59,7 @@ function deleteUnofficialRunParams(searchParams: URLSearchParams): void {
     if (UNOFFICIAL_RUN_PARAM_RE.test(key)) keysToDelete.push(key);
   }
   for (const key of keysToDelete) searchParams.delete(key);
+  searchParams.delete(AS_OFFICIAL_PARAM);
 }
 
 export interface AvailableModelSequence {
@@ -74,6 +80,11 @@ export interface OverlayScopeInput {
 
 export interface UnofficialRunContextType {
   isUnofficialRun: boolean;
+  /** The runs render through the official pipeline, as if ingested, instead of as overlays. */
+  showAsOfficial: boolean;
+  setShowAsOfficial?: (checked: boolean) => void;
+  /** Unofficial benchmark rows for the official chart pipeline; set only while showAsOfficial. */
+  officialPreviewBenchmarkRows?: BenchmarkRow[] | null;
   unofficialRunInfo: UnofficialRunInfo | null;
   unofficialRunInfos: UnofficialRunInfo[];
   runIndexByUrl: Record<string, number>;
@@ -348,6 +359,17 @@ export function UnofficialRunProvider({
   const queryClient = useQueryClient();
   const search = useClientRouteSearch();
   const runIds = useMemo(() => parseUnofficialRunIds(search), [search]);
+  const showAsOfficialParam = useMemo(
+    () => new URLSearchParams(search).get(AS_OFFICIAL_PARAM) === '1',
+    [search],
+  );
+  const setShowAsOfficial = useCallback((checked: boolean) => {
+    const url = new URL(window.location.href);
+    if (checked) url.searchParams.set(AS_OFFICIAL_PARAM, '1');
+    else url.searchParams.delete(AS_OFFICIAL_PARAM);
+    window.history.replaceState(window.history.state, '', url);
+    notifyClientSearchChange(url.href);
+  }, []);
   const runIdsKey = runIds.join(',');
   const query = useQuery({
     queryKey: ['unofficial-runs', runIdsKey] as const,
@@ -504,29 +526,37 @@ export function UnofficialRunProvider({
   const loading = hasRunIds && (query.isFetching || !chartDataModule);
   const error = query.error instanceof Error ? query.error.message : null;
 
+  const showAsOfficial = showAsOfficialParam && unofficialRunInfos.length > 0;
+  // As official, the runs keep their banner and filter options but publish no overlay
+  // data; the official chart pipeline merges their rows instead.
   const contextValue = useMemo<UnofficialRunContextType>(
     () => ({
-      isUnofficialRun: unofficialRunInfos.length > 0,
-      unofficialRunInfo,
+      isUnofficialRun: !showAsOfficial && unofficialRunInfos.length > 0,
+      showAsOfficial,
+      setShowAsOfficial,
+      officialPreviewBenchmarkRows: showAsOfficial ? unofficialBenchmarkRows : null,
+      unofficialRunInfo: showAsOfficial ? null : unofficialRunInfo,
       unofficialRunInfos,
-      runIndexByUrl,
-      unofficialChartData,
-      unofficialBenchmarkRows,
-      unofficialEvalRows,
+      runIndexByUrl: showAsOfficial ? EMPTY_RUN_INDEX : runIndexByUrl,
+      unofficialChartData: showAsOfficial ? null : unofficialChartData,
+      unofficialBenchmarkRows: showAsOfficial ? null : unofficialBenchmarkRows,
+      unofficialEvalRows: showAsOfficial ? null : unofficialEvalRows,
       loading,
       error,
       clearUnofficialRun,
       dismissRun,
       availableModelsAndSequences,
-      getOverlayData,
-      activeOverlayHwTypes: selection.activeOverlayHwTypes,
-      allOverlayHwTypes,
-      localOfficialOverride: selection.localOfficialOverride,
+      getOverlayData: showAsOfficial ? noOverlayData : getOverlayData,
+      activeOverlayHwTypes: showAsOfficial ? EMPTY_HW_TYPES : selection.activeOverlayHwTypes,
+      allOverlayHwTypes: showAsOfficial ? EMPTY_HW_TYPES : allOverlayHwTypes,
+      localOfficialOverride: showAsOfficial ? null : selection.localOfficialOverride,
       reconcileOverlayScope,
       setUnifiedOverlaySelection,
       resetOverlaySelection,
     }),
     [
+      showAsOfficial,
+      setShowAsOfficial,
       unofficialRunInfos,
       unofficialRunInfo,
       runIndexByUrl,
@@ -557,13 +587,21 @@ export function UnofficialRunProvider({
 }
 
 export function UnofficialRunBanner({ attached = false }: { attached?: boolean }) {
-  const { unofficialRunInfos, dismissRun, clearUnofficialRun } = useUnofficialRun();
+  const { unofficialRunInfos, dismissRun, clearUnofficialRun, showAsOfficial, setShowAsOfficial } =
+    useUnofficialRun();
   return (
     <UnofficialBanner
       runs={unofficialRunInfos}
       attached={attached}
+      showAsOfficial={showAsOfficial}
+      onShowAsOfficialChange={setShowAsOfficial}
       onDismissRun={dismissRun}
       onDismissAll={clearUnofficialRun}
     />
   );
+}
+
+/** Rows the official chart pipeline merges as if ingested; null outside a provider. */
+export function useOfficialPreviewBenchmarkRows(): BenchmarkRow[] | null {
+  return useContext(UnofficialRunContext)?.officialPreviewBenchmarkRows ?? null;
 }

@@ -534,6 +534,7 @@ export function createMockUnofficialRunContext(
 ): UnofficialRunContextType {
   return {
     isUnofficialRun: false,
+    showAsOfficial: false,
     unofficialRunInfo: null,
     unofficialRunInfos: [],
     runIndexByUrl: {},

@@ -304,7 +304,11 @@ export function hasExclusion(model: Model | string | null | undefined): boolean 
   return getModelExclusion(model).length > 0;
 }
 
-export function getChartWatermark(isUnofficialRun = false): 'logo' | 'unofficial' {
+export function getChartWatermark(
+  isUnofficialRun = false,
+  showAsOfficial = false,
+): 'logo' | 'logo-always' | 'unofficial' {
+  if (showAsOfficial) return 'logo-always';
   return isUnofficialRun ? 'unofficial' : 'logo';
 }
 

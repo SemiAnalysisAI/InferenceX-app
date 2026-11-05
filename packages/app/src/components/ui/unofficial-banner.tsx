@@ -2,8 +2,10 @@
 
 import { AlertTriangle, ExternalLink, X } from 'lucide-react';
 
+import { Switch } from '@/components/ui/switch';
 import { track } from '@/lib/analytics/analytics';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
+import { useLocale } from '@/lib/i18n/use-locale';
 import { cn } from '@/lib/shared/utils';
 
 interface RunInfo {
@@ -17,17 +19,27 @@ interface RunInfo {
 
 interface UnofficialBannerProps {
   runs: RunInfo[];
+  showAsOfficial?: boolean;
+  onShowAsOfficialChange?: (checked: boolean) => void;
   attached?: boolean;
   onDismissRun?: (runId: string) => void;
   onDismissAll?: () => void;
 }
+
+const STRINGS = {
+  en: { showAsOfficial: 'Show as official' },
+  zh: { showAsOfficial: '按官方数据显示' },
+};
 
 export function UnofficialBanner({
   runs,
   attached = false,
   onDismissRun,
   onDismissAll,
+  showAsOfficial = false,
+  onShowAsOfficialChange,
 }: UnofficialBannerProps) {
+  const locale = useLocale();
   if (runs.length === 0) return null;
   const multiple = runs.length > 1;
 
@@ -59,6 +71,20 @@ export function UnofficialBanner({
             />
           ))}
         </div>
+        {onShowAsOfficialChange && (
+          <label className="flex items-center gap-2 text-xs cursor-pointer">
+            <Switch
+              data-testid="show-as-official"
+              checked={showAsOfficial}
+              onCheckedChange={(checked) => {
+                track('unofficial_show_as_official_toggled', { enabled: checked });
+                onShowAsOfficialChange(checked);
+              }}
+              aria-label={STRINGS[locale].showAsOfficial}
+            />
+            {STRINGS[locale].showAsOfficial}
+          </label>
+        )}
         {multiple && onDismissAll && (
           <button
             type="button"
