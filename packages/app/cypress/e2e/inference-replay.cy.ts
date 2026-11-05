@@ -42,24 +42,14 @@ const visitChineseReplay = () => {
 };
 
 describe('Inference Replay', () => {
-  before(() => {
+  beforeEach(() => {
     cy.window().then((win) => {
       win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
     });
-    cy.visit('/inference');
+    cy.visit('/inference?g_model=DeepSeek-R1-0528');
     cy.get('[data-testid="inference-chart-display"]').should('exist');
-  });
-
-  it('opens the replay preview modal from the MP4 menu item', () => {
     openReplayDialog();
-    cy.get('[data-testid="replay-dialog-chart-0"]').should('be.visible');
     cy.get('[data-testid="replay-panel-chart-0"]').should('exist');
-    cy.get('[data-testid="replay-panel-chart-0"]').then(($panel) => {
-      const text = $panel.text();
-      const hasControls = $panel.find('[data-testid="replay-play-pause"]').length > 0;
-      const hasMessage = /Loading benchmark history|Not enough history/u.test(text) || hasControls;
-      expect(hasMessage).to.equal(true);
-    });
   });
 
   it('advances the date overlay and scrubber when Play is pressed', () => {
@@ -71,12 +61,12 @@ describe('Inference Replay', () => {
       .then((startDate) => {
         cy.get('[data-testid="replay-play-pause"]').click();
         cy.get('[data-testid="replay-scrubber"]')
-          .invoke({ timeout: 10_000 }, 'val')
+          .invoke('val')
           .should((endVal) => {
             expect(Number(endVal)).to.be.greaterThan(0);
           });
         cy.get('[data-testid="replay-date-overlay"]')
-          .invoke({ timeout: 10_000 }, 'text')
+          .invoke('text')
           .should((endDate) => {
             expect(endDate).not.to.equal(startDate);
           });
@@ -86,94 +76,77 @@ describe('Inference Replay', () => {
   });
 
   it('re-renders the replay frame when a parent-chart toggle changes', () => {
-    cy.get('body').then(($body) => {
-      if ($body.find('[data-testid="replay-panel-chart-0"]').length === 0) return;
-      setReplayScrubber(1_000_000);
-      cy.get('[data-testid="replay-scrubber"]').should('have.value', '1000');
-      cy.get('[data-testid="replay-panel-chart-0"] svg path.roofline-path')
-        .first()
-        .invoke('attr', 'd')
-        .then((beforeD) => {
-          cy.get('body').type('{esc}');
-          cy.get('[data-testid="replay-panel-chart-0"]').should('not.exist');
-          cy.get('[data-testid="chart-figure"]')
-            .first()
-            .within(() => {
-              cy.get('[data-testid="legend-advanced-toggle"]').then(($toggle) => {
-                if ($toggle.attr('aria-expanded') !== 'true') cy.wrap($toggle).click();
-              });
-              cy.get('[data-testid="scatter-log-scale"]').click();
-            });
-          openReplayDialog();
-          setReplayScrubber(1_000_000);
-          cy.get('[data-testid="replay-scrubber"]').should('have.value', '1000');
-          cy.get('[data-testid="replay-panel-chart-0"] svg path.roofline-path')
-            .first()
-            .invoke('attr', 'd')
-            .should((afterD) => {
-              expect(afterD).not.to.equal(beforeD);
-            });
-        });
-    });
+    setReplayScrubber(1_000_000);
+    cy.get('[data-testid="replay-scrubber"]').should('have.value', '1000');
+    cy.get('[data-testid="replay-panel-chart-0"] svg path.roofline-path')
+      .first()
+      .invoke('attr', 'd')
+      .then((beforeD) => {
+        cy.get('body').type('{esc}');
+        cy.get('[data-testid="replay-panel-chart-0"]').should('not.exist');
+        expandLegendAdvanced();
+        cy.get('[data-testid="scatter-log-scale"]').first().click();
+        openReplayDialog();
+        setReplayScrubber(1_000_000);
+        cy.get('[data-testid="replay-scrubber"]').should('have.value', '1000');
+        cy.get('[data-testid="replay-panel-chart-0"] svg path.roofline-path')
+          .first()
+          .invoke('attr', 'd')
+          .should((afterD) => {
+            expect(afterD).not.to.equal(beforeD);
+          });
+      });
   });
 
   it('renders line labels in the foreground during replay', () => {
-    cy.get('body').then(($body) => {
-      if ($body.find('[data-testid="replay-panel-chart-0"]').length === 0) return;
-      cy.get('[data-testid="replay-panel-chart-0"]').within(() => {
-        expandLegendAdvanced();
-        cy.get('[data-testid="scatter-line-labels"]').then(($el) => {
-          if ($el.attr('data-state') !== 'checked') cy.wrap($el).click();
-        });
+    cy.get('[data-testid="replay-panel-chart-0"]').within(() => {
+      expandLegendAdvanced();
+      cy.get('[data-testid="scatter-line-labels"]').then(($el) => {
+        if ($el.attr('data-state') !== 'checked') cy.wrap($el).click();
       });
-      cy.get('[data-testid="replay-panel-chart-0"] svg g.line-label').should(
-        'have.length.greaterThan',
-        0,
-      );
-      cy.get('[data-testid="replay-panel-chart-0"] svg').then(($svg) => {
-        const svg = $svg[0];
-        const points = svg.querySelector(CANVAS_POINT_LAYER_SELECTOR);
-        const firstLabel = svg.querySelector('g.line-label');
-        if (!points || !firstLabel) return;
-        expect(
-          points.compareDocumentPosition(firstLabel) & Node.DOCUMENT_POSITION_FOLLOWING,
-          'replay line label follows the scatter points (foreground)',
-        ).to.be.greaterThan(0);
-      });
+    });
+    cy.get('[data-testid="replay-panel-chart-0"] svg g.line-label').should(
+      'have.length.greaterThan',
+      0,
+    );
+    cy.get('[data-testid="replay-panel-chart-0"] svg').then(($svg) => {
+      const svg = $svg[0];
+      const points = svg.querySelector(CANVAS_POINT_LAYER_SELECTOR);
+      const firstLabel = svg.querySelector('g.line-label');
+      expect(points, 'replay scatter point layer exists').to.not.equal(null);
+      expect(firstLabel, 'replay line labels exist').to.not.equal(null);
+      expect(
+        points!.compareDocumentPosition(firstLabel!) & Node.DOCUMENT_POSITION_FOLLOWING,
+        'replay line label follows the scatter points (foreground)',
+      ).to.be.greaterThan(0);
     });
   });
 
   it('Fixed axes stay constant across frames; toggling off refits per frame', () => {
-    cy.get('body').then(($body) => {
-      if ($body.find('[data-testid="replay-scrubber"]').length === 0) {
-        cy.log('Replay history fixture has < 2 dates; skipping fixed-axes check');
-        return;
-      }
-      cy.get('[data-testid="replay-fixed-axes"]').should('have.attr', 'data-state', 'checked');
+    cy.get('[data-testid="replay-fixed-axes"]').should('have.attr', 'data-state', 'checked');
+    setReplayScrubber(0);
+    cy.get('[data-testid="replay-scrubber"]').should('have.value', '0');
+    replayAxisExtent().then((fixedAtStart) => {
+      setReplayScrubber(1_000_000);
+      cy.get('[data-testid="replay-scrubber"]').should('have.value', '1000');
+      cy.get('[data-testid="replay-panel-chart-0"] svg').should(($svg) => {
+        expect(
+          replayAxisExtentFrom($svg[0]),
+          'fixed axes are identical at the first and last frame',
+        ).to.equal(fixedAtStart);
+      });
+
+      cy.get('[data-testid="replay-fixed-axes"]').click();
       setReplayScrubber(0);
       cy.get('[data-testid="replay-scrubber"]').should('have.value', '0');
-      replayAxisExtent().then((fixedAtStart) => {
-        setReplayScrubber(1_000_000);
-        cy.get('[data-testid="replay-scrubber"]').should('have.value', '1000');
-        cy.get('[data-testid="replay-panel-chart-0"] svg').should(($svg) => {
+      cy.get('[data-testid="replay-panel-chart-0"] svg')
+        .should(($svg) => {
           expect(
             replayAxisExtentFrom($svg[0]),
-            'fixed axes are identical at the first and last frame',
-          ).to.equal(fixedAtStart);
-        });
-
-        cy.get('[data-testid="replay-fixed-axes"]').click();
-        setReplayScrubber(0);
-        cy.get('[data-testid="replay-scrubber"]').should('have.value', '0');
-        cy.get('[data-testid="replay-panel-chart-0"] svg')
-          .should(($svg) => {
-            expect(
-              replayAxisExtentFrom($svg[0]),
-              'per-frame axes at the first frame differ from the whole-run fixed extent',
-            ).not.to.equal(fixedAtStart);
-          })
-          .then(() => cy.get('[data-testid="replay-fixed-axes"]').click());
-      });
+            'per-frame axes at the first frame differ from the whole-run fixed extent',
+          ).not.to.equal(fixedAtStart);
+        })
+        .then(() => cy.get('[data-testid="replay-fixed-axes"]').click());
     });
   });
 });

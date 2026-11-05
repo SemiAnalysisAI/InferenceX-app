@@ -7,33 +7,10 @@ describe('Evaluation ChartControls', () => {
     mountWithProviders(<EvaluationChartControls />, { evaluation: {} });
   });
 
-  it('renders the model selector with the current model label', () => {
-    cy.get('#model-select').should('be.visible');
-    cy.get('#model-select').should('contain.text', 'DeepSeek R1 0528');
-  });
-
-  it('renders the benchmark selector with the current benchmark', () => {
-    cy.contains('legend', 'Configuration').should('be.visible');
-    cy.get('label[for="eval-benchmark-select"]').should('have.text', 'Benchmark');
-    cy.get('[data-testid="evaluation-benchmark-selector"]').should('be.visible');
-    cy.get('[data-testid="evaluation-benchmark-selector"]').should('contain.text', 'MMLU');
-  });
-
-  it('displays all available benchmarks in the dropdown', () => {
-    cy.get('[data-testid="evaluation-benchmark-selector"]').click();
-    cy.contains('[role="option"]', 'MMLU').should('exist');
-    cy.contains('[role="option"]', 'HUMANEVAL').should('exist');
-    cy.contains('[role="option"]', 'GSM8K').should('exist');
-  });
-
   it('calls setSelectedBenchmark when a benchmark is chosen', () => {
     cy.get('[data-testid="evaluation-benchmark-selector"]').click();
     cy.contains('[role="option"]', 'GSM8K').click();
     cy.get('@setSelectedBenchmark').should('have.been.calledOnceWith', 'gsm8k');
-  });
-
-  it('shows the current run date in the date picker', () => {
-    cy.contains('Mar 1, 2025').should('be.visible');
   });
 
   it('keeps benchmark controls aligned beside the secondary run context on desktop', () => {

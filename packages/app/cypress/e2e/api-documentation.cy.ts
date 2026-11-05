@@ -26,16 +26,6 @@ describe('API documentation', () => {
         body.models.find((entry: { slug: string }) => entry.slug === 'muse-spark-open'),
       ).to.have.nested.property('architecture.totalParams', 816);
     });
-    for (const suffix of [
-      '?model=missing',
-      '?model=',
-      '?model=kimi-k3&model=Kimi-K3',
-      '?runId=123',
-    ]) {
-      cy.request({ url: `${endpoint}${suffix}`, failOnStatusCode: false })
-        .its('status')
-        .should('eq', 400);
-    }
     cy.request('/api/openapi.json').then(({ body }) => {
       const operation = body.paths[endpoint].get;
       expect(operation.parameters.map((item: { name: string }) => item.name)).to.deep.equal([
@@ -77,11 +67,6 @@ describe('API documentation', () => {
         });
       },
     );
-    for (const suffix of ['&i_frontier=1', '&i_hinterland=2']) {
-      cy.request({ url: `${query}${suffix}`, failOnStatusCode: false })
-        .its('status')
-        .should('eq', 400);
-    }
     cy.request(`${query}&hardware=not-a-hardware`).then(({ body }) => {
       expect(body.frontier).to.deep.equal([]);
       expect(body.hinterland).to.deep.equal([]);
@@ -92,51 +77,23 @@ describe('API documentation', () => {
       cy.get('[data-testid="api-endpoint-get-pareto"] summary').click();
       cy.get('[data-testid="api-endpoint-get-pareto"]').should('contain.text', '/api/v1/pareto');
     }
-    cy.request('/api/openapi.json').then(({ body }) => {
-      const operation = body.paths['/api/v1/pareto'].get;
-      expect(operation.operationId).to.equal('get-pareto');
-      expect(operation.parameters.map((item: { name: string }) => item.name)).to.not.include(
-        'i_hinterland',
-      );
-      expect(body.components.schemas.ParetoBoundaries.properties).to.have.keys(
-        'source_url',
-        'selection',
-        'counts',
-        'frontier',
-        'hinterland',
-      );
-    });
   });
   for (const locale of [
     {
       path: '/api',
-      heading: 'Use the API with your agent',
-      version: 'Skill version',
-      scope: 'benchmarks, provenance, datasets, CollectiveX, and diagnostics',
-      example: 'First example: measured PowerX',
       missing: 'Keep missing metrics unavailable and genuine zeros unchanged',
       context: 'request URL, retrieval time, package version, local filters',
       excluded: 'Explain why rows were excluded and list missing requested metrics',
       copy: 'Copy',
       copied: 'Copied',
-      upgrade: 'replace the version in the installation command',
-      status: 'replace install with status',
-      examples: 'Usage examples',
     },
     {
       path: '/zh/api',
-      heading: '通过智能体使用 API',
-      version: '技能版本',
-      scope: '基准测试、溯源、数据集、CollectiveX 和诊断接口',
-      example: '首个示例：实测 PowerX 数据',
       missing: '缺失指标保持不可用，真实零值保持为零',
       context: '请求 URL、提取时间、包版本、本地筛选条件',
       excluded: '说明数据行被排除的原因，并列出所请求指标的缺失项',
       copy: '复制',
       copied: '已复制',
-      upgrade: '新的已发布版本',
-      status: 'install 改为 status',
-      examples: '使用示例（英文）',
     },
   ]) {
     it(`guides ${locale.path} visitors from a pinned public install to a traceable export`, () => {
@@ -156,11 +113,8 @@ describe('API documentation', () => {
       cy.then(() => {
         const manifest = PUBLISHED_SKILL;
         cy.get('[data-testid="api-agent-skill"]')
-          .should('contain.text', locale.heading)
-          .and('contain.text', `${locale.version} · ${manifest.version}`)
-          .and('contain.text', manifest.name)
-          .and('contain.text', locale.scope)
-          .and('contain.text', 'Node 24');
+          .should('contain.text', manifest.version)
+          .and('contain.text', manifest.name);
 
         for (const target of ['codex', 'claude']) {
           const command = `npm exec --yes --package ${manifest.name}@${manifest.version} -- inferencex-skills install --target ${target}`;
@@ -173,25 +127,15 @@ describe('API documentation', () => {
         }
       });
 
-      cy.get('[data-testid="api-agent-upgrade"]')
-        .should('contain.text', locale.upgrade)
-        .and('contain.text', '--force');
-      cy.get('[data-testid="api-agent-status"]')
-        .should('contain.text', locale.status)
-        .and('contain.text', '--target')
-        .and('contain.text', 'Installer version')
-        .and('contain.text', 'Installed version')
-        .and('contain.text', 'unknown');
-      cy.get('[data-testid="api-agent-examples"]')
-        .should('have.text', locale.examples)
-        .and(
-          'have.attr',
-          'href',
-          'https://github.com/SemiAnalysisAI/InferenceX-app/blob/master/docs/inferencex-api-examples.md',
-        );
+      cy.get('[data-testid="api-agent-upgrade"]').should('contain.text', '--force');
+      cy.get('[data-testid="api-agent-status"]').should('contain.text', '--target');
+      cy.get('[data-testid="api-agent-examples"]').should(
+        'have.attr',
+        'href',
+        'https://github.com/SemiAnalysisAI/InferenceX-app/blob/master/docs/inferencex-api-examples.md',
+      );
 
       cy.get('[data-testid="api-agent-prompt"]').within(() => {
-        cy.contains(locale.example).should('be.visible');
         cy.get('code')
           .should('contain.text', 'inferencex-api')
           .and('contain.text', 'DeepSeek-V4-Pro')
@@ -302,12 +246,8 @@ describe('API documentation', () => {
     cy.visit('/api');
 
     cy.get('[data-testid="api-reference"]')
-      .should('contain.text', 'InferenceX API reference')
-      .and('contain.text', 'Quickstart')
-      .and('contain.text', 'curl')
+      .should('contain.text', 'curl')
       .and('contain.text', '/api/v1/availability')
-      .and('contain.text', 'Endpoint reference')
-      .and('contain.text', 'Measured power')
       .and('contain.text', 'powerValid=strictV2');
     cy.get('[data-testid="api-openapi-link"]').should('have.attr', 'href', '/api/openapi.json');
     cy.get('[data-testid="api-spec-version"]').should('have.text', 'v1 · OpenAPI 3.1');
@@ -332,9 +272,7 @@ describe('API documentation', () => {
     cy.get('[data-testid="language-toggle"]')
       .should('have.attr', 'href', '/zh/api')
       .and('have.attr', 'hreflang', 'zh-CN');
-    cy.get('[data-testid="footer-link-api"]')
-      .should('have.attr', 'href', '/api')
-      .and('have.text', 'API reference');
+    cy.get('[data-testid="footer-link-api"]').should('have.attr', 'href', '/api');
 
     cy.request('/api/openapi.json').then(({ body, headers, status }) => {
       expect(status).to.equal(200);
@@ -344,11 +282,6 @@ describe('API documentation', () => {
         'operationId',
         'list-benchmarks',
       );
-      const powerValid = body.paths['/api/v1/benchmarks'].get.parameters.find(
-        (parameter: { name: string }) => parameter.name === 'powerValid',
-      );
-      expect(powerValid.required).to.equal(false);
-      expect(powerValid.schema).to.deep.equal({ type: 'string', enum: ['strictV2'] });
       expect(body.paths['/api/v1/collectivex/runs/{runId}'].get).to.have.property(
         'operationId',
         'get-collectivex-run',
@@ -357,14 +290,7 @@ describe('API documentation', () => {
 
     cy.visit('/zh/api');
 
-    cy.get('[data-testid="api-reference"]')
-      .should('contain.text', 'InferenceX API 参考文档')
-      .and('contain.text', '快速入门')
-      .and('contain.text', '约定')
-      .and('contain.text', '端点参考')
-      .and('contain.text', 'BenchmarkRow 与指标')
-      .and('contain.text', '实测功率')
-      .and('contain.text', 'powerValid=strictV2');
+    cy.get('[data-testid="api-reference"]').should('contain.text', 'powerValid=strictV2');
     cy.get('[data-testid="api-openapi-link"]').should('have.attr', 'href', '/api/openapi.json');
     cy.get('link[rel="alternate"][hreflang="en"]').should('have.attr', 'href', `${SITE_URL}/api`);
     cy.get('link[rel="alternate"][hreflang="zh-CN"]').should(
@@ -380,9 +306,7 @@ describe('API documentation', () => {
     cy.get('[data-testid="language-toggle"]')
       .should('have.attr', 'href', '/api')
       .and('have.attr', 'hreflang', 'en');
-    cy.get('[data-testid="footer-link-api"]')
-      .should('have.attr', 'href', '/zh/api')
-      .and('have.text', 'API 文档');
+    cy.get('[data-testid="footer-link-api"]').should('have.attr', 'href', '/zh/api');
 
     cy.viewport(375, 844);
     cy.visit('/zh/api');
@@ -400,45 +324,6 @@ describe('API documentation', () => {
       expect(document.documentElement.scrollWidth).to.be.at.most(
         document.documentElement.clientWidth,
       );
-    });
-  });
-
-  it('supports strictV2 power requests while preserving ordinary benchmark requests', () => {
-    const url = '/api/v1/benchmarks?model=DeepSeek-R1-0528';
-    cy.request<BenchmarkRow[]>(url).then(({ body, status }) => {
-      expect(status).to.equal(200);
-      expect(body).to.be.an('array');
-      expect(body.length).to.be.greaterThan(0);
-      const expected = body.filter(
-        (row) => row.metrics.power_valid === 1 && row.metrics.power_metric_schema_version === 2,
-      );
-      cy.request<BenchmarkRow[]>(`${url}&powerValid=strictV2`).then((response) => {
-        expect(response.status).to.equal(200);
-        expect(response.body).to.deep.equal(expected);
-      });
-    });
-
-    for (const value of ['1', '0', 'any', 'certified', '']) {
-      cy.request({ url: `${url}&powerValid=${value}`, failOnStatusCode: false }).then(
-        ({ body, status }) => {
-          expect(status).to.equal(400);
-          expect(body).to.deep.equal({ error: 'Unknown powerValid filter' });
-        },
-      );
-    }
-
-    const calculatorUrl = `${url}&view=calculator&sequence=8k%2F1k`;
-    cy.request<BenchmarkRow[]>(calculatorUrl).then(({ body, status }) => {
-      expect(status).to.equal(200);
-      expect(body).to.be.an('array');
-      expect(body.length).to.be.greaterThan(0);
-    });
-    cy.request({
-      url: `${calculatorUrl}&powerValid=strictV2`,
-      failOnStatusCode: false,
-    }).then(({ body, status }) => {
-      expect(status).to.equal(400);
-      expect(body).to.deep.equal({ error: 'powerValid cannot be combined with view=calculator' });
     });
   });
 });

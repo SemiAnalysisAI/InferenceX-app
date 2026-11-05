@@ -30,7 +30,7 @@ function interceptMinimaxM3RubinData(
   });
 }
 
-const TARGET = '/inference/kimi-k3';
+const TARGET = '/inference/deepseek-v41-flash';
 
 describe('Muse Spark Open results', () => {
   beforeEach(() => {
@@ -52,10 +52,7 @@ describe('Muse Spark Open results', () => {
         `${prefix}/inference/muse-spark-open`,
       );
       cy.get('[data-testid="compare-agentx-model-muse-spark-open"]').click();
-      cy.location('pathname', { timeout: 30000 }).should(
-        'eq',
-        `${prefix}/inference/muse-spark-open`,
-      );
+      cy.location('pathname').should('eq', `${prefix}/inference/muse-spark-open`);
       cy.location('search').should('eq', '');
       cy.get('[data-testid="model-selector"]').should(($selector) => {
         expect(['Muse Spark Open 816B', 'Muse-Spark-Open']).to.include($selector.text().trim());
@@ -118,7 +115,7 @@ describe('landing model curation', () => {
       cy.get('[data-testid="compare-agentx-primary"]').within(() => {
         cy.get('[data-testid^="compare-agentx-model-"]').should(($links) => {
           expect([...$links].map((link) => link.getAttribute('href'))).to.deep.eq(
-            ['muse-spark-open', 'deepseek-v41-flash'].map((slug) => `${prefix}/inference/${slug}`),
+            ['deepseek-v41-flash', 'muse-spark-open'].map((slug) => `${prefix}/inference/${slug}`),
           );
         });
         cy.get('[data-testid="compare-agentx-model-muse-spark-open"]')
@@ -142,7 +139,7 @@ describe('landing model curation', () => {
           .next('nav')
           .find('[data-testid^="compare-agentx-model-"]')
           .first()
-          .should('have.attr', 'data-testid', 'compare-agentx-model-muse-spark-open');
+          .should('have.attr', 'data-testid', 'compare-agentx-model-deepseek-v41-flash');
         cy.get('[data-testid="landing-minimax-m31-flash-results-link"]')
           .should('contain.text', 'MiniMax M3.1 Flash')
           .and('contain.text', 'AgentX')
@@ -206,7 +203,7 @@ describe('landing model curation', () => {
           .next('nav')
           .find('[data-testid^="compare-agentx-model-"]')
           .first()
-          .should('have.attr', 'data-testid', 'compare-agentx-model-muse-spark-open');
+          .should('have.attr', 'data-testid', 'compare-agentx-model-deepseek-v41-flash');
       });
 
       cy.visit(`${prefix}/compare`);
@@ -242,15 +239,6 @@ describe('landing model curation', () => {
       cy.get('[data-testid="model-selector"]')
         .invoke('text')
         .should('match', /MiniMax[- ]M3\.1[- ]Flash/u);
-    });
-
-    it(`keeps the Qwen3.5 AgentX TPU deep link working on ${prefix || '/'}`, () => {
-      interceptTpuLaunchData();
-      cy.visit(`${prefix}${TPU_RESULTS_HREF}`);
-      cy.location('pathname').should('eq', `${prefix}/inference/qwen-3-5`);
-      assertTpuView();
-      cy.reload();
-      assertTpuView();
     });
 
     it(`opens Kimi K3 AgentX TPU results from ${prefix || '/'} and retains them on reload`, () => {
@@ -317,45 +305,54 @@ describe('landing model curation', () => {
       cy.get('[data-testid^="remove-filter-spec-"]').should('not.exist');
       cy.get('[data-testid="chart-legend"]').should('contain.text', 'Jalapeño');
     });
-
-    it(`does not carry TPU precision through Back into Rubin on ${prefix}/compare`, () => {
-      const rubinRows = [
-        ...minimaxM3RubinRows,
-        ...minimaxM3RubinRows
-          .filter((row) => row.hardware === 'vr200')
-          .map((row) => ({
-            ...row,
-            id: row.id + 1000,
-            hardware: 'h200',
-            precision: 'fp8',
-          })),
-      ];
-      interceptTpuLaunchData();
-      interceptMinimaxM3RubinData(
-        rubinRows,
-        tpuLaunchRows().map(({ metrics: _metrics, ...row }) => row),
-      );
-      cy.visit(`${prefix}/compare`);
-      cy.visit(`${prefix}${TPU_RESULTS_HREF}`);
-      assertTpuView();
-      cy.go('back');
-      cy.location('pathname').should('eq', `${prefix}/compare`);
-      cy.get('[data-testid="compare-agentx-model-minimax-m3"]').click();
-      cy.get('[data-testid="precision-multiselect"]')
-        .should('contain.text', 'FP4')
-        .and('contain.text', 'FP8');
-      cy.get('[data-testid="chart-legend"]').should('contain.text', 'Vera Rubin NVL72');
-      cy.reload();
-      cy.get('[data-testid="chart-legend"]').should('contain.text', 'Vera Rubin NVL72');
-      cy.go('back');
-      cy.location('pathname').should('eq', `${prefix}/compare`);
-      cy.visit(prefix || '/');
-      cy.get('[data-testid="landing-jalapeno-results-link"]').click();
-      cy.get('[data-testid="precision-multiselect"]').should('contain.text', 'FP4');
-      cy.get('[data-testid^="remove-filter-spec-"]').should('not.exist');
-      cy.get('[data-testid="chart-legend"]').should('contain.text', 'Jalapeño');
-    });
   }
+
+  it('keeps the Qwen3.5 AgentX TPU deep link working on /', () => {
+    interceptTpuLaunchData();
+    cy.visit(TPU_RESULTS_HREF);
+    cy.location('pathname').should('eq', '/inference/qwen-3-5');
+    assertTpuView();
+    cy.reload();
+    assertTpuView();
+  });
+
+  it('does not carry TPU precision through Back into Rubin on /compare', () => {
+    const rubinRows = [
+      ...minimaxM3RubinRows,
+      ...minimaxM3RubinRows
+        .filter((row) => row.hardware === 'vr200')
+        .map((row) => ({
+          ...row,
+          id: row.id + 1000,
+          hardware: 'h200',
+          precision: 'fp8',
+        })),
+    ];
+    interceptTpuLaunchData();
+    interceptMinimaxM3RubinData(
+      rubinRows,
+      tpuLaunchRows().map(({ metrics: _metrics, ...row }) => row),
+    );
+    cy.visit('/compare');
+    cy.visit(TPU_RESULTS_HREF);
+    assertTpuView();
+    cy.go('back');
+    cy.location('pathname').should('eq', '/compare');
+    cy.get('[data-testid="compare-agentx-model-minimax-m3"]').click();
+    cy.get('[data-testid="precision-multiselect"]')
+      .should('contain.text', 'FP4')
+      .and('contain.text', 'FP8');
+    cy.get('[data-testid="chart-legend"]').should('contain.text', 'Vera Rubin NVL72');
+    cy.reload();
+    cy.get('[data-testid="chart-legend"]').should('contain.text', 'Vera Rubin NVL72');
+    cy.go('back');
+    cy.location('pathname').should('eq', '/compare');
+    cy.visit('/');
+    cy.get('[data-testid="landing-jalapeno-results-link"]').click();
+    cy.get('[data-testid="precision-multiselect"]').should('contain.text', 'FP4');
+    cy.get('[data-testid^="remove-filter-spec-"]').should('not.exist');
+    cy.get('[data-testid="chart-legend"]').should('contain.text', 'Jalapeño');
+  });
 });
 
 describe('landing → full dashboard navigation', () => {
@@ -380,7 +377,7 @@ describe('landing → full dashboard navigation', () => {
   it('commits exactly one navigation and one history entry on a cold dashboard load', () => {
     const writes: HistoryWrite[] = [];
 
-    cy.intercept({ url: /\/inference\/kimi-k3/ }, (req) => {
+    cy.intercept({ url: /\/inference\/deepseek-v41-flash/ }, (req) => {
       if (req.headers['next-router-prefetch']) {
         req.reply({ statusCode: 404, body: '' });
         return;
@@ -424,7 +421,7 @@ describe('landing → full dashboard navigation', () => {
     });
 
     cy.get('[data-testid="compare-agentx-dashboard-link"]').click();
-    cy.location('pathname', { timeout: 15000 }).should('eq', TARGET);
+    cy.location('pathname').should('eq', TARGET);
 
     // eslint-disable-next-line cypress/no-unnecessary-waiting
     cy.wait(1000);
@@ -453,34 +450,4 @@ describe('landing → full dashboard navigation', () => {
     cy.go('forward');
     cy.location('pathname').should('eq', TARGET);
   });
-});
-
-describe('Huawei UbenchX landing navigation', () => {
-  for (const prefix of ['', '/zh']) {
-    it(`links Huawei results to the localized core memory profiles from ${prefix || '/'}`, () => {
-      cy.visit(prefix || '/');
-      cy.get('[data-testid="landing-huawei-results-link"]')
-        .should('have.attr', 'href', `${prefix}/ubenchx/core-memory-profiles`)
-        .and('contain.text', prefix ? '华为 Ascend 950PR' : 'Huawei Ascend 950PR')
-        .and('contain.text', 'UbenchX')
-        .and('not.contain.text', 'OperatorX');
-      cy.get('[data-testid="landing-huawei-huawei-logo"] path').should(
-        'have.attr',
-        'fill',
-        '#FF0000',
-      );
-      cy.get('[data-testid="landing-huawei-results-link"]').click();
-      cy.location('pathname').should('eq', `${prefix}/ubenchx/core-memory-profiles`);
-      cy.get('[data-testid="ubenchx-test-select"]').should(
-        'contain.text',
-        prefix ? '核心访存特征' : 'Core memory-access profiles',
-      );
-      cy.get('[data-testid="core-profile-hardware"]').should(
-        'contain.text',
-        prefix ? '全部硬件' : 'All hardware',
-      );
-      cy.get('[data-testid="ascend-core-profiles"] h2').should('have.text', 'Huawei 950PR');
-      cy.get('[data-testid="sm-l2-heatmap"]').should('exist');
-    });
-  }
 });

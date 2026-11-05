@@ -430,6 +430,8 @@ export function rowToAggDataEntry(
     kv_p2p_transfer: stringMetric('kv_p2p_transfer'),
     router_name: stringMetric('router_name'),
     router_version: stringMetric('router_version'),
+    spec_algorithm: stringMetric('spec_algorithm'),
+    spec_draft_model: stringMetric('spec_draft_model'),
     server_gpu_cache_hit_rate: m.server_gpu_cache_hit_rate,
     server_external_cache_hit_rate: m.server_external_cache_hit_rate,
     server_cpu_cache_hit_rate: m.server_cpu_cache_hit_rate,

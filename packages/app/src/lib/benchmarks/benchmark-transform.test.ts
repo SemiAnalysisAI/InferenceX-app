@@ -74,6 +74,33 @@ function makeRow(overrides: Partial<BenchmarkRow> = {}): BenchmarkRow {
 }
 
 describe('rowToAggDataEntry', () => {
+  it.each(['sglang', 'vllm'])(
+    'uses SMG metadata for %s chart config without changing identity',
+    (framework) => {
+      const row = makeRow({
+        hardware: 'mi355x',
+        framework,
+        metrics: { ...makeRow().metrics, router_name: 'smg' } as unknown as BenchmarkRow['metrics'],
+        run_url: 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/41803503347',
+      });
+      const key = `mi355x_${framework}`;
+      const label = framework === 'sglang' ? 'SGLang' : 'vLLM';
+      const { chartData, hardwareConfig } = transformBenchmarkRows([row]);
+      expect(Object.keys(hardwareConfig)).toEqual([key]);
+      expect(hardwareConfig[key].suffix).toBe(`(SMG ${label})`);
+      for (const points of chartData) {
+        expect(points[0]).toMatchObject({
+          hwKey: key,
+          framework,
+          router_name: 'smg',
+          run_url: row.run_url,
+        });
+      }
+      const mixed = transformBenchmarkRows([row, { ...row, id: 2, metrics: makeRow().metrics }]);
+      expect(mixed.hardwareConfig[key].suffix).toBe(`(SMG ${label})`);
+    },
+  );
+
   it('carries the curve snapshot identity of append-only rows and leaves legacy rows without one', () => {
     const stitched = rowToAggDataEntry(
       makeRow({ curve_date: '2026-09-20', curve_workflow_run_id: 35843506474 }),

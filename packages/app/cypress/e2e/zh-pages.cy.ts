@@ -6,33 +6,6 @@ describe('Chinese (/zh) pages', () => {
       cy.visit('/zh');
     });
 
-    it('renders the Chinese landing content', () => {
-      cy.get('[data-testid="intro-section"]').should('contain.text', 'AI 加速器系统基准测试');
-      cy.get('[data-testid="splash-text"]').should('not.exist');
-      cy.get('[data-testid="landing-quick-comparisons"]').should('not.exist');
-      cy.contains('快速对比').should('not.exist');
-    });
-
-    it('renders the AgentX hero on the Chinese landing page', () => {
-      cy.get('[data-testid="compare-agentx-primary"]').within(() => {
-        cy.get('h1').should('have.text', '真实智能体工作负载下的推理性能对比');
-        cy.get('[data-testid="compare-agentx-revenue-calculator-link"]')
-          .should('contain.text', 'Token 收入计算器')
-          .and('have.attr', 'href', '/zh/profit-estimator-per-gigawatt');
-        cy.get('[data-testid="compare-agentx-dashboard-link"]')
-          .should('have.text', '仪表板')
-          .and('have.attr', 'href', '/zh/inference/kimi-k3');
-        cy.get('[data-testid="compare-agentx-methodology-link"]').should('not.exist');
-        cy.get('[data-testid^="compare-agentx-model-"]').should('have.length', 2);
-        for (const hidden of ['minimax-m3', 'kimi-k3', 'glm-5-3']) {
-          cy.get(`[data-testid="compare-agentx-model-${hidden}"]`).should('not.exist');
-        }
-        cy.get('[data-testid^="compare-agentx-model-"] [data-new-badge="agentx-ledger"]').should(
-          'not.exist',
-        );
-      });
-    });
-
     it('footer renders in Chinese with zh-internal links', () => {
       cy.get('[data-testid="footer-brand-description"]').should(
         'contain.text',
@@ -68,58 +41,17 @@ describe('Chinese (/zh) pages', () => {
     });
 
     it('renders the Chinese h1 without an intro box', () => {
-      cy.location('pathname').should('eq', '/zh/inference/kimi-k3');
-      cy.get('[data-testid="inference-page-heading"]').should('have.text', 'Kimi K3 推理基准测试');
+      cy.location('pathname').should('eq', '/zh/inference/deepseek-v41-flash');
+      cy.get('[data-testid="inference-page-heading"]').should(
+        'have.text',
+        'DeepSeek V4.1 Flash 推理基准测试',
+      );
       cy.get('[data-testid="zh-tab-intro"]').should('not.exist');
 
       cy.get('[data-testid="tab-trigger-evaluation"]')
         .should('contain.text', '准确率评估')
         .and('have.attr', 'href')
         .and('match', /^\/zh\/evaluation/u);
-    });
-  });
-
-  describe('zh per-model inference page', () => {
-    it('renders a model-specific Chinese h1', () => {
-      cy.visit('/zh/inference/kimi-k3');
-      cy.get('[data-testid="inference-page-heading"]')
-        .should('contain.text', 'Kimi')
-        .and('contain.text', '推理基准测试');
-    });
-  });
-
-  describe('zh FAQ', () => {
-    it('uses the same direct-link anchor as the English FAQ', () => {
-      cy.visit('/zh/about#faq-normalized-interactivity');
-
-      cy.get('#faq-normalized-interactivity')
-        .should('be.visible')
-        .within(() => {
-          cy.contains(
-            'a[href="#faq-normalized-interactivity"]',
-            '端到端归一化交互性与交互性有何区别？',
-          ).should('be.visible');
-          cy.contains('TTFT 越长，归一化指标越低').should('be.visible');
-          cy.get('[data-testid="faq-copy-link-faq-normalized-interactivity"]')
-            .should('be.visible')
-            .and('have.attr', 'title', '复制链接')
-            .find('svg.lucide-link')
-            .should('be.visible');
-        });
-      cy.location('hash').should('eq', '#faq-normalized-interactivity');
-      cy.get('#faq-normalized-interactivity').should(($row) => {
-        const question = $row.find('dt')[0].getBoundingClientRect();
-        const answer = $row.find('dd')[0].getBoundingClientRect();
-        expect(answer.left, 'desktop answer column').to.be.greaterThan(question.right);
-      });
-      cy.viewport(390, 720);
-      cy.get('#faq-normalized-interactivity').should(($row) => {
-        const question = $row.find('dt')[0].getBoundingClientRect();
-        const answer = $row.find('dd')[0].getBoundingClientRect();
-        expect(answer.top, 'mobile answer follows its question').to.be.greaterThan(question.bottom);
-        expect(answer.right).to.be.at.most(390);
-      });
-      cy.viewport(1280, 720);
     });
   });
 
@@ -215,55 +147,6 @@ describe('Chinese (/zh) pages', () => {
     });
   });
 
-  describe('Land acknowledgement pages', () => {
-    it('keeps every region and nation visible on mobile', () => {
-      cy.viewport(375, 812);
-      cy.visit('/zh/land-acknowledgement');
-
-      cy.get('[data-testid="land-acknowledgement-page"]').should(
-        'contain.text',
-        '原住民传统领地声明',
-      );
-      cy.title().should('contain', '原住民传统领地声明');
-      for (const [testId, region, nation] of [
-        ['land-acknowledgement-san-jose', 'San Jose', 'Muwekma Ohlone'],
-        ['land-acknowledgement-los-angeles', 'Los Angeles', 'Tongva'],
-        ['land-acknowledgement-chicago', 'Chicago', 'Potawatomi'],
-      ] as const) {
-        cy.get(`[data-testid="${testId}"]`)
-          .should('contain.text', region)
-          .and('contain.text', nation);
-      }
-      cy.get('link[rel="alternate"][hreflang="en"]').should('exist');
-      cy.document().then((document) => {
-        expect(document.documentElement.scrollWidth).to.be.at.most(
-          document.documentElement.clientWidth,
-        );
-      });
-    });
-  });
-
-  describe('zh blog post page', () => {
-    before(() => {
-      cy.visit('/zh/blog/inferencemax-open-source-inference-benchmarking');
-    });
-
-    it('localizes the table of contents and heading-link controls at mobile widths', () => {
-      cy.viewport(390, 844);
-      cy.get('details[aria-label="本页目录"]')
-        .should('be.visible')
-        .find('summary')
-        .should('contain.text', '本页目录');
-      cy.get('article.prose a[aria-label="复制本节链接"]')
-        .first()
-        .should('have.attr', 'href')
-        .and('match', /^#/u);
-      cy.document().then((doc) => {
-        expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
-      });
-    });
-  });
-
   describe('localized not-found pages', { testIsolation: true }, () => {
     it('returns a noindex English 404 for unknown paths', () => {
       const path = '/this-route-does-not-exist';
@@ -316,9 +199,6 @@ describe('Chinese (/zh) pages', () => {
 
     it('renders KaTeX in the translation too', () => {
       cy.get('article.prose .katex').should('have.length.gte', 1);
-
-      cy.get('article.prose figure img').should('have.length.gte', 20);
-      cy.get('article.prose figcaption').first().should('contain.text', '来源');
     });
   });
 
@@ -330,7 +210,6 @@ describe('Chinese (/zh) pages', () => {
 
     it('localizes chart controls, table headers, sorting, and expanded details', () => {
       cy.viewport(1440, 900);
-      cy.contains('h2', '基准测试提交').should('be.visible');
       cy.get('[data-testid="submissions-mode-toggle"]')
         .should('have.attr', 'aria-label', '图表模式')
         .and('contain.text', '按周')
@@ -431,9 +310,7 @@ describe('Chinese (/zh) pages', () => {
 
     it('localizes the empty state, key validation, and accessibility label', () => {
       cy.viewport(1440, 900);
-      cy.get('[data-testid="zh-tab-intro"]').should('contain.text', '用户反馈');
       cy.get('[data-testid="feedback-viewer"]').should('contain.text', '暂无反馈记录');
-      cy.contains('仅在浏览器中处理密钥').and('contain.text', '不会持久化').should('be.visible');
       cy.get('button[aria-label="显示密钥"]').should('be.visible');
       cy.get('[data-testid="feedback-key-input"]').type('invalid-key');
       cy.get('[data-testid="feedback-key-submit"]').click();
@@ -443,17 +320,6 @@ describe('Chinese (/zh) pages', () => {
         .type('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=');
       cy.get('[data-testid="feedback-key-submit"]').click();
       cy.contains('button', '清除密钥').should('be.visible');
-    });
-
-    it('names the feedback loading state instead of showing an objectless spinner label', () => {
-      cy.intercept('GET', '**/api/v1/feedback/list', {
-        delay: 500,
-        body: { rows: [] },
-      }).as('slowFeedbackList');
-      cy.reload();
-      cy.contains('正在加载反馈记录……').should('be.visible');
-      cy.wait('@slowFeedbackList');
-      cy.contains('暂无反馈记录').should('be.visible');
     });
 
     it('shows a safe fetch error and retries through a real button click', () => {

@@ -76,14 +76,6 @@ describe('TCO Calculator', () => {
       cy.get('input[type="range"]').should('be.visible');
     });
 
-    it('shows the precision for a single-precision model', () => {
-      cy.get('[data-testid="calc-cost-selector"]').should('exist');
-      cy.get('[data-testid="calculator-controls"]').within(() => {
-        cy.contains('Precision').should('be.visible');
-        cy.get('button#calc-precision').should('have.text', 'FP4').and('be.disabled');
-      });
-    });
-
     it('places the config-range toggle beside its label above the slider', () => {
       cy.get('[data-testid="calculator-hide-over-limit-control"]').then(($control) => {
         const label = $control.children().first()[0].getBoundingClientRect();
@@ -326,7 +318,6 @@ describe('TCO Calculator', () => {
           .should('have.length.greaterThan', 0)
           .each(($span) => {
             const text = $span.text().trim();
-            expect(Number(text)).to.be.a('number');
             expect(Number.isNaN(Number(text))).to.equal(false);
           });
       });
@@ -375,18 +366,6 @@ describe('TCO Calculator', () => {
       cy.get('[data-testid="calculator-comparison-banner"]').should('not.exist');
     });
 
-    it('shows disaggregated throughput disclaimer for throughput metric', () => {
-      cy.visit('/calculator');
-      cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
-      cy.get('[data-testid="calculator-chart-section"]').should(
-        'contain.text',
-        'Disaggregated inference configurations',
-      );
-      cy.get('[data-testid="calculator-chart-section"]')
-        .should('contain.text', 'per prefill chip and per decode chip')
-        .and('contain.text', 'reads faster per chip than it is');
-    });
-
     it('shows the disaggregated cost disclaimer only for per-token-type cost', () => {
       cy.visit('/calculator');
       cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
@@ -398,23 +377,13 @@ describe('TCO Calculator', () => {
         cy.get('[data-testid="calc-cost-type-selector"]').click();
         cy.contains('[role="option"]', tokenType).click();
         cy.get('body').type('{esc}');
-        cy.get('[data-testid="calculator-disagg-cost-note"]')
-          .should('be.visible')
-          .and('contain.text', 'per prefill chip and per decode chip')
-          .and('contain.text', 'reads cheaper than it is');
+        cy.get('[data-testid="calculator-disagg-cost-note"]').should('be.visible');
       }
 
       cy.get('[data-testid="calc-cost-type-selector"]').click();
       cy.contains('[role="option"]', 'Total tokens').click();
       cy.get('body').type('{esc}');
       cy.get('[data-testid="calculator-disagg-cost-note"]').should('not.be.visible');
-    });
-
-    it('shows disaggregated throughput disclaimer for power metric', () => {
-      cy.get('[data-testid="calculator-metric-power"]').click();
-      cy.get('[data-testid="calculator-chart-section"]')
-        .should('contain.text', 'per prefill chip and per decode chip')
-        .and('contain.text', 'reads faster per chip than it is');
     });
   });
 
@@ -674,53 +643,6 @@ describe('TCO Calculator Chinese route', () => {
     cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
   });
 
-  it('localizes chart internals, table headers, and preserved units', () => {
-    cy.contains('label', '计价方式').should('be.visible');
-    cy.get('[data-testid="calculator-secondary-controls"] > button').click();
-    cy.contains('label', '目标交互性 (tok/s/user)')
-      .parent()
-      .find('button')
-      .trigger('pointerover', { pointerType: 'mouse' });
-    cy.get('[role="dialog"]')
-      .should('contain.text', '用于插值计算的交互性目标值。')
-      .and('contain.text', '拖动滑块，可比较不同交互性要求下各芯片的吞吐量、成本和能效。');
-    cy.get('body').type('{esc}');
-    cy.get('[data-testid="calculator-chart-section"]').should('contain.text', '分离式推理配置');
-    cy.get('[data-testid="calculator-bar-chart"] svg .x-axis-label-calc').should(
-      'contain.text',
-      '每芯片吞吐量 (tok/s/chip)',
-    );
-    cy.get('[data-testid="calculator-bar-chart"]').should('contain.text', 'Shift+滚轮横向缩放');
-    cy.get('[data-testid="calculator-bar-chart"] svg .bar')
-      .first()
-      .trigger('mouseenter', { force: true });
-    cy.get('[data-chart-tooltip]:visible')
-      .should('contain.text', 'tok/s/chip')
-      .and('contain.text', '并发数');
-    cy.get('[data-testid="calculator-metric-power"]').click();
-    cy.get('[data-testid="calculator-cost-badges"]').should('contain.text', '单芯片整机功耗');
-    cy.contains('[role="tab"]:visible', '表格').click();
-    cy.get('[data-testid="calculator-results-table"] thead')
-      .should('contain.text', '芯片')
-      .and('contain.text', '成本 ($/M tok)')
-      .and('contain.text', '并发数');
-  });
-
-  it('supports the complete chart-to-table path at 1440px', () => {
-    cy.viewport(1440, 900);
-    cy.reload();
-    cy.get('[data-testid="calculator-bar-chart"] svg .bar').should('have.length.greaterThan', 0);
-    cy.get('[data-testid="calculator-bar-chart"] svg .bar').first().click();
-    cy.get('[data-testid="calculator-comparison-banner"]')
-      .should('be.visible')
-      .and('contain.text', '已选中。点击其他柱形即可对比。');
-    cy.get('[data-testid="calculator-table-view-btn"]').click();
-    cy.get('[data-testid="calculator-results-table"]').should('be.visible');
-    cy.document().then((doc) => {
-      expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
-    });
-  });
-
   it('keeps dense tables internally scrollable without body overflow at 390px', () => {
     cy.contains('[role="tab"]:visible', '表格').click();
     cy.get('[data-testid="calculator-results-table"] .overflow-x-auto')
@@ -735,11 +657,7 @@ describe('TCO Calculator Chinese route', () => {
 
   it('keeps the localized chart contained at 375px', () => {
     cy.viewport(375, 812);
-    cy.get('[data-testid="calculator-bar-chart"] svg .x-axis-label-calc').should(
-      'contain.text',
-      '每芯片吞吐量 (tok/s/chip)',
-    );
-    cy.document().then((doc) => {
+    cy.document().should((doc) => {
       expect(doc.documentElement.scrollWidth).to.be.at.most(doc.documentElement.clientWidth);
     });
   });

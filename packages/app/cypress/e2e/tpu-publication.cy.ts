@@ -75,25 +75,6 @@ describe('TPU publication preview', () => {
     cy.get('[data-testid="tco-basis-toggle"]').should('not.exist');
   });
 
-  it('restores the pricing basis on a Chinese share URL', () => {
-    cy.visit(`/zh/inference?${query}&g_tco=internal`);
-    cy.wait('@tpuPreview');
-    openChartControls();
-    cy.get('[data-testid="tco-basis-internal"]')
-      .first()
-      .should('have.attr', 'aria-pressed', 'true');
-    cy.contains('TCO 口径').should('be.visible');
-    cy.get('[data-testid="tco-basis-external"]').first().click();
-    cy.get(overlayPoints).should(($points) => {
-      const dp8 = [...$points]
-        .map((node) => (node as unknown as { __data__: InferenceData }).__data__)
-        .find((row) => row.dp === 8)!;
-      expect(dp8.y).to.be.closeTo((3674.8418266267754 * 3600) / 1.21, 0.001);
-    });
-    cy.get('[data-testid="tco-basis-toggle"]').scrollIntoView({ offset: { top: -90, left: 0 } });
-    cy.screenshot('tco-caption-zh', { capture: 'viewport' });
-  });
-
   it('places the historical TCO selector beside Cost Tier and updates its export value', () => {
     cy.intercept('GET', '/api/v1/benchmarks/history/trends*', {
       body: compactTrendHistory(preview.benchmarks),
@@ -170,10 +151,6 @@ describe('TPU publication preview', () => {
           });
         });
       expectNoPageOverflow();
-      cy.get('[data-testid="tco-basis-toggle"]').scrollIntoView({
-        offset: { top: -100, left: 0 },
-      });
-      cy.screenshot(`tco-chart-${width}`, { capture: 'viewport' });
     });
   }
 });

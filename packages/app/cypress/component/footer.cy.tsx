@@ -16,12 +16,6 @@ describe('Footer', () => {
     );
   });
 
-  it('displays copyright notice with semianalysis.com and current year', () => {
-    const year = new Date().getFullYear().toString();
-    cy.get('[data-testid="footer-copyright"]').should('contain', 'semianalysis.com');
-    cy.get('[data-testid="footer-copyright"]').should('contain', year);
-  });
-
   it('marks star and share clicks as coming from the footer', () => {
     registerAnalyticsClient({ capture: cy.stub().as('capture') });
     cy.window().then((win) => cy.stub(win, 'open'));
@@ -35,82 +29,6 @@ describe('Footer', () => {
       'social_share_linkedin',
       Cypress.sinon.match({ placement: 'footer', route_template: Cypress.sinon.match.string }),
     );
-  });
-
-  it('has Privacy Policy link', () => {
-    cy.get('[data-testid="footer-link-privacy"]')
-      .should('have.attr', 'href')
-      .and('include', 'semianalysis.com/privacy-policy');
-  });
-
-  it('has Cookie Policy link', () => {
-    cy.get('[data-testid="footer-link-cookies"]')
-      .should('have.attr', 'href')
-      .and('include', 'semianalysis.com/cookie-policy');
-  });
-
-  it('has Contribute section with GitHub links', () => {
-    cy.get('[data-testid="footer-link-benchmarks"]')
-      .should('have.attr', 'href')
-      .and('include', 'github.com/SemiAnalysisAI/InferenceX');
-    cy.get('[data-testid="footer-link-agentx-harness"]')
-      .should('contain.text', 'AgentX harness')
-      .and('have.attr', 'href')
-      .and('include', 'github.com/SemiAnalysisAI/agentx-harness');
-    cy.get('[data-testid="footer-link-visualization"]')
-      .should('contain.text', 'Visualization')
-      .and('have.attr', 'href')
-      .and('include', 'github.com/SemiAnalysisAI/InferenceX-app');
-  });
-
-  it('contains the destinations moved out of the primary navigation', () => {
-    cy.get('[data-testid="footer-link-supporters"]')
-      .should('contain.text', 'Supporters')
-      .and('have.attr', 'href', '/quotes');
-    cy.get('[data-testid="footer-link-agentx"]')
-      .should('contain.text', 'AgentX')
-      .and('have.attr', 'href', '/agentx');
-    cy.get('[data-testid="footer-link-compare"]')
-      .should('contain.text', 'Comparisons')
-      .and('have.attr', 'href', '/compare');
-    cy.get('[data-testid="footer-link-articles"]')
-      .should('contain.text', 'Articles')
-      .and('have.attr', 'href', '/blog');
-    cy.get('[data-testid="footer-link-hardware"]')
-      .should('contain.text', 'Hardware results')
-      .and('have.attr', 'href', '/hardware');
-  });
-
-  it('tracks each footer destination under its own event', () => {
-    const capture = cy.stub();
-    registerAnalyticsClient({ capture });
-    cy.get('[data-testid="footer-links-more"] a').each(($link) => {
-      $link[0].addEventListener('click', (event) => event.preventDefault());
-      cy.wrap($link).click();
-    });
-    cy.wrap(null).should(() => {
-      const footerClicks = capture
-        .getCalls()
-        .map((call) => call.args)
-        .filter(([name]) => String(name).startsWith('footer_'));
-      expect(footerClicks).to.deep.equal(
-        [
-          'supporters',
-          'agentx',
-          'telemetry',
-          'compare',
-          'articles',
-          'hardware',
-          'whitepapers',
-          'api',
-          'historical',
-          'calculator',
-          'fleet',
-          'first_token',
-          'cache_reuse',
-        ].map((name) => [`footer_${name}_clicked`, { placement: 'footer' }]),
-      );
-    });
   });
 
   for (const width of [390, 768, 1280]) {

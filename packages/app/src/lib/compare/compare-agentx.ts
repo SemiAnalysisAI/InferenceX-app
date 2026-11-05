@@ -2,9 +2,9 @@ import { COMPARE_MODEL_SLUGS, type CompareModelSlug } from '@/lib/compare/compar
 import { getInferenceModelBySlug, inferenceModelPath } from '@/lib/routing/inference-model-slug';
 
 const FEATURED_AGENTX_MODEL_SLUGS = [
-  'kimi-k3',
-  'muse-spark-open',
   'deepseek-v41-flash',
+  'muse-spark-open',
+  'kimi-k3',
   'deepseek-v4',
   'glm-5-3',
   'minimax-m3',
@@ -14,7 +14,11 @@ const FEATURED_AGENTX_MODEL_SLUGS = [
 
 const AGENTX_NEW_MODEL_SLUGS: readonly (typeof FEATURED_AGENTX_MODEL_SLUGS)[number][] = [];
 
-const AGENTX_ONLY_MODEL_SLUGS: readonly string[] = ['minimax-m31-flash', 'glm-5-3-flash'];
+const AGENTX_ONLY_MODEL_SLUGS: readonly string[] = [
+  'kimi-k31-pro',
+  'minimax-m31-flash',
+  'glm-5-3-flash',
+];
 
 const AGENTX_SCENARIO_MODEL_SET = new Set<string>([
   ...FEATURED_AGENTX_MODEL_SLUGS,

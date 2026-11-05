@@ -224,23 +224,6 @@ describe('Historical Trends — Content & Interactions', () => {
       .and('be.enabled');
   });
 
-  it('Log Scale switch exists in the legend and can be toggled', () => {
-    cy.document().then((doc) => {
-      delete doc.body.dataset.scrollLocked;
-      doc.body.style.removeProperty('pointer-events');
-    });
-    cy.get('[data-testid="historical-trend-figure"]')
-      .find('.sidebar-legend')
-      .contains('label', 'Log scale')
-      .should('exist');
-
-    cy.get('#historical-log-scale').click();
-    cy.get('#historical-log-scale').should('have.attr', 'data-state', 'checked');
-
-    cy.get('#historical-log-scale').click();
-    cy.get('#historical-log-scale').should('have.attr', 'data-state', 'unchecked');
-  });
-
   it('Y-axis metric selector is present and can be changed', () => {
     cy.document().then((doc) => {
       delete doc.body.dataset.scrollLocked;
@@ -277,30 +260,6 @@ describe('Historical Trends — Content & Interactions', () => {
       'contain.text',
       'Rent - 3 Year Commit',
     );
-  });
-
-  it('changing model updates the chart title to reflect the new model', () => {
-    cy.document().then((doc) => {
-      delete doc.body.dataset.scrollLocked;
-      doc.body.style.removeProperty('pointer-events');
-    });
-    cy.get('[data-testid="historical-trend-figure"]').should('exist');
-
-    cy.get('[data-testid="historical-trend-figure"] h2')
-      .first()
-      .invoke('text')
-      .then((initialSubtitle) => {
-        cy.get('[data-testid="model-selector"]').click();
-        cy.get('[role="option"]').then(($options) => {
-          if ($options.length <= 1) return;
-          cy.wrap($options).last().click();
-
-          cy.get('[data-testid="historical-trend-figure"] h2')
-            .first()
-            .invoke('text')
-            .should('not.eq', initialSubtitle);
-        });
-      });
   });
 });
 

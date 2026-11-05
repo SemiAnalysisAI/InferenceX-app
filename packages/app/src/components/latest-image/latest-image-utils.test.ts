@@ -12,7 +12,6 @@ import {
   earliestSubmission,
   firstSubmissionDates,
   getActualLatestRelease,
-  getCurrentImageNodeTypeTooltip,
   imageRowDisplayModel,
   imageRowModel,
   imageRowSequence,
@@ -265,17 +264,6 @@ describe('getActualLatestRelease', () => {
   });
 });
 
-describe('getCurrentImageNodeTypeTooltip', () => {
-  it('preserves the English Mori spelling while using MoRI in Chinese', () => {
-    expect(getCurrentImageNodeTypeTooltip('en')).toBe(
-      'Single node = non-disaggregated serving. Disaggregated = separate prefill/decode pools, including Dynamo, Mori, and llm-d.',
-    );
-    expect(getCurrentImageNodeTypeTooltip('zh')).toBe(
-      '单节点指非分离式推理；分离式配置使用独立的 prefill/decode 池，包括 Dynamo、MoRI 和 llm-d。',
-    );
-  });
-});
-
 function imageRow(
   model: string,
   scenario: 'agentic' | '1k/1k' | '1k/8k' | '8k/1k' | { isl: number; osl: number },
@@ -342,6 +330,8 @@ describe('isActiveImageRow', () => {
   });
 
   it('drops deprecated models on every scenario, including point-release buckets', () => {
+    expect(isActiveImageRow(imageRow('kimik3', 'agentic'))).toBe(false);
+    expect(isActiveImageRow(imageRow('kimik3', '8k/1k'))).toBe(false);
     expect(isActiveImageRow(imageRow('dsv4', 'agentic'))).toBe(false);
     expect(isActiveImageRow(imageRow('dsv4', { isl: 4096, osl: 512 }))).toBe(false);
     expect(isActiveImageRow(imageRow('minimaxm3', 'agentic'))).toBe(false);

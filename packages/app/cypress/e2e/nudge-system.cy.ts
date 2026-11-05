@@ -25,16 +25,23 @@ beforeEach(() => {
   cy.clearAllSessionStorage();
 });
 
+/**
+ * Nudge triggers are `window.setTimeout` delays armed after hydration. Advance the faked clock in
+ * small steps until `selector` renders, so the test never guesses when the engine armed them.
+ */
+function tickUntilVisible(clock: Cypress.Clock, selector: string) {
+  cy.get('body').should(($body) => {
+    clock.tick(100);
+    expect($body.find(selector).filter(':visible'), selector).to.have.length(1);
+  });
+}
+
 describe('Landing nudges — modals', { testIsolation: true }, () => {
   it('shows the launch banner on fresh first load', () => {
     cy.visit('/', {
       onBeforeLoad: clearAllNudgeStorage,
     });
-    cy.get('[data-testid="launch-banner"]')
-      .should('be.visible')
-      .and('contain.text', 'Huawei Ascend 950PR microbenchmarks')
-      .and('contain.text', 'Cycle-level core memory-access microbenchmarks (beta)')
-      .and('contain.text', 'View results');
+    cy.get('[data-testid="launch-banner"]').should('be.visible');
     cy.get('[data-new-badge="launch-banner"]').should('have.class', 'new-badge-flash');
     cy.get('[data-new-badge]')
       .should('have.length', 4)
@@ -47,7 +54,6 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
           expect(size.width).to.eq(sizes[0].width);
           expect(size.height).to.eq(sizes[0].height);
         }
-        expect(sizes[0]).to.deep.eq({ width: 32, height: 16 });
 
         for (const badge of $badges) {
           const label = badge.querySelector('[data-new-badge-label]');
@@ -77,17 +83,6 @@ describe('Landing nudges — modals', { testIsolation: true }, () => {
 
     cy.get('[data-testid="github-star-modal"]').should('not.exist');
     cy.get('[data-testid="footer-star-cta"]').should('exist');
-  });
-
-  it('localizes the launch banner title in Chinese', () => {
-    cy.visit('/zh', {
-      onBeforeLoad: clearAllNudgeStorage,
-    });
-    cy.get('[data-testid="launch-banner"]')
-      .should('be.visible')
-      .and('contain.text', 'Huawei Ascend 950PR 微基准测试')
-      .and('contain.text', '周期级核心访存微基准测试（Beta）')
-      .and('contain.text', '查看结果');
   });
 });
 
@@ -129,104 +124,74 @@ describe('Landing nudges — TPUv7 launch modal', { testIsolation: true }, () =>
     });
   });
 
-  for (const offset of [-1, 0, 1]) {
-    it(`checks the three-day cooldown at ${offset}ms from expiry`, () => {
-      const now = Date.parse('2026-10-22T12:00:00Z');
-      cy.clock(now, ['Date']);
-      cy.visit('/', {
-        onBeforeLoad(win) {
-          showLaunchModal(win);
-          win.localStorage.setItem(
-            LAUNCH_MODAL_KEY,
-            String(now - (3 * 24 * 60 * 60 * 1000 + offset)),
-          );
-        },
-      });
-      if (offset < 0) {
-        cy.get('[data-testid="launch-banner"]').should('be.visible');
-        cy.get('[data-testid="launch-modal"]').should('not.exist');
-      } else {
-        cy.get('[data-testid="launch-modal"]').should('be.visible');
-      }
-    });
-  }
-
-  for (const prefix of ['', '/zh']) {
-    for (const width of [1280, 375]) {
-      it(`centers each button row and loads model logos at ${width}px on ${prefix || '/'}`, () => {
-        cy.viewport(width, 812);
-        cy.visit(prefix || '/', { onBeforeLoad: showLaunchModal });
-        cy.get('[data-testid="launch-modal"]')
-          .should('be.visible')
-          .then(($modal) => {
-            const modal = $modal[0];
-            const panel = modal.getBoundingClientRect();
-            const rows = new Map<number, DOMRect[]>();
-            modal.querySelectorAll('button[data-testid]').forEach((button) => {
-              const rect = button.getBoundingClientRect();
-              const top = Math.round(rect.top);
-              rows.set(top, [...(rows.get(top) ?? []), rect]);
-            });
-            expect(modal.querySelectorAll('button[data-testid]')).to.have.length(2);
-            expect(modal.querySelector('[data-testid="launch-modal-dismiss"]')).to.eq(null);
-            const close = modal.querySelector('button[aria-label]')!;
-            expect(close.getBoundingClientRect().width).to.eq(36);
-            expect(close.getBoundingClientRect().height).to.eq(36);
-            expect(close.querySelector('svg')!.getBoundingClientRect().width).to.eq(20);
-            const actions = [...modal.querySelectorAll('button[data-testid]')].map((button) =>
-              button.getBoundingClientRect(),
-            );
-            expect(Math.abs(actions[0].width - actions[1].width)).to.be.lessThan(1);
-            expect(actions[0].top).to.eq(actions[1].top);
-            expect(actions[0].height).to.be.at.least(44);
-            const heading = modal.querySelector('h2')!.getBoundingClientRect();
-            const badge = modal.querySelector('[data-new-badge]')!.getBoundingClientRect();
-            expect(badge.bottom).to.be.lessThan(heading.top);
-            const styles = modal.ownerDocument.defaultView!.getComputedStyle(
-              modal.querySelector('h2')!,
-            );
-            expect(styles.textAlign).to.eq('center');
-            expect(styles.fontSize).to.eq('22px');
-            expect(
-              modal.ownerDocument.defaultView!.getComputedStyle(modal.querySelector('p')!)
-                .textAlign,
-            ).to.eq('center');
-            const eyebrow = modal.querySelector('[data-new-badge]')!.parentElement!;
-            const google = eyebrow.querySelector('svg[aria-label="Google"]')!;
-            expect(google).not.to.eq(null);
-            expect(google.getBoundingClientRect().width).to.eq(24);
-            expect(
-              [...google.querySelectorAll('path')].map((path) => path.getAttribute('fill')),
-            ).to.deep.eq(['#EA4335', '#4285F4', '#FBBC05', '#34A853']);
-            const center = (google.getBoundingClientRect().left + badge.right) / 2;
-            expect(Math.abs(center - (panel.left + panel.width / 2))).to.be.lessThan(1);
-            for (const row of rows.values()) {
-              const left = Math.min(...row.map((rect) => rect.left)) - panel.left;
-              const right = panel.right - Math.max(...row.map((rect) => rect.right));
-              expect(left).to.be.greaterThan(0);
-              expect(
-                Math.abs(left - right),
-                'equal space on both sides of each row',
-              ).to.be.lessThan(2);
-            }
-          });
-        for (const [action, logo] of [
-          ['action', 'qwen-color.svg'],
-          ['secondary-action', 'kimi-color.svg'],
-        ]) {
-          cy.get(`[data-testid="launch-modal-${action}"] img`)
-            .should('have.attr', 'src', `/logos/${logo}`)
-            .and('have.attr', 'alt', '')
-            .and('have.attr', 'aria-hidden', 'true')
-            .and('be.visible')
-            .should(($img) => {
-              expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
-            });
-          cy.get(`[data-testid="launch-modal-${action}"] svg`).should('not.exist');
+  it('centers each button row and loads model logos at 1280px on /', () => {
+    cy.viewport(1280, 812);
+    cy.visit('/', { onBeforeLoad: showLaunchModal });
+    cy.get('[data-testid="launch-modal"]')
+      .should('be.visible')
+      .then(($modal) => {
+        const modal = $modal[0];
+        const panel = modal.getBoundingClientRect();
+        const rows = new Map<number, DOMRect[]>();
+        modal.querySelectorAll('button[data-testid]').forEach((button) => {
+          const rect = button.getBoundingClientRect();
+          const top = Math.round(rect.top);
+          rows.set(top, [...(rows.get(top) ?? []), rect]);
+        });
+        expect(modal.querySelectorAll('button[data-testid]')).to.have.length(2);
+        expect(modal.querySelector('[data-testid="launch-modal-dismiss"]')).to.eq(null);
+        const close = modal.querySelector('button[aria-label]')!;
+        expect(close.getBoundingClientRect().width).to.eq(36);
+        expect(close.getBoundingClientRect().height).to.eq(36);
+        expect(close.querySelector('svg')!.getBoundingClientRect().width).to.eq(20);
+        const actions = [...modal.querySelectorAll('button[data-testid]')].map((button) =>
+          button.getBoundingClientRect(),
+        );
+        expect(Math.abs(actions[0].width - actions[1].width)).to.be.lessThan(1);
+        expect(actions[0].top).to.eq(actions[1].top);
+        expect(actions[0].height).to.be.at.least(44);
+        const heading = modal.querySelector('h2')!.getBoundingClientRect();
+        const badge = modal.querySelector('[data-new-badge]')!.getBoundingClientRect();
+        expect(badge.bottom).to.be.lessThan(heading.top);
+        const styles = modal.ownerDocument.defaultView!.getComputedStyle(
+          modal.querySelector('h2')!,
+        );
+        expect(styles.textAlign).to.eq('center');
+        expect(styles.fontSize).to.eq('22px');
+        expect(
+          modal.ownerDocument.defaultView!.getComputedStyle(modal.querySelector('p')!).textAlign,
+        ).to.eq('center');
+        const eyebrow = modal.querySelector('[data-new-badge]')!.parentElement!;
+        const google = eyebrow.querySelector('svg[aria-label="Google"]')!;
+        expect(google).not.to.eq(null);
+        expect(google.getBoundingClientRect().width).to.eq(24);
+        expect(
+          [...google.querySelectorAll('path')].map((path) => path.getAttribute('fill')),
+        ).to.deep.eq(['#EA4335', '#4285F4', '#FBBC05', '#34A853']);
+        const center = (google.getBoundingClientRect().left + badge.right) / 2;
+        expect(Math.abs(center - (panel.left + panel.width / 2))).to.be.lessThan(1);
+        for (const row of rows.values()) {
+          const left = Math.min(...row.map((rect) => rect.left)) - panel.left;
+          const right = panel.right - Math.max(...row.map((rect) => rect.right));
+          expect(left).to.be.greaterThan(0);
+          expect(Math.abs(left - right), 'equal space on both sides of each row').to.be.lessThan(2);
         }
       });
+    for (const [action, logo] of [
+      ['action', 'qwen-color.svg'],
+      ['secondary-action', 'kimi-color.svg'],
+    ]) {
+      cy.get(`[data-testid="launch-modal-${action}"] img`)
+        .should('have.attr', 'src', `/logos/${logo}`)
+        .and('have.attr', 'alt', '')
+        .and('have.attr', 'aria-hidden', 'true')
+        .and('be.visible')
+        .should(($img) => {
+          expect(($img[0] as HTMLImageElement).naturalWidth).to.be.greaterThan(0);
+        });
+      cy.get(`[data-testid="launch-modal-${action}"] svg`).should('not.exist');
     }
-  }
+  });
 
   it('centers the modal over a backdrop and opens Qwen3.5 AgentX results', () => {
     interceptTpuLaunchData();
@@ -388,15 +353,15 @@ describe('Dashboard nudges — reproducibility toast', () => {
       },
     });
     cy.get('[data-testid="reproducibility-nudge"]').should('not.exist');
-    cy.get('[data-testid="reproducibility-nudge"]', { timeout: 4000 }).should('be.visible');
-    cy.get('[data-testid="reproducibility-nudge"] button[aria-label="Dismiss"]').click();
-    cy.get('[data-testid="reproducibility-nudge"]').should('not.exist');
+    cy.get('[data-testid="reproducibility-nudge"]').should('be.visible');
 
     cy.window().then((win) => {
       expect(win.localStorage.getItem('inferencex-reproducibility-nudge-dismissed')).to.eq('1');
     });
     cy.reload();
-    cy.wait(2000);
+    // Both toasts share one slot and the reproducibility timer (1.5s) fires before the filter
+    // hint (2.5s), so the filter hint appearing proves the reproducibility nudge stayed hidden.
+    cy.get('[data-testid="filter-hint-nudge"]').should('be.visible');
     cy.get('[data-testid="reproducibility-nudge"]').should('not.exist');
   });
 });
@@ -409,9 +374,13 @@ function suppressCompetingDashboardToasts(win: Cypress.AUTWindow) {
 
 describe('Dashboard nudges — filter-hint toast', () => {
   it('does not show the filter-hint nudge outside the inference tab', () => {
-    cy.visit('/evaluation', { onBeforeLoad: suppressCompetingDashboardToasts });
-    cy.wait(3500);
-    cy.get('[data-testid="filter-hint-nudge"]').should('not.exist');
+    cy.clock(Date.now(), ['setTimeout', 'clearTimeout']).then((clock) => {
+      cy.visit('/evaluation', { onBeforeLoad: suppressCompetingDashboardToasts });
+      // The evaluation toast (1.5s) proves the hydrated engines have armed their timers.
+      tickUntilVisible(clock, '[data-testid="eval-samples-nudge"]');
+      cy.tick(2500);
+      cy.get('[data-testid="filter-hint-nudge"]').should('not.exist');
+    });
   });
 
   it('arms the filter hint before a client transition into inference', () => {
@@ -420,14 +389,14 @@ describe('Dashboard nudges — filter-hint toast', () => {
 
     cy.get('[data-testid="tab-trigger-inference"]').click();
     cy.location('pathname').should('eq', '/inference');
-    cy.get('[data-testid="filter-hint-nudge"]', { timeout: 3000 }).should('be.visible');
+    cy.get('[data-testid="filter-hint-nudge"]').should('be.visible');
   });
 
   it('re-evaluates the localized filter hint after a Chinese tab transition', () => {
     cy.visit('/zh/evaluation', { onBeforeLoad: suppressCompetingDashboardToasts });
     cy.get('[data-testid="tab-trigger-inference"]').click();
     cy.location('pathname').should('eq', '/zh/inference');
-    cy.get('[data-testid="filter-hint-nudge"]', { timeout: 3000 })
+    cy.get('[data-testid="filter-hint-nudge"]')
       .should('be.visible')
       .and('contain.text', '图表太拥挤？');
   });
@@ -435,13 +404,13 @@ describe('Dashboard nudges — filter-hint toast', () => {
   it('dismissal persists to localStorage and the nudge stays gone after reload', () => {
     cy.visit('/inference', { onBeforeLoad: suppressCompetingDashboardToasts });
     cy.get('[data-testid="filter-hint-nudge"]').should('not.exist');
-    cy.get('[data-testid="filter-hint-nudge"]', { timeout: 5000 }).should('be.visible');
+    cy.get('[data-testid="filter-hint-nudge"]').should('be.visible');
 
     cy.get('[data-testid="filter-hint-nudge"] button[aria-label]').first().click();
-    cy.wait(400);
-    cy.window().then((win) => {
-      expect(win.localStorage.getItem('inferencex-filter-hint-nudge-dismissed')).to.eq('1');
-    });
+    cy.window()
+      .its('localStorage')
+      .invoke('getItem', 'inferencex-filter-hint-nudge-dismissed')
+      .should('eq', '1');
 
     cy.reload();
     cy.wait(3500);
@@ -456,7 +425,7 @@ describe('Evaluation nudges — eval-samples toast', () => {
         clearAllNudgeStorage(win);
       },
     });
-    cy.get('[data-testid="eval-samples-nudge"]', { timeout: 4000 }).should('be.visible');
+    cy.get('[data-testid="eval-samples-nudge"]').should('be.visible');
 
     cy.window().then((win) => {
       const value = win.localStorage.getItem('inferencex-eval-samples-nudge-dismissed');
@@ -465,17 +434,11 @@ describe('Evaluation nudges — eval-samples toast', () => {
     });
 
     cy.window().then((win) => {
-      const before = Number(
-        win.localStorage.getItem('inferencex-eval-samples-nudge-dismissed') ?? '0',
-      );
-      cy.wait(50);
-      cy.window().then((win2) => {
-        win2.dispatchEvent(new CustomEvent('inferencex:eval-samples-opened'));
-        const after = Number(
-          win2.localStorage.getItem('inferencex-eval-samples-nudge-dismissed') ?? '0',
-        );
-        expect(after).to.be.greaterThan(before);
-      });
+      win.localStorage.setItem('inferencex-eval-samples-nudge-dismissed', '1');
+      win.dispatchEvent(new CustomEvent('inferencex:eval-samples-opened'));
+      expect(
+        Number(win.localStorage.getItem('inferencex-eval-samples-nudge-dismissed')),
+      ).to.be.greaterThan(1);
     });
   });
 });

@@ -50,7 +50,6 @@ describe('Video performance evidence (retained fixture)', () => {
       cy.get('[data-testid="video-evidence"]').should(($section) => {
         expect($section[0].scrollWidth).to.be.at.most($section[0].clientWidth);
       });
-      exhibit('plateau').screenshot(`video-evidence-cohort-${locale}-${width}`);
     });
   }
   it('does not call low board power compute saturation', () => {
@@ -192,33 +191,6 @@ describe('Video performance evidence (retained fixture)', () => {
       .and('contain', 'not node, rack or facility power')
       .and('contain', 'n = 20 clips per cell')
       .and('contain', 'Matched workload: 1344 × 768 · 8 s · 24 fps · 50 steps');
-  });
-  it('renders Chinese copy on /zh/video at mobile width', () => {
-    cy.viewport(390, 844);
-    mount('/zh/video');
-    cy.get('[data-testid="video-evidence"]')
-      .should('contain', '性能测量证据')
-      .and('contain', '板卡功率 vs. 生效功率上限')
-      .and('contain', '客户端并发测量')
-      .and('contain', '实测加速比 vs. 规格表比值');
-    exhibit('power-reading').should(
-      'contain',
-      '全部 3 种实测硬件生成期间均运行在生效功率上限的 92%–97%',
-    );
-    exhibit('plateau-reading')
-      .should('contain', '最大偏差为 1.4%')
-      .and('contain', 'C2 时 1.97–2.00×、C4 时 3.94–4.00×');
-    exhibit('scaling-reading').should('contain', '规格表比值仅供参考，不能用于判定瓶颈');
-    cy.get('[data-testid="video-evidence"]')
-      .should('not.contain', '算力饱和')
-      .and('not.contain', '出片时间升至')
-      .should(($section) => {
-        expect($section[0].scrollWidth).to.be.at.most($section[0].clientWidth);
-      });
-    exhibit('caveats')
-      .should('contain', '每条视频由 4 张 GPU 参与计算（TP2 × Ulysses 2）')
-      .and('contain', '每个 cell n = 20 条视频');
-    cy.screenshot('video-evidence-zh-mobile', { capture: 'viewport' });
   });
   it('hides the plateau and scaling exhibits when only one hardware at C1 is measured', () => {
     mount('/video', (points) =>

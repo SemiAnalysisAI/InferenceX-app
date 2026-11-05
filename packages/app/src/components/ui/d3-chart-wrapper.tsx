@@ -228,7 +228,7 @@ export function D3ChartWrapper({
       frame = 0;
       const label = svg.querySelector('.x-axis-label');
       const space = label?.textContent
-        ? Math.floor(svg.getBoundingClientRect().right - label.getBoundingClientRect().right - 24)
+        ? Math.floor(svg.getBoundingClientRect().right - label.getBoundingClientRect().right - 36)
         : 0;
       setHintWidth(space * 2 >= natural + 24 ? space : null);
     };
@@ -297,7 +297,7 @@ export function D3ChartWrapper({
               'no-export text-muted-foreground',
               hintWidth === null
                 ? 'mt-2 text-center text-xs'
-                : 'pointer-events-none relative ml-auto -mt-[21px] text-right text-2xs leading-4',
+                : 'pointer-events-none relative ml-auto -mt-[21px] pr-3 text-right text-2xs leading-4',
             )}
             style={hintWidth === null ? undefined : { maxWidth: hintWidth }}
           >

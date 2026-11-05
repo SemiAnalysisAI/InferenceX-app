@@ -60,6 +60,8 @@ const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR || '.next',
   allowedDevOrigins: allowedDevOriginsFromEnv(),
   transpilePackages: ['@semianalysisai/inferencex-constants'],
+  // Tests (Unit) typechecks the workspace; the E2E fixture build skips the duplicate pass.
+  typescript: { ignoreBuildErrors: process.env.E2E_FIXTURES === '1' },
   serverExternalPackages: ['shiki'],
   // PostHog endpoints end in a slash (`/ingest/e/`); the redirects below keep stripping it elsewhere.
   skipTrailingSlashRedirect: true,
@@ -76,7 +78,7 @@ const nextConfig: NextConfig = {
       // The featured model can change; do not permanently cache this default.
       ...LOCALE_PREFIXES.map((prefix) => ({
         source: `${prefix}/inference`,
-        destination: `${prefix}/inference/kimi-k3`,
+        destination: `${prefix}/inference/deepseek-v41-flash`,
         permanent: false,
         missing: [{ type: 'query' as const, key: 'g_model' }],
       })),

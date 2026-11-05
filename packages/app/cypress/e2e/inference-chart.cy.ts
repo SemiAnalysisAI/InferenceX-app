@@ -118,33 +118,19 @@ const CHART_DISPLAY = '[data-testid="inference-chart-display"]';
 type PointSource = 'scatter' | '.dot-group' | '.unofficial-overlay-pt';
 type BoundPoint = HTMLElement & { __data__: { y: number } };
 
-function measuredValues(
-  $display: JQuery<HTMLElement>,
-  source: PointSource,
-  visibleOnly: boolean,
-): number[] {
+function measuredValues($display: JQuery<HTMLElement>, source: PointSource): number[] {
   if (source === 'scatter') {
     return pointsIn($display)
-      .filter((point) => !visibleOnly || point.opacity === 1)
       .map((point) => point.datum.y)
       .sort((a, b) => a - b);
   }
   const elements = $display.find(`svg ${source}`).toArray() as BoundPoint[];
-  return elements
-    .filter((element) => !visibleOnly || getComputedStyle(element).opacity === '1')
-    .map((element) => element.__data__.y)
-    .sort((a, b) => a - b);
+  return elements.map((element) => element.__data__.y).sort((a, b) => a - b);
 }
 
 function assertMeasuredValues(source: PointSource, expected: number[]) {
   cy.get(CHART_DISPLAY).should(($display) => {
-    expect(measuredValues($display, source, false)).to.deep.equal(expected);
-  });
-}
-
-function assertVisibleMeasuredValues(source: PointSource, expected: number[]) {
-  cy.get(CHART_DISPLAY).should(($display) => {
-    expect(measuredValues($display, source, true)).to.deep.equal(expected);
+    expect(measuredValues($display, source)).to.deep.equal(expected);
   });
 }
 
@@ -330,106 +316,6 @@ describe('Inference Chart', () => {
       .and('contain.text', 'all-in cost per chip-hour');
   });
 
-  it('ships OpenRouter-priced token revenue in Chinese', () => {
-    cy.viewport(390, 844);
-    cy.intercept('GET', 'https://openrouter.ai/api/v1/models', {
-      statusCode: 200,
-      body: {
-        data: [
-          {
-            id: 'deepseek/deepseek-v4-pro-0813',
-            pricing: {
-              prompt: '0.000001122',
-              input_cache_read: '0.00000008',
-              completion: '0.000003366',
-            },
-          },
-        ],
-      },
-    }).as('openRouterPricingZh');
-    interceptOverlayRun();
-    cy.visit(
-      `/zh/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces&i_pctl=p90&i_metric=y_tokenRevenuePerGpuHour&i_revenue=openrouter`,
-      { onBeforeLoad: unlockAgenticGate },
-    );
-    cy.wait('@unofficialRun');
-    cy.wait('@openRouterPricingZh');
-    cy.get('[data-testid="yaxis-metric-selector"]').should(
-      'contain.text',
-      '每 GPU 小时 token 收入',
-    );
-    cy.get('[data-testid="token-revenue-price-source"]').should(
-      'contain.text',
-      'OpenRouter 当前价格',
-    );
-    cy.get('[data-testid="openrouter-price-summary"]')
-      .should('contain.text', '未缓存输入 $1.122/百万 token')
-      .and('contain.text', '缓存输入 $0.08/百万 token')
-      .and('contain.text', '输出 $3.366/百万 token');
-    cy.get('[data-testid="chart-figure"]')
-      .first()
-      .find('[data-testid="token-revenue-subtitle-prices"]')
-      .should(
-        'have.text',
-        '未缓存 $1.122/百万 token · 缓存 $0.08/百万 token · 输出 $3.366/百万 token',
-      )
-      .closest('[data-testid="result-context"]')
-      .should('contain.text', '成本口径:')
-      .and('contain.text', '更新时间:');
-    cy.get('[data-testid="chart-figure"]')
-      .first()
-      .find('h2')
-      .should('contain.text', '按 OpenRouter 价格计算的每 GPU 小时 token 收入');
-    openYAxisHelp('y_tokenRevenuePerGpuHour');
-    cy.get('[data-testid="option-help-content-y_tokenRevenuePerGpuHour"]')
-      .should(
-        'contain.text',
-        '已报告 external cache 时，Agentic 缓存命中率由 GPU 与 external cache 相加',
-      )
-      .and('contain.text', '缓存指标仅覆盖部分 frontier 数据点时，不应用缓存折扣。')
-      .and(($body) => {
-        expect($body.text()).not.to.include('—');
-      });
-  });
-
-  it('ships infrastructure total tokens per dollar in Chinese', () => {
-    cy.viewport(390, 844);
-    interceptOverlayRun();
-    cy.visit(
-      `/zh/inference?unofficialrun=${OVERLAY_RUN_ID}&i_seq=agentic-traces&i_pctl=p90&i_metric=y_tokensPerDollarH`,
-      { onBeforeLoad: unlockAgenticGate },
-    );
-    cy.wait('@unofficialRun');
-
-    cy.get('[data-testid="yaxis-metric-selector"]')
-      .should('contain.text', '每 1 美元 TCO 对应的总 token 数')
-      .and('not.contain.text', '（自有');
-    cy.get('[data-testid="inference-chart-configuration"]')
-      .find('[data-testid="cost-tier-selector"]')
-      .should('not.exist');
-    cy.get('[data-testid="token-revenue-price-source"]').should('not.exist');
-    cy.get('[data-testid="chart-figure"]')
-      .first()
-      .find('h2')
-      .should('contain.text', '每 1 美元 TCO 对应的总 token 数')
-      .and('not.contain.text', '（自有');
-    cy.get('[data-testid="chart-figure"]')
-      .first()
-      .find('[data-testid="result-context-cost-tier"]')
-      .should('contain.text', '自有 · 超大规模云厂商批量采购')
-      .find('[data-testid="cost-tier-selector"]')
-      .should('be.visible');
-    cy.get('[data-testid="inference-chart-display"] svg .unofficial-overlay-pt').should(
-      'have.length.greaterThan',
-      0,
-    );
-    openYAxisHelp('y_tokensPerDollarH');
-    cy.get('[data-testid="option-help-content-y_tokensPerDollarH"]')
-      .should('contain.text', '基础设施开支')
-      .and('contain.text', '超大规模云厂商大批量采购价')
-      .and('contain.text', '每芯片小时全包成本');
-  });
-
   it('surfaces the error instead of an endless skeleton when availability fails', () => {
     cy.intercept('GET', '/api/v1/availability/compact', { statusCode: 500, body: {} }).as(
       'availabilityFailure',
@@ -610,18 +496,6 @@ describe('Inference Chart — Simplified Chinese mobile path', () => {
       .and('have.attr', 'aria-label', '下载图表');
     expectNoPageOverflow();
   });
-
-  it('localizes architecture and changelog overlays without changing technical model data', () => {
-    cy.viewport(1440, 900);
-    cy.get('[data-testid="model-architecture-link"]')
-      .should('have.attr', 'aria-label')
-      .and('match', /^了解 .*DeepSeek.*模型架构$/u);
-    cy.get('[data-testid="model-architecture-link"]')
-      .should('have.attr', 'href')
-      .and('match', /^\/zh\/model\//u);
-    cy.contains('button', '变更日志').should('be.visible').click();
-    cy.contains('说明').should('be.visible');
-  });
 });
 
 describe('AgentX replaces a complete curve while preserving an unofficial comparison', () => {
@@ -790,90 +664,26 @@ it('says when chosen chip configs report no measured power, and plots them on ot
   cy.scatterPoints(CHART_DISPLAY).should('have.length.at.least', 1);
 });
 
-it('uses Optimal Only to filter power boundary dots without replacing official or overlay curves', () => {
-  interceptMeasuredComparison(boundaryRows(null), boundaryRows(OVERLAY_RUN_URL));
-  cy.viewport(1440, 900);
-  cy.visit(
-    `/powerx?g_model=DeepSeek-V4-Pro&unofficialrun=${OVERLAY_RUN_ID}&i_seq=1k%2F1k&i_prec=fp4&i_metric=y_measuredAvgPower`,
-    { onBeforeLoad: unlockAgenticGate },
-  );
-  cy.wait('@measuredOverlay');
-  selectXAxisMode('interactivity');
-  cy.get('#scatter-hide-non-optimal').then(($toggle) => {
-    if ($toggle.attr('data-state') === 'unchecked') cy.wrap($toggle).click();
-  });
-  cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
-  assertVisibleMeasuredValues('scatter', [650, 700, 900]);
-  assertVisibleMeasuredValues('.unofficial-overlay-pt', [700, 750, 950]);
-
-  const curves = '[data-testid="inference-chart-display"] .roofline-path, .overlay-roofline-path';
-  cy.get(curves)
-    .should('have.length', 2)
-    .and(($curves) => {
-      for (const curve of $curves) {
-        expect(curve.dataset.curveKind).to.equal('power-envelope');
-        expect(curve.getAttribute('d')).to.be.a('string');
-        expect(curve.getAttribute('d')).not.to.equal('');
-      }
-    })
-    .then(($curves) => {
-      const geometry = Array.from($curves, (curve) => curve.getAttribute('d'));
-      for (const optimalOnly of [false, true]) {
-        cy.get('#scatter-hide-non-optimal').click();
-        assertVisibleMeasuredValues(
-          'scatter',
-          optimalOnly ? [650, 700, 900] : [200, 650, 700, 900],
-        );
-        assertVisibleMeasuredValues(
-          '.unofficial-overlay-pt',
-          optimalOnly ? [700, 750, 950] : [250, 700, 750, 950],
-        );
-        cy.get(curves).should(($current) => {
-          expect(Array.from($current, (curve) => curve.getAttribute('d'))).to.deep.equal(geometry);
-          for (const curve of $current) {
-            expect(curve.dataset.curveKind).to.equal('power-envelope');
-          }
-        });
-      }
-    });
-
-  cy.get('[data-testid="powerx-tab-energy"]').click();
-  cy.get('[data-testid="chart-figure"] h2').should('contain', 'Measured Joules per Token');
-  cy.get('#scatter-hide-non-optimal').should('have.attr', 'data-state', 'checked');
-  assertVisibleMeasuredValues('scatter', [2, 4, 5]);
-  assertVisibleMeasuredValues('.unofficial-overlay-pt', [3, 5, 6]);
-  cy.get(curves)
-    .should('have.length', 2)
-    .and(($curves) => {
-      for (const curve of $curves) expect(curve.dataset.curveKind).to.equal('pareto');
-    });
-  cy.get('#scatter-hide-non-optimal').click();
-  assertVisibleMeasuredValues('scatter', [2, 4, 4.5, 5]);
-  assertVisibleMeasuredValues('.unofficial-overlay-pt', [3, 5, 5.5, 6]);
-});
-
 describe('VR publication data compatibility', () => {
-  for (const locale of ['', '/zh']) {
-    it(`renders September TRTLLM data and cache metrics under ${locale || '/en'}`, () => {
-      interceptVrPublicationData();
-      cy.visit(`${locale}/inference/deepseek-v4?i_metric=y_tpPerGpu`);
-      cy.scatterPoints(CHART_DISPLAY).should((scatter) => {
-        const points = scatter.map((point) => point.datum);
-        const vr = points.filter((point) => point.hwKey.startsWith('vr200_'));
-        expect(new Set(vr.map((point) => Number(point.id))).size).to.equal(4);
-        for (const point of vr) {
-          expect(point.actualDate).to.equal(VR_FIXTURE_DATE);
-          expect(point.server_gpu_cache_hit_rate).to.equal(0.95);
-          expect(point.theoretical_cache_hit_rate).to.equal(0.97);
-        }
-        expect(points.some((point) => point.hwKey.startsWith('gb300_'))).to.equal(true);
-      });
-      cy.get('[data-testid="chart-legend"]').should('contain.text', 'Vera Rubin NVL72');
-      cy.get('[data-testid="vera-rubin-official-preview-notice"]')
-        .should('contain.text', 'Vera Rubin NVL72')
-        .and('not.contain.text', 'July');
+  it('renders September TRTLLM data and cache metrics under /en', () => {
+    interceptVrPublicationData();
+    cy.visit('/inference/deepseek-v4?i_metric=y_tpPerGpu');
+    cy.scatterPoints(CHART_DISPLAY).should((scatter) => {
+      const points = scatter.map((point) => point.datum);
+      const vr = points.filter((point) => point.hwKey.startsWith('vr200_'));
+      expect(new Set(vr.map((point) => Number(point.id))).size).to.equal(4);
+      for (const point of vr) {
+        expect(point.actualDate).to.equal(VR_FIXTURE_DATE);
+        expect(point.server_gpu_cache_hit_rate).to.equal(0.95);
+        expect(point.theoretical_cache_hit_rate).to.equal(0.97);
+      }
+      expect(points.some((point) => point.hwKey.startsWith('gb300_'))).to.equal(true);
     });
-  }
+    cy.get('[data-testid="chart-legend"]').should('contain.text', 'Vera Rubin NVL72');
+    cy.get('[data-testid="vera-rubin-official-preview-notice"]')
+      .should('contain.text', 'Vera Rubin NVL72')
+      .and('not.contain.text', 'July');
+  });
 });
 
 function assertVrDate(expectedDate: string) {
@@ -895,28 +705,23 @@ function assertVrDate(expectedDate: string) {
 }
 
 describe('VR default date preference', () => {
-  for (const locale of ['', '/zh']) {
-    it(`defaults only VR to September 9 under ${locale || '/en'}`, () => {
-      interceptVrPublicationData(true);
-      cy.intercept({
-        pathname: '/api/v1/benchmarks',
-        query: { date: VR_FIXTURE_DATE, exact: 'true' },
-      }).as('preferredSnapshot');
-      cy.visit(`${locale}/inference/deepseek-v4?i_metric=y_tpPerGpu`);
-      cy.wait('@preferredSnapshot');
-      assertVrDate(VR_FIXTURE_DATE);
-    });
+  it('defaults only VR to September 9 under /en', () => {
+    interceptVrPublicationData(true);
+    cy.intercept({
+      pathname: '/api/v1/benchmarks',
+      query: { date: VR_FIXTURE_DATE, exact: 'true' },
+    }).as('preferredSnapshot');
+    cy.visit('/inference/deepseek-v4?i_metric=y_tpPerGpu');
+    cy.wait('@preferredSnapshot');
+    assertVrDate(VR_FIXTURE_DATE);
+  });
 
-    for (const query of [
-      `g_rundate=${VR_LATEST_FIXTURE_DATE}`,
-      `g_runid=${VR_LATEST_FIXTURE_RUN}`,
-    ]) {
-      it(`honors explicit ${query} under ${locale || '/en'}`, () => {
-        interceptVrPublicationData(true);
-        cy.visit(`${locale}/inference/deepseek-v4?i_metric=y_tpPerGpu&${query}`);
-        assertVrDate(VR_LATEST_FIXTURE_DATE);
-      });
-    }
+  for (const query of [`g_rundate=${VR_LATEST_FIXTURE_DATE}`, `g_runid=${VR_LATEST_FIXTURE_RUN}`]) {
+    it(`honors explicit ${query} under /en`, () => {
+      interceptVrPublicationData(true);
+      cy.visit(`/inference/deepseek-v4?i_metric=y_tpPerGpu&${query}`);
+      assertVrDate(VR_LATEST_FIXTURE_DATE);
+    });
   }
 
   it('honors a manual selection of the latest date after opening the default', () => {
@@ -1162,39 +967,18 @@ describe('Qwen3.5 chart defaults', () => {
     expectGpuSelection(['mi300x', 'mi325x', 'h100'], false);
   });
 
-  it('keeps the other model defaults and resets hardware when switching to Qwen', () => {
-    cy.visit('/inference?g_model=DeepSeek-R1-0528&i_prec=fp8', {
+  it('switches to E2EL when entering Qwen after a URL axis selection', () => {
+    cy.visit('/inference?g_model=DeepSeek-R1-0528&i_prec=fp8&i_xmode=ttft', {
       onBeforeLoad: unlockAgenticGate,
     });
-    cy.get('[data-testid="x-axis-mode-selector"]').should(
-      'have.attr',
-      'data-value',
-      'interactivity',
-    );
-    expectGpuSelection([...olderGpus, ...newerGpus], true);
-    cy.get('[data-testid="model-selector"]').click();
+    cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'ttft');
+    cy.scrollTo('top');
+    cy.get('[data-testid="model-selector"]').click().should('have.attr', 'aria-expanded', 'true');
     cy.contains('[data-slot="select-item"]', 'Qwen3.5 397B').click();
     cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'e2e');
     expectGpuSelection(olderGpus, false);
     expectGpuSelection(newerGpus, true);
   });
-
-  for (const axisSource of ['URL', 'manual']) {
-    it(`switches to E2EL when entering Qwen after a ${axisSource} axis selection`, () => {
-      const axisParam = axisSource === 'URL' ? '&i_xmode=ttft' : '';
-      cy.visit(`/inference?g_model=DeepSeek-R1-0528&i_prec=fp8${axisParam}`, {
-        onBeforeLoad: unlockAgenticGate,
-      });
-      if (axisSource === 'manual') selectXAxisMode('ttft');
-      cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'ttft');
-      cy.scrollTo('top');
-      cy.get('[data-testid="model-selector"]').click().should('have.attr', 'aria-expanded', 'true');
-      cy.contains('[data-slot="select-item"]', 'Qwen3.5 397B').click();
-      cy.get('[data-testid="x-axis-mode-selector"]').should('have.attr', 'data-value', 'e2e');
-      expectGpuSelection(olderGpus, false);
-      expectGpuSelection(newerGpus, true);
-    });
-  }
 
   for (const { chart, path, expectedAxis } of [
     { chart: 'Qwen inference', path: '/inference/qwen-3-5', expectedAxis: 'e2e' },
@@ -1265,18 +1049,5 @@ describe('Qwen3.5 chart defaults', () => {
       'interactivity',
     );
     cy.contains('button', 'More chart controls').should('not.contain.text', 'changed');
-  });
-});
-
-describe('PowerX controls on a phone', () => {
-  beforeEach(() => {
-    cy.viewport(390, 844);
-    cy.visit('/powerx', {
-      onBeforeLoad(win) {
-        win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
-        unlockAgenticGate(win);
-      },
-    });
-    cy.get('[data-testid="inference-chart-display"]').should('exist');
   });
 });

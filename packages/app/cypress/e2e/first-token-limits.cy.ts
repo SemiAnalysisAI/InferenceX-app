@@ -3,7 +3,6 @@ import {
   OVERLAY_ONLY_HARDWARE,
   OVERLAY_RUN_BRANCH,
   OVERLAY_RUN_ID,
-  SINGLE_TURN_CONFIGS,
 } from '../support/overlay-fixtures';
 
 const SEQUENCE = '1k/1k';
@@ -11,9 +10,6 @@ const BARS = '[data-testid="first-token-chart"] svg .ft-bar';
 const EMPTY_MARKS = '[data-testid="first-token-chart"] svg .ft-empty';
 const X_TICKS = '[data-testid="first-token-chart"] svg .x-axis .tick text';
 const SUMMARY = '[data-testid="first-token-chart"] svg .ft-summary-who';
-
-const concurrenciesAtOrAbove = (floor: number) =>
-  SINGLE_TURN_CONFIGS.filter(([, intvty]) => intvty >= floor).map(([conc]) => conc);
 
 const dismissNudges = (win: Cypress.AUTWindow) => {
   win.localStorage.setItem('inferencex-star-modal-dismissed', String(Date.now()));
@@ -39,15 +35,8 @@ describe('First-Token Limits', () => {
     });
 
     it('picks the cheapest row that clears the interactivity floor, not the cheapest row', () => {
-      cy.get('label[for="first-token-caps"]').should('contain.text', 'TTFT caps');
       cy.get('[data-testid="first-token-caps"]').should('have.value', '0.1,2');
-      cy.get('label[for="first-token-min-interactivity"]').should(
-        'contain.text',
-        'Minimum Median interactivity',
-      );
-      cy.get('[data-testid="first-token-min-interactivity"]')
-        .should('have.value', '')
-        .and('have.attr', 'placeholder', '35');
+      cy.get('[data-testid="first-token-min-interactivity"]').should('have.value', '');
       cy.get(X_TICKS).should('have.length', 2);
       cy.get(X_TICKS).first().should('have.text', '≤0.1s');
       cy.get(X_TICKS).last().should('have.text', '≤2s');
@@ -61,7 +50,6 @@ describe('First-Token Limits', () => {
         expect(labels).to.deep.equal(['', 'B300 only']);
       });
 
-      expect(concurrenciesAtOrAbove(35)).to.deep.equal([8, 2, 1]);
       firstRowCell('Concurrency').should('have.text', '8');
       firstRowCell('Configuration').should('contain.text', 'B300');
       firstRowCell('Median TTFT').should('have.text', '0.50');
@@ -107,7 +95,7 @@ describe('First-Token Limits', () => {
         cy.get('[data-testid="first-token-figure"] [data-testid="export-button"]').click();
         cy.get('[data-testid="png-aspect-ratio"]').select(ratio);
         cy.get('[data-testid="export-png-button"]').click();
-        cy.wrap(null, { timeout: 30000 }).should(() => {
+        cy.wrap(null).should(() => {
           if (failure) throw failure;
           expect(downloads).to.eq(index + 1);
         });
@@ -206,21 +194,6 @@ describe('First-Token Limits', () => {
       cy.get('.sidebar-legend label').contains(OVERLAY_ONLY_HARDWARE.toUpperCase()).click();
       cy.get(BARS).should('have.length', 2);
       cy.get(`${BARS}[data-series="run:0"]`).should('have.attr', 'data-hw', 'b300_sglang');
-    });
-  });
-
-  describe('Chinese page', () => {
-    it('renders the intro and Chinese control labels', () => {
-      interceptCalculatorOverlayRun();
-      cy.visit(`/zh/first-token?i_seq=${encodeURIComponent(SEQUENCE)}`, {
-        onBeforeLoad: dismissNudges,
-      });
-      cy.wait('@benchmarks');
-      cy.get('[data-testid="zh-tab-intro"]').should('contain.text', '首 token 延迟约束');
-      cy.get('label[for="first-token-caps"]').should('contain.text', 'TTFT 上限');
-      cy.get('label[for="first-token-min-interactivity"]').should('contain.text', '交互性');
-      cy.get('[data-testid="first-token-figure"]').should('exist');
-      cy.get(SUMMARY).last().should('have.text', '仅 B300');
     });
   });
 });

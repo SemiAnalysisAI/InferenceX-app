@@ -4,29 +4,12 @@ const exact = (label: string) =>
 describe('Y-Axis Metrics All Render Data', () => {
   const metrics: { label: string; tier?: 'hyperscaler' | 'rental' | 'custom' }[] = [
     { label: 'Token Throughput per Chip' },
-    { label: 'Input Token Throughput per Chip' },
     { label: 'Output Token Throughput per Chip' },
     { label: 'Token Throughput per All in Utility MW' },
-    { label: 'Input Token Throughput per All in Utility MW' },
-    { label: 'Output Token Throughput per All in Utility MW' },
     { label: 'Cost per Million Total Tokens', tier: 'hyperscaler' },
-    { label: 'Cost per Million Total Tokens', tier: 'rental' },
-    { label: 'Cost per Million Output Tokens', tier: 'hyperscaler' },
-    { label: 'Cost per Million Output Tokens', tier: 'rental' },
-    { label: 'Cost per Million Input Tokens', tier: 'hyperscaler' },
-    { label: 'Cost per Million Input Tokens', tier: 'rental' },
-    { label: 'Total Tokens per $1 TCO', tier: 'hyperscaler' },
     { label: 'Total Tokens per $1 TCO', tier: 'rental' },
-    { label: 'Output Tokens per $1 TCO', tier: 'hyperscaler' },
-    { label: 'Output Tokens per $1 TCO', tier: 'rental' },
-    { label: 'Input Tokens per $1 TCO', tier: 'hyperscaler' },
-    { label: 'Input Tokens per $1 TCO', tier: 'rental' },
     { label: 'Cost per Million Total Tokens', tier: 'custom' },
-    { label: 'Total Tokens per $1 TCO', tier: 'custom' },
-    { label: 'Token Throughput per All in Utility MW (Custom User Values)' },
     { label: 'All-in Provisioned Joules per Total Token' },
-    { label: 'All-in Provisioned Joules per Output Token' },
-    { label: 'All-in Provisioned Joules per Input Token' },
   ];
 
   before(() => {

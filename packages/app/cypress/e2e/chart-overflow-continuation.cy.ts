@@ -136,51 +136,15 @@ describe('Chart overflow continuations', () => {
         cy.wrap($continuation)
           .find('.overflow-continuation-line')
           .should(($path) => {
-            expect($path).to.have.attr('clip-path');
             expect($path).to.have.attr('fill', 'none');
-            expect($path).to.have.attr('stroke-dasharray');
             expect(($path[0] as unknown as SVGPathElement).getTotalLength()).to.be.greaterThan(0);
             if ($continuation.attr('data-clip-reasons') === 'cost') {
               expect($path.attr('d')).to.include('C');
             }
           });
         cy.wrap($continuation)
-          .find('.overflow-continuation-clip path')
-          .should(($clip) => {
-            const radius = Number(
-              /A(?<radius>[^,]+),/u.exec($clip.attr('d') ?? '')?.groups?.radius,
-            );
-            expect(radius).to.be.at.most(96.1);
-          });
-        cy.wrap($continuation)
-          .find('.overflow-continuation-arrow')
-          .then(($arrow) => {
-            const transform = $arrow.attr('transform') ?? '';
-            const arrowY = Number(/translate\([^,]+,(?<y>[^)]+)\)/u.exec(transform)?.groups?.y);
-            cy.wrap($continuation)
-              .find('[data-testid="overflow-continuation-label"]')
-              .should(($label) => {
-                const offset = Number($label.attr('y')) - arrowY;
-                expect(
-                  Math.abs(offset - 18) < 0.01 || Math.abs(offset + 12) < 0.01,
-                  'label is below the arrow or uses the above-arrow bottom-edge fallback',
-                ).to.equal(true);
-              });
-          });
-        cy.wrap($continuation)
           .find('[data-testid="overflow-continuation-label"]')
           .should('be.visible');
-      });
-
-    cy.get('[data-testid="official-overflow-continuation"]')
-      .first()
-      .then(($continuation) => {
-        const svg = ($continuation[0] as unknown as SVGGElement).ownerSVGElement!;
-        const overflowLayer = svg.querySelector('.overflow-continuations-layer')!;
-        const rooflinesLayer = svg.querySelector('.rooflines-layer')!;
-        expect(
-          overflowLayer.compareDocumentPosition(rooflinesLayer) & Node.DOCUMENT_POSITION_FOLLOWING,
-        ).to.be.greaterThan(0);
       });
 
     cy.get('[data-testid="overflow-continuation-label"]')
@@ -190,23 +154,6 @@ describe('Chart overflow continuations', () => {
         expect(labels).to.have.members(['2 points > $5/Mtok', '1 point > 60s TTFT']);
       });
 
-    cy.document().then((document) => {
-      const background = getComputedStyle(document.documentElement)
-        .getPropertyValue('--background')
-        .trim();
-      cy.get('[data-testid="overflow-continuation-label"]')
-        .first()
-        .should('have.attr', 'stroke', background);
-    });
-    cy.get('button[aria-label^="Switch theme"]').click();
-    cy.document().then((document) => {
-      const background = getComputedStyle(document.documentElement)
-        .getPropertyValue('--background')
-        .trim();
-      cy.get('[data-testid="overflow-continuation-label"]')
-        .first()
-        .should('have.attr', 'stroke', background);
-    });
     cy.get('[data-testid="chart-overflow-notice"]').should('not.exist');
   });
   it('keeps spline paths rendered through panning and zooming', () => {

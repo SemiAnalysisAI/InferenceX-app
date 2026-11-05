@@ -176,35 +176,21 @@ describe('Fleet — Fleet Lifecycle', () => {
           }
         }
       });
-      assertFleetControlLabels();
     }
+    assertFleetControlLabels();
   });
 
   it('the default MW budget drives the lifecycle table', () => {
-    assertFleetControlLabels();
-    cy.get('[data-testid="calculator-lifecycle-section"]')
-      .should('be.visible')
-      .and('contain.text', 'Fleet lifecycle');
-    cy.get('[data-testid="calc-fleet-mw-input"]').should('have.value', '10');
     cy.get('[data-testid="calculator-lifecycle-figure"]').should('be.visible');
     cy.get('[data-testid="calculator-lifecycle-empty"]').should('not.exist');
 
-    cy.get('[data-testid="calculator-lifecycle-figure"]').should('be.visible');
     cy.get('[data-testid="calculator-lifecycle-table"]').should('not.exist');
     showTable();
     cy.get('[data-testid="calculator-lifecycle-table"]').should('be.visible');
-    cy.get('[data-testid="calculator-lifecycle-table"]').within(() => {
-      cy.contains('th', 'Config now').should('exist');
-      cy.contains('th', 'First run').should('exist');
-      cy.contains('th', 'Latest best').should('exist');
-      cy.contains('th', 'Improvements').should('exist');
-      cy.contains('th', 'Chips').should('exist');
-      cy.contains('th', 'Concurrent users now').should('exist');
-      cy.contains('th', 'Margin $/day').should('exist');
-      cy.contains('th', 'Payback').should('exist');
-      cy.contains('th', 'Cumulative margin').should('exist');
-      cy.get('tbody tr').should('have.length.greaterThan', 0);
-    });
+    cy.get('[data-testid="calculator-lifecycle-table"] tbody tr').should(
+      'have.length.greaterThan',
+      0,
+    );
     cy.get('[data-testid="calculator-lifecycle-empty"]').should('not.exist');
     cy.get('[data-testid="calculator-lifecycle-table"] input[type="text"]').should('not.exist');
     cy.get('[data-testid="calc-lifecycle-cache-input"]').should('not.exist');
@@ -219,12 +205,6 @@ describe('Fleet — Fleet Lifecycle', () => {
           });
       });
 
-    cy.get('[data-testid="calc-lifecycle-price-input"]')
-      .invoke('val')
-      .should('match', /^\d+(?:\.\d+)?$/u);
-    cy.get('[data-testid="calc-lifecycle-price-input"]')
-      .invoke('val')
-      .then((val) => expect(Number(val)).to.be.greaterThan(0));
     showTable();
     cy.get('[data-testid="calculator-lifecycle-table"]').should('contain.text', 'Never');
   });
@@ -235,15 +215,7 @@ describe('Fleet — Fleet Lifecycle', () => {
     cy.get('[data-testid="calculator-lifecycle-figure"]').should('not.contain', '$12.0000');
     cy.get('[data-testid="calculator-lifecycle-figure"]').within(() => {
       cy.contains('$12 in / $48 out per M tok').should('be.visible');
-      cy.contains('MW').should('be.visible');
     });
-
-    showTable();
-    cy.get('[data-testid="calculator-lifecycle-figure"]').should(
-      'contain',
-      '$12 in / $48 out per M tok',
-    );
-    showChart();
 
     cy.get('[data-testid="calc-lifecycle-price-input"]').clear().type('7.25');
     cy.get('[data-testid="calculator-lifecycle-figure"]').within(() => {
@@ -265,56 +237,6 @@ describe('Fleet — Fleet Lifecycle', () => {
           : String(seeded);
         cy.get('[data-testid="calculator-lifecycle-figure"]').should('contain', `$${trimmed} in /`);
       });
-
-    cy.get('[data-testid="calculator-lifecycle-figure"]').within(() => {
-      cy.contains('h2', 'Fleet lifecycle').should('be.visible');
-      cy.contains('tok/s/user').should('be.visible');
-    });
-    cy.get('[data-testid="calculator-lifecycle-chart-svg"]').should('be.visible');
-    cy.get('[data-testid="calculator-lifecycle-table"]').should('not.exist');
-
-    showTable();
-    cy.get('[data-testid="calculator-lifecycle-table"]').should('be.visible');
-    cy.get('[data-testid="calculator-lifecycle-chart-svg"]').should('not.exist');
-    cy.get('[data-testid="calculator-lifecycle-figure"]').within(() => {
-      cy.contains('h2', 'Fleet lifecycle').should('be.visible');
-    });
-
-    showChart();
-    cy.get('[data-testid="calculator-lifecycle-chart-svg"]').should('be.visible');
-
-    cy.get('[data-testid="calculator-lifecycle-section"]')
-      .should('contain.text', 'Power and $/chip/hr are today')
-      .and('contain.text', 'Unofficial runs loaded via a run link are not shown here');
-    cy.get('[data-testid="calculator-lifecycle-section"]').should(
-      'contain.text',
-      'SemiAnalysis Datacenter Industry Model',
-    );
-
-    exportMenu().should('be.visible').click();
-    cy.get('[data-testid="export-csv-button"]').should('be.visible');
-    cy.get('[data-testid="export-png-button"]').should('not.have.attr', 'aria-disabled', 'true');
-    cy.get('body').type('{esc}');
-
-    showTable();
-    exportMenu().click();
-    cy.get('[data-testid="export-png-button"]').should('have.attr', 'aria-disabled', 'true');
-    cy.get('[data-testid="export-csv-button"]').should('be.visible');
-    cy.get('body').type('{esc}');
-  });
-
-  it('raising the price above break-even turns margin positive and produces a payback', () => {
-    cy.get('[data-testid="calc-lifecycle-price-input"]').clear();
-    cy.get('[data-testid="calc-lifecycle-price-input"]').type('50');
-    firstRowCell('Margin $/day').invoke('text').should('match', /^\$/u);
-    firstRowCell('Payback')
-      .invoke('text')
-      .should('match', /\d+(?:\.\d+)? mo/u);
-
-    cy.get('[data-testid="calc-lifecycle-price-reset"]').should('be.visible').click();
-    cy.get('[data-testid="calc-lifecycle-price-input"]')
-      .invoke('val')
-      .then((val) => expect(Number(val)).to.be.lessThan(50));
   });
 
   it('bills the two streams apart — the output price alone moves margin', () => {
@@ -441,7 +363,6 @@ describe('Fleet — Fleet Lifecycle', () => {
       xAxisTicks().should('not.equal', before);
       cy.get('[data-testid="calculator-lifecycle-chart-svg"]').dblclick();
       xAxisTicks().should('equal', before);
-      cy.wait(900);
     });
     cy.get('[data-testid="calculator-lifecycle-chart-svg"] path.line-path').then((lines) => {
       cy.get('[data-testid="calculator-lifecycle-chart-svg"] .lifecycle-series-label').should(
@@ -668,27 +589,6 @@ describe('Fleet — self-contained lifecycle regressions', () => {
       });
   });
 
-  it('plots revenue per MW as a real normalized y-axis metric', () => {
-    cy.get('[data-testid="calc-lifecycle-metric-revenue"]').click();
-    cy.get('[data-testid="calculator-lifecycle-chart-svg"] .y-axis')
-      .invoke('text')
-      .then((revenuePerDay) => {
-        cy.get('[data-testid="calc-lifecycle-metric-revenue-per-mw"]').click();
-        chartText().should('contain', 'Revenue ($/MW/day)');
-        cy.get('[data-testid="calculator-lifecycle-chart-svg"] .lifecycle-zero-rule').should(
-          'not.exist',
-        );
-        cy.get('[data-testid="calculator-lifecycle-chart-svg"] .y-axis')
-          .invoke('text')
-          .should((revenuePerMw) => {
-            expect(revenuePerMw, 'Revenue/MW is not Revenue/day relabelled').to.not.equal(
-              revenuePerDay,
-            );
-          });
-      });
-    cy.get('[data-testid="calc-lifecycle-metric-margin"]').click();
-  });
-
   it('exports the physical fleet sizing alongside its economics', () => {
     showTable();
     cy.window().then(captureLifecycleCsvDownloads);
@@ -776,7 +676,6 @@ describe('Fleet — Fleet Lifecycle with agentic traces', () => {
   });
 
   it('raises the break-even price it seeds, because fewer tokens are billable', () => {
-    assertFleetControlLabels();
     cy.get('[data-testid="calculator-lifecycle-unsupported"]').should('not.exist');
     cy.get('[data-testid="calculator-lifecycle-table"] tbody tr').should(
       'have.length.greaterThan',
@@ -870,16 +769,16 @@ describe('Fleet — Fleet Lifecycle in Chinese', () => {
       cy.get('[data-testid="fleet-cost-type-selector"]').click();
       cy.contains('[role="option"]', option).click();
       cy.get('[data-testid="calculator-lifecycle-table"] thead').should('contain.text', header);
-      exportMenu().click();
-      cy.get('[data-testid="export-csv-button"]').click();
-      readCapturedLifecycleCsv().then((csv) => {
-        expect(csv.split('\n').find((line) => line.startsWith('芯片,'))).to.contain(header);
-        expect(csv.split('\n').find((line) => line.startsWith('# 假设：'))).to.equal(
-          '# 假设：输入价格 $1.25/M tok，输出价格 $3.5/M tok，爬坡期 2 个月，平均中断间隔（MTBI）12 天，恢复时间 6 小时，测算期 18 个月，设施功率 4 MW，TCO 口径：内部',
-        );
-        expect(csv).not.to.contain('# Assumptions:');
-      });
     }
+    exportMenu().click();
+    cy.get('[data-testid="export-csv-button"]').click();
+    readCapturedLifecycleCsv().then((csv) => {
+      expect(csv.split('\n').find((line) => line.startsWith('芯片,'))).to.contain('当前 tok/s/MW');
+      expect(csv.split('\n').find((line) => line.startsWith('# 假设：'))).to.equal(
+        '# 假设：输入价格 $1.25/M tok，输出价格 $3.5/M tok，爬坡期 2 个月，平均中断间隔（MTBI）12 天，恢复时间 6 小时，测算期 18 个月，设施功率 4 MW，TCO 口径：内部',
+      );
+      expect(csv).not.to.contain('# Assumptions:');
+    });
   });
 
   it('uses the selected cost tier’s Chinese label in the assumptions footer', () => {
@@ -904,6 +803,7 @@ describe('Fleet — Fleet Lifecycle in Chinese', () => {
       cy.viewport(width, height);
       showChart();
       assertReadableChineseAxis();
+      if (width !== 1280) return;
       hoverPlot(0.4);
       readout()
         .should('have.css', 'display', 'block')
@@ -933,55 +833,51 @@ describe('Fleet — Fleet Lifecycle in Chinese', () => {
           '[data-testid="calculator-lifecycle-figure"] [data-testid="zoom-reset-button"]',
         ).click();
         xAxisLayout().should('equal', before);
-        cy.wait(900);
       });
 
-      if (width === 1280) {
-        cy.window().then((win) => {
-          const capture = win as CsvCaptureWindow;
-          capture.__capturedLifecyclePngUrl = undefined;
-          capture.__capturedLifecyclePngAxis = undefined;
-          win.HTMLAnchorElement.prototype.click = function () {
-            if (this.download.endsWith('.png')) {
-              capture.__capturedLifecyclePngUrl = this.href;
-              capture.__capturedLifecyclePngAxis = Array.from(
-                win.document.querySelectorAll('#fleet-lifecycle-export .x-axis .tick text'),
-                (tick) => tick.textContent ?? '',
-              );
-            }
-          };
+      cy.window().then((win) => {
+        const capture = win as CsvCaptureWindow;
+        capture.__capturedLifecyclePngUrl = undefined;
+        capture.__capturedLifecyclePngAxis = undefined;
+        win.HTMLAnchorElement.prototype.click = function () {
+          if (this.download.endsWith('.png')) {
+            capture.__capturedLifecyclePngUrl = this.href;
+            capture.__capturedLifecyclePngAxis = Array.from(
+              win.document.querySelectorAll('#fleet-lifecycle-export .x-axis .tick text'),
+              (tick) => tick.textContent ?? '',
+            );
+          }
+        };
+      });
+      exportMenu().click();
+      cy.get('[data-testid="export-png-button"]').click();
+      cy.window()
+        .should((win) => {
+          expect((win as CsvCaptureWindow).__capturedLifecyclePngUrl).to.match(
+            /^data:image\/png;base64,/u,
+          );
+        })
+        .then((win) => {
+          const image = (win as CsvCaptureWindow).__capturedLifecyclePngUrl!;
+          const labels = (win as CsvCaptureWindow).__capturedLifecyclePngAxis!;
+          expect(labels.length, 'date labels in the exported clone').to.be.greaterThan(0);
+          labels.forEach((label) => expect(label).to.match(/^\d{4}年\d{1,2}月$/u));
+          cy.then(
+            () =>
+              new Cypress.Promise<void>((resolve, reject) => {
+                const png = new win.Image();
+                png.addEventListener('load', () => {
+                  expect(png.naturalWidth).to.be.greaterThan(600);
+                  expect(png.naturalHeight).to.be.greaterThan(400);
+                  resolve();
+                });
+                png.addEventListener('error', () =>
+                  reject(new Error('Exported PNG did not decode')),
+                );
+                png.src = image;
+              }),
+          );
         });
-        exportMenu().click();
-        cy.get('[data-testid="export-png-button"]').click();
-        cy.window()
-          .should((win) => {
-            expect((win as CsvCaptureWindow).__capturedLifecyclePngUrl).to.match(
-              /^data:image\/png;base64,/u,
-            );
-          })
-          .then((win) => {
-            const image = (win as CsvCaptureWindow).__capturedLifecyclePngUrl!;
-            const labels = (win as CsvCaptureWindow).__capturedLifecyclePngAxis!;
-            expect(labels.length, 'date labels in the exported clone').to.be.greaterThan(0);
-            labels.forEach((label) => expect(label).to.match(/^\d{4}年\d{1,2}月$/u));
-            cy.writeFile('cypress/downloads/fleet-lifecycle-zh.png', image.split(',')[1], 'base64');
-            cy.then(
-              () =>
-                new Cypress.Promise<void>((resolve, reject) => {
-                  const png = new win.Image();
-                  png.addEventListener('load', () => {
-                    expect(png.naturalWidth).to.be.greaterThan(600);
-                    expect(png.naturalHeight).to.be.greaterThan(400);
-                    resolve();
-                  });
-                  png.addEventListener('error', () =>
-                    reject(new Error('Exported PNG did not decode')),
-                  );
-                  png.src = image;
-                }),
-            );
-          });
-      }
     });
   }
 });

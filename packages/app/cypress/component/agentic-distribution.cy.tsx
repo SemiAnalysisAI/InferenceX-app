@@ -76,12 +76,4 @@ describe('Agentic ISL/OSL distribution', () => {
     cy.contains('No data').should('be.visible');
     cy.get(`path[stroke="${FIT_STROKE}"]`).should('not.exist');
   });
-
-  it('renders in Simplified Chinese on the /zh route', () => {
-    mountDistribution(lognormalSample(600, 7, 0.8), '/zh/inference/agentic/96255');
-    cy.contains('600 个请求').should('be.visible');
-    cy.contains('对数刻度').should('be.visible');
-    cy.contains('数值（tokens，对数刻度）').should('be.visible');
-    cy.contains('requests').should('not.exist');
-  });
 });

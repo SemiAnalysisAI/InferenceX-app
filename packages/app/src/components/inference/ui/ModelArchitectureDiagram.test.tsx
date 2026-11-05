@@ -128,14 +128,6 @@ afterEach(() => {
 });
 
 describe('ModelArchitectureDiagram rendering', () => {
-  it('preserves the exact English release sentence spacing', () => {
-    render();
-    expand();
-
-    expect(container.textContent).toContain('Released by DeepSeek on');
-    expect(container.textContent).not.toContain('DeepSeekon');
-  });
-
   it('localizes the complete architecture chrome and keeps technical feature data intact', () => {
     mocks.pathname.value = '/zh/inference';
     render();

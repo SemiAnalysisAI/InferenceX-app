@@ -449,6 +449,28 @@ describe('buildPointDetails', () => {
     ).not.toContain('data-action="view-logs"');
   });
 
+  it.each([
+    [{ spec_decoding: 'draft_model' }, 'Draft Model'],
+    [
+      {
+        spec_decoding: 'draft_model',
+        spec_algorithm: 'dflash',
+        spec_draft_model: 'RadixArk/Muse-Spark-Open-DFlash2',
+      },
+      'DFlash (RadixArk/Muse-Spark-Open-DFlash2)',
+    ],
+    [
+      { spec_decoding: 'mtp', spec_algorithm: 'dspark', spec_draft_model: 'native' },
+      'DSpark (native)',
+    ],
+    [{ spec_decoding: 'none', spec_algorithm: 'dspark', spec_draft_model: 'native' }, 'Off'],
+  ])('labels speculative decoding by what the server ran: %j', (fields, label) => {
+    const { rows } = buildPointDetails(
+      tooltipConfig({ data: pt({ id: 3, benchmark_type: 'agentic_traces', ...fields }) }),
+    );
+    expect(rows).toContainEqual({ label: 'Speculative decoding', value: label });
+  });
+
   it('routes fixed-sequence log actions to the fixed benchmark log viewer', () => {
     const html = detailsText(
       tooltipConfig({

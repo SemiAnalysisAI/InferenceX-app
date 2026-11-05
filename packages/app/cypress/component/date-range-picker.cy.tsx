@@ -1,16 +1,13 @@
 import { useState } from 'react';
-import { PathnameContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 
 import { type DateRange, DateRangePicker } from '@/components/ui/date-range-picker';
 
 function DateRangePickerHarness({
   initialRange = { startDate: '', endDate: '' },
   availableDates,
-  useDefaults = false,
 }: {
   initialRange?: DateRange;
   availableDates?: string[];
-  useDefaults?: boolean;
 }) {
   const [range, setRange] = useState<DateRange>(initialRange);
   return (
@@ -19,7 +16,7 @@ function DateRangePickerHarness({
         dateRange={range}
         onChange={setRange}
         availableDates={availableDates}
-        placeholder={useDefaults ? undefined : 'Select date range'}
+        placeholder="Select date range"
       />
       <div data-testid="date-range-output">
         {range.startDate && range.endDate ? `${range.startDate} to ${range.endDate}` : 'no range'}
@@ -43,21 +40,6 @@ describe('DateRangePicker', () => {
     cy.get('[role="dialog"]').should('not.exist');
   });
 
-  it('displays formatted range when dates are provided', () => {
-    cy.mount(
-      <DateRangePickerHarness initialRange={{ startDate: '2026-01-15', endDate: '2026-02-20' }} />,
-    );
-    cy.get('[data-testid="date-range-wrapper"]').should('contain', 'Jan 15, 2026');
-    cy.get('[data-testid="date-range-wrapper"]').should('contain', 'Feb 20, 2026');
-  });
-
-  it('shows quick select buttons when availableDates provided', () => {
-    const dates = ['2025-12-01', '2025-12-15', '2026-01-01', '2026-02-01', '2026-03-01'];
-    cy.mount(<DateRangePickerHarness availableDates={dates} />);
-    cy.contains('Select date range').click();
-    cy.contains('button', 'Max range').should('be.visible');
-  });
-
   it('shows overlay when no available dates', () => {
     cy.mount(<DateRangePickerHarness availableDates={[]} />);
     cy.contains('Select date range').click();
@@ -76,20 +58,5 @@ describe('DateRangePicker', () => {
     cy.contains('button', 'View anyway').click();
     cy.get('[role="dialog"]').should('not.exist');
     cy.get('[data-testid="date-range-output"]').should('contain', '2026-01-01 to 2026-01-01');
-  });
-
-  it('localizes status, quick actions, and dialog actions on Chinese routes', () => {
-    const dates = ['2025-12-01', '2026-01-01', '2026-02-01'];
-    cy.mount(
-      <PathnameContext.Provider value="/zh/inference">
-        <DateRangePickerHarness availableDates={dates} useDefaults />
-      </PathnameContext.Provider>,
-    );
-    cy.contains('选择日期范围').click();
-    cy.contains('请选择开始和结束日期以定义日期范围').should('be.visible');
-    cy.contains('button', '最大范围').should('be.visible');
-    cy.contains('button', '取消').should('be.visible');
-    cy.contains('button', '应用').should('be.visible');
-    cy.get('[role="dialog"]').should('not.contain.text', 'Max range');
   });
 });

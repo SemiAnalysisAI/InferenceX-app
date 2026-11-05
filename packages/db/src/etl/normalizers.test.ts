@@ -62,6 +62,29 @@ describe('MiniMax M3.1 Flash ingestion', () => {
   });
 });
 
+describe('Kimi K3.1 Pro ingestion', () => {
+  // InferenceX#4803 (run 41932307764) emits the `kimik3.1` prefix and the
+  // moonshotai/Kimi-K3.1-Pro path; neither may fall into the `kimik3` bucket.
+  it.each([
+    { infmax_model_prefix: 'kimik3.1' },
+    { infmax_model_prefix: 'kimik3.1-fp4' },
+    { model_prefix: 'kimik3.1' },
+    { model: 'moonshotai/Kimi-K3.1-Pro' },
+  ])('resolves the recipe identity %j', (row) => {
+    expect(resolveModelKey(row)).toBe('kimik3.1');
+  });
+
+  it('keeps Kimi K3 rows in their own bucket', () => {
+    expect(resolveModelKey({ infmax_model_prefix: 'kimik3' })).toBe('kimik3');
+    expect(resolveModelKey({ infmax_model_prefix: 'kimik3-fp4' })).toBe('kimik3');
+    expect(resolveModelKey({ model: 'moonshotai/Kimi-K3' })).toBe('kimik3');
+  });
+
+  it('does not mistake the DFlash draft for the target model', () => {
+    expect(resolveModelKey({ model: 'RadixArk/Kimi-K3.1-Dflash2-Preview' })).toBeNull();
+  });
+});
+
 describe('hwToGpuKey', () => {
   it('strips -nv suffix', () => {
     expect(hwToGpuKey('h200-nv')).toBe('h200');

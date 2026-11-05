@@ -552,7 +552,7 @@ export function AgentXCompareHero({
                 data-testid="compare-agentx-dashboard-link"
                 href={agentxDashboardHref(locale, FEATURED_AGENTX_MODELS[0])}
                 analyticsEvent="compare_agentx_dashboard_clicked"
-                analyticsTarget="kimi-k3"
+                analyticsTarget={FEATURED_AGENTX_MODELS[0].slug}
                 analyticsSurface={surface}
                 appNavigation
                 className="group motion-press inline-flex min-h-11 items-center gap-2 rounded-md border border-border px-5 py-2.5 font-medium text-foreground transition-colors hover:bg-muted"

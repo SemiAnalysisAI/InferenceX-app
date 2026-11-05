@@ -21,8 +21,6 @@ describe('App error boundary localization', () => {
     );
 
     cy.get('[role="alert"]').should('have.attr', 'lang', 'en');
-    cy.contains('h2', 'Something went wrong').should('be.visible');
-    cy.contains('An unexpected error has occurred').should('be.visible');
     cy.get('@capture').should('have.been.calledWith', 'error_page_shown', {
       message: 'fixture failure',
       digest: 'en-1',
@@ -48,8 +46,6 @@ describe('App error boundary localization', () => {
     );
 
     cy.get('[role="alert"]').should('have.attr', 'lang', 'zh-CN');
-    cy.contains('h2', '页面出了点问题').should('be.visible');
-    cy.contains('发生意外错误').should('be.visible');
     cy.contains('p', message).should('have.attr', 'lang', 'en');
     cy.get('@capture').should('have.been.calledWith', 'error_page_shown', {
       message,

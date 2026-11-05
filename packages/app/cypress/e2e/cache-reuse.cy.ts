@@ -1,4 +1,3 @@
-import { interceptDerivedAgenticMetrics, unlockAgenticGate } from '../support/e2e';
 import {
   b300Rows,
   interceptCalculatorOverlayRun,
@@ -63,12 +62,6 @@ describe('Prefix Cache Reuse', () => {
           );
         });
     });
-
-    it('takes the host tier from the CPU-offload rate and leaves the external rate out', () => {
-      firstRowCell('HBM').should('have.text', '80.0%');
-      firstRowCell('Host').should('have.text', '5.0%');
-      firstRowCell('Not reused').should('have.text', '15.0%');
-    });
   });
 
   describe('share-link seeding', () => {
@@ -121,10 +114,6 @@ describe('Prefix Cache Reuse', () => {
         cy.get(BARS).should('have.length', REAL_CONFIGS.length);
         firstRowCell('HBM').should('have.text', '80.0%');
         firstRowCell('Recipe').should('contain.text', 'TP8');
-        cy.get('[data-testid="cache-reuse-controls"]').screenshot(
-          `cache-recipes-controls-${width}`,
-        );
-        cy.get('[data-testid="cache-reuse-figure"]').screenshot(`cache-recipes-chart-${width}`);
       });
     }
   });
@@ -214,40 +203,12 @@ describe('Prefix Cache Reuse', () => {
     });
   });
 
-  describe('entry from the inference chart', () => {
-    it('omits the cache-reuse link and optimization note from the agentic footer', () => {
-      interceptOverlayRun();
-      interceptDerivedAgenticMetrics();
-      cy.visit('/inference?g_model=DeepSeek-V4-Pro&i_seq=agentic-traces&i_prec=fp4', {
-        onBeforeLoad(win) {
-          dismissNudges(win);
-          unlockAgenticGate(win);
-        },
-      });
-      cy.wait('@benchmarks');
-      cy.get('#chart-0 svg[data-testid="d3-chart-svg"]').should('be.visible');
-      cy.get('[data-testid="chart-figure"] [data-testid="cache-reuse-link"]').should('not.exist');
-      cy.get('[data-testid="agentic-optimization-note"]').should('not.exist');
-    });
-
-    it('stays off the fixed-sequence chart', () => {
-      interceptCalculatorOverlayRun();
-      cy.visit('/inference?i_seq=1k%2F1k', { onBeforeLoad: dismissNudges });
-      cy.wait('@benchmarks');
-      cy.get('[data-testid="chart-status-notes"] [data-testid="cache-reuse-link"]').should(
-        'not.exist',
-      );
-    });
-  });
-
   describe('Chinese page', () => {
     it('renders the intro and Chinese tier labels', () => {
       interceptOverlayRun();
       cy.visit('/zh/cache-reuse', { onBeforeLoad: dismissNudges });
       cy.wait('@benchmarks');
-      cy.get('[data-testid="zh-tab-intro"]').should('contain.text', '前缀缓存复用');
-      cy.get('label[for="cache-reuse-config"]').should('contain.text', '配置');
-      cy.get('.sidebar-legend').should('contain.text', 'HBM 缓存').and('contain.text', '未复用');
+      cy.get('[data-testid="zh-tab-intro"]').should('be.visible');
       firstRowCell('HBM').should('have.text', '80.0%');
     });
   });

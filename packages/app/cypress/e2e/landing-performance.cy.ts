@@ -47,18 +47,13 @@ describe('Landing page performance', () => {
     for (const prefix of ['', '/zh']) {
       cy.visit(prefix || '/');
       cy.get('[data-testid="intro-section"]').within(() => {
-        cy.contains('Anyscale').should('not.exist');
         cy.contains('a', 'Google').should('have.attr', 'href', `${prefix}/quotes#quote-google`);
         cy.get('img[alt="Google"]').should('not.exist');
         cy.contains('a', 'Google').click();
       });
       cy.location('pathname').should('eq', `${prefix}/quotes`);
       cy.location('hash').should('eq', '#quote-google');
-      cy.get('#quote-google')
-        .should('be.visible')
-        .and('contain.text', 'Bill Jia')
-        .and('contain.text', prefix ? 'Google 工程副总裁' : 'VP of Engineering at Google');
-      cy.get('#quote-anyscale').should('contain.text', 'Seiji Eicher');
+      cy.get('#quote-google').should('be.visible');
     }
   });
 

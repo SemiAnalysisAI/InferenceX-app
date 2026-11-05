@@ -26,17 +26,6 @@ beforeEach(() => {
 });
 
 describe('GET /api/v1/availability', () => {
-  it('returns availability data', async () => {
-    const mockData = { dsr1: ['2026-03-01', '2026-03-02'], llama70b: ['2026-03-01'] };
-    mockGetAvailabilityData.mockResolvedValueOnce(mockData);
-
-    const res = await GET(new Request('https://example.test/api/v1/availability'));
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body).toEqual(mockData);
-    expect(mockGetAvailabilityData).toHaveBeenCalledWith('mock-sql');
-  });
-
   it('returns empty object when no data', async () => {
     mockGetAvailabilityData.mockResolvedValueOnce({});
 

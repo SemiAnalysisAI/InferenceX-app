@@ -1,5 +1,16 @@
 # D3 Chart Design Rationale
 
+## Router-aware framework labels
+
+Inference line labels and legends use `router_name` from each point's runtime
+metadata. Plain `sglang` or `vllm` with router `smg` displays as `SMG SGLang`
+or `SMG vLLM`. If any point uses SMG, the entire curve's line label and legend
+use the SMG framework name without a mixed-name suffix. Curves with no SMG
+points keep the standard name, and point tooltips use only that point's
+metadata. This applies to official results and unofficial overlays.
+Hardware keys, framework filters and measurements do not change.
+The inference Views API uses the same helper for series and table labels.
+
 ## Desktop legend alignment
 
 The shared chart wrapper places the desktop legend 8px below the plot's top
