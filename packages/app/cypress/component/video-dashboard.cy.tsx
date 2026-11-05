@@ -481,7 +481,10 @@ describe('VideoGenX results', () => {
     points('[data-hardware="b200"] .visible-shape').click({ force: true });
     cy.get('[data-chart-tooltip]:visible')
       .should('contain', 'B200 · 4 GPU')
-      .and('contain', '4 participating · 8 allocated');
+      .and('contain', '4 participating · 8 allocated')
+      .and('contain', 'Deployment: TP2 × Ulysses 2')
+      .find('a[href="https://github.com/SemiAnalysisAI/InferenceX/actions/runs/34341996789"]')
+      .should('contain', 'GitHub Actions Run');
     cy.get('[data-chart-tooltip]:visible [data-action="view-telemetry"]').click();
     cy.get('[data-testid="video-results-detail"] h1').should('contain', 'B200');
     searchParam('r_point').should('match', /^34341996789:/u);

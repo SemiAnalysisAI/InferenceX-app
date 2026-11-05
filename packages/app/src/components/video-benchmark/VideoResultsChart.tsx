@@ -9,10 +9,17 @@ import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { overlayRunColor } from '@/lib/charts/overlay-run-style';
 import { escapeHtml } from '@/lib/shared/utils';
+import { FRAMEWORK_LABELS } from '@semianalysisai/inferencex-constants';
+import {
+  runLinkHTML,
+  tooltipLine,
+  tooltipShellStyle,
+} from '@/components/inference/utils/tooltipUtils';
 import { zeroAnchoredDomain } from './chart-domain';
 import { hardwareLabel, hardwareSort } from './hardware';
 import type { ResultCell, ResultsState } from './results';
 import {
+  RESULTS_X_METRIC_KEYS,
   RESULTS_X_METRICS,
   RESULTS_Y_METRICS,
   resultsChartSeries,
@@ -41,10 +48,12 @@ const STRINGS = {
     dismiss: 'Click elsewhere to dismiss',
     unofficial: 'Unofficial run',
     date: 'Date',
-    gpuCounts: 'GPUs',
+    totalGpus: 'Total GPUs',
     gpuDetail: (participating: string, allocated: string) =>
       `${participating} participating · ${allocated} allocated`,
-    latency: 'P50 / P90 latency',
+    deployment: 'Deployment',
+    replicas: (count: number) => `${count} ${count === 1 ? 'replica' : 'replicas'}`,
+    concurrency: 'Concurrency',
     perVideo: 'Cost per video',
     energy: 'Energy per clip',
     power: 'Avg board power',
@@ -66,10 +75,12 @@ const STRINGS = {
     dismiss: '点击其他位置关闭',
     unofficial: '非官方运行',
     date: '日期',
-    gpuCounts: 'GPU',
+    totalGpus: 'GPU 总数',
     gpuDetail: (participating: string, allocated: string) =>
       `参与计算 ${participating} 张 · 分配 ${allocated} 张`,
-    latency: 'P50 / P90 延迟',
+    deployment: '部署',
+    replicas: (count: number) => `${count} 个副本`,
+    concurrency: '并发数',
     perVideo: '每条视频成本',
     energy: '每条视频能耗',
     power: '板卡平均功率',
@@ -206,33 +217,47 @@ export default function VideoResultsChart({
     [lines, lineColors, plotted, labels, s],
   );
   const tooltip = useMemo<TooltipConfig<PlotPoint>>(() => {
-    const colon = locale === 'zh' ? '：' : ': ';
-    const row = (label: string, value: string) =>
-      `<div><span class="text-muted-foreground">${escapeHtml(label)}${colon}</span>${value}</div>`;
+    const line = (label: string, value: string) => tooltipLine(escapeHtml(label), value);
+    const otherX = RESULTS_X_METRICS[RESULTS_X_METRIC_KEYS.find((key) => key !== state.xMetric)!];
+    const selection = { basis: state.costBasis, tier: state.costTier };
     return {
       rulerType: 'none',
       attachToLayer: 1,
-      content: ({ cell, color, overlay }, pinned) => {
+      content: ({ cell, overlay, x: xValue, y: yValue }, pinned) => {
         const { point } = cell;
         const cost = cell.cost[state.costBasis];
+        const engine = cell.metadata.engine;
         const title = [
-          hardwareLabel(point.hardwareKey ?? ''),
-          s.gpus(point.participating),
+          `${hardwareLabel(point.hardwareKey ?? '')} · ${s.gpus(point.participating)}${engine ? ` (${FRAMEWORK_LABELS[engine] ?? engine})` : ''}`,
           ...(overlay ? [`${s.unofficial} #${point.runId}`] : []),
         ].join(' · ');
-        return `<div class="rounded-md border bg-background/95 px-3 py-2 text-xs shadow-md backdrop-blur-sm" style="min-width:220px;max-width:300px;user-select:${pinned ? 'text' : 'none'}" data-testid="video-results-popover">
-          ${pinned ? `<div class="mb-1 italic text-muted-foreground">${s.dismiss}</div>` : ''}
-          <div class="mb-1 font-semibold" style="color:${color}">${escapeHtml(title)}</div>
-          ${row(s.date, escapeHtml(point.observedAt?.slice(0, 10) ?? '—'))}
-          ${row(s.gpuCounts, escapeHtml(s.gpuDetail(n(point.participating, 0), n(point.allocated, 0))))}
-          ${row(s.latency, `${n(point.p50, 1)} / ${n(point.p90, 1)} s`)}
-          ${row(y.label[locale], `${n(y.value(cell, { basis: state.costBasis, tier: state.costTier }), y.digits)}${y.unit ? ` ${y.unit}` : ''}`)}
-          ${row(s.perVideo, cost ? `$${n(cost.perVideo, 4)}` : '—')}
-          ${row(s.energy, cell.joulesPerClip === null ? '—' : `${n(cell.joulesPerClip / 1000, 1)} kJ`)}
-          ${row(s.power, point.avgPowerW === null ? '—' : `${n(point.avgPowerW, 0)} W`)}
-          ${row(s.valid, `${n(point.valid, 0)} / ${n(point.scheduled, 0)}`)}
-          ${row(s.runtime, `<span class="font-mono">${escapeHtml(point.runtime.slice(0, 12) || '—')}</span>`)}
-          ${pinned ? `<button type="button" data-action="view-telemetry" class="mt-2 w-full cursor-pointer rounded-md border px-2 py-1.5 font-medium hover:bg-muted">${s.viewTelemetry} →</button>` : ''}
+        const tp = point.server?.tp ?? null,
+          ulysses = point.server?.ulysses ?? null;
+        const deployment =
+          tp !== null && ulysses !== null
+            ? [
+                `TP${tp} × Ulysses ${ulysses}`,
+                ...(point.replicas === null ? [] : [s.replicas(point.replicas)]),
+              ].join(' · ')
+            : null;
+        const other = otherX.value(cell, selection);
+        return `<div style="${tooltipShellStyle({ isPinned: pinned })}; min-width: 220px" data-testid="video-results-popover">
+          ${pinned ? `<div style="color: var(--muted-foreground); font-size: 10px; margin-bottom: 6px; font-style: italic;">${s.dismiss}</div>` : ''}
+          <div style="color: var(--foreground); font-size: 12px; font-weight: 600; margin-bottom: 8px;">${escapeHtml(title)}</div>
+          ${line(s.date, escapeHtml(point.observedAt?.slice(0, 10) ?? '—'))}
+          ${point.runtime ? line(s.runtime, `<span class="font-mono">${escapeHtml(point.runtime.slice(0, 12))}</span>`) : ''}
+          ${line(xLabel, n(xValue, x.digits))}
+          ${line(yLabel, n(yValue, y.digits))}
+          ${line(s.totalGpus, escapeHtml(s.gpuDetail(n(point.participating, 0), n(point.allocated, 0))))}
+          ${deployment ? line(s.deployment, escapeHtml(deployment)) : ''}
+          ${point.concurrency === null ? '' : line(s.concurrency, String(point.concurrency))}
+          ${line(resultsMetricLabel(otherX, locale, clip), n(other, otherX.digits))}
+          ${line(s.perVideo, cost ? `$${n(cost.perVideo, 4)}` : '—')}
+          ${line(s.energy, cell.joulesPerClip === null ? '—' : `${n(cell.joulesPerClip / 1000, 1)} kJ`)}
+          ${line(s.power, point.avgPowerW === null ? '—' : `${n(point.avgPowerW, 0)} W`)}
+          ${line(s.valid, `${n(point.valid, 0)} / ${n(point.scheduled, 0)}`)}
+          ${runLinkHTML(`https://github.com/SemiAnalysisAI/InferenceX/actions/runs/${encodeURIComponent(point.runId)}`, locale, point.hardwareKey ?? '')}
+          ${pinned ? `<button type="button" data-action="view-telemetry" class="mt-2 w-full rounded-md border border-border bg-accent px-2 py-1 text-xs font-medium text-accent-foreground cursor-pointer">${s.viewTelemetry} &rarr;</button>` : ''}
         </div>`;
       },
       onPointClick: (point) => {
@@ -251,7 +276,7 @@ export default function VideoResultsChart({
           });
       },
     };
-  }, [locale, s, state, y, onOpen]);
+  }, [locale, s, state, x, y, xLabel, yLabel, clip, onOpen]);
 
   const hidden = new Set(state.hidden);
   const measured = new Set(cells.map((cell) => cell.point.hardwareKey));

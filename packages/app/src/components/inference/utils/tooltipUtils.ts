@@ -97,7 +97,7 @@ export const getPointLabel = (d: InferenceData): string => {
   return label;
 };
 
-const runLinkHTML = (runUrl: string | undefined, locale: Locale, hardware: string) =>
+export const runLinkHTML = (runUrl: string | undefined, locale: Locale, hardware: string) =>
   runUrl && !hardware.startsWith('tpu')
     ? `<div style="font-size: 11px; margin-top: 4px;">
         <a href="${runUrl}" target="_blank" rel="noopener noreferrer" style="color: var(--muted-foreground); text-decoration: underline; cursor: pointer;">${locale === 'zh' ? 'GitHub Actions 运行记录' : 'GitHub Actions Run'}</a>
@@ -106,7 +106,7 @@ const runLinkHTML = (runUrl: string | undefined, locale: Locale, hardware: strin
 
 const labelColon = (label: string) => (/[\u4E00-\u9FFF]/u.test(label) ? '：' : ':');
 
-const tooltipLine = (label: string, value: string | number) =>
+export const tooltipLine = (label: string, value: string | number) =>
   `<div style="color: var(--muted-foreground); font-size: 11px; margin-bottom: 4px;"><strong>${label}${labelColon(label)}</strong> ${value}</div>`;
 
 const formatPct = (v: number | undefined): string | null =>
