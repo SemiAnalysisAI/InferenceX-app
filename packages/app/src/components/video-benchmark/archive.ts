@@ -123,7 +123,10 @@ export async function archiveSources(blob: Blob, artifact: CIArtifact) {
     (artifact.workflow_run !== undefined &&
       (String(artifact.workflow_run.id) !== identity.run ||
         ((identity.configuration || at(manifest, 'ci', 'head_sha') !== null) &&
-          artifact.workflow_run.head_sha !== at(manifest, 'ci', 'head_sha'))))
+          // A dispatched run tests ci.head_sha on the workflow at ci.workflow_sha, which GitHub reports.
+          ![at(manifest, 'ci', 'head_sha'), at(manifest, 'ci', 'workflow_sha')].includes(
+            artifact.workflow_run.head_sha,
+          ))))
   )
     throw new Error('Manifest and GitHub artifact identify different runs');
   return [
