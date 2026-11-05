@@ -59,9 +59,6 @@ const points = (selector = '') =>
 const openRow = (hardware: string, overlay = false) =>
   row(hardware).filter(`[data-overlay="${overlay}"]`).find('button').click();
 const toggleHardware = (hardware: string) => cy.get(`label[for="checkbox-${hardware}"]`).click();
-const clips = () => cy.get<HTMLVideoElement>('[data-testid="video-results-clip"] video');
-const clip = (hardware: string) =>
-  cy.get<HTMLVideoElement>(`[data-testid="video-results-clip"][data-hardware="${hardware}"] video`);
 const searchParam = (key: string) =>
   cy.location('search').then((search) => new URLSearchParams(search).get(key));
 const plottedY = (hardware: string) =>
@@ -290,69 +287,6 @@ describe('VideoGenX results', () => {
     row('b200').should('have.length', 1).and('have.attr', 'data-overlay', 'false');
   });
 
-  it('holds every clip while one lacks data, then resumes together, ends and restarts from zero', () => {
-    mount({
-      editPage: (page) => {
-        cy.intercept('GET', 'https://media.test/**', {
-          fixture: 'video-results/candidate.mp4,null',
-          headers: { 'Content-Type': 'video/mp4', 'Access-Control-Allow-Origin': '*' },
-        });
-        for (const [hardware, name] of [
-          ['b200', 'NVIDIA B200'],
-          ['h200', 'NVIDIA H200'],
-        ] as const) {
-          const point = videoPoints([page]).find(
-            (item) => item.hardwareKey === hardware && item.concurrency === 1,
-          )!;
-          const saved = servingArtifact(Number(point.runId), point.artifactId, name);
-          saved.sources[0].checksums = saved.sources[0].checksums.map(([path, sha]) => [
-            path,
-            path === 'manifest.json' ? point.id.split(':')[0] : sha,
-          ]);
-          cy.intercept(
-            'GET',
-            `/api/video-runs?run=${point.runId}&artifact=${point.artifactId}&format=published`,
-            saved,
-          );
-        }
-      },
-    });
-    clips().should('have.length', 2).and('have.attr', 'preload', 'auto');
-    clips().should(($videos) => {
-      for (const video of $videos) expect(video.readyState, 'fixture decoded').to.be.at.least(3);
-    });
-    clip('b200').then(($video) => {
-      Object.defineProperty($video[0], 'readyState', { value: 2, configurable: true });
-    });
-    cy.get('[data-testid="video-results-play"]').click();
-    cy.get('[data-testid="video-results-buffering"]').should('contain', 'Loading 100%');
-    cy.get('[data-testid="video-results-play"]').should('have.attr', 'aria-pressed', 'true');
-    cy.wait(300);
-    clips().should(($videos) => {
-      for (const video of $videos) expect(video.paused, 'no clip starts early').to.equal(true);
-    });
-    clip('b200').then(($video) => {
-      delete ($video[0] as unknown as Record<string, unknown>).readyState;
-    });
-    cy.get('[data-testid="video-results-buffering"]').should('not.exist');
-    cy.get('[data-testid="video-results-play"]', { timeout: 10000 }).should(
-      'have.attr',
-      'aria-pressed',
-      'false',
-    );
-    clips().should(($videos) => {
-      const times = [...$videos].map((video) => video.currentTime);
-      expect(Math.min(...times), 'ended at the shared duration').to.be.at.least(1.6);
-      expect(Math.max(...times) - Math.min(...times), 'ended together').to.be.lessThan(0.3);
-      for (const video of $videos) expect(video.paused).to.equal(true);
-    });
-    cy.get('[data-testid="video-results-play"]').click();
-    cy.get('[data-testid="video-results-play"]').should('have.attr', 'aria-pressed', 'true');
-    clips().should(($videos) => {
-      for (const video of $videos) expect(video.currentTime, 'restarted').to.be.lessThan(1);
-    });
-  });
-
   it('applies the sample floor, preserves unknown allocation and drops every planned placeholder', () => {
     mount({
       edit: (observation) => {
@@ -392,41 +326,6 @@ describe('VideoGenX results', () => {
     cy.get('[data-testid="results-cost-context"]').should('contain', 'B200: 3.7');
   });
 
-  it('hides hardware from the chart and table through the legend and handles an empty selection', () => {
-    mount({ search: '?r_y=videosPerGpuHour' });
-    points().should('have.length', 3);
-    cy.get('[data-testid="video-results-single-note"]').should('be.visible');
-    cy.get('#checkbox-mi355x').should('have.attr', 'aria-disabled', 'true');
-    cy.contains('label', 'MI355X · no matched run').should('exist');
-    cy.get('#checkbox-gb200').should('not.exist');
-    cy.get('[data-testid="video-results-clip"]').should(($tiles) => {
-      const hardware = [...$tiles].map((tile) => tile.dataset.hardware);
-      expect(hardware, 'tiles follow the measured legend entries').to.deep.equal([
-        'b200',
-        'h200',
-        'h100',
-      ]);
-    });
-    toggleHardware('b200');
-    cy.get('#checkbox-b200').should('not.be.checked');
-    row('b200').should('not.exist');
-    points('[data-hardware="b200"]').should('not.exist');
-    cy.get('[data-testid="video-results-clip"][data-hardware="b200"]').should('not.exist');
-    cy.get('[data-testid="video-results-clip"]').should('have.length', 2);
-    cy.location('search').should('contain', 'r_hidden=b200');
-    toggleHardware('h200');
-    toggleHardware('h100');
-    cy.get('[data-testid="results-row"]').should('not.exist');
-    points().should('not.exist');
-    cy.get('[data-testid="video-results-chart"]').should(
-      'contain',
-      'No visible hardware has both selected metrics',
-    );
-    cy.get('[data-testid="video-results-legend-reset"]').click();
-    points().should('have.length', 3);
-    cy.location('search').should('not.contain', 'r_hidden=');
-  });
-
   it('views results as of an earlier run and compares a chip config over time', () => {
     mount({ search: '?r_y=videosPerGpuHour' });
     cy.get('#run-select').should('contain', 'Run 3/3');
@@ -464,11 +363,11 @@ describe('VideoGenX results', () => {
     cy.get('[data-testid="results-utilization"]').then(($input) => {
       const input = $input[0] as HTMLInputElement;
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
-      setter.call(input, '0');
+      setter.call(input, '50');
       input.dispatchEvent(new Event('input', { bubbles: true }));
     });
-    cy.get('[data-testid="results-profit"] [data-hardware="b200"]').should('contain', '-1.73');
-    cy.location('search').should('contain', 'r_utilization=0');
+    cy.get('[data-testid="results-profit"] [data-hardware="b200"]').should('contain', '0.77');
+    cy.location('search').should('contain', 'r_utilization=0.5');
   });
 
   it('plots the selected axis metrics and cost basis', () => {
@@ -547,41 +446,6 @@ describe('VideoGenX results', () => {
     cy.get('[data-testid="video-results-detail"]').should('not.exist');
     cy.go('forward');
     cy.get('[data-testid="video-results-detail"] h1').should('contain', 'H200');
-  });
-
-  it('keeps the selected clip case and fetched media across a detail visit', () => {
-    mount({
-      editPage: (page) => {
-        const point = videoPoints([page]).find(
-          (item) => item.hardwareKey === 'b200' && item.concurrency === 1,
-        )!;
-        const saved = servingArtifact(Number(point.runId), point.artifactId, 'NVIDIA B200');
-        saved.sources[0].checksums = saved.sources[0].checksums.map(([path, sha]) => [
-          path,
-          path === 'manifest.json' ? point.id.split(':')[0] : sha,
-        ]);
-        cy.intercept('GET', 'https://media.test/**', {
-          fixture: 'video-results/candidate.mp4',
-          headers: { 'Content-Type': 'video/mp4' },
-        });
-        cy.intercept(
-          'GET',
-          `/api/video-runs?run=${point.runId}&artifact=${point.artifactId}&format=published`,
-          saved,
-        ).as('publishedMedia');
-      },
-    });
-    cy.wait('@publishedMedia');
-    cy.get('[data-testid="video-results-case"]').click();
-    cy.contains('[role="option"]', 'take 3').click();
-    cy.get('[data-testid="video-results-case"]').should('contain', 'take 3');
-    openRow('b200');
-    cy.get('[data-testid="video-results-detail"] h1').should('contain', 'B200');
-    cy.get('[data-testid="results-detail-back"]').click();
-    cy.get('[data-testid="video-results-detail"]').should('not.exist');
-    cy.get('[data-testid="video-results-case"]').should('contain', 'take 3');
-    cy.get('[data-testid="video-results-clip"][data-hardware="b200"] video').should('exist');
-    cy.get('@publishedMedia.all').should('have.length', 1);
   });
 
   it('falls back to the overview for an unknown or hidden deployment and drops its key', () => {

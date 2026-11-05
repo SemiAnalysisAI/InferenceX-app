@@ -158,23 +158,6 @@ requirements. The command neither publishes metadata nor creates media URLs, and
 does not modify fixtures. Reader acceptance of an older plan does not qualify a new
 workload or establish browser/API/playback, CI E2E, or release acceptance.
 
-## Manual replay checks
-
-The manual Cypress specs use retained local artifacts rather than API stubs.
-`video-original-artifact.cy.ts` selects its exact run/artifact from History, even
-when other retained runs are loaded. `video-matched-artifacts.cy.ts` expects the
-complete review manifest: both original B200/H100 artifacts, their 20 reference
-pairs each, and the separate H100 matched-noise diagnostic. It distinguishes the
-20 CI groups from the diagnostic, including the empty B200 diagnostic tile, and
-checks English desktop at 1440 px and Chinese mobile at 390 px. Component tests
-cover both locales and the 320 px single-column layout. The selector test samples
-the first and last CI cases; API assertions still check all 40 clip scores. Run
-these specs against the
-development server with `E2E_FIXTURES=1` and `E2E_VIDEO_REPLAY_MANIFEST` set; they
-are not substitutes for hosted CI or a new benchmark run.
-
-中文：手动 Cypress 验证使用本机保留的真实产物。完整审阅 manifest 包含 B200/H100 原始产物、各 20 条参考配对及独立的 H100 相同初始噪声诊断。测试区分 20 组 CI 用例与诊断，保留 B200 诊断空卡片，并检查英文 1440 px 和中文 390 px 的真实媒体回放；组件测试另行覆盖两种语言和 320 px 单列布局。选择器检查首尾 CI 用例，API 断言仍覆盖全部 40 条配对分数。使用开启上述回放变量的开发服务运行；这不代替托管 CI 或新的 benchmark 验收。
-
 ## 中文说明
 
 从 `packages/app` 使用上述 `bun --no-env-file` 命令，可离线读取未改动的原始 CI ZIP、

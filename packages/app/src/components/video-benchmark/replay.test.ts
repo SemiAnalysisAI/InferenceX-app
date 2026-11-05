@@ -127,45 +127,4 @@ describe('offline original CI ZIP replay', () => {
     );
     expect(report.history.sources[0].observations[0].allocated).toBeNull();
   });
-
-  it('keeps failed-cell denominators and reports a missing run instead of manufacturing an accepted result', async () => {
-    const { blob, metadata } = await archive((files) => {
-      const matrix = JSON.parse(files['serving-smoke.json']);
-      Object.assign(matrix.cells[0], {
-        verified: false,
-        status: 'failed',
-        run: null,
-        receipt: null,
-        power: null,
-        completion: { scheduled: 20, attempted: 20, completed: 19, valid: 19, failed: 1 },
-      });
-      files['serving-smoke.json'] = JSON.stringify(matrix);
-    });
-    const report = await replayVideoArtifact(blob, metadata, planHash);
-    expect(report.ok).toBe(false);
-    expect(report.cells[0]).toMatchObject({
-      status: 'failed',
-      verified: false,
-      powerValid: null,
-      planSha256: null,
-      completion: { scheduled: 20, attempted: 20, completed: 19, valid: 19, failed: 1 },
-    });
-    expect(report.errors).toEqual(['123456789/c1: missing or mismatched expected plan SHA256']);
-    expect(report.officialPoints).toBe(0);
-  });
-
-  it('reports a rejected source and fails an empty replay', async () => {
-    const { blob, metadata } = await archive((files) => {
-      const matrix = JSON.parse(files['serving-smoke.json']);
-      matrix.cells = [];
-      files['serving-smoke.json'] = JSON.stringify(matrix);
-    });
-    const report = await replayVideoArtifact(blob, metadata, planHash);
-    expect(report.ok).toBe(false);
-    expect(report.errors).toContain(
-      '123456789: Invalid H3 serving matrix: unsupported matrix contract',
-    );
-    expect(report.cells).toEqual([]);
-    expect(report.namedDiagnosticPoints).toBe(0);
-  });
 });

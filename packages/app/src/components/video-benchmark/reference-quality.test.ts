@@ -61,6 +61,8 @@ describe('sealed per-clip reference pairs', () => {
     'model',
     'generation',
     'fairness',
+    'runtime',
+    'cases',
   ])('rejects %s substitution or ambiguity', (defect) => {
     const f = referenceQualityFixture();
     const pair = f.attachment.pairs[0];
@@ -74,6 +76,9 @@ describe('sealed per-clip reference pairs', () => {
     if (defect === 'seed') pair.candidate.seed = 12;
     if (defect === 'duplicate') f.attachment.pairs.push(structuredClone(pair));
     if (defect === 'reference') pair.reference.media_sha256 = '0'.repeat(64);
+    if (defect === 'runtime')
+      f.receipt.runtime.diffusers_source.url = 'https://example.test/unrelated-runtime';
+    if (defect === 'cases') f.receipt.cases = [];
     const key = defect === 'model' ? 'model_revision' : defect;
     if (['model', 'generation', 'fairness'].includes(defect)) {
       const plan = at(f.receipt, 'plan');
@@ -132,20 +137,5 @@ describe('sealed per-clip reference pairs', () => {
     expect(quality.notes).toEqual(['incompatible-media']);
     expect(quality.status).toBe('incompatible');
     expect(quality.psnrDb).toBeNull();
-  });
-  it('requires retained completed cases and the executed pinned reference runtime', () => {
-    const f = referenceQualityFixture();
-    f.receipt.status = 'failed';
-    expect(
-      verifiedReferencePairs(f.attachment, f.receipts, [f.stored], '9'.repeat(64))[0].status,
-    ).toBe('measured');
-    f.receipt.runtime.diffusers_source.url = 'https://example.test/unrelated-runtime';
-    expect(() =>
-      verifiedReferencePairs(f.attachment, f.receipts, [f.stored], '9'.repeat(64)),
-    ).toThrow('executed reference runtime');
-    f.receipt.cases = [];
-    expect(() =>
-      verifiedReferencePairs(f.attachment, f.receipts, [f.stored], '9'.repeat(64)),
-    ).toThrow('completed reference case');
   });
 });

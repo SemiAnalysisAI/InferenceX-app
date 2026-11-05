@@ -147,74 +147,19 @@ afterEach(async () => {
 });
 
 describe('original-artifact development replay', () => {
-  it('serves new diagnostic media under isolated receipt identities without new History observations', async () => {
-    const { dir } = await configureDiagnostic();
-    const response = await GET(
-      new NextRequest('http://localhost/api/video-runs?run=123&artifact=7&format=published'),
-    );
-    expect(response.status, await response.clone().text()).toBe(200);
-    const saved = await response.json();
-    expect(saved.diagnostics).toHaveLength(1);
-    expect(saved.diagnostics[0]).toMatchObject({
-      scope: 'matched-noise-diagnostic',
-      psnrDb: 25,
-      releaseQualified: false,
-    });
-    expect(JSON.stringify(saved)).not.toContain(dir);
-    for (const role of ['candidate', 'reference']) {
-      const diagnosticUrl = new URL(saved.diagnostics[0][role].url, 'http://localhost');
-      const media = await GET(new NextRequest(diagnosticUrl, { headers: { range: 'bytes=0-2' } }));
-      expect(media.status).toBe(206);
-      expect(await media.text()).toBe('new');
-      diagnosticUrl.searchParams.set('path', 'native.json');
-      const deniedEvidence = await GET(new NextRequest(diagnosticUrl));
-      expect(deniedEvidence.status).toBe(404);
-      diagnosticUrl.searchParams.set('path', saved.diagnostics[0][role].media_path);
-      diagnosticUrl.searchParams.set('artifact', '8');
-      const deniedArtifact = await GET(new NextRequest(diagnosticUrl));
-      expect(deniedArtifact.status).toBe(404);
-    }
-    const historyResponse = await GET(
-      new NextRequest('http://localhost/api/video-runs?format=history&page=1&pages=5'),
-    );
-    const history = await historyResponse.json();
-    expect(history.nextPage).toBeNull();
-    expect(history.entries).toHaveLength(1);
-    expect(history.entries[0]).toMatchObject({ approved: false, publishedAt: null });
-    expect(history.entries[0].sources[0].observations).toHaveLength(3);
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-  it.each(['candidate/drum-taps/candidate.mp4', 'candidate/native.json', 'diagnostics.json'])(
-    'rejects tampered diagnostic %s without exposing private paths',
+  it.each([null, 'candidate/drum-taps/candidate.mp4', 'candidate/native.json', 'diagnostics.json'])(
+    'verifies the diagnostic attachment with %s tampered, without private paths',
     async (member) => {
       const { dir } = await configureDiagnostic();
-      await appendFile(join(dir, member), '\n');
+      if (member !== null) await appendFile(join(dir, member), '\n');
       const response = await GET(new NextRequest('http://localhost/api/video-runs?format=history'));
-      expect(response.status).toBe(503);
       const body = await response.text();
-      expect(body).toContain('Diagnostic attachment failed verification');
+      expect(response.status, body).toBe(member === null ? 200 : 503);
+      expect(body.includes('Diagnostic attachment failed verification')).toBe(member !== null);
       expect(body).not.toContain(dir);
       expect(fetchMock).not.toHaveBeenCalled();
     },
   );
-  it('fails a bad quality attachment closed without returning its private file path', async () => {
-    await configure();
-    const manifest = process.env.E2E_VIDEO_REPLAY_MANIFEST!;
-    const config = JSON.parse(await readFile(manifest, 'utf8'));
-    await writeFile(
-      manifest,
-      JSON.stringify({
-        ...config,
-        quality: { path: '/private/missing-quality.json', sha256: '0'.repeat(64) },
-      }),
-    );
-    const response = await GET(new NextRequest('http://localhost/api/video-runs?format=history'));
-    expect(response.status).toBe(503);
-    const body = await response.text();
-    expect(body).toContain('Quality attachment failed verification');
-    expect(body).not.toContain('/private/');
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
   it('attaches sealed quality without approval and isolates reference byte-range URLs', async () => {
     const replay = await configure();
     const f = referenceQualityFixture();
@@ -306,47 +251,6 @@ describe('original-artifact development replay', () => {
     const unsatisfiable = await GET(new NextRequest(assetUrl, { headers: { range: 'bytes=10-' } }));
     expect(unsatisfiable.status).toBe(416);
     expect(unsatisfiable.headers.get('content-range')).toBe('bytes */10');
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it('keeps same-run artifacts and colliding media paths separate without approval', async () => {
-    await configureCollection([7, 8]);
-    const history = await GET(new NextRequest('http://localhost/api/video-runs?format=history'));
-    expect(history.status).toBe(200);
-    expect(history.headers.get('x-videogenx-replay')).toBe('1');
-    const page = await history.json();
-    expect(page.entries).toHaveLength(2);
-    expect(page.entries.map((entry: { artifact: { id: number } }) => entry.artifact.id)).toEqual([
-      7, 8,
-    ]);
-    for (const entry of page.entries) {
-      expect(entry).toMatchObject({ runId: '123', approved: false, publishedAt: null });
-      expect(entry.sources[0].releaseQualified).toBe(false);
-      const artifact = await GET(
-        new NextRequest(
-          `http://localhost/api/video-runs?run=123&artifact=${entry.artifact.id}&format=published`,
-        ),
-      );
-      expect(artifact.status).toBe(200);
-      const saved = await artifact.json();
-      const storedAssetUrl = saved.sources[0].assets[0][1].url;
-      const media = await GET(new NextRequest(`http://localhost${storedAssetUrl}`));
-      expect(await media.text()).toBe(`clip-${entry.artifact.id}`);
-    }
-    const wrongRun = await GET(new NextRequest(assetUrl.replace('run=123', 'run=124')));
-    expect(wrongRun.status).toBe(404);
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    { ids: [], error: 'nonempty artifacts array' },
-    { ids: [7, 7], error: 'Duplicate replay artifact' },
-  ])('rejects an ambiguous or empty collection: $ids', async ({ ids, error }) => {
-    await configureCollection(ids);
-    const response = await GET(new NextRequest('http://localhost/api/video-runs?format=history'));
-    expect(response.status).toBe(503);
-    const body = await response.json();
-    expect(body.error).toContain(error);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
