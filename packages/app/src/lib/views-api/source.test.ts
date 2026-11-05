@@ -21,18 +21,21 @@ describe('Kimi K3 TCO selection', () => {
   });
 });
 
-describe('Muse Spark Open TCO selection', () => {
-  it('preserves both pricing bases for agentic', () => {
-    const search = new URLSearchParams({ model: Model.Muse_Spark_Open, sequence: 'agentic' });
-    const defaults = selection(search);
-    expect(defaults.model).toBe(Model.Muse_Spark_Open);
-    expect(defaults.sequence).toBe(Sequence.AgenticTraces);
-    expect(defaults.tcoBasis).toBe('internal');
-    for (const basis of ['external', 'internal']) {
-      search.set('tcoBasis', basis);
-      expect(selection(search)).toEqual({ ...defaults, tcoBasis: basis });
-    }
-  });
+describe('AgentX-only TCO selection', () => {
+  it.each([Model.Muse_Spark_Open, Model.GLM_5_2, Model.GLM_5_3_Flash])(
+    'preserves both pricing bases for %s on agentic',
+    (model) => {
+      const search = new URLSearchParams({ model, sequence: 'agentic' });
+      const defaults = selection(search);
+      expect(defaults.model).toBe(model);
+      expect(defaults.sequence).toBe(Sequence.AgenticTraces);
+      expect(defaults.tcoBasis).toBe('internal');
+      for (const basis of ['external', 'internal']) {
+        search.set('tcoBasis', basis);
+        expect(selection(search)).toEqual({ ...defaults, tcoBasis: basis });
+      }
+    },
+  );
 });
 
 describe('internal published GET response decoding', () => {
