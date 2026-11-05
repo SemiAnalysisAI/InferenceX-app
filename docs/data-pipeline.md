@@ -286,6 +286,37 @@ point across attempts; the log records the applied backfill ID. Changelog correc
 likewise applied to artifact metadata before `appendOnly`/`evalsOnly` run semantics are
 resolved and before the changelog is upserted.
 
+### Audited Framework Reassignments
+
+A sweep can serve one framework while its matrix entry declares another. The Qwen3.5
+TPU v7 AgentX xPyD run 40744397059 ran every engine behind the llm-d router but was
+declared as `vllm`, so its points were grouped with plain vLLM instead of `llmd-vllm`
+like the GB200 llm-d sweeps. Register such a run in `RUN_FRAMEWORK_OVERRIDES` in
+`packages/db/src/etl/run-framework-overrides.ts` (re-exported by `run-overrides.ts`; it
+is a separate dependency-free module because the mappers, which the app bundles for the
+unofficial-run route, read it at mapping time) with a stable `id`, a `reason`, the `githubRunId`,
+the canonical declared framework (`from`), and the canonical served framework (`to`,
+which must be a registered `FW_REGISTRY` key). Validation rejects aliases, unregistered
+targets, duplicate selectors, and purged runs.
+
+The benchmark and eval mappers substitute `to` for `from` before any config is
+resolved, so every ingest path (CI, GCS backup, re-ingest) stores benchmark rows, eval
+rows, and availability under the served framework, and changelog config keys are
+rewritten (`qwen3.5-fp8-tpuv7-vllm-agentic-xpyd-mtp` becomes
+`qwen3.5-fp8-tpuv7-llmd-vllm-agentic-xpyd-mtp`) so the changelog keeps matching the
+corrected series. Point purges and backfills for the same run must therefore name the
+served framework in their selectors.
+
+`bun run admin:db:apply-overrides` moves rows an earlier ingest stored under `from`:
+for each affected config it upserts the config that differs only in framework, repoints
+the run's benchmark and eval rows in one transaction, inserts the served-framework
+availability rows, deletes declared-framework availability rows that no remaining
+successful row supports, rewrites the run's changelog config keys, and refreshes
+`latest_benchmarks`. Unique constraints make a collision with an existing destination
+row fail the transaction rather than merging two points. The orphaned source configs
+are left in place; they are harmless and a future ingest of the same run resolves
+straight to the served-framework config.
+
 ### Syncing Public Runs Into a Downstream Database
 
 A downstream deployment's database does not receive public CI ingests. `bun run

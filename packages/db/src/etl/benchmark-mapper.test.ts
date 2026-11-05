@@ -110,6 +110,46 @@ const GPU_SIDE_KEYS = [...MEASURED_POWER_METRIC_KEYS].filter(
 );
 
 describe('mapBenchmarkRow', () => {
+  it('reassigns the framework for a registered run framework override', () => {
+    const row = makeV2Row({
+      infmax_model_prefix: 'qwen3.5',
+      hw: 'tpuv7',
+      framework: 'vllm',
+      precision: 'fp8',
+      scenario_type: 'agentic-coding',
+      spec_decoding: 'mtp',
+      disagg: true,
+      is_multinode: true,
+      prefill_tp: 1,
+      prefill_ep: 1,
+      prefill_num_workers: 2,
+      decode_tp: 8,
+      decode_ep: 8,
+      decode_dp_attention: false,
+      decode_num_workers: 4,
+      num_prefill_gpu: 8,
+      num_decode_gpu: 16,
+    });
+    const overridden = mapBenchmarkRow(row, createSkipTracker(), null, 40744397059);
+    expect(overridden?.config.framework).toBe('llmd-vllm');
+    expect(overridden?.config.disagg).toBe(true);
+
+    const viaString = mapBenchmarkRow(row, createSkipTracker(), null, '40744397059');
+    expect(viaString?.config).toEqual(overridden?.config);
+
+    const otherRun = mapBenchmarkRow(row, createSkipTracker(), null, 40744397060);
+    expect(otherRun?.config.framework).toBe('vllm');
+    expect(mapBenchmarkRow(row, createSkipTracker())?.config.framework).toBe('vllm');
+
+    const otherFramework = mapBenchmarkRow(
+      { ...row, framework: 'sglang' },
+      createSkipTracker(),
+      null,
+      40744397059,
+    );
+    expect(otherFramework?.config.framework).toBe('sglang');
+  });
+
   describe('v1 schema', () => {
     it('maps a valid v1 row to BenchmarkParams', () => {
       const tracker = createSkipTracker();
