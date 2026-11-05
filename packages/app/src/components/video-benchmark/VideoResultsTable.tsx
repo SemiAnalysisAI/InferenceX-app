@@ -6,7 +6,6 @@ import { Label } from '@/components/ui/label';
 import { track } from '@/lib/analytics/analytics';
 import { useLocale } from '@/lib/i18n/use-locale';
 import { hardwareLabel } from './hardware';
-import { TIER_LABELS } from './metrics';
 import type { ResultCell, ResultsState } from './results';
 import { resultsPointKey } from './results-chart';
 import { resultsNumber as n } from './VideoResultsCharts';
@@ -15,10 +14,7 @@ import styles from './results.module.css';
 const STRINGS = {
   en: {
     title: 'Representative deployments',
-    hint: 'One row per hardware and unofficial run: the deployment with the most videos per participating GPU-hour. Select a row to open its telemetry.',
     open: (label: string) => `Open telemetry for ${label}`,
-    basis: { participating: 'participating GPUs', allocated: 'allocated GPUs' },
-    costNote: (basis: string, tier: string) => `Costs: ${basis} · ${tier}`,
     deadline: 'Deadline (s)',
     csv: 'Download CSV',
     hardware: 'Hardware',
@@ -31,10 +27,7 @@ const STRINGS = {
   },
   zh: {
     title: '代表性部署',
-    hint: '每种硬件及每个非官方运行各占一行，展示按参与计算的 GPU 折算后每 GPU 小时生成视频数最多的部署。点击行可查看其遥测数据。',
     open: (label: string) => `查看 ${label} 的遥测数据`,
-    basis: { participating: '参与计算的 GPU', allocated: '分配的 GPU' },
-    costNote: (basis: string, tier: string) => `成本口径：${basis} · ${tier}`,
     deadline: '截止时间（s）',
     csv: '下载 CSV',
     hardware: '硬件',
@@ -84,9 +77,6 @@ export default function VideoResultsTable({
           <Heading as="h3" level="label" id="video-results-table-title" className="font-semibold">
             {s.title}
           </Heading>
-          <p className="text-xs text-muted-foreground">
-            {s.hint} {s.costNote(s.basis[state.costBasis], TIER_LABELS[state.costTier][locale])}
-          </p>
         </div>
         <div className="flex items-center gap-2">
           <Label htmlFor="results-deadline" className="text-xs">
