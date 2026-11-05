@@ -157,6 +157,7 @@ export function extractServerMetricSamples(json: string): {
     'sglang:token_usage',
     'atom:kv_cache_usage_ratio',
     'trtllm_kv_cache_utilization',
+    'tokenspeed:kv_cache_usage_perc',
   );
   const kvCacheUtil = [...aggregateSeriesByStart(kvSeriesAll, 'avg', 'avg').values()];
 
@@ -219,6 +220,8 @@ const TARGET_METRIC_KEYS = new Set([
   'atom:prefix_cache_cached_tokens',
   'atom:prefix_cache_full_tokens',
   'atom:prefix_cache_hit_ratio',
+  // TokenSpeed (device KV utilization only; no prefix-hit counter is exported)
+  'tokenspeed:kv_cache_usage_perc',
   // TensorRT-LLM
   'trtllm_kv_cache_utilization',
   'trtllm_kv_cache_hit_rate',

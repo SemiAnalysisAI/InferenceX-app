@@ -1249,6 +1249,30 @@ export interface ApiContractSourceDigest {
  */
 export const apiContractSourceDigests = [
   {
+    source: '../constants/src/framework-aliases.ts',
+    sourceSha256: '6c220e6aed1465e647f2c3ffcb03828e0f98ac6b9edb4019f0dce6db10c4054e',
+    reviewArea: {
+      en: 'Shared engine labels, family classification and dashboard/read-only view filter parity.',
+      zh: '共享引擎标签、系列分类，以及仪表板与只读视图的筛选一致性。',
+    },
+  },
+  {
+    source: 'src/lib/catalog/framework-family.ts',
+    sourceSha256: '8720fbb931453e16882584f846148b29688d07fbf296c2c829c286d638abfec5',
+    reviewArea: {
+      en: 'Shared engine labels, family classification and dashboard/read-only view filter parity.',
+      zh: '共享引擎标签、系列分类，以及仪表板与只读视图的筛选一致性。',
+    },
+  },
+  {
+    source: 'src/components/inference/utils/quickFilters.ts',
+    sourceSha256: 'ba6e41f71f0ebbecad861b2694dbfb8a72f1e1d4e27252a1eacc154702aaf388',
+    reviewArea: {
+      en: 'Shared engine labels, family classification and dashboard/read-only view filter parity.',
+      zh: '共享引擎标签、系列分类，以及仪表板与只读视图的筛选一致性。',
+    },
+  },
+  {
     source: 'src/components/ubenchx/ubenchx-transform.ts',
     sourceSha256: '9458ad2b969525fe68da5a3b54ac151384610d0bd2ba84585a9043b3a67bf949',
     reviewArea: {
@@ -1949,8 +1973,16 @@ export const apiContractSourceDigests = [
     },
   },
   {
+    source: '../db/src/etl/compute-chart-series.ts',
+    sourceSha256: '04e7a27bc027f64a77eb585c2a8415d2398f54460522c22487fcec7124c9bef5',
+    reviewArea: {
+      en: 'Server metric chart version, supported engine metrics, source identity, and missing-data semantics.',
+      zh: '服务器指标图表版本、支持的引擎指标、来源标识以及缺失数据语义。',
+    },
+  },
+  {
     source: '../db/src/queries/agentic-aggregates.ts',
-    sourceSha256: 'a7dc1bd4fff46597a9343c6b124dc4a1c38fc287c083556ae97d1b334ce248ba',
+    sourceSha256: '6cf88477d4aec60e6a2d276637281dbffe39bc42d37256511e10e6c741fa10a8',
     reviewArea: {
       en: 'Agentic aggregate percentile keys, nullability, and ID-keyed response shape.',
       zh: '智能体汇总百分位字段、可空性和按 ID 索引的响应结构。',

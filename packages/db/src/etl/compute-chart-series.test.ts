@@ -153,6 +153,14 @@ function buildTrtllmSeries(
   };
 }
 
+const tokenSpeedGauge = (values: number[]) => ({
+  series: values.map((avg, engine) => ({
+    endpoint_url: 'http://tokenspeed:30000/metrics',
+    labels: { engine: String(engine) },
+    timeslices: [{ start_ns: 0, end_ns: 1e9, avg }],
+  })),
+});
+
 describe('computeChartSeries', () => {
   it('returns null when the blob is null', async () => {
     expect(await computeChartSeries(null)).toBeNull();
@@ -170,6 +178,32 @@ describe('computeChartSeries', () => {
       { t: 1, value: 0.4 },
       { t: 2, value: 0.7 },
     ]);
+  });
+
+  it('reads TokenSpeed KV and queue gauges without inventing missing cache or token counters', async () => {
+    const blob = gzipSync(
+      Buffer.from(
+        JSON.stringify({
+          metrics: {
+            'tokenspeed:kv_cache_usage_perc': tokenSpeedGauge([0.25, 0.75]),
+            'tokenspeed:num_requests_running': tokenSpeedGauge([3, 5]),
+            'tokenspeed:num_requests_waiting': tokenSpeedGauge([1, 2]),
+          },
+        }),
+      ),
+    );
+    const series = await computeChartSeries(blob);
+    expect(series?.kvCacheUsage).toEqual([{ t: 0, value: 0.5 }]);
+    expect(series?.kvCacheUsageByEngine.map((engine) => engine.points)).toEqual([
+      [{ t: 0, value: 0.25 }],
+      [{ t: 0, value: 0.75 }],
+    ]);
+    expect(series?.queueDepth).toEqual([{ t: 0, running: 8, waiting: 3, total: 11 }]);
+    expect(series?.prefixCacheHitRate).toEqual([]);
+    expect(series?.promptTokensBySource).toEqual({});
+    expect(series?.prefillTps).toEqual([]);
+    expect(series?.decodeTps).toEqual([]);
+    expect(series?.hostKvCacheUsage).toEqual([]);
   });
 
   it('merges warmup_metrics before profiling into one continuous series (v11)', async () => {
