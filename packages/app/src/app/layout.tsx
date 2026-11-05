@@ -2,7 +2,7 @@ import '@/lib/runtime/polyfills';
 import './globals.css';
 
 import type { Metadata } from 'next';
-import { DM_Sans } from 'next/font/google';
+import { DM_Sans, Geist } from 'next/font/google';
 
 import { VercelAnalytics } from '@/components/analytics/vercel-analytics';
 import { Footer } from '@/components/footer/footer';
@@ -36,6 +36,13 @@ const dm_sans = DM_Sans({
   subsets: ['latin'],
   display: 'optional',
   variable: '--font-dm-sans',
+});
+
+// On <html> so the :root `--font-mono` token can resolve it.
+const geist = Geist({
+  subsets: ['latin'],
+  display: 'optional',
+  variable: '--font-geist',
 });
 
 export const metadata: Metadata = {
@@ -175,7 +182,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className={geist.variable} suppressHydrationWarning>
       <body className={`${dm_sans.variable} antialiased relative min-h-screen flex flex-col`}>
         <style
           id="landing-banner-prepaint-style"

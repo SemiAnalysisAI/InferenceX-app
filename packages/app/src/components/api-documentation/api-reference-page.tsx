@@ -267,7 +267,7 @@ export function ApiReferencePage({ locale }: { locale: ApiDocumentationLocale })
             </div>
             <div className="p-4">
               <dt className="text-xs font-medium text-muted-foreground">{copy.facts.baseUrl}</dt>
-              <dd className="mt-1 break-all font-mono text-sm font-semibold">
+              <dd className="mt-1 break-all font-code text-sm font-semibold">
                 {documentation.baseUrl}
               </dd>
             </div>
@@ -333,7 +333,7 @@ export function ApiReferencePage({ locale }: { locale: ApiDocumentationLocale })
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 {copy.agentSkillDescription}
               </p>
-              <p className="mt-3 break-all font-mono text-xs">{PUBLISHED_SKILL.name}</p>
+              <p className="mt-3 break-all font-code text-xs">{PUBLISHED_SKILL.name}</p>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">
                 {copy.agentPrerequisites}
               </p>
@@ -385,13 +385,13 @@ export function ApiReferencePage({ locale }: { locale: ApiDocumentationLocale })
               <dl className="mt-3 space-y-2 text-sm">
                 <div>
                   <dt className="font-medium">Codex</dt>
-                  <dd className="break-all font-mono text-xs">
+                  <dd className="break-all font-code text-xs">
                     .agents/skills/inferencex-api/references/powerx.md
                   </dd>
                 </div>
                 <div>
                   <dt className="font-medium">Claude Code</dt>
-                  <dd className="break-all font-mono text-xs">
+                  <dd className="break-all font-code text-xs">
                     .claude/skills/inferencex-api/references/powerx.md
                   </dd>
                 </div>
@@ -464,7 +464,7 @@ export function ApiReferencePage({ locale }: { locale: ApiDocumentationLocale })
                   key={schema.id}
                   className="min-w-0 border-b border-border/50 p-4 last:border-b-0 md:border-r md:even:border-r-0"
                 >
-                  <dt className="font-mono text-sm font-semibold">{schema.title}</dt>
+                  <dt className="font-code text-sm font-semibold">{schema.title}</dt>
                   <dd className="mt-2">
                     <p className="text-sm leading-6 text-muted-foreground">{schema.description}</p>
                     <p className="mt-4 mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
@@ -608,14 +608,14 @@ export function ApiReferencePage({ locale }: { locale: ApiDocumentationLocale })
                                       <tr key={`${parameter.location}-${parameter.name}`}>
                                         <th
                                           scope="row"
-                                          className="px-3 py-3 font-mono font-semibold"
+                                          className="px-3 py-3 font-code font-semibold"
                                         >
                                           {parameter.name}
                                         </th>
-                                        <td className="px-3 py-3 font-mono text-xs">
+                                        <td className="px-3 py-3 font-code text-xs">
                                           {parameter.location}
                                         </td>
-                                        <td className="px-3 py-3 font-mono text-xs">
+                                        <td className="px-3 py-3 font-code text-xs">
                                           {parameter.type}
                                         </td>
                                         <td className="px-3 py-3 text-xs">
@@ -624,7 +624,7 @@ export function ApiReferencePage({ locale }: { locale: ApiDocumentationLocale })
                                         <td className="max-w-sm px-3 py-3 leading-5 text-muted-foreground">
                                           {parameter.description}
                                         </td>
-                                        <td className="px-3 py-3 font-mono text-xs">
+                                        <td className="px-3 py-3 font-code text-xs">
                                           {parameter.example === undefined
                                             ? null
                                             : formatCode(parameter.example)}
@@ -672,7 +672,7 @@ export function ApiReferencePage({ locale }: { locale: ApiDocumentationLocale })
                                       {response.description}
                                     </p>
                                     {response.mediaType && (
-                                      <span className="font-mono text-xs text-muted-foreground">
+                                      <span className="font-code text-xs text-muted-foreground">
                                         {copy.mediaType}: {response.mediaType}
                                       </span>
                                     )}
@@ -702,7 +702,7 @@ export function ApiReferencePage({ locale }: { locale: ApiDocumentationLocale })
                                       key={alternate.mediaType}
                                       className="mt-4 border-t border-border/50 pt-4"
                                     >
-                                      <p className="font-mono text-xs font-semibold text-muted-foreground">
+                                      <p className="font-code text-xs font-semibold text-muted-foreground">
                                         {copy.alternateRepresentation}: {alternate.mediaType}
                                       </p>
                                       <div className="mt-3 grid gap-4 lg:grid-cols-2">

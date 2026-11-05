@@ -107,7 +107,7 @@ export function ValidityWidget({ locale, alt }: WidgetProps) {
                 <div className="pb-4 pl-10 text-sm leading-6 text-muted-foreground">
                   <p>{copy.detail}</p>
                   <p className="mt-2 text-xs">
-                    {t.reason} <code className="font-mono text-foreground">{check.reason}</code>
+                    {t.reason} <code className="font-code text-foreground">{check.reason}</code>
                   </p>
                 </div>
               </details>

@@ -24,7 +24,7 @@ import { formatSwapBytes, swapChartPoints, swapRooflines, type SwapChartPoint } 
  */
 export function SwapBlocksName() {
   return (
-    <code className="rounded bg-muted/50 px-1 py-0.5 font-mono dark:bg-muted">swap_blocks</code>
+    <code className="rounded bg-muted/50 px-1 py-0.5 font-code dark:bg-muted">swap_blocks</code>
   );
 }
 

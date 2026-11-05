@@ -173,7 +173,7 @@
 
 /* Code keeps the monospace face but sits on Excalidraw's light gray panel. */
 .excalidraw :is(pre, code) {
-  font-family: var(--font-mono);
+  font-family: var(--font-code);
 }
 
 html[data-inferencex-embed] [data-testid='excalidraw-theme-banner'] {

@@ -429,7 +429,7 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
             <SelectTrigger
               id="agentic-log-file"
               size="sm"
-              className="w-full min-w-0 shrink overflow-hidden font-mono text-xs sm:w-72 lg:w-96 *:data-[slot=select-value]:min-w-0 *:data-[slot=select-value]:truncate"
+              className="w-full min-w-0 shrink overflow-hidden font-code text-xs sm:w-72 lg:w-96 *:data-[slot=select-value]:min-w-0 *:data-[slot=select-value]:truncate"
               title={selectedFile}
             >
               <SelectValue />
@@ -440,7 +440,7 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
                   key={fileName}
                   value={fileName}
                   textValue={fileName}
-                  className="max-w-full font-mono text-xs whitespace-normal break-all"
+                  className="max-w-full font-code text-xs whitespace-normal break-all"
                   title={fileName}
                 >
                   <FilePath path={fileName} />
@@ -463,7 +463,7 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
               placeholder={t.searchPlaceholder}
-              className="h-8 pr-9 pl-8.5 font-mono text-xs md:text-xs"
+              className="h-8 pr-9 pl-8.5 font-code text-xs md:text-xs"
               data-testid="server-log-search"
             />
             {searchQuery.isFetching ? (
@@ -548,7 +548,7 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
               >
                 {searchQuery.data.matches.map((result) => (
                   <article key={`${result.fileName}:${result.offset}`} className="grid gap-1.5 p-3">
-                    <div className="flex min-w-0 items-center gap-3 font-mono text-2xs">
+                    <div className="flex min-w-0 items-center gap-3 font-code text-2xs">
                       <span className="min-w-0 truncate text-zinc-300" title={result.fileName}>
                         <FilePath path={result.fileName} className="[&>span]:text-zinc-500" />
                       </span>
@@ -567,7 +567,7 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
                         {t.goToMatch}
                       </Button>
                     </div>
-                    <pre className="max-h-20 overflow-hidden border-l-2 border-white/10 pl-2.5 font-mono text-xs leading-5 break-all whitespace-pre-wrap text-zinc-400">
+                    <pre className="max-h-20 overflow-hidden border-l-2 border-white/10 pl-2.5 font-code text-xs leading-5 break-all whitespace-pre-wrap text-zinc-400">
                       {readableLogText(result.before)}
                       <mark className="rounded-xs bg-amber-300 px-0.5 text-zinc-950">
                         {readableLogText(result.match)}
@@ -585,7 +585,7 @@ export function ServerLogViewer({ id, enabled, analyticsContext = 'agentic' }: P
       <pre
         ref={logViewportRef}
         className={cn(
-          'max-h-[70vh] min-h-[28rem] overflow-auto font-mono text-xs leading-5 selection:bg-sky-400/30',
+          'max-h-[70vh] min-h-[28rem] overflow-auto font-code text-xs leading-5 selection:bg-sky-400/30',
           LOG_SURFACE,
         )}
         data-testid="server-log-content"

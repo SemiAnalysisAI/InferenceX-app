@@ -216,7 +216,13 @@ html[data-inferencex-embed] .autumn-leaves {
   --color-subtle: color-mix(in oklab, var(--muted-foreground) 55%, var(--background));
 
   --font-sans: var(--font-dm-sans);
-  --font-mono: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', monospace;
+  /* `font-mono` is the label and data face, not a monospace: Geist with tabular figures. */
+  --font-mono: var(--font-geist);
+  --font-mono--font-feature-settings: 'tnum';
+  /* Code, logs and raw payloads: `font-code`, plus code/kbd/samp/pre via preflight. */
+  --font-code: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', monospace;
+  --default-mono-font-family: var(--font-code);
+  --default-mono-font-feature-settings: normal;
 
   --breakpoint-2xl: 80rem;
   --breakpoint-3xl: 80rem;
@@ -237,8 +243,8 @@ html[data-inferencex-embed] .autumn-leaves {
   --text-dialog-title: 1.375rem;
   --text-dialog-title--line-height: 1.875rem;
 
-  --tracking-eyebrow: 0.16em;
-  --tracking-eyebrow-wide: 0.2em;
+  --tracking-eyebrow: 0.08em;
+  --tracking-eyebrow-wide: 0.12em;
   --tracking-heading: -0.04em;
 }
 

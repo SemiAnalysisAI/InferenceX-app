@@ -616,7 +616,7 @@ export default function CollectiveXDisplay() {
       : []),
     ...(hasKv ? [{ value: 'kv' as const, label: 'KV' }] : []),
     // swap_blocks is a vLLM function name, so it reads as code.
-    ...(hasSwap ? [{ value: 'swap' as const, label: 'swap_blocks', className: 'font-mono' }] : []),
+    ...(hasSwap ? [{ value: 'swap' as const, label: 'swap_blocks', className: 'font-code' }] : []),
   ];
   const shownSuite = suiteOptions.some((option) => option.value === suite)
     ? suite

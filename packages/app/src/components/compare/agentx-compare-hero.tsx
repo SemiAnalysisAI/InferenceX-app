@@ -627,7 +627,7 @@ export function AgentXCompareHero({
                               </NewBadge>
                             )}
                           </span>
-                          <span className="mt-1 block font-mono text-3xs tracking-eyebrow text-brand uppercase">
+                          <span className="mt-0.5 block font-mono text-xs text-brand">
                             {locale === 'zh' && 'subtitleZh' in result
                               ? result.subtitleZh
                               : result.subtitle}
@@ -677,9 +677,7 @@ export function AgentXCompareHero({
                           <NewBadge data-new-badge="agentx-ledger">{t.newModel}</NewBadge>
                         )}
                       </span>
-                      <span className="mt-1 block font-mono text-3xs tracking-eyebrow text-brand uppercase">
-                        AgentX
-                      </span>
+                      <span className="mt-0.5 block font-mono text-xs text-brand">AgentX</span>
                     </span>
                   </span>
                   <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground group-hover:text-foreground">

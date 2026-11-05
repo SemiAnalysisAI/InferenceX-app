@@ -174,7 +174,7 @@ export function RunConfigWidget({ locale, alt }: WidgetProps) {
 
       <div className="mt-4 overflow-hidden rounded-lg border border-border/60">
         <div className="flex items-center justify-between gap-2 border-b border-border/60 px-3 py-1">
-          <span className="font-mono text-xs text-muted-foreground">{config.file}</span>
+          <span className="font-code text-xs text-muted-foreground">{config.file}</span>
           <CopyButton
             text={config.yaml}
             label={t.copy}
@@ -184,7 +184,7 @@ export function RunConfigWidget({ locale, alt }: WidgetProps) {
         </div>
         <pre
           data-testid="powerx-run-config-yaml"
-          className="overflow-x-auto px-4 py-3 font-mono text-xs leading-5 text-foreground"
+          className="overflow-x-auto px-4 py-3 font-code text-xs leading-5 text-foreground"
         >
           {config.yaml}
         </pre>

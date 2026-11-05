@@ -394,7 +394,7 @@ function D3Tree({
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'central')
       .attr('fill', '#fff')
-      .attr('font-family', 'monospace')
+      .attr('font-family', 'var(--font-mono)')
       .attr('font-weight', 'bold')
       .attr('font-size', (d) => {
         const r = rScale(d.data.reqs);

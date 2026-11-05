@@ -583,13 +583,13 @@ function FewShotBlock({
               <div className="mb-1 text-3xs font-semibold uppercase tracking-wider text-muted-foreground">
                 {t.exampleQuestion(i + 1)}
               </div>
-              <pre className="mb-2 whitespace-pre-wrap font-mono text-2xs leading-snug wrap-break-word">
+              <pre className="mb-2 whitespace-pre-wrap font-code text-2xs leading-snug wrap-break-word">
                 {d.question}
               </pre>
               <div className="mb-1 text-3xs font-semibold uppercase tracking-wider text-muted-foreground">
                 {t.exampleAnswer(i + 1)}
               </div>
-              <pre className="whitespace-pre-wrap font-mono text-2xs leading-snug wrap-break-word">
+              <pre className="whitespace-pre-wrap font-code text-2xs leading-snug wrap-break-word">
                 {d.answer}
               </pre>
             </div>
@@ -612,7 +612,7 @@ function Block({
   return (
     <div className="min-w-0">
       <div className="mb-2 text-xs font-semibold text-muted-foreground">{label}</div>
-      <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-md border border-border/50 bg-muted/30 p-3 font-mono text-xs leading-relaxed wrap-break-word">
+      <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-md border border-border/50 bg-muted/30 p-3 font-code text-xs leading-relaxed wrap-break-word">
         {value ?? <span className="italic text-muted-foreground">{emptyText}</span>}
       </pre>
     </div>

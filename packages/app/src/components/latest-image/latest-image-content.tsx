@@ -615,7 +615,7 @@ export function CurrentImageContent() {
                       </th>
                       <td className="px-4 py-4 align-top text-sm">
                         <code
-                          className={`block break-all rounded-md px-2.5 py-2 font-mono text-xs leading-relaxed select-all ${outdated ? 'bg-red-500/10 text-red-700 dark:text-red-300' : 'bg-muted'}`}
+                          className={`block break-all rounded-md px-2.5 py-2 font-code text-xs leading-relaxed select-all ${outdated ? 'bg-red-500/10 text-red-700 dark:text-red-300' : 'bg-muted'}`}
                         >
                           {row.image}
                         </code>
@@ -627,7 +627,7 @@ export function CurrentImageContent() {
                       </td>
                       <td className="px-4 py-4 align-top text-sm">
                         {release ? (
-                          <code className="inline-block break-all rounded bg-muted px-1.5 py-0.5 font-mono text-xs select-all">
+                          <code className="inline-block break-all rounded bg-muted px-1.5 py-0.5 font-code text-xs select-all">
                             {release.tag}
                           </code>
                         ) : (

@@ -141,7 +141,7 @@ export default function RawTracePage() {
                       <h4 className="text-xs font-medium text-muted-foreground mb-2">
                         {t.requestHeaders}
                       </h4>
-                      <pre className="text-xs font-mono bg-muted/50 rounded-md p-3 overflow-x-auto max-h-96 overflow-y-auto">
+                      <pre className="text-xs font-code bg-muted/50 rounded-md p-3 overflow-x-auto max-h-96 overflow-y-auto">
                         {formatJsonCompact(req.requestHeaders)}
                       </pre>
                     </div>
@@ -150,7 +150,7 @@ export default function RawTracePage() {
                     <h4 className="text-xs font-medium text-muted-foreground mb-2">
                       {t.requestBody}
                     </h4>
-                    <pre className="text-xs font-mono bg-muted/50 rounded-md p-3 overflow-x-auto max-h-96 overflow-y-auto">
+                    <pre className="text-xs font-code bg-muted/50 rounded-md p-3 overflow-x-auto max-h-96 overflow-y-auto">
                       {formatJsonCompact(req.requestBody)}
                     </pre>
                   </div>
@@ -159,7 +159,7 @@ export default function RawTracePage() {
                       <h4 className="text-xs font-medium text-muted-foreground mb-2">
                         {t.responseBody}
                       </h4>
-                      <pre className="text-xs font-mono bg-muted/50 rounded-md p-3 overflow-x-auto max-h-96 overflow-y-auto">
+                      <pre className="text-xs font-code bg-muted/50 rounded-md p-3 overflow-x-auto max-h-96 overflow-y-auto">
                         {formatJsonCompact(req.responseBody)}
                       </pre>
                     </div>
@@ -167,7 +167,7 @@ export default function RawTracePage() {
                   {req.error && (
                     <div>
                       <h4 className="text-xs font-medium text-muted-foreground mb-2">{t.error}</h4>
-                      <pre className="text-xs font-mono text-destructive bg-destructive/10 rounded-md p-3">
+                      <pre className="text-xs font-code text-destructive bg-destructive/10 rounded-md p-3">
                         {req.error}
                       </pre>
                     </div>

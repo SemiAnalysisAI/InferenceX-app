@@ -920,7 +920,7 @@ function RequestContextBlock({ context }: { context: NonNullable<MessageNode['re
             <div className="text-3xs font-mono font-bold uppercase tracking-eyebrow-wide text-amber-400 mb-1">
               {t.systemPromptHeading}
             </div>
-            <pre className="text-xs font-mono bg-amber-500/5 border border-amber-500/20 rounded p-2 overflow-x-auto max-h-64 overflow-y-auto whitespace-pre-wrap">
+            <pre className="text-xs font-code bg-amber-500/5 border border-amber-500/20 rounded p-2 overflow-x-auto max-h-64 overflow-y-auto whitespace-pre-wrap">
               {systemTexts!.join('\n\n---\n\n')}
             </pre>
           </div>
@@ -934,7 +934,7 @@ function RequestContextBlock({ context }: { context: NonNullable<MessageNode['re
               <summary className="text-3xs font-mono text-muted-foreground cursor-pointer">
                 {t.showToolDefs}
               </summary>
-              <pre className="text-xs font-mono bg-indigo-500/5 border border-indigo-500/20 rounded p-2 overflow-x-auto max-h-64 overflow-y-auto mt-1">
+              <pre className="text-xs font-code bg-indigo-500/5 border border-indigo-500/20 rounded p-2 overflow-x-auto max-h-64 overflow-y-auto mt-1">
                 {JSON.stringify(context.tools, null, 2)}
               </pre>
             </details>
@@ -984,7 +984,7 @@ function TextContent({
   }
   if (!text) return null;
   if (typeof text !== 'string') {
-    return <pre className="text-xs font-mono">{JSON.stringify(text, null, 2)}</pre>;
+    return <pre className="text-xs font-code">{JSON.stringify(text, null, 2)}</pre>;
   }
   const maxPreview = type === 'thinking' ? 200 : 500;
   const truncated = text.length > maxPreview;
@@ -1068,7 +1068,7 @@ function MarkdownText({ text }: { text: string }) {
             const isBlock = /language-/u.test(className ?? '');
             if (isBlock) {
               return (
-                <code className={`${className ?? ''} font-mono text-xs`} {...props}>
+                <code className={`${className ?? ''} font-code text-xs`} {...props}>
                   {children}
                 </code>
               );
@@ -1083,7 +1083,7 @@ function MarkdownText({ text }: { text: string }) {
             );
           },
           pre: ({ children }) => (
-            <pre className="text-xs font-mono bg-surface border border-border rounded p-2.5 overflow-x-auto mb-2 whitespace-pre">
+            <pre className="text-xs font-code bg-surface border border-border rounded p-2.5 overflow-x-auto mb-2 whitespace-pre">
               {children}
             </pre>
           ),
@@ -1113,14 +1113,14 @@ function ToolCallContent({ name, input }: { name?: string; input?: Record<string
   if (name === 'Edit' && input.file_path) {
     return (
       <div className="space-y-1">
-        <div className="text-sm font-mono text-muted-foreground">{String(input.file_path)}</div>
+        <div className="text-sm font-code text-muted-foreground">{String(input.file_path)}</div>
         {input.old_string !== null && (
-          <pre className="text-xs font-mono bg-red-500/10 text-red-400 rounded p-2 overflow-x-auto max-h-32 overflow-y-auto">
+          <pre className="text-xs font-code bg-red-500/10 text-red-400 rounded p-2 overflow-x-auto max-h-32 overflow-y-auto">
             {String(input.old_string)}
           </pre>
         )}
         {input.new_string !== null && (
-          <pre className="text-xs font-mono bg-emerald-500/10 text-emerald-400 rounded p-2 overflow-x-auto max-h-32 overflow-y-auto">
+          <pre className="text-xs font-code bg-emerald-500/10 text-emerald-400 rounded p-2 overflow-x-auto max-h-32 overflow-y-auto">
             {String(input.new_string)}
           </pre>
         )}
@@ -1130,7 +1130,7 @@ function ToolCallContent({ name, input }: { name?: string; input?: Record<string
 
   if (name === 'Bash' && input.command) {
     return (
-      <pre className="text-sm font-mono bg-muted/50 rounded p-2 overflow-x-auto">
+      <pre className="text-sm font-code bg-muted/50 rounded p-2 overflow-x-auto">
         $ {String(input.command)}
       </pre>
     );
@@ -1139,13 +1139,13 @@ function ToolCallContent({ name, input }: { name?: string; input?: Record<string
   if (name === 'Write' && input.file_path) {
     return (
       <div className="space-y-1">
-        <div className="text-sm font-mono text-muted-foreground">{String(input.file_path)}</div>
+        <div className="text-sm font-code text-muted-foreground">{String(input.file_path)}</div>
         {input.content !== null && (
           <details>
             <summary className="text-xs text-muted-foreground cursor-pointer">
               {t.nLines(String(input.content).split('\n').length)}
             </summary>
-            <pre className="text-xs font-mono bg-muted/50 rounded p-2 overflow-x-auto max-h-48 overflow-y-auto mt-1">
+            <pre className="text-xs font-code bg-muted/50 rounded p-2 overflow-x-auto max-h-48 overflow-y-auto mt-1">
               {String(input.content)}
             </pre>
           </details>
@@ -1156,7 +1156,7 @@ function ToolCallContent({ name, input }: { name?: string; input?: Record<string
 
   if (name === 'Grep' || name === 'Glob') {
     return (
-      <div className="text-sm font-mono text-muted-foreground">
+      <div className="text-sm font-code text-muted-foreground">
         {name === 'Grep' ? `grep "${input.pattern}"` : `glob "${input.pattern}"`}
         {input.path ? ` in ${input.path}` : ''}
       </div>
@@ -1166,7 +1166,7 @@ function ToolCallContent({ name, input }: { name?: string; input?: Record<string
   return (
     <details>
       <summary className="text-xs text-muted-foreground cursor-pointer">{t.parameters}</summary>
-      <pre className="text-xs font-mono bg-muted/50 rounded p-2 overflow-x-auto max-h-48 overflow-y-auto mt-1">
+      <pre className="text-xs font-code bg-muted/50 rounded p-2 overflow-x-auto max-h-48 overflow-y-auto mt-1">
         {JSON.stringify(input, null, 2)}
       </pre>
     </details>
@@ -1182,7 +1182,7 @@ function ToolResultContent({ content, isError }: { content: string | unknown; is
   }
   if (!content) return null;
   if (typeof content !== 'string') {
-    return <pre className="text-xs font-mono">{JSON.stringify(content, null, 2)}</pre>;
+    return <pre className="text-xs font-code">{JSON.stringify(content, null, 2)}</pre>;
   }
   const maxPreview = 300;
   const truncated = content.length > maxPreview;
@@ -1190,13 +1190,13 @@ function ToolResultContent({ content, isError }: { content: string | unknown; is
   return (
     <details open={!truncated}>
       <summary
-        className={`text-xs font-mono ${isError ? 'text-red-400' : 'text-muted-foreground'} ${truncated ? 'cursor-pointer' : 'list-none'} whitespace-pre-wrap break-words`}
+        className={`text-xs font-code ${isError ? 'text-red-400' : 'text-muted-foreground'} ${truncated ? 'cursor-pointer' : 'list-none'} whitespace-pre-wrap break-words`}
       >
         {truncated ? `${content.slice(0, maxPreview)}...` : content}
       </summary>
       {truncated && (
         <pre
-          className={`text-xs font-mono ${isError ? 'text-red-400' : 'text-muted-foreground'} mt-2 overflow-x-auto max-h-64 overflow-y-auto whitespace-pre-wrap`}
+          className={`text-xs font-code ${isError ? 'text-red-400' : 'text-muted-foreground'} mt-2 overflow-x-auto max-h-64 overflow-y-auto whitespace-pre-wrap`}
         >
           {content}
         </pre>

@@ -111,7 +111,7 @@ export const TimelineBars = memo(
                 fill="currentColor"
                 opacity={0.55}
                 fontSize={9}
-                fontFamily="ui-monospace, SFMono-Regular, monospace"
+                fontFamily="var(--font-mono)"
               >
                 {formatTickLabel(t)}
               </text>

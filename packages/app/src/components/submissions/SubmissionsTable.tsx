@@ -607,7 +607,7 @@ function SubmissionRow({
                     {previousImage ? (
                       <span
                         data-testid="submissions-image-diff"
-                        className="font-mono text-xs break-all"
+                        className="font-code text-xs break-all"
                       >
                         <span className="text-muted-foreground">{previousImage}</span>
                         <span className="mx-2 text-muted-foreground" aria-label={t.changedTo}>
@@ -616,7 +616,7 @@ function SubmissionRow({
                         <span>{row.image}</span>
                       </span>
                     ) : (
-                      <span className="font-mono text-xs break-all">{row.image ?? '—'}</span>
+                      <span className="font-code text-xs break-all">{row.image ?? '—'}</span>
                     )}
                   </DetailItem>
                 </div>
