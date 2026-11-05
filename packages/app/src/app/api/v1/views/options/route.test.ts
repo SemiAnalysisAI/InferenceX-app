@@ -98,6 +98,7 @@ describe('GET /api/v1/views/options', () => {
       'DeepSeek-V4.1-Flash',
       'GLM-5.2',
       'GLM-5.3-Flash',
+      'Kimi-K3.1-Pro',
       'MiniMax-M3.1-Flash',
       'Muse-Spark-Open',
       'Qwen-3.5-397B-A17B',

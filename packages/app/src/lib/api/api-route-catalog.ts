@@ -1887,7 +1887,9 @@ export const apiContractSourceDigests = [
     // joins OVERVIEW_MODEL_SCENARIOS as AgentX-only. No parameter or response
     // shape change, so the docs stand.
     // GLM-5.3-Flash adds an AgentX-only row without changing the response shape.
-    sourceSha256: 'bcd4e439b197551b432f8d3e5798189f502f13aebc196a4f81579edaa75262c8',
+    // Kimi-K3.1-Pro (InferenceX#4803) joins OVERVIEW_MODEL_SCENARIOS as
+    // AgentX-only. No parameter or response shape change, so the docs stand.
+    sourceSha256: '75281dc574436f1dd84b76ffe115e395a1eb59ad1eda93f90f53a0138865086a',
     reviewArea: {
       en: 'Overview BFF tier, engine, comparison-window, reference, and model-scope parameters plus the OverviewPageData response shape.',
       zh: '概览 BFF 的档位、引擎、对比时间窗口、参考硬件和模型范围参数，以及 OverviewPageData 响应结构。',
@@ -1918,7 +1920,10 @@ export const apiContractSourceDigests = [
     // AgentX cookbook documents the model; no endpoint or parameter shape changes.
     // GLM-5.3-Flash / glm5.3flash is separate from GLM-5.2/5.3; the API
     // model documentation and AgentX cookbook describe the publication boundary.
-    sourceSha256: 'c635cd27433e15298093460ef8b1b2ae8cfe87928c2fc8352036a52bbe809aa9',
+    // Reviewed for the Kimi-K3.1-Pro addition (InferenceX#4803): one new DB key,
+    // `kimik3.1`, with its own display name and release date. No endpoint or
+    // parameter shape changes, so the docs stand.
+    sourceSha256: 'd331d67e91f5bf56eeee7c2d30c34448d498ddb33e21399bcb3854d5ed599c3d',
     reviewArea: {
       en: 'Published benchmark and TCO model names, aliases, and parameter enums.',
       zh: '已发布基准与 TCO 模型名称、别名和参数枚举。',
