@@ -179,7 +179,6 @@ const GPU_STRINGS = {
     perfRuler: 'Perf ruler',
     perfRulerInfo:
       'Click two curves to place a vertical ruler, then drag it to measure the ratio of their Y-axis values at any x value — across dates of the same chip config or across chip configs. Repeat to add more rulers (up to 8); hover a ruler and click × to delete it. Turning the toggle off clears all rulers.',
-    resetFilter: 'Reset filter',
     clearPerfRulers: (count: number) => `Clear rulers (${count})`,
     quickFilters: (count: number) => (count > 0 ? `Quick filters (${count})` : 'Quick filters'),
     noData: 'No data available',
@@ -205,7 +204,6 @@ const GPU_STRINGS = {
     perfRuler: '性能标尺',
     perfRulerInfo:
       '先点击两条曲线放置垂直标尺，再拖动标尺，比较任意横坐标下两条曲线的纵轴数值之比，既可比较同一芯片配置的不同日期，也可比较不同芯片配置。重复操作可添加多把标尺（最多 8 把）；悬停标尺并点击 × 可删除该标尺。关闭开关将清除所有标尺。',
-    resetFilter: '重置筛选',
     clearPerfRulers: (count: number) => `清除标尺（${count}）`,
     quickFilters: (count: number) => (count > 0 ? `快捷筛选（${count}）` : '快捷筛选'),
     noData: '暂无数据',
@@ -1688,6 +1686,17 @@ const GPUGraph = React.memo(
                 },
               },
             ]}
+            reset={{
+              id: 'gpu-reset-filter',
+              disabled:
+                quickFilterCount === 0 &&
+                allGraphs.every(({ id }) => !idsWithData.has(id) || activeDates.has(id)),
+              onClick: () => {
+                selectAllActiveDates();
+                clearQuickFilters();
+                track('gpu_timeseries_reset_filter');
+              },
+            }}
             actions={[
               ...(perfRulerMode && perfRulerState.rulers.length > 0
                 ? [
@@ -1703,15 +1712,6 @@ const GPUGraph = React.memo(
                     },
                   ]
                 : []),
-              {
-                id: 'gpu-reset-filter',
-                label: legendT.resetFilter,
-                onClick: () => {
-                  selectAllActiveDates();
-                  clearQuickFilters();
-                  track('gpu_timeseries_reset_filter');
-                },
-              },
               {
                 id: 'gpu-quick-filters',
                 label: legendT.quickFilters(quickFilterCount),

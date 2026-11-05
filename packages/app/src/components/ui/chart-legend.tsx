@@ -19,6 +19,7 @@ export type { CommonLegendItemProps } from './chart-legend-item';
 const STRINGS = {
   en: {
     advanced: 'Advanced',
+    resetFilter: 'Reset filter',
     moreInfo: (label: string) => `More info about ${label}`,
     hideLegend: 'Hide legend',
     showLegend: 'Show legend',
@@ -27,6 +28,7 @@ const STRINGS = {
   },
   zh: {
     advanced: '高级',
+    resetFilter: '重置筛选',
     moreInfo: (label: string) => `查看${label}的更多信息`,
     hideLegend: '隐藏图例',
     showLegend: '显示图例',
@@ -50,11 +52,18 @@ export interface LegendActionConfig {
   onClick: () => void;
 }
 
+export interface LegendResetConfig {
+  id: string;
+  onClick: () => void;
+  disabled: boolean;
+}
+
 export interface ChartLegendProps {
   legendItems: CommonLegendItemProps[];
   isLegendExpanded: boolean;
   onExpandedChange: (expanded: boolean) => void;
   switches?: LegendSwitchConfig[];
+  reset?: LegendResetConfig;
   actions?: LegendActionConfig[];
   grouped?: boolean;
   keyIndicators?: React.ReactNode;
@@ -78,6 +87,7 @@ export default function ChartLegend({
   isLegendExpanded: expandedProp,
   onExpandedChange,
   switches,
+  reset,
   actions,
   grouped = false,
   keyIndicators,
@@ -100,6 +110,7 @@ export default function ChartLegend({
   const isSidebar = variant === 'sidebar';
   if (readOnly) {
     switches = undefined;
+    reset = undefined;
     actions = undefined;
     onItemRemove = undefined;
     enableTooltips = false;
@@ -200,37 +211,38 @@ export default function ChartLegend({
 
   const hasSidebarControls =
     isSidebar && (keyIndicators || (switches && switches.length > 0) || hasAtomFootnote);
-  const hasActions = Boolean(actions && actions.length > 0);
-  const toggleBesideFirstItem =
-    isSidebar && !readOnly && collapsible && isLegendExpanded && !hasActions;
+  const headerButtons: (LegendActionConfig & { disabled?: boolean })[] = [
+    ...(reset ? [{ ...reset, label: t.resetFilter }] : []),
+    ...(actions ?? []),
+  ];
   const scrollClasses = isSidebar
     ? cn(
         'overflow-y-auto flex-initial min-h-0 space-y-0.5',
         hasSidebarControls && 'border-b border-border/50 pb-2',
-        toggleBesideFirstItem && '[&>:first-child]:pr-8',
       )
     : grouped
       ? 'flex gap-x-4 flex-wrap flex-row md:block md:overflow-y-auto md:flex-1 md:min-h-0'
       : 'flex flex-row flex-wrap gap-x-4 gap-y-2 md:block md:overflow-y-auto md:flex-1 md:min-h-0';
 
   const actionElements =
-    actions && actions.length > 0 ? (
+    headerButtons.length > 0 ? (
       <div
         className={cn(
           'no-export flex flex-wrap gap-y-1',
           isSidebar ? 'min-w-0 gap-x-1' : 'w-full gap-x-3',
         )}
       >
-        {actions.map((action) => (
+        {headerButtons.map((action) => (
           <button
             type="button"
             key={action.id}
             data-testid={action.id}
             onClick={action.onClick}
+            disabled={action.disabled}
             className={cn(
-              'text-xs text-muted-foreground hover:text-foreground cursor-pointer',
+              'text-xs text-muted-foreground enabled:hover:text-foreground enabled:cursor-pointer disabled:opacity-50',
               isSidebar
-                ? 'min-h-8 rounded-md px-2 hover:bg-muted transition-colors'
+                ? 'min-h-8 rounded-md px-2 enabled:hover:bg-muted transition-colors'
                 : 'mt-2 underline',
             )}
           >
@@ -255,23 +267,14 @@ export default function ChartLegend({
     </button>
   ) : null;
   const panelHeader =
-    isSidebar && !readOnly ? (
-      toggleBesideFirstItem ? (
-        <div
-          data-testid="legend-toolbar"
-          className="no-export absolute right-1 top-1.5 z-10 rounded-md bg-background"
-        >
-          {toggleButton}
-        </div>
-      ) : (
-        <div
-          data-testid="legend-toolbar"
-          className="-mx-1 -mt-1 pb-1 no-export flex shrink-0 items-start gap-1"
-        >
-          <div className="min-w-0 flex-1">{isLegendExpanded && actionElements}</div>
-          {toggleButton}
-        </div>
-      )
+    isSidebar && !readOnly && (collapsible || actionElements) ? (
+      <div
+        data-testid="legend-toolbar"
+        className="-mx-1 -mt-1 pb-1 no-export flex shrink-0 items-start gap-1"
+      >
+        <div className="min-w-0 flex-1">{isLegendExpanded && actionElements}</div>
+        {toggleButton}
+      </div>
     ) : null;
 
   const standardSwitches = switches?.filter((sw) => !sw.advanced) ?? [];
@@ -430,41 +433,17 @@ export default function ChartLegend({
         className={cn(scrollClasses, 'custom-scrollbar')}
       >
         {rows.map((row, i) => (
-          <div key={i} className={cn('p-1 rounded-sm shrink-0', i > 0 && 'mt-2')}>
+          <div key={i} className={cn('shrink-0', i > 0 && 'mt-2', !isSidebar && 'p-1')}>
             <div className="text-sm font-medium text-muted-foreground gpu-legend-title whitespace-nowrap overflow-ellipsis overflow-hidden">
               {row[0].title}
             </div>
             <ul
               className={cn(
-                'flex flex-wrap gap-x-2 gap-y-1',
+                isSidebar ? 'space-y-0.5' : 'flex flex-wrap gap-x-2 gap-y-1',
                 itemsExpanded && 'md:block md:space-y-1',
               )}
             >
-              {row.map((item: CommonLegendItemProps) => (
-                <li key={item.name}>
-                  <ChartLegendItem
-                    name={item.name}
-                    hw={item.hw}
-                    label={item.label}
-                    color={item.color}
-                    lineDasharray={item.lineDasharray}
-                    title={item.title}
-                    isActive={item.isActive}
-                    onClick={item.onClick}
-                    onHover={onItemHover}
-                    onHoverEnd={onItemHoverEnd}
-                    onRemove={removeFor(item)}
-                    onShowPoints={item.onShowPoints}
-                    hideAriaLabel={t.hide(item.label)}
-                    showPointsAriaLabel={t.showPoints(item.label)}
-                    isLegendExpanded={itemsExpanded}
-                    sidebarMode={isSidebar}
-                    blockedReason={item.blockedReason}
-                    idScope={item.idScope}
-                    asFragment
-                  />
-                </li>
-              ))}
+              {row.map((item: CommonLegendItemProps) => renderItem(item))}
             </ul>
           </div>
         ))}

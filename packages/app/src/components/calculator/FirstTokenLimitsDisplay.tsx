@@ -758,6 +758,18 @@ function FirstTokenLimitsInner({ initialPercentile }: { initialPercentile: Perce
           },
         },
       ]}
+      reset={{
+        id: 'first-token-reset-filter',
+        disabled: visibleHwKeys.size >= legendHwKeys.length,
+        onClick: () => {
+          setVisibilityIntent({
+            scopeKey: selectionKey,
+            visible: new Set(legendHwKeys),
+            known: new Set(legendHwKeys),
+          });
+          track('first_token_gpu_reset', { gpu_count: legendHwKeys.length });
+        },
+      }}
     />
   );
 

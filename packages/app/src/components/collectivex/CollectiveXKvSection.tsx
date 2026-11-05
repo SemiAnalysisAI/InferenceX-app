@@ -374,6 +374,15 @@ export function CollectiveXKvSection({
       track('collectivex_kv_range_toggled', { range: band.id });
     },
   }));
+  const legendReset = {
+    id: 'collectivex-kv-reset-filter',
+    disabled: rangeView ? hiddenRangeIds.size === 0 : activeCases.length >= measuredCases.length,
+    onClick: () => {
+      if (rangeView) setHiddenRanges(null);
+      else setSeriesSelection(null);
+      track('collectivex_kv_filter_reset');
+    },
+  };
 
   const columns = useMemo<DataTableColumn<CollectiveXKvRunCase>[]>(
     () => [
@@ -644,6 +653,7 @@ export function CollectiveXKvSection({
                     variant="sidebar"
                     legendItems={legendItems}
                     switches={envelopeLegendSwitches}
+                    reset={legendReset}
                     disableActiveSort
                     isLegendExpanded={legendExpanded}
                     onExpandedChange={onLegendExpanded}
@@ -674,6 +684,7 @@ export function CollectiveXKvSection({
                     variant="sidebar"
                     legendItems={legendItems}
                     disableActiveSort
+                    reset={legendReset}
                     isLegendExpanded={legendExpanded}
                     onExpandedChange={onLegendExpanded}
                   />
@@ -704,6 +715,7 @@ export function CollectiveXKvSection({
                       variant="sidebar"
                       legendItems={rangeView ? rangeLegendItems : legendItems}
                       switches={legendSwitches}
+                      reset={legendReset}
                       disableActiveSort
                       isLegendExpanded={legendExpanded}
                       onExpandedChange={onLegendExpanded}

@@ -229,7 +229,6 @@ const STRINGS = {
     clickToCompare: 'selected. Click another bar to compare.',
     clearSelection: 'Clear selection',
     highContrast: 'High contrast',
-    resetFilter: 'Reset filter',
     totalTokens: 'Total tokens',
     inputTokens: 'Input tokens',
     outputTokens: 'Output tokens',
@@ -294,7 +293,6 @@ const STRINGS = {
     clickToCompare: '已选中。点击其他柱形即可对比。',
     clearSelection: '清除选择',
     highContrast: '高对比度',
-    resetFilter: '重置筛选',
     totalTokens: '总 token',
     inputTokens: '输入 token',
     outputTokens: '输出 token',
@@ -1421,17 +1419,11 @@ function ThroughputCalculatorInner({ initialPercentile }: { initialPercentile: P
                                   },
                                 },
                               ]}
-                              actions={
-                                visibleHwKeys.size < legendHwKeys.length
-                                  ? [
-                                      {
-                                        id: 'calc-reset-filter',
-                                        label: t.resetFilter,
-                                        onClick: handleResetGpus,
-                                      },
-                                    ]
-                                  : []
-                              }
+                              reset={{
+                                id: 'calc-reset-filter',
+                                disabled: visibleHwKeys.size >= legendHwKeys.length,
+                                onClick: handleResetGpus,
+                              }}
                               enableTooltips={true}
                             />
                           ) : undefined

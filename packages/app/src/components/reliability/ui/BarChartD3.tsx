@@ -105,7 +105,6 @@ function positionLabelPairs(
 const RELIABILITY_STRINGS = {
   en: {
     highContrast: 'High contrast',
-    resetFilter: 'Reset filter',
     xAxis: 'Success rate (%)',
     loading: 'Loading reliability data…',
     loadError: 'Failed to load reliability data',
@@ -116,7 +115,6 @@ const RELIABILITY_STRINGS = {
   },
   zh: {
     highContrast: '高对比度',
-    resetFilter: '重置筛选',
     xAxis: '成功率（%）',
     loading: '正在加载可靠性数据……',
     loadError: '可靠性数据加载失败',
@@ -469,20 +467,14 @@ export default function ReliabilityBarChartD3({
                 },
               },
             ]}
-            actions={
-              enabledModels.size < modelsWithData.size
-                ? [
-                    {
-                      id: 'reliability-reset-filter',
-                      label: legendT.resetFilter,
-                      onClick: () => {
-                        selectAllModels();
-                        track('reliability_filter_reset');
-                      },
-                    },
-                  ]
-                : []
-            }
+            reset={{
+              id: 'reliability-reset-filter',
+              disabled: enabledModels.size >= modelsWithData.size,
+              onClick: () => {
+                selectAllModels();
+                track('reliability_filter_reset');
+              },
+            }}
             enableTooltips={true}
           />
         }

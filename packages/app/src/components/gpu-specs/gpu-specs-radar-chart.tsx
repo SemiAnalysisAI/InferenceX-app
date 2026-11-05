@@ -63,12 +63,10 @@ interface GpuSpecsRadarChartProps {
 
 const RADAR_STRINGS = {
   en: {
-    resetFilter: 'Reset filter',
     empty: 'Select at least one chip to display the radar chart',
     note: 'Values are normalized to percentages of the maximum across all chips for each metric. chips without FP4 support show 0% on the FP4 axis.',
   },
   zh: {
-    resetFilter: '重置筛选',
     empty: '请至少选择一款芯片以显示雷达图',
     note: '每项指标均按所有芯片中的最大值归一化为百分比；不支持 FP4 的芯片在 FP4 轴上显示为 0%。',
   },
@@ -217,20 +215,14 @@ export function GpuSpecsRadarChart({ caption }: GpuSpecsRadarChartProps) {
               track('gpu_specs_radar_legend_expanded', { enabled: expanded });
             }}
             grouped={false}
-            actions={
-              selectedGpus.size < GPU_SPECS.length
-                ? [
-                    {
-                      id: 'radar-reset-filter',
-                      label: t.resetFilter,
-                      onClick: () => {
-                        selectAll();
-                        track('gpu_specs_radar_reset_filter');
-                      },
-                    },
-                  ]
-                : []
-            }
+            reset={{
+              id: 'radar-reset-filter',
+              disabled: selectedGpus.size >= GPU_SPECS.length,
+              onClick: () => {
+                selectAll();
+                track('gpu_specs_radar_reset_filter');
+              },
+            }}
             disableActiveSort={true}
           />
         }

@@ -333,6 +333,14 @@ export default function SubmissionsChart({ volume, mode, caption, footer }: Subm
               setIsLegendExpanded(expanded);
               track('submissions_legend_expanded', { enabled: expanded });
             }}
+            reset={{
+              id: 'submissions-reset-filter',
+              disabled: hiddenLines.size === 0,
+              onClick: () => {
+                setHiddenLines(new Set());
+                track('submissions_legend_filter_reset');
+              },
+            }}
             switches={
               mode === 'weekly'
                 ? [

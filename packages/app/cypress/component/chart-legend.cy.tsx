@@ -63,7 +63,7 @@ describe('ChartLegend in an enclosing controls panel', () => {
             onCheckedChange: onHighContrast,
           },
         ]}
-        actions={[{ id: 'embedded-reset', label: 'Reset filter', onClick: onReset }]}
+        reset={{ id: 'embedded-reset', onClick: onReset, disabled: false }}
       />,
     );
     cy.get('[data-testid="legend-open-button"], [data-testid="legend-close-button"]').should(
@@ -196,14 +196,14 @@ function ChartLegendWrapper({
             ]
           : undefined
       }
-      actions={[
-        ...(itemsWithHandler.some((i) => !i.isActive)
-          ? [{ id: 'reset-filter', label: 'Reset filter', onClick: () => setLegendItems(items) }]
-          : []),
-        ...(inChart
-          ? [{ id: 'quick-filters', label: 'Quick Filters', onClick: onQuickFilters }]
-          : []),
-      ]}
+      reset={{
+        id: 'reset-filter',
+        disabled: itemsWithHandler.every((i) => i.isActive),
+        onClick: () => setLegendItems(items),
+      }}
+      actions={
+        inChart ? [{ id: 'quick-filters', label: 'Quick Filters', onClick: onQuickFilters }] : []
+      }
     />
   );
 
@@ -458,17 +458,40 @@ describe('ChartLegend (sidebar variant)', () => {
     cy.get('[data-testid="log-scale"]').should('have.attr', 'aria-checked', 'true');
   });
 
-  it('clicking a legend item toggles its active state', () => {
+  it('clicking a legend item enables Reset filter', () => {
+    cy.contains('button', 'Reset filter').should('be.disabled');
     cy.get('.sidebar-legend label').first().click();
-    cy.contains('Reset filter').should('be.visible');
+    cy.contains('button', 'Reset filter').should('be.enabled');
   });
 
-  it('reset filter restores all items', () => {
+  it('reset filter restores all items and stays in the header disabled', () => {
     cy.get('.sidebar-legend label').first().click();
-    cy.contains('Reset filter').should('be.visible');
-    cy.contains('Reset filter').click();
-    cy.contains('Reset filter').should('not.exist');
+    cy.contains('button', 'Reset filter').click();
+    cy.get('.sidebar-legend input[type="checkbox"]').should('be.checked');
+    cy.get('[data-testid="legend-toolbar"]')
+      .contains('button', 'Reset filter')
+      .should('be.visible')
+      .and('be.disabled');
   });
+
+  for (const width of [390, 1280]) {
+    it(`keeps the header row above the first item with the toggle right-aligned at ${width}px`, () => {
+      cy.viewport(width, 900);
+      cy.mount(<ChartLegendWrapper />);
+      cy.get('[data-testid="chart-legend"]').should(($legend) => {
+        const panel = $legend[0].getBoundingClientRect();
+        const toolbar = $legend.find('[data-testid="legend-toolbar"]')[0].getBoundingClientRect();
+        const reset = $legend.find('[data-testid="reset-filter"]')[0].getBoundingClientRect();
+        const toggle = $legend
+          .find('[data-testid="legend-close-button"]')[0]
+          .getBoundingClientRect();
+        const firstItem = $legend.find('ul > li')[0].getBoundingClientRect();
+        expect(firstItem.top, 'items start below the header').to.be.at.least(toolbar.bottom);
+        expect(reset.left, 'reset on the left').to.be.lessThan(toggle.left);
+        expect(panel.right - toggle.right, 'toggle right-aligned').to.be.lessThan(8);
+      });
+    });
+  }
 
   it('close button hides the panel and the reopen button restores it', () => {
     cy.get('.sidebar-legend').should('exist');

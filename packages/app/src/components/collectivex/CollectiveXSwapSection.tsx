@@ -361,6 +361,14 @@ export function CollectiveXSwapSection({
             isLegendExpanded={expanded}
             onExpandedChange={setExpanded}
             disableActiveSort
+            reset={{
+              id: 'collectivex-swap-reset-filter',
+              disabled: series.every((p) => !hidden.has(p.seriesId)),
+              onClick: () => {
+                setHidden(new Set());
+                track('collectivex_swap_filter_reset');
+              },
+            }}
             legendItems={series.map((p) => ({
               name: p.seriesId,
               label: `${p.device} · ${t.blocks(p.row.num_blocks)}`,

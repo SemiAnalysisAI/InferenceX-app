@@ -308,7 +308,6 @@ const EVAL_STRINGS = {
   en: {
     showLabels: 'Show labels',
     highContrast: 'High contrast',
-    resetFilter: 'Reset filter',
     score: 'Score',
     unofficialTitle: (branch: string) => `Unofficial: ${branch}`,
     unofficialRun: 'Unofficial run',
@@ -328,7 +327,6 @@ const EVAL_STRINGS = {
   zh: {
     showLabels: '显示标签',
     highContrast: '高对比度',
-    resetFilter: '重置筛选',
     score: '得分',
     unofficialTitle: (branch: string) => `非官方：${branch}`,
     unofficialRun: '非官方运行',
@@ -703,7 +701,7 @@ export default function EvalBarChartD3({
   );
 
   const parallelismKey = hasDisaggConfigs ? (
-    <div className="mt-2 px-1 pr-2 text-3xs text-muted-foreground leading-tight no-export">
+    <div className="mt-2 text-3xs text-muted-foreground leading-tight no-export">
       <div>
         <span className="font-mono">P(·/·/·/·)</span> {legendT.prefill}
         <span className="mx-1">·</span>
@@ -1314,22 +1312,17 @@ export default function EvalBarChartD3({
               },
             },
           ]}
-          actions={
-            effectiveOfficialHardware.size < hwTypesWithData.size ||
-            activeOverlayHwTypes.size < allOverlayHwTypes.size
-              ? [
-                  {
-                    id: 'eval-reset-filter',
-                    label: legendT.resetFilter,
-                    onClick: () => {
-                      selectAllHwTypes();
-                      setUnifiedOverlaySelection(hwTypesWithData, allOverlayHwTypes);
-                      track('evaluation_filter_reset');
-                    },
-                  },
-                ]
-              : []
-          }
+          reset={{
+            id: 'eval-reset-filter',
+            disabled:
+              effectiveOfficialHardware.size >= hwTypesWithData.size &&
+              activeOverlayHwTypes.size >= allOverlayHwTypes.size,
+            onClick: () => {
+              selectAllHwTypes();
+              setUnifiedOverlaySelection(hwTypesWithData, allOverlayHwTypes);
+              track('evaluation_filter_reset');
+            },
+          }}
           enableTooltips={true}
           keyIndicators={parallelismKey}
         />

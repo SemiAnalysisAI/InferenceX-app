@@ -285,6 +285,14 @@ export default function VideoDashboard() {
         isLegendExpanded={legendExpanded}
         onExpandedChange={setLegendExpanded}
         disableActiveSort
+        reset={{
+          id: 'video-reset-filter',
+          disabled: hidden.size === 0,
+          onClick: () => {
+            update({ hidden: [] });
+            track('video_legend_filter_reset');
+          },
+        }}
         switches={[
           {
             id: 'video-optimal-only',

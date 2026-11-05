@@ -481,7 +481,6 @@ const SCATTER_STRINGS = {
     perfRuler: 'Perf ruler',
     perfRulerInfo:
       'Click two curves to place a vertical ruler, then drag it to measure the ratio of their Y-axis values at any x value. Repeat to add more rulers (up to 8); hover a ruler and click × to delete it. Turning the toggle off clears all rulers.',
-    resetFilter: 'Reset filter',
     clearPerfRulers: (count: number) => `Clear rulers (${count})`,
     quickFilters: (count: number) => (count > 0 ? `Quick filters (${count})` : 'Quick filters'),
     overflowMixed: (count: number) => `${pointCountEn(count)} clipped`,
@@ -518,7 +517,6 @@ const SCATTER_STRINGS = {
     perfRuler: '性能标尺',
     perfRulerInfo:
       '先点击两条曲线放置垂直标尺，再拖动标尺，比较任意横坐标下两条曲线的纵轴数值之比。重复操作可添加多把标尺（最多 8 把）；悬停标尺并点击 × 可删除该标尺。关闭开关将清除所有标尺。',
-    resetFilter: '重置筛选',
     clearPerfRulers: (count: number) => `清除标尺（${count}）`,
     quickFilters: (count: number) => (count > 0 ? `快捷筛选（${count}）` : '快捷筛选'),
     overflowMixed: (count: number) => `${count} 个点已截断`,
@@ -4531,22 +4529,19 @@ const ScatterGraph = React.memo(
               onAdvancedExpandedChange={(expanded) => {
                 track('latency_advanced_controls_toggled', { enabled: expanded });
               }}
+              reset={{
+                id: 'scatter-reset-filter',
+                disabled:
+                  effectiveOfficialHwTypes.size >= hwTypesWithData.size &&
+                  activeOverlayHwTypes.size >= scopedOverlayHwTypes.size &&
+                  quickFilterCount === 0,
+                onClick: () => {
+                  resetUnifiedSelection();
+                  clearQuickFilters();
+                  track('latency_legend_filter_reset');
+                },
+              }}
               actions={[
-                ...(effectiveOfficialHwTypes.size < hwTypesWithData.size ||
-                activeOverlayHwTypes.size < scopedOverlayHwTypes.size ||
-                quickFilterCount > 0
-                  ? [
-                      {
-                        id: 'scatter-reset-filter',
-                        label: legendT.resetFilter,
-                        onClick: () => {
-                          resetUnifiedSelection();
-                          clearQuickFilters();
-                          track('latency_legend_filter_reset');
-                        },
-                      },
-                    ]
-                  : []),
                 ...(perfRulerState.rulers.length > 0
                   ? [
                       {

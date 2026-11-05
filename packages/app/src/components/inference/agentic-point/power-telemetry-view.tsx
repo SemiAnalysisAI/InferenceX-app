@@ -59,7 +59,6 @@ const STRINGS = {
     perGpuStats: 'Per-chip statistics',
     chip: 'Chip',
     secondsUnit: 's',
-    resetFilter: 'Show all chips',
     allInLine: 'All-in provisioned line',
     allInHelp:
       'Dashed reference at the all-in provisioned utility power per chip from the hardware registry (SemiAnalysis Datacenter Industry Model). Off by default because it compresses the traces.',
@@ -88,7 +87,6 @@ const STRINGS = {
     perGpuStats: '单芯片统计信息',
     chip: '芯片',
     secondsUnit: '秒',
-    resetFilter: '显示全部芯片',
     allInLine: '整体预配功耗参考线',
     allInHelp:
       '以虚线标出硬件注册表中每芯片的整体预配功耗，即市电侧的 all-in 功率（SemiAnalysis 数据中心行业模型）。默认关闭，因为它会压缩曲线的纵向分辨率。',
@@ -436,20 +434,14 @@ export function PowerTelemetryView({ id, enabled, hardware, serverMetricsEnabled
                     ]
                   : undefined
               }
-              actions={
-                hiddenGpus.size === 0
-                  ? []
-                  : [
-                      {
-                        id: 'power-telemetry-show-all-chips',
-                        label: t.resetFilter,
-                        onClick: () => {
-                          track('inference_agentic_power_gpu_reset_filter', { id });
-                          setHiddenSelection(null);
-                        },
-                      },
-                    ]
-              }
+              reset={{
+                id: 'power-telemetry-show-all-chips',
+                disabled: hiddenGpus.size === 0,
+                onClick: () => {
+                  track('inference_agentic_power_gpu_reset_filter', { id });
+                  setHiddenSelection(null);
+                },
+              }}
             />
           }
           caption={

@@ -99,7 +99,6 @@ const STRINGS = {
     updated: 'Updated:',
     logScale: 'Log scale',
     highContrast: 'High contrast',
-    resetFilter: 'Reset filter',
     noData: 'No interactivity chart data available for the selected model and sequence',
     loadError: 'Historical benchmark data could not be loaded',
     retry: 'Reload page',
@@ -125,7 +124,6 @@ const STRINGS = {
     updated: '更新时间：',
     logScale: '对数缩放',
     highContrast: '高对比度',
-    resetFilter: '重置筛选',
     noData: '所选模型和序列暂无交互性图表数据',
     loadError: '历史基准测试数据加载失败',
     retry: '重新加载页面',
@@ -638,20 +636,14 @@ export default function HistoricalTrendsDisplay() {
                         },
                       },
                     ]}
-                    actions={
-                      [...hwTypesWithData].some((key) => !activeHwTypes.has(key))
-                        ? [
-                            {
-                              id: 'historical-reset-filter',
-                              label: t.resetFilter,
-                              onClick: () => {
-                                selectAllHwTypes();
-                                track('historical_legend_filter_reset');
-                              },
-                            },
-                          ]
-                        : []
-                    }
+                    reset={{
+                      id: 'historical-reset-filter',
+                      disabled: [...hwTypesWithData].every((key) => activeHwTypes.has(key)),
+                      onClick: () => {
+                        selectAllHwTypes();
+                        track('historical_legend_filter_reset');
+                      },
+                    }}
                     enableTooltips={true}
                   />
                 }

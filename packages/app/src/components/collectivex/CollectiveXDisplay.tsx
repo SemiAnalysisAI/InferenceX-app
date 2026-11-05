@@ -153,7 +153,6 @@ const STRINGS = {
     activationRateOption: 'Activation rate',
     payloadRateOption: 'Payload BW / chip',
     noSeries: 'No measured series match these filters',
-    resetFilter: 'Reset filter',
     payloadNote:
       'Activation-data rate is derived at the selected latency percentile and is not physical link bandwidth.',
     payloadBandwidthNote:
@@ -234,7 +233,6 @@ const STRINGS = {
     activationRateOption: '激活数据速率',
     payloadRateOption: '每芯片载荷带宽',
     noSeries: '没有实测序列符合当前筛选条件',
-    resetFilter: '重置筛选',
     payloadNote: '逻辑载荷速率按所选延迟分位点派生，不代表物理链路带宽。',
     payloadBandwidthNote:
       '载荷带宽为完整逻辑载荷（含 FP8 缩放字节）÷ 延迟（每芯片），是基于逻辑字节的派生速率，不代表物理链路带宽。工具提示中的 β/α 根据各 token 档位下的字节数与延迟做最小二乘拟合（β = 每芯片带宽项，α = 固定开销）。',
@@ -915,35 +913,18 @@ export default function CollectiveXDisplay() {
                         setLegendExpanded(expanded);
                         track('collectivex_legend_expanded', { enabled: expanded });
                       }}
-                      actions={
-                        rangeView
-                          ? hiddenRangeIds.size > 0
-                            ? [
-                                {
-                                  id: 'collectivex-reset-filter',
-                                  label: t.resetFilter,
-                                  onClick: () => {
-                                    setHiddenRangeIds(new Set());
-                                    track('collectivex_series_filter_reset');
-                                  },
-                                },
-                              ]
-                            : []
-                          : activeSeries.length < phaseSeries.length
-                            ? [
-                                {
-                                  id: 'collectivex-reset-filter',
-                                  label: t.resetFilter,
-                                  onClick: () => {
-                                    setActiveSeriesIds(
-                                      new Set(phaseSeries.map((item) => item.series_id)),
-                                    );
-                                    track('collectivex_series_filter_reset');
-                                  },
-                                },
-                              ]
-                            : []
-                      }
+                      reset={{
+                        id: 'collectivex-reset-filter',
+                        disabled: rangeView
+                          ? hiddenRangeIds.size === 0
+                          : activeSeries.length >= phaseSeries.length,
+                        onClick: () => {
+                          if (rangeView) setHiddenRangeIds(new Set());
+                          else
+                            setActiveSeriesIds(new Set(phaseSeries.map((item) => item.series_id)));
+                          track('collectivex_series_filter_reset');
+                        },
+                      }}
                     />
                   }
                 />
