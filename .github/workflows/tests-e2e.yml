@@ -189,7 +189,14 @@ jobs:
       matrix:
         browser: [chrome, firefox]
         shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
-        mode: [base, fast]
+        mode: [base, nolog, noui, fastvis]
+        exclude:
+          - browser: firefox
+            mode: nolog
+          - browser: firefox
+            mode: noui
+          - browser: firefox
+            mode: fastvis
     steps:
       - name: Record CPU
         run: lscpu | grep -E 'Model name|^CPU\(s\)|MHz'
@@ -267,12 +274,12 @@ jobs:
           start: bun run start
           wait-on: 'http://localhost:3000'
           browser: ${{ matrix.browser }}
-          command: ${{ matrix.mode == 'fast' && format('bunx cypress run --browser {0} --no-runner-ui --config experimentalFastVisibility=true', matrix.browser) || '' }}
+          command: ${{ (matrix.mode == 'noui' && 'bunx cypress run --browser chrome --no-runner-ui') || (matrix.mode == 'fastvis' && 'bunx cypress run --browser chrome --config experimentalFastVisibility=true') || '' }}
           publish-summary: false
         env:
           CI: true
           E2E_FIXTURES: '1'
-          CYPRESS_NO_COMMAND_LOG: ${{ matrix.mode == 'fast' && '1' || '' }}
+          CYPRESS_NO_COMMAND_LOG: ${{ matrix.mode == 'nolog' && '1' || '' }}
           # cypress-split picks the subset of specs for this shard.
           # SPLIT_INDEX1 is 1-based to match matrix.shard values [1..8].
           # SPLIT_FILE seeds the balance from observed timings;
