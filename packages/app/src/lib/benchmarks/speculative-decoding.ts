@@ -22,13 +22,22 @@ export interface SpeculativeDecoding {
 export const specAlgorithmLabel = (algorithm: string): string =>
   SPEC_ALGORITHM_LABELS[algorithm] ?? algorithm.toUpperCase();
 
+export function speculativeDecodingName(
+  { method, algorithm }: SpeculativeDecoding,
+  model: string | undefined,
+): string | null {
+  if (!method || method === 'none') return null;
+  return algorithm ? specAlgorithmLabel(algorithm) : resolveFrameworkPartLabel(model, method);
+}
+
 export function speculativeDecodingLabel(
-  { method, algorithm, draftModel }: SpeculativeDecoding,
+  spec: SpeculativeDecoding,
   model: string | undefined,
   locale: Locale,
 ): string | null {
-  if (!method || method === 'none') return null;
-  if (!algorithm) return resolveFrameworkPartLabel(model, method);
-  const draft = !draftModel || draftModel === 'native' ? NATIVE_DRAFT[locale] : draftModel;
-  return `${specAlgorithmLabel(algorithm)} (${draft})`;
+  const name = speculativeDecodingName(spec, model);
+  if (!name || !spec.algorithm) return name;
+  const draft =
+    !spec.draftModel || spec.draftModel === 'native' ? NATIVE_DRAFT[locale] : spec.draftModel;
+  return `${name} (${draft})`;
 }

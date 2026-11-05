@@ -95,7 +95,7 @@ describe('buildEvaluationChartRows', () => {
     expect(result[0]).toMatchObject({
       configId: 1,
       hwKey: 'h200_sglang',
-      configLabel: 'H200 (SGLang)\nC128 T8 E1',
+      configLabel: 'H200 (SGLang)\nC128 · TP8',
       score: 0.8,
       framework: 'sglang',
       precision: 'fp8',
@@ -136,7 +136,7 @@ describe('buildEvaluationChartRows', () => {
       '2026-03-01',
     );
 
-    expect(result[0].configLabel).toBe('H200 (Dynamo TRTLLM, MTP)\nFP4 C128 T8 E1');
+    expect(result[0].configLabel).toBe('H200 (Dynamo TRTLLM · MTP)\nFP4 · C128 · TP8');
   });
 
   it('names the recorded speculative algorithm and draft model in the chip and config labels', () => {
@@ -150,7 +150,7 @@ describe('buildEvaluationChartRows', () => {
     expect(en).toMatchObject({
       hwLabel: 'H200',
       engineLabel: 'SGLang · DFlash (RadixArk/Kimi-K3.1-Dflash2-Preview)',
-      configLabel: 'H200 (SGLang, DFlash (RadixArk/Kimi-K3.1-Dflash2-Preview))\nC128 T8 E1',
+      configLabel: 'H200 (SGLang · DFlash)\nC128 · TP8',
     });
     const [zh] = buildEvaluationChartRows(
       [{ ...row, spec_method: 'mtp', spec_algorithm: 'mtp', spec_draft_model: 'native' }],
@@ -199,10 +199,10 @@ describe('buildEvaluationChartRows', () => {
 
     const labels = rows.map((r) => r.configLabel).toSorted();
     expect(labels).toEqual([
-      'H200 (Dynamo TRTLLM)\nC128 P(8/1/T/0) D(8/1/F/0)',
-      'H200 (Dynamo TRTLLM)\nC256 P(8/1/F/0) D(8/1/T/0)',
-      'H200 (Dynamo TRTLLM)\nC512 P(8/1/T/0) D(8/1/T/0)',
-      'H200 (SGLang)\nC128 T8 E1 DPA',
+      'H200 (Dynamo TRTLLM)\nC128 · prefill TP8 DPA ×1 · decode TP8 ×1',
+      'H200 (Dynamo TRTLLM)\nC256 · prefill TP8 ×1 · decode TP8 DPA ×1',
+      'H200 (Dynamo TRTLLM)\nC512 · prefill TP8 DPA ×1 · decode TP8 DPA ×1',
+      'H200 (SGLang)\nC128 · TP8 DPA',
     ]);
   });
 
@@ -326,11 +326,11 @@ describe('buildEvalChangelogEntries', () => {
     expect(result).toEqual([
       {
         benchmark: 'gsm8k',
-        configs: ['H200 (Dynamo TRTLLM)\nC128', 'H200 (SGLang)\nC64'],
+        configs: ['H200 (Dynamo TRTLLM)\nC128 · TP8', 'H200 (SGLang)\nC64 · TP8'],
       },
       {
         benchmark: 'mmlu',
-        configs: ['H200 (SGLang)\nC256'],
+        configs: ['H200 (SGLang)\nC256 · TP8'],
       },
     ]);
   });

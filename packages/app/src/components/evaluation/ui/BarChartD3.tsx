@@ -20,6 +20,7 @@ import { computeLeftMargin } from '@/lib/d3-chart/dynamic-margins';
 
 import { useEvaluation } from '@/components/evaluation/EvaluationContext';
 import type { EvaluationChartData } from '@/components/evaluation/types';
+import { parallelismPills } from '@/components/evaluation/chart-data';
 import {
   type EvalBenchmark,
   type Precision,
@@ -64,7 +65,12 @@ export const formatEvaluationEmptyStateDate = (dateStr: string, locale: Locale) 
 };
 
 const fmtSideTooltip = (tp: number, ep: number, dpa: boolean, nw: number, locale: Locale) =>
-  `TP ${tp}, EP ${ep}, DPA ${dpa ? (locale === 'zh' ? '是' : 'True') : locale === 'zh' ? '否' : 'False'}, NW ${nw}`;
+  [
+    ...parallelismPills(tp, ep, dpa).map((pill) => `${pill.label} ${pill.value ?? ''}`.trim()),
+    locale === 'zh'
+      ? `${nw || 1} 个 worker`
+      : `${nw || 1} ${(nw || 1) === 1 ? 'worker' : 'workers'}`,
+  ].join(' · ');
 
 const EVALUATION_TOOLTIP_STRINGS = {
   en: {
@@ -151,12 +157,11 @@ export const evaluationPointDetails = (
   locale: Locale = 'en',
 ) => {
   const t = EVALUATION_TOOLTIP_STRINGS[locale];
-  const [title = '', ...rest] = data.configLabel.split('\n');
   const precision = getPrecisionLabel(data.precision as Precision);
   const date = formatEvaluationDate(data.date, locale);
   return {
-    title,
-    subtitle: rest.join(' ') || undefined,
+    title: data.hwLabel,
+    subtitle: data.engineLabel || undefined,
     date,
     warning: unofficialBranch ? t.unofficial : undefined,
     metrics: [

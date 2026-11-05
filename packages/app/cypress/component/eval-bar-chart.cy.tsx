@@ -42,17 +42,26 @@ describe('EvalBarChartD3', () => {
       unofficial: { runIndexByUrl: { [runUrl]: 0 } },
     });
     cy.get('[data-testid="data-table-preset-all"]').click();
-    cy.contains('thead th', /^TP$/)
+    cy.contains('thead th', /^Prefill$/)
       .invoke('index')
       .then((index) => {
-        cy.get('tbody tr').eq(0).find('td').eq(index).should('have.text', '8');
-        cy.get('tbody tr').eq(1).find('td').eq(index).should('have.text', '1 / DP8');
+        cy.get('tbody tr').eq(0).find('td').eq(index).should('have.attr', 'colspan', '2');
+        cy.get('tbody tr')
+          .eq(0)
+          .find('td')
+          .eq(index)
+          .invoke('text')
+          .should('match', /^TP8(?!.*DP\d)/);
+        cy.get('tbody tr').eq(1).find('td').eq(index).should('contain.text', 'DP8');
       });
     cy.contains('thead th', 'Physical chips')
       .invoke('index')
       .then((index) => {
         cy.get('tbody tr').each(($row) => {
-          cy.wrap($row).find('td').eq(index).should('have.text', '4');
+          cy.wrap($row)
+            .find('td')
+            .eq(index - 1)
+            .should('have.text', '4');
         });
       });
   });
