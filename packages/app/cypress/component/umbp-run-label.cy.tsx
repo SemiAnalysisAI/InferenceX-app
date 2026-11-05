@@ -99,3 +99,88 @@ describe('UMBP run recognition legend', () => {
     });
   }
 });
+
+describe('router-aware framework labels', () => {
+  for (const [framework, label] of [
+    ['sglang', 'SGLang'],
+    ['vllm', 'vLLM'],
+  ]) {
+    it(`renders SMG ${label} in official and unofficial legends and line labels`, () => {
+      cy.viewport(1440, 1000);
+      const key = `mi355x_${framework}`;
+      const url = 'https://github.com/SemiAnalysisAI/InferenceX/actions/runs/41803503347';
+      const data = [8, 16, 32].map((x, index) =>
+        createMockInferenceData({
+          hwKey: key,
+          framework,
+          router_name: 'smg',
+          run_url: url,
+          precision: Precision.FP4,
+          x,
+          y: 300 - index * 60,
+        }),
+      );
+      const hardwareConfig = { [key]: getInferenceHardwareConfig(key, undefined, data) };
+      mountWithProviders(
+        <div style={{ width: 1200 }}>
+          <ScatterGraph
+            chartId="smg-recognition"
+            modelLabel="DeepSeek V4.1 Flash"
+            data={data}
+            overlayData={{
+              data: data.map((point) => ({ ...point, y: point.y + 40 })),
+              hardwareConfig,
+              label: 'smg-test',
+              runUrl: url,
+            }}
+            xLabel="Interactivity"
+            yLabel="Throughput / Chip (tok/s)"
+            chartDefinition={createMockChartDefinition({
+              chartType: 'interactivity',
+              y_tpPerGpu_roofline: 'upper_left',
+            })}
+            transitionDuration={0}
+          />
+        </div>,
+        {
+          inference: {
+            hardwareConfig,
+            activeHwTypes: new Set([key]),
+            hwTypesWithData: new Set([key]),
+            selectedPrecisions: [Precision.FP4],
+            showLineLabels: true,
+          },
+          unofficial: {
+            activeOverlayHwTypes: new Set([key]),
+            allOverlayHwTypes: new Set([key]),
+            runIndexByUrl: { [url]: 0, '41803503347': 0 },
+            unofficialRunInfos: [
+              {
+                id: 41803503347,
+                name: 'Router label test',
+                branch: 'smg-test',
+                sha: 'test',
+                createdAt: '2026-11-04T08:57:28Z',
+                url,
+                conclusion: 'success',
+                status: 'completed',
+                isNonMainBranch: true,
+              },
+            ],
+          },
+        },
+      );
+      cy.get('[data-testid="chart-legend"]')
+        .should('contain.text', `MI355X (SMG ${label})`)
+        .and('contain.text', `✕ smg-test (SMG ${label})`);
+      cy.get('.line-label[data-line-key]:not([data-line-key^="overlay-"])').should(
+        'contain.text',
+        `SMG ${label}`,
+      );
+      cy.get('.line-label[data-line-key^="overlay-"]').should('contain.text', `SMG ${label}`);
+      cy.get('.roofline-path').should('have.length.greaterThan', 0);
+      cy.get('.overlay-roofline-path').should('have.length.greaterThan', 0);
+      cy.screenshot(`smg-${framework}-labels`);
+    });
+  }
+});

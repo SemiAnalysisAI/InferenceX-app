@@ -1,10 +1,14 @@
-import { resolveFrameworkAlias } from '@semianalysisai/inferencex-constants';
+import {
+  resolveFrameworkAlias,
+  resolveFrameworkPartLabel,
+} from '@semianalysisai/inferencex-constants';
 
 import { getHardwareConfig, type HardwareEntry } from '@/lib/catalog/constants';
 import { runIdFromRunUrl } from '@/lib/benchmarks/known-issues';
 
 interface RunProvenance {
   run_url?: string | null;
+  router_name?: string | null;
 }
 
 const UMBP_LABEL_RUNS = new Set(['34926284365']);
@@ -27,8 +31,14 @@ const TEMPORARY_UMBP_LABEL_RUNS: Record<string, { label: string; expiresAt: numb
 export function inferenceFrameworkLabelOverride(
   framework: string,
   runUrl?: string | null,
+  routerName?: string | null,
 ): string | undefined {
-  if (resolveFrameworkAlias(framework) !== 'mori-sglang') return undefined;
+  const canonical = resolveFrameworkAlias(framework);
+  if (routerName?.trim().toLowerCase() === 'smg') {
+    if (canonical === 'sglang') return 'SMG SGLang';
+    if (canonical === 'vllm') return 'SMG vLLM';
+  }
+  if (canonical !== 'mori-sglang') return undefined;
   const runId = runIdFromRunUrl(runUrl);
   if (runId === null) return undefined;
   if (UMBP_LABEL_RUNS.has(runId)) return 'MoRI UMBP SGLang';
@@ -68,10 +78,27 @@ export function getInferenceRunLabel(
   label: string,
   points: readonly (RunProvenance & { framework?: string })[],
 ): string {
+  const hasSmg = points.some((point) =>
+    inferenceFrameworkLabelOverride(
+      point.framework ?? '',
+      point.run_url,
+      point.router_name,
+    )?.startsWith('SMG '),
+  );
   const override = [
     ...new Set(
       points
-        .map((point) => inferenceFrameworkLabelOverride(point.framework ?? '', point.run_url))
+        .map(
+          (point) =>
+            inferenceFrameworkLabelOverride(
+              point.framework ?? '',
+              point.run_url,
+              point.router_name,
+            ) ??
+            (hasSmg && point.framework
+              ? resolveFrameworkPartLabel(undefined, point.framework)
+              : undefined),
+        )
         .filter(Boolean),
     ),
   ]
@@ -88,16 +115,17 @@ export function getInferenceHardwareConfig(
   const config = getHardwareConfig(hwKey, model);
   const framework = hwKey.split('_')[1] ?? '';
   const overrides = points.map((point) =>
-    inferenceFrameworkLabelOverride(framework, point.run_url),
+    inferenceFrameworkLabelOverride(framework, point.run_url, point.router_name),
   );
   if (!overrides.some(Boolean)) return config;
-  const label = [...new Set(overrides.map((override) => override ?? 'MoRI SGLang'))]
+  const frameworkLabel = resolveFrameworkPartLabel(model, framework);
+  const label = [...new Set(overrides.map((override) => override ?? frameworkLabel))]
     .sort()
     .join(' / ');
   return {
     ...config,
-    suffix: config.suffix.replace('MoRI SGLang', label),
-    gpu: config.gpu.replace('MoRI SGLang', label),
+    suffix: config.suffix.replace(frameworkLabel, label),
+    gpu: config.gpu.replace(frameworkLabel, label),
   };
 }
 
@@ -106,7 +134,9 @@ export function getPointHardwareConfig(
   fallback: HardwareEntry,
 ): HardwareEntry {
   const hwKey = String(point.hwKey);
-  return resolveFrameworkAlias(hwKey.split('_')[1] ?? '') === 'mori-sglang'
+  return ['mori-sglang', 'sglang', 'vllm'].includes(
+    resolveFrameworkAlias(hwKey.split('_')[1] ?? ''),
+  )
     ? getInferenceHardwareConfig(hwKey, point.model, [point])
     : fallback;
 }
