@@ -77,8 +77,10 @@ const ENTITIES: Record<string, string> = {
   '&#39;': "'",
 };
 const render = (html: string) => ({
+  // Text between tags only; the result is asserted on, never rendered.
   textContent: html
-    .replaceAll(/<[^>]*>/g, '')
+    .split(/<[^>]*>/)
+    .join('')
     .replaceAll(/&(?:amp|lt|gt|quot|#39);/g, (entity) => ENTITIES[entity] ?? entity),
   hasCacheBar: html.includes('data-hover-cache-bar'),
 });
