@@ -22,10 +22,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "AgentX telemetry catalog",
-            "ships the Simplified Chinese catalog"
-          ],
+          "title": ["AgentX telemetry catalog", "ships the Simplified Chinese catalog"],
           "duration": 175,
           "attempts": 1
         }
@@ -360,18 +357,12 @@
           "attempts": 1
         },
         {
-          "title": [
-            "AgentX optimizations",
-            "returns 404 for a project that does not exist"
-          ],
+          "title": ["AgentX optimizations", "returns 404 for a project that does not exist"],
           "duration": 23,
           "attempts": 1
         },
         {
-          "title": [
-            "AgentX optimizations",
-            "ships the Simplified Chinese index and project pages"
-          ],
+          "title": ["AgentX optimizations", "ships the Simplified Chinese index and project pages"],
           "duration": 266,
           "attempts": 1
         }
@@ -468,18 +459,12 @@
           "attempts": 1
         },
         {
-          "title": [
-            "AI chart workspace",
-            "keeps the en workspace labeled and contained on mobile"
-          ],
+          "title": ["AI chart workspace", "keeps the en workspace labeled and contained on mobile"],
           "duration": 108,
           "attempts": 1
         },
         {
-          "title": [
-            "AI chart workspace",
-            "keeps the zh workspace labeled and contained on mobile"
-          ],
+          "title": ["AI chart workspace", "keeps the zh workspace labeled and contained on mobile"],
           "duration": 132,
           "attempts": 1
         },
@@ -671,11 +656,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Blog",
-            "Blog post page",
-            "renders the post title as the one and only h1"
-          ],
+          "title": ["Blog", "Blog post page", "renders the post title as the one and only h1"],
           "duration": 109,
           "attempts": 1
         },
@@ -734,11 +715,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Blog",
-            "Math rendering",
-            "renders $$ blocks through KaTeX"
-          ],
+          "title": ["Blog", "Math rendering", "renders $$ blocks through KaTeX"],
           "duration": 183,
           "attempts": 1
         },
@@ -752,11 +729,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Blog",
-            "Math rendering",
-            "renders every figure the post references"
-          ],
+          "title": ["Blog", "Math rendering", "renders every figure the post references"],
           "duration": 185,
           "attempts": 1
         }
@@ -1197,10 +1170,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "CollectiveX neutral run view",
-            "pins a compact tooltip on point click"
-          ],
+          "title": ["CollectiveX neutral run view", "pins a compact tooltip on point click"],
           "duration": 690,
           "attempts": 1
         },
@@ -1245,10 +1215,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "CollectiveX availability states",
-            "reports a missing run list"
-          ],
+          "title": ["CollectiveX availability states", "reports a missing run list"],
           "duration": 1141,
           "attempts": 1
         },
@@ -1277,10 +1244,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "CollectiveX source repository links",
-            "links the recorded source repository"
-          ],
+          "title": ["CollectiveX source repository links", "links the recorded source repository"],
           "duration": 128,
           "attempts": 1
         },
@@ -1433,10 +1397,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Chinese compare-per-dollar table",
-            "localizes the per-dollar metric label"
-          ],
+          "title": ["Chinese compare-per-dollar table", "localizes the per-dollar metric label"],
           "duration": 519,
           "attempts": 1
         },
@@ -1487,10 +1448,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Compare precision zh index",
-            "renders Chinese hero and /zh card hrefs"
-          ],
+          "title": ["Compare precision zh index", "renders Chinese hero and /zh card hrefs"],
           "duration": 83,
           "attempts": 1
         }
@@ -1547,10 +1505,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Compare scenario routes",
-            "lets the path segment override the pair default"
-          ],
+          "title": ["Compare scenario routes", "lets the path segment override the pair default"],
           "duration": 361,
           "attempts": 1
         },
@@ -2062,10 +2017,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "AgentX quickstart",
-            "opens the guide from AgentX and the About FAQ (en)"
-          ],
+          "title": ["AgentX quickstart", "opens the guide from AgentX and the About FAQ (en)"],
           "duration": 335,
           "attempts": 1
         },
@@ -2078,10 +2030,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "AgentX quickstart",
-            "opens the guide from AgentX and the About FAQ (/zh)"
-          ],
+          "title": ["AgentX quickstart", "opens the guide from AgentX and the About FAQ (/zh)"],
           "duration": 354,
           "attempts": 1
         },
@@ -2162,10 +2111,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Evaluation sample sharing",
-            "copies and restores a link to the prompt drawer"
-          ],
+          "title": ["Evaluation sample sharing", "copies and restores a link to the prompt drawer"],
           "duration": 1004,
           "attempts": 1
         },
@@ -2374,10 +2320,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Fleet — Fleet Lifecycle",
-            "the default MW budget drives the lifecycle table"
-          ],
+          "title": ["Fleet — Fleet Lifecycle", "the default MW budget drives the lifecycle table"],
           "duration": 642,
           "attempts": 1
         },
@@ -2414,10 +2357,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Fleet — Fleet Lifecycle",
-            "names each line with its chip at the right edge"
-          ],
+          "title": ["Fleet — Fleet Lifecycle", "names each line with its chip at the right edge"],
           "duration": 178,
           "attempts": 1
         },
@@ -2462,10 +2402,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Fleet — Fleet Lifecycle",
-            "switches the y axis between margin and revenue"
-          ],
+          "title": ["Fleet — Fleet Lifecycle", "switches the y axis between margin and revenue"],
           "duration": 497,
           "attempts": 1
         },
@@ -2494,10 +2431,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Fleet — Fleet Lifecycle",
-            "a shorter MTBI lowers availability"
-          ],
+          "title": ["Fleet — Fleet Lifecycle", "a shorter MTBI lowers availability"],
           "duration": 714,
           "attempts": 1
         },
@@ -2510,10 +2444,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Fleet — Fleet Lifecycle",
-            "follows legend visibility"
-          ],
+          "title": ["Fleet — Fleet Lifecycle", "follows legend visibility"],
           "duration": 396,
           "attempts": 1
         },
@@ -2688,10 +2619,7 @@
       "duration": 6731,
       "tests": [
         {
-          "title": [
-            "GPU Specs Tab",
-            "specs table is visible with all GPUs"
-          ],
+          "title": ["GPU Specs Tab", "specs table is visible with all GPUs"],
           "duration": 247,
           "attempts": 1
         },
@@ -2720,34 +2648,22 @@
           "attempts": 1
         },
         {
-          "title": [
-            "GPU Specs Bar Chart View",
-            "table view is active by default"
-          ],
+          "title": ["GPU Specs Bar Chart View", "table view is active by default"],
           "duration": 154,
           "attempts": 1
         },
         {
-          "title": [
-            "GPU Specs Bar Chart View",
-            "clicking Chart button switches to bar chart view"
-          ],
+          "title": ["GPU Specs Bar Chart View", "clicking Chart button switches to bar chart view"],
           "duration": 84,
           "attempts": 1
         },
         {
-          "title": [
-            "GPU Specs Bar Chart View",
-            "FP4 metric excludes GPUs without FP4 support"
-          ],
+          "title": ["GPU Specs Bar Chart View", "FP4 metric excludes GPUs without FP4 support"],
           "duration": 123,
           "attempts": 1
         },
         {
-          "title": [
-            "GPU Specs Bar Chart View",
-            "switching back to table view restores the table"
-          ],
+          "title": ["GPU Specs Bar Chart View", "switching back to table view restores the table"],
           "duration": 58,
           "attempts": 1
         },
@@ -2894,10 +2810,7 @@
       "duration": 2434,
       "tests": [
         {
-          "title": [
-            "Gradient Labels Toggle",
-            "both toggles can be enabled simultaneously"
-          ],
+          "title": ["Gradient Labels Toggle", "both toggles can be enabled simultaneously"],
           "duration": 850,
           "attempts": 1
         },
@@ -3090,9 +3003,7 @@
       "duration": 24052,
       "tests": [
         {
-          "title": [
-            "opens an old Inference power link on PowerX with the same metric"
-          ],
+          "title": ["opens an old Inference power link on PowerX with the same metric"],
           "duration": 637,
           "attempts": 1
         },
@@ -3158,18 +3069,12 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Inference Chart",
-            "ships OpenRouter-priced token revenue in Chinese"
-          ],
+          "title": ["Inference Chart", "ships OpenRouter-priced token revenue in Chinese"],
           "duration": 568,
           "attempts": 1
         },
         {
-          "title": [
-            "Inference Chart",
-            "ships infrastructure total tokens per dollar in Chinese"
-          ],
+          "title": ["Inference Chart", "ships infrastructure total tokens per dollar in Chinese"],
           "duration": 594,
           "attempts": 1
         },
@@ -3238,50 +3143,32 @@
           "attempts": 1
         },
         {
-          "title": [
-            "VR default date preference",
-            "defaults only VR to September 9 under /en"
-          ],
+          "title": ["VR default date preference", "defaults only VR to September 9 under /en"],
           "duration": 306,
           "attempts": 1
         },
         {
-          "title": [
-            "VR default date preference",
-            "honors explicit g_rundate=2026-09-10 under /en"
-          ],
+          "title": ["VR default date preference", "honors explicit g_rundate=2026-09-10 under /en"],
           "duration": 289,
           "attempts": 1
         },
         {
-          "title": [
-            "VR default date preference",
-            "honors explicit g_runid=9100001 under /en"
-          ],
+          "title": ["VR default date preference", "honors explicit g_runid=9100001 under /en"],
           "duration": 222,
           "attempts": 1
         },
         {
-          "title": [
-            "VR default date preference",
-            "defaults only VR to September 9 under /zh"
-          ],
+          "title": ["VR default date preference", "defaults only VR to September 9 under /zh"],
           "duration": 284,
           "attempts": 1
         },
         {
-          "title": [
-            "VR default date preference",
-            "honors explicit g_rundate=2026-09-10 under /zh"
-          ],
+          "title": ["VR default date preference", "honors explicit g_rundate=2026-09-10 under /zh"],
           "duration": 291,
           "attempts": 1
         },
         {
-          "title": [
-            "VR default date preference",
-            "honors explicit g_runid=9100001 under /zh"
-          ],
+          "title": ["VR default date preference", "honors explicit g_runid=9100001 under /zh"],
           "duration": 304,
           "attempts": 1
         },
@@ -3412,10 +3299,7 @@
       "duration": 12166,
       "tests": [
         {
-          "title": [
-            "Inference Replay",
-            "opens the replay preview modal from the MP4 menu item"
-          ],
+          "title": ["Inference Replay", "opens the replay preview modal from the MP4 menu item"],
           "duration": 790,
           "attempts": 1
         },
@@ -3436,10 +3320,7 @@
           "attempts": 2
         },
         {
-          "title": [
-            "Inference Replay",
-            "renders line labels in the foreground during replay"
-          ],
+          "title": ["Inference Replay", "renders line labels in the foreground during replay"],
           "duration": 2,
           "attempts": 1
         },
@@ -3498,18 +3379,12 @@
           "attempts": 1
         },
         {
-          "title": [
-            "official preview notices",
-            "appears with Jalapeño calculator results"
-          ],
+          "title": ["official preview notices", "appears with Jalapeño calculator results"],
           "duration": 627,
           "attempts": 1
         },
         {
-          "title": [
-            "official preview notices",
-            "appears with Jalapeño historical trend lines"
-          ],
+          "title": ["official preview notices", "appears with Jalapeño historical trend lines"],
           "duration": 448,
           "attempts": 1
         },
@@ -3616,10 +3491,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "landing model curation",
-            "opens GLM 5.3 Rubin AgentX results from /"
-          ],
+          "title": ["landing model curation", "opens GLM 5.3 Rubin AgentX results from /"],
           "duration": 575,
           "attempts": 1
         },
@@ -3632,10 +3504,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "landing model curation",
-            "opens Jalapeño R1 results from /"
-          ],
+          "title": ["landing model curation", "opens Jalapeño R1 results from /"],
           "duration": 742,
           "attempts": 1
         },
@@ -3680,10 +3549,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "landing model curation",
-            "opens GLM 5.3 Rubin AgentX results from /zh"
-          ],
+          "title": ["landing model curation", "opens GLM 5.3 Rubin AgentX results from /zh"],
           "duration": 559,
           "attempts": 1
         },
@@ -3696,10 +3562,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "landing model curation",
-            "opens Jalapeño R1 results from /zh"
-          ],
+          "title": ["landing model curation", "opens Jalapeño R1 results from /zh"],
           "duration": 854,
           "attempts": 1
         },
@@ -3788,26 +3651,17 @@
       "duration": 3326,
       "tests": [
         {
-          "title": [
-            "Line Labels Toggle",
-            "line labels stay in the foreground after zooming"
-          ],
+          "title": ["Line Labels Toggle", "line labels stay in the foreground after zooming"],
           "duration": 768,
           "attempts": 1
         },
         {
-          "title": [
-            "Line Labels Toggle",
-            "Line Labels can be enabled alongside Gradient Labels"
-          ],
+          "title": ["Line Labels Toggle", "Line Labels can be enabled alongside Gradient Labels"],
           "duration": 544,
           "attempts": 1
         },
         {
-          "title": [
-            "Line Labels Toggle",
-            "URL param i_linelabel=0 disables line labels on load"
-          ],
+          "title": ["Line Labels Toggle", "URL param i_linelabel=0 disables line labels on load"],
           "duration": 673,
           "attempts": 1
         },
@@ -4451,10 +4305,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Per-model dashboard routes",
-            "returns 404 for unknown model slugs"
-          ],
+          "title": ["Per-model dashboard routes", "returns 404 for unknown model slugs"],
           "duration": 37,
           "attempts": 1
         },
@@ -4585,18 +4436,12 @@
       "duration": 15681,
       "tests": [
         {
-          "title": [
-            "Chart Section Tabs — E2E",
-            "updates the URL path when switching tabs"
-          ],
+          "title": ["Chart Section Tabs — E2E", "updates the URL path when switching tabs"],
           "duration": 1121,
           "attempts": 1
         },
         {
-          "title": [
-            "Chart Section Tabs — E2E",
-            "opens Historical Trends from the footer link"
-          ],
+          "title": ["Chart Section Tabs — E2E", "opens Historical Trends from the footer link"],
           "duration": 214,
           "attempts": 1
         },
@@ -4609,34 +4454,22 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Chart Section Tabs — E2E",
-            "opens First-Token Limits from the footer link"
-          ],
+          "title": ["Chart Section Tabs — E2E", "opens First-Token Limits from the footer link"],
           "duration": 116,
           "attempts": 1
         },
         {
-          "title": [
-            "Chart Section Tabs — E2E",
-            "opens Prefix Cache Reuse from the footer link"
-          ],
+          "title": ["Chart Section Tabs — E2E", "opens Prefix Cache Reuse from the footer link"],
           "duration": 160,
           "attempts": 1
         },
         {
-          "title": [
-            "Chart Section Tabs — E2E",
-            "opens GPU Reliability from the footer link"
-          ],
+          "title": ["Chart Section Tabs — E2E", "opens GPU Reliability from the footer link"],
           "duration": 180,
           "attempts": 1
         },
         {
-          "title": [
-            "Chart Section Tabs — E2E",
-            "opens Chip Specs from the footer link"
-          ],
+          "title": ["Chart Section Tabs — E2E", "opens Chip Specs from the footer link"],
           "duration": 192,
           "attempts": 1
         },
@@ -4697,10 +4530,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "First-load navigation",
-            "navigates to articles from the footer"
-          ],
+          "title": ["First-load navigation", "navigates to articles from the footer"],
           "duration": 186,
           "attempts": 1
         },
@@ -4729,10 +4559,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "First-load navigation",
-            "navigates to AgentX from the header with one click"
-          ],
+          "title": ["First-load navigation", "navigates to AgentX from the header with one click"],
           "duration": 353,
           "attempts": 1
         },
@@ -4745,10 +4572,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "First-load navigation",
-            "navigates to submissions from the landing CTA"
-          ],
+          "title": ["First-load navigation", "navigates to submissions from the landing CTA"],
           "duration": 255,
           "attempts": 1
         },
@@ -4769,18 +4593,12 @@
           "attempts": 1
         },
         {
-          "title": [
-            "OperatorX launch banner A/B arm",
-            "opens OperatorX from / landing page"
-          ],
+          "title": ["OperatorX launch banner A/B arm", "opens OperatorX from / landing page"],
           "duration": 292,
           "attempts": 1
         },
         {
-          "title": [
-            "OperatorX launch banner A/B arm",
-            "opens OperatorX from /zh landing page"
-          ],
+          "title": ["OperatorX launch banner A/B arm", "opens OperatorX from /zh landing page"],
           "duration": 310,
           "attempts": 1
         },
@@ -4793,26 +4611,17 @@
           "attempts": 1
         },
         {
-          "title": [
-            "OperatorX launch banner A/B arm",
-            "shares dismissal across arms"
-          ],
+          "title": ["OperatorX launch banner A/B arm", "shares dismissal across arms"],
           "duration": 186,
           "attempts": 1
         },
         {
-          "title": [
-            "TPUv7 results",
-            "preserves TPUv7 FP8 cost basis in / share URLs"
-          ],
+          "title": ["TPUv7 results", "preserves TPUv7 FP8 cost basis in / share URLs"],
           "duration": 2056,
           "attempts": 1
         },
         {
-          "title": [
-            "TPUv7 results",
-            "preserves TPUv7 FP8 cost basis in /zh share URLs"
-          ],
+          "title": ["TPUv7 results", "preserves TPUv7 FP8 cost basis in /zh share URLs"],
           "duration": 2016,
           "attempts": 1
         },
@@ -4825,10 +4634,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "TPUv7 results",
-            "hides the TCO basis selector outside Qwen3.5 8K/1K"
-          ],
+          "title": ["TPUv7 results", "hides the TCO basis selector outside Qwen3.5 8K/1K"],
           "duration": 185,
           "attempts": 1
         },
@@ -4863,18 +4669,12 @@
       "duration": 25969,
       "tests": [
         {
-          "title": [
-            "Landing nudges — modals",
-            "shows the launch banner on fresh first load"
-          ],
+          "title": ["Landing nudges — modals", "shows the launch banner on fresh first load"],
           "duration": 289,
           "attempts": 1
         },
         {
-          "title": [
-            "Landing nudges — modals",
-            "localizes the launch banner title in Chinese"
-          ],
+          "title": ["Landing nudges — modals", "localizes the launch banner title in Chinese"],
           "duration": 184,
           "attempts": 1
         },
@@ -4959,18 +4759,12 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Landing nudges — TPUv7 launch modal",
-            "dismisses on Escape"
-          ],
+          "title": ["Landing nudges — TPUv7 launch modal", "dismisses on Escape"],
           "duration": 197,
           "attempts": 1
         },
         {
-          "title": [
-            "Landing nudges — TPUv7 launch modal",
-            "persists close-button dismissal"
-          ],
+          "title": ["Landing nudges — TPUv7 launch modal", "persists close-button dismissal"],
           "duration": 280,
           "attempts": 1
         },
@@ -5007,10 +4801,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Landing nudges — banner",
-            "dismissing the banner persists across reloads"
-          ],
+          "title": ["Landing nudges — banner", "dismissing the banner persists across reloads"],
           "duration": 465,
           "attempts": 1
         },
@@ -5071,18 +4862,12 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Nudge scope isolation",
-            "landing nudges do not appear on dashboard"
-          ],
+          "title": ["Nudge scope isolation", "landing nudges do not appear on dashboard"],
           "duration": 127,
           "attempts": 1
         },
         {
-          "title": [
-            "Nudge scope isolation",
-            "dashboard nudges do not appear on landing page"
-          ],
+          "title": ["Nudge scope isolation", "dashboard nudges do not appear on landing page"],
           "duration": 2146,
           "attempts": 1
         }
@@ -5093,9 +4878,7 @@
       "duration": 9040,
       "tests": [
         {
-          "title": [
-            "shows measured and missing GPU coverage, then switches the URL to MoE"
-          ],
+          "title": ["shows measured and missing GPU coverage, then switches the URL to MoE"],
           "duration": 399,
           "attempts": 1
         },
@@ -5114,44 +4897,32 @@
           "attempts": 1
         },
         {
-          "title": [
-            "shows median and best bars across the row above metric vs size at /"
-          ],
+          "title": ["shows median and best bars across the row above metric vs size at /"],
           "duration": 506,
           "attempts": 1
         },
         {
-          "title": [
-            "keeps a median label that does not fit its bar on the same row at /"
-          ],
+          "title": ["keeps a median label that does not fit its bar on the same row at /"],
           "duration": 241,
           "attempts": 1
         },
         {
-          "title": [
-            "keeps 950PR FP8 points visible when normalized at /"
-          ],
+          "title": ["keeps 950PR FP8 points visible when normalized at /"],
           "duration": 277,
           "attempts": 1
         },
         {
-          "title": [
-            "shows median and best bars across the row above metric vs size at /zh"
-          ],
+          "title": ["shows median and best bars across the row above metric vs size at /zh"],
           "duration": 602,
           "attempts": 1
         },
         {
-          "title": [
-            "keeps a median label that does not fit its bar on the same row at /zh"
-          ],
+          "title": ["keeps a median label that does not fit its bar on the same row at /zh"],
           "duration": 323,
           "attempts": 1
         },
         {
-          "title": [
-            "keeps 950PR FP8 points visible when normalized at /zh"
-          ],
+          "title": ["keeps 950PR FP8 points visible when normalized at /zh"],
           "duration": 262,
           "attempts": 1
         },
@@ -5625,10 +5396,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Overview page",
-            "keeps one history entry when the overview request fails"
-          ],
+          "title": ["Overview page", "keeps one history entry when the overview request fails"],
           "duration": 611,
           "attempts": 1
         },
@@ -5697,10 +5465,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Overview page",
-            "switches the history window through the embedded selector"
-          ],
+          "title": ["Overview page", "switches the history window through the embedded selector"],
           "duration": 614,
           "attempts": 1
         },
@@ -5713,18 +5478,12 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Overview page",
-            "releases the exact history pair after a model change"
-          ],
+          "title": ["Overview page", "releases the exact history pair after a model change"],
           "duration": 692,
           "attempts": 1
         },
         {
-          "title": [
-            "Overview page",
-            "keeps a benchmark result usable without comparison dates"
-          ],
+          "title": ["Overview page", "keeps a benchmark result usable without comparison dates"],
           "duration": 406,
           "attempts": 1
         },
@@ -5793,10 +5552,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Overview page",
-            "stacks the metric definition under the title at every width"
-          ],
+          "title": ["Overview page", "stacks the metric definition under the title at every width"],
           "duration": 714,
           "attempts": 1
         },
@@ -5817,10 +5573,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Overview page",
-            "re-renders the whole matrix from the six-stop SLO slider"
-          ],
+          "title": ["Overview page", "re-renders the whole matrix from the six-stop SLO slider"],
           "duration": 885,
           "attempts": 1
         },
@@ -6051,10 +5804,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Profit Estimator — GLM 5.2/5.3",
-            "308s the older glm-5-2 slug to glm-5-3"
-          ],
+          "title": ["Profit Estimator — GLM 5.2/5.3", "308s the older glm-5-2 slug to glm-5-3"],
           "duration": 19,
           "attempts": 1
         },
@@ -6374,10 +6124,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Profit Estimator per GW",
-            "uses the SKU legend as the bar filter"
-          ],
+          "title": ["Profit Estimator per GW", "uses the SKU legend as the bar filter"],
           "duration": 187,
           "attempts": 1
         },
@@ -6716,10 +6463,7 @@
       "duration": 1251,
       "tests": [
         {
-          "title": [
-            "Page Load & Navigation",
-            "page renders without JavaScript errors"
-          ],
+          "title": ["Page Load & Navigation", "page renders without JavaScript errors"],
           "duration": 145,
           "attempts": 1
         },
@@ -6732,10 +6476,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Page Load & Navigation",
-            "opens and preserves a direct link to an FAQ answer"
-          ],
+          "title": ["Page Load & Navigation", "opens and preserves a direct link to an FAQ answer"],
           "duration": 278,
           "attempts": 1
         },
@@ -6748,10 +6489,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Theme Toggle",
-            "theme persists across page reload (localStorage)"
-          ],
+          "title": ["Theme Toggle", "theme persists across page reload (localStorage)"],
           "duration": 387,
           "attempts": 1
         }
@@ -6762,10 +6500,7 @@
       "duration": 3045,
       "tests": [
         {
-          "title": [
-            "Site search",
-            "does not load the search chunk or fetch pages until opened"
-          ],
+          "title": ["Site search", "does not load the search chunk or fetch pages until opened"],
           "duration": 277,
           "attempts": 1
         },
@@ -6786,10 +6521,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Site search",
-            "serves Chinese UI and crawls /zh siblings on Chinese pages"
-          ],
+          "title": ["Site search", "serves Chinese UI and crawls /zh siblings on Chinese pages"],
           "duration": 809,
           "attempts": 1
         }
@@ -7121,18 +6853,12 @@
           "attempts": 1
         },
         {
-          "title": [
-            "TCO Calculator Chinese route",
-            "keeps the localized chart contained at 375px"
-          ],
+          "title": ["TCO Calculator Chinese route", "keeps the localized chart contained at 375px"],
           "duration": 169,
           "attempts": 1
         },
         {
-          "title": [
-            "TCO Calculator Chinese route",
-            "emits bidirectional hreflang metadata"
-          ],
+          "title": ["TCO Calculator Chinese route", "emits bidirectional hreflang metadata"],
           "duration": 212,
           "attempts": 1
         }
@@ -7165,10 +6891,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "TPU publication preview",
-            "restores the pricing basis on a Chinese share URL"
-          ],
+          "title": ["TPU publication preview", "restores the pricing basis on a Chinese share URL"],
           "duration": 439,
           "attempts": 1
         },
@@ -7363,10 +7086,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Default scenario",
-            "keeps 8K / 1K when the link asks for it explicitly"
-          ],
+          "title": ["Default scenario", "keeps 8K / 1K when the link asks for it explicitly"],
           "duration": 813,
           "attempts": 1
         },
@@ -7433,16 +7153,12 @@
       "duration": 33654,
       "tests": [
         {
-          "title": [
-            "omits idle selection controls from all core-profile panels on /"
-          ],
+          "title": ["omits idle selection controls from all core-profile panels on /"],
           "duration": 419,
           "attempts": 1
         },
         {
-          "title": [
-            "omits idle selection controls from all core-profile panels on /zh"
-          ],
+          "title": ["omits idle selection controls from all core-profile panels on /zh"],
           "duration": 760,
           "attempts": 1
         },
@@ -7454,9 +7170,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "filters both devices on one page and preserves their API values and units"
-          ],
+          "title": ["filters both devices on one page and preserves their API values and units"],
           "duration": 7912,
           "attempts": 1
         },
@@ -7492,10 +7206,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "ubenchX hub and test routes",
-            "renders the Chinese TPC Skyline page"
-          ],
+          "title": ["ubenchX hub and test routes", "renders the Chinese TPC Skyline page"],
           "duration": 205,
           "attempts": 1
         },
@@ -7516,10 +7227,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "ubenchX hub and test routes",
-            "renders the Chinese sm-l2-distance page"
-          ],
+          "title": ["ubenchX hub and test routes", "renders the Chinese sm-l2-distance page"],
           "duration": 249,
           "attempts": 1
         },

@@ -14,10 +14,7 @@
       "duration": 238,
       "tests": [
         {
-          "title": [
-            "Agentic ISL/OSL distribution",
-            "bins on a log axis without a fitted overlay"
-          ],
+          "title": ["Agentic ISL/OSL distribution", "bins on a log axis without a fitted overlay"],
           "duration": 81,
           "attempts": 1
         },
@@ -76,66 +73,42 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Autumn leaf gutter regression",
-            "still hides the decoration in embeds"
-          ],
+          "title": ["Autumn leaf gutter regression", "still hides the decoration in embeds"],
           "duration": 28,
           "attempts": 1
         },
         {
-          "title": [
-            "Autumn leaf gutter regression",
-            "does not paint over content at 320px"
-          ],
+          "title": ["Autumn leaf gutter regression", "does not paint over content at 320px"],
           "duration": 112,
           "attempts": 1
         },
         {
-          "title": [
-            "Autumn leaf gutter regression",
-            "does not paint over content at 640px"
-          ],
+          "title": ["Autumn leaf gutter regression", "does not paint over content at 640px"],
           "duration": 105,
           "attempts": 1
         },
         {
-          "title": [
-            "Autumn leaf gutter regression",
-            "does not paint over content at 768px"
-          ],
+          "title": ["Autumn leaf gutter regression", "does not paint over content at 768px"],
           "duration": 105,
           "attempts": 1
         },
         {
-          "title": [
-            "Autumn leaf gutter regression",
-            "does not paint over content at 1024px"
-          ],
+          "title": ["Autumn leaf gutter regression", "does not paint over content at 1024px"],
           "duration": 101,
           "attempts": 1
         },
         {
-          "title": [
-            "Autumn leaf gutter regression",
-            "does not paint over content at 1280px"
-          ],
+          "title": ["Autumn leaf gutter regression", "does not paint over content at 1280px"],
           "duration": 102,
           "attempts": 1
         },
         {
-          "title": [
-            "Autumn leaf gutter regression",
-            "does not paint over content at 1440px"
-          ],
+          "title": ["Autumn leaf gutter regression", "does not paint over content at 1440px"],
           "duration": 98,
           "attempts": 1
         },
         {
-          "title": [
-            "Autumn leaf gutter regression",
-            "does not paint over content at 1536px"
-          ],
+          "title": ["Autumn leaf gutter regression", "does not paint over content at 1536px"],
           "duration": 111,
           "attempts": 1
         }
@@ -206,18 +179,12 @@
           "attempts": 1
         },
         {
-          "title": [
-            "ChartButtons",
-            "does not offer PNG sizing when image export is unavailable"
-          ],
+          "title": ["ChartButtons", "does not offer PNG sizing when image export is unavailable"],
           "duration": 106,
           "attempts": 1
         },
         {
-          "title": [
-            "ChartButtons",
-            "renders localized accessible actions on mobile by default"
-          ],
+          "title": ["ChartButtons", "renders localized accessible actions on mobile by default"],
           "duration": 247,
           "attempts": 1
         },
@@ -246,20 +213,12 @@
           "attempts": 1
         },
         {
-          "title": [
-            "ChartButtons",
-            "without CSV export",
-            "zoom reset dispatches custom event"
-          ],
+          "title": ["ChartButtons", "without CSV export", "zoom reset dispatches custom event"],
           "duration": 105,
           "attempts": 1
         },
         {
-          "title": [
-            "ChartButtons",
-            "with CSV export",
-            "clicking CSV calls onExportCsv"
-          ],
+          "title": ["ChartButtons", "with CSV export", "clicking CSV calls onExportCsv"],
           "duration": 194,
           "attempts": 1
         },
@@ -451,10 +410,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "ChartLegend (sidebar variant)",
-            "reset filter restores all items"
-          ],
+          "title": ["ChartLegend (sidebar variant)", "reset filter restores all items"],
           "duration": 190,
           "attempts": 1
         },
@@ -499,10 +455,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "ChartLegend points-table icon + dialog",
-            "dialog closes and can be reopened"
-          ],
+          "title": ["ChartLegend points-table icon + dialog", "dialog closes and can be reopened"],
           "duration": 269,
           "attempts": 1
         },
@@ -611,11 +564,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Chart Selectors",
-            "ModelSelector",
-            "shows options when clicked"
-          ],
+          "title": ["Chart Selectors", "ModelSelector", "shows options when clicked"],
           "duration": 109,
           "attempts": 1
         },
@@ -656,11 +605,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Chart Selectors",
-            "ModelSelector",
-            "explains maintenance mode in a tooltip"
-          ],
+          "title": ["Chart Selectors", "ModelSelector", "explains maintenance mode in a tooltip"],
           "duration": 187,
           "attempts": 1
         },
@@ -674,11 +619,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Chart Selectors",
-            "SequenceSelector",
-            "shows options when clicked"
-          ],
+          "title": ["Chart Selectors", "SequenceSelector", "shows options when clicked"],
           "duration": 105,
           "attempts": 1
         },
@@ -827,11 +768,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Chart Selectors",
-            "PrecisionSelector",
-            "shows current selection"
-          ],
+          "title": ["Chart Selectors", "PrecisionSelector", "shows current selection"],
           "duration": 23,
           "attempts": 1
         },
@@ -878,9 +815,7 @@
       "duration": 523,
       "tests": [
         {
-          "title": [
-            "keeps comparison runs independently toggleable and distinguishes their lines"
-          ],
+          "title": ["keeps comparison runs independently toggleable and distinguishes their lines"],
           "duration": 518,
           "attempts": 1
         }
@@ -1033,10 +968,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "component CSS harness",
-            "keeps tapped help readable inside a narrow viewport"
-          ],
+          "title": ["component CSS harness", "keeps tapped help readable inside a narrow viewport"],
           "duration": 312,
           "attempts": 1
         },
@@ -1049,10 +981,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "component CSS harness",
-            "loads Tailwind visibility and sizing utilities"
-          ],
+          "title": ["component CSS harness", "loads Tailwind visibility and sizing utilities"],
           "duration": 23,
           "attempts": 1
         },
@@ -1111,18 +1040,12 @@
       "duration": 1526,
       "tests": [
         {
-          "title": [
-            "CostTierSelector",
-            "renders nothing for metrics without a pricing basis"
-          ],
+          "title": ["CostTierSelector", "renders nothing for metrics without a pricing basis"],
           "duration": 38,
           "attempts": 1
         },
         {
-          "title": [
-            "CostTierSelector",
-            "does not reseed $/hr the reader has already entered"
-          ],
+          "title": ["CostTierSelector", "does not reseed $/hr the reader has already entered"],
           "duration": 216,
           "attempts": 1
         },
@@ -1135,10 +1058,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "CostTierSelector",
-            "shows the rental tier on rental-tier metrics"
-          ],
+          "title": ["CostTierSelector", "shows the rental tier on rental-tier metrics"],
           "duration": 30,
           "attempts": 1
         },
@@ -1247,34 +1167,22 @@
           "attempts": 1
         },
         {
-          "title": [
-            "DatasetList",
-            "renders a card per dataset with its summary stats"
-          ],
+          "title": ["DatasetList", "renders a card per dataset with its summary stats"],
           "duration": 53,
           "attempts": 1
         },
         {
-          "title": [
-            "DatasetList",
-            "keeps grouped metrics readable when cards stack on mobile"
-          ],
+          "title": ["DatasetList", "keeps grouped metrics readable when cards stack on mobile"],
           "duration": 51,
           "attempts": 1
         },
         {
-          "title": [
-            "DatasetList",
-            "shows the empty state when no datasets are ingested"
-          ],
+          "title": ["DatasetList", "shows the empty state when no datasets are ingested"],
           "duration": 26,
           "attempts": 1
         },
         {
-          "title": [
-            "DatasetList",
-            "shows the error state when the request fails"
-          ],
+          "title": ["DatasetList", "shows the error state when the request fails"],
           "duration": 28,
           "attempts": 1
         }
@@ -1285,66 +1193,42 @@
       "duration": 2342,
       "tests": [
         {
-          "title": [
-            "DatePicker",
-            "displays formatted date when date is provided"
-          ],
+          "title": ["DatePicker", "displays formatted date when date is provided"],
           "duration": 55,
           "attempts": 1
         },
         {
-          "title": [
-            "DatePicker",
-            "available dates are clickable"
-          ],
+          "title": ["DatePicker", "available dates are clickable"],
           "duration": 139,
           "attempts": 1
         },
         {
-          "title": [
-            "DatePicker",
-            "unavailable dates have visual indicator"
-          ],
+          "title": ["DatePicker", "unavailable dates have visual indicator"],
           "duration": 121,
           "attempts": 1
         },
         {
-          "title": [
-            "DatePicker",
-            "\"Go to Latest\" button navigates to latest available date"
-          ],
+          "title": ["DatePicker", "\"Go to Latest\" button navigates to latest available date"],
           "duration": 411,
           "attempts": 1
         },
         {
-          "title": [
-            "DatePicker",
-            "Previous/Next date arrows work"
-          ],
+          "title": ["DatePicker", "Previous/Next date arrows work"],
           "duration": 194,
           "attempts": 1
         },
         {
-          "title": [
-            "DatePicker",
-            "Apply button submits selected date"
-          ],
+          "title": ["DatePicker", "Apply button submits selected date"],
           "duration": 572,
           "attempts": 1
         },
         {
-          "title": [
-            "DatePicker",
-            "Cancel reverts selection"
-          ],
+          "title": ["DatePicker", "Cancel reverts selection"],
           "duration": 414,
           "attempts": 1
         },
         {
-          "title": [
-            "DatePicker",
-            "localizes the complete dialog chrome on Chinese routes"
-          ],
+          "title": ["DatePicker", "localizes the complete dialog chrome on Chinese routes"],
           "duration": 173,
           "attempts": 1
         },
@@ -1371,50 +1255,32 @@
       "duration": 1744,
       "tests": [
         {
-          "title": [
-            "DateRangePicker",
-            "apply is disabled when no dates selected"
-          ],
+          "title": ["DateRangePicker", "apply is disabled when no dates selected"],
           "duration": 160,
           "attempts": 1
         },
         {
-          "title": [
-            "DateRangePicker",
-            "cancel closes the dialog"
-          ],
+          "title": ["DateRangePicker", "cancel closes the dialog"],
           "duration": 501,
           "attempts": 1
         },
         {
-          "title": [
-            "DateRangePicker",
-            "displays formatted range when dates are provided"
-          ],
+          "title": ["DateRangePicker", "displays formatted range when dates are provided"],
           "duration": 26,
           "attempts": 1
         },
         {
-          "title": [
-            "DateRangePicker",
-            "shows quick select buttons when availableDates provided"
-          ],
+          "title": ["DateRangePicker", "shows quick select buttons when availableDates provided"],
           "duration": 117,
           "attempts": 1
         },
         {
-          "title": [
-            "DateRangePicker",
-            "shows overlay when no available dates"
-          ],
+          "title": ["DateRangePicker", "shows overlay when no available dates"],
           "duration": 117,
           "attempts": 1
         },
         {
-          "title": [
-            "DateRangePicker",
-            "shows overlay when only 1 available date"
-          ],
+          "title": ["DateRangePicker", "shows overlay when only 1 available date"],
           "duration": 116,
           "attempts": 1
         },
@@ -1441,10 +1307,7 @@
       "duration": 443,
       "tests": [
         {
-          "title": [
-            "DistributionCard",
-            "renders the title, summary stats, and one bar per bin"
-          ],
+          "title": ["DistributionCard", "renders the title, summary stats, and one bar per bin"],
           "duration": 126,
           "attempts": 1
         },
@@ -1457,10 +1320,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "DistributionCard",
-            "marks the chart as log scale when scale=\"log\""
-          ],
+          "title": ["DistributionCard", "marks the chart as log scale when scale=\"log\""],
           "duration": 36,
           "attempts": 1
         },
@@ -1563,10 +1423,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "EvalBarChartD3",
-            "shows skeleton during loading with no data"
-          ],
+          "title": ["EvalBarChartD3", "shows skeleton during loading with no data"],
           "duration": 36,
           "attempts": 1
         },
@@ -1587,18 +1444,12 @@
           "attempts": 1
         },
         {
-          "title": [
-            "EvalBarChartD3",
-            "renders SVG with chart elements when data is provided"
-          ],
+          "title": ["EvalBarChartD3", "renders SVG with chart elements when data is provided"],
           "duration": 41,
           "attempts": 1
         },
         {
-          "title": [
-            "EvalBarChartD3",
-            "renders legend items for each configuration"
-          ],
+          "title": ["EvalBarChartD3", "renders legend items for each configuration"],
           "duration": 27,
           "attempts": 1
         },
@@ -1657,10 +1508,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Evaluation ChartControls",
-            "shows the current run date in the date picker"
-          ],
+          "title": ["Evaluation ChartControls", "shows the current run date in the date picker"],
           "duration": 29,
           "attempts": 1
         },
@@ -1689,10 +1537,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Evaluation ChartControls",
-            "shows run context by default on desktop"
-          ],
+          "title": ["Evaluation ChartControls", "shows run context by default on desktop"],
           "duration": 36,
           "attempts": 1
         },
@@ -1727,18 +1572,12 @@
       "duration": 182,
       "tests": [
         {
-          "title": [
-            "FaqQuestionLink",
-            "shows an icon-only control and copies the direct URL"
-          ],
+          "title": ["FaqQuestionLink", "shows an icon-only control and copies the direct URL"],
           "duration": 145,
           "attempts": 1
         },
         {
-          "title": [
-            "FaqQuestionLink",
-            "uses concise Chinese button copy on the Chinese route"
-          ],
+          "title": ["FaqQuestionLink", "uses concise Chinese button copy on the Chinese route"],
           "duration": 29,
           "attempts": 1
         }
@@ -1749,58 +1588,37 @@
       "duration": 2165,
       "tests": [
         {
-          "title": [
-            "Footer",
-            "displays copyright notice with semianalysis.com and current year"
-          ],
+          "title": ["Footer", "displays copyright notice with semianalysis.com and current year"],
           "duration": 65,
           "attempts": 1
         },
         {
-          "title": [
-            "Footer",
-            "marks star and share clicks as coming from the footer"
-          ],
+          "title": ["Footer", "marks star and share clicks as coming from the footer"],
           "duration": 220,
           "attempts": 1
         },
         {
-          "title": [
-            "Footer",
-            "has Privacy Policy link"
-          ],
+          "title": ["Footer", "has Privacy Policy link"],
           "duration": 28,
           "attempts": 1
         },
         {
-          "title": [
-            "Footer",
-            "has Cookie Policy link"
-          ],
+          "title": ["Footer", "has Cookie Policy link"],
           "duration": 25,
           "attempts": 1
         },
         {
-          "title": [
-            "Footer",
-            "has Contribute section with GitHub links"
-          ],
+          "title": ["Footer", "has Contribute section with GitHub links"],
           "duration": 33,
           "attempts": 1
         },
         {
-          "title": [
-            "Footer",
-            "contains the destinations moved out of the primary navigation"
-          ],
+          "title": ["Footer", "contains the destinations moved out of the primary navigation"],
           "duration": 41,
           "attempts": 1
         },
         {
-          "title": [
-            "Footer",
-            "tracks each footer destination under its own event"
-          ],
+          "title": ["Footer", "tracks each footer destination under its own event"],
           "duration": 1545,
           "attempts": 1
         },
@@ -1857,42 +1675,27 @@
           "attempts": 1
         },
         {
-          "title": [
-            "GPUGraph",
-            "keeps GPU-count and parallelism labels independent"
-          ],
+          "title": ["GPUGraph", "keeps GPU-count and parallelism labels independent"],
           "duration": 556,
           "attempts": 1
         },
         {
-          "title": [
-            "GPUGraph",
-            "renders SVG within chart container"
-          ],
+          "title": ["GPUGraph", "renders SVG within chart container"],
           "duration": 30,
           "attempts": 1
         },
         {
-          "title": [
-            "GPUGraph",
-            "shows empty state when data is empty"
-          ],
+          "title": ["GPUGraph", "shows empty state when data is empty"],
           "duration": 36,
           "attempts": 1
         },
         {
-          "title": [
-            "GPUGraph",
-            "explains missing role-local energy in GPU comparison mode"
-          ],
+          "title": ["GPUGraph", "explains missing role-local energy in GPU comparison mode"],
           "duration": 38,
           "attempts": 1
         },
         {
-          "title": [
-            "GPUGraph",
-            "localizes the Chinese comparison empty state"
-          ],
+          "title": ["GPUGraph", "localizes the Chinese comparison empty state"],
           "duration": 56,
           "attempts": 1
         },
@@ -1921,18 +1724,12 @@
           "attempts": 1
         },
         {
-          "title": [
-            "GPUGraph",
-            "hides line labels when showLineLabels is off"
-          ],
+          "title": ["GPUGraph", "hides line labels when showLineLabels is off"],
           "duration": 23,
           "attempts": 1
         },
         {
-          "title": [
-            "GPUGraph",
-            "renders legend with GPU and date entries"
-          ],
+          "title": ["GPUGraph", "renders legend with GPU and date entries"],
           "duration": 39,
           "attempts": 1
         },
@@ -2023,10 +1820,7 @@
       "duration": 348,
       "tests": [
         {
-          "title": [
-            "GpuSpecsBarChart",
-            "changing metric re-renders chart"
-          ],
+          "title": ["GpuSpecsBarChart", "changing metric re-renders chart"],
           "duration": 295,
           "attempts": 1
         },
@@ -2061,10 +1855,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Header",
-            "pushes locale navigation exactly once outside Overview"
-          ],
+          "title": ["Header", "pushes locale navigation exactly once outside Overview"],
           "duration": 103,
           "attempts": 1
         },
@@ -2077,18 +1868,12 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Header",
-            "makes a click on the tab already showing a no-op"
-          ],
+          "title": ["Header", "makes a click on the tab already showing a no-op"],
           "duration": 98,
           "attempts": 1
         },
         {
-          "title": [
-            "Header",
-            "still navigates to Dashboard from a sibling dashboard tab"
-          ],
+          "title": ["Header", "still navigates to Dashboard from a sibling dashboard tab"],
           "duration": 95,
           "attempts": 1
         },
@@ -2109,10 +1894,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Header",
-            "keeps AgentX in the Chinese navigation tree"
-          ],
+          "title": ["Header", "keeps AgentX in the Chinese navigation tree"],
           "duration": 30,
           "attempts": 1
         },
@@ -2125,50 +1907,32 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Header",
-            "orders the nav with Home first and AgentX second"
-          ],
+          "title": ["Header", "orders the nav with Home first and AgentX second"],
           "duration": 29,
           "attempts": 1
         },
         {
-          "title": [
-            "Header",
-            "keeps footer destinations out of the primary nav"
-          ],
+          "title": ["Header", "keeps footer destinations out of the primary nav"],
           "duration": 11,
           "attempts": 1
         },
         {
-          "title": [
-            "Header",
-            "shows the GitHub stars button linking to the correct repo"
-          ],
+          "title": ["Header", "shows the GitHub stars button linking to the correct repo"],
           "duration": 27,
           "attempts": 1
         },
         {
-          "title": [
-            "Header",
-            "omits the leaves toggle from desktop and mobile headers on /"
-          ],
+          "title": ["Header", "omits the leaves toggle from desktop and mobile headers on /"],
           "duration": 99,
           "attempts": 1
         },
         {
-          "title": [
-            "Header",
-            "omits the leaves toggle from desktop and mobile headers on /zh"
-          ],
+          "title": ["Header", "omits the leaves toggle from desktop and mobile headers on /zh"],
           "duration": 104,
           "attempts": 1
         },
         {
-          "title": [
-            "Header",
-            "shows mobile hamburger menu on small viewports"
-          ],
+          "title": ["Header", "shows mobile hamburger menu on small viewports"],
           "duration": 129,
           "attempts": 1
         },
@@ -2213,11 +1977,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Header",
-            "at 320x700",
-            "hides the GitHub star control"
-          ],
+          "title": ["Header", "at 320x700", "hides the GitHub star control"],
           "duration": 38,
           "attempts": 1
         },
@@ -2249,20 +2009,12 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Header",
-            "at 320x700",
-            "does not overflow horizontally"
-          ],
+          "title": ["Header", "at 320x700", "does not overflow horizontally"],
           "duration": 21,
           "attempts": 1
         },
         {
-          "title": [
-            "Header",
-            "at 320x700",
-            "still opens the menu and exposes its links"
-          ],
+          "title": ["Header", "at 320x700", "still opens the menu and exposes its links"],
           "duration": 186,
           "attempts": 1
         }
@@ -2289,18 +2041,12 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Inference ChartControls",
-            "renders the Y-axis metric selector"
-          ],
+          "title": ["Inference ChartControls", "renders the Y-axis metric selector"],
           "duration": 33,
           "attempts": 1
         },
         {
-          "title": [
-            "Inference ChartControls",
-            "Y-axis metric selector shows grouped options"
-          ],
+          "title": ["Inference ChartControls", "Y-axis metric selector shows grouped options"],
           "duration": 111,
           "attempts": 1
         },
@@ -2393,10 +2139,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Inference ChartControls",
-            "shows secondary controls by default on desktop"
-          ],
+          "title": ["Inference ChartControls", "shows secondary controls by default on desktop"],
           "duration": 50,
           "attempts": 1
         },
@@ -2657,10 +2400,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Axis option help",
-            "exposes separate accessible selection and help actions"
-          ],
+          "title": ["Axis option help", "exposes separate accessible selection and help actions"],
           "duration": 341,
           "attempts": 1
         },
@@ -2719,10 +2459,7 @@
       "duration": 1358,
       "tests": [
         {
-          "title": [
-            "InferenceTcoBadges",
-            "quotes the published prices on a tiered metric"
-          ],
+          "title": ["InferenceTcoBadges", "quotes the published prices on a tiered metric"],
           "duration": 62,
           "attempts": 1
         },
@@ -2767,10 +2504,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "InferenceTcoBadges",
-            "gives each mounted set of badges its own input ids"
-          ],
+          "title": ["InferenceTcoBadges", "gives each mounted set of badges its own input ids"],
           "duration": 30,
           "attempts": 1
         }
@@ -2837,10 +2571,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Blue wave wordmark",
-            "keeps a static, readable label with forced-colors"
-          ],
+          "title": ["Blue wave wordmark", "keeps a static, readable label with forced-colors"],
           "duration": 141,
           "attempts": 1
         }
@@ -2865,18 +2596,12 @@
       "duration": 1775,
       "tests": [
         {
-          "title": [
-            "Power boundary labels",
-            "keeps boundary selection clear (en)"
-          ],
+          "title": ["Power boundary labels", "keeps boundary selection clear (en)"],
           "duration": 911,
           "attempts": 1
         },
         {
-          "title": [
-            "Power boundary labels",
-            "keeps boundary selection clear (zh)"
-          ],
+          "title": ["Power boundary labels", "keeps boundary selection clear (zh)"],
           "duration": 857,
           "attempts": 1
         }
@@ -2895,10 +2620,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "ModeToggle",
-            "keeps a native button and retains focus after activation"
-          ],
+          "title": ["ModeToggle", "keeps a native button and retains focus after activation"],
           "duration": 110,
           "attempts": 1
         }
@@ -2925,10 +2647,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "MultiSelect",
-            "keeps single-value selectors a one-click replacement"
-          ],
+          "title": ["MultiSelect", "keeps single-value selectors a one-click replacement"],
           "duration": 211,
           "attempts": 1
         },
@@ -2941,42 +2660,27 @@
           "attempts": 1
         },
         {
-          "title": [
-            "MultiSelect",
-            "keeps disabled choices in grouped menus unavailable"
-          ],
+          "title": ["MultiSelect", "keeps disabled choices in grouped menus unavailable"],
           "duration": 174,
           "attempts": 1
         },
         {
-          "title": [
-            "MultiSelect",
-            "renders placeholder when no selections"
-          ],
+          "title": ["MultiSelect", "renders placeholder when no selections"],
           "duration": 33,
           "attempts": 1
         },
         {
-          "title": [
-            "MultiSelect",
-            "click trigger opens dropdown"
-          ],
+          "title": ["MultiSelect", "click trigger opens dropdown"],
           "duration": 103,
           "attempts": 1
         },
         {
-          "title": [
-            "MultiSelect",
-            "selecting an item adds a badge"
-          ],
+          "title": ["MultiSelect", "selecting an item adds a badge"],
           "duration": 187,
           "attempts": 1
         },
         {
-          "title": [
-            "MultiSelect",
-            "deselecting removes badge"
-          ],
+          "title": ["MultiSelect", "deselecting removes badge"],
           "duration": 200,
           "attempts": 1
         },
@@ -2989,50 +2693,32 @@
           "attempts": 1
         },
         {
-          "title": [
-            "MultiSelect",
-            "search filters options"
-          ],
+          "title": ["MultiSelect", "search filters options"],
           "duration": 216,
           "attempts": 1
         },
         {
-          "title": [
-            "MultiSelect",
-            "maxSelections prevents selecting more items"
-          ],
+          "title": ["MultiSelect", "maxSelections prevents selecting more items"],
           "duration": 109,
           "attempts": 1
         },
         {
-          "title": [
-            "MultiSelect",
-            "minSelections prevents deselecting below minimum"
-          ],
+          "title": ["MultiSelect", "minSelections prevents deselecting below minimum"],
           "duration": 99,
           "attempts": 1
         },
         {
-          "title": [
-            "MultiSelect",
-            "clear all removes all selections"
-          ],
+          "title": ["MultiSelect", "clear all removes all selections"],
           "duration": 101,
           "attempts": 1
         },
         {
-          "title": [
-            "MultiSelect",
-            "localizes visible and accessible defaults on Chinese routes"
-          ],
+          "title": ["MultiSelect", "localizes visible and accessible defaults on Chinese routes"],
           "duration": 208,
           "attempts": 1
         },
         {
-          "title": [
-            "MultiSelect",
-            "click outside closes dropdown"
-          ],
+          "title": ["MultiSelect", "click outside closes dropdown"],
           "duration": 163,
           "attempts": 1
         }
@@ -3065,18 +2751,12 @@
       "duration": 120,
       "tests": [
         {
-          "title": [
-            "PowerAnalysisPanels",
-            "renders role observations on the derived P75 axis"
-          ],
+          "title": ["PowerAnalysisPanels", "renders role observations on the derived P75 axis"],
           "duration": 83,
           "attempts": 1
         },
         {
-          "title": [
-            "PowerAnalysisPanels",
-            "renders role observations on the derived P90 axis"
-          ],
+          "title": ["PowerAnalysisPanels", "renders role observations on the derived P90 axis"],
           "duration": 34,
           "attempts": 1
         }
@@ -3141,18 +2821,12 @@
       "duration": 4339,
       "tests": [
         {
-          "title": [
-            "PowerX telemetry interactions",
-            "renders Celsius gaps on the en point chart"
-          ],
+          "title": ["PowerX telemetry interactions", "renders Celsius gaps on the en point chart"],
           "duration": 773,
           "attempts": 1
         },
         {
-          "title": [
-            "PowerX telemetry interactions",
-            "renders Celsius gaps on the zh point chart"
-          ],
+          "title": ["PowerX telemetry interactions", "renders Celsius gaps on the zh point chart"],
           "duration": 586,
           "attempts": 1
         },
@@ -3577,10 +3251,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "QuickFiltersDialog",
-            "shows every filter group for fixed-sequence charts"
-          ],
+          "title": ["QuickFiltersDialog", "shows every filter group for fixed-sequence charts"],
           "duration": 65,
           "attempts": 1
         },
@@ -3609,10 +3280,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "QuickFiltersDialog",
-            "clears every filter category from one action"
-          ],
+          "title": ["QuickFiltersDialog", "clears every filter category from one action"],
           "duration": 290,
           "attempts": 1
         }
@@ -3631,10 +3299,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "QuotesContent",
-            "gives the first quote of each org a stable anchor id"
-          ],
+          "title": ["QuotesContent", "gives the first quote of each org a stable anchor id"],
           "duration": 153,
           "attempts": 1
         },
@@ -3671,10 +3336,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "QuotesContent",
-            "shows supporter logos in full color in light mode"
-          ],
+          "title": ["QuotesContent", "shows supporter logos in full color in light mode"],
           "duration": 101,
           "attempts": 1
         },
@@ -3687,10 +3349,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "QuotesContent",
-            "scrolls to the matching quote when a logo is clicked"
-          ],
+          "title": ["QuotesContent", "scrolls to the matching quote when a logo is clicked"],
           "duration": 126,
           "attempts": 1
         },
@@ -3821,10 +3480,7 @@
       "duration": 278,
       "tests": [
         {
-          "title": [
-            "ReliabilityBarChartD3",
-            "tracks retry and requests reliability data again"
-          ],
+          "title": ["ReliabilityBarChartD3", "tracks retry and requests reliability data again"],
           "duration": 140,
           "attempts": 1
         },
@@ -3845,18 +3501,12 @@
           "attempts": 1
         },
         {
-          "title": [
-            "ReliabilityBarChartD3",
-            "legend items render for each model"
-          ],
+          "title": ["ReliabilityBarChartD3", "legend items render for each model"],
           "duration": 28,
           "attempts": 1
         },
         {
-          "title": [
-            "ReliabilityBarChartD3",
-            "high contrast switch is present in the legend"
-          ],
+          "title": ["ReliabilityBarChartD3", "high contrast switch is present in the legend"],
           "duration": 29,
           "attempts": 1
         }
@@ -3867,34 +3517,22 @@
       "duration": 674,
       "tests": [
         {
-          "title": [
-            "Reliability ChartControls",
-            "shows the current date range value from context"
-          ],
+          "title": ["Reliability ChartControls", "shows the current date range value from context"],
           "duration": 67,
           "attempts": 1
         },
         {
-          "title": [
-            "Reliability ChartControls",
-            "displays all date range options"
-          ],
+          "title": ["Reliability ChartControls", "displays all date range options"],
           "duration": 156,
           "attempts": 1
         },
         {
-          "title": [
-            "Reliability ChartControls",
-            "calls setDateRange when an option is selected"
-          ],
+          "title": ["Reliability ChartControls", "calls setDateRange when an option is selected"],
           "duration": 212,
           "attempts": 1
         },
         {
-          "title": [
-            "Reliability ChartControls",
-            "calls setDateRange with \"all-time\" value"
-          ],
+          "title": ["Reliability ChartControls", "calls setDateRange with \"all-time\" value"],
           "duration": 219,
           "attempts": 1
         }
@@ -3905,18 +3543,12 @@
       "duration": 1757,
       "tests": [
         {
-          "title": [
-            "ScaleUpTopologyDiagram",
-            "renders compact SVG view"
-          ],
+          "title": ["ScaleUpTopologyDiagram", "renders compact SVG view"],
           "duration": 63,
           "attempts": 1
         },
         {
-          "title": [
-            "ScaleUpTopologyDiagram",
-            "click opens dialog with expanded view"
-          ],
+          "title": ["ScaleUpTopologyDiagram", "click opens dialog with expanded view"],
           "duration": 128,
           "attempts": 1
         },
@@ -3937,26 +3569,17 @@
           "attempts": 1
         },
         {
-          "title": [
-            "ScaleUpTopologyDiagram",
-            "dialog shows GPU spec name"
-          ],
+          "title": ["ScaleUpTopologyDiagram", "dialog shows GPU spec name"],
           "duration": 154,
           "attempts": 1
         },
         {
-          "title": [
-            "ScaleUpTopologyDiagram",
-            "Prev/Next navigation works"
-          ],
+          "title": ["ScaleUpTopologyDiagram", "Prev/Next navigation works"],
           "duration": 478,
           "attempts": 1
         },
         {
-          "title": [
-            "ScaleUpTopologyDiagram",
-            "different topology types render without errors"
-          ],
+          "title": ["ScaleUpTopologyDiagram", "different topology types render without errors"],
           "duration": 39,
           "attempts": 1
         }
@@ -3975,18 +3598,12 @@
           "attempts": 1
         },
         {
-          "title": [
-            "ScatterGraph",
-            "shows the refresh changelog for a matching run series"
-          ],
+          "title": ["ScatterGraph", "shows the refresh changelog for a matching run series"],
           "duration": 79,
           "attempts": 1
         },
         {
-          "title": [
-            "ScatterGraph",
-            "hides the refresh changelog for a mixed run series"
-          ],
+          "title": ["ScatterGraph", "hides the refresh changelog for a mixed run series"],
           "duration": 59,
           "attempts": 1
         },
@@ -3999,58 +3616,37 @@
           "attempts": 1
         },
         {
-          "title": [
-            "ScatterGraph",
-            "renders SVG within chart container"
-          ],
+          "title": ["ScatterGraph", "renders SVG within chart container"],
           "duration": 34,
           "attempts": 1
         },
         {
-          "title": [
-            "ScatterGraph",
-            "shows empty state when data array is empty"
-          ],
+          "title": ["ScatterGraph", "shows empty state when data array is empty"],
           "duration": 38,
           "attempts": 1
         },
         {
-          "title": [
-            "ScatterGraph",
-            "explains when the selected dataset lacks role-local energy"
-          ],
+          "title": ["ScatterGraph", "explains when the selected dataset lacks role-local energy"],
           "duration": 34,
           "attempts": 1
         },
         {
-          "title": [
-            "ScatterGraph",
-            "localizes the complete Chinese empty state"
-          ],
+          "title": ["ScatterGraph", "localizes the complete Chinese empty state"],
           "duration": 43,
           "attempts": 1
         },
         {
-          "title": [
-            "ScatterGraph",
-            "localizes the missing role-energy explanation"
-          ],
+          "title": ["ScatterGraph", "localizes the missing role-energy explanation"],
           "duration": 39,
           "attempts": 1
         },
         {
-          "title": [
-            "ScatterGraph",
-            "explains why All in Measured has no points"
-          ],
+          "title": ["ScatterGraph", "explains why All in Measured has no points"],
           "duration": 193,
           "attempts": 1
         },
         {
-          "title": [
-            "ScatterGraph",
-            "localizes the All in Measured explanation"
-          ],
+          "title": ["ScatterGraph", "localizes the All in Measured explanation"],
           "duration": 153,
           "attempts": 1
         },
@@ -4079,10 +3675,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "ScatterGraph",
-            "renders scatter points as shapes in SVG with mock data"
-          ],
+          "title": ["ScatterGraph", "renders scatter points as shapes in SVG with mock data"],
           "duration": 32,
           "attempts": 1
         },
@@ -4095,10 +3688,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "ScatterGraph",
-            "keeps a preview scope pending until official data arrives"
-          ],
+          "title": ["ScatterGraph", "keeps a preview scope pending until official data arrives"],
           "duration": 194,
           "attempts": 1
         },
@@ -4183,10 +3773,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "ScatterGraph",
-            "clears perf rulers when the y-axis or x-axis metric changes"
-          ],
+          "title": ["ScatterGraph", "clears perf rulers when the y-axis or x-axis metric changes"],
           "duration": 683,
           "attempts": 1
         },
@@ -4437,10 +4024,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Scatter label overlap",
-            "keeps point labels clear of the run-name pills"
-          ],
+          "title": ["Scatter label overlap", "keeps point labels clear of the run-name pills"],
           "duration": 92,
           "attempts": 1
         },
@@ -4459,10 +4043,7 @@
       "duration": 1089,
       "tests": [
         {
-          "title": [
-            "SubmissionsTable — Spec Method column",
-            "renders a Spec Method column header"
-          ],
+          "title": ["SubmissionsTable — Spec Method column", "renders a Spec Method column header"],
           "duration": 95,
           "attempts": 1
         },
@@ -4475,10 +4056,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "SubmissionsTable — Spec Method column",
-            "renders M3 mtp as EAGLE, not MTP"
-          ],
+          "title": ["SubmissionsTable — Spec Method column", "renders M3 mtp as EAGLE, not MTP"],
           "duration": 158,
           "attempts": 1
         },
@@ -4743,10 +4321,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "TraceFlamegraph",
-            "expand all / collapse all toggles every subagent group"
-          ],
+          "title": ["TraceFlamegraph", "expand all / collapse all toggles every subagent group"],
           "duration": 194,
           "attempts": 1
         },
@@ -4873,10 +4448,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "VideoApiReference",
-            "renders Chinese copy under /zh"
-          ],
+          "title": ["VideoApiReference", "renders Chinese copy under /zh"],
           "duration": 36,
           "attempts": 1
         }
@@ -4903,10 +4475,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Video compare panel (retained fixture)",
-            "drives both players together"
-          ],
+          "title": ["Video compare panel (retained fixture)", "drives both players together"],
           "duration": 338,
           "attempts": 1
         },
@@ -4951,10 +4520,7 @@
           "attempts": 1
         },
         {
-          "title": [
-            "Video compare panel (retained fixture)",
-            "renders Chinese copy on /zh/video"
-          ],
+          "title": ["Video compare panel (retained fixture)", "renders Chinese copy on /zh/video"],
           "duration": 83,
           "attempts": 1
         }
