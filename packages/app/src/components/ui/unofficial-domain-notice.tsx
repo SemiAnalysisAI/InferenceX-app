@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowUpRight, Info } from 'lucide-react';
+import { ArrowUpRight, TriangleAlert } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 
 import { useUnofficialDomain } from '@/hooks/useUnofficialDomain';
@@ -35,11 +35,13 @@ export function UnofficialDomainNotice() {
       <div
         role="note"
         data-testid="unofficial-domain-notice"
-        className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-border/50 bg-card px-4 py-3"
+        className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3"
       >
-        <Info aria-hidden className="size-4 shrink-0 text-brand" />
-        <p className="min-w-0 flex-1 text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">{t.title}</span>
+        <TriangleAlert aria-hidden className="size-4 shrink-0 text-destructive" />
+        <p className="min-w-0 flex-1 text-sm text-foreground">
+          <span className="font-semibold text-[color-mix(in_oklch,var(--destructive)_70%,var(--foreground))]">
+            {t.title}
+          </span>
           <span aria-hidden> · </span>
           {t.text}
         </p>
@@ -48,7 +50,7 @@ export function UnofficialDomainNotice() {
           target="_blank"
           rel="noopener noreferrer"
           title={OFFICIAL_HOSTNAME}
-          className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-brand underline-offset-2 hover:underline"
+          className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-foreground underline underline-offset-2 hover:text-destructive"
         >
           {t.link}
           <ArrowUpRight aria-hidden className="size-3.5" />
