@@ -1,3 +1,4 @@
+import { canonical, type Json } from './bundle';
 import { deploymentKey } from './deployment';
 import { hardwareKey, hardwareSort } from './hardware';
 import type { VideoHistoryEntry, VideoHistoryObservation, VideoHistoryPage } from './history';
@@ -47,6 +48,19 @@ function historyPoints(entries: VideoHistoryEntry[]): VideoPoint[] {
   );
 }
 
+/**
+ * A plan's schema_version names its document format, not the workload; its fairness terms stay
+ * in the key. Stripped on read because recorded History snapshots carry the versioned key.
+ */
+function workloadIdentity(key: string | null | undefined): string | null {
+  if (typeof key !== 'string' || key.length === 0) return null;
+  if (!key.startsWith('{')) return key;
+  const identity = JSON.parse(key) as { plan?: Record<string, Json> } & Record<string, Json>;
+  if (identity.plan?.schema_version === undefined) return key;
+  const { schema_version: _version, ...plan } = identity.plan;
+  return canonical({ ...identity, plan });
+}
+
 /** Observations published before the additive fields existed read as null, never 0. */
 function toPoint(
   o: Partial<VideoHistoryObservation> & Pick<VideoHistoryObservation, 'id' | 'hardware'>,
@@ -66,8 +80,7 @@ function toPoint(
     runtime: o.runtime ?? '',
     model: o.model ?? '',
     workload: o.workload ?? '',
-    workloadKey:
-      typeof o.workloadKey === 'string' && o.workloadKey.length > 0 ? o.workloadKey : null,
+    workloadKey: workloadIdentity(o.workloadKey),
     concurrency: num(o.concurrency),
     participating: num(o.participating),
     allocated: num(o.allocated),

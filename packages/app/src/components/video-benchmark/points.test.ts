@@ -138,6 +138,12 @@ describe('videoPoints', () => {
       server: { tp: 2, ulysses: 2, attention: 'auto' },
       observedAt: '2026-09-09T10:00:00Z',
     });
+    const versioned = structuredClone(page);
+    versioned.entries[0].sources[0].observations[0].workloadKey =
+      '{"plan":{"model_id":"m","schema_version":2},"semantics":null}';
+    expect(videoPoints([versioned])[0].workloadKey).toBe(
+      '{"plan":{"model_id":"m"},"semantics":null}',
+    );
   });
   it('sorts by HW_REGISTRY order, then concurrency', () => {
     const b200 = {
