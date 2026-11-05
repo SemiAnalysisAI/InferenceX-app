@@ -16,7 +16,6 @@ import {
 } from './availability-index';
 import { compactAvailability } from './compact-availability';
 import { countCurvesByPrecision } from './default-precisions';
-import { withSupplementalAvailability } from './supplemental-benchmarks';
 
 const fixtureRows = availabilityFixture as AvailabilityRow[];
 
@@ -121,8 +120,7 @@ function expectSameDerivations(rows: readonly AvailabilityRow[], index: Availabi
 
 describe('availability index', () => {
   it('derives every dashboard value the rows give, in the same order', async () => {
-    const rows = withSupplementalAvailability(fixtureRows);
-    expectSameDerivations(rows, await overWire(rows));
+    expectSameDerivations(fixtureRows, await overWire(fixtureRows));
   });
 
   it('keeps first-row order when rows of one date arrive in any order', async () => {

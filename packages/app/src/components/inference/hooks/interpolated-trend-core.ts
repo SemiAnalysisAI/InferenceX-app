@@ -60,9 +60,9 @@ import {
   supportedTokenMetrics,
   supportsTokenMetric,
   type TokenMetricType,
-} from '@/lib/benchmarks/supplemental-benchmarks';
+} from '@/lib/benchmarks/token-metric-support';
 
-/** Snapshot-scoped token metric support for raw historical rows. */
+/** Token metric support for raw historical rows. */
 export function rowSupportsTrendMetric(row: BenchmarkRow, selectedYAxisMetric: string): boolean {
   return supportsTokenMetric(row, tokenMetricTypeForConfigKey(selectedYAxisMetric));
 }
@@ -220,7 +220,8 @@ function createTrendRowPreparer(): (row: ChipBasisRow) => TrendRow | null {
     }
 
     const metrics = row.metrics;
-    const tputPerGpu = metrics.tput_per_gpu ?? 0;
+    // Output-only sources store no total; their output rate orders the frontier.
+    const tputPerGpu = metrics.tput_per_gpu ?? metrics.output_tput_per_gpu ?? 0;
     const inputTputPerGpu = metrics.input_tput_per_gpu ?? 0;
     return {
       row,

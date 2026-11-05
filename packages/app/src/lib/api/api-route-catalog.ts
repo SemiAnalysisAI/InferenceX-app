@@ -680,10 +680,10 @@ export const apiRouteCatalog = [
     method: 'GET',
     classification: 'page-bff',
     exclusionReason: {
-      en: 'Dashboard filter BFF: the published availability rows plus the supplemental datasets, sent once per distinct line with its dates as runs over a date dictionary.',
-      zh: '看板筛选专用 BFF：已发布的可用性行加上补充数据集，每条不同的配置线只发送一次，其日期以日期字典上的区间表示。',
+      en: 'Dashboard filter BFF: the published availability rows, sent once per distinct line with its dates as runs over a date dictionary.',
+      zh: '看板筛选专用 BFF：已发布的可用性行，每条不同的配置线只发送一次，其日期以日期字典上的区间表示。',
     },
-    sourceSha256: 'c28f632ac500b9e02a5677827bb286081fc780daf4b2fc67b83518c29620232d',
+    sourceSha256: '7fdb38e3400b62e42ee86ff74f6779796df8cd3f3b2ffd8b7177d850f81bb4c9',
   },
   {
     source: 'src/app/api/v1/benchmark-presence/route.ts',
@@ -1684,7 +1684,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/inference/hooks/interpolated-trend-core.ts',
-    sourceSha256: '9244bd94e390872a9ea82d685667588e664403aee0bc8d20e6ef616ccc0b7110',
+    sourceSha256: '91b05094830ebe261810c935159c145c4ac95c1f8f3b9431242a167de1ebc187',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1693,7 +1693,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/inference/hooks/chart-data-core.ts',
-    sourceSha256: 'e2b95516a6ebb16c312c711b540cc7ffff52ab184238bb5b2f40b6155b69d126',
+    sourceSha256: '6be86db9c2dd179a6c9a83480d2ce6725cbe6a9fb16b90a20215501f9cb6f2bb',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -1711,7 +1711,7 @@ export const apiContractSourceDigests = [
 
   {
     source: 'src/components/calculator/throughput-data.ts',
-    sourceSha256: '77455329d9249cf9f99a5b4aa8b53cfaa74ef8c9a5a5713851da756ef88a02aa',
+    sourceSha256: 'bd4f108feade8cb2aa7ff83523bfdea271db8f03dfb95a32af819e83bf01932d',
     reviewArea: {
       en: 'Dashboard read-only selector and calculation parity.',
       zh: '仪表板只读接口的选择项与计算一致性。',
@@ -2006,7 +2006,7 @@ export const apiContractSourceDigests = [
   },
   {
     source: '../db/src/queries/benchmarks.ts',
-    sourceSha256: '8435e87e23b68feb2cbe9ca5918c9d650a3102a009292794708ad63f315dd230',
+    sourceSha256: '1d1d88901f19beb47400c004cefe0723b05c441bd36582226bc36ad517f748d9',
     reviewArea: {
       en: 'Benchmark row fields and latest, exact-run, history, and TCO query semantics.',
       zh: '基准行字段以及最新、精确运行、历史和 TCO 查询语义。',

@@ -615,24 +615,29 @@ describe('applyScopeFilters', () => {
 });
 
 describe('supportsPointTokenMetric', () => {
-  it('uses the source snapshot date when a curve is stamped with the selected display date', () => {
-    const julyRubin = scopePoint('vr200_rubin-july', {
-      date: '2026-08-22',
-      actualDate: '2026-07-01',
+  it('limits a point without stored total throughput to output-token metrics', () => {
+    const outputOnly = scopePoint('vr200_rubin-july', {
+      rawMetricKeys: ['output_tput_per_gpu', 'median_intvty'],
     });
 
-    expect(supportsPointTokenMetric(julyRubin, 'output')).toBe(true);
-    expect(supportsPointTokenMetric(julyRubin, 'total')).toBe(false);
-    expect(supportsPointTokenMetric(julyRubin, 'input')).toBe(false);
+    expect(supportsPointTokenMetric(outputOnly, 'output')).toBe(true);
+    expect(supportsPointTokenMetric(outputOnly, 'total')).toBe(false);
+    expect(supportsPointTokenMetric(outputOnly, 'input')).toBe(false);
   });
 
-  it('does not restrict future Vera Rubin snapshots without capability metadata', () => {
-    const futureRubin = scopePoint('vr200_rubin-july', {
-      date: '2026-10-01',
-      actualDate: '2026-09-01',
+  it('does not restrict points that store total throughput', () => {
+    const full = scopePoint('vr200_rubin-july', {
+      rawMetricKeys: ['tput_per_gpu', 'output_tput_per_gpu', 'median_intvty'],
     });
 
-    expect(supportsPointTokenMetric(futureRubin, 'total')).toBe(true);
+    expect(supportsPointTokenMetric(full, 'total')).toBe(true);
+    expect(supportsPointTokenMetric(full, 'input')).toBe(true);
+  });
+
+  it('does not restrict points that report no throughput at all', () => {
+    const powerOnly = scopePoint('b200_sglang', { rawMetricKeys: ['median_intvty'] });
+
+    expect(supportsPointTokenMetric(powerOnly, 'total')).toBe(true);
   });
 });
 

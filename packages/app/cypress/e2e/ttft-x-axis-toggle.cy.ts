@@ -7,6 +7,7 @@ import {
 } from '../support/e2e';
 import { agenticMetrics, measuredPowerMetrics } from '../support/agentic-fixtures';
 import { expandLegendAdvanced } from '../support/legend-advanced';
+import { previewAvailability } from '../support/preview-snapshot-fixtures';
 import { POINT_LABELS, pointsIn } from '../support/scatter-points';
 
 const DEFAULT_MODEL_DB_KEY = 'dsv4';
@@ -575,6 +576,7 @@ describe('Measured prefill metrics preserve the selected x-axis', () => {
     cy.intercept('GET', '/api/v1/availability/compact', {
       body: availabilityBody([
         { ...agenticAvailability[2], framework: 'dynamo-sglang', disagg: true },
+        ...previewAvailability,
       ]),
     });
     cy.intercept('GET', '/api/v1/benchmarks*', { body: powerRows });
