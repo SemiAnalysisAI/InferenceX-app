@@ -9,6 +9,7 @@ import { useEphemeralUrlState } from '@/hooks/useUrlState';
 import { useIsCoarsePointer } from '@/hooks/useMediaQuery';
 import { rememberChartStateInUrl } from '@/lib/routing/url-state';
 import * as d3 from 'd3';
+import { chartFont, measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
 import { CHART_TYPE } from '@/lib/d3-chart/typography';
 import dynamic from 'next/dynamic';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -2831,16 +2832,22 @@ const ScatterGraph = React.memo(
               const textX = Number(text.attr('x') ?? 0);
               const maxLineWidth = ctx.width - textX - 10;
               let lineWidth = 0;
-              text.selectAll<SVGTSpanElement, unknown>('tspan').each(function () {
-                const width = this.getComputedTextLength();
-                if (lineWidth > 0 && lineWidth + width > maxLineWidth) {
-                  d3.select(this)
-                    .attr('x', textX)
-                    .attr('dy', CHART_TYPE.lineLabel + 3);
-                  lineWidth = 0;
-                }
-                lineWidth += width;
-              });
+              text
+                .selectAll<SVGTSpanElement, (typeof segments)[number]>('tspan')
+                .each(function (segment) {
+                  const width = measureTextWidth(
+                    segment.text,
+                    chartFont(CHART_TYPE.lineLabel, segment.weight),
+                    { whiteSpace: 'pre-wrap' },
+                  );
+                  if (lineWidth > 0 && lineWidth + width > maxLineWidth) {
+                    d3.select(this)
+                      .attr('x', textX)
+                      .attr('dy', CHART_TYPE.lineLabel + 3);
+                    lineWidth = 0;
+                  }
+                  lineWidth += width;
+                });
             },
           });
           applyParetoFadeRef.current(zoomGroup);

@@ -10,6 +10,12 @@ import {
   renderKnownIssueAnnotations,
 } from './knownIssueAnnotations';
 
+vi.mock('@/lib/d3-chart/dynamic-margins', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  measureTextWidth: (text: string, font: string) =>
+    text.length * Number.parseFloat(font.split(' ')[1]) * 0.58,
+}));
+
 let g: d3.Selection<SVGGElement, unknown, null, undefined>;
 let defs: d3.Selection<SVGDefsElement, unknown, null, undefined>;
 

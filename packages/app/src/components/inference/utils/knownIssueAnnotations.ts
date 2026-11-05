@@ -3,6 +3,7 @@ import * as d3 from 'd3';
 import type { KnownConfigIssue } from '@/lib/benchmarks/known-issues';
 import type { CustomLayerConfig, RenderContext } from '@/lib/d3-chart/D3Chart/types';
 import type { ContinuousScale } from '@/lib/d3-chart/types';
+import { chartFont, measureTextWidth } from '@/lib/d3-chart/dynamic-margins';
 import { CHART_TYPE } from '@/lib/d3-chart/typography';
 
 interface AnnotationBase {
@@ -105,36 +106,22 @@ const SWATCH_SPACE = 14;
 const ARROW_STANDOFF = 9;
 const MIN_ARROW_LEN = 24;
 
-function measureTextWidth(node: SVGTextElement | null, chars: number, fontSize: number): number {
-  if (node && typeof node.getComputedTextLength === 'function') {
-    try {
-      const len = node.getComputedTextLength();
-      if (Number.isFinite(len) && len > 0) return len;
-    } catch {}
-  }
-  return chars * fontSize * 0.58;
-}
-
 function fitTextToWidth(
   target:
     | d3.Selection<SVGTextElement, unknown, null, undefined>
     | d3.Selection<SVGTSpanElement, unknown, null, undefined>,
   full: string,
   maxWidth: number,
-  fontSize: number,
-  measureNode?: d3.Selection<SVGTextElement, unknown, null, undefined>,
+  font: string,
 ): number {
-  const node = (
-    measureNode ?? (target as d3.Selection<SVGTextElement, unknown, null, undefined>)
-  ).node();
   let chars = full.length;
-  let width = measureTextWidth(node, chars, fontSize);
+  let width = measureTextWidth(full, font);
   while (chars > 1 && width > maxWidth) {
     const ratio = maxWidth / width;
     chars = Math.max(1, Math.min(chars - 1, Math.floor(chars * ratio)));
     const text = `${full.slice(0, chars).trimEnd()}…`;
     target.text(text);
-    width = measureTextWidth(node, text.length, fontSize);
+    width = measureTextWidth(text, font);
   }
   return Math.min(width, maxWidth);
 }
@@ -248,21 +235,19 @@ export function renderKnownIssueAnnotations(
 
     const boxRight = width - BOX_RIGHT_GAP - (opts.rightInset ?? 0);
     const maxTextW = Math.max(0, boxRight - 2 - PAD_X * 2);
-    let w1 = measureTextWidth(text1.node(), label.length, LINE1_SIZE) + SWATCH_SPACE;
+    const line1Font = chartFont(LINE1_SIZE, 600);
+    const line2Font = chartFont(LINE2_SIZE);
+    let w1 = measureTextWidth(label, line1Font) + SWATCH_SPACE;
     if (w1 > maxTextW) {
-      w1 = fitTextToWidth(text1, label, maxTextW - SWATCH_SPACE, LINE1_SIZE) + SWATCH_SPACE;
+      w1 = fitTextToWidth(text1, label, maxTextW - SWATCH_SPACE, line1Font) + SWATCH_SPACE;
     }
-    let w2 = measureTextWidth(
-      text2.node(),
-      detail.length + (issue?.issueRef.length ?? 0),
-      LINE2_SIZE,
-    );
+    let w2 = measureTextWidth(detail + (issue?.issueRef ?? ''), line2Font);
     if (w2 > maxTextW && issue === undefined) {
       const detailTspan = text2.select<SVGTSpanElement>('tspan');
       const summary = preview!.summary;
       detailTspan.text(summary);
-      w2 = measureTextWidth(text2.node(), summary.length, LINE2_SIZE);
-      if (w2 > maxTextW) w2 = fitTextToWidth(detailTspan, summary, maxTextW, LINE2_SIZE, text2);
+      w2 = measureTextWidth(summary, line2Font);
+      if (w2 > maxTextW) w2 = fitTextToWidth(detailTspan, summary, maxTextW, line2Font);
     }
     const boxW = Math.max(w1, w2) + PAD_X * 2;
     const boxH = PAD_Y * 2 + LINE1_H + LINE2_H;

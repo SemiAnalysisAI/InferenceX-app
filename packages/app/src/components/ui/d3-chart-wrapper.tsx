@@ -6,6 +6,7 @@ import { createPortal } from 'react-dom';
 import { useIsCoarsePointer, useIsMobileViewport, useMediaQuery } from '@/hooks/useMediaQuery';
 import type { Locale } from '@/lib/i18n/i18n';
 import { useLocale } from '@/lib/i18n/use-locale';
+import { chartFont, measureTextWidth, useFontsVersion } from '@/lib/d3-chart/dynamic-margins';
 import { CHART_TOOLTIP_Z_INDEX } from '@/lib/d3-chart/tooltip-placement';
 import { cn } from '@/lib/shared/utils';
 
@@ -217,46 +218,31 @@ export function D3ChartWrapper({
 
   const hintRef = useRef<HTMLParagraphElement>(null);
   const [hintWidth, setHintWidth] = useState<number | null>(null);
+  const fontsVersion = useFontsVersion();
   useEffect(() => {
     const svg = svgRef.current;
-    const hint = hintRef.current;
-    if (!svg || !hint || !resolvedInstructions) return;
+    if (!svg || !resolvedInstructions) return;
+    const natural = measureTextWidth(resolvedInstructions, chartFont(11));
     let frame = 0;
-    // The one-line width depends only on the text and font, so svg redraws (every zoom and pan
-    // frame) only read geometry; the style swap below runs again only after web fonts load.
-    let natural: number | null = null;
     const measure = () => {
       frame = 0;
       const label = svg.querySelector('.x-axis-label');
       const space = label?.textContent
         ? Math.floor(svg.getBoundingClientRect().right - label.getBoundingClientRect().right - 24)
         : 0;
-      if (natural === null) {
-        const style = hint.style.cssText;
-        hint.style.cssText =
-          'width:max-content;max-width:none;font-size:0.6875rem;white-space:nowrap';
-        natural = hint.getBoundingClientRect().width;
-        hint.style.cssText = style;
-      }
       setHintWidth(space * 2 >= natural + 24 ? space : null);
     };
     const schedule = () => {
       if (!frame) frame = requestAnimationFrame(measure);
     };
-    const remeasure = () => {
-      natural = null;
-      schedule();
-    };
     schedule();
     const mutations = new MutationObserver(schedule);
     mutations.observe(svg, { childList: true, subtree: true, characterData: true });
-    document.fonts?.addEventListener('loadingdone', remeasure);
     return () => {
       cancelAnimationFrame(frame);
       mutations.disconnect();
-      document.fonts?.removeEventListener('loadingdone', remeasure);
     };
-  }, [svgRef, resolvedInstructions]);
+  }, [svgRef, resolvedInstructions, fontsVersion]);
 
   const plot = (
     <div

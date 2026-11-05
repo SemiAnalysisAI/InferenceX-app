@@ -1,6 +1,7 @@
 'use client';
 
-import { Suspense, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Suspense, useMemo, useState, type ReactNode } from 'react';
+import { chartFont, measureTextWidth, useFontsVersion } from '@/lib/d3-chart/dynamic-margins';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -92,8 +93,6 @@ const PLOT_H = CHART_H - MARGIN.top - MARGIN.bottom;
 const SVG_FONT = 'var(--font-mono, ui-monospace, monospace)';
 const SVG_FONT_SIZE = '9px';
 
-/** Monospace advance for the 9-unit tick font; only used until the real widths are measured. */
-const TICK_CHAR_WIDTH_ESTIMATE = 5.8;
 const TICK_MIN_GAP = 6;
 
 interface AxisTickCandidate {
@@ -523,17 +522,13 @@ function ConcurrentSessionsChart({
       };
     });
   }, [data, locale]);
-  const tickRefs = useRef<(SVGTextElement | null)[]>([]);
-  const [measuredWidths, setMeasuredWidths] = useState<number[] | null>(null);
-  useLayoutEffect(() => {
-    setMeasuredWidths(
-      tickRefs.current.slice(0, tickCandidates.length).map((el) => el?.getBBox().width ?? 0),
-    );
-  }, [tickCandidates]);
-  const tickWidths =
-    measuredWidths?.length === tickCandidates.length
-      ? measuredWidths
-      : tickCandidates.map((c) => c.label.length * TICK_CHAR_WIDTH_ESTIMATE);
+  const fontsVersion = useFontsVersion();
+  const tickWidths = useMemo(() => {
+    if (tickCandidates.length === 0) return [];
+    const font = chartFont(9, 400, SVG_FONT);
+    return tickCandidates.map((c) => measureTextWidth(c.label, font));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-measure once web fonts load
+  }, [tickCandidates, fontsVersion]);
   const visibleTicks = layoutAxisTicks(tickCandidates, tickWidths);
 
   if (data.length === 0) {
@@ -613,9 +608,6 @@ function ConcurrentSessionsChart({
           {tickCandidates.map((tick, k) => (
             <text
               key={tick.index}
-              ref={(el) => {
-                tickRefs.current[k] = el;
-              }}
               x={tick.x}
               y={MARGIN.top + PLOT_H + 14}
               textAnchor={k === tickCandidates.length - 1 ? 'end' : 'middle'}
