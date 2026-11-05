@@ -3,6 +3,7 @@ import { getInferenceModelBySlug, inferenceModelPath } from '@/lib/routing/infer
 
 const FEATURED_AGENTX_MODEL_SLUGS = [
   'deepseek-v41-flash',
+  'kimi-k31-pro',
   'muse-spark-open',
   'kimi-k3',
   'deepseek-v4',
@@ -14,11 +15,7 @@ const FEATURED_AGENTX_MODEL_SLUGS = [
 
 const AGENTX_NEW_MODEL_SLUGS: readonly (typeof FEATURED_AGENTX_MODEL_SLUGS)[number][] = [];
 
-const AGENTX_ONLY_MODEL_SLUGS: readonly string[] = [
-  'kimi-k31-pro',
-  'minimax-m31-flash',
-  'glm-5-3-flash',
-];
+const AGENTX_ONLY_MODEL_SLUGS: readonly string[] = ['minimax-m31-flash', 'glm-5-3-flash'];
 
 const AGENTX_SCENARIO_MODEL_SET = new Set<string>([
   ...FEATURED_AGENTX_MODEL_SLUGS,

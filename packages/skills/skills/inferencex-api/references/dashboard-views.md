@@ -840,6 +840,19 @@ existing inference view API for its results.
 导航至现有 AgentX 模型页面，不改变数据筛选条件、默认值、计算逻辑或 API 契约；结果仍由
 现有推理视图 API 提供。
 
+### Landing-page Kimi K3.1 Pro link
+
+The English and Chinese landing pages list Kimi K3.1 Pro in place of Muse Spark
+Open, linking to `/inference/kimi-k31-pro` and `/zh/inference/kimi-k31-pro`.
+`/compare` lists both models. This is presentation-only navigation to an existing
+AgentX model view; use `model=Kimi-K3.1-Pro&sequence=agentic-traces` with the
+existing inference view API for its results.
+
+中文：英文和中文首页以 Kimi K3.1 Pro 替换 Muse Spark Open，分别链接至
+`/inference/kimi-k31-pro` 和 `/zh/inference/kimi-k31-pro`；`/compare` 仍同时列出这两个模型。
+这条入口仅用于导航至现有 AgentX 模型页面；如需查询结果，可向现有推理视图 API 传入
+`model=Kimi-K3.1-Pro&sequence=agentic-traces`。
+
 ### Cross-backend case alignment
 
 The comparison API and all charts align cases by the full serialized operation
